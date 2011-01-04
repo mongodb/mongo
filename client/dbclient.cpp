@@ -32,7 +32,7 @@
 namespace mongo {
 
     DBClientBase* ConnectionString::connect( string& errmsg ) const {
-        switch ( _type ){
+        switch ( _type ) {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
             log(1) << "creating new connection to:" << _servers[0] << endl;
@@ -42,11 +42,11 @@ namespace mongo {
             }
             return c;
         }
-            
-        case PAIR: 
+
+        case PAIR:
         case SET: {
             DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers );
-            if( ! set->connect() ){
+            if( ! set->connect() ) {
                 delete set;
                 errmsg = "connect failed to set ";
                 errmsg += toString();
@@ -54,7 +54,7 @@ namespace mongo {
             }
             return set;
         }
-            
+
         case SYNC: {
             // TODO , don't copy
             list<HostAndPort> l;
@@ -62,41 +62,41 @@ namespace mongo {
                 l.push_back( _servers[i] );
             return new SyncClusterConnection( l );
         }
-            
+
         case INVALID:
             throw UserException( 13421 , "trying to connect to invalid ConnectionString" );
             break;
         }
-        
+
         assert( 0 );
         return 0;
     }
 
-    ConnectionString ConnectionString::parse( const string& host , string& errmsg ){
-        
+    ConnectionString ConnectionString::parse( const string& host , string& errmsg ) {
+
         string::size_type i = host.find( '/' );
-        if ( i != string::npos && i != 0){
+        if ( i != string::npos && i != 0) {
             // replica set
             return ConnectionString( SET , host.substr( i + 1 ) , host.substr( 0 , i ) );
         }
 
         int numCommas = str::count( host , ',' );
-        
-        if( numCommas == 0 ) 
+
+        if( numCommas == 0 )
             return ConnectionString( HostAndPort( host ) );
-        
-        if ( numCommas == 1 ) 
+
+        if ( numCommas == 1 )
             return ConnectionString( PAIR , host );
 
         if ( numCommas == 2 )
             return ConnectionString( SYNC , host );
-        
+
         errmsg = (string)"invalid hostname [" + host + "]";
         return ConnectionString(); // INVALID
     }
 
-    string ConnectionString::typeToString( ConnectionType type ){
-        switch ( type ){
+    string ConnectionString::typeToString( ConnectionType type ) {
+        switch ( type ) {
         case INVALID:
             return "invalid";
         case MASTER:
@@ -111,9 +111,9 @@ namespace mongo {
         assert(0);
         return "";
     }
-    
 
-    Query& Query::where(const string &jscode, BSONObj scope) { 
+
+    Query& Query::where(const string &jscode, BSONObj scope) {
         /* use where() before sort() and hint() and explain(), else this will assert. */
         assert( ! isComplex() );
         BSONObjBuilder b;
@@ -131,44 +131,44 @@ namespace mongo {
         obj = b.obj();
     }
 
-    Query& Query::sort(const BSONObj& s) { 
+    Query& Query::sort(const BSONObj& s) {
         appendComplex( "orderby", s );
-        return *this; 
+        return *this;
     }
 
     Query& Query::hint(BSONObj keyPattern) {
         appendComplex( "$hint", keyPattern );
-        return *this; 
+        return *this;
     }
 
     Query& Query::explain() {
         appendComplex( "$explain", true );
-        return *this; 
+        return *this;
     }
-    
+
     Query& Query::snapshot() {
         appendComplex( "$snapshot", true );
-        return *this; 
+        return *this;
     }
-    
+
     Query& Query::minKey( const BSONObj &val ) {
         appendComplex( "$min", val );
-        return *this; 
+        return *this;
     }
 
     Query& Query::maxKey( const BSONObj &val ) {
         appendComplex( "$max", val );
-        return *this; 
+        return *this;
     }
 
-    bool Query::isComplex( bool * hasDollar ) const{
-        if ( obj.hasElement( "query" ) ){
+    bool Query::isComplex( bool * hasDollar ) const {
+        if ( obj.hasElement( "query" ) ) {
             if ( hasDollar )
                 hasDollar[0] = false;
             return true;
         }
 
-        if ( obj.hasElement( "$query" ) ){
+        if ( obj.hasElement( "$query" ) ) {
             if ( hasDollar )
                 hasDollar[0] = true;
             return true;
@@ -176,12 +176,12 @@ namespace mongo {
 
         return false;
     }
-        
+
     BSONObj Query::getFilter() const {
         bool hasDollar;
         if ( ! isComplex( &hasDollar ) )
             return obj;
-        
+
         return obj.getObjectField( hasDollar ? "$query" : "query" );
     }
     BSONObj Query::getSort() const {
@@ -200,8 +200,8 @@ namespace mongo {
     bool Query::isExplain() const {
         return isComplex() && obj.getBoolField( "$explain" );
     }
-    
-    string Query::toString() const{
+
+    string Query::toString() const {
         return obj.toString();
     }
 
@@ -221,7 +221,7 @@ namespace mongo {
         }
         return _cachedAvailableOptions;
     }
-    
+
     inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
         string ns = dbname + ".$cmd";
         info = findOne(ns, cmd, 0 , options);
@@ -240,7 +240,7 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query, int options, int limit, int skip ) { 
+    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query, int options, int limit, int skip ) {
         NamespaceString ns(_ns);
         BSONObjBuilder b;
         b.append( "count" , ns.coll );
@@ -258,27 +258,27 @@ namespace mongo {
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
 
-    BSONObj DBClientWithCommands::getLastErrorDetailed() { 
+    BSONObj DBClientWithCommands::getLastErrorDetailed() {
         BSONObj info;
         runCommand("admin", getlasterrorcmdobj, info);
-		return info;
+        return info;
     }
 
-    string DBClientWithCommands::getLastError() { 
+    string DBClientWithCommands::getLastError() {
         BSONObj info = getLastErrorDetailed();
         return getLastErrorString( info );
     }
-    
-    string DBClientWithCommands::getLastErrorString( const BSONObj& info ){
+
+    string DBClientWithCommands::getLastErrorString( const BSONObj& info ) {
         BSONElement e = info["err"];
         if( e.eoo() ) return "";
         if( e.type() == Object ) return e.toString();
-        return e.str();        
+        return e.str();
     }
 
     BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
 
-    BSONObj DBClientWithCommands::getPrevError() { 
+    BSONObj DBClientWithCommands::getPrevError() {
         BSONObj info;
         runCommand("admin", getpreverrorcmdobj, info);
         return info;
@@ -286,7 +286,7 @@ namespace mongo {
 
     BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
 
-    string DBClientWithCommands::createPasswordDigest( const string & username , const string & clearTextPassword ){
+    string DBClientWithCommands::createPasswordDigest( const string & username , const string & clearTextPassword ) {
         md5digest d;
         {
             md5_state_t st;
@@ -300,9 +300,9 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
-		string password = password_text;
-		if( digestPassword ) 
-			password = createPasswordDigest( username , password_text );
+        string password = password_text;
+        if( digestPassword )
+            password = createPasswordDigest( username , password_text );
 
         BSONObj info;
         string nonce;
@@ -333,8 +333,8 @@ namespace mongo {
             b << "key" << digestToString( d );
             authCmd = b.done();
         }
-        
-        if( runCommand(dbname, authCmd, info) ) 
+
+        if( runCommand(dbname, authCmd, info) )
             return true;
 
         errmsg = info.toString();
@@ -345,7 +345,7 @@ namespace mongo {
 
     bool DBClientWithCommands::isMaster(bool& isMaster, BSONObj *info) {
         BSONObj o;
-        if ( info == 0 )	
+        if ( info == 0 )
             info = &o;
         bool ok = runCommand("admin", ismastercmdobj, *info);
         isMaster = info->getField("ismaster").trueValue();
@@ -354,7 +354,7 @@ namespace mongo {
 
     bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
         BSONObj o;
-        if ( info == 0 )	info = &o;
+        if ( info == 0 )    info = &o;
         BSONObjBuilder b;
         string db = nsToDatabase(ns.c_str());
         b.append("create", ns.c_str() + db.length() + 1);
@@ -404,7 +404,7 @@ namespace mongo {
         return false;
     }
 
-    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) { 
+    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) {
         BSONObjBuilder b;
         b.append("mapreduce", nsGetCollection(ns));
         b.appendCode("map", jsmapf);
@@ -435,27 +435,27 @@ namespace mongo {
         return eval(dbname, jscode, info, retValue);
     }
 
-    list<string> DBClientWithCommands::getDatabaseNames(){
+    list<string> DBClientWithCommands::getDatabaseNames() {
         BSONObj info;
         uassert( 10005 ,  "listdatabases failed" , runCommand( "admin" , BSON( "listDatabases" << 1 ) , info ) );
         uassert( 10006 ,  "listDatabases.databases not array" , info["databases"].type() == Array );
-        
+
         list<string> names;
-        
+
         BSONObjIterator i( info["databases"].embeddedObjectUserCheck() );
-        while ( i.more() ){
+        while ( i.more() ) {
             names.push_back( i.next().embeddedObjectUserCheck()["name"].valuestr() );
         }
 
         return names;
     }
 
-    list<string> DBClientWithCommands::getCollectionNames( const string& db ){
+    list<string> DBClientWithCommands::getCollectionNames( const string& db ) {
         list<string> names;
-        
+
         string ns = db + ".system.namespaces";
         auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
-        while ( c->more() ){
+        while ( c->more() ) {
             string name = c->next()["name"].valuestr();
             if ( name.find( "$" ) != string::npos )
                 continue;
@@ -464,9 +464,9 @@ namespace mongo {
         return names;
     }
 
-    bool DBClientWithCommands::exists( const string& ns ){
+    bool DBClientWithCommands::exists( const string& ns ) {
         list<string> names;
-        
+
         string db = nsGetDB( ns ) + ".system.namespaces";
         BSONObj q = BSON( "name" << ns );
         return count( db.c_str() , q ) != 0;
@@ -474,21 +474,21 @@ namespace mongo {
 
     /* --- dbclientconnection --- */
 
-	bool DBClientConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
-		string password = password_text;
-		if( digestPassword ) 
-			password = createPasswordDigest( username , password_text );
+    bool DBClientConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
+        string password = password_text;
+        if( digestPassword )
+            password = createPasswordDigest( username , password_text );
 
-		if( autoReconnect ) {
-			/* note we remember the auth info before we attempt to auth -- if the connection is broken, we will 
-			   then have it for the next autoreconnect attempt. 
-			*/
-			pair<string,string> p = pair<string,string>(username, password);
-			authCache[dbname] = p;
-		}
+        if( autoReconnect ) {
+            /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
+               then have it for the next autoreconnect attempt.
+            */
+            pair<string,string> p = pair<string,string>(username, password);
+            authCache[dbname] = p;
+        }
 
-		return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
-	}
+        return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
+    }
 
     BSONObj DBClientInterface::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
         auto_ptr<DBClientCursor> c =
@@ -505,20 +505,20 @@ namespace mongo {
         return c->nextSafe().copy();
     }
 
-    bool DBClientConnection::connect(const HostAndPort& server, string& errmsg){
+    bool DBClientConnection::connect(const HostAndPort& server, string& errmsg) {
         _server = server;
         _serverString = _server.toString();
         return _connect( errmsg );
     }
 
-    bool DBClientConnection::_connect( string& errmsg ){
+    bool DBClientConnection::_connect( string& errmsg ) {
         _serverString = _server.toString();
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
         server.reset(new SockAddr(_server.host().c_str(), _server.port()));
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
-        if (server->getAddr() == "0.0.0.0"){
+        if (server->getAddr() == "0.0.0.0") {
             failed = true;
             return false;
         }
@@ -548,27 +548,27 @@ namespace mongo {
         log(_logLevel) << "trying reconnect to " << _serverString << endl;
         string errmsg;
         failed = false;
-        if ( ! _connect(errmsg) ) { 
+        if ( ! _connect(errmsg) ) {
             failed = true;
             log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
             throw SocketException(SocketException::CONNECT_ERROR);
-		}
+        }
 
-		log(_logLevel) << "reconnect " << _serverString << " ok" << endl;
-		for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) { 
-			const char *dbname = i->first.c_str();
-			const char *username = i->second.first.c_str();
-			const char *password = i->second.second.c_str();
-			if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
-				log(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
-		}
+        log(_logLevel) << "reconnect " << _serverString << " ok" << endl;
+        for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) {
+            const char *dbname = i->first.c_str();
+            const char *username = i->second.first.c_str();
+            const char *password = i->second.second.c_str();
+            if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
+                log(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
+        }
     }
 
     auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
-                                                 int nToSkip, const BSONObj *fieldsToReturn, int queryOptions , int batchSize ) {
+            int nToSkip, const BSONObj *fieldsToReturn, int queryOptions , int batchSize ) {
         auto_ptr<DBClientCursor> c( new DBClientCursor( this,
-                                                        ns, query.obj, nToReturn, nToSkip,
-                                                        fieldsToReturn, queryOptions , batchSize ) );
+                                    ns, query.obj, nToReturn, nToSkip,
+                                    fieldsToReturn, queryOptions , batchSize ) );
         if ( c->init() )
             return c;
         return auto_ptr< DBClientCursor >( 0 );
@@ -589,14 +589,14 @@ namespace mongo {
         }
         boost::function<void(const BSONObj &)> _f;
     };
-    
+
     unsigned long long DBClientConnection::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
         DBClientFunConvertor fun;
         fun._f = f;
         boost::function<void(DBClientCursorBatchIterator &)> ptr( fun );
         return DBClientConnection::query( ptr, ns, query, fieldsToReturn, queryOptions );
     }
-        
+
     unsigned long long DBClientConnection::query( boost::function<void(DBClientCursorBatchIterator &)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
         // mask options
         queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
@@ -604,11 +604,11 @@ namespace mongo {
 
         bool doExhaust = ( availableOptions() & QueryOption_Exhaust );
         if ( doExhaust ) {
-            queryOptions |= (int)QueryOption_Exhaust;            
+            queryOptions |= (int)QueryOption_Exhaust;
         }
         auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
         uassert( 13386, "socket error for mapping query", c.get() );
-        
+
         if ( !doExhaust ) {
             while( c->more() ) {
                 DBClientCursorBatchIterator i( *c );
@@ -618,21 +618,21 @@ namespace mongo {
             return n;
         }
 
-        try { 
-            while( 1 ) { 
-                while( c->moreInCurrentBatch() ) { 
+        try {
+            while( 1 ) {
+                while( c->moreInCurrentBatch() ) {
                     DBClientCursorBatchIterator i( *c );
                     f( i );
                     n += i.n();
                 }
 
-                if( c->getCursorId() == 0 ) 
+                if( c->getCursorId() == 0 )
                     break;
 
                 c->exhaustReceiveMore();
             }
         }
-        catch(std::exception&) { 
+        catch(std::exception&) {
             /* connection CANNOT be used anymore as more data may be on the way from the server.
                we have to reconnect.
                */
@@ -660,16 +660,16 @@ namespace mongo {
 
     void DBClientBase::insert( const string & ns , const vector< BSONObj > &v ) {
         Message toSend;
-        
+
         BufBuilder b;
         int opts = 0;
         b.appendNum( opts );
         b.appendStr( ns );
         for( vector< BSONObj >::const_iterator i = v.begin(); i != v.end(); ++i )
             i->appendSelfToBufBuilder( b );
-        
+
         toSend.setData( dbInsert, b.buf(), b.len() );
-        
+
         say( toSend );
     }
 
@@ -713,63 +713,63 @@ namespace mongo {
         say( toSend );
     }
 
-    auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ){
+    auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
     }
-    
-    void DBClientWithCommands::dropIndex( const string& ns , BSONObj keys ){
+
+    void DBClientWithCommands::dropIndex( const string& ns , BSONObj keys ) {
         dropIndex( ns , genIndexName( keys ) );
     }
 
 
-    void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ){
+    void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ) {
         BSONObj info;
-        if ( ! runCommand( nsToDatabase( ns.c_str() ) , 
-                           BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
-                           info ) ){
+        if ( ! runCommand( nsToDatabase( ns.c_str() ) ,
+                           BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) ,
+                           info ) ) {
             log(_logLevel) << "dropIndex failed: " << info << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
         }
         resetIndexCache();
     }
-    
-    void DBClientWithCommands::dropIndexes( const string& ns ){
+
+    void DBClientWithCommands::dropIndexes( const string& ns ) {
         BSONObj info;
-        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns.c_str() ) , 
-                                                    BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") , 
-                                                    info ) );
+        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns.c_str() ) ,
+                 BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") ,
+                 info ) );
         resetIndexCache();
     }
 
-    void DBClientWithCommands::reIndex( const string& ns ){
+    void DBClientWithCommands::reIndex( const string& ns ) {
         list<BSONObj> all;
         auto_ptr<DBClientCursor> i = getIndexes( ns );
-        while ( i->more() ){
+        while ( i->more() ) {
             all.push_back( i->next().getOwned() );
         }
-        
+
         dropIndexes( ns );
-        
-        for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ){
+
+        for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
             BSONObj o = *i;
             insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
         }
-        
-    }
-    
 
-    string DBClientWithCommands::genIndexName( const BSONObj& keys ){
+    }
+
+
+    string DBClientWithCommands::genIndexName( const BSONObj& keys ) {
         stringstream ss;
-        
+
         bool first = 1;
         for ( BSONObjIterator i(keys); i.more(); ) {
             BSONElement f = i.next();
-            
+
             if ( first )
                 first = 0;
             else
                 ss << "_";
-            
+
             ss << f.fieldName() << "_";
             if( f.isNumber() )
                 ss << f.numberInt();
@@ -794,7 +794,7 @@ namespace mongo {
             toSave.append( "name" , nn );
             cacheKey += nn;
         }
-        
+
         if ( unique )
             toSave.appendBool( "unique", unique );
 
@@ -837,9 +837,10 @@ namespace mongo {
 
     void DBClientConnection::say( Message &toSend ) {
         checkConnection();
-        try { 
+        try {
             port().say( toSend );
-        } catch( SocketException & ) { 
+        }
+        catch( SocketException & ) {
             failed = true;
             throw;
         }
@@ -849,16 +850,16 @@ namespace mongo {
         port().piggyBack( toSend );
     }
 
-    void DBClientConnection::recv( Message &m ) { 
+    void DBClientConnection::recv( Message &m ) {
         port().recv(m);
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
-        /* todo: this is very ugly messagingport::call returns an error code AND can throw 
-                 an exception.  we should make it return void and just throw an exception anytime 
+        /* todo: this is very ugly messagingport::call returns an error code AND can throw
+                 an exception.  we should make it return void and just throw an exception anytime
                  it fails
         */
-        try { 
+        try {
             if ( !port().call(toSend, response) ) {
                 failed = true;
                 if ( assertOk )
@@ -867,7 +868,7 @@ namespace mongo {
                 return false;
             }
         }
-        catch( SocketException & ) { 
+        catch( SocketException & ) {
             failed = true;
             throw;
         }
@@ -888,15 +889,15 @@ namespace mongo {
         }
     }
 
-    void DBClientConnection::killCursor( long long cursorId ){
+    void DBClientConnection::killCursor( long long cursorId ) {
         BufBuilder b;
         b.appendNum( (int)0 ); // reserved
         b.appendNum( (int)1 ); // number
         b.appendNum( cursorId );
-        
+
         Message m;
         m.setData( dbKillCursors , b.buf() , b.len() );
-        
+
         sayPiggyBack( m );
     }
 
@@ -912,5 +913,5 @@ namespace mongo {
             return false;
         return true;
     }
-    
+
 } // namespace mongo

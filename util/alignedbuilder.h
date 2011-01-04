@@ -20,7 +20,7 @@
 
 #include "../bson/stringdata.h"
 
-namespace mongo { 
+namespace mongo {
 
     /** a page-aligned BufBuilder. */
     class AlignedBuilder {
@@ -39,10 +39,10 @@ namespace mongo {
         /** note this may be deallocated (realloced) if you keep writing or reset(). */
         const char* buf() const { return _p._data; }
 
-        /** leave room for some stuff later 
+        /** leave room for some stuff later
             @return offset in the buffer that was our current position
         */
-        size_t skip(unsigned n) { 
+        size_t skip(unsigned n) {
             unsigned l = len();
             grow(n);
             return l;
@@ -50,10 +50,10 @@ namespace mongo {
 
         char* atOfs(unsigned ofs) { return _p._data + ofs; }
 
-        void appendChar(char j){
+        void appendChar(char j) {
             *((char*)grow(sizeof(char))) = j;
         }
-        void appendNum(char j){
+        void appendNum(char j) {
             *((char*)grow(sizeof(char))) = j;
         }
         void appendNum(short j) {
@@ -110,7 +110,7 @@ namespace mongo {
         void mallocSelfAligned(unsigned sz);
         void _malloc(unsigned sz);
         void _realloc(unsigned newSize, unsigned oldLenInUse);
-        void _free(void*);        
+        void _free(void*);
 
         struct AllocationInfo {
             char *_data;

@@ -42,53 +42,54 @@ namespace mongo {
         LoggingManager()
             : _enabled(0) , _file(0) {
         }
-        
-        void start( const string& lp , bool append ){
+
+        void start( const string& lp , bool append ) {
             uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
             _append = append;
 
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
-            if ( ! test ){
-                if (boost::filesystem::is_directory(lp)){
+            if ( ! test ) {
+                if (boost::filesystem::is_directory(lp)) {
                     cout << "logpath [" << lp << "] should be a file name not a directory" << endl;
-                } else {
+                }
+                else {
                     cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
                 }
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }
             fclose( test );
-            
+
             _path = lp;
             _enabled = 1;
             rotate();
         }
-        
-        void rotate(){
-            if ( ! _enabled ){
+
+        void rotate() {
+            if ( ! _enabled ) {
                 cout << "LoggingManager not enabled" << endl;
                 return;
             }
 
-            if ( _file ){
+            if ( _file ) {
 #ifdef _WIN32
                 cout << "log rotation doesn't work on windows" << endl;
                 return;
 #else
                 struct tm t;
                 localtime_r( &_opened , &t );
-                
+
                 stringstream ss;
                 ss << _path << "." << terseCurrentTime(false);
                 string s = ss.str();
                 rename( _path.c_str() , s.c_str() );
 #endif
             }
-            
-            
+
+
             FILE* tmp = freopen(_path.c_str(), (_append ? "a" : "w"), stdout);
-            if (!tmp){
+            if (!tmp) {
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
                 dbexit( EXIT_BADOPTIONS );
                 assert(0);
@@ -99,24 +100,24 @@ namespace mongo {
             _file = tmp;
             _opened = time(0);
         }
-        
+
     private:
-        
+
         bool _enabled;
         string _path;
         bool _append;
-        
+
         FILE * _file;
         time_t _opened;
-        
+
     } loggingManager;
 
-    void initLogging( const string& lp , bool append ){
+    void initLogging( const string& lp , bool append ) {
         cout << "all output going to: " << lp << endl;
         loggingManager.start( lp , append );
     }
 
-    void rotateLogs( int signal ){
+    void rotateLogs( int signal ) {
         loggingManager.rotate();
     }
 

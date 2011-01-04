@@ -21,9 +21,9 @@
 namespace mongo {
 
     /** this is a sort of smart pointer class where we can move where something is and all the pointers will adjust.
-        not threadsafe. 
+        not threadsafe.
         */
-    struct MoveableBuffer { 
+    struct MoveableBuffer {
         MoveableBuffer();
         MoveableBuffer(void *);
         MoveableBuffer& operator=(const MoveableBuffer&);
@@ -40,12 +40,12 @@ namespace mongo {
 
     inline MoveableBuffer::MoveableBuffer(void *_p) : p(_p) { }
 
-    inline MoveableBuffer& MoveableBuffer::operator=(const MoveableBuffer& r) { 
+    inline MoveableBuffer& MoveableBuffer::operator=(const MoveableBuffer& r) {
         p = r.p;
         return *this;
     }
 
-    inline MoveableBuffer::~MoveableBuffer() { 
+    inline MoveableBuffer::~MoveableBuffer() {
     }
 
 }

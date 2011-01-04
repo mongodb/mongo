@@ -60,7 +60,7 @@ namespace mongo {
     extern int diagLogging;
     extern unsigned lenForNewNsFiles;
     extern int lockFile;
-    extern bool checkNsFilesOnLoad;    
+    extern bool checkNsFilesOnLoad;
     extern string repairpath;
 
     void setupSignals( bool inFork );
@@ -76,7 +76,7 @@ namespace mongo {
     static bool forceRepair = 0;
     Timer startupSrandTimer;
 
-    const char *ourgetns() { 
+    const char *ourgetns() {
         Client *c = currentClient.get();
         if ( ! c )
             return "";
@@ -99,7 +99,7 @@ namespace mongo {
         OurListener(const string &ip, int p) : Listener(ip, p) { }
         virtual void accepted(MessagingPort *mp) {
 
-            if ( ! connTicketHolder.tryAcquire() ){
+            if ( ! connTicketHolder.tryAcquire() ) {
                 log() << "connection refused because too many open connections: " << connTicketHolder.used() << " of " << connTicketHolder.outof() << endl;
                 // TODO: would be nice if we notified them...
                 mp->shutdown();
@@ -110,12 +110,12 @@ namespace mongo {
             try {
                 boost::thread thr(boost::bind(&connThread,mp));
             }
-            catch ( boost::thread_resource_error& ){
+            catch ( boost::thread_resource_error& ) {
                 log() << "can't create new thread, closing connection" << endl;
                 mp->shutdown();
                 delete mp;
             }
-            catch ( ... ){
+            catch ( ... ) {
                 log() << "unkonwn exception starting connThread" << endl;
                 mp->shutdown();
                 delete mp;
@@ -123,14 +123,14 @@ namespace mongo {
         }
     };
 
-/* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
+    /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
 // QueryOption_Exhaust
 #define TESTEXHAUST 0
 #if( TESTEXHAUST )
-    void testExhaust() { 
+    void testExhaust() {
         sleepsecs(1);
         unsigned n = 0;
-        auto f = [&n](const BSONObj& o) { 
+        auto f = [&n](const BSONObj& o) {
             assert( o.valid() );
             //cout << o << endl;
             n++;
@@ -142,20 +142,20 @@ namespace mongo {
         db.connect("localhost");
         const char *ns = "local.foo";
         if( db.count(ns) < 10000 )
-            for( int i = 0; i < 20000; i++ ) 
+            for( int i = 0; i < 20000; i++ )
                 db.insert(ns, BSON("aaa" << 3 << "b" << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
 
         try {
             db.query(f, ns, Query() );
         }
-        catch(...) { 
+        catch(...) {
             cout << "hmmm" << endl;
         }
 
         try {
             db.query(f, ns, Query() );
         }
-        catch(...) { 
+        catch(...) {
             cout << "caught" << endl;
         }
 
@@ -200,8 +200,7 @@ namespace mongo {
        app server will open a pool of threads.
        todo: one day, asio...
     */
-    void connThread( MessagingPort * inPort )
-    {
+    void connThread( MessagingPort * inPort ) {
         TicketHolderReleaser connTicketReleaser( &connTicketHolder );
 
         /* todo: move to Client object */
@@ -222,7 +221,7 @@ namespace mongo {
 
                 if ( !dbMsgPort->recv(m) ) {
                     if( !cmdLine.quiet )
-                      log() << "end connection " << dbMsgPort->farEnd.toString() << endl;
+                        log() << "end connection " << dbMsgPort->farEnd.toString() << endl;
                     dbMsgPort->shutdown();
                     break;
                 }
@@ -231,7 +230,7 @@ sendmore:
                     log() << "got request after shutdown()" << endl;
                     break;
                 }
-                
+
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
@@ -251,7 +250,7 @@ sendmore:
 
                 if ( dbresponse.response ) {
                     dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
-                    if( dbresponse.exhaust ) { 
+                    if( dbresponse.exhaust ) {
                         MsgData *header = dbresponse.response->header();
                         QueryResult *qr = (QueryResult *) header;
                         long long cursorid = qr->cursorId;
@@ -294,7 +293,7 @@ sendmore:
         }
         catch ( const ClockSkewException & ) {
             exitCleanly( EXIT_CLOCK_SKEW );
-        }        
+        }
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
@@ -317,7 +316,7 @@ sendmore:
         SockAddr db(address, port);
 
         MessagingPort p;
-        if ( !p.connect(db) ){
+        if ( !p.connect(db) ) {
             log() << "msg couldn't connect" << endl;
             return;
         }
@@ -346,40 +345,40 @@ sendmore:
         msg(m, "127.0.0.1", CmdLine::DefaultDBPort, extras);
     }
 
-    bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ){
+    bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
         static DBDirectClient db;
-        
-        if ( h->version == 4 && h->versionMinor == 4 ){
+
+        if ( h->version == 4 && h->versionMinor == 4 ) {
             assert( VERSION == 4 );
             assert( VERSION_MINOR == 5 );
-            
+
             list<string> colls = db.getCollectionNames( dbName );
-            for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++){
+            for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
                 string c = *i;
                 log() << "\t upgrading collection:" << c << endl;
                 BSONObj out;
                 bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
-                if ( ! ok ){
+                if ( ! ok ) {
                     errmsg = "reindex failed";
                     log() << "\t\t reindex failed: " << out << endl;
                     return false;
                 }
             }
-            
+
             h->versionMinor = 5;
             return true;
         }
-        
+
         // do this in the general case
         return repairDatabase( dbName.c_str(), errmsg );
     }
-    
+
     // ran at startup.
     static void repairDatabasesAndCheckVersion() {
-		//        LastError * le = lastError.get( true );
+        //        LastError * le = lastError.get( true );
         Client::GodScope gs;
         log(1) << "enter repairDatabases (to check pdfile version #)" << endl;
-        
+
         //assert(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
 
@@ -402,7 +401,7 @@ sendmore:
                 log() << "****" << endl;
                 log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
                       << "new version: " << VERSION << "." << VERSION_MINOR << endl;
-                if ( shouldRepairDatabases ){
+                if ( shouldRepairDatabases ) {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
                     string errmsg;
@@ -416,14 +415,15 @@ sendmore:
                     shouldRepairDatabases = 1;
                     return;
                 }
-            } else {
+            }
+            else {
                 Database::closeDatabase( dbName.c_str(), dbpath );
             }
         }
 
         log(1) << "done repairDatabases" << endl;
 
-        if ( shouldRepairDatabases ){
+        if ( shouldRepairDatabases ) {
             log() << "finished checking dbs" << endl;
             cc().shutdown();
             dbexit( EXIT_CLEAN );
@@ -438,11 +438,11 @@ sendmore:
                 i != boost::filesystem::directory_iterator(); ++i ) {
             string fileName = boost::filesystem::path(*i).leaf();
             if ( boost::filesystem::is_directory( *i ) &&
-                fileName.length() && fileName[ 0 ] == '$' )
+                    fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );
         }
     }
-    
+
     void clearTmpCollections() {
         Client::GodScope gs;
         vector< string > toDelete;
@@ -457,38 +457,38 @@ sendmore:
             cli.dropCollection( *i );
         }
     }
-    
+
     void flushDiagLog();
-    
+
     /**
      * does background async flushes of mmapped files
      */
     class DataFileSync : public BackgroundJob {
     public:
         string name() const { return "DataFileSync"; }
-        void run(){
+        void run() {
             if( cmdLine.syncdelay == 0 )
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
-            else if( cmdLine.syncdelay == 1 ) 
+            else if( cmdLine.syncdelay == 1 )
                 log() << "--syncdelay 1" << endl;
             else if( cmdLine.syncdelay != 60 )
                 log(1) << "--syncdelay " << cmdLine.syncdelay << endl;
             int time_flushing = 0;
-            while ( ! inShutdown() ){
+            while ( ! inShutdown() ) {
                 flushDiagLog();
-                if ( cmdLine.syncdelay == 0 ){
+                if ( cmdLine.syncdelay == 0 ) {
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
                     continue;
                 }
 
                 sleepmillis( (long long) std::max(0.0, (cmdLine.syncdelay * 1000) - time_flushing) );
-                
-                if ( inShutdown() ){
+
+                if ( inShutdown() ) {
                     // occasional issue trying to flush during shutdown when sleep interrupted
                     break;
                 }
-                
+
                 Date_t start = jsTime();
                 int numFiles = MemoryMappedFile::flushAll( true );
                 time_flushing = (int) (jsTime() - start);
@@ -505,11 +505,11 @@ sendmore:
         // should be safe to interrupt in js code, even if we have a write lock
         return killCurrentOp.checkForInterruptNoAssert( false );
     }
-    
+
     unsigned jsGetInterruptSpecCallback() {
         return cc().curop()->opNum();
     }
-    
+
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
         bool is32bit = sizeof(int*) == 4;
@@ -542,7 +542,7 @@ sendmore:
             ss << "repairpath (" << repairpath << ") does not exist";
             uassert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
         }
-        
+
         acquirePathLock();
         remove_all( dbpath + "/_tmp/" );
 
@@ -555,7 +555,7 @@ sendmore:
 
         dur::startup();
 
-        if( cmdLine.durOptions & CmdLine::DurRecoverOnly ) 
+        if( cmdLine.durOptions & CmdLine::DurRecoverOnly )
             return;
 
         // comes after getDur().startup() because this reads from the database
@@ -573,7 +573,7 @@ sendmore:
 
         /* we didn't want to pre-open all fiels for the repair check above. for regular
            operation we do for read/write lock concurrency reasons.
-        */        
+        */
         Database::_openAllFiles = true;
 
         if ( shouldRepairDatabases )
@@ -605,7 +605,7 @@ sendmore:
             log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
-        catch ( int& n ){
+        catch ( int& n ) {
             log() << "exception in initAndListen int: " << n << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
@@ -615,13 +615,13 @@ sendmore:
         }
     }
 
-    #if defined(_WIN32)
+#if defined(_WIN32)
     bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
         initAndListen( cmdLine.port, appsrvPath );
         return true;
     }
-    #endif
+#endif
 
 } // namespace mongo
 
@@ -655,15 +655,14 @@ string arg_error_check(int argc, char* argv[]) {
     return "";
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     getcurns = ourgetns;
 
     po::options_description general_options("General options");
-	#if defined(_WIN32)
-	po::options_description windows_scm_options("Windows Service Control Manager options");
-	#endif
+#if defined(_WIN32)
+    po::options_description windows_scm_options("Windows Service Control Manager options");
+#endif
     po::options_description replication_options("Replication options");
     po::options_description ms_options("Master/slave options");
     po::options_description rs_options("Replica set options");
@@ -676,87 +675,87 @@ int main(int argc, char* argv[])
     CmdLine::addGlobalOptions( general_options , hidden_options );
 
     general_options.add_options()
-        ("dbpath", po::value<string>() , "directory for datafiles")
-        ("directoryperdb", "each database will be stored in a separate directory")
-        ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
-        ("cpu", "periodically show cpu and iowait utilization")
-        ("noauth", "run without security")
-        ("auth", "run with security")
-        ("objcheck", "inspect client data for validity on receipt")
-        ("quota", "limits each database to a certain number of files (8 default)")
-        ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
-        ("appsrvpath", po::value<string>(), "root directory for the babble app server")
-        ("nocursors", "diagnostic/debugging option")
-        ("nohints", "ignore query hints")
-        ("nohttpinterface", "disable http interface")
-        ("rest","turn on simple rest api")
-        ("jsonp","allow JSONP access via http (has security implications)")
-        ("noscripting", "disable scripting engine")
-        ("noprealloc", "disable data file preallocation - will often hurt performance")
-        ("smallfiles", "use a smaller default file size")
-        ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-        ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
-        ("sysinfo", "print some diagnostic system information")
-        ("upgrade", "upgrade db if needed")
-        ("repair", "run repair on all dbs")
-        ("notablescan", "do not allow table scans")
-        ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
-        ("profile",po::value<int>(), "0=off 1=slow, 2=all")
-        ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
-        ("maxConns",po::value<int>(), "max number of simultaneous connections")
-		#if !defined(_WIN32)
-        ("nounixsocket", "disable listening on unix sockets")
-		#endif
-        ("ipv6", "enable IPv6 support (disabled by default)")
-        ;
+    ("dbpath", po::value<string>() , "directory for datafiles")
+    ("directoryperdb", "each database will be stored in a separate directory")
+    ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
+    ("cpu", "periodically show cpu and iowait utilization")
+    ("noauth", "run without security")
+    ("auth", "run with security")
+    ("objcheck", "inspect client data for validity on receipt")
+    ("quota", "limits each database to a certain number of files (8 default)")
+    ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
+    ("appsrvpath", po::value<string>(), "root directory for the babble app server")
+    ("nocursors", "diagnostic/debugging option")
+    ("nohints", "ignore query hints")
+    ("nohttpinterface", "disable http interface")
+    ("rest","turn on simple rest api")
+    ("jsonp","allow JSONP access via http (has security implications)")
+    ("noscripting", "disable scripting engine")
+    ("noprealloc", "disable data file preallocation - will often hurt performance")
+    ("smallfiles", "use a smaller default file size")
+    ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
+    ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
+    ("sysinfo", "print some diagnostic system information")
+    ("upgrade", "upgrade db if needed")
+    ("repair", "run repair on all dbs")
+    ("notablescan", "do not allow table scans")
+    ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
+    ("profile",po::value<int>(), "0=off 1=slow, 2=all")
+    ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
+    ("maxConns",po::value<int>(), "max number of simultaneous connections")
+#if !defined(_WIN32)
+    ("nounixsocket", "disable listening on unix sockets")
+#endif
+    ("ipv6", "enable IPv6 support (disabled by default)")
+    ;
 
 #if defined(_WIN32)
     CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
 #endif
 
-	replication_options.add_options()
-        ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-        ("autoresync", "automatically resync if slave data is stale")
-        ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
-        ;
+    replication_options.add_options()
+    ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
+    ("autoresync", "automatically resync if slave data is stale")
+    ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
+    ;
 
-        ms_options.add_options()
-        ("master", "master mode")
-        ("slave", "slave mode")
-        ("source", po::value<string>(), "when slave: specify master as <server:port>")
-        ("only", po::value<string>(), "when slave: specify a single database to replicate")
-        ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
-        ;
-            
-        rs_options.add_options()
-        ("replSet", po::value<string>(), "arg is <setname>[/<optionalseedhostlist>]")
-        ;
-        
-	sharding_options.add_options()
-		("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
-		("shardsvr", "declare this is a shard db of a cluster; default port 27018")
-        ("noMoveParanoia" , "turn off paranoid saving of data for moveChunk.  this is on by default for now, but default will switch" )
-		;
+    ms_options.add_options()
+    ("master", "master mode")
+    ("slave", "slave mode")
+    ("source", po::value<string>(), "when slave: specify master as <server:port>")
+    ("only", po::value<string>(), "when slave: specify a single database to replicate")
+    ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
+    ;
+
+    rs_options.add_options()
+    ("replSet", po::value<string>(), "arg is <setname>[/<optionalseedhostlist>]")
+    ;
+
+    sharding_options.add_options()
+    ("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
+    ("shardsvr", "declare this is a shard db of a cluster; default port 27018")
+    ("noMoveParanoia" , "turn off paranoid saving of data for moveChunk.  this is on by default for now, but default will switch" )
+    ;
 
     hidden_options.add_options()
-        ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
-        ("command", po::value< vector<string> >(), "command")
-        ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-        // these move to unhidden later:
-        ("dur", "enable journaling")
-        ("durOptions", po::value<int>(), "durability diagnostic options")
-        ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
-        ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
-        ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
-        ("nodur", "disable journaling (currently the default)")
-        ;
+    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
+    ("command", po::value< vector<string> >(), "command")
+    ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
+    // these move to unhidden later:
+    ("dur", "enable journaling")
+    ("durOptions", po::value<int>(), "durability diagnostic options")
+    ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
+    ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
+    ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
+    ("nodur", "disable journaling (currently the default)")
+    ;
 
 
     positional_options.add("command", 3);
     visible_options.add(general_options);
-	#if defined(_WIN32)
-	visible_options.add(windows_scm_options);
-	#endif
+#if defined(_WIN32)
+    visible_options.add(windows_scm_options);
+#endif
     visible_options.add(replication_options);
     visible_options.add(ms_options);
     visible_options.add(rs_options);
@@ -787,7 +786,7 @@ int main(int argc, char* argv[])
 
     {
         po::variables_map params;
-        
+
         string error_message = arg_error_check(argc, argv);
         if (error_message != "") {
             cout << error_message << endl << endl;
@@ -831,10 +830,10 @@ int main(int argc, char* argv[])
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
-        if( params.count("nodur") ) { 
+        if( params.count("nodur") ) {
             cmdLine.dur = false;
         }
-        if( params.count("dur") ) { 
+        if( params.count("dur") ) {
             cmdLine.dur = true;
             log() << "***** WARNING --dur should not be used yet except for testing" << endl;
         }
@@ -854,7 +853,8 @@ int main(int argc, char* argv[])
                 out() << "repairpath has to be non-zero" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-        } else {
+        }
+        else {
             repairpath = dbpath;
         }
         if (params.count("nocursors")) {
@@ -923,14 +923,15 @@ int main(int argc, char* argv[])
             /* specifies what the source in local.sources should be */
             cmdLine.source = params["source"].as<string>().c_str();
         }
-        if( params.count("pretouch") ) { 
+        if( params.count("pretouch") ) {
             cmdLine.pretouch = params["pretouch"].as<int>();
         }
         if (params.count("replSet")) {
             if (params.count("slavedelay")) {
                 out() << "--slavedelay cannot be used with --replSet" << endl;
                 dbexit( EXIT_BADOPTIONS );
-            } else if (params.count("only")) {
+            }
+            else if (params.count("only")) {
                 out() << "--only cannot be used with --replSet" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
@@ -944,16 +945,18 @@ int main(int argc, char* argv[])
             cout << "***********************************\n"
                  << "WARNING WARNING WARNING\n"
                  << " replica pairs are deprecated\n"
-                 << " see: http://www.mongodb.org/display/DOCS/Replica+Pairs \n" 
+                 << " see: http://www.mongodb.org/display/DOCS/Replica+Pairs \n"
                  << "***********************************" << endl;
             string paired = params["pairwith"].as<string>();
             if (params.count("arbiter")) {
                 string arbiter = params["arbiter"].as<string>();
                 pairWith(paired.c_str(), arbiter.c_str());
-            } else {
+            }
+            else {
                 pairWith(paired.c_str(), "-");
             }
-        } else if (params.count("arbiter")) {
+        }
+        else if (params.count("arbiter")) {
             out() << "specifying --arbiter without --pairwith" << endl;
             dbexit( EXIT_BADOPTIONS );
         }
@@ -973,7 +976,7 @@ int main(int argc, char* argv[])
                 dbexit( EXIT_BADOPTIONS );
             }
             // note a small size such as x==1 is ok for an arbiter.
-            if( x > 1000 && sizeof(void*) == 4 ) { 
+            if( x > 1000 && sizeof(void*) == 4 ) {
                 out() << "--oplogSize of " << x << "MB is too big for 32 bit version. Use 64 bit build instead." << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
@@ -997,20 +1000,20 @@ int main(int argc, char* argv[])
             }
             log() << "--cacheSize option not currently supported" << endl;
         }
-        if (params.count("port") == 0 ) { 
+        if (params.count("port") == 0 ) {
             if( params.count("configsvr") ) {
                 cmdLine.port = CmdLine::ConfigServerPort;
             }
             if( params.count("shardsvr") )
                 cmdLine.port = CmdLine::ShardServerPort;
         }
-        else { 
-            if ( cmdLine.port <= 0 || cmdLine.port > 65535 ){
+        else {
+            if ( cmdLine.port <= 0 || cmdLine.port > 65535 ) {
                 out() << "bad --port number" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
         }
-        if ( params.count("configsvr" ) ){
+        if ( params.count("configsvr" ) ) {
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);
@@ -1020,10 +1023,10 @@ int main(int argc, char* argv[])
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
         }
-        if ( params.count( "profile" ) ){
+        if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
         }
-        if ( params.count( "maxConns" ) ){
+        if ( params.count( "maxConns" ) ) {
             int newSize = params["maxConns"].as<int>();
             if ( newSize < 5 ) {
                 out() << "maxConns has to be at least 5" << endl;
@@ -1031,17 +1034,17 @@ int main(int argc, char* argv[])
             }
             else if ( newSize >= 10000000 ) {
                 out() << "maxConns can't be greater than 10000000" << endl;
-                dbexit( EXIT_BADOPTIONS );                
+                dbexit( EXIT_BADOPTIONS );
             }
             connTicketHolder.resize( newSize );
         }
-        if (params.count("nounixsocket")){
+        if (params.count("nounixsocket")) {
             noUnixSocket = true;
         }
-        if (params.count("ipv6")){
+        if (params.count("ipv6")) {
             enableIPv6();
         }
-        if (params.count("noMoveParanoia")){
+        if (params.count("noMoveParanoia")) {
             cmdLine.moveParanoia = false;
         }
 
@@ -1087,7 +1090,7 @@ int main(int argc, char* argv[])
         }
 
         if( cmdLine.pretouch )
-            log() << "--pretouch " << cmdLine.pretouch << endl; 
+            log() << "--pretouch " << cmdLine.pretouch << endl;
 
 #if defined(_WIN32)
         if (serviceParamsCheck( params, dbpath, argc, argv )) {
@@ -1112,7 +1115,7 @@ namespace mongo {
         {
             dblock lk;
             log() << "now exiting" << endl;
-            dbexit( code );        
+            dbexit( code );
         }
     }
 
@@ -1169,8 +1172,8 @@ namespace mongo {
         printStackTrace();
         abort();
     }
-    
-    void setupSignals_ignoreHelper( int signal ){}
+
+    void setupSignals_ignoreHelper( int signal ) {}
 
     void setupSignals( bool inFork ) {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
@@ -1193,49 +1196,47 @@ namespace mongo {
         sigaddset( &asyncSignals, SIGTERM );
         assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
-        
+
         set_terminate( myterminate );
     }
 
 #else
-void ctrlCTerminate() {
-    log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
-    Client::initThread( "ctrlCTerminate" );
-    exitCleanly( EXIT_KILL );
-}
-BOOL CtrlHandler( DWORD fdwCtrlType )
-{
-    switch( fdwCtrlType )
-    {
-    case CTRL_C_EVENT:
-        rawOut("Ctrl-C signal");
-        ctrlCTerminate();
-        return( TRUE );
-    case CTRL_CLOSE_EVENT:
-        rawOut("CTRL_CLOSE_EVENT signal");
-        ctrlCTerminate();
-        return( TRUE );
-    case CTRL_BREAK_EVENT:
-        rawOut("CTRL_BREAK_EVENT signal");
-        ctrlCTerminate();
-        return TRUE;
-    case CTRL_LOGOFF_EVENT:
-        rawOut("CTRL_LOGOFF_EVENT signal (ignored)");
-        return FALSE;
-    case CTRL_SHUTDOWN_EVENT:
-         rawOut("CTRL_SHUTDOWN_EVENT signal (ignored)");
-         return FALSE;
-    default:
-        return FALSE;
+    void ctrlCTerminate() {
+        log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
+        Client::initThread( "ctrlCTerminate" );
+        exitCleanly( EXIT_KILL );
     }
-}
+    BOOL CtrlHandler( DWORD fdwCtrlType ) {
+        switch( fdwCtrlType ) {
+        case CTRL_C_EVENT:
+            rawOut("Ctrl-C signal");
+            ctrlCTerminate();
+            return( TRUE );
+        case CTRL_CLOSE_EVENT:
+            rawOut("CTRL_CLOSE_EVENT signal");
+            ctrlCTerminate();
+            return( TRUE );
+        case CTRL_BREAK_EVENT:
+            rawOut("CTRL_BREAK_EVENT signal");
+            ctrlCTerminate();
+            return TRUE;
+        case CTRL_LOGOFF_EVENT:
+            rawOut("CTRL_LOGOFF_EVENT signal (ignored)");
+            return FALSE;
+        case CTRL_SHUTDOWN_EVENT:
+            rawOut("CTRL_SHUTDOWN_EVENT signal (ignored)");
+            return FALSE;
+        default:
+            return FALSE;
+        }
+    }
 
     void myPurecallHandler() {
         rawOut( "pure virtual method called, printing stack:" );
         printStackTrace();
-        abort();        
+        abort();
     }
-    
+
     void setupSignals( bool inFork ) {
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
             ;

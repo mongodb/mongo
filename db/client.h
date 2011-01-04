@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Client represents a connection to the database (the server-side) and corresponds 
+/* Client represents a connection to the database (the server-side) and corresponds
    to an open socket (or logical connection if pooling on sockets) from a client.
 
    todo: switch to asio...this will fit nicely with that.
@@ -30,7 +30,7 @@
 #include "lasterror.h"
 #include "stats/top.h"
 
-namespace mongo { 
+namespace mongo {
 
     extern class ReplSet *theReplSet;
     class AuthenticationInfo;
@@ -44,7 +44,7 @@ namespace mongo {
 
     typedef long long ConnectionId;
 
-    class Client : boost::noncopyable { 
+    class Client : boost::noncopyable {
     public:
         class Context;
 
@@ -56,12 +56,12 @@ namespace mongo {
         static Client *syncThread;
 
 
-        /* each thread which does db operations has a Client object in TLS.  
-           call this when your thread starts. 
+        /* each thread which does db operations has a Client object in TLS.
+           call this when your thread starts.
         */
         static Client& initThread(const char *desc, MessagingPort *mp = 0);
 
-        /* 
+        /*
            this has to be called as the client goes away, but before thread termination
            @return true if anything was done
          */
@@ -70,9 +70,9 @@ namespace mongo {
 
         ~Client();
 
-        void iAmSyncThread() { 
+        void iAmSyncThread() {
             wassert( syncThread == 0 );
-            syncThread = this; 
+            syncThread = this;
         }
         bool isSyncThread() const { return this == syncThread; } // true if this client is the replication secondary pull thread
 
@@ -80,7 +80,7 @@ namespace mongo {
         string clientAddress(bool includePort=false) const;
         AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
-        CurOp* curop() const { return _curOp; }        
+        CurOp* curop() const { return _curOp; }
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
@@ -96,7 +96,7 @@ namespace mongo {
         void gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
-        
+
         MessagingPort * port() const { return _mp; }
 
         ConnectionId getConnectionId() const { return _connectionId; }
@@ -128,54 +128,54 @@ namespace mongo {
             ~GodScope();
         };
 
-        
+
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */
-        class Context : boost::noncopyable{
+        class Context : boost::noncopyable {
         public:
-            /** 
+            /**
              * this is the main constructor
              * use this unless there is a good reason not to
              */
             Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true );
-            
+
             /* this version saves the context but doesn't yet set the new one: */
             Context();
-            
+
             /**
              * if you are doing this after allowing a write there could be a race condition
              * if someone closes that db.  this checks that the DB is still valid
              */
             Context( string ns , Database * db, bool doauth=true );
-            
+
             ~Context();
 
-            Client* getClient() const { return _client; }            
+            Client* getClient() const { return _client; }
             Database* db() const { return _db; }
-            const char * ns() const { return _ns.c_str(); }            
-            
+            const char * ns() const { return _ns.c_str(); }
+
             /** @return if the db was created by this Context */
             bool justCreated() const { return _justCreated; }
 
             bool equals( const string& ns , const string& path=dbpath ) const { return _ns == ns && _path == path; }
-            
+
             /**
              * @return true iff the current Context is using db/path
              */
             bool inDB( const string& db , const string& path=dbpath ) const;
 
-            void clear(){ _ns = ""; _db = 0; }
+            void clear() { _ns = ""; _db = 0; }
 
             /**
              * call before unlocking, so clear any non-thread safe state
              */
-            void unlocked(){ _db = 0; }
+            void unlocked() { _db = 0; }
 
             /**
              * call after going back into the lock, will re-establish non-thread safe stuff
              */
-            void relocked(){ _finishInit(); }
+            void relocked() { _finishInit(); }
 
             friend class CurOp;
 
@@ -187,12 +187,12 @@ namespace mongo {
              * will also set _client->_context to this
              */
             void _finishInit( bool doauth=true);
-            
+
             void _auth( int lockState = dbMutex.getState() );
 
             Client * _client;
             Context * _oldContext;
-            
+
             string _path;
             mongolock * _lock;
             bool _justCreated;
@@ -201,26 +201,26 @@ namespace mongo {
             Database * _db;
 
         }; // class Client::Context
-        
+
 
     };
-    
+
     /** get the Client object for this thread. */
-    inline Client& cc() { 
+    inline Client& cc() {
         Client * c = currentClient.get();
         assert( c );
         return *c;
     }
 
-    inline Client::GodScope::GodScope(){
+    inline Client::GodScope::GodScope() {
         _prev = cc()._god;
         cc()._god = true;
     }
 
     inline Client::GodScope::~GodScope() { cc()._god = _prev; }
 
-	/* this unlocks, does NOT upgrade. that works for our current usage */
-    inline void mongolock::releaseAndWriteLock() { 
+    /* this unlocks, does NOT upgrade. that works for our current usage */
+    inline void mongolock::releaseAndWriteLock() {
         if( !_writelock ) {
 
 #if BOOST_VERSION >= 103500
@@ -241,6 +241,6 @@ namespace mongo {
     }
 
     string sayClientState();
-  
+
     inline bool haveClient() { return currentClient.get() > 0; }
 };

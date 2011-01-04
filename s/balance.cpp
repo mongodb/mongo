@@ -31,10 +31,10 @@
 #include "grid.h"
 
 namespace mongo {
-    
+
     Balancer balancer;
 
-    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy ){}
+    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy ) {}
 
     Balancer::~Balancer() {
         delete _policy;
@@ -43,15 +43,15 @@ namespace mongo {
     int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks ) {
         int movedCount = 0;
 
-        for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ){
+        for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
             const CandidateChunk& chunkInfo = *it->get();
 
             DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
             assert( cfg );
-        
+
             ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
             assert( cm );
-        
+
             const BSONObj& chunkToMove = chunkInfo.chunk;
             ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
             if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) || c->getMax().woCompare( chunkToMove["max"].Obj() ) ) {
@@ -61,50 +61,50 @@ namespace mongo {
 
                 c = cm->findChunk( chunkToMove["min"].Obj() );
                 if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) || c->getMax().woCompare( chunkToMove["max"].Obj() ) ) {
-                    log() << "chunk mismatch after reload, ignoring will retry issue cm: " 
+                    log() << "chunk mismatch after reload, ignoring will retry issue cm: "
                           << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
                     continue;
                 }
             }
-        
+
             BSONObj res;
-            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , Chunk::MaxChunkSize , res ) ){
+            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , Chunk::MaxChunkSize , res ) ) {
                 movedCount++;
                 continue;
             }
 
             // the move requires acquiring the collection metadata's lock, which can fail
-            log() << "balacer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to 
+            log() << "balacer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
                   << " chunk: " << chunkToMove << endl;
         }
 
         return movedCount;
     }
-    
-    void Balancer::_ping( DBClientBase& conn ){
+
+    void Balancer::_ping( DBClientBase& conn ) {
         WriteConcern w = conn.getWriteConcern();
         conn.setWriteConcern( W_NONE );
 
-        conn.update( ShardNS::mongos , 
-                      BSON( "_id" << _myid ) , 
-                      BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started) ) ) , 
-                      true );
+        conn.update( ShardNS::mongos ,
+                     BSON( "_id" << _myid ) ,
+                     BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started) ) ) ,
+                     true );
 
         conn.setWriteConcern( w);
     }
-    
-    bool Balancer::_checkOIDs(){
+
+    bool Balancer::_checkOIDs() {
         vector<Shard> all;
         Shard::getAllShards( all );
-        
+
         map<int,Shard> oids;
-        
-        for ( vector<Shard>::iterator i=all.begin(); i!=all.end(); ++i ){
+
+        for ( vector<Shard>::iterator i=all.begin(); i!=all.end(); ++i ) {
             Shard s = *i;
             BSONObj f = s.runCommand( "admin" , "features" );
-            if ( f["oidMachine"].isNumber() ){
+            if ( f["oidMachine"].isNumber() ) {
                 int x = f["oidMachine"].numberInt();
-                if ( oids.count(x) == 0 ){
+                if ( oids.count(x) == 0 ) {
                     oids[x] = s;
                 }
                 else {
@@ -121,7 +121,7 @@ namespace mongo {
         return true;
     }
 
-    void Balancer::_doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks ){
+    void Balancer::_doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks ) {
         assert( candidateChunks );
 
         //
@@ -131,7 +131,7 @@ namespace mongo {
 
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::collection , BSONObj() );
         vector< string > collections;
-        while ( cursor->more() ){
+        while ( cursor->more() ) {
             BSONObj col = cursor->next();
 
             // sharded collections will have a shard "key".
@@ -152,7 +152,7 @@ namespace mongo {
         //
         // TODO: skip unresponsive shards and mark information as stale.
         //
- 
+
         vector<Shard> allShards;
         Shard::getAllShards( allShards );
         if ( allShards.size() < 2) {
@@ -160,12 +160,12 @@ namespace mongo {
             return;
         }
 
-        map< string, BSONObj > shardLimitsMap; 
-        for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ){
+        map< string, BSONObj > shardLimitsMap;
+        for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ) {
             const Shard& s = *it;
             ShardStatus status = s.getStatus();
 
-            BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) << 
+            BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) <<
                                       LimitsFields::currSize( status.mapped() ) <<
                                       ShardFields::draining( s.isDraining() )  <<
                                       LimitsFields::hasOpsQueued( status.hasOpsQueued() )
@@ -183,7 +183,7 @@ namespace mongo {
 
             map< string,vector<BSONObj> > shardToChunksMap;
             cursor = conn.query( ShardNS::chunk , QUERY( "ns" << ns ).sort( "min" ) );
-            while ( cursor->more() ){
+            while ( cursor->more() ) {
                 BSONObj chunk = cursor->next();
                 vector<BSONObj>& chunks = shardToChunksMap[chunk["shard"].String()];
                 chunks.push_back( chunk.getOwned() );
@@ -194,8 +194,8 @@ namespace mongo {
                 log(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
-                
-            for ( vector<Shard>::iterator i=allShards.begin(); i!=allShards.end(); ++i ){
+
+            for ( vector<Shard>::iterator i=allShards.begin(); i!=allShards.end(); ++i ) {
                 // this just makes sure there is an entry in shardToChunksMap for every shard
                 Shard s = *i;
                 shardToChunksMap[s.getName()].size();
@@ -208,7 +208,7 @@ namespace mongo {
 
     bool Balancer::_init() {
         try {
-            
+
             log() << "about to contact config servers and shards" << endl;
 
             // contact the config server and refresh shard information
@@ -225,11 +225,12 @@ namespace mongo {
             _myid = buf.str();
             _started = time(0);
 
-            log() << "balancer id: " << _myid << " started at " << time_t_to_String_short(_started) << endl;            
+            log() << "balancer id: " << _myid << " started at " << time_t_to_String_short(_started) << endl;
 
             return true;
 
-        } catch ( std::exception& ) {
+        }
+        catch ( std::exception& ) {
 
             log( LL_WARNING ) << "could not initialize balancer, please check that all shards and config servers are up" << endl;
             return false;
@@ -237,7 +238,7 @@ namespace mongo {
         }
     }
 
-    void Balancer::run(){
+    void Balancer::run() {
 
         // this is the body of a BackgroundJob so if we throw here we're basically ending the balancer thread prematurely
         while ( ! inShutdown() ) {
@@ -256,28 +257,28 @@ namespace mongo {
         ConnectionString config = configServer.getConnectionString();
         DistributedLock balanceLock( config , "balancer" );
 
-        while ( ! inShutdown() ){
-            
+        while ( ! inShutdown() ) {
+
             try {
                 ScopedDbConnection conn( config );
 
-                _ping( conn.conn() );                
-                if ( ! _checkOIDs() ){
+                _ping( conn.conn() );
+                if ( ! _checkOIDs() ) {
                     uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
                 }
-                
+
                 // use fresh shard state
-                Shard::reloadShardInfo(); 
+                Shard::reloadShardInfo();
 
                 dist_lock_try lk( &balanceLock , "doing balance round" );
-                if ( ! lk.got() ){
+                if ( ! lk.got() ) {
                     log(1) << "skipping balancing round because another balancer is active" << endl;
                     conn.done();
 
                     sleepsecs( 30 ); // no need to wake up soon
                     continue;
                 }
-                        
+
                 if ( ! grid.shouldBalance() ) {
                     log(1) << "skipping balancing round because balancing is disabled" << endl;;
                     conn.done();
@@ -286,26 +287,27 @@ namespace mongo {
                     continue;
                 }
 
-                log(1) << "*** start balancing round" << endl;        
+                log(1) << "*** start balancing round" << endl;
 
                 vector<CandidateChunkPtr> candidateChunks;
                 _doBalanceRound( conn.conn() , &candidateChunks );
                 if ( candidateChunks.size() == 0 ) {
                     log(1) << "no need to move any chunk" << endl;
-                } else {
+                }
+                else {
                     _balancedLastTime = _moveChunks( &candidateChunks );
                 }
 
-                log(1) << "*** end of balancing round" << endl;        
+                log(1) << "*** end of balancing round" << endl;
                 conn.done();
 
                 sleepsecs( _balancedLastTime ? 5 : 10 );
             }
-            catch ( std::exception& e ){
+            catch ( std::exception& e ) {
                 log() << "caught exception while doing balance: " << e.what() << endl;
 
                 // Just to match the opening statement if in log level 1
-                log(1) << "*** End of balancing round" << endl;        
+                log(1) << "*** End of balancing round" << endl;
 
                 sleepsecs( 30 ); // sleep a fair amount b/c of error
                 continue;

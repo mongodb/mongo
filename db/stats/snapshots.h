@@ -28,7 +28,7 @@
 namespace mongo {
 
     class SnapshotThread;
-    
+
     /**
      * stores a point in time snapshot
      * i.e. all counters at a given time
@@ -45,14 +45,14 @@ namespace mongo {
         friend class SnapshotDelta;
         friend class Snapshots;
     };
-    
+
     /**
      * contains performance information for a time period
      */
     class SnapshotDelta {
     public:
         SnapshotDelta( const SnapshotData& older , const SnapshotData& newer );
-        
+
         unsigned long long start() const {
             return _older._created;
         }
@@ -60,7 +60,7 @@ namespace mongo {
         unsigned long long elapsed() const {
             return _elapsed;
         }
-        
+
         unsigned long long timeInWriteLock() const {
             return _newer._totalWriteLockedTime - _older._totalWriteLockedTime;
         }
@@ -83,15 +83,15 @@ namespace mongo {
     class Snapshots {
     public:
         Snapshots(int n=100);
-        
+
         const SnapshotData* takeSnapshot();
-        
+
         int numDeltas() const { return _stored-1; }
 
         const SnapshotData& getPrev( int numBack = 0 );
         auto_ptr<SnapshotDelta> computeDelta( int numBack = 0 );
-        
-        
+
+
         void outputLockInfoHTML( stringstream& ss );
     private:
         mongo::mutex _lock;
@@ -106,7 +106,7 @@ namespace mongo {
         string name() const { return "snapshot"; }
         void run();
     };
-    
+
     extern Snapshots statsSnapshots;
     extern SnapshotThread snapshotThread;
 

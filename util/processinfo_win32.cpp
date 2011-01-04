@@ -25,27 +25,27 @@
 
 using namespace std;
 
-int getpid(){
+int getpid() {
     return GetCurrentProcessId();
 }
 
 namespace mongo {
-    
-    int _wconvertmtos( SIZE_T s ){
+
+    int _wconvertmtos( SIZE_T s ) {
         return (int)( s / ( 1024 * 1024 ) );
     }
-    
-    ProcessInfo::ProcessInfo( pid_t pid ){
+
+    ProcessInfo::ProcessInfo( pid_t pid ) {
     }
 
-    ProcessInfo::~ProcessInfo(){
+    ProcessInfo::~ProcessInfo() {
     }
 
-    bool ProcessInfo::supported(){
+    bool ProcessInfo::supported() {
         return true;
     }
-    
-    int ProcessInfo::getVirtualMemorySize(){
+
+    int ProcessInfo::getVirtualMemorySize() {
         MEMORYSTATUSEX mse;
         mse.dwLength = sizeof(mse);
         assert( GlobalMemoryStatusEx( &mse ) );
@@ -53,8 +53,8 @@ namespace mongo {
         assert( x <= 0x7fffffff );
         return (int) x;
     }
-    
-    int ProcessInfo::getResidentSize(){
+
+    int ProcessInfo::getResidentSize() {
         PROCESS_MEMORY_COUNTERS pmc;
         assert( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) );
         return _wconvertmtos( pmc.WorkingSetSize );
@@ -62,11 +62,11 @@ namespace mongo {
 
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
 
-    bool ProcessInfo::blockCheckSupported(){
+    bool ProcessInfo::blockCheckSupported() {
         return false;
     }
-    
-    bool ProcessInfo::blockInMemory( char * start ){
+
+    bool ProcessInfo::blockInMemory( char * start ) {
         assert(0);
         return true;
     }

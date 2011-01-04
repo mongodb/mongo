@@ -46,9 +46,9 @@ namespace mongo {
 
     /* low level - only drops this ns */
     void dropNS(const string& dropNs);
-    
+
     /* deletes this ns, indexes and cursors */
-    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ); 
+    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result );
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
     shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
@@ -66,7 +66,7 @@ namespace mongo {
         MongoDataFile(int fn) : _mb(0), fileNo(fn) { }
         void open(const char *filename, int requestedDataSize = 0, bool preallocateOnly = false);
 
-        /* allocate a new extent from this datafile. 
+        /* allocate a new extent from this datafile.
            @param capped - true if capped collection
            @param loops is our recursion check variable - you want to pass in zero
         */
@@ -78,10 +78,10 @@ namespace mongo {
 
         /* return max size an extent may be */
         static int maxSize();
-        
+
         /** fsync */
         void flush( bool sync );
-        
+
     private:
         void badOfs(int) const;
         void badOfs2(int) const;
@@ -91,7 +91,7 @@ namespace mongo {
         Extent* _getExtent(DiskLoc loc);
         Record* recordAt(DiskLoc dl);
         Record* makeRecord(DiskLoc dl, int size);
-		void grow(DiskLoc dl, int size);
+        void grow(DiskLoc dl, int size);
 
         char* p() { return (char *) _mb; }
         DataFileHeader* header() { return (DataFileHeader*) _mb; }
@@ -118,7 +118,7 @@ namespace mongo {
             Record *toupdate, const DiskLoc& dl,
             const char *buf, int len, OpDebug& debug, bool god=false);
 
-        // The object o may be updated if modified on insert.                                
+        // The object o may be updated if modified on insert.
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
 
         /** @param obj both and in and out param -- insert can sometimes modify an object (such as add _id). */
@@ -202,7 +202,7 @@ namespace mongo {
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
 
-        struct NP { 
+        struct NP {
             int nextOfs;
             int prevOfs;
         };
@@ -221,10 +221,10 @@ namespace mongo {
         DiskLoc myLoc;
         DiskLoc xnext, xprev; /* next/prev extent for this namespace */
 
-        /* which namespace this extent is for.  this is just for troubleshooting really 
+        /* which namespace this extent is for.  this is just for troubleshooting really
            and won't even be correct if the collection were renamed!
         */
-        Namespace nsDiagnostic; 
+        Namespace nsDiagnostic;
 
         int length;   /* size of the extent, including these fields */
         DiskLoc firstRecord;
@@ -267,24 +267,24 @@ namespace mongo {
 
         Extent* getNextExtent() { return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext); }
         Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
-        
+
         static int maxSize();
         /**
          * @param len lengt of record we need
          * @param lastRecord size of last extent which is a factor in next extent size
          */
         static int followupSize(int len, int lastExtentLen);
-        
+
         /**
          * @param len lengt of record we need
          */
         static int initialSize(int len);
 
-        struct FL { 
+        struct FL {
             DiskLoc firstRecord;
             DiskLoc lastRecord;
         };
-        /** often we want to update just the firstRecord and lastRecord fields. 
+        /** often we want to update just the firstRecord and lastRecord fields.
             this helper is for that -- for use with getDur().writing() method
         */
         FL* fl() { return (FL*) &firstRecord; }
@@ -335,7 +335,7 @@ namespace mongo {
                 h->unusedLength = fileLength - HeaderSize - 16;
             }
         }
-        
+
         bool isEmpty() const {
             return uninitialized() || ( unusedLength == fileLength - HeaderSize - 16 );
         }
@@ -367,8 +367,8 @@ namespace mongo {
         return (Record*) (p()+ofs);
     }
 
-    inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
-        int ofs = dl.getOfs();	   
+    inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) {
+        int ofs = dl.getOfs();
         if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
         return (Record*) (p()+ofs);
     }
@@ -460,15 +460,15 @@ namespace mongo {
         return cc().database()->getFile(dl.a())->recordAt(dl);
     }
 
-	BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
+    BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
-    inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) { 
+    inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) {
         assert( dl.a() != -1 );
         return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, sizeof(DeletedRecord));
     }
-    
+
     void ensureHaveIdIndex(const char *ns);
-    
+
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
 
@@ -476,9 +476,9 @@ namespace mongo {
      * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
      * special case for the local.oplog.$main ns -- naming it as such was a mistake.
      */
-    inline bool isANormalNSName( const char* ns ){
+    inline bool isANormalNSName( const char* ns ) {
         if ( strchr( ns , '$' ) == 0 )
-            return true;        
+            return true;
         return strcmp( ns, "local.oplog.$main" ) == 0;
     }
 

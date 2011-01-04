@@ -29,34 +29,34 @@
 namespace ThreadedTests {
 
     template <int nthreads_param=10>
-    class ThreadedTest{
-        public:
-            virtual void setup() {} //optional
-            virtual void subthread() = 0;
-            virtual void validate() = 0;
+    class ThreadedTest {
+    public:
+        virtual void setup() {} //optional
+        virtual void subthread() = 0;
+        virtual void validate() = 0;
 
-            static const int nthreads = nthreads_param;
+        static const int nthreads = nthreads_param;
 
-            void run(){
-                setup();
+        void run() {
+            setup();
 
-                launch_subthreads(nthreads);
+            launch_subthreads(nthreads);
 
-                validate();
-            }
+            validate();
+        }
 
-            virtual ~ThreadedTest() {}; // not necessary, but makes compilers happy
+        virtual ~ThreadedTest() {}; // not necessary, but makes compilers happy
 
-        private:
-            void launch_subthreads(int remaining){
-                if (!remaining) return;
+    private:
+        void launch_subthreads(int remaining) {
+            if (!remaining) return;
 
-                boost::thread athread(boost::bind(&ThreadedTest::subthread, this));
+            boost::thread athread(boost::bind(&ThreadedTest::subthread, this));
 
-                launch_subthreads(remaining - 1);
+            launch_subthreads(remaining - 1);
 
-                athread.join();
-            }
+            athread.join();
+        }
     };
 
     // Tested with up to 30k threads
@@ -64,13 +64,13 @@ namespace ThreadedTests {
         static const int iterations = 1000000;
         AtomicUInt target;
 
-        void subthread(){
-            for(int i=0; i < iterations; i++){
+        void subthread() {
+            for(int i=0; i < iterations; i++) {
                 //target.x++; // verified to fail with this version
                 target++;
             }
         }
-        void validate(){
+        void validate() {
             ASSERT_EQUALS(target.x , unsigned(nthreads * iterations));
 
             AtomicUInt u;
@@ -87,10 +87,10 @@ namespace ThreadedTests {
         static const int iterations = 10000;
         MVar<int> target;
 
-        public:
+    public:
         MVarTest() : target(0) {}
-        void subthread(){
-            for(int i=0; i < iterations; i++){
+        void subthread() {
+            for(int i=0; i < iterations; i++) {
                 int val = target.take();
 #if BOOST_VERSION >= 103500
                 //increase chances of catching failure
@@ -99,30 +99,30 @@ namespace ThreadedTests {
                 target.put(val+1);
             }
         }
-        void validate(){
+        void validate() {
             ASSERT_EQUALS(target.take() , nthreads * iterations);
         }
     };
 
-    class ThreadPoolTest{
+    class ThreadPoolTest {
         static const int iterations = 10000;
         static const int nThreads = 8;
 
         AtomicUInt counter;
-        void increment(int n){
-            for (int i=0; i<n; i++){
+        void increment(int n) {
+            for (int i=0; i<n; i++) {
                 counter++;
             }
         }
 
-        public:
-        void run(){
+    public:
+        void run() {
             ThreadPool tp(nThreads);
 
-            for (int i=0; i < iterations; i++){
+            for (int i=0; i < iterations; i++) {
                 tp.schedule(&ThreadPoolTest::increment, this, 2);
             }
-            
+
             tp.join();
 
             ASSERT(counter == (unsigned)(iterations * 2));
@@ -131,7 +131,7 @@ namespace ThreadedTests {
 
     class LockTest {
     public:
-        void run(){
+        void run() {
             // quick atomicint wrap test
             // MSGID likely assumes this semantic
             AtomicUInt counter = 0xffffffff;
@@ -145,10 +145,10 @@ namespace ThreadedTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "threading" ){
+        All() : Suite( "threading" ) {
         }
 
-        void setupTests(){
+        void setupTests() {
             add< IsAtomicUIntAtomic >();
             add< MVarTest >();
             add< ThreadPoolTest >();

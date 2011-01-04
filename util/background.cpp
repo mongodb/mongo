@@ -25,9 +25,9 @@ namespace mongo {
 
     // both the BackgroundJob and the internal thread point to JobStatus
     struct BackgroundJob::JobStatus {
-        JobStatus( bool delFlag )  
+        JobStatus( bool delFlag )
             : deleteSelf(delFlag), m("backgroundJob"), state(NotStarted) { }
-        
+
         const bool deleteSelf;
 
         mongo::mutex m;  // protects state below
@@ -40,7 +40,7 @@ namespace mongo {
     }
 
     // Background object can be only be destroyed after jobBody() ran
-    void BackgroundJob::jobBody( boost::shared_ptr<JobStatus> status ){            
+    void BackgroundJob::jobBody( boost::shared_ptr<JobStatus> status ) {
         {
             scoped_lock l( status->m );
             assert( status->state == NotStarted );
@@ -54,20 +54,20 @@ namespace mongo {
         try {
             run();
         }
-        catch ( std::exception& e ){
+        catch ( std::exception& e ) {
             log( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
         }
         catch(...) {
             log( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
         }
 
-        { 
+        {
             scoped_lock l( status->m );
             status->state = Done;
             status->finished.notify_all();
         }
 
-        if( status->deleteSelf ) 
+        if( status->deleteSelf )
             delete this;
     }
 
@@ -87,7 +87,8 @@ namespace mongo {
                 unsigned long long ns = msTimeOut * 1000000ULL; // milli to nano
                 if ( xt.nsec + ns < 1000000000 ) {
                     xt.nsec = (xtime::xtime_nsec_t) (xt.nsec + ns);
-                } else {
+                }
+                else {
                     xt.sec += 1 + ns / 1000000000;
                     xt.nsec = ( ns + xt.nsec ) % 1000000000;
                 }
@@ -95,21 +96,22 @@ namespace mongo {
                 if ( ! _status->finished.timed_wait( l.boost() , xt ) )
                     return false;
 
-            } else {
+            }
+            else {
                 _status->finished.wait( l.boost() );
             }
         }
         return true;
     }
 
-    BackgroundJob::State BackgroundJob::getState() const { 
-        scoped_lock l( _status->m); 
-        return _status->state; 
+    BackgroundJob::State BackgroundJob::getState() const {
+        scoped_lock l( _status->m);
+        return _status->state;
     }
 
-    bool BackgroundJob::running() const { 
+    bool BackgroundJob::running() const {
         scoped_lock l( _status->m);
-        return _status->state == Running; 
+        return _status->state == Running;
     }
 
 } // namespace mongo

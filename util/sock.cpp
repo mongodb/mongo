@@ -26,7 +26,7 @@ namespace mongo {
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
 
-    string getAddrInfoStrError(int code) { 
+    string getAddrInfoStrError(int code) {
 #if !defined(_WIN32)
         return gai_strerror(code);
 #else
@@ -47,7 +47,7 @@ namespace mongo {
         if (!strcmp(iporhost, "localhost"))
             iporhost = "127.0.0.1";
 
-        if (strchr(iporhost, '/')){
+        if (strchr(iporhost, '/')) {
 #ifdef _WIN32
             uassert(13080, "no unix socket support on windows", false);
 #endif
@@ -55,7 +55,8 @@ namespace mongo {
             as<sockaddr_un>().sun_family = AF_UNIX;
             strcpy(as<sockaddr_un>().sun_path, iporhost);
             addressSize = sizeof(sockaddr_un);
-        }else{
+        }
+        else {
             addrinfo* addrs = NULL;
             addrinfo hints;
             memset(&hints, 0, sizeof(addrinfo));
@@ -74,16 +75,17 @@ namespace mongo {
 #else
             int nodata = false;
 #endif
-            if (ret == EAI_NONAME || nodata){
+            if (ret == EAI_NONAME || nodata) {
                 // iporhost isn't an IP address, allow DNS lookup
                 hints.ai_flags &= ~AI_NUMERICHOST;
                 ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
             }
 
-            if (ret){
+            if (ret) {
                 log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
-                *this = SockAddr(port); 
-            }else{
+                *this = SockAddr(port);
+            }
+            else {
                 //TODO: handle other addresses in linked list;
                 assert(addrs->ai_addrlen <= sizeof(sa));
                 memcpy(&sa, addrs->ai_addr, addrs->ai_addrlen);
@@ -92,13 +94,13 @@ namespace mongo {
             }
         }
     }
- 
+
     bool SockAddr::isLocalHost() const {
-        switch (getType()){
-            case AF_INET: return getAddr() == "127.0.0.1";
-            case AF_INET6: return getAddr() == "::1";
-            case AF_UNIX: return true;
-            default: return false;
+        switch (getType()) {
+        case AF_INET: return getAddr() == "127.0.0.1";
+        case AF_INET6: return getAddr() == "::1";
+        case AF_UNIX: return true;
+        default: return false;
         }
         assert(false);
         return false;
@@ -214,18 +216,18 @@ namespace mongo {
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
     ListeningSockets* ListeningSockets::_instance = new ListeningSockets();
-    
-    ListeningSockets* ListeningSockets::get(){
+
+    ListeningSockets* ListeningSockets::get() {
         return _instance;
     }
 
     string _hostNameCached;
-    static void _hostNameCachedInit(){
+    static void _hostNameCachedInit() {
         _hostNameCached = getHostName();
     }
     boost::once_flag _hostNameCachedInitFlags = BOOST_ONCE_INIT;
 
-    string getHostNameCached(){
+    string getHostNameCached() {
         boost::call_once( _hostNameCachedInit , _hostNameCachedInitFlags );
         return _hostNameCached;
     }

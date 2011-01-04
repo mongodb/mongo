@@ -31,7 +31,7 @@ namespace PdfileTests {
 
         class Base {
         public:
-            Base() : _context( ns() ){
+            Base() : _context( ns() ) {
             }
             virtual ~Base() {
                 if ( !nsd() )
@@ -268,11 +268,11 @@ namespace PdfileTests {
         };
 
     } // namespace ScanCapped
-    
+
     namespace Insert {
         class Base {
         public:
-            Base() : _context( ns() ){
+            Base() : _context( ns() ) {
             }
             virtual ~Base() {
                 if ( !nsd() )
@@ -291,7 +291,7 @@ namespace PdfileTests {
             dblock lk_;
             Client::Context _context;
         };
-        
+
         class UpdateDate : public Base {
         public:
             void run() {
@@ -308,33 +308,33 @@ namespace PdfileTests {
     class ExtentSizing {
     public:
         struct SmallFilesControl {
-            SmallFilesControl(){
+            SmallFilesControl() {
                 old = cmdLine.smallfiles;
                 cmdLine.smallfiles = false;
             }
-            ~SmallFilesControl(){
+            ~SmallFilesControl() {
                 cmdLine.smallfiles = old;
             }
             bool old;
         };
-        void run(){
+        void run() {
             SmallFilesControl c;
             // test that no matter what we start with, we always get to max extent size
-            for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ){
+            for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ) {
                 int sz = Extent::initialSize( obj );
-                for ( int i=0; i<100; i++ ){
+                for ( int i=0; i<100; i++ ) {
                     sz = Extent::followupSize( obj , sz );
                 }
                 ASSERT_EQUALS( Extent::maxSize() , sz );
             }
         }
     };
-    
+
     class ExtentAllocOrder {
     public:
-        void run(){
+        void run() {
             string dbname = "unittest_ex";
-            
+
             string c1 = dbname + ".x1";
             string c2 = dbname + ".x2";
 
@@ -345,23 +345,23 @@ namespace PdfileTests {
 
             dblock mylock;
             Client::Context cx( dbname );
-            
+
             bool isnew;
             Database * d = dbHolder.getOrCreate( dbname , dbpath , isnew );
             assert( d );
 
             int big = 10 * 1024;
             //int small = 1024;
-            
+
             unsigned long long l = 0;
-            while ( 1 ){
+            while ( 1 ) {
                 MongoDataFile * f = d->addAFile( big , false );
                 cout << f->length() << endl;
                 if ( f->length() == l )
                     break;
                 l = f->length();
             }
-            
+
             int start = d->numFiles();
             for ( int i=0; i<start; i++ )
                 d->allocExtent( c1.c_str() , d->getFile( i )->getHeader()->unusedLength , false );
@@ -374,12 +374,12 @@ namespace PdfileTests {
         }
     };
 
-    
+
     class All : public Suite {
     public:
-        All() : Suite( "pdfile" ){}
-        
-        void setupTests(){
+        All() : Suite( "pdfile" ) {}
+
+        void setupTests() {
             add< ScanCapped::Empty >();
             add< ScanCapped::EmptyLooped >();
             add< ScanCapped::EmptyMultiExtentLooped >();

@@ -37,7 +37,7 @@ namespace PairingTests {
         ~Base() {
             pairSync = backup;
             dblock lk;
-			Helpers::emptyCollection( "local.pair.sync" );
+            Helpers::emptyCollection( "local.pair.sync" );
             if ( pairSync->initialSyncCompleted() ) {
                 // save to db
                 pairSync->setInitialSyncCompleted();
@@ -63,7 +63,7 @@ namespace PairingTests {
     private:
         static void init() {
             dblock lk;
-			Helpers::emptyCollection( "local.pair.sync" );
+            Helpers::emptyCollection( "local.pair.sync" );
             if ( synced != 0 && notSynced != 0 )
                 return;
             notSynced = new PairSync();
@@ -71,7 +71,7 @@ namespace PairingTests {
             synced = new PairSync();
             synced->init();
             synced->setInitialSyncCompleted();
-			Helpers::emptyCollection( "local.pair.sync" );
+            Helpers::emptyCollection( "local.pair.sync" );
         }
         PairSync *backup;
         static PairSync *synced;
@@ -199,24 +199,24 @@ namespace PairingTests {
 
                 TestableReplPair rp4( true, fromjson( "{ok:1,you_are:1}" ) );
                 rp4.arbitrate();
-                ASSERT( rp4.state == ReplPair::State_Master );                
+                ASSERT( rp4.state == ReplPair::State_Master );
 
                 TestableReplPair rp5( true, fromjson( "{ok:1,you_are:0}" ) );
                 rp5.arbitrate();
-                ASSERT( rp5.state == ReplPair::State_Slave );                
+                ASSERT( rp5.state == ReplPair::State_Slave );
 
                 TestableReplPair rp6( true, fromjson( "{ok:1,you_are:-1}" ) );
                 rp6.arbitrate();
                 // unchanged from initial value
-                ASSERT( rp6.state == ReplPair::State_Negotiating );           
+                ASSERT( rp6.state == ReplPair::State_Negotiating );
             }
         private:
             class TestableReplPair : public ReplPair {
             public:
                 TestableReplPair( bool connect, const BSONObj &one ) :
-                        ReplPair( "a", "z" ),
-                        connect_( connect ),
-                        one_( one ) {
+                    ReplPair( "a", "z" ),
+                    connect_( connect ),
+                    one_( one ) {
                 }
                 virtual
                 DBClientConnection *newClientConnection() const {
@@ -326,10 +326,10 @@ namespace PairingTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "pairing" ){
+        All() : Suite( "pairing" ) {
         }
-        
-        void setupTests(){
+
+        void setupTests() {
             add< ReplPairTests::Create >();
             add< ReplPairTests::Dominant >();
             add< ReplPairTests::SetMaster >();

@@ -23,16 +23,16 @@ namespace mongo {
 
     class Prioritizable {
     public:
-        Prioritizable( double p ) : _priority(p){}
+        Prioritizable( double p ) : _priority(p) {}
         double priority() const { return _priority; }
     private:
         double _priority;
     };
-    
+
     class DbWebHandler : public Prioritizable {
     public:
         DbWebHandler( const string& name , double priority , bool requiresREST );
-        virtual ~DbWebHandler(){}
+        virtual ~DbWebHandler() {}
 
         virtual bool handles( const string& url ) const { return url == _defaultUrl; }
 
@@ -46,15 +46,15 @@ namespace mongo {
                              int& responseCode,
                              vector<string>& headers, // if completely empty, content-type: text/html will be added
                              const SockAddr &from
-                             ) = 0;
-        
+                           ) = 0;
+
         string toString() const { return _toString; }
         static DbWebHandler * findHandler( const string& url );
 
     private:
         string _name;
         bool _requiresREST;
-        
+
         string _defaultUrl;
         string _toString;
 
@@ -64,8 +64,8 @@ namespace mongo {
     class WebStatusPlugin : public Prioritizable {
     public:
         WebStatusPlugin( const string& secionName , double priority , const string& subheader = "" );
-        virtual ~WebStatusPlugin(){}
-        
+        virtual ~WebStatusPlugin() {}
+
         virtual void run( stringstream& ss ) = 0;
         /** called when web server stats up */
         virtual void init() = 0;
@@ -76,10 +76,10 @@ namespace mongo {
         string _name;
         string _subHeading;
         static vector<WebStatusPlugin*> * _plugins;
-        
+
     };
 
     void webServerThread( const AdminAccess* admins );
     string prettyHostName();
-    
+
 };

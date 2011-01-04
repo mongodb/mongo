@@ -39,7 +39,8 @@ namespace mongo {
             HandleScope handle_scope;
             if (first) {
                 first = false;
-            } else {
+            }
+            else {
                 printf(" ");
             }
             v8::String::Utf8Value str(args[i]);
@@ -49,66 +50,66 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    std::string toSTLString( const Handle<v8::Value> & o ){
-        v8::String::Utf8Value str(o);    
+    std::string toSTLString( const Handle<v8::Value> & o ) {
+        v8::String::Utf8Value str(o);
         const char * foo = *str;
         std::string s(foo);
         return s;
     }
 
-    std::string toSTLString( const v8::TryCatch * try_catch ){
-        
+    std::string toSTLString( const v8::TryCatch * try_catch ) {
+
         stringstream ss;
-        
+
         //while ( try_catch ){ // disabled for v8 bleeding edge
-            
-            v8::String::Utf8Value exception(try_catch->Exception());
-            Handle<v8::Message> message = try_catch->Message();
-            
-            if (message.IsEmpty()) {
-                ss << *exception << endl;
-            } 
-            else {
-                
-                v8::String::Utf8Value filename(message->GetScriptResourceName());
-                int linenum = message->GetLineNumber();
-                ss << *filename << ":" << linenum << " " << *exception << endl;
-                
-                v8::String::Utf8Value sourceline(message->GetSourceLine());
-                ss << *sourceline << endl;
-                
-                int start = message->GetStartColumn();
-                for (int i = 0; i < start; i++)
-                    ss << " ";
-                
-                int end = message->GetEndColumn();
-                for (int i = start; i < end; i++)
-                    ss << "^";
-                
-                ss << endl;
-            }    
-            
-            //try_catch = try_catch->next_;
+
+        v8::String::Utf8Value exception(try_catch->Exception());
+        Handle<v8::Message> message = try_catch->Message();
+
+        if (message.IsEmpty()) {
+            ss << *exception << endl;
+        }
+        else {
+
+            v8::String::Utf8Value filename(message->GetScriptResourceName());
+            int linenum = message->GetLineNumber();
+            ss << *filename << ":" << linenum << " " << *exception << endl;
+
+            v8::String::Utf8Value sourceline(message->GetSourceLine());
+            ss << *sourceline << endl;
+
+            int start = message->GetStartColumn();
+            for (int i = 0; i < start; i++)
+                ss << " ";
+
+            int end = message->GetEndColumn();
+            for (int i = start; i < end; i++)
+                ss << "^";
+
+            ss << endl;
+        }
+
+        //try_catch = try_catch->next_;
         //}
-        
+
         return ss.str();
     }
 
 
-    std::ostream& operator<<( std::ostream &s, const Handle<v8::Value> & o ){
-        v8::String::Utf8Value str(o);    
+    std::ostream& operator<<( std::ostream &s, const Handle<v8::Value> & o ) {
+        v8::String::Utf8Value str(o);
         s << *str;
         return s;
     }
 
-    std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ){
+    std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ) {
         HandleScope handle_scope;
         v8::String::Utf8Value exception(try_catch->Exception());
         Handle<v8::Message> message = try_catch->Message();
-    
+
         if (message.IsEmpty()) {
             s << *exception << endl;
-        } 
+        }
         else {
 
             v8::String::Utf8Value filename(message->GetScriptResourceName());
@@ -127,7 +128,7 @@ namespace mongo {
                 cout << "^";
 
             cout << endl;
-        }    
+        }
 
         //if ( try_catch->next_ ) // disabled for v8 bleeding edge
         //    s << try_catch->next_;
@@ -144,9 +145,9 @@ namespace mongo {
     void ReportException(v8::TryCatch* try_catch) {
         cout << try_catch << endl;
     }
-    
+
     Handle< Context > baseContext_;
-    
+
     class JSThreadConfig {
     public:
         JSThreadConfig( const Arguments &args, bool newScope = false ) : started_(), done_(), newScope_( newScope ) {
@@ -199,7 +200,8 @@ namespace mongo {
                     string fCode = toSTLString( config_.f_->ToString() );
                     Context::Scope context_scope( context );
                     fun = scope->__createFunction( fCode.c_str() );
-                } else {
+                }
+                else {
                     context = baseContext_;
                     Context::Scope context_scope( context );
                     fun = config_.f_;
@@ -221,7 +223,7 @@ namespace mongo {
         private:
             JSThreadConfig &config_;
         };
-        
+
         bool started_;
         bool done_;
         bool newScope_;
@@ -230,7 +232,7 @@ namespace mongo {
         auto_ptr< boost::thread > thread_;
         Persistent< Value > returnData_;
     };
-    
+
     Handle< Value > ThreadInit( const Arguments &args ) {
         Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
@@ -239,7 +241,7 @@ namespace mongo {
         it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
         return v8::Undefined();
     }
-    
+
     Handle< Value > ScopedThreadInit( const Arguments &args ) {
         Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
@@ -254,17 +256,17 @@ namespace mongo {
         JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
         return config;
     }
-    
+
     Handle< Value > ThreadStart( const Arguments &args ) {
         thisConfig( args )->start();
         return v8::Undefined();
     }
-    
+
     Handle< Value > ThreadJoin( const Arguments &args ) {
         thisConfig( args )->join();
         return v8::Undefined();
     }
-    
+
     Handle< Value > ThreadReturnData( const Arguments &args ) {
         HandleScope handle_scope;
         return handle_scope.Close( thisConfig( args )->returnData() );
@@ -273,29 +275,29 @@ namespace mongo {
     Handle< Value > ThreadInject( const Arguments &args ) {
         jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
         jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
-        
+
         Local<v8::Object> o = args[0]->ToObject();
-        
+
         o->Set( v8::String::New( "init" ) , newV8Function< ThreadInit >()->GetFunction() );
         o->Set( v8::String::New( "start" ) , newV8Function< ThreadStart >()->GetFunction() );
         o->Set( v8::String::New( "join" ) , newV8Function< ThreadJoin >()->GetFunction() );
         o->Set( v8::String::New( "returnData" ) , newV8Function< ThreadReturnData >()->GetFunction() );
-        
-        return v8::Undefined();    
+
+        return v8::Undefined();
     }
 
     Handle< Value > ScopedThreadInject( const Arguments &args ) {
         jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
         jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
-        
+
         Local<v8::Object> o = args[0]->ToObject();
-        
+
         o->Set( v8::String::New( "init" ) , newV8Function< ScopedThreadInit >()->GetFunction() );
         // inheritance takes care of other member functions
-        
+
         return v8::Undefined();
     }
-    
+
     void installFork( v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
         if ( baseContext_.IsEmpty() ) // if this is the shell, first call will be with shell context, otherwise don't expect to use fork() anyway
             baseContext_ = context;

@@ -35,7 +35,7 @@
 namespace po = boost::program_options;
 
 namespace mongo {
-    
+
     CmdLine cmdLine;
 
     namespace regression {
@@ -47,21 +47,21 @@ namespace mongo {
             Result( string name ) : _name( name ) , _rc(0) , _tests(0) , _fails(0) , _asserts(0) {
             }
 
-            string toString(){
+            string toString() {
                 stringstream ss;
 
                 char result[128];
                 sprintf(result, "%-20s | tests: %4d | fails: %4d | assert calls: %6d\n", _name.c_str(), _tests, _fails, _asserts);
                 ss << result;
 
-                for ( list<string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ){
+                for ( list<string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ) {
                     ss << "\t" << *i << '\n';
                 }
-                
+
                 return ss.str();
             }
 
-            int rc(){
+            int rc() {
                 return _rc;
             }
 
@@ -78,7 +78,7 @@ namespace mongo {
 
         Result * Result::cur = 0;
 
-        Result * Suite::run( const string& filter ){
+        Result * Suite::run( const string& filter ) {
             tlogLevel = -1;
 
             log(1) << "\t about to setupTests" << endl;
@@ -91,53 +91,53 @@ namespace mongo {
             /* see note in SavedContext */
             //writelock lk("");
 
-            for ( list<TestCase*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ){
+            for ( list<TestCase*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
                 TestCase * tc = *i;
-                if ( filter.size() && tc->getName().find( filter ) == string::npos ){
+                if ( filter.size() && tc->getName().find( filter ) == string::npos ) {
                     log(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << endl;
                     continue;
                 }
 
                 r->_tests++;
-                
+
                 bool passes = false;
-                
+
                 log(1) << "\t going to run test: " << tc->getName() << endl;
-                
+
                 stringstream err;
                 err << tc->getName() << "\t";
-                
+
                 try {
                     tc->run();
                     passes = true;
                 }
-                catch ( MyAssertionException * ae ){
+                catch ( MyAssertionException * ae ) {
                     err << ae->ss.str();
                     delete( ae );
                 }
-                catch ( std::exception& e ){
+                catch ( std::exception& e ) {
                     err << " exception: " << e.what();
                 }
-                catch ( int x ){
+                catch ( int x ) {
                     err << " caught int : " << x << endl;
                 }
-                catch ( ... ){
+                catch ( ... ) {
                     cerr << "unknown exception in test: " << tc->getName() << endl;
                 }
-                
-                if ( ! passes ){
+
+                if ( ! passes ) {
                     string s = err.str();
                     log() << "FAIL: " << s << endl;
                     r->_fails++;
                     r->_messages.push_back( s );
-                }	
+                }
             }
-            
+
             if ( r->_fails )
                 r->_rc = 17;
 
             log(1) << "\t DONE running tests" << endl;
-	    
+
             return r;
         }
 
@@ -156,23 +156,23 @@ namespace mongo {
             po::positional_options_description positional_options;
 
             shell_options.add_options()
-                ("help,h", "show this usage information")
-                ("dbpath", po::value<string>(&dbpathSpec)->default_value(default_dbpath),
-                 "db data path for this test run. NOTE: the contents of this "
-                 "directory will be overwritten if it already exists")
-                ("debug", "run tests with verbose output")
-                ("list,l", "list available test suites")
-                ("bigfiles", "use big datafiles instead of smallfiles which is the default")
-                ("filter,f" , po::value<string>() , "string substring filter on test name" )
-                ("verbose,v", "verbose")
-                ("dur", "enable journaling")
-                ("nodur", "disable journaling (currently the default)")
-                ("seed", po::value<unsigned long long>(&seed), "random number seed")
-                ;
-            
+            ("help,h", "show this usage information")
+            ("dbpath", po::value<string>(&dbpathSpec)->default_value(default_dbpath),
+             "db data path for this test run. NOTE: the contents of this "
+             "directory will be overwritten if it already exists")
+            ("debug", "run tests with verbose output")
+            ("list,l", "list available test suites")
+            ("bigfiles", "use big datafiles instead of smallfiles which is the default")
+            ("filter,f" , po::value<string>() , "string substring filter on test name" )
+            ("verbose,v", "verbose")
+            ("dur", "enable journaling")
+            ("nodur", "disable journaling (currently the default)")
+            ("seed", po::value<unsigned long long>(&seed), "random number seed")
+            ;
+
             hidden_options.add_options()
-                ("suites", po::value< vector<string> >(), "test suites to run")
-                ;
+            ("suites", po::value< vector<string> >(), "test suites to run")
+            ;
 
             positional_options.add("suites", -1);
 
@@ -189,7 +189,8 @@ namespace mongo {
                           positional(positional_options).
                           style(command_line_style).run(), params);
                 po::notify(params);
-            } catch (po::error &e) {
+            }
+            catch (po::error &e) {
                 cout << "ERROR: " << e.what() << endl << endl;
                 show_help_text(argv[0], shell_options);
                 return EXIT_BADOPTIONS;
@@ -200,10 +201,10 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
-            if( params.count("nodur") ) { 
+            if( params.count("nodur") ) {
                 cmdLine.dur = false;
             }
-            if( params.count("dur") || cmdLine.dur ) { 
+            if( params.count("dur") || cmdLine.dur ) {
                 cmdLine.dur = true;
             }
 
@@ -228,21 +229,22 @@ namespace mongo {
                 }
                 boost::filesystem::directory_iterator end_iter;
                 for (boost::filesystem::directory_iterator dir_iter(p);
-                     dir_iter != end_iter; ++dir_iter) {
+                        dir_iter != end_iter; ++dir_iter) {
                     boost::filesystem::remove_all(*dir_iter);
                 }
-            } else {
+            }
+            else {
                 boost::filesystem::create_directory(p);
             }
 
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
-            
+
             cmdLine.prealloc = false;
 
             // dbtest defaults to smallfiles
             cmdLine.smallfiles = true;
-            if( params.count("bigfiles") ) { 
+            if( params.count("bigfiles") ) {
                 cmdLine.dur = true;
             }
 
@@ -261,9 +263,9 @@ namespace mongo {
             if (params.count("suites")) {
                 suites = params["suites"].as< vector<string> >();
             }
-            
+
             string filter = "";
-            if ( params.count( "filter" ) ){
+            if ( params.count( "filter" ) ) {
                 filter = params["filter"].as<string>();
             }
 
@@ -274,13 +276,13 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
             flock( lockFile, LOCK_UN );
 #endif
-            
+
             cc().shutdown();
             dbexit( (ExitCode)ret ); // so everything shuts down cleanly
             return ret;
         }
 
-        int Suite::run( vector<string> suites , const string& filter ){
+        int Suite::run( vector<string> suites , const string& filter ) {
             for ( unsigned int i = 0; i < suites.size(); i++ ) {
                 if ( _suites->find( suites[i] ) == _suites->end() ) {
                     cout << "invalid test [" << suites[i] << "], use --list to see valid names" << endl;
@@ -296,7 +298,7 @@ namespace mongo {
 
             list<Result*> results;
 
-            for ( list<string>::iterator i=torun.begin(); i!=torun.end(); i++ ){
+            for ( list<string>::iterator i=torun.begin(); i!=torun.end(); i++ ) {
                 string name = *i;
                 Suite * s = (*_suites)[name];
                 assert( s );
@@ -317,12 +319,12 @@ namespace mongo {
             int fails = 0;
             int asserts = 0;
 
-            for ( list<Result*>::iterator i=results.begin(); i!=results.end(); i++ ){
+            for ( list<Result*>::iterator i=results.begin(); i!=results.end(); i++ ) {
                 Result * r = *i;
                 cout << r->toString();
                 if ( abs( r->rc() ) > abs( rc ) )
                     rc = r->rc();
-                
+
                 tests += r->_tests;
                 fails += r->_fails;
                 asserts += r->_asserts;
@@ -332,13 +334,13 @@ namespace mongo {
             totals._tests = tests;
             totals._fails = fails;
             totals._asserts = asserts;
-            
+
             cout << totals.toString(); // includes endl
 
             return rc;
         }
 
-        void Suite::registerSuite( string name , Suite * s ){
+        void Suite::registerSuite( string name , Suite * s ) {
             if ( ! _suites )
                 _suites = new map<string,Suite*>();
             Suite*& m = (*_suites)[name];
@@ -346,37 +348,37 @@ namespace mongo {
             m = s;
         }
 
-        void assert_pass(){
+        void assert_pass() {
             Result::cur->_asserts++;
         }
 
-        void assert_fail( const char * exp , const char * file , unsigned line ){
+        void assert_fail( const char * exp , const char * file , unsigned line ) {
             Result::cur->_asserts++;
-            
+
             MyAssertionException * e = new MyAssertionException();
             e->ss << "ASSERT FAILED! " << file << ":" << line << endl;
             throw e;
         }
 
-        void fail( const char * exp , const char * file , unsigned line ){
+        void fail( const char * exp , const char * file , unsigned line ) {
             assert(0);
         }
 
-        MyAssertionException * MyAsserts::getBase(){
+        MyAssertionException * MyAsserts::getBase() {
             MyAssertionException * e = new MyAssertionException();
             e->ss << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
             return e;
         }
-        
-        void MyAsserts::printLocation(){
+
+        void MyAsserts::printLocation() {
             log() << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
         }
 
-        void MyAsserts::_gotAssert(){
+        void MyAsserts::_gotAssert() {
             Result::cur->_asserts++;
         }
 
     }
 
-    void setupSignals( bool inFork ){}
+    void setupSignals( bool inFork ) {}
 }

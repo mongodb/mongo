@@ -31,7 +31,7 @@ namespace mongo {
     */
     class BSONObjIterator {
     public:
-        /** Create an iterator for a BSON object. 
+        /** Create an iterator for a BSON object.
         */
         BSONObjIterator(const BSONObj& jso) {
             int sz = jso.objsize();
@@ -43,11 +43,11 @@ namespace mongo {
             _theend = jso.objdata() + sz;
         }
 
-        BSONObjIterator( const char * start , const char * end ){
+        BSONObjIterator( const char * start , const char * end ) {
             _pos = start + 4;
             _theend = end;
         }
-        
+
         /** @return true if more elements exist to be enumerated. */
         bool more() { return _pos < _theend && _pos[0]; }
 
@@ -78,18 +78,18 @@ namespace mongo {
     class BSONObjIteratorSorted {
     public:
         BSONObjIteratorSorted( const BSONObj& o );
-        
-        ~BSONObjIteratorSorted(){
+
+        ~BSONObjIteratorSorted() {
             assert( _fields );
             delete[] _fields;
             _fields = 0;
         }
 
-        bool more(){
+        bool more() {
             return _cur < _nfields;
         }
-        
-        BSONElement next(){
+
+        BSONElement next() {
             assert( _fields );
             if ( _cur < _nfields )
                 return BSONElement( _fields[_cur++] );
@@ -102,30 +102,30 @@ namespace mongo {
         int _cur;
     };
 
-/** Similar to BOOST_FOREACH
- *
- *  because the iterator is defined outside of the for, you must use {} around
- *  the surrounding scope. Don't do this:
- *
- *  if (foo)
- *      BSONForEach(e, obj)
- *          doSomething(e);
- *
- *  but this is OK:
- *
- *  if (foo) {
- *      BSONForEach(e, obj)
- *          doSomething(e);
- *  }
- *
- */
+    /** Similar to BOOST_FOREACH
+     *
+     *  because the iterator is defined outside of the for, you must use {} around
+     *  the surrounding scope. Don't do this:
+     *
+     *  if (foo)
+     *      BSONForEach(e, obj)
+     *          doSomething(e);
+     *
+     *  but this is OK:
+     *
+     *  if (foo) {
+     *      BSONForEach(e, obj)
+     *          doSomething(e);
+     *  }
+     *
+     */
 
 #define BSONForEach(e, obj)                                     \
     BSONObjIterator BOOST_PP_CAT(it_,__LINE__)(obj);            \
     for ( BSONElement e;                                        \
-          (BOOST_PP_CAT(it_,__LINE__).more() ?                  \
-               (e = BOOST_PP_CAT(it_,__LINE__).next(), true) :  \
-               false) ;                                         \
-          /*nothing*/ )
+            (BOOST_PP_CAT(it_,__LINE__).more() ?                  \
+             (e = BOOST_PP_CAT(it_,__LINE__).next(), true) :  \
+             false) ;                                         \
+            /*nothing*/ )
 
 }

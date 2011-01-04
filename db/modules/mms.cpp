@@ -37,54 +37,54 @@ namespace mongo {
         MMS()
             : Module( "mms" ) , _baseurl( "" ) ,
               _secsToSleep(1) , _token( "" ) , _name( "" ) {
-            
+
             add_options()
-                ( "mms-url" , po::value<string>()->default_value("http://mms.10gen.com/ping") , "url for mongo monitoring server" )
-                ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
-                ( "mms-name" , po::value<string>() , "server name for mongo monitoring server" )
-                ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval (in seconds) for mongo monitoring server" )
-                ;
-        }    
-        
-        ~MMS(){}
-        
-        void config( program_options::variables_map& params ){
+            ( "mms-url" , po::value<string>()->default_value("http://mms.10gen.com/ping") , "url for mongo monitoring server" )
+            ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
+            ( "mms-name" , po::value<string>() , "server name for mongo monitoring server" )
+            ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval (in seconds) for mongo monitoring server" )
+            ;
+        }
+
+        ~MMS() {}
+
+        void config( program_options::variables_map& params ) {
             _baseurl = params["mms-url"].as<string>();
-            if ( params.count( "mms-token" ) ){
+            if ( params.count( "mms-token" ) ) {
                 _token = params["mms-token"].as<string>();
             }
-            if ( params.count( "mms-name" ) ){
+            if ( params.count( "mms-name" ) ) {
                 _name = params["mms-name"].as<string>();
             }
             _secsToSleep = params["mms-interval"].as<int>();
         }
-        
-        void run(){
-            if ( _token.size() == 0  && _name.size() == 0 ){
+
+        void run() {
+            if ( _token.size() == 0  && _name.size() == 0 ) {
                 log(1) << "mms not configured" << endl;
                 return;
             }
 
-            if ( _token.size() == 0 ){
+            if ( _token.size() == 0 ) {
                 log() << "no token for mms - not running" << endl;
                 return;
             }
-        
-            if ( _name.size() == 0 ){
+
+            if ( _name.size() == 0 ) {
                 log() << "no name for mms - not running" << endl;
                 return;
             }
-            
+
             log() << "mms monitor staring...  token:" << _token << " name:" << _name << " interval: " << _secsToSleep << endl;
             Client::initThread( "mms" );
             Client& c = cc();
-            
-            
+
+
             // TODO: using direct client is bad, but easy for now
-            
-            while ( ! inShutdown() ){
+
+            while ( ! inShutdown() ) {
                 sleepsecs( _secsToSleep );
-                
+
                 try {
                     stringstream url;
                     url << _baseurl << "?"
@@ -92,47 +92,47 @@ namespace mongo {
                         << "name=" << _name << "&"
                         << "ts=" << time(0)
                         ;
-                    
+
                     BSONObjBuilder bb;
                     // duplicated so the post has everything
                     bb.append( "token" , _token );
                     bb.append( "name" , _name );
                     bb.appendDate( "ts" , jsTime()  );
-                    
+
                     // any commands
                     _add( bb , "buildinfo" );
                     _add( bb , "serverStatus" );
-                    
+
                     BSONObj postData = bb.obj();
-                    
+
                     log(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
-                    
+
                     HttpClient c;
                     HttpClient::Result r;
                     int rc = c.post( url.str() , postData.jsonString() , &r );
                     log(1) << "\t response code: " << rc << endl;
-                    if ( rc != 200 ){
+                    if ( rc != 200 ) {
                         log() << "mms error response code:" << rc << endl;
                         log(1) << "mms error body:" << r.getEntireResponse() << endl;
                     }
                 }
-                catch ( std::exception& e ){
+                catch ( std::exception& e ) {
                     log() << "mms exception: " << e.what() << endl;
                 }
             }
-            
+
             c.shutdown();
         }
-        
-        void _add( BSONObjBuilder& postData , const char* cmd ){
+
+        void _add( BSONObjBuilder& postData , const char* cmd ) {
             Command * c = Command::findCommand( cmd );
-            if ( ! c ){
+            if ( ! c ) {
                 log() << "MMS can't find command: " << cmd << endl;
                 postData.append( cmd , "can't find command" );
                 return;
             }
-            
-            if ( c->locktype() ){
+
+            if ( c->locktype() ) {
                 log() << "MMS can only use noLocking commands not: " << cmd << endl;
                 postData.append( cmd , "not noLocking" );
                 return;
@@ -147,24 +147,24 @@ namespace mongo {
             else
                 postData.append( cmd , sub.obj() );
         }
-        
 
-        void init(){ go(); }
 
-        void shutdown(){
+        void init() { go(); }
+
+        void shutdown() {
             // TODO
         }
 
     private:
         string _baseurl;
         int _secsToSleep;
-        
+
         string _token;
         string _name;
-        
+
     } /*mms*/ ;
 
 }
 
-        
+
 

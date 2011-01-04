@@ -25,7 +25,7 @@ namespace mongo {
 
     using std::ostringstream;
 
-    ServiceStats::ServiceStats(){
+    ServiceStats::ServiceStats() {
         // Time histogram covers up to 128msec in exponential intervals
         // starting at 125usec.
         Histogram::Options timeOpts;
@@ -43,12 +43,12 @@ namespace mongo {
         _spaceHistogram = new Histogram( spaceOpts );
     }
 
-    ServiceStats::~ServiceStats(){
+    ServiceStats::~ServiceStats() {
         delete _timeHistogram;
         delete _spaceHistogram;
     }
 
-    void ServiceStats::logResponse( uint64_t duration, uint64_t bytes ){
+    void ServiceStats::logResponse( uint64_t duration, uint64_t bytes ) {
         _spinLock.lock();
         _timeHistogram->insert( duration / 1000 /* in usecs */ );
         _spaceHistogram->insert( bytes );

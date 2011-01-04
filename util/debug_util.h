@@ -62,7 +62,7 @@ namespace mongo {
 #define MONGO_RARELY SOMETIMES( rarely, 128 )
 #define RARELY MONGO_RARELY
 
-#define MONGO_ONCE for( static bool undone = true; undone; undone = false ) 
+#define MONGO_ONCE for( static bool undone = true; undone; undone = false )
 #define ONCE MONGO_ONCE
 
 #if defined(_WIN32)
@@ -74,8 +74,8 @@ namespace mongo {
     void setupSIGTRAPforGDB();
 
     extern int tlogLevel;
-    
-    inline void breakpoint(){
+
+    inline void breakpoint() {
         if ( tlogLevel < 0 )
             return;
 #ifdef _WIN32
@@ -87,20 +87,20 @@ namespace mongo {
             //prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
             struct sigaction current;
             sigaction(SIGTRAP, NULL, &current);
-            if (current.sa_handler == SIG_DFL){
+            if (current.sa_handler == SIG_DFL) {
                 signal(SIGTRAP, SIG_IGN);
             }
         }
-        
+
         raise(SIGTRAP);
 #endif
     }
-    
+
 
     // conditional breakpoint
-    inline void breakif(bool test){
+    inline void breakif(bool test) {
         if (test)
             breakpoint();
     }
-   
+
 } // namespace mongo

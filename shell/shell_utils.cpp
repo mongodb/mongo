@@ -50,10 +50,10 @@
 #include "../util/file.h"
 
 namespace mongo {
-    
+
     DBClientWithCommands *latestConn = 0;
     extern bool dbexitCalled;
-    
+
 #ifdef _WIN32
     inline int close(int fd) { return _close(fd); }
     inline int read(int fd, void* buf, size_t size) { return _read(fd, buf, size); }
@@ -64,29 +64,29 @@ namespace mongo {
     namespace shellUtils {
 
         Scope* theScope = 0;
-        
+
         std::string _dbConnect;
         std::string _dbAuth;
-                
+
         const char *argv0 = 0;
         void RecordMyLocation( const char *_argv0 ) { argv0 = _argv0; }
-        
+
         // helpers
-        
+
         BSONObj makeUndefined() {
             BSONObjBuilder b;
             b.appendUndefined( "" );
             return b.obj();
         }
         const BSONObj undefined_ = makeUndefined();
-        
+
         BSONObj encapsulate( const BSONObj &obj ) {
             return BSON( "" << obj );
         }
-        
+
         // real methods
 
-        mongo::BSONObj JSSleep(const mongo::BSONObj &args){
+        mongo::BSONObj JSSleep(const mongo::BSONObj &args) {
             assert( args.nFields() == 1 );
             assert( args.firstElement().isNumber() );
             int ms = int( args.firstElement().number() );
@@ -107,52 +107,52 @@ namespace mongo {
             return undefined_;
         }
 
-        BSONObj JSGetMemInfo( const BSONObj& args ){
+        BSONObj JSGetMemInfo( const BSONObj& args ) {
             ProcessInfo pi;
             uassert( 10258 ,  "processinfo not supported" , pi.supported() );
-            
+
             BSONObjBuilder e;
             e.append( "virtual" , pi.getVirtualMemorySize() );
             e.append( "resident" , pi.getResidentSize() );
-            
+
             BSONObjBuilder b;
             b.append( "ret" , e.obj() );
-            
+
             return b.obj();
         }
 
 
 #ifndef MONGO_SAFE_SHELL
 
-        BSONObj listFiles(const BSONObj& _args){
+        BSONObj listFiles(const BSONObj& _args) {
             static BSONObj cd = BSON( "0" << "." );
             BSONObj args = _args.isEmpty() ? cd : _args;
 
             uassert( 10257 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
-            
+
             BSONObjBuilder lst;
-            
+
             string rootname = args.firstElement().valuestrsafe();
             path root( rootname );
             stringstream ss;
             ss << "listFiles: no such directory: " << rootname;
             string msg = ss.str();
             uassert( 12581, msg.c_str(), boost::filesystem::exists( root ) );
-            
+
             directory_iterator end;
             directory_iterator i( root);
-            
+
             int num =0;
-            while ( i != end ){
+            while ( i != end ) {
                 path p = *i;
                 BSONObjBuilder b;
                 b << "name" << p.string();
                 b.appendBool( "isDirectory", is_directory( p ) );
-                if ( ! is_directory( p ) ){
-                    try { 
+                if ( ! is_directory( p ) ) {
+                    try {
                         b.append( "size" , (double)file_size( p ) );
                     }
-                    catch ( ... ){
+                    catch ( ... ) {
                         i++;
                         continue;
                     }
@@ -165,16 +165,16 @@ namespace mongo {
                 num++;
                 i++;
             }
-            
+
             BSONObjBuilder ret;
             ret.appendArray( "", lst.done() );
             return ret.obj();
         }
 
-        BSONObj ls(const BSONObj& args) { 
+        BSONObj ls(const BSONObj& args) {
             BSONObj o = listFiles(args);
             if( !o.isEmpty() ) {
-                for( BSONObj::iterator i = o.firstElement().Obj().begin(); i.more(); ) { 
+                for( BSONObj::iterator i = o.firstElement().Obj().begin(); i.more(); ) {
                     BSONObj f = i.next().Obj();
                     cout << f["name"].String();
                     if( f["isDirectory"].trueValue() ) cout << '/';
@@ -185,38 +185,38 @@ namespace mongo {
             return BSONObj();
         }
 
-        BSONObj cd(const BSONObj& args) { 
+        BSONObj cd(const BSONObj& args) {
 #if defined(_WIN32)
             std::wstring dir = toWideString( args.firstElement().String().c_str() );
             if( SetCurrentDirectory(dir.c_str()) )
                 return BSONObj();
 #else
             string dir = args.firstElement().String();
-/*            if( chdir(dir.c_str) ) == 0 )
-                return BSONObj();
-                */
+            /*            if( chdir(dir.c_str) ) == 0 )
+                            return BSONObj();
+                            */
             if( 1 ) return BSON(""<<"implementation not done for posix");
 #endif
             return BSON( "" << "change directory failed" );
         }
 
-        BSONObj pwd(const BSONObj&) { 
+        BSONObj pwd(const BSONObj&) {
             boost::filesystem::path p = boost::filesystem::current_path();
             return BSON( "" << p.string() );
         }
 
-        BSONObj hostname(const BSONObj&) { 
+        BSONObj hostname(const BSONObj&) {
             return BSON( "" << getHostName() );
         }
 
-        static BSONElement oneArg(const BSONObj& args) { 
+        static BSONElement oneArg(const BSONObj& args) {
             uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
             return args.firstElement();
         }
 
         const int CANT_OPEN_FILE = 13300;
 
-        BSONObj cat(const BSONObj& args){
+        BSONObj cat(const BSONObj& args) {
             BSONElement e = oneArg(args);
             stringstream ss;
             ifstream f(e.valuestrsafe());
@@ -235,7 +235,7 @@ namespace mongo {
             return BSON( "" << ss.str() );
         }
 
-        BSONObj md5sumFile(const BSONObj& args){
+        BSONObj md5sumFile(const BSONObj& args) {
             BSONElement e = oneArg(args);
             stringstream ss;
             FILE* f = fopen(e.valuestrsafe(), "rb");
@@ -256,17 +256,17 @@ namespace mongo {
             return BSON( "" << digestToString( d ) );
         }
 
-        BSONObj mkdir(const BSONObj& args){
+        BSONObj mkdir(const BSONObj& args) {
             boost::filesystem::create_directories(args.firstElement().String());
             return BSON( "" << true );
         }
 
-        BSONObj removeFile(const BSONObj& args){
+        BSONObj removeFile(const BSONObj& args) {
             BSONElement e = oneArg(args);
             bool found = false;
-            
+
             path root( args.firstElement().valuestrsafe() );
-            if ( boost::filesystem::exists( root ) ){
+            if ( boost::filesystem::exists( root ) ) {
                 found = true;
                 boost::filesystem::remove_all( root );
             }
@@ -280,31 +280,31 @@ namespace mongo {
          * @param args - [ name, byte index ]
          * In this initial implementation, all bits in the specified byte are flipped.
          */
-        BSONObj fuzzFile(const BSONObj& args){
+        BSONObj fuzzFile(const BSONObj& args) {
             uassert( 13619, "fuzzFile takes 2 arguments", args.nFields() == 2 );
             shared_ptr< File > f( new File() );
             f->open( args.getStringField( "0" ) );
             uassert( 13620, "couldn't open file to fuzz", !f->bad() && f->is_open() );
-            
+
             char c;
             f->read( args.getIntField( "1" ), &c, 1 );
             c = ~c;
             f->write( args.getIntField( "1" ), &c, 1 );
 
             return undefined_;
-            // f close is implicit            
-        }        
-        
+            // f close is implicit
+        }
+
         map< int, pair< pid_t, int > > dbs;
         map< pid_t, int > shells;
 #ifdef _WIN32
         map< pid_t, HANDLE > handles;
 #endif
-        
+
         mongo::mutex mongoProgramOutputMutex("mongoProgramOutputMutex");
         stringstream mongoProgramOutput_;
 
-        void goingAwaySoon() { 
+        void goingAwaySoon() {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             mongo::dbexitCalled = true;
         }
@@ -320,7 +320,7 @@ namespace mongo {
             cout << buf.str() << endl;
             mongoProgramOutput_ << buf.str() << endl;
         }
-        
+
         // only returns last 100000 characters
         BSONObj RawMongoProgramOutput( const BSONObj &args ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
@@ -336,7 +336,7 @@ namespace mongo {
             mongoProgramOutput_.str( "" );
             return undefined_;
         }
-        
+
         class ProgramRunner {
             vector<string> argv_;
             int port_;
@@ -346,13 +346,13 @@ namespace mongo {
             pid_t pid() const { return pid_; }
             int port() const { return port_; }
 
-            boost::filesystem::path find(string prog) { 
+            boost::filesystem::path find(string prog) {
                 boost::filesystem::path p = prog;
 #ifdef _WIN32
                 p = change_extension(p, ".exe");
 #endif
 
-                if( boost::filesystem::exists(p) ){
+                if( boost::filesystem::exists(p) ) {
 #ifndef _WIN32
                     p = boost::filesystem::initial_path() / p;
 #endif
@@ -371,23 +371,23 @@ namespace mongo {
                             if( boost::filesystem::exists(t) ) return t;
                         }
                     }
-                } catch(...) { }
+                }
+                catch(...) { }
                 {
                     boost::filesystem::path t = boost::filesystem::initial_path() / p;
                     if( boost::filesystem::exists(t)  ) return t;
                 }
                 return p; // not found; might find via system path
-            } 
+            }
 
-            ProgramRunner( const BSONObj &args , bool isMongoProgram=true)
-            {
+            ProgramRunner( const BSONObj &args , bool isMongoProgram=true) {
                 assert( !args.isEmpty() );
 
                 string program( args.firstElement().valuestrsafe() );
                 assert( !program.empty() );
                 boost::filesystem::path programPath = find(program);
 
-                if (isMongoProgram){
+                if (isMongoProgram) {
 #if 0
                     if (program == "mongos") {
                         argv_.push_back("valgrind");
@@ -401,9 +401,9 @@ namespace mongo {
                 }
 
                 argv_.push_back( programPath.native_file_string() );
-                
+
                 port_ = -1;
-                
+
                 BSONObjIterator j( args );
                 j.next(); // skip program name (handled above)
                 while(j.more()) {
@@ -413,7 +413,8 @@ namespace mongo {
                         stringstream ss;
                         ss << e.number();
                         str = ss.str();
-                    } else {
+                    }
+                    else {
                         assert( e.type() == mongo::String );
                         str = e.valuestr();
                     }
@@ -423,7 +424,7 @@ namespace mongo {
                         port_ = strtol( str.c_str(), 0, 10 );
                     argv_.push_back(str);
                 }
-                
+
                 if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
                     port_ = 0;
                 else {
@@ -431,19 +432,19 @@ namespace mongo {
                         cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
                     assert( port_ > 0 );
                 }
-                if ( port_ > 0 && dbs.count( port_ ) != 0 ){
+                if ( port_ > 0 && dbs.count( port_ ) != 0 ) {
                     cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
-                    assert( dbs.count( port_ ) == 0 );        
+                    assert( dbs.count( port_ ) == 0 );
                 }
             }
-            
+
             void start() {
                 int pipeEnds[ 2 ];
                 assert( pipe( pipeEnds ) != -1 );
-                
+
                 fflush( 0 );
                 launch_process(pipeEnds[1]); //sets pid_
-                
+
                 {
                     stringstream ss;
                     ss << "shell: started program";
@@ -459,52 +460,54 @@ namespace mongo {
                     shells.insert( make_pair( pid_, pipeEnds[ 1 ] ) );
                 pipe_ = pipeEnds[ 0 ];
             }
-            
+
             // Continue reading output
             void operator()() {
                 try {
-                // This assumes there aren't any 0's in the mongo program output.
-                // Hope that's ok.
-                const unsigned bufSize = 64000;
-                char buf[ bufSize ];
-                char temp[ bufSize ];
-                char *start = buf;
-                while( 1 ) {
-                    int lenToRead = ( bufSize - 1 ) - ( start - buf );
-                    assert( lenToRead > 0 );
-                    int ret = read( pipe_, (void *)start, lenToRead );
-                    if( mongo::dbexitCalled )
-                        break;
-                    assert( ret != -1 );
-                    start[ ret ] = '\0';
-                    if ( strlen( start ) != unsigned( ret ) )
-                        writeMongoProgramOutputLine( port_, pid_, "WARNING: mongod wrote null bytes to output" );
-                    char *last = buf;
-                    for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
-                        *i = '\0';
-                        writeMongoProgramOutputLine( port_, pid_, last );
-                    }
-                    if ( ret == 0 ) {
-                        if ( *last )
+                    // This assumes there aren't any 0's in the mongo program output.
+                    // Hope that's ok.
+                    const unsigned bufSize = 64000;
+                    char buf[ bufSize ];
+                    char temp[ bufSize ];
+                    char *start = buf;
+                    while( 1 ) {
+                        int lenToRead = ( bufSize - 1 ) - ( start - buf );
+                        assert( lenToRead > 0 );
+                        int ret = read( pipe_, (void *)start, lenToRead );
+                        if( mongo::dbexitCalled )
+                            break;
+                        assert( ret != -1 );
+                        start[ ret ] = '\0';
+                        if ( strlen( start ) != unsigned( ret ) )
+                            writeMongoProgramOutputLine( port_, pid_, "WARNING: mongod wrote null bytes to output" );
+                        char *last = buf;
+                        for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
+                            *i = '\0';
                             writeMongoProgramOutputLine( port_, pid_, last );
-                        close( pipe_ );
-                        break;
+                        }
+                        if ( ret == 0 ) {
+                            if ( *last )
+                                writeMongoProgramOutputLine( port_, pid_, last );
+                            close( pipe_ );
+                            break;
+                        }
+                        if ( last != buf ) {
+                            strcpy( temp, last );
+                            strcpy( buf, temp );
+                        }
+                        else {
+                            assert( strlen( buf ) < bufSize );
+                        }
+                        start = buf + strlen( buf );
                     }
-                    if ( last != buf ) {
-                        strcpy( temp, last );
-                        strcpy( buf, temp );
-                    } else {
-                        assert( strlen( buf ) < bufSize );
-                    }
-                    start = buf + strlen( buf );
-                }    
-                } catch(...) { 
+                }
+                catch(...) {
                 }
             }
-            void launch_process(int child_stdout){
+            void launch_process(int child_stdout) {
 #ifdef _WIN32
                 stringstream ss;
-                for( unsigned i=0; i < argv_.size(); i++ ){
+                for( unsigned i=0; i < argv_.size(); i++ ) {
                     if (i) ss << ' ';
                     if (argv_[i].find(' ') == string::npos)
                         ss << argv_[i];
@@ -513,7 +516,7 @@ namespace mongo {
                 }
 
                 string args = ss.str();
-                
+
                 boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
                 size_t i;
                 for(i=0; i < args.size(); i++)
@@ -545,24 +548,23 @@ namespace mongo {
 
                 pid_ = pi.dwProcessId;
                 handles.insert( make_pair( pid_, pi.hProcess ) );
-                
+
 #else
 
                 pid_ = fork();
                 assert( pid_ != -1 );
-                
+
                 if ( pid_ == 0 ) {
                     // DON'T ASSERT IN THIS BLOCK - very bad things will happen
 
                     const char** argv = new const char* [argv_.size()+1]; // don't need to free - in child
-                    for (unsigned i=0; i < argv_.size(); i++){
+                    for (unsigned i=0; i < argv_.size(); i++) {
                         argv[i] = argv_[i].c_str();
                     }
                     argv[argv_.size()] = 0;
-                    
+
                     if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
-                         dup2( child_stdout, STDERR_FILENO ) == -1 )
-                    {
+                            dup2( child_stdout, STDERR_FILENO ) == -1 ) {
                         cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
                         ::_Exit(-1); //do not pass go, do not call atexit handlers
                     }
@@ -574,7 +576,7 @@ namespace mongo {
                     env[1] = NULL;
 
                     // Heap-check for mongos only. 'argv[0]' must be in the path format.
-                    if ( argv_[0].find("mongos") != string::npos){
+                    if ( argv_[0].find("mongos") != string::npos) {
                         execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
                     }
 #endif // HEAP_CHECKING
@@ -588,9 +590,9 @@ namespace mongo {
 #endif
             }
         };
-        
+
         //returns true if process exited
-        bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL){
+        bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL) {
 #ifdef _WIN32
             assert(handles.count(pid));
             HANDLE h = handles[pid];
@@ -599,13 +601,14 @@ namespace mongo {
                 WaitForSingleObject(h, INFINITE);
 
             DWORD tmp;
-            if(GetExitCodeProcess(h, &tmp)){
+            if(GetExitCodeProcess(h, &tmp)) {
                 CloseHandle(h);
                 handles.erase(pid);
                 if (exit_code)
                     *exit_code = tmp;
                 return true;
-            }else{
+            }
+            else {
                 return false;
             }
 #else
@@ -614,11 +617,11 @@ namespace mongo {
             if (exit_code)
                 *exit_code = WEXITSTATUS(tmp);
             return ret;
-                
+
 #endif
         }
 
-        BSONObj WaitProgram( const BSONObj& a ){
+        BSONObj WaitProgram( const BSONObj& a ) {
             int pid = a.firstElement().numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
             shells.erase( pid );
@@ -641,7 +644,8 @@ namespace mongo {
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
                 dbs.erase( r.port() );
-            } else {
+            }
+            else {
                 shells.erase( r.pid() );
             }
             return BSON( string( "" ) << exit_code );
@@ -663,10 +667,10 @@ namespace mongo {
             assert( !path.empty() );
             if ( boost::filesystem::exists( path ) )
                 boost::filesystem::remove_all( path );
-            boost::filesystem::create_directory( path );    
+            boost::filesystem::create_directory( path );
             return undefined_;
         }
-        
+
         void copyDir( const path &from, const path &to ) {
             directory_iterator end;
             directory_iterator i( from );
@@ -677,14 +681,15 @@ namespace mongo {
                         path newDir = to / p.leaf();
                         boost::filesystem::create_directory( newDir );
                         copyDir( p, newDir );
-                    } else {
+                    }
+                    else {
                         boost::filesystem::copy_file( p, to / p.leaf() );
                     }
                 }
                 ++i;
-            }            
+            }
         }
-        
+
         // NOTE target dbpath will be cleared first
         BSONObj CopyDbpath( const BSONObj &a ) {
             assert( a.nFields() == 2 );
@@ -700,24 +705,26 @@ namespace mongo {
             return undefined_;
         }
 
-        inline void kill_wrapper(pid_t pid, int sig, int port){
+        inline void kill_wrapper(pid_t pid, int sig, int port) {
 #ifdef _WIN32
-            if (sig == SIGKILL || port == 0){
+            if (sig == SIGKILL || port == 0) {
                 assert( handles.count(pid) );
                 TerminateProcess(handles[pid], 1); // returns failure for "zombie" processes.
-            }else{
+            }
+            else {
                 DBClientConnection conn;
                 conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
                 try {
                     conn.simpleCommand("admin", NULL, "shutdown");
-                } catch (...) {
+                }
+                catch (...) {
                     //Do nothing. This command never returns data to the client and the driver doesn't like that.
                 }
             }
 #else
             int x = kill( pid, sig );
-            if ( x ){
-                if ( errno == ESRCH ){
+            if ( x ) {
+                if ( errno == ESRCH ) {
                 }
                 else {
                     cout << "killFailed: " << errnoWithDescription() << endl;
@@ -726,8 +733,8 @@ namespace mongo {
             }
 
 #endif
-        }            
-        
+        }
+
         int killDb( int port, pid_t _pid, int signal ) {
             pid_t pid;
             int exitCode = 0;
@@ -737,12 +744,13 @@ namespace mongo {
                     return 0;
                 }
                 pid = dbs[ port ].first;
-            } else {
+            }
+            else {
                 pid = _pid;
             }
-            
+
             kill_wrapper( pid, signal, port );
-            
+
             int i = 0;
             for( ; i < 130; ++i ) {
                 if ( i == 30 ) {
@@ -751,7 +759,7 @@ namespace mongo {
                     now[ 20 ] = 0;
                     cout << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
                     kill_wrapper( pid, SIGKILL, port );
-                }        
+                }
                 if(wait_for_pid(pid, false, &exitCode))
                     break;
                 sleepmillis( 1000 );
@@ -767,7 +775,8 @@ namespace mongo {
             if ( port > 0 ) {
                 close( dbs[ port ].second );
                 dbs.erase( port );
-            } else {
+            }
+            else {
                 close( shells[ pid ] );
                 shells.erase( pid );
             }
@@ -776,7 +785,7 @@ namespace mongo {
             if ( i > 4 || signal == SIGKILL ) {
                 sleepmillis( 4000 ); // allow operating system to reclaim resources
             }
-            
+
             return exitCode;
         }
 
@@ -791,7 +800,7 @@ namespace mongo {
             }
             return ret;
         }
-        
+
         /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
@@ -800,23 +809,23 @@ namespace mongo {
             int code = killDb( port, 0, getSignal( a ) );
             cout << "shell: stopped mongo program on port " << port << endl;
             return BSON( "" << code );
-        }        
-        
+        }
+
         BSONObj StopMongoProgramByPid( const BSONObj &a ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
             assert( a.firstElement().isNumber() );
-            int pid = int( a.firstElement().number() );            
+            int pid = int( a.firstElement().number() );
             int code = killDb( 0, pid, getSignal( a ) );
             cout << "shell: stopped mongo program on pid " << pid << endl;
             return BSON( "" << code );
         }
-                                                
+
         void KillMongoProgramInstances() {
             vector< int > ports;
             for( map< int, pair< pid_t, int > >::iterator i = dbs.begin(); i != dbs.end(); ++i )
                 ports.push_back( i->first );
             for( vector< int >::iterator i = ports.begin(); i != ports.end(); ++i )
-                killDb( *i, 0, SIGTERM );            
+                killDb( *i, 0, SIGTERM );
             vector< pid_t > pids;
             for( map< pid_t, int >::iterator i = shells.begin(); i != shells.end(); ++i )
                 pids.push_back( i->first );
@@ -826,7 +835,7 @@ namespace mongo {
 #else // ndef MONGO_SAFE_SHELL
         void KillMongoProgramInstances() {}
 #endif
-        
+
         MongoProgramScope::~MongoProgramScope() {
             DESTRUCTOR_GUARD(
                 KillMongoProgramInstances();
@@ -835,14 +844,14 @@ namespace mongo {
         }
 
         unsigned _randomSeed;
-        
+
         BSONObj JSSrand( const BSONObj &a ) {
             uassert( 12518, "srand requires a single numeric argument",
-                    a.nFields() == 1 && a.firstElement().isNumber() );
+                     a.nFields() == 1 && a.firstElement().isNumber() );
             _randomSeed = (unsigned)a.firstElement().numberLong(); // grab least significant digits
             return undefined_;
         }
-        
+
         BSONObj JSRand( const BSONObj &a ) {
             uassert( 12519, "rand accepts no arguments", a.nFields() == 0 );
             unsigned r;
@@ -854,7 +863,7 @@ namespace mongo {
             return BSON( "" << double( r ) / ( double( RAND_MAX ) + 1 ) );
         }
 
-        BSONObj isWindows(const BSONObj& a){
+        BSONObj isWindows(const BSONObj& a) {
             uassert( 13006, "isWindows accepts no arguments", a.nFields() == 0 );
 #ifdef _WIN32
             return BSON( "" << true );
@@ -863,7 +872,7 @@ namespace mongo {
 #endif
         }
 
-        BSONObj getHostName(const BSONObj& a){
+        BSONObj getHostName(const BSONObj& a) {
             uassert( 13411, "getHostName accepts no arguments", a.nFields() == 0 );
             char buf[260]; // HOST_NAME_MAX is usually 255
             assert(gethostname(buf, 260) == 0);
@@ -871,8 +880,8 @@ namespace mongo {
             return BSON("" << buf);
 
         }
-        
-        void installShellUtils( Scope& scope ){
+
+        void installShellUtils( Scope& scope ) {
             theScope = &scope;
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
@@ -888,8 +897,8 @@ namespace mongo {
             scope.injectNative( "run", RunProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
-            scope.injectNative( "stopMongoProgram", StopMongoProgram );        
-            scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
+            scope.injectNative( "stopMongoProgram", StopMongoProgram );
+            scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
@@ -914,7 +923,7 @@ namespace mongo {
             scope.externalSetup();
             mongo::shellUtils::installShellUtils( scope );
             scope.execSetup(JSFiles::servers);
-            
+
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
                 if ( !_dbAuth.empty() ) {
@@ -923,7 +932,7 @@ namespace mongo {
                 }
             }
         }
-        
+
         //   connstr, myuris
         map< string, set<string> > _allMyUris;
         mongo::mutex _allMyUrisMutex("_allMyUrisMutex");

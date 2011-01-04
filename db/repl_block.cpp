@@ -40,8 +40,8 @@ namespace mongo {
         static const char * NS;
 
         struct Ident {
-            
-            Ident(BSONObj r,string h,string n){
+
+            Ident(BSONObj r,string h,string n) {
                 BSONObjBuilder b;
                 b.appendElements( r );
                 b.append( "host" , h );
@@ -52,14 +52,14 @@ namespace mongo {
             bool operator<( const Ident& other ) const {
                 return obj.woCompare( other.obj ) < 0;
             }
-            
+
             BSONObj obj;
         };
 
         struct Info {
-            Info() : loc(0){}
-            ~Info(){
-                if ( loc && owned ){
+            Info() : loc(0) {}
+            ~Info() {
+                if ( loc && owned ) {
                     delete loc;
                 }
             }
@@ -72,33 +72,33 @@ namespace mongo {
             _started = false;
         }
 
-        void run(){
+        void run() {
             Client::initThread( "slaveTracking" );
             DBDirectClient db;
-            while ( ! inShutdown() ){
+            while ( ! inShutdown() ) {
                 sleepsecs( 1 );
 
                 if ( ! _dirty )
                     continue;
-                
+
                 writelock lk(NS);
 
                 list< pair<BSONObj,BSONObj> > todo;
-                
+
                 {
                     scoped_lock mylk(_mutex);
-                    
-                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ){
+
+                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ) {
                         BSONObjBuilder temp;
                         temp.appendTimestamp( "syncedTo" , i->second.loc[0].asDate() );
-                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() , 
+                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() ,
                                                                BSON( "$set" << temp.obj() ).getOwned() ) );
                     }
-                    
+
                     _slaves.clear();
                 }
 
-                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ){
+                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
                     db.update( NS , i->first , i->second , true );
                 }
 
@@ -106,52 +106,52 @@ namespace mongo {
             }
         }
 
-        void reset(){
+        void reset() {
             scoped_lock mylk(_mutex);
             _slaves.clear();
         }
 
-        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
+        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ) {
             REPLDEBUG( host << " " << rid << " " << ns << " " << last );
 
             scoped_lock mylk(_mutex);
-            
+
 #ifdef _DEBUG
             MongoFileAllowWrites allowWrites;
 #endif
 
             Ident ident(rid,host,ns);
             Info& i = _slaves[ ident ];
-            if ( i.loc ){
+            if ( i.loc ) {
                 i.loc[0] = last;
                 return;
             }
-            
+
             dbMutex.assertAtLeastReadLocked();
 
             BSONObj res;
-            if ( Helpers::findOne( NS , ident.obj , res ) ){
+            if ( Helpers::findOne( NS , ident.obj , res ) ) {
                 assert( res["syncedTo"].type() );
                 i.owned = false;
                 i.loc = (OpTime*)res["syncedTo"].value();
                 i.loc[0] = last;
                 return;
             }
-            
+
             i.owned = true;
             i.loc = new OpTime[1];
             i.loc[0] = last;
             _dirty = true;
 
-            if ( ! _started ){
+            if ( ! _started ) {
                 // start background thread here since we definitely need it
                 _started = true;
                 go();
             }
 
         }
-        
-        bool opReplicatedEnough( OpTime op , int w ){
+
+        bool opReplicatedEnough( OpTime op , int w ) {
             RARELY {
                 REPLDEBUG( "looking for : " << op << " w=" << w );
             }
@@ -161,9 +161,9 @@ namespace mongo {
 
             w--; // now this is the # of slaves i need
             scoped_lock mylk(_mutex);
-            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++){
+            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++) {
                 OpTime s = *(i->second.loc);
-                if ( s < op ){
+                if ( s < op ) {
                     continue;
                 }
                 if ( --w == 0 )
@@ -177,7 +177,7 @@ namespace mongo {
 
             return _slaves.size();
         }
-        
+
         // need to be careful not to deadlock with this
         mutable mongo::mutex _mutex;
         map<Ident,Info> _slaves;
@@ -188,12 +188,12 @@ namespace mongo {
 
     const char * SlaveTracking::NS = "local.slaves";
 
-    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ){
+    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ) {
         if ( lastOp.isNull() )
             return;
-        
+
         assert( str::startsWith(ns, "local.oplog.") );
-        
+
         Client * c = curop.getClient();
         assert(c);
         BSONObj rid = c->getRemoteID();
@@ -203,15 +203,15 @@ namespace mongo {
         slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
     }
 
-    bool opReplicatedEnough( OpTime op , int w ){
+    bool opReplicatedEnough( OpTime op , int w ) {
         return slaveTracking.opReplicatedEnough( op , w );
     }
 
-    void resetSlaveCache(){
+    void resetSlaveCache() {
         slaveTracking.reset();
     }
 
-    unsigned getSlaveCount(){
+    unsigned getSlaveCount() {
         return slaveTracking.getSlaveCount();
     }
 }

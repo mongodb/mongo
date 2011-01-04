@@ -40,7 +40,7 @@ namespace mongo {
          * will return an empty DBConfig if not in db already
          */
         DBConfigPtr getDBConfig( string ns , bool create=true , const string& shardNameHint="" );
-        
+
         /**
          * removes db entry.
          * on next getDBConfig call will fetch from db
@@ -60,14 +60,14 @@ namespace mongo {
         /**
          *
          * addShard will create a new shard in the grid. It expects a mongod process to be runing
-         * on the provided address. Adding a shard that is a replica set is supported. 
+         * on the provided address. Adding a shard that is a replica set is supported.
          *
          * @param name is an optional string with the name of the shard. if ommited, grid will
          *        generate one and update the parameter.
          * @param servers is the connection string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
          *        space usage
-         * @param errMsg is the error description in case the operation failed. 
+         * @param errMsg is the error description in case the operation failed.
          * @return true if shard was successfully added.
          */
         bool addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg );
@@ -76,7 +76,7 @@ namespace mongo {
          * @return true if the config database knows about a host 'name'
          */
         bool knowAboutShard( const string& name ) const;
-        
+
         /**
          * @return true if the chunk balancing functionality is enabled
          */
@@ -88,7 +88,7 @@ namespace mongo {
 
         /**
          * @param balancerDoc bson that may contain a window of time for the balancer to work
-         *        format { ... , activeWindow: { start: "8:30" , stop: "19:00" } , ... } 
+         *        format { ... , activeWindow: { start: "8:30" , stop: "19:00" } , ... }
          * @return true if there is no window of time specified for the balancer or it we're currently in it
          */
         static bool _inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now );
@@ -101,7 +101,7 @@ namespace mongo {
         /**
          * @param name is the chose name for the shard. Parameter is mandatory.
          * @return true if it managed to generate a shard name. May return false if (currently)
-         * 10000 shard 
+         * 10000 shard
          */
         bool _getNewShardName( string* name ) const;
 

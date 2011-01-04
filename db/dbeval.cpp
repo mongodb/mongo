@@ -66,7 +66,7 @@ namespace mongo {
             errmsg = (string)"compile failed: " + s->getError();
             return false;
         }
-        
+
         if ( e.type() == CodeWScope )
             s->init( e.codeWScopeScopeData() );
         s->localConnect( dbName.c_str() );
@@ -100,7 +100,7 @@ namespace mongo {
             errmsg += s->getError();
             return false;
         }
-        
+
         s->append( result , "retval" , "return" );
 
         return true;
@@ -122,18 +122,18 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            
+
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
             uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(dbname.c_str()) );
-            
-            if ( cmdObj["nolock"].trueValue() ){
+
+            if ( cmdObj["nolock"].trueValue() ) {
                 return dbEval(dbname, cmdObj, result, errmsg);
             }
-            
+
             // write security will be enforced in DBDirectClient
             mongolock lk( ai->isAuthorized( dbname.c_str() ) );
             Client::Context ctx( dbname );
-            
+
             return dbEval(dbname, cmdObj, result, errmsg);
         }
     } cmdeval;

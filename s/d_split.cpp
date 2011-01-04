@@ -50,19 +50,19 @@ namespace mongo {
     public:
         CmdMedianKey() : Command( "medianKey" ) {}
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << 
-                "Internal command.\n"
-                "example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
-                "NOTE: This command may take a while to run";
+            help <<
+                 "Internal command.\n"
+                 "example: { medianKey:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }\n"
+                 "NOTE: This command may take a while to run";
         }
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const char *ns = jsobj.getStringField( "medianKey" );
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
-            
+
             Client::Context ctx( ns );
 
             IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
@@ -73,22 +73,22 @@ namespace mongo {
             int num = 0;
             NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
-            
+
             // only yielding on firt half for now
             // after this it should be in ram, so 2nd should be fast
             {
                 shared_ptr<Cursor> c( new BtreeCursor( d, idxNo, *id, min, max, false, 1 ) );
                 scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
-                while ( c->ok() ){
+                while ( c->ok() ) {
                     num++;
                     c->advance();
                     if ( ! cc->yieldSometimes() )
                         break;
                 }
             }
-            
+
             num /= 2;
-            
+
             BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
             for( ; num; c.advance(), --num );
 
@@ -106,15 +106,15 @@ namespace mongo {
 
             int x = median.woCompare( min , BSONObj() , false );
             int y = median.woCompare( max , BSONObj() , false );
-            if ( x == 0 || y == 0 ){
+            if ( x == 0 || y == 0 ) {
                 // its on an edge, ok
             }
-            else if ( x < 0 && y < 0 ){
+            else if ( x < 0 && y < 0 ) {
                 log( LL_ERROR ) << "median error (1) min: " << min << " max: " << max << " median: " << median << endl;
                 errmsg = "median error 1";
                 return false;
             }
-            else if ( x > 0 && y > 0 ){
+            else if ( x > 0 && y > 0 ) {
                 log( LL_ERROR ) << "median error (2) min: " << min << " max: " << max << " median: " << median << endl;
                 errmsg = "median error 2";
                 return false;
@@ -124,25 +124,25 @@ namespace mongo {
         }
     } cmdMedianKey;
 
-     class SplitVector : public Command {
-     public:
-        SplitVector() : Command( "splitVector" , false ){}
+    class SplitVector : public Command {
+    public:
+        SplitVector() : Command( "splitVector" , false ) {}
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
             help <<
-                "Internal command.\n"
-                "examples:\n"
-                "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
-                "  maxChunkSize unit in MBs\n"
-                "  May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid traversing the whole chunk\n"
-                "  \n"
-                "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, force: true }\n"
-                "  'force' will produce one split point even if data is small; defaults to false\n"
-                "NOTE: This command may take a while to run";
+                 "Internal command.\n"
+                 "examples:\n"
+                 "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, maxChunkSize:200 }\n"
+                 "  maxChunkSize unit in MBs\n"
+                 "  May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid traversing the whole chunk\n"
+                 "  \n"
+                 "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, force: true }\n"
+                 "  'force' will produce one split point even if data is small; defaults to false\n"
+                 "NOTE: This command may take a while to run";
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             //
             // 1.a We'll parse the parameters in two steps. First, make sure the we can use the split index to get
@@ -155,16 +155,17 @@ namespace mongo {
             // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
-            if ( min.isEmpty() && max.isEmpty() ){
+            if ( min.isEmpty() && max.isEmpty() ) {
                 BSONObjBuilder minBuilder;
                 BSONObjBuilder maxBuilder;
-                BSONForEach(key, keyPattern){
+                BSONForEach(key, keyPattern) {
                     minBuilder.appendMinKey( key.fieldName() );
                     maxBuilder.appendMaxKey( key.fieldName() );
                 }
                 min = minBuilder.obj();
                 max = maxBuilder.obj();
-            } else if ( min.isEmpty() || max.isEmpty() ){
+            }
+            else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "either provide both min and max or leave both empty";
                 return false;
             }
@@ -172,13 +173,13 @@ namespace mongo {
             // Get the size estimate for this namespace
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails( ns );
-            if ( ! d ){
+            if ( ! d ) {
                 errmsg = "ns not found";
                 return false;
             }
-            
+
             IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
-            if ( idx == NULL ){
+            if ( idx == NULL ) {
                 errmsg = "couldn't find index over splitting key";
                 return false;
             }
@@ -190,8 +191,8 @@ namespace mongo {
             // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size
             //     restrictions specified there.
             //
-            
-            // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current chunk, i.e., the 
+
+            // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current chunk, i.e., the
             // logic below will split that chunk in half
             long long maxChunkSize = 0;
             bool force = false;
@@ -203,17 +204,19 @@ namespace mongo {
                     force = true;
                     maxChunkSize = dataSize;
 
-                } else if ( maxSizeElem.isNumber() ){
-                    maxChunkSize = maxSizeElem.numberLong() * 1<<20; 
+                }
+                else if ( maxSizeElem.isNumber() ) {
+                    maxChunkSize = maxSizeElem.numberLong() * 1<<20;
 
-                } else {
+                }
+                else {
                     maxSizeElem = jsobj["maxChunkSizeBytes"];
-                    if ( maxSizeElem.isNumber() ){
+                    if ( maxSizeElem.isNumber() ) {
                         maxChunkSize = maxSizeElem.numberLong();
                     }
                 }
-                
-                if ( maxChunkSize <= 0 ){
+
+                if ( maxChunkSize <= 0 ) {
                     errmsg = "need to specify the desired max chunk size (maxChunkSize or maxChunkSizeBytes)";
                     return false;
                 }
@@ -221,13 +224,13 @@ namespace mongo {
 
             long long maxSplitPoints = 0;
             BSONElement maxSplitPointsElem = jsobj[ "maxSplitPoints" ];
-            if ( maxSplitPointsElem.isNumber() ){
+            if ( maxSplitPointsElem.isNumber() ) {
                 maxSplitPoints = maxSplitPointsElem.numberLong();
             }
 
             long long maxChunkObjects = 0;
             BSONElement MaxChunkObjectsElem = jsobj[ "maxChunkObjects" ];
-            if ( MaxChunkObjectsElem.isNumber() ){
+            if ( MaxChunkObjectsElem.isNumber() ) {
                 maxChunkObjects = MaxChunkObjectsElem.numberLong();
             }
 
@@ -239,9 +242,9 @@ namespace mongo {
             }
 
             log() << "request split points lookup for chunk " << ns << " " << min << " -->> " << max << endl;
- 
+
             // We'll use the average object size and number of object to find approximately how many keys
-            // each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects, if 
+            // each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects, if
             // provided.
             const long long avgRecSize = dataSize / recCount;
             long long keyCount = maxChunkSize / (2 * avgRecSize);
@@ -252,38 +255,39 @@ namespace mongo {
 
             //
             // 2. Traverse the index and add the keyCount-th key to the result vector. If that key
-            //    appeared in the vector before, we omit it. The invariant here is that all the 
+            //    appeared in the vector before, we omit it. The invariant here is that all the
             //    instances of a given key value live in the same chunk.
             //
 
             Timer timer;
             long long currCount = 0;
             long long numChunks = 0;
-            
+
             BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
-            if ( ! cc->ok() ){
+            if ( ! cc->ok() ) {
                 errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                 return false;
             }
 
             // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel, to be removed
-            // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and 
+            // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and
             // split on the following key.
             vector<BSONObj> splitKeys;
             set<BSONObj> tooFrequentKeys;
             splitKeys.push_back( c->currKey() );
-            while ( cc->ok() ){ 
+            while ( cc->ok() ) {
                 currCount++;
-                if ( currCount > keyCount ){
+                if ( currCount > keyCount ) {
                     BSONObj currKey = c->currKey();
 
                     // Do not use this split key if it is the same used in the previous split point.
-                    if ( currKey.woCompare( splitKeys.back() ) == 0 ){
+                    if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
                         tooFrequentKeys.insert( currKey );
 
-                    } else {
+                    }
+                    else {
                         splitKeys.push_back( currKey );
                         currCount = 0;
                         numChunks++;
@@ -295,14 +299,14 @@ namespace mongo {
                 cc->advance();
 
                 // Stop if we have enough split points.
-                if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ){
-                    log() << "max number of requested split points reached (" << numChunks 
-                           << ") before the end of chunk " << ns << " " << min << " -->> " << max 
-                           << endl;
+                if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ) {
+                    log() << "max number of requested split points reached (" << numChunks
+                          << ") before the end of chunk " << ns << " " << min << " -->> " << max
+                          << endl;
                     break;
                 }
-                
-                if ( ! cc->yieldSometimes() ){
+
+                if ( ! cc->yieldSometimes() ) {
                     // we were near and and got pushed to the end
                     // i think returning the splits we've already found is fine
 
@@ -319,23 +323,23 @@ namespace mongo {
             //
 
             // Warn for keys that are more numerous than maxChunkSize allows.
-            for ( set<BSONObj>::const_iterator it = tooFrequentKeys.begin(); it != tooFrequentKeys.end(); ++it ){
-                log( LL_WARNING ) << "chunk is larger than " << maxChunkSize 
+            for ( set<BSONObj>::const_iterator it = tooFrequentKeys.begin(); it != tooFrequentKeys.end(); ++it ) {
+                log( LL_WARNING ) << "chunk is larger than " << maxChunkSize
                                   << " bytes because of key " << bc->prettyKey( *it ) << endl;
             }
 
             // Remove the sentinel at the beginning before returning and add fieldnames.
             splitKeys.erase( splitKeys.begin() );
-            for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ){
+            for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ) {
                 *it = bc->prettyKey( *it );
             }
 
             ostringstream os;
-            os << "Finding the split vector for " <<  ns << " over "<< keyPattern 
+            os << "Finding the split vector for " <<  ns << " over "<< keyPattern
                << " keyCount: " << keyCount << " numSplits: " << splitKeys.size();
             logIfSlow( timer , os.str() );
 
-            // Warning: we are sending back an array of keys but are currently limited to 
+            // Warning: we are sending back an array of keys but are currently limited to
             // 4MB work of 'result' size. This should be okay for now.
 
             result.append( "splitKeys" , splitKeys );
@@ -348,25 +352,25 @@ namespace mongo {
     // ** temporary ** 2010-10-22
     // chunkInfo is a helper to collect and log information about the chunks generated in splitChunk.
     // It should hold the chunk state for this module only, while we don't have min/max key info per chunk on the
-    // mongod side. Do not build on this; it will go away. 
-    struct ChunkInfo { 
+    // mongod side. Do not build on this; it will go away.
+    struct ChunkInfo {
         BSONObj min;
         BSONObj max;
         ShardChunkVersion lastmod;
 
-        ChunkInfo() { } 
+        ChunkInfo() { }
         ChunkInfo( BSONObj aMin , BSONObj aMax , ShardChunkVersion aVersion ) : min(aMin) , max(aMax) , lastmod(aVersion) {}
         void appendShortVersion( const char* name, BSONObjBuilder& b ) const;
         string toString() const;
     };
 
-    void ChunkInfo::appendShortVersion( const char * name , BSONObjBuilder& b ) const { 
-        BSONObjBuilder bb( b.subobjStart( name ) ); 
-        bb.append( "min" , min ); 
+    void ChunkInfo::appendShortVersion( const char * name , BSONObjBuilder& b ) const {
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        bb.append( "min" , min );
         bb.append( "max" , max );
         bb.appendTimestamp( "lastmod" , lastmod );
-        bb.done(); 
-    } 
+        bb.done();
+    }
 
     string ChunkInfo::toString() const {
         ostringstream os;
@@ -377,56 +381,56 @@ namespace mongo {
 
     class SplitChunkCommand : public Command {
     public:
-        SplitChunkCommand() : Command( "splitChunk" ){}
+        SplitChunkCommand() : Command( "splitChunk" ) {}
         virtual void help( stringstream& help ) const {
-            help << 
-                "internal command usage only\n" 
-                "example:\n"
-                " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { splitKeys : [ {a:150} , ... ]}";
+            help <<
+                 "internal command usage only\n"
+                 "example:\n"
+                 " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { splitKeys : [ {a:150} , ... ]}";
         }
 
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
 
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             //
             // 1. check whether parameters passed to splitChunk are sound
             //
 
             const string ns = cmdObj.firstElement().str();
-            if ( ns.empty() ){
+            if ( ns.empty() ) {
                 errmsg  = "need to specify namespace in command";
                 return false;
             }
 
             BSONObj keyPattern = cmdObj["keyPattern"].Obj();
-            if ( keyPattern.isEmpty() ){
+            if ( keyPattern.isEmpty() ) {
                 errmsg = "need to specify the key pattern the collection is sharded over";
                 return false;
             }
 
             BSONObj min = cmdObj["min"].Obj();
-            if ( min.isEmpty() ){
+            if ( min.isEmpty() ) {
                 errmsg = "neet to specify the min key for the chunk";
                 return false;
             }
 
             BSONObj max = cmdObj["max"].Obj();
-            if ( max.isEmpty() ){
+            if ( max.isEmpty() ) {
                 errmsg = "neet to specify the max key for the chunk";
                 return false;
             }
 
             string from = cmdObj["from"].str();
-            if ( from.empty() ){
+            if ( from.empty() ) {
                 errmsg = "need specify server to split chunk at";
                 return false;
             }
 
             BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
-            if ( splitKeysElem.isEmpty() ){
+            if ( splitKeysElem.isEmpty() ) {
                 errmsg = "need to provide the split points to chunk over";
                 return false;
             }
@@ -443,10 +447,10 @@ namespace mongo {
             }
 
             // It is possible that this is the first sharded command this mongod is asked to perform. If so,
-            // start sharding apparatus. We'd still be missing some more shard-related info but we'll get it 
+            // start sharding apparatus. We'd still be missing some more shard-related info but we'll get it
             // in step 2. below.
-            if ( ! shardingState.enabled() ){
-                if ( cmdObj["configdb"].type() != String ){
+            if ( ! shardingState.enabled() ) {
+                if ( cmdObj["configdb"].type() != String ) {
                     errmsg = "sharding not enabled";
                     return false;
                 }
@@ -465,7 +469,7 @@ namespace mongo {
 
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC) , ns );
             dist_lock_try dlk( &lockSetup, string("split-") + min.toString() );
-            if ( ! dlk.got() ){
+            if ( ! dlk.got() ) {
                 errmsg = "the collection's metadata lock is taken";
                 result.append( "who" , dlk.other() );
                 return false;
@@ -478,7 +482,7 @@ namespace mongo {
             ChunkInfo origChunk;
             {
                 ScopedDbConnection conn( shardingState.getConfigServer() );
-                
+
                 BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
                 maxVersion = x["lastmod"];
 
@@ -488,7 +492,7 @@ namespace mongo {
                 assert( currChunk["max"].type() );
                 shard = currChunk["shard"].String();
                 conn.done();
-                
+
                 BSONObj currMin = currChunk["min"].Obj();
                 BSONObj currMax = currChunk["max"].Obj();
                 if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
@@ -498,7 +502,7 @@ namespace mongo {
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
 
-                    log( LL_WARNING ) << "aborted split because " << errmsg << ": " << min << "->" << max 
+                    log( LL_WARNING ) << "aborted split because " << errmsg << ": " << min << "->" << max
                                       << " is now " << currMin << "->" << currMax << endl;
                     return false;
                 }
@@ -513,12 +517,12 @@ namespace mongo {
                     return false;
                 }
 
-                if ( maxVersion < shardingState.getVersion( ns ) ){
+                if ( maxVersion < shardingState.getVersion( ns ) ) {
                     errmsg = "official version less than mine?";
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
 
-                    log( LL_WARNING ) << "aborted split because " << errmsg << ": official " << maxVersion 
+                    log( LL_WARNING ) << "aborted split because " << errmsg << ": official " << maxVersion
                                       << " mine: " << shardingState.getVersion(ns) << endl;
                     return false;
                 }
@@ -536,7 +540,7 @@ namespace mongo {
 
             }
 
-            // 
+            //
             // 3. create the batch of updates to metadata ( the new chunks ) to be applied via 'applyOps' command
             //
 
@@ -552,13 +556,13 @@ namespace mongo {
             BSONObjBuilder cmdBuilder;
             BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
 
-            for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it ){
+            for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it ) {
                 BSONObj endKey = *it;
 
                 // splits only update the 'minor' portion of version
                 myVersion.incMinor();
 
-                // build an update operation against the chunks collection of the config database with 
+                // build an update operation against the chunks collection of the config database with
                 // upsert true
                 BSONObjBuilder op;
                 op.append( "op" , "u" );
@@ -586,10 +590,10 @@ namespace mongo {
                 newChunks.push_back( ChunkInfo( startKey , endKey, myVersion ) );
 
                 startKey = endKey;
-            }        
+            }
 
             updates.done();
-        
+
             {
                 BSONArrayBuilder preCond( cmdBuilder.subarrayStart( "preCondition" ) );
                 BSONObjBuilder b;
@@ -604,7 +608,7 @@ namespace mongo {
                 preCond.done();
             }
 
-            // 
+            //
             // 4. apply the batch of updates to metadata and to the chunk manager
             //
 
@@ -620,7 +624,7 @@ namespace mongo {
                 conn.done();
             }
 
-            if ( ! ok ){
+            if ( ! ok ) {
                 stringstream ss;
                 ss << "saving chunks failed.  cmd: " << cmd << " result: " << cmdResult;
                 error() << ss.str() << endl;
@@ -630,7 +634,7 @@ namespace mongo {
             // install a chunk manager with knowledge about newly split chunks in this shard's state
             splitKeys.pop_back(); // 'max' was used as sentinel
             maxVersion.incMinor();
-            shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );            
+            shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
 
             //
             // 5. logChanges
@@ -642,12 +646,13 @@ namespace mongo {
                 newChunks[1].appendShortVersion( "right" , logDetail );
                 configServer.logChange( "split" , ns , logDetail.obj() );
 
-            } else {
+            }
+            else {
                 BSONObj beforeDetailObj = logDetail.obj();
                 BSONObj firstDetailObj = beforeDetailObj.getOwned();
                 const int newChunksSize = newChunks.size();
 
-                for ( int i=0; i < newChunksSize; i++ ){
+                for ( int i=0; i < newChunksSize; i++ ) {
                     BSONObjBuilder chunkDetail;
                     chunkDetail.appendElements( beforeDetailObj );
                     chunkDetail.append( "number", i );

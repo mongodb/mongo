@@ -41,7 +41,7 @@ namespace mongo {
         // --- static helpers ----
 
         static void parseParams( BSONObj & params , string query );
-        
+
         static string parseURL( const char * buf );
         static string parseMethod( const char * headers );
         static string getHeader( const char * headers , string name );

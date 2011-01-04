@@ -20,11 +20,11 @@
 
 namespace mongo {
 
-inline void checkDataFileVersion(NamespaceDetails& d) { 
-}
+    inline void checkDataFileVersion(NamespaceDetails& d) {
+    }
 
-inline void checkIndexFileVersion(NamespaceDetails& d) { 
-}
+    inline void checkIndexFileVersion(NamespaceDetails& d) {
+    }
 
 }
 

@@ -43,12 +43,12 @@ using namespace boost::spirit;
 namespace mongo {
 
     struct ObjectBuilder : boost::noncopyable {
-        ~ObjectBuilder(){
+        ~ObjectBuilder() {
             unsigned i = builders.size();
-            if ( i ){
+            if ( i ) {
                 i--;
-                for ( ; i>=1; i-- ){
-                    if ( builders[i] ){
+                for ( ; i>=1; i-- ) {
+                    if ( builders[i] ) {
                         builders[i]->done();
                     }
                 }
@@ -205,7 +205,8 @@ namespace mongo {
             else if ( first < 0x08 ) {
                 b.ss << char( 0xc0 | ( ( first << 2 ) | ( second >> 6 ) ) );
                 b.ss << char( 0x80 | ( ~0xc0 & second ) );
-            } else {
+            }
+            else {
                 b.ss << char( 0xe0 | ( first >> 4 ) );
                 b.ss << char( 0x80 | ( ~0xc0 & ( ( first << 2 ) | ( second >> 6 ) ) ) );
                 b.ss << char( 0x80 | ( ~0xc0 & second ) );
@@ -437,7 +438,7 @@ namespace mongo {
 // in the original z example on line 3, if the input was "ab", foo() would only
 // be called once.
     struct JsonGrammar : public grammar< JsonGrammar > {
-public:
+    public:
         JsonGrammar( ObjectBuilder &_b ) : b( _b ) {}
 
         template < typename ScannerT >
@@ -471,32 +472,32 @@ public:
                 str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
                                 *( ( ch_p( '\\' ) >>
                                      (
-                                       ch_p( 'b' )[ chE( self.b ) ] |
-                                       ch_p( 'f' )[ chE( self.b ) ] |
-                                       ch_p( 'n' )[ chE( self.b ) ] |
-                                       ch_p( 'r' )[ chE( self.b ) ] |
-                                       ch_p( 't' )[ chE( self.b ) ] |
-                                       ch_p( 'v' )[ chE( self.b ) ] |
-                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
-                                       ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
+                                         ch_p( 'b' )[ chE( self.b ) ] |
+                                         ch_p( 'f' )[ chE( self.b ) ] |
+                                         ch_p( 'n' )[ chE( self.b ) ] |
+                                         ch_p( 'r' )[ chE( self.b ) ] |
+                                         ch_p( 't' )[ chE( self.b ) ] |
+                                         ch_p( 'v' )[ chE( self.b ) ] |
+                                         ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
+                                         ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
                                      )
                                    ) |
                                    ( ~range_p( 0x00, 0x1f ) & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
 
                 singleQuoteStr = lexeme_d[ ch_p( '\'' )[ chClear( self.b ) ] >>
-                                *( ( ch_p( '\\' ) >>
-                                     (
-                                       ch_p( 'b' )[ chE( self.b ) ] |
-                                       ch_p( 'f' )[ chE( self.b ) ] |
-                                       ch_p( 'n' )[ chE( self.b ) ] |
-                                       ch_p( 'r' )[ chE( self.b ) ] |
-                                       ch_p( 't' )[ chE( self.b ) ] |
-                                       ch_p( 'v' )[ chE( self.b ) ] |
-                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
-                                       ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
-                                     )
-                                   ) |
-                                   ( ~range_p( 0x00, 0x1f ) & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
+                                           *( ( ch_p( '\\' ) >>
+                                                (
+                                                    ch_p( 'b' )[ chE( self.b ) ] |
+                                                    ch_p( 'f' )[ chE( self.b ) ] |
+                                                    ch_p( 'n' )[ chE( self.b ) ] |
+                                                    ch_p( 'r' )[ chE( self.b ) ] |
+                                                    ch_p( 't' )[ chE( self.b ) ] |
+                                                    ch_p( 'v' )[ chE( self.b ) ] |
+                                                    ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
+                                                    ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
+                                                )
+                                              ) |
+                                              ( ~range_p( 0x00, 0x1f ) & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
@@ -547,8 +548,8 @@ public:
                                    >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
             }
             rule< ScannerT > object, members, array, elements, value, str, number, integer,
-            dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
-            regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
+                  dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
+                  regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
             const rule< ScannerT > &start() const {
                 return object;
             }
@@ -557,7 +558,7 @@ public:
     };
 
     BSONObj fromjson( const char *str , int* len) {
-        if ( str[0] == '\0' ){
+        if ( str[0] == '\0' ) {
             if (len) *len = 0;
             return BSONObj();
         }
@@ -567,7 +568,8 @@ public:
         parse_info<> result = parse( str, parser, space_p );
         if (len) {
             *len = result.stop - str;
-        } else if ( !result.full ) {
+        }
+        else if ( !result.full ) {
             int limit = strnlen(result.stop , 10);
             if (limit == -1) limit = 10;
             msgasserted(10340, "Failure parsing JSON string near: " + string( result.stop, limit ));

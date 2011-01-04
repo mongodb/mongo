@@ -23,7 +23,7 @@
 namespace mongo {
 
     class RamLog : public Tee {
-        enum { 
+        enum {
             N = 128,
             C = 256
         };
@@ -31,7 +31,7 @@ namespace mongo {
         unsigned h, n;
 
     public:
-        RamLog() { 
+        RamLog() {
             h = 0; n = 0;
             for( int i = 0; i < N; i++ )
                 lines[i][C-1] = 0;
@@ -52,7 +52,7 @@ namespace mongo {
                 v.push_back(lines[i]);
         }
 
-        static int repeats(const vector<const char *>& v, int i) { 
+        static int repeats(const vector<const char *>& v, int i) {
             for( int j = i-1; j >= 0 && j+8 > i; j-- ) {
                 if( strcmp(v[i]+20,v[j]+20) == 0 ) {
                     for( int x = 1; ; x++ ) {
@@ -67,14 +67,14 @@ namespace mongo {
         }
 
 
-        static string clean(const vector<const char *>& v, int i, string line="") { 
+        static string clean(const vector<const char *>& v, int i, string line="") {
             if( line.empty() ) line = v[i];
             if( i > 0 && strncmp(v[i], v[i-1], 11) == 0 )
                 return string("           ") + line.substr(11);
             return v[i];
         }
 
-        static string color(string line) { 
+        static string color(string line) {
             string s = str::after(line, "replSet ");
             if( str::startsWith(s, "warning") || startsWith(s, "error") )
                 return html::red(line);
@@ -85,16 +85,16 @@ namespace mongo {
                     return html::yellow(line);
                 return line; //html::blue(line);
             }
-            
+
             return line;
         }
 
         /* turn http:... into an anchor */
-        string linkify(const char *s) { 
+        string linkify(const char *s) {
             const char *p = s;
             const char *h = strstr(p, "http://");
             if( h == 0 ) return s;
-	  
+
             const char *sp = h + 7;
             while( *sp && *sp != ' ' ) sp++;
 
@@ -115,15 +115,15 @@ namespace mongo {
                 int r = repeats(v, i);
                 if( r < 0 ) {
                     s << color( linkify( clean(v,i).c_str() ) );
-                } 
+                }
                 else {
                     stringstream x;
                     x << string(v[i], 0, 20);
                     int nr = (i-r);
                     int last = i+nr-1;
                     for( ; r < i ; r++ ) x << '.';
-                    if( 1 ) { 
-                        stringstream r; 
+                    if( 1 ) {
+                        stringstream r;
                         if( nr == 1 ) r << "repeat last line";
                         else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
                         first = false; s << html::a("", r.str(), clean(v,i,x.str()));
@@ -135,7 +135,7 @@ namespace mongo {
             }
             s << "</pre>\n";
         }
-        
+
 
     };
 

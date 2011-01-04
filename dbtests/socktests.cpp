@@ -29,20 +29,20 @@ namespace SockTests {
             ASSERT_EQUALS( "127.0.0.1", hostbyname( "localhost" ) );
             ASSERT_EQUALS( "127.0.0.1", hostbyname( "127.0.0.1" ) );
             // ASSERT_EQUALS( "::1", hostbyname( "::1" ) ); // IPv6 disabled at runtime by default.
-            
+
             HostAndPort h("asdfasdfasdf_no_such_host");
             // this fails uncomment when fixed.
             ASSERT( !h.isSelf() );
         }
     };
-    
+
     class All : public Suite {
     public:
-        All() : Suite( "sock" ){}
-        void setupTests(){
+        All() : Suite( "sock" ) {}
+        void setupTests() {
             add< HostByName >();
         }
     } myall;
-    
+
 } // namespace SockTests
 

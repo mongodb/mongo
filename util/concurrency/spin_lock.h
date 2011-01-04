@@ -48,7 +48,7 @@ namespace mongo {
         // Non-copyable, non-assignable
         SpinLock(SpinLock&);
         SpinLock& operator=(SpinLock&);
-    }; 
+    };
 
 }  // namespace mongo
 

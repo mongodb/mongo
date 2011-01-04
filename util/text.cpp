@@ -19,9 +19,9 @@
 #include "text.h"
 #include "unittest.h"
 
-namespace mongo{
+namespace mongo {
 
-    inline int leadingOnes(unsigned char c){
+    inline int leadingOnes(unsigned char c) {
         if (c < 0x80) return 0;
         static const char _leadingOnes[128] = {
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x80 - 0x8F
@@ -32,24 +32,25 @@ namespace mongo{
             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, // 0xD0 - 0xD9
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, // 0xE0 - 0xE9
             4, 4, 4, 4, 4, 4, 4, 4,                         // 0xF0 - 0xF7
-                                    5, 5, 5, 5,             // 0xF8 - 0xFB
-                                                6, 6,       // 0xFC - 0xFD
-                                                      7,    // 0xFE
-                                                         8, // 0xFF
+            5, 5, 5, 5,             // 0xF8 - 0xFB
+            6, 6,       // 0xFC - 0xFD
+            7,    // 0xFE
+            8, // 0xFF
         };
         return _leadingOnes[c & 0x7f];
 
     }
 
-    bool isValidUTF8(const char *s){
+    bool isValidUTF8(const char *s) {
         int left = 0; // how many bytes are left in the current codepoint
-        while (*s){
+        while (*s) {
             const unsigned char c = (unsigned char) *(s++);
             const int ones = leadingOnes(c);
-            if (left){
+            if (left) {
                 if (ones != 1) return false; // should be a continuation byte
                 left--;
-            }else{
+            }
+            else {
                 if (ones == 0) continue; // ASCII byte
                 if (ones == 1) return false; // unexpected continuation byte
                 if (c > 0xF4) return false; // codepoint too large (< 0x10FFFF)
@@ -61,53 +62,50 @@ namespace mongo{
         }
         if (left!=0) return false; // string ended mid-codepoint
         return true;
-    }   
+    }
 
-    #if defined(_WIN32)
+#if defined(_WIN32)
 
-	std::string toUtf8String(const std::wstring& wide)
-	{
-		if (wide.size() > boost::integer_traits<int>::const_max)
-			throw std::length_error(
-					"Wide string cannot be more than INT_MAX characters long.");
-		if (wide.size() == 0)
-			return "";
+    std::string toUtf8String(const std::wstring& wide) {
+        if (wide.size() > boost::integer_traits<int>::const_max)
+            throw std::length_error(
+                "Wide string cannot be more than INT_MAX characters long.");
+        if (wide.size() == 0)
+            return "";
 
-		// Calculate necessary buffer size
-		int len = ::WideCharToMultiByte(
-			CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()), 
-			NULL, 0, NULL, NULL);
+        // Calculate necessary buffer size
+        int len = ::WideCharToMultiByte(
+                      CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()),
+                      NULL, 0, NULL, NULL);
 
-		// Perform actual conversion
-		if (len > 0)
-		{
-			std::vector<char> buffer(len);
-			len = ::WideCharToMultiByte(
-					CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()),
-					&buffer[0], static_cast<int>(buffer.size()), NULL, NULL);
-			if (len > 0)
-			{
-					assert(len == static_cast<int>(buffer.size()));
-					return std::string(&buffer[0], buffer.size());
-			}
-		}
+        // Perform actual conversion
+        if (len > 0) {
+            std::vector<char> buffer(len);
+            len = ::WideCharToMultiByte(
+                      CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()),
+                      &buffer[0], static_cast<int>(buffer.size()), NULL, NULL);
+            if (len > 0) {
+                assert(len == static_cast<int>(buffer.size()));
+                return std::string(&buffer[0], buffer.size());
+            }
+        }
 
-		throw boost::system::system_error(
-			::GetLastError(), boost::system::system_category);
-	}
+        throw boost::system::system_error(
+            ::GetLastError(), boost::system::system_category);
+    }
 
 #if defined(_UNICODE)
-	std::wstring toWideString(const char *s) {
+    std::wstring toWideString(const char *s) {
         std::basic_ostringstream<TCHAR> buf;
         buf << s;
         return buf.str();
     }
 #endif
 
-    #endif
+#endif
 
     struct TextUnitTest : public UnitTest {
-        void run() { 
+        void run() {
             assert( parseLL("123") == 123 );
             assert( parseLL("-123000000000") == -123000000000LL );
         }

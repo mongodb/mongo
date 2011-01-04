@@ -52,7 +52,7 @@ namespace mongo {
             return n - old;
         }
 
-        unsigned long long startTime(){
+        unsigned long long startTime() {
             return old;
         }
 

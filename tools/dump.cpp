@@ -28,16 +28,16 @@ namespace po = boost::program_options;
 
 class Dump : public Tool {
 public:
-    Dump() : Tool( "dump" , ALL , "*" , "*" , false ){
+    Dump() : Tool( "dump" , ALL , "*" , "*" , false ) {
         add_options()
-            ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
-            ("query,q", po::value<string>() , "json query" )
-            ("oplog", "Use oplog for point-in-time snapshotting" )
-            ;
+        ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
+        ("query,q", po::value<string>() , "json query" )
+        ("oplog", "Use oplog for point-in-time snapshotting" )
+        ;
     }
 
     // This is a functor that writes a BSONObj to a file
-    struct Writer{
+    struct Writer {
         Writer(ostream& out, ProgressMeter* m) :_out(out), _m(m) {}
 
         void operator () (const BSONObj& obj) {
@@ -68,11 +68,12 @@ public:
         Writer writer(out, m);
 
         // use low-latency "exhaust" mode if going over the network
-        if (typeid(connBase) == typeid(DBClientConnection&)){
+        if (typeid(connBase) == typeid(DBClientConnection&)) {
             DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
             boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
             conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
-        } else {
+        }
+        else {
             //This branch should only be taken with DBDirectClient which doesn't support exhaust mode
             scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , queryOptions ));
             while ( cursor->more() ) {
@@ -83,7 +84,7 @@ public:
 
     void writeCollectionFile( const string coll , path outputFile ) {
         cout << "\t" << coll << " to " << outputFile.string() << endl;
-        
+
         ofstream out;
         out.open( outputFile.string().c_str() , ios_base::out | ios_base::binary  );
         assertStreamGood( 10262 ,  "couldn't open file" , out );
@@ -107,7 +108,7 @@ public:
         create_directories( outdir );
 
         string sns = db + ".system.namespaces";
-        
+
         auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
@@ -125,9 +126,9 @@ public:
         }
 
     }
-    
-    int run(){
-        
+
+    int run() {
+
         {
             string q = getParam("query");
             if ( q.size() )
@@ -137,20 +138,21 @@ public:
         string opLogName = "";
         unsigned long long opLogStart = 0;
         if (hasParam("oplog")) {
-            if (hasParam("query") || hasParam("db") || hasParam("collection")){
+            if (hasParam("query") || hasParam("db") || hasParam("collection")) {
                 cout << "oplog mode is only supported on full dumps" << endl;
                 return -1;
             }
 
-            
+
             BSONObj isMaster;
             conn("true").simpleCommand("admin", &isMaster, "isMaster");
 
             if (isMaster.hasField("hosts")) { // if connected to replica set member
                 opLogName = "local.oplog.rs";
-            } else {
+            }
+            else {
                 opLogName = "local.oplog.$main";
-                if ( ! isMaster["ismaster"].trueValue() ){
+                if ( ! isMaster["ismaster"].trueValue() ) {
                     cout << "oplog mode is only supported on master or replica set member" << endl;
                     return -1;
                 }
@@ -161,12 +163,12 @@ public:
                 cout << "No operations in oplog. Please ensure you are connecting to a master." << endl;
                 return -1;
             }
-            
+
             assert(op["ts"].type() == Timestamp);
             opLogStart = op["ts"]._numberLong();
         }
 
-            
+
 
         // check if we're outputting to stdout
         string out = getParam("out");
@@ -184,7 +186,7 @@ public:
         path root( out );
         string db = _db;
 
-        if ( db == "*" ){
+        if ( db == "*" ) {
             cout << "all dbs" << endl;
             auth( "admin" );
 
@@ -209,7 +211,7 @@ public:
             go( db , root / db );
         }
 
-        if (!opLogName.empty()){
+        if (!opLogName.empty()) {
             BSONObjBuilder b;
             b.appendTimestamp("$gt", opLogStart);
 

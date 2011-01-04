@@ -23,7 +23,7 @@ namespace mongo {
 
     namespace dur {
 
-        /** true if ok to cleanup journal files at termination. otherwise, files journal will be retained. 
+        /** true if ok to cleanup journal files at termination. otherwise, files journal will be retained.
         */
         extern bool okToCleanUp;
 
@@ -33,7 +33,7 @@ namespace mongo {
         /** assure journal/ dir exists. throws */
         void journalMakeDir();
 
-        /** check if time to rotate files; assure a file is open. 
+        /** check if time to rotate files; assure a file is open.
              done separately from the journal() call as we can do this part
              outside of lock.
             only called by durThread.
@@ -47,7 +47,7 @@ namespace mongo {
         void journal(const AlignedBuilder& buf);
 
         /** flag that something has gone wrong during writing to the journal
-            (not for recovery mode) 
+            (not for recovery mode)
         */
         void journalingFailure(const char *msg);
 
@@ -56,13 +56,13 @@ namespace mongo {
 
         unsigned long long getLastDataFileFlushTime();
 
-        /** never throws.  
-            @return true if there are any journal files in the journal dir. 
+        /** never throws.
+            @return true if there are any journal files in the journal dir.
         */
         bool haveJournalFiles();
 
         // in case disk controller buffers writes
-        const long long ExtraKeepTimeMs = 10000; 
+        const long long ExtraKeepTimeMs = 10000;
 
     }
 }

@@ -35,41 +35,41 @@ namespace mongo {
 
     CmdLine cmdLine;
 
-    Tool::Tool( string name , DBAccess access , string defaultDB , 
+    Tool::Tool( string name , DBAccess access , string defaultDB ,
                 string defaultCollection , bool usesstdout ) :
-        _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , 
+        _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) ,
         _usesstdout(usesstdout), _noconnection(false), _autoreconnect(false), _conn(0), _slaveConn(0), _paired(false) {
-        
+
         _options = new po::options_description( "options" );
         _options->add_options()
-            ("help","produce help message")
-            ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
-            ;
+        ("help","produce help message")
+        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
+        ;
 
         if ( access & REMOTE_SERVER )
             _options->add_options()
-                ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
-                ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
-                ("ipv6", "enable IPv6 support (disabled by default)")
+            ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
+            ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
+            ("ipv6", "enable IPv6 support (disabled by default)")
 
-                ("username,u",po::value<string>(), "username" )
-                ("password,p", new PasswordValue( &_password ), "password" )
-                ;
-        
+            ("username,u",po::value<string>(), "username" )
+            ("password,p", new PasswordValue( &_password ), "password" )
+            ;
+
         if ( access & LOCAL_SERVER )
             _options->add_options()
-                ("dbpath",po::value<string>(), "directly access mongod database "
-                 "files in the given path, instead of connecting to a mongod  "
-                 "server - needs to lock the data directory, so cannot be "
-                 "used if a mongod is currently accessing the same path" )
-                ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
-                ;            
-        
+            ("dbpath",po::value<string>(), "directly access mongod database "
+             "files in the given path, instead of connecting to a mongod  "
+             "server - needs to lock the data directory, so cannot be "
+             "used if a mongod is currently accessing the same path" )
+            ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
+            ;
+
         if ( access & SPECIFY_DBCOL )
             _options->add_options()
-                ("db,d",po::value<string>(), "database to use" )
-                ("collection,c",po::value<string>(), "collection to use (some commands)" )
-                ;
+            ("db,d",po::value<string>(), "database to use" )
+            ("collection,c",po::value<string>(), "collection to use (some commands)" )
+            ;
 
         _hidden_options = new po::options_description( name + " hidden options" );
 
@@ -79,7 +79,7 @@ namespace mongo {
         }
     }
 
-    Tool::~Tool(){
+    Tool::~Tool() {
         delete( _options );
         delete( _hidden_options );
         if ( _conn )
@@ -92,9 +92,9 @@ namespace mongo {
         printExtraHelpAfter(out);
     }
 
-    int Tool::main( int argc , char ** argv ){
+    int Tool::main( int argc , char ** argv ) {
         static StaticObserver staticObserver;
-        
+
         cmdLine.prealloc = false;
 
         boost::filesystem::path::default_name_check( boost::filesystem::no_check );
@@ -116,23 +116,24 @@ namespace mongo {
                        style(command_line_style).run() , _params );
 
             po::notify( _params );
-        } catch (po::error &e) {
+        }
+        catch (po::error &e) {
             cerr << "ERROR: " << e.what() << endl << endl;
             printHelp(cerr);
             return EXIT_BADOPTIONS;
         }
 
         // hide password from ps output
-        for (int i=0; i < (argc-1); ++i){
-            if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--password")){
+        for (int i=0; i < (argc-1); ++i) {
+            if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--password")) {
                 char* arg = argv[i+1];
-                while (*arg){
+                while (*arg) {
                     *arg++ = 'x';
                 }
             }
         }
 
-        if ( _params.count( "help" ) ){
+        if ( _params.count( "help" ) ) {
             printHelp(cout);
             return 0;
         }
@@ -146,11 +147,11 @@ namespace mongo {
                 logLevel = s.length();
             }
         }
-        
+
         preSetup();
 
         bool useDirectClient = hasParam( "dbpath" );
-        
+
         if ( ! useDirectClient ) {
             _host = "127.0.0.1";
             if ( _params.count( "host" ) )
@@ -158,21 +159,21 @@ namespace mongo {
 
             if ( _params.count( "port" ) )
                 _host += ':' + _params["port"].as<string>();
-            
-            if ( _noconnection ){
+
+            if ( _noconnection ) {
                 // do nothing
             }
             else {
                 string errmsg;
 
                 ConnectionString cs = ConnectionString::parse( _host , errmsg );
-                if ( ! cs.isValid() ){
+                if ( ! cs.isValid() ) {
                     cerr << "invalid hostname [" << _host << "] " << errmsg << endl;
                     return -1;
                 }
-                
+
                 _conn = cs.connect( errmsg );
-                if ( ! _conn ){
+                if ( ! _conn ) {
                     cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
                     return -1;
                 }
@@ -194,10 +195,10 @@ namespace mongo {
             try {
                 acquirePathLock();
             }
-            catch ( DBException& ){
+            catch ( DBException& ) {
                 cerr << endl << "If you are running a mongod on the same "
-                    "path you should connect to that instead of direct data "
-                    "file access" << endl << endl;
+                     "path you should connect to that instead of direct data "
+                     "file access" << endl << endl;
                 dbexit( EXIT_CLEAN );
                 return -1;
             }
@@ -215,7 +216,7 @@ namespace mongo {
             _username = _params["username"].as<string>();
 
         if ( _params.count( "password" )
-             && ( _password.empty() ) ) {
+                && ( _password.empty() ) ) {
             _password = askPassword();
         }
 
@@ -226,11 +227,11 @@ namespace mongo {
         try {
             ret = run();
         }
-        catch ( DBException& e ){
+        catch ( DBException& e ) {
             cerr << "assertion: " << e.toString() << endl;
             ret = -1;
         }
-    
+
         if ( currentClient.get() )
             currentClient->shutdown();
 
@@ -239,8 +240,8 @@ namespace mongo {
         return ret;
     }
 
-    DBClientBase& Tool::conn( bool slaveIfPaired ){
-        if ( slaveIfPaired && _conn->type() == ConnectionString::SET ){
+    DBClientBase& Tool::conn( bool slaveIfPaired ) {
+        if ( slaveIfPaired && _conn->type() == ConnectionString::SET ) {
             if (!_slaveConn)
                 _slaveConn = &((DBClientReplicaSet*)_conn)->slaveConn();
             return *_slaveConn;
@@ -252,47 +253,47 @@ namespace mongo {
         if ( hasParam("dbpath") ) {
             return true;
         }
-        
+
         BSONObj info;
         bool isMaster;
         bool ok = conn().isMaster(isMaster, &info);
-        
+
         if (ok && !isMaster) {
             cerr << "ERROR: trying to write to non-master " << conn().toString() << endl;
             cerr << "isMaster info: " << info << endl;
             return false;
         }
-        
+
         return true;
     }
 
-    void Tool::addFieldOptions(){
+    void Tool::addFieldOptions() {
         add_options()
-            ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
-            ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
-            ;
+        ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
+        ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
+        ;
     }
 
-    void Tool::needFields(){
+    void Tool::needFields() {
 
-        if ( hasParam( "fields" ) ){
+        if ( hasParam( "fields" ) ) {
             BSONObjBuilder b;
-        
+
             string fields_arg = getParam("fields");
             pcrecpp::StringPiece input(fields_arg);
-        
+
             string f;
             pcrecpp::RE re("([#\\w\\.\\s\\-]+),?" );
-            while ( re.Consume( &input, &f ) ){
+            while ( re.Consume( &input, &f ) ) {
                 _fields.push_back( f );
                 b.append( f , 1 );
             }
-        
+
             _fieldsObj = b.obj();
             return;
         }
 
-        if ( hasParam( "fieldFile" ) ){
+        if ( hasParam( "fieldFile" ) ) {
             string fn = getParam( "fieldFile" );
             if ( ! exists( fn ) )
                 throw UserException( 9999 , ((string)"file: " + fn ) + " doesn't exist" );
@@ -302,7 +303,7 @@ namespace mongo {
             ifstream file( fn.c_str() );
 
             BSONObjBuilder b;
-            while ( file.rdstate() == ios_base::goodbit ){
+            while ( file.rdstate() == ios_base::goodbit ) {
                 file.getline( line , BUF_SIZE );
                 const char * cur = line;
                 while ( isspace( cur[0] ) ) cur++;
@@ -319,7 +320,7 @@ namespace mongo {
         throw UserException( 9998 , "you need to specify fields" );
     }
 
-    void Tool::auth( string dbname ){
+    void Tool::auth( string dbname ) {
         if ( ! dbname.size() )
             dbname = _db;
 
@@ -338,28 +339,28 @@ namespace mongo {
         throw UserException( 9997 , (string)"auth failed: " + errmsg );
     }
 
-    BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck ) 
-        : Tool( name , access , "" , "" ) , _objcheck( objcheck ){
-        
+    BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck )
+        : Tool( name , access , "" , "" ) , _objcheck( objcheck ) {
+
         add_options()
-            ("objcheck" , "validate object before inserting" )
-            ("filter" , po::value<string>() , "filter to apply before inserting" )
-            ;
+        ("objcheck" , "validate object before inserting" )
+        ("filter" , po::value<string>() , "filter to apply before inserting" )
+        ;
     }
 
 
-    int BSONTool::run(){
+    int BSONTool::run() {
         _objcheck = hasParam( "objcheck" );
-        
+
         if ( hasParam( "filter" ) )
             _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
-        
+
         return doRun();
     }
 
-    long long BSONTool::processFile( const path& root ){
+    long long BSONTool::processFile( const path& root ) {
         _fileName = root.string();
-        
+
         unsigned long long fileLength = file_size( root );
 
         if ( fileLength == 0 ) {
@@ -369,7 +370,7 @@ namespace mongo {
 
 
         FILE* file = fopen( _fileName.c_str() , "rb" );
-        if ( ! file ){
+        if ( ! file ) {
             log() << "error opening file: " << _fileName << endl;
             return 0;
         }
@@ -393,7 +394,7 @@ namespace mongo {
         while ( read < fileLength ) {
             int readlen = fread(buf, 4, 1, file);
             int size = ((int*)buf)[0];
-            if ( size >= BUF_SIZE ){
+            if ( size >= BUF_SIZE ) {
                 cerr << "got an object of size: " << size << "  terminating..." << endl;
             }
             uassert( 10264 ,  "invalid object size" , size < BUF_SIZE );
@@ -401,24 +402,24 @@ namespace mongo {
             readlen = fread(buf+4, size-4, 1, file);
 
             BSONObj o( buf );
-            if ( _objcheck && ! o.valid() ){
+            if ( _objcheck && ! o.valid() ) {
                 cerr << "INVALID OBJECT - going try and pring out " << endl;
                 cerr << "size: " << size << endl;
                 BSONObjIterator i(o);
-                while ( i.more() ){
+                while ( i.more() ) {
                     BSONElement e = i.next();
                     try {
                         e.validate();
                     }
-                    catch ( ... ){
+                    catch ( ... ) {
                         cerr << "\t\t NEXT ONE IS INVALID" << endl;
                     }
                     cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
                     cerr << "\t " << e << endl;
                 }
             }
-            
-            if ( _matcher.get() == 0 || _matcher->matches( o ) ){
+
+            if ( _matcher.get() == 0 || _matcher->matches( o ) ) {
                 gotObject( o );
                 processed++;
             }
@@ -435,8 +436,8 @@ namespace mongo {
             out() << "\t "  << processed << " objects processed" << endl;
         return processed;
     }
-            
 
 
-    void setupSignals( bool inFork ){}
+
+    void setupSignals( bool inFork ) {}
 }

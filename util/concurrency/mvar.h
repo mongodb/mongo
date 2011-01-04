@@ -31,18 +31,18 @@ namespace mongo {
 
         // create an empty MVar
         MVar()
-          : _state(EMPTY)
+            : _state(EMPTY)
         {}
 
         // creates a full MVar
         MVar(const T& val)
-          : _state(FULL)
-          , _value(val)
+            : _state(FULL)
+            , _value(val)
         {}
 
         // puts val into the MVar and returns true or returns false if full
         // never blocks
-        bool tryPut(const T& val){
+        bool tryPut(const T& val) {
             // intentionally repeat test before and after lock
             if (_state == FULL) return false;
             Mutex::scoped_lock lock(_mutex);
@@ -59,17 +59,17 @@ namespace mongo {
 
         // puts val into the MVar
         // will block if the MVar is already full
-        void put(const T& val){
+        void put(const T& val) {
             Mutex::scoped_lock lock(_mutex);
-            while (!tryPut(val)){
-                 // unlocks lock while waiting and relocks before returning
+            while (!tryPut(val)) {
+                // unlocks lock while waiting and relocks before returning
                 _condition.wait(lock);
-            } 
+            }
         }
 
         // takes val out of the MVar and returns true or returns false if empty
         // never blocks
-        bool tryTake(T& out){
+        bool tryTake(T& out) {
             // intentionally repeat test before and after lock
             if (_state == EMPTY) return false;
             Mutex::scoped_lock lock(_mutex);
@@ -86,14 +86,14 @@ namespace mongo {
 
         // takes val out of the MVar
         // will block if the MVar is empty
-        T take(){
+        T take() {
             T ret = T();
 
             Mutex::scoped_lock lock(_mutex);
-            while (!tryTake(ret)){
-                 // unlocks lock while waiting and relocks before returning
+            while (!tryTake(ret)) {
+                // unlocks lock while waiting and relocks before returning
                 _condition.wait(lock);
-            } 
+            }
 
             return ret;
         }
@@ -102,7 +102,7 @@ namespace mongo {
         // Note: this is fast because there is no locking, but state could
         // change before you get a chance to act on it.
         // Mainly useful for sanity checks / asserts.
-        State getState(){ return _state; }
+        State getState() { return _state; }
 
 
     private:

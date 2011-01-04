@@ -18,13 +18,13 @@
 #include "../pch.h"
 
 namespace mongo {
-    
-    /* 
+
+    /*
      * Handles allocation of contiguous files on disk.  Allocation may be
      * requested asynchronously or synchronously.
      */
     class FileAllocator {
-        /* 
+        /*
          * The public functions may not be called concurrently.  The allocation
          * functions may be called multiple times per file, but only the first
          * size specified per file will be used.
@@ -33,7 +33,7 @@ namespace mongo {
         FileAllocator();
 
         void start();
-        
+
         /**
          * May be called if file exists. If file exists, or its allocation has
          *  been requested, size is updated to match existing file size.
@@ -48,20 +48,20 @@ namespace mongo {
         void allocateAsap( const string &name, unsigned long long &size );
 
         void waitUntilFinished() const;
-        
+
         static void ensureLength(int fd , long size);
-        
+
     private:
 #if !defined(_WIN32)
         void checkFailure();
-        
-        // caller must hold pendingMutex_ lock.  Returns size if allocated or 
+
+        // caller must hold pendingMutex_ lock.  Returns size if allocated or
         // allocation requested, -1 otherwise.
         long prevSize( const string &name ) const;
-         
+
         // caller must hold pendingMutex_ lock.
         bool inProgress( const string &name ) const;
-        
+
         /** called from the worked thread */
         static void run( FileAllocator * fa );
 
@@ -72,8 +72,8 @@ namespace mongo {
         mutable map< string, long > _pendingSize;
 
         bool _failed;
-#endif    
+#endif
     };
-    
+
     FileAllocator &theFileAllocator();
 } // namespace mongo

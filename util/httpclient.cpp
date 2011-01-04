@@ -27,20 +27,20 @@ namespace mongo {
 #define HD(x)
 
 
-    int HttpClient::get( string url , Result * result ){
+    int HttpClient::get( string url , Result * result ) {
         return _go( "GET" , url , 0 , result );
     }
 
-    int HttpClient::post( string url , string data , Result * result ){
+    int HttpClient::post( string url , string data , Result * result ) {
         return _go( "POST" , url , data.c_str() , result );
-    }    
+    }
 
-    int HttpClient::_go( const char * command , string url , const char * body , Result * result ){
+    int HttpClient::_go( const char * command , string url , const char * body , Result * result ) {
         uassert( 10271 ,  "invalid url" , url.find( "http://" ) == 0 );
         url = url.substr( 7 );
-        
+
         string host , path;
-        if ( url.find( "/" ) == string::npos ){
+        if ( url.find( "/" ) == string::npos ) {
             host = url;
             path = "/";
         }
@@ -49,15 +49,15 @@ namespace mongo {
             path = url.substr( url.find( "/" ) );
         }
 
-        
+
         HD( "host [" << host << "]" );
         HD( "path [" << path << "]" );
 
         string server = host;
         int port = 80;
-        
+
         string::size_type idx = host.find( ":" );
-        if ( idx != string::npos ){
+        if ( idx != string::npos ) {
             server = host.substr( 0 , idx );
             string t = host.substr( idx + 1 );
             port = atoi( t.c_str() );
@@ -65,7 +65,7 @@ namespace mongo {
 
         HD( "server [" << server << "]" );
         HD( "port [" << port << "]" );
-        
+
         string req;
         {
             stringstream ss;
@@ -83,20 +83,20 @@ namespace mongo {
 
             req = ss.str();
         }
-        
+
         SockAddr addr( server.c_str() , port );
         HD( "addr: " << addr.toString() );
-        
+
         MessagingPort p;
         if ( ! p.connect( addr ) )
             return -1;
-        
-        { 
+
+        {
             const char * out = req.c_str();
             int toSend = req.size();
             p.send( out , toSend, "_go" );
         }
-        
+
         char buf[4096];
         int got = p.unsafe_recv( buf , 4096 );
         buf[got] = 0;
@@ -105,46 +105,46 @@ namespace mongo {
         char version[32];
         assert( sscanf( buf , "%s %d" , version , &rc ) == 2 );
         HD( "rc: " << rc );
-        
+
         StringBuilder sb;
         if ( result )
             sb << buf;
-        
-        while ( ( got = p.unsafe_recv( buf , 4096 ) ) > 0){
+
+        while ( ( got = p.unsafe_recv( buf , 4096 ) ) > 0) {
             if ( result )
                 sb << buf;
         }
 
-        if ( result ){
+        if ( result ) {
             result->_init( rc , sb.str() );
         }
 
         return rc;
     }
 
-    void HttpClient::Result::_init( int code , string entire ){
+    void HttpClient::Result::_init( int code , string entire ) {
         _code = code;
         _entireResponse = entire;
 
-        while ( true ){
+        while ( true ) {
             size_t i = entire.find( '\n' );
-            if ( i == string::npos ){
+            if ( i == string::npos ) {
                 // invalid
                 break;
             }
-            
+
             string h = entire.substr( 0 , i );
             entire = entire.substr( i + 1 );
-            
+
             if ( h.size() && h[h.size()-1] == '\r' )
                 h = h.substr( 0 , h.size() - 1 );
 
             if ( h.size() == 0 )
                 break;
         }
-        
+
         _body = entire;
     }
 
-    
+
 }

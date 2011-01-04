@@ -35,7 +35,7 @@ namespace mongo {
     */
 
     extern bool objcheck;
-    
+
 #pragma pack(1)
     struct QueryResult : public MsgData {
         long long cursorId;
@@ -50,7 +50,7 @@ namespace mongo {
         int& _resultFlags() {
             return dataAsInt();
         }
-        void setResultFlagsToOk() { 
+        void setResultFlagsToOk() {
             _resultFlags() = ResultFlag_AwaitCapable;
         }
     };
@@ -63,8 +63,7 @@ namespace mongo {
     */
     class DbMessage {
     public:
-        DbMessage(const Message& _m) : m(_m)
-        {
+        DbMessage(const Message& _m) : m(_m) {
             // for received messages, Message has only one buffer
             theEnd = _m.singleData()->_data + _m.header()->dataLen();
             char *r = _m.singleData()->_data;
@@ -86,7 +85,7 @@ namespace mongo {
         const char * afterNS() const {
             return data + strlen( data ) + 1;
         }
-        
+
         int getInt( int num ) const {
             const int * foo = (const int*)afterNS();
             return foo[num];
@@ -96,7 +95,7 @@ namespace mongo {
             return getInt( 1 );
         }
 
-        void resetPull(){ nextjsobj = data; }
+        void resetPull() { nextjsobj = data; }
         int pullInt() const { return pullInt(); }
         int& pullInt() {
             if ( nextjsobj == data )
@@ -140,10 +139,10 @@ namespace mongo {
             BSONObj js(nextjsobj);
             massert( 10305 ,  "Client Error: Invalid object size", js.objsize() > 3 );
             massert( 10306 ,  "Client Error: Next object larger than space left in message",
-                    js.objsize() < ( theEnd - data ) );
+                     js.objsize() < ( theEnd - data ) );
             if ( objcheck && !js.valid() ) {
                 massert( 10307 , "Client Error: bad object in message", false);
-            }            
+            }
             nextjsobj += js.objsize();
             if ( nextjsobj >= theEnd )
                 nextjsobj = 0;
@@ -152,11 +151,11 @@ namespace mongo {
 
         const Message& msg() const { return m; }
 
-        void markSet(){
+        void markSet() {
             mark = nextjsobj;
         }
-        
-        void markReset(){
+
+        void markReset() {
             nextjsobj = mark;
         }
 
@@ -180,7 +179,7 @@ namespace mongo {
         int queryOptions;
         BSONObj query;
         BSONObj fields;
-        
+
         /* parses the message into the above fields */
         QueryMessage(DbMessage& d) {
             ns = d.getns();
@@ -232,8 +231,7 @@ namespace mongo {
     /* object reply helper. */
     inline void replyToQuery(int queryResultFlags,
                              AbstractMessagingPort* p, Message& requestMsg,
-                             BSONObj& responseObj)
-    {
+                             BSONObj& responseObj) {
         replyToQuery(queryResultFlags,
                      p, requestMsg,
                      (void *) responseObj.objdata(), responseObj.objsize(), 1);

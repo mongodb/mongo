@@ -32,15 +32,15 @@ namespace mongo {
     BSONField<long long> LimitsFields::currSize( "currSize" );
     BSONField<bool> LimitsFields::hasOpsQueued( "hasOpsQueued" );
 
-    BalancerPolicy::ChunkInfo* BalancerPolicy::balance( const string& ns, 
-                                                        const ShardToLimitsMap& shardToLimitsMap,  
-                                                        const ShardToChunksMap& shardToChunksMap, 
-                                                        int balancedLastTime ){
+    BalancerPolicy::ChunkInfo* BalancerPolicy::balance( const string& ns,
+            const ShardToLimitsMap& shardToLimitsMap,
+            const ShardToChunksMap& shardToChunksMap,
+            int balancedLastTime ) {
         pair<string,unsigned> min("",numeric_limits<unsigned>::max());
         pair<string,unsigned> max("",0);
         vector<string> drainingShards;
-	        
-        for (ShardToChunksIter i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ){
+
+        for (ShardToChunksIter i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ) {
 
             // Find whether this shard's capacity or availability are exhausted
             const string& shard = i->first;
@@ -53,37 +53,37 @@ namespace mongo {
 
             // Is this shard a better chunk receiver then the current one?
             // Shards that would be bad receiver candidates:
-            // + maxed out shards 
-            // + draining shards 
+            // + maxed out shards
+            // + draining shards
             // + shards with operations queued for writeback
             const unsigned size = i->second.size();
-            if ( ! maxedOut && ! draining && ! opsQueued ){
-                if ( size < min.second ){
+            if ( ! maxedOut && ! draining && ! opsQueued ) {
+                if ( size < min.second ) {
                     min = make_pair( shard , size );
                 }
             }
 
             // Check whether this shard is a better chunk donor then the current one.
             // Draining shards take a lower priority than overloaded shards.
-            if ( size > max.second ){
-                max = make_pair( shard , size ); 
+            if ( size > max.second ) {
+                max = make_pair( shard , size );
             }
-            if ( draining && (size > 0)){
+            if ( draining && (size > 0)) {
                 drainingShards.push_back( shard );
             }
         }
 
-        // If there is no candidate chunk receiver -- they may have all been maxed out, 
-        // draining, ... -- there's not much that the policy can do.  
-        if ( min.second == numeric_limits<unsigned>::max() ){
+        // If there is no candidate chunk receiver -- they may have all been maxed out,
+        // draining, ... -- there's not much that the policy can do.
+        if ( min.second == numeric_limits<unsigned>::max() ) {
             log() << "no availalable shards to take chunks" << endl;
             return NULL;
         }
-        
+
         log(1) << "collection : " << ns << endl;
         log(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
         log(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
-        if ( ! drainingShards.empty() ){
+        if ( ! drainingShards.empty() ) {
             string drainingStr;
             joinStringDelim( drainingShards, &drainingStr, ',' );
             log(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
@@ -94,34 +94,36 @@ namespace mongo {
         const int imbalance = max.second - min.second;
         const int threshold = balancedLastTime ? 2 : 8;
         string from, to;
-        if ( imbalance >= threshold ){
+        if ( imbalance >= threshold ) {
             from = max.first;
             to = min.first;
 
-        } else if ( ! drainingShards.empty() ){
+        }
+        else if ( ! drainingShards.empty() ) {
             from = drainingShards[ rand() % drainingShards.size() ];
             to = min.first;
 
-        } else {
-            // Everything is balanced here! 
+        }
+        else {
+            // Everything is balanced here!
             return NULL;
         }
 
         const vector<BSONObj>& chunksFrom = shardToChunksMap.find( from )->second;
         const vector<BSONObj>& chunksTo = shardToChunksMap.find( to )->second;
         BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
-        log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;        
+        log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;
 
         return new ChunkInfo( ns, to, from, chunkToMove );
     }
 
-    BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ){
+    BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ) {
         // It is possible for a donor ('from') shard to have less chunks than a recevier one ('to')
-        // if the donor is in draining mode. 
-        
+        // if the donor is in draining mode.
+
         if ( to.size() == 0 )
             return from[0];
-        
+
         if ( from[0]["min"].Obj().woCompare( to[to.size()-1]["max"].Obj() , BSONObj() , false ) == 0 )
             return from[0];
 
@@ -131,38 +133,38 @@ namespace mongo {
         return from[0];
     }
 
-    bool BalancerPolicy::isSizeMaxed( BSONObj limits ){
-        // If there's no limit information for the shard, assume it can be a chunk receiver 
+    bool BalancerPolicy::isSizeMaxed( BSONObj limits ) {
+        // If there's no limit information for the shard, assume it can be a chunk receiver
         // (i.e., there's not bound on space utilization)
-        if ( limits.isEmpty() ){
+        if ( limits.isEmpty() ) {
             return false;
         }
 
         long long maxUsage = limits[ ShardFields::maxSize.name() ].Long();
-        if ( maxUsage == 0 ){
+        if ( maxUsage == 0 ) {
             return false;
         }
 
         long long currUsage = limits[ LimitsFields::currSize.name() ].Long();
-        if ( currUsage < maxUsage ){
+        if ( currUsage < maxUsage ) {
             return false;
         }
 
         return true;
     }
 
-    bool BalancerPolicy::isDraining( BSONObj limits ){
+    bool BalancerPolicy::isDraining( BSONObj limits ) {
         BSONElement draining = limits[ ShardFields::draining.name() ];
-        if ( draining.eoo() || ! draining.Bool() ){
+        if ( draining.eoo() || ! draining.Bool() ) {
             return false;
         }
 
         return true;
     }
 
-    bool BalancerPolicy::hasOpsQueued( BSONObj limits ){
+    bool BalancerPolicy::hasOpsQueued( BSONObj limits ) {
         BSONElement opsQueued = limits[ LimitsFields::hasOpsQueued.name() ];
-        if ( opsQueued.eoo() || ! opsQueued.Bool() ){
+        if ( opsQueued.eoo() || ! opsQueued.Bool() ) {
             return false;
         }
         return true;

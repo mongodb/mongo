@@ -44,9 +44,9 @@ namespace mongo {
 
     void MemoryMappedFile::flush(bool sync) {
     }
-    
+
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}
 
-} 
+}
 

@@ -20,23 +20,23 @@
 namespace mongo {
 
     typedef unsigned long long nonce;
-    
+
     struct Security {
         Security();
 
         nonce getNonce();
 
-		/** safe during global var initialization */
-		nonce getNonceInitSafe() { 
-			init();
-			return getNonce();
-		}
-	private:
+        /** safe during global var initialization */
+        nonce getNonceInitSafe() {
+            init();
+            return getNonce();
+        }
+    private:
         ifstream *_devrandom;
-		static bool _initialized;
-		void init(); // can call more than once
+        static bool _initialized;
+        void init(); // can call more than once
     };
-    
+
     extern Security security;
-        
+
 } // namespace mongo

@@ -33,36 +33,36 @@ namespace mongo {
     class AuthenticationInfo : boost::noncopyable {
         mongo::mutex _lock;
         map<string, Auth> m; // dbname -> auth
-		static int warned;
+        static int warned;
     public:
-		bool isLocalHost;
+        bool isLocalHost;
         AuthenticationInfo() : _lock("AuthenticationInfo") { isLocalHost = false; }
         ~AuthenticationInfo() {
         }
-        void logout(const string& dbname ) { 
+        void logout(const string& dbname ) {
             scoped_lock lk(_lock);
-			m.erase(dbname); 
-		}
-        void authorize(const string& dbname ) { 
+            m.erase(dbname);
+        }
+        void authorize(const string& dbname ) {
             scoped_lock lk(_lock);
             m[dbname].level = 2;
         }
         void authorizeReadOnly(const string& dbname) {
             scoped_lock lk(_lock);
-            m[dbname].level = 1;            
+            m[dbname].level = 1;
         }
         bool isAuthorized(const string& dbname) { return _isAuthorized( dbname, 2 ); }
         bool isAuthorizedReads(const string& dbname) { return _isAuthorized( dbname, 1 ); }
         bool isAuthorizedForLock(const string& dbname, int lockType ) { return _isAuthorized( dbname , lockType > 0 ? 2 : 1 ); }
-        
+
         void print();
 
     protected:
-        bool _isAuthorized(const string& dbname, int level) { 
+        bool _isAuthorized(const string& dbname, int level) {
             if( m[dbname].level >= level ) return true;
-			if( noauth ) return true;
-			if( m["admin"].level >= level ) return true;
-			if( m["local"].level >= level ) return true;
+            if( noauth ) return true;
+            if( m["admin"].level >= level ) return true;
+            if( m["local"].level >= level ) return true;
             return _isAuthorizedSpecialChecks( dbname );
         }
 

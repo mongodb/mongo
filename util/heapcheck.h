@@ -25,9 +25,9 @@
 #define IGNORE_OBJECT( a ) HeapLeakChecker::IgnoreObject( a )
 #define UNIGNORE_OBJECT( a ) HeapLeakChecker::UnIgnoreObject( a )
 
-#else 
+#else
 
 #define IGNORE_OBJECT( a )
-#define UNIGNORE_OBJECT( a ) 
+#define UNIGNORE_OBJECT( a )
 
 #endif

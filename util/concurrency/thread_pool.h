@@ -24,59 +24,59 @@
 
 namespace mongo {
 
-namespace threadpool {
-    class Worker;
+    namespace threadpool {
+        class Worker;
 
-    typedef boost::function<void(void)> Task; //nullary function or functor
+        typedef boost::function<void(void)> Task; //nullary function or functor
 
-    // exported to the mongo namespace
-    class ThreadPool : boost::noncopyable{
-    public:
-        explicit ThreadPool(int nThreads=8);
+        // exported to the mongo namespace
+        class ThreadPool : boost::noncopyable {
+        public:
+            explicit ThreadPool(int nThreads=8);
 
-        // blocks until all tasks are complete (tasks_remaining() == 0)
-        // You should not call schedule while in the destructor
-        ~ThreadPool();
+            // blocks until all tasks are complete (tasks_remaining() == 0)
+            // You should not call schedule while in the destructor
+            ~ThreadPool();
 
-        // blocks until all tasks are complete (tasks_remaining() == 0)
-        // does not prevent new tasks from being scheduled so could wait forever.
-        // Also, new tasks could be scheduled after this returns.
-        void join();
+            // blocks until all tasks are complete (tasks_remaining() == 0)
+            // does not prevent new tasks from being scheduled so could wait forever.
+            // Also, new tasks could be scheduled after this returns.
+            void join();
 
-        // task will be copied a few times so make sure it's relatively cheap
-        void schedule(Task task);
+            // task will be copied a few times so make sure it's relatively cheap
+            void schedule(Task task);
 
-        // Helpers that wrap schedule and boost::bind.
-        // Functor and args will be copied a few times so make sure it's relatively cheap
-        template<typename F, typename A>
-        void schedule(F f, A a){ schedule(boost::bind(f,a)); }
-        template<typename F, typename A, typename B>
-        void schedule(F f, A a, B b){ schedule(boost::bind(f,a,b)); }
-        template<typename F, typename A, typename B, typename C>
-        void schedule(F f, A a, B b, C c){ schedule(boost::bind(f,a,b,c)); }
-        template<typename F, typename A, typename B, typename C, typename D>
-        void schedule(F f, A a, B b, C c, D d){ schedule(boost::bind(f,a,b,c,d)); }
-        template<typename F, typename A, typename B, typename C, typename D, typename E>
-        void schedule(F f, A a, B b, C c, D d, E e){ schedule(boost::bind(f,a,b,c,d,e)); }
+            // Helpers that wrap schedule and boost::bind.
+            // Functor and args will be copied a few times so make sure it's relatively cheap
+            template<typename F, typename A>
+            void schedule(F f, A a) { schedule(boost::bind(f,a)); }
+            template<typename F, typename A, typename B>
+            void schedule(F f, A a, B b) { schedule(boost::bind(f,a,b)); }
+            template<typename F, typename A, typename B, typename C>
+            void schedule(F f, A a, B b, C c) { schedule(boost::bind(f,a,b,c)); }
+            template<typename F, typename A, typename B, typename C, typename D>
+            void schedule(F f, A a, B b, C c, D d) { schedule(boost::bind(f,a,b,c,d)); }
+            template<typename F, typename A, typename B, typename C, typename D, typename E>
+            void schedule(F f, A a, B b, C c, D d, E e) { schedule(boost::bind(f,a,b,c,d,e)); }
 
-        int tasks_remaining() { return _tasksRemaining; }
+            int tasks_remaining() { return _tasksRemaining; }
 
-    private:
-        mongo::mutex _mutex;
-        boost::condition _condition;
+        private:
+            mongo::mutex _mutex;
+            boost::condition _condition;
 
-        list<Worker*> _freeWorkers; //used as LIFO stack (always front)
-        list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
-        int _tasksRemaining; // in queue + currently processing
-        int _nThreads; // only used for sanity checking. could be removed in the future.
-        
-        // should only be called by a worker from the worker's thread
-        void task_done(Worker* worker);
-        friend class Worker;
-    };
+            list<Worker*> _freeWorkers; //used as LIFO stack (always front)
+            list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
+            int _tasksRemaining; // in queue + currently processing
+            int _nThreads; // only used for sanity checking. could be removed in the future.
 
-} //namespace threadpool
+            // should only be called by a worker from the worker's thread
+            void task_done(Worker* worker);
+            friend class Worker;
+        };
 
-using threadpool::ThreadPool;
+    } //namespace threadpool
+
+    using threadpool::ThreadPool;
 
 } //namespace mongo

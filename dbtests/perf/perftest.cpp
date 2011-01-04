@@ -81,7 +81,7 @@ public:
 
 class RunnerSuite : public Suite {
 public:
-    RunnerSuite( string name ) : Suite( name ){}
+    RunnerSuite( string name ) : Suite( name ) {}
 protected:
     template< class T >
     void add() {
@@ -168,9 +168,9 @@ namespace Insert {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite( "insert" ){}
+        All() : RunnerSuite( "insert" ) {}
 
-        void setupTests(){
+        void setupTests() {
             add< IdIndex >();
             add< TwoIndex >();
             add< TenIndex >();
@@ -252,8 +252,8 @@ namespace Update {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite( "update" ){}
-        void setupTests(){
+        All() : RunnerSuite( "update" ) {}
+        void setupTests() {
             add< Smaller >();
             add< Bigger >();
             add< Inc >();
@@ -266,33 +266,33 @@ namespace Update {
 namespace BSON {
 
     const char *sample =
-    "{\"one\":2, \"two\":5, \"three\": {},"
-    "\"four\": { \"five\": { \"six\" : 11 } },"
-    "\"seven\": [ \"a\", \"bb\", \"ccc\", 5 ],"
-    "\"eight\": Dbref( \"rrr\", \"01234567890123456789aaaa\" ),"
-    "\"_id\": ObjectId( \"deadbeefdeadbeefdeadbeef\" ),"
-    "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"02\" },"
-    "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }";
+        "{\"one\":2, \"two\":5, \"three\": {},"
+        "\"four\": { \"five\": { \"six\" : 11 } },"
+        "\"seven\": [ \"a\", \"bb\", \"ccc\", 5 ],"
+        "\"eight\": Dbref( \"rrr\", \"01234567890123456789aaaa\" ),"
+        "\"_id\": ObjectId( \"deadbeefdeadbeefdeadbeef\" ),"
+        "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"02\" },"
+        "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }";
 
     const char *shopwikiSample =
-    "{ '_id' : '289780-80f85380b5c1d4a0ad75d1217673a4a2' , 'site_id' : 289780 , 'title'"
-    ": 'Jubilee - Margaret Walker' , 'image_url' : 'http://www.heartlanddigsandfinds.c"
-    "om/store/graphics/Product_Graphics/Product_8679.jpg' , 'url' : 'http://www.heartla"
-    "nddigsandfinds.com/store/store_product_detail.cfm?Product_ID=8679&Category_ID=2&Su"
-    "b_Category_ID=910' , 'url_hash' : 3450626119933116345 , 'last_update' :  null  , '"
-    "features' : { '$imagePrefetchDate' : '2008Aug30 22:39' , '$image.color.rgb' : '5a7"
-    "574' , 'Price' : '$10.99' , 'Description' : 'Author--s 1st Novel. A Houghton Miffl"
-    "in Literary Fellowship Award novel by the esteemed poet and novelist who has demon"
-    "strated a lifelong commitment to the heritage of black culture. An acclaimed story"
-    "of Vyry, a negro slave during the 19th Century, facing the biggest challenge of h"
-    "er lifetime - that of gaining her freedom, fighting for all the things she had nev"
-    "er known before. The author, great-granddaughter of Vyry, reveals what the Civil W"
-    "ar in America meant to the Negroes. Slavery W' , '$priceHistory-1' : '2008Dec03 $1"
-    "0.99' , 'Brand' : 'Walker' , '$brands_in_title' : 'Walker' , '--path' : '//HTML[1]"
-    "/BODY[1]/TABLE[1]/TR[1]/TD[1]/P[1]/TABLE[1]/TR[1]/TD[1]/TABLE[1]/TR[2]/TD[2]/TABLE"
-    "[1]/TR[1]/TD[1]/P[1]/TABLE[1]/TR[1]' , '~location' : 'en_US' , '$crawled' : '2009J"
-    "an11 03:22' , '$priceHistory-2' : '2008Nov15 $10.99' , '$priceHistory-0' : '2008De"
-    "c24 $10.99'}}";
+        "{ '_id' : '289780-80f85380b5c1d4a0ad75d1217673a4a2' , 'site_id' : 289780 , 'title'"
+        ": 'Jubilee - Margaret Walker' , 'image_url' : 'http://www.heartlanddigsandfinds.c"
+        "om/store/graphics/Product_Graphics/Product_8679.jpg' , 'url' : 'http://www.heartla"
+        "nddigsandfinds.com/store/store_product_detail.cfm?Product_ID=8679&Category_ID=2&Su"
+        "b_Category_ID=910' , 'url_hash' : 3450626119933116345 , 'last_update' :  null  , '"
+        "features' : { '$imagePrefetchDate' : '2008Aug30 22:39' , '$image.color.rgb' : '5a7"
+        "574' , 'Price' : '$10.99' , 'Description' : 'Author--s 1st Novel. A Houghton Miffl"
+        "in Literary Fellowship Award novel by the esteemed poet and novelist who has demon"
+        "strated a lifelong commitment to the heritage of black culture. An acclaimed story"
+        "of Vyry, a negro slave during the 19th Century, facing the biggest challenge of h"
+        "er lifetime - that of gaining her freedom, fighting for all the things she had nev"
+        "er known before. The author, great-granddaughter of Vyry, reveals what the Civil W"
+        "ar in America meant to the Negroes. Slavery W' , '$priceHistory-1' : '2008Dec03 $1"
+        "0.99' , 'Brand' : 'Walker' , '$brands_in_title' : 'Walker' , '--path' : '//HTML[1]"
+        "/BODY[1]/TABLE[1]/TR[1]/TD[1]/P[1]/TABLE[1]/TR[1]/TD[1]/TABLE[1]/TR[2]/TD[2]/TABLE"
+        "[1]/TR[1]/TD[1]/P[1]/TABLE[1]/TR[1]' , '~location' : 'en_US' , '$crawled' : '2009J"
+        "an11 03:22' , '$priceHistory-2' : '2008Nov15 $10.99' , '$priceHistory-0' : '2008De"
+        "c24 $10.99'}}";
 
     class Parse {
     public:
@@ -332,8 +332,8 @@ namespace BSON {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite( "bson" ){}
-        void setupTests(){
+        All() : RunnerSuite( "bson" ) {}
+        void setupTests() {
             add< Parse >();
             add< ShopwikiParse >();
             add< Json >();
@@ -402,8 +402,8 @@ namespace Index {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite( "index" ){}
-        void setupTests(){
+        All() : RunnerSuite( "index" ) {}
+        void setupTests() {
             add< Int >();
             add< ObjectId >();
             add< String >();
@@ -435,7 +435,7 @@ namespace QueryTests {
         }
         void run() {
             client_->findOne( ns_.c_str(),
-                             QUERY( "a" << "b" ).hint( BSON( "_id" << 1 ) ) );
+                              QUERY( "a" << "b" ).hint( BSON( "_id" << 1 ) ) );
         }
         string ns_;
     };
@@ -465,7 +465,7 @@ namespace QueryTests {
         }
         void run() {
             auto_ptr< DBClientCursor > c =
-            client_->query( ns_.c_str(), Query( BSONObj() ).sort( BSON( "_id" << 1 ) ) );
+                client_->query( ns_.c_str(), Query( BSONObj() ).sort( BSON( "_id" << 1 ) ) );
             int i = 0;
             for( ; c->more(); c->nextSafe(), ++i );
             ASSERT_EQUALS( 50000, i );
@@ -481,7 +481,7 @@ namespace QueryTests {
         }
         void run() {
             auto_ptr< DBClientCursor > c =
-            client_->query( ns_.c_str(), Query( BSONObj() ).sort( BSON( "_id" << 1 ) ) );
+                client_->query( ns_.c_str(), Query( BSONObj() ).sort( BSON( "_id" << 1 ) ) );
             int i = 0;
             for( ; c->more(); c->nextSafe(), ++i );
             ASSERT_EQUALS( 50000, i );
@@ -541,8 +541,8 @@ namespace QueryTests {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite( "query" ){}
-        void setupTests(){
+        All() : RunnerSuite( "query" ) {}
+        void setupTests() {
             add< NoMatch >();
             add< NoMatchIndex >();
             add< NoMatchLong >();
@@ -602,8 +602,8 @@ namespace Count {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite( "count" ){}
-        void setupTests(){
+        All() : RunnerSuite( "count" ) {}
+        void setupTests() {
             add< Count >();
             add< CountIndex >();
             add< CountSimpleIndex >();
@@ -677,8 +677,8 @@ namespace Plan {
 
     class All : public RunnerSuite {
     public:
-        All() : RunnerSuite("plan" ){}
-        void setupTests(){
+        All() : RunnerSuite("plan" ) {}
+        void setupTests() {
             add< Hint >();
             add< Sort >();
             add< Query >();

@@ -24,37 +24,37 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    extern string dbpath; 
+    extern string dbpath;
 
-    /** this is very much like a boost::path.  however, we define a new type to get some type 
+    /** this is very much like a boost::path.  however, we define a new type to get some type
         checking.  if you want to say 'my param MUST be a relative path", use this.
     */
-    struct RelativePath { 
+    struct RelativePath {
         string _p;
 
         bool empty() const { return _p.empty(); }
 
-        static RelativePath fromRelativePath(string f) { 
+        static RelativePath fromRelativePath(string f) {
             RelativePath rp;
             rp._p = f;
             return rp;
         }
 
         /** from a full path */
-        static RelativePath fromFullPath(path f) { 
+        static RelativePath fromFullPath(path f) {
             path dbp(dbpath); // normalizes / and backslash
             string fullpath = f.string();
             string relative = str::after(fullpath, dbp.string());
-            if( relative.empty() ) { 
+            if( relative.empty() ) {
                 log() << "warning file is not under db path? " << fullpath << ' ' << dbp.string() << endl;
                 RelativePath rp;
                 rp._p = fullpath;
                 return rp;
             }
-            /*uassert(13600, 
-                    str::stream() << "file path is not under the db path? " << fullpath << ' ' << dbpath, 
+            /*uassert(13600,
+                    str::stream() << "file path is not under the db path? " << fullpath << ' ' << dbpath,
                     relative != fullpath);*/
-            if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) { 
+            if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) {
                 relative.erase(0, 1);
             }
             RelativePath rp;
@@ -68,11 +68,11 @@ namespace mongo {
         bool operator==(const RelativePath& r) const { return _p == r._p; }
         bool operator<(const RelativePath& r) const { return _p < r._p; }
 
-        string asFullPath() const { 
+        string asFullPath() const {
             path x(dbpath);
             x /= _p;
             return x.string();
-        } 
+        }
 
     };
 

@@ -23,8 +23,8 @@ namespace mongo {
     /* throws */
     bool requestHeartbeat(string setname, string fromHost, string memberFullName, BSONObj& result, int myConfigVersion, int& theirConfigVersion, bool checkEmpty = false);
 
-    struct HealthOptions { 
-        HealthOptions() { 
+    struct HealthOptions {
+        HealthOptions() {
             heartbeatSleepMillis = 2000;
             heartbeatTimeoutMillis = 10000;
             heartbeatConnRetries  = 2;
@@ -42,8 +42,8 @@ namespace mongo {
             uassert(13113, "bad replset heartbeat option", heartbeatTimeoutMillis >= 10);
         }
 
-        bool operator==(const HealthOptions& r) const { 
-            return heartbeatSleepMillis==r.heartbeatSleepMillis && heartbeatTimeoutMillis==r.heartbeatTimeoutMillis && heartbeatConnRetries==heartbeatConnRetries; 
+        bool operator==(const HealthOptions& r) const {
+            return heartbeatSleepMillis==r.heartbeatSleepMillis && heartbeatTimeoutMillis==r.heartbeatTimeoutMillis && heartbeatConnRetries==heartbeatConnRetries;
         }
     };
 

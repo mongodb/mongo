@@ -20,9 +20,9 @@
 #include "concurrency/rwlock.h"
 
 namespace mongo {
-    
+
     /* the administrative-ish stuff here */
-    class MongoFile : boost::noncopyable {         
+    class MongoFile : boost::noncopyable {
     public:
         /** Flushable has to fail nicely if the underlying object gets killed */
         class Flushable {
@@ -30,7 +30,7 @@ namespace mongo {
             virtual ~Flushable() {}
             virtual void flush() = 0;
         };
-        
+
         virtual ~MongoFile() {}
 
         enum Options {
@@ -38,8 +38,8 @@ namespace mongo {
             READONLY = 2    // not contractually guaranteed, but if specified the impl has option to fault writes
         };
 
-        /** @param fun is called for each MongoFile. 
-            calledl from within a mutex that MongoFile uses. so be careful not to deadlock. 
+        /** @param fun is called for each MongoFile.
+            calledl from within a mutex that MongoFile uses. so be careful not to deadlock.
         */
         template < class F >
         static void forEach( F fun );
@@ -77,7 +77,7 @@ namespace mongo {
          * Flushable has to fail nicely if the underlying object gets killed
          */
         virtual Flushable * prepareFlush() = 0;
-        
+
         void created(); /* subclass must call after create */
         void destroyed(); /* subclass must call in destructor */
 
@@ -99,7 +99,7 @@ namespace mongo {
     inline void MongoFile::unmarkAllWritable() {}
 #endif
 
-    /** look up a MMF by filename. scoped mutex locking convention.  
+    /** look up a MMF by filename. scoped mutex locking convention.
         example:
           MMFFinderByName finder;
           MongoMMF *a = finder.find("file_name_a");
@@ -109,10 +109,10 @@ namespace mongo {
     public:
         MongoFileFinder() : _lk(MongoFile::mmmutex,false) { }
 
-        /** @return The MongoFile object associated with the specified file name.  If no file is open 
+        /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
         */
-        MongoFile* findByPath(string path) { 
+        MongoFile* findByPath(string path) {
             map<string,MongoFile*>::iterator i = MongoFile::pathToFile.find(path);
             return  i == MongoFile::pathToFile.end() ? 0 : i->second;
         }
@@ -122,10 +122,10 @@ namespace mongo {
     };
 
     struct MongoFileAllowWrites {
-        MongoFileAllowWrites(){
+        MongoFileAllowWrites() {
             MongoFile::markAllWritable();
         }
-        ~MongoFileAllowWrites(){
+        ~MongoFileAllowWrites() {
             MongoFile::unmarkAllWritable();
         }
     };
@@ -151,7 +151,7 @@ namespace mongo {
         */
         void* map(const char *filename, unsigned long long &length, int options = 0 );
 
-        /* Create. Must not exist. 
+        /* Create. Must not exist.
            @param zero fill file with zeros when true
         */
         void* create(string filename, unsigned long long len, bool zero);
@@ -162,15 +162,15 @@ namespace mongo {
         long shortLength() const          { return (long) len; }
         unsigned long long length() const { return len; }
 
-        /** create a new view with the specified properties. 
-            automatically cleaned up upon close/destruction of the MemoryMappedFile object. 
+        /** create a new view with the specified properties.
+            automatically cleaned up upon close/destruction of the MemoryMappedFile object.
             */
         void* createReadOnlyMap();
         void* createPrivateMap();
 
     private:
         static void updateLength( const char *filename, unsigned long long &length );
-        
+
         HANDLE fd;
         HANDLE maphandle;
         vector<void *> views;
@@ -189,13 +189,13 @@ namespace mongo {
         void* remapPrivateView(void *oldPrivateAddr);
     };
 
-    void printMemInfo( const char * where );    
+    void printMemInfo( const char * where );
 
     typedef MemoryMappedFile MMF;
 
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
     template < class F >
-    inline void MongoFile::forEach( F p ) { 
+    inline void MongoFile::forEach( F p ) {
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);

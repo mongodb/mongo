@@ -30,8 +30,8 @@ namespace mongo {
         RS_FATAL      something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.
         RS_STARTUP2   loaded config, still determining who is primary
     */
-    struct MemberState { 
-        enum MS { 
+    struct MemberState {
+        enum MS {
             RS_STARTUP = 0,
             RS_PRIMARY = 1,
             RS_SECONDARY = 2,
@@ -61,9 +61,9 @@ namespace mongo {
         bool operator!=(const MemberState& r) const { return s != r.s; }
     };
 
-    /* this is supposed to be just basic information on a member, 
+    /* this is supposed to be just basic information on a member,
        and copy constructable. */
-    class HeartbeatInfo { 
+    class HeartbeatInfo {
         unsigned _id;
     public:
         HeartbeatInfo() : _id(0xffffffff),hbstate(MemberState::RS_UNKNOWN),health(-1.0),downSince(0),skew(INT_MIN) { }
@@ -89,15 +89,15 @@ namespace mongo {
         bool changed(const HeartbeatInfo& old) const;
     };
 
-    inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) { 
+    inline HeartbeatInfo::HeartbeatInfo(unsigned id) : _id(id) {
         hbstate = MemberState::RS_UNKNOWN;
         health = -1.0;
         downSince = 0;
-        lastHeartbeat = upSince = 0; 
+        lastHeartbeat = upSince = 0;
         skew = INT_MIN;
     }
 
-    inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const { 
+    inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const {
         return health != old.health ||
                hbstate != old.hbstate;
     }

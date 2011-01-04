@@ -37,7 +37,7 @@
 #include "jstypes.h"
 #undef JS_PUBLIC_API
 #undef JS_PUBLIC_DATA
-#define JS_PUBLIC_API(t)    t __cdecl 
+#define JS_PUBLIC_API(t)    t __cdecl
 #define JS_PUBLIC_DATA(t)   t
 #endif
 
@@ -64,7 +64,7 @@
 
 #define JSCLASS_GLOBAL_FLAGS 0
 
-JSBool JS_CStringsAreUTF8(){
+JSBool JS_CStringsAreUTF8() {
     return false;
 }
 
@@ -85,7 +85,7 @@ namespace mongo {
 
     class SMScope;
     class Convertor;
-    
+
     extern JSClass bson_class;
     extern JSClass bson_ro_class;
 
@@ -99,10 +99,10 @@ namespace mongo {
     extern JSClass maxkey_class;
 
     // internal things
-    void dontDeleteScope( SMScope * s ){}
+    void dontDeleteScope( SMScope * s ) {}
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report );
     extern boost::thread_specific_ptr<SMScope> currentScope;
-    
+
     // bson
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
 
@@ -112,14 +112,14 @@ namespace mongo {
     bool appendSpecialDBObject( Convertor * c , BSONObjBuilder& b , const string& name , jsval val , JSObject * o );
 
 #define JSVAL_IS_OID(v) ( JSVAL_IS_OBJECT( v ) && JS_InstanceOf( cx , JSVAL_TO_OBJECT( v ) , &object_id_class , 0 ) )
-    
+
     bool isDate( JSContext * cx , JSObject * o );
 
     // JS private data must be 2byte aligned, so we use a holder to refer to an unaligned pointer.
     struct BinDataHolder {
         BinDataHolder( const char *c, int copyLen = -1 ) :
-        c_( const_cast< char * >( c ) ),
-        iFree_( copyLen != -1 ) {
+            c_( const_cast< char * >( c ) ),
+            iFree_( copyLen != -1 ) {
             if ( copyLen != -1 ) {
                 c_ = (char*)malloc( copyLen );
                 memcpy( c_, c, copyLen );

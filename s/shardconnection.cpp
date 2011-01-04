@@ -23,18 +23,18 @@
 #include <set>
 
 namespace mongo {
-    
+
     // The code in shardconnection may run not only in mongos context. When elsewhere, chunk shard versioning
     // is disabled. To enable chunk shard versioning, provide the check/resetShardVerionCB's below
     //
     // TODO: better encapsulate this mechanism.
 
-    bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ){
+    bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ) {
         // no-op in mongod
         return false;
     }
-    
-    void defaultResetShardVersion( DBClientBase * conn ){
+
+    void defaultResetShardVersion( DBClientBase * conn ) {
         // no-op in mongod
     }
 
@@ -48,22 +48,22 @@ namespace mongo {
     class ClientConnections : boost::noncopyable {
     public:
         struct Status : boost::noncopyable {
-            Status() : created(0), avail(0){}
+            Status() : created(0), avail(0) {}
 
-            long long created;            
+            long long created;
             DBClientBase* avail;
         };
 
 
-        ClientConnections(){}
-        
-        ~ClientConnections(){
-            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
+        ClientConnections() {}
+
+        ~ClientConnections() {
+            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
                 assert( ss );
-                if ( ss->avail ){
-                    /* if we're shutting down, don't want to initiate release mechanism as it is slow, 
+                if ( ss->avail ) {
+                    /* if we're shutting down, don't want to initiate release mechanism as it is slow,
                        and isn't needed since all connections will be closed anyway */
                     if ( inShutdown() )
                         delete ss->avail;
@@ -75,15 +75,15 @@ namespace mongo {
             }
             _hosts.clear();
         }
-        
-        DBClientBase * get( const string& addr , const string& ns ){
+
+        DBClientBase * get( const string& addr , const string& ns ) {
             _check( ns );
 
             Status* &s = _hosts[addr];
             if ( ! s )
                 s = new Status();
-            
-            if ( s->avail ){
+
+            if ( s->avail ) {
                 DBClientBase* c = s->avail;
                 s->avail = 0;
                 pool.onHandedOut( c );
@@ -93,23 +93,23 @@ namespace mongo {
             s->created++;
             return pool.get( addr );
         }
-        
-        void done( const string& addr , DBClientBase* conn ){
+
+        void done( const string& addr , DBClientBase* conn ) {
             Status* s = _hosts[addr];
             assert( s );
-            if ( s->avail ){
+            if ( s->avail ) {
                 release( addr , conn );
                 return;
             }
             s->avail = conn;
         }
-        
-        void sync(){
-            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
+
+        void sync() {
+            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
 
-                if ( ss->avail ){
+                if ( ss->avail ) {
                     ss->avail->getLastError();
                     release( addr , ss->avail );
                     ss->avail = 0;
@@ -119,16 +119,16 @@ namespace mongo {
             _hosts.clear();
         }
 
-        void checkVersions( const string& ns ){
+        void checkVersions( const string& ns ) {
             vector<Shard> all;
             Shard::getAllShards( all );
-            for ( unsigned i=0; i<all.size(); i++ ){
+            for ( unsigned i=0; i<all.size(); i++ ) {
                 Status* &s = _hosts[all[i].getConnString()];
                 if ( ! s )
                     s = new Status();
             }
 
-            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
+            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 if ( ! Shard::isAShard( i->first ) )
                     continue;
                 Status* ss = i->second;
@@ -139,12 +139,12 @@ namespace mongo {
             }
         }
 
-        void release( const string& addr , DBClientBase * conn ){
+        void release( const string& addr , DBClientBase * conn ) {
             resetShardVersionCB( conn );
             BSONObj res;
-            
+
             try {
-                if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) ){
+                if ( conn->simpleCommand( "admin" , &res , "unsetSharding" ) ) {
                     pool.release( addr , conn );
                 }
                 else {
@@ -152,13 +152,13 @@ namespace mongo {
                     delete conn;
                 }
             }
-            catch ( std::exception& e ){
+            catch ( std::exception& e ) {
                 log(LL_ERROR) << "couldn't unset sharding : " << e.what() << endl;
                 delete conn;
             }
         }
-        
-        void _check( const string& ns ){
+
+        void _check( const string& ns ) {
             if ( ns.size() == 0 || _seenNS.count( ns ) )
                 return;
             _seenNS.insert( ns );
@@ -168,12 +168,12 @@ namespace mongo {
         map<string,Status*> _hosts;
         set<string> _seenNS;
         // -----
-        
+
         static thread_specific_ptr<ClientConnections> _perThread;
 
-        static ClientConnections* threadInstance(){
+        static ClientConnections* threadInstance() {
             ClientConnections* cc = _perThread.get();
-            if ( ! cc ){
+            if ( ! cc ) {
                 cc = new ClientConnections();
                 _perThread.reset( cc );
             }
@@ -192,57 +192,57 @@ namespace mongo {
         : _addr( s.getConnString() ) , _ns( ns ) {
         _init();
     }
-    
+
     ShardConnection::ShardConnection( const string& addr , const string& ns )
         : _addr( addr ) , _ns( ns ) {
         _init();
     }
-    
-    void ShardConnection::_init(){
+
+    void ShardConnection::_init() {
         assert( _addr.size() );
         _conn = ClientConnections::threadInstance()->get( _addr , _ns );
         _finishedInit = false;
     }
 
-    void ShardConnection::_finishInit(){
+    void ShardConnection::_finishInit() {
         if ( _finishedInit )
             return;
         _finishedInit = true;
-        
-        if ( _ns.size() ){
+
+        if ( _ns.size() ) {
             _setVersion = checkShardVersionCB( *_conn , _ns , false , 1 );
         }
         else {
             _setVersion = false;
         }
-        
+
     }
 
-    void ShardConnection::done(){
-        if ( _conn ){
+    void ShardConnection::done() {
+        if ( _conn ) {
             ClientConnections::threadInstance()->done( _addr , _conn );
             _conn = 0;
             _finishedInit = true;
         }
     }
 
-    void ShardConnection::kill(){
-        if ( _conn ){
+    void ShardConnection::kill() {
+        if ( _conn ) {
             delete _conn;
             _conn = 0;
             _finishedInit = true;
         }
     }
 
-    void ShardConnection::sync(){
+    void ShardConnection::sync() {
         ClientConnections::threadInstance()->sync();
     }
 
-    bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ){
+    bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ) {
         assert( _conn );
         bool ok = _conn->runCommand( db , cmd , res );
-        if ( ! ok ){
-            if ( res["code"].numberInt() == StaleConfigInContextCode ){
+        if ( ! ok ) {
+            if ( res["code"].numberInt() == StaleConfigInContextCode ) {
                 string big = res["errmsg"].String();
                 string ns,raw;
                 massert( 13409 , (string)"can't parse ns from: " + big  , StaleConfigException::parse( big , ns , raw ) );
@@ -253,12 +253,12 @@ namespace mongo {
         return ok;
     }
 
-    void ShardConnection::checkMyConnectionVersions( const string & ns ){
+    void ShardConnection::checkMyConnectionVersions( const string & ns ) {
         ClientConnections::threadInstance()->checkVersions( ns );
     }
 
     ShardConnection::~ShardConnection() {
-        if ( _conn ){
+        if ( _conn ) {
             if ( ! _conn->isFailed() ) {
                 /* see done() comments above for why we log this line */
                 log() << "~ScopedDBConnection: _conn != null" << endl;

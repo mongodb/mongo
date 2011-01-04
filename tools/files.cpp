@@ -33,21 +33,21 @@ namespace po = boost::program_options;
 
 class Files : public Tool {
 public:
-    Files() : Tool( "files" ){
+    Files() : Tool( "files" ) {
         add_options()
-            ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
-            ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
-            ( "replace,r", "Remove other files with same name after PUT")
-            ;
+        ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
+        ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
+        ( "replace,r", "Remove other files with same name after PUT")
+        ;
         add_hidden_options()
-            ( "command" , po::value<string>() , "command (list|search|put|get)" )
-            ( "file" , po::value<string>() , "filename for get|put" )
-            ;
+        ( "command" , po::value<string>() , "command (list|search|put|get)" )
+        ( "file" , po::value<string>() , "filename for get|put" )
+        ;
         addPositionArg( "command" , 1 );
         addPositionArg( "file" , 2 );
     }
 
-    virtual void printExtraHelp( ostream & out ){
+    virtual void printExtraHelp( ostream & out ) {
         out << "usage: " << _name << " [options] command [gridfs filename]" << endl;
         out << "command:" << endl;
         out << "  one of (list|search|put|get)" << endl;
@@ -60,20 +60,20 @@ public:
         out << "  delete - delete all files with filename 'gridfs filename'" << endl;
     }
 
-    void display( GridFS * grid , BSONObj obj ){
+    void display( GridFS * grid , BSONObj obj ) {
         auto_ptr<DBClientCursor> c = grid->list( obj );
-        while ( c->more() ){
+        while ( c->more() ) {
             BSONObj obj = c->next();
             cout
-                << obj["filename"].str() << "\t"
-                << (long)obj["length"].number()
-                << endl;
+                    << obj["filename"].str() << "\t"
+                    << (long)obj["length"].number()
+                    << endl;
         }
     }
 
-    int run(){
+    int run() {
         string cmd = getParam( "command" );
-        if ( cmd.size() == 0 ){
+        if ( cmd.size() == 0 ) {
             cerr << "ERROR: need command" << endl << endl;
             printHelp(cout);
             return -1;
@@ -84,7 +84,7 @@ public:
 
         string filename = getParam( "file" );
 
-        if ( cmd == "list" ){
+        if ( cmd == "list" ) {
             BSONObjBuilder b;
             if ( filename.size() )
                 b.appendRegex( "filename" , ( (string)"^" + filename ) );
@@ -92,22 +92,22 @@ public:
             return 0;
         }
 
-        if ( filename.size() == 0 ){
+        if ( filename.size() == 0 ) {
             cerr << "ERROR: need a filename" << endl << endl;
             printHelp(cout);
             return -1;
         }
 
-        if ( cmd == "search" ){
+        if ( cmd == "search" ) {
             BSONObjBuilder b;
             b.appendRegex( "filename" , filename );
             display( &g , b.obj() );
             return 0;
         }
 
-        if ( cmd == "get" ){
+        if ( cmd == "get" ) {
             GridFile f = g.findFile( filename );
-            if ( ! f.exists() ){
+            if ( ! f.exists() ) {
                 cerr << "ERROR: file not found" << endl;
                 return -2;
             }
@@ -121,16 +121,16 @@ public:
             return 0;
         }
 
-        if ( cmd == "put" ){
+        if ( cmd == "put" ) {
             const string& infile = getParam("local", filename);
             const string& type = getParam("type", "");
 
             BSONObj file = g.storeFile(infile, filename, type);
             cout << "added file: " << file << endl;
 
-            if (hasParam("replace")){
+            if (hasParam("replace")) {
                 auto_ptr<DBClientCursor> cursor = conn().query(_db+".fs.files", BSON("filename" << filename << "_id" << NE << file["_id"] ));
-                while (cursor->more()){
+                while (cursor->more()) {
                     BSONObj o = cursor->nextSafe();
                     conn().remove(_db+".fs.files", BSON("_id" << o["_id"]));
                     conn().remove(_db+".fs.chunks", BSON("_id" << o["_id"]));
@@ -144,7 +144,7 @@ public:
             return 0;
         }
 
-        if ( cmd == "delete" ){
+        if ( cmd == "delete" ) {
             g.removeFile(filename);
             conn().getLastError();
             cout << "done!" << endl;

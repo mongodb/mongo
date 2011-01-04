@@ -20,15 +20,15 @@
 
 #include "namespace.h"
 
-namespace mongo { 
+namespace mongo {
 
     inline Namespace& Namespace::operator=(const char *ns) {
-        // we fill the remaining space with all zeroes here.  as the full Namespace struct is in 
-        // the datafiles (the .ns files specifically), that is helpful as then they are deterministic 
+        // we fill the remaining space with all zeroes here.  as the full Namespace struct is in
+        // the datafiles (the .ns files specifically), that is helpful as then they are deterministic
         // in the bytes they have for a given sequence of operations.  that makes testing and debugging
         // the data files easier.
         //
-        // if profiling indicates this method is a significant bottleneck, we could have a version we 
+        // if profiling indicates this method is a significant bottleneck, we could have a version we
         // use for reads which does not fill with zeroes, and keep the zeroing behavior on writes.
         //
         unsigned len = strlen(ns);
@@ -46,7 +46,7 @@ namespace mongo {
         return s;
     }
 
-    inline bool Namespace::isExtra() const { 
+    inline bool Namespace::isExtra() const {
         const char *p = strstr(buf, "$extr");
         return p && p[5] && p[6] == 0; //==0 important in case an index uses name "$extra_1" for example
     }
@@ -71,10 +71,10 @@ namespace mongo {
     }
 
     inline IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected ) {
-        if( idxNo < NIndexesBase ) 
+        if( idxNo < NIndexesBase )
             return _indexes[idxNo];
         Extra *e = extra();
-        if ( ! e ){
+        if ( ! e ) {
             if ( missingExpected )
                 throw MsgAssertionException( 13283 , "Missing Extra" );
             massert(13282, "missing Extra", e);
@@ -82,7 +82,7 @@ namespace mongo {
         int i = idxNo - NIndexesBase;
         if( i >= NIndexesExtra ) {
             e = e->next(this);
-            if ( ! e ){
+            if ( ! e ) {
                 if ( missingExpected )
                     throw MsgAssertionException( 13283 , "missing extra" );
                 massert(13283, "missing Extra", e);
@@ -92,7 +92,7 @@ namespace mongo {
         return e->details[i];
     }
 
-    inline int NamespaceDetails::idxNo(IndexDetails& idx) { 
+    inline int NamespaceDetails::idxNo(IndexDetails& idx) {
         IndexIterator i = ii();
         while( i.more() ) {
             if( &i.next() == &idx )
@@ -105,7 +105,7 @@ namespace mongo {
     inline int NamespaceDetails::findIndexByKeyPattern(const BSONObj& keyPattern) {
         IndexIterator i = ii();
         while( i.more() ) {
-            if( i.next().keyPattern() == keyPattern ) 
+            if( i.next().keyPattern() == keyPattern )
                 return i.pos()-1;
         }
         return -1;
@@ -121,7 +121,7 @@ namespace mongo {
         return -1;
     }
 
-    inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d) { 
+    inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d) {
         d = _d;
         i = 0;
         n = d->nIndexes;

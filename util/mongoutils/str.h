@@ -17,14 +17,14 @@
 
 #pragma once
 
-/* Things in the mongoutils namespace 
+/* Things in the mongoutils namespace
    (1) are not database specific, rather, true utilities
    (2) are cross platform
    (3) may require boost headers, but not libs
    (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
 
-   Note: within this module, we use int for all offsets -- there are no unsigned offsets 
-   and no size_t's.  If you need 3 gigabyte long strings, don't use this module. 
+   Note: within this module, we use int for all offsets -- there are no unsigned offsets
+   and no size_t's.  If you need 3 gigabyte long strings, don't use this module.
 */
 
 #include <string>
@@ -37,12 +37,12 @@ namespace mongoutils {
 
         typedef std::string string;
 
-        /** the idea here is to make one liners easy.  e.g.: 
+        /** the idea here is to make one liners easy.  e.g.:
 
                return str::stream() << 1 << ' ' << 2;
 
             since the following doesn't work:
-               
+
                (stringstream() << 1).str();
         */
         class stream {
@@ -61,7 +61,7 @@ namespace mongoutils {
         inline bool startsWith(const char *str, const char *prefix) {
             const char *s = str;
             const char *p = prefix;
-            while( *p ) { 
+            while( *p ) {
                 if( *p != *s ) return false;
                 p++; s++;
             }
@@ -69,7 +69,7 @@ namespace mongoutils {
         }
         inline bool startsWith(string s, string p) { return startsWith(s.c_str(), p.c_str()); }
 
-        inline bool endsWith(string s, string p) { 
+        inline bool endsWith(string s, string p) {
             int l = p.size();
             int x = s.size();
             if( x < l ) return false;
@@ -81,36 +81,44 @@ namespace mongoutils {
         /** find char x, and return rest of string thereafter, or "" if not found */
         inline const char * after(const char *s, char x) {
             const char *p = strchr(s, x);
-            return (p != 0) ? p+1 : ""; }
+            return (p != 0) ? p+1 : "";
+        }
         inline string after(const string& s, char x) {
             const char *p = strchr(s.c_str(), x);
-            return (p != 0) ? string(p+1) : ""; }
+            return (p != 0) ? string(p+1) : "";
+        }
 
         /** find string x, and return rest of string thereafter, or "" if not found */
         inline const char * after(const char *s, const char *x) {
             const char *p = strstr(s, x);
-            return (p != 0) ? p+strlen(x) : ""; }
+            return (p != 0) ? p+strlen(x) : "";
+        }
         inline string after(string s, string x) {
             const char *p = strstr(s.c_str(), x.c_str());
-            return (p != 0) ? string(p+x.size()) : ""; }
+            return (p != 0) ? string(p+x.size()) : "";
+        }
 
         /** @return true if s contains x */
-        inline bool contains(string s, string x) { 
-            return strstr(s.c_str(), x.c_str()) != 0; }
-        inline bool contains(string s, char x) { 
-            return strchr(s.c_str(), x) != 0; }
+        inline bool contains(string s, string x) {
+            return strstr(s.c_str(), x.c_str()) != 0;
+        }
+        inline bool contains(string s, char x) {
+            return strchr(s.c_str(), x) != 0;
+        }
 
         /** @return everything befor the character x, else entire string */
         inline string before(const string& s, char x) {
             const char *p = strchr(s.c_str(), x);
-            return (p != 0) ? s.substr(0, p-s.c_str()) : s; }
+            return (p != 0) ? s.substr(0, p-s.c_str()) : s;
+        }
 
         /** @return everything befor the string x, else entire string */
         inline string before(const string& s, const string& x) {
             const char *p = strstr(s.c_str(), x.c_str());
-            return (p != 0) ? s.substr(0, p-s.c_str()) : s; }
+            return (p != 0) ? s.substr(0, p-s.c_str()) : s;
+        }
 
-        /** check if if strings share a common starting prefix 
+        /** check if if strings share a common starting prefix
             @return offset of divergence (or length if equal).  0=nothing in common. */
         inline int shareCommonPrefix(const char *p, const char *q) {
             int ofs = 0;
@@ -121,7 +129,8 @@ namespace mongoutils {
                     break;
                 p++; q++; ofs++;
             }
-            return ofs; }
+            return ofs;
+        }
         inline int shareCommonPrefix(const string &a, const string &b)
         { return shareCommonPrefix(a.c_str(), b.c_str()); }
 
@@ -129,7 +138,7 @@ namespace mongoutils {
         inline unsigned toUnsigned(const string& a) {
             unsigned x = 0;
             const char *p = a.c_str();
-            while( 1 ) { 
+            while( 1 ) {
                 if( !isdigit(*p) )
                     break;
                 x = x * 10 + (*p - '0');
@@ -138,7 +147,7 @@ namespace mongoutils {
             return x;
         }
 
-        /** split a string on a specific char.  We don't split N times, just once 
+        /** split a string on a specific char.  We don't split N times, just once
             on the first occurrence.  If char not present entire string is in L
             and R is empty.
             @return true if char found
@@ -146,7 +155,7 @@ namespace mongoutils {
         inline bool splitOn(const string &s, char c, string& L, string& R) {
             const char *start = s.c_str();
             const char *p = strchr(start, c);
-            if( p == 0 ) { 
+            if( p == 0 ) {
                 L = s; R.clear();
                 return false;
             }
@@ -158,7 +167,7 @@ namespace mongoutils {
         inline bool rSplitOn(const string &s, char c, string& L, string& R) {
             const char *start = s.c_str();
             const char *p = strrchr(start, c);
-            if( p == 0 ) { 
+            if( p == 0 ) {
                 L = s; R.clear();
                 return false;
             }
@@ -168,7 +177,7 @@ namespace mongoutils {
         }
 
         /** @return number of occurrences of c in s */
-        inline unsigned count( const string& s , char c ){
+        inline unsigned count( const string& s , char c ) {
             unsigned n=0;
             for ( unsigned i=0; i<s.size(); i++ )
                 if ( s[i] == c )
@@ -177,18 +186,18 @@ namespace mongoutils {
         }
 
         /** trim leading spaces. spaces only, not tabs etc. */
-	inline string ltrim(const string& s) { 
-	    const char *p = s.c_str();
-	    while( *p == ' ' ) p++;
-	    return p;
-	}
-        
+        inline string ltrim(const string& s) {
+            const char *p = s.c_str();
+            while( *p == ' ' ) p++;
+            return p;
+        }
+
         /** remove trailing chars in place */
-        inline void stripTrailing(string& s, const char *chars) { 
+        inline void stripTrailing(string& s, const char *chars) {
             string::iterator i = s.end();
-            while( s.begin() != i ) { 
+            while( s.begin() != i ) {
                 i--;
-                if( contains(chars, *i) ) { 
+                if( contains(chars, *i) ) {
                     s.erase(i);
                 }
             }

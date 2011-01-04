@@ -23,11 +23,11 @@
 namespace mongo {
     namespace dur {
 
-        void Writes::D::go(const Writes::D& d) { 
+        void Writes::D::go(const Writes::D& d) {
             commitJob.wi()._insertWriteIntent(d.p, d.len);
         }
 
-        void WriteIntent::absorb(const WriteIntent& other){
+        void WriteIntent::absorb(const WriteIntent& other) {
             dassert(overlaps(other));
 
             void* newStart = min(start(), other.start());
@@ -37,7 +37,7 @@ namespace mongo {
             dassert(contains(other));
         }
 
-        void Writes::clear() { 
+        void Writes::clear() {
             dbMutex.assertAtLeastReadLocked();
 
             _alreadyNoted.clear();
@@ -51,7 +51,7 @@ namespace mongo {
         }
 
 #if defined(DEBUG_WRITE_INTENT)
-        void assertAlreadyDeclared(void *p, int len) { 
+        void assertAlreadyDeclared(void *p, int len) {
             if( commitJob.wi()._debug[p] >= len )
                 return;
             log() << "assertAlreadyDeclared fails " << (void*)p << " len:" << len << ' ' << commitJob.wi()._debug[p] << endl;
@@ -60,10 +60,10 @@ namespace mongo {
         }
 #endif
 
-        void Writes::_insertWriteIntent(void* p, int len){
+        void Writes::_insertWriteIntent(void* p, int len) {
             WriteIntent wi(p, len);
 
-            if (_writes.empty()){
+            if (_writes.empty()) {
                 _writes.insert(wi);
                 return;
             }
@@ -74,8 +74,7 @@ namespace mongo {
             // closest.end() >= wi.end()
 
             if ((closest != _writes.end() && closest->overlaps(wi)) || // high end
-                (closest != _writes.begin() && (--closest)->overlaps(wi))) // low end
-            {
+                    (closest != _writes.begin() && (--closest)->overlaps(wi))) { // low end
                 if (closest->contains(wi))
                     return; // nothing to do
 
@@ -87,7 +86,7 @@ namespace mongo {
                 if (!begin->overlaps(wi)) ++begin; // make inclusive
 
                 DEV { // ensure we're not deleting anything we shouldn't
-                    for (iterator it(begin); it != end; ++it){
+                    for (iterator it(begin); it != end; ++it) {
                         assert(wi.contains(*it));
                     }
                 }
@@ -96,7 +95,7 @@ namespace mongo {
                 _writes.insert(wi);
 
                 DEV { // ensure there are no overlaps
-                    for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it){
+                    for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it) {
                         assert(!it->overlaps(*boost::next(it)));
                     }
                 }
@@ -118,7 +117,7 @@ namespace mongo {
             _wi._ops.push_back(p);
         }
 
-        void CommitJob::reset() { 
+        void CommitJob::reset() {
             _hasWritten = false;
             _wi.clear();
             _ab.reset();

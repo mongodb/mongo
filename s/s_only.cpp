@@ -31,17 +31,16 @@ namespace mongo {
 
     boost::thread_specific_ptr<Client> currentClient;
 
-    Client::Client(const char *desc , MessagingPort *p) : 
-      _context(0),
-      _shutdown(false),
-      _desc(desc),
-      _god(0),
-      _lastOp(0),
-      _mp(p)
-    {
+    Client::Client(const char *desc , MessagingPort *p) :
+        _context(0),
+        _shutdown(false),
+        _desc(desc),
+        _god(0),
+        _lastOp(0),
+        _mp(p) {
     }
-    Client::~Client(){}
-    bool Client::shutdown(){ return true; }
+    Client::~Client() {}
+    bool Client::shutdown() { return true; }
 
     Client& Client::initThread(const char *desc, MessagingPort *mp) {
         setThreadName(desc);
@@ -60,24 +59,24 @@ namespace mongo {
     }
 
     bool execCommand( Command * c ,
-                      Client& client , int queryOptions , 
-                      const char *ns, BSONObj& cmdObj , 
-                      BSONObjBuilder& result, 
-                      bool fromRepl ){
+                      Client& client , int queryOptions ,
+                      const char *ns, BSONObj& cmdObj ,
+                      BSONObjBuilder& result,
+                      bool fromRepl ) {
         assert(c);
-    
+
         string dbname = nsToDatabase( ns );
-         
-        if ( cmdObj["help"].trueValue() ){
+
+        if ( cmdObj["help"].trueValue() ) {
             stringstream ss;
             ss << "help for: " << c->name << " ";
             c->help( ss );
             result.append( "help" , ss.str() );
             result.append( "lockType" , c->locktype() );
             return true;
-        } 
+        }
 
-        if ( c->adminOnly() ){
+        if ( c->adminOnly() ) {
             if ( dbname != "admin" ) {
                 result.append( "errmsg" ,  "access denied- use admin db" );
                 log() << "command denied: " << cmdObj.toString() << endl;

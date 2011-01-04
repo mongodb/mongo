@@ -22,50 +22,50 @@ namespace mongo {
     class FastArray {
     public:
         FastArray( int capacity=10000 )
-            : _capacity( capacity ) , _size(0) , _end(this,capacity){
+            : _capacity( capacity ) , _size(0) , _end(this,capacity) {
             _data = new T[capacity];
         }
 
-        ~FastArray(){
+        ~FastArray() {
             delete[] _data;
         }
-        
-        void clear(){
+
+        void clear() {
             _size = 0;
         }
-        
-        T& operator[]( int x ){
+
+        T& operator[]( int x ) {
             assert( x >= 0 && x < _capacity );
             return _data[x];
         }
-        
-        T& getNext(){
+
+        T& getNext() {
             return _data[_size++];
         }
-        
-        void push_back( const T& t ){
+
+        void push_back( const T& t ) {
             _data[_size++] = t;
         }
-        
-        void sort( int (*comp)(const void *, const void *) ){
+
+        void sort( int (*comp)(const void *, const void *) ) {
             qsort( _data , _size , sizeof(T) , comp );
         }
-        
-        int size(){
+
+        int size() {
             return _size;
         }
-        
-        bool hasSpace(){
+
+        bool hasSpace() {
             return _size < _capacity;
         }
         class iterator {
         public:
-            iterator(){
+            iterator() {
                 _it = 0;
                 _pos = 0;
             }
-            
-            iterator( FastArray * it , int pos=0 ){
+
+            iterator( FastArray * it , int pos=0 ) {
                 _it = it;
                 _pos = pos;
             }
@@ -78,14 +78,14 @@ namespace mongo {
                 return _pos != other._pos;
             }
 
-            void operator++(){
+            void operator++() {
                 _pos++;
             }
 
-            T& operator*(){
+            T& operator*() {
                 return _it->_data[_pos];
             }
-            
+
             string toString() const {
                 stringstream ss;
                 ss << _pos;
@@ -97,13 +97,13 @@ namespace mongo {
 
             friend class FastArray;
         };
-        
 
-        iterator begin(){
+
+        iterator begin() {
             return iterator(this);
         }
 
-        iterator end(){
+        iterator end() {
             _end._pos = _size;
             return _end;
         }
@@ -112,7 +112,7 @@ namespace mongo {
     private:
         int _capacity;
         int _size;
-        
+
         iterator _end;
 
         T * _data;

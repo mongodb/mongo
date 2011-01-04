@@ -40,7 +40,7 @@ namespace mongo {
         /** allow query of replica slave.  normally these return an error except for namespace "local".
         */
         QueryOption_SlaveOk = 1 << 2,
-        
+
         // findingStart mode is used to find the first operation of interest when
         // we are scanning through a repl log.  For efficiency in the common case,
         // where the first operation of interest is closer to the tail than the head,
@@ -52,24 +52,24 @@ namespace mongo {
         QueryOption_OplogReplay = 1 << 3,
 
         /** The server normally times out idle cursors after an inactivy period to prevent excess memory uses
-            Set this option to prevent that. 
+            Set this option to prevent that.
         */
         QueryOption_NoCursorTimeout = 1 << 4,
 
-        /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while rather 
+        /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while rather
             than returning no data. After a timeout period, we do return as normal.
         */
         QueryOption_AwaitData = 1 << 5,
 
-        /** Stream the data down full blast in multiple "more" packages, on the assumption that the client 
-            will fully read all data queried.  Faster when you are pulling a lot of data and know you want to 
+        /** Stream the data down full blast in multiple "more" packages, on the assumption that the client
+            will fully read all data queried.  Faster when you are pulling a lot of data and know you want to
             pull it all down.  Note: it is not allowed to not read all the data unless you close the connection.
 
-            Use the query( boost::function<void(const BSONObj&)> f, ... ) version of the connection's query() 
+            Use the query( boost::function<void(const BSONObj&)> f, ... ) version of the connection's query()
             method, and it will take care of all the details for you.
         */
         QueryOption_Exhaust = 1 << 6,
-        
+
         QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust
 
     };
@@ -78,7 +78,7 @@ namespace mongo {
         /** Upsert - that is, insert the item if no matching item is found. */
         UpdateOption_Upsert = 1 << 0,
 
-        /** Update multiple documents (if multiple documents match query expression). 
+        /** Update multiple documents (if multiple documents match query expression).
            (Default is update a single document and stop.) */
         UpdateOption_Multi = 1 << 1,
 
@@ -103,7 +103,7 @@ namespace mongo {
      *    server:port
      *    foo/server:port,server:port   SET
      *    server,server,server          SYNC
-     * 
+     *
      * tyipcal use
      * string errmsg,
      * ConnectionString cs = ConnectionString::parse( url , errmsg );
@@ -113,19 +113,19 @@ namespace mongo {
     class ConnectionString {
     public:
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
-        
-        ConnectionString( const HostAndPort& server ){
+
+        ConnectionString( const HostAndPort& server ) {
             _type = MASTER;
             _servers.push_back( server );
             _finishInit();
         }
 
-        ConnectionString( ConnectionType type , const string& s , const string& setName = "" ){
+        ConnectionString( ConnectionType type , const string& s , const string& setName = "" ) {
             _type = type;
             _setName = setName;
             _fillServers( s );
-            
-            switch ( _type ){
+
+            switch ( _type ) {
             case MASTER:
                 assert( _servers.size() == 1 );
                 break;
@@ -139,13 +139,13 @@ namespace mongo {
             default:
                 assert( _servers.size() > 0 );
             }
-            
+
             _finishInit();
         }
 
-        ConnectionString( const string& s , ConnectionType favoredMultipleType ){
+        ConnectionString( const string& s , ConnectionType favoredMultipleType ) {
             _fillServers( s );
-            if ( _servers.size() == 1 ){
+            if ( _servers.size() == 1 ) {
                 _type = MASTER;
             }
             else {
@@ -156,14 +156,14 @@ namespace mongo {
         }
 
         bool isValid() const { return _type != INVALID; }
-        
+
         string toString() const {
             return _string;
         }
-        
+
         DBClientBase* connect( string& errmsg ) const;
-        
-        string getSetName() const{
+
+        string getSetName() const {
             return _setName;
         }
 
@@ -172,29 +172,29 @@ namespace mongo {
         }
 
         static ConnectionString parse( const string& url , string& errmsg );
-        
+
         static string typeToString( ConnectionType type );
-        
+
     private:
 
-        ConnectionString(){
+        ConnectionString() {
             _type = INVALID;
         }
-        
-        void _fillServers( string s ){
+
+        void _fillServers( string s ) {
             string::size_type idx;
-            while ( ( idx = s.find( ',' ) ) != string::npos ){
+            while ( ( idx = s.find( ',' ) ) != string::npos ) {
                 _servers.push_back( s.substr( 0 , idx ) );
                 s = s.substr( idx + 1 );
             }
             _servers.push_back( s );
         }
-        
-        void _finishInit(){
+
+        void _finishInit() {
             stringstream ss;
             if ( _type == SET )
                 ss << _setName << "/";
-            for ( unsigned i=0; i<_servers.size(); i++ ){
+            for ( unsigned i=0; i<_servers.size(); i++ ) {
                 if ( i > 0 )
                     ss << ",";
                 ss << _servers[i].toString();
@@ -207,7 +207,7 @@ namespace mongo {
         string _string;
         string _setName;
     };
-    
+
     /**
      * controls how much a clients cares about writes
      * default is NORMAL
@@ -223,7 +223,7 @@ namespace mongo {
     class DBClientCursor;
     class DBClientCursorBatchIterator;
 
-    /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object. 
+    /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object.
         Examples:
            QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
            QUERY( "age" << GT << 30 << LT << 50 )
@@ -233,22 +233,22 @@ namespace mongo {
         BSONObj obj;
         Query() : obj(BSONObj()) { }
         Query(const BSONObj& b) : obj(b) { }
-        Query(const string &json) : 
+        Query(const string &json) :
             obj(fromjson(json)) { }
-        Query(const char * json) : 
+        Query(const char * json) :
             obj(fromjson(json)) { }
 
-        /** Add a sort (ORDER BY) criteria to the query expression. 
+        /** Add a sort (ORDER BY) criteria to the query expression.
             @param sortPattern the sort order template.  For example to order by name ascending, time descending:
               { name : 1, ts : -1 }
             i.e.
               BSON( "name" << 1 << "ts" << -1 )
-            or 
+            or
               fromjson(" name : 1, ts : -1 ")
         */
         Query& sort(const BSONObj& sortPattern);
 
-        /** Add a sort (ORDER BY) criteria to the query expression. 
+        /** Add a sort (ORDER BY) criteria to the query expression.
             This version of sort() assumes you want to sort on a single field.
             @param asc = 1 for ascending order
             asc = -1 for descending order
@@ -277,8 +277,8 @@ namespace mongo {
         */
         Query& explain();
 
-        /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or objects missed, which were 
-            present at both the start and end of the query's execution (if an object is new during the query, or deleted during 
+        /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or objects missed, which were
+            present at both the start and end of the query's execution (if an object is new during the query, or deleted during
             the query, it may or may not be returned, even with snapshot mode).
 
             Note that short query responses (less than 1MB) are always effectively snapshotted.
@@ -287,16 +287,16 @@ namespace mongo {
         */
         Query& snapshot();
 
-        /** Queries to the Mongo database support a $where parameter option which contains 
-            a javascript function that is evaluated to see whether objects being queried match 
-            its criteria.  Use this helper to append such a function to a query object. 
+        /** Queries to the Mongo database support a $where parameter option which contains
+            a javascript function that is evaluated to see whether objects being queried match
+            its criteria.  Use this helper to append such a function to a query object.
             Your query may also contain other traditional Mongo query terms.
 
-            @param jscode The javascript function to evaluate against each potential object 
-                   match.  The function must return true for matched objects.  Use the this 
+            @param jscode The javascript function to evaluate against each potential object
+                   match.  The function must return true for matched objects.  Use the this
                    variable to inspect the current object.
-            @param scope SavedContext for the javascript object.  List in a BSON object any 
-                   variables you would like defined when the jscode executes.  One can think 
+            @param scope SavedContext for the javascript object.  List in a BSON object any
+                   variables you would like defined when the jscode executes.  One can think
                    of these as "bind variables".
 
             Examples:
@@ -310,12 +310,12 @@ namespace mongo {
          * if this query has an orderby, hint, or some other field
          */
         bool isComplex( bool * hasDollar = 0 ) const;
-        
+
         BSONObj getFilter() const;
         BSONObj getSort() const;
         BSONObj getHint() const;
         bool isExplain() const;
-        
+
         string toString() const;
         operator string() const { return toString(); }
     private:
@@ -326,13 +326,13 @@ namespace mongo {
             BSONObjBuilder b;
             b.appendElements(obj);
             b.append(fieldName, val);
-            obj = b.obj();            
+            obj = b.obj();
         }
     };
-    
-/** Typically one uses the QUERY(...) macro to construct a Query object.
-    Example: QUERY( "age" << 33 << "school" << "UCLA" )
-*/
+
+    /** Typically one uses the QUERY(...) macro to construct a Query object.
+        Example: QUERY( "age" << 33 << "school" << "UCLA" )
+    */
 #define QUERY(x) mongo::Query( BSON(x) )
 
     /**
@@ -360,9 +360,9 @@ namespace mongo {
 
         /** don't use this - called automatically by DBClientCursor for you */
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
-        
+
         virtual void insert( const string &ns, BSONObj obj ) = 0;
-        
+
         virtual void insert( const string &ns, const vector< BSONObj >& v ) = 0;
 
         virtual void remove( const string &ns , Query query, bool justOne = 0 ) = 0;
@@ -406,18 +406,18 @@ namespace mongo {
             directly call runCommand.
 
             @param dbname database name.  Use "admin" for global administrative commands.
-			@param cmd  the command object to execute.  For example, { ismaster : 1 }
-			@param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
-			       set.
+            @param cmd  the command object to execute.  For example, { ismaster : 1 }
+            @param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
+                   set.
             @param options see enum QueryOptions - normally not needed to run a command
             @return true if the command returned "ok".
         */
         virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
 
         /** Authorize access to a particular database.
-            Authentication is separate for each database on the server -- you may authenticate for any 
+            Authentication is separate for each database on the server -- you may authenticate for any
             number of databases on a single connection.
-            The "admin" database is special and once authenticated provides access to all databases on the 
+            The "admin" database is special and once authenticated provides access to all databases on the
             server.
             @param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
             @return true if successful
@@ -459,14 +459,14 @@ namespace mongo {
         */
         bool createCollection(const string &ns, long long size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
-        /** Get error result from the last operation on this connection. 
+        /** Get error result from the last operation on this connection.
             @return error message text, or empty string if no error.
         */
         string getLastError();
-		/** Get error result from the last operation on this connection. 
-			@return full error object.
-		*/
-		virtual BSONObj getLastErrorDetailed();
+        /** Get error result from the last operation on this connection.
+            @return full error object.
+        */
+        virtual BSONObj getLastErrorDetailed();
 
         static string getLastErrorString( const BSONObj& res );
 
@@ -475,23 +475,23 @@ namespace mongo {
            @return { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
 
            result.err will be null if no error has occurred.
-        */        
+        */
         BSONObj getPrevError();
 
-        /** Reset the previous error state for this connection (accessed via getLastError and 
-            getPrevError).  Useful when performing several operations at once and then checking 
+        /** Reset the previous error state for this connection (accessed via getLastError and
+            getPrevError).  Useful when performing several operations at once and then checking
             for an error after attempting all operations.
         */
         bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
-        /** Delete the specified collection. */        
-        virtual bool dropCollection( const string &ns ){
+        /** Delete the specified collection. */
+        virtual bool dropCollection( const string &ns ) {
             string db = nsGetDB( ns );
             string coll = nsGetCollection( ns );
             uassert( 10011 ,  "no collection name", coll.size() );
 
             BSONObj info;
-            
+
             bool res = runCommand( db.c_str() , BSON( "drop" << coll ) , info );
             resetIndexCache();
             return res;
@@ -503,7 +503,7 @@ namespace mongo {
         bool repairDatabase(const string &dbname, BSONObj *info = 0) {
             return simpleCommand(dbname, info, "repairDatabase");
         }
-        
+
         /** Copy database from one server or name to another server or name.
 
            Generally, you should dropDatabase() first as otherwise the copied information will MERGE
@@ -533,23 +533,23 @@ namespace mongo {
             ProfileOff = 0,
             ProfileSlow = 1, // log very slow (>100ms) operations
             ProfileAll = 2
-            
+
         };
         bool setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info = 0);
 
-        /** Run a map/reduce job on the server. 
+        /** Run a map/reduce job on the server.
 
             See http://www.mongodb.org/display/DOCS/MapReduce
 
             ns        namespace (db+collection name) of input data
-            jsmapf    javascript map function code 
-            jsreducef javascript reduce function code. 
+            jsmapf    javascript map function code
+            jsreducef javascript reduce function code.
             query     optional query filter for the input
-            output    optional permanent output collection name.  if not specified server will 
+            output    optional permanent output collection name.  if not specified server will
                       generate a temporary collection and return its name.
 
-            returns a result object which contains: 
+            returns a result object which contains:
              { result : <collection_name>,
                numObjects : <number_of_objects_scanned>,
                timeMillis : <job_time>,
@@ -557,8 +557,8 @@ namespace mongo {
                [, err : <errmsg_if_error>]
              }
 
-             For example one might call: 
-               result.getField("ok").trueValue() 
+             For example one might call:
+               result.getField("ok").trueValue()
              on the result to check if ok.
         */
         BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), const string& output = "");
@@ -569,7 +569,7 @@ namespace mongo {
            jscode    source code for a javascript function.
            info      the command object which contains any information on the invocation result including
                       the return value and other information.  If an error occurs running the jscode, error
-        			 information will be in info.  (try "out() << info.toString()")
+                     information will be in info.  (try "out() << info.toString()")
            retValue  return value from the jscode function.
            args      args to pass to the jscode function.  when invoked, the 'args' variable will be defined
                      for use by the jscode.
@@ -583,7 +583,7 @@ namespace mongo {
         /** validate a collection, checking for errors and reporting back statistics.
             this operation is slow and blocking.
          */
-        bool validate( const string &ns , bool scandata=true ){
+        bool validate( const string &ns , bool scandata=true ) {
             BSONObj cmd = BSON( "validate" << nsGetCollection( ns ) << "scandata" << scandata );
             BSONObj info;
             return runCommand( nsGetDB( ns ).c_str() , cmd , info );
@@ -616,7 +616,7 @@ namespace mongo {
             ret = (NumType) retValue.number();
             return true;
         }
-        
+
         /**
            get a list of all the current databases
            uses the { listDatabases : 1 } command.
@@ -632,7 +632,7 @@ namespace mongo {
         bool exists( const string& ns );
 
         /** Create an index if it does not already exist.
-            ensureIndex calls are remembered so it is safe/fast to call this function many 
+            ensureIndex calls are remembered so it is safe/fast to call this function many
             times in your code.
            @param ns collection to be indexed
            @param keys the "key pattern" for the index.  e.g., { name : 1 }
@@ -642,7 +642,7 @@ namespace mongo {
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "", 
+        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "",
                                   bool cache = true );
 
         /**
@@ -651,17 +651,17 @@ namespace mongo {
         virtual void resetIndexCache();
 
         virtual auto_ptr<DBClientCursor> getIndexes( const string &ns );
-        
+
         virtual void dropIndex( const string& ns , BSONObj keys );
         virtual void dropIndex( const string& ns , const string& indexName );
-        
+
         /**
            drops all indexes for the collection
          */
         virtual void dropIndexes( const string& ns );
 
         virtual void reIndex( const string& ns );
-        
+
         string genIndexName( const BSONObj& keys );
 
         /** Erase / drop an entire database */
@@ -674,33 +674,33 @@ namespace mongo {
         virtual string toString() = 0;
 
         /** @return the database name portion of an ns string */
-        string nsGetDB( const string &ns ){
+        string nsGetDB( const string &ns ) {
             string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
                 return ns;
-            
+
             return ns.substr( 0 , pos );
         }
-        
+
         /** @return the collection name portion of an ns string */
-        string nsGetCollection( const string &ns ){
+        string nsGetCollection( const string &ns ) {
             string::size_type pos = ns.find( "." );
             if ( pos == string::npos )
                 return "";
 
-            return ns.substr( pos + 1 );            
+            return ns.substr( pos + 1 );
         }
 
     protected:
         bool isOk(const BSONObj&);
-        
+
         enum QueryOptions availableOptions();
-        
+
     private:
         enum QueryOptions _cachedAvailableOptions;
         bool _haveCachedAvailableOptions;
     };
-    
+
     /**
      abstract class that implements the core db operations
      */
@@ -709,13 +709,13 @@ namespace mongo {
         WriteConcern _writeConcern;
 
     public:
-        DBClientBase(){
+        DBClientBase() {
             _writeConcern = W_NORMAL;
         }
-        
+
         WriteConcern getWriteConcern() const { return _writeConcern; }
-        void setWriteConcern( WriteConcern w ){ _writeConcern = w; }
-        
+        void setWriteConcern( WriteConcern w ) { _writeConcern = w; }
+
         /** send a query to the database.
          @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
          @param query query to perform on the collection.  this is a BSONObj (binary JSON)
@@ -744,7 +744,7 @@ namespace mongo {
            insert an object into the database
          */
         virtual void insert( const string &ns , BSONObj obj );
-        
+
         /**
            insert a vector of objects into the database
          */
@@ -755,14 +755,14 @@ namespace mongo {
            @param justOne if this true, then once a single match is found will stop
          */
         virtual void remove( const string &ns , Query q , bool justOne = 0 );
-        
+
         /**
            updates objects matching query
          */
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = false , bool multi = false );
-        
+
         virtual bool isFailed() const = 0;
-        
+
         virtual void killCursor( long long cursorID ) = 0;
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
@@ -772,16 +772,16 @@ namespace mongo {
         virtual ConnectionString::ConnectionType type() const = 0;
 
     }; // DBClientBase
-    
+
     class DBClientReplicaSet;
-    
-    class ConnectException : public UserException { 
+
+    class ConnectException : public UserException {
     public:
         ConnectException(string msg) : UserException(9000,msg) { }
     };
 
-    /** 
-        A basic connection to the database. 
+    /**
+        A basic connection to the database.
         This is the main entry point for talking to a simple Mongo setup
     */
     class DBClientConnection : public DBClientBase {
@@ -789,7 +789,7 @@ namespace mongo {
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
            @param cp used by DBClientReplicaSet.  You do not need to specify this parameter
-           @param timeout tcp timeout in seconds - this is for read/write, not connect.  
+           @param timeout tcp timeout in seconds - this is for read/write, not connect.
            Connect timeout is fixed, but short, at 5 seconds.
          */
         DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
@@ -797,7 +797,7 @@ namespace mongo {
             _numConnections++;
         }
 
-        virtual ~DBClientConnection(){
+        virtual ~DBClientConnection() {
             _numConnections--;
         }
 
@@ -812,14 +812,14 @@ namespace mongo {
            @deprecated please use HostAndPort
            @return false if fails to connect.
         */
-        virtual bool connect(const char * hostname, string& errmsg){
+        virtual bool connect(const char * hostname, string& errmsg) {
             // TODO: remove this method
             HostAndPort t( hostname );
             return connect( t , errmsg );
         }
 
         /** Connect to a Mongo database server.
-            
+
            If autoReconnect is true, you can try to use the DBClientConnection even when
            false was returned -- it will try to connect again.
 
@@ -837,9 +837,9 @@ namespace mongo {
 
            @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
         */
-        void connect(const string& serverHostname) { 
+        void connect(const string& serverHostname) {
             string errmsg;
-            if( !connect(HostAndPort(serverHostname), errmsg) ) 
+            if( !connect(HostAndPort(serverHostname), errmsg) )
                 throw ConnectException(string("can't connect ") + errmsg);
         }
 
@@ -851,8 +851,8 @@ namespace mongo {
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions , batchSize );
         }
 
-        /** Uses QueryOption_Exhaust 
-            Exhaust mode sends back all data queries as fast as possible, with no back-and-for for OP_GETMORE.  If you are certain 
+        /** Uses QueryOption_Exhaust
+            Exhaust mode sends back all data queries as fast as possible, with no back-and-for for OP_GETMORE.  If you are certain
             you will exhaust the query, it could be useful.
 
             Use DBClientCursorBatchIterator version if you want to do items in large blocks, perhaps to avoid granular locking and such.
@@ -861,7 +861,7 @@ namespace mongo {
         unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         /**
-           @return true if this connection is currently in a failed state.  When autoreconnect is on, 
+           @return true if this connection is currently in a failed state.  When autoreconnect is on,
                    a connection will transition back to an ok state after reconnecting.
          */
         bool isFailed() const { return failed; }
@@ -877,18 +877,18 @@ namespace mongo {
 
         /** Returns the address of the server */
         string toString() { return _serverString; }
-        
+
         string getServerAddress() const { return _serverString; }
-        
+
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
         virtual void say( Message &toSend );
-        virtual bool call( Message &toSend, Message &response, bool assertOk = true );        
-        virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }  
+        virtual bool call( Message &toSend, Message &response, bool assertOk = true );
+        virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
         virtual void checkResponse( const char *data, int nReturned );
         void setSoTimeout(double to) { _so_timeout = to; }
-        
-        static int getNumConnections(){
+
+        static int getNumConnections() {
             return _numConnections;
         }
 
@@ -911,18 +911,18 @@ namespace mongo {
         void checkConnection() { if( failed ) _checkConnection(); }
 
         map< string, pair<string,string> > authCache;
-        double _so_timeout;        
+        double _so_timeout;
         bool _connect( string& errmsg );
 
         static AtomicUInt _numConnections;
     };
-    
+
     /** pings server to check if it's up
      */
     bool serverAlive( const string &uri );
 
     DBClientBase * createDirectClient();
-    
+
 } // namespace mongo
 
 #include "dbclientcursor.h"

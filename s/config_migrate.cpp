@@ -30,12 +30,12 @@
 
 namespace mongo {
 
-    int ConfigServer::checkConfigVersion( bool upgrade ){
+    int ConfigServer::checkConfigVersion( bool upgrade ) {
         int cur = dbConfigVersion();
         if ( cur == VERSION )
             return 0;
-        
-        if ( cur == 0 ){
+
+        if ( cur == 0 ) {
             ScopedDbConnection conn( _primary );
             conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             pool.flush();
@@ -43,20 +43,20 @@ namespace mongo {
             conn.done();
             return 0;
         }
-        
-        if ( cur == 2 ){
+
+        if ( cur == 2 ) {
 
             // need to upgrade
             assert( VERSION == 3 );
-            if ( ! upgrade ){
+            if ( ! upgrade ) {
                 log() << "newer version of mongo meta data\n"
                       << "need to --upgrade after shutting all mongos down"
                       << endl;
                 return -9;
             }
-            
+
             ScopedDbConnection conn( _primary );
-            
+
             // do a backup
             string backupName;
             {
@@ -67,20 +67,20 @@ namespace mongo {
             log() << "backing up config to: " << backupName << endl;
             conn->copyDatabase( "config" , backupName );
 
-            map<string,string> hostToShard;            
+            map<string,string> hostToShard;
             set<string> shards;
             // shards
             {
                 unsigned n = 0;
                 auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , BSONObj() );
-                while ( c->more() ){
+                while ( c->more() ) {
                     BSONObj o = c->next();
                     string host = o["host"].String();
 
                     string name = "";
-                    
+
                     BSONElement id = o["_id"];
-                    if ( id.type() == String ){
+                    if ( id.type() == String ) {
                         name = id.String();
                     }
                     else {
@@ -88,18 +88,18 @@ namespace mongo {
                         ss << "shard" << hostToShard.size();
                         name = ss.str();
                     }
-                    
+
                     hostToShard[host] = name;
                     shards.insert( name );
                     n++;
                 }
-                
+
                 assert( n == hostToShard.size() );
                 assert( n == shards.size() );
-                
+
                 conn->remove( ShardNS::shard , BSONObj() );
-                
-                for ( map<string,string>::iterator i=hostToShard.begin(); i != hostToShard.end(); i++ ){
+
+                for ( map<string,string>::iterator i=hostToShard.begin(); i != hostToShard.end(); i++ ) {
                     conn->insert( ShardNS::shard , BSON( "_id" << i->second << "host" << i->first ) );
                 }
             }
@@ -109,27 +109,27 @@ namespace mongo {
                 auto_ptr<DBClientCursor> c = conn->query( ShardNS::database , BSONObj() );
                 map<string,BSONObj> newDBs;
                 unsigned n = 0;
-                while ( c->more() ){
+                while ( c->more() ) {
                     BSONObj old = c->next();
                     n++;
-                    
-                    if ( old["name"].eoo() ){
+
+                    if ( old["name"].eoo() ) {
                         // already done
                         newDBs[old["_id"].String()] = old;
                         continue;
                     }
-                    
+
                     BSONObjBuilder b(old.objsize());
                     b.appendAs( old["name"] , "_id" );
-                    
+
                     BSONObjIterator i(old);
-                    while ( i.more() ){
+                    while ( i.more() ) {
                         BSONElement e = i.next();
                         if ( strcmp( "_id" , e.fieldName() ) == 0 ||
-                             strcmp( "name" , e.fieldName() ) == 0 ){
+                                strcmp( "name" , e.fieldName() ) == 0 ) {
                             continue;
                         }
-                        
+
                         b.append( e );
                     }
 
@@ -139,45 +139,45 @@ namespace mongo {
                 }
 
                 assert( n == newDBs.size() );
-                
+
                 conn->remove( ShardNS::database , BSONObj() );
-                
-                for ( map<string,BSONObj>::iterator i=newDBs.begin(); i!=newDBs.end(); i++ ){
+
+                for ( map<string,BSONObj>::iterator i=newDBs.begin(); i!=newDBs.end(); i++ ) {
                     conn->insert( ShardNS::database , i->second );
                 }
-                
+
             }
-            
+
             // chunks
             {
                 unsigned num = 0;
                 map<string,BSONObj> chunks;
                 auto_ptr<DBClientCursor> c = conn->query( ShardNS::chunk , BSONObj() );
-                while ( c->more() ){
+                while ( c->more() ) {
                     BSONObj x = c->next();
                     BSONObjBuilder b;
 
                     string id = Chunk::genID( x["ns"].String() , x["min"].Obj() );
                     b.append( "_id" , id );
-                    
+
                     BSONObjIterator i(x);
-                    while ( i.more() ){
+                    while ( i.more() ) {
                         BSONElement e = i.next();
                         if ( strcmp( e.fieldName() , "_id" ) == 0 )
                             continue;
                         b.append( e );
                     }
-                    
+
                     BSONObj n = b.obj();
                     log() << x << "\n\t" << n << endl;
                     chunks[id] = n;
                     num++;
                 }
-                
+
                 assert( num == chunks.size() );
-                
+
                 conn->remove( ShardNS::chunk , BSONObj() );
-                for ( map<string,BSONObj>::iterator i=chunks.begin(); i!=chunks.end(); i++ ){
+                for ( map<string,BSONObj>::iterator i=chunks.begin(); i!=chunks.end(); i++ ) {
                     conn->insert( ShardNS::chunk , i->second );
                 }
 
@@ -188,7 +188,7 @@ namespace mongo {
             pool.flush();
             return 1;
         }
-        
+
         log() << "don't know how to upgrade " << cur << " to " << VERSION << endl;
         return -8;
     }

@@ -18,7 +18,7 @@
 #include "engine.h"
 
 namespace mongo {
-    void ScriptEngine::setup(){
+    void ScriptEngine::setup() {
         // noop
     }
 }

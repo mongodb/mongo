@@ -36,20 +36,20 @@ namespace mongo {
             };
             unsigned long long _combined;
         };
-        
+
         ShardChunkVersion( int major=0, int minor=0 )
-            : _minor(minor),_major(major){
+            : _minor(minor),_major(major) {
         }
-        
+
         ShardChunkVersion( unsigned long long ll )
-            : _combined( ll ){
+            : _combined( ll ) {
         }
-        
-        ShardChunkVersion( const BSONElement& e ){
-            if ( e.type() == Date || e.type() == Timestamp ){
+
+        ShardChunkVersion( const BSONElement& e ) {
+            if ( e.type() == Date || e.type() == Timestamp ) {
                 _combined = e._numberLong();
             }
-            else if ( e.eoo() ){
+            else if ( e.eoo() ) {
                 _combined = 0;
             }
             else {
@@ -59,7 +59,7 @@ namespace mongo {
             }
         }
 
-        void inc( bool major ){
+        void inc( bool major ) {
             if ( major )
                 incMajor();
             else
@@ -70,7 +70,7 @@ namespace mongo {
             _major++;
             _minor = 0;
         }
-        
+
         void incMinor() {
             _minor++;
         }
@@ -83,19 +83,19 @@ namespace mongo {
             return _combined > 0;
         }
 
-        string toString() const { 
-            stringstream ss; 
-            ss << _major << "|" << _minor; 
-            return ss.str(); 
+        string toString() const {
+            stringstream ss;
+            ss << _major << "|" << _minor;
+            return ss.str();
         }
 
         int majorVersion() const { return _major; }
         int minorVersion() const { return _minor; }
-        
+
         operator unsigned long long() const { return _combined; }
-        
-        ShardChunkVersion& operator=( const BSONElement& elem ){
-            switch ( elem.type() ){
+
+        ShardChunkVersion& operator=( const BSONElement& elem ) {
+            switch ( elem.type() ) {
             case Timestamp:
             case NumberLong:
             case Date:
@@ -110,39 +110,39 @@ namespace mongo {
             return *this;
         }
     };
-    
-    inline ostream& operator<<( ostream &s , const ShardChunkVersion& v){
+
+    inline ostream& operator<<( ostream &s , const ShardChunkVersion& v) {
         s << v._major << "|" << v._minor;
         return s;
     }
 
-    /** 
-     * your config info for a given shard/chunk is out of date 
+    /**
+     * your config info for a given shard/chunk is out of date
      */
     class StaleConfigException : public AssertionException {
     public:
         StaleConfigException( const string& ns , const string& raw , bool justConnection = false )
-            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ) , 
+            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ) ,
               _justConnection(justConnection) ,
-              _ns(ns){
+              _ns(ns) {
         }
-        
-        virtual ~StaleConfigException() throw(){}
-        
+
+        virtual ~StaleConfigException() throw() {}
+
         virtual void appendPrefix( stringstream& ss ) const { ss << "StaleConfigException: "; }
-        
+
         bool justConnection() const { return _justConnection; }
-        
+
         string getns() const { return _ns; }
 
-        static bool parse( const string& big , string& ns , string& raw ){
+        static bool parse( const string& big , string& ns , string& raw ) {
             string::size_type start = big.find( '[' );
             if ( start == string::npos )
                 return false;
             string::size_type end = big.find( ']' ,start );
             if ( end == string::npos )
                 return false;
-            
+
             ns = big.substr( start + 1 , ( end - start ) - 1 );
             raw = big.substr( end + 1 );
             return true;

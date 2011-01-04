@@ -18,17 +18,17 @@
 
 #pragma once
 
-namespace mongo { 
+namespace mongo {
 
-    class LogFile { 
+    class LogFile {
     public:
-        /** create the file and open.  must not already exist. 
+        /** create the file and open.  must not already exist.
             throws UserAssertion on i/o error
         */
         LogFile(string name);
 
         /** closes */
-        ~LogFile(); 
+        ~LogFile();
 
         /** append to file.  does not return until sync'd.  uses direct i/o when possible.
             throws UserAssertion on an i/o error

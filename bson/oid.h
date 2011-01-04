@@ -22,18 +22,18 @@
 namespace mongo {
 
 #pragma pack(1)
-    /**	Object ID type.
-        BSON objects typically have an _id field for the object id.  This field should be the first 
-        member of the object when present.  class OID is a special type that is a 12 byte id which 
+    /** Object ID type.
+        BSON objects typically have an _id field for the object id.  This field should be the first
+        member of the object when present.  class OID is a special type that is a 12 byte id which
         is likely to be unique to the system.  You may also use other types for _id's.
-        When _id field is missing from a BSON object, on an insert the database may insert one 
+        When _id field is missing from a BSON object, on an insert the database may insert one
         automatically in certain circumstances.
 
         Warning: You must call OID::newState() after a fork().
 
-        Typical contents of the BSON ObjectID is a 12-byte value consisting of a 4-byte timestamp (seconds since epoch), 
-        a 3-byte machine id, a 2-byte process id, and a 3-byte counter. Note that the timestamp and counter fields must 
-        be stored big endian unlike the rest of BSON. This is because they are compared byte-by-byte and we want to ensure 
+        Typical contents of the BSON ObjectID is a 12-byte value consisting of a 4-byte timestamp (seconds since epoch),
+        a 3-byte machine id, a 2-byte process id, and a 3-byte counter. Note that the timestamp and counter fields must
+        be stored big endian unlike the rest of BSON. This is because they are compared byte-by-byte and we want to ensure
         a mostly increasing order.
     */
     class OID {
@@ -43,8 +43,8 @@ namespace mongo {
         /** init from a 24 char hex string */
         explicit OID(const string &s) { init(s); }
 
-		/** initialize to 'null' */
-		void clear() { a = 0; b = 0; }
+        /** initialize to 'null' */
+        void clear() { a = 0; b = 0; }
 
         const unsigned char *getData() const { return data; }
 
@@ -59,7 +59,7 @@ namespace mongo {
         string toString() const { return str(); }
 
         static OID gen() { OID o; o.init(); return o; }
-        
+
         /** sets the contents to a new oid / randomized value */
         void init();
 
@@ -71,9 +71,9 @@ namespace mongo {
 
         time_t asTimeT();
         Date_t asDateT() { return asTimeT() * (long long)1000; }
-        
+
         bool isSet() const { return a || b; }
-        
+
         /** call this after a fork to update the process id */
         static void justForked();
 
@@ -81,7 +81,7 @@ namespace mongo {
         static void regenMachineId(); // used by unit tests
 
     private:
-        struct MachineAndPid { 
+        struct MachineAndPid {
             unsigned char _machineNumber[3];
             unsigned short _pid;
             bool operator!=(const OID::MachineAndPid& rhs) const;

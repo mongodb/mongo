@@ -45,29 +45,29 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
         BOOST_STATIC_ASSERT( sizeof(LSNFile) == 88 );
 
-        filesystem::path getJournalDir() { 
+        filesystem::path getJournalDir() {
             filesystem::path p(dbpath);
             p /= "journal";
             return p;
         }
 
-        path lsnPath() { 
+        path lsnPath() {
             return getJournalDir()/"lsn";
         }
 
         /** this should be called when something really bad happens so that we can flag appropriately
         */
-        void journalingFailure(const char *msg) { 
+        void journalingFailure(const char *msg) {
             /** todo:
                 (1) don't log too much
-                (2) make an indicator in the journal dir that something bad happened. 
+                (2) make an indicator in the journal dir that something bad happened.
                 (2b) refuse to do a recovery startup if that is there without manual override.
-            */ 
+            */
             log() << "journaling error " << msg << endl;
             assert(false);
         }
 
-        JHeader::JHeader(string fname) { 
+        JHeader::JHeader(string fname) {
             magic[0] = 'j'; magic[1] = '\n';
             _version = CurrentVersion;
             memset(ts, 0, sizeof(ts));
@@ -85,24 +85,23 @@ namespace mongo {
 
         const unsigned long long LsnShutdownSentinel = ~((unsigned long long)0);
 
-        Journal::Journal() : 
-            _curLogFileMutex("JournalLfMutex")
-        { 
+        Journal::Journal() :
+            _curLogFileMutex("JournalLfMutex") {
             _written = 0;
             _nextFileNumber = 0;
-            _curLogFile = 0; 
+            _curLogFile = 0;
             _preFlushTime = 0;
             _lastFlushTime = 0;
             _writeToLSNNeeded = false;
         }
 
-        path Journal::getFilePathFor(int filenumber) const { 
+        path Journal::getFilePathFor(int filenumber) const {
             filesystem::path p(dir);
             p /= string(str::stream() << "j._" << filenumber);
             return p;
         }
 
-        bool Journal::tryToCloseCurJournalFile() { 
+        bool Journal::tryToCloseCurJournalFile() {
             mutex::try_lock lk(_curLogFileMutex, 2000);
             if( lk.ok ) {
                 closeCurrentJournalFile();
@@ -110,14 +109,14 @@ namespace mongo {
             return lk.ok;
         }
 
-        /** never throws 
+        /** never throws
             @return true if journal dir is not empty
         */
-        bool haveJournalFiles() { 
+        bool haveJournalFiles() {
             try {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
-                      i != boost::filesystem::directory_iterator(); 
-                      ++i ) {
+                        i != boost::filesystem::directory_iterator();
+                        ++i ) {
                     string fileName = boost::filesystem::path(*i).leaf();
                     if( str::startsWith(fileName, "j._") )
                         return true;
@@ -126,14 +125,14 @@ namespace mongo {
             catch(...) { }
             return false;
         }
-        
+
         /** throws */
-        void removeJournalFiles() { 
+        void removeJournalFiles() {
             log() << "removeJournalFiles" << endl;
             try {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
-                      i != boost::filesystem::directory_iterator(); 
-                      ++i ) {
+                        i != boost::filesystem::directory_iterator();
+                        ++i ) {
                     string fileName = boost::filesystem::path(*i).leaf();
                     if( str::startsWith(fileName, "j._") ) {
                         try {
@@ -148,12 +147,12 @@ namespace mongo {
                 try {
                     boost::filesystem::remove(lsnPath());
                 }
-                catch(...) { 
+                catch(...) {
                     log() << "couldn't remove " << lsnPath().string() << endl;
                     throw;
                 }
             }
-            catch( std::exception& e ) { 
+            catch( std::exception& e ) {
                 log() << "error removing journal files " << e.what() << endl;
                 throw;
             }
@@ -162,17 +161,17 @@ namespace mongo {
 
         /** at clean shutdown */
         bool okToCleanUp = false; // failed recovery would set this to false
-        void journalCleanupAtShutdown() { 
-            if( testIntent ) 
+        void journalCleanupAtShutdown() {
+            if( testIntent )
                 return;
-            if( !okToCleanUp ) 
+            if( !okToCleanUp )
                 return;
 
             if( !j.tryToCloseCurJournalFile() ) {
                 return;
             }
-            try { 
-                removeJournalFiles(); 
+            try {
+                removeJournalFiles();
             }
             catch(std::exception& e) {
                 log() << "error couldn't remove journal file during shutdown " << e.what() << endl;
@@ -191,12 +190,12 @@ namespace mongo {
                 try {
                     create_directory(j.dir);
                 }
-                catch(std::exception& e) { 
+                catch(std::exception& e) {
                     log() << "error creating directory " << j.dir << ' ' << e.what() << endl;
                     throw;
                 }
             }
-       }
+        }
 
         void Journal::_open() {
             assert( _curLogFile == 0 );
@@ -223,12 +222,12 @@ namespace mongo {
             _open();
         }
 
-        void LSNFile::set(unsigned long long x) { 
+        void LSNFile::set(unsigned long long x) {
             lsn = x;
             checkbytes = ~x;
         }
 
-        /** logs details of the situation, and returns 0, if anything surprising in the LSNFile 
+        /** logs details of the situation, and returns 0, if anything surprising in the LSNFile
             if something highly surprising, throws to abort
         */
         unsigned long long LSNFile::get() {
@@ -243,19 +242,19 @@ namespace mongo {
         /** called during recovery (the error message text below assumes that)
         */
         unsigned long long journalReadLSN() {
-            if( !debug ) { 
+            if( !debug ) {
                 // in nondebug build, for now, be conservative until more tests written, and apply the whole journal.
                 // however we will still write the lsn file to exercise that code, and use in _DEBUG build.
                 return 0;
             }
 
-            if( !MemoryMappedFile::exists(lsnPath()) ) { 
+            if( !MemoryMappedFile::exists(lsnPath()) ) {
                 log() << "info no lsn file in journal/ directory" << endl;
                 return 0;
             }
 
             try {
-                // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
+                // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
                 // however, given we actually close the file when writing, that seems unlikely.
                 MemoryMappedFile f;
                 LSNFile *L = static_cast<LSNFile*>(f.map(lsnPath().string().c_str()));
@@ -263,13 +262,13 @@ namespace mongo {
                 unsigned long long lsn = L->get();
                 return lsn;
             }
-            catch(std::exception& e) { 
+            catch(std::exception& e) {
                 uasserted(13611, str::stream() << "can't read lsn file in journal directory : " << e.what());
             }
             return 0;
         }
 
-        /** remember "last sequence number" to speed recoveries 
+        /** remember "last sequence number" to speed recoveries
             concurrency: called by durThread only.
         */
         void Journal::updateLSNFile() {
@@ -277,7 +276,7 @@ namespace mongo {
                 return;
             _writeToLSNNeeded = false;
             try {
-                // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery. 
+                // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
                 // however, given we actually close the file, that seems unlikely.
                 MemoryMappedFile f; // not a MongoMMF so no closing notification
                 unsigned long long length = sizeof(LSNFile);
@@ -285,23 +284,23 @@ namespace mongo {
                 assert(lsnf);
                 lsnf->set(_lastFlushTime);
             }
-            catch(std::exception& e) { 
+            catch(std::exception& e) {
                 log() << "write to lsn file fails " << e.what() << endl;
                 // don't care if this fails
             }
         }
 
-        void Journal::preFlush() { 
+        void Journal::preFlush() {
             j._preFlushTime = Listener::getElapsedTimeMillis();
         }
 
-        void Journal::postFlush() { 
+        void Journal::postFlush() {
             j._lastFlushTime = j._preFlushTime;
             j._writeToLSNNeeded = true;
         }
 
         // call from within _curLogFileMutex
-        void Journal::closeCurrentJournalFile() { 
+        void Journal::closeCurrentJournalFile() {
             assert(_curLogFile);
 
             JFile jf;
@@ -314,14 +313,14 @@ namespace mongo {
             _written = 0;
         }
 
-        /** remove older journal files. 
+        /** remove older journal files.
             be in _curLogFileMutex but not dbMutex when calling
         */
-        void Journal::removeUnneededJournalFiles() { 
+        void Journal::removeUnneededJournalFiles() {
             while( !_oldJournalFiles.empty() ) {
                 JFile f = _oldJournalFiles.front();
 
-                if( f.lastEventTimeMs < _lastFlushTime + ExtraKeepTimeMs ) { 
+                if( f.lastEventTimeMs < _lastFlushTime + ExtraKeepTimeMs ) {
                     // eligible for deletion
                     path p( f.filename );
                     log() << "old journal file will be removed: " << f.filename << endl;
@@ -329,19 +328,19 @@ namespace mongo {
                     remove(p);
                 }
                 else {
-                    break; 
+                    break;
                 }
 
                 _oldJournalFiles.pop_front();
             }
         }
 
-        /** check if time to rotate files.  assure a file is open. 
+        /** check if time to rotate files.  assure a file is open.
             done separately from the journal() call as we can do this part
             outside of lock.
             thread: durThread()
          */
-        void journalRotate() { 
+        void journalRotate() {
             j.rotate();
         }
         void Journal::rotate() {
@@ -349,14 +348,14 @@ namespace mongo {
 
             j.updateLSNFile();
 
-            if( _curLogFile && _written < DataLimit ) 
+            if( _curLogFile && _written < DataLimit )
                 return;
 
             scoped_lock lk(_curLogFileMutex);
-            if( _curLogFile && _written < DataLimit ) 
+            if( _curLogFile && _written < DataLimit )
                 return;
 
-            if( _curLogFile ) { 
+            if( _curLogFile ) {
 
                 closeCurrentJournalFile();
 
@@ -367,11 +366,11 @@ namespace mongo {
                 Timer t;
                 _open();
                 int ms = t.millis();
-                if( ms >= 200 ) { 
+                if( ms >= 200 ) {
                     log() << "DR101 latency warning on journal file open " << ms << "ms" << endl;
                 }
             }
-            catch(std::exception& e) { 
+            catch(std::exception& e) {
                 log() << "warning exception opening journal file " << e.what() << endl;
                 throw;
             }
@@ -392,7 +391,7 @@ namespace mongo {
                 _written += b.len();
                 _curLogFile->synchronousAppend((void *) b.buf(), b.len());
             }
-            catch(std::exception& e) { 
+            catch(std::exception& e) {
                 log() << "warning exception in dur::journal " << e.what() << endl;
                 throw;
             }
@@ -401,7 +400,7 @@ namespace mongo {
     }
 }
 
-/* todo 
+/* todo
    test (and handle) disk full on journal append.  best quick thing to do is to terminate.
    if we roll back operations, there are nuances such as is ReplSetImpl::lastOpTimeWritten too new in ram then?
 */

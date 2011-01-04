@@ -55,10 +55,10 @@ namespace mongo {
     void MiniWebServer::parseParams( BSONObj & params , string query ) {
         if ( query.size() == 0 )
             return;
-        
+
         BSONObjBuilder b;
         while ( query.size() ) {
-            
+
             string::size_type amp = query.find( "&" );
 
             string cur;
@@ -77,7 +77,7 @@ namespace mongo {
 
             b.append( urlDecode(cur.substr(0,eq)) , urlDecode(cur.substr(eq+1) ) );
         }
-        
+
         params = b.obj();
     }
 
@@ -132,16 +132,16 @@ namespace mongo {
         string responseMsg;
         int responseCode = 599;
         vector<string> headers;
-        
+
         try {
             doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers, from);
         }
-        catch ( std::exception& e ){
+        catch ( std::exception& e ) {
             responseCode = 500;
             responseMsg = "error loading page: ";
             responseMsg += e.what();
         }
-        catch ( ... ){
+        catch ( ... ) {
             responseCode = 500;
             responseMsg = "unknown error loading page";
         }
@@ -168,32 +168,34 @@ namespace mongo {
         ::send(s, response.c_str(), response.size(), 0);
         closesocket(s);
     }
-    
-    string MiniWebServer::getHeader( const char * req , string wanted ){
+
+    string MiniWebServer::getHeader( const char * req , string wanted ) {
         const char * headers = strchr( req , '\n' );
         if ( ! headers )
             return "";
         pcrecpp::StringPiece input( headers + 1 );
-        
+
         string name;
         string val;
         pcrecpp::RE re("([\\w\\-]+): (.*?)\r?\n");
-        while ( re.Consume( &input, &name, &val) ){
+        while ( re.Consume( &input, &name, &val) ) {
             if ( name == wanted )
                 return val;
         }
         return "";
     }
 
-    string MiniWebServer::urlDecode(const char* s){
+    string MiniWebServer::urlDecode(const char* s) {
         stringstream out;
-        while(*s){
-            if (*s == '+'){
+        while(*s) {
+            if (*s == '+') {
                 out << ' ';
-            }else if (*s == '%'){
+            }
+            else if (*s == '%') {
                 out << fromHex(s+1);
                 s+=2;
-            }else{
+            }
+            else {
                 out << *s;
             }
             s++;

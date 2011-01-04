@@ -25,36 +25,36 @@ namespace mongo {
 
     class DistinctCommand : public Command {
     public:
-        DistinctCommand() : Command("distinct"){}
+        DistinctCommand() : Command("distinct") {}
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
             help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
         }
 
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );
 
             BSONObj query = getQuery( cmdObj );
-            
+
             int bufSize = BSONObjMaxUserSize - 4096;
             BufBuilder bb( bufSize );
             char * start = bb.buf();
-                
+
             BSONArrayBuilder arr( bb );
             BSONElementSet values;
-            
+
             long long nscanned = 0; // locations looked at
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
             MatchDetails md;
-            
+
             NamespaceDetails * d = nsdetails( ns.c_str() );
 
-            if ( ! d ){
+            if ( ! d ) {
                 result.appendArray( "values" , BSONObj() );
                 result.append( "stats" , BSON( "n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0 ) );
                 return true;
@@ -69,7 +69,7 @@ namespace mongo {
                 // query is empty, so lets see if we can find an index
                 // with the key so we don't have to hit the raw data
                 NamespaceDetails::IndexIterator ii = d->ii();
-                while ( ii.more() ){
+                while ( ii.more() ) {
                     IndexDetails& idx = ii.next();
 
                     if ( d->isMultikey( ii.pos() - 1 ) )
@@ -79,33 +79,33 @@ namespace mongo {
                         cursor = bestGuessCursor( ns.c_str() , BSONObj() , idx.keyPattern() );
                         break;
                     }
-                        
+
                 }
-                
+
                 if ( ! cursor.get() )
                     cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
-                
+
             }
-            
+
 
 
             scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
-            
-            while ( cursor->ok() ){
+
+            while ( cursor->ok() ) {
                 nscanned++;
                 bool loadedObject = false;
-                
-                if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ){
+
+                if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ) {
                     n++;
 
                     BSONElementSet temp;
                     loadedObject = ! cc->getFieldsDotted( key , temp );
-                    
-                    for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ){
+
+                    for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
                         BSONElement e = *i;
                         if ( values.count( e ) )
                             continue;
-                        
+
                         int now = bb.len();
 
                         uassert(10044,  "distinct too big, 4mb cap", ( now + e.size() + 1024 ) < bufSize );
@@ -117,7 +117,7 @@ namespace mongo {
                     }
                 }
 
-                if ( loadedObject || md.loadedObject ) 
+                if ( loadedObject || md.loadedObject )
                     nscannedObjects++;
 
                 cursor->advance();
@@ -129,9 +129,9 @@ namespace mongo {
             }
 
             assert( start == bb.buf() );
-            
+
             result.appendArray( "values" , arr.done() );
-            
+
             {
                 BSONObjBuilder b;
                 b.appendNumber( "n" , n );
@@ -139,7 +139,7 @@ namespace mongo {
                 b.appendNumber( "nscannedObjects" , nscannedObjects );
                 result.append( "stats" , b.obj() );
             }
-            
+
             return true;
         }
 

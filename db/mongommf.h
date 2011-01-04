@@ -23,10 +23,10 @@
 namespace mongo {
 
     /** MongoMMF adds some layers atop memory mapped files - specifically our handling of private views & such.
-        if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, 
+        if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class,
         not this.
     */
-    class MongoMMF : private MemoryMappedFile { 
+    class MongoMMF : private MemoryMappedFile {
     public:
         MongoMMF();
         virtual ~MongoMMF();
@@ -54,32 +54,32 @@ namespace mongo {
         */
         void* getView();
 
-        /* switch to _view_write.  normally, this is a bad idea since your changes will not 
+        /* switch to _view_write.  normally, this is a bad idea since your changes will not
            show up in _view_private if there have been changes there; thus the leading underscore
-           as a tad of a "warning".  but useful when done with some care, such as during 
+           as a tad of a "warning".  but useful when done with some care, such as during
            initialization.
         */
         static void* _switchToWritableView(void *private_ptr);
 
         /** for _TESTINTENT build.
-            translates the read view pointer into a pointer to the corresponding 
+            translates the read view pointer into a pointer to the corresponding
             place in the private view.
         */
         static void* switchToPrivateView(void *debug_readonly_ptr);
-        
+
         /** for a filename a/b/c.3
             filePath() is "a/b/c"
             fileSuffixNo() is 3
             if the suffix is "ns", fileSuffixNo -1
         */
-        RelativePath relativePath() const { 
+        RelativePath relativePath() const {
             DEV assert( !_p._p.empty() );
-            return _p; 
+            return _p;
         }
         int fileSuffixNo() const { return _fileSuffixNo; }
         void* view_write() { return _view_write; }
 
-        /** true if we have written.  
+        /** true if we have written.
             set in PREPLOGBUFFER, it is NOT set immediately on write intent declaration.
             reset to false in REMAPPRIVATEVIEW
         */
@@ -102,9 +102,9 @@ namespace mongo {
         bool finishOpening();
     };
 
-    /** for durability support we want to be able to map pointers to specific MongoMMF objects. 
+    /** for durability support we want to be able to map pointers to specific MongoMMF objects.
     */
-    class PointerToMMF : boost::noncopyable { 
+    class PointerToMMF : boost::noncopyable {
     public:
         PointerToMMF();
 

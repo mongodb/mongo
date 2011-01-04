@@ -34,7 +34,7 @@ namespace mongo {
     class Database {
     public:
         static bool _openAllFiles;
-        
+
         Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
     private:
         ~Database();
@@ -52,30 +52,30 @@ namespace mongo {
          * tries to make sure that this hasn't been deleted
          */
         bool isOk() const { return magic == 781231; }
-        
-        bool isEmpty(){ return ! namespaceIndex.allocated(); }
+
+        bool isEmpty() { return ! namespaceIndex.allocated(); }
 
         /**
          * total file size of Database in bytes
          */
         long long fileSize() const;
-        
+
         int numFiles() const { return (int)files.size(); }
 
-        /** 
-         * returns file valid for file number n 
+        /**
+         * returns file valid for file number n
          */
         boost::filesystem::path fileName( int n ) const;
-        
+
         bool exists(int n) const { return boost::filesystem::exists( fileName( n ) ); }
 
-        /** 
-         * return file n.  if it doesn't exist, create it 
+        /**
+         * return file n.  if it doesn't exist, create it
          */
         MongoDataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
-        
+
         MongoDataFile* addAFile( int sizeNeeded, bool preallocateNextFile );
-        
+
         /**
          * makes sure we have an extra file at the end that is empty
          * safe to call this multiple times - the implementation will only preallocate one file
@@ -85,9 +85,9 @@ namespace mongo {
         MongoDataFile* suitableFile( int sizeNeeded, bool preallocate );
 
         Extent* allocExtent( const char *ns, int size, bool capped );
-        
+
         MongoDataFile* newestFile();
-        
+
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */
@@ -95,7 +95,7 @@ namespace mongo {
 
 
         void flushFiles( bool sync ) const;
-        
+
         /**
          * @return true if ns is part of the database
          *         ns=foo.bar, db=foo returns true
@@ -109,7 +109,7 @@ namespace mongo {
         static bool validDBName( const string& ns );
 
     public: // this should be private later
-        
+
         vector<MongoDataFile*> files;
         const string name; // "alleyinsider"
         const string path;
@@ -117,7 +117,7 @@ namespace mongo {
         int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
-        int magic; // used for making sure the object is still loaded in memory 
+        int magic; // used for making sure the object is still loaded in memory
     };
 
 } // namespace mongo

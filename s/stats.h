@@ -22,7 +22,7 @@
 #include "../db/stats/counters.h"
 
 namespace mongo {
-    
+
     extern OpCounters opsNonSharded;
     extern OpCounters opsSharded;
 

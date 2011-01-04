@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* this module adds some of our layers atop memory mapped files - specifically our handling of private views & such 
+/* this module adds some of our layers atop memory mapped files - specifically our handling of private views & such
    if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
 */
 
@@ -31,15 +31,14 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    void MongoMMF::remapThePrivateView()
-    { 
+    void MongoMMF::remapThePrivateView() {
         assert( cmdLine.dur && !testIntent );
         privateViews.remove(_view_private);
-        _view_private = remapPrivateView(_view_private); 
+        _view_private = remapPrivateView(_view_private);
         privateViews.add(_view_private, this);
     }
 
-    void* MongoMMF::getView() { 
+    void* MongoMMF::getView() {
         if( testIntent )
             return _view_readonly;
         return _view_private;
@@ -58,8 +57,8 @@ namespace mongo {
             _views.erase(view);
         }
     }
-        
-    PointerToMMF::PointerToMMF() : _m("PointerToMMF") { 
+
+    PointerToMMF::PointerToMMF() : _m("PointerToMMF") {
 #if defined(SIZE_MAX)
         size_t max = SIZE_MAX;
 #else
@@ -74,7 +73,7 @@ namespace mongo {
 
     /** underscore version of find is for when you are already locked
         @param ofs out return our offset in the view
-        @return the MongoMMF to which this pointer belongs 
+        @return the MongoMMF to which this pointer belongs
     */
     MongoMMF* PointerToMMF::_find(void *p, /*out*/ size_t& ofs) {
         //
@@ -88,7 +87,7 @@ namespace mongo {
         MongoMMF *mmf = x.second;
         if( mmf ) {
             size_t o = ((char *)p) - ((char*)x.first);
-            if( o < mmf->length() ) { 
+            if( o < mmf->length() ) {
                 ofs = o;
                 return mmf;
             }
@@ -109,7 +108,7 @@ namespace mongo {
     PointerToMMF privateViews;
     static PointerToMMF ourReadViews; /// _TESTINTENT (testIntent) build use only (other than existance)
 
-    /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) { 
+    /*static*/ void* MongoMMF::switchToPrivateView(void *readonly_ptr) {
         assert( cmdLine.dur );
         assert( testIntent );
 
@@ -138,14 +137,14 @@ namespace mongo {
         return p;
     }
 
-    /* switch to _view_write.  normally, this is a bad idea since your changes will not 
+    /* switch to _view_write.  normally, this is a bad idea since your changes will not
        show up in _view_private if there have been changes there; thus the leading underscore
-       as a tad of a "warning".  but useful when done with some care, such as during 
+       as a tad of a "warning".  but useful when done with some care, such as during
        initialization.
     */
-    /*static*/ void* MongoMMF::_switchToWritableView(void *p) { 
+    /*static*/ void* MongoMMF::_switchToWritableView(void *p) {
         RARELY log() << "todo dur not done switchtowritable" << endl;
-        if( debug ) 
+        if( debug )
             return switchToPrivateView(p);
         return p;
     }
@@ -160,7 +159,7 @@ namespace mongo {
         uassert(13520, str::stream() << "MongoMMF only supports filenames in a certain format " << f, ok);
         if( suffix == "ns" )
             _fileSuffixNo = dur::JEntry::DotNsSuffix;
-        else 
+        else
             _fileSuffixNo = (int) str::toUnsigned(suffix);
 
         _p = RelativePath::fromFullPath(prefix);
@@ -172,11 +171,11 @@ namespace mongo {
         return finishOpening();
     }
 
-    bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) { 
+    bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) {
         setPath(fname);
         bool preExisting = MemoryMappedFile::exists(fname.c_str());
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
-        if( cmdLine.dur && !testIntent && _view_write && !preExisting ) { 
+        if( cmdLine.dur && !testIntent && _view_write && !preExisting ) {
             getDur().createdFile(fname, len);
         }
         return finishOpening();
@@ -185,7 +184,7 @@ namespace mongo {
     bool MongoMMF::finishOpening() {
         if( _view_write ) {
             if( cmdLine.dur ) {
-                if( testIntent ) { 
+                if( testIntent ) {
                     _view_private = _view_write;
                     _view_readonly = MemoryMappedFile::createReadOnlyMap();
                     ourReadViews.add(_view_readonly, this);
@@ -195,30 +194,30 @@ namespace mongo {
                 }
                 privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
-            else { 
+            else {
                 _view_private = _view_write;
             }
             return true;
         }
         return false;
     }
-    
+
     MongoMMF::MongoMMF() : _willNeedRemap(false) {
-        _view_write = _view_private = _view_readonly = 0; 
+        _view_write = _view_private = _view_readonly = 0;
     }
 
-    MongoMMF::~MongoMMF() { 
+    MongoMMF::~MongoMMF() {
         close();
     }
 
-    namespace dur { 
+    namespace dur {
         void closingFileNotification();
     }
 
     /*virtual*/ void MongoMMF::close() {
         {
-            if( !testIntent && cmdLine.dur && _view_write/*actually was opened*/ ) { 
-                if( debug ) 
+            if( !testIntent && cmdLine.dur && _view_write/*actually was opened*/ ) {
+                if( debug )
                     log() << "closingFileNotication:" << filename() << endl;
                 dur::closingFileNotification();
             }

@@ -22,18 +22,18 @@
 extern int do_md5_test(void);
 
 namespace mongo {
-    
+
     BOOST_STATIC_ASSERT( sizeof(nonce) == 8 );
 
-	Security::Security() {
-		static int n;
-		massert( 10352 , "Security is a singleton class", ++n == 1);
-		init(); 
-	}
+    Security::Security() {
+        static int n;
+        massert( 10352 , "Security is a singleton class", ++n == 1);
+        init();
+    }
 
-    void Security::init(){
-		if( _initialized ) return;
-		_initialized = true;
+    void Security::init() {
+        if( _initialized ) return;
+        _initialized = true;
 
 #if defined(__linux__) || defined(__sunos__)
         _devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
@@ -43,20 +43,20 @@ namespace mongo {
 #else
         srandomdev();
 #endif
-        
+
 #ifndef NDEBUG
         if ( do_md5_test() )
-	    massert( 10354 , "md5 unit test fails", false);
+            massert( 10354 , "md5 unit test fails", false);
 #endif
     }
-    
-    nonce Security::getNonce(){
+
+    nonce Security::getNonce() {
         static mongo::mutex m("getNonce");
         scoped_lock lk(m);
 
-		/* question/todo: /dev/random works on OS X.  is it better 
-		   to use that than random() / srandom()?
-		*/
+        /* question/todo: /dev/random works on OS X.  is it better
+           to use that than random() / srandom()?
+        */
 
         nonce n;
 #if defined(__linux__) || defined(__sunos__)
@@ -73,8 +73,8 @@ namespace mongo {
         return n;
     }
     unsigned getRandomNumber() { return (unsigned) security.getNonce(); }
-    
-	bool Security::_initialized;
+
+    bool Security::_initialized;
     Security security;
-        
+
 } // namespace mongo

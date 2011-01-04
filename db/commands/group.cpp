@@ -24,16 +24,16 @@ namespace mongo {
 
     class GroupCommand : public Command {
     public:
-        GroupCommand() : Command("group"){}
-        virtual LockType locktype() const { return READ; } 
+        GroupCommand() : Command("group") {}
+        virtual LockType locktype() const { return READ; }
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() { return true; }
         virtual void help( stringstream &help ) const {
             help << "http://www.mongodb.org/display/DOCS/Aggregation";
         }
 
-        BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , ScriptingFunction func , double avgSize , Scope * s ){
-            if ( func ){
+        BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , ScriptingFunction func , double avgSize , Scope * s ) {
+            if ( func ) {
                 BSONObjBuilder b( obj.objsize() + 32 );
                 b.append( "0" , obj );
                 int res = s->invoke( func , b.obj() );
@@ -45,10 +45,10 @@ namespace mongo {
             return obj.extractFields( keyPattern , true );
         }
 
-        bool group( string realdbname , const string& ns , const BSONObj& query , 
+        bool group( string realdbname , const string& ns , const BSONObj& query ,
                     BSONObj keyPattern , string keyFunctionCode , string reduceCode , const char * reduceScope ,
                     BSONObj initial , string finalize ,
-                    string& errmsg , BSONObjBuilder& result ){
+                    string& errmsg , BSONObjBuilder& result ) {
 
 
             auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname );
@@ -62,19 +62,19 @@ namespace mongo {
             s->exec( "$reduce = " + reduceCode , "reduce setup" , false , true , true , 100 );
             s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
             ScriptingFunction f = s->createFunction(
-                "function(){ "
-                "  if ( $arr[n] == null ){ "
-                "    next = {}; "
-                "    Object.extend( next , $key ); "
-                "    Object.extend( next , $initial , true ); "
-                "    $arr[n] = next; "
-                "    next = null; "
-                "  } "
-                "  $reduce( obj , $arr[n] ); "
-                "}" );
+                                      "function(){ "
+                                      "  if ( $arr[n] == null ){ "
+                                      "    next = {}; "
+                                      "    Object.extend( next , $key ); "
+                                      "    Object.extend( next , $initial , true ); "
+                                      "    $arr[n] = next; "
+                                      "    next = null; "
+                                      "  } "
+                                      "  $reduce( obj , $arr[n] ); "
+                                      "}" );
 
             ScriptingFunction keyFunction = 0;
-            if ( keyFunctionCode.size() ){
+            if ( keyFunctionCode.size() ) {
                 keyFunction = s->createFunction( keyFunctionCode.c_str() );
             }
 
@@ -87,8 +87,8 @@ namespace mongo {
 
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
 
-            while ( cursor->ok() ){
-                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ){
+            while ( cursor->ok() ) {
+                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
                     cursor->advance();
                     continue;
                 }
@@ -101,7 +101,7 @@ namespace mongo {
                 keynum++;
 
                 int& n = map[key];
-                if ( n == 0 ){
+                if ( n == 0 ) {
                     n = map.size();
                     s->setObject( "$key" , key , true );
 
@@ -110,24 +110,24 @@ namespace mongo {
 
                 s->setObject( "obj" , obj , true );
                 s->setNumber( "n" , n - 1 );
-                if ( s->invoke( f , BSONObj() , 0 , true ) ){
+                if ( s->invoke( f , BSONObj() , 0 , true ) ) {
                     throw UserException( 9010 , (string)"reduce invoke failed: " + s->getError() );
                 }
             }
 
-            if (!finalize.empty()){
+            if (!finalize.empty()) {
                 s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
                 ScriptingFunction g = s->createFunction(
-                    "function(){ "
-                    "  for(var i=0; i < $arr.length; i++){ "
-                    "  var ret = $finalize($arr[i]); "
-                    "  if (ret !== undefined) "
-                    "    $arr[i] = ret; "
-                    "  } "
-                    "}" );
+                                          "function(){ "
+                                          "  for(var i=0; i < $arr.length; i++){ "
+                                          "  var ret = $finalize($arr[i]); "
+                                          "  if (ret !== undefined) "
+                                          "    $arr[i] = ret; "
+                                          "  } "
+                                          "}" );
                 s->invoke( g , BSONObj() , 0 , true );
             }
-            
+
             result.appendArray( "retval" , s->getObject( "$arr" ) );
             result.append( "count" , keynum - 1 );
             result.append( "keys" , (int)(map.size()) );
@@ -137,7 +137,7 @@ namespace mongo {
             return true;
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             /* db.$cmd.findOne( { group : <p> } ) */
             const BSONObj& p = jsobj.firstElement().embeddedObjectUserCheck();
@@ -147,26 +147,26 @@ namespace mongo {
                 q = p["cond"].embeddedObject();
             else if ( p["condition"].type() == Object )
                 q = p["condition"].embeddedObject();
-            else 
+            else
                 q = getQuery( p );
 
-            if ( p["ns"].type() != String ){
+            if ( p["ns"].type() != String ) {
                 errmsg = "ns has to be set";
                 return false;
             }
-            
+
             string ns = dbname + "." + p["ns"].String();
 
             BSONObj key;
             string keyf;
-            if ( p["key"].type() == Object ){
+            if ( p["key"].type() == Object ) {
                 key = p["key"].embeddedObjectUserCheck();
-                if ( ! p["$keyf"].eoo() ){
+                if ( ! p["$keyf"].eoo() ) {
                     errmsg = "can't have key and $keyf";
                     return false;
                 }
             }
-            else if ( p["$keyf"].type() ){
+            else if ( p["$keyf"].type() ) {
                 keyf = p["$keyf"]._asCode();
             }
             else {
@@ -174,13 +174,13 @@ namespace mongo {
             }
 
             BSONElement reduce = p["$reduce"];
-            if ( reduce.eoo() ){
+            if ( reduce.eoo() ) {
                 errmsg = "$reduce has to be set";
                 return false;
             }
 
             BSONElement initial = p["initial"];
-            if ( initial.type() != Object ){
+            if ( initial.type() != Object ) {
                 errmsg = "initial has to be an object";
                 return false;
             }
@@ -198,5 +198,5 @@ namespace mongo {
 
     } cmdGroup;
 
-    
+
 } // namespace mongo

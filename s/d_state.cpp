@@ -44,12 +44,12 @@ using namespace std;
 namespace mongo {
 
     // -----ShardingState START ----
-    
+
     ShardingState::ShardingState()
-        : _enabled(false) , _mutex( "ShardingState" ){
+        : _enabled(false) , _mutex( "ShardingState" ) {
     }
-    
-    void ShardingState::enable( const string& server ){
+
+    void ShardingState::enable( const string& server ) {
         _enabled = true;
         assert( server.size() );
         if ( _configServer.size() == 0 )
@@ -58,56 +58,56 @@ namespace mongo {
             assert( server == _configServer );
         }
     }
-    
-    void ShardingState::gotShardName( const string& name ){
-        if ( _shardName.size() == 0 ){
+
+    void ShardingState::gotShardName( const string& name ) {
+        if ( _shardName.size() == 0 ) {
             // TODO SERVER-2299 verify the name is sound w.r.t IPs
             _shardName = name;
             return;
         }
-        
+
         if ( _shardName == name )
             return;
 
         stringstream ss;
-        ss << "gotShardName different than what i had before " 
-           << " before [" << _shardName << "] " 
-           << " got [" << name << "] " 
-            ;
+        ss << "gotShardName different than what i had before "
+           << " before [" << _shardName << "] "
+           << " got [" << name << "] "
+           ;
         uasserted( 13298 , ss.str() );
     }
-    
-    void ShardingState::gotShardHost( string host ){
-        
+
+    void ShardingState::gotShardHost( string host ) {
+
         size_t slash = host.find( '/' );
         if ( slash != string::npos )
             host = host.substr( 0 , slash );
 
-        if ( _shardHost.size() == 0 ){
+        if ( _shardHost.size() == 0 ) {
             _shardHost = host;
             return;
         }
-        
+
         if ( _shardHost == host )
             return;
 
         stringstream ss;
-        ss << "gotShardHost different than what i had before " 
-           << " before [" << _shardHost << "] " 
-           << " got [" << host << "] " 
-            ;
+        ss << "gotShardHost different than what i had before "
+           << " before [" << _shardHost << "] "
+           << " got [" << host << "] "
+           ;
         uasserted( 13299 , ss.str() );
     }
-    
+
     // TODO we shouldn't need three ways for checking the version. Fix this.
-    bool ShardingState::hasVersion( const string& ns ){
+    bool ShardingState::hasVersion( const string& ns ) {
         scoped_lock lk(_mutex);
 
         ChunkManagersMap::const_iterator it = _chunks.find(ns);
         return it != _chunks.end();
     }
-    
-    bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ){
+
+    bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ) {
         scoped_lock lk(_mutex);
 
         ChunkManagersMap::const_iterator it = _chunks.find(ns);
@@ -118,7 +118,7 @@ namespace mongo {
         version = p->getVersion();
         return true;
     }
-    
+
     const ConfigVersion ShardingState::getVersion( const string& ns ) const {
         scoped_lock lk(_mutex);
 
@@ -126,11 +126,12 @@ namespace mongo {
         if ( it != _chunks.end() ) {
             ShardChunkManagerPtr p = it->second;
             return p->getVersion();
-        } else {
+        }
+        else {
             return 0;
         }
     }
-    
+
     void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
         scoped_lock lk( _mutex );
 
@@ -157,28 +158,28 @@ namespace mongo {
     void ShardingState::splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
                                     ShardChunkVersion version ) {
         scoped_lock lk( _mutex );
-        
+
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         assert( it != _chunks.end() ) ;
         ShardChunkManagerPtr p( it->second->cloneSplit( min , max , splitKeys , version ) );
         _chunks[ns] = p;
     }
 
-    void ShardingState::resetVersion( const string& ns ) { 
+    void ShardingState::resetVersion( const string& ns ) {
         scoped_lock lk( _mutex );
 
         _chunks.erase( ns );
     }
-    
+
     bool ShardingState::trySetVersion( const string& ns , ConfigVersion& version /* IN-OUT */ ) {
 
         // fast path - requested version is at the same version as this chunk manager
         //
-        // cases: 
+        // cases:
         //   + this shard updated the version for a migrate's commit (FROM side)
         //     a client reloaded chunk state from config and picked the newest version
         //   + two clients reloaded
-        //     one triggered the 'slow path' (below) 
+        //     one triggered the 'slow path' (below)
         //     when the second's request gets here, the version is already current
         {
             scoped_lock lk( _mutex );
@@ -187,11 +188,11 @@ namespace mongo {
                 return true;
         }
 
-        // slow path - requested version is different than the current chunk manager's, if one exists, so must check for 
+        // slow path - requested version is different than the current chunk manager's, if one exists, so must check for
         // newest version in the config server
         //
         // cases:
-        //   + a chunk moved TO here 
+        //   + a chunk moved TO here
         //     (we don't bump up the version on the TO side but the commit to config does use higher version)
         //     a client reloads from config an issued the request
         //   + there was a take over from a secondary
@@ -216,7 +217,7 @@ namespace mongo {
         }
     }
 
-    void ShardingState::appendInfo( BSONObjBuilder& b ){
+    void ShardingState::appendInfo( BSONObjBuilder& b ) {
         b.appendBool( "enabled" , _enabled );
         if ( ! _enabled )
             return;
@@ -227,10 +228,10 @@ namespace mongo {
 
         {
             BSONObjBuilder bb( b.subobjStart( "versions" ) );
-            
+
             scoped_lock lk(_mutex);
 
-            for ( ChunkManagersMap::iterator it = _chunks.begin(); it != _chunks.end(); ++it ){
+            for ( ChunkManagersMap::iterator it = _chunks.begin(); it != _chunks.end(); ++it ) {
                 ShardChunkManagerPtr p = it->second;
                 bb.appendTimestamp( it->first , p->getVersion() );
             }
@@ -242,20 +243,21 @@ namespace mongo {
     bool ShardingState::needShardChunkManager( const string& ns ) const {
         if ( ! _enabled )
             return false;
-        
+
         if ( ! ShardedConnectionInfo::get( false ) )
             return false;
 
         return true;
     }
 
-    ShardChunkManagerPtr ShardingState::getShardChunkManager( const string& ns ){
+    ShardChunkManagerPtr ShardingState::getShardChunkManager( const string& ns ) {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         if ( it == _chunks.end() ) {
             return ShardChunkManagerPtr();
-        } else {
+        }
+        else {
             return it->second;
         }
     }
@@ -263,19 +265,19 @@ namespace mongo {
     ShardingState shardingState;
 
     // -----ShardingState END ----
-    
+
     // -----ShardedConnectionInfo START ----
 
     boost::thread_specific_ptr<ShardedConnectionInfo> ShardedConnectionInfo::_tl;
 
-    ShardedConnectionInfo::ShardedConnectionInfo(){
+    ShardedConnectionInfo::ShardedConnectionInfo() {
         _forceVersionOk = false;
         _id.clear();
     }
-    
-    ShardedConnectionInfo* ShardedConnectionInfo::get( bool create ){
+
+    ShardedConnectionInfo* ShardedConnectionInfo::get( bool create ) {
         ShardedConnectionInfo* info = _tl.get();
-        if ( ! info && create ){
+        if ( ! info && create ) {
             log(1) << "entering shard mode for connection" << endl;
             info = new ShardedConnectionInfo();
             _tl.reset( info );
@@ -283,7 +285,7 @@ namespace mongo {
         return info;
     }
 
-    void ShardedConnectionInfo::reset(){
+    void ShardedConnectionInfo::reset() {
         _tl.reset();
     }
 
@@ -291,41 +293,42 @@ namespace mongo {
         NSVersionMap::const_iterator it = _versions.find( ns );
         if ( it != _versions.end() ) {
             return it->second;
-        } else {
+        }
+        else {
             return 0;
         }
     }
-    
-    void ShardedConnectionInfo::setVersion( const string& ns , const ConfigVersion& version ){
+
+    void ShardedConnectionInfo::setVersion( const string& ns , const ConfigVersion& version ) {
         _versions[ns] = version;
     }
 
-    void ShardedConnectionInfo::setID( const OID& id ){
+    void ShardedConnectionInfo::setID( const OID& id ) {
         _id = id;
     }
 
     // -----ShardedConnectionInfo END ----
 
-    unsigned long long extractVersion( BSONElement e , string& errmsg ){
-        if ( e.eoo() ){
+    unsigned long long extractVersion( BSONElement e , string& errmsg ) {
+        if ( e.eoo() ) {
             errmsg = "no version";
             return 0;
         }
-        
+
         if ( e.isNumber() )
             return (unsigned long long)e.number();
-        
+
         if ( e.type() == Date || e.type() == Timestamp )
             return e._numberLong();
 
-        
+
         errmsg = "version is not a numeric type";
         return 0;
     }
 
     class MongodShardCommand : public Command {
     public:
-        MongodShardCommand( const char * n ) : Command( n ){
+        MongodShardCommand( const char * n ) : Command( n ) {
         }
         virtual bool slaveOk() const {
             return false;
@@ -334,12 +337,12 @@ namespace mongo {
             return true;
         }
     };
-    
-    
-    bool haveLocalShardingInfo( const string& ns ){
+
+
+    bool haveLocalShardingInfo( const string& ns ) {
         if ( ! shardingState.enabled() )
             return false;
-        
+
         if ( ! shardingState.hasVersion( ns ) )
             return false;
 
@@ -348,32 +351,32 @@ namespace mongo {
 
     class UnsetShardingCommand : public MongodShardCommand {
     public:
-        UnsetShardingCommand() : MongodShardCommand("unsetSharding"){}
+        UnsetShardingCommand() : MongodShardCommand("unsetSharding") {}
 
         virtual void help( stringstream& help ) const {
             help << " example: { unsetSharding : 1 } ";
         }
-        
-        virtual LockType locktype() const { return NONE; } 
- 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+
+        virtual LockType locktype() const { return NONE; }
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             ShardedConnectionInfo::reset();
             return true;
-        } 
-    
+        }
+
     } unsetShardingCommand;
-    
+
     class SetShardVersion : public MongodShardCommand {
     public:
-        SetShardVersion() : MongodShardCommand("setShardVersion"){}
+        SetShardVersion() : MongodShardCommand("setShardVersion") {}
 
         virtual void help( stringstream& help ) const {
             help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
         }
-        
+
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
- 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
 
             lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
@@ -381,20 +384,21 @@ namespace mongo {
             bool authoritative = cmdObj.getBoolField( "authoritative" );
 
             string configdb = cmdObj["configdb"].valuestrsafe();
-            { // configdb checking
-                if ( configdb.size() == 0 ){
+            {
+                // configdb checking
+                if ( configdb.size() == 0 ) {
                     errmsg = "no configdb";
                     return false;
                 }
-                
-                if ( shardingState.enabled() ){
-                    if ( configdb != shardingState.getConfigServer() ){
+
+                if ( shardingState.enabled() ) {
+                    if ( configdb != shardingState.getConfigServer() ) {
                         errmsg = "specified a different configdb!";
                         return false;
                     }
                 }
                 else {
-                    if ( ! authoritative ){
+                    if ( ! authoritative ) {
                         result.appendBool( "need_authoritative" , true );
                         errmsg = "first setShardVersion";
                         return false;
@@ -404,23 +408,24 @@ namespace mongo {
                 }
             }
 
-            if ( cmdObj["shard"].type() == String ){
+            if ( cmdObj["shard"].type() == String ) {
                 shardingState.gotShardName( cmdObj["shard"].String() );
                 shardingState.gotShardHost( cmdObj["shardHost"].String() );
             }
 
-            { // setting up ids
-                if ( cmdObj["serverID"].type() != jstOID ){
+            {
+                // setting up ids
+                if ( cmdObj["serverID"].type() != jstOID ) {
                     // TODO: fix this
                     //errmsg = "need serverID to be an OID";
                     //return 0;
                 }
                 else {
                     OID clientId = cmdObj["serverID"].__oid();
-                    if ( ! info->hasID() ){
+                    if ( ! info->hasID() ) {
                         info->setID( clientId );
                     }
-                    else if ( clientId != info->getID() ){
+                    else if ( clientId != info->getID() ) {
                         errmsg = "server id has changed!";
                         return 0;
                     }
@@ -429,32 +434,32 @@ namespace mongo {
 
             unsigned long long version = extractVersion( cmdObj["version"] , errmsg );
 
-            if ( errmsg.size() ){
+            if ( errmsg.size() ) {
                 return false;
             }
-            
+
             string ns = cmdObj["setShardVersion"].valuestrsafe();
-            if ( ns.size() == 0 ){
+            if ( ns.size() == 0 ) {
                 errmsg = "need to speciy fully namespace";
                 return false;
             }
-            
+
             const ConfigVersion oldVersion = info->getVersion(ns);
             const ConfigVersion globalVersion = shardingState.getVersion(ns);
-            
-            if ( oldVersion > 0 && globalVersion == 0 ){
+
+            if ( oldVersion > 0 && globalVersion == 0 ) {
                 // this had been reset
                 info->setVersion( ns , 0 );
             }
 
-            if ( version == 0 && globalVersion == 0 ){
+            if ( version == 0 && globalVersion == 0 ) {
                 // this connection is cleaning itself
                 info->setVersion( ns , 0 );
                 return true;
             }
 
-            if ( version == 0 && globalVersion > 0 ){
-                if ( ! authoritative ){
+            if ( version == 0 && globalVersion > 0 ) {
+                if ( ! authoritative ) {
                     result.appendBool( "need_authoritative" , true );
                     result.append( "ns" , ns );
                     result.appendTimestamp( "globalVersion" , globalVersion );
@@ -471,7 +476,7 @@ namespace mongo {
                 return true;
             }
 
-            if ( version < oldVersion ){
+            if ( version < oldVersion ) {
                 errmsg = "you already have a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "oldVersion" , oldVersion );
@@ -479,9 +484,9 @@ namespace mongo {
                 result.appendTimestamp( "globalVersion" , globalVersion );
                 return false;
             }
-            
-            if ( version < globalVersion ){
-                while ( shardingState.inCriticalMigrateSection() ){
+
+            if ( version < globalVersion ) {
+                while ( shardingState.inCriticalMigrateSection() ) {
                     dbtemprelease r;
                     sleepmillis(2);
                     log() << "waiting till out of critical section" << endl;
@@ -492,8 +497,8 @@ namespace mongo {
                 result.appendTimestamp( "globalVersion" , globalVersion );
                 return false;
             }
-            
-            if ( globalVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ){
+
+            if ( globalVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ) {
                 // need authoritative for first look
                 result.append( "ns" , ns );
                 result.appendBool( "need_authoritative" , true );
@@ -505,7 +510,7 @@ namespace mongo {
                 dbtemprelease unlock;
 
                 ShardChunkVersion currVersion = version;
-                if ( ! shardingState.trySetVersion( ns , currVersion ) ){
+                if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
                     errmsg = str::stream() << "client version differs from config's for colleciton '" << ns << "'";
                     result.append( "ns" , ns );
                     result.appendTimestamp( "version" , version );
@@ -520,72 +525,72 @@ namespace mongo {
 
             return true;
         }
-        
+
     } setShardVersionCmd;
-    
+
     class GetShardVersion : public MongodShardCommand {
     public:
-        GetShardVersion() : MongodShardCommand("getShardVersion"){}
+        GetShardVersion() : MongodShardCommand("getShardVersion") {}
 
         virtual void help( stringstream& help ) const {
             help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
         }
-        
-        virtual LockType locktype() const { return NONE; } 
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        virtual LockType locktype() const { return NONE; }
+
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             string ns = cmdObj["getShardVersion"].valuestrsafe();
-            if ( ns.size() == 0 ){
+            if ( ns.size() == 0 ) {
                 errmsg = "need to speciy fully namespace";
                 return false;
             }
-            
+
             result.append( "configServer" , shardingState.getConfigServer() );
 
             result.appendTimestamp( "global" , shardingState.getVersion(ns) );
-            
+
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
             if ( info )
                 result.appendTimestamp( "mine" , info->getVersion(ns) );
-            else 
+            else
                 result.appendTimestamp( "mine" , 0 );
-            
+
             return true;
         }
-        
+
     } getShardVersion;
 
     class ShardingStateCmd : public MongodShardCommand {
     public:
-        ShardingStateCmd() : MongodShardCommand( "shardingState" ){}
+        ShardingStateCmd() : MongodShardCommand( "shardingState" ) {}
 
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){        
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             shardingState.appendInfo( result );
             return true;
         }
-        
+
     } shardingStateCmd;
 
     /**
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , bool isWriteOp , string& errmsg ){
+    bool shardVersionOk( const string& ns , bool isWriteOp , string& errmsg ) {
         if ( ! shardingState.enabled() )
             return true;
 
         ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
 
-        if ( ! info ){
+        if ( ! info ) {
             // this means the client has nothing sharded
             // so this allows direct connections to do whatever they want
             // which i think is the correct behavior
             return true;
         }
-        
-        if ( info->inForceVersionOkMode() ){
+
+        if ( info->inForceVersionOkMode() ) {
             return true;
         }
 
@@ -593,33 +598,33 @@ namespace mongo {
         //   all collections at some point, be sharded or not, will have a version (and a ShardChunkManager)
         //   for now, we remove the sharding state of dropped collection
         //   so delayed request may come in. This has to be fixed.
-        ConfigVersion version;    
-        if ( ! shardingState.hasVersion( ns , version ) ){
+        ConfigVersion version;
+        if ( ! shardingState.hasVersion( ns , version ) ) {
             return true;
         }
 
         ConfigVersion clientVersion = info->getVersion(ns);
 
-        if ( version == 0 && clientVersion > 0 ){
+        if ( version == 0 && clientVersion > 0 ) {
             stringstream ss;
             ss << "collection was dropped or this shard no longer valied version: " << version << " clientVersion: " << clientVersion;
             errmsg = ss.str();
             return false;
         }
-        
+
         if ( clientVersion >= version )
             return true;
-        
 
-        if ( clientVersion == 0 ){
+
+        if ( clientVersion == 0 ) {
             stringstream ss;
             ss << "client in sharded mode, but doesn't have version set for this collection: " << ns << " myVersion: " << version;
             errmsg = ss.str();
             return false;
         }
 
-        if ( isWriteOp && version.majorVersion() == clientVersion.majorVersion() ){
-            // this means there was just a split 
+        if ( isWriteOp && version.majorVersion() == clientVersion.majorVersion() ) {
+            // this means there was just a split
             // since on a split w/o a migrate this server is ok
             // going to accept write
             return true;

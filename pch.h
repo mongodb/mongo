@@ -96,7 +96,7 @@
 namespace mongo {
 
 # if defined(_TESTINTENT)
-    /** Use _TESTINTENT to test write intent declarations by using a read only view for non-declared operations. 
+    /** Use _TESTINTENT to test write intent declarations by using a read only view for non-declared operations.
         We don't do journalling when _TESTINTENT is enabled.
     */
     const bool testIntent = true;
@@ -118,8 +118,8 @@ namespace mongo {
     const int VERSION_MINOR = 5;
 
     enum ExitCode {
-        EXIT_CLEAN = 0 , 
-        EXIT_BADOPTIONS = 2 , 
+        EXIT_CLEAN = 0 ,
+        EXIT_BADOPTIONS = 2 ,
         EXIT_REPLICATION_ERROR = 3 ,
         EXIT_NEED_UPGRADE = 4 ,
         EXIT_SHARDING_ERROR = 5 ,
@@ -127,8 +127,8 @@ namespace mongo {
         EXIT_ABRUPT = 14 ,
         EXIT_NTSERVICE_ERROR = 20 ,
         EXIT_JAVA = 21 ,
-        EXIT_OOM_MALLOC = 42 , 
-        EXIT_OOM_REALLOC = 43 , 
+        EXIT_OOM_MALLOC = 42 ,
+        EXIT_OOM_REALLOC = 43 ,
         EXIT_FS = 45 ,
         EXIT_CLOCK_SKEW = 47 ,
         EXIT_NET_ERROR = 48 ,
@@ -147,7 +147,7 @@ namespace mongo {
      */
     void exit( ExitCode returnCode );
     bool inShutdown();
-    
+
     using namespace boost::filesystem;
     void asserted(const char *msg, const char *file, unsigned line);
 }

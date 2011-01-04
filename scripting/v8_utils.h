@@ -32,9 +32,9 @@ namespace mongo {
     v8::Handle<v8::Value> GCV8(const v8::Arguments& args);
 
     void ReportException(v8::TryCatch* handler);
-    
+
 #define jsassert(x,msg) assert(x)
-    
+
     std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::Value> & o );
     std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::TryCatch> * try_catch );
 

@@ -55,19 +55,19 @@ namespace mongo {
             no tss cleanup on windows for boost lib?
             we don't care for now esp on windows only
 
-    		the boost source says:
+            the boost source says:
 
-    		  This function's sole purpose is to cause a link error in cases where
-    		  automatic tss cleanup is not implemented by Boost.Threads as a
-    		  reminder that user code is responsible for calling the necessary
-    		  functions at the appropriate times (and for implementing an a
-    		  tss_cleanup_implemented() function to eliminate the linker's
-    		  missing symbol error).
+              This function's sole purpose is to cause a link error in cases where
+              automatic tss cleanup is not implemented by Boost.Threads as a
+              reminder that user code is responsible for calling the necessary
+              functions at the appropriate times (and for implementing an a
+              tss_cleanup_implemented() function to eliminate the linker's
+              missing symbol error).
 
-    		  If Boost.Threads later implements automatic tss cleanup in cases
-    		  where it currently doesn't (which is the plan), the duplicate
-    		  symbol error will warn the user that their custom solution is no
-    		  longer needed and can be removed.
+              If Boost.Threads later implements automatic tss cleanup in cases
+              where it currently doesn't (which is the plan), the duplicate
+              symbol error will warn the user that their custom solution is no
+              longer needed and can be removed.
     */
     extern "C" void tss_cleanup_implemented(void) {
         //out() << "tss_cleanup_implemented called" << endl;
@@ -185,10 +185,10 @@ namespace mongo {
         if ( res ) {
             log() << "using classpath: " << q << endl;
             log()
-                << " res : " << (unsigned) res << " "
-                << "_jvm : " << _jvm  << " "
-                << "_env : " << _mainEnv << " "
-                << endl;
+                    << " res : " << (unsigned) res << " "
+                    << "_jvm : " << _jvm  << " "
+                    << "_env : " << _mainEnv << " "
+                    << endl;
             problem() << "Couldn't create JVM res:" << (int) res << " terminating" << endl;
             log() << "(try --nojni if you do not require that functionality)" << endl;
             exit(22);
@@ -397,12 +397,11 @@ namespace mongo {
         return retStr;
     }
 
-    BSONObj JavaJSImpl::scopeGetObject( jlong id , const char * field )
-    {
+    BSONObj JavaJSImpl::scopeGetObject( jlong id , const char * field ) {
         jstring s1 = _getEnv()->NewStringUTF( field );
         int guess = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGuessObjectSize , id , _getEnv()->NewStringUTF( field ) );
         _getEnv()->DeleteLocalRef( s1 );
-        
+
         if ( guess == 0 )
             return BSONObj();
 
@@ -471,12 +470,12 @@ namespace mongo {
         return env;
     }
 
-    Scope * JavaJSImpl::createScope(){
+    Scope * JavaJSImpl::createScope() {
         return new JavaScope();
     }
 
-    void ScriptEngine::setup(){
-        if ( ! JavaJS ){
+    void ScriptEngine::setup() {
+        if ( ! JavaJS ) {
             JavaJS = new JavaJSImpl();
             globalScriptEngine = JavaJS;
         }
@@ -564,40 +563,40 @@ namespace mongo {
         if ( ! possible.size() ) {
             possible.push_back( "./" );
             possible.push_back( "../" );
-            
+
             log(2) << "dbExecCommand: " << dbExecCommand << endl;
-            
+
             string dbDir = dbExecCommand;
 #ifdef WIN32
-            if ( dbDir.find( "\\" ) != string::npos ){
+            if ( dbDir.find( "\\" ) != string::npos ) {
                 dbDir = dbDir.substr( 0 , dbDir.find_last_of( "\\" ) );
             }
             else {
                 dbDir = ".";
             }
 #else
-            if ( dbDir.find( "/" ) != string::npos ){
+            if ( dbDir.find( "/" ) != string::npos ) {
                 dbDir = dbDir.substr( 0 , dbDir.find_last_of( "/" ) );
             }
             else {
                 bool found = false;
-                
-                if ( getenv( "PATH" ) ){
+
+                if ( getenv( "PATH" ) ) {
                     string s = getenv( "PATH" );
                     s += ":";
                     pcrecpp::StringPiece input( s );
                     string dir;
                     pcrecpp::RE re("(.*?):");
-                    while ( re.Consume( &input, &dir ) ){
+                    while ( re.Consume( &input, &dir ) ) {
                         string test = dir + "/" + dbExecCommand;
-                        if ( boost::filesystem::exists( test ) ){
-                            while ( boost::filesystem::symbolic_link_exists( test ) ){
+                        if ( boost::filesystem::exists( test ) ) {
+                            while ( boost::filesystem::symbolic_link_exists( test ) ) {
                                 char tmp[2048];
                                 int len = readlink( test.c_str() , tmp , 2048 );
                                 tmp[len] = 0;
                                 log(5) << " symlink " << test << "  -->> " << tmp << endl;
                                 test = tmp;
-                                
+
                                 dir = test.substr( 0 , test.rfind( "/" ) );
                             }
                             dbDir = dir;
@@ -606,12 +605,12 @@ namespace mongo {
                         }
                     }
                 }
-                
+
                 if ( ! found )
                     dbDir = ".";
             }
 #endif
-            
+
             log(2) << "dbDir [" << dbDir << "]" << endl;
             possible.push_back( ( dbDir + "/../lib/mongo/" ));
             possible.push_back( ( dbDir + "/../lib64/mongo/" ));
@@ -624,7 +623,7 @@ namespace mongo {
         for ( list<string>::iterator i = possible.begin() ; i != possible.end(); i++ ) {
             const string temp = *i;
             const string jarDir = ((string)temp) + "jars/";
-            
+
             log(5) << "possible jarDir [" << jarDir << "]" << endl;
 
             path p(jarDir );
@@ -641,7 +640,7 @@ namespace mongo {
 
     };
 
-    
+
 // ---
 
     JNIEXPORT void JNICALL java_native_say(JNIEnv * env , jclass, jobject outBuffer ) {
@@ -692,7 +691,7 @@ namespace mongo {
 
 
         jlong func1 = JavaJS.functionCreate( "foo = 5.6; bar = \"eliot\"; abc = { foo : 517 }; " );
-         jassert( ! JavaJS.invoke( scope , func1 ) );
+        jassert( ! JavaJS.invoke( scope , func1 ) );
 
 
         if ( debug ) out() << "func3 start" << endl;
@@ -757,7 +756,7 @@ namespace mongo {
         assert( 12 == JavaJS.scopeGetNumber( scope , "return" ) );
 
     }
-    
+
 #endif
 
 } // namespace mongo

@@ -41,17 +41,17 @@ namespace mongo {
 
     class RESTHandler : public DbWebHandler {
     public:
-        RESTHandler() : DbWebHandler( "DUMMY REST" , 1000 , true ){}
+        RESTHandler() : DbWebHandler( "DUMMY REST" , 1000 , true ) {}
 
-        virtual bool handles( const string& url ) const { 
-            return 
+        virtual bool handles( const string& url ) const {
+            return
                 url[0] == '/' &&
                 url.find_last_of( '/' ) > 0;
         }
 
-        virtual void handle( const char *rq, string url, BSONObj params, 
+        virtual void handle( const char *rq, string url, BSONObj params,
                              string& responseMsg, int& responseCode,
-                             vector<string>& headers,  const SockAddr &from ){
+                             vector<string>& headers,  const SockAddr &from ) {
 
             string::size_type first = url.find( "/" , 1 );
             if ( first == string::npos ) {
@@ -103,7 +103,7 @@ namespace mongo {
                 out() << "don't know how to handle a [" << method << "]" << endl;
             }
 
-            if( html ) 
+            if( html )
                 headers.push_back("Content-Type: text/html;charset=utf-8");
             else
                 headers.push_back("Content-Type: text/plain;charset=utf-8");
@@ -114,7 +114,7 @@ namespace mongo {
         bool handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
             Timer t;
 
-            int html = _getOption( params["html"] , 0 ); 
+            int html = _getOption( params["html"] , 0 );
             int skip = _getOption( params["skip"] , 0 );
             int num  = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
 
@@ -127,7 +127,7 @@ namespace mongo {
             BSONObjBuilder queryBuilder;
 
             BSONObjIterator i(params);
-            while ( i.more() ){
+            while ( i.more() ) {
                 BSONElement e = i.next();
                 string name = e.fieldName();
                 if ( ! name.find( "filter_" ) == 0 )
@@ -163,10 +163,11 @@ namespace mongo {
 
             if( html )  {
                 string title = string("query ") + ns;
-                out << start(title) 
+                out << start(title)
                     << p(title)
                     << "<pre>";
-            } else {
+            }
+            else {
                 out << "{\n";
                 out << "  \"offset\" : " << skip << ",\n";
                 out << "  \"rows\": [\n";
@@ -191,7 +192,7 @@ namespace mongo {
                 }
             }
 
-            if( html ) { 
+            if( html ) {
                 out << "</pre>\n";
                 if( howMany == 0 ) out << p("Collection is empty");
                 out << _end();
@@ -212,7 +213,8 @@ namespace mongo {
             try {
                 BSONObj obj = fromjson( body );
                 db.insert( ns.c_str(), obj );
-            } catch ( ... ) {
+            }
+            catch ( ... ) {
                 responseCode = 400; // Bad Request.  Seems reasonable for now.
                 out << "{ \"ok\" : false }";
                 return;
@@ -229,7 +231,7 @@ namespace mongo {
                 return atoi( e.valuestr() );
             return def;
         }
-        
+
         DBDirectClient db;
 
     } restHandler;
@@ -252,19 +254,19 @@ namespace mongo {
 
     class LowLevelMongodStatus : public WebStatusPlugin {
     public:
-        LowLevelMongodStatus() : WebStatusPlugin( "low level" , 5 , "requires read lock" ){}
+        LowLevelMongodStatus() : WebStatusPlugin( "low level" , 5 , "requires read lock" ) {}
 
-        virtual void init(){}
+        virtual void init() {}
 
-        void _gotLock( int millis , stringstream& ss ){
+        void _gotLock( int millis , stringstream& ss ) {
             ss << "<pre>\n";
             ss << "time to get readlock: " << millis << "ms\n";
-            
+
             ss << "# databases: " << dbHolder.size() << '\n';
-            
+
             if( ClientCursor::numCursors()>500 )
                 ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
-            
+
             ss << "\nreplication: ";
             if( *replInfo )
                 ss << "\nreplInfo:  " << replInfo << "\n\n";
@@ -292,10 +294,10 @@ namespace mongo {
             ss << "</pre>\n";
         }
 
-        virtual void run( stringstream& ss ){
+        virtual void run( stringstream& ss ) {
             Timer t;
             readlocktry lk( "" , 300 );
-            if ( lk.got() ){
+            if ( lk.got() ) {
                 _gotLock( t.millis() , ss );
             }
             else {

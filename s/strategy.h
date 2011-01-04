@@ -23,21 +23,21 @@
 #include "request.h"
 
 namespace mongo {
-    
+
     class Strategy {
     public:
-        Strategy(){}
+        Strategy() {}
         virtual ~Strategy() {}
         virtual void queryOp( Request& r ) = 0;
         virtual void getMore( Request& r ) = 0;
         virtual void writeOp( int op , Request& r ) = 0;
-        
+
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );
-        
+
         void insert( const Shard& shard , const char * ns , const BSONObj& obj );
-        
+
     };
 
     extern Strategy * SINGLE;

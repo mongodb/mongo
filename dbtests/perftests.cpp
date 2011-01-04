@@ -1,6 +1,6 @@
 /** @file perftests.cpp.cpp : unit tests relating to performance
 
-          The idea herein is tests that run fast and can be part of the normal CI suite.  So no tests herein that take 
+          The idea herein is tests that run fast and can be part of the normal CI suite.  So no tests herein that take
           a long time to run.  Obviously we need those too, but they will be separate.
 
           These tests use DBDirectClient; they are a bit white-boxish.
@@ -65,14 +65,14 @@ namespace PerfTests {
     DBClientType ClientBase::_client;
 
     // todo: use a couple threads. not a very good test yet.
-    class DefInvoke { 
+    class DefInvoke {
         static int tot;
-        struct V { 
+        struct V {
             int val;
             static void go(const V &v) { tot += v.val; }
         };
     public:
-        void run() { 
+        void run() {
             tot = 0;
             TaskQueue<V> d;
             int x = 0;
@@ -92,11 +92,10 @@ namespace PerfTests {
     };
     int DefInvoke::tot;
 
-    class CappedTest : public ClientBase { 
+    class CappedTest : public ClientBase {
     };
 
-    class B : public ClientBase 
-    { 
+    class B : public ClientBase {
         string _ns;
     protected:
         const char *ns() { return _ns.c_str(); }
@@ -113,11 +112,11 @@ namespace PerfTests {
         virtual unsigned long long expectation() = 0;
         virtual int howLongMillis() { return 5000; }
     public:
-        void say(unsigned long long n, int ms, string s) { 
+        void say(unsigned long long n, int ms, string s) {
             cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
             cout << dur::stats.curr->_asObj().toString() << endl;
         }
-        void run() { 
+        void run() {
             _ns = string("perftest.") + name();
             client().dropCollection(ns());
 
@@ -130,17 +129,18 @@ namespace PerfTests {
             Timer t;
             unsigned long long n = 0;
             const unsigned Batch = 50;
-            do { 
+            do {
                 unsigned i;
                 for( i = 0; i < Batch; i++ )
                     timed();
                 n += i;
-            } while( t.millis() < hlm );
+            }
+            while( t.millis() < hlm );
             client().getLastError(); // block until all ops are finished
             int ms = t.millis();
             say(n, ms, name());
 
-            if( n < expectation() ) { 
+            if( n < expectation() ) {
                 cout << "\ntest " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
                 cout << endl;
             }
@@ -151,12 +151,12 @@ namespace PerfTests {
                     dur::stats.curr->reset();
                     Timer t;
                     unsigned long long n = 0;
-                    while( 1 ) { 
+                    while( 1 ) {
                         unsigned i;
                         for( i = 0; i < Batch; i++ )
                             timed2();
                         n += i;
-                        if( t.millis() > hlm ) 
+                        if( t.millis() > hlm )
                             break;
                     }
                     int ms = t.millis();
@@ -166,14 +166,14 @@ namespace PerfTests {
         }
     };
 
-    class InsertDup : public B { 
+    class InsertDup : public B {
         const BSONObj o;
     public:
         InsertDup() : o( BSON("_id" << 1) ) { } // dup keys
-        string name() { 
-            return "insert duplicate _ids"; 
+        string name() {
+            return "insert duplicate _ids";
         }
-        void prep() { 
+        void prep() {
             client().insert( ns(), o );
         }
         void timed() {
@@ -184,8 +184,8 @@ namespace PerfTests {
         }
         unsigned long long expectation() { return 1000; }
     };
-    
-    class Insert1 : public InsertDup { 
+
+    class Insert1 : public InsertDup {
         const BSONObj x;
     public:
         Insert1() : x( BSON("x" << 99) ) { }
@@ -199,10 +199,10 @@ namespace PerfTests {
         unsigned long long expectation() { return 1000; }
     };
 
-    class InsertBig : public InsertDup { 
+    class InsertBig : public InsertDup {
         BSONObj x;
-        virtual int howLongMillis() { 
-            if( sizeof(void*) == 4 ) 
+        virtual int howLongMillis() {
+            if( sizeof(void*) == 4 )
                 return 1000;  // could exceed mmapping if run too long, as this function adds a lot fasta
             return 5000;
         }
@@ -221,10 +221,10 @@ namespace PerfTests {
         unsigned long long expectation() { return 20; }
     };
 
-    class InsertRandom : public B { 
+    class InsertRandom : public B {
     public:
         string name() { return "random inserts"; }
-        void prep() { 
+        void prep() {
             client().insert( ns(), BSONObj() );
             client().ensureIndex(ns(), BSON("x"<<1));
         }
@@ -237,17 +237,17 @@ namespace PerfTests {
         }
         unsigned long long expectation() { return 1000; }
     };
-                
-    /** upserts about 32k records and then keeps updating them 
+
+    /** upserts about 32k records and then keeps updating them
         2 indexes
     */
-    class Update1 : public B { 
+    class Update1 : public B {
     public:
-        static int rand() { 
+        static int rand() {
             return std::rand() & 0x7fff;
         }
         string name() { return "random upserts"; }
-        void prep() { 
+        void prep() {
             client().insert( ns(), BSONObj() );
             client().ensureIndex(ns(), BSON("x"<<1));
         }
@@ -274,12 +274,12 @@ namespace PerfTests {
         }
         unsigned long long expectation() { return 1000; }
     };
-                
+
     template <typename T>
-    class MoreIndexes : public T { 
+    class MoreIndexes : public T {
     public:
         string name() { return T::name() + " with more indexes"; }
-        void prep() { 
+        void prep() {
             T::prep();
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
             this->client().ensureIndex(this->ns(), BSON("z"<<1));
@@ -290,7 +290,7 @@ namespace PerfTests {
     public:
         All() : Suite( "perf" ) {
         }
-        void setupTests(){
+        void setupTests() {
             add< DefInvoke >();
             add< InsertDup >();
             add< Insert1 >();

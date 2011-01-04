@@ -38,26 +38,26 @@
 #include "shard_version.h"
 
 namespace mongo {
-    
-    CmdLine cmdLine;    
+
+    CmdLine cmdLine;
     Database *database = 0;
     string mongosCommand;
     bool dbexitCalled = false;
 
-    bool inShutdown(){
+    bool inShutdown() {
         return dbexitCalled;
     }
-    
+
     string getDbContext() {
         return "?";
     }
 
-    bool haveLocalShardingInfo( const string& ns ){
+    bool haveLocalShardingInfo( const string& ns ) {
         assert( 0 );
         return false;
     }
-    
-    void usage( char * argv[] ){
+
+    void usage( char * argv[] ) {
         out() << argv[0] << " usage:\n\n";
         out() << " -v+  verbose 1: general 2: more 3: per request 4: more\n";
         out() << " --port <portno>\n";
@@ -68,23 +68,23 @@ namespace mongo {
     class ShardingConnectionHook : public DBConnectionHook {
     public:
 
-        virtual void onHandedOut( DBClientBase * conn ){
+        virtual void onHandedOut( DBClientBase * conn ) {
             ClientInfo::get()->addShard( conn->getServerAddress() );
         }
     } shardingConnectionHook;
-    
+
     class ShardedMessageHandler : public MessageHandler {
     public:
-        virtual ~ShardedMessageHandler(){}
+        virtual ~ShardedMessageHandler() {}
 
-        virtual void process( Message& m , AbstractMessagingPort* p ){
+        virtual void process( Message& m , AbstractMessagingPort* p ) {
             assert( p );
             Request r( m , p );
 
             LastError * le = lastError.startRequest( m , r.getClientId() );
             assert( le );
-            
-            if ( logLevel > 5 ){
+
+            if ( logLevel > 5 ) {
                 log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
             }
             try {
@@ -92,43 +92,43 @@ namespace mongo {
                 setClientId( r.getClientId() );
                 r.process();
             }
-            catch ( AssertionException & e ){
+            catch ( AssertionException & e ) {
                 log( e.isUserAssertion() ? 1 : 0 ) << "AssertionException in process: " << e.what() << endl;
 
                 le->raiseError( e.getCode() , e.what() );
-                
+
                 m.header()->id = r.id();
-                
-                if ( r.expectResponse() ){
+
+                if ( r.expectResponse() ) {
                     BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
                     replyToQuery( ResultFlag_ErrSet, p , m , err );
                 }
             }
-            catch ( DBException& e ){
+            catch ( DBException& e ) {
                 log() << "DBException in process: " << e.what() << endl;
-                
+
                 le->raiseError( e.getCode() , e.what() );
-                
+
                 m.header()->id = r.id();
-                
-                if ( r.expectResponse() ){
+
+                if ( r.expectResponse() ) {
                     BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
                     replyToQuery( ResultFlag_ErrSet, p , m , err );
                 }
             }
         }
 
-        virtual void disconnected( AbstractMessagingPort* p ){
+        virtual void disconnected( AbstractMessagingPort* p ) {
             ClientInfo::disconnect( p->getClientId() );
             lastError.disconnect( p->getClientId() );
         }
     };
 
-    void sighandler(int sig){
+    void sighandler(int sig) {
         dbexit(EXIT_CLEAN, (string("received signal ") + BSONObjBuilder::numStr(sig)).c_str());
     }
-    
-    void setupSignals( bool inFork ){
+
+    void setupSignals( bool inFork ) {
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
 
@@ -143,14 +143,14 @@ namespace mongo {
 #endif
     }
 
-    void init(){
+    void init() {
         serverID.init();
         setupSIGTRAPforGDB();
         setupCoreSignals();
         setupSignals( false );
     }
 
-    void start( const MessageServer::Options& opts ){
+    void start( const MessageServer::Options& opts ) {
         setThreadName( "mongosMain" );
         installChunkShardVersioning();
         balancer.go();
@@ -165,12 +165,12 @@ namespace mongo {
         server->run();
     }
 
-    DBClientBase *createDirectClient(){
+    DBClientBase *createDirectClient() {
         uassert( 10197 ,  "createDirectClient not implemented for sharding yet" , 0 );
         return 0;
     }
 
-    void printShardingVersionInfo(){
+    void printShardingVersionInfo() {
         log() << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
         printGitVersion();
         printSysInfo();
@@ -192,87 +192,87 @@ int main(int argc, char* argv[]) {
     po::options_description sharding_options("Sharding options");
     po::options_description hidden("Hidden options");
     po::positional_options_description positional;
-    
+
     CmdLine::addGlobalOptions( options , hidden );
-    
+
     sharding_options.add_options()
-        ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
-        ( "test" , "just run unit tests" )
-        ( "upgrade" , "upgrade meta data version" )
-        ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
-        ( "ipv6", "enable IPv6 support (disabled by default)" )
-        ( "jsonp","allow JSONP access via http (has security implications)" )
-        ;
+    ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
+    ( "test" , "just run unit tests" )
+    ( "upgrade" , "upgrade meta data version" )
+    ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
+    ( "ipv6", "enable IPv6 support (disabled by default)" )
+    ( "jsonp","allow JSONP access via http (has security implications)" )
+    ;
 
     options.add(sharding_options);
     // parse options
     po::variables_map params;
     if ( ! CmdLine::store( argc , argv , options , hidden , positional , params ) )
         return 0;
-    
-    if ( params.count( "help" ) ){
+
+    if ( params.count( "help" ) ) {
         cout << options << endl;
         return 0;
     }
 
-    if ( params.count( "version" ) ){
+    if ( params.count( "version" ) ) {
         printShardingVersionInfo();
         return 0;
     }
 
-    if ( params.count( "chunkSize" ) ){
+    if ( params.count( "chunkSize" ) ) {
         Chunk::MaxChunkSize = params["chunkSize"].as<int>() * 1024 * 1024;
     }
 
-    if ( params.count( "ipv6" ) ){
+    if ( params.count( "ipv6" ) ) {
         enableIPv6();
     }
 
-    if ( params.count( "jsonp" ) ){
+    if ( params.count( "jsonp" ) ) {
         cmdLine.jsonp = true;
     }
 
-    if ( params.count( "test" ) ){
+    if ( params.count( "test" ) ) {
         logLevel = 5;
         UnitTest::runTests();
         cout << "tests passed" << endl;
         return 0;
     }
-    
-    if ( ! params.count( "configdb" ) ){
+
+    if ( ! params.count( "configdb" ) ) {
         out() << "error: no args for --configdb" << endl;
         return 4;
     }
 
     vector<string> configdbs;
     splitStringDelim( params["configdb"].as<string>() , &configdbs , ',' );
-    if ( configdbs.size() != 1 && configdbs.size() != 3 ){
+    if ( configdbs.size() != 1 && configdbs.size() != 3 ) {
         out() << "need either 1 or 3 configdbs" << endl;
         return 5;
     }
 
     // we either have a seeting were all process are in localhost or none is
-    for ( vector<string>::const_iterator it = configdbs.begin() ; it != configdbs.end() ; ++it ){
+    for ( vector<string>::const_iterator it = configdbs.begin() ; it != configdbs.end() ; ++it ) {
         try {
 
             HostAndPort configAddr( *it );  // will throw if address format is invalid
 
-            if ( it == configdbs.begin() ){
+            if ( it == configdbs.begin() ) {
                 grid.setAllowLocalHost( configAddr.isLocalHost() );
             }
 
-            if ( configAddr.isLocalHost() != grid.allowLocalHost() ){
+            if ( configAddr.isLocalHost() != grid.allowLocalHost() ) {
                 out() << "cannot mix localhost and ip addresses in configdbs" << endl;
                 return 10;
             }
 
-        } 
+        }
         catch ( DBException& e) {
             out() << "configdb: " << e.what() << endl;
             return 9;
         }
     }
-    
+
     pool.addHook( &shardingConnectionHook );
     pool.setName( "mongos connectionpool" );
 
@@ -289,22 +289,22 @@ int main(int argc, char* argv[]) {
         usage( argv );
         return 1;
     }
-    
+
     printShardingVersionInfo();
-    
-    if ( ! configServer.init( configdbs ) ){
+
+    if ( ! configServer.init( configdbs ) ) {
         cout << "couldn't resolve config db address" << endl;
         return 7;
     }
-    
-    if ( ! configServer.ok( true ) ){
+
+    if ( ! configServer.ok( true ) ) {
         cout << "configServer startup check failed" << endl;
         return 8;
     }
-    
+
     int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );
-    if ( configError ){
-        if ( configError > 0 ){
+    if ( configError ) {
+        if ( configError > 0 ) {
             cout << "upgrade success!" << endl;
         }
         else {
@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
     init();
 
     boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
-    
+
     MessageServer::Options opts;
     opts.port = cmdLine.port;
     opts.ipList = cmdLine.bind_ip;
@@ -330,8 +330,8 @@ int main(int argc, char* argv[]) {
 #undef exit
 void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
     dbexitCalled = true;
-    log() << "dbexit: " << why 
-          << " rc:" << rc 
+    log() << "dbexit: " << why
+          << " rc:" << rc
           << " " << ( why ? why : "" )
           << endl;
     ::exit(rc);

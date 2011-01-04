@@ -35,50 +35,50 @@
 
 namespace mongo {
 
-    Request::Request( Message& m, AbstractMessagingPort* p ) : 
-        _m(m) , _d( m ) , _p(p) , _didInit(false){
-        
+    Request::Request( Message& m, AbstractMessagingPort* p ) :
+        _m(m) , _d( m ) , _p(p) , _didInit(false) {
+
         assert( _d.getns() );
         _id = _m.header()->id;
-        
+
         _clientId = p ? p->getClientId() : 0;
         _clientInfo = ClientInfo::get( _clientId );
         _clientInfo->newRequest( p );
-        
+
     }
-    
-    void Request::init(){
+
+    void Request::init() {
         if ( _didInit )
             return;
         _didInit = true;
         reset();
     }
-    
-    void Request::reset( bool reload ){
-        if ( _m.operation() == dbKillCursors ){
+
+    void Request::reset( bool reload ) {
+        if ( _m.operation() == dbKillCursors ) {
             return;
         }
-        
+
         _config = grid.getDBConfig( getns() );
         if ( reload )
             uassert( 10192 ,  "db config reload failed!" , _config->reload() );
 
-        if ( _config->isSharded( getns() ) ){
+        if ( _config->isSharded( getns() ) ) {
             _chunkManager = _config->getChunkManager( getns() , reload );
             uassert( 10193 ,  (string)"no shard info for: " + getns() , _chunkManager );
         }
         else {
             _chunkManager.reset();
-        }        
+        }
 
         _m.header()->id = _id;
-        
+
     }
-    
+
     Shard Request::primaryShard() const {
         assert( _didInit );
-            
-        if ( _chunkManager ){
+
+        if ( _chunkManager ) {
             if ( _chunkManager->numChunks() > 1 )
                 throw UserException( 8060 , "can't call primaryShard on a sharded collection" );
             return _chunkManager->findChunk( _chunkManager->getShardKey().globalMin() )->getShard();
@@ -87,26 +87,26 @@ namespace mongo {
         uassert( 10194 ,  "can't call primaryShard on a sharded collection!" , s.ok() );
         return s;
     }
-    
-    void Request::process( int attempt ){
+
+    void Request::process( int attempt ) {
         init();
         int op = _m.operation();
         assert( op > dbMsg );
-        
-        if ( op == dbKillCursors ){
+
+        if ( op == dbKillCursors ) {
             cursorCache.gotKillCursors( _m );
             return;
         }
-        
+
 
         log(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
-        
+
         Strategy * s = SINGLE;
         _counter = &opsNonSharded;
-        
+
         _d.markSet();
-        
-        if ( _chunkManager ){
+
+        if ( _chunkManager ) {
             s = SHARDED;
             _counter = &opsSharded;
         }
@@ -117,7 +117,7 @@ namespace mongo {
             try {
                 s->queryOp( *this );
             }
-            catch ( StaleConfigException& staleConfig ){
+            catch ( StaleConfigException& staleConfig ) {
                 log() << staleConfig.what() << " attempt: " << attempt << endl;
                 uassert( 10195 ,  "too many attempts to update config, failing" , attempt < 5 );
                 ShardConnection::checkMyConnectionVersions( getns() );
@@ -139,24 +139,24 @@ namespace mongo {
         globalOpCounters.gotOp( op , iscmd );
         _counter->gotOp( op , iscmd );
     }
-    
+
     bool Request::isCommand() const {
         int x = _d.getQueryNToReturn();
         return ( x == 1 || x == -1 ) && strstr( getns() , ".$cmd" );
     }
 
-    void Request::gotInsert(){
+    void Request::gotInsert() {
         globalOpCounters.gotInsert();
         _counter->gotInsert();
     }
 
-    void Request::reply( Message & response , const string& fromServer ){
+    void Request::reply( Message & response , const string& fromServer ) {
         assert( _didInit );
         long long cursor =response.header()->getCursor();
-        if ( cursor ){
+        if ( cursor ) {
             cursorCache.storeRef( fromServer , cursor );
         }
         _p->reply( _m , response , _id );
     }
-    
+
 } // namespace mongo

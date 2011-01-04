@@ -29,138 +29,138 @@
 
 #include "text.h"
 
-namespace mongo { 
+namespace mongo {
 
 #ifndef __sunos__
-typedef uint64_t fileofs;
+    typedef uint64_t fileofs;
 #else
-typedef boost::uint64_t fileofs;
+    typedef boost::uint64_t fileofs;
 #endif
 
-class FileInterface { 
-public:
-    void open(const char *fn) {}
-    void write(fileofs o, const char *data, unsigned len) {}
-    void read(fileofs o, char *data, unsigned len) {}
-    bool bad() {return false;}
-    bool is_open() {return false;}
-    fileofs len() { return 0; }
-    void fsync() { assert(false); }
-};
+    class FileInterface {
+    public:
+        void open(const char *fn) {}
+        void write(fileofs o, const char *data, unsigned len) {}
+        void read(fileofs o, char *data, unsigned len) {}
+        bool bad() {return false;}
+        bool is_open() {return false;}
+        fileofs len() { return 0; }
+        void fsync() { assert(false); }
+    };
 
-#if defined(_WIN32) 
+#if defined(_WIN32)
 #include <io.h>
 
-class File : public FileInterface { 
-    HANDLE fd;
-    bool _bad;
-    void err(BOOL b=false) { /* false = error happened */
-        if( !b && !_bad ) { 
+    class File : public FileInterface {
+        HANDLE fd;
+        bool _bad;
+        void err(BOOL b=false) { /* false = error happened */
+            if( !b && !_bad ) {
+                _bad = true;
+                log() << "File I/O error " << GetLastError() << '\n';
+            }
+        }
+    public:
+        File() {
+            fd = INVALID_HANDLE_VALUE;
             _bad = true;
-            log() << "File I/O error " << GetLastError() << '\n';
         }
-    }
-public:
-    File() { 
-        fd = INVALID_HANDLE_VALUE; 
-        _bad = true; 
-    }
-    ~File() { 
-        if( is_open() ) CloseHandle(fd);
-        fd = INVALID_HANDLE_VALUE; 
-    }
-    void open(const char *filename, bool readOnly=false ) {
-        fd = CreateFile(
-                 toNativeString(filename).c_str(),
-                 ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_WRITE|FILE_SHARE_READ,
-                 NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if( !is_open() ) {
-             DWORD e = GetLastError();
-             log() << "Create/Open File failed " << filename << ' ' << errnoWithDescription(e) << endl;
+        ~File() {
+            if( is_open() ) CloseHandle(fd);
+            fd = INVALID_HANDLE_VALUE;
         }
-        else 
-            _bad = false;
-    }
-    void write(fileofs o, const char *data, unsigned len) {
-        LARGE_INTEGER li;
-        li.QuadPart = o;
-        SetFilePointerEx(fd, li, NULL, FILE_BEGIN);
-        DWORD written;
-        err( WriteFile(fd, data, len, &written, NULL) );
-    }
-    void read(fileofs o, char *data, unsigned len) {
-        DWORD read;
-        LARGE_INTEGER li;
-        li.QuadPart = o;
-        SetFilePointerEx(fd, li, NULL, FILE_BEGIN);
-        int ok = ReadFile(fd, data, len, &read, 0);
-        if( !ok ) 
-            err(ok);
-        else
-            massert( 10438 , "ReadFile error - truncated file?", read == len);
-    }
-    bool bad() { return _bad; }
-    bool is_open() { return fd != INVALID_HANDLE_VALUE; }
-    fileofs len() {
-        LARGE_INTEGER li;
-        li.LowPart = GetFileSize(fd, (DWORD *) &li.HighPart);
-        if( li.HighPart == 0 && li.LowPart == INVALID_FILE_SIZE ) {
-            err( false );
-            return 0;
+        void open(const char *filename, bool readOnly=false ) {
+            fd = CreateFile(
+                     toNativeString(filename).c_str(),
+                     ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_WRITE|FILE_SHARE_READ,
+                     NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if( !is_open() ) {
+                DWORD e = GetLastError();
+                log() << "Create/Open File failed " << filename << ' ' << errnoWithDescription(e) << endl;
+            }
+            else
+                _bad = false;
         }
-        return li.QuadPart;
-    }
-    void fsync() { FlushFileBuffers(fd); }
-};
+        void write(fileofs o, const char *data, unsigned len) {
+            LARGE_INTEGER li;
+            li.QuadPart = o;
+            SetFilePointerEx(fd, li, NULL, FILE_BEGIN);
+            DWORD written;
+            err( WriteFile(fd, data, len, &written, NULL) );
+        }
+        void read(fileofs o, char *data, unsigned len) {
+            DWORD read;
+            LARGE_INTEGER li;
+            li.QuadPart = o;
+            SetFilePointerEx(fd, li, NULL, FILE_BEGIN);
+            int ok = ReadFile(fd, data, len, &read, 0);
+            if( !ok )
+                err(ok);
+            else
+                massert( 10438 , "ReadFile error - truncated file?", read == len);
+        }
+        bool bad() { return _bad; }
+        bool is_open() { return fd != INVALID_HANDLE_VALUE; }
+        fileofs len() {
+            LARGE_INTEGER li;
+            li.LowPart = GetFileSize(fd, (DWORD *) &li.HighPart);
+            if( li.HighPart == 0 && li.LowPart == INVALID_FILE_SIZE ) {
+                err( false );
+                return 0;
+            }
+            return li.QuadPart;
+        }
+        void fsync() { FlushFileBuffers(fd); }
+    };
 
 #else
 
-class File : public FileInterface { 
-    int fd;
-    bool _bad;
-    void err(bool ok) {
-        if( !ok && !_bad ) { 
-            _bad = true;
-            log() << "File I/O " << errnoWithDescription() << '\n';
+    class File : public FileInterface {
+        int fd;
+        bool _bad;
+        void err(bool ok) {
+            if( !ok && !_bad ) {
+                _bad = true;
+                log() << "File I/O " << errnoWithDescription() << '\n';
+            }
         }
-    }
-public:
-    File() { 
-        fd = -1;
-        _bad = true; 
-    }
-    ~File() { 
-        if( is_open() ) ::close(fd);
-        fd = -1;
-    }
+    public:
+        File() {
+            fd = -1;
+            _bad = true;
+        }
+        ~File() {
+            if( is_open() ) ::close(fd);
+            fd = -1;
+        }
 
 #ifndef O_NOATIME
 #define O_NOATIME 0
 #endif
 
-    void open(const char *filename, bool readOnly=false ) {
-        fd = ::open(filename, 
-                    O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) ,
-                    S_IRUSR | S_IWUSR);
-        if ( fd <= 0 ) {
-            out() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
-            return;
+        void open(const char *filename, bool readOnly=false ) {
+            fd = ::open(filename,
+                        O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) ,
+                        S_IRUSR | S_IWUSR);
+            if ( fd <= 0 ) {
+                out() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
+                return;
+            }
+            _bad = false;
         }
-        _bad = false;
-    }
-    void write(fileofs o, const char *data, unsigned len) {
-        err( ::pwrite(fd, data, len, o) == (int) len );
-    }
-    void read(fileofs o, char *data, unsigned len) {
-        err( ::pread(fd, data, len, o) == (int) len );
-    }
-    bool bad() { return _bad; }
-    bool is_open() { return fd > 0; }
-    fileofs len() {
-        return lseek(fd, 0, SEEK_END);
-    }
-    void fsync() { ::fsync(fd); }
-};
+        void write(fileofs o, const char *data, unsigned len) {
+            err( ::pwrite(fd, data, len, o) == (int) len );
+        }
+        void read(fileofs o, char *data, unsigned len) {
+            err( ::pread(fd, data, len, o) == (int) len );
+        }
+        bool bad() { return _bad; }
+        bool is_open() { return fd > 0; }
+        fileofs len() {
+            return lseek(fd, 0, SEEK_END);
+        }
+        void fsync() { ::fsync(fd); }
+    };
 
 
 #endif

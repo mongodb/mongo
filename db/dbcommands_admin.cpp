@@ -37,22 +37,22 @@ namespace mongo {
 
     class CleanCmd : public Command {
     public:
-        CleanCmd() : Command( "clean" ){}
+        CleanCmd() : Command( "clean" ) {}
 
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return WRITE; } 
-        
+        virtual LockType locktype() const { return WRITE; }
+
         virtual void help(stringstream& h) const { h << "internal"; }
 
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string dropns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-            
+
             if ( !cmdLine.quiet )
                 tlog() << "CMD: clean " << dropns << endl;
-            
+
             NamespaceDetails *d = nsdetails(dropns.c_str());
-            
-            if ( ! d ){
+
+            if ( ! d ) {
                 errmsg = "ns not found";
                 return 0;
             }
@@ -63,39 +63,39 @@ namespace mongo {
             result.append("ns", dropns.c_str());
             return 1;
         }
-        
+
     } cleanCmd;
-    
+
     class ValidateCmd : public Command {
     public:
-        ValidateCmd() : Command( "validate" ){}
+        ValidateCmd() : Command( "validate" ) {}
 
         virtual bool slaveOk() const {
             return true;
         }
-        
+
         virtual void help(stringstream& h) const { h << "Validate contents of a namespace by scanning its data structures for correctness.  Slow."; }
 
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return READ; }
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
-        
-        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( !cmdLine.quiet )
                 tlog() << "CMD: validate " << ns << endl;
 
-            if ( ! d ){
+            if ( ! d ) {
                 errmsg = "ns not found";
                 return 0;
             }
-            
+
             result.append( "ns", ns );
             result.append( "result" , validateNS( ns.c_str() , d, &cmdObj ) );
             return 1;
         }
-                    
-        
+
+
         string validateNS(const char *ns, NamespaceDetails *d, BSONObj *cmdObj) {
             bool scanData = true;
             if( cmdObj && cmdObj->hasElement("scandata") && !cmdObj->getBoolField("scandata") )
@@ -106,13 +106,13 @@ namespace mongo {
             //ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
             if ( d->capped )
                 ss << "  capped:" << d->capped << " max:" << d->max << '\n';
-            
+
             ss << "  firstExtent:" << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString()<< '\n';
             ss << "  lastExtent:" << d->lastExtent.toString()    << " ns:" << d->lastExtent.ext()->nsDiagnostic.toString() << '\n';
             try {
                 d->firstExtent.ext()->assertOk();
                 d->lastExtent.ext()->assertOk();
-                
+
                 DiskLoc el = d->firstExtent;
                 int ne = 0;
                 while( !el.isNull() ) {
@@ -123,7 +123,8 @@ namespace mongo {
                     killCurrentOp.checkForInterrupt();
                 }
                 ss << "  # extents:" << ne << '\n';
-            } catch (...) {
+            }
+            catch (...) {
                 valid=false;
                 ss << " extent asserted ";
             }
@@ -198,7 +199,7 @@ namespace mongo {
                             ndel++;
 
                             if ( loc.questionable() ) {
-                                if( d->capped && !loc.isValid() && i == 1 ) { 
+                                if( d->capped && !loc.isValid() && i == 1 ) {
                                     /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
                                        see comments in namespace.h
                                     */
@@ -218,7 +219,8 @@ namespace mongo {
                             k++;
                             killCurrentOp.checkForInterrupt();
                         }
-                    } catch (...) {
+                    }
+                    catch (...) {
                         ss <<"    ?exception in deleted chain for bucket " << i << endl;
                         valid = false;
                     }
@@ -236,7 +238,7 @@ namespace mongo {
                     while( i.more() ) {
                         IndexDetails& id = i.next();
                         ss << "    " << id.indexNamespace() << " keys:" <<
-                            id.head.btree()->fullValidate(id.head, id.keyPattern()) << endl;
+                           id.head.btree()->fullValidate(id.head, id.keyPattern()) << endl;
                     }
                 }
                 catch (...) {
@@ -261,36 +263,36 @@ namespace mongo {
     extern unsigned lockedForWriting;
     extern mongo::mutex lockedForWritingMutex;
 
-/*
-    class UnlockCommand : public Command { 
-    public:
-        UnlockCommand() : Command( "unlock" ) { }
-        virtual bool readOnly() { return true; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( lockedForWriting ) { 
-				log() << "command: unlock requested" << endl;
-                errmsg = "unlock requested";
-                unlockRequested = true;
+    /*
+        class UnlockCommand : public Command {
+        public:
+            UnlockCommand() : Command( "unlock" ) { }
+            virtual bool readOnly() { return true; }
+            virtual bool slaveOk() const { return true; }
+            virtual bool adminOnly() const { return true; }
+            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+                if( lockedForWriting ) {
+                    log() << "command: unlock requested" << endl;
+                    errmsg = "unlock requested";
+                    unlockRequested = true;
+                }
+                else {
+                    errmsg = "not locked, so cannot unlock";
+                    return 0;
+                }
+                return 1;
             }
-            else { 
-                errmsg = "not locked, so cannot unlock";
-                return 0;
-            }
-            return 1;
-        }
-        
-    } unlockCommand;
-*/
+
+        } unlockCommand;
+    */
     /* see unlockFsync() for unlocking:
        db.$cmd.sys.unlock.findOne()
     */
     class FSyncCommand : public Command {
-        class LockDBJob : public BackgroundJob { 
+        class LockDBJob : public BackgroundJob {
         protected:
             string name() { return "lockdbjob"; }
-            void run() { 
+            void run() {
                 Client::initThread("fsyncjob");
                 Client& c = cc();
                 {
@@ -301,8 +303,8 @@ namespace mongo {
                 MemoryMappedFile::flushAll(true);
                 log() << "db is now locked for snapshotting, no writes allowed. use db.$cmd.sys.unlock.findOne() to unlock" << endl;
                 _ready = true;
-                while( 1 ) { 
-                    if( unlockRequested ) { 
+                while( 1 ) {
+                    if( unlockRequested ) {
                         unlockRequested = false;
                         break;
                     }
@@ -316,16 +318,16 @@ namespace mongo {
             }
         public:
             bool& _ready;
-            LockDBJob(bool& ready) : BackgroundJob( true /* delete self */ ), _ready(ready){
+            LockDBJob(bool& ready) : BackgroundJob( true /* delete self */ ), _ready(ready) {
                 _ready = false;
             }
         };
     public:
-        FSyncCommand() : Command( "fsync" ){}
-        virtual LockType locktype() const { return WRITE; } 
+        FSyncCommand() : Command( "fsync" ) {}
+        virtual LockType locktype() const { return WRITE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 
+        /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) {
             string x = cmdObj["exec"].valuestrsafe();
             return !x.empty();
         }*/
@@ -336,12 +338,12 @@ namespace mongo {
             bool lock = cmdObj["lock"].trueValue();
             log() << "CMD fsync:  sync:" << sync << " lock:" << lock << endl;
 
-            if( lock ) { 
+            if( lock ) {
                 uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
                 uassert(12032, "fsync: sync option must be true when using lock", sync);
-                /* With releaseEarly(), we must be extremely careful we don't do anything 
-                   where we would have assumed we were locked.  profiling is one of those things. 
-                   Perhaps at profile time we could check if we released early -- however, 
+                /* With releaseEarly(), we must be extremely careful we don't do anything
+                   where we would have assumed we were locked.  profiling is one of those things.
+                   Perhaps at profile time we could check if we released early -- however,
                    we need to be careful to keep that code very fast it's a very common code path when on.
                 */
                 uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
@@ -350,7 +352,7 @@ namespace mongo {
                 dbMutex.releaseEarly();
                 l->go();
                 // don't return until background thread has acquired the write lock
-                while( !ready ) { 
+                while( !ready ) {
                     sleepmillis(10);
                 }
                 result.append("info", "now locked against writes, use db.$cmd.sys.unlock.findOne() to unlock");
@@ -360,9 +362,9 @@ namespace mongo {
             }
             return 1;
         }
-        
+
     } fsyncCmd;
-    
+
 
 
 }

@@ -23,7 +23,7 @@ using namespace std;
 using namespace mongo;
 
 int main( int argc, const char **argv ) {
-    
+
     const char *port = "27017";
     if ( argc != 1 ) {
         if ( argc != 3 )

@@ -28,24 +28,24 @@
 namespace mongo {
 
     enum LogLevel {  LL_DEBUG , LL_INFO , LL_NOTICE , LL_WARNING , LL_ERROR , LL_SEVERE };
-    
-    inline const char * logLevelToString( LogLevel l ){
-        switch ( l ){
+
+    inline const char * logLevelToString( LogLevel l ) {
+        switch ( l ) {
         case LL_DEBUG:
-        case LL_INFO: 
+        case LL_INFO:
         case LL_NOTICE:
             return "";
-        case LL_WARNING: 
-            return "warning" ; 
-        case LL_ERROR: 
+        case LL_WARNING:
+            return "warning" ;
+        case LL_ERROR:
             return "ERROR";
-        case LL_SEVERE: 
+        case LL_SEVERE:
             return "SEVERE";
         default:
             return "UNKNOWN";
         }
     }
-    
+
     class LazyString {
     public:
         virtual ~LazyString() {}
@@ -62,15 +62,15 @@ namespace mongo {
         const T& t_;
     };
 
-    class Tee { 
+    class Tee {
     public:
-        virtual ~Tee(){}
+        virtual ~Tee() {}
         virtual void write(LogLevel level , const string& str) = 0;
     };
 
     class Nullstream {
     public:
-        virtual Nullstream& operator<< (Tee* tee) { 
+        virtual Nullstream& operator<< (Tee* tee) {
             return *this;
         }
         virtual ~Nullstream() {}
@@ -128,13 +128,13 @@ namespace mongo {
         template< class T >
         Nullstream& operator<<(T *t) {
             return operator<<( static_cast<void*>( t ) );
-        }        
+        }
         template< class T >
         Nullstream& operator<<(const T *t) {
             return operator<<( static_cast<const void*>( t ) );
-        }        
+        }
         template< class T >
-        Nullstream& operator<<(const shared_ptr<T> p ){
+        Nullstream& operator<<(const shared_ptr<T> p ) {
             return *this;
         }
         template< class T >
@@ -150,7 +150,7 @@ namespace mongo {
         virtual void flush(Tee *t = 0) {}
     };
     extern Nullstream nullstream;
-    
+
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
@@ -161,13 +161,13 @@ namespace mongo {
         static vector<Tee*> * globalTees;
     public:
         inline static void logLockless( const StringData& s );
-        
-        static void setLogFile(FILE* f){
+
+        static void setLogFile(FILE* f) {
             scoped_lock lk(mutex);
             logfile = f;
         }
 
-        static int magicNumber(){
+        static int magicNumber() {
             return 1717;
         }
 
@@ -184,8 +184,8 @@ namespace mongo {
         }
 
         inline void flush(Tee *t = 0);
-        
-        inline Nullstream& setLogLevel(LogLevel l){
+
+        inline Nullstream& setLogLevel(LogLevel l) {
             logLevel = l;
             return *this;
         }
@@ -212,7 +212,7 @@ namespace mongo {
             ss << x.val();
             return *this;
         }
-        Nullstream& operator<< (Tee* tee) { 
+        Nullstream& operator<< (Tee* tee) {
             ss << '\n';
             flush(tee);
             return *this;
@@ -228,11 +228,11 @@ namespace mongo {
         }
 
         template< class T >
-        Nullstream& operator<<(const shared_ptr<T> p ){
+        Nullstream& operator<<(const shared_ptr<T> p ) {
             T * t = p.get();
             if ( ! t )
                 *this << "null";
-            else 
+            else
                 *this << *t;
             return *this;
         }
@@ -240,8 +240,8 @@ namespace mongo {
         Logstream& prolog() {
             return *this;
         }
-        
-        void addGlobalTee( Tee * t ){
+
+        void addGlobalTee( Tee * t ) {
             if ( ! globalTees )
                 globalTees = new vector<Tee*>();
             globalTees->push_back( t );
@@ -249,10 +249,10 @@ namespace mongo {
 
     private:
         static thread_specific_ptr<Logstream> tsp;
-        Logstream(){
+        Logstream() {
             _init();
         }
-        void _init(){
+        void _init() {
             ss.str("");
             logLevel = LL_INFO;
         }
@@ -273,16 +273,16 @@ namespace mongo {
             return nullstream;
         return Logstream::get();
     }
-    
-    /* flush the log stream if the log level is 
+
+    /* flush the log stream if the log level is
        at the specified level or higher. */
-    inline void logflush(int level = 0) { 
+    inline void logflush(int level = 0) {
         if( level > logLevel )
             Logstream::get().flush(0);
     }
 
     /* without prolog */
-    inline Nullstream& _log( int level = 0 ){
+    inline Nullstream& _log( int level = 0 ) {
         if ( level > logLevel )
             return nullstream;
         return Logstream::get();
@@ -313,7 +313,7 @@ namespace mongo {
     inline Nullstream& log() {
         return Logstream::get().prolog();
     }
-    
+
     inline Nullstream& error() {
         return log( LL_ERROR );
     }
@@ -335,7 +335,7 @@ namespace mongo {
 
     /**
        log to a file rather than stdout
-       defined in assert_util.cpp 
+       defined in assert_util.cpp
      */
     void initLogging( const string& logpath , bool append );
     void rotateLogs( int signal = 0 );
@@ -351,7 +351,7 @@ namespace mongo {
         FormatMessage(
             FORMAT_MESSAGE_FROM_SYSTEM
             |FORMAT_MESSAGE_ALLOCATE_BUFFER
-            |FORMAT_MESSAGE_IGNORE_INSERTS,  
+            |FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             x, 0,
             (LPTSTR) &errorText,  // output
@@ -360,7 +360,7 @@ namespace mongo {
         if( errorText ) {
             string x = toUtf8String(errorText);
             for( string::iterator i = x.begin(); i != x.end(); i++ ) {
-                if( *i == '\n' || *i == '\r' ) 
+                if( *i == '\n' || *i == '\r' )
                     break;
                 s << *i;
             }
@@ -369,11 +369,11 @@ namespace mongo {
         else
             s << strerror(x);
         /*
-        DWORD n = FormatMessage( 
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-            FORMAT_MESSAGE_FROM_SYSTEM | 
+        DWORD n = FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            FORMAT_MESSAGE_FROM_SYSTEM |
             FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, x, 
+            NULL, x,
             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
             (LPTSTR) &lpMsgBuf, 0, NULL);
         */
@@ -383,21 +383,21 @@ namespace mongo {
         return s.str();
     }
 
-    /** output the error # and error message with prefix.  
+    /** output the error # and error message with prefix.
         handy for use as parm in uassert/massert.
         */
     string errnoWithPrefix( const char * prefix );
 
-    void Logstream::logLockless( const StringData& s ){
+    void Logstream::logLockless( const StringData& s ) {
 
         if ( s.size() == 0 )
             return;
 
-        if ( doneSetup == 1717 ){
-            if (fwrite(s.data(), s.size(), 1, logfile)){
+        if ( doneSetup == 1717 ) {
+            if (fwrite(s.data(), s.size(), 1, logfile)) {
                 fflush(logfile);
             }
-            else{
+            else {
                 int x = errno;
                 cout << "Failed to write to logfile: " << errnoWithDescription(x) << endl;
             }
@@ -422,13 +422,13 @@ namespace mongo {
 
             BufBuilder b(bufSize);
             time_t_to_String( time(0) , b.grow(20) );
-            if (!threadName.empty()){
+            if (!threadName.empty()) {
                 b.appendChar( '[' );
                 b.appendStr( threadName , false );
                 b.appendChar( ']' );
                 b.appendChar( ' ' );
             }
-            if ( type[0] ){
+            if ( type[0] ) {
                 b.appendStr( type , false );
                 b.appendStr( ": " , false );
             }
@@ -439,7 +439,7 @@ namespace mongo {
             scoped_lock lk(mutex);
 
             if( t ) t->write(logLevel,out);
-            if ( globalTees ){
+            if ( globalTees ) {
                 for ( unsigned i=0; i<globalTees->size(); i++ )
                     (*globalTees)[i]->write(logLevel,out);
             }
@@ -447,9 +447,10 @@ namespace mongo {
 #ifndef _WIN32
             //syslog( LOG_INFO , "%s" , cc );
 #endif
-            if(fwrite(out.data(), out.size(), 1, logfile)){
+            if(fwrite(out.data(), out.size(), 1, logfile)) {
                 fflush(logfile);
-            }else{
+            }
+            else {
                 int x = errno;
                 cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
             }

@@ -19,7 +19,7 @@
 #include "../pch.h"
 
 namespace mongo {
-    
+
     /**
      * holds information about a client connected to a mongos
      * 1 per client socket
@@ -32,20 +32,20 @@ namespace mongo {
     public:
         ClientInfo( int clientId );
         ~ClientInfo();
-        
+
         /** new request from client, adjusts internal state */
         void newRequest( AbstractMessagingPort* p = 0 );
 
         /** client disconnected */
         void disconnect();
-        
+
         /**
          * @return remote socket address of the client
          */
         string getRemote() const { return _remote; }
-        
+
         /**
-         * notes that this client use this shard 
+         * notes that this client use this shard
          * keeps track of all shards accessed this request
          */
         void addShard( const string& shard );
@@ -54,23 +54,23 @@ namespace mongo {
          * gets shards used on the previous request
          */
         set<string> * getPrev() const { return _prev; };
-        
+
         /**
          * gets all shards we've accessed since the last time we called clearSinceLastGetError
          */
         const set<string>& sinceLastGetError() const { return _sinceLastGetError; }
-        
+
         /**
          * clears list of shards we've talked to
          */
-        void clearSinceLastGetError(){ _sinceLastGetError.clear(); }
-        
+        void clearSinceLastGetError() { _sinceLastGetError.clear(); }
+
         /**
-         * calls getLastError 
+         * calls getLastError
          * resets shards since get last error
          */
         bool getLastError( const BSONObj& options , BSONObjBuilder& result );
-        
+
 
         static ClientInfo * get( int clientId = 0 , bool create = true );
         static void disconnect( int clientId );
@@ -78,7 +78,7 @@ namespace mongo {
     private:
 
         struct WBInfo {
-            WBInfo( ConnectionId c , OID o ) : connectionId( c ) , id( o ){}
+            WBInfo( ConnectionId c , OID o ) : connectionId( c ) , id( o ) {}
             ConnectionId connectionId;
             OID id;
         };
@@ -87,10 +87,10 @@ namespace mongo {
         void _addWriteBack( vector<WBInfo>& all , const BSONObj& o );
         void _handleWriteBacks( vector<WBInfo>& all );
 
-        
+
         int _id; // unique client id
         string _remote; // server:port of remote socket end
-        
+
         // we use _a and _b to store shards we've talked to on the current request and the previous
         // we use 2 so we can flip for getLastError type operations
 
@@ -99,12 +99,12 @@ namespace mongo {
 
         set<string> * _cur; // pointer to _a or _b depending on state
         set<string> * _prev; //  ""
-        
-        
+
+
         set<string> _sinceLastGetError; // all shards accessed since last getLastError
-        
+
         int _lastAccess;
-        
+
 
         static mongo::mutex _clientsLock;
         static Cache& _clients;

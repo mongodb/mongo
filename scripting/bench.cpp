@@ -33,15 +33,15 @@ namespace mongo {
     /**
      * benchQuery( "foo" , { _id : 1 } )
      */
-    BSONObj benchQuery( const BSONObj& args ){
+    BSONObj benchQuery( const BSONObj& args ) {
         return BSONObj();
     }
 
     struct BenchRunConfig {
-        BenchRunConfig(){
+        BenchRunConfig() {
             host = "localhost";
             db = "test";
-            
+
             parallel = 1;
             seconds = 1;
 
@@ -49,10 +49,10 @@ namespace mongo {
             threadsReady = 0;
             error = false;
         }
-        
+
         string host;
         string db;
-        
+
         unsigned parallel;
         int seconds;
 
@@ -63,18 +63,18 @@ namespace mongo {
 
         bool error;
     };
-    
-    static void benchThread( BenchRunConfig * config ){
+
+    static void benchThread( BenchRunConfig * config ) {
         ScopedDbConnection conn( config->host );
-        config->threadsReady++;        
-        
-        while ( config->active ){
+        config->threadsReady++;
+
+        while ( config->active ) {
             BSONObjIterator i( config->ops );
-            while ( i.more() ){
+            while ( i.more() ) {
                 BSONElement e = i.next();
                 string ns = e["ns"].String();
                 string op = e["op"].String();
-                
+
                 if ( op == "findOne" ) {
                     conn->findOne( ns , e["query"].Obj() );
                 }
@@ -89,18 +89,18 @@ namespace mongo {
 
         conn.done();
     }
-    
+
     /**
      * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
      */
-    BSONObj benchRun( const BSONObj& argsFake ){
+    BSONObj benchRun( const BSONObj& argsFake ) {
         assert( argsFake.firstElement().isABSONObj() );
         BSONObj args = argsFake.firstElement().Obj();
 
         // setup
 
         BenchRunConfig config;
-        
+
         if ( args["host"].type() == String )
             config.host = args["host"].String();
         if ( args["db"].type() == String )
@@ -122,40 +122,40 @@ namespace mongo {
         vector<boost::thread*> all;
         for ( unsigned i=0; i<config.parallel; i++ )
             all.push_back( new boost::thread( boost::bind( benchThread , &config ) ) );
-        
+
         //    give them time to init
         while ( config.threadsReady < config.parallel )
             sleepmillis( 1 );
 
         BSONObj before;
         conn->simpleCommand( "admin" , &before , "serverStatus" );
-        
+
         sleepsecs( config.seconds );
 
         BSONObj after;
         conn->simpleCommand( "admin" , &after , "serverStatus" );
-        
+
         conn.done();
 
         config.active = false;
-        
+
         for ( unsigned i=0; i<all.size(); i++ )
             all[i]->join();
-        
+
         if ( config.error )
             return BSON( "err" << 1 );
-        
+
         // compute actual ops/sec
-        
+
         before = before["opcounters"].Obj();
         after = after["opcounters"].Obj();
-        
+
         BSONObjBuilder buf;
         buf.append( "note" , "values per second" );
 
         {
             BSONObjIterator i( after );
-            while ( i.more() ){
+            while ( i.more() ) {
                 BSONElement e = i.next();
                 double x = e.number();
                 x = x - before[e.fieldName()].number();
@@ -166,7 +166,7 @@ namespace mongo {
         return BSON( "" << zoo );
     }
 
-    void installBenchmarkSystem( Scope& scope ){
+    void installBenchmarkSystem( Scope& scope ) {
         scope.injectNative( "benchRun" , benchRun );
     }
 

@@ -11,9 +11,9 @@ namespace mongo {
     namespace dur {
         struct ParsedJournalEntry;
 
-       /** call go() to execute a recovery from existing journal files.
-        */
-        class RecoveryJob : boost::noncopyable { 
+        /** call go() to execute a recovery from existing journal files.
+         */
+        class RecoveryJob : boost::noncopyable {
         public:
             RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") {}
             void go(vector<path>& files);

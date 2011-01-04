@@ -27,19 +27,19 @@ using namespace v8;
 namespace mongo {
 
     class V8ScriptEngine;
-    
+
     class V8Scope : public Scope {
     public:
-        
+
         V8Scope( V8ScriptEngine * engine );
         ~V8Scope();
-        
+
         virtual void reset();
         virtual void init( const BSONObj * data );
 
         virtual void localConnect( const char * dbName );
         virtual void externalSetup();
-        
+
         v8::Handle<v8::Value> get( const char * field ); // caller must create context and handle scopes
         virtual double getNumber( const char *field );
         virtual int getNumberInt( const char *field );
@@ -47,7 +47,7 @@ namespace mongo {
         virtual string getString( const char *field );
         virtual bool getBoolean( const char *field );
         virtual BSONObj getObject( const char *field );
-        
+
         virtual int type( const char *field );
 
         virtual void setNumber( const char *field , double val );
@@ -58,22 +58,22 @@ namespace mongo {
         virtual void setThis( const BSONObj * obj );
 
         virtual void rename( const char * from , const char * to );
-        
+
         virtual ScriptingFunction _createFunction( const char * code );
         Local< v8::Function > __createFunction( const char * code );
         virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false );
         virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
-        virtual string getError(){ return _error; }
-        
+        virtual string getError() { return _error; }
+
         virtual void injectNative( const char *field, NativeFunction func );
 
         void gc();
 
         Handle< Context > context() const { return _context; }
-        
+
     private:
         void _startCall();
-        
+
         static Handle< Value > nativeCallback( const Arguments &args );
 
         static Handle< Value > loadCallback( const Arguments &args );
@@ -92,32 +92,32 @@ namespace mongo {
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
     };
-    
+
     class V8ScriptEngine : public ScriptEngine {
     public:
         V8ScriptEngine();
         virtual ~V8ScriptEngine();
-        
-        virtual Scope * createScope(){ return new V8Scope( this ); }
-        
-        virtual void runTest(){}
+
+        virtual Scope * createScope() { return new V8Scope( this ); }
+
+        virtual void runTest() {}
 
         bool utf8Ok() const { return true; }
 
         class V8UnlockForClient : public Unlocker {
             V8Unlock u_;
         };
-        
+
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8UnlockForClient ); }
-        
+
         virtual void interrupt( unsigned opSpec );
         virtual void interruptAll();
 
     private:
         friend class V8Scope;
     };
-    
-    
+
+
     extern ScriptEngine * globalScriptEngine;
     extern map< unsigned, int > __interruptSpecToThreadId;
 }

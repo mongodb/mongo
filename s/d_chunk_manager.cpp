@@ -26,7 +26,7 @@
 
 namespace mongo {
 
-    ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) { 
+    ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) {
 
         // have to get a connection to the config db
         // special case if i'm the configdb since i'm locked and if i connect to myself
@@ -34,15 +34,16 @@ namespace mongo {
         scoped_ptr<ScopedDbConnection> scoped;
         scoped_ptr<DBDirectClient> direct;
         DBClientBase * conn;
-        if ( configServer.empty() ){
+        if ( configServer.empty() ) {
             direct.reset( new DBDirectClient() );
             conn = direct.get();
-        } else {
+        }
+        else {
             scoped.reset( new ScopedDbConnection( configServer ) );
             conn = scoped->get();
         }
 
-        // get this collection's sharding key 
+        // get this collection's sharding key
         BSONObj collectionDoc = conn->findOne( "config.collections", BSON( "_id" << ns ) );
         uassert( 13539 , str::stream() << ns << " does not exist" , !collectionDoc.isEmpty() );
         uassert( 13540 , str::stream() << ns << " collection config entry corrupted" , collectionDoc["dropped"].type() );
@@ -80,13 +81,13 @@ namespace mongo {
             b.append( key.fieldName() , 1 );
         }
         _key = b.obj();
-    }        
+    }
 
     void ShardChunkManager::_fillChunks( DBClientCursorInterface* cursor ) {
         assert( cursor );
 
         ShardChunkVersion version;
-        while ( cursor->more() ){
+        while ( cursor->more() ) {
             BSONObj d = cursor->next();
             _chunksMap.insert( make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() ) );
 
@@ -106,13 +107,13 @@ namespace mongo {
         // the version for this shard would be the highest version for any of the chunks
         RangeMap::const_iterator it = _chunksMap.begin();
         BSONObj min,max;
-        while ( it != _chunksMap.end() ){
+        while ( it != _chunksMap.end() ) {
             BSONObj currMin = it->first;
             BSONObj currMax = it->second;
             ++it;
 
-            // coallesce the chunk's bounds in ranges if they are adjacent chunks 
-            if ( min.isEmpty() ){
+            // coallesce the chunk's bounds in ranges if they are adjacent chunks
+            if ( min.isEmpty() ) {
                 min = currMin;
                 max = currMax;
                 continue;
@@ -128,7 +129,7 @@ namespace mongo {
             max = currMax;
         }
         assert( ! min.isEmpty() );
-        
+
         _rangesMap.insert( make_pair( min , max ) );
     }
 
@@ -145,17 +146,17 @@ namespace mongo {
         RangeMap::const_iterator it = _rangesMap.upper_bound( x );
         if ( it != _rangesMap.begin() )
             it--;
-        
+
         bool good = contains( it->first , it->second , x );
 
-        #if 0
-        if ( ! good ){
+#if 0
+        if ( ! good ) {
             log() << "bad: " << x << " " << it->first << " " << x.woCompare( it->first ) << " " << x.woCompare( it->second ) << endl;
-            for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ){
+            for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ) {
                 log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
             }
         }
-        #endif
+#endif
 
         return good;
     }
@@ -184,7 +185,7 @@ namespace mongo {
             *foundMax = it->second;
             return false;
         }
-            
+
         return true;
     }
 
@@ -197,14 +198,14 @@ namespace mongo {
         if ( it->second.woCompare( max ) != 0 ) {
             ostringstream os;
             os << "ranges differ, "
-               << "requested: "  << min << " -> " << max << " " 
+               << "requested: "  << min << " -> " << max << " "
                << "existing: " << (it == _chunksMap.end()) ? "<empty>" : it->first.toString() + " -> " + it->second.toString();
             uasserted( 13587 , os.str() );
         }
     }
 
     ShardChunkManager* ShardChunkManager::cloneMinus( const BSONObj& min, const BSONObj& max, const ShardChunkVersion& version ) {
-        
+
         // check that we have the exact chunk that'll be subtracted
         _assertChunkExists( min , max );
 
@@ -217,7 +218,8 @@ namespace mongo {
 
             p->_version = 0;
 
-        } else {
+        }
+        else {
             // can't move version backwards when subtracting chunks
             // this is what guarantees that no read or write would be taken once we subtract data from the current shard
             if ( version <= _version ) {
@@ -232,16 +234,16 @@ namespace mongo {
 
         return p.release();
     }
- 
+
     static bool overlap( const BSONObj& l1 , const BSONObj& h1 , const BSONObj& l2 , const BSONObj& h2 ) {
         return ! ( ( h1.woCompare( l2 ) <= 0 ) || ( h2.woCompare( l1 ) <= 0 ) );
     }
-    
+
     ShardChunkManager* ShardChunkManager::clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version ) {
 
         // it is acceptable to move version backwards (e.g., undoing a migration that went bad during commit)
         // but only cloning away the last chunk may reset the version to 0
-        uassert( 13591 , "version can't be set to zero" , version > 0 ); 
+        uassert( 13591 , "version can't be set to zero" , version > 0 );
 
         if ( ! _chunksMap.empty() ) {
 
@@ -253,11 +255,11 @@ namespace mongo {
             if ( overlap( min , max , it->first , it->second ) ) {
                 ostringstream os;
                 os << "ranges overlap, "
-                   << "requested: " << min << " -> " << max << " " 
+                   << "requested: " << min << " -> " << max << " "
                    << "existing: " << it->first.toString() + " -> " + it->second.toString();
                 uasserted( 13588 , os.str() );
             }
-        }        
+        }
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
 
@@ -270,17 +272,17 @@ namespace mongo {
         return p.release();
     }
 
-    ShardChunkManager* ShardChunkManager::cloneSplit( const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys , 
-                                                      const ShardChunkVersion& version ) {
+    ShardChunkManager* ShardChunkManager::cloneSplit( const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
+            const ShardChunkVersion& version ) {
 
         // the version required in both resulting chunks could be simply an increment in the minor portion of the current version
-        // however, we are enforcing uniqueness over the attributes <ns, lastmod> of the configdb collection 'chunks' 
+        // however, we are enforcing uniqueness over the attributes <ns, lastmod> of the configdb collection 'chunks'
         // so in practice, a migrate somewhere may force this split to pick up a version that has the major portion higher
         // than the one that this shard has been using
         //
         // TODO drop the uniqueness constraint and tigthen the check below so that only the minor portion of version changes
         if ( version <= _version ) {
-            uasserted( 13592 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() ); 
+            uasserted( 13592 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
         }
 
         // check that we have the exact chunk that'll be split and that the split point is valid
@@ -292,7 +294,7 @@ namespace mongo {
         }
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
-        
+
         p->_key = this->_key;
         p->_chunksMap = this->_chunksMap;
         p->_version = version; // will increment second, third, ... chunks below

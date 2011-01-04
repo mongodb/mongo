@@ -20,17 +20,17 @@
 #include "sock.h"
 #include "../db/cmdline.h"
 #include "mongoutils/str.h"
- 
-namespace mongo { 
+
+namespace mongo {
 
     using namespace mongoutils;
 
-    /** helper for manipulating host:port connection endpoints. 
+    /** helper for manipulating host:port connection endpoints.
       */
-    struct HostAndPort { 
+    struct HostAndPort {
         HostAndPort() : _port(-1) { }
 
-        /** From a string hostname[:portnumber] 
+        /** From a string hostname[:portnumber]
             Throws user assertion if bad config string or bad port #.
             */
         HostAndPort(string s);
@@ -38,11 +38,11 @@ namespace mongo {
         /** @param p port number. -1 is ok to use default. */
         HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { }
 
-        HostAndPort(const SockAddr& sock ) 
-            : _host( sock.getAddr() ) , _port( sock.getPort() ){
+        HostAndPort(const SockAddr& sock )
+            : _host( sock.getAddr() ) , _port( sock.getPort() ) {
         }
 
-        static HostAndPort me() { 
+        static HostAndPort me() {
             return HostAndPort("localhost", cmdLine.port);
         }
 
@@ -50,7 +50,7 @@ namespace mongo {
         static HostAndPort Me();
 
         bool operator<(const HostAndPort& r) const {
-            if( _host < r._host ) 
+            if( _host < r._host )
                 return true;
             if( _host == r._host )
                 return port() < r.port();
@@ -71,7 +71,7 @@ namespace mongo {
         bool isLocalHost() const;
 
         // @returns host:port
-        string toString() const; 
+        string toString() const;
 
         operator string() const { return toString(); }
 
@@ -96,7 +96,8 @@ namespace mongo {
         if (prefixLen == a.size()) { // (a == b) or (a isPrefixOf b)
             if ( b[prefixLen] == '.' || b[prefixLen] == '\0')
                 return true;
-        } else if(prefixLen == b.size()) { // (b isPrefixOf a)
+        }
+        else if(prefixLen == b.size()) {   // (b isPrefixOf a)
             if ( a[prefixLen] == '.') // can't be '\0'
                 return true;
         }
@@ -104,15 +105,16 @@ namespace mongo {
         return false;
     }
 
-    inline HostAndPort HostAndPort::Me() { 
+    inline HostAndPort HostAndPort::Me() {
         const char* ips = cmdLine.bind_ip.c_str();
-        while(*ips){
+        while(*ips) {
             string ip;
             const char * comma = strchr(ips, ',');
-            if (comma){
+            if (comma) {
                 ip = string(ips, comma - ips);
                 ips = comma + 1;
-            }else{
+            }
+            else {
                 ip = string(ips);
                 ips = "";
             }
@@ -121,7 +123,7 @@ namespace mongo {
                 return h;
             }
         }
-            
+
         string h = getHostName();
         assert( !h.empty() );
         assert( h != "localhost" );
@@ -131,10 +133,10 @@ namespace mongo {
     inline string HostAndPort::toString() const {
         stringstream ss;
         ss << _host;
-        if ( _port != -1 ){
+        if ( _port != -1 ) {
             ss << ':';
 #if defined(_DEBUG)
-            if( _port >= 44000 && _port < 44100 ) { 
+            if( _port >= 44000 && _port < 44100 ) {
                 log() << "warning: special debug port 44xxx used" << endl;
                 ss << _port+1;
             }
@@ -147,7 +149,7 @@ namespace mongo {
         return ss.str();
     }
 
-    inline bool HostAndPort::isLocalHost() const { 
+    inline bool HostAndPort::isLocalHost() const {
         return _host == "localhost" || startsWith(_host.c_str(), "127.") || _host == "::1";
     }
 

@@ -36,7 +36,7 @@ namespace mongo {
             OpTime::now().asDate()
         */
         void initTimestamp();
-        
+
         /** Change the value, in place, of the number. */
         void setNumber(double d) {
             if ( _element.type() == NumberDouble ) *reinterpret_cast< double * >( value() )  = d;
@@ -44,30 +44,30 @@ namespace mongo {
             else assert(0);
         }
         void SetNumber(double d) {
-            if ( _element.type() == NumberDouble ) 
+            if ( _element.type() == NumberDouble )
                 *getDur().writing( reinterpret_cast< double * >( value() )  ) = d;
-            else if ( _element.type() == NumberInt ) 
+            else if ( _element.type() == NumberInt )
                 *getDur().writing( reinterpret_cast< int * >( value() ) ) = (int) d;
             else assert(0);
         }
-        void setLong(long long n) { 
+        void setLong(long long n) {
             assert( _element.type() == NumberLong );
             *reinterpret_cast< long long * >( value() ) = n;
         }
-        void SetLong(long long n) { 
+        void SetLong(long long n) {
             assert( _element.type() == NumberLong );
             *getDur().writing( reinterpret_cast< long long * >(value()) ) = n;
         }
-        void setInt(int n) { 
+        void setInt(int n) {
             assert( _element.type() == NumberInt );
             *reinterpret_cast< int * >( value() ) = n;
         }
-        void SetInt(int n) { 
+        void SetInt(int n) {
             assert( _element.type() == NumberInt );
             getDur().writingInt( *reinterpret_cast< int * >( value() ) ) = n;
         }
 
-        
+
         /** Replace the type and value of the element with the type and value of e,
             preserving the original fieldName */
         void replaceTypeAndValue( const BSONElement &e ) {
@@ -86,18 +86,18 @@ namespace mongo {
             *p = e.type();
             memcpy( p + ofs, e.value(), valsize );
         }
-        
-        static void lookForTimestamps( const BSONObj& obj ){
+
+        static void lookForTimestamps( const BSONObj& obj ) {
             // If have a Timestamp field as the first or second element,
             // update it to a Date field set to OpTime::now().asDate().  The
             // replacement policy is a work in progress.
-            
+
             BSONObjIterator i( obj );
             for( int j = 0; i.moreWithEOO() && j < 2; ++j ) {
                 BSONElement e = i.next();
                 if ( e.eoo() )
                     break;
-                if ( e.type() == Timestamp ){
+                if ( e.type() == Timestamp ) {
                     BSONElementManipulator( e ).initTimestamp();
                     break;
                 }

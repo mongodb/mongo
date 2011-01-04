@@ -25,9 +25,9 @@ namespace mongo {
 
     using mongo::Histogram;
 
-    class BoundariesInit{
+    class BoundariesInit {
     public:
-        void run(){
+        void run() {
             Histogram::Options opts;
             opts.numBuckets = 3;
             opts.bucketSize = 10;
@@ -45,9 +45,9 @@ namespace mongo {
         }
     };
 
-    class BoundariesExponential{
+    class BoundariesExponential {
     public:
-        void run(){
+        void run() {
             Histogram::Options opts;
             opts.numBuckets = 4;
             opts.bucketSize = 125;
@@ -57,13 +57,13 @@ namespace mongo {
             ASSERT_EQUALS( h.getBoundary( 0 ), 125u );
             ASSERT_EQUALS( h.getBoundary( 1 ), 250u );
             ASSERT_EQUALS( h.getBoundary( 2 ), 500u );
-            ASSERT_EQUALS( h.getBoundary( 3 ), numeric_limits<uint32_t>::max() );            
+            ASSERT_EQUALS( h.getBoundary( 3 ), numeric_limits<uint32_t>::max() );
         }
     };
 
-    class BoundariesFind{
+    class BoundariesFind {
     public:
-        void run(){
+        void run() {
             Histogram::Options opts;
             opts.numBuckets = 3;
             opts.bucketSize = 10;
@@ -81,14 +81,14 @@ namespace mongo {
 
     class HistogramSuite : public Suite {
     public:
-        HistogramSuite() : Suite( "histogram" ){}
+        HistogramSuite() : Suite( "histogram" ) {}
 
-        void setupTests(){
+        void setupTests() {
             add< BoundariesInit >();
             add< BoundariesExponential >();
             add< BoundariesFind >();
             // TODO: complete the test suite
-        } 
+        }
     } histogramSuite;
 
 }  // anonymous namespace

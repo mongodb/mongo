@@ -20,7 +20,7 @@
 #include "dbclientcursor.h"
 
 namespace mongo {
-    
+
     class DBClientMockCursor : public DBClientCursorInterface {
     public:
         DBClientMockCursor( const BSONArray& mockCollection ) : _iter( mockCollection ) {}

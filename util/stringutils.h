@@ -26,20 +26,20 @@ namespace mongo {
 
     void joinStringDelim( const vector<string>& strs , string* res , char delim );
 
-    inline string tolowerString( const string& input ){
+    inline string tolowerString( const string& input ) {
         string::size_type sz = input.size();
-        
+
         boost::scoped_array<char> line(new char[sz+1]);
         char * copy = line.get();
-        
-        for ( string::size_type i=0; i<sz; i++ ){
+
+        for ( string::size_type i=0; i<sz; i++ ) {
             char c = input[i];
             copy[i] = (char)tolower( (int)c );
         }
         copy[sz] = 0;
         return string(copy);
     }
-   
+
 } // namespace mongo
 
 #endif // UTIL_STRING_UTILS_HEADER

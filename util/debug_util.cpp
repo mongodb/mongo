@@ -29,7 +29,7 @@ namespace mongo {
      *  2) You have run "handle SIGSTOP noprint" in gdb
      *  3) cmdLine.port + 2000 is free
      */
-    void launchGDB(int){
+    void launchGDB(int) {
         // Don't come back here
         signal(SIGTRAP, SIG_IGN);
 
@@ -38,18 +38,19 @@ namespace mongo {
         string pidToDebug = BSONObjBuilder::numStr(getpid());
 
         cout << "\n\n\t**** Launching gdbserver on " << newPortStr << " ****" << endl << endl;
-        if (fork() == 0){
+        if (fork() == 0) {
             //child
             execlp("gdbserver", "gdbserver", "--attach", newPortStr.c_str(), pidToDebug.c_str(), NULL);
             perror(NULL);
-        }else{
+        }
+        else {
             //parent
             raise(SIGSTOP); // pause all threads until gdb connects and continues
             raise(SIGTRAP); // break inside gdbserver
         }
     }
 
-    void setupSIGTRAPforGDB(){
+    void setupSIGTRAPforGDB() {
         assert( signal(SIGTRAP , launchGDB ) != SIG_ERR );
     }
 #else

@@ -24,7 +24,7 @@
 #include "../util/timer.h"
 
 namespace mongo {
-    
+
     /**
      * simple blocking queue
      */
@@ -32,47 +32,47 @@ namespace mongo {
     public:
         BlockingQueue() : _lock("BlockingQueue") { }
 
-        void push(T const& t){
+        void push(T const& t) {
             scoped_lock l( _lock );
             _queue.push( t );
             _condition.notify_one();
         }
-        
+
         bool empty() const {
             scoped_lock l( _lock );
             return _queue.empty();
         }
-        
-        bool tryPop( T & t ){
+
+        bool tryPop( T & t ) {
             scoped_lock l( _lock );
             if ( _queue.empty() )
                 return false;
-            
+
             t = _queue.front();
             _queue.pop();
-            
+
             return true;
         }
-        
-        T blockingPop(){
+
+        T blockingPop() {
 
             scoped_lock l( _lock );
             while( _queue.empty() )
                 _condition.wait( l.boost() );
-            
+
             T t = _queue.front();
             _queue.pop();
-            return t;    
+            return t;
         }
 
-        
+
         /**
          * blocks waiting for an object until maxSecondsToWait passes
          * if got one, return true and set in t
          * otherwise return false and t won't be changed
          */
-        bool blockingPop( T& t , int maxSecondsToWait ){
-            
+        bool blockingPop( T& t , int maxSecondsToWait ) {
+
             Timer timer;
 
             boost::xtime xt;
@@ -80,19 +80,19 @@ namespace mongo {
             xt.sec += maxSecondsToWait;
 
             scoped_lock l( _lock );
-            while( _queue.empty() ){
+            while( _queue.empty() ) {
                 if ( ! _condition.timed_wait( l.boost() , xt ) )
                     return false;
             }
-            
+
             t = _queue.front();
             _queue.pop();
             return true;
         }
-        
+
     private:
         std::queue<T> _queue;
-        
+
         mutable mongo::mutex _lock;
         boost::condition _condition;
     };

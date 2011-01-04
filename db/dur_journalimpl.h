@@ -38,7 +38,7 @@ namespace mongo {
             boost::filesystem::path getFilePathFor(int filenumber) const;
 
             /** used at shutdown.
-                @return false if can't close in a timely manner. 
+                @return false if can't close in a timely manner.
             */
             bool tryToCloseCurJournalFile();
 
@@ -59,7 +59,7 @@ namespace mongo {
 
             LogFile *_curLogFile; // use _curLogFileMutex
 
-            struct JFile { 
+            struct JFile {
                 string filename;
                 unsigned long long lastEventTimeMs;
             };

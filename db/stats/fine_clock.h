@@ -36,29 +36,30 @@ namespace mongo {
      * Really, you shouldn't be using this class in hot code paths for
      * platforms you're not sure whether the overhead is low.
      */
-    class FineClock{
+    class FineClock {
     public:
 
         typedef timespec WallTime;
 
-        static WallTime now(){
+        static WallTime now() {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
             return ts;
         }
 
-        static uint64_t diffInNanos( WallTime end, WallTime start ){
+        static uint64_t diffInNanos( WallTime end, WallTime start ) {
             uint64_t diff;
-            if ( end.tv_nsec < start.tv_nsec ){
+            if ( end.tv_nsec < start.tv_nsec ) {
                 diff = 1000000000 * ( end.tv_sec - start.tv_sec - 1);
                 diff += 1000000000 + end.tv_nsec - start.tv_nsec;
-            } else {
+            }
+            else {
                 diff = 1000000000 * ( end.tv_sec - start.tv_sec );
                 diff += end.tv_nsec - start.tv_nsec;
             }
             return diff;
         }
-  
+
     };
 }
 

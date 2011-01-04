@@ -20,7 +20,7 @@
 #include "pch.h"
 
 namespace mongo {
-    
+
     namespace mr {
 
         typedef vector<BSONObj> BSONList;
@@ -31,35 +31,35 @@ namespace mongo {
 
         class Mapper : boost::noncopyable {
         public:
-            virtual ~Mapper(){}
+            virtual ~Mapper() {}
             virtual void init( State * state ) = 0;
 
             virtual void map( const BSONObj& o ) = 0;
         };
-        
+
         class Finalizer : boost::noncopyable {
         public:
-            virtual ~Finalizer(){}
+            virtual ~Finalizer() {}
             virtual void init( State * state ) = 0;
-            
+
             /**
              * this takes a tuple and returns a tuple
              */
             virtual BSONObj finalize( const BSONObj& tuple ) = 0;
         };
-        
+
         class Reducer : boost::noncopyable {
         public:
-            virtual ~Reducer(){}
+            virtual ~Reducer() {}
             virtual void init( State * state ) = 0;
-            
+
             virtual BSONObj reduce( const BSONList& tuples ) = 0;
             /** this means its a fianl reduce, even if there is no finalizer */
             virtual BSONObj reduce( const BSONList& tuples , Finalizer * finalizer ) = 0;
         };
-        
-        // ------------  js function implementations -----------        
-        
+
+        // ------------  js function implementations -----------
+
         /**
          * used as a holder for Scope and ScriptingFunction
          * visitor like pattern as Scope is gotten from first access
@@ -70,8 +70,8 @@ namespace mongo {
              * @param type (map|reduce|finalzie)
              */
             JSFunction( string type , const BSONElement& e );
-            virtual ~JSFunction(){}
-            
+            virtual ~JSFunction() {}
+
             virtual void init( State * state );
 
             Scope * scope() const { return _scope; }
@@ -80,27 +80,27 @@ namespace mongo {
         private:
             string _type;
             string _code; // actual javascript code
-            BSONObj _wantedScope; // this is for CodeWScope 
-            
+            BSONObj _wantedScope; // this is for CodeWScope
+
             Scope * _scope; // this is not owned by us, and might be shared
             ScriptingFunction _func;
         };
 
         class JSMapper : public Mapper {
         public:
-            JSMapper( const BSONElement & code ) : _func( "map" , code ){}
+            JSMapper( const BSONElement & code ) : _func( "map" , code ) {}
             virtual void map( const BSONObj& o );
             virtual void init( State * state );
-            
+
         private:
             JSFunction _func;
             BSONObj _params;
         };
-        
+
         class JSReducer : public Reducer {
         public:
-            JSReducer( const BSONElement& code ) : _func( "reduce" , code ){}
-            virtual void init( State * state ){ _func.init( state ); }
+            JSReducer( const BSONElement& code ) : _func( "reduce" , code ) {}
+            virtual void init( State * state ) { _func.init( state ); }
 
             virtual BSONObj reduce( const BSONList& tuples );
             virtual BSONObj reduce( const BSONList& tuples , Finalizer * finalizer );
@@ -109,36 +109,36 @@ namespace mongo {
 
             /**
              * result in "return"
-             * @param key OUT 
+             * @param key OUT
              * @param endSizeEstimate OUT
             */
             void _reduce( const BSONList& values , BSONObj& key , int& endSizeEstimate );
-            
+
             JSFunction _func;
 
         };
-        
+
         class JSFinalizer : public Finalizer  {
         public:
-            JSFinalizer( const BSONElement& code ) : _func( "finalize" , code ){}
+            JSFinalizer( const BSONElement& code ) : _func( "finalize" , code ) {}
             virtual BSONObj finalize( const BSONObj& o );
-            virtual void init( State * state ){ _func.init( state ); }
+            virtual void init( State * state ) { _func.init( state ); }
         private:
             JSFunction _func;
 
         };
 
         // -----------------
-        
+
 
         class TupleKeyCmp {
         public:
-            TupleKeyCmp(){}
+            TupleKeyCmp() {}
             bool operator()( const BSONObj &l, const BSONObj &r ) const {
                 return l.firstElement().woCompare( r.firstElement() ) < 0;
             }
         };
-        
+
         typedef map< BSONObj,BSONList,TupleKeyCmp > InMemory; // from key to list of tuples
 
         /**
@@ -150,29 +150,29 @@ namespace mongo {
 
             string dbname;
             string ns;
-            
+
             // options
-            bool verbose;            
+            bool verbose;
 
             // query options
-            
+
             BSONObj filter;
             BSONObj sort;
             long long limit;
 
             // functions
-            
+
             scoped_ptr<Mapper> mapper;
             scoped_ptr<Reducer> reducer;
             scoped_ptr<Finalizer> finalizer;
-            
+
             BSONObj mapParams;
             BSONObj scopeSetup;
-            
+
             // output tables
             string incLong;
             string tempLong;
-            
+
             string finalShort;
             string finalLong;
 
@@ -180,11 +180,11 @@ namespace mongo {
                    MERGE ,  // merge keys, override dups
                    REDUCE , // merge keys, reduce dups
                    INMEMORY // only store in memory, limited in size
-            } outType;
-            
+                 } outType;
+
             static AtomicUInt JOB_NUMBER;
         }; // end MRsetup
-        
+
         /**
          * stores information about intermediate map reduce state
          * controls flow of data from map->reduce->finalize->output
@@ -195,14 +195,14 @@ namespace mongo {
             ~State();
 
             void init();
-            
+
             // ---- prep  -----
             bool sourceExists();
 
             long long incomingDocuments();
 
-            // ---- map stage ---- 
-            
+            // ---- map stage ----
+
             /**
              * stages on in in-memory storage
              */
@@ -226,19 +226,19 @@ namespace mongo {
 
             // ------ reduce stage -----------
 
-            void prepTempCollection();            
-            
+            void prepTempCollection();
+
             void finalReduce( BSONList& values );
-            
+
             void finalReduce( CurOp * op , ProgressMeterHolder& pm );
-            
+
             // ------- cleanup/data positioning ----------
-            
+
             /**
                @return number objects in collection
              */
             long long renameIfNeeded();
-            
+
             /**
              * if INMEMORY will append
              * may also append stats or anything else it likes
@@ -246,17 +246,17 @@ namespace mongo {
             void appendResults( BSONObjBuilder& b );
 
             // -------- util ------------
-            
+
             /**
              * inserts with correct replication semantics
              */
             void insert( const string& ns , BSONObj& o );
-            
+
             // ------ simple accessors -----
 
             /** State maintains ownership, do no use past State lifetime */
             Scope* scope() { return _scope.get(); }
-            
+
             const Config& config() { return _config; }
 
             long long numEmits() const { return _numEmits; }
@@ -274,7 +274,7 @@ namespace mongo {
 
             scoped_ptr<InMemory> _temp;
             long _size; // bytes in _temp
-            
+
             long long _numEmits;
         };
 

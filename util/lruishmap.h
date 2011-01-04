@@ -23,8 +23,8 @@
 namespace mongo {
 
     /* Your K object must define:
-    	 int hash() - must always return > 0.
-    	 operator==
+         int hash() - must always return > 0.
+         operator==
     */
 
     template <class K, class V, int MaxChain>

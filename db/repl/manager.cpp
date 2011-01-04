@@ -1,4 +1,4 @@
-/* @file manager.cpp 
+/* @file manager.cpp
 */
 
 /**
@@ -23,20 +23,20 @@
 
 namespace mongo {
 
-    enum { 
+    enum {
         NOPRIMARY = -2,
         SELFPRIMARY = -1
     };
 
     /* check members OTHER THAN US to see if they think they are primary */
-    const Member * Manager::findOtherPrimary(bool& two) { 
+    const Member * Manager::findOtherPrimary(bool& two) {
         two = false;
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
             DEV assert( m != rs->_self );
             if( m->state().primary() && m->hbinfo().up() ) {
-                if( p ) { 
+                if( p ) {
                     two = true;
                     return 0;
                 }
@@ -44,36 +44,36 @@ namespace mongo {
             }
             m = m->next();
         }
-        if( p ) 
+        if( p )
             noteARemoteIsPrimary(p);
         return p;
     }
 
-    Manager::Manager(ReplSetImpl *_rs) : 
-    task::Server("rs Manager"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY)
-    { 
+    Manager::Manager(ReplSetImpl *_rs) :
+        task::Server("rs Manager"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY) {
     }
-    
-    Manager::~Manager() { 
-        /* we don't destroy the replset object we sit in; however, the destructor could have thrown on init. 
-           the log message below is just a reminder to come back one day and review this code more, and to 
-           make it cleaner. 
+
+    Manager::~Manager() {
+        /* we don't destroy the replset object we sit in; however, the destructor could have thrown on init.
+           the log message below is just a reminder to come back one day and review this code more, and to
+           make it cleaner.
            */
         log() << "info: ~Manager called" << rsLog;
         rs->mgr = 0;
     }
 
-    void Manager::starting() { 
+    void Manager::starting() {
         Client::initThread("rs Manager");
     }
 
-    void Manager::noteARemoteIsPrimary(const Member *m) { 
+    void Manager::noteARemoteIsPrimary(const Member *m) {
         if( rs->box.getPrimary() == m )
             return;
         rs->_self->lhb() = "";
         if( rs->iAmArbiterOnly() ) {
             rs->box.set(MemberState::RS_ARBITER, m);
-        } else {
+        }
+        else {
             rs->box.noteRemoteIsPrimary(m);
         }
     }
@@ -90,9 +90,8 @@ namespace mongo {
 
             const Member *p = rs->box.getPrimary();
             if( p && p != rs->_self ) {
-                if( !p->hbinfo().up() || 
-                    !p->hbinfo().hbstate.primary() ) 
-                {
+                if( !p->hbinfo().up() ||
+                        !p->hbinfo().hbstate.primary() ) {
                     p = 0;
                     rs->box.setOtherPrimary(0);
                 }
@@ -111,29 +110,29 @@ namespace mongo {
 
             if( p2 ) {
                 /* someone else thinks they are primary. */
-                if( p == p2 ) { 
+                if( p == p2 ) {
                     // we thought the same; all set.
                     return;
                 }
                 if( p == 0 ) {
-                    noteARemoteIsPrimary(p2); 
+                    noteARemoteIsPrimary(p2);
                     return;
                 }
                 // todo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                 if( p != rs->_self ) {
                     // switch primary from oldremotep->newremotep2
-                    noteARemoteIsPrimary(p2); 
+                    noteARemoteIsPrimary(p2);
                     return;
                 }
                 /* we thought we were primary, yet now someone else thinks they are. */
                 if( !rs->elect.aMajoritySeemsToBeUp() ) {
                     /* we can't see a majority.  so the other node is probably the right choice. */
-                    noteARemoteIsPrimary(p2); 
+                    noteARemoteIsPrimary(p2);
                     return;
                 }
-                /* ignore for now, keep thinking we are master. 
-                   this could just be timing (we poll every couple seconds) or could indicate 
-                   a problem?  if it happens consistently for a duration of time we should 
+                /* ignore for now, keep thinking we are master.
+                   this could just be timing (we poll every couple seconds) or could indicate
+                   a problem?  if it happens consistently for a duration of time we should
                    alert the sysadmin.
                 */
                 return;
@@ -141,17 +140,17 @@ namespace mongo {
 
             /* didn't find anyone who wants to be primary */
 
-            if( p ) { 
+            if( p ) {
                 /* we are already primary */
 
-                if( p != rs->_self ) { 
+                if( p != rs->_self ) {
                     rs->sethbmsg("error p != rs->self in checkNewState");
                     log() << "replSet " << p->fullName() << rsLog;
                     log() << "replSet " << rs->_self->fullName() << rsLog;
                     return;
                 }
 
-                if( rs->elect.shouldRelinquish() ) { 
+                if( rs->elect.shouldRelinquish() ) {
                     log() << "replSet can't see a majority of the set, relinquishing primary" << rsLog;
                     rs->relinquish();
                 }
@@ -165,7 +164,7 @@ namespace mongo {
             /* TODO : CHECK PRIORITY HERE.  can't be elected if priority zero. */
 
             /* no one seems to be primary.  shall we try to elect ourself? */
-            if( !rs->elect.aMajoritySeemsToBeUp() ) { 
+            if( !rs->elect.aMajoritySeemsToBeUp() ) {
                 static time_t last;
                 static int n;
                 int ll = 0;
@@ -178,15 +177,15 @@ namespace mongo {
 
             busyWithElectSelf = true; // don't try to do further elections & such while we are already working on one.
         }
-        try { 
-            rs->elect.electSelf(); 
+        try {
+            rs->elect.electSelf();
         }
         catch(RetryAfterSleepException&) {
             /* we want to process new inbounds before trying this again.  so we just put a checkNewstate in the queue for eval later. */
             requeue();
         }
-        catch(...) { 
-            log() << "replSet error unexpected assertion in rs manager" << rsLog; 
+        catch(...) {
+            log() << "replSet error unexpected assertion in rs manager" << rsLog;
         }
         busyWithElectSelf = false;
     }

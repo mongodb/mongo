@@ -27,7 +27,7 @@
 #include "db.h"
 #include "../scripting/engine.h"
 
-namespace mongo { 
+namespace mongo {
 
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
@@ -35,7 +35,7 @@ namespace mongo {
         StringBuilder str;
         void reset() { str.reset(); }
     };
-    
+
     /**
      * stores a copy of a bson obj in a fixed size buffer
      * if its too big for the buffer, says "too big"
@@ -46,67 +46,67 @@ namespace mongo {
         enum { TOO_BIG_SENTINEL = 1 } ;
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
-        CachedBSONObj(){
+        CachedBSONObj() {
             _size = (int*)_buf;
             reset();
         }
-        
+
         void reset( int sz = 0 ) { _size[0] = sz; }
-        
-        void set( const BSONObj& o ){
+
+        void set( const BSONObj& o ) {
             _lock.lock();
             try {
                 int sz = o.objsize();
-                
-                if ( sz > (int) sizeof(_buf) ) { 
+
+                if ( sz > (int) sizeof(_buf) ) {
                     reset(TOO_BIG_SENTINEL);
                 }
                 else {
                     memcpy(_buf, o.objdata(), sz );
                 }
-                
+
                 _lock.unlock();
             }
-            catch ( ... ){
+            catch ( ... ) {
                 _lock.unlock();
                 throw;
             }
-            
+
         }
-        
+
         int size() const { return *_size; }
         bool have() const { return size() > 0; }
 
-        BSONObj get(){
-            _lock.lock();            
+        BSONObj get() {
+            _lock.lock();
             BSONObj o;
             try {
                 o = _get();
                 _lock.unlock();
             }
-            catch ( ... ){
+            catch ( ... ) {
                 _lock.unlock();
                 throw;
-            }            
-            return o;            
+            }
+            return o;
         }
 
-        void append( BSONObjBuilder& b , const StringData& name ){
+        void append( BSONObjBuilder& b , const StringData& name ) {
             _lock.lock();
             try {
                 BSONObj temp = _get();
                 b.append( name , temp );
                 _lock.unlock();
             }
-            catch ( ... ){
+            catch ( ... ) {
                 _lock.unlock();
                 throw;
             }
         }
-        
+
     private:
         /** you have to be locked when you call this */
-        BSONObj _get(){
+        BSONObj _get() {
             int sz = size();
             if ( sz == 0 )
                 return BSONObj();
@@ -121,7 +121,7 @@ namespace mongo {
     };
 
     /* Current operation (for the current Client).
-       an embedded member of Client class, and typically used from within the mutex there. 
+       an embedded member of Client class, and typically used from within the mutex there.
     */
     class CurOp : boost::noncopyable {
     public:
@@ -129,26 +129,26 @@ namespace mongo {
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
-        BSONObj query(){ return _query.get();  }
+        BSONObj query() { return _query.get();  }
 
-        void ensureStarted(){
+        void ensureStarted() {
             if ( _start == 0 )
-                _start = _checkpoint = curTimeMicros64();            
+                _start = _checkpoint = curTimeMicros64();
         }
-        void enter( Client::Context * context ){
+        void enter( Client::Context * context ) {
             ensureStarted();
             setNS( context->ns() );
             if ( context->_db && context->_db->profile > _dbprofile )
                 _dbprofile = context->_db->profile;
         }
 
-        void leave( Client::Context * context ){
+        void leave( Client::Context * context ) {
             unsigned long long now = curTimeMicros64();
             Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
             _checkpoint = now;
         }
 
-        void reset(){
+        void reset() {
             _reset();
             _start = _checkpoint = 0;
             _active = true;
@@ -157,16 +157,16 @@ namespace mongo {
             _debug.reset();
             _query.reset();
         }
-        
+
         void reset( const SockAddr & remote, int op ) {
             reset();
             _remote = remote;
             _op = op;
         }
-        
+
         void markCommand() { _command = true; }
 
-        void waitingForLock( int type ){
+        void waitingForLock( int type ) {
             _waitingForLock = true;
             if ( type > 0 )
                 _lockType = 1;
@@ -174,26 +174,26 @@ namespace mongo {
                 _lockType = -1;
         }
         void gotLock()             { _waitingForLock = false; }
-        OpDebug& debug()           { return _debug; }        
+        OpDebug& debug()           { return _debug; }
         int profileLevel() const   { return _dbprofile; }
         const char * getNS() const { return _ns; }
 
         bool shouldDBProfile( int ms ) const {
             if ( _dbprofile <= 0 )
                 return false;
-            
+
             return _dbprofile >= 2 || ms >= cmdLine.slowMS;
         }
-        
+
         AtomicUInt opNum() const { return _opNum; }
 
         /** if this op is running */
         bool active() const { return _active; }
-        
+
         int getLockType() const { return _lockType; }
-        bool isWaitingForLock() const { return _waitingForLock; } 
+        bool isWaitingForLock() const { return _waitingForLock; }
         int getOp() const { return _op; }
-                
+
         /** micros */
         unsigned long long startTime() {
             ensureStarted();
@@ -204,7 +204,7 @@ namespace mongo {
             _active = false;
             _end = curTimeMicros64();
         }
-        
+
         unsigned long long totalTimeMicros() {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - startTime();
@@ -223,22 +223,22 @@ namespace mongo {
 
         Client * getClient() const { return _client; }
 
-        BSONObj info() { 
-            if( ! cc().getAuthenticationInfo()->isAuthorized("admin") ) { 
+        BSONObj info() {
+            if( ! cc().getAuthenticationInfo()->isAuthorized("admin") ) {
                 BSONObjBuilder b;
                 b.append("err", "unauthorized");
                 return b.obj();
             }
             return infoNoauth();
         }
-        
+
         BSONObj infoNoauth();
 
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
 
         ProgressMeter& setMessage( const char * msg , unsigned long long progressMeterTotal = 0 , int secondsBetween = 3 ) {
-            if ( progressMeterTotal ){
-                if ( _progressMeter.isActive() ){
+            if ( progressMeterTotal ) {
+                if ( _progressMeter.isActive() ) {
                     cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
                     assert( ! _progressMeter.isActive() );
                 }
@@ -247,19 +247,19 @@ namespace mongo {
             else {
                 _progressMeter.finished();
             }
-            
+
             _message = msg;
-            
+
             return _progressMeter;
         }
-        
+
         string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }
         void kill() { _killed = true; }
         bool killed() const { return _killed; }
-        void setNS(const char *ns) { 
-            strncpy(_ns, ns, Namespace::MaxNsLen); 
+        void setNS(const char *ns) {
+            strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
         }
         friend class Client;
@@ -286,7 +286,7 @@ namespace mongo {
         ProgressMeter _progressMeter;
         volatile bool _killed;
 
-        void _reset(){
+        void _reset() {
             _command = false;
             _lockType = 0;
             _dbprofile = 0;
@@ -303,14 +303,14 @@ namespace mongo {
        this class does not handle races between interruptJs and the checkForInterrupt functions - those must be
        handled by the client of this class
     */
-    extern class KillCurrentOp { 
+    extern class KillCurrentOp {
     public:
         void killAll();
         void kill(AtomicUInt i);
 
         /** @return true if global interrupt and should terminate the operation */
         bool globalInterruptCheck() const { return _globalKill; }
-        
+
         void checkForInterrupt( bool heedMutex = true ) {
             if ( heedMutex && dbMutex.isWriteLocked() )
                 return;
@@ -319,7 +319,7 @@ namespace mongo {
             if( cc().curop()->killed() )
                 uasserted(11601,"interrupted");
         }
-        
+
         /** @return "" if not interrupted.  otherwise, you should stop. */
         const char *checkForInterruptNoAssert( bool heedMutex = true ) {
             if ( heedMutex && dbMutex.isWriteLocked() )
@@ -330,7 +330,7 @@ namespace mongo {
                 return "interrupted";
             return "";
         }
-        
+
     private:
         void interruptJs( AtomicUInt *op );
         volatile bool _globalKill;

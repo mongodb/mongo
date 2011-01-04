@@ -32,9 +32,9 @@ namespace mongo {
      */
     unsigned setThreadName(const char * name);
     string getThreadName();
-    
+
     template<class T>
-    inline string ToString(const T& t) { 
+    inline string ToString(const T& t) {
         stringstream s;
         s << t;
         return s.str();
@@ -98,7 +98,8 @@ namespace mongo {
                 cout << endl;
                 len -= 16;
             }
-        } catch (...) {
+        }
+        catch (...) {
         }
     }
 
@@ -137,14 +138,14 @@ namespace mongo {
     };
 
     /*
-    
+
     class DebugMutex : boost::noncopyable {
-    	friend class lock;
-    	mongo::mutex m;
-    	int locked;
+        friend class lock;
+        mongo::mutex m;
+        int locked;
     public:
-    	DebugMutex() : locked(0); { }
-    	bool isLocked() { return locked; }
+        DebugMutex() : locked(0); { }
+        bool isLocked() { return locked; }
     };
 
     */
@@ -182,7 +183,7 @@ namespace mongo {
         return swapEndian(x);
     }
 #endif
-    
+
 #if !defined(_WIN32)
     typedef int HANDLE;
     inline void strcpy_s(char *dst, unsigned len, const char *src) {
@@ -192,10 +193,10 @@ namespace mongo {
 #else
     typedef void *HANDLE;
 #endif
-    
+
     /* thread local "value" rather than a pointer
        good for things which have copy constructors (and the copy constructor is fast enough)
-       e.g. 
+       e.g.
          ThreadLocalValue<int> myint;
     */
     template<class T>
@@ -212,7 +213,7 @@ namespace mongo {
 
         void set( const T& i ) {
             T *v = _val.get();
-            if( v ) { 
+            if( v ) {
                 *v = i;
                 return;
             }
@@ -227,15 +228,15 @@ namespace mongo {
 
     class ProgressMeter : boost::noncopyable {
     public:
-        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ){
+        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ) {
             reset( total , secondsBetween , checkInterval );
         }
 
-        ProgressMeter(){
+        ProgressMeter() {
             _active = 0;
         }
-        
-        void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ){
+
+        void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ) {
             _total = total;
             _secondsBetween = secondsBetween;
             _checkInterval = checkInterval;
@@ -247,19 +248,19 @@ namespace mongo {
             _active = 1;
         }
 
-        void finished(){
+        void finished() {
             _active = 0;
         }
 
-        bool isActive(){
+        bool isActive() {
             return _active;
         }
-        
+
         /**
          * @return if row was printed
          */
-        bool hit( int n = 1 ){
-            if ( ! _active ){
+        bool hit( int n = 1 ) {
+            if ( ! _active ) {
                 cout << "warning: hit on in-active ProgressMeter" << endl;
                 return false;
             }
@@ -268,12 +269,12 @@ namespace mongo {
             _hits++;
             if ( _hits % _checkInterval )
                 return false;
-            
+
             int t = (int) time(0);
             if ( t - _lastTime < _secondsBetween )
                 return false;
-            
-            if ( _total > 0 ){
+
+            if ( _total > 0 ) {
                 int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
                 cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
             }
@@ -281,11 +282,11 @@ namespace mongo {
             return true;
         }
 
-        unsigned long long done(){
+        unsigned long long done() {
             return _done;
         }
-        
-        unsigned long long hits(){
+
+        unsigned long long hits() {
             return _hits;
         }
 
@@ -303,7 +304,7 @@ namespace mongo {
     private:
 
         bool _active;
-        
+
         unsigned long long _total;
         int _secondsBetween;
         int _checkInterval;
@@ -316,29 +317,29 @@ namespace mongo {
     class ProgressMeterHolder : boost::noncopyable {
     public:
         ProgressMeterHolder( ProgressMeter& pm )
-            : _pm( pm ){
+            : _pm( pm ) {
         }
-        
-        ~ProgressMeterHolder(){
+
+        ~ProgressMeterHolder() {
             _pm.finished();
         }
 
-        ProgressMeter* operator->(){
+        ProgressMeter* operator->() {
             return &_pm;
         }
 
-        bool hit( int n = 1 ){
+        bool hit( int n = 1 ) {
             return _pm.hit( n );
         }
 
-        void finished(){
+        void finished() {
             _pm.finished();
         }
-        
-        bool operator==( const ProgressMeter& other ){
+
+        bool operator==( const ProgressMeter& other ) {
             return _pm == other;
         }
-        
+
     private:
         ProgressMeter& _pm;
     };
@@ -349,11 +350,11 @@ namespace mongo {
             _outof = num;
             _num = num;
         }
-        
-        bool tryAcquire(){
+
+        bool tryAcquire() {
             scoped_lock lk( _mutex );
-            if ( _num <= 0 ){
-                if ( _num < 0 ){
+            if ( _num <= 0 ) {
+                if ( _num < 0 ) {
                     cerr << "DISASTER! in TicketHolder" << endl;
                 }
                 return false;
@@ -361,20 +362,20 @@ namespace mongo {
             _num--;
             return true;
         }
-        
-        void release(){
+
+        void release() {
             scoped_lock lk( _mutex );
             _num++;
         }
 
-        void resize( int newSize ){
-            scoped_lock lk( _mutex );            
+        void resize( int newSize ) {
+            scoped_lock lk( _mutex );
             int used = _outof - _num;
-            if ( used > newSize ){
+            if ( used > newSize ) {
                 cout << "ERROR: can't resize since we're using (" << used << ") more than newSize(" << newSize << ")" << endl;
                 return;
             }
-            
+
             _outof = newSize;
             _num = _outof - used;
         }
@@ -397,11 +398,11 @@ namespace mongo {
 
     class TicketHolderReleaser {
     public:
-        TicketHolderReleaser( TicketHolder * holder ){
+        TicketHolderReleaser( TicketHolder * holder ) {
             _holder = holder;
         }
-        
-        ~TicketHolderReleaser(){
+
+        ~TicketHolderReleaser() {
             _holder->release();
         }
     private:
@@ -416,26 +417,26 @@ namespace mongo {
     class ThreadSafeString {
     public:
         ThreadSafeString( size_t size=256 )
-            : _size( 256 ) , _buf( new char[256] ){
+            : _size( 256 ) , _buf( new char[256] ) {
             memset( _buf , 0 , _size );
         }
 
         ThreadSafeString( const ThreadSafeString& other )
-            : _size( other._size ) , _buf( new char[_size] ){
+            : _size( other._size ) , _buf( new char[_size] ) {
             strncpy( _buf , other._buf , _size );
         }
 
-        ~ThreadSafeString(){
+        ~ThreadSafeString() {
             delete[] _buf;
             _buf = 0;
         }
-        
+
         string toString() const {
             string s = _buf;
             return s;
         }
 
-        ThreadSafeString& operator=( const char * str ){
+        ThreadSafeString& operator=( const char * str ) {
             size_t s = strlen(str);
             if ( s >= _size - 2 )
                 s = _size - 2;
@@ -443,7 +444,7 @@ namespace mongo {
             _buf[s] = 0;
             return *this;
         }
-        
+
         bool operator==( const ThreadSafeString& other ) const {
             return strcmp( _buf , other._buf ) == 0;
         }
@@ -462,7 +463,7 @@ namespace mongo {
 
     private:
         size_t _size;
-        char * _buf;  
+        char * _buf;
     };
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o );
@@ -484,7 +485,7 @@ namespace mongo {
         }
         return x;
     }
-    
+
     // for convenience, '{' is greater than anything and stops number parsing
     inline int lexNumCmp( const char *s1, const char *s2 ) {
         //cout << "START : " << s1 << "\t" << s2 << endl;
@@ -497,10 +498,10 @@ namespace mongo {
                 return 1;
             if ( p2 && !p1 )
                 return -1;
-                
+
             bool n1 = isNumber( *s1 );
             bool n2 = isNumber( *s2 );
-        
+
             if ( n1 && n2 ) {
                 // get rid of leading 0s
                 while ( *s1 == '0' ) s1++;
@@ -534,24 +535,24 @@ namespace mongo {
                 s1 = e1;
                 s2 = e2;
                 continue;
-            } 
-        
-            if ( n1 ) 
+            }
+
+            if ( n1 )
                 return 1;
-        
-            if ( n2 ) 
+
+            if ( n2 )
                 return -1;
-        
+
             if ( *s1 > *s2 )
                 return 1;
-        
+
             if ( *s2 > *s1 )
                 return -1;
-        
+
             s1++; s2++;
         }
-    
-        if ( *s1 ) 
+
+        if ( *s1 )
             return 1;
         if ( *s2 )
             return -1;
@@ -565,8 +566,8 @@ namespace mongo {
      *  ptr<const T>  =>  T const *  or  const T*
      */
     template <typename T>
-    struct ptr{
-        
+    struct ptr {
+
         ptr() : _p(NULL) {}
 
         // convert to ptr<T>
@@ -576,7 +577,7 @@ namespace mongo {
         template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
         template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
         //template<typename U> ptr(const auto_ptr<U>& p) : _p(p.get()) {}
-        
+
         // assign to ptr<T>
         ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
         template<typename U> ptr& operator= (U* p) { _p = p; return *this; }

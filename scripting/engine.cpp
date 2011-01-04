@@ -23,27 +23,27 @@
 namespace mongo {
 
     long long Scope::_lastVersion = 1;
-    
+
     int Scope::_numScopes = 0;
 
-    Scope::Scope() : _localDBName("") , _loadedVersion(0){
+    Scope::Scope() : _localDBName("") , _loadedVersion(0) {
         _numScopes++;
     }
 
-    Scope::~Scope(){
+    Scope::~Scope() {
         _numScopes--;
     }
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }
 
-    ScriptEngine::~ScriptEngine(){
+    ScriptEngine::~ScriptEngine() {
     }
 
-    void Scope::append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName ){
+    void Scope::append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName ) {
         int t = type( scopeName );
-        
-        switch ( t ){
+
+        switch ( t ) {
         case Object:
             builder.append( fieldName , getObject( scopeName ) );
             break;
@@ -82,20 +82,20 @@ namespace mongo {
             temp << t;
             uassert( 10206 ,  temp.str() , 0 );
         }
-        
+
     }
 
-    int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ){
+    int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ) {
         ScriptingFunction func = createFunction( code );
         uassert( 10207 ,  "compile failed" , func );
         return invoke( func , args, timeoutMs );
     }
-    
-    bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
-        
+
+    bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ) {
+
         path p( filename );
 
-        if ( ! exists( p ) ){
+        if ( ! exists( p ) ) {
             log() << "file [" << filename << "] doesn't exist" << endl;
             if ( assertOnError )
                 assert( 0 );
@@ -103,10 +103,10 @@ namespace mongo {
         }
 
         // iterate directories and recurse using all *.js files in the directory
-        if ( is_directory( p ) ){
+        if ( is_directory( p ) ) {
             directory_iterator end;
             bool empty = true;
-            for (directory_iterator it (p); it != end; it++){
+            for (directory_iterator it (p); it != end; it++) {
                 empty = false;
                 path sub (*it);
                 if (!endsWith(sub.string().c_str(), ".js"))
@@ -115,7 +115,7 @@ namespace mongo {
                     return false;
             }
 
-            if (empty){
+            if (empty) {
                 log() << "directory [" << filename << "] doesn't have any *.js files" << endl;
                 if ( assertOnError )
                     assert( 0 );
@@ -124,7 +124,7 @@ namespace mongo {
 
             return true;
         }
-        
+
         File f;
         f.open( filename.c_str() , true );
 
@@ -139,7 +139,7 @@ namespace mongo {
         f.read( 0 , data.get() , L );
 
         int offset = 0;
-        if (data[0] == '#' && data[1] == '!'){
+        if (data[0] == '#' && data[1] == '!') {
             const char* newline = strchr(data.get(), '\n');
             if (! newline)
                 return true; // file of just shebang treated same as empty file
@@ -147,74 +147,74 @@ namespace mongo {
         }
 
         StringData code (data.get() + offset, L - offset);
-        
+
         return exec( code , filename , printResult , reportError , assertOnError, timeoutMs );
     }
 
-    void Scope::storedFuncMod(){
+    void Scope::storedFuncMod() {
         _lastVersion++;
     }
-    
+
     void Scope::validateObjectIdString( const string &str ) {
         massert( 10448 , "invalid object id: length", str.size() == 24 );
 
-        for ( string::size_type i=0; i<str.size(); i++ ){
+        for ( string::size_type i=0; i<str.size(); i++ ) {
             char c = str[i];
             if ( ( c >= '0' && c <= '9' ) ||
-                ( c >= 'a' && c <= 'f' ) ||
-                ( c >= 'A' && c <= 'F' ) ){
+                    ( c >= 'a' && c <= 'f' ) ||
+                    ( c >= 'A' && c <= 'F' ) ) {
                 continue;
             }
             massert( 10430 ,  "invalid object id: not hex", false );
-        }        
+        }
     }
 
-    void Scope::loadStored( bool ignoreNotConnected ){
-        if ( _localDBName.size() == 0 ){
+    void Scope::loadStored( bool ignoreNotConnected ) {
+        if ( _localDBName.size() == 0 ) {
             if ( ignoreNotConnected )
                 return;
             uassert( 10208 ,  "need to have locallyConnected already" , _localDBName.size() );
         }
         if ( _loadedVersion == _lastVersion )
             return;
-        
+
         _loadedVersion = _lastVersion;
 
         string coll = _localDBName + ".system.js";
-        
+
         static DBClientBase * db = createDirectClient();
         auto_ptr<DBClientCursor> c = db->query( coll , Query(), 0, 0, NULL, QueryOption_SlaveOk, 0 );
         assert( c.get() );
-        
+
         set<string> thisTime;
-        
-        while ( c->more() ){
+
+        while ( c->more() ) {
             BSONObj o = c->next();
 
             BSONElement n = o["_id"];
             BSONElement v = o["value"];
-            
+
             uassert( 10209 ,  "name has to be a string" , n.type() == String );
             uassert( 10210 ,  "value has to be set" , v.type() != EOO );
-            
+
             setElement( n.valuestr() , v );
 
             thisTime.insert( n.valuestr() );
             _storedNames.insert( n.valuestr() );
-            
+
         }
 
         // --- remove things from scope that were removed
 
         list<string> toremove;
 
-        for ( set<string>::iterator i=_storedNames.begin(); i!=_storedNames.end(); i++ ){
+        for ( set<string>::iterator i=_storedNames.begin(); i!=_storedNames.end(); i++ ) {
             string n = *i;
             if ( thisTime.count( n ) == 0 )
                 toremove.push_back( n );
         }
-        
-        for ( list<string>::iterator i=toremove.begin(); i!=toremove.end(); i++ ){
+
+        for ( list<string>::iterator i=toremove.begin(); i!=toremove.end(); i++ ) {
             string n = *i;
             _storedNames.erase( n );
             execSetup( (string)"delete " + n , "clean up scope" );
@@ -222,11 +222,11 @@ namespace mongo {
 
     }
 
-    ScriptingFunction Scope::createFunction( const char * code ){
-        if ( code[0] == '/' && code [1] == '*' ){
+    ScriptingFunction Scope::createFunction( const char * code ) {
+        if ( code[0] == '/' && code [1] == '*' ) {
             code += 2;
-            while ( code[0] && code[1] ){
-                if ( code[0] == '*' && code[1] == '/' ){
+            while ( code[0] && code[1] ) {
+                if ( code[0] == '*' && code[1] == '/' ) {
                     code += 2;
                     break;
                 }
@@ -240,7 +240,7 @@ namespace mongo {
         _cachedFunctions[code] = f;
         return f;
     }
-    
+
     typedef map< string , list<Scope*> > PoolToScopes;
 
     class ScopeCache {
@@ -249,21 +249,21 @@ namespace mongo {
         ScopeCache() : _mutex("ScopeCache") {
             _magic = 17;
         }
-        
-        ~ScopeCache(){
+
+        ~ScopeCache() {
             assert( _magic == 17 );
             _magic = 1;
 
             if ( inShutdown() )
                 return;
-            
+
             clear();
         }
 
-        void done( const string& pool , Scope * s ){
+        void done( const string& pool , Scope * s ) {
             scoped_lock lk( _mutex );
             list<Scope*> & l = _pools[pool];
-            if ( l.size() > 10 ){
+            if ( l.size() > 10 ) {
                 delete s;
             }
             else {
@@ -271,31 +271,31 @@ namespace mongo {
                 s->reset();
             }
         }
-        
-        Scope * get( const string& pool ){
+
+        Scope * get( const string& pool ) {
             scoped_lock lk( _mutex );
             list<Scope*> & l = _pools[pool];
             if ( l.size() == 0 )
                 return 0;
-            
+
             Scope * s = l.back();
             l.pop_back();
             s->reset();
             return s;
         }
-        
-        void clear(){
+
+        void clear() {
             set<Scope*> seen;
-            
-            for ( PoolToScopes::iterator i=_pools.begin() ; i != _pools.end(); i++ ){
-                for ( list<Scope*>::iterator j=i->second.begin(); j != i->second.end(); j++ ){
+
+            for ( PoolToScopes::iterator i=_pools.begin() ; i != _pools.end(); i++ ) {
+                for ( list<Scope*>::iterator j=i->second.begin(); j != i->second.end(); j++ ) {
                     Scope * s = *j;
                     assert( ! seen.count( s ) );
                     delete s;
                     seen.insert( s );
                 }
             }
-            
+
             _pools.clear();
         }
 
@@ -309,12 +309,12 @@ namespace mongo {
 
     class PooledScope : public Scope {
     public:
-        PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ){
+        PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ) {
             _real->loadStored( true );
         };
-        virtual ~PooledScope(){
+        virtual ~PooledScope() {
             ScopeCache * sc = scopeCache.get();
-            if ( sc ){
+            if ( sc ) {
                 sc->done( _pool , _real );
                 _real = 0;
             }
@@ -326,92 +326,92 @@ namespace mongo {
                 _real = 0;
             }
         }
-        
-        void reset(){
+
+        void reset() {
             _real->reset();
         }
-        void init( const BSONObj * data ){
+        void init( const BSONObj * data ) {
             _real->init( data );
         }
-        
-        void localConnect( const char * dbName ){
+
+        void localConnect( const char * dbName ) {
             _real->localConnect( dbName );
         }
-        void externalSetup(){
+        void externalSetup() {
             _real->externalSetup();
         }
-        
-        double getNumber( const char *field ){
+
+        double getNumber( const char *field ) {
             return _real->getNumber( field );
         }
-        string getString( const char *field ){
+        string getString( const char *field ) {
             return _real->getString( field );
         }
-        bool getBoolean( const char *field ){
+        bool getBoolean( const char *field ) {
             return _real->getBoolean( field );
         }
-        BSONObj getObject( const char *field ){
+        BSONObj getObject( const char *field ) {
             return _real->getObject( field );
         }
 
-        int type( const char *field ){
+        int type( const char *field ) {
             return _real->type( field );
         }
 
-        void setElement( const char *field , const BSONElement& val ){
+        void setElement( const char *field , const BSONElement& val ) {
             _real->setElement( field , val );
         }
-        void setNumber( const char *field , double val ){
+        void setNumber( const char *field , double val ) {
             _real->setNumber( field , val );
         }
-        void setString( const char *field , const char * val ){
+        void setString( const char *field , const char * val ) {
             _real->setString( field , val );
         }
-        void setObject( const char *field , const BSONObj& obj , bool readOnly=true ){
+        void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) {
             _real->setObject( field , obj , readOnly );
         }
-        void setBoolean( const char *field , bool val ){
+        void setBoolean( const char *field , bool val ) {
             _real->setBoolean( field , val );
         }
-        void setThis( const BSONObj * obj ){
+        void setThis( const BSONObj * obj ) {
             _real->setThis( obj );
         }
-        
-        ScriptingFunction createFunction( const char * code ){
+
+        ScriptingFunction createFunction( const char * code ) {
             return _real->createFunction( code );
         }
 
-        ScriptingFunction _createFunction( const char * code ){
+        ScriptingFunction _createFunction( const char * code ) {
             return _real->createFunction( code );
         }
 
-        void rename( const char * from , const char * to ){
+        void rename( const char * from , const char * to ) {
             _real->rename( from , to );
         }
 
         /**
          * @return 0 on success
          */
-        int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
+        int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs , bool ignoreReturn ) {
             return _real->invoke( func , args , timeoutMs , ignoreReturn );
         }
 
-        string getError(){
+        string getError() {
             return _real->getError();
         }
-        
-        bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ){
+
+        bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) {
             return _real->exec( code , name , printResult , reportError , assertOnError , timeoutMs );
         }
-        bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ){
+        bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) {
             return _real->execFile( filename , printResult , reportError , assertOnError , timeoutMs );
         }
-        
-        void injectNative( const char *field, NativeFunction func ){
+
+        void injectNative( const char *field, NativeFunction func ) {
             _real->injectNative( field , func );
         }
-        
-        void gc(){
+
+        void gc() {
             _real->gc();
         }
 
@@ -420,57 +420,57 @@ namespace mongo {
         Scope * _real;
     };
 
-    auto_ptr<Scope> ScriptEngine::getPooledScope( const string& pool ){
-        if ( ! scopeCache.get() ){
+    auto_ptr<Scope> ScriptEngine::getPooledScope( const string& pool ) {
+        if ( ! scopeCache.get() ) {
             scopeCache.reset( new ScopeCache() );
         }
 
         Scope * s = scopeCache->get( pool );
-        if ( ! s ){
+        if ( ! s ) {
             s = newScope();
         }
-        
+
         auto_ptr<Scope> p;
         p.reset( new PooledScope( pool , s ) );
         return p;
     }
-    
-    void ScriptEngine::threadDone(){
+
+    void ScriptEngine::threadDone() {
         ScopeCache * sc = scopeCache.get();
-        if ( sc ){
+        if ( sc ) {
             sc->clear();
         }
     }
-    
+
     void ( *ScriptEngine::_connectCallback )( DBClientWithCommands & ) = 0;
     const char * ( *ScriptEngine::_checkInterruptCallback )() = 0;
     unsigned ( *ScriptEngine::_getInterruptSpecCallback )() = 0;
-    
+
     ScriptEngine * globalScriptEngine = 0;
 
-    bool hasJSReturn( const string& code ){
+    bool hasJSReturn( const string& code ) {
         size_t x = code.find( "return" );
         if ( x == string::npos )
             return false;
 
-        return 
+        return
             ( x == 0 || ! isalpha( code[x-1] ) ) &&
             ! isalpha( code[x+6] );
     }
 
-    const char * jsSkipWhiteSpace( const char * raw ){
-        while ( raw[0] ){
+    const char * jsSkipWhiteSpace( const char * raw ) {
+        while ( raw[0] ) {
             while (isspace(*raw)) {
                 raw++;
             }
-            
+
             if ( raw[0] != '/' || raw[1] != '/' )
                 break;
-            
+
             while ( raw[0] && raw[0] != '\n' )
                 raw++;
         }
         return raw;
     }
 }
-    
+

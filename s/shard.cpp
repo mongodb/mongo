@@ -23,53 +23,54 @@
 #include <set>
 
 namespace mongo {
-    
+
     class StaticShardInfo {
     public:
         StaticShardInfo() : _mutex("StaticShardInfo") { }
-        void reload(){
+        void reload() {
 
             list<BSONObj> all;
             {
                 ScopedDbConnection conn( configServer.getPrimary() );
                 auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , Query() );
                 assert( c.get() );
-                while ( c->more() ){
+                while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
                 }
                 conn.done();
             }
-            
+
             scoped_lock lk( _mutex );
-            
+
             // We use the _lookup table for all shards and for the primary config DB. The config DB info,
             // however, does not come from the ShardNS::shard. So when cleaning the _lookup table we leave
             // the config state intact. The rationale is that this way we could drop shards that
             // were removed without reinitializing the config DB information.
 
             map<string,Shard>::iterator i = _lookup.find( "config" );
-            if ( i != _lookup.end() ){
+            if ( i != _lookup.end() ) {
                 Shard config = i->second;
                 _lookup.clear();
                 _lookup[ "config" ] = config;
-            } else {
+            }
+            else {
                 _lookup.clear();
             }
 
-            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ){
+            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ) {
                 BSONObj o = *i;
                 string name = o["_id"].String();
                 string host = o["host"].String();
 
                 long long maxSize = 0;
                 BSONElement maxSizeElem = o[ ShardFields::maxSize.name() ];
-                if ( ! maxSizeElem.eoo() ){
+                if ( ! maxSizeElem.eoo() ) {
                     maxSize = maxSizeElem.numberLong();
                 }
 
                 bool isDraining = false;
                 BSONElement isDrainingElem = o[ ShardFields::draining.name() ];
-                if ( ! isDrainingElem.eoo() ){
+                if ( ! isDrainingElem.eoo() ) {
                     isDraining = isDrainingElem.Bool();
                 }
 
@@ -85,14 +86,14 @@ namespace mongo {
             }
 
         }
-        
-        bool isMember( const string& addr ){
+
+        bool isMember( const string& addr ) {
             scoped_lock lk( _mutex );
             map<string,Shard>::iterator i = _lookup.find( addr );
             return i != _lookup.end();
         }
 
-        const Shard& find( const string& ident ){
+        const Shard& find( const string& ident ) {
             string mykey = ident;
 
             {
@@ -109,17 +110,17 @@ namespace mongo {
                 if ( i != _lookup.end() )
                     return i->second;
             }
-            
+
             // not in our maps, re-load all
             reload();
 
             scoped_lock lk( _mutex );
             map<string,Shard>::iterator i = _lookup.find( mykey );
             uassert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
-            return i->second;        
+            return i->second;
         }
-        
-        void set( const string& name , const string& addr , bool setName = true , bool setAddr = true ){
+
+        void set( const string& name , const string& addr , bool setName = true , bool setAddr = true ) {
             Shard s(name,addr);
             scoped_lock lk( _mutex );
             if ( setName )
@@ -127,23 +128,24 @@ namespace mongo {
             if ( setAddr )
                 _lookup[addr] = s;
         }
-        
-        void remove( const string& name ){
+
+        void remove( const string& name ) {
             scoped_lock lk( _mutex );
-            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ){
+            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ) {
                 Shard s = i->second;
-                if ( s.getName() == name ){
+                if ( s.getName() == name ) {
                     _lookup.erase(i++);
-                } else {
+                }
+                else {
                     ++i;
                 }
             }
         }
 
-        void getAllShards( vector<Shard>& all ){
+        void getAllShards( vector<Shard>& all ) {
             scoped_lock lk( _mutex );
             std::set<string> seen;
-            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ++i ){
+            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
                 Shard s = i->second;
                 if ( s.getName() == "config" )
                     continue;
@@ -156,17 +158,17 @@ namespace mongo {
 
     private:
         map<string,Shard> _lookup;
-        mongo::mutex _mutex;        
+        mongo::mutex _mutex;
     } staticShardInfo;
-    
-    void Shard::setAddress( const string& addr , bool authoritative ){
+
+    void Shard::setAddress( const string& addr , bool authoritative ) {
         assert( _name.size() );
         _addr = addr;
         if ( authoritative )
             staticShardInfo.set( _name , _addr , true , false );
     }
-    
-    void Shard::reset( const string& ident ){
+
+    void Shard::reset( const string& ident ) {
         const Shard& s = staticShardInfo.find( ident );
         uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
@@ -174,28 +176,28 @@ namespace mongo {
         _maxSize = s._maxSize;
         _isDraining = s._isDraining;
     }
-    
-    void Shard::getAllShards( vector<Shard>& all ){
+
+    void Shard::getAllShards( vector<Shard>& all ) {
         staticShardInfo.getAllShards( all );
     }
 
-    bool Shard::isAShard( const string& ident ){
+    bool Shard::isAShard( const string& ident ) {
         return staticShardInfo.isMember( ident );
     }
 
-    void Shard::printShardInfo( ostream& out ){
+    void Shard::printShardInfo( ostream& out ) {
         vector<Shard> all;
         getAllShards( all );
         for ( unsigned i=0; i<all.size(); i++ )
             out << all[i].toString() << "\n";
         out.flush();
     }
-    
+
     BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
         ScopedDbConnection conn( this );
         BSONObj res;
         bool ok = conn->runCommand( db , cmd , res );
-        if ( ! ok ){
+        if ( ! ok ) {
             stringstream ss;
             ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
             throw UserException( 13136 , ss.str() );
@@ -204,41 +206,41 @@ namespace mongo {
         conn.done();
         return res;
     }
-    
+
     ShardStatus Shard::getStatus() const {
         return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
     }
-    
-    void Shard::reloadShardInfo(){
+
+    void Shard::reloadShardInfo() {
         staticShardInfo.reload();
     }
 
 
-    bool Shard::isMember( const string& addr ){
+    bool Shard::isMember( const string& addr ) {
         return staticShardInfo.isMember( addr );
     }
-  
-    void Shard::removeShard( const string& name ){
+
+    void Shard::removeShard( const string& name ) {
         staticShardInfo.remove( name );
     }
 
-    Shard Shard::pick( const Shard& current ){
+    Shard Shard::pick( const Shard& current ) {
         vector<Shard> all;
         staticShardInfo.getAllShards( all );
-        if ( all.size() == 0 ){
+        if ( all.size() == 0 ) {
             staticShardInfo.reload();
             staticShardInfo.getAllShards( all );
             if ( all.size() == 0 )
                 return EMPTY;
         }
-        
+
         // if current shard was provided, pick a different shard only if it is a better choice
         ShardStatus best = all[0].getStatus();
-        if ( current != EMPTY ){
+        if ( current != EMPTY ) {
             best = current.getStatus();
         }
-            
-        for ( size_t i=0; i<all.size(); i++ ){
+
+        for ( size_t i=0; i<all.size(); i++ ) {
             ShardStatus t = all[i].getStatus();
             if ( t < best )
                 best = t;

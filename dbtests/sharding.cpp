@@ -27,17 +27,17 @@ namespace ShardingTests {
     namespace serverandquerytests {
         class test1 {
         public:
-            void run(){
+            void run() {
                 ServerAndQuery a( "foo:1" , BSON( "a" << GT << 0 << LTE << 100 ) );
                 ServerAndQuery b( "foo:1" , BSON( "a" << GT << 200 << LTE << 1000 ) );
-                
+
                 ASSERT( a < b );
                 ASSERT( ! ( b < a ) );
 
                 set<ServerAndQuery> s;
                 s.insert( a );
                 s.insert( b );
-                
+
                 ASSERT_EQUALS( (unsigned int)2 , s.size() );
             }
         };
@@ -45,12 +45,12 @@ namespace ShardingTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "sharding" ){
+        All() : Suite( "sharding" ) {
         }
 
-        void setupTests(){
+        void setupTests() {
             add< serverandquerytests::test1 >();
         }
     } myall;
-        
+
 }

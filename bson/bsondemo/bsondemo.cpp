@@ -1,4 +1,4 @@
-/** @file bsondemo.cpp 
+/** @file bsondemo.cpp
 
     Example of use of BSON from C++.
 
@@ -29,16 +29,15 @@
 using namespace std;
 using namespace bson;
 
-void iter(bo o) { 
+void iter(bo o) {
     /* iterator example */
     cout << "\niter()\n";
-    for( bo::iterator i(o); i.more(); ) { 
+    for( bo::iterator i(o); i.more(); ) {
         cout << ' ' << i.next().toString() << '\n';
     }
 }
 
-int main()
-{
+int main() {
     cout << "build bits: " << 8 * sizeof(char *) << '\n' <<  endl;
 
     /* a bson object defaults on construction to { } */
@@ -47,7 +46,7 @@ int main()
 
     /* make a simple { name : 'joe', age : 33.7 } object */
     {
-        bob b; 
+        bob b;
         b.append("name", "joe");
         b.append("age", 33.7);
         b.obj();
@@ -73,7 +72,7 @@ int main()
 
     /* reach in and get subobj.z */
     cout << "subobj.z: " << y.getFieldDotted("subobj.z").Number() << endl;
- 
+
     /* alternate syntax: */
     cout << "subobj.z: " << y["subobj"]["z"].Number() << endl;
 
@@ -83,19 +82,19 @@ int main()
     cout << v[0] << endl;
 
     /* into an array */
-    list<be> L; 
+    list<be> L;
     y.elems(L);
 
     bo sub = y["subobj"].Obj();
 
-    /* grab all the int's that were in subobj.  if it had elements that were not ints, we throw an exception 
-       (capital V on Vals() means exception if wrong type found 
+    /* grab all the int's that were in subobj.  if it had elements that were not ints, we throw an exception
+       (capital V on Vals() means exception if wrong type found
     */
     vector<int> myints;
     sub.Vals(myints);
     cout << "my ints: " << myints[0] << ' ' << myints[1] << endl;
 
-    /* grab all the string values from x.  if the field isn't of string type, just skip it -- 
+    /* grab all the string values from x.  if the field isn't of string type, just skip it --
        lowercase v on vals() indicates skip don't throw.
     */
     vector<string> strs;

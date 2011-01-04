@@ -25,19 +25,19 @@ namespace mongo {
     const char rsoplog[] = "local.oplog.rs";
 
     /*
-    class RSOpTime : public OpTime { 
+    class RSOpTime : public OpTime {
     public:
         bool initiated() const { return getSecs() != 0; }
     };*/
 
-    /*struct RSOpTime { 
+    /*struct RSOpTime {
         unsigned long long ord;
 
         RSOpTime() : ord(0) { }
 
         bool initiated() const { return ord > 0; }
 
-        void initiate() { 
+        void initiate() {
             assert( !initiated() );
             ord = 1000000;
         }

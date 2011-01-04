@@ -35,7 +35,7 @@ namespace mongo {
 
     struct ShardNS {
         static string shard;
-        
+
         static string database;
         static string collection;
         static string chunk;
@@ -51,7 +51,7 @@ namespace mongo {
         static BSONField<bool> draining;      // is it draining chunks?
         static BSONField<long long> maxSize;  // max allowed disk space usage
     };
-        
+
     class ConfigServer;
 
     class DBConfig;
@@ -66,17 +66,17 @@ namespace mongo {
     class DBConfig  {
 
         struct CollectionInfo {
-            CollectionInfo(){
+            CollectionInfo() {
                 _dirty = false;
                 _dropped = false;
             }
-            
+
             CollectionInfo( const BSONObj& in );
-            
+
             bool isSharded() const {
                 return _cm.get();
             }
-            
+
             ChunkManagerPtr getCM() const {
                 return _cm;
             }
@@ -86,41 +86,41 @@ namespace mongo {
 
             bool isDirty() const { return _dirty; }
             bool wasDropped() const { return _dropped; }
-            
+
             void save( const string& ns , DBClientBase* conn );
-            
+
 
         private:
             ChunkManagerPtr _cm;
             bool _dirty;
             bool _dropped;
         };
-        
+
         typedef map<string,CollectionInfo> Collections;
-        
+
     public:
 
-        DBConfig( string name ) 
-            : _name( name ) , 
-              _primary("config","") , 
-              _shardingEnabled(false), 
-              _lock("DBConfig"){
+        DBConfig( string name )
+            : _name( name ) ,
+              _primary("config","") ,
+              _shardingEnabled(false),
+              _lock("DBConfig") {
             assert( name.size() );
         }
-        virtual ~DBConfig(){}
-        
-        string getName(){ return _name; };
+        virtual ~DBConfig() {}
+
+        string getName() { return _name; };
 
         /**
          * @return if anything in this db is partitioned or not
          */
-        bool isShardingEnabled(){
+        bool isShardingEnabled() {
             return _shardingEnabled;
         }
-        
+
         void enableSharding();
         ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
-        
+
         /**
            @return true if there was sharding info to remove
          */
@@ -130,25 +130,25 @@ namespace mongo {
          * @return whether or not the 'ns' collection is partitioned
          */
         bool isSharded( const string& ns );
-        
+
         ChunkManagerPtr getChunkManager( const string& ns , bool reload = false );
-        
+
         /**
          * @return the correct for shard for the ns
          * if the namespace is sharded, will return NULL
          */
         const Shard& getShard( const string& ns );
-        
+
         const Shard& getPrimary() const {
             uassert( 8041 , (string)"no primary shard configured for db: " + _name , _primary.ok() );
             return _primary;
         }
-        
+
         void setPrimary( string s );
 
         bool load();
         bool reload();
-        
+
         bool dropDatabase( string& errmsg );
 
         // model stuff
@@ -162,7 +162,7 @@ namespace mongo {
 
     protected:
 
-        /** 
+        /**
             lockless
         */
         bool _isSharded( const string& ns );
@@ -176,7 +176,7 @@ namespace mongo {
         string _name; // e.g. "alleyinsider"
         Shard _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
-        
+
         //map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
         //map<string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
 
@@ -190,34 +190,34 @@ namespace mongo {
 
         ConfigServer();
         ~ConfigServer();
-        
+
         bool ok( bool checkConsistency = false );
-        
-        virtual string modelServer(){
+
+        virtual string modelServer() {
             uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
             return _primary.getConnString();
         }
-        
+
         /**
-           call at startup, this will initiate connection to the grid db 
+           call at startup, this will initiate connection to the grid db
         */
         bool init( vector<string> configHosts );
-        
+
         bool init( string s );
 
         bool allUp();
         bool allUp( string& errmsg );
-        
+
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );
-        
+
         void reloadSettings();
 
         /**
          * @return 0 = ok, otherwise error #
          */
         int checkConfigVersion( bool upgrade );
-        
+
         /**
          * Create a metadata change log entry in the config.changelog collection.
          *
@@ -236,7 +236,7 @@ namespace mongo {
         void replicaSetChange( const ReplicaSetMonitor * monitor );
 
         static int VERSION;
-        
+
 
         /**
          * check to see if all config servers have the same state

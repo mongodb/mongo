@@ -28,13 +28,13 @@ namespace mongo {
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
-    int __findingStartInitialTimeout = 5; // configurable for testing    
+    int __findingStartInitialTimeout = 5; // configurable for testing
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static NamespaceDetails *localOplogMainDetails = 0;
     static Database *localDB = 0;
     static NamespaceDetails *rsOplogDetails = 0;
-    void oplogCheckCloseDatabase( Database * db ){
+    void oplogCheckCloseDatabase( Database * db ) {
         localDB = 0;
         localOplogMainDetails = 0;
         rsOplogDetails = 0;
@@ -45,10 +45,10 @@ namespace mongo {
         uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
     }
 
-    /** write an op to the oplog that is already built. 
+    /** write an op to the oplog that is already built.
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
-    void _logOpObjRS(const BSONObj& op) { 
+    void _logOpObjRS(const BSONObj& op) {
         DEV assertInWriteLock();
 
         const OpTime ts = op["ts"]._opTime();
@@ -83,7 +83,7 @@ namespace mongo {
         }
     }
 
-    /** given a BSON object, create a new one at dst which is the existing (partial) object 
+    /** given a BSON object, create a new one at dst which is the existing (partial) object
         with a new object element appended at the end with fieldname "o".
 
         @param partial already build object with everything except the o member.  e.g. something like:
@@ -117,8 +117,8 @@ namespace mongo {
         DEV assertInWriteLock();
         // ^- static is safe as we are in write lock
         static BufBuilder bufbuilder(8*1024);
-        
-        if ( strncmp(ns, "local.", 6) == 0 ){
+
+        if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
                 resetSlaveCache();
             return;
@@ -127,7 +127,7 @@ namespace mongo {
         const OpTime ts = OpTime::now();
 
         long long hashNew;
-        if( theReplSet ) { 
+        if( theReplSet ) {
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
             hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
@@ -215,9 +215,9 @@ namespace mongo {
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
         DEV assertInWriteLock();
         static BufBuilder bufbuilder(8*1024);
-        
-        if ( strncmp(ns, "local.", 6) == 0 ){
-            if ( strncmp(ns, "local.slaves", 12) == 0 ){
+
+        if ( strncmp(ns, "local.", 6) == 0 ) {
+            if ( strncmp(ns, "local.slaves", 12) == 0 ) {
                 resetSlaveCache();
             }
             return;
@@ -225,7 +225,7 @@ namespace mongo {
 
         const OpTime ts = OpTime::now();
         Client::Context context;
-        
+
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
@@ -256,7 +256,8 @@ namespace mongo {
             }
             Client::Context ctx( logNS , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
-        } else {
+        }
+        else {
             Client::Context ctx( logNS, dbpath, 0, false );
             assert( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
@@ -275,17 +276,17 @@ namespace mongo {
     }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;
-    void newReplUp() { 
+    void newReplUp() {
         replSettings.master = true;
-        _logOp = _logOpRS; 
+        _logOp = _logOpRS;
     }
-    void newRepl() { 
+    void newRepl() {
         replSettings.master = true;
-        _logOp = _logOpUninitialized; 
+        _logOp = _logOpUninitialized;
     }
     void oldRepl() { _logOp = _logOpOld; }
 
-    void logKeepalive() { 
+    void logKeepalive() {
         _logOp("n", "", 0, BSONObj(), 0, 0);
     }
     void logOpComment(const BSONObj& obj) {
@@ -306,9 +307,9 @@ namespace mongo {
         if ( replSettings.master ) {
             _logOp(opstr, ns, 0, obj, patt, b);
         }
-        
+
         logOpForSharding( opstr , ns , obj , patt );
-    }    
+    }
 
     void createOplog() {
         dblock lk;
@@ -320,15 +321,15 @@ namespace mongo {
             ns = rsoplog;
 
         Client::Context ctx(ns);
-        
+
         NamespaceDetails * nsd = nsdetails( ns );
 
         if ( nsd ) {
-            
-            if ( cmdLine.oplogSize != 0 ){
+
+            if ( cmdLine.oplogSize != 0 ) {
                 int o = (int)(nsd->storageSize() / ( 1024 * 1024 ) );
                 int n = (int)(cmdLine.oplogSize / ( 1024 * 1024 ) );
-                if ( n != o ){
+                if ( n != o ) {
                     stringstream ss;
                     ss << "cmdline oplogsize (" << n << ") different than existing (" << o << ") see: http://dochub.mongodb.org/core/increase-oplog";
                     log() << ss.str() << endl;
@@ -345,19 +346,19 @@ namespace mongo {
             }
             return;
         }
-        
+
         /* create an oplog collection, if it doesn't yet exist. */
         BSONObjBuilder b;
         double sz;
         if ( cmdLine.oplogSize != 0 )
             sz = (double)cmdLine.oplogSize;
         else {
-			/* not specified. pick a default size */
+            /* not specified. pick a default size */
             sz = 50.0 * 1000 * 1000;
             if ( sizeof(int *) >= 8 ) {
 #if defined(__APPLE__)
-				// typically these are desktops (dev machines), so keep it smallish
-				sz = (256-64) * 1000 * 1000;
+                // typically these are desktops (dev machines), so keep it smallish
+                sz = (256-64) * 1000 * 1000;
 #else
                 sz = 990.0 * 1000 * 1000;
                 boost::intmax_t free = freeSpace(); //-1 if call not supported.
@@ -408,7 +409,7 @@ namespace mongo {
         DEV assert( !dbMutex.isWriteLocked() );
 
         Client *c = currentClient.get();
-        if( c == 0 ) { 
+        if( c == 0 ) {
             Client::initThread("pretouchN");
             c = &cc();
         }
@@ -426,7 +427,7 @@ namespace mongo {
                 continue;
             /* todo : other operations */
 
-            try { 
+            try {
                 BSONObj o = op.getObjectField(which);
                 BSONElement _id;
                 if( o.getObjectID(_id) ) {
@@ -439,7 +440,7 @@ namespace mongo {
                         _dummy_z += result.objsize(); // touch
                 }
             }
-            catch( DBException& e ) { 
+            catch( DBException& e ) {
                 log() << "ignoring assertion in pretouchN() " << a << ' ' << b << ' ' << i << ' ' << e.toString() << endl;
             }
         }
@@ -460,7 +461,7 @@ namespace mongo {
             return;
         /* todo : other operations */
 
-        try { 
+        try {
             BSONObj o = op.getObjectField(which);
             BSONElement _id;
             if( o.getObjectID(_id) ) {
@@ -474,17 +475,17 @@ namespace mongo {
                     _dummy_z += result.objsize(); // touch
             }
         }
-        catch( DBException& ) { 
+        catch( DBException& ) {
             log() << "ignoring assertion in pretouchOperation()" << endl;
         }
     }
 
-    void applyOperation_inlock(const BSONObj& op , bool fromRepl ){
+    void applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
         OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
 
-        if( logLevel >= 6 ) 
+        if( logLevel >= 6 )
             log() << "applying op: " << op << endl;
-        
+
         assertInWriteLock();
 
         OpDebug debug;
@@ -516,11 +517,11 @@ namespace mongo {
                 else {
                     BSONObjBuilder b;
                     b.append(_id);
-                    
-                    /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
-                    RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow 
 
-                    /* todo : it may be better to do an insert here, and then catch the dup key exception and do update 
+                    /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
+                    RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow
+
+                    /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
                               */
                     updateObjects(ns, o, b.done(), true, false, false , debug );
@@ -529,7 +530,7 @@ namespace mongo {
         }
         else if ( *opType == 'u' ) {
             opCounters->gotUpdate();
-            
+
             RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
             updateObjects(ns, o, op.getObjectField("o2"), /*upsert*/ op.getBoolField("b"), /*multi*/ false, /*logop*/ false , debug );
         }
@@ -544,7 +545,7 @@ namespace mongo {
         else if ( *opType == 'n' ) {
             // no op
         }
-        else if ( *opType == 'c' ){
+        else if ( *opType == 'c' ) {
             opCounters->gotCommand();
 
             BufBuilder bb;
@@ -556,9 +557,9 @@ namespace mongo {
             ss << "unknown opType [" << opType << "]";
             throw MsgAssertionException( 13141 , ss.str() );
         }
-        
+
     }
-    
+
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }
@@ -568,17 +569,18 @@ namespace mongo {
             help << "examples: { applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            
-            if ( cmdObj.firstElement().type() != Array ){
+
+            if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";
                 return false;
             }
-            
+
             BSONObj ops = cmdObj.firstElement().Obj();
-            
-            { // check input
+
+            {
+                // check input
                 BSONObjIterator i( ops );
-                while ( i.more() ){
+                while ( i.more() ) {
                     BSONElement e = i.next();
                     if ( e.type() == Object )
                         continue;
@@ -587,16 +589,16 @@ namespace mongo {
                     return false;
                 }
             }
-            
-            if ( cmdObj["preCondition"].type() == Array ){
+
+            if ( cmdObj["preCondition"].type() == Array ) {
                 BSONObjIterator i( cmdObj["preCondition"].Obj() );
-                while ( i.more() ){
+                while ( i.more() ) {
                     BSONObj f = i.next().Obj();
-                    
+
                     BSONObj realres = db.findOne( f["ns"].String() , f["q"].Obj() );
-                    
+
                     Matcher m( f["res"].Obj() );
-                    if ( ! m.matches( realres ) ){
+                    if ( ! m.matches( realres ) ) {
                         result.append( "got" , realres );
                         result.append( "whatFailed" , f );
                         errmsg = "pre-condition failed";
@@ -604,24 +606,24 @@ namespace mongo {
                     }
                 }
             }
-            
+
             // apply
             int num = 0;
             BSONObjIterator i( ops );
-            while ( i.more() ){
+            while ( i.more() ) {
                 BSONElement e = i.next();
                 applyOperation_inlock( e.Obj() , false );
                 num++;
             }
-            
+
             result.append( "applied" , num );
 
-            if ( ! fromRepl ){
+            if ( ! fromRepl ) {
                 // We want this applied atomically on slaves
                 // so we re-wrap without the pre-condition for speed
-                
+
                 string tempNS = str::stream() << dbname << ".$cmd";
-                
+
                 logOp( "c" , tempNS.c_str() , cmdObj.firstElement().wrap() );
             }
 
@@ -629,7 +631,7 @@ namespace mongo {
         }
 
         DBDirectClient db;
-        
+
     } applyOpsCmd;
 
 }

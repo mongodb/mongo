@@ -1,10 +1,10 @@
-/** @file bson_db.h 
+/** @file bson_db.h
 
-    This file contains the implementation of BSON-related methods that are required 
+    This file contains the implementation of BSON-related methods that are required
     by the MongoDB database server.
 
-    Normally, for standalone BSON usage, you do not want this file - it will tend to 
-    pull in some other files from the MongoDB project. Thus, bson.h (the main file 
+    Normally, for standalone BSON usage, you do not want this file - it will tend to
+    pull in some other files from the MongoDB project. Thus, bson.h (the main file
     one would use) does not include this file.
 */
 
@@ -35,10 +35,10 @@ namespace mongo {
     Append a timestamp element to the object being ebuilt.
     @param time - in millis (but stored in seconds)
     */
-    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( const StringData& fieldName , unsigned long long time , unsigned int inc ){
+    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( const StringData& fieldName , unsigned long long time , unsigned int inc ) {
         OpTime t( (unsigned) (time / 1000) , inc );
         appendTimestamp( fieldName , t.asDate() );
-        return *this; 
+        return *this;
     }
 
     inline OpTime BSONElement::_opTime() const {
@@ -48,7 +48,7 @@ namespace mongo {
     }
 
     inline string BSONElement::_asCode() const {
-        switch( type() ){
+        switch( type() ) {
         case mongo::String:
         case Code:
             return string(valuestr(), valuestrsize()-1);
@@ -61,19 +61,19 @@ namespace mongo {
         return "";
     }
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(DateNowLabeler& id){
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(DateNowLabeler& id) {
         _builder->appendDate(_fieldName, jsTime());
         _fieldName = 0;
         return *_builder;
     }
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MinKeyLabeler& id){
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MinKeyLabeler& id) {
         _builder->appendMinKey(_fieldName);
         _fieldName = 0;
         return *_builder;
     }
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MaxKeyLabeler& id){
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MaxKeyLabeler& id) {
         _builder->appendMaxKey(_fieldName);
         _fieldName = 0;
         return *_builder;

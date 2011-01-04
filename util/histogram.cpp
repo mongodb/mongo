@@ -28,30 +28,31 @@ namespace mongo {
     using std::setfill;
     using std::setw;
 
-    Histogram::Histogram( const Options& opts ) 
+    Histogram::Histogram( const Options& opts )
         : _initialValue( opts.initialValue )
         , _numBuckets( opts.numBuckets )
         , _boundaries( new uint32_t[_numBuckets] )
-        , _buckets( new uint64_t[_numBuckets] ){
+        , _buckets( new uint64_t[_numBuckets] ) {
 
         // TODO more sanity checks
         // + not too few buckets
         // + initialBucket and bucketSize fit within 32 bit ints
 
         // _boundaries store the maximum value falling in that bucket.
-        if ( opts.exponential ){
+        if ( opts.exponential ) {
             uint32_t twoPow = 1; // 2^0
-            for ( uint32_t i = 0; i < _numBuckets - 1; i++){
+            for ( uint32_t i = 0; i < _numBuckets - 1; i++) {
                 _boundaries[i] = _initialValue + opts.bucketSize * twoPow;
                 twoPow *= 2;     // 2^i+1
             }
-        } else {
+        }
+        else {
             _boundaries[0] = _initialValue + opts.bucketSize;
-            for ( uint32_t i = 1; i < _numBuckets - 1; i++ ){
+            for ( uint32_t i = 1; i < _numBuckets - 1; i++ ) {
                 _boundaries[i] = _boundaries[ i-1 ] + opts.bucketSize;
             }
         }
-        _boundaries[ _numBuckets-1 ] = std::numeric_limits<uint32_t>::max();            
+        _boundaries[ _numBuckets-1 ] = std::numeric_limits<uint32_t>::max();
 
         for ( uint32_t i = 0; i < _numBuckets; i++ ) {
             _buckets[i] = 0;
@@ -63,16 +64,16 @@ namespace mongo {
         delete [] _buckets;
     }
 
-    void Histogram::insert( uint32_t element ){
+    void Histogram::insert( uint32_t element ) {
         if ( element < _initialValue) return;
 
         _buckets[ _findBucket(element) ] += 1;
     }
 
-    string Histogram::toHTML() const{
+    string Histogram::toHTML() const {
         uint64_t max = 0;
-        for ( uint32_t i = 0; i < _numBuckets; i++ ){
-            if ( _buckets[i] > max ){
+        for ( uint32_t i = 0; i < _numBuckets; i++ ) {
+            if ( _buckets[i] > max ) {
                 max = _buckets[i];
             }
         }
@@ -83,10 +84,10 @@ namespace mongo {
         // normalize buckets to max
         const int maxBar = 20;
         ostringstream ss;
-        for ( uint32_t i = 0; i < _numBuckets; i++ ){
+        for ( uint32_t i = 0; i < _numBuckets; i++ ) {
             int barSize = _buckets[i] * maxBar / max;
-            ss << string( barSize,'*' ) 
-               << setfill(' ') << setw( maxBar-barSize + 12 ) 
+            ss << string( barSize,'*' )
+               << setfill(' ') << setw( maxBar-barSize + 12 )
                << _boundaries[i] << '\n';
         }
 
@@ -109,21 +110,22 @@ namespace mongo {
         return _numBuckets;
     }
 
-    uint32_t Histogram::_findBucket( uint32_t element ) const{
+    uint32_t Histogram::_findBucket( uint32_t element ) const {
         // TODO assert not too small a value?
 
         uint32_t low = 0;
         uint32_t high = _numBuckets - 1;
-        while ( low < high ){
+        while ( low < high ) {
             // low + ( (high - low) / 2 );
             uint32_t mid = ( low + high ) >> 1;
-            if ( element > _boundaries[ mid ] ){
+            if ( element > _boundaries[ mid ] ) {
                 low = mid + 1;
-            } else {
+            }
+            else {
                 high = mid;
             }
         }
         return low;
-    }        
+    }
 
 }  // namespace mongo

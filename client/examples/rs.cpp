@@ -25,16 +25,16 @@
 using namespace mongo;
 using namespace std;
 
-int main( int argc , const char ** argv ){
+int main( int argc , const char ** argv ) {
     string errmsg;
-    ConnectionString cs = ConnectionString::parse( "foo/127.0.0.1" , errmsg ); 
-    if ( ! cs.isValid() ){
+    ConnectionString cs = ConnectionString::parse( "foo/127.0.0.1" , errmsg );
+    if ( ! cs.isValid() ) {
         cout << "error parsing url: " << errmsg << endl;
         return 1;
     }
-    
+
     DBClientReplicaSet * conn = (DBClientReplicaSet*)cs.connect( errmsg );
-    if ( ! conn ){
+    if ( ! conn ) {
         cout << "error connecting: " << errmsg << endl;
         return 2;
     }
@@ -42,17 +42,17 @@ int main( int argc , const char ** argv ){
     string collName = "test.rs1";
 
     conn->dropCollection( collName );
-    while ( true ){
+    while ( true ) {
         try {
             conn->update( collName , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , true );
             cout << conn->findOne( collName , BSONObj() ) << endl;
             cout << "\t A" << conn->slaveConn().findOne( collName , BSONObj() , 0 , QueryOption_SlaveOk ) << endl;
             cout << "\t B " << conn->findOne( collName , BSONObj() , 0 , QueryOption_SlaveOk ) << endl;
         }
-        catch ( std::exception& e ){
+        catch ( std::exception& e ) {
             cout << "ERROR: " << e.what() << endl;
         }
         sleepsecs( 1 );
     }
-    
+
 }

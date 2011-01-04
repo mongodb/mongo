@@ -26,7 +26,7 @@ namespace mongo {
         bool _inclusive;
         bool operator==( const FieldBound &other ) const {
             return _bound.woCompare( other._bound ) == 0 &&
-            _inclusive == other._inclusive;
+                   _inclusive == other._inclusive;
         }
         void flipInclusive() { _inclusive = !_inclusive; }
     };
@@ -77,7 +77,7 @@ namespace mongo {
             if ( equality() ) {
                 return true;
             }
-            for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {            
+            for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
                 if ( !i->equality() ) {
                     return false;
                 }
@@ -86,14 +86,14 @@ namespace mongo {
         }
         bool nontrivial() const {
             return
-                ! empty() && 
+                ! empty() &&
                 ( _intervals.size() != 1 ||
                   minKey.firstElement().woCompare( min(), false ) != 0 ||
                   maxKey.firstElement().woCompare( max(), false ) != 0 );
         }
         bool empty() const { return _intervals.empty(); }
         void makeEmpty() { _intervals.clear(); }
-		const vector< FieldInterval > &intervals() const { return _intervals; }
+        const vector< FieldInterval > &intervals() const { return _intervals; }
         string getSpecial() const { return _special; }
         void setExclusiveBounds() {
             for( vector< FieldInterval >::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
@@ -121,7 +121,7 @@ namespace mongo {
         vector< BSONObj > _objData;
         string _special;
     };
-    
+
     // implements query pattern matching, used to determine if a query is
     // similar to an earlier query and should use the same plan
     class QueryPattern {
@@ -192,8 +192,8 @@ namespace mongo {
     // the specified direction of traversal.  For example, given a simple index {i:1}
     // and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
     // would be valid for index {i:-1} with direction -1.
-    typedef vector< pair< BSONObj, BSONObj > > BoundList;	
-    
+    typedef vector< pair< BSONObj, BSONObj > > BoundList;
+
     // ranges of fields' value that may be determined from query -- used to
     // determine index limits
     class FieldRangeSet {
@@ -209,13 +209,13 @@ namespace mongo {
             map< string, FieldRange >::const_iterator f = _ranges.find( fieldName );
             if ( f == _ranges.end() )
                 return trivialRange();
-            return f->second;            
+            return f->second;
         }
         FieldRange &range( const char *fieldName ) {
             map< string, FieldRange >::iterator f = _ranges.find( fieldName );
             if ( f == _ranges.end() )
                 return trivialRange();
-            return f->second;            
+            return f->second;
         }
         int nNontrivialRanges() const {
             int count = 0;
@@ -236,7 +236,7 @@ namespace mongo {
         }
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         string getSpecial() const;
-        // Btree scanning for a multidimentional key range will yield a 
+        // Btree scanning for a multidimentional key range will yield a
         // multidimensional box.  The idea here is that if an 'other'
         // multidimensional box contains the current box we don't have to scan
         // the current box.  If the 'other' box contains the current box in
@@ -258,22 +258,25 @@ namespace mongo {
                 if ( cmp == 0 ) {
                     if ( i->second <= j->second ) {
                         // nothing
-                    } else {
+                    }
+                    else {
                         ++nUnincluded;
                         unincludedKey = i->first;
                     }
                     ++i;
                     ++j;
-                } else if ( cmp < 0 ) {
+                }
+                else if ( cmp < 0 ) {
                     ++i;
-                } else {
+                }
+                else {
                     // other has a bound we don't, nothing can be done
                     return *this;
                 }
             }
             if ( j != other._ranges.end() ) {
                 // other has a bound we don't, nothing can be done
-                return *this;                
+                return *this;
             }
             if ( nUnincluded > 1 ) {
                 return *this;
@@ -296,23 +299,25 @@ namespace mongo {
                     i->second &= j->second;
                     ++i;
                     ++j;
-                } else if ( cmp < 0 ) {
+                }
+                else if ( cmp < 0 ) {
                     ++i;
-                } else {
+                }
+                else {
                     _ranges[ j->first ] = j->second;
                     ++j;
                 }
             }
             while( j != other._ranges.end() ) {
                 _ranges[ j->first ] = j->second;
-                ++j;                
+                ++j;
             }
             appendQueries( other );
             return *this;
         }
         // TODO get rid of this
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
-        
+
         /**
          * @return - A new FieldRangeSet based on this FieldRangeSet, but with only
          * a subset of the fields.
@@ -323,8 +328,8 @@ namespace mongo {
     private:
         void appendQueries( const FieldRangeSet &other ) {
             for( vector< BSONObj >::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
-                _queries.push_back( *i );                
-            }                        
+                _queries.push_back( *i );
+            }
         }
         void makeEmpty() {
             for( map< string, FieldRange >::iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
@@ -342,7 +347,7 @@ namespace mongo {
     };
 
     class IndexSpec;
-    
+
     /**
      * This class manages the ranges of valid element values for each field in
      * an ordered list of signed fields corresponding to an index specification.
@@ -355,8 +360,7 @@ namespace mongo {
          * @direction The direction of index traversal
          */
         FieldRangeVector( const FieldRangeSet &frs, const BSONObj &keyPattern, int direction )
-        :_keyPattern( keyPattern ), _direction( direction >= 0 ? 1 : -1 )
-        {
+            :_keyPattern( keyPattern ), _direction( direction >= 0 ? 1 : -1 ) {
             _queries = frs._queries;
             BSONObjIterator i( _keyPattern );
             while( i.more() ) {
@@ -365,7 +369,8 @@ namespace mongo {
                 bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
                 if ( forward ) {
                     _ranges.push_back( frs.range( e.fieldName() ) );
-                } else {
+                }
+                else {
                     _ranges.push_back( FieldRange() );
                     frs.range( e.fieldName() ).reverse( _ranges.back() );
                 }
@@ -379,14 +384,14 @@ namespace mongo {
                 ret *= i->intervals().size();
             }
             return ret;
-        }        
+        }
         BSONObj startKey() const {
             BSONObjBuilder b;
             for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
                 const FieldInterval &fi = i->intervals().front();
                 b.appendAs( fi._lower._bound, "" );
             }
-            return b.obj();            
+            return b.obj();
         }
         BSONObj endKey() const {
             BSONObjBuilder b;
@@ -394,7 +399,7 @@ namespace mongo {
                 const FieldInterval &fi = i->intervals().back();
                 b.appendAs( fi._upper._bound, "" );
             }
-            return b.obj();            
+            return b.obj();
         }
         BSONObj obj() const {
             BSONObjBuilder b;
@@ -402,7 +407,7 @@ namespace mongo {
             for( int i = 0; i < (int)_ranges.size(); ++i ) {
                 BSONArrayBuilder a( b.subarrayStart( k.next().fieldName() ) );
                 for( vector< FieldInterval >::const_iterator j = _ranges[ i ].intervals().begin();
-                    j != _ranges[ i ].intervals().end(); ++j ) {
+                        j != _ranges[ i ].intervals().end(); ++j ) {
                     a << BSONArray( BSON_ARRAY( j->_lower._bound << j->_upper._bound ).clientReadable() );
                 }
                 a.done();
@@ -440,7 +445,8 @@ namespace mongo {
                     for( unsigned j = i + 1; j < _i.size(); ++j ) {
                         _i[ j ] = 0;
                     }
-                } else {
+                }
+                else {
                     _i[ 0 ] = _v._ranges[ 0 ].intervals().size();
                 }
                 return ok();
@@ -482,7 +488,7 @@ namespace mongo {
                     const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
                     b.appendAs( fi._upper._bound, "" );
                 }
-                return b.obj();            
+                return b.obj();
             }
             // check
         private:
@@ -502,7 +508,7 @@ namespace mongo {
         // This IndexSpec is lazily constructed directly from _keyPattern if needed.
         mutable shared_ptr< IndexSpec > _indexSpec;
     };
-        
+
     // generages FieldRangeSet objects, accounting for or clauses
     class FieldRangeOrSet {
     public:
@@ -522,7 +528,7 @@ namespace mongo {
         void popOrClause( const BSONObj &indexSpec = BSONObj() );
         FieldRangeSet *topFrs() const {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
-            if (_orSets.size()){
+            if (_orSets.size()) {
                 *ret &= _orSets.front();
             }
             return ret;
@@ -532,10 +538,10 @@ namespace mongo {
         // used instead of more precise bounds, they should
         FieldRangeSet *topFrsOriginal() const {
             FieldRangeSet *ret = new FieldRangeSet( _baseSet );
-            if (_originalOrSets.size()){
+            if (_originalOrSets.size()) {
                 *ret &= _originalOrSets.front();
             }
-            return ret;            
+            return ret;
         }
         void allClausesSimplified( vector< BSONObj > &ret ) const {
             for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
@@ -554,7 +560,7 @@ namespace mongo {
         list< FieldRangeSet > _oldOrSets; // make sure memory is owned
         bool _orFound;
     };
-    
+
     /** returns a string that when used as a matcher, would match a super set of regex()
         returns "" for complex regular expressions
         used to optimize queries in some simple regex cases that start with '^'

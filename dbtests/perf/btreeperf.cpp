@@ -58,7 +58,7 @@ protected:
      * Helper functions for converting a sample value to a sample object with
      * specified _id, to be inserted or removed.
      */
-     
+
     template< class T >
     BSONObj insertObjWithVal( const T &val ) {
         BSONObjBuilder b;
@@ -177,7 +177,7 @@ protected:
         b2.append( "$gte", val );
         b2.done();
         return b1.obj();
-    }    
+    }
     virtual T insertVal() = 0;
     virtual T removeVal() = 0;
 };
@@ -190,8 +190,8 @@ protected:
 class UniformInsertRangedUniformRemoveInteger : public InsertAndRangedRemoveStrategy< long long > {
 public:
     UniformInsertRangedUniformRemoveInteger() :
-    _uniform_int( 0ULL, ~0ULL ),
-    _nextLongLong( randomNumberGenerator, _uniform_int ) {
+        _uniform_int( 0ULL, ~0ULL ),
+        _nextLongLong( randomNumberGenerator, _uniform_int ) {
     }
     /** Small likelihood of duplicates */
     virtual long long insertVal() { return _nextLongLong(); }
@@ -216,10 +216,10 @@ private:
 class UniformInsertRangedUniformRemoveString : public InsertAndRangedRemoveStrategy< string > {
 public:
     UniformInsertRangedUniformRemoveString() :
-    _geometric_distribution( 0.9 ),
-    _nextLength( randomNumberGenerator, _geometric_distribution ),
-    _uniform_char( 'a', 'z' ),
-    _nextChar( randomNumberGenerator, _uniform_char ) {
+        _geometric_distribution( 0.9 ),
+        _nextLength( randomNumberGenerator, _geometric_distribution ),
+        _uniform_char( 'a', 'z' ),
+        _nextChar( randomNumberGenerator, _uniform_char ) {
     }
     /** Small likelihood of duplicates */
     virtual string insertVal() { return nextString(); }
@@ -256,7 +256,7 @@ private:
 class IncreasingInsertRangedUniformRemoveOID : public InsertAndRangedRemoveStrategy< OID > {
 public:
     IncreasingInsertRangedUniformRemoveOID() :
-    _max( -1 ) {
+        _max( -1 ) {
     }
     virtual OID insertVal() { return oidFromULL( ++_max ); }
     virtual OID removeVal() {
@@ -290,10 +290,10 @@ private:
 class IncreasingInsertIncreasingRemoveInteger : public InsertAndRemoveStrategy {
 public:
     IncreasingInsertIncreasingRemoveInteger() :
-      // Start with a large value so data type will be preserved if we round
-      // trip through json.
-      _min( 1LL << 32 ),
-      _max( 1LL << 32 ) {
+        // Start with a large value so data type will be preserved if we round
+        // trip through json.
+        _min( 1LL << 32 ),
+        _max( 1LL << 32 ) {
     }
     virtual BSONObj insertObj() { return insertObjWithVal( ++_max ); }
     virtual BSONObj removeObj() { return removeObjWithVal( _min < _max ? ++_min : _min ); }
@@ -311,27 +311,28 @@ public:
      * specify 5 for this argument.
      */
     BernoulliGenerator( int excessFalsePercent ) :
-    _bernoulli_distribution( 1.0 / ( 2.0 + excessFalsePercent / 100.0 ) ),
-    _generator( randomNumberGenerator, _bernoulli_distribution ) {
+        _bernoulli_distribution( 1.0 / ( 2.0 + excessFalsePercent / 100.0 ) ),
+        _generator( randomNumberGenerator, _bernoulli_distribution ) {
     }
     bool operator()() { return _generator(); }
 private:
     bernoulli_distribution<> _bernoulli_distribution;
-    variate_generator< mt19937&, bernoulli_distribution<> > _generator;    
+    variate_generator< mt19937&, bernoulli_distribution<> > _generator;
 };
 
 /** Runs a strategy on a connection, with specified mix of inserts and removes. */
 class InsertAndRemoveRunner {
 public:
     InsertAndRemoveRunner( DBClientConnection &conn, InsertAndRemoveStrategy &strategy, int excessInsertPercent ) :
-    _conn( conn ),
-    _strategy( strategy ),
-    _nextOpTypeRemove( excessInsertPercent ) {
+        _conn( conn ),
+        _strategy( strategy ),
+        _nextOpTypeRemove( excessInsertPercent ) {
     }
     void writeOne() {
         if ( _nextOpTypeRemove() ) {
             _conn.remove( ns, _strategy.removeObj(), true );
-        } else {
+        }
+        else {
             _conn.insert( ns, _strategy.insertObj() );
         }
     }
@@ -356,14 +357,15 @@ private:
 class InsertAndRemoveScriptGenerator {
 public:
     InsertAndRemoveScriptGenerator( InsertAndRemoveStrategy &strategy, int excessInsertPercent ) :
-    _strategy( strategy ),
-    _nextOpTypeRemove( excessInsertPercent ) {
+        _strategy( strategy ),
+        _nextOpTypeRemove( excessInsertPercent ) {
     }
     void writeOne() {
         if ( _nextOpTypeRemove() ) {
-            cout << "r " << _strategy.removeObj().jsonString() << endl;  
-        } else {
-            cout << "i " << _strategy.insertObj().jsonString() << endl;  
+            cout << "r " << _strategy.removeObj().jsonString() << endl;
+        }
+        else {
+            cout << "i " << _strategy.insertObj().jsonString() << endl;
         }
     }
 private:
@@ -379,14 +381,15 @@ private:
 class InsertAndRemoveScriptRunner {
 public:
     InsertAndRemoveScriptRunner( DBClientConnection &conn ) :
-    _conn( conn ) {
+        _conn( conn ) {
     }
     void writeOne() {
         cin.getline( _buf, 1024 );
         BSONObj val = fromjson( _buf + 2 );
         if ( _buf[ 0 ] == 'r' ) {
             _conn.remove( ns, val, true );
-        } else {
+        }
+        else {
             _conn.insert( ns, val );
         }
     }
@@ -396,7 +399,7 @@ private:
 };
 
 int main( int argc, const char **argv ) {
-    
+
     DBClientConnection conn;
     conn.connect( "127.0.0.1:27017" );
     conn.dropCollection( ns );
@@ -410,13 +413,13 @@ int main( int argc, const char **argv ) {
 //    IncreasingInsertIncreasingRemoveInteger strategy;
 //    InsertAndRemoveScriptGenerator runner( strategy, 5 );
     InsertAndRemoveScriptRunner runner( conn );
-    
+
     Timer t;
     BSONObj statsCmd = BSON( "collstats" << index_collection );
-    
+
     // Print header, unless we are generating a script (in that case, comment this out).
     cout << "ops,milliseconds,docs,totalBucketSize" << endl;
-    
+
     long long i = 0;
     long long n = 10000000000;
     while( i < n ) {

@@ -37,12 +37,12 @@ namespace mongo {
         out() << "exiting" << endl;
         ::exit( returnCode );
     }
-    
-    bool inShutdown(){
+
+    bool inShutdown() {
         return dbexitCalled;
     }
 
-    void setupSignals(){
+    void setupSignals() {
         // maybe should do SIGPIPE here, not sure
     }
 
@@ -50,20 +50,20 @@ namespace mongo {
         return "in client only mode";
     }
 
-    bool haveLocalShardingInfo( const string& ns ){
+    bool haveLocalShardingInfo( const string& ns ) {
         return false;
     }
 
-    DBClientBase * createDirectClient(){
+    DBClientBase * createDirectClient() {
         uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
         return 0;
     }
 
-    void Shard::getAllShards( vector<Shard>& all ){
+    void Shard::getAllShards( vector<Shard>& all ) {
         assert(0);
     }
 
-    bool Shard::isAShard( const string& ident ){
+    bool Shard::isAShard( const string& ident ) {
         assert(0);
         return false;
     }

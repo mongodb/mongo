@@ -1,4 +1,4 @@
-// @file 
+// @file
 
 /*
  *    Copyright (C) 2010 10gen Inc.
@@ -22,10 +22,10 @@
 #include "../../client/dbclient.h"
 #include "../security_key.h"
 
-namespace mongo { 
+namespace mongo {
 
-    /** here we keep a single connection (with reconnect) for a set of hosts, 
-        one each, and allow one user at a time per host.  if in use already for that 
+    /** here we keep a single connection (with reconnect) for a set of hosts,
+        one each, and allow one user at a time per host.  if in use already for that
         host, we block.  so this is an easy way to keep a 1-deep pool of connections
         that many threads can share.
 
@@ -40,24 +40,24 @@ namespace mongo {
         throws exception on connect error (but fine to try again later with a new
         scopedconn object for same host).
     */
-    class ScopedConn { 
+    class ScopedConn {
     public:
         /** throws assertions if connect failure etc. */
         ScopedConn(string hostport);
         ~ScopedConn();
 
         /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
-           So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes 
+           So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
            ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
            */
 
         bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
             return conn()->runCommand(dbname, cmd, info, options);
         }
-        unsigned long long count(const string &ns) { 
-            return conn()->count(ns); 
+        unsigned long long count(const string &ns) {
+            return conn()->count(ns);
         }
-        BSONObj findOne(const string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) { 
+        BSONObj findOne(const string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
         }
         void setTimeout(double to) {
@@ -67,10 +67,10 @@ namespace mongo {
     private:
         auto_ptr<scoped_lock> connLock;
         static mongo::mutex mapMutex;
-        struct X { 
+        struct X {
             mongo::mutex z;
             DBClientConnection cc;
-            X() : z("X"), cc(/*reconnect*/ true, 0, /*timeout*/ 10.0) { 
+            X() : z("X"), cc(/*reconnect*/ true, 0, /*timeout*/ 10.0) {
                 cc._logLevel = 2;
             }
         } *x;
@@ -90,7 +90,7 @@ namespace mongo {
                 connLock.reset( new scoped_lock(x->z) );
             }
         }
-        if( !first ) { 
+        if( !first ) {
             connLock.reset( new scoped_lock(x->z) );
             return;
         }
@@ -108,12 +108,12 @@ namespace mongo {
         }
     }
 
-    inline ScopedConn::~ScopedConn() { 
+    inline ScopedConn::~ScopedConn() {
         // conLock releases...
     }
 
-    /*inline DBClientConnection* ScopedConn::operator->() { 
-        return &x->cc; 
+    /*inline DBClientConnection* ScopedConn::operator->() {
+        return &x->cc;
     }*/
 
 }

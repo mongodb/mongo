@@ -18,14 +18,14 @@
 
 #pragma once
 
-namespace mongo { 
+namespace mongo {
 
     /** helper to log (and read log) of a capped collection in the database */
     class DBLogger {
         bool _inited;
     public:
         const string _ns;
-        DBLogger(string ns) : _inited(false), _ns(ns){ }
+        DBLogger(string ns) : _inited(false), _ns(ns) { }
     };
 
 }

@@ -23,7 +23,7 @@
 using namespace mongo;
 
 int main( int argc, const char **argv ) {
-    
+
     int port = 27017;
     if ( argc != 1 ) {
         if ( argc != 3 )
@@ -31,11 +31,11 @@ int main( int argc, const char **argv ) {
         port = atoi( argv[ 2 ] );
     }
     port += 1000;
-    
+
     stringstream ss;
     ss << "http://localhost:" << port << "/";
     string url = ss.str();
-    
+
     cout << "[" << url << "]" << endl;
 
     HttpClient c;

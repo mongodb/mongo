@@ -23,19 +23,19 @@ using namespace mongo;
 
 namespace CommandTests {
     // one namespace per command
-    namespace FileMD5{
+    namespace FileMD5 {
         struct Base {
-            Base(){
+            Base() {
                 db.dropCollection(ns());
                 db.ensureIndex(ns(), BSON( "files_id" << 1 << "n" << 1 ));
             }
 
             const char* ns() { return "test.fs.chunks"; }
-            
+
             DBDirectClient db;
         };
         struct Type0 : Base {
-            void run(){
+            void run() {
                 {
                     BSONObjBuilder b;
                     b.genOID();
@@ -58,8 +58,8 @@ namespace CommandTests {
                 ASSERT_EQUALS( string("5eb63bbbe01eeed093cb22bb8f5acdc3") , result["md5"].valuestr() );
             }
         };
-        struct Type2 : Base{
-            void run(){
+        struct Type2 : Base {
+            void run() {
                 {
                     BSONObjBuilder b;
                     b.genOID();
@@ -86,13 +86,13 @@ namespace CommandTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "commands" ){
+        All() : Suite( "commands" ) {
         }
 
-        void setupTests(){
+        void setupTests() {
             add< FileMD5::Type0 >();
             add< FileMD5::Type2 >();
         }
-        
+
     } all;
 }

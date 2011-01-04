@@ -22,24 +22,24 @@
 #include "dur_recover.h"
 #include "../util/timer.h"
 
-namespace mongo { 
+namespace mongo {
     namespace dur {
 
         void debugValidateAllMapsMatch();
 
-        /** apply the writes back to the non-private MMF after they are for certain in redo log 
+        /** apply the writes back to the non-private MMF after they are for certain in redo log
 
             (1) todo we don't need to write back everything every group commit.  we MUST write back
-            that which is going to be a remapped on its private view - but that might not be all 
+            that which is going to be a remapped on its private view - but that might not be all
             views.
 
             (2) todo should we do this using N threads?  would be quite easy
                 see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
 
-            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though. 
-                - we couldn't do it from the private views then as they may be changing.  would have to then 
+            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though.
+                - we couldn't do it from the private views then as they may be changing.  would have to then
                   be from the journal alignedbuffer.
-                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something 
+                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something
                   with MongoMMF on closes or something to coordinate that.
 
             locking: in read lock when called
@@ -52,11 +52,11 @@ namespace mongo {
         }
 
         // the old implementation
-        void WRITETODATAFILES_Impl2() { 
+        void WRITETODATAFILES_Impl2() {
             MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
 
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ){
+            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
                 const WriteIntent& intent = *it;
                 stats.curr->_writeToDataFilesBytes += intent.length();
                 dassert(intent.w_ptr);
@@ -68,17 +68,17 @@ namespace mongo {
         }
 
 #if defined(_EXPERIMENTAL)
-        void WRITETODATAFILES_Impl3() { 
+        void WRITETODATAFILES_Impl3() {
             MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
 
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ){
+            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
                 const WriteIntent& intent = *it;
                 stats.curr->_writeToDataFilesBytes += intent.length();
                 dassert(intent.w_ptr);
-                memcpy(intent.w_ptr, 
-                    commitJob._ab.atOfs(intent.ofsInJournalBuffer), 
-                    intent.length());
+                memcpy(intent.w_ptr,
+                       commitJob._ab.atOfs(intent.ofsInJournalBuffer),
+                       intent.length());
             }
 
             if (!dbMutex.isWriteLocked())
@@ -86,7 +86,7 @@ namespace mongo {
         }
 #endif
 
-        void WRITETODATAFILES() { 
+        void WRITETODATAFILES() {
             dbMutex.assertAtLeastReadLocked();
             Timer t;
 #if defined(_EXPERIMENTAL)

@@ -46,9 +46,9 @@ namespace DirectClientTests {
 
     const char *ns = "a.b";
 
-    class Capped : public ClientBase { 
+    class Capped : public ClientBase {
     public:
-        virtual void run() { 
+        virtual void run() {
             for( int pass=0; pass < 3; pass++ ) {
                 client().createCollection(ns, 1024 * 1024, true, 999);
                 for( int j =0; j < pass*3; j++ )
@@ -68,12 +68,12 @@ namespace DirectClientTests {
             }
         }
     };
-                
+
     class All : public Suite {
     public:
         All() : Suite( "directclient" ) {
         }
-        void setupTests(){
+        void setupTests() {
             add< Capped >();
         }
     } myall;

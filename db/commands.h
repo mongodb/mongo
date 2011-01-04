@@ -34,7 +34,7 @@ namespace mongo {
         */
     class Command {
     public:
-        
+
         enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
 
         const string name;
@@ -49,11 +49,11 @@ namespace mongo {
         */
         virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
 
-        /* 
-		   note: logTheTop() MUST be false if READ
+        /*
+           note: logTheTop() MUST be false if READ
            if NONE, can't use Client::Context setup
                     use with caution
-		 */
+         */
         virtual LockType locktype() const = 0;
 
         /* Return true if only the admin ns has privileges to run this command. */
@@ -63,7 +63,7 @@ namespace mongo {
 
         void htmlHelp(stringstream&) const;
 
-        /* Like adminOnly, but even stricter: we must either be authenticated for admin db, 
+        /* Like adminOnly, but even stricter: we must either be authenticated for admin db,
            or, if running without auth, on the local interface.
 
            When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
@@ -74,7 +74,7 @@ namespace mongo {
            (the command directly from a client -- if fromRepl, always allowed).
         */
         virtual bool slaveOk() const = 0;
-        
+
         /* Return true if the client force a command to be run on a slave by
            turning on the 'slaveok' option in the command query.
         */
@@ -91,12 +91,12 @@ namespace mongo {
 
         virtual void help( stringstream& help ) const;
 
-        /* Return true if authentication and security applies to the commands.  Some commands 
+        /* Return true if authentication and security applies to the commands.  Some commands
            (e.g., getnonce, authenticate) can be done by anyone even unauthorized.
         */
         virtual bool requiresAuth() { return true; }
 
-        /** @param webUI expose the command in the web ui as localhost:28017/<name> 
+        /** @param webUI expose the command in the web ui as localhost:28017/<name>
             @param oldName an optional old, deprecated name for the command
         */
         Command(const char *_name, bool webUI = false, const char *oldName = 0);
@@ -104,7 +104,7 @@ namespace mongo {
         virtual ~Command() {}
 
     protected:
-        BSONObj getQuery( const BSONObj& cmdObj ){
+        BSONObj getQuery( const BSONObj& cmdObj ) {
             if ( cmdObj["query"].type() == Object )
                 return cmdObj["query"].embeddedObject();
             if ( cmdObj["q"].type() == Object )

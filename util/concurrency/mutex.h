@@ -22,11 +22,11 @@
 
 #include "../heapcheck.h"
 
-namespace mongo { 
+namespace mongo {
 
     class mutex;
 
-    inline boost::xtime incxtimemillis( long long s ){
+    inline boost::xtime incxtimemillis( long long s ) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
         xt.sec += (int)( s / 1000 );
@@ -34,7 +34,7 @@ namespace mongo {
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
-        }        
+        }
         return xt;
     }
 
@@ -42,7 +42,7 @@ namespace mongo {
         MutexDebugger checks that we always acquire locks for multiple mutexes in a consistant (acyclic) order.
         If we were inconsistent we could deadlock.
     */
-    class MutexDebugger { 
+    class MutexDebugger {
         typedef const char * mid; // mid = mutex ID
         typedef map<mid,int> Preceeding;
         map< mid, int > maxNest;
@@ -55,12 +55,12 @@ namespace mongo {
     public:
         // set these to create an assert that
         //   b must never be locked before a
-        //   so 
+        //   so
         //     a.lock(); b.lock(); is fine
         //     b.lock(); alone is fine too
         //   only checked on _DEBUG builds.
         string a,b;
-        
+
         /** outputs some diagnostic info on mutexes (on _DEBUG builds) */
         void programEnding();
 
@@ -75,7 +75,7 @@ namespace mongo {
                 us.reset( _preceeding = new Preceeding() );
             Preceeding &preceeding = *_preceeding;
 
-            if( a == m ) { 
+            if( a == m ) {
                 aBreakPoint();
                 if( preceeding[b.c_str()] ) {
                     cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << endl;
@@ -84,7 +84,7 @@ namespace mongo {
             }
 
             preceeding[m]++;
-            if( preceeding[m] > 1 ) { 
+            if( preceeding[m] > 1 ) {
                 // recursive re-locking.
                 if( preceeding[m] > maxNest[m] )
                     maxNest[m] = preceeding[m];
@@ -96,19 +96,19 @@ namespace mongo {
             {
                 boost::mutex::scoped_lock lk(x);
                 followers[m];
-                for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
+                for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
                     if( m != i->first && i->second > 0 ) {
                         followers[i->first].insert(m);
-                        if( followers[m].count(i->first) != 0 ){
+                        if( followers[m].count(i->first) != 0 ) {
                             failed = true;
                             stringstream ss;
                             mid bad = i->first;
                             ss << "mutex problem" <<
-                                "\n  when locking " << m <<
-                                "\n  " << bad << " was already locked and should not be."
-                                "\n  set a and b above to debug.\n";
+                               "\n  when locking " << m <<
+                               "\n  " << bad << " was already locked and should not be."
+                               "\n  set a and b above to debug.\n";
                             stringstream q;
-                            for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) { 
+                            for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
                                 if( i->first != m && i->first != bad && i->second > 0 )
                                     q << "  " << i->first << '\n';
                             }
@@ -126,7 +126,7 @@ namespace mongo {
                 assert( 0 );
             }
         }
-        void leaving(mid m) { 
+        void leaving(mid m) {
             if( this == 0 ) return; // still in startup pre-main()
             Preceeding& preceeding = *us.get();
             preceeding[m]--;
@@ -137,7 +137,7 @@ namespace mongo {
         }
     };
     extern MutexDebugger &mutexDebugger;
-    
+
     // If you create a local static instance of this class, that instance will be destroyed
     // before all global static objects are destroyed, so _destroyingStatics will be set
     // to true before the global static variables are destroyed.
@@ -157,13 +157,13 @@ namespace mongo {
 #endif
 
 #if defined(_DEBUG)
-        mutex(const char *name) 
-           : _name(name) 
+        mutex(const char *name)
+            : _name(name)
 #else
-        mutex(const char *) 
+        mutex(const char *)
 #endif
-        { 
-            _m = new boost::timed_mutex(); 
+        {
+            _m = new boost::timed_mutex();
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
         }
         ~mutex() {
@@ -172,22 +172,22 @@ namespace mongo {
                 delete _m;
             }
         }
-        
+
         class try_lock : boost::noncopyable {
         public:
-            try_lock( mongo::mutex &m , int millis = 0 ) 
-                : _l( m.boost() , incxtimemillis( millis ) ) , 
+            try_lock( mongo::mutex &m , int millis = 0 )
+                : _l( m.boost() , incxtimemillis( millis ) ) ,
 #if BOOST_VERSION >= 103500
-                  ok( _l.owns_lock() ) 
+                  ok( _l.owns_lock() )
 #else
                   ok( _l.locked() )
 #endif
             {
             }
 
-            ~try_lock() { 
+            ~try_lock() {
             }
-            
+
         private:
             boost::timed_mutex::scoped_timed_lock _l;
 
@@ -207,7 +207,7 @@ namespace mongo {
                 mutexDebugger.entering(mut->_name);
 #endif
             }
-            ~scoped_lock() { 
+            ~scoped_lock() {
 #if defined(_DEBUG)
                 mutexDebugger.leaving(mut->_name);
 #endif
@@ -223,7 +223,7 @@ namespace mongo {
         boost::timed_mutex &boost() { return *_m; }
         boost::timed_mutex *_m;
     };
-    
+
     typedef mutex::scoped_lock scoped_lock;
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
 

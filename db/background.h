@@ -21,16 +21,16 @@
 
 #pragma once
 
-namespace mongo { 
+namespace mongo {
 
-    /* these are administrative operations / jobs 
-       for a namespace running in the background, and that only one 
+    /* these are administrative operations / jobs
+       for a namespace running in the background, and that only one
        at a time per namespace is permitted, and that if in progress,
        you aren't allowed to do other NamespaceDetails major manipulations
-       (such as dropping ns or db) even in the foreground and must 
-       instead uassert. 
+       (such as dropping ns or db) even in the foreground and must
+       instead uassert.
 
-       It's assumed this is not for super-high RPS things, so we don't do 
+       It's assumed this is not for super-high RPS things, so we don't do
        anything special in the implementation here to be fast.
     */
     class BackgroundOperation : public boost::noncopyable {

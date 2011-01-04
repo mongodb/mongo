@@ -22,14 +22,14 @@
 #include "../time_support.h"
 
 #if BOOST_VERSION >= 103500
-  #define BOOST_RWLOCK
+#define BOOST_RWLOCK
 #else
 
-  #if defined(_WIN32)
-    #error need boost >= 1.35 for windows
-  #endif
- 
-  #include <pthread.h>
+#if defined(_WIN32)
+#error need boost >= 1.35 for windows
+#endif
+
+#include <pthread.h>
 
 #endif
 
@@ -51,40 +51,40 @@ namespace mongo {
 #else
         RWLock(const char *) { }
 #endif
-        void lock(){
+        void lock() {
             _m.lock();
 #if defined(_DEBUG)
             mutexDebugger.entering(_name);
 #endif
         }
-        void unlock(){
+        void unlock() {
 #if defined(_DEBUG)
             mutexDebugger.leaving(_name);
 #endif
             _m.unlock();
         }
-        
-        void lock_shared(){
+
+        void lock_shared() {
             _m.lock_shared();
         }
-        
-        void unlock_shared(){
+
+        void unlock_shared() {
             _m.unlock_shared();
         }
 
-        bool lock_shared_try( int millis ){
+        bool lock_shared_try( int millis ) {
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
-            if( _m.timed_lock_shared( until ) ) { 
+            if( _m.timed_lock_shared( until ) ) {
                 return true;
             }
             return false;
         }
 
-        bool lock_try( int millis = 0 ){
+        bool lock_try( int millis = 0 ) {
             boost::system_time until = get_system_time();
             until += boost::posix_time::milliseconds(millis);
-            if( _m.timed_lock( until ) ) { 
+            if( _m.timed_lock( until ) ) {
 #if defined(_DEBUG)
                 mutexDebugger.entering(_name);
 #endif
@@ -99,7 +99,7 @@ namespace mongo {
     class RWLock {
         pthread_rwlock_t _lock;
 
-        inline void check( int x ){
+        inline void check( int x ) {
             if( x == 0 )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
@@ -115,40 +115,40 @@ namespace mongo {
 #endif
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
-        
-        ~RWLock(){
-            if ( ! StaticObserver::_destroyingStatics ){
+
+        ~RWLock() {
+            if ( ! StaticObserver::_destroyingStatics ) {
                 check( pthread_rwlock_destroy( &_lock ) );
             }
         }
 
-        void lock(){
+        void lock() {
             check( pthread_rwlock_wrlock( &_lock ) );
 #if defined(_DEBUG)
             mutexDebugger.entering(_name);
 #endif
         }
-        void unlock(){
+        void unlock() {
 #if defined(_DEBUG)
             mutexDebugger.leaving(_name);
 #endif
             check( pthread_rwlock_unlock( &_lock ) );
         }
-        
-        void lock_shared(){
+
+        void lock_shared() {
             check( pthread_rwlock_rdlock( &_lock ) );
         }
-        
-        void unlock_shared(){
+
+        void unlock_shared() {
             check( pthread_rwlock_unlock( &_lock ) );
         }
-        
-        bool lock_shared_try( int millis ){
+
+        bool lock_shared_try( int millis ) {
             return _try( millis , false );
         }
 
-        bool lock_try( int millis = 0 ){
-            if( _try( millis , true ) ) { 
+        bool lock_try( int millis = 0 ) {
+            if( _try( millis , true ) ) {
 #if defined(_DEBUG)
                 mutexDebugger.entering(_name);
 #endif
@@ -157,31 +157,31 @@ namespace mongo {
             return false;
         }
 
-        bool _try( int millis , bool write ){
+        bool _try( int millis , bool write ) {
             while ( true ) {
-                int x = write ? 
-                    pthread_rwlock_trywrlock( &_lock ) : 
-                    pthread_rwlock_tryrdlock( &_lock );
-                
+                int x = write ?
+                        pthread_rwlock_trywrlock( &_lock ) :
+                        pthread_rwlock_tryrdlock( &_lock );
+
                 if ( x <= 0 ) {
                     return true;
                 }
-                
+
                 if ( millis-- <= 0 )
                     return false;
-                
-                if ( x == EBUSY ){
+
+                if ( x == EBUSY ) {
                     sleepmillis(1);
                     continue;
                 }
                 check(x);
-            } 
-            
+            }
+
             return false;
         }
 
     };
-    
+
 
 #endif
 
@@ -190,7 +190,7 @@ namespace mongo {
     public:
         struct exception { };
         rwlock_try_write(RWLock& l, int millis = 0) : _l(l) {
-            if( !l.lock_try(millis) ) 
+            if( !l.lock_try(millis) )
                 throw exception();
         }
         ~rwlock_try_write() { _l.unlock(); }
@@ -216,7 +216,7 @@ namespace mongo {
             else
                 _lock.unlock_shared();
         }
-    private:        
+    private:
         RWLock& _lock;
         const bool _write;
     };

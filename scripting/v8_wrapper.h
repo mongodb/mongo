@@ -28,10 +28,10 @@ namespace mongo {
     v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
     mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
-    void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , 
+    void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
                            const string sname , v8::Handle<v8::Value> value , int depth = 0 );
     v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f );
-    
+
     v8::Function * getNamedCons( const char * name );
     v8::Function * getObjectIdCons();
 

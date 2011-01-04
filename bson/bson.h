@@ -1,10 +1,10 @@
-/* NOTE: Standalone bson header for when not using MongoDB.  
+/* NOTE: Standalone bson header for when not using MongoDB.
    See also: bsondemo.
 
    MongoDB includes ../db/jsobj.h instead. This file, however, pulls in much less code / dependencies.
 */
 
-/** @file bson.h 
+/** @file bson.h
     BSON classes
 */
 
@@ -47,15 +47,15 @@
 #include <boost/utility.hpp>
 #include "util/builder.h"
 
-namespace bson { 
+namespace bson {
 
     using std::string;
     using std::stringstream;
 
-    class assertion : public std::exception { 
+    class assertion : public std::exception {
     public:
         assertion( unsigned u , const string& s )
-            : id( u ) , msg( s ){
+            : id( u ) , msg( s ) {
             mongo::StringBuilder ss;
             ss << "BsonAssertion id: " << u << " " << s;
             full = ss.str();
@@ -64,7 +64,7 @@ namespace bson {
         virtual ~assertion() throw() {}
 
         virtual const char* what() const throw() { return full.c_str(); }
-        
+
         unsigned id;
         string msg;
         string full;
@@ -72,9 +72,9 @@ namespace bson {
 }
 
 namespace mongo {
-#if !defined(assert) 
+#if !defined(assert)
     inline void assert(bool expr) {
-        if(!expr) { 
+        if(!expr) {
             throw bson::assertion( 0 , "assertion failure in bson library" );
         }
     }
@@ -88,12 +88,12 @@ namespace mongo {
         if( !expr )
             uasserted( msgid , msg );
     }
-    inline void msgasserted(int msgid, const char *msg) { 
+    inline void msgasserted(int msgid, const char *msg) {
         throw bson::assertion( msgid , msg );
     }
     inline void msgasserted(int msgid, const std::string &msg) { msgasserted(msgid, msg.c_str()); }
-    inline void massert(unsigned msgid, std::string msg, bool expr) { 
-        if(!expr) { 
+    inline void massert(unsigned msgid, std::string msg, bool expr) {
+        if(!expr) {
             std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
             throw bson::assertion( msgid , msg );
         }
@@ -110,13 +110,13 @@ namespace mongo {
 #include "../bson/bsonobjiterator.h"
 #include "../bson/bson-inl.h"
 
-namespace mongo { 
+namespace mongo {
 
     inline unsigned getRandomNumber() {
 #if defined(_WIN32)
         return rand();
 #else
-        return random(); 
+        return random();
 #endif
     }
 
