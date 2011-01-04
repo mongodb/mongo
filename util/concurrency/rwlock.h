@@ -21,27 +21,64 @@
 #include "mutex.h"
 #include "../time_support.h"
 
+#if !defined(_WIN32)
+
 #if BOOST_VERSION >= 103500
-#define BOOST_RWLOCK
+# define BOOST_RWLOCK
 #else
-
-#if defined(_WIN32)
-#error need boost >= 1.35 for windows
-#endif
-
-#include <pthread.h>
-
+# if defined(_WIN32)
+#  error need boost >= 1.35 for windows
+# endif
+# include <pthread.h>
 #endif
 
 #ifdef BOOST_RWLOCK
-#include <boost/thread/shared_mutex.hpp>
-#undef assert
-#define assert MONGO_assert
+# include <boost/thread/shared_mutex.hpp>
+# undef assert
+# define assert MONGO_assert
+#endif
+
 #endif
 
 namespace mongo {
 
-#ifdef BOOST_RWLOCK
+#if defined(_WIN32)
+
+    class RWLock {
+    public:
+        RWLock(const char *) { InitializeSRWLock(&_lock); }
+        ~RWLock() { }
+        void lock()          { AcquireSRWLockExclusive(&_lock); }
+        void unlock()        { ReleaseSRWLockExclusive(&_lock); }
+        void lock_shared()   { AcquireSRWLockShared(&_lock); }
+        void unlock_shared() { ReleaseSRWLockShared(&_lock); }
+        bool lock_shared_try( int millis ) {
+            unsigned long long end = curTimeMicros64() + millis*1000;
+            while( 1 ) {
+                if( TryAcquireSRWLockShared(&_lock) )
+                    return true;
+                if( curTimeMicros64() >= end ) 
+                    break;
+                Sleep(1);
+            }
+            return false;
+        }
+        bool lock_try( int millis = 0 ) {
+            unsigned long long end = curTimeMicros64() + millis*1000;
+            while( 1 ) {
+                if( TryAcquireSRWLockExclusive(&_lock) )
+                    return true;
+                if( curTimeMicros64() >= end ) 
+                    break;
+                Sleep(1);
+            }
+            return false;
+        }
+    private:
+        SRWLOCK _lock;
+    };
+
+#elif defined(BOOST_RWLOCK)
     class RWLock {
         boost::shared_mutex _m;
     public:
@@ -181,7 +218,6 @@ namespace mongo {
         }
 
     };
-
 
 #endif
 
