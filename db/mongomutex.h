@@ -74,9 +74,9 @@ namespace mongo {
 
             Client *c = curopWaitingForLock( 1 );
             bool got = _m.lock_try( millis );
-            curopGotLock(c);
 
             if ( got ) {
+                curopGotLock(c);
                 _minfo.entered();
                 _state.set(1);
                 MongoFile::markAllWritable(); // for _DEBUG validation -- a no op for release build
