@@ -1333,6 +1333,12 @@ env.AlwaysBuild("docs")
 #  ---- astyle ----
 
 def doStyling( env , target , source ):
+    
+    res = utils.execsys( "astyle --version" )
+    if res[0].count( "2." ) == 0:
+        print( "astyle 2.x needed" )
+        Exit(-1)
+
     files = utils.getAllSourceFiles() 
     files = filter( lambda x: not x.endswith( ".c" ) , files )
     cmd = "astyle --options=mongo_astyle " + " ".join( files )
