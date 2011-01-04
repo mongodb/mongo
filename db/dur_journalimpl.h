@@ -23,16 +23,26 @@
 namespace mongo {
     namespace dur {
 
+        /** the writeahead journal for durability */
         class Journal {
         public:
             string dir; // set by journalMakeDir() during initialization
 
             Journal();
 
+            /** call during startup by journalMakeDir() */
             void init();
 
+            /** check if time to rotate files.  assure a file is open.
+                done separately from the journal() call as we can do this part
+                outside of lock.
+                thread: durThread()
+             */
             void rotate();
 
+            /** write to journal
+                thread: durThread()
+            */
             void journal(const AlignedBuilder& b);
 
             boost::filesystem::path getFilePathFor(int filenumber) const;
@@ -43,6 +53,7 @@ namespace mongo {
             bool tryToCloseCurJournalFile();
 
         private:
+            // rotate after reaching this data size in a journal (j._<n>) file
             static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
 
             /** open a journal file to journal operations to. */

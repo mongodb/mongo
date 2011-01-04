@@ -75,7 +75,7 @@ namespace mongo {
         @param ofs out return our offset in the view
         @return the MongoMMF to which this pointer belongs
     */
-    MongoMMF* PointerToMMF::_find(void *p, /*out*/ size_t& ofs) {
+    MongoMMF* PointerToMMF::find_inlock(void *p, /*out*/ size_t& ofs) {
         //
         // .................memory..........................
         //    v1       p                      v2
@@ -102,7 +102,7 @@ namespace mongo {
     */
     MongoMMF* PointerToMMF::find(void *p, /*out*/ size_t& ofs) {
         mutex::scoped_lock lk(_m);
-        return _find(p, ofs);
+        return find_inlock(p, ofs);
     }
 
     PointerToMMF privateViews;

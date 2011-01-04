@@ -108,10 +108,14 @@ namespace mongo {
     public:
         PointerToMMF();
 
-        /** register view. threadsafe */
+        /** register view. \
+            threadsafe 
+            */
         void add(void *view, MongoMMF *f);
 
-        /** de-register view. threadsafe */
+        /** de-register view. 
+            threadsafe 
+            */
         void remove(void *view);
 
         /** find associated MMF object for a given pointer.
@@ -123,7 +127,7 @@ namespace mongo {
 
         /** for doing many finds in a row with one lock operation */
         mutex& _mutex() { return _m; }
-        MongoMMF* _findx(void *p, /*out*/ size_t& ofs);
+        MongoMMF* find_inlock(void *p, /*out*/ size_t& ofs);
 
     private:
         mutex _m;

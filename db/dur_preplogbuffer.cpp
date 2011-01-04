@@ -42,8 +42,8 @@ namespace mongo {
 
         RelativePath local = RelativePath::fromRelativePath("local");
 
-        MongoMMF* findMMF(void *ptr, size_t &ofs) {
-            MongoMMF *f = privateViews._find(ptr, ofs);
+        MongoMMF* findMMF_inlock(void *ptr, size_t &ofs) {
+            MongoMMF *f = privateViews.find_inlock(ptr, ofs);
             if( f == 0 ) {
                 string s = str::stream() << "view pointer cannot be resolved " << (size_t) ptr;
                 journalingFailure(s.c_str()); // asserts
@@ -51,9 +51,10 @@ namespace mongo {
             return f;
         }
 
-        void prepBasicWrite(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
+        /** put the basic write operation into the buffer (bb) to be journaled */
+        void prepBasicWrite_inlock(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
-            MongoMMF *mmf = findMMF(i->start(), /*out*/ofs);
+            MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
             dassert( i->w_ptr == 0 );
 
             if( !mmf->willNeedRemap() ) {
@@ -97,7 +98,7 @@ namespace mongo {
                 // mappings, but better to be safe.
 
                 WriteIntent next ((char*)i->start() + e.len, i->length() - e.len);
-                prepBasicWrite(bb, &next, lastDbPath);
+                prepBasicWrite_inlock(bb, &next, lastDbPath);
             }
         }
 
@@ -106,11 +107,13 @@ namespace mongo {
             (although not assured) that it is journaled here once.
         */
         void prepBasicWrites(AlignedBuilder& bb) {
+            scoped_lock lk(privateViews._mutex());
+
             // each time events switch to a different database we journal a JDbContext
             RelativePath lastDbPath;
 
             for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
-                prepBasicWrite(bb, &(*i), lastDbPath);
+                prepBasicWrite_inlock(bb, &(*i), lastDbPath);
             }
         }
 
@@ -151,7 +154,6 @@ namespace mongo {
             }
 
             {
-                scoped_lock lk(privateViews._mutex());
                 prepBasicWrites(bb);
             }
 
