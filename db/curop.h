@@ -53,7 +53,7 @@ namespace mongo {
 
         void reset( int sz = 0 ) {
             _lock.lock();
-            _size[0] = sz;
+            _reset( sz );
             _lock.unlock();
         }
 
@@ -120,7 +120,7 @@ namespace mongo {
         }
 
         /** you have to be locked when you call this */
-        void _reset( int sz = 0 ) { _size[0] = sz; }
+        void _reset( int sz ) { _size[0] = sz; }
 
         SpinLock _lock;
         int * _size;
