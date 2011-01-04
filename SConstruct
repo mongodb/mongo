@@ -1333,14 +1333,16 @@ env.AlwaysBuild("docs")
 #  ---- astyle ----
 
 def doStyling( env , target , source ):
-    cmd = "astyle --options=mongo_astyle " + " ".join( utils.getAllSourceFiles() ) 
+    files = utils.getAllSourceFiles() 
+    files = filter( lambda x: not x.endswith( ".c" ) , files )
+    cmd = "astyle --options=mongo_astyle " + " ".join( files )
     res = utils.execsys( cmd )
     print( res[0] )
     print( res[1] )
 
 
-#env.Alias( "style" , [] , [ doStyling ] )
-#env.AlwaysBuild( "style" )
+env.Alias( "style" , [] , [ doStyling ] )
+env.AlwaysBuild( "style" )
 
 
 
