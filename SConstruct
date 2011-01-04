@@ -1335,8 +1335,9 @@ env.AlwaysBuild("docs")
 def doStyling( env , target , source ):
     
     res = utils.execsys( "astyle --version" )
-    if res[0].count( "2." ) == 0:
-        print( "astyle 2.x needed" )
+    res = " ".join(res)
+    if res.count( "2." ) == 0:
+        print( "astyle 2.x needed, found:" + res )
         Exit(-1)
 
     files = utils.getAllSourceFiles() 
