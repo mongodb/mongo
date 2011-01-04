@@ -4,16 +4,13 @@
 
 \section overview_intro Introduction
 
-The WiredTiger Data Store is a platform for extensible data management.
-This documentation describes the public interface used by developers to
-construct applications.
+The WiredTiger Data Store is an extensible platform for data management.  This documentation describes the public interface to WiredTiger used by developers to construct applications.
 
 We follow SQL terminology: a database is set of tables that are managed together.  Tables logically consist of rows, each row has a key and a value.  Tables may optionally have an associated schema, which splits the key/value pair into a set of columns.  Tables may also have associated indices, each of which is ordered by some set of columns.
 
-TODO: we need more paragraphs on this page -- maybe two more paragraphs in the Introduction that say "Applications will generally do X, Y and Z, configuration is based on strings passed to the methods, the retrieval/update interfaces is based on cursors that look like X, Y and Z."
+WiredTiger supports column-oriented storage in addition to traditional row-oriented storage.  Instead of storing all fields from a row together, WiredTiger can efficiently store and access sets of columns (including single columns) separately.  The same programming interface is used to access row- and column-oriented data, making it possible to change the data layout to improve throughput without rewriting applications.
 
-The API consists of only a small set of classes, of which the following are
-the most commonly used:
+Applications will generally use the following classes to access and manage data:
 
  - a WT_CONNECTION represents a connection to a database.  Most applications
  will only open one connection to a database for each process.  The first
@@ -34,9 +31,11 @@ the most commonly used:
  columns), as an interface to statistics, configuration data or
  application-specific data sources.
 
+Handles and operations are configured using strings, which keeps the set of methods in the API relatively small and makes the interface very similar regardless of the programming language used in the application.  WiredTiger supports the C, C++, Java and Python programming languages (among others).
+
 \section overview_details Programmer's Reference
 
-For more details about using WiredTiger, see:
+For full details about using WiredTiger, see:
 
 - \subpage architecture
 - \ref using

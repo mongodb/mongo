@@ -162,21 +162,21 @@ class WT_CURSOR_HANDLE:
   """
   Attributes:
    - id
-   - keyfmt
-   - valuefmt
+   - key_format
+   - value_format
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.I32, 'id', None, None, ), # 1
-    (2, TType.STRING, 'keyfmt', None, None, ), # 2
-    (3, TType.STRING, 'valuefmt', None, None, ), # 3
+    (2, TType.STRING, 'key_format', None, None, ), # 2
+    (3, TType.STRING, 'value_format', None, None, ), # 3
   )
 
-  def __init__(self, id=None, keyfmt=None, valuefmt=None,):
+  def __init__(self, id=None, key_format=None, value_format=None,):
     self.id = id
-    self.keyfmt = keyfmt
-    self.valuefmt = valuefmt
+    self.key_format = key_format
+    self.value_format = value_format
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -194,12 +194,12 @@ class WT_CURSOR_HANDLE:
           iprot.skip(ftype)
       elif fid == 2:
         if ftype == TType.STRING:
-          self.keyfmt = iprot.readString();
+          self.key_format = iprot.readString();
         else:
           iprot.skip(ftype)
       elif fid == 3:
         if ftype == TType.STRING:
-          self.valuefmt = iprot.readString();
+          self.value_format = iprot.readString();
         else:
           iprot.skip(ftype)
       else:
@@ -216,13 +216,13 @@ class WT_CURSOR_HANDLE:
       oprot.writeFieldBegin('id', TType.I32, 1)
       oprot.writeI32(self.id)
       oprot.writeFieldEnd()
-    if self.keyfmt != None:
-      oprot.writeFieldBegin('keyfmt', TType.STRING, 2)
-      oprot.writeString(self.keyfmt)
+    if self.key_format != None:
+      oprot.writeFieldBegin('key_format', TType.STRING, 2)
+      oprot.writeString(self.key_format)
       oprot.writeFieldEnd()
-    if self.valuefmt != None:
-      oprot.writeFieldBegin('valuefmt', TType.STRING, 3)
-      oprot.writeString(self.valuefmt)
+    if self.value_format != None:
+      oprot.writeFieldBegin('value_format', TType.STRING, 3)
+      oprot.writeString(self.value_format)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

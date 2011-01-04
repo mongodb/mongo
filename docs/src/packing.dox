@@ -2,5 +2,8 @@
 
 /*! \page packing Packing and Unpacking Data
 
-What are WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT_CURSOR::set_value all about?
+XXX What are WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT_CURSOR::set_value all about?
+
+- native C structs
+- portability between programming languages
  */

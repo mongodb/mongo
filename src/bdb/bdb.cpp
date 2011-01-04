@@ -103,7 +103,7 @@ __session_open_cursor(WT_SESSION *session, const char *uri, const char *config, 
 		return (ENOMEM);
 	*c = iface;
 	c->session = session;
-	c->keyfmt = c->valuefmt = "u";
+	c->key_format = c->value_format = "u";
 	__wt_curstd_init(cstd);
 	*cursorp = c;
 
@@ -117,7 +117,7 @@ __session_dup_cursor(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CUR
 }
 
 static int
-__session_add_schema(WT_SESSION *session, const char *name, const char *keyfmt, const char *valuefmt, const char *columns, const char *column_sets, const char *indices, const char *config)
+__session_add_schema(WT_SESSION *session, const char *name, const char *config)
 {
 	return ENOTSUP;
 }

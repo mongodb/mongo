@@ -27,8 +27,7 @@ int main()
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	if (conn->is_new(conn))
-		session->create_table(session, "access", "keyfmt=S,valuefmt=S");
+	session->create_table(session, "access", "key_format=S,value_format=S");
 
 	/* Open a cursor on the (virtual) configuration table. */
 	ret = session->open_cursor(session, "config:", NULL, &cursor);

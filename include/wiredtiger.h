@@ -84,7 +84,7 @@ struct WT_CURSOR {
 	 * of "u" is assumed, and applications use the WT_ITEM struct to
 	 * manipulate raw byte arrays.
 	 */
-	const char *keyfmt;
+	const char *key_format;
 
 	/*!
 	 * The format of the data packed into value items.  See
@@ -92,7 +92,7 @@ struct WT_CURSOR {
 	 * of "u" is assumed, and applications use the WT_ITEM struct to
 	 * manipulate raw byte arrays.
 	 */
-	const char *valuefmt;
+	const char *value_format;
 
 	/*! \name Data access
 	 * @{
@@ -161,7 +161,8 @@ struct WT_CURSOR {
 	/*! Search for a record.
 	 *
 	 * \param cursor the cursor handle
-	 * \param exactp the status of the search: 0 if an exact match is found, -1 if a smaller key is found, +1 if a larger key is found
+	 * \param exactp the status of the search: 0 if an exact match is
+	 * found, -1 if a smaller key is found, +1 if a larger key is found
 	 * \errors
 	 */
 	int __F(search)(WT_CURSOR *cursor, int *exactp);
@@ -253,14 +254,19 @@ struct WT_SESSION {
 	 * \param session the session handle
 	 * \configstart
 	 * \config{dup,["all"] or "first" or "last",duplicate handling}
-	 * \config{isolation,"snapshot" or ["read-committed"] or "read-uncommitted",the isolation level for this cursor.  Ignored for transactional cursors}
-	 * \config{overwrite,["0"] or "1",if an existing key is inserted\, overwrite the existing value}
-	 * \config{raw,["0"] or "1",ignore the encodings for the key and value\, return data as if the formats were 'u'}
+	 * \config{isolation,"snapshot" or ["read-committed"] or
+	 * "read-uncommitted",the isolation level for this cursor.  Ignored for
+	 * transactional cursors}
+	 * \config{overwrite,["0"] or "1",if an existing key is inserted\,
+	 * overwrite the existing value}
+	 * \config{raw,["0"] or "1",ignore the encodings for the key and
+	 * value\, return data as if the formats were 'u'}
 	 * \configend
 	 * \param cursorp a pointer to the newly opened cursor
 	 * \errors
 	 */
-	int __F(open_cursor)(WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp);
+	int __F(open_cursor)(WT_SESSION *session,
+	    const char *uri, const char *config, WT_CURSOR **cursorp);
 
 	/*! Duplicate a cursor.
 	 *
@@ -268,13 +274,16 @@ struct WT_SESSION {
 	 * \param cursor the cursor handle to duplicate
 	 * \configstart
 	 * \config{dup,["all"] or "first" or "last",duplicate handling}
-	 * \config{overwrite,["0"] or "1",if an existing key is inserted\, overwrite the existing value}
-	 * \config{raw,["0"] or "1",ignore the encodings for the key and value\, return data as if the formats were 'u'}
+	 * \config{overwrite,["0"] or "1",if an existing key is inserted\,
+	 * overwrite the existing value}
+	 * \config{raw,["0"] or "1",ignore the encodings for the key and
+	 * value\, return data as if the formats were 'u'}
 	 * \configend
 	 * \param dupp a pointer to the new cursor
 	 * \errors
 	 */
-	int __F(dup_cursor)(WT_SESSION *session, WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp);
+	int __F(dup_cursor)(WT_SESSION *session,
+	    WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp);
 	/*! @} */
 
 	/*! \name Table operations
@@ -284,46 +293,68 @@ struct WT_SESSION {
 	 *
 	 * \param session the session handle
 	 * \param name the name of the new schema
-	 * \param keyfmt The format of the data packed into key items.  See
-	 * ::wiredtiger_struct_pack for details.  If not set, a default value
-	 * of "u" is assumed, and applications use the WT_ITEM struct to
-	 * manipulate raw byte arrays.
-	 * \param valuefmt The format of the data packed into value items.  See
-	 * ::wiredtiger_struct_pack for details.  If not set, a default value
-	 * of "u" is assumed, and applications use the WT_ITEM struct to
-	 * manipulate raw byte arrays.
-	 * \param columns Names of the columns in the schema, comma separated.
+	 * \configstart
+	 * \config{key_format,,The format of the data packed into key items.
+	 * See ::wiredtiger_struct_pack for details.  If not set\, a default
+	 * value of "u" is assumed\, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.}
+	 * \config{value_format,,The format of the data packed into value items.
+	 * See ::wiredtiger_struct_pack for details.  If not set\, a default
+	 * value of "u" is assumed\, and applications use the WT_ITEM struct to
+	 * manipulate raw byte arrays.}
+	 * \config{columns,,Names of the columns in the schema\, comma separated.
 	 * The number of entries must match the total number of values in
-	 * #keyfmt and #valuefmt.
-	 * \param column_sets List of the column sets.  Comma-separated list of
-	 * the form <code>name(column[,...])[,...]</code>.  Each column set is
-	 * stored separately, keyed by the primary key of the table.  Any
-	 * column that does not appear in a column set is stored in an unnamed
-	 * default column set for the table.
-	 * \param indices List of the indices.  Comma-separated list of the
-	 * form <code>name(column[,...])[,...]</code>.  Each index is keyed by
-	 * the specified columns.
-	 * \configempty
+	 * #key_format and #value_format.}
+	 * \config{column_set,(multiple),List of the column sets.
+	 * Comma-separated list of the form
+	 * <code>name(column[\,...])[\,...]</code>.  Each column set is stored
+	 * separately\, keyed by the primary key of the table.  Any column that
+	 * does not appear in a column set is stored in an unnamed default
+	 * column set for the table.}
+	 * \config{index,(multiple),List of the indices.
+	 * Comma-separated list of the form
+	 * <code>name(column[\,...])[\,...]</code>.  Each index is keyed by the
+	 * specified columns.}
 	 * \configend
 	 * \errors
 	 */
 	int __F(add_schema)(WT_SESSION *session, const char *name,
-	    const char *keyfmt, const char *valuefmt, const char *columns,
-	    const char *column_sets, const char *indices, const char *config);
+	    const char *config);
 
 	/*! Create a table.
 	 *
 	 * \param session the session handle
 	 * \param name the name of the table
 	 * \configstart
-	 * \config{keyfmt,data format for keys ['u'],See \ref ::wiredtiger_struct_pack}
-	 * \config{valuefmt,data format for values ['u'],See \ref ::wiredtiger_struct_pack}
-	 * \config{schema,[none],name of a schema for the table}
+	 * \config{exclusive,[no],Fail if the table exists (if "no"\, the
+	 * default\, verifies that the table exists and has the specified
+	 * schema.}
+	 * \config{key_format,["u"],The format of the data packed into key
+	 * items.  See ::wiredtiger_struct_pack for details.  If not set\, a
+	 * default value of "u" is assumed\, and applications use the WT_ITEM
+	 * struct to manipulate raw byte arrays.}
+	 * \config{value_format,["u"],The format of the data packed into value
+	 * items.  See ::wiredtiger_struct_pack for details.  If not set\, a
+	 * default value of "u" is assumed\, and applications use the WT_ITEM
+	 * struct to manipulate raw byte arrays.}
+	 * \config{columns,,Names of the columns in the schema\, comma separated.
+	 * The number of entries must match the total number of values in
+	 * #key_format and #value_format.}
+	 * \config{column_set,(multiple),List of the column sets.
+	 * Comma-separated list of the form
+	 * <code>name(column[\,...])[\,...]</code>.  Each column set is stored
+	 * separately\, keyed by the primary key of the table.  Any column that
+	 * does not appear in a column set is stored in an unnamed default
+	 * column set for the table.}
+	 * \config{index,(multiple),List of the indices.
+	 * Comma-separated list of the form
+	 * <code>name(column[\,...])[\,...]</code>.  Each index is keyed by the
+	 * specified columns.}
 	 * \configend
 	 * \errors
 	 */
-
-	int __F(create_table)(WT_SESSION *session, const char *name, const char *config);
+	int __F(create_table)(WT_SESSION *session, const char *name,
+	    const char *config);
 
 	/*! Rename a table.
 	 *
@@ -333,7 +364,8 @@ struct WT_SESSION {
 	 * \configempty
 	 * \errors
 	 */
-	int __F(rename_table)(WT_SESSION *session, const char *oldname, const char *newname, const char *config);
+	int __F(rename_table)(WT_SESSION *session,
+	    const char *oldname, const char *newname, const char *config);
 
 	/*! Drop (delete) a table.
 	 *
@@ -342,19 +374,25 @@ struct WT_SESSION {
 	 * \configempty
 	 * \errors
 	 */
-	int __F(drop_table)(WT_SESSION *session, const char *name, const char *config);
+	int __F(drop_table)(WT_SESSION *session,
+	     const char *name, const char *config);
 
 	/*! Truncate a table.
 	 *
 	 * \param session the session handle
 	 * \param name the name of the table
-	 * \param start optional cursor marking the start of the truncate operation.  If <code>NULL</code>, the truncate starts from the beginning of the table
-	 * \param end optional cursor marking the end of the truncate operation.  If <code>NULL</code>, the truncate continues to the end of the table
+	 * \param start optional cursor marking the start of the truncate
+	 * operation.  If <code>NULL</code>, the truncate starts from the
+	 * beginning of the table
+	 * \param end optional cursor marking the end of the truncate
+	 * operation.  If <code>NULL</code>, the truncate continues to the end
+	 * of the table
 	 * \param name the name of the table
 	 * \configempty
 	 * \errors
 	 */
-	int __F(truncate_table)(WT_SESSION *session, const char *name, WT_CURSOR *start, WT_CURSOR *end, const char *config);
+	int __F(truncate_table)(WT_SESSION *session, const char *name,
+	    WT_CURSOR *start, WT_CURSOR *end, const char *config);
 
 	/*! Verify a table.
 	 *
@@ -363,7 +401,8 @@ struct WT_SESSION {
 	 * \configempty
 	 * \errors
 	 */
-	int __F(verify_table)(WT_SESSION *session, const char *name, const char *config);
+	int __F(verify_table)(WT_SESSION *session, const char *name,
+	    const char *config);
 	/*! @} */
 
 	/*! \name Transactions
@@ -380,10 +419,14 @@ struct WT_SESSION {
 	 *
 	 * \param session the session handle
 	 * \configstart
-	 * \config{isolation,"serializable" or ["snapshot"] or<br>"read-committed" or "read-uncommitted",the isolation level for this transaction}
+	 * \config{isolation,"serializable" or ["snapshot"]
+	 * or<br>"read-committed" or "read-uncommitted",the isolation level for
+	 * this transaction}
 	 * \config{name,[none],name of the transaction for tracing and debugging}
-	 * \config{sync,["full"] or "flush" or "write" or "none",how to sync log records when the transaction commits}
-	 * \config{priority,integer between -100 and 100 ["0"],priority of the transaction for resolving conflicts}
+	 * \config{sync,["full"] or "flush" or "write" or "none",how to sync
+	 * log records when the transaction commits}
+	 * \config{priority,integer between -100 and 100 ["0"],priority of the
+	 * transaction for resolving conflicts}
 	 * \configend
 	 * \errors
 	 */
@@ -418,11 +461,14 @@ struct WT_SESSION {
 	 * \param session the session handle
 	 * \configstart
 	 * \config{archive,["0"] or "1",remove old log files}
-	 * \config{force,["0"] or "1",write a new checkpoint even if nothing has changed since the last one}
+	 * \config{force,["0"] or "1",write a new checkpoint even if nothing
+	 * has changed since the last one}
 	 * \config{flush_cache,"0" or ["1"],flush the cache}
 	 * \config{flush_log,"0" or ["1"],flush the log}
-	 * \config{log_size,[none],only proceed if more than the specified amount of log records have been written since the last checkpoint}
-	 * \config{timeout,[none],only proceed if more than the specified number of milliseconds have elapsed since the last checkpoint}
+	 * \config{log_size,[none],only proceed if more than the specified
+	 * amount of log records have been written since the last checkpoint}
+	 * \config{timeout,[none],only proceed if more than the specified
+	 * number of milliseconds have elapsed since the last checkpoint}
 	 * \configend
 	 * \errors
 	 */
@@ -446,42 +492,52 @@ struct WT_CONNECTION {
 	 * \param connection the connection handle
 	 * \param path the filename of the extension module
 	 * \configstart
-	 * \config{entry,["wiredtiger_extension_init"],the entry point of the extension}
-	 * \config{prefix,[none],a prefix for all names registered by this extension (e.g.\, to make namespaces distinct or during upgrades}
+	 * \config{entry,["wiredtiger_extension_init"],the entry point of the
+	 * extension}
+	 * \config{prefix,[none],a prefix for all names registered by this
+	 * extension (e.g.\, to make namespaces distinct or during upgrades}
 	 * \configend
 	 * \errors
 	 */
-	int __F(load_extension)(WT_CONNECTION *connection, const char *path, const char *config);
+	int __F(load_extension)(WT_CONNECTION *connection,
+	    const char *path, const char *config);
 
 	/*! Add a new type of cursor.
 	 *
 	 * \param connection the connection handle
-	 * \param prefix the prefix for location strings passed to WT_SESSION::open_cursor
-	 * \param factory the application-supplied code to manage cursors of this type
+	 * \param prefix the prefix for location strings passed to
+	 * WT_SESSION::open_cursor
+	 * \param factory the application-supplied code to manage cursors of
+	 * this type
 	 * \configempty
 	 * \errors
 	 */
-	int __F(add_cursor_factory)(WT_CONNECTION *connection, const char *prefix, WT_CURSOR_FACTORY *factory, const char *config);
+	int __F(add_cursor_factory)(WT_CONNECTION *connection,
+	    const char *prefix, WT_CURSOR_FACTORY *factory, const char *config);
 
 	/*! Add a custom collation function.
 	 *
 	 * \param connection the connection handle
-	 * \param name the name of the collation to be used in calls to WT_SESSION::add_schema
+	 * \param name the name of the collation to be used in calls to
+	 * WT_SESSION::add_schema
 	 * \param collator the application-supplied collation handler
 	 * \configempty
 	 * \errors
 	 */
-	int __F(add_collation)(WT_CONNECTION *connection, const char *name, WT_COLLATOR *collator, const char *config);
+	int __F(add_collation)(WT_CONNECTION *connection,
+	    const char *name, WT_COLLATOR *collator, const char *config);
 
 	/*! Add a custom extractor for index keys or column sets.
 	 *
 	 * \param connection the connection handle
-	 * \param name the name of the extractor to be used in calls to WT_SESSION::add_schema
+	 * \param name the name of the extractor to be used in calls to
+	 * WT_SESSION::add_schema
 	 * \param extractor the application-supplied extractor
 	 * \configempty
 	 * \errors
 	 */
-	int __F(add_extractor)(WT_CONNECTION *connection, const char *name, WT_EXTRACTOR *extractor, const char *config);
+	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
+	    WT_EXTRACTOR *extractor, const char *config);
 
 
 	/*! Close a connection.
@@ -513,29 +569,38 @@ struct WT_CONNECTION {
 	/*! Open a session.
 	 *
 	 * \param connection the connection handle
-	 * \param errhandler An error handler.  If <code>NULL</code>, the connection's error handler is used
+	 * \param errhandler An error handler.  If <code>NULL</code>, the
+	 * connection's error handler is used
 	 * \configempty
 	 * \param sessionp the new session handle
 	 * \errors
 	 */
-	int __F(open_session)(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, const char *config, WT_SESSION **sessionp);
+	int __F(open_session)(WT_CONNECTION *connection,
+	    WT_ERROR_HANDLER *errhandler, const char *config,
+	    WT_SESSION **sessionp);
 };
 
 /*! Open a connection to a database.
  *
  * \param home The path to the database home directory
- * \param errhandler An error handler.  If <code>NULL</code>, a builtin error handler is installed that writes error messages to stderr
+ * \param errhandler An error handler.  If <code>NULL</code>, a builtin error
+ * handler is installed that writes error messages to stderr
  * \configstart
  * \config{create,["0"] or "1",create the database if it does not exist}
  * \config{exclusive,["0"] or "1",fail if the database already exists}
- * \config{sharing,["0"] or "1",permit sharing between processes (will automatically start an RPC server for primary processes and use RPC for secondary processes)}
+ * \config{sharing,["0"] or "1",permit sharing between processes (will
+ * automatically start an RPC server for primary processes and use RPC for
+ * secondary processes)}
  * \config{cache_size,["1000000"],maximum heap memory to allocate for the cache}
- * \config{max_threads,["100"],maximum expected number of threads (including RPC client threads)}
+ * \config{max_threads,["100"],maximum expected number of threads (including
+ * RPC client threads)}
  * \configend
  * \param connectionp A pointer to the newly opened connection handle
  * \errors
  */
-int wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *config, WT_CONNECTION **connectionp);
+int wiredtiger_open(const char *home,
+    WT_ERROR_HANDLER *errhandler, const char *config,
+    WT_CONNECTION **connectionp);
 
 /*! Get information about an error as a string.
  *
@@ -555,7 +620,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 
 /*! Pack a structure into a buffer.
  *
- * Uses format strings as specified in the Python struct module:
+ * Uses format strings mostly as specified in the Python struct module:
  *   http://docs.python.org/library/struct
  *
  * The first character of the format string can be used to indicate the byte
@@ -598,7 +663,8 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 <tr><td>u</td><td>WT_ITEM</td><td>byte[]</td><td>string</td><td>variable</td></tr>
  * </table>
  *
- * The <code>'S'</code> type is encoded as a C language string terminated by a NUL character.
+ * The <code>'S'</code> type is encoded as a C language string terminated by a
+ * NUL character.
  *
  * The <code>'u'</code> type is for raw byte arrays: if it appears at the end
  * of a format string (including in the default <code>"u"</code> format for
@@ -629,10 +695,10 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  *
  * \param buffer a pointer to a packed byte array
  * \param size the number of valid bytes in the buffer
- * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param format the data format, see ::wiredtiger_struct_pack
  * \errors
  */
-int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...);
+int wiredtiger_struct_pack(void *buffer, int size, const char *format, ...);
 
 /*! Pack a structure into a buffer.
  *
@@ -640,11 +706,12 @@ int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...);
  *
  * \param buffer a pointer to a packed byte array
  * \param size the number of valid bytes in the buffer
- * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param format the data format, see ::wiredtiger_struct_pack
  * \param ap the list of values to pack
  * \errors
  */
-int wiredtiger_struct_packv(void *buffer, int size, const char *fmt, va_list ap);
+int wiredtiger_struct_packv(void *buffer, int size,
+    const char *format, va_list ap);
 
 /*! Calculate the size required to pack a structure.
  *
@@ -652,20 +719,22 @@ int wiredtiger_struct_packv(void *buffer, int size, const char *fmt, va_list ap)
  * integers, the calculated sized merely reflects the expected sizes specified
  * in the format string itself.
  *
- * \param fmt the data format, see ::wiredtiger_struct_pack
- * \returns the number of bytes needed for the matching call to ::wiredtiger_struct_pack
+ * \param format the data format, see ::wiredtiger_struct_pack
+ * \returns the number of bytes needed for the matching call to
+ * ::wiredtiger_struct_pack
  */
-int wiredtiger_struct_size(const char *fmt, ...);
+int wiredtiger_struct_size(const char *format, ...);
 
 /*! Calculate the size required to pack a structure.
  *
  * stdarg version of ::wiredtiger_struct_size.
  *
- * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param format the data format, see ::wiredtiger_struct_pack
  * \param ap the list of values to be packed
- * \returns the number of bytes needed for the matching call to ::wiredtiger_struct_pack
+ * \returns the number of bytes needed for the matching call to
+ * ::wiredtiger_struct_pack
  */
-int wiredtiger_struct_sizev(const char *fmt, va_list ap);
+int wiredtiger_struct_sizev(const char *format, va_list ap);
 
 /*! Unpack a structure from a buffer.
  *
@@ -673,10 +742,11 @@ int wiredtiger_struct_sizev(const char *fmt, va_list ap);
  *
  * \param buffer a pointer to a packed byte array
  * \param size the number of valid bytes in the buffer
- * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param format the data format, see ::wiredtiger_struct_pack
  * \errors
  */
-int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...);
+int wiredtiger_struct_unpack(const void *buffer, int size,
+    const char *format, ...);
 
 /*! Unpack a structure from a buffer.
  *
@@ -684,11 +754,12 @@ int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...)
  *
  * \param buffer a pointer to a packed byte array
  * \param size the number of valid bytes in the buffer
- * \param fmt the data format, see ::wiredtiger_struct_pack
+ * \param format the data format, see ::wiredtiger_struct_pack
  * \param ap the list of locations where values are unpacked
  * \errors
  */
-int wiredtiger_struct_unpackv(const void *buffer, int size, const char *fmt, va_list ap);
+int wiredtiger_struct_unpackv(const void *buffer, int size,
+    const char *format, va_list ap);
 
 /*! Entry point to an extension, implemented by loadable modules.
  *
@@ -696,10 +767,19 @@ int wiredtiger_struct_unpackv(const void *buffer, int size, const char *fmt, va_
  * \configempty
  * \errors
  */
-extern int wiredtiger_extension_init(WT_CONNECTION *connection, const char *config);
+extern int wiredtiger_extension_init(WT_CONNECTION *connection,
+    const char *config);
 
-/*! No matching record was found, including when reaching the limits of a cursor traversal. */
-#define	WT_NOTFOUND	(-10000)
+/*! Concurrent operations caused a deadlock, a transaction must rollback. */
+#define	WT_DEADLOCK	(-10000)
+
+/*! No matching record was found, including when reaching the limits of a
+ * cursor traversal.
+ */
+#define	WT_NOTFOUND	(-10001)
+
+/*! Concurrent operations caused a conflict, a transaction must rollback. */
+#define	WT_UPDATE_CONFLICT	(-10002)
 
 /*!
  * Applications can extend WiredTiger by providing new implementation of the
@@ -718,16 +798,19 @@ struct WT_CURSOR_FACTORY {
 	 *
 	 * \errors
 	 */
-	int (*cursor_size)(WT_CURSOR_FACTORY *factory, const char *obj, size_t *sizep);
+	int (*cursor_size)(WT_CURSOR_FACTORY *factory,
+	    const char *obj, size_t *sizep);
 
 	/*! Callback to initialize a cursor. */
-	int (*init_cursor)(WT_CURSOR_FACTORY *factory, WT_SESSION *session, const char *obj, WT_CURSOR *cursor);
+	int (*init_cursor)(WT_CURSOR_FACTORY *factory,
+	    WT_SESSION *session, const char *obj, WT_CURSOR *cursor);
 
 	/*! Callback to duplicate a cursor.
 	 *
 	 * \errors
 	 */
-	int (*dup_cursor)(WT_CURSOR_FACTORY *factory, WT_SESSION *session, WT_CURSOR *old_cursor, WT_CURSOR *new_cursor);
+	int (*dup_cursor)(WT_CURSOR_FACTORY *factory,
+	    WT_SESSION *session, WT_CURSOR *old_cursor, WT_CURSOR *new_cursor);
 };
 
 /*!
@@ -750,7 +833,8 @@ struct WT_COLLATOR {
  */
 struct WT_ERROR_HANDLER {
 	/*! Callback to handle errors within the session. */
-	int (*handle_error)(WT_ERROR_HANDLER *handler, int err, const char *errmsg);
+	int (*handle_error)(WT_ERROR_HANDLER *handler,
+	    int err, const char *errmsg);
 
 	/*! Optional callback to retrieve buffered messages. */
 	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);

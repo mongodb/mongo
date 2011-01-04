@@ -15,9 +15,9 @@ __curstd_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->keyfmt;
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format;
 	return wiredtiger_struct_unpackv(stdc->key.data, stdc->key.size,
-	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->keyfmt, ap);
+	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format, ap);
 }
 
 static int
@@ -28,9 +28,9 @@ __curstd_get_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->valuefmt;
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format;
 	return wiredtiger_struct_unpackv(stdc->value.data, stdc->value.size,
-	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->valuefmt, ap);
+	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format, ap);
 }
 
 static int
@@ -42,7 +42,7 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 		
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->keyfmt;
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format;
 	sz = wiredtiger_struct_sizev(fmt, ap);
 	if (stdc->keybufsz < sz) {
 		stdc->keybuf = (stdc->keybuf == NULL) ?
@@ -64,7 +64,7 @@ __curstd_set_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->valuefmt;
+	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format;
 	sz = wiredtiger_struct_sizev(fmt, ap);
 	if (stdc->valuebufsz < sz) {
 		stdc->valuebuf = (stdc->valuebuf == NULL) ?

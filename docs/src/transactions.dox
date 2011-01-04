@@ -2,5 +2,40 @@
 
 /*! \page transactions Transactions
 
-\section acid The ACID properties.
+Note: the initial release of WiredTiger does not include support for transactions.  This page describes the behavior of a future release.
+
+\section transactions_acid The ACID properties.
+
+Transactions provide a powerful abstraction for multiple threads to operate on data concurrently because they have the following properties:
+
+- Atomicity: all or none of a transaction is completed.
+- Consistency: if each transaction maintains some property when considered separately, then the combined effect of executing the transactions concurrently will maintain the same property.
+- Isolation: developers can reason about transactions independently.
+- Durability: once a transaction commits, its updates are saved.
+
+\section transactions_api The Transaction API
+
+To configure for transactions, the database must be created with transaction support enabled.  This is done by passing the configuration string <code>"transactional"</code> to ::wiredtiger_open when creating the database.
+
+In WiredTiger, the transactional context is managed by the WT_SESSION class.  Applications call WT_SESSION::begin_transaction to start a new transaction, which is only permitted when no cursors are open.  Operations performed with that WT_SESSION handle are then part of the transaction, and their effects can be committed by calling WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, both of which implicitly close any open cursors.
+
+When transactions are used, operations may fail with additional errors, including ::WT_DEADLOCK, ::WT_UPDATE_CONFLICT, ... [XXX].
+
+\section transactions_cc Concurrency Control
+
+WiredTiger uses a timestamp-based optimistic concurrency control algorithm.  This avoids the bottleneck of a centralized lock manager and expensive graph searching to identify deadlock cycles. [XXX]
+
+\section transaction_isolation Isolation Levels
+
+The default isolation level is <code>serializable</code>, which means that the concurrent execution of committed transactions is equivalent to executing the transactions in some serial order.
+
+Weaker isolation levels are also provided, including <code>repeatable read</code>, which permits phantoms, <code>snapshot isolation</code>, which permits write skew, <code>read committed</code>, which permits lost updates and always returns the most recently committed changes, and <code>read uncommitted</code>, which always reads the most recent version of data, regardless of whether it is committed.
+
+\section transaction_recovery Recovery
+
+Recovery is run automatically during ::wiredtiger_open when required.  See \ref processes_sharing for details.
+
+Recovery works by using a database log that contains a record of the actions of all transactions.  Recovery first finds the last complete checkpoint, and then scans forward through the log from that point to determine which transactions committed after the checkpoint.  All actions are rolled forward from the checkpoint so that the in-memory tree matches its state when the crash occurred.  Then the "losing" transactions (those that did not commit) are rolled back to return the database to a consistent state.
+
+This suggests the importance of regular checkpoints: they limit the amount of work required during recovery, which speeds up the ::wiredtiger_open call.  See WT_SESSION::checkpoint for information about triggering checkpoints.
  */

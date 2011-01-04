@@ -27,6 +27,6 @@ make
 
 # Java API
 cd $TOP
-CLASSES=lang/java/classes
+CLASSES=$BUILD/classes
 mkdir -p $CLASSES
 CLASSPATH=$THRIFT_HOME/libthrift.jar:$SLF4J_JAR javac -d $CLASSES src/server/gen-java/com/wiredtiger/protocol/W*.java lang/java/src/com/wiredtiger/*.java lang/java/src/com/wiredtiger/*/*.java lang/java/tests/com/wiredtiger/*.java

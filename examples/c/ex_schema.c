@@ -46,20 +46,23 @@ int main()
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	if (conn->is_new(conn)) {
-		/*
-		 * Create a schema for the population table.
-		 * Keys are record numbers, the format for values is
-		 * (5-byte string, short, long).
-		 * See ::wiredtiger_struct_pack for details.
-		 */
-		ret = session->add_schema(session, "POP_RECORD", "r", "5sHQ",
-		    "id,country,year,population",
-		    "population(population)",
-		    "country_year(country,year)", NULL);
-		ret = session->create_table(session, "population",
-		    "schema=POP_RECORD");
-	}
+	/*
+	 * Create the population table.
+	 * Keys are record numbers, the format for values is
+	 * (5-byte string, short, long).
+	 * See ::wiredtiger_struct_pack for details of the format strings.
+	 *
+	 * If this program is run multiple times so the table already exists,
+	 * this call will verify that the table exists.  It is not required in
+	 * that case, but is a safety check that the schema matches what the
+	 * program expects.
+	 */
+	ret = session->create_table(session, "population",
+	    "key_format=r,"
+	    "value_format=5sHQ,"
+	    "columns=(id,country,year,population),"
+	    "column_set=population(population),"
+	    "index=country_year(country,year)");
 
 	ret = session->open_cursor(session, "table:population", NULL, &cursor);
 

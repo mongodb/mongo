@@ -2,13 +2,11 @@
 
 /*! \page schema Schemas
 
+The tables we have seen so far have all had simple key/value pairs for records.
+
 \section schema_intro Tables, Rows and Columns
 
-XXX rewrite from scratch, fill out with more details about how to use WT_SCHEMA for various things: native C structs, portability between programming languages, non-relational data such as multiple index keys per row, etc.
-
-Lifted from http://en.wikipedia.org/wiki/Column-oriented_DBMS.
-
-A database program must show its data as two-dimensional tables, of columns and rows, but store it as one-dimensional strings. For example, a database might have this table.
+A table is a logical representation of data consisting of cells in rows and columns.  For example, a database might have this table.
 
 <table>
 <tr><th>EmpId</th><th>Lastname</th><th>Firstname</th><th>Salary</th></tr>
@@ -17,17 +15,17 @@ A database program must show its data as two-dimensional tables, of columns and 
 <tr><td>3</td><td>Johnson</td><td>Cathy</td><td>44000</td></tr>
 </table>
 
-This simple table includes an employee identifier (EmpId), name fields (Lastname and Firstname) and a salary (Salary).
+This simple table includes an employee identifier, last name and first name, and a salary.
 
-A row-oriented database serializes all of the values in a row together, then the values in the next row, and so on:
+A row-oriented database would store all of the values in a row together, then the values in the next row, and so on:
 
-<pre>k
+<pre>
       1,Smith,Joe,40000;
       2,Jones,Mary,50000;
       3,Johnson,Cathy,44000;
 </pre>
 
-A column-oriented database serializes all of the values of a column together, then the values of the next column, and so on:
+A column-oriented database stores all of the values of a column together, then the values of the next column, and so on:
 
 <pre>
       1,2,3;
@@ -36,11 +34,24 @@ A column-oriented database serializes all of the values of a column together, th
       40000,50000,44000;
 </pre>
 
-\section packing Serializing Values
+WiredTiger supports both storage formats, and can mix and match the storage of columns within a logical table.
 
-\section schema_storage How Schemas are Stored
+Applications describe the format of their data by supplying a *schema* to WT_SESSION::create_table.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
 
-\section schema_startup Loading of Schemas during Startup
+\section schema_columns Describing Columns
 
-\section schema_mapping Mapping Tables onto Access Methods
+XXX
+
+\section schema_indices Adding an Index
+
+XXX
+
+\section schema_mapping Column Storage
+
+XXX
+
+\section schema_advanced Advanced Schemas
+
+- non-relational data such as multiple index keys per row
+- application-supplied extractors and collators may need to be registered before recovery can run.
  */

@@ -63,22 +63,20 @@ int main()
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	if (conn->is_new(conn)) {
-		ret = session->add_schema(session, "CUSTOMER",
-		    "r", "SSS", "id,name,address,phone",
-		    /* Column sets. */ "cust_address(address)",
-		    /* Indices. */ "cust_phone(phone)", NULL);
-		ret = session->create_table(session, "customers",
-		    "schema=CUSTOMER");
+	ret = session->create_table(session, "customers",
+	    "key_format=r,"
+	    "value_format=SSS,"
+	    "columns=(id,name,address,phone),"
+	    "column_set=cust_address(address),"
+	    "index=cust_phone(phone)");
 
-		ret = session->add_schema(session, "CALL",
-		    "r", "qrrSS", "id,call_date,cust_id,emp_id,call_type,notes",
-		    /* Column sets. */ NULL,
-		    /* Indices. */ "call_cust_date(cust_id,call_date)", NULL);
-		ret = session->create_table(session, "calls", "schema=CALL");
+	ret = session->create_table(session, "calls",
+	    "key_format=r,"
+	    "value_format=qrrSS,"
+	    "columns=(id,call_date,cust_id,emp_id,call_type,notes),"
+	    "index=call_cust_date(cust_id,call_date)");
 
-		/* Omitted: populate the tables with some data. */
-	}
+	/* Omitted: populate the tables with some data. */
 
 	/*
 	 * First query: a call arrives.  In SQL:
