@@ -58,7 +58,7 @@ namespace ThreadedTests {
     };
 
     class MongoMutexTest : public ThreadedTest<> { 
-        enum { N = 1000000 };
+        enum { N = 100000 };
         MongoMutex *mm;
         virtual void setup() { 
             mm = new MongoMutex("MongoMutexTest");
