@@ -123,7 +123,7 @@ namespace mongo {
 
         /** for doing many finds in a row with one lock operation */
         mutex& _mutex() { return _m; }
-        MongoMMF* _find(void *p, /*out*/ size_t& ofs);
+        MongoMMF* _findx(void *p, /*out*/ size_t& ofs);
 
     private:
         mutex _m;
