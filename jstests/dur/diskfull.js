@@ -52,9 +52,15 @@ function work() {
 function verify() { 
     log("verify");
     var d = conn.getDB("test");
-    assert( d.foo.validate().valid );
-    print( d.foo.count() );
-    assert( d.foo.count() > 0 );
+    c = d.foo.count();
+    v = d.foo.validate();
+    // not much we can guarantee about the writes, just validate when possible
+    if ( c != 0 && !v.valid ) {
+        printjson( v );
+        print( c );
+        assert( v.valid );
+        assert.gt( c, 0 );
+    }
 }
 
 function runFirstMongodAndFillDisk() {
