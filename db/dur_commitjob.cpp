@@ -95,8 +95,11 @@ namespace mongo {
                 _writes.insert(wi);
 
                 DEV { // ensure there are no overlaps
-                    for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it) {
-                        assert(!it->overlaps(*boost::next(it)));
+                    // this can be very slow - n^2 - so make it RARELY
+                    RARELY { 
+                        for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it) {
+                            assert(!it->overlaps(*boost::next(it)));
+                        }
                     }
                 }
             }
