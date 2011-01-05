@@ -170,7 +170,7 @@ namespace mongo {
             const bool _doDurOps;
         };
 
-        static string fileName(const char* dbName, int fileNo){
+        static string fileName(const char* dbName, int fileNo) {
             stringstream ss;
             ss << dbName << '.';
             assert( fileNo >= 0 );
@@ -197,10 +197,10 @@ namespace mongo {
 
         void RecoveryJob::_close() {
             MongoFile::flushAll(true);
-            _mmfs.clear(); 
+            _mmfs.clear();
         }
 
-        void RecoveryJob::write(const ParsedJournalEntry& entry){
+        void RecoveryJob::write(const ParsedJournalEntry& entry) {
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;
             {
@@ -209,7 +209,7 @@ namespace mongo {
             }
 
             MongoMMF* mmf;
-            if (file){
+            if (file) {
                 assert(file->isMongoMMF());
                 mmf = (MongoMMF*)file;
             }

@@ -57,7 +57,7 @@ namespace mongo {
             while( 1 ) {
                 if( TryAcquireSRWLockShared(&_lock) )
                     return true;
-                if( curTimeMicros64() >= end ) 
+                if( curTimeMicros64() >= end )
                     break;
                 Sleep(1);
             }
@@ -68,7 +68,7 @@ namespace mongo {
             while( 1 ) {
                 if( TryAcquireSRWLockExclusive(&_lock) )
                     return true;
-                if( curTimeMicros64() >= end ) 
+                if( curTimeMicros64() >= end )
                     break;
                 Sleep(1);
             }

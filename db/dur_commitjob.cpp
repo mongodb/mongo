@@ -96,7 +96,7 @@ namespace mongo {
 
                 DEV { // ensure there are no overlaps
                     // this can be very slow - n^2 - so make it RARELY
-                    RARELY { 
+                    RARELY {
                         for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it) {
                             assert(!it->overlaps(*boost::next(it)));
                         }
