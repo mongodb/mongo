@@ -67,8 +67,6 @@ namespace ThreadedTests {
             Client::initThread("mongomutextest");
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) { 
-                if( i % 20000 == 0 ) 
-                    log() << i << endl;
                 if( i % 7 == 0 ) { 
                     mm->lock_shared();
                     mm->lock_shared();
