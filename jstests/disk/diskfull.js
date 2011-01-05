@@ -13,11 +13,11 @@ if ( !doIt ) {
     doIt = false;
 }
 
-// Clear dbpath without removing and recreating diskfulltest directory, as resetDbpath does
-files = listFiles( dbpath );
-files.forEach( function( x ) { removeFile( x.name ) } );
-
 if ( doIt ) {
+    // Clear dbpath without removing and recreating diskfulltest directory, as resetDbpath does
+    files = listFiles( dbpath );
+    files.forEach( function( x ) { removeFile( x.name ) } );
+    
     port = allocatePorts( 1 )[ 0 ];
     m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
     c = m.getDB( "diskfulltest" ).getCollection( "diskfulltest" )
