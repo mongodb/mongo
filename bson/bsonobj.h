@@ -76,7 +76,7 @@ namespace mongo {
             init(msgdata, ifree);
         }
 
-        BSONObj(const Record *r);
+        explicit BSONObj(const Record *r);
 
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();

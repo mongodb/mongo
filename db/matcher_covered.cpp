@@ -76,7 +76,7 @@ namespace mongo {
         if ( details )
             details->loadedObject = true;
 
-        return _docMatcher->matches(recLoc.rec() , details );
+        return _docMatcher->matches(recLoc.obj() , details );
     }
 
 
