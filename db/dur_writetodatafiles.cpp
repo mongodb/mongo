@@ -53,8 +53,6 @@ namespace mongo {
 
         // the old implementation
         void WRITETODATAFILES_Impl2() {
-            MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
-
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
             for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
                 const WriteIntent& intent = *it;
@@ -62,15 +60,10 @@ namespace mongo {
                 dassert(intent.w_ptr);
                 memcpy(intent.w_ptr, intent.start(), intent.length());
             }
-
-            if (!dbMutex.isWriteLocked())
-                MongoFile::unmarkAllWritable();
         }
 
 #if defined(_EXPERIMENTAL)
         void WRITETODATAFILES_Impl3() {
-            MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
-
             /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
             for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
                 const WriteIntent& intent = *it;
@@ -80,14 +73,14 @@ namespace mongo {
                        commitJob._ab.atOfs(intent.ofsInJournalBuffer),
                        intent.length());
             }
-
-            if (!dbMutex.isWriteLocked())
-                MongoFile::unmarkAllWritable();
         }
 #endif
 
         void WRITETODATAFILES() {
             dbMutex.assertAtLeastReadLocked();
+
+            MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
+
             Timer t;
 #if defined(_EXPERIMENTAL)
             WRITETODATAFILES_Impl3();
@@ -95,6 +88,10 @@ namespace mongo {
             WRITETODATAFILES_Impl1();
 #endif
             stats.curr->_writeToDataFilesMicros += t.micros();
+
+            if (!dbMutex.isWriteLocked())
+                MongoFile::unmarkAllWritable();
+
             debugValidateAllMapsMatch();
         }
 
