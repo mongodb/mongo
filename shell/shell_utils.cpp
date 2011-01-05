@@ -672,13 +672,13 @@ namespace mongo {
             directory_iterator i( from );
             while( i != end ) {
                 path p = *i;
-                if ( p.leaf() != "mongod.lock" ) {
+                if ( p.filename() != "mongod.lock" ) {
                     if ( is_directory( p ) ) {
-                        path newDir = to / p.leaf();
+                        path newDir = to / p.filename();
                         boost::filesystem::create_directory( newDir );
                         copyDir( p, newDir );
                     } else {
-                        boost::filesystem::copy_file( p, to / p.leaf() );
+                        boost::filesystem::copy_file( p, to / p.filename() );
                     }
                 }
                 ++i;

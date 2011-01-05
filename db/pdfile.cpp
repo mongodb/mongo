@@ -1782,7 +1782,7 @@ namespace mongo {
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
-                boostRenameWrapper( p, newPath_ / ( p.filename().string() + ".bak" ) );
+                boostRenameWrapper( p, newPath_ / p.filename() / ".bak" );
                 return true;
             }
             virtual const char * op() const {
@@ -1805,7 +1805,7 @@ namespace mongo {
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
-                boostRenameWrapper( p, newPath_ / p.leaf() );
+                boostRenameWrapper( p, newPath_ / p.filename() );
                 return true;
             }
             virtual const char * op() const {
