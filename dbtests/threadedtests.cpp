@@ -57,7 +57,7 @@ namespace ThreadedTests {
         }
     };
 
-    class MongoMutexTest : public ThreadedTest<135> { 
+    class MongoMutexTest : public ThreadedTest<135> {
         enum { N = 80000 };
         MongoMutex *mm;
         virtual void setup() {
@@ -66,8 +66,8 @@ namespace ThreadedTests {
         virtual void subthread() {
             Client::initThread("mongomutextest");
             sleepmillis(0);
-            for( int i = 0; i < N; i++ ) { 
-                if( i % 7 == 0 ) { 
+            for( int i = 0; i < N; i++ ) {
+                if( i % 7 == 0 ) {
                     mm->lock_shared();
                     mm->lock_shared();
                     mm->unlock_shared();
