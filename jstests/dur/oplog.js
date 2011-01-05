@@ -23,7 +23,7 @@ function runDiff(a, b) {
     a = reSlash(a);
     b = reSlash(b);
     print("diff " + a + " " + b);
-    return run("diff", a, b);
+    return runProgram("diff", a, b);
 }
 
 function log(str) {
