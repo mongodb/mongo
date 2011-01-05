@@ -277,11 +277,11 @@ namespace mongo {
                 log() << "END section" << endl;
         }
 
-        void RecoveryJob::processSection(const void *p, unsigned len, bool doDurOps) {
+        void RecoveryJob::processSection(const void *p, unsigned len) {
             scoped_lock lk(_mx);
 
             vector<ParsedJournalEntry> entries;
-            JournalSectionIterator i(p, len, doDurOps);
+            JournalSectionIterator i(p, len, _recovering);
 
             if( _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) {
                 log() << "recover skipping application of section " << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
@@ -323,7 +323,7 @@ namespace mongo {
                 while ( !br.atEof() ) {
                     JSectHeader h;
                     br.peek(h);
-                    processSection(br.skip(h.len), h.len, /*doDurOps*/true);
+                    processSection(br.skip(h.len), h.len);
 
                     // ctrl c check
                     killCurrentOp.checkForInterrupt(false);
@@ -350,6 +350,7 @@ namespace mongo {
         /** @param files all the j._0 style files we need to apply for recovery */
         void RecoveryJob::go(vector<path>& files) {
             log() << "recover begin" << endl;
+            _recovering = true;
 
             // load the last sequence number synced to the datafiles on disk before the last crash
             _lastDataSyncedFromLastRun = journalReadLSN();
@@ -374,6 +375,7 @@ namespace mongo {
             removeJournalFiles();
             log() << "recover done" << endl;
             okToCleanUp = true;
+            _recovering = false;
         }
 
         void _recover() {

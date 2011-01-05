@@ -48,7 +48,7 @@ namespace mongo {
         */
 
         void WRITETODATAFILES_Impl1() {
-            RecoveryJob::get().processSection(commitJob._ab.buf(), commitJob._ab.len(), false);
+            RecoveryJob::get().processSection(commitJob._ab.buf(), commitJob._ab.len());
         }
 
         // the old implementation

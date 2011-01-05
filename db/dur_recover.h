@@ -18,7 +18,7 @@ namespace mongo {
             RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") {}
             void go(vector<path>& files);
             ~RecoveryJob();
-            void processSection(const void *, unsigned len, bool doDurOps);
+            void processSection(const void *, unsigned len);
             void close(); // locks and calls _close()
 
             static RecoveryJob & get() { return _instance; }
@@ -44,6 +44,8 @@ namespace mongo {
             unsigned long long _lastDataSyncedFromLastRun;
 
             mongo::mutex _mx; // protects _files
+
+            bool _recovering; // are we in recovery or WRITETODATAFILES
 
             static RecoveryJob _instance;
         };
