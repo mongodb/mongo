@@ -529,10 +529,6 @@ namespace mongo {
         void closingFileNotification() {
             if( dbMutex.atLeastReadLocked() ) {
                 groupCommit();
-
-                if (!inShutdown()) {
-                    RecoveryJob::get().close();
-                }
             }
             else {
                 assert( inShutdown() );

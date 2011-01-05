@@ -32,6 +32,7 @@
 #include "../util/unittest.h"
 #include "cmdline.h"
 #include "curop.h"
+#include "mongommf.h"
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -169,52 +170,23 @@ namespace mongo {
             const bool _doDurOps;
         };
 
+        static string fileName(const char* dbName, int fileNo){
+            stringstream ss;
+            ss << dbName << '.';
+            assert( fileNo >= 0 );
+            if( fileNo == JEntry::DotNsSuffix )
+                ss << "ns";
+            else
+                ss << fileNo;
 
-        /** retrieve the file for the specified dbName plus file number.
-            open if not yet open.
-        */
-        File& RecoveryJob::getFile(const char *dbName, int fileNo) {
-            File &file = _files[ make_pair(fileNo,dbName) ];
-
-            if(!file.is_open()) {
-                string fn;
-                {
-                    stringstream ss;
-                    ss << dbName << '.';
-                    assert( fileNo >= 0 );
-                    if( fileNo == JEntry::DotNsSuffix )
-                        ss << "ns";
-                    else
-                        ss << fileNo;
-                    /* todo: do we need to create file here if DNE?
-                             we need to know what its length should be for that though.
-                             however does this happen?  FileCreatedOp should have been in the journal and
-                             already applied if the file is new.
-                    */
-                    fn = ss.str();
-                }
-
-                path full(dbpath);
-                try {
-                    // relative name -> full path name
-                    full /= fn;
-                    file.open(full.string().c_str());
-                }
-                catch(DBException&) {
-                    log() << "recover error opening file " << full.string() << endl;
-                    throw;
-                }
-                uassert(13534, str::stream() << "recovery error couldn't open " << fn, file.is_open());
-
-                if( cmdLine.durOptions & CmdLine::DurDumpJournal )
-                    log() << "  opened " << fn << ' ' << file.len()/1024.0/1024.0 << endl;
-            }
-
-            return file;
+            // relative name -> full path name
+            path full(dbpath);
+            full /= ss.str();
+            return full.string();
         }
 
         RecoveryJob::~RecoveryJob() {
-            if( !_files.empty() )
+            if( !_mmfs.empty() )
                 close();
         }
 
@@ -224,11 +196,38 @@ namespace mongo {
         }
 
         void RecoveryJob::_close() {
-            for(FileMap::iterator it(_files.begin()), end(_files.end()); it!=end; ++it) {
-                it->second.fsync();
+            MongoFile::flushAll(true);
+            _mmfs.clear(); 
+        }
+
+        void RecoveryJob::write(const ParsedJournalEntry& entry){
+            const string fn = fileName(entry.dbName, entry.e->getFileNo());
+            MongoFile* file;
+            {
+                MongoFileFinder finder; // must release lock before creating new MongoMMF
+                file = finder.findByPath(fn);
             }
 
-            _files.clear(); // closes files
+            MongoMMF* mmf;
+            if (file){
+                assert(file->isMongoMMF());
+                mmf = (MongoMMF*)file;
+            }
+            else {
+                assert(_recovering);
+                boost::shared_ptr<MongoMMF> sp (new MongoMMF);
+                assert(sp->open(fn, false));
+                _mmfs.push_back(sp);
+                mmf = sp.get();
+            }
+
+            if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
+                void* dest = (char*)mmf->view_write() + entry.e->ofs;
+                memcpy(dest, entry.e->srcData(), entry.e->len);
+            }
+            else {
+                massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
+            }
         }
 
         void RecoveryJob::applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump) {
@@ -245,8 +244,7 @@ namespace mongo {
                     log() << ss.str() << endl;
                 }
                 if( apply ) {
-                    File& file = getFile(entry.dbName, entry.e->getFileNo());
-                    file.write(entry.e->ofs, entry.e->srcData(), entry.e->len);
+                    write(entry);
                 }
             }
             else if(entry.op) {
