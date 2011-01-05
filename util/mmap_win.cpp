@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    mutex mapViewMutex("mapView");
+
     MemoryMappedFile::MemoryMappedFile()
         : _flushMutex(new mutex("flushMutex")) {
         fd = 0;
@@ -46,6 +48,9 @@ namespace mongo {
     unsigned long long mapped = 0;
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        // the mutex is to assure we get the same address on the remap
+        scoped_lock lk(mapViewMutex);
+
         bool ok = UnmapViewOfFile(oldPrivateAddr);
         assert(ok);
 
@@ -53,6 +58,7 @@ namespace mongo {
         void *p = MapViewOfFileEx(maphandle, FILE_MAP_COPY, 0, 0,
                                   /*dwNumberOfBytesToMap 0 means to eof*/0 /*len*/,
                                   oldPrivateAddr);
+
         assert(p);
         assert(p == oldPrivateAddr);
         return p;
@@ -60,6 +66,7 @@ namespace mongo {
 
     void* MemoryMappedFile::createPrivateMap() {
         assert( maphandle );
+        scoped_lock lk(mapViewMutex);
         void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
@@ -73,6 +80,7 @@ namespace mongo {
 
     void* MemoryMappedFile::createReadOnlyMap() {
         assert( maphandle );
+        scoped_lock lk(mapViewMutex);
         void *p = MapViewOfFile(maphandle, FILE_MAP_READ, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
@@ -141,6 +149,7 @@ namespace mongo {
 
         void *view = 0;
         {
+            scoped_lock lk(mapViewMutex);
             DWORD access = (options&READONLY)? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
             view = MapViewOfFile(maphandle, access, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         }
@@ -152,24 +161,6 @@ namespace mongo {
             views.push_back(view);
         }
         len = length;
-
-#if 0
-        {
-            if( !( options & READONLY ) ) {
-                log() << "dur: not readonly view which is wrong : " << filename << endl;
-            }
-            void *p = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
-            assert( p );
-            writeView = p;
-            {
-                mutex::scoped_lock lk(viewToWritableMutex);
-                viewToWritable[view] = this;
-            }
-            log() << filenameIn << endl;
-            log() << "  ro: " << view << " - " << (void*) (((char *)view)+length) << endl;
-            log() << "  w : " << writeView << " - " << (void*) (((char *)writeView)+length) << endl;
-        }
-#endif
 
         return view;
     }
