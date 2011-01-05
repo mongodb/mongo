@@ -84,7 +84,28 @@ namespace mongo {
 #define MONGO_ctime _ctime_is_not_threadsafe_
 #define ctime MONGO_ctime
 
-#if defined(_WIN32) || defined(__sunos__)
+#if defined(_WIN32)
+    inline void sleepsecs(int s) {
+        Sleep(s*1000);
+    }
+    inline void sleepmillis(long long s) {
+        assert( s <= 0xffffffff );
+        Sleep((DWORD) s);
+    }
+    inline void sleepmicros(long long s) {
+        if ( s <= 0 )
+            return;
+        boost::xtime xt;
+        boost::xtime_get(&xt, boost::TIME_UTC);
+        xt.sec += (int)( s / 1000000 );
+        xt.nsec += (int)(( s % 1000000 ) * 1000);
+        if ( xt.nsec >= 1000000000 ) {
+            xt.nsec -= 1000000000;
+            xt.sec++;
+        }
+        boost::thread::sleep(xt);
+    }
+#elif defined(__sunos__)
     inline void sleepsecs(int s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);

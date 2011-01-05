@@ -6,7 +6,7 @@
 #include "../util/file.h"
 
 namespace mongo {
-    class MemoryMappedFile;
+    class MongoMMF;
 
     namespace dur {
         struct ParsedJournalEntry;
@@ -18,32 +18,25 @@ namespace mongo {
             RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") {}
             void go(vector<path>& files);
             ~RecoveryJob();
-            void processSection(const void *, unsigned len, bool doDurOps);
+            void processSection(const void *, unsigned len);
             void close(); // locks and calls _close()
 
             static RecoveryJob & get() { return _instance; }
         private:
+            void write(const ParsedJournalEntry& entry); // actually writes to the file
             void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump);
             void applyEntries(const vector<ParsedJournalEntry> &entries);
             bool processFileBuffer(const void *, unsigned len);
             bool processFile(path journalfile);
             void _close(); // doesn't lock
 
-            /** retrieve the File for the specified dbName plus file number.
-                open if not yet open.
-                @param fileNo a value of -1 indicates ".ns"
-                @param ofs offset to add to the pointer before returning
-            */
-            File& getFile(const char *dbName, int fileNo);
-
-            // fileno,dbname -> File
-            // all close at end (destruction) of RecoveryJob
-            typedef map< pair<int,string>, File > FileMap;
-            FileMap _files;
+            list<boost::shared_ptr<MongoMMF> > _mmfs;
 
             unsigned long long _lastDataSyncedFromLastRun;
 
-            mongo::mutex _mx; // protects _files
+            mongo::mutex _mx; // protects _mmfs
+
+            bool _recovering; // are we in recovery or WRITETODATAFILES
 
             static RecoveryJob _instance;
         };

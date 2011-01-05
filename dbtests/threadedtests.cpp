@@ -57,13 +57,13 @@ namespace ThreadedTests {
         }
     };
 
-    class MongoMutexTest : public ThreadedTest<> { 
-        enum { N = 100000 };
+    class MongoMutexTest : public ThreadedTest<135> { 
+        enum { N = 80000 };
         MongoMutex *mm;
-        virtual void setup() { 
+        virtual void setup() {
             mm = new MongoMutex("MongoMutexTest");
         }
-        virtual void subthread() { 
+        virtual void subthread() {
             Client::initThread("mongomutextest");
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) { 
@@ -73,46 +73,46 @@ namespace ThreadedTests {
                     mm->unlock_shared();
                     mm->unlock_shared();
                 }
-                else if( i % 7 == 1 ) { 
+                else if( i % 7 == 1 ) {
                     mm->lock_shared();
                     ASSERT( mm->atLeastReadLocked() );
                     mm->unlock_shared();
                 }
-                else if( i % 7 == 2 ) { 
+                else if( i % 7 == 2 ) {
                     mm->lock();
                     ASSERT( mm->isWriteLocked() );
                     mm->unlock();
                 }
-                else if( i % 7 == 3 ) { 
+                else if( i % 7 == 3 ) {
                     mm->lock();
                     mm->lock_shared();
                     ASSERT( mm->isWriteLocked() );
                     mm->unlock_shared();
                     mm->unlock();
                 }
-                else if( i % 7 == 4 ) { 
+                else if( i % 7 == 4 ) {
                     mm->lock();
                     mm->releaseEarly();
                     mm->unlock();
                 }
-                else if( i % 7 == 5 ) { 
-                    if( mm->lock_try(1) ) { 
+                else if( i % 7 == 5 ) {
+                    if( mm->lock_try(1) ) {
                         mm->unlock();
                     }
                 }
-                else if( i % 7 == 6 ) { 
-                    if( mm->lock_shared_try(0) ) { 
+                else if( i % 7 == 6 ) {
+                    if( mm->lock_shared_try(0) ) {
                         mm->unlock_shared();
                     }
                 }
-                else { 
+                else {
                     mm->lock_shared();
                     mm->unlock_shared();
                 }
             }
             cc().shutdown();
         }
-        virtual void validate() { 
+        virtual void validate() {
             ASSERT( !mm->atLeastReadLocked() );
             mm->lock();
             mm->unlock();

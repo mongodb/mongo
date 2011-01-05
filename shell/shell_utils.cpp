@@ -622,10 +622,21 @@ namespace mongo {
         }
 
         BSONObj WaitProgram( const BSONObj& a ) {
-            int pid = a.firstElement().numberInt();
+            int pid = oneArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
             shells.erase( pid );
             return x;
+        }
+
+        BSONObj WaitMongoProgramOnPort( const BSONObj &a ) {
+            int port = oneArg( a ).numberInt();
+            uassert( 13621, "no known mongo program on port", dbs.count( port ) != 0 );
+            log() << "waiting port: " << port << ", pid: " << dbs[ port ].first << endl;
+            bool ret = wait_for_pid( dbs[ port ].first );
+            if ( ret ) {
+                dbs.erase( port );
+            }
+            return BSON( "" << ret );
         }
 
         BSONObj StartMongoProgram( const BSONObj &a ) {
@@ -902,6 +913,7 @@ namespace mongo {
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
+            scope.injectNative( "waitMongoProgramOnPort" , WaitMongoProgramOnPort );
 
             scope.injectNative( "getHostName" , getHostName );
             scope.injectNative( "removeFile" , removeFile );

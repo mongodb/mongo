@@ -26,6 +26,7 @@
 #include "../queryoptimizer.h"
 #include "../matcher.h"
 #include "../clientcursor.h"
+#include "../replpair.h"
 
 #include "mr.h"
 
@@ -421,7 +422,7 @@ namespace mongo {
         }
 
         long long State::incomingDocuments() {
-            return _db.count( _config.ns , _config.filter , 0 , (unsigned) _config.limit );
+            return _db.count( _config.ns , _config.filter , QueryOption_SlaveOk , (unsigned) _config.limit );
         }
 
         State::~State() {
@@ -508,7 +509,7 @@ namespace mongo {
             BSONObj prev;
             BSONList all;
 
-            assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong ) ) );
+            assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong, NULL, QueryOption_SlaveOk ) ) );
 
             shared_ptr<Cursor> temp = bestGuessCursor( _config.incLong.c_str() , BSONObj() , sortKey );
             auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , _config.incLong.c_str() ) );
@@ -647,7 +648,8 @@ namespace mongo {
         class MapReduceCommand : public Command {
         public:
             MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
-            virtual bool slaveOk() const { return true; }
+            virtual bool slaveOk() const { return false; }
+            virtual bool slaveOverrideOk() { return true; }
 
             virtual void help( stringstream &help ) const {
                 help << "Run a map/reduce operation on the server.\n";
@@ -677,6 +679,15 @@ namespace mongo {
                 if ( ! state.sourceExists() ) {
                     errmsg = "ns doesn't exist";
                     return false;
+                }
+
+                if (state.isOnDisk()) {
+                    // this means that it will be doing a write operation, make sure we are on Master
+                    // ideally this check should be in slaveOk(), but at that point config is not known
+                    if (!isMaster(dbname.c_str())) {
+                        errmsg = "not master";
+                        return false;
+                    }
                 }
 
                 try {
@@ -791,7 +802,8 @@ namespace mongo {
         class MapReduceFinishCommand : public Command {
         public:
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
-            virtual bool slaveOk() const { return true; }
+            virtual bool slaveOk() const { return false; }
+            virtual bool slaveOverrideOk() { return true; }
 
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {

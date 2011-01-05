@@ -109,12 +109,12 @@ namespace mongo {
         PointerToMMF();
 
         /** register view. \
-            threadsafe 
+            threadsafe
             */
         void add(void *view, MongoMMF *f);
 
-        /** de-register view. 
-            threadsafe 
+        /** de-register view.
+            threadsafe
             */
         void remove(void *view);
 

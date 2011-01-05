@@ -21,7 +21,11 @@
 #include "mutex.h"
 #include "../time_support.h"
 
-#if !defined(_WIN32)
+// this requires Vista+ to work
+// it works better than sharable_mutex under high contention
+//#define MONGO_USE_SRW_ON_WINDOWS 1
+
+#if !defined(MONGO_USE_SRW_ON_WINDOWS)
 
 #if BOOST_VERSION >= 103500
 # define BOOST_RWLOCK
@@ -32,7 +36,14 @@
 # include <pthread.h>
 #endif
 
-#ifdef BOOST_RWLOCK
+#if defined(_WIN32)
+# include "shared_mutex_win.hpp"
+namespace mongo {
+    typedef boost::modified_shared_mutex shared_mutex;
+}
+# undef assert
+# define assert MONGO_assert
+#elif defined(BOOST_RWLOCK)
 # include <boost/thread/shared_mutex.hpp>
 # undef assert
 # define assert MONGO_assert
@@ -42,7 +53,7 @@
 
 namespace mongo {
 
-#if defined(_WIN32)
+#if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
     class RWLock {
     public:
@@ -57,7 +68,7 @@ namespace mongo {
             while( 1 ) {
                 if( TryAcquireSRWLockShared(&_lock) )
                     return true;
-                if( curTimeMicros64() >= end ) 
+                if( curTimeMicros64() >= end )
                     break;
                 Sleep(1);
             }
@@ -68,7 +79,7 @@ namespace mongo {
             while( 1 ) {
                 if( TryAcquireSRWLockExclusive(&_lock) )
                     return true;
-                if( curTimeMicros64() >= end ) 
+                if( curTimeMicros64() >= end )
                     break;
                 Sleep(1);
             }
@@ -80,7 +91,7 @@ namespace mongo {
 
 #elif defined(BOOST_RWLOCK)
     class RWLock {
-        boost::shared_mutex _m;
+        shared_mutex _m;
     public:
 #if defined(_DEBUG)
         const char *_name;

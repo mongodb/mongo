@@ -17,7 +17,7 @@ function durPassThrough() {
 
     /** run a test. won't run more than once. logs if fails and then throws.
     */
-    function run(x) {
+    function runTest(x) {
         function _run(x) {
             if (/[\/\\]_/.test(x.name) ||
                     !/\.js$/.test(x.name) ||
@@ -50,17 +50,17 @@ function durPassThrough() {
     if( !skippingTo ) {
 	    // run something that will almost surely pass and is fast just to make sure our framework 
 	    // here is really working
-	    run({ name: 'jstests/basic1.js' });
+	    runTest({ name: 'jstests/basic1.js' });
 
 	    // run "suspicious" tests early.  these are tests that have ever failed in buildbot.  we run them 
 	    // early and try to get a fail fast
-	    run({ name: 'jstests/shellstartparallel.js' });
-	    run({ name: 'jstests/cursora.js' });
+	    runTest({ name: 'jstests/shellstartparallel.js' });
+	    runTest({ name: 'jstests/cursora.js' });
 
 	    // run the shell-oriented tests early. if the shell is broken the other tests aren't meaningful
-	    run({ name: 'jstests/run_program1.js' });
-	    run({ name: 'jstests/shellspawn.js' });
-	    run({ name: 'jstests/shellkillop.js' });
+	    runTest({ name: 'jstests/run_program1.js' });
+	    runTest({ name: 'jstests/shellspawn.js' });
+	    runTest({ name: 'jstests/shellkillop.js' });
     }
 
     files = files.sort(compareOn('name'));
@@ -71,7 +71,7 @@ function durPassThrough() {
                 return;
             }
             skippingTo = false;
-            run(x);
+            runTest(x);
         }
     );
 

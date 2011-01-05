@@ -114,7 +114,7 @@ namespace mongo {
         */
         MongoFile* findByPath(string path) {
             map<string,MongoFile*>::iterator i = MongoFile::pathToFile.find(path);
-            return  i == MongoFile::pathToFile.end() ? 0 : i->second;
+            return  i == MongoFile::pathToFile.end() ? NULL : i->second;
         }
 
     private:
