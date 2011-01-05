@@ -259,6 +259,8 @@ namespace mongo {
 
             const Config& config() { return _config; }
 
+            const bool isOnDisk() { return _onDisk; }
+
             long long numEmits() const { return _numEmits; }
 
         protected:

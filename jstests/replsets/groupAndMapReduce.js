@@ -35,25 +35,64 @@ doTest = function( signal ) {
     slaves = replTest.liveNodes.slaves;
     assert( slaves.length == 2, "Expected 2 slaves but length was " + slaves.length );
     slaves.forEach(function(slave) {
-        // testing against 
-        slave.setSlaveOk();
-
         // try to read from slave
+        slave.slaveOk = true;
         var count = slave.getDB("foo").foo.count();
         printjson( count );
         assert.eq( len , count , "slave count wrong: " + slave );
-       
+      
+        print("Doing a findOne to verify we can get a row"); 
         var one = slave.getDB("foo").foo.findOne();
         printjson(one);
 
 //        stats = slave.getDB("foo").adminCommand({replSetGetStatus:1});
 //        printjson(stats);
  
-        // now do group on slave
+        print("Calling group() with slaveOk=true, must succeed");
+        slave.slaveOk = true;
         count = slave.getDB("foo").foo.group({initial: {n:0}, reduce: function(obj,out){out.n++;}});
         printjson( count );
         assert.eq( len , count[0].n , "slave group count wrong: " + slave );
+
+        print("Calling group() with slaveOk=false, must fail"); 
+        slave.slaveOk = false;
+        try {
+            count = slave.getDB("foo").foo.group({initial: {n:0}, reduce: function(obj,out){out.n++;}});
+            assert(false, "group() succeeded with slaveOk=false");
+        } catch (e) {
+            print("Received exception: " + e);
+        }
         
+        print("Calling inline mr() with slaveOk=true, must succeed"); 
+        slave.slaveOk = true;
+        map = function() { emit(this.a, 1); };
+        reduce = function(key, vals) { var sum = 0; for (var i = 0; i < vals.length; ++i) { sum += vals[i]; } return sum; };
+        slave.getDB("foo").foo.mapReduce(map, reduce, {out: { "inline" : 1}});
+
+        print("Calling mr() to collection with slaveOk=true, must fail");
+        try {
+            slave.getDB("foo").foo.mapReduce(map, reduce, "output");
+            assert(false, "mapReduce() to collection succeeded on slave");
+        } catch (e) {
+            print("Received exception: " + e);
+        }
+
+        print("Calling inline mr() with slaveOk=false, must fail"); 
+        slave.slaveOk = false;
+        try {
+            slave.getDB("foo").foo.mapReduce(map, reduce, {out: { "inline" : 1}});
+            assert(false, "mapReduce() succeeded on slave with slaveOk=false");
+        } catch (e) {
+            print("Received exception: " + e);
+        }
+        print("Calling mr() to collection with slaveOk=false, must fail");
+        try {
+            slave.getDB("foo").foo.mapReduce(map, reduce, "output");
+            assert(false, "mapReduce() to collection succeeded on slave with slaveOk=false");
+        } catch (e) {
+            print("Received exception: " + e);
+        }
+
     });
 
     
