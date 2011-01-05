@@ -136,10 +136,11 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        assert( munmap(oldPrivateAddr,len) == 0 );
+        // don't unmap, just mmap over the old region
         void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_FIXED , fd , 0 );
         if( x == MAP_FAILED ) {
             int err = errno;
+            assert( munmap(oldPrivateAddr,len) == 0 );
             remove(views.begin(), views.end(), oldPrivateAddr);
             massert(13601, str::stream() << "Couldn't remap private view: " << errnoWithDescription(err), false);
         }
