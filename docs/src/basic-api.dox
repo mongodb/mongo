@@ -1,10 +1,10 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page basic_api Getting Started with the WiredTiger API
+/*! \page basic_api Getting Started with the API
 
 \dontinclude ex_access.c
 
-All applications that use WiredTiger will be structured roughly as follows.  The code below is taken from the complete example program \ref ex_access.c "ex_access.c" which is available in the source tree as \c examples/c/ex_access.c.
+All applications that use WiredTiger will be structured roughly as follows.  The code below is taken from the complete example program \ex_ref{ex_access.c}.
 
 \section basic_connection Connecting to a database
 
@@ -34,7 +34,7 @@ This call creates a table called \c "access", configured to use strings for its 
 
 Now that we're sure we have a table, we open a cursor to perform some operations on it:
 
-\until }
+\until insert
 
 Here, the string \c "table:access" specifies that we are opening the cursor on the table named \c "access" that we created above.
 

@@ -19,4 +19,12 @@ XXX
 \section extractors Custom Field Extractors
 
 XXX
+
+\section extending_example Code Samples
+
+The code below is taken from the complete example program \ex_ref{ex_extending.c}.
+
+\dontinclude ex_extending.c
+\skip main
+\until ->close
  */

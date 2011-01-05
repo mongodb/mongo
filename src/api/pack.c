@@ -2,22 +2,22 @@
 
 #include "wiredtiger.h"
 
-int wiredtiger_struct_sizev(const char *fmt, va_list ap)
+size_t wiredtiger_struct_sizev(const char *fmt, va_list ap)
 {
 	return 0;
 }
 
-int wiredtiger_struct_packv(void *buffer, int size, const char *fmt, va_list ap)
+int wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 {
 	return 0;
 }
 
-int wiredtiger_struct_unpackv(const void *buffer, int size, const char *fmt, va_list ap)
+int wiredtiger_struct_unpackv(const void *buffer, size_t size, const char *fmt, va_list ap)
 {
 	return 0;
 }
 
-int wiredtiger_struct_size(const char *fmt, ...)
+size_t wiredtiger_struct_size(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -25,7 +25,7 @@ int wiredtiger_struct_size(const char *fmt, ...)
 	return wiredtiger_struct_sizev(fmt, ap);
 }
 
-int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...)
+int wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -33,7 +33,7 @@ int wiredtiger_struct_pack(void *buffer, int size, const char *fmt, ...)
 	return wiredtiger_struct_packv(buffer, size, fmt, ap);
 }
 
-int wiredtiger_struct_unpack(const void *buffer, int size, const char *fmt, ...)
+int wiredtiger_struct_unpack(const void *buffer, size_t size, const char *fmt, ...)
 {
 	va_list ap;
 

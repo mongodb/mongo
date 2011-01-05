@@ -115,7 +115,7 @@ INLINE_INHERITED_MEMB  = NO
 # path before files name in the file list and in the header files. If set 
 # to NO the shortest path that makes the file name unique will be used.
 
-FULL_PATH_NAMES        = YES
+FULL_PATH_NAMES        = NO
 
 # If the FULL_PATH_NAMES tag is set to YES then the STRIP_FROM_PATH tag 
 # can be used to strip a user-defined part of the path. Stripping is 
@@ -189,11 +189,12 @@ TAB_SIZE               = 8
 # will result in a user-defined paragraph with heading "Side Effects:". 
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                = config{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr> \
-                         configend=</table> \
-                         "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Value [Default]</th><th>Notes</th></tr>" \
+ALIASES                = configend=</table> \
                          "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
-                         "errors=\returns zero on success and a non-zero error code on failure"
+                         "errors=\returns zero on success and a non-zero error code on failure" \
+                         "ex_ref{1}=\ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
+                         "config{3}=<tr><td>\1</td><td>\3 \2</td></tr>" \
+                         "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Effect [Default]</th></tr>"
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 
@@ -399,7 +400,7 @@ HIDE_SCOPE_NAMES       = NO
 # will put a list of the files that are included by a file in the documentation 
 # of that file.
 
-SHOW_INCLUDE_FILES     = YES
+SHOW_INCLUDE_FILES     = NO
 
 # If the FORCE_LOCAL_INCLUDES tag is set to YES then Doxygen 
 # will list include files with double quotes in the documentation 
@@ -489,13 +490,13 @@ ENABLED_SECTIONS       =
 # documentation can be controlled using \showinitializer or \hideinitializer 
 # command in the documentation regardless of this setting.
 
-MAX_INITIALIZER_LINES  = 32
+MAX_INITIALIZER_LINES  = 0
 
 # Set the SHOW_USED_FILES tag to NO to disable the list of files generated 
 # at the bottom of the documentation of classes and structs. If set to YES the 
 # list will mention the files that were used to generate the documentation.
 
-SHOW_USED_FILES        = YES
+SHOW_USED_FILES        = NO
 
 # If the sources in your project are distributed over multiple directories 
 # then setting the SHOW_DIRECTORIES tag to YES will show the directory hierarchy 
@@ -507,13 +508,13 @@ SHOW_DIRECTORIES       = NO
 # This will remove the Files entry from the Quick Index and from the 
 # Folder Tree View (if specified). The default is YES.
 
-SHOW_FILES             = YES
+SHOW_FILES             = NO
 
 # Set the SHOW_NAMESPACES tag to NO to disable the generation of the 
 # Namespaces page.  This will remove the Namespaces entry from the Quick Index 
 # and from the Folder Tree View (if specified). The default is YES.
 
-SHOW_NAMESPACES        = YES
+SHOW_NAMESPACES        = NO
 
 # The FILE_VERSION_FILTER tag can be used to specify a program or script that 
 # doxygen should invoke to get the current version for each file (typically from 
@@ -594,8 +595,8 @@ WARN_LOGFILE           = doxygen.log
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = src \
-                         ../include/wiredtiger.h
+INPUT                  = ../include/wiredtiger.h \
+                         src
 
 # This tag can be used to specify the character encoding of the source files 
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is 

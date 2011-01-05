@@ -21,15 +21,17 @@ int main()
 	const char *key, *value;
 
 	if ((ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=10000000", &conn)) != 0 ||
-	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+	    "create,cache_size=10M", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
+	ret = conn->open_session(conn, NULL, NULL, &session);
+
 	session->create_table(session, "access", "key_format=S,value_format=S");
 
-	/* Open a cursor on the (virtual) configuration table. */
+	session->begin_transaction(session, "priority=100,name=mytxn");
+
 	ret = session->open_cursor(session, "config:", NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -38,6 +40,8 @@ int main()
 
 		printf("Got configuration value: %s = %s\n", key, value);
 	}
+
+	ret = session->commit_transaction(session);
 
 	ret = conn->close(conn, NULL);
 

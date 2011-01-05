@@ -698,7 +698,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * \param format the data format, see ::wiredtiger_struct_pack
  * \errors
  */
-int wiredtiger_struct_pack(void *buffer, int size, const char *format, ...);
+int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
 
 /*! Pack a structure into a buffer.
  *
@@ -710,7 +710,7 @@ int wiredtiger_struct_pack(void *buffer, int size, const char *format, ...);
  * \param ap the list of values to pack
  * \errors
  */
-int wiredtiger_struct_packv(void *buffer, int size,
+int wiredtiger_struct_packv(void *buffer, size_t size,
     const char *format, va_list ap);
 
 /*! Calculate the size required to pack a structure.
@@ -723,7 +723,7 @@ int wiredtiger_struct_packv(void *buffer, int size,
  * \returns the number of bytes needed for the matching call to
  * ::wiredtiger_struct_pack
  */
-int wiredtiger_struct_size(const char *format, ...);
+size_t wiredtiger_struct_size(const char *format, ...);
 
 /*! Calculate the size required to pack a structure.
  *
@@ -734,7 +734,7 @@ int wiredtiger_struct_size(const char *format, ...);
  * \returns the number of bytes needed for the matching call to
  * ::wiredtiger_struct_pack
  */
-int wiredtiger_struct_sizev(const char *format, va_list ap);
+size_t wiredtiger_struct_sizev(const char *format, va_list ap);
 
 /*! Unpack a structure from a buffer.
  *
@@ -745,7 +745,7 @@ int wiredtiger_struct_sizev(const char *format, va_list ap);
  * \param format the data format, see ::wiredtiger_struct_pack
  * \errors
  */
-int wiredtiger_struct_unpack(const void *buffer, int size,
+int wiredtiger_struct_unpack(const void *buffer, size_t size,
     const char *format, ...);
 
 /*! Unpack a structure from a buffer.
@@ -758,7 +758,7 @@ int wiredtiger_struct_unpack(const void *buffer, int size,
  * \param ap the list of locations where values are unpacked
  * \errors
  */
-int wiredtiger_struct_unpackv(const void *buffer, int size,
+int wiredtiger_struct_unpackv(const void *buffer, size_t size,
     const char *format, va_list ap);
 
 /*! Entry point to an extension, implemented by loadable modules.

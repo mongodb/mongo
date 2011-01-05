@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page cursors WiredTiger Cursors
+/*! \page cursors Cursors
 
 Most common operations in WiredTiger are performed using cursors.  A cursor includes:
 
@@ -34,4 +34,19 @@ This is particularly useful with index cursors, because if all columns in the pr
 \section cursor_ranges Restricting the Range of a Scan
 
 XXX
+
+\section cursor_examples Code Samples
+
+The code below is taken from the complete example program \ex_ref{ex_cursor.c}.
+
+\dontinclude ex_cursor.c
+
+\skipline open_cursor
+
+\skipline open_cursor
+
+\skipline open_cursor
+
+\skipline open_cursor
+
  */

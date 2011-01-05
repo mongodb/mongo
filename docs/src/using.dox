@@ -2,6 +2,8 @@
 
 /*! \page using Using WiredTiger
 
+This section explains how to use WiredTiger by developing a sequence of example programs:
+
 - \subpage basic_api
 - \subpage config_strings
 - \subpage packing

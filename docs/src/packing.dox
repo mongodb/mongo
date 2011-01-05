@@ -6,4 +6,12 @@ XXX What are WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT
 
 - native C structs
 - portability between programming languages
+
+\section config_examples Code Samples
+
+The code below is taken from the complete example program \ex_ref{ex_pack.c}.
+
+\dontinclude ex_pack.c
+\skip struct_size
+\until unpack
  */

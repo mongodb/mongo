@@ -26,16 +26,20 @@ Keys are processed in order from left to right, with later settings overriding e
 
 \section config_examples Code Samples
 
-The code below is taken from the complete example program \ref ex_config.c "ex_config.c" which is available in the source tree as \c examples/c/ex_config.c.
+The code below is taken from the complete example program \ex_ref{ex_config.c}.
 
 \dontinclude ex_config.c
-\skip wiredtiger_open
-\until close
 
-<ul>
-<li>To open a connection to a database, creating it if it does not exist and set a cache size of 10MiB, pass <code>"create,cache_size=10M"</code> to ::wiredtiger_open.
-<li>Create a table that uses C language strings for keys and values: pass <code>"keyfmt=S,valuefmt=S"</code> to WT_SESSION::create_table.</li>
-<li>Assign a name to a transaction for debugging purposes: pass <code>"name=mytxn"</code> to WT_SESSION::begin_transaction.</li>
-<li>Assign a priority to a transaction to avoid aborting: pass <code>"priority=100"</code> to WT_SESSION::begin_transaction.</li>
-</ul>
+Open a connection to a database, creating it if it does not exist and set a cache size of 10MiB:
+
+\skip wiredtiger_open
+\until != 0
+
+Create a table that uses C language strings for keys and values:
+
+\skipline create_table
+
+Assign a priority to a transaction to reduce aborts and give it a name for debugging:
+
+\skipline begin_transaction
 */

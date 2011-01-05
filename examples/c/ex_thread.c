@@ -11,6 +11,7 @@
 #include <wiredtiger.h>
 
 const char *home = "WT_TEST";
+#define	NUM_THREADS	10
 
 WT_CONNECTION *conn;
 
@@ -24,9 +25,7 @@ void *scan_thread(void *arg) {
 	ret = session->open_cursor(session, "table:access", NULL, &cursor);
 
 	/* Show all records. */
-	for (ret = cursor->first(cursor);
-	    ret == 0;
-	    ret = cursor->next(cursor)) {
+	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &key);
 		ret = cursor->get_value(cursor, &value);
 
@@ -40,7 +39,8 @@ int main()
 {
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	int ret;
+	pthread_t threads[NUM_THREADS];
+	int i, ret;
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
@@ -57,8 +57,11 @@ int main()
 	ret = cursor->insert(cursor);
 	ret = session->close(session, NULL);
 
-	/* XXX start threads */
-	/* XXX join threads */
+	for (i = 0; i < NUM_THREADS; i++)
+		ret = pthread_create(&threads[i], NULL, scan_thread, NULL);
+
+	for (i = 0; i < NUM_THREADS; i++)
+		ret = pthread_join(threads[i], NULL);
 
 	ret = conn->close(conn, NULL);
 

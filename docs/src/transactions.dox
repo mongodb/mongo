@@ -38,4 +38,12 @@ Recovery is run automatically during ::wiredtiger_open when required.  See \ref 
 Recovery works by using a database log that contains a record of the actions of all transactions.  Recovery first finds the last complete checkpoint, and then scans forward through the log from that point to determine which transactions committed after the checkpoint.  All actions are rolled forward from the checkpoint so that the in-memory tree matches its state when the crash occurred.  Then the "losing" transactions (those that did not commit) are rolled back to return the database to a consistent state.
 
 This suggests the importance of regular checkpoints: they limit the amount of work required during recovery, which speeds up the ::wiredtiger_open call.  See WT_SESSION::checkpoint for information about triggering checkpoints.
+
+\section transaction_example Code Samples
+
+The code below is taken from the complete example program \ex_ref{ex_transaction.c}.
+
+\dontinclude ex_transaction.c
+\skip begin_transaction
+\until commit
  */

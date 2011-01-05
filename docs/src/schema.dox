@@ -50,6 +50,26 @@ XXX
 
 XXX
 
+\section schema_examples Code Samples
+
+The code below is taken from the complete example program \ex_ref{ex_schema.c}.
+
+\dontinclude ex_schema.c
+\skip C struct
+\until POP_RECORD
+
+\skip open_session
+\until conn->close
+
+The code below is taken from the complete example program \ex_ref{ex_call_center.c}.
+
+\dontinclude ex_call_center.c
+\skip home
+\until CALL
+
+\skip create_table
+\until conn->close
+
 \section schema_advanced Advanced Schemas
 
 - non-relational data such as multiple index keys per row
