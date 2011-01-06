@@ -37,26 +37,26 @@ namespace MatcherTests {
             ASSERT( m.matches( fromjson( "{\"a\":\"b\"}" ) ) );
         }
     };
-    
+
     class DoubleEqual {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":5}" );
             Matcher m( query );
-            ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
+            ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
-    
+
     class MixedNumericEqual {
     public:
         void run() {
             BSONObjBuilder query;
             query.append( "a", 5 );
             Matcher m( query.done() );
-            ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
-        }        
+            ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
+        }
     };
-    
+
     class MixedNumericGt {
     public:
         void run() {
@@ -65,16 +65,16 @@ namespace MatcherTests {
             BSONObjBuilder b;
             b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
-        }        
+        }
     };
-    
+
     class MixedNumericIN {
     public:
-        void run(){
+        void run() {
             BSONObj query = fromjson( "{ a : { $in : [4,6] } }" );
             ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
             ASSERT_EQUALS( NumberInt , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
-            
+
             Matcher m( query );
 
             {
@@ -95,19 +95,19 @@ namespace MatcherTests {
                 b.append( "a" , 4 );
                 ASSERT( m.matches( b.done() ) );
             }
-                
+
         }
     };
 
     class MixedNumericEmbedded {
     public:
-        void run(){
+        void run() {
             Matcher m( BSON( "a" << BSON( "x" << 1 ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1 ) ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1.0 ) ) ) );
         }
     };
-    
+
     class Size {
     public:
         void run() {
@@ -116,16 +116,16 @@ namespace MatcherTests {
             ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[[1,2,3,4]]}" ) ) );
-        }        
+        }
     };
-    
-    
+
+
     class TimingBase {
     public:
-        long time( const BSONObj& patt , const BSONObj& obj ){
+        long time( const BSONObj& patt , const BSONObj& obj ) {
             Matcher m( patt );
             Timer t;
-            for ( int i=0; i<10000; i++ ){
+            for ( int i=0; i<10000; i++ ) {
                 ASSERT( m.matches( obj ) );
             }
             return t.millis();
@@ -134,20 +134,20 @@ namespace MatcherTests {
 
     class AllTiming : public TimingBase {
     public:
-        void run(){
+        void run() {
             long normal = time( BSON( "x" << 5 ) , BSON( "x" << 5 ) );
             long all = time( BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) ) , BSON( "x" << 5 ) );
-            
+
             cout << "normal: " << normal << " all: " << all << endl;
         }
     };
 
     class All : public Suite {
     public:
-        All() : Suite( "matcher" ){
+        All() : Suite( "matcher" ) {
         }
-        
-        void setupTests(){
+
+        void setupTests() {
             add< Basic >();
             add< DoubleEqual >();
             add< MixedNumericEqual >();
@@ -158,6 +158,6 @@ namespace MatcherTests {
             add< AllTiming >();
         }
     } dball;
-    
+
 } // namespace MatcherTests
 

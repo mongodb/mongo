@@ -3,15 +3,15 @@
 namespace mongo {
     namespace dur {
 
-        /** journalling stats.  the model here is that the commit thread is the only writer, and that reads are 
+        /** journalling stats.  the model here is that the commit thread is the only writer, and that reads are
             uncommon (from a serverStatus command and such).  Thus, there should not be multicore chatter overhead.
         */
-        struct Stats { 
+        struct Stats {
             Stats();
             void rotate();
             BSONObj asObj();
             unsigned _intervalMicros;
-            struct S { 
+            struct S {
                 BSONObj _asObj();
                 void reset();
 
@@ -24,12 +24,12 @@ namespace mongo {
                 unsigned long long _writeToDataFilesMicros;
                 unsigned long long _remapPrivateViewMicros;
 
-                // undesirable to be in write lock for the group commit (it can be done in a read lock), so good if we 
+                // undesirable to be in write lock for the group commit (it can be done in a read lock), so good if we
                 // have visibility when this happens.  can happen for a couple reasons
                 // - read lock starvation
                 // - file being closed
                 // - data being written faster than the normal group commit interval
-                unsigned _commitsInWriteLock; 
+                unsigned _commitsInWriteLock;
 
                 unsigned _dtMillis;
             };

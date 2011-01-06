@@ -42,7 +42,7 @@ namespace mongo {
 
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
-    inline string terseCurrentTime(bool colonsOk=true){
+    inline string terseCurrentTime(bool colonsOk=true) {
         struct tm t;
         time_t_to_Struct( time(0) , &t );
 
@@ -64,7 +64,7 @@ namespace mongo {
         if ( 2 != sscanf( str.c_str() , "%d:%d" , &hh , &mm ) ) {
             return false;
         }
-        
+
         // verify that time is well formed
         if ( ( hh / 24 ) || ( mm / 60 ) ) {
             return false;
@@ -84,7 +84,28 @@ namespace mongo {
 #define MONGO_ctime _ctime_is_not_threadsafe_
 #define ctime MONGO_ctime
 
-#if defined(_WIN32) || defined(__sunos__)
+#if defined(_WIN32)
+    inline void sleepsecs(int s) {
+        Sleep(s*1000);
+    }
+    inline void sleepmillis(long long s) {
+        assert( s <= 0xffffffff );
+        Sleep((DWORD) s);
+    }
+    inline void sleepmicros(long long s) {
+        if ( s <= 0 )
+            return;
+        boost::xtime xt;
+        boost::xtime_get(&xt, boost::TIME_UTC);
+        xt.sec += (int)( s / 1000000 );
+        xt.nsec += (int)(( s % 1000000 ) * 1000);
+        if ( xt.nsec >= 1000000000 ) {
+            xt.nsec -= 1000000000;
+            xt.sec++;
+        }
+        boost::thread::sleep(xt);
+    }
+#elif defined(__sunos__)
     inline void sleepsecs(int s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -99,7 +120,7 @@ namespace mongo {
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
-        }        
+        }
         boost::thread::sleep(xt);
     }
     inline void sleepmicros(long long s) {
@@ -112,7 +133,7 @@ namespace mongo {
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
-        }        
+        }
         boost::thread::sleep(xt);
     }
 #else
@@ -120,7 +141,7 @@ namespace mongo {
         struct timespec t;
         t.tv_sec = s;
         t.tv_nsec = 0;
-        if ( nanosleep( &t , 0 ) ){
+        if ( nanosleep( &t , 0 ) ) {
             cout << "nanosleep failed" << endl;
         }
     }
@@ -131,7 +152,7 @@ namespace mongo {
         t.tv_sec = (int)(s / 1000000);
         t.tv_nsec = 1000 * ( s % 1000000 );
         struct timespec out;
-        if ( nanosleep( &t , &out ) ){
+        if ( nanosleep( &t , &out ) ) {
             cout << "nanosleep failed" << endl;
         }
     }

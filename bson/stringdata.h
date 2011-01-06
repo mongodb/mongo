@@ -31,18 +31,18 @@ namespace mongo {
     // go around the fact that string literals in C++ are char[N]'s.
     //
     // Note that the object StringData wraps around must be alive while the StringDAta
-    // is. 
+    // is.
 
     class StringData {
     public:
         // Construct a StringData explicilty, for the case where the lenght of
         // string is not known. 'c' must be a pointer to a null-terminated string.
-        StringData( const char* c ) 
+        StringData( const char* c )
             : _data(c), _size((unsigned) strlen(c)) {}
 
-        // Construct a StringData explicitly, for the case where the length of the string 
-        // is already known. 'c' must be a pointer to a null-terminated string, and strlenOfc 
-        // must be the length that std::strlen(c) would return, a.k.a the index of the 
+        // Construct a StringData explicitly, for the case where the length of the string
+        // is already known. 'c' must be a pointer to a null-terminated string, and strlenOfc
+        // must be the length that std::strlen(c) would return, a.k.a the index of the
         // terminator in c.
         StringData( const char* c, size_t strlenOfc )
             : _data(c), _size((unsigned) strlenOfc) {}
@@ -50,7 +50,7 @@ namespace mongo {
         // Construct a StringData explicitly, for the case of a std::string.
         StringData( const string& s )
             : _data(s.c_str()), _size((unsigned) s.size()) {}
-        
+
         // Construct a StringData explicitly, for the case of a literal whose size is
         // known at compile time.
         struct LiteralTag {};

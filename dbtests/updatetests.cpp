@@ -110,14 +110,14 @@ namespace UpdateTests {
 
     class PushAllNonArray : public Fail {
         void doIt() {
-	  insert( ns(), fromjson( "{a:[1]}" ) );
+            insert( ns(), fromjson( "{a:[1]}" ) );
             update( ns(), BSONObj(), fromjson( "{$pushAll:{a:'d'}}" ) );
         }
     };
 
     class PullAllNonArray : public Fail {
         void doIt() {
-	  insert( ns(), fromjson( "{a:[1]}" ) );
+            insert( ns(), fromjson( "{a:[1]}" ) );
             update( ns(), BSONObj(), fromjson( "{$pullAll:{a:'d'}}" ) );
         }
     };
@@ -241,12 +241,12 @@ namespace UpdateTests {
 
     class MultiInc : public SetBase {
     public:
-        
-        string s(){
+
+        string s() {
             stringstream ss;
             auto_ptr<DBClientCursor> cc = client().query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
             bool first = true;
-            while ( cc->more() ){
+            while ( cc->more() ) {
                 if ( first ) first = false;
                 else ss << ",";
 
@@ -255,11 +255,11 @@ namespace UpdateTests {
             }
             return ss.str();
         }
-        
-        void run(){
+
+        void run() {
             client().insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
             client().insert( ns(), BSON( "_id" << 2 << "x" << 5 ) );
-            
+
             ASSERT_EQUALS( "1,5" , s() );
 
             client().update( ns() , BSON( "_id" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
@@ -270,7 +270,7 @@ namespace UpdateTests {
 
             client().update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , false , true );
             ASSERT_EQUALS( "4,6" , s() );
-            
+
         }
     };
 
@@ -498,10 +498,10 @@ namespace UpdateTests {
             client().insert( ns(), BSON( "_id" << 55 << "i" << 5 ) );
             client().update( ns(), BSON( "i" << 5 ), BSON( "i" << 6 ) );
             ASSERT( !client().findOne( ns(), Query( BSON( "_id" << 55 ) ).hint
-                                     ( "{\"_id\":ObjectId(\"000000000000000000000000\")}" ) ).isEmpty() );
+                                       ( "{\"_id\":ObjectId(\"000000000000000000000000\")}" ) ).isEmpty() );
         }
     };
-    
+
     class CheckNoMods : public SetBase {
     public:
         void run() {
@@ -509,7 +509,7 @@ namespace UpdateTests {
             ASSERT( error() );
         }
     };
-    
+
     class UpdateMissingToNull : public SetBase {
     public:
         void run() {
@@ -520,10 +520,10 @@ namespace UpdateTests {
     };
 
     namespace ModSetTests {
-        
+
         class internal1 {
         public:
-            void run(){
+            void run() {
                 BSONObj b = BSON( "$inc" << BSON( "x" << 1 << "a.b" << 1 ) );
                 ModSet m(b);
 
@@ -532,7 +532,7 @@ namespace UpdateTests {
                 ASSERT( ! m.haveModForField( "y" ) );
                 ASSERT( ! m.haveModForField( "a.c" ) );
                 ASSERT( ! m.haveModForField( "a" ) );
-                
+
                 ASSERT( m.haveConflictingMod( "x" ) );
                 ASSERT( m.haveConflictingMod( "a" ) );
                 ASSERT( m.haveConflictingMod( "a.b" ) );
@@ -541,14 +541,14 @@ namespace UpdateTests {
                 ASSERT( ! m.haveConflictingMod( "a.a" ) );
             }
         };
-        
+
         class Base {
         public:
 
-            virtual ~Base(){}
+            virtual ~Base() {}
 
-            
-            void test( BSONObj morig , BSONObj in , BSONObj wanted ){
+
+            void test( BSONObj morig , BSONObj in , BSONObj wanted ) {
                 BSONObj m = morig.copy();
                 ModSet set(m);
 
@@ -556,20 +556,20 @@ namespace UpdateTests {
                 ASSERT_EQUALS( wanted , out );
             }
         };
-        
+
         class inc1 : public Base {
         public:
-            void run(){
+            void run() {
                 BSONObj m = BSON( "$inc" << BSON( "x" << 1 ) );
                 test( m , BSON( "x" << 5 )  , BSON( "x" << 6 ) );
                 test( m , BSON( "a" << 5 )  , BSON( "a" << 5 << "x" << 1 ) );
                 test( m , BSON( "z" << 5 )  , BSON( "x" << 1 << "z" << 5 ) );
             }
         };
-        
+
         class inc2 : public Base {
         public:
-            void run(){
+            void run() {
                 BSONObj m = BSON( "$inc" << BSON( "a.b" << 1 ) );
                 test( m , BSONObj() , BSON( "a" << BSON( "b" << 1 ) ) );
                 test( m , BSON( "a" << BSON( "b" << 2 ) ) , BSON( "a" << BSON( "b" << 3 ) ) );
@@ -577,23 +577,23 @@ namespace UpdateTests {
                 m = BSON( "$inc" << BSON( "a.b" << 1 << "a.c" << 1 ) );
                 test( m , BSONObj() , BSON( "a" << BSON( "b" << 1 << "c" << 1 ) ) );
 
-                
+
             }
         };
 
         class set1 : public Base {
         public:
-            void run(){
+            void run() {
                 test( BSON( "$set" << BSON( "x" << 17 ) ) , BSONObj() , BSON( "x" << 17 ) );
                 test( BSON( "$set" << BSON( "x" << 17 ) ) , BSON( "x" << 5 ) , BSON( "x" << 17 ) );
 
                 test( BSON( "$set" << BSON( "x.a" << 17 ) ) , BSON( "z" << 5 ) , BSON( "x" << BSON( "a" << 17 )<< "z" << 5 ) );
             }
-        };        
-        
+        };
+
         class push1 : public Base {
         public:
-            void run(){
+            void run() {
                 test( BSON( "$push" << BSON( "a" << 5 ) ) , fromjson( "{a:[1]}" ) , fromjson( "{a:[1,5]}" ) );
             }
         };
@@ -603,28 +603,28 @@ namespace UpdateTests {
     namespace basic {
         class Base : public ClientBase {
         protected:
-            
+
             virtual const char * ns() = 0;
             virtual void dotest() = 0;
-            
-            void insert( const BSONObj& o ){
+
+            void insert( const BSONObj& o ) {
                 client().insert( ns() , o );
             }
-            
-            void update( const BSONObj& m ){
+
+            void update( const BSONObj& m ) {
                 client().update( ns() , BSONObj() , m );
             }
 
-            BSONObj findOne(){
+            BSONObj findOne() {
                 return client().findOne( ns() , BSONObj() );
             }
 
-            void test( const char* initial , const char* mod , const char* after ){
+            void test( const char* initial , const char* mod , const char* after ) {
                 test( fromjson( initial ) , fromjson( mod ) , fromjson( after ) );
             }
 
 
-            void test( const BSONObj& initial , const BSONObj& mod , const BSONObj& after ){
+            void test( const BSONObj& initial , const BSONObj& mod , const BSONObj& after ) {
                 client().dropCollection( ns() );
                 insert( initial );
                 update( mod );
@@ -633,14 +633,14 @@ namespace UpdateTests {
             }
 
         public:
-            
-            Base(){}
-            virtual ~Base(){
+
+            Base() {}
+            virtual ~Base() {
             }
 
-            void run(){
+            void run() {
                 client().dropCollection( ns() );
-                
+
                 dotest();
 
                 client().dropCollection( ns() );
@@ -652,87 +652,87 @@ namespace UpdateTests {
             virtual BSONObj mod() = 0;
             virtual BSONObj after() = 0;
 
-            void dotest(){
+            void dotest() {
                 test( initial() , mod() , after() );
             }
-            
+
         };
-        
+
         class inc1 : public SingleTest {
-            virtual BSONObj initial(){
+            virtual BSONObj initial() {
                 return BSON( "_id" << 1 << "x" << 1 );
             }
-            virtual BSONObj mod(){
+            virtual BSONObj mod() {
                 return BSON( "$inc" << BSON( "x" << 2 ) );
             }
-            virtual BSONObj after(){
+            virtual BSONObj after() {
                 return BSON( "_id" << 1 << "x" << 3 );
             }
-            virtual const char * ns(){
+            virtual const char * ns() {
                 return "unittests.inc1";
             }
 
         };
 
         class inc2 : public SingleTest {
-            virtual BSONObj initial(){
+            virtual BSONObj initial() {
                 return BSON( "_id" << 1 << "x" << 1 );
             }
-            virtual BSONObj mod(){
+            virtual BSONObj mod() {
                 return BSON( "$inc" << BSON( "x" << 2.5 ) );
             }
-            virtual BSONObj after(){
+            virtual BSONObj after() {
                 return BSON( "_id" << 1 << "x" << 3.5 );
             }
-            virtual const char * ns(){
+            virtual const char * ns() {
                 return "unittests.inc2";
             }
 
         };
-            
+
         class inc3 : public SingleTest {
-            virtual BSONObj initial(){
+            virtual BSONObj initial() {
                 return BSON( "_id" << 1 << "x" << 537142123123LL );
             }
-            virtual BSONObj mod(){
+            virtual BSONObj mod() {
                 return BSON( "$inc" << BSON( "x" << 2 ) );
             }
-            virtual BSONObj after(){
+            virtual BSONObj after() {
                 return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
-            virtual const char * ns(){
+            virtual const char * ns() {
                 return "unittests.inc3";
             }
 
         };
 
         class inc4 : public SingleTest {
-            virtual BSONObj initial(){
+            virtual BSONObj initial() {
                 return BSON( "_id" << 1 << "x" << 537142123123LL );
             }
-            virtual BSONObj mod(){
+            virtual BSONObj mod() {
                 return BSON( "$inc" << BSON( "x" << 2LL ) );
             }
-            virtual BSONObj after(){
+            virtual BSONObj after() {
                 return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
-            virtual const char * ns(){
+            virtual const char * ns() {
                 return "unittests.inc4";
             }
 
         };
 
         class inc5 : public SingleTest {
-            virtual BSONObj initial(){
+            virtual BSONObj initial() {
                 return BSON( "_id" << 1 << "x" << 537142123123LL );
             }
-            virtual BSONObj mod(){
+            virtual BSONObj mod() {
                 return BSON( "$inc" << BSON( "x" << 2.0 ) );
             }
-            virtual BSONObj after(){
+            virtual BSONObj after() {
                 return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
-            virtual const char * ns(){
+            virtual const char * ns() {
                 return "unittests.inc5";
             }
 
@@ -740,23 +740,23 @@ namespace UpdateTests {
 
         class inc6 : public Base {
 
-            virtual const char * ns(){
+            virtual const char * ns() {
                 return "unittests.inc6";
             }
 
 
-            virtual BSONObj initial(){ return BSONObj(); }
-            virtual BSONObj mod(){ return BSONObj(); }
-            virtual BSONObj after(){ return BSONObj(); }
+            virtual BSONObj initial() { return BSONObj(); }
+            virtual BSONObj mod() { return BSONObj(); }
+            virtual BSONObj after() { return BSONObj(); }
 
-            void dotest(){
+            void dotest() {
                 client().insert( ns() , BSON( "x" << 5 ) );
                 ASSERT( findOne()["x"].type() == NumberInt );
                 long long start = 5;
                 long long max = numeric_limits<int>::max();
                 max *= 32;
 
-                while ( start < max ){
+                while ( start < max ) {
                     update( BSON( "$inc" << BSON( "x" << 500000 ) ) );
                     start += 500000;
                     ASSERT_EQUALS( start , findOne()["x"].numberLong() ); // SERVER-2005
@@ -764,12 +764,12 @@ namespace UpdateTests {
 
             }
         };
-        
+
         class bit1 : public Base {
-            const char * ns(){
+            const char * ns() {
                 return "unittests.bit1";
             }
-            void dotest(){
+            void dotest() {
                 test( BSON( "_id" << 1 << "x" << 3 ) , BSON( "$bit" << BSON( "x" << BSON( "and" << 2 ) ) ) , BSON( "_id" << 1 << "x" << ( 3 & 2 ) ) );
                 test( BSON( "_id" << 1 << "x" << 1 ) , BSON( "$bit" << BSON( "x" << BSON( "or" << 4 ) ) ) , BSON( "_id" << 1 << "x" << ( 1 | 4 ) ) );
                 test( BSON( "_id" << 1 << "x" << 3 ) , BSON( "$bit" << BSON( "x" << BSON( "and" << 2 << "or" << 8 ) ) ) , BSON( "_id" << 1 << "x" << ( ( 3 & 2 ) | 8 ) ) );
@@ -777,21 +777,21 @@ namespace UpdateTests {
 
             }
         };
-        
+
         class unset : public Base {
-            const char * ns(){
+            const char * ns() {
                 return "unittests.unset";
             }
-            void dotest(){
+            void dotest() {
                 test( "{_id:1,x:1}" , "{$unset:{x:1}}" , "{_id:1}" );
             }
         };
 
         class setswitchint : public Base {
-            const char * ns(){
+            const char * ns() {
                 return "unittests.int1";
             }
-            void dotest(){
+            void dotest() {
                 test( BSON( "_id" << 1 << "x" << 1 ) , BSON( "$set" << BSON( "x" << 5.6 ) ) , BSON( "_id" << 1 << "x" << 5.6 ) );
                 test( BSON( "_id" << 1 << "x" << 5.6 ) , BSON( "$set" << BSON( "x" << 1 ) ) , BSON( "_id" << 1 << "x" << 1 ) );
             }
@@ -799,12 +799,12 @@ namespace UpdateTests {
 
 
     };
-    
+
     class All : public Suite {
     public:
         All() : Suite( "update" ) {
         }
-        void setupTests(){
+        void setupTests() {
             add< ModId >();
             add< ModNonmodMix >();
             add< InvalidMod >();
@@ -853,13 +853,13 @@ namespace UpdateTests {
             add< PreserveIdWithIndex >();
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
-            
+
             add< ModSetTests::internal1 >();
             add< ModSetTests::inc1 >();
             add< ModSetTests::inc2 >();
             add< ModSetTests::set1 >();
             add< ModSetTests::push1 >();
-            
+
             add< basic::inc1 >();
             add< basic::inc2 >();
             add< basic::inc3 >();

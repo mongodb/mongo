@@ -130,12 +130,14 @@ int main( int argc, const char **argv ) {
 
     }
 
-    { // ensure index
+    {
+        // ensure index
         assert( conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
         assert( ! conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
     }
 
-    { // hint related tests
+    {
+        // hint related tests
         assert( conn.findOne(ns, "{}")["name"].str() == "sara" );
 
         assert( conn.findOne(ns, "{ name : 'eliot' }")["name"].str() == "eliot" );
@@ -146,7 +148,7 @@ int main( int argc, const char **argv ) {
         try {
             conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}"));
         }
-        catch ( ... ){
+        catch ( ... ) {
             asserted = true;
         }
         assert( asserted );
@@ -158,7 +160,8 @@ int main( int argc, const char **argv ) {
         assert( conn.validate( ns ) );
     }
 
-    { // timestamp test
+    {
+        // timestamp test
 
         const char * tsns = "test.tstest1";
         conn.dropCollection( tsns );
@@ -190,32 +193,33 @@ int main( int argc, const char **argv ) {
                 ( oldTime == found["ts"].timestampTime() && oldInc < found["ts"].timestampInc() ) );
 
     }
-    
-    { // check that killcursors doesn't affect last error
+
+    {
+        // check that killcursors doesn't affect last error
         assert( conn.getLastError().empty() );
-        
+
         BufBuilder b;
         b.appendNum( (int)0 ); // reserved
         b.appendNum( (int)-1 ); // invalid # of cursors triggers exception
         b.appendNum( (int)-1 ); // bogus cursor id
-        
+
         Message m;
         m.setData( dbKillCursors, b.buf(), b.len() );
-        
+
         // say() is protected in DBClientConnection, so get superclass
         static_cast< DBConnector* >( &conn )->say( m );
-        
+
         assert( conn.getLastError().empty() );
     }
 
     {
         list<string> l = conn.getDatabaseNames();
-        for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ){
+        for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ) {
             cout << "db name : " << *i << endl;
         }
 
         l = conn.getCollectionNames( "test" );
-        for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ){
+        for ( list<string>::iterator i = l.begin(); i != l.end(); i++ ) {
             cout << "coll name : " << *i << endl;
         }
     }

@@ -20,40 +20,40 @@
 #include "../client/dbclient.h"
 #include "dbtests.h"
 #include "../db/concurrency.h"
- 
+
 namespace ClientTests {
-    
+
     class Base {
     public:
-        
-        Base( string coll ){
+
+        Base( string coll ) {
             _ns = (string)"test." + coll;
         }
-        
-        virtual ~Base(){
+
+        virtual ~Base() {
             db.dropCollection( _ns );
         }
-        
-        const char * ns(){ return _ns.c_str(); }
-        
+
+        const char * ns() { return _ns.c_str(); }
+
         string _ns;
         DBDirectClient db;
     };
-        
+
 
     class DropIndex : public Base {
     public:
-        DropIndex() : Base( "dropindex" ){}
-        void run(){
+        DropIndex() : Base( "dropindex" ) {}
+        void run() {
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
-            
+
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
             ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
-            
+
             db.dropIndex( ns() , BSON( "x" << 1 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
-            
+
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
             ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
 
@@ -61,18 +61,18 @@ namespace ClientTests {
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
         }
     };
-    
+
     class ReIndex : public Base {
     public:
-        ReIndex() : Base( "reindex" ){}
-        void run(){
-            
+        ReIndex() : Base( "reindex" ) {}
+        void run() {
+
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
-            
+
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
             ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
-            
+
             db.reIndex( ns() );
             ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
         }
@@ -81,15 +81,15 @@ namespace ClientTests {
 
     class ReIndex2 : public Base {
     public:
-        ReIndex2() : Base( "reindex2" ){}
-        void run(){
-            
+        ReIndex2() : Base( "reindex2" ) {}
+        void run() {
+
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
-            
+
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
             ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
-            
+
             BSONObj out;
             ASSERT( db.runCommand( "test" , BSON( "reIndex" << "reindex2" ) , out ) );
             ASSERT_EQUALS( 2 , out["nIndexes"].number() );
@@ -106,7 +106,7 @@ namespace ClientTests {
             for( int i = 0; i < 1111; ++i )
                 db.insert( ns(), BSON( "a" << i << "b" << longs ) );
             db.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
-            
+
             auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ) );
             ASSERT_EQUALS( 1111, c->itcount() );
         }
@@ -164,10 +164,10 @@ namespace ClientTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "client" ){
+        All() : Suite( "client" ) {
         }
 
-        void setupTests(){
+        void setupTests() {
             add<DropIndex>();
             add<ReIndex>();
             add<ReIndex2>();
@@ -175,6 +175,6 @@ namespace ClientTests {
             add<PushBack>();
             add<Create>();
         }
-        
+
     } all;
 }

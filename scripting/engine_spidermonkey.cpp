@@ -26,10 +26,10 @@
 #endif
 
 #define smuassert( cx , msg , val ) \
-  if ( ! ( val ) ){ \
-    JS_ReportError( cx , msg ); \
-    return JS_FALSE; \
-  }
+    if ( ! ( val ) ){ \
+        JS_ReportError( cx , msg ); \
+        return JS_FALSE; \
+    }
 
 #define CHECKNEWOBJECT(xx,ctx,w)                                   \
     if ( ! xx ){                                                   \
@@ -40,20 +40,20 @@
     massert( 13615 , "JS allocation failed, either memory leak or using too much memory" , newthing )
 
 namespace mongo {
-    
+
     class InvalidUTF8Exception : public UserException {
     public:
-        InvalidUTF8Exception() : UserException( 9006 , "invalid utf8" ){
+        InvalidUTF8Exception() : UserException( 9006 , "invalid utf8" ) {
         }
     };
 
-    string trim( string s ){
+    string trim( string s ) {
         while ( s.size() && isspace( s[0] ) )
             s = s.substr( 1 );
-        
+
         while ( s.size() && isspace( s[s.size()-1] ) )
             s = s.substr( 0 , s.size() - 1 );
-        
+
         return s;
     }
 
@@ -68,18 +68,18 @@ namespace mongo {
     class BSONHolder {
     public:
 
-        BSONHolder( BSONObj obj ){
+        BSONHolder( BSONObj obj ) {
             _obj = obj.getOwned();
             _inResolve = false;
             _modified = false;
             _magic = 17;
         }
-        
-        ~BSONHolder(){
+
+        ~BSONHolder() {
             _magic = 18;
         }
 
-        void check(){
+        void check() {
             uassert( 10212 ,  "holder magic value is wrong" , _magic == 17 && _obj.isValid() );
         }
 
@@ -92,24 +92,24 @@ namespace mongo {
         set<string> _removed;
         bool _modified;
     };
-    
+
     class BSONFieldIterator {
     public:
 
-        BSONFieldIterator( BSONHolder * holder ){
+        BSONFieldIterator( BSONHolder * holder ) {
 
             set<string> added;
 
             BSONObjIterator it( holder->_obj );
-            while ( it.more() ){
+            while ( it.more() ) {
                 BSONElement e = it.next();
                 if ( holder->_removed.count( e.fieldName() ) )
                     continue;
                 _names.push_back( e.fieldName() );
                 added.insert( e.fieldName() );
             }
-            
-            for ( list<string>::iterator i = holder->_extra.begin(); i != holder->_extra.end(); i++ ){
+
+            for ( list<string>::iterator i = holder->_extra.begin(); i != holder->_extra.end(); i++ ) {
                 if ( ! added.count( *i ) )
                     _names.push_back( *i );
             }
@@ -117,11 +117,11 @@ namespace mongo {
             _it = _names.begin();
         }
 
-        bool more(){
+        bool more() {
             return _it != _names.end();
         }
 
-        string next(){
+        string next() {
             string s = *_it;
             _it++;
             return s;
@@ -132,24 +132,24 @@ namespace mongo {
         list<string>::iterator _it;
     };
 
-    BSONFieldIterator * BSONHolder::it(){
+    BSONFieldIterator * BSONHolder::it() {
         return new BSONFieldIterator( this );
     }
 
     class TraverseStack {
     public:
-        TraverseStack(){
+        TraverseStack() {
             _o = 0;
             _parent = 0;
         }
 
-        TraverseStack( JSObject * o , const TraverseStack * parent ){
+        TraverseStack( JSObject * o , const TraverseStack * parent ) {
             _o = o;
             _parent = parent;
         }
 
         TraverseStack dive( JSObject * o ) const {
-            if ( o ){
+            if ( o ) {
                 uassert( 13076 , (string)"recursive toObject" , ! has( o ) );
             }
             return TraverseStack( o , this );
@@ -158,7 +158,7 @@ namespace mongo {
         int depth() const {
             int d = 0;
             const TraverseStack * s = _parent;
-            while ( s ){
+            while ( s ) {
                 s = s->_parent;
                 d++;
             }
@@ -168,12 +168,12 @@ namespace mongo {
         bool isTop() const {
             return _parent == 0;
         }
-        
+
         bool has( JSObject * o ) const {
             if ( ! o )
                 return false;
             const TraverseStack * s = this;
-            while ( s ){
+            while ( s ) {
                 if ( s->_o == o )
                     return true;
                 s = s->_parent;
@@ -187,11 +187,11 @@ namespace mongo {
 
     class Convertor : boost::noncopyable {
     public:
-        Convertor( JSContext * cx ){
+        Convertor( JSContext * cx ) {
             _context = cx;
         }
 
-        string toString( JSString * so ){
+        string toString( JSString * so ) {
             jschar * s = JS_GetStringChars( so );
             size_t srclen = JS_GetStringLength( so );
             if( srclen == 0 )
@@ -205,10 +205,10 @@ namespace mongo {
             // units, but experiments suggest 8bit units expected.  We allocate
             // enough memory that either will work.
 
-            if ( !JS_EncodeCharacters( _context , s , srclen , dst , &len) ){
+            if ( !JS_EncodeCharacters( _context , s , srclen , dst , &len) ) {
                 StringBuilder temp;
                 temp << "Not proper UTF-16: ";
-                for ( size_t i=0; i<srclen; i++ ){
+                for ( size_t i=0; i<srclen; i++ ) {
                     if ( i > 0 )
                         temp << ",";
                     temp << s[i];
@@ -224,7 +224,7 @@ namespace mongo {
             return ss;
         }
 
-        string toString( jsval v ){
+        string toString( jsval v ) {
             return toString( JS_ValueToString( _context , v ) );
         }
 
@@ -233,27 +233,28 @@ namespace mongo {
             boost::uint64_t val;
             if ( hasProperty( o, "top" ) ) {
                 val =
-                ( (boost::uint64_t)(boost::uint32_t)getNumber( o , "top" ) << 32 ) +
-                ( boost::uint32_t)( getNumber( o , "bottom" ) );
-            } else {
+                    ( (boost::uint64_t)(boost::uint32_t)getNumber( o , "top" ) << 32 ) +
+                    ( boost::uint32_t)( getNumber( o , "bottom" ) );
+            }
+            else {
                 val = (boost::uint64_t)(boost::int64_t) getNumber( o, "floatApprox" );
             }
             return val;
         }
-        
-        double toNumber( jsval v ){
+
+        double toNumber( jsval v ) {
             double d;
             uassert( 10214 ,  "not a number" , JS_ValueToNumber( _context , v , &d ) );
             return d;
         }
 
-        bool toBoolean( jsval v ){
+        bool toBoolean( jsval v ) {
             JSBool b;
             assert( JS_ValueToBoolean( _context, v , &b ) );
             return b;
         }
 
-        OID toOID( jsval v ){
+        OID toOID( jsval v ) {
             JSContext * cx = _context;
             assert( JSVAL_IS_OID( v ) );
 
@@ -263,21 +264,21 @@ namespace mongo {
             return oid;
         }
 
-        BSONObj toObject( JSObject * o , const TraverseStack& stack=TraverseStack() ){
+        BSONObj toObject( JSObject * o , const TraverseStack& stack=TraverseStack() ) {
             if ( ! o )
                 return BSONObj();
 
-            if ( JS_InstanceOf( _context , o , &bson_ro_class , 0 ) ){
+            if ( JS_InstanceOf( _context , o , &bson_ro_class , 0 ) ) {
                 BSONHolder * holder = GETHOLDER( _context , o );
                 assert( holder );
                 return holder->_obj.getOwned();
             }
 
             BSONObj orig;
-            if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
+            if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ) {
                 BSONHolder * holder = GETHOLDER(_context,o);
                 assert( holder );
-                if ( ! holder->_modified ){
+                if ( ! holder->_modified ) {
                     return holder->_obj;
                 }
                 orig = holder->_obj;
@@ -285,26 +286,26 @@ namespace mongo {
 
             BSONObjBuilder b;
 
-            if ( ! appendSpecialDBObject( this , b , "value" , OBJECT_TO_JSVAL( o ) , o ) ){
+            if ( ! appendSpecialDBObject( this , b , "value" , OBJECT_TO_JSVAL( o ) , o ) ) {
 
-                if ( stack.isTop() ){
+                if ( stack.isTop() ) {
                     jsval theid = getProperty( o , "_id" );
-                    if ( ! JSVAL_IS_VOID( theid ) ){
+                    if ( ! JSVAL_IS_VOID( theid ) ) {
                         append( b , "_id" , theid , EOO , stack.dive( o ) );
                     }
                 }
-                
+
                 JSIdArray * properties = JS_Enumerate( _context , o );
                 assert( properties );
-                
-                for ( jsint i=0; i<properties->length; i++ ){
+
+                for ( jsint i=0; i<properties->length; i++ ) {
                     jsid id = properties->vector[i];
                     jsval nameval;
                     assert( JS_IdToValue( _context ,id , &nameval ) );
                     string name = toString( nameval );
                     if ( stack.isTop() && name == "_id" )
                         continue;
-                    
+
                     append( b , name , getProperty( o , name.c_str() ) , orig[name].type() , stack.dive( o ) );
                 }
 
@@ -314,34 +315,34 @@ namespace mongo {
             return b.obj();
         }
 
-        BSONObj toObject( jsval v ){
+        BSONObj toObject( jsval v ) {
             if ( JSVAL_IS_NULL( v ) ||
-                 JSVAL_IS_VOID( v ) )
+                    JSVAL_IS_VOID( v ) )
                 return BSONObj();
 
             uassert( 10215 ,  "not an object" , JSVAL_IS_OBJECT( v ) );
             return toObject( JSVAL_TO_OBJECT( v ) );
         }
 
-        string getFunctionCode( JSFunction * func ){
+        string getFunctionCode( JSFunction * func ) {
             return toString( JS_DecompileFunction( _context , func , 0 ) );
         }
 
-        string getFunctionCode( jsval v ){
+        string getFunctionCode( jsval v ) {
             uassert( 10216 ,  "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
             return getFunctionCode( JS_ValueToFunction( _context , v ) );
         }
-        
-        void appendRegex( BSONObjBuilder& b , const string& name , string s ){
+
+        void appendRegex( BSONObjBuilder& b , const string& name , string s ) {
             assert( s[0] == '/' );
             s = s.substr(1);
             string::size_type end = s.rfind( '/' );
             b.appendRegex( name , s.substr( 0 , end ) , s.substr( end + 1 ) );
         }
 
-        void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO , const TraverseStack& stack=TraverseStack() ){
+        void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO , const TraverseStack& stack=TraverseStack() ) {
             //cout << "name: " << name << "\t" << typeString( val ) << " oldType: " << oldType << endl;
-            switch ( JS_TypeOfValue( _context , val ) ){
+            switch ( JS_TypeOfValue( _context , val ) ) {
 
             case JSTYPE_VOID: b.appendUndefined( name ); break;
             case JSTYPE_NULL: b.appendNull( name ); break;
@@ -359,12 +360,12 @@ namespace mongo {
 
             case JSTYPE_OBJECT: {
                 JSObject * o = JSVAL_TO_OBJECT( val );
-                if ( ! o || o == JSVAL_NULL ){
+                if ( ! o || o == JSVAL_NULL ) {
                     b.appendNull( name );
                 }
-                else if ( ! appendSpecialDBObject( this , b , name , val , o ) ){
+                else if ( ! appendSpecialDBObject( this , b , name , val , o ) ) {
                     BSONObj sub = toObject( o , stack );
-                    if ( JS_IsArrayObject( _context , o ) ){
+                    if ( JS_IsArrayObject( _context , o ) ) {
                         b.appendArray( name , sub );
                     }
                     else {
@@ -376,7 +377,7 @@ namespace mongo {
 
             case JSTYPE_FUNCTION: {
                 string s = toString(val);
-                if ( s[0] == '/' ){
+                if ( s[0] == '/' ) {
                     appendRegex( b , name , s );
                 }
                 else {
@@ -391,28 +392,28 @@ namespace mongo {
 
         // ---------- to spider monkey ---------
 
-        bool hasFunctionIdentifier( const string& code ){
+        bool hasFunctionIdentifier( const string& code ) {
             if ( code.size() < 9 || code.find( "function" ) != 0  )
                 return false;
 
             return code[8] == ' ' || code[8] == '(';
         }
 
-        bool isSimpleStatement( const string& code ){
+        bool isSimpleStatement( const string& code ) {
             if ( hasJSReturn( code ) )
                 return false;
 
             if ( code.find( ';' ) != string::npos &&
-                 code.find( ';' ) != code.rfind( ';' ) )
+                    code.find( ';' ) != code.rfind( ';' ) )
                 return false;
-            
+
             if ( code.find( '\n') != string::npos )
                 return false;
 
             if ( code.find( "for(" ) != string::npos ||
-                 code.find( "for (" ) != string::npos ||
-                 code.find( "while (" ) != string::npos ||
-                 code.find( "while(" ) != string::npos )
+                    code.find( "for (" ) != string::npos ||
+                    code.find( "while (" ) != string::npos ||
+                    code.find( "while(" ) != string::npos )
                 return false;
 
             return true;
@@ -420,14 +421,14 @@ namespace mongo {
 
         void addRoot( JSFunction * f , const char * name );
 
-        JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
+        JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ) {
             const char * gcName = "unknown";
             JSFunction * f = _compileFunction( code , assoc , gcName );
             //addRoot( f , gcName );
             return f;
         }
 
-        JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ){
+        JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ) {
             if ( ! assoc )
                 assoc = JS_GetGlobalObject( _context );
 
@@ -441,9 +442,9 @@ namespace mongo {
             fname << "_" << fnum++ << "_";
 
 
-            if ( ! hasFunctionIdentifier( raw ) ){
+            if ( ! hasFunctionIdentifier( raw ) ) {
                 string s = raw;
-                if ( isSimpleStatement( s ) ){
+                if ( isSimpleStatement( s ) ) {
                     s = "return " + s;
                 }
                 gcName = "cf anon";
@@ -452,23 +453,23 @@ namespace mongo {
             }
 
             string code = raw;
-            
+
             size_t start = code.find( '(' );
             assert( start != string::npos );
-            
+
             fname << "_f_" << trim( code.substr( 9 , start - 9 ) );
 
             code = code.substr( start + 1 );
             size_t end = code.find( ')' );
             assert( end != string::npos );
-            
+
             string paramString = trim( code.substr( 0 , end ) );
             code = code.substr( end + 1 );
-            
+
             vector<string> params;
-            while ( paramString.size() ){
+            while ( paramString.size() ) {
                 size_t c = paramString.find( ',' );
-                if ( c == string::npos ){
+                if ( c == string::npos ) {
                     params.push_back( paramString );
                     break;
                 }
@@ -476,14 +477,14 @@ namespace mongo {
                 paramString = trim( paramString.substr( c + 1 ) );
                 paramString = trim( paramString );
             }
-            
+
             boost::scoped_array<const char *> paramArray (new const char*[params.size()]);
             for ( size_t i=0; i<params.size(); i++ )
                 paramArray[i] = params[i].c_str();
-            
+
             JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray.get() , code.c_str() , code.size() , "nofile_b" , 0 );
 
-            if ( ! func ){
+            if ( ! func ) {
                 log() << "compile failed for: " << raw << endl;
                 return 0;
             }
@@ -492,31 +493,31 @@ namespace mongo {
         }
 
 
-        jsval toval( double d ){
+        jsval toval( double d ) {
             jsval val;
             assert( JS_NewNumberValue( _context, d , &val ) );
             return val;
         }
 
-        jsval toval( const char * c ){
+        jsval toval( const char * c ) {
             JSString * s = JS_NewStringCopyZ( _context , c );
             if ( s )
                 return STRING_TO_JSVAL( s );
-            
+
             // possibly unicode, try manual
-            
+
             size_t len = strlen( c );
             size_t dstlen = len * 4;
             jschar * dst = (jschar*)malloc( dstlen );
-            
+
             JSBool res = JS_DecodeBytes( _context , c , len , dst, &dstlen );
-            if ( res ){
+            if ( res ) {
                 s = JS_NewUCStringCopyN( _context , dst , dstlen );
             }
 
             free( dst );
 
-            if ( ! res ){
+            if ( ! res ) {
                 tlog() << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
@@ -528,9 +529,9 @@ namespace mongo {
             return STRING_TO_JSVAL( s );
         }
 
-        JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
+        JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ) {
             static string ref = "$ref";
-            if ( ref == obj->firstElement().fieldName() ){
+            if ( ref == obj->firstElement().fieldName() ) {
                 JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
                 CHECKNEWOBJECT(o,_context,"toJSObject1");
                 assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
@@ -542,7 +543,7 @@ namespace mongo {
             return o;
         }
 
-        jsval toval( const BSONObj* obj , bool readOnly=false ){
+        jsval toval( const BSONObj* obj , bool readOnly=false ) {
             JSObject * o = toJSObject( obj , readOnly );
             return OBJECT_TO_JSVAL( o );
         }
@@ -550,7 +551,7 @@ namespace mongo {
         void makeLongObj( long long n, JSObject * o ) {
             boost::uint64_t val = (boost::uint64_t)n;
             CHECKNEWOBJECT(o,_context,"NumberLong1");
-            setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );                    
+            setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );
             if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
                 // using 2 doubles here instead of a single double because certain double
                 // bit patterns represent undefined values and sm might trash them
@@ -558,16 +559,16 @@ namespace mongo {
                 setProperty( o , "bottom" , toval( (double)(boost::uint32_t)( val & 0x00000000ffffffff ) ) );
             }
         }
-        
+
         jsval toval( long long n ) {
             JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
             makeLongObj( n, o );
             return OBJECT_TO_JSVAL( o );
         }
-        
-        jsval toval( const BSONElement& e ){
 
-            switch( e.type() ){
+        jsval toval( const BSONElement& e ) {
+
+            switch( e.type() ) {
             case EOO:
             case jstNULL:
             case Undefined:
@@ -580,15 +581,15 @@ namespace mongo {
                 return toval( e.valuestr() );
             case Bool:
                 return e.boolean() ? JSVAL_TRUE : JSVAL_FALSE;
-            case Object:{
+            case Object: {
                 BSONObj embed = e.embeddedObject().getOwned();
                 return toval( &embed );
             }
-            case Array:{
+            case Array: {
 
                 BSONObj embed = e.embeddedObject().getOwned();
 
-                if ( embed.isEmpty() ){
+                if ( embed.isEmpty() ) {
                     return OBJECT_TO_JSVAL( JS_NewArrayObject( _context , 0 , 0 ) );
                 }
 
@@ -599,31 +600,31 @@ namespace mongo {
 
                 jsval myarray = OBJECT_TO_JSVAL( array );
 
-                for ( int i=0; i<n; i++ ){
+                for ( int i=0; i<n; i++ ) {
                     jsval v = toval( embed[i] );
                     assert( JS_SetElement( _context , array , i , &v ) );
                 }
 
                 return myarray;
             }
-            case jstOID:{
+            case jstOID: {
                 OID oid = e.__oid();
                 JSObject * o = JS_NewObject( _context , &object_id_class , 0 , 0 );
                 CHECKNEWOBJECT(o,_context,"jstOID");
                 setProperty( o , "str" , toval( oid.str().c_str() ) );
                 return OBJECT_TO_JSVAL( o );
             }
-            case RegEx:{
+            case RegEx: {
                 const char * flags = e.regexFlags();
                 uintN flagNumber = 0;
-                while ( *flags ){
-                    switch ( *flags ){
+                while ( *flags ) {
+                    switch ( *flags ) {
                     case 'g': flagNumber |= JSREG_GLOB; break;
                     case 'i': flagNumber |= JSREG_FOLD; break;
                     case 'm': flagNumber |= JSREG_MULTILINE; break;
                         //case 'y': flagNumber |= JSREG_STICKY; break;
-                        
-                    default: 
+
+                    default:
                         log() << "warning: unknown regex flag:" << *flags << endl;
                     }
                     flags++;
@@ -633,17 +634,17 @@ namespace mongo {
                 assert( r );
                 return OBJECT_TO_JSVAL( r );
             }
-            case Code:{
+            case Code: {
                 JSFunction * func = compileFunction( e.valuestr() );
                 if ( func )
                     return OBJECT_TO_JSVAL( JS_GetFunctionObject( func ) );
                 return JSVAL_NULL;
             }
-            case CodeWScope:{
+            case CodeWScope: {
                 JSFunction * func = compileFunction( e.codeWScopeCode() );
 
                 BSONObj extraScope = e.codeWScopeObject();
-                if ( ! extraScope.isEmpty() ){
+                if ( ! extraScope.isEmpty() ) {
                     log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
                 }
 
@@ -680,7 +681,7 @@ namespace mongo {
                 setProperty( o , "id" , OBJECT_TO_JSVAL( oid ) );
                 return OBJECT_TO_JSVAL( o );
             }
-            case BinData:{
+            case BinData: {
                 JSObject * o = JS_NewObject( _context , &bindata_class , 0 , 0 );
                 CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
                 int len;
@@ -701,55 +702,55 @@ namespace mongo {
 
         // ------- object helpers ------
 
-        JSObject * getJSObject( JSObject * o , const char * name ){
+        JSObject * getJSObject( JSObject * o , const char * name ) {
             jsval v;
             assert( JS_GetProperty( _context , o , name , &v ) );
             return JSVAL_TO_OBJECT( v );
         }
 
-        JSObject * getGlobalObject( const char * name ){
+        JSObject * getGlobalObject( const char * name ) {
             return getJSObject( JS_GetGlobalObject( _context ) , name );
         }
 
-        JSObject * getGlobalPrototype( const char * name ){
+        JSObject * getGlobalPrototype( const char * name ) {
             return getJSObject( getGlobalObject( name ) , "prototype" );
         }
 
-        bool hasProperty( JSObject * o , const char * name ){
+        bool hasProperty( JSObject * o , const char * name ) {
             JSBool res;
             assert( JS_HasProperty( _context , o , name , & res ) );
             return res;
         }
 
-        jsval getProperty( JSObject * o , const char * field ){
+        jsval getProperty( JSObject * o , const char * field ) {
             uassert( 10219 ,  "object passed to getPropery is null" , o );
             jsval v;
             assert( JS_GetProperty( _context , o , field , &v ) );
             return v;
         }
 
-        void setProperty( JSObject * o , const char * field , jsval v ){
+        void setProperty( JSObject * o , const char * field , jsval v ) {
             assert( JS_SetProperty( _context , o , field , &v ) );
         }
 
-        string typeString( jsval v ){
+        string typeString( jsval v ) {
             JSType t = JS_TypeOfValue( _context , v );
             return JS_GetTypeName( _context , t );
         }
 
-        bool getBoolean( JSObject * o , const char * field ){
+        bool getBoolean( JSObject * o , const char * field ) {
             return toBoolean( getProperty( o , field ) );
         }
 
-        double getNumber( JSObject * o , const char * field ){
+        double getNumber( JSObject * o , const char * field ) {
             return toNumber( getProperty( o , field ) );
         }
 
-        string getString( JSObject * o , const char * field ){
+        string getString( JSObject * o , const char * field ) {
             return toString( getProperty( o , field ) );
         }
 
-        JSClass * getClass( JSObject * o , const char * field ){
+        JSClass * getClass( JSObject * o , const char * field ) {
             jsval v;
             assert( JS_GetProperty( _context , o , field , &v ) );
             if ( ! JSVAL_IS_OBJECT( v ) )
@@ -763,25 +764,25 @@ namespace mongo {
     };
 
 
-    void bson_finalize( JSContext * cx , JSObject * obj ){
+    void bson_finalize( JSContext * cx , JSObject * obj ) {
         BSONHolder * o = GETHOLDER( cx , obj );
-        if ( o ){
+        if ( o ) {
             delete o;
             assert( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
-    JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ){
+    JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ) {
 
         BSONHolder * o = GETHOLDER( cx , obj );
-        
-        if ( enum_op == JSENUMERATE_INIT ){
-            if ( o ){
+
+        if ( enum_op == JSENUMERATE_INIT ) {
+            if ( o ) {
                 BSONFieldIterator * it = o->it();
                 *statep = PRIVATE_TO_JSVAL( it );
             }
             else {
-                *statep = 0;                
+                *statep = 0;
             }
             if ( idp )
                 *idp = JSVAL_ZERO;
@@ -789,13 +790,13 @@ namespace mongo {
         }
 
         BSONFieldIterator * it = (BSONFieldIterator*)JSVAL_TO_PRIVATE( *statep );
-        if ( ! it ){
+        if ( ! it ) {
             *statep = 0;
             return JS_TRUE;
         }
 
-        if ( enum_op == JSENUMERATE_NEXT ){
-            if ( it->more() ){
+        if ( enum_op == JSENUMERATE_NEXT ) {
+            if ( it->more() ) {
                 string name = it->next();
                 Convertor c(cx);
                 assert( JS_ValueToId( cx , c.toval( name.c_str() ) , idp ) );
@@ -807,7 +808,7 @@ namespace mongo {
             return JS_TRUE;
         }
 
-        if ( enum_op == JSENUMERATE_DESTROY ){
+        if ( enum_op == JSENUMERATE_DESTROY ) {
             if ( it )
                 delete it;
             return JS_TRUE;
@@ -817,9 +818,9 @@ namespace mongo {
         return JS_FALSE;
     }
 
-    JSBool noaccess( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+    JSBool noaccess( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
         BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( ! holder ){
+        if ( ! holder ) {
             // in init code still
             return JS_TRUE;
         }
@@ -836,7 +837,7 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
-    JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+    JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         cerr << "bson_cons : shouldn't be here!" << endl;
         JS_ReportError( cx , "can't construct bson object" );
         return JS_FALSE;
@@ -845,26 +846,26 @@ namespace mongo {
     JSFunctionSpec bson_functions[] = {
         { 0 }
     };
-    
-    JSBool bson_add_prop( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+
+    JSBool bson_add_prop( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
         BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( ! holder ){
+        if ( ! holder ) {
             // static init
             return JS_TRUE;
         }
-        if ( ! holder->_inResolve ){
+        if ( ! holder->_inResolve ) {
             Convertor c(cx);
             string name = c.toString( idval );
-            if ( holder->_obj[name].eoo() ){
+            if ( holder->_obj[name].eoo() ) {
                 holder->_extra.push_back( name );
             }
             holder->_modified = true;
         }
         return JS_TRUE;
     }
-    
 
-    JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+
+    JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
         Convertor c(cx);
         BSONHolder * holder = GETHOLDER( cx , obj );
         if ( !holder ) // needed when we're messing with DBRef.prototype
@@ -875,8 +876,8 @@ namespace mongo {
         holder->_removed.erase( c.toString( idval ) );
         return JS_TRUE;
     }
-    
-    JSBool mark_modified_remove( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
+
+    JSBool mark_modified_remove( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
         Convertor c(cx);
         BSONHolder * holder = GETHOLDER( cx , obj );
         if ( holder->_inResolve )
@@ -902,10 +903,10 @@ namespace mongo {
 
     // --- global helpers ---
 
-    JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ){
+    JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
         stringstream ss;
         Convertor c( cx );
-        for ( uintN i=0; i<argc; i++ ){
+        for ( uintN i=0; i<argc; i++ ) {
             if ( i > 0 )
                 ss << " ";
             ss << c.toString( argv[i] );
@@ -915,32 +916,32 @@ namespace mongo {
         return JS_TRUE;
     }
 
-    JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+    JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
         Convertor c(cx);
-        
+
         NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
         assert( func );
-        
+
         BSONObj a;
-        if ( argc > 0 ){
+        if ( argc > 0 ) {
             BSONObjBuilder args;
-            for ( uintN i=0; i<argc; i++ ){
+            for ( uintN i=0; i<argc; i++ ) {
                 c.append( args , args.numStr( i ) , argv[i] );
             }
-            
+
             a = args.obj();
         }
-        
+
         BSONObj out;
         try {
             out = func( a );
         }
-        catch ( std::exception& e ){
+        catch ( std::exception& e ) {
             JS_ReportError( cx , e.what() );
             return JS_FALSE;
         }
-        
-        if ( out.isEmpty() ){
+
+        if ( out.isEmpty() ) {
             *rval = JSVAL_VOID;
         }
         else {
@@ -952,7 +953,7 @@ namespace mongo {
 
     JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval );
 
-    JSBool native_gc( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+    JSBool native_gc( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
         JS_GC( cx );
         return JS_TRUE;
     }
@@ -968,16 +969,16 @@ namespace mongo {
     // ----END global helpers ----
 
     // Object helpers
-    
-    JSBool bson_get_size(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+
+    JSBool bson_get_size(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         if ( argc != 1 || !JSVAL_IS_OBJECT( argv[ 0 ] ) ) {
             JS_ReportError( cx , "bsonsize requires one valid object" );
             return JS_FALSE;
         }
 
         Convertor c(cx);
-        
-        if ( argv[0] == JSVAL_VOID || argv[0] == JSVAL_NULL ){
+
+        if ( argv[0] == JSVAL_VOID || argv[0] == JSVAL_NULL ) {
             *rval = c.toval( 0.0 );
             return JS_TRUE;
         }
@@ -987,9 +988,9 @@ namespace mongo {
         double size = 0;
 
         if ( JS_InstanceOf( cx , o , &bson_ro_class , 0 ) ||
-             JS_InstanceOf( cx , o , &bson_class , 0 ) ){
+                JS_InstanceOf( cx , o , &bson_class , 0 ) ) {
             BSONHolder * h = GETHOLDER( cx , o );
-            if ( h ){
+            if ( h ) {
                 size = h->_obj.objsize();
             }
         }
@@ -997,36 +998,36 @@ namespace mongo {
             BSONObj temp = c.toObject( o );
             size = temp.objsize();
         }
-        
+
         *rval = c.toval( size );
-        return JS_TRUE;        
+        return JS_TRUE;
     }
-    
+
     JSFunctionSpec objectHelpers[] = {
-    { "bsonsize" , &bson_get_size , 1 , 0 , 0 } ,
-    { 0 , 0 , 0 , 0 , 0 }
+        { "bsonsize" , &bson_get_size , 1 , 0 , 0 } ,
+        { 0 , 0 , 0 , 0 , 0 }
     };
-    
+
     // end Object helpers
 
-    JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
+    JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ) {
         assert( JS_EnterLocalRootScope( cx ) );
         Convertor c( cx );
 
         BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( ! holder ){
+        if ( ! holder ) {
             // static init
             *objp = 0;
             JS_LeaveLocalRootScope( cx );
             return JS_TRUE;
         }
         holder->check();
-        
+
         string s = c.toString( id );
 
         BSONElement e = holder->_obj[ s.c_str() ];
-        
-        if ( e.type() == EOO || holder->_removed.count( s ) ){
+
+        if ( e.type() == EOO || holder->_removed.count( s ) ) {
             *objp = 0;
             JS_LeaveLocalRootScope( cx );
             return JS_TRUE;
@@ -1046,12 +1047,12 @@ namespace mongo {
         holder->_inResolve = true;
         assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
         holder->_inResolve = false;
-        
-        if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ){
+
+        if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ) {
             // TODO: this is a hack to get around sub objects being modified
             JSObject * oo = JSVAL_TO_OBJECT( val );
-            if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) || 
-                 JS_IsArrayObject( cx , oo ) ){
+            if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) ||
+                    JS_IsArrayObject( cx , oo ) ) {
                 holder->_modified = true;
             }
         }
@@ -1067,15 +1068,15 @@ namespace mongo {
     class SMEngine : public ScriptEngine {
     public:
 
-        SMEngine(){
+        SMEngine() {
 #ifdef SM18
             JS_SetCStringsAreUTF8();
 #endif
 
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
             uassert( 10221 ,  "JS_NewRuntime failed" , _runtime );
-            
-            if ( ! utf8Ok() ){
+
+            if ( ! utf8Ok() ) {
                 log() << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
 
@@ -1084,7 +1085,7 @@ namespace mongo {
             uassert( 10222 ,  "assert not being executed" , x == 1 );
         }
 
-        ~SMEngine(){
+        ~SMEngine() {
             JS_DestroyRuntime( _runtime );
             JS_ShutDown();
         }
@@ -1109,7 +1110,7 @@ namespace mongo {
     SMEngine * globalSMEngine;
 
 
-    void ScriptEngine::setup(){
+    void ScriptEngine::setup() {
         globalSMEngine = new SMEngine();
         globalScriptEngine = globalSMEngine;
     }
@@ -1118,11 +1119,11 @@ namespace mongo {
     // ------ scope ------
 
 
-    JSBool no_gc(JSContext *cx, JSGCStatus status){
+    JSBool no_gc(JSContext *cx, JSGCStatus status) {
         return JS_FALSE;
     }
 
-    JSBool yes_gc(JSContext *cx, JSGCStatus status){
+    JSBool yes_gc(JSContext *cx, JSGCStatus status) {
         return JS_TRUE;
     }
 
@@ -1146,64 +1147,64 @@ namespace mongo {
             JS_SetOptions( _context , JS_GetOptions( _context ) | JSOPTION_VAROBJFIX );
 
             JS_DefineFunctions( _context , _global , globalHelpers );
-            
+
             JS_DefineFunctions( _context , _convertor->getGlobalObject( "Object" ), objectHelpers );
 
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
 
             _postCreateHacks();
         }
-        
-        ~SMScope(){
+
+        ~SMScope() {
             smlock;
             uassert( 10223 ,  "deleted SMScope twice?" , _convertor );
 
-            for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
+            for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ) {
                 JS_RemoveRoot( _context , *i );
             }
             _roots.clear();
-            
-            if ( _this ){
+
+            if ( _this ) {
                 JS_RemoveRoot( _context , &_this );
                 _this = 0;
             }
 
-            if ( _convertor ){
+            if ( _convertor ) {
                 delete _convertor;
                 _convertor = 0;
             }
-            
-            if ( _context ){
+
+            if ( _context ) {
                 JS_DestroyContext( _context );
                 _context = 0;
             }
 
         }
-        
-        void reset(){
+
+        void reset() {
             smlock;
             assert( _convertor );
             return;
-            if ( _this ){
+            if ( _this ) {
                 JS_RemoveRoot( _context , &_this );
                 _this = 0;
             }
             currentScope.reset( this );
             _error = "";
         }
-        
-        void addRoot( void * root , const char * name ){
+
+        void addRoot( void * root , const char * name ) {
             JS_AddNamedRoot( _context , root , name );
             _roots.push_back( root );
         }
 
-        void init( const BSONObj * data ){
+        void init( const BSONObj * data ) {
             smlock;
             if ( ! data )
                 return;
 
             BSONObjIterator i( *data );
-            while ( i.more() ){
+            while ( i.more() ) {
                 BSONElement e = i.next();
                 _convertor->setProperty( _global , e.fieldName() , _convertor->toval( e ) );
                 _initFieldNames.insert( e.fieldName() );
@@ -1211,7 +1212,7 @@ namespace mongo {
 
         }
 
-        void externalSetup(){
+        void externalSetup() {
             smlock;
             uassert( 10224 ,  "already local connected" , ! _localConnect );
             if ( _externalSetup )
@@ -1220,20 +1221,20 @@ namespace mongo {
             _externalSetup = true;
         }
 
-        void localConnect( const char * dbName ){
+        void localConnect( const char * dbName ) {
             {
                 smlock;
                 uassert( 10225 ,  "already setup for external db" , ! _externalSetup );
-                if ( _localConnect ){
+                if ( _localConnect ) {
                     uassert( 10226 ,  "connected to different db" , _localDBName == dbName );
                     return;
                 }
-                
+
                 initMongoJS( this , _context , _global , true );
-                
+
                 exec( "_mongo = new Mongo();" );
                 exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
-                
+
                 _localConnect = true;
                 _localDBName = dbName;
             }
@@ -1241,14 +1242,14 @@ namespace mongo {
         }
 
         // ----- getters ------
-        double getNumber( const char *field ){
+        double getNumber( const char *field ) {
             smlock;
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
             return _convertor->toNumber( val );
         }
 
-        string getString( const char *field ){
+        string getString( const char *field ) {
             smlock;
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
@@ -1256,27 +1257,27 @@ namespace mongo {
             return _convertor->toString( s );
         }
 
-        bool getBoolean( const char *field ){
+        bool getBoolean( const char *field ) {
             smlock;
             return _convertor->getBoolean( _global , field );
         }
 
-        BSONObj getObject( const char *field ){
+        BSONObj getObject( const char *field ) {
             smlock;
             return _convertor->toObject( _convertor->getProperty( _global , field ) );
         }
 
-        JSObject * getJSObject( const char * field ){
+        JSObject * getJSObject( const char * field ) {
             smlock;
             return _convertor->getJSObject( _global , field );
         }
 
-        int type( const char *field ){
+        int type( const char *field ) {
             smlock;
             jsval val;
             assert( JS_GetProperty( _context , _global , field , &val ) );
 
-            switch ( JS_TypeOfValue( _context , val ) ){
+            switch ( JS_TypeOfValue( _context , val ) ) {
             case JSTYPE_VOID: return Undefined;
             case JSTYPE_NULL: return jstNULL;
             case JSTYPE_OBJECT: {
@@ -1301,50 +1302,50 @@ namespace mongo {
 
         // ----- setters ------
 
-        void setElement( const char *field , const BSONElement& val ){
+        void setElement( const char *field , const BSONElement& val ) {
             smlock;
             jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
-        void setNumber( const char *field , double val ){
+        void setNumber( const char *field , double val ) {
             smlock;
             jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
-        void setString( const char *field , const char * val ){
+        void setString( const char *field , const char * val ) {
             smlock;
             jsval v = _convertor->toval( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
-        void setObject( const char *field , const BSONObj& obj , bool readOnly ){
+        void setObject( const char *field , const BSONObj& obj , bool readOnly ) {
             smlock;
             jsval v = _convertor->toval( &obj , readOnly );
             JS_SetProperty( _context , _global , field , &v );
         }
 
-        void setBoolean( const char *field , bool val ){
+        void setBoolean( const char *field , bool val ) {
             smlock;
             jsval v = BOOLEAN_TO_JSVAL( val );
             assert( JS_SetProperty( _context , _global , field , &v ) );
         }
 
-        void setThis( const BSONObj * obj ){
+        void setThis( const BSONObj * obj ) {
             smlock;
-            if ( _this ){
+            if ( _this ) {
                 JS_RemoveRoot( _context , &_this );
                 _this = 0;
             }
-            
-            if ( obj ){
+
+            if ( obj ) {
                 _this = _convertor->toJSObject( obj );
                 JS_AddNamedRoot( _context , &_this , "scope this" );
             }
         }
 
-        void rename( const char * from , const char * to ){
+        void rename( const char * from , const char * to ) {
             smlock;
             jsval v;
             assert( JS_GetProperty( _context , _global , from , &v ) );
@@ -1355,7 +1356,7 @@ namespace mongo {
 
         // ---- functions -----
 
-        ScriptingFunction _createFunction( const char * code ){
+        ScriptingFunction _createFunction( const char * code ) {
             smlock;
             precall();
             return (ScriptingFunction)_convertor->compileFunction( code );
@@ -1367,10 +1368,10 @@ namespace mongo {
             int count;
         };
 
-        // should not generate exceptions, as those can be caught in 
+        // should not generate exceptions, as those can be caught in
         // javascript code; returning false without an exception exits
         // immediately
-        static JSBool _interrupt( JSContext *cx ){
+        static JSBool _interrupt( JSContext *cx ) {
             TimeoutSpec &spec = *(TimeoutSpec *)( JS_GetContextPrivate( cx ) );
             if ( ++spec.count % 1000 != 0 )
                 return JS_TRUE;
@@ -1388,8 +1389,8 @@ namespace mongo {
             return JS_FALSE;
 
         }
-        
-        static JSBool interrupt( JSContext *cx, JSScript *script ){
+
+        static JSBool interrupt( JSContext *cx, JSScript *script ) {
             return _interrupt( cx );
         }
 
@@ -1420,12 +1421,12 @@ namespace mongo {
             }
         }
 
-        void precall(){
+        void precall() {
             _error = "";
             currentScope.reset( this );
         }
 
-        bool exec( const StringData& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ){
+        bool exec( const StringData& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ) {
             smlock;
             precall();
 
@@ -1435,9 +1436,9 @@ namespace mongo {
             JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 1 , &ret );
             uninstallInterrupt( timeoutMs );
 
-            if ( ! worked && _error.size() == 0 ){
+            if ( ! worked && _error.size() == 0 ) {
                 jsval v;
-                if ( JS_GetPendingException( _context , &v ) ){
+                if ( JS_GetPendingException( _context , &v ) ) {
                     _error = _convertor->toString( v );
                     if ( reportError )
                         cout << _error << endl;
@@ -1447,7 +1448,7 @@ namespace mongo {
             if ( assertOnError )
                 uassert( 10228 ,  name + " exec failed" , worked );
 
-            if ( reportError && ! _error.empty() ){
+            if ( reportError && ! _error.empty() ) {
                 // cout << "exec error: " << _error << endl;
                 // already printed in reportError, so... TODO
             }
@@ -1460,23 +1461,23 @@ namespace mongo {
 
             return worked;
         }
-        
-        int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
+
+        int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ) {
             smlock;
             precall();
 
             assert( JS_EnterLocalRootScope( _context ) );
-                
+
             int nargs = args.nFields();
             scoped_array<jsval> smargsPtr( new jsval[nargs] );
-            if ( nargs ){
+            if ( nargs ) {
                 BSONObjIterator it( args );
-                for ( int i=0; i<nargs; i++ ){
+                for ( int i=0; i<nargs; i++ ) {
                     smargsPtr[i] = _convertor->toval( it.next() );
                 }
             }
 
-            if ( args.isEmpty() ){
+            if ( args.isEmpty() ) {
                 _convertor->setProperty( _global , "args" , JSVAL_NULL );
             }
             else {
@@ -1493,27 +1494,27 @@ namespace mongo {
             if ( !ret ) {
                 return -3;
             }
-            
-            if ( ! ignoreReturn ){
+
+            if ( ! ignoreReturn ) {
                 assert( JS_SetProperty( _context , _global , "return" , &rval ) );
             }
 
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = 0 ){
+        int invoke( ScriptingFunction funcAddr , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = 0 ) {
             return invoke( (JSFunction*)funcAddr , args , timeoutMs , ignoreReturn );
         }
 
-        void gotError( string s ){
+        void gotError( string s ) {
             _error = s;
         }
 
-        string getError(){
+        string getError() {
             return _error;
         }
 
-        void injectNative( const char *field, NativeFunction func ){
+        void injectNative( const char *field, NativeFunction func ) {
             smlock;
             string name = field;
             _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
@@ -1524,16 +1525,16 @@ namespace mongo {
             exec( code.str() );
         }
 
-        virtual void gc(){
+        virtual void gc() {
             smlock;
             JS_GC( _context );
         }
 
         JSContext *SavedContext() const { return _context; }
-        
+
     private:
 
-        void _postCreateHacks(){
+        void _postCreateHacks() {
 #ifdef XULRUNNER
             exec( "__x__ = new Date(1);" );
             globalSMEngine->_dateClass = _convertor->getClass( _global , "__x__" );
@@ -1541,7 +1542,7 @@ namespace mongo {
             globalSMEngine->_regexClass = _convertor->getClass( _global , "__x__" );
 #endif
         }
-        
+
         JSContext * _context;
         Convertor * _convertor;
 
@@ -1553,41 +1554,41 @@ namespace mongo {
 
         bool _externalSetup;
         bool _localConnect;
-        
+
         set<string> _initFieldNames;
-        
+
     };
 
     /* used to make the logging not overly chatty in the mongo shell. */
     extern bool isShell;
 
-    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
+    void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ) {
         stringstream ss;
-        if( !isShell ) 
+        if( !isShell )
             ss << "JS Error: ";
         ss << message;
 
-        if ( report && report->filename ){
+        if ( report && report->filename ) {
             ss << " " << report->filename << ":" << report->lineno;
         }
 
         tlog() << ss.str() << endl;
 
-        if ( currentScope.get() ){
+        if ( currentScope.get() ) {
             currentScope->gotError( ss.str() );
         }
     }
 
-    JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
+    JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
         Convertor c(cx);
 
         Scope * s = currentScope.get();
 
-        for ( uintN i=0; i<argc; i++ ){
+        for ( uintN i=0; i<argc; i++ ) {
             string filename = c.toString( argv[i] );
             //cout << "load [" << filename << "]" << endl;
 
-            if ( ! s->execFile( filename , false , true , false ) ){
+            if ( ! s->execFile( filename , false , true , false ) ) {
                 JS_ReportError( cx , ((string)"error loading js file: " + filename ).c_str() );
                 return JS_FALSE;
             }
@@ -1598,7 +1599,7 @@ namespace mongo {
 
 
 
-    void SMEngine::runTest(){
+    void SMEngine::runTest() {
         SMScope s;
 
         s.localConnect( "foo" );
@@ -1628,17 +1629,17 @@ namespace mongo {
 
     }
 
-    Scope * SMEngine::createScope(){
+    Scope * SMEngine::createScope() {
         return new SMScope();
     }
 
-    void Convertor::addRoot( JSFunction * f , const char * name ){
+    void Convertor::addRoot( JSFunction * f , const char * name ) {
         if ( ! f )
             return;
 
         SMScope * scope = currentScope.get();
         uassert( 10229 ,  "need a scope" , scope );
-        
+
         JSObject * o = JS_GetFunctionObject( f );
         assert( o );
         scope->addRoot( &o , name );

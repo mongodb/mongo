@@ -26,7 +26,7 @@ namespace mongo {
        To define a unit test, inherit from this and implement run. instantiate one object for the new class
        as a global.
 
-       These tests are ran on *every* startup of mongod, so they have to be very lightweight.  But it is a 
+       These tests are ran on *every* startup of mongod, so they have to be very lightweight.  But it is a
        good quick check for a bad build.
     */
     struct UnitTest {

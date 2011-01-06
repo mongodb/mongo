@@ -31,23 +31,23 @@ namespace mongo {
 
     class GeoBitSets {
     public:
-        GeoBitSets(){
-            for ( int i=0; i<32; i++ ){
+        GeoBitSets() {
+            for ( int i=0; i<32; i++ ) {
                 masks32[i] = ( 1 << ( 31 - i ) );
             }
-            for ( int i=0; i<64; i++ ){
+            for ( int i=0; i<64; i++ ) {
                 masks64[i] = ( 1LL << ( 63 - i ) );
             }
-            
-            for ( unsigned i=0; i<16; i++ ){
+
+            for ( unsigned i=0; i<16; i++ ) {
                 unsigned fixed = 0;
-                for ( int j=0; j<4; j++ ){
+                for ( int j=0; j<4; j++ ) {
                     if ( i & ( 1 << j ) )
                         fixed |= ( 1 << ( j * 2 ) );
                 }
                 hashedToNormal[fixed] = i;
             }
-            
+
         }
         int masks32[32];
         long long masks64[64];
@@ -56,24 +56,24 @@ namespace mongo {
     };
 
     extern GeoBitSets geoBitSets;
-    
+
     class GeoHash {
     public:
         GeoHash()
-            : _hash(0),_bits(0){
+            : _hash(0),_bits(0) {
         }
 
-        explicit GeoHash( const char * hash ){
+        explicit GeoHash( const char * hash ) {
             init( hash );
         }
 
-        explicit GeoHash( const string& hash ){
+        explicit GeoHash( const string& hash ) {
             init( hash );
         }
 
-        explicit GeoHash( const BSONElement& e , unsigned bits=32 ){
+        explicit GeoHash( const BSONElement& e , unsigned bits=32 ) {
             _bits = bits;
-            if ( e.type() == BinData ){
+            if ( e.type() == BinData ) {
                 int len = 0;
                 _copy( (char*)&_hash , e.binData( len ) );
                 assert( len == 8 );
@@ -85,26 +85,26 @@ namespace mongo {
             }
             _fix();
         }
-        
-        GeoHash( unsigned x , unsigned y , unsigned bits=32){
+
+        GeoHash( unsigned x , unsigned y , unsigned bits=32) {
             init( x , y , bits );
         }
 
-        GeoHash( const GeoHash& old ){
+        GeoHash( const GeoHash& old ) {
             _hash = old._hash;
             _bits = old._bits;
         }
 
         GeoHash( long long hash , unsigned bits )
-            : _hash( hash ) , _bits( bits ){
+            : _hash( hash ) , _bits( bits ) {
             _fix();
         }
 
-        void init( unsigned x , unsigned y , unsigned bits ){
+        void init( unsigned x , unsigned y , unsigned bits ) {
             assert( bits <= 32 );
             _hash = 0;
             _bits = bits;
-            for ( unsigned i=0; i<bits; i++ ){
+            for ( unsigned i=0; i<bits; i++ ) {
                 if ( isBitSet( x , i ) ) _hash |= geoBitSets.masks64[i*2];
                 if ( isBitSet( y , i ) ) _hash |= geoBitSets.masks64[(i*2)+1];
             }
@@ -114,7 +114,7 @@ namespace mongo {
             x = 0;
             y = 0;
             char * c = (char*)(&_hash);
-            for ( int i=0; i<8; i++ ){
+            for ( int i=0; i<8; i++ ) {
                 unsigned t = (unsigned)(c[i]) & 0x55;
                 y |= ( geoBitSets.hashedToNormal[t] << (4*(i)) );
 
@@ -126,7 +126,7 @@ namespace mongo {
         void unhash_slow( unsigned& x , unsigned& y ) const {
             x = 0;
             y = 0;
-            for ( unsigned i=0; i<_bits; i++ ){
+            for ( unsigned i=0; i<_bits; i++ ) {
                 if ( getBitX(i) )
                     x |= geoBitSets.masks32[i];
                 if ( getBitY(i) )
@@ -141,14 +141,14 @@ namespace mongo {
         /**
          * @param 0 = high
          */
-        static bool isBitSet( unsigned val , unsigned  bit ){
+        static bool isBitSet( unsigned val , unsigned  bit ) {
             return geoBitSets.masks32[bit] & val;
         }
-        
+
         GeoHash up() const {
             return GeoHash( _hash , _bits - 1 );
         }
-        
+
         bool hasPrefix( const GeoHash& other ) const {
             assert( other._bits <= _bits );
             if ( other._bits == 0 )
@@ -157,9 +157,9 @@ namespace mongo {
             x = x >> (64-(other._bits*2));
             return x == 0;
         }
-        
 
-        string toString() const { 
+
+        string toString() const {
             StringBuilder buf( _bits * 2 );
             for ( unsigned x=0; x<_bits*2; x++ )
                 buf.append( _hash & geoBitSets.masks64[x] ? "1" : "0" );
@@ -172,7 +172,7 @@ namespace mongo {
             return ss.str();
         }
 
-        void init( const string& s ){
+        void init( const string& s ) {
             _hash = 0;
             _bits = s.size() / 2;
             for ( unsigned pos=0; pos<s.size(); pos++ )
@@ -180,14 +180,14 @@ namespace mongo {
                     setBit( pos , 1 );
         }
 
-        void setBit( unsigned pos , bool one ){
+        void setBit( unsigned pos , bool one ) {
             assert( pos < _bits * 2 );
             if ( one )
                 _hash |= geoBitSets.masks64[pos];
             else if ( _hash & geoBitSets.masks64[pos] )
                 _hash &= ~geoBitSets.masks64[pos];
         }
-        
+
         bool getBit( unsigned pos ) const {
             return _hash & geoBitSets.masks64[pos];
         }
@@ -201,7 +201,7 @@ namespace mongo {
             assert( pos < 32 );
             return getBit( ( pos * 2 ) + 1 );
         }
-        
+
         BSONObj wrap() const {
             BSONObjBuilder b(20);
             append( b , "" );
@@ -213,20 +213,20 @@ namespace mongo {
         bool constrains() const {
             return _bits > 0;
         }
-        
-        void move( int x , int y ){
+
+        void move( int x , int y ) {
             assert( _bits );
             _move( 0 , x );
             _move( 1 , y );
         }
 
-        void _move( unsigned offset , int d ){
+        void _move( unsigned offset , int d ) {
             if ( d == 0 )
                 return;
             assert( d <= 1 && d>= -1 ); // TEMP
-            
+
             bool from, to;
-            if ( d > 0 ){
+            if ( d > 0 ) {
                 from = 0;
                 to = 1;
             }
@@ -238,34 +238,34 @@ namespace mongo {
             unsigned pos = ( _bits * 2 ) - 1;
             if ( offset == 0 )
                 pos--;
-            while ( true ){
-                if ( getBit(pos) == from ){
+            while ( true ) {
+                if ( getBit(pos) == from ) {
                     setBit( pos , to );
                     return;
                 }
 
-                if ( pos < 2 ){
+                if ( pos < 2 ) {
                     // overflow
-                    for ( ; pos < ( _bits * 2 ) ; pos += 2 ){
+                    for ( ; pos < ( _bits * 2 ) ; pos += 2 ) {
                         setBit( pos , from );
                     }
                     return;
                 }
-                
+
                 setBit( pos , from );
                 pos -= 2;
             }
-            
+
             assert(0);
         }
 
-        GeoHash& operator=(const GeoHash& h) { 
+        GeoHash& operator=(const GeoHash& h) {
             _hash = h._hash;
             _bits = h._bits;
             return *this;
         }
-        
-        bool operator==(const GeoHash& h ){
+
+        bool operator==(const GeoHash& h ) {
             return _hash == h._hash && _bits == h._bits;
         }
 
@@ -273,7 +273,7 @@ namespace mongo {
             unsigned pos = _bits * 2;
             _bits += strlen(s) / 2;
             assert( _bits <= 32 );
-            while ( s[0] ){
+            while ( s[0] ) {
                 if ( s[0] == '1' )
                     setBit( pos , 1 );
                 pos++;
@@ -288,19 +288,19 @@ namespace mongo {
             n+=s;
             return n;
         }
-      
-        void _fix(){
+
+        void _fix() {
             static long long FULL = 0xFFFFFFFFFFFFFFFFLL;
             long long mask = FULL << ( 64 - ( _bits * 2 ) );
             _hash &= mask;
         }
-        
+
         void append( BSONObjBuilder& b , const char * name ) const {
             char buf[8];
             _copy( buf , (char*)&_hash );
             b.appendBinData( name , 8 , bdtCustom , buf );
         }
-        
+
         long long getHash() const {
             return _hash;
         }
@@ -311,9 +311,9 @@ namespace mongo {
 
         GeoHash commonPrefix( const GeoHash& other ) const {
             unsigned i=0;
-            for ( ; i<_bits && i<other._bits; i++ ){
+            for ( ; i<_bits && i<other._bits; i++ ) {
                 if ( getBitX( i ) == other.getBitX( i ) &&
-                     getBitY( i ) == other.getBitY( i ) )
+                        getBitY( i ) == other.getBitY( i ) )
                     continue;
                 break;
             }
@@ -323,7 +323,7 @@ namespace mongo {
     private:
 
         void _copy( char * dst , const char * src ) const {
-            for ( unsigned a=0; a<8; a++ ){
+            for ( unsigned a=0; a<8; a++ ) {
                 dst[a] = src[7-a];
             }
         }
@@ -332,14 +332,14 @@ namespace mongo {
         unsigned _bits; // bits per field, so 1 to 32
     };
 
-    inline ostream& operator<<( ostream &s, const GeoHash &h ){
+    inline ostream& operator<<( ostream &s, const GeoHash &h ) {
         s << h.toString();
         return s;
-    } 
+    }
 
     class GeoConvert {
     public:
-        virtual ~GeoConvert(){}
+        virtual ~GeoConvert() {}
 
         virtual void unhash( const GeoHash& h , double& x , double& y ) const = 0;
         virtual GeoHash hash( double x , double y ) const = 0;
@@ -347,31 +347,31 @@ namespace mongo {
 
     class Point {
     public:
-        
-        Point( const GeoConvert * g , const GeoHash& hash ){
+
+        Point( const GeoConvert * g , const GeoHash& hash ) {
             g->unhash( hash , _x , _y );
         }
-        
-        explicit Point( const BSONElement& e ){
+
+        explicit Point( const BSONElement& e ) {
             BSONObjIterator i(e.Obj());
             _x = i.next().number();
             _y = i.next().number();
         }
 
-        explicit Point( const BSONObj& o ){
+        explicit Point( const BSONObj& o ) {
             BSONObjIterator i(o);
             _x = i.next().number();
             _y = i.next().number();
         }
 
         Point( double x , double y )
-            : _x( x ) , _y( y ){
-        }
-        
-        Point() : _x(0),_y(0){
+            : _x( x ) , _y( y ) {
         }
 
-        GeoHash hash( const GeoConvert * g ){
+        Point() : _x(0),_y(0) {
+        }
+
+        GeoHash hash( const GeoConvert * g ) {
             return g->hash( _x , _y );
         }
 
@@ -380,12 +380,12 @@ namespace mongo {
             double b = _y - p._y;
             return sqrt( ( a * a ) + ( b * b ) );
         }
-        
+
         string toString() const {
             StringBuilder buf(32);
             buf << "(" << _x << "," << _y << ")";
             return buf.str();
-  
+
         }
 
         double _x;
@@ -410,13 +410,13 @@ namespace mongo {
         double sin_y1(sin(p1._y)), cos_y1(cos(p1._y));
         double sin_x2(sin(p2._x)), cos_x2(cos(p2._x));
         double sin_y2(sin(p2._y)), cos_y2(cos(p2._y));
-        
-        double cross_prod = 
+
+        double cross_prod =
             (cos_y1*cos_x1 * cos_y2*cos_x2) +
             (cos_y1*sin_x1 * cos_y2*sin_x2) +
             (sin_y1        * sin_y2);
-        
-        if (cross_prod >= 1 || cross_prod <= -1){
+
+        if (cross_prod >= 1 || cross_prod <= -1) {
             // fun with floats
             assert( fabs(cross_prod)-1 < 1e-6 );
             return cross_prod > 0 ? 0 : M_PI;
@@ -428,8 +428,8 @@ namespace mongo {
     // note: return is still in radians as that can be multiplied by radius to get arc length
     inline double spheredist_deg( const Point& p1, const Point& p2 ) {
         return spheredist_rad(
-                    Point( deg2rad(p1._x), deg2rad(p1._y) ),
-                    Point( deg2rad(p2._x), deg2rad(p2._y) )
+                   Point( deg2rad(p1._x), deg2rad(p1._y) ),
+                   Point( deg2rad(p2._x), deg2rad(p2._y) )
                );
     }
 

@@ -33,7 +33,7 @@ namespace mongo {
         int nPrev;
         bool valid;
         bool disabled;
-        void writeback( OID& oid ){
+        void writeback( OID& oid ) {
             reset( true );
             writebackId = oid;
         }
@@ -42,13 +42,13 @@ namespace mongo {
             code = _code;
             msg = _msg;
         }
-        void recordUpdate( bool _updateObjects , long long _nObjects , OID _upsertedId ){
+        void recordUpdate( bool _updateObjects , long long _nObjects , OID _upsertedId ) {
             reset( true );
             nObjects = _nObjects;
             updatedExisting = _updateObjects ? True : False;
             if ( _upsertedId.isSet() )
                 upsertedId = _upsertedId;
-                
+
         }
         void recordDelete( long long nDeleted ) {
             reset( true );
@@ -75,17 +75,18 @@ namespace mongo {
         bool appendSelf( BSONObjBuilder &b , bool blankErr = true );
 
         struct Disabled : boost::noncopyable {
-            Disabled( LastError * le ){
+            Disabled( LastError * le ) {
                 _le = le;
-                if ( _le ){
+                if ( _le ) {
                     _prev = _le->disabled;
                     _le->disabled = true;
-                } else {
+                }
+                else {
                     _prev = false;
                 }
             }
-            
-            ~Disabled(){
+
+            ~Disabled() {
                 if ( _le )
                     _le->disabled = _prev;
             }
@@ -93,7 +94,7 @@ namespace mongo {
             LastError * _le;
             bool _prev;
         };
-        
+
         static LastError noError;
     };
 
@@ -103,9 +104,9 @@ namespace mongo {
         ~LastErrorHolder();
 
         LastError * get( bool create = false );
-        LastError * getSafe(){
+        LastError * getSafe() {
             LastError * le = get(false);
-            if ( ! le ){
+            if ( ! le ) {
                 log( LL_ERROR ) << " no LastError!  id: " << getID() << endl;
                 assert( le );
             }
@@ -127,11 +128,11 @@ namespace mongo {
 
         void remove( int id );
         void release();
-        
+
         /** when db receives a message/request, call this */
         void startRequest( Message& m , LastError * connectionOwned );
         LastError * startRequest( Message& m , int clientId );
-        
+
         void disconnect( int clientId );
 
         // used to disable lastError reporting while processing a killCursors message
@@ -140,7 +141,7 @@ namespace mongo {
     private:
         ThreadLocalValue<int> _id;
         boost::thread_specific_ptr<LastError> _tl;
-        
+
         struct Status {
             time_t time;
             LastError *lerr;
@@ -148,7 +149,7 @@ namespace mongo {
         typedef map<int,Status> IDMap;
 
         static mongo::mutex _idsmutex;
-        IDMap _ids;    
+        IDMap _ids;
     } lastError;
 
     void raiseError(int code , const char *msg);

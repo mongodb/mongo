@@ -68,8 +68,8 @@ namespace mongo {
         bool busyWithElectSelf;
         int _primary;
 
-        /** @param two - if true two primaries were seen.  this can happen transiently, in addition to our 
-                         polling being only occasional.  in this case null is returned, but the caller should 
+        /** @param two - if true two primaries were seen.  this can happen transiently, in addition to our
+                         polling being only occasional.  in this case null is returned, but the caller should
                          not assume primary itself in that situation.
         */
         const Member* findOtherPrimary(bool& two);
@@ -87,7 +87,7 @@ namespace mongo {
 
     class Consensus {
         ReplSetImpl &rs;
-        struct LastYea { 
+        struct LastYea {
             LastYea() : when(0), who(0xffffffff) { }
             time_t when;
             unsigned who;
@@ -99,12 +99,12 @@ namespace mongo {
         bool weAreFreshest(bool& allUp, int& nTies);
         bool sleptLast; // slept last elect() pass
     public:
-        Consensus(ReplSetImpl *t) : rs(*t) { 
+        Consensus(ReplSetImpl *t) : rs(*t) {
             sleptLast = false;
             steppedDown = 0;
         }
 
-        /* if we've stepped down, this is when we are allowed to try to elect ourself again. 
+        /* if we've stepped down, this is when we are allowed to try to elect ourself again.
            todo: handle possible weirdnesses at clock skews etc.
         */
         time_t steppedDown;
@@ -118,7 +118,7 @@ namespace mongo {
     };
 
     /** most operations on a ReplSet object should be done while locked. that logic implemented here. */
-    class RSBase : boost::noncopyable { 
+    class RSBase : boost::noncopyable {
     public:
         const unsigned magic;
         void assertValid() { assert( magic == 0x12345677 ); }
@@ -128,30 +128,30 @@ namespace mongo {
         ThreadLocalValue<bool> _lockedByMe;
     protected:
         RSBase() : magic(0x12345677), m("RSBase"), _locked(0) { }
-        ~RSBase() { 
+        ~RSBase() {
             /* this can happen if we throw in the constructor; otherwise never happens.  thus we log it as it is quite unusual. */
             log() << "replSet ~RSBase called" << rsLog;
         }
 
-        class lock { 
+        class lock {
             RSBase& rsbase;
             auto_ptr<scoped_lock> sl;
         public:
-            lock(RSBase* b) : rsbase(*b) { 
+            lock(RSBase* b) : rsbase(*b) {
                 if( rsbase._lockedByMe.get() )
                     return; // recursive is ok...
 
                 sl.reset( new scoped_lock(rsbase.m) );
                 DEV assert(rsbase._locked == 0);
-                rsbase._locked++; 
+                rsbase._locked++;
                 rsbase._lockedByMe.set(true);
             }
-            ~lock() { 
+            ~lock() {
                 if( sl.get() ) {
                     assert( rsbase._lockedByMe.get() );
                     DEV assert(rsbase._locked == 1);
                     rsbase._lockedByMe.set(false);
-                    rsbase._locked--; 
+                    rsbase._locked--;
                 }
             }
         };
@@ -160,11 +160,11 @@ namespace mongo {
         /* for asserts */
         bool locked() const { return _locked != 0; }
 
-        /* if true, is locked, and was locked by this thread. note if false, it could be in the lock or not for another 
+        /* if true, is locked, and was locked by this thread. note if false, it could be in the lock or not for another
            just for asserts & such so we can make the contracts clear on who locks what when.
            we don't use these locks that frequently, so the little bit of overhead is fine.
         */
-        bool lockedByMe() { return _lockedByMe.get(); } 
+        bool lockedByMe() { return _lockedByMe.get(); }
     };
 
     class ReplSetHealthPollTask;
@@ -177,19 +177,19 @@ namespace mongo {
             MemberState state;
             const Member *primary;
         };
-        const SP get() { 
+        const SP get() {
             scoped_lock lk(m);
             return sp;
         }
         MemberState getState() const { return sp.state; }
         const Member* getPrimary() const { return sp.primary; }
-        void change(MemberState s, const Member *self) { 
+        void change(MemberState s, const Member *self) {
             scoped_lock lk(m);
-            if( sp.state != s ) { 
+            if( sp.state != s ) {
                 log() << "replSet " << s.toString() << rsLog;
             }
             sp.state = s;
-            if( s.primary() ) { 
+            if( s.primary() ) {
                 sp.primary = self;
             }
             else {
@@ -197,17 +197,17 @@ namespace mongo {
                     sp.primary = 0;
             }
         }
-        void set(MemberState s, const Member *p) { 
+        void set(MemberState s, const Member *p) {
             scoped_lock lk(m);
             sp.state = s; sp.primary = p;
         }
         void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
-        void setOtherPrimary(const Member *mem) { 
+        void setOtherPrimary(const Member *mem) {
             scoped_lock lk(m);
             assert( !sp.state.primary() );
             sp.primary = mem;
         }
-        void noteRemoteIsPrimary(const Member *remote) { 
+        void noteRemoteIsPrimary(const Member *remote) {
             scoped_lock lk(m);
             if( !sp.state.secondary() && !sp.state.fatal() )
                 sp.state = MemberState::RS_RECOVERING;
@@ -218,7 +218,7 @@ namespace mongo {
         mongo::mutex m;
         SP sp;
     };
-    
+
     void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
 
     /** Parameter given to the --replSet command line option (parsed).
@@ -233,15 +233,15 @@ namespace mongo {
     };
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
-    /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
+    /* note: We currently do not free mem when the set goes away - it is assumed the replset is a
              singleton and long lived.
     */
     class ReplSetImpl : protected RSBase {
     public:
         /** info on our state if the replset isn't yet "up".  for example, if we are pre-initiation. */
-        enum StartupStatus { 
-            PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, 
-            EMPTYUNREACHABLE=4, STARTED=5, SOON=6 
+        enum StartupStatus {
+            PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3,
+            EMPTYUNREACHABLE=4, STARTED=5, SOON=6
         };
         static StartupStatus startupStatus;
         static string startupStatusMsg;
@@ -273,11 +273,11 @@ namespace mongo {
         void _changeArbiterState();
     protected:
         // "heartbeat message"
-        // sent in requestHeartbeat respond in field "hbm" 
+        // sent in requestHeartbeat respond in field "hbm"
         char _hbmsg[256]; // we change this unlocked, thus not an stl::string
         time_t _hbmsgTime; // when it was logged
     public:
-        void sethbmsg(string s, int logLevel = 0); 
+        void sethbmsg(string s, int logLevel = 0);
     protected:
         bool initFromConfig(ReplSetConfig& c, bool reconf=false); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);
@@ -287,7 +287,7 @@ namespace mongo {
         MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
-        void _summarizeAsHtml(stringstream&) const;        
+        void _summarizeAsHtml(stringstream&) const;
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
         /* throws exception if a problem initializing. */
@@ -301,7 +301,7 @@ namespace mongo {
         const vector<HostAndPort> *_seeds;
         ReplSetConfig *_cfg;
 
-        /** load our configuration from admin.replset.  try seed machines too. 
+        /** load our configuration from admin.replset.  try seed machines too.
             @return true if ok; throws if config really bad; false if config doesn't include self
         */
         bool _loadConfigFinish(vector<ReplSetConfig>& v);
@@ -312,10 +312,10 @@ namespace mongo {
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
     protected:
-        Member *_self;     
+        Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
         void setSelfTo(Member *); // use this as it sets buildIndexes var
-   private:
+    private:
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
@@ -354,7 +354,7 @@ namespace mongo {
         void syncThread();
     };
 
-    class ReplSet : public ReplSetImpl { 
+    class ReplSet : public ReplSetImpl {
     public:
         ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {  }
 
@@ -364,7 +364,7 @@ namespace mongo {
         // for the replSetFreeze command
         bool freeze(int secs) { return _freeze(secs); }
 
-        string selfFullName() { 
+        string selfFullName() {
             lock lk(this);
             return _self->fullName();
         }
@@ -385,7 +385,7 @@ namespace mongo {
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
 
-        /* we have a new config (reconfig) - apply it. 
+        /* we have a new config (reconfig) - apply it.
            @param comment write a no-op comment to the oplog about it.  only makes sense if one is primary and initiating the reconf.
         */
         void haveNewConfig(ReplSetConfig& c, bool comment);
@@ -396,16 +396,16 @@ namespace mongo {
         bool lockedByMe() { return RSBase::lockedByMe(); }
 
         // heartbeat msg to send to others; descriptive diagnostic info
-        string hbmsg() const { 
+        string hbmsg() const {
             if( time(0)-_hbmsgTime > 120 ) return "";
-            return _hbmsg; 
+            return _hbmsg;
         }
     };
 
-    /** base class for repl set commands.  checks basic things such as in rs mode before the command 
+    /** base class for repl set commands.  checks basic things such as in rs mode before the command
         does its real work
         */
-    class ReplSetCommand : public Command { 
+    class ReplSetCommand : public Command {
     protected:
         ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
         virtual bool slaveOk() const { return true; }
@@ -414,14 +414,14 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help << "internal"; }
         bool check(string& errmsg, BSONObjBuilder& result) {
-            if( !replSet ) { 
+            if( !replSet ) {
                 errmsg = "not running with --replSet";
                 return false;
             }
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg;
-                if( ReplSet::startupStatus == 3 ) 
+                if( ReplSet::startupStatus == 3 )
                     result.append("info", "run rs.initiate(...) if not yet done for the set");
                 return false;
             }
@@ -431,9 +431,8 @@ namespace mongo {
 
     /** inlines ----------------- */
 
-    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) : 
-        _config(*c), _h(h), _hbinfo(ord) 
-    { 
+    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
+        _config(*c), _h(h), _hbinfo(ord) {
         if( self )
             _hbinfo.health = 1.0;
     }

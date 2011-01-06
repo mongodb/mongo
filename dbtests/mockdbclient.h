@@ -64,8 +64,8 @@ public:
         virtual void afterCommand() {}
     };
     DirectDBClientConnection( ReplPair *rp, ConnectionCallback *cc = 0 ) :
-            rp_( rp ),
-            cc_( cc ) {
+        rp_( rp ),
+        cc_( cc ) {
     }
     virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
         BSONObj c = query.obj.copy();

@@ -39,27 +39,26 @@ namespace mongo {
     }
 
     boost::thread_specific_ptr<string> _threadName;
-    
-    unsigned _setThreadName( const char * name ){
+
+    unsigned _setThreadName( const char * name ) {
         static unsigned N = 0;
 
-        if ( strcmp( name , "conn" ) == 0 ){
+        if ( strcmp( name , "conn" ) == 0 ) {
             unsigned n = ++N;
             stringstream ss;
             ss << name << n;
             _threadName.reset( new string( ss.str() ) );
             return n;
         }
-        
-        _threadName.reset( new string(name) );        
+
+        _threadName.reset( new string(name) );
         return 0;
     }
 
 #if defined(_WIN32)
 #define MS_VC_EXCEPTION 0x406D1388
 #pragma pack(push,8)
-    typedef struct tagTHREADNAME_INFO
-    {
+    typedef struct tagTHREADNAME_INFO {
         DWORD dwType; // Must be 0x1000.
         LPCSTR szName; // Pointer to name (in user addr space).
         DWORD dwThreadID; // Thread ID (-1=caller thread).
@@ -67,7 +66,7 @@ namespace mongo {
     } THREADNAME_INFO;
 #pragma pack(pop)
 
-    void setWinThreadName(const char *name) { 
+    void setWinThreadName(const char *name) {
         /* is the sleep here necessary???
            Sleep(10);
            */
@@ -76,17 +75,14 @@ namespace mongo {
         info.szName = name;
         info.dwThreadID = -1;
         info.dwFlags = 0;
-        __try
-        {
+        __try {
             RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
         }
-        __except(EXCEPTION_EXECUTE_HANDLER)
-        {
+        __except(EXCEPTION_EXECUTE_HANDLER) {
         }
     }
 
-    unsigned setThreadName(const char *name)
-    {
+    unsigned setThreadName(const char *name) {
         unsigned n = _setThreadName( name );
 #if !defined(_DEBUG)
         // naming might be expensive so don't do "conn*" over and over
@@ -99,13 +95,13 @@ namespace mongo {
 
 #else
 
-    unsigned setThreadName(const char * name ) { 
+    unsigned setThreadName(const char * name ) {
         return _setThreadName( name );
     }
 
 #endif
 
-    string getThreadName(){
+    string getThreadName() {
         string * s = _threadName.get();
         if ( s )
             return *s;
@@ -122,7 +118,7 @@ namespace mongo {
     int tlogLevel = 0;
     mongo::mutex Logstream::mutex("Logstream");
     int Logstream::doneSetup = Logstream::magicNumber();
-    
+
     bool isPrime(int n) {
         int z = 2;
         while ( 1 ) {
@@ -171,9 +167,9 @@ namespace mongo {
 
         }
     } utilTest;
-    
+
     OpTime OpTime::last(0, 0);
-    
+
     /* this is a good place to set a breakpoint when debugging, as lots of warning things
        (assert, wassert) call it.
     */
@@ -201,11 +197,11 @@ namespace mongo {
         Logstream::logLockless("\n");
     }
 
-    ostream& operator<<( ostream &s, const ThreadSafeString &o ){
+    ostream& operator<<( ostream &s, const ThreadSafeString &o ) {
         s << o.toString();
         return s;
     }
 
     bool StaticObserver::_destroyingStatics = false;
-    
+
 } // namespace mongo

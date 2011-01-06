@@ -24,45 +24,44 @@ namespace mongo {
         public:
             Alphabet()
                 : encode((unsigned char*)
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                    "abcdefghijklmnopqrstuvwxyz"
-                    "0123456789"
-                    "+/")
-                , decode(new unsigned char[257])
-            {
+                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                         "abcdefghijklmnopqrstuvwxyz"
+                         "0123456789"
+                         "+/")
+                , decode(new unsigned char[257]) {
                 memset( decode.get() , 0 , 256 );
-                for ( int i=0; i<64; i++ ){
+                for ( int i=0; i<64; i++ ) {
                     decode[ encode[i] ] = i;
                 }
 
                 test();
             }
-            void test(){
+            void test() {
                 assert( strlen( (char*)encode ) == 64 );
                 for ( int i=0; i<26; i++ )
                     assert( encode[i] == toupper( encode[i+26] ) );
             }
 
-            char e( int x ){
+            char e( int x ) {
                 return encode[x&0x3f];
             }
-            
+
         private:
             const unsigned char * encode;
         public:
             boost::scoped_array<unsigned char> decode;
         };
-        
+
         extern Alphabet alphabet;
 
 
         void encode( stringstream& ss , const char * data , int size );
         string encode( const char * data , int size );
         string encode( const string& s );
-        
+
         void decode( stringstream& ss , const string& s );
         string decode( const string& s );
-        
+
 
         void testAlphabet();
     }

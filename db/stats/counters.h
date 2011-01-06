@@ -31,22 +31,22 @@ namespace mongo {
      */
     class OpCounters {
     public:
-        
+
         OpCounters();
 
-        AtomicUInt * getInsert(){ return _insert; }
-        AtomicUInt * getQuery(){ return _query; }
-        AtomicUInt * getUpdate(){ return _update; }
-        AtomicUInt * getDelete(){ return _delete; }
-        AtomicUInt * getGetMore(){ return _getmore; }
-        AtomicUInt * getCommand(){ return _command; }
-        
-        void gotInsert(){ _insert[0]++; }
-        void gotQuery(){ _query[0]++; }
-        void gotUpdate(){ _update[0]++; }
-        void gotDelete(){ _delete[0]++; }
-        void gotGetMore(){ _getmore[0]++; }
-        void gotCommand(){ _command[0]++; }
+        AtomicUInt * getInsert() { return _insert; }
+        AtomicUInt * getQuery() { return _query; }
+        AtomicUInt * getUpdate() { return _update; }
+        AtomicUInt * getDelete() { return _delete; }
+        AtomicUInt * getGetMore() { return _getmore; }
+        AtomicUInt * getCommand() { return _command; }
+
+        void gotInsert() { _insert[0]++; }
+        void gotQuery() { _query[0]++; }
+        void gotUpdate() { _update[0]++; }
+        void gotDelete() { _delete[0]++; }
+        void gotGetMore() { _getmore[0]++; }
+        void gotCommand() { _command[0]++; }
 
         void gotOp( int op , bool isCommand );
 
@@ -61,7 +61,7 @@ namespace mongo {
         AtomicUInt * _getmore;
         AtomicUInt * _command;
     };
-    
+
     extern OpCounters globalOpCounters;
     extern OpCounters replOpCounters;
 
@@ -69,8 +69,8 @@ namespace mongo {
     class IndexCounters {
     public:
         IndexCounters();
-        
-        void btree( char * node ){
+
+        void btree( char * node ) {
             if ( ! _memSupported )
                 return;
             if ( _sampling++ % _samplingrate )
@@ -78,28 +78,28 @@ namespace mongo {
             btree( _pi.blockInMemory( node ) );
         }
 
-        void btree( bool memHit ){
+        void btree( bool memHit ) {
             if ( memHit )
                 _btreeMemHits++;
             else
                 _btreeMemMisses++;
             _btreeAccesses++;
         }
-        void btreeHit(){ _btreeMemHits++; _btreeAccesses++; }
-        void btreeMiss(){ _btreeMemMisses++; _btreeAccesses++; }
-        
+        void btreeHit() { _btreeMemHits++; _btreeAccesses++; }
+        void btreeMiss() { _btreeMemMisses++; _btreeAccesses++; }
+
         void append( BSONObjBuilder& b );
-        
+
     private:
         ProcessInfo _pi;
         bool _memSupported;
 
         int _sampling;
         int _samplingrate;
-        
+
         int _resets;
         long long _maxAllowed;
-        
+
         long long _btreeMemMisses;
         long long _btreeMemHits;
         long long _btreeAccesses;
@@ -112,7 +112,7 @@ namespace mongo {
         FlushCounters();
 
         void flushed(int ms);
-        
+
         void append( BSONObjBuilder& b );
 
     private:
@@ -137,7 +137,7 @@ namespace mongo {
 
     class NetworkCounter {
     public:
-        NetworkCounter() : _bytesIn(0), _bytesOut(0), _requests(0), _overflows(0){}
+        NetworkCounter() : _bytesIn(0), _bytesOut(0), _requests(0), _overflows(0) {}
         void hit( long long bytesIn , long long bytesOut );
         void append( BSONObjBuilder& b );
     private:
@@ -149,6 +149,6 @@ namespace mongo {
 
         SpinLock _lock;
     };
-    
+
     extern NetworkCounter networkCounter;
 }

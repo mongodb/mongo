@@ -30,15 +30,15 @@ namespace mongo {
 
         const unsigned Alignment = 8192;
 
-        /** DurOp - Operations we journal that aren't just basic writes.  
+        /** DurOp - Operations we journal that aren't just basic writes.
          *
          *  Basic writes are logged as JEntry's, and indicated in ram temporarily as struct dur::WriteIntent.
-         *  We don't make WriteIntent inherit from DurOp to keep it as lean as possible as there will be millions of 
+         *  We don't make WriteIntent inherit from DurOp to keep it as lean as possible as there will be millions of
          *  them (we don't want a vtable for example there).
-         * 
+         *
          *  For each op we want to journal, we define a subclass.
          */
-        class DurOp /* copyable */ { 
+        class DurOp { /* copyable */
         public:
             // @param opcode a sentinel value near max unsigned which uniquely identifies the operation.
             // @see dur::JEntry
@@ -54,7 +54,7 @@ namespace mongo {
             */
             static shared_ptr<DurOp> read(unsigned opcode, BufReader& br);
 
-            /** replay the operation (during recovery) 
+            /** replay the operation (during recovery)
                 throws
 
                 For now, these are not replayed during the normal WRITETODATAFILES phase, since these
@@ -76,7 +76,7 @@ namespace mongo {
         };
 
         /** indicates creation of a new file */
-        class FileCreatedOp : public DurOp { 
+        class FileCreatedOp : public DurOp {
         public:
             FileCreatedOp(BufReader& log);
             /** param f filename to create with path */
@@ -92,11 +92,11 @@ namespace mongo {
         };
 
         /** record drop of a database */
-        class DropDbOp : public DurOp { 
+        class DropDbOp : public DurOp {
         public:
             DropDbOp(BufReader& log);
-            DropDbOp(string db) : 
-              DurOp(JEntry::OpCode_DropDb), _db(db) { }
+            DropDbOp(string db) :
+                DurOp(JEntry::OpCode_DropDb), _db(db) { }
             virtual void replay();
             virtual string toString() { return string("DropDbOp ") + _db; }
             virtual bool needFilesClosed() { return true; }

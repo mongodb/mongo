@@ -21,7 +21,7 @@
 #include "../client/dbclient.h"
 
 namespace mongo {
-    
+
     class Chunk;
 
     /* A ShardKeyPattern is a pattern indicating what data to extract from the object to make the shard key from.
@@ -30,10 +30,10 @@ namespace mongo {
     class ShardKeyPattern {
     public:
         ShardKeyPattern( BSONObj p = BSONObj() );
-        
+
         /**
            global min is the lowest possible value for this key
-		   e.g. { num : MinKey }
+           e.g. { num : MinKey }
          */
         BSONObj globalMin() const { return gMin; }
 
@@ -42,15 +42,15 @@ namespace mongo {
          */
         BSONObj globalMax() const { return gMax; }
 
-        bool isGlobalMin( const BSONObj& k ) const{
+        bool isGlobalMin( const BSONObj& k ) const {
             return k.woCompare( globalMin() ) == 0;
         }
 
-        bool isGlobalMax( const BSONObj& k ) const{
+        bool isGlobalMax( const BSONObj& k ) const {
             return k.woCompare( globalMax() ) == 0;
         }
-        
-        bool isGlobal( const BSONObj& k ) const{
+
+        bool isGlobal( const BSONObj& k ) const {
             return isGlobalMin( k ) || isGlobalMax( k );
         }
 
@@ -60,20 +60,20 @@ namespace mongo {
            l > r positive
          */
         int compare( const BSONObj& l , const BSONObj& r ) const;
-        
+
         /**
            @return whether or not obj has all fields in this shard key pattern
-		   e.g. 
-		     ShardKey({num:1}).hasShardKey({ name:"joe", num:3 }) is true
+           e.g.
+             ShardKey({num:1}).hasShardKey({ name:"joe", num:3 }) is true
          */
         bool hasShardKey( const BSONObj& obj ) const;
-        
+
         BSONObj key() const { return pattern; }
 
         string toString() const;
 
         BSONObj extractKey(const BSONObj& from) const;
-        
+
         bool partOfShardKey(const char* key ) const {
             return pattern.hasField(key);
         }
@@ -91,7 +91,7 @@ namespace mongo {
          * @return BSONObj with _id and shardkey at front. May return original object.
          */
         BSONObj moveToFront(const BSONObj& obj) const;
-        
+
     private:
         BSONObj pattern;
         BSONObj gMin;
@@ -101,10 +101,10 @@ namespace mongo {
         set<string> patternfields;
     };
 
-    inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const { 
+    inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {
         BSONObj k = from.extractFields(pattern);
         uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < 512);
         return k;
     }
 
-} 
+}

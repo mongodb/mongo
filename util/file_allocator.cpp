@@ -36,20 +36,20 @@ using namespace mongoutils;
 namespace mongo {
 
 #if defined(_WIN32)
-    FileAllocator::FileAllocator(){
+    FileAllocator::FileAllocator() {
     }
-    
-    void FileAllocator::start(){
+
+    void FileAllocator::start() {
     }
 
     void FileAllocator::requestAllocation( const string &name, long &size ) {
-        /* Some of the system calls in the file allocator don't work in win, 
-           so no win support - 32 or 64 bit.  Plus we don't seem to need preallocation 
+        /* Some of the system calls in the file allocator don't work in win,
+           so no win support - 32 or 64 bit.  Plus we don't seem to need preallocation
            on windows anyway as we don't have to pre-zero the file there.
         */
     }
 
-    void FileAllocator::allocateAsap( const string &name, unsigned long long &size ){
+    void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
         // no-op
     }
 
@@ -63,16 +63,16 @@ namespace mongo {
     }
 
 #else
-    
-    FileAllocator::FileAllocator() 
+
+    FileAllocator::FileAllocator()
         : _pendingMutex("FileAllocator"), _failed() {
     }
-    
+
 
     void FileAllocator::start() {
         boost::thread t( boost::bind( &FileAllocator::run , this ) );
     }
-    
+
     void FileAllocator::requestAllocation( const string &name, long &size ) {
         scoped_lock lk( _pendingMutex );
         if ( _failed )
@@ -86,7 +86,7 @@ namespace mongo {
         _pendingSize[ name ] = size;
         _pendingUpdated.notify_all();
     }
-    
+
     void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
         scoped_lock lk( _pendingMutex );
         long oldSize = prevSize( name );
@@ -110,9 +110,9 @@ namespace mongo {
             checkFailure();
             _pendingUpdated.wait( lk.boost() );
         }
-        
+
     }
-    
+
     void FileAllocator::waitUntilFinished() const {
         if ( _failed )
             return;
@@ -120,16 +120,16 @@ namespace mongo {
         while( _pending.size() != 0 )
             _pendingUpdated.wait( lk.boost() );
     }
-    
+
     void FileAllocator::ensureLength(int fd , long size) {
-#if defined(__linux__) 
+#if defined(__linux__)
         int ret = posix_fallocate(fd,0,size);
         if ( ret == 0 )
             return;
-        
+
         log() << "FileAllocator: posix_fallocate failed: " << errnoWithDescription( ret ) << " falling back" << endl;
 #endif
-        
+
         off_t filelen = lseek(fd, 0, SEEK_END);
         if ( filelen < size ) {
             if (filelen != 0) {
@@ -138,13 +138,13 @@ namespace mongo {
                 uassert( 10440 ,  ss.str(), filelen == 0 );
             }
             // Check for end of disk.
-			
+
             uassert( 10441 ,  str::stream() << "Unable to allocate new file of size " << size << ' ' << errnoWithDescription(),
                      size - 1 == lseek(fd, size - 1, SEEK_SET) );
             uassert( 10442 ,  str::stream() << "Unable to allocate new file of size " << size << ' ' << errnoWithDescription(),
                      1 == write(fd, "", 1) );
             lseek(fd, 0, SEEK_SET);
-            
+
             const long z = 256 * 1024;
             const boost::scoped_array<char> buf_holder (new char[z]);
             char* buf = buf_holder.get();
@@ -154,21 +154,21 @@ namespace mongo {
                 long towrite = left;
                 if ( towrite > z )
                     towrite = z;
-                
+
                 int written = write( fd , buf , towrite );
                 uassert( 10443 , errnoWithPrefix("FileAllocator: file write failed" ), written > 0 );
                 left -= written;
             }
         }
     }
-    
+
     void FileAllocator::checkFailure() {
         if (_failed) {
             // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack tracke
             msgassertedNoTrace( 12520, "new file allocation failure" );
         }
     }
-    
+
     long FileAllocator::prevSize( const string &name ) const {
         if ( _pendingSize.count( name ) > 0 )
             return _pendingSize[ name ];
@@ -176,7 +176,7 @@ namespace mongo {
             return boost::filesystem::file_size( name );
         return -1;
     }
-         
+
     // caller must hold _pendingMutex lock.
     bool FileAllocator::inProgress( const string &name ) const {
         for( list< string >::const_iterator i = _pending.begin(); i != _pending.end(); ++i )
@@ -185,7 +185,7 @@ namespace mongo {
         return false;
     }
 
-    void FileAllocator::run( FileAllocator * fa ){
+    void FileAllocator::run( FileAllocator * fa ) {
         setThreadName( "FileAllocator" );
         while( 1 ) {
             {
@@ -213,29 +213,31 @@ namespace mongo {
                     }
 
 #if defined(POSIX_FADV_DONTNEED)
-                    if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) { 
+                    if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) {
                         log() << "warning: posix_fadvise fails " << name << ' ' << errnoWithDescription() << endl;
                     }
 #endif
-                            
+
                     Timer t;
-                            
+
                     /* make sure the file is the full desired length */
                     ensureLength( fd , size );
 
-                    log() << "done allocating datafile " << name << ", " 
+                    log() << "done allocating datafile " << name << ", "
                           << "size: " << size/1024/1024 << "MB, "
-                          << " took " << ((double)t.millis())/1000.0 << " secs" 
+                          << " took " << ((double)t.millis())/1000.0 << " secs"
                           << endl;
 
                     close( fd );
-                            
-                } catch ( ... ) {
+
+                }
+                catch ( ... ) {
                     log() << "error failed to allocate new file: " << name
                           << " size: " << size << ' ' << errnoWithDescription() << endl;
                     try {
                         BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
-                    } catch ( ... ) {
+                    }
+                    catch ( ... ) {
                     }
                     scoped_lock lk( fa->_pendingMutex );
                     fa->_failed = true;
@@ -243,7 +245,7 @@ namespace mongo {
                     fa->_pendingUpdated.notify_all();
                     return; // no more allocation
                 }
-                        
+
                 {
                     scoped_lock lk( fa->_pendingMutex );
                     fa->_pendingSize.erase( name );
@@ -253,11 +255,11 @@ namespace mongo {
             }
         }
     }
-    
-#endif    
-    
+
+#endif
+
     // The mutex contained in this object may be held on shutdown.
     FileAllocator &theFileAllocator_ = *(new FileAllocator());
     FileAllocator &theFileAllocator() { return theFileAllocator_; }
-    
+
 } // namespace mongo

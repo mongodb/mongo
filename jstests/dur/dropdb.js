@@ -117,7 +117,7 @@ sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
-assert(ls(path2 + "/journal") == null);
+assert.eq( [], listFiles(path2 + "/journal") );
 
 log("check data matches ns");
 var diff = runDiff(path1 + "/test.ns", path2 + "/test.ns");

@@ -26,26 +26,26 @@ namespace {
 
     using mongo::SpinLock;
 
-    class LockTester{
+    class LockTester {
     public:
         LockTester( SpinLock* spin, int* counter )
-            : _spin(spin), _counter(counter), _requests(0){}
+            : _spin(spin), _counter(counter), _requests(0) {}
 
-        ~LockTester(){
+        ~LockTester() {
             delete _t;
         }
 
-        void start( int increments ){
-            _t = new boost::thread( boost::bind(&LockTester::test, this, increments) ); 
+        void start( int increments ) {
+            _t = new boost::thread( boost::bind(&LockTester::test, this, increments) );
         }
 
-        void join(){
+        void join() {
             if ( _t ) _t->join();
         }
 
-        int requests() const{ 
-            return _requests; 
-        } 
+        int requests() const {
+            return _requests;
+        }
 
     private:
         SpinLock*      _spin;     // not owned here
@@ -53,7 +53,7 @@ namespace {
         int            _requests;
         boost::thread* _t;
 
-        void test( int increments ){
+        void test( int increments ) {
             while ( increments-- > 0 ) {
                 _spin->lock();
                 ++(*_counter);
@@ -61,14 +61,14 @@ namespace {
                 _spin->unlock();
             }
         }
-        
+
         LockTester( LockTester& );
         LockTester& operator=( LockTester& );
     };
 
-    class ConcurrentIncs{
+    class ConcurrentIncs {
     public:
-        void run(){
+        void run() {
 
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
 
@@ -77,37 +77,37 @@ namespace {
 
             const int threads = 64;
             const int incs = 10000;
-            LockTester* testers[threads];  
+            LockTester* testers[threads];
 
-          for ( int i = 0; i < threads; i++ ){
-              testers[i] = new LockTester( &spin, &counter );
-          }
-          for ( int i = 0; i < threads; i++ ){
-              testers[i]->start( incs );
-          }
-          for ( int i = 0; i < threads; i++ ){
-              testers[i]->join();
-              ASSERT_EQUALS( testers[i]->requests(), incs );
-              delete testers[i];
-          }
+            for ( int i = 0; i < threads; i++ ) {
+                testers[i] = new LockTester( &spin, &counter );
+            }
+            for ( int i = 0; i < threads; i++ ) {
+                testers[i]->start( incs );
+            }
+            for ( int i = 0; i < threads; i++ ) {
+                testers[i]->join();
+                ASSERT_EQUALS( testers[i]->requests(), incs );
+                delete testers[i];
+            }
 
-          ASSERT_EQUALS( counter, threads*incs );
+            ASSERT_EQUALS( counter, threads*incs );
 #else
 
-          // WARNING "TODO Missing spin lock in this platform."
-          ASSERT( true );
+            // WARNING "TODO Missing spin lock in this platform."
+            ASSERT( true );
 
-          
+
 #endif
 
         }
     };
 
-    class SpinLockSuite : public Suite{
+    class SpinLockSuite : public Suite {
     public:
-        SpinLockSuite() : Suite( "spinlock" ){}
+        SpinLockSuite() : Suite( "spinlock" ) {}
 
-        void setupTests(){
+        void setupTests() {
             add< ConcurrentIncs >();
         }
     } spinLockSuite;

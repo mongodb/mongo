@@ -25,11 +25,11 @@
 #include "../unittest.h"
 #include "../time_support.h"
 
-namespace mongo { 
+namespace mongo {
 
-    namespace task { 
+    namespace task {
 
-        /*void foo() { 
+        /*void foo() {
             boost::mutex m;
             boost::mutex::scoped_lock lk(m);
             boost::condition cond;
@@ -37,21 +37,21 @@ namespace mongo {
             cond.notify_one();
         }*/
 
-        Task::Task() 
-            : BackgroundJob( true /* deleteSelf */ ) { 
+        Task::Task()
+            : BackgroundJob( true /* deleteSelf */ ) {
             n = 0;
             repeat = 0;
         }
 
         void Task::halt() { repeat = 0; }
 
-        void Task::run() { 
+        void Task::run() {
             assert( n == 0 );
             while( 1 ) {
                 n++;
-                try { 
+                try {
                     doWork();
-                } 
+                }
                 catch(...) { }
                 if( repeat == 0 )
                     break;
@@ -65,11 +65,11 @@ namespace mongo {
             go();
         }
 
-        void fork(Task *t) { 
+        void fork(Task *t) {
             t->begin();
         }
 
-        void repeat(Task *t, unsigned millis) { 
+        void repeat(Task *t, unsigned millis) {
             t->repeat = millis;
             t->begin();
         }
@@ -110,7 +110,7 @@ namespace mongo {
             }
         }
 
-        void Server::send( lam msg ) { 
+        void Server::send( lam msg ) {
             {
                 boost::mutex::scoped_lock lk(m);
                 d.push_back(msg);
@@ -118,9 +118,9 @@ namespace mongo {
             c.notify_one();
         }
 
-        void Server::doWork() { 
+        void Server::doWork() {
             starting();
-            while( 1 ) { 
+            while( 1 ) {
                 lam f;
                 try {
                     boost::mutex::scoped_lock lk(m);
@@ -129,7 +129,7 @@ namespace mongo {
                     f = d.front();
                     d.pop_front();
                 }
-                catch(...) { 
+                catch(...) {
                     log() << "ERROR exception in Server:doWork?" << endl;
                 }
                 try {
@@ -141,27 +141,28 @@ namespace mongo {
                             d.push_back(f);
                         }
                     }
-                } catch(std::exception& e) { 
-  				    log() << "Server::doWork task:" << name() << " exception:" << e.what() << endl;
-                } 
-				catch(const char *p) {
-				    log() << "Server::doWork task:" << name() << " unknown c exception:" << 
-                      ((p&&strlen(p)<800)?p:"?") << endl;
-				}
-				catch(...) {
-				    log() << "Server::doWork unknown exception task:" << name() << endl;
+                }
+                catch(std::exception& e) {
+                    log() << "Server::doWork task:" << name() << " exception:" << e.what() << endl;
+                }
+                catch(const char *p) {
+                    log() << "Server::doWork task:" << name() << " unknown c exception:" <<
+                          ((p&&strlen(p)<800)?p:"?") << endl;
+                }
+                catch(...) {
+                    log() << "Server::doWork unknown exception task:" << name() << endl;
                 }
             }
         }
 
         static Server *s;
-        static void abc(int i) { 
+        static void abc(int i) {
             cout << "Hello " << i << endl;
             s->requeue();
         }
         class TaskUnitTest : public mongo::UnitTest {
         public:
-            virtual void run() { 
+            virtual void run() {
                 lam f = boost::bind(abc, 3);
                 //f();
 

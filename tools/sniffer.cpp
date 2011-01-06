@@ -157,11 +157,11 @@ map< Connection, map< long long, long long > > mapCursor;
 
 void processMessage( Connection& c , Message& d );
 
-void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
+void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
 
     const struct sniff_ip* ip = (struct sniff_ip*)(packet + captureHeaderSize);
     int size_ip = IP_HL(ip)*4;
-    if ( size_ip < 20 ){
+    if ( size_ip < 20 ) {
         cerr << "*** Invalid IP header length: " << size_ip << " bytes" << endl;
         return;
     }
@@ -170,13 +170,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     const struct sniff_tcp* tcp = (struct sniff_tcp*)(packet + captureHeaderSize + size_ip);
     int size_tcp = TH_OFF(tcp)*4;
-    if (size_tcp < 20){
+    if (size_tcp < 20) {
         cerr << "*** Invalid TCP header length: " << size_tcp << " bytes" << endl;
         return;
     }
 
     if ( ! ( serverPorts.count( ntohs( tcp->th_sport ) ) ||
-             serverPorts.count( ntohs( tcp->th_dport ) ) ) ){
+             serverPorts.count( ntohs( tcp->th_dport ) ) ) ) {
         return;
     }
 
@@ -199,7 +199,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         if ( expectedSeq[ c ] != ntohl( tcp->th_seq ) ) {
             cerr << "Warning: sequence # mismatch, there may be dropped packets" << endl;
         }
-    } else {
+    }
+    else {
         seen[ c ] = true;
     }
 
@@ -223,7 +224,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
             messageBuilder[ c ]->appendBuf( (void*)payload, size_payload );
             return;
         }
-    } else {
+    }
+    else {
         bytesRemainingInMessage[ c ] -= size_payload;
         messageBuilder[ c ]->appendBuf( (void*)payload, size_payload );
         if ( bytesRemainingInMessage[ c ] < 0 ) {
@@ -264,70 +266,71 @@ public:
     }
 };
 
-void processMessage( Connection& c , Message& m ){
+void processMessage( Connection& c , Message& m ) {
     AuditingDbMessage d(m);
-    
+
     if ( m.operation() == mongo::opReply )
         out() << " - " << (unsigned)m.header()->responseTo;
     out() << endl;
 
     try {
-        switch( m.operation() ){
-            case mongo::opReply:{
-                mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
-                out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
-                if ( r->nReturned ){
-                    mongo::BSONObj o( r->data() , 0 );
-                    out() << "\t" << o << endl;
-                }
-                break;
+        switch( m.operation() ) {
+        case mongo::opReply: {
+            mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
+            out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
+            if ( r->nReturned ) {
+                mongo::BSONObj o( r->data() , 0 );
+                out() << "\t" << o << endl;
             }
-            case mongo::dbQuery:{
-                mongo::QueryMessage q(d);
-                out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
-                break;
-            }
-            case mongo::dbUpdate:{
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj( "update" );
-                BSONObj o = d.nextJsObj( "update" );
-                out() << "\tupdate  flags:" << flags << " q:" << q << " o:" << o << endl;
-                break;
-            }
-            case mongo::dbInsert:{
-                out() << "\tinsert: " << d.nextJsObj( "insert" ) << endl;
-                while ( d.moreJSObjs() ) {
-                    out() << "\t\t" << d.nextJsObj( "insert" ) << endl;
-                }
-                break;
-            }
-            case mongo::dbGetMore:{
-                int nToReturn = d.pullInt();
-                long long cursorId = d.pullInt64();
-                out() << "\tgetMore nToReturn: " << nToReturn << " cursorId: " << cursorId << endl;
-                break;
-            }
-            case mongo::dbDelete:{
-                int flags = d.pullInt();
-                BSONObj q = d.nextJsObj( "delete" );
-                out() << "\tdelete flags: " << flags << " q: " << q << endl;
-                break;
-            }
-            case mongo::dbKillCursors:{
-                int *x = (int *) m.singleData()->_data;
-                x++; // reserved
-                int n = *x;
-                out() << "\tkillCursors n: " << n << endl;
-                break;
-            }
-            default:
-                cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
+            break;
         }
-    } catch ( ... ) {
+        case mongo::dbQuery: {
+            mongo::QueryMessage q(d);
+            out() << "\tquery: " << q.query << "  ntoreturn: " << q.ntoreturn << " ntoskip: " << q.ntoskip << endl;
+            break;
+        }
+        case mongo::dbUpdate: {
+            int flags = d.pullInt();
+            BSONObj q = d.nextJsObj( "update" );
+            BSONObj o = d.nextJsObj( "update" );
+            out() << "\tupdate  flags:" << flags << " q:" << q << " o:" << o << endl;
+            break;
+        }
+        case mongo::dbInsert: {
+            out() << "\tinsert: " << d.nextJsObj( "insert" ) << endl;
+            while ( d.moreJSObjs() ) {
+                out() << "\t\t" << d.nextJsObj( "insert" ) << endl;
+            }
+            break;
+        }
+        case mongo::dbGetMore: {
+            int nToReturn = d.pullInt();
+            long long cursorId = d.pullInt64();
+            out() << "\tgetMore nToReturn: " << nToReturn << " cursorId: " << cursorId << endl;
+            break;
+        }
+        case mongo::dbDelete: {
+            int flags = d.pullInt();
+            BSONObj q = d.nextJsObj( "delete" );
+            out() << "\tdelete flags: " << flags << " q: " << q << endl;
+            break;
+        }
+        case mongo::dbKillCursors: {
+            int *x = (int *) m.singleData()->_data;
+            x++; // reserved
+            int n = *x;
+            out() << "\tkillCursors n: " << n << endl;
+            break;
+        }
+        default:
+            cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
+        }
+    }
+    catch ( ... ) {
         cerr << "Error parsing message for operation: " << m.operation() << endl;
     }
-    
-        
+
+
     if ( !forwardAddress.empty() ) {
         if ( m.operation() != mongo::opReply ) {
             boost::shared_ptr<DBClientConnection> conn = forwarder[ c ];
@@ -353,10 +356,12 @@ void processMessage( Connection& c , Message& m ){
                     }
                 }
                 lastCursor[ c ] = 0;
-            } else {
+            }
+            else {
                 conn->port().say( m );
             }
-        } else {
+        }
+        else {
             Connection r = c.reverse();
             long long myCursor = lastCursor[ r ];
             QueryResult *qr = (QueryResult *) m.singleData();
@@ -375,7 +380,7 @@ void processMessage( Connection& c , Message& m ){
     }
 }
 
-void processDiagLog( const char * file ){
+void processDiagLog( const char * file ) {
     Connection c;
     MemoryMappedFile f;
     long length;
@@ -385,45 +390,45 @@ void processDiagLog( const char * file ){
     length = (long) L;
     assert( root );
     assert( length > 0 );
-    
+
     char * pos = root;
 
     long read = 0;
-    while ( read < length ){
+    while ( read < length ) {
         Message m(pos,false);
         int len = m.header()->len;
         DbMessage d(m);
         cout << len << " " << d.getns() << endl;
-        
+
         processMessage( c , m );
 
         read += len;
         pos += len;
     }
-    
+
     f.close();
 }
 
 void usage() {
     cout <<
-    "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
-    "--forward       Forward all parsed request messages to mongod instance at \n"
-    "                specified host:port\n"
-    "--source        Source of traffic to sniff, either a network interface or a\n"
-    "                file containing previously captured packets in pcap format,\n"
-    "                or a file containing output from mongod's --diaglog option.\n"
-    "                If no source is specified, mongosniff will attempt to sniff\n"
-    "                from one of the machine's network interfaces.\n"
-    "--objcheck      Log hex representation of invalid BSON objects and nothing\n"
-    "                else.  Spurious messages about invalid objects may result\n"
-    "                when there are dropped tcp packets.\n"
-    "<port0>...      These parameters are used to filter sniffing.  By default, \n"
-    "                only port 27017 is sniffed.\n"
-    "--help          Print this help message.\n"
-    << endl;
+         "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
+         "--forward       Forward all parsed request messages to mongod instance at \n"
+         "                specified host:port\n"
+         "--source        Source of traffic to sniff, either a network interface or a\n"
+         "                file containing previously captured packets in pcap format,\n"
+         "                or a file containing output from mongod's --diaglog option.\n"
+         "                If no source is specified, mongosniff will attempt to sniff\n"
+         "                from one of the machine's network interfaces.\n"
+         "--objcheck      Log hex representation of invalid BSON objects and nothing\n"
+         "                else.  Spurious messages about invalid objects may result\n"
+         "                when there are dropped tcp packets.\n"
+         "<port0>...      These parameters are used to filter sniffing.  By default, \n"
+         "                only port 27017 is sniffed.\n"
+         "--help          Print this help message.\n"
+         << endl;
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
 
     stringstream nullStream;
     nullStream.clear(ios::failbit);
@@ -435,7 +440,7 @@ int main(int argc, char **argv){
     struct bpf_program fp;
     bpf_u_int32 mask;
     bpf_u_int32 net;
-    
+
     bool source = false;
     bool replay = false;
     bool diaglog = false;
@@ -451,10 +456,10 @@ int main(int argc, char **argv){
             if ( arg == string( "--help" ) ) {
                 usage();
                 return 0;
-            } 
+            }
             else if ( arg == string( "--forward" ) ) {
                 forwardAddress = args[ ++i ];
-            } 
+            }
             else if ( arg == string( "--source" ) ) {
                 uassert( 10266 ,  "can't use --source twice" , source == false );
                 uassert( 10267 ,  "source needs more args" , args.size() > i + 2);
@@ -474,21 +479,22 @@ int main(int argc, char **argv){
                 serverPorts.insert( atoi( args[ i ] ) );
             }
         }
-    } catch ( ... ) {
+    }
+    catch ( ... ) {
         usage();
         return -1;
     }
 
     if ( !serverPorts.size() )
         serverPorts.insert( 27017 );
-    
-    if ( diaglog ){
+
+    if ( diaglog ) {
         processDiagLog( file );
         return 0;
     }
-    else if ( replay ){
+    else if ( replay ) {
         handle = pcap_open_offline(file, errbuf);
-        if ( ! handle ){
+        if ( ! handle ) {
             cerr << "error opening capture file!" << endl;
             return -1;
         }
@@ -502,18 +508,18 @@ int main(int argc, char **argv){
             }
             cout << "found device: " << dev << endl;
         }
-        if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1){
+        if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
             cerr << "can't get netmask: " << errbuf << endl;
             return -1;
         }
         handle = pcap_open_live(dev, SNAP_LEN, 1, 1000, errbuf);
-        if ( ! handle ){
+        if ( ! handle ) {
             cerr << "error opening device: " << errbuf << endl;
             return -1;
         }
-    } 
+    }
 
-    switch ( pcap_datalink( handle ) ){
+    switch ( pcap_datalink( handle ) ) {
     case DLT_EN10MB:
         captureHeaderSize = 14;
         break;

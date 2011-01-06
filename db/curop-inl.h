@@ -20,11 +20,11 @@
 
 #include "curop.h"
 
-namespace mongo { 
+namespace mongo {
 
     // todo : move more here
 
-    inline CurOp::CurOp( Client * client , CurOp * wrapped ) { 
+    inline CurOp::CurOp( Client * client , CurOp * wrapped ) {
         _client = client;
         _wrapped = wrapped;
         if ( _wrapped )

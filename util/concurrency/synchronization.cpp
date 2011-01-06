@@ -22,15 +22,15 @@ namespace mongo {
 
     Notification::Notification() : _mutex ( "Notification" ) , _notified( false ) { }
 
-    Notification::~Notification(){ }
+    Notification::~Notification() { }
 
-    void Notification::waitToBeNotified(){
+    void Notification::waitToBeNotified() {
         scoped_lock lock( _mutex );
         while ( ! _notified )
             _condition.wait( lock.boost() );
     }
 
-    void Notification::notifyOne(){
+    void Notification::notifyOne() {
         scoped_lock lock( _mutex );
         assert( !_notified );
         _notified = true;
@@ -38,7 +38,7 @@ namespace mongo {
     }
 
     NotifyAll::NotifyAll() : _mutex("NotifyAll"), _counter(0) { }
-    
+
     void NotifyAll::wait() {
         scoped_lock lock( _mutex );
         unsigned long long old = _counter;

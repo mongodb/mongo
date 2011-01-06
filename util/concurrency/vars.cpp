@@ -20,28 +20,28 @@
 #include "value.h"
 #include "mutex.h"
 
-namespace mongo { 
+namespace mongo {
 
     mongo::mutex _atomicMutex("_atomicMutex");
 
     // intentional leak. otherwise destructor orders can be problematic at termination.
     MutexDebugger &mutexDebugger = *(new MutexDebugger());
 
-    MutexDebugger::MutexDebugger() : 
-      x( *(new boost::mutex()) ), magic(0x12345678) {
-          // optional way to debug lock order
-          /*
-          a = "a_lock";
-          b = "b_lock";
-          */
+    MutexDebugger::MutexDebugger() :
+        x( *(new boost::mutex()) ), magic(0x12345678) {
+        // optional way to debug lock order
+        /*
+        a = "a_lock";
+        b = "b_lock";
+        */
     }
 
-    void MutexDebugger::programEnding() { 
+    void MutexDebugger::programEnding() {
         if( logLevel>=1 && followers.size() ) {
             std::cout << followers.size() << " mutexes in program" << endl;
-            for( map< mid, set<mid> >::iterator i = followers.begin(); i != followers.end(); i++ ) { 
+            for( map< mid, set<mid> >::iterator i = followers.begin(); i != followers.end(); i++ ) {
                 cout << i->first;
-                if( maxNest[i->first] > 1 ) 
+                if( maxNest[i->first] > 1 )
                     cout << " maxNest:" << maxNest[i->first];
                 cout << '\n';
                 for( set<mid>::iterator j = i->second.begin(); j != i->second.end(); j++ )

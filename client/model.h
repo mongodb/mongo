@@ -43,16 +43,16 @@ namespace mongo {
         virtual void unserialize(const BSONObj& from) = 0;
         virtual BSONObj toObject();
         virtual void append( const char * name , BSONObjBuilder& b );
-        
+
         virtual string modelServer() = 0;
-        
-        /** Load a single object. 
+
+        /** Load a single object.
             @return true if successful.
         */
         virtual bool load(BSONObj& query);
         virtual void save( bool safe=false );
         virtual void remove( bool safe=false );
-        
+
     protected:
         BSONObj _id;
     };

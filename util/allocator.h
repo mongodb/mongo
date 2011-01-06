@@ -18,22 +18,22 @@
 #pragma once
 
 namespace mongo {
-    
+
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);
         if ( x == 0 ) dbexit( EXIT_OOM_MALLOC , "malloc fails");
         return x;
     }
-    
+
     inline void * ourrealloc(void *ptr, size_t size) {
         void *x = realloc(ptr, size);
         if ( x == 0 ) dbexit( EXIT_OOM_REALLOC , "realloc fails");
         return x;
     }
-    
+
 #define MONGO_malloc mongo::ourmalloc
 #define malloc MONGO_malloc
 #define MONGO_realloc mongo::ourrealloc
 #define realloc MONGO_realloc
-    
+
 } // namespace mongo

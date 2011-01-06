@@ -33,7 +33,7 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 class Import : public Tool {
-    
+
     enum Type { JSON , CSV , TSV };
     Type _type;
 
@@ -44,36 +44,36 @@ class Import : public Tool {
     bool _doimport;
     bool _jsonArray;
     vector<string> _upsertFields;
-    
-    void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
+
+    void _append( BSONObjBuilder& b , const string& fieldName , const string& data ) {
         if ( b.appendAsNumber( fieldName , data ) )
             return;
-        
+
         if ( _ignoreBlanks && data.size() == 0 )
             return;
 
         // TODO: other types?
         b.append( fieldName , data );
     }
-    
-    BSONObj parseLine( char * line ){
+
+    BSONObj parseLine( char * line ) {
         uassert(13289, "Invalid UTF8 character detected", isValidUTF8(line));
 
-        if ( _type == JSON ){
+        if ( _type == JSON ) {
             char * end = ( line + strlen( line ) ) - 1;
-            while ( isspace(*end) ){
+            while ( isspace(*end) ) {
                 *end = 0;
                 end--;
             }
             return fromjson( line );
         }
-        
+
         BSONObjBuilder b;
 
         unsigned int pos=0;
-        while ( line[0] ){
+        while ( line[0] ) {
             string name;
-            if ( pos < _fields.size() ){
+            if ( pos < _fields.size() ) {
                 name = _fields[pos];
             }
             else {
@@ -82,76 +82,81 @@ class Import : public Tool {
                 name = ss.str();
             }
             pos++;
-            
+
             bool done = false;
             string data;
             char * end;
-            if ( _type == CSV && line[0] == '"' ){
+            if ( _type == CSV && line[0] == '"' ) {
                 line++; //skip first '"'
 
                 while (true) {
                     end = strchr( line , '"' );
-                    if (!end){
+                    if (!end) {
                         data += line;
                         done = true;
                         break;
-                    } else if (end[1] == '"') {
+                    }
+                    else if (end[1] == '"') {
                         // two '"'s get appended as one
                         data.append(line, end-line+1); //include '"'
                         line = end+2; //skip both '"'s
-                    } else if (end[-1] == '\\') {
+                    }
+                    else if (end[-1] == '\\') {
                         // "\\\"" gets appended as '"'
                         data.append(line, end-line-1); //exclude '\\'
                         data.append("\"");
                         line = end+1; //skip the '"'
-                    } else {
+                    }
+                    else {
                         data.append(line, end-line);
                         line = end+2; //skip '"' and ','
                         break;
                     }
                 }
-            } else {
+            }
+            else {
                 end = strstr( line , _sep );
-                if ( ! end ){
+                if ( ! end ) {
                     done = true;
                     data = string( line );
-                } else {
+                }
+                else {
                     data = string( line , end - line );
                     line = end+1;
                 }
             }
 
-            if ( _headerLine ){
+            if ( _headerLine ) {
                 while ( isspace( data[0] ) )
                     data = data.substr( 1 );
                 _fields.push_back( data );
             }
             else
                 _append( b , name , data );
-            
+
             if ( done )
                 break;
         }
         return b.obj();
     }
-    
+
 public:
-    Import() : Tool( "import" ){
+    Import() : Tool( "import" ) {
         addFieldOptions();
         add_options()
-            ("ignoreBlanks","if given, empty fields in csv and tsv will be ignored")
-            ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
-            ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
-            ("drop", "drop collection first " )
-            ("headerline","CSV,TSV only - use first line as headers")
-            ("upsert", "insert or update objects that already exist" )
-            ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
-            ("stopOnError", "stop importing at first error rather than continuing" )
-            ("jsonArray", "load a json array, not one item per line. Currently limited to 4MB." )
-            ;
+        ("ignoreBlanks","if given, empty fields in csv and tsv will be ignored")
+        ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
+        ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
+        ("drop", "drop collection first " )
+        ("headerline","CSV,TSV only - use first line as headers")
+        ("upsert", "insert or update objects that already exist" )
+        ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
+        ("stopOnError", "stop importing at first error rather than continuing" )
+        ("jsonArray", "load a json array, not one item per line. Currently limited to 4MB." )
+        ;
         add_hidden_options()
-            ("noimport", "don't actually import. useful for benchmarking parser" )
-            ;
+        ("noimport", "don't actually import. useful for benchmarking parser" )
+        ;
         addPositionArg( "file" , 1 );
         _type = JSON;
         _ignoreBlanks = false;
@@ -160,8 +165,8 @@ public:
         _doimport = true;
         _jsonArray = false;
     }
-    
-    int run(){
+
+    int run() {
         string filename = getParam( "file" );
         long long fileSize = -1;
 
@@ -169,8 +174,8 @@ public:
 
         ifstream file( filename.c_str() , ios_base::in);
 
-        if ( filename.size() > 0 && filename != "-" ){
-            if ( ! exists( filename ) ){
+        if ( filename.size() > 0 && filename != "-" ) {
+            if ( ! exists( filename ) ) {
                 cerr << "file doesn't exist: " << filename << endl;
                 return -1;
             }
@@ -182,53 +187,55 @@ public:
         if (!isMaster()) {
             return -1;
         }
-        
+
         string ns;
 
         try {
             ns = getNS();
-        } catch (...) {
+        }
+        catch (...) {
             printHelp(cerr);
             return -1;
         }
-        
+
         log(1) << "ns: " << ns << endl;
-        
+
         auth();
 
-        if ( hasParam( "drop" ) ){
+        if ( hasParam( "drop" ) ) {
             cout << "dropping: " << ns << endl;
             conn().dropCollection( ns.c_str() );
         }
 
-        if ( hasParam( "ignoreBlanks" ) ){
+        if ( hasParam( "ignoreBlanks" ) ) {
             _ignoreBlanks = true;
         }
 
-        if ( hasParam( "upsert" ) || hasParam( "upsertFields" )){
+        if ( hasParam( "upsert" ) || hasParam( "upsertFields" )) {
             _upsert = true;
 
             string uf = getParam("upsertFields");
-            if (uf.empty()){
+            if (uf.empty()) {
                 _upsertFields.push_back("_id");
-            } else {
+            }
+            else {
                 StringSplitter(uf.c_str(), ",").split(_upsertFields);
             }
         }
 
-        if ( hasParam( "noimport" ) ){
+        if ( hasParam( "noimport" ) ) {
             _doimport = false;
         }
 
-        if ( hasParam( "type" ) ){
+        if ( hasParam( "type" ) ) {
             string type = getParam( "type" );
             if ( type == "json" )
                 _type = JSON;
-            else if ( type == "csv" ){
+            else if ( type == "csv" ) {
                 _type = CSV;
                 _sep = ",";
             }
-            else if ( type == "tsv" ){
+            else if ( type == "tsv" ) {
                 _type = TSV;
                 _sep = "\t";
             }
@@ -237,21 +244,21 @@ public:
                 return -1;
             }
         }
-        
-        if ( _type == CSV || _type == TSV ){
+
+        if ( _type == CSV || _type == TSV ) {
             _headerLine = hasParam( "headerline" );
             if ( ! _headerLine )
                 needFields();
         }
 
-        if (_type == JSON && hasParam("jsonArray")){
+        if (_type == JSON && hasParam("jsonArray")) {
             _jsonArray = true;
         }
 
         int errors = 0;
-        
+
         int num = 0;
-        
+
         time_t start = time(0);
 
         log(1) << "filesize: " << fileSize << endl;
@@ -259,37 +266,39 @@ public:
         const int BUF_SIZE = 1024 * 1024 * 4;
         boost::scoped_array<char> line(new char[BUF_SIZE+2]);
         char * buf = line.get();
-        while ( _jsonArray || in->rdstate() == 0 ){
-            if (_jsonArray){
-                if (buf == line.get()){ //first pass
+        while ( _jsonArray || in->rdstate() == 0 ) {
+            if (_jsonArray) {
+                if (buf == line.get()) { //first pass
                     in->read(buf, BUF_SIZE);
                     uassert(13295, "JSONArray file too large", (in->rdstate() & ios_base::eofbit));
                     buf[ in->gcount() ] = '\0';
                 }
-            } else {
+            }
+            else {
                 buf = line.get();
                 in->getline( buf , BUF_SIZE );
                 log(1) << "got line:" << buf << endl;
             }
             uassert( 10263 ,  "unknown error reading file" ,
-                    (!(in->rdstate() & ios_base::badbit)) &&
-                    (!(in->rdstate() & ios_base::failbit) || (in->rdstate() & ios_base::eofbit)) );
+                     (!(in->rdstate() & ios_base::badbit)) &&
+                     (!(in->rdstate() & ios_base::failbit) || (in->rdstate() & ios_base::eofbit)) );
 
             int len = 0;
-            if (strncmp("\xEF\xBB\xBF", buf, 3) == 0){ // UTF-8 BOM (notepad is stupid)
+            if (strncmp("\xEF\xBB\xBF", buf, 3) == 0) { // UTF-8 BOM (notepad is stupid)
                 buf += 3;
                 len += 3;
             }
 
-            if (_jsonArray){
+            if (_jsonArray) {
                 while (buf[0] != '{' && buf[0] != '\0') {
                     len++;
                     buf++;
                 }
                 if (buf[0] == '\0')
                     break;
-            } else {
-                while (isspace( buf[0] )){
+            }
+            else {
+                while (isspace( buf[0] )) {
                     len++;
                     buf++;
                 }
@@ -300,24 +309,26 @@ public:
 
             try {
                 BSONObj o;
-                if (_jsonArray){
+                if (_jsonArray) {
                     int jslen;
                     o = fromjson(buf, &jslen);
                     len += jslen;
                     buf += jslen;
-                } else {
+                }
+                else {
                     o = parseLine( buf );
                 }
 
-                if ( _headerLine ){
+                if ( _headerLine ) {
                     _headerLine = false;
-                } else if (_doimport) {
+                }
+                else if (_doimport) {
                     bool doUpsert = _upsert;
                     BSONObjBuilder b;
-                    if (_upsert){
-                        for (vector<string>::const_iterator it=_upsertFields.begin(), end=_upsertFields.end(); it!=end; ++it){
+                    if (_upsert) {
+                        for (vector<string>::const_iterator it=_upsertFields.begin(), end=_upsertFields.end(); it!=end; ++it) {
                             BSONElement e = o.getFieldDotted(it->c_str());
-                            if (e.eoo()){
+                            if (e.eoo()) {
                                 doUpsert = false;
                                 break;
                             }
@@ -325,25 +336,26 @@ public:
                         }
                     }
 
-                    if (doUpsert){
+                    if (doUpsert) {
                         conn().update(ns, Query(b.obj()), o, true);
-                    } else {
+                    }
+                    else {
                         conn().insert( ns.c_str() , o );
                     }
                 }
 
                 num++;
             }
-            catch ( std::exception& e ){
+            catch ( std::exception& e ) {
                 cout << "exception:" << e.what() << endl;
                 cout << buf << endl;
                 errors++;
-                
+
                 if (hasParam("stopOnError") || _jsonArray)
                     break;
             }
 
-            if ( pm.hit( len + 1 ) ){
+            if ( pm.hit( len + 1 ) ) {
                 cout << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
             }
         }
@@ -351,10 +363,10 @@ public:
         cout << "imported " << num << " objects" << endl;
 
         conn().getLastError();
-        
+
         if ( errors == 0 )
             return 0;
-        
+
         cerr << "encountered " << errors << " error" << ( errors == 1 ? "" : "s" ) << endl;
         return -1;
     }

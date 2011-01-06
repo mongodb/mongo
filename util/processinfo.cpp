@@ -22,26 +22,26 @@
 using namespace std;
 
 namespace mongo {
-    
+
     class PidFileWiper {
     public:
-        ~PidFileWiper(){
+        ~PidFileWiper() {
             ofstream out( path.c_str() , ios_base::out );
-            out.close();    
+            out.close();
         }
-        
-        void write( const string& p ){
+
+        void write( const string& p ) {
             path = p;
             ofstream out( path.c_str() , ios_base::out );
             out << getpid() << endl;
             out.close();
         }
-        
+
         string path;
     } pidFileWiper;
-    
-    void writePidFile( const string& path ){
+
+    void writePidFile( const string& path ) {
         pidFileWiper.write( path );
-    }    
+    }
 
 }

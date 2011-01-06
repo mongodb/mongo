@@ -36,45 +36,45 @@ namespace mongo {
     class Tool {
     public:
         enum DBAccess {
-            NONE = 0 , 
-            REMOTE_SERVER = 1 << 1 , 
-            LOCAL_SERVER = 1 << 2 , 
+            NONE = 0 ,
+            REMOTE_SERVER = 1 << 1 ,
+            LOCAL_SERVER = 1 << 2 ,
             SPECIFY_DBCOL = 1 << 3 ,
             ALL = REMOTE_SERVER | LOCAL_SERVER | SPECIFY_DBCOL
         };
 
-        Tool( string name , DBAccess access=ALL, string defaultDB="test" , 
+        Tool( string name , DBAccess access=ALL, string defaultDB="test" ,
               string defaultCollection="", bool usesstdout=true);
         virtual ~Tool();
 
         int main( int argc , char ** argv );
 
-        boost::program_options::options_description_easy_init add_options(){
+        boost::program_options::options_description_easy_init add_options() {
             return _options->add_options();
         }
-        boost::program_options::options_description_easy_init add_hidden_options(){
+        boost::program_options::options_description_easy_init add_hidden_options() {
             return _hidden_options->add_options();
         }
-        void addPositionArg( const char * name , int pos ){
+        void addPositionArg( const char * name , int pos ) {
             _positonalOptions.add( name , pos );
         }
 
-        string getParam( string name , string def="" ){
+        string getParam( string name , string def="" ) {
             if ( _params.count( name ) )
                 return _params[name.c_str()].as<string>();
             return def;
         }
-        int getParam( string name , int def ){
+        int getParam( string name , int def ) {
             if ( _params.count( name ) )
                 return _params[name.c_str()].as<int>();
             return def;
         }
-        bool hasParam( string name ){
+        bool hasParam( string name ) {
             return _params.count( name );
         }
 
-        string getNS(){
-            if ( _coll.size() == 0 ){
+        string getNS() {
+            if ( _coll.size() == 0 ) {
                 cerr << "no collection specified!" << endl;
                 throw -1;
             }
@@ -82,21 +82,21 @@ namespace mongo {
         }
 
         bool isMaster();
-        
-        virtual void preSetup(){}
+
+        virtual void preSetup() {}
 
         virtual int run() = 0;
 
         virtual void printHelp(ostream &out);
 
-        virtual void printExtraHelp( ostream & out ){}
-        virtual void printExtraHelpAfter( ostream & out ){}
+        virtual void printExtraHelp( ostream & out ) {}
+        virtual void printExtraHelpAfter( ostream & out ) {}
 
     protected:
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );
         void auth( string db = "" );
-        
+
         string _name;
 
         string _db;
@@ -105,18 +105,18 @@ namespace mongo {
 
         string _username;
         string _password;
-        
+
         bool _usesstdout;
         bool _noconnection;
         bool _autoreconnect;
 
         void addFieldOptions();
         void needFields();
-        
+
         vector<string> _fields;
         BSONObj _fieldsObj;
 
-        
+
         string _host;
 
     protected:
@@ -136,17 +136,17 @@ namespace mongo {
     class BSONTool : public Tool {
         bool _objcheck;
         auto_ptr<Matcher> _matcher;
-        
+
     public:
         BSONTool( const char * name , DBAccess access=ALL, bool objcheck = false );
-        
+
         virtual int doRun() = 0;
         virtual void gotObject( const BSONObj& obj ) = 0;
-        
+
         virtual int run();
 
         long long processFile( const path& file );
-        
+
     };
 
 }

@@ -37,12 +37,12 @@ namespace mongo {
     map<ConnectionId,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
     mongo::mutex WriteBackListener::_seenWritebacksLock("WriteBackListener::seen");
 
-    WriteBackListener::WriteBackListener( const string& addr ) : _addr( addr ){
+    WriteBackListener::WriteBackListener( const string& addr ) : _addr( addr ) {
         log() << "creating WriteBackListener for: " << addr << endl;
     }
-    
+
     /* static */
-    void WriteBackListener::init( DBClientBase& conn ){
+    void WriteBackListener::init( DBClientBase& conn ) {
         scoped_lock lk( _cacheLock );
         WriteBackListener*& l = _cache[conn.getServerAddress()];
         if ( l )
@@ -52,13 +52,13 @@ namespace mongo {
     }
 
     /* static */
-    void WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ){
+    void WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ) {
         Timer t;
-        for ( int i=0; i<5000; i++ ){
+        for ( int i=0; i<5000; i++ ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[connectionId];
-                if ( oid <= s.id ){
+                if ( oid <= s.id ) {
                     // TODO return gle
                     return;
                 }
@@ -70,36 +70,36 @@ namespace mongo {
         uasserted( 13403 , ss.str() );
     }
 
-    void WriteBackListener::run(){
+    void WriteBackListener::run() {
         int secsToSleep = 0;
-        while ( ! inShutdown() && Shard::isMember( _addr ) ){
-                
+        while ( ! inShutdown() && Shard::isMember( _addr ) ) {
+
 
             try {
                 ScopedDbConnection conn( _addr );
-                    
+
                 BSONObj result;
-                    
+
                 {
                     BSONObjBuilder cmd;
                     cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
-                    if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ){
+                    if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ) {
                         log() <<  "writebacklisten command failed!  "  << result << endl;
                         conn.done();
                         continue;
                     }
 
                 }
-                    
+
                 log(1) << "writebacklisten result: " << result << endl;
-                    
+
                 BSONObj data = result.getObjectField( "data" );
-                if ( data.getBoolField( "writeBack" ) ){
+                if ( data.getBoolField( "writeBack" ) ) {
                     string ns = data["ns"].valuestrsafe();
-                    
+
                     ConnectionId cid = 0;
                     OID wid;
-                    if ( data["connectionId"].isNumber() && data["id"].type() == jstOID ){
+                    if ( data["connectionId"].isNumber() && data["id"].type() == jstOID ) {
                         cid = data["connectionId"].numberLong();
                         wid = data["id"].OID();
                     }
@@ -109,28 +109,28 @@ namespace mongo {
 
                     int len; // not used, but needed for next call
                     Message m( (void*)data["msg"].binData( len ) , false );
-                    massert( 10427 ,  "invalid writeback message" , m.header()->valid() );                        
+                    massert( 10427 ,  "invalid writeback message" , m.header()->valid() );
 
                     DBConfigPtr db = grid.getDBConfig( ns );
                     ShardChunkVersion needVersion( data["version"] );
-                        
-                    log(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString() 
+
+                    log(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
                            << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
-                        
+
                     if ( logLevel ) log(1) << debugString( m ) << endl;
 
-                    if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ){
+                    if ( needVersion.isSet() && needVersion <= db->getChunkManager( ns )->getVersion() ) {
                         // this means when the write went originally, the version was old
                         // if we're here, it means we've already updated the config, so don't need to do again
                         //db->getChunkManager( ns , true ); // SERVER-1349
                     }
                     else {
                         // we received a writeback object that was sent to a previous version of a shard
-                        // the actual shard may not have the object the writeback operation is for 
+                        // the actual shard may not have the object the writeback operation is for
                         // we need to reload the chunk manager and get the new shard versions
                         db->getChunkManager( ns , true );
                     }
-                    
+
                     // do reequest and then call getLastError
                     // we have to call getLastError so we can return the right fields to the user if they decide to call getLastError
 
@@ -142,14 +142,14 @@ namespace mongo {
 
                         gle = BSONObj(); // TODO
                     }
-                    catch ( DBException& e ){
+                    catch ( DBException& e ) {
                         error() << "error processing writeback: " << e << endl;
                         BSONObjBuilder b;
                         b.append( "err" , e.toString() );
                         e.getInfo().append( b );
                         gle = b.obj();
                     }
-                    
+
                     {
                         scoped_lock lk( _seenWritebacksLock );
                         WBStatus& s = _seenWritebacks[cid];
@@ -157,30 +157,30 @@ namespace mongo {
                         s.gle = gle;
                     }
                 }
-                else if ( result["noop"].trueValue() ){
+                else if ( result["noop"].trueValue() ) {
                     // no-op
                 }
                 else {
                     log() << "unknown writeBack result: " << result << endl;
                 }
-                    
+
                 conn.done();
                 secsToSleep = 0;
                 continue;
             }
-            catch ( std::exception e ){
+            catch ( std::exception e ) {
 
-                if ( inShutdown() ){
+                if ( inShutdown() ) {
                     // we're shutting down, so just clean up
                     return;
                 }
 
                 log() << "WriteBackListener exception : " << e.what() << endl;
-                    
+
                 // It's possible this shard was removed
-                Shard::reloadShardInfo();                    
+                Shard::reloadShardInfo();
             }
-            catch ( ... ){
+            catch ( ... ) {
                 log() << "WriteBackListener uncaught exception!" << endl;
             }
             secsToSleep++;

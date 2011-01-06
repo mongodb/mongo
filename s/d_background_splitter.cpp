@@ -24,13 +24,13 @@
 
 namespace mongo {
 
-void Splitter::run() {
-    while ( ! inShutdown() ) {
+    void Splitter::run() {
+        while ( ! inShutdown() ) {
 
-        log() << "splitter not implemented yet" << endl;
+            log() << "splitter not implemented yet" << endl;
 
-        sleepsecs(60);
+            sleepsecs(60);
+        }
     }
-}
 
 } // namespace mongo

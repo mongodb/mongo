@@ -22,32 +22,32 @@
 using namespace std;
 
 namespace mongo {
-    
-    ProcessInfo::ProcessInfo( pid_t pid ){
+
+    ProcessInfo::ProcessInfo( pid_t pid ) {
     }
 
-    ProcessInfo::~ProcessInfo(){
+    ProcessInfo::~ProcessInfo() {
     }
 
-    bool ProcessInfo::supported(){
+    bool ProcessInfo::supported() {
         return false;
     }
-    
-    int ProcessInfo::getVirtualMemorySize(){
+
+    int ProcessInfo::getVirtualMemorySize() {
         return -1;
     }
-    
-    int ProcessInfo::getResidentSize(){
+
+    int ProcessInfo::getResidentSize() {
         return -1;
     }
 
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
-    
-    bool ProcessInfo::blockCheckSupported(){
+
+    bool ProcessInfo::blockCheckSupported() {
         return false;
     }
-    
-    bool ProcessInfo::blockInMemory( char * start ){
+
+    bool ProcessInfo::blockInMemory( char * start ) {
         assert(0);
         return true;
     }

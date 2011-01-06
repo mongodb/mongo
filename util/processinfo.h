@@ -30,12 +30,12 @@ int getpid();
 namespace mongo {
 
     class BSONObjBuilder;
-    
+
     class ProcessInfo {
     public:
         ProcessInfo( pid_t pid = getpid() );
         ~ProcessInfo();
-        
+
         /**
          * @return mbytes
          */
@@ -50,7 +50,7 @@ namespace mongo {
          * Append platform-specific data to obj
          */
         void getExtraInfo(BSONObjBuilder& info);
-        
+
         bool supported();
 
         bool blockCheckSupported();
@@ -59,7 +59,7 @@ namespace mongo {
     private:
         pid_t _pid;
     };
-    
+
     void writePidFile( const std::string& path );
-    
+
 }

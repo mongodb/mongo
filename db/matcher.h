@@ -24,7 +24,7 @@
 #include <pcrecpp.h>
 
 namespace mongo {
-    
+
     class Cursor;
     class CoveredIndexMatcher;
     class Matcher;
@@ -40,11 +40,9 @@ namespace mongo {
         bool isNot;
         RegexMatcher() : isNot() {}
     };
-    
-    struct element_lt
-    {
-        bool operator()(const BSONElement& l, const BSONElement& r) const
-        {
+
+    struct element_lt {
+        bool operator()(const BSONElement& l, const BSONElement& r) const {
             int x = (int) l.canonicalType() - (int) r.canonicalType();
             if ( x < 0 ) return true;
             else if ( x > 0 ) return false;
@@ -52,17 +50,17 @@ namespace mongo {
         }
     };
 
-    
+
     class ElementMatcher {
     public:
-    
+
         ElementMatcher() {
         }
-        
+
         ElementMatcher( BSONElement _e , int _op, bool _isNot );
-        
+
         ElementMatcher( BSONElement _e , int _op , const BSONObj& array, bool _isNot );
-        
+
         ~ElementMatcher() { }
 
         BSONElement toMatch;
@@ -70,7 +68,7 @@ namespace mongo {
         bool isNot;
         shared_ptr< set<BSONElement,element_lt> > myset;
         shared_ptr< vector<RegexMatcher> > myregex;
-        
+
         // these are for specific operators
         int mod;
         int modm;
@@ -86,15 +84,15 @@ namespace mongo {
     class DiskLoc;
 
     struct MatchDetails {
-        MatchDetails(){
+        MatchDetails() {
             reset();
         }
-        
-        void reset(){
+
+        void reset() {
             loadedObject = false;
             elemMatchKey = 0;
         }
-        
+
         string toString() const {
             stringstream ss;
             ss << "loadedObject: " << loadedObject << " ";
@@ -130,7 +128,7 @@ namespace mongo {
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
             const ElementMatcher&bm, MatchDetails * details );
-        
+
     public:
         static int opDirection(int op) {
             return op <= BSONObj::LTE ? -1 : 1;
@@ -141,14 +139,14 @@ namespace mongo {
         ~Matcher();
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 );
-        
+
         // fast rough check to see if we must load the real doc - we also
         // compare field counts against covereed index matcher; for $or clauses
         // we just compare field counts
         bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 
         bool atomic() const { return _atomic; }
-        
+
         bool hasType( BSONObj::MatchType type ) const;
 
         string toString() const {
@@ -158,18 +156,18 @@ namespace mongo {
         void addOrConstraint( const shared_ptr< FieldRangeVector > &frv ) {
             _orConstraints.push_back( frv );
         }
-        
+
         void popOrClause() {
             _orMatchers.pop_front();
         }
-        
+
         bool sameCriteriaCount( const Matcher &other ) const;
-        
+
     private:
         // Only specify constrainIndexKey if matches() will be called with
         // index keys having empty string field names.
         Matcher( const Matcher &other, const BSONObj &constrainIndexKey );
-        
+
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
@@ -179,7 +177,7 @@ namespace mongo {
 
         void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
         bool addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags );
-        
+
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
 
         bool parseOrNor( const BSONElement &e, bool subMatcher );
@@ -195,7 +193,7 @@ namespace mongo {
         bool haveNeg;
 
         /* $atomic - if true, a multi document operation (some removes, updates)
-                     should be done atomically.  in that case, we do not yield - 
+                     should be done atomically.  in that case, we do not yield -
                      i.e. we stay locked the whole time.
                      http://www.mongodb.org/display/DOCS/Removing[
         */
@@ -212,16 +210,16 @@ namespace mongo {
 
         friend class CoveredIndexMatcher;
     };
-    
+
     // If match succeeds on index key, then attempt to match full document.
     class CoveredIndexMatcher : boost::noncopyable {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
-        bool matches(const BSONObj &o){ return _docMatcher->matches( o ); }
+        bool matches(const BSONObj &o) { return _docMatcher->matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
         bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
-        bool needRecord(){ return _needRecord; }
-        
+        bool needRecord() { return _needRecord; }
+
         Matcher& docMatcher() { return *_docMatcher; }
 
         // once this is called, shouldn't use this matcher for matching any more
@@ -232,7 +230,7 @@ namespace mongo {
             // we may not pop all the clauses we can.
             _docMatcher->popOrClause();
         }
-        
+
         CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
             return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
         }
@@ -246,5 +244,5 @@ namespace mongo {
         bool _needRecordReject; // if the key itself isn't good enough to determine a negative match
         bool _useRecordOnly;
     };
-    
+
 } // namespace mongo

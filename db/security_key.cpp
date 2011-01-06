@@ -31,7 +31,7 @@ namespace mongo {
 
     bool noauth = true;
     AuthInfo internalSecurity;
-    
+
     bool setUpSecurityKey(const string& filename) {
         struct stat stats;
 
@@ -50,12 +50,12 @@ namespace mongo {
 #endif
 
         const unsigned long long fileLength = stats.st_size;
-        if (fileLength < 6 || fileLength > 1024) { 
+        if (fileLength < 6 || fileLength > 1024) {
             log() << " key file " << filename << " has length " << stats.st_size
                   << ", must be between 6 and 1024 chars" << endl;
             return false;
         }
-        
+
         FILE* file = fopen( filename.c_str(), "rb" );
         if (!file) {
             log() << "error opening file: " << filename << ": " << strerror(errno) << endl;
@@ -63,9 +63,9 @@ namespace mongo {
         }
 
         string str = "";
-        
+
         // strip key file
-        unsigned long long read = 0;        
+        unsigned long long read = 0;
         while (read < fileLength) {
             char buf;
             int readLength = fread(&buf, 1, 1, file);
@@ -85,7 +85,7 @@ namespace mongo {
                 log() << "invalid char in key file " << filename << ": " << buf << endl;
                 return false;
             }
-            
+
             str += buf;
         }
 
@@ -93,13 +93,13 @@ namespace mongo {
             log() << "security key must be at least 6 characters" << endl;
             return false;
         }
-        
+
         log(1) << "security key: " << str << endl;
 
         // createPWDigest should really not be a member func
         DBClientConnection conn;
         internalSecurity.pwd = conn.createPasswordDigest(internalSecurity.user, str);
-        
+
         return true;
     }
 } // namespace mongo

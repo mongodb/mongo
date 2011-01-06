@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    inline BSONObjIterator BSONObj::begin() { 
+    inline BSONObjIterator BSONObj::begin() {
         return BSONObjIterator(*this);
     }
 
@@ -48,7 +48,7 @@ namespace mongo {
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
 
-    inline NOINLINE_DECL void BSONObj::_assertInvalid() const { 
+    inline NOINLINE_DECL void BSONObj::_assertInvalid() const {
         StringBuilder ss;
         int os = objsize();
         ss << "Invalid BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ')';
@@ -59,8 +59,8 @@ namespace mongo {
         catch ( ... ) { }
         massert( 10334 , ss.str() , 0 );
     }
-    
-    /* the idea with NOINLINE_DECL here is to keep this from inlining in the 
+
+    /* the idea with NOINLINE_DECL here is to keep this from inlining in the
        getOwned() method.  the presumption being that is better.
     */
     inline NOINLINE_DECL BSONObj BSONObj::copy() const {
@@ -121,14 +121,14 @@ namespace mongo {
         return *this;
     }
 
-    inline bool BSONObj::isValid(){
+    inline bool BSONObj::isValid() {
         int x = objsize();
         return x > 0 && x <= BSONObjMaxInternalSize;
     }
 
-    inline bool BSONObj::getObjectID(BSONElement& e) const { 
+    inline bool BSONObj::getObjectID(BSONElement& e) const {
         BSONElement f = getField("_id");
-        if( !f.eoo() ) { 
+        if( !f.eoo() ) {
             e = f;
             return true;
         }
@@ -139,21 +139,21 @@ namespace mongo {
         _fieldName = 0;
         _builder = builder;
     }
-    
-    template<class T> 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) { 
+
+    template<class T>
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) {
         _builder->append(_fieldName, value);
         _fieldName = 0;
         return *_builder;
     }
 
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) { 
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) {
         _builder->appendAs( e , _fieldName );
         _fieldName = 0;
         return *_builder;
     }
 
-    inline Labeler BSONObjBuilderValueStream::operator<<( const Labeler::Label &l ) { 
+    inline Labeler BSONObjBuilderValueStream::operator<<( const Labeler::Label &l ) {
         return Labeler( l, this );
     }
 
@@ -163,29 +163,29 @@ namespace mongo {
         }
         _subobj.reset();
         _fieldName = nextFieldName;
-    }    
+    }
 
     inline BSONObjBuilder *BSONObjBuilderValueStream::subobj() {
         if ( !haveSubobj() )
             _subobj.reset( new BSONObjBuilder() );
         return _subobj.get();
     }
-    
+
     template<class T> inline
     BSONObjBuilder& Labeler::operator<<( T value ) {
         s_->subobj()->append( l_.l_, value );
         return *s_->_builder;
-    }    
+    }
 
     inline
     BSONObjBuilder& Labeler::operator<<( const BSONElement& e ) {
         s_->subobj()->appendAs( e, l_.l_ );
         return *s_->_builder;
-    }    
+    }
 
     // {a: {b:1}} -> {a.b:1}
     void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base="");
-    inline BSONObj nested2dotted(const BSONObj& obj){
+    inline BSONObj nested2dotted(const BSONObj& obj) {
         BSONObjBuilder b;
         nested2dotted(b, obj);
         return b.obj();
@@ -193,7 +193,7 @@ namespace mongo {
 
     // {a.b:1} -> {a: {b:1}}
     void dotted2nested(BSONObjBuilder& b, const BSONObj& obj);
-    inline BSONObj dotted2nested(const BSONObj& obj){
+    inline BSONObj dotted2nested(const BSONObj& obj) {
         BSONObjBuilder b;
         dotted2nested(b, obj);
         return b.obj();
@@ -204,17 +204,17 @@ namespace mongo {
         const char * e = _b.buf() + _b.len();
         return BSONObjIterator( s , e );
     }
-    
+
     /* WARNING: nested/dotted conversions are not 100% reversible
      * nested2dotted(dotted2nested({a.b: {c:1}})) -> {a.b.c: 1}
      * also, dotted2nested ignores order
      */
 
     typedef map<string, BSONElement> BSONMap;
-    inline BSONMap bson2map(const BSONObj& obj){
+    inline BSONMap bson2map(const BSONObj& obj) {
         BSONMap m;
         BSONObjIterator it(obj);
-        while (it.more()){
+        while (it.more()) {
             BSONElement e = it.next();
             m[e.fieldName()] = e;
         }
@@ -228,7 +228,7 @@ namespace mongo {
     };
 
     typedef set<BSONElement, BSONElementFieldNameCmp> BSONSortedElements;
-    inline BSONSortedElements bson2set( const BSONObj& obj ){
+    inline BSONSortedElements bson2set( const BSONObj& obj ) {
         BSONSortedElements s;
         BSONObjIterator it(obj);
         while ( it.more() )
@@ -243,7 +243,7 @@ namespace mongo {
         return s.str();
     }
     inline void BSONObj::toString(StringBuilder& s,  bool isArray, bool full ) const {
-        if ( isEmpty() ){
+        if ( isEmpty() ) {
             s << "{}";
             return;
         }
@@ -258,7 +258,7 @@ namespace mongo {
             massert( 10329 ,  "Element too large", e.size() < ( 1 << 30 ) );
             int offset = (int) (e.rawdata() - this->objdata());
             massert( 10330 ,  "Element extends past end of object",
-                    e.size() + offset <= this->objsize() );
+                     e.size() + offset <= this->objsize() );
             e.validate();
             bool end = ( e.size() + offset == this->objsize() );
             if ( e.eoo() ) {
@@ -278,7 +278,7 @@ namespace mongo {
 
     inline void BSONElement::validate() const {
         const BSONType t = type();
-        
+
         switch( t ) {
         case DBRef:
         case Code:
@@ -290,7 +290,7 @@ namespace mongo {
                 return;
             StringBuilder buf;
             buf <<  "Invalid dbref/code/string/symbol size: " << x;
-            if( lenOk ) 
+            if( lenOk )
                 buf << " strnlen:" << mongo::strnlen( valuestr() , x );
             msgasserted( 10321 , buf.str() );
             break;
@@ -368,8 +368,7 @@ namespace mongo {
             massert( 10317 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = valuestrsize() + 4 + 1/*subtype*/;
             break;
-        case RegEx:
-        {
+        case RegEx: {
             const char *p = value();
             size_t len1 = ( maxLen == -1 ) ? strlen( p ) : mongo::strnlen( p, remain );
             //massert( 10318 ,  "Invalid regex string", len1 != -1 ); // ERH - 4/28/10 - don't think this does anything
@@ -413,13 +412,12 @@ namespace mongo {
         case mongo::Date:
             s << "new Date(" << date() << ')';
             break;
-        case RegEx:
-            {
-                s << "/" << regex() << '/';
-                const char *p = regexFlags();
-                if ( p ) s << p;
-            }
-            break;
+        case RegEx: {
+            s << "/" << regex() << '/';
+            const char *p = regexFlags();
+            if ( p ) s << p;
+        }
+        break;
         case NumberDouble:
             s.appendDoubleNice( number() );
             break;
@@ -452,13 +450,14 @@ namespace mongo {
             break;
         case CodeWScope:
             s << "CodeWScope( "
-                << codeWScopeCode() << ", " << codeWScopeObject().toString(false, full) << ")";
+              << codeWScopeCode() << ", " << codeWScopeObject().toString(false, full) << ")";
             break;
         case Code:
             if ( !full &&  valuestrsize() > 80 ) {
                 s.write(valuestr(), 70);
                 s << "...";
-            } else {
+            }
+            else {
                 s.write(valuestr(), valuestrsize()-1);
             }
             break;
@@ -468,7 +467,8 @@ namespace mongo {
             if ( !full &&  valuestrsize() > 80 ) {
                 s.write(valuestr(), 70);
                 s << "...\"";
-            } else {
+            }
+            else {
                 s.write(valuestr(), valuestrsize()-1);
                 s << '"';
             }
@@ -486,7 +486,7 @@ namespace mongo {
             break;
         case BinData:
             s << "BinData";
-            if (full){
+            if (full) {
                 int len;
                 const char* data = binDataClean(len);
                 s << '(' << binDataType() << ", " << toHex(data, len) << ')';
@@ -537,8 +537,8 @@ namespace mongo {
     }
 
     inline BSONObj::BSONObj() {
-        /* little endian ordering here, but perhaps that is ok regardless as BSON is spec'd 
-           to be little endian external to the system. (i.e. the rest of the implementation of bson, 
+        /* little endian ordering here, but perhaps that is ok regardless as BSON is spec'd
+           to be little endian external to the system. (i.e. the rest of the implementation of bson,
            not this part, fails to support big endian)
         */
         static char p[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
@@ -547,7 +547,7 @@ namespace mongo {
 
     inline BSONObj BSONElement::Obj() const { return embeddedObjectUserCheck(); }
 
-    inline BSONElement BSONElement::operator[] (const string& field) const { 
+    inline BSONElement BSONElement::operator[] (const string& field) const {
         BSONObj o = Obj();
         return o[field];
     }
@@ -558,14 +558,14 @@ namespace mongo {
             v.push_back(i.next());
     }
 
-    inline void BSONObj::elems(list<BSONElement> &v) const { 
+    inline void BSONObj::elems(list<BSONElement> &v) const {
         BSONObjIterator i(*this);
         while( i.more() )
             v.push_back(i.next());
     }
 
     template <class T>
-    void BSONObj::Vals(vector<T>& v) const { 
+    void BSONObj::Vals(vector<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             T t;
@@ -574,7 +574,7 @@ namespace mongo {
         }
     }
     template <class T>
-    void BSONObj::Vals(list<T>& v) const { 
+    void BSONObj::Vals(list<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             T t;
@@ -584,25 +584,27 @@ namespace mongo {
     }
 
     template <class T>
-    void BSONObj::vals(vector<T>& v) const { 
+    void BSONObj::vals(vector<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             try {
                 T t;
                 i.next().Val(t);
                 v.push_back(t);
-            } catch(...) { }
+            }
+            catch(...) { }
         }
     }
     template <class T>
-    void BSONObj::vals(list<T>& v) const { 
+    void BSONObj::vals(list<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             try {
                 T t;
                 i.next().Val(t);
                 v.push_back(t);
-            } catch(...) { }
+            }
+            catch(...) { }
         }
     }
 

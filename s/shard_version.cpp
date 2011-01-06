@@ -35,9 +35,9 @@ namespace mongo {
     static void resetShardVersion( DBClientBase * conn );
 
     void installChunkShardVersioning() {
-        // 
+        //
         // Overriding no-op behavior in shardconnection.cpp
-        // 
+        //
         // TODO: Better encapsulate this mechanism.
         //
         checkShardVersionCB = checkShardVersion;
@@ -45,24 +45,24 @@ namespace mongo {
     }
 
     struct ConnectionShardStatus {
-        
+
         typedef unsigned long long S;
 
-        ConnectionShardStatus() 
-            : _mutex( "ConnectionShardStatus" ){
+        ConnectionShardStatus()
+            : _mutex( "ConnectionShardStatus" ) {
         }
 
-        S getSequence( DBClientBase * conn , const string& ns ){
+        S getSequence( DBClientBase * conn , const string& ns ) {
             scoped_lock lk( _mutex );
             return _map[conn][ns];
         }
 
-        void setSequence( DBClientBase * conn , const string& ns , const S& s ){
+        void setSequence( DBClientBase * conn , const string& ns , const S& s ) {
             scoped_lock lk( _mutex );
             _map[conn][ns] = s;
         }
 
-        void reset( DBClientBase * conn ){
+        void reset( DBClientBase * conn ) {
             scoped_lock lk( _mutex );
             _map.erase( conn );
         }
@@ -75,27 +75,27 @@ namespace mongo {
 
     } connectionShardStatus;
 
-    void resetShardVersion( DBClientBase * conn ){
+    void resetShardVersion( DBClientBase * conn ) {
         connectionShardStatus.reset( conn );
     }
-    
+
     /**
      * @return true if had to do something
      */
-    bool checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative , int tryNumber ){
+    bool checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative , int tryNumber ) {
         // TODO: cache, optimize, etc...
-        
+
         WriteBackListener::init( conn );
 
         DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf )
             return false;
-        
+
         unsigned long long officialSequenceNumber = 0;
-        
+
         ChunkManagerPtr manager;
         const bool isSharded = conf->isSharded( ns );
-        if ( isSharded ){
+        if ( isSharded ) {
             manager = conf->getChunkManager( ns , authoritative );
             officialSequenceNumber = manager->getSequenceNumber();
         }
@@ -103,40 +103,40 @@ namespace mongo {
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
         // (ie, last time we issued the setShardVersions below)
         unsigned long long sequenceNumber = connectionShardStatus.getSequence(&conn,ns);
-        if ( sequenceNumber == officialSequenceNumber ){
+        if ( sequenceNumber == officialSequenceNumber ) {
             return false;
         }
 
 
         ShardChunkVersion version = 0;
-        if ( isSharded ){
+        if ( isSharded ) {
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
-        
-        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
-               << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber 
+
+        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns
+               << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
                << endl;
-        
+
         BSONObj result;
-        if ( setShardVersion( conn , ns , version , authoritative , result ) ){
+        if ( setShardVersion( conn , ns , version , authoritative , result ) ) {
             // success!
             log(1) << "      setShardVersion success!" << endl;
             connectionShardStatus.setSequence( &conn , ns , officialSequenceNumber );
             return true;
         }
-        
+
         log(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result.getBoolField( "need_authoritative" ) )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
-        
-        if ( ! authoritative ){
+
+        if ( ! authoritative ) {
             checkShardVersion( conn , ns , 1 , tryNumber + 1 );
             return true;
         }
-        
-        if ( tryNumber < 4 ){
+
+        if ( tryNumber < 4 ) {
             log(1) << "going to retry checkShardVersion" << endl;
             sleepmillis( 10 );
             checkShardVersion( conn , ns , 1 , tryNumber + 1 );
@@ -147,5 +147,5 @@ namespace mongo {
         massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
         return true;
     }
-    
+
 }  // namespace mongo

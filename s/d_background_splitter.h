@@ -25,7 +25,7 @@
 namespace mongo {
 
     /**
-     * Traverses continuously this shard's chunk and splits the ones that are above the 
+     * Traverses continuously this shard's chunk and splits the ones that are above the
      * maximum desired size
      */
     class Splitter : public BackgroundJob {
@@ -40,5 +40,5 @@ namespace mongo {
         virtual string name() const { return "BackgroundSplitter"; }
     };
 
-} // namespace mongo    
-  
+} // namespace mongo
+

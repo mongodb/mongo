@@ -22,26 +22,26 @@
 
 namespace mongo {
 
-	typedef bool ( *ServiceCallback )( void );
+    typedef bool ( *ServiceCallback )( void );
     bool serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] );
 
     class ServiceController {
     public:
         ServiceController();
         virtual ~ServiceController() {}
-        
+
         static bool installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, const std::wstring& serviceUser, const std::wstring& servicePassword, const std::string dbpath, int argc, char* argv[] );
         static bool removeService( const std::wstring& serviceName );
         static bool startService( const std::wstring& serviceName, ServiceCallback startService );
         static bool reportStatus( DWORD reportState, DWORD waitHint = 0 );
-        
+
         static void WINAPI initService( DWORD argc, LPTSTR *argv );
-		static void WINAPI serviceCtrl( DWORD ctrlCode );
-    
+        static void WINAPI serviceCtrl( DWORD ctrlCode );
+
     protected:
-		static std::wstring _serviceName;
-		static SERVICE_STATUS_HANDLE _statusHandle;
-		static ServiceCallback _serviceCallback;
+        static std::wstring _serviceName;
+        static SERVICE_STATUS_HANDLE _statusHandle;
+        static ServiceCallback _serviceCallback;
     };
 
 } // namespace mongo

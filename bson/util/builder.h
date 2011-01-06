@@ -42,9 +42,9 @@ namespace mongo {
        is slightly larger than a user object for example.
     */
     const int BSONObjMaxInternalSize = BSONObjMaxUserSize + ( 16 * 1024 );
-    
+
     const int BufferMaxSize = 64 * 1024 * 1024;
-    
+
     class StringBuilder;
 
     void msgasserted(int msgid, const char *msg);
@@ -56,7 +56,8 @@ namespace mongo {
                 data = (char *) malloc(size);
                 if( data == 0 )
                     msgasserted(10000, "out of memory BufBuilder");
-            } else {
+            }
+            else {
                 data = 0;
             }
             l = 0;
@@ -72,16 +73,16 @@ namespace mongo {
             }
         }
 
-        void reset( int maxSize = 0 ){
+        void reset( int maxSize = 0 ) {
             l = 0;
-            if ( maxSize && size > maxSize ){
+            if ( maxSize && size > maxSize ) {
                 free(data);
                 data = (char*)malloc(maxSize);
                 size = maxSize;
-            }            
+            }
         }
 
-        /** leave room for some stuff later 
+        /** leave room for some stuff later
             @return point to region that was skipped.  pointer may change later (on realloc), so for immediate use only
         */
         char* skip(int n) { return grow(n); }
@@ -93,10 +94,10 @@ namespace mongo {
         /* assume ownership of the buffer - you must then free() it */
         void decouple() { data = 0; }
 
-        void appendChar(char j){
+        void appendChar(char j) {
             *((char*)grow(sizeof(char))) = j;
         }
-        void appendNum(char j){
+        void appendNum(char j) {
             *((char*)grow(sizeof(char))) = j;
         }
         void appendNum(short j) {
@@ -126,7 +127,7 @@ namespace mongo {
         }
 
         template<class T>
-        void appendStruct(const T& s) { 
+        void appendStruct(const T& s) {
             appendBuf(&s, sizeof(T));
         }
 
@@ -151,7 +152,7 @@ namespace mongo {
 
     private:
         /* "slow" portion of 'grow()'  */
-        void NOINLINE_DECL grow_reallocate(){
+        void NOINLINE_DECL grow_reallocate() {
             int a = size * 2;
             if ( a == 0 )
                 a = 512;
@@ -180,45 +181,45 @@ namespace mongo {
     class StringBuilder {
     public:
         StringBuilder( int initsize=256 )
-            : _buf( initsize ){
+            : _buf( initsize ) {
         }
 
-        StringBuilder& operator<<( double x ){
+        StringBuilder& operator<<( double x ) {
             return SBNUM( x , 25 , "%g" );
         }
-        StringBuilder& operator<<( int x ){
+        StringBuilder& operator<<( int x ) {
             return SBNUM( x , 11 , "%d" );
         }
-        StringBuilder& operator<<( unsigned x ){
+        StringBuilder& operator<<( unsigned x ) {
             return SBNUM( x , 11 , "%u" );
         }
-        StringBuilder& operator<<( long x ){
+        StringBuilder& operator<<( long x ) {
             return SBNUM( x , 22 , "%ld" );
         }
-        StringBuilder& operator<<( unsigned long x ){
+        StringBuilder& operator<<( unsigned long x ) {
             return SBNUM( x , 22 , "%lu" );
         }
-        StringBuilder& operator<<( long long x ){
+        StringBuilder& operator<<( long long x ) {
             return SBNUM( x , 22 , "%lld" );
         }
-        StringBuilder& operator<<( unsigned long long x ){
+        StringBuilder& operator<<( unsigned long long x ) {
             return SBNUM( x , 22 , "%llu" );
         }
-        StringBuilder& operator<<( short x ){
+        StringBuilder& operator<<( short x ) {
             return SBNUM( x , 8 , "%hd" );
         }
-        StringBuilder& operator<<( char c ){
+        StringBuilder& operator<<( char c ) {
             _buf.grow( 1 )[0] = c;
             return *this;
         }
 
-        void appendDoubleNice( double x ){
+        void appendDoubleNice( double x ) {
             int prev = _buf.l;
             char * start = _buf.grow( 32 );
             int z = sprintf( start , "%.16g" , x );
             assert( z >= 0 );
             _buf.l = prev + z;
-            if( strchr(start, '.') == 0 && strchr(start, 'E') == 0 && strchr(start, 'N') == 0 ){
+            if( strchr(start, '.') == 0 && strchr(start, 'E') == 0 && strchr(start, 'N') == 0 ) {
                 write( ".0" , 2 );
             }
         }
@@ -227,13 +228,13 @@ namespace mongo {
 
         void append( const StringData& str ) { memcpy( _buf.grow( str.size() ) , str.data() , str.size() ); }
 
-        StringBuilder& operator<<( const StringData& str ){
+        StringBuilder& operator<<( const StringData& str ) {
             append( str );
             return *this;
         }
-        
+
         void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
-        
+
         std::string str() const { return std::string(_buf.data, _buf.l); }
 
     private:
@@ -249,7 +250,7 @@ namespace mongo {
             int z = sprintf( _buf.grow(maxSize) , macro , (val) );
             assert( z >= 0 );
             _buf.l = prev + z;
-            return *this; 
+            return *this;
         }
     };
 

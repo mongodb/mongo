@@ -1,4 +1,4 @@
-/** @file jsobj.h 
+/** @file jsobj.h
     BSON classes
 */
 

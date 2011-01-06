@@ -26,7 +26,7 @@
 #include "util.h"
 
 namespace mongo {
-    
+
     typedef ShardChunkVersion ConfigVersion;
     typedef map<string,ConfigVersion> NSVersionMap;
 
@@ -37,23 +37,23 @@ namespace mongo {
     class ShardingState {
     public:
         ShardingState();
-        
+
         bool enabled() const { return _enabled; }
         const string& getConfigServer() const { return _configServer; }
         void enable( const string& server );
 
         void gotShardName( const string& name );
         void gotShardHost( string host );
-        
+
         // versioning support
 
         bool hasVersion( const string& ns );
         bool hasVersion( const string& ns , ConfigVersion& version );
         const ConfigVersion getVersion( const string& ns ) const;
-        
+
         /**
-         * Uninstalls the manager for a given collection. This should be used when the collection is dropped. 
-         * 
+         * Uninstalls the manager for a given collection. This should be used when the collection is dropped.
+         *
          * NOTE:
          *   An existing collection with no chunks on this shard will have a manager on version 0, which is different than a
          *   a dropped collection, which will not have a manager.
@@ -77,9 +77,9 @@ namespace mongo {
          * @return true if the access can be allowed at the provided version
          */
         bool trySetVersion( const string& ns , ConfigVersion& version );
-        
+
         void appendInfo( BSONObjBuilder& b );
-        
+
         // querying support
 
         bool needShardChunkManager( const string& ns ) const;
@@ -87,7 +87,7 @@ namespace mongo {
 
         // chunk migrate and split support
 
-        /** 
+        /**
          * Creates and installs a new chunk manager for a given collection by "forgetting" about one of its chunks.
          * The new manager uses the provided version, which has to be higher than the current manager's.
          * One exception: if the forgotten chunk is the last one in this shard for the collection, version has to be 0.
@@ -104,7 +104,7 @@ namespace mongo {
          * Creates and installs a new chunk manager for a given collection by reclaiming a previously donated chunk.
          * The previous manager's version has to be provided.
          *
-         * If it runs successfully, clients that became stale by the previous donateChunk will be able to access the 
+         * If it runs successfully, clients that became stale by the previous donateChunk will be able to access the
          * collection again.
          *
          * @param ns the collection
@@ -123,19 +123,19 @@ namespace mongo {
          *
          * @param ns the collection
          * @param min max the chunk that should be split
-         * @param splitKeys point in which to split 
+         * @param splitKeys point in which to split
          * @param version at which the new manager should be at
          */
         void splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
                          ShardChunkVersion version );
 
         bool inCriticalMigrateSection();
-       
-    private: 
+
+    private:
         bool _enabled;
-        
+
         string _configServer;
-        
+
         string _shardName;
         string _shardHost;
 
@@ -147,7 +147,7 @@ namespace mongo {
         typedef map<string,ShardChunkManagerPtr> ChunkManagersMap;
         ChunkManagersMap _chunks;
     };
-    
+
     extern ShardingState shardingState;
 
     /**
@@ -157,26 +157,26 @@ namespace mongo {
     class ShardedConnectionInfo {
     public:
         ShardedConnectionInfo();
-        
+
         const OID& getID() const { return _id; }
         bool hasID() const { return _id.isSet(); }
         void setID( const OID& id );
-        
+
         const ConfigVersion getVersion( const string& ns ) const;
         void setVersion( const string& ns , const ConfigVersion& version );
-        
+
         static ShardedConnectionInfo* get( bool create );
         static void reset();
-        
-        bool inForceVersionOkMode() const { 
+
+        bool inForceVersionOkMode() const {
             return _forceVersionOk;
         }
-        
-        void enterForceVersionOkMode(){ _forceVersionOk = true; }
-        void leaveForceVersionOkMode(){ _forceVersionOk = false; }
+
+        void enterForceVersionOkMode() { _forceVersionOk = true; }
+        void leaveForceVersionOkMode() { _forceVersionOk = false; }
 
     private:
-        
+
         OID _id;
         NSVersionMap _versions;
         bool _forceVersionOk; // if this is true, then chunk version #s aren't check, and all ops are allowed
@@ -185,31 +185,31 @@ namespace mongo {
     };
 
     struct ShardForceVersionOkModeBlock {
-        ShardForceVersionOkModeBlock(){
+        ShardForceVersionOkModeBlock() {
             info = ShardedConnectionInfo::get( false );
             if ( info )
                 info->enterForceVersionOkMode();
         }
-        ~ShardForceVersionOkModeBlock(){
+        ~ShardForceVersionOkModeBlock() {
             if ( info )
                 info->leaveForceVersionOkMode();
         }
 
         ShardedConnectionInfo * info;
     };
-    
+
     // -----------------
     // --- core ---
     // -----------------
 
     unsigned long long extractVersion( BSONElement e , string& errmsg );
 
-    
+
     /**
      * @return true if we have any shard info for the ns
      */
     bool haveLocalShardingInfo( const string& ns );
-    
+
     /**
      * @return true if the current threads shard version is ok, or not in sharded version
      */

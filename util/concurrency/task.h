@@ -20,9 +20,9 @@
 
 #include "../background.h"
 
-namespace mongo { 
+namespace mongo {
 
-    namespace task { 
+    namespace task {
 
         /** abstraction around threads.  simpler than BackgroundJob which is used behind the scenes.
             allocate the Task dynamically.  when the thread terminates, the Task object will delete itself.
@@ -34,7 +34,7 @@ namespace mongo {
         public:
             Task();
 
-            /** for a repeating task, stop after current invocation ends. can be called by other threads 
+            /** for a repeating task, stop after current invocation ends. can be called by other threads
                 as long as the Task is still in scope.
                 */
             void halt();
@@ -54,8 +54,8 @@ namespace mongo {
         void repeat(Task *t, unsigned millis);
 
         /*** Example ***
-        inline void sample() { 
-            class Sample : public Task { 
+        inline void sample() {
+            class Sample : public Task {
             public:
                 int result;
                 virtual void doWork() { result = 1234; }

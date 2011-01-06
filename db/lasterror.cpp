@@ -34,14 +34,16 @@ namespace mongo {
     void raiseError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
-            /* might be intentional (non-user thread) */    
+            /* might be intentional (non-user thread) */
             DEV {
                 static unsigned n;
                 if( ++n < 4 && !isShell ) log() << "dev: lastError==0 won't report:" << msg << endl;
             }
-        } else if ( le->disabled ) {
+        }
+        else if ( le->disabled ) {
             log() << "lastError disabled, can't report: " << code << ":" << msg << endl;
-        } else {
+        }
+        else {
             le->raiseError(code, msg);
         }
     }
@@ -56,8 +58,8 @@ namespace mongo {
 
         if ( msg.empty() ) {
             if ( blankErr ) {
-                b.appendNull( "err" ); 
-            } 
+                b.appendNull( "err" );
+            }
         }
         else {
             b.append( "err", msg );
@@ -72,12 +74,12 @@ namespace mongo {
         if ( writebackId.isSet() )
             b.append( "writeback" , writebackId );
         b.appendNumber( "n", nObjects );
-        
+
         return ! msg.empty();
     }
 
-    LastErrorHolder::~LastErrorHolder(){
-        for ( IDMap::iterator i = _ids.begin(); i != _ids.end(); ++i ){
+    LastErrorHolder::~LastErrorHolder() {
+        for ( IDMap::iterator i = _ids.begin(); i != _ids.end(); ++i ) {
             delete i->second.lerr;
             i->second.lerr = 0;
         }
@@ -85,11 +87,11 @@ namespace mongo {
     }
 
 
-    void LastErrorHolder::setID( int id ){
+    void LastErrorHolder::setID( int id ) {
         _id.set( id );
     }
-    
-    int LastErrorHolder::getID(){
+
+    int LastErrorHolder::getID() {
         return _id.get();
     }
 
@@ -107,24 +109,24 @@ namespace mongo {
             return ret;
         return 0;
     }
-    
-    LastError * LastErrorHolder::_get( bool create ){
+
+    LastError * LastErrorHolder::_get( bool create ) {
         int id = _id.get();
-        if ( id == 0 ){
+        if ( id == 0 ) {
             LastError * le = _tl.get();
-            if ( ! le && create ){
+            if ( ! le && create ) {
                 le = new LastError();
                 _tl.reset( le );
             }
             return le;
         }
 
-        scoped_lock lock(_idsmutex);        
+        scoped_lock lock(_idsmutex);
         map<int,Status>::iterator i = _ids.find( id );
-        if ( i == _ids.end() ){
+        if ( i == _ids.end() ) {
             if ( ! create )
                 return 0;
-            
+
             LastError * le = new LastError();
             Status s;
             s.time = time(0);
@@ -132,42 +134,42 @@ namespace mongo {
             _ids[id] = s;
             return le;
         }
-        
+
         Status &status = i->second;
         status.time = time(0);
         return status.lerr;
     }
 
-    void LastErrorHolder::remove( int id ){
+    void LastErrorHolder::remove( int id ) {
         scoped_lock lock(_idsmutex);
         map<int,Status>::iterator i = _ids.find( id );
         if ( i == _ids.end() )
             return;
-        
+
         delete i->second.lerr;
         _ids.erase( i );
     }
 
-    void LastErrorHolder::release(){
+    void LastErrorHolder::release() {
         int id = _id.get();
-        if ( id == 0 ){
+        if ( id == 0 ) {
             _tl.release();
             return;
         }
-        
+
         remove( id );
     }
 
     /** ok to call more than once. */
-    void LastErrorHolder::initThread() { 
+    void LastErrorHolder::initThread() {
         if( _tl.get() ) return;
         assert( _id.get() == 0 );
         _tl.reset( new LastError() );
     }
-    
-    void LastErrorHolder::reset( LastError * le ){
+
+    void LastErrorHolder::reset( LastError * le ) {
         int id = _id.get();
-        if ( id == 0 ){
+        if ( id == 0 ) {
             _tl.reset( le );
             return;
         }
@@ -177,17 +179,18 @@ namespace mongo {
         status.time = time(0);
         status.lerr = le;
     }
-    
+
     void prepareErrForNewRequest( Message &m, LastError * err ) {
         // a killCursors message shouldn't affect last error
         if ( m.operation() == dbKillCursors ) {
             err->disabled = true;
-        } else {
+        }
+        else {
             err->disabled = false;
             err->nPrev++;
-        }        
+        }
     }
-    
+
     LastError * LastErrorHolder::startRequest( Message& m , int clientId ) {
         assert( clientId );
         setID( clientId );
@@ -201,33 +204,33 @@ namespace mongo {
         prepareErrForNewRequest( m, connectionOwned );
     }
 
-    void LastErrorHolder::disconnect( int clientId ){
+    void LastErrorHolder::disconnect( int clientId ) {
         if ( clientId )
             remove(clientId);
     }
 
     struct LastErrorHolderTest : public UnitTest {
     public:
-        
-        void test( int i ){
+
+        void test( int i ) {
             _tl.set( i );
             assert( _tl.get() == i );
         }
-        
-        void tlmaptest(){
+
+        void tlmaptest() {
             test( 1 );
             test( 12123123 );
             test( -123123 );
             test( numeric_limits<int>::min() );
             test( numeric_limits<int>::max() );
         }
-        
-        void run(){
+
+        void run() {
             tlmaptest();
 
             LastError * a = new LastError();
             LastError * b = new LastError();
-            
+
             LastErrorHolder holder;
             holder.reset( a );
             assert( a == holder.get() );
@@ -237,10 +240,10 @@ namespace mongo {
             assert( b == holder.get() );
             holder.setID( 0 );
             assert( a == holder.get() );
-            
+
             holder.remove( 1 );
         }
-        
+
         ThreadLocalValue<int> _tl;
     } lastErrorHolderTest;
 

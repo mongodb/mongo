@@ -43,27 +43,27 @@ using namespace std;
 
 namespace mongo {
 
-    bool handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ){
+    bool handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
         if ( ! shardingState.enabled() )
             return false;
 
         int op = m.operation();
-        if ( op < 2000 
-             || op >= 3000 
-             || op == dbGetMore  // cursors are weird
-             )
+        if ( op < 2000
+                || op >= 3000
+                || op == dbGetMore  // cursors are weird
+           )
             return false;
-        
-        DbMessage d(m);        
+
+        DbMessage d(m);
         const char *ns = d.getns();
         string errmsg;
-        if ( shardVersionOk( ns , opIsWrite( op ) , errmsg ) ){
+        if ( shardVersionOk( ns , opIsWrite( op ) , errmsg ) ) {
             return false;
         }
 
         log(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
-        
-        if ( doesOpGetAResponse( op ) ){
+
+        if ( doesOpGetAResponse( op ) ) {
             assert( dbresponse );
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
@@ -71,7 +71,7 @@ namespace mongo {
                 BSONObj obj = BSON( "$err" << errmsg );
                 b.appendBuf( obj.objdata() , obj.objsize() );
             }
-            
+
             QueryResult *qr = (QueryResult*)b.buf();
             qr->_resultFlags() = ResultFlag_ErrSet | ResultFlag_ShardConfigStale;
             qr->len = b.len();
@@ -83,19 +83,19 @@ namespace mongo {
 
             Message * resp = new Message();
             resp->setData( qr , true );
-            
+
             dbresponse->response = resp;
             dbresponse->responseTo = m.header()->id;
             return true;
         }
-        
+
         OID writebackID;
         writebackID.init();
         lastError.getSafe()->writeback( writebackID );
 
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
-        
+
         log(1) << "got write with an old config - writing back ns: " << ns << endl;
         if ( logLevel ) log(1) << debugString( m ) << endl;
 

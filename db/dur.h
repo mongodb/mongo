@@ -8,10 +8,10 @@
 namespace mongo {
 
     class NamespaceDetails;
-    
+
     namespace dur {
 
-        /** Call during startup so durability module can initialize 
+        /** Call during startup so durability module can initialize
             Throws if fatal error
             Does nothing if cmdLine.dur is false
          */
@@ -25,13 +25,13 @@ namespace mongo {
             const bool _wasDur;
         };
 
-        class DurableInterface : boost::noncopyable { 
+        class DurableInterface : boost::noncopyable {
         public:
             virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
 
-            /** Declare that a file has been created 
-                Normally writes are applied only after journalling, for safety.  But here the file 
-                is created first, and the journal will just replay the creation if the create didn't 
+            /** Declare that a file has been created
+                Normally writes are applied only after journalling, for safety.  But here the file
+                is created first, and the journal will just replay the creation if the create didn't
                 happen because of crashing.
             */
             virtual void createdFile(string filename, unsigned long long len) = 0;
@@ -40,20 +40,20 @@ namespace mongo {
             virtual void droppingDb(string db) = 0;
 
             /** Declarations of write intent.
-            
-                Use these methods to declare "i'm about to write to x and it should be logged for redo." 
-            
+
+                Use these methods to declare "i'm about to write to x and it should be logged for redo."
+
                 Failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
-                (i.e., you'll segfault if the code is covered in that situation).  The _DEBUG check doesn't 
+                (i.e., you'll segfault if the code is covered in that situation).  The _DEBUG check doesn't
                 verify that your length is correct though.
             */
 
-            /** declare intent to write to x for up to len 
+            /** declare intent to write to x for up to len
                 @return pointer where to write.  this is modified when testIntent is true.
             */
             virtual void* writingPtr(void *x, unsigned len) = 0;
 
-            /** declare write intent; should already be in the write view to work correctly when testIntent is true. 
+            /** declare write intent; should already be in the write view to work correctly when testIntent is true.
                 if you aren't, use writingPtr() instead.
             */
             virtual void declareWriteIntent(void *x, unsigned len) = 0;
@@ -64,7 +64,7 @@ namespace mongo {
                 @return new buffer pointer.  this is modified when testIntent is true.
             */
             virtual void* writingAtOffset(void *buf, unsigned ofs, unsigned len) = 0;
-            
+
             /** declare intent to write
                 @param ranges vector of pairs representing ranges.  Each pair
                 comprises an offset from buf where a range begins, then the
@@ -72,8 +72,8 @@ namespace mongo {
                 @return new buffer pointer.  this is modified when testIntent is true.
              */
             virtual void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges ) = 0;
-            
-            /** Wait for acknowledgement of the next group commit. 
+
+            /** Wait for acknowledgement of the next group commit.
                 @return true if --dur is on.  There will be delay.
                 @return false if --dur is off.
             */
@@ -81,12 +81,12 @@ namespace mongo {
 
             /** Commit immediately.
 
-                Generally, you do not want to do this often, as highly granular committing may affect 
+                Generally, you do not want to do this often, as highly granular committing may affect
                 performance.
-                
+
                 Does not return until the commit is complete.
 
-                You must be at least read locked when you call this.  Ideally, you are not write locked 
+                You must be at least read locked when you call this.  Ideally, you are not write locked
                 and then read operations can occur concurrently.
 
                 @return true if --dur is on.
@@ -114,18 +114,18 @@ namespace mongo {
             */
             template <typename T>
             inline
-            T* alreadyDeclared(T *x) { 
+            T* alreadyDeclared(T *x) {
 #if defined(_TESTINTENT)
                 return (T*) MongoMMF::switchToPrivateView(x);
 #else
-                return x; 
+                return x;
 #endif
             }
 
             /** declare intent to write to x for sizeof(*x) */
-            template <typename T> 
-            inline 
-            T* writing(T *x) { 
+            template <typename T>
+            inline
+            T* writing(T *x) {
                 return (T*) writingPtr(x, sizeof(T));
             }
 
@@ -136,15 +136,15 @@ namespace mongo {
             virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 
             /* assert that we have not (at least so far) declared write intent for p */
-            inline void assertReading(void *p) { 
-                dassert( !testIntent || MongoMMF::switchToPrivateView(p) != p ); 
+            inline void assertReading(void *p) {
+                dassert( !testIntent || MongoMMF::switchToPrivateView(p) != p );
             }
 
             static DurableInterface& getDur() { return *_impl; }
 
         private:
             /** Intentionally unimplemented method.
-             It's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect. 
+             It's very easy to manipulate Record::data open ended.  Thus a call to writing(Record*) is suspect.
              This will override the templated version and yield an unresolved external.
              */
             Record* writing(Record* r);
@@ -152,7 +152,7 @@ namespace mongo {
             BtreeBucket* writing( BtreeBucket* );
             /** Intentionally unimplemented method. NamespaceDetails may be based on references to 'Extra' objects. */
             NamespaceDetails* writing( NamespaceDetails* );
-                        
+
             static DurableInterface* _impl; // NonDurableImpl at startup()
             static void enableDurability(); // makes _impl a DurableImpl
             static void disableDurability(); // makes _impl a NonDurableImpl

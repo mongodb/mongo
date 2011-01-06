@@ -33,22 +33,22 @@ namespace mongo {
     class MongoDataFile;
 
 #pragma pack(1)
-	/** represents a disk location/offset on disk in a database.  64 bits. 
-		it is assumed these will be passed around by value a lot so don't do anything to make them large 
-		(such as adding a virtual function)
-	 */
+    /** represents a disk location/offset on disk in a database.  64 bits.
+        it is assumed these will be passed around by value a lot so don't do anything to make them large
+        (such as adding a virtual function)
+     */
     class DiskLoc {
         int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 
     public:
 
-        enum SentinelValues { 
+        enum SentinelValues {
             NullOfs = -1,
             MaxFiles=16000 // thus a limit of about 32TB of data per db
-		};
+        };
 
-	    DiskLoc(int a, int b) : _a(a), ofs(b) { }
+        DiskLoc(int a, int b) : _a(a), ofs(b) { }
         DiskLoc() { Null(); }
         DiskLoc(const DiskLoc& l) {
             _a=l._a;
@@ -68,7 +68,7 @@ namespace mongo {
         }
         void assertOk() { assert(!isNull()); }
         void setInvalid() {
-            _a = -2; 
+            _a = -2;
             ofs = 0;
         }
         bool isValid() const { return _a != -2; }

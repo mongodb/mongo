@@ -40,7 +40,7 @@ int main( int argc, const char **argv ) {
             throw -12;
         port = argv[ 2 ];
     }
-    
+
     mongo::DBClientConnection conn;
     string errmsg;
     if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
@@ -48,14 +48,15 @@ int main( int argc, const char **argv ) {
         throw -11;
     }
 
-    { // clean up old data from any previous tests
+    {
+        // clean up old data from any previous tests
         mongo::BSONObjBuilder query;
         conn.remove( "test.people" , query.obj() );
     }
 
     insert( conn , "eliot" , 15 );
     insert( conn , "sara" , 23 );
-    
+
     {
         mongo::BSONObjBuilder query;
         auto_ptr<mongo::DBClientCursor> cursor = conn.query( "test.people" , query.obj() );
@@ -66,14 +67,14 @@ int main( int argc, const char **argv ) {
         }
 
     }
-    
+
     {
         mongo::BSONObjBuilder query;
         query.append( "name" , "eliot" );
         mongo::BSONObj res = conn.findOne( "test.people" , query.obj() );
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
-    
+
     {
         mongo::BSONObjBuilder query;
         query.append( "name" , "asd" );

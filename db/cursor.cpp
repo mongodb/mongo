@@ -24,11 +24,13 @@ namespace mongo {
         killCurrentOp.checkForInterrupt();
         if ( eof() ) {
             if ( tailable_ && !last.isNull() ) {
-                curr = s->next( last );       
-            } else {
+                curr = s->next( last );
+            }
+            else {
                 return false;
             }
-        } else {
+        }
+        else {
             last = curr;
             curr = s->next( curr );
         }
@@ -73,7 +75,7 @@ namespace mongo {
     }
 
     ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd, const DiskLoc &startLoc ) :
-            nsd( _nsd ) {
+        nsd( _nsd ) {
         if ( !nsd )
             return;
         DiskLoc start = startLoc;
@@ -114,14 +116,15 @@ namespace mongo {
     }
 
     ReverseCappedCursor::ReverseCappedCursor( NamespaceDetails *_nsd, const DiskLoc &startLoc ) :
-            nsd( _nsd ) {
+        nsd( _nsd ) {
         if ( !nsd )
             return;
         DiskLoc start = startLoc;
         if ( start.isNull() ) {
             if ( !nsd->capLooped() ) {
                 start = nsd->lastRecord();
-            } else {
+            }
+            else {
                 start = nsd->capExtent.ext()->lastRecord;
             }
         }
@@ -141,7 +144,8 @@ namespace mongo {
             if ( i == nextLoop( nsd, nsd->capExtent.ext()->lastRecord ) ) {
                 return DiskLoc();
             }
-        } else {
+        }
+        else {
             if ( i == nsd->capExtent.ext()->firstRecord ) {
                 return DiskLoc();
             }

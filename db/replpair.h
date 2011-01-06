@@ -55,8 +55,8 @@ namespace mongo {
         int remotePort;
         string remoteHost;
         string remote; // host:port if port specified.
-	//    int date; // -1 not yet set; 0=slave; 1=master
-        
+        //    int date; // -1 not yet set; 0=slave; 1=master
+
         string getInfo() {
             stringstream ss;
             ss << "  state:   ";
@@ -113,12 +113,12 @@ namespace mongo {
     */
     inline bool _isMaster() {
         if( replSet ) {
-            if( theReplSet ) 
+            if( theReplSet )
                 return theReplSet->isPrimary();
             return false;
         }
 
-        if( ! replSettings.slave ) 
+        if( ! replSettings.slave )
             return true;
 
         if ( replAllDead )
@@ -128,17 +128,17 @@ namespace mongo {
             if( replPair->state == ReplPair::State_Master )
                 return true;
         }
-        else { 
+        else {
             if( replSettings.master ) {
-                // if running with --master --slave, allow.  note that master is also true 
+                // if running with --master --slave, allow.  note that master is also true
                 // for repl pairs so the check for replPair above is important.
                 return true;
             }
         }
-        
+
         if ( cc().isGod() )
             return true;
-        
+
         return false;
     }
     inline bool isMaster(const char *client = 0) {
@@ -152,12 +152,12 @@ namespace mongo {
         return strcmp( client, "local" ) == 0;
     }
 
-    inline void notMasterUnless(bool expr) { 
+    inline void notMasterUnless(bool expr) {
         uassert( 10107 , "not master" , expr );
     }
 
-    /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
-       so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
+    /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair
+       so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to
        query the nonmaster member of a replica pair.
     */
     inline void replVerifyReadsOk(ParsedQuery& pq) {
@@ -166,7 +166,8 @@ namespace mongo {
             if( isMaster() ) return;
             uassert(13435, "not master and slaveok=false", pq.hasOption(QueryOption_SlaveOk));
             uassert(13436, "not master or secondary, can't read", theReplSet && theReplSet->isSecondary() );
-        } else {
+        }
+        else {
             notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
         }
     }

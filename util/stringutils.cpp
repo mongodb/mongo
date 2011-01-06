@@ -20,13 +20,13 @@
 
 namespace mongo {
 
-    void splitStringDelim( const string& str , vector<string>* res , char delim ){
+    void splitStringDelim( const string& str , vector<string>* res , char delim ) {
         if ( str.empty() )
             return;
 
         size_t beg = 0;
         size_t pos = str.find( delim );
-        while ( pos != string::npos ){
+        while ( pos != string::npos ) {
             res->push_back( str.substr( beg, pos - beg) );
             beg = ++pos;
             pos = str.find( delim, beg );
@@ -34,8 +34,8 @@ namespace mongo {
         res->push_back( str.substr( beg ) );
     }
 
-    void joinStringDelim( const vector<string>& strs , string* res , char delim ){
-        for ( vector<string>::const_iterator it = strs.begin(); it != strs.end(); ++it ){
+    void joinStringDelim( const vector<string>& strs , string* res , char delim ) {
+        for ( vector<string>::const_iterator it = strs.begin(); it != strs.end(); ++it ) {
             if ( it !=strs.begin() ) res->push_back( delim );
             res->append( *it );
         }

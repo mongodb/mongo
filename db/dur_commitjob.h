@@ -29,7 +29,7 @@
 
 //#define DEBUG_WRITE_INTENT 1
 
-namespace mongo { 
+namespace mongo {
     namespace dur {
 
         /** declaration of an intent to write to a region of a memory mapped view
@@ -37,7 +37,7 @@ namespace mongo {
          * We store the end rather than the start pointer to make operator< faster
          * since that is heavily used in set lookup.
          */
-        struct WriteIntent /* copyable */ { 
+        struct WriteIntent { /* copyable */
             WriteIntent() : w_ptr(0), p(0) { }
             WriteIntent(void *a, unsigned b) : w_ptr(0), p((char*)a+b), len(b) { }
 
@@ -65,7 +65,7 @@ namespace mongo {
             }
 
             mutable void *w_ptr;  // writable mapping of p.
-                                  // mutable because set::iterator is const but this isn't used in op<
+            // mutable because set::iterator is const but this isn't used in op<
 #if defined(_EXPERIMENTAL)
             mutable unsigned ofsInJournalBuffer;
 #endif
@@ -74,7 +74,7 @@ namespace mongo {
             unsigned len; // up to this len
         };
 
-        /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent - 
+        /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent -
            we will just log them twice.
         */
         template<int Prime>
@@ -90,7 +90,7 @@ namespace mongo {
             bool checkAndSet(void* p, int len) {
                 unsigned x = mongoutils::hashPointer(p);
                 pair<void*, int> nd = nodes[x % N];
-                if( nd.first == p ) { 
+                if( nd.first == p ) {
                     if( nd.second < len ) {
                         nd.second = len;
                         return false; // haven't indicated this len yet
@@ -110,7 +110,7 @@ namespace mongo {
         /** our record of pending/uncommitted write intents */
         class Writes : boost::noncopyable {
             struct D {
-                void *p;     
+                void *p;
                 unsigned len;
                 static void go(const D& d);
             };
@@ -125,9 +125,9 @@ namespace mongo {
             void clear();
 
             /** merges into set (ie non-deferred version) */
-            void _insertWriteIntent(void* p, int len); 
+            void _insertWriteIntent(void* p, int len);
 
-            void insertWriteIntent(void* p, int len) { 
+            void insertWriteIntent(void* p, int len) {
 #if defined(DEBUG_WRITE_INTENT)
                 if( _debug[p] < len )
                     _debug[p] = len;
@@ -135,7 +135,7 @@ namespace mongo {
                 D d;
                 d.p = p;
                 d.len = len;
-                _deferred.defer(d); 
+                _deferred.defer(d);
             }
 
 #ifdef _DEBUG
@@ -158,7 +158,7 @@ namespace mongo {
                          for example note() invocations are from the write lock.
                          other uses are in a read lock from a single thread (durThread)
         */
-        class CommitJob : boost::noncopyable { 
+        class CommitJob : boost::noncopyable {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
@@ -170,19 +170,19 @@ namespace mongo {
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
 
-            set<WriteIntent>& writes() { 
+            set<WriteIntent>& writes() {
                 if( !_wi._drained ) {
                     // generally, you don't want to use the set until it is prepared (after deferred ops are applied)
                     // thus this assert here.
-                    assert(false); 
+                    assert(false);
                 }
-                return _wi._writes; 
+                return _wi._writes;
             }
 
             vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
-            /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even 
-                trying to acquire a lock, which might be helpful at times. 
+            /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even
+                trying to acquire a lock, which might be helpful at times.
             */
             bool hasWritten() const { return _hasWritten; }
 
@@ -192,10 +192,10 @@ namespace mongo {
             /** the commit code calls this when data reaches the journal (on disk) */
             void notifyCommitted() { _notify.notifyAll(); }
 
-            /** Wait until the next group commit occurs. That is, wait until someone calls notifyCommitted. */ 
-            void awaitNextCommit() { 
+            /** Wait until the next group commit occurs. That is, wait until someone calls notifyCommitted. */
+            void awaitNextCommit() {
                 if( hasWritten() )
-                    _notify.wait(); 
+                    _notify.wait();
             }
 
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
@@ -217,8 +217,8 @@ namespace mongo {
         // inlines
 
         inline void CommitJob::note(void* p, int len) {
-            // from the point of view of the dur module, it would be fine (i think) to only 
-            // be read locked here.  but must be at least read locked to avoid race with 
+            // from the point of view of the dur module, it would be fine (i think) to only
+            // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
             DEV dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
@@ -232,25 +232,25 @@ namespace mongo {
                 }
 
                 /** tips for debugging:
-                        if you have an incorrect diff between data files in different folders 
+                        if you have an incorrect diff between data files in different folders
                         (see jstests/dur/quick.js for example),
-                        turn this on and see what is logged.  if you have a copy of its output from before the 
+                        turn this on and see what is logged.  if you have a copy of its output from before the
                         regression, a simple diff of these lines would tell you a lot likely.
                 */
 #if 0 && defined(_DEBUG)
-                { 
+                {
                     static int n;
-                    if( ++n < 10000 ) { 
+                    if( ++n < 10000 ) {
                         size_t ofs;
                         MongoMMF *mmf = privateViews._find(w.p, ofs);
                         if( mmf ) {
                             log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
                         }
-                        else { 
+                        else {
                             log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
                         }
                     }
-                    else if( n == 10000 ) { 
+                    else if( n == 10000 ) {
                         log() << "DEBUG stopping write intent logging, too much to log" << endl;
                     }
                 }

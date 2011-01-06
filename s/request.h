@@ -26,16 +26,16 @@
 
 namespace mongo {
 
-    
+
     class OpCounters;
     class ClientInfo;
-    
+
     class Request : boost::noncopyable {
     public:
         Request( Message& m, AbstractMessagingPort* p );
 
         // ---- message info -----
-        
+
 
         const char * getns() const {
             return _d.getns();
@@ -60,12 +60,12 @@ namespace mongo {
             assert( _didInit );
             return _config->isShardingEnabled();
         }
-        
+
         ChunkManagerPtr getChunkManager() const {
             assert( _didInit );
             return _chunkManager;
         }
-        
+
         int getClientId() const {
             return _clientId;
         }
@@ -74,14 +74,14 @@ namespace mongo {
         }
 
         // ---- remote location info -----
-        
-        
+
+
         Shard primaryShard() const ;
-        
+
         // ---- low level access ----
 
         void reply( Message & response , const string& fromServer );
-        
+
         Message& m() { return _m; }
         DbMessage& d() { return _d; }
         AbstractMessagingPort* p() const { return _p; }
@@ -93,16 +93,16 @@ namespace mongo {
         void init();
 
         void reset( bool reload=false );
-        
+
     private:
         Message& _m;
         DbMessage _d;
         AbstractMessagingPort* _p;
-        
+
         MSGID _id;
         DBConfigPtr _config;
         ChunkManagerPtr _chunkManager;
-        
+
         int _clientId;
         ClientInfo * _clientInfo;
 

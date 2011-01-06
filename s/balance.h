@@ -24,14 +24,14 @@
 #include "balancer_policy.h"
 
 namespace mongo {
-    
+
     /**
      * The balancer is a background task that tries to keep the number of chunks across all servers of the cluster even. Although
      * every mongos will have one balancer running, only one of them will be active at the any given point in time. The balancer
      * uses a 'DistributedLock' for that coordination.
      *
-     * The balancer does act continuously but in "rounds". At a given round, it would decide if there is an imbalance by 
-     * checking the difference in chunks between the most and least loaded shards. It would issue a request for a chunk 
+     * The balancer does act continuously but in "rounds". At a given round, it would decide if there is an imbalance by
+     * checking the difference in chunks between the most and least loaded shards. It would issue a request for a chunk
      * migration per round, if it found so.
      */
     class Balancer : public BackgroundJob {
@@ -43,7 +43,7 @@ namespace mongo {
 
         virtual void run();
 
-        virtual string name() const { return "Balancer"; }        
+        virtual string name() const { return "Balancer"; }
 
     private:
         typedef BalancerPolicy::ChunkInfo CandidateChunk;
@@ -56,10 +56,10 @@ namespace mongo {
         time_t _started;
 
         // number of moved chunks in last round
-        int _balancedLastTime; 
+        int _balancedLastTime;
 
         // decide which chunks to move; owned here.
-        BalancerPolicy* _policy;           
+        BalancerPolicy* _policy;
 
         /**
          * Checks that the balancer can connect to all servers it needs to do its job.
@@ -69,7 +69,7 @@ namespace mongo {
          * This method throws on a network exception
          */
         bool _init();
-        
+
         /**
          * Gathers all the necessary information about shards and chunks, and decides whether there are candidate chunks to
          * be moved.
@@ -81,7 +81,7 @@ namespace mongo {
 
         /**
          * Issues chunk migration request, one at a time.
-         * 
+         *
          * @param candidateChunks possible chunks to move
          * @return number of chunks effectively moved
          */
@@ -100,6 +100,6 @@ namespace mongo {
         bool _checkOIDs();
 
     };
-    
+
     extern Balancer balancer;
 }

@@ -29,20 +29,20 @@ namespace mongo {
 
         /**
          * Returns a suggested chunk to move whithin a collection's shards, given information about
-         * space usage and number of chunks for that collection. If the policy doesn't recommend 
+         * space usage and number of chunks for that collection. If the policy doesn't recommend
          * moving, it returns NULL.
          *
          * @param ns is the collections namepace.
-         * @param shardLimitMap is a map from shardId to an object that describes (for now) space 
+         * @param shardLimitMap is a map from shardId to an object that describes (for now) space
          * cap and usage. E.g.: { "maxSize" : <size_in_MB> , "usedSize" : <size_in_MB> }.
          * @param shardToChunksMap is a map from shardId to chunks that live there. A chunk's format
-         * is { }. 
+         * is { }.
          * @param balancedLastTime is the number of chunks effectively moved in the last round.
          * @returns NULL or ChunkInfo of the best move to make towards balacing the collection.
          */
         typedef map< string,BSONObj > ShardToLimitsMap;
         typedef map< string,vector<BSONObj> > ShardToChunksMap;
-        static ChunkInfo* balance( const string& ns, const ShardToLimitsMap& shardToLimitsMap,  
+        static ChunkInfo* balance( const string& ns, const ShardToLimitsMap& shardToLimitsMap,
                                    const ShardToChunksMap& shardToChunksMap, int balancedLastTime );
 
         // below exposed for testing purposes only -- treat it as private --
@@ -57,7 +57,7 @@ namespace mongo {
         static bool isSizeMaxed( BSONObj shardLimits );
 
         /**
-         * Returns true if 'shardLimist' contains a field "draining". Expects the optional field 
+         * Returns true if 'shardLimist' contains a field "draining". Expects the optional field
          * "isDraining" on 'shrdLimits'.
          */
         static bool isDraining( BSONObj shardLimits );
@@ -81,7 +81,7 @@ namespace mongo {
         const BSONObj chunk;
 
         ChunkInfo( const string& a_ns , const string& a_to , const string& a_from , const BSONObj& a_chunk )
-            : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ){}
+            : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ) {}
     };
 
     /**
@@ -92,7 +92,7 @@ namespace mongo {
         static BSONField<long long> currSize; // currently used disk space in bytes
         static BSONField<bool> hasOpsQueued;  // writeback queue is not empty?
     };
-        
+
 }  // namespace mongo
 
 #endif  // S_BALANCER_POLICY_HEADER

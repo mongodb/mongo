@@ -34,13 +34,13 @@ namespace ReplTests {
 
     BSONObj f( const char *s ) {
         return fromjson( s );
-    }    
-    
+    }
+
     class Base {
         dblock lk;
         Client::Context _context;
     public:
-        Base() : _context( ns() ){
+        Base() : _context( ns() ) {
             replSettings.master = true;
             createOplog();
             ensureHaveIdIndex( ns() );
@@ -50,7 +50,8 @@ namespace ReplTests {
                 replSettings.master = false;
                 deleteAll( ns() );
                 deleteAll( cllNS() );
-            } catch ( ... ) {
+            }
+            catch ( ... ) {
                 FAIL( "Exception while cleaning up test" );
             }
         }
@@ -63,7 +64,7 @@ namespace ReplTests {
         }
         DBDirectClient *client() const { return &client_; }
         BSONObj one( const BSONObj &query = BSONObj() ) const {
-            return client()->findOne( ns(), query );            
+            return client()->findOne( ns(), query );
         }
         void checkOne( const BSONObj &o ) const {
             check( o, one( o ) );
@@ -78,11 +79,11 @@ namespace ReplTests {
         void check( const BSONObj &expected, const BSONObj &got ) const {
             if ( expected.woCompare( got ) ) {
                 out() << "expected: " << expected.toString()
-                    << ", got: " << got.toString() << endl;
+                      << ", got: " << got.toString() << endl;
             }
             ASSERT_EQUALS( expected , got );
         }
-        BSONObj oneOp() const { 
+        BSONObj oneOp() const {
             return client()->findOne( cllNS(), BSONObj() );
         }
         int count() const {
@@ -131,7 +132,7 @@ namespace ReplTests {
             out() << "all for " << ns << endl;
             for(; c->ok(); c->advance() ) {
                 out() << c->current().toString() << endl;
-            }            
+            }
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
@@ -143,7 +144,7 @@ namespace ReplTests {
                 toDelete.push_back( c->currLoc() );
             }
             for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-                theDataFileMgr.deleteRecord( ns, i->rec(), *i, true );            
+                theDataFileMgr.deleteRecord( ns, i->rec(), *i, true );
             }
         }
         static void insert( const BSONObj &o, bool god = false ) {
@@ -163,7 +164,7 @@ namespace ReplTests {
         static DBDirectClient client_;
     };
     DBDirectClient Base::client_;
-    
+
     class LogBasic : public Base {
     public:
         void run() {
@@ -172,9 +173,9 @@ namespace ReplTests {
             ASSERT_EQUALS( 2, opCount() );
         }
     };
-    
+
     namespace Idempotence {
-        
+
         class Base : public ReplTests::Base {
         public:
             virtual ~Base() {}
@@ -186,7 +187,7 @@ namespace ReplTests {
                 applyAllOperations();
                 check();
                 ASSERT_EQUALS( nOps, opCount() );
-                
+
                 reset();
                 applyAllOperations();
                 check();
@@ -200,7 +201,7 @@ namespace ReplTests {
             virtual void check() const = 0;
             virtual void reset() const = 0;
         };
-        
+
         class InsertTimestamp : public Base {
         public:
             void doIt() const {
@@ -221,7 +222,7 @@ namespace ReplTests {
         private:
             mutable Date_t date_;
         };
-        
+
         class InsertAutoId : public Base {
         public:
             InsertAutoId() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
@@ -248,12 +249,12 @@ namespace ReplTests {
                 checkOne( o_ );
             }
         };
-        
+
         class InsertTwo : public Base {
         public:
-            InsertTwo() : 
-            o_( fromjson( "{'_id':1,a:'b'}" ) ),
-            t_( fromjson( "{'_id':2,c:'d'}" ) ) {}
+            InsertTwo() :
+                o_( fromjson( "{'_id':1,a:'b'}" ) ),
+                t_( fromjson( "{'_id':2,c:'d'}" ) ) {}
             void doIt() const {
                 vector< BSONObj > v;
                 v.push_back( o_ );
@@ -287,7 +288,7 @@ namespace ReplTests {
                 deleteAll( ns() );
             }
         private:
-            BSONObj o_;            
+            BSONObj o_;
         };
 
         class UpdateTimestamp : public Base {
@@ -311,14 +312,14 @@ namespace ReplTests {
         private:
             mutable Date_t date_;
         };
-        
+
         class UpdateSameField : public Base {
         public:
             UpdateSameField() :
-            q_( fromjson( "{a:'b'}" ) ),
-            o1_( wid( "{a:'b'}" ) ),
-            o2_( wid( "{a:'b'}" ) ),
-            u_( fromjson( "{a:'c'}" ) ){}
+                q_( fromjson( "{a:'b'}" ) ),
+                o1_( wid( "{a:'b'}" ) ),
+                o2_( wid( "{a:'b'}" ) ),
+                u_( fromjson( "{a:'c'}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
             }
@@ -334,14 +335,14 @@ namespace ReplTests {
             }
         private:
             BSONObj q_, o1_, o2_, u_;
-        };        
-        
+        };
+
         class UpdateSameFieldWithId : public Base {
         public:
             UpdateSameFieldWithId() :
-            o_( fromjson( "{'_id':1,a:'b'}" ) ),
-            q_( fromjson( "{a:'b'}" ) ),
-            u_( fromjson( "{'_id':1,a:'c'}" ) ){}
+                o_( fromjson( "{'_id':1,a:'b'}" ) ),
+                q_( fromjson( "{a:'b'}" ) ),
+                u_( fromjson( "{'_id':1,a:'c'}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
             }
@@ -356,14 +357,14 @@ namespace ReplTests {
                 insert( fromjson( "{'_id':2,a:'b'}" ) );
             }
         private:
-            BSONObj o_, q_, u_;            
-        };        
+            BSONObj o_, q_, u_;
+        };
 
         class UpdateSameFieldExplicitId : public Base {
         public:
             UpdateSameFieldExplicitId() :
-            o_( fromjson( "{'_id':1,a:'b'}" ) ),
-            u_( fromjson( "{'_id':1,a:'c'}" ) ){}
+                o_( fromjson( "{'_id':1,a:'b'}" ) ),
+                u_( fromjson( "{'_id':1,a:'c'}" ) ) {}
             void doIt() const {
                 client()->update( ns(), o_, u_ );
             }
@@ -376,15 +377,15 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, u_;            
+            BSONObj o_, u_;
         };
-        
+
         class UpdateDifferentFieldExplicitId : public Base {
         public:
             UpdateDifferentFieldExplicitId() :
-            o_( fromjson( "{'_id':1,a:'b'}" ) ),
-            q_( fromjson( "{'_id':1}" ) ),
-            u_( fromjson( "{'_id':1,a:'c'}" ) ){}
+                o_( fromjson( "{'_id':1,a:'b'}" ) ),
+                q_( fromjson( "{'_id':1}" ) ),
+                u_( fromjson( "{'_id':1,a:'c'}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
             }
@@ -397,28 +398,28 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, q_, u_;            
-        };        
-        
+            BSONObj o_, q_, u_;
+        };
+
         class UpsertUpdateNoMods : public UpdateDifferentFieldExplicitId {
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
         };
-        
+
         class UpsertInsertNoMods : public InsertAutoId {
             void doIt() const {
                 client()->update( ns(), fromjson( "{a:'c'}" ), o_, true );
             }
         };
-        
+
         class UpdateSet : public Base {
         public:
             UpdateSet() :
-            o_( fromjson( "{'_id':1,a:5}" ) ),
-            q_( fromjson( "{a:5}" ) ),
-            u_( fromjson( "{$set:{a:7}}" ) ),
-            ou_( fromjson( "{'_id':1,a:7}" ) ) {}
+                o_( fromjson( "{'_id':1,a:5}" ) ),
+                q_( fromjson( "{a:5}" ) ),
+                u_( fromjson( "{$set:{a:7}}" ) ),
+                ou_( fromjson( "{'_id':1,a:7}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
             }
@@ -431,16 +432,16 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
-        
+
         class UpdateInc : public Base {
         public:
             UpdateInc() :
-            o_( fromjson( "{'_id':1,a:5}" ) ),
-            q_( fromjson( "{a:5}" ) ),
-            u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{'_id':1,a:8}" ) ) {}
+                o_( fromjson( "{'_id':1,a:5}" ) ),
+                q_( fromjson( "{a:5}" ) ),
+                u_( fromjson( "{$inc:{a:3}}" ) ),
+                ou_( fromjson( "{'_id':1,a:8}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
             }
@@ -453,16 +454,16 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
 
         class UpdateInc2 : public Base {
         public:
             UpdateInc2() :
-            o_( fromjson( "{'_id':1,a:5}" ) ),
-            q_( fromjson( "{a:5}" ) ),
-            u_( fromjson( "{$inc:{a:3},$set:{x:5}}" ) ),
-            ou_( fromjson( "{'_id':1,a:8,x:5}" ) ) {}
+                o_( fromjson( "{'_id':1,a:5}" ) ),
+                q_( fromjson( "{a:5}" ) ),
+                u_( fromjson( "{$inc:{a:3},$set:{x:5}}" ) ),
+                ou_( fromjson( "{'_id':1,a:8,x:5}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
             }
@@ -475,16 +476,16 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
-        
+
         class IncEmbedded : public Base {
         public:
             IncEmbedded() :
-            o_( fromjson( "{'_id':1,a:{b:3},b:{b:1}}" ) ),
-            q_( fromjson( "{'_id':1}" ) ),
-            u_( fromjson( "{$inc:{'a.b':1,'b.b':1}}" ) ),
-            ou_( fromjson( "{'_id':1,a:{b:4},b:{b:2}}" ) )
+                o_( fromjson( "{'_id':1,a:{b:3},b:{b:1}}" ) ),
+                q_( fromjson( "{'_id':1}" ) ),
+                u_( fromjson( "{$inc:{'a.b':1,'b.b':1}}" ) ),
+                ou_( fromjson( "{'_id':1,a:{b:4},b:{b:2}}" ) )
             {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
@@ -498,16 +499,16 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
 
         class IncCreates : public Base {
         public:
             IncCreates() :
-            o_( fromjson( "{'_id':1}" ) ),
-            q_( fromjson( "{'_id':1}" ) ),
-            u_( fromjson( "{$inc:{'a':1}}" ) ),
-            ou_( fromjson( "{'_id':1,a:1}") )
+                o_( fromjson( "{'_id':1}" ) ),
+                q_( fromjson( "{'_id':1}" ) ),
+                u_( fromjson( "{$inc:{'a':1}}" ) ),
+                ou_( fromjson( "{'_id':1,a:1}") )
             {}
             void doIt() const {
                 client()->update( ns(), q_, u_ );
@@ -521,16 +522,16 @@ namespace ReplTests {
                 insert( o_ );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
 
 
         class UpsertInsertIdMod : public Base {
         public:
             UpsertInsertIdMod() :
-            q_( fromjson( "{'_id':5,a:4}" ) ),
-            u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{'_id':5,a:7}" ) ) {}
+                q_( fromjson( "{'_id':5,a:4}" ) ),
+                u_( fromjson( "{$inc:{a:3}}" ) ),
+                ou_( fromjson( "{'_id':5,a:7}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
@@ -542,15 +543,15 @@ namespace ReplTests {
                 deleteAll( ns() );
             }
         protected:
-            BSONObj q_, u_, ou_;            
+            BSONObj q_, u_, ou_;
         };
-        
+
         class UpsertInsertSet : public Base {
         public:
             UpsertInsertSet() :
-            q_( fromjson( "{a:5}" ) ),
-            u_( fromjson( "{$set:{a:7}}" ) ),
-            ou_( fromjson( "{a:7}" ) ) {}
+                q_( fromjson( "{a:5}" ) ),
+                u_( fromjson( "{$set:{a:7}}" ) ),
+                ou_( fromjson( "{a:7}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
@@ -563,15 +564,15 @@ namespace ReplTests {
                 insert( fromjson( "{'_id':7,a:7}" ) );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
-        
+
         class UpsertInsertInc : public Base {
         public:
             UpsertInsertInc() :
-            q_( fromjson( "{a:5}" ) ),
-            u_( fromjson( "{$inc:{a:3}}" ) ),
-            ou_( fromjson( "{a:8}" ) ) {}
+                q_( fromjson( "{a:5}" ) ),
+                u_( fromjson( "{$inc:{a:3}}" ) ),
+                ou_( fromjson( "{a:8}" ) ) {}
             void doIt() const {
                 client()->update( ns(), q_, u_, true );
             }
@@ -583,38 +584,38 @@ namespace ReplTests {
                 deleteAll( ns() );
             }
         protected:
-            BSONObj o_, q_, u_, ou_;            
+            BSONObj o_, q_, u_, ou_;
         };
-        
+
         class MultiInc : public Base {
         public:
-            
+
             string s() const {
                 stringstream ss;
                 auto_ptr<DBClientCursor> cc = client()->query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
                 bool first = true;
-                while ( cc->more() ){
+                while ( cc->more() ) {
                     if ( first ) first = false;
                     else ss << ",";
-                    
+
                     BSONObj o = cc->next();
                     ss << o["x"].numberInt();
                 }
                 return ss.str();
             }
-            
+
             void doIt() const {
                 client()->insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
                 client()->insert( ns(), BSON( "_id" << 2 << "x" << 5 ) );
-                
+
                 ASSERT_EQUALS( "1,5" , s() );
-                
+
                 client()->update( ns() , BSON( "_id" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
                 ASSERT_EQUALS( "2,5" , s() );
-                
+
                 client()->update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) );
                 ASSERT_EQUALS( "3,5" , s() );
-                
+
                 client()->update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , false , true );
                 check();
             }
@@ -622,18 +623,18 @@ namespace ReplTests {
             void check() const {
                 ASSERT_EQUALS( "4,6" , s() );
             }
-            
+
             void reset() const {
                 deleteAll( ns() );
             }
         };
-        
+
         class UpdateWithoutPreexistingId : public Base {
         public:
             UpdateWithoutPreexistingId() :
-            o_( fromjson( "{a:5}" ) ),
-            u_( fromjson( "{a:5}" ) ),
-            ot_( fromjson( "{b:4}" ) ) {}
+                o_( fromjson( "{a:5}" ) ),
+                u_( fromjson( "{a:5}" ) ),
+                ot_( fromjson( "{b:4}" ) ) {}
             void doIt() const {
                 client()->update( ns(), o_, u_ );
             }
@@ -648,15 +649,15 @@ namespace ReplTests {
                 insert( o_, true );
             }
         protected:
-            BSONObj o_, u_, ot_;            
-        };        
-        
+            BSONObj o_, u_, ot_;
+        };
+
         class Remove : public Base {
         public:
             Remove() :
-            o1_( f( "{\"_id\":\"010101010101010101010101\",\"a\":\"b\"}" ) ),
-            o2_( f( "{\"_id\":\"010101010101010101010102\",\"a\":\"b\"}" ) ),
-            q_( f( "{\"a\":\"b\"}" ) ) {}
+                o1_( f( "{\"_id\":\"010101010101010101010101\",\"a\":\"b\"}" ) ),
+                o2_( f( "{\"_id\":\"010101010101010101010102\",\"a\":\"b\"}" ) ),
+                q_( f( "{\"a\":\"b\"}" ) ) {}
             void doIt() const {
                 client()->remove( ns(), q_ );
             }
@@ -669,23 +670,23 @@ namespace ReplTests {
                 insert( o2_ );
             }
         protected:
-            BSONObj o1_, o2_, q_;            
+            BSONObj o1_, o2_, q_;
         };
-        
+
         class RemoveOne : public Remove {
             void doIt() const {
                 client()->remove( ns(), q_, true );
-            }            
+            }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
             }
         };
-          
+
         class FailingUpdate : public Base {
         public:
             FailingUpdate() :
-            o_( fromjson( "{'_id':1,a:'b'}" ) ),
-            u_( fromjson( "{'_id':1,c:'d'}" ) ) {}
+                o_( fromjson( "{'_id':1,a:'b'}" ) ),
+                u_( fromjson( "{'_id':1,c:'d'}" ) ) {}
             void doIt() const {
                 client()->update( ns(), o_, u_ );
                 client()->insert( ns(), o_ );
@@ -700,7 +701,7 @@ namespace ReplTests {
         protected:
             BSONObj o_, u_;
         };
-        
+
         class SetNumToStr : public Base {
         public:
             void doIt() const {
@@ -715,7 +716,7 @@ namespace ReplTests {
                 insert( BSON( "_id" << 0 << "a" << 4.0 ) );
             }
         };
-        
+
         class Push : public Base {
         public:
             void doIt() const {
@@ -729,9 +730,9 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4]}" ) );
-            }            
+            }
         };
-        
+
         class PushUpsert : public Base {
         public:
             void doIt() const {
@@ -745,7 +746,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4]}" ) );
-            }            
+            }
         };
 
         class MultiPush : public Base {
@@ -761,7 +762,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4]}" ) );
-            }            
+            }
         };
 
         class EmptyPush : public Base {
@@ -777,13 +778,13 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0}" ) );
-            }                        
+            }
         };
 
         class PushAll : public Base {
         public:
             void doIt() const {
-	      client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -793,13 +794,13 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4]}" ) );
-            }            
+            }
         };
-        
+
         class PushAllUpsert : public Base {
         public:
             void doIt() const {
-	      client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ), true );
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ), true );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -809,7 +810,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4]}" ) );
-            }            
+            }
         };
 
         class EmptyPushAll : public Base {
@@ -825,7 +826,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0}" ) );
-            }                        
+            }
         };
 
         class Pull : public Base {
@@ -841,9 +842,9 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4,5]}" ) );
-            }            
+            }
         };
-                
+
         class PullNothing : public Base {
         public:
             void doIt() const {
@@ -857,13 +858,13 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4,5]}" ) );
-            }            
+            }
         };
-                
+
         class PullAll : public Base {
         public:
             void doIt() const {
-	      client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pullAll:{a:[4,5]}}" ) );
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pullAll:{a:[4,5]}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -873,7 +874,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4,5,6]}" ) );
-            }            
+            }
         };
 
         class Pop : public Base {
@@ -889,7 +890,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4,5,6]}" ) );
-            }            
+            }
         };
 
         class PopReverse : public Base {
@@ -905,7 +906,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:[4,5,6]}" ) );
-            }            
+            }
         };
 
         class BitOp : public Base {
@@ -921,14 +922,14 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:3}" ) );
-            }            
+            }
         };
 
         class Rename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );                
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -938,14 +939,14 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:3}" ) );
-            }            
+            }
         };
 
         class RenameReplace : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );                
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -955,13 +956,13 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:3,b:100}" ) );
-            }            
+            }
         };
 
         class RenameOverwrite : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );                
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -971,13 +972,13 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,z:1,a:3}" ) );
-            }            
+            }
         };
-        
+
         class NoRename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{c:'b'},$set:{z:1}}" ) );                
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{c:'b'},$set:{z:1}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -987,12 +988,12 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0,a:3}" ) );
-            }            
+            }
         };
-        
-        
+
+
     } // namespace Idempotence
-    
+
     class DeleteOpIsIdBased : public Base {
     public:
         void run() {
@@ -1002,21 +1003,21 @@ namespace ReplTests {
             client()->remove( ns(), BSON( "a" << 10 ) );
             ASSERT_EQUALS( 1U, client()->count( ns(), BSONObj() ) );
             insert( BSON( "_id" << 0 << "a" << 11 ) );
-            insert( BSON( "_id" << 2 << "a" << 10 ) );            
+            insert( BSON( "_id" << 2 << "a" << 10 ) );
             insert( BSON( "_id" << 3 << "a" << 10 ) );
-            
+
             applyAllOperations();
             ASSERT_EQUALS( 2U, client()->count( ns(), BSONObj() ) );
             ASSERT( !one( BSON( "_id" << 1 ) ).isEmpty() );
             ASSERT( !one( BSON( "_id" << 2 ) ).isEmpty() );
         }
     };
-    
+
     class DbIdsTest {
     public:
         void run() {
             Client::Context ctx( "unittests.repltest.DbIdsTest" );
-            
+
             s_.reset( new DbIds( "local.temp.DbIdsTest" ) );
             s_->reset();
             check( false, false, false );
@@ -1025,7 +1026,7 @@ namespace ReplTests {
             check( true, false, false );
             s_->set( "a", BSON( "_id" << 4 ), false );
             check( false, false, false );
-            
+
             s_->set( "b", BSON( "_id" << 4 ), true );
             check( false, true, false );
             s_->set( "b", BSON( "_id" << 4 ), false );
@@ -1043,7 +1044,7 @@ namespace ReplTests {
 
             s_->reset();
             check( false, false, false );
-            
+
             s_->set( "a", BSON( "_id" << 4 ), true );
             s_->set( "a", BSON( "_id" << 4 ), true );
             check( true, false, false );
@@ -1054,17 +1055,17 @@ namespace ReplTests {
         void check( bool one, bool two, bool three ) {
             ASSERT_EQUALS( one, s_->get( "a", BSON( "_id" << 4 ) ) );
             ASSERT_EQUALS( two, s_->get( "b", BSON( "_id" << 4 ) ) );
-            ASSERT_EQUALS( three, s_->get( "a", BSON( "_id" << 5 ) ) );            
+            ASSERT_EQUALS( three, s_->get( "a", BSON( "_id" << 5 ) ) );
         }
         dblock lk_;
         auto_ptr< DbIds > s_;
     };
-    
+
     class MemIdsTest {
     public:
         void run() {
             int n = sizeof( BSONObj ) + BSON( "_id" << 4 ).objsize();
-            
+
             s_.reset();
             ASSERT_EQUALS( 0, s_.roughSize() );
             ASSERT( !s_.get( "a", BSON( "_id" << 4 ) ) );
@@ -1091,7 +1092,7 @@ namespace ReplTests {
     public:
         void run() {
             Client::Context ctx( "unittests.repltests.IdTrackerTest" );
-            
+
             ASSERT( s_.inMem() );
             s_.reset( 4 * sizeof( BSONObj ) - 1 );
             s_.haveId( "a", BSON( "_id" << 0 ), true );
@@ -1103,34 +1104,34 @@ namespace ReplTests {
             s_.mayUpgradeStorage();
             ASSERT( !s_.inMem() );
             check();
-            
+
             s_.haveId( "a", BSON( "_id" << 1 ), false );
             ASSERT( !s_.haveId( "a", BSON( "_id" << 1 ) ) );
             s_.haveId( "a", BSON( "_id" << 1 ), true );
             check();
-            ASSERT( !s_.inMem() );            
-            
+            ASSERT( !s_.inMem() );
+
             s_.reset( 4 * sizeof( BSONObj ) - 1 );
             s_.mayUpgradeStorage();
-            ASSERT( s_.inMem() );                        
+            ASSERT( s_.inMem() );
         }
     private:
         void check() {
             ASSERT( s_.haveId( "a", BSON( "_id" << 0 ) ) );
             ASSERT( s_.haveId( "a", BSON( "_id" << 1 ) ) );
             ASSERT( s_.haveId( "b", BSON( "_id" << 0 ) ) );
-            ASSERT( s_.haveModId( "b", BSON( "_id" << 0 ) ) );            
+            ASSERT( s_.haveModId( "b", BSON( "_id" << 0 ) ) );
         }
         dblock lk_;
         IdTracker s_;
     };
-    
+
     class All : public Suite {
     public:
-        All() : Suite( "repl" ){
+        All() : Suite( "repl" ) {
         }
-        
-        void setupTests(){
+
+        void setupTests() {
             add< LogBasic >();
             add< Idempotence::InsertTimestamp >();
             add< Idempotence::InsertAutoId >();
@@ -1182,6 +1183,6 @@ namespace ReplTests {
             add< IdTrackerTest >();
         }
     } myall;
-    
+
 } // namespace ReplTests
 

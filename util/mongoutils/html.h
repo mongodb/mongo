@@ -2,7 +2,7 @@
 
 #pragma once
 
-/* Things in the mongoutils namespace 
+/* Things in the mongoutils namespace
    (1) are not database specific, rather, true utilities
    (2) are cross platform
    (3) may require boost headers, but not libs
@@ -37,41 +37,41 @@ namespace mongoutils {
         inline string _tr() { return "</tr>\n"; }
 
         inline string tr() { return "<tr>"; }
-        inline string tr(string a, string b) { 
+        inline string tr(string a, string b) {
             stringstream ss;
             ss << "<tr><td>" << a << "</td><td>" << b << "</td></tr>\n";
             return ss.str();
         }
         template <class T>
-        inline string td(T x) { 
+        inline string td(T x) {
             stringstream ss;
             ss << "<td>" << x << "</td>";
             return ss.str();
         }
-        inline string td(string x) { 
+        inline string td(string x) {
             return "<td>" + x + "</td>";
         }
-        inline string th(string x) { 
+        inline string th(string x) {
             return "<th>" + x + "</th>";
         }
 
-        inline void tablecell( stringstream& ss , bool b ){
+        inline void tablecell( stringstream& ss , bool b ) {
             ss << "<td>" << (b ? "<b>X</b>" : "") << "</td>";
         }
 
-        template< typename T> 
-        inline void tablecell( stringstream& ss , const T& t ){
+        template< typename T>
+        inline void tablecell( stringstream& ss , const T& t ) {
             ss << "<td>" << t << "</td>";
         }
-        
-        inline string table(const char *headers[] = 0, bool border = true) { 
+
+        inline string table(const char *headers[] = 0, bool border = true) {
             stringstream ss;
-            ss << "\n<table " 
-                << (border?"border=1 ":"")
-                << "cellpadding=2 cellspacing=0>\n";
-            if( headers ) { 
+            ss << "\n<table "
+               << (border?"border=1 ":"")
+               << "cellpadding=2 cellspacing=0>\n";
+            if( headers ) {
                 ss << "<tr>";
-                while( *headers ) { 
+                while( *headers ) {
                     ss << "<th>" << *headers << "</th>";
                     headers++;
                 }
@@ -80,18 +80,18 @@ namespace mongoutils {
             return ss.str();
         }
 
-        inline string start(string title) { 
+        inline string start(string title) {
             stringstream ss;
             ss << "<html><head>\n<title>";
             ss << title;
             ss << "</title>\n";
 
             ss << "<style type=\"text/css\" media=\"screen\">"
-                "body { font-family: helvetica, arial, san-serif }\n"
-                "table { border-collapse:collapse; border-color:#999; margin-top:.5em }\n"
-                "th { background-color:#bbb; color:#000 }\n"
-                "td,th { padding:.25em }\n"
-                "</style>\n";
+               "body { font-family: helvetica, arial, san-serif }\n"
+               "table { border-collapse:collapse; border-color:#999; margin-top:.5em }\n"
+               "th { background-color:#bbb; color:#000 }\n"
+               "td,th { padding:.25em }\n"
+               "</style>\n";
 
             ss << "</head>\n<body>\n";
             return ss.str();
@@ -141,7 +141,7 @@ namespace mongoutils {
         }
 
         /* does NOT escape the strings. */
-        inline string a(string href, string title="", string contentHtml = "") { 
+        inline string a(string href, string title="", string contentHtml = "") {
             stringstream ss;
             ss << "<a";
             if( !href.empty() ) ss << " href=\"" << href << '"';

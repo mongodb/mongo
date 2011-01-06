@@ -25,7 +25,7 @@ namespace mongo {
 
     class RestAdminAccess : public AdminAccess {
     public:
-        virtual ~RestAdminAccess() { } 
+        virtual ~RestAdminAccess() { }
 
         virtual bool haveAdminUsers() const;
         virtual BSONObj getAdminUser( const string& username ) const;

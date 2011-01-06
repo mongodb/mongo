@@ -20,11 +20,11 @@
 
 #pragma once
 
-namespace mongo { 
+namespace mongo {
 
     extern mutex _atomicMutex;
 
-    /** atomic wrapper for a value.  enters a mutex on each access.  must 
+    /** atomic wrapper for a value.  enters a mutex on each access.  must
         be copyable.
     */
     template<typename T>
@@ -33,20 +33,22 @@ namespace mongo {
     public:
         Atomic<T>() { }
 
-        void operator=(const T& a) { 
+        void operator=(const T& a) {
             scoped_lock lk(_atomicMutex);
-            val = a; }
+            val = a;
+        }
 
-        operator T() const { 
+        operator T() const {
             scoped_lock lk(_atomicMutex);
-            return val; }
-        
+            return val;
+        }
+
         /** example:
               Atomic<int> q;
               ...
               {
                 Atomic<int>::tran t(q);
-                if( q.ref() > 0 ) 
+                if( q.ref() > 0 )
                     q.ref()--;
               }
         */
@@ -58,11 +60,11 @@ namespace mongo {
         };
     };
 
-    /** this string COULD be mangled but with the double buffering, assuming writes 
-    are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
+    /** this string COULD be mangled but with the double buffering, assuming writes
+    are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of
     diagnostic strings, where their content isn't critical.
     */
-    class DiagStr { 
+    class DiagStr {
         char buf1[256];
         char buf2[256];
         char *p;

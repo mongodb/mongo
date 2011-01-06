@@ -35,7 +35,7 @@ namespace BalancerPolicyTests {
 
     class SizeMaxedShardTest {
     public:
-        void run(){
+        void run() {
             BSONObj shard0 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) );
             ASSERT( ! BalancerPolicy::isSizeMaxed( shard0 ) );
 
@@ -52,7 +52,7 @@ namespace BalancerPolicyTests {
 
     class DrainingShardTest {
     public:
-        void run(){
+        void run() {
             BSONObj shard0 = BSON( sf::draining(true) );
             ASSERT( BalancerPolicy::isDraining( shard0 ) );
 
@@ -66,7 +66,7 @@ namespace BalancerPolicyTests {
 
     class BalanceNormalTest {
     public:
-        void run(){
+        void run() {
             // 2 chunks and 0 chunk shards
             BalancerPolicy::ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
@@ -84,7 +84,7 @@ namespace BalancerPolicyTests {
             BSONObj limits1 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) << sf::draining(false) << lf::hasOpsQueued(false) );
             limitsMap["shard0"] = limits0;
             limitsMap["shard1"] = limits1;
-	    
+
             BalancerPolicy::ChunkInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 1 );
             ASSERT( c );
@@ -93,7 +93,7 @@ namespace BalancerPolicyTests {
 
     class BalanceDrainingTest {
     public:
-        void run(){
+        void run() {
             // one normal, one draining
             // 2 chunks and 0 chunk shards
             BalancerPolicy::ShardToChunksMap chunkMap;
@@ -112,7 +112,7 @@ namespace BalancerPolicyTests {
             BSONObj limits1 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) << sf::draining(false) );
             limitsMap["shard0"] = limits0;
             limitsMap["shard1"] = limits1;
-	    
+
             BalancerPolicy::ChunkInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( c );
@@ -124,7 +124,7 @@ namespace BalancerPolicyTests {
 
     class BalanceEndedDrainingTest {
     public:
-        void run(){
+        void run() {
             // 2 chunks and 0 chunk (drain completed) shards
             BalancerPolicy::ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
@@ -142,7 +142,7 @@ namespace BalancerPolicyTests {
             BSONObj limits1 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) << sf::draining(true) );
             limitsMap["shard0"] = limits0;
             limitsMap["shard1"] = limits1;
-	    
+
             BalancerPolicy::ChunkInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( ! c );
@@ -151,7 +151,7 @@ namespace BalancerPolicyTests {
 
     class BalanceImpasseTest {
     public:
-        void run(){
+        void run() {
             // one maxed out, one draining
             // 2 chunks and 0 chunk shards
             BalancerPolicy::ShardToChunksMap chunkMap;
@@ -172,7 +172,7 @@ namespace BalancerPolicyTests {
             limitsMap["shard0"] = limits0;
             limitsMap["shard1"] = limits1;
             limitsMap["shard2"] = limits2;
-	    
+
             BalancerPolicy::ChunkInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( ! c );
@@ -186,10 +186,10 @@ namespace BalancerPolicyTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "balancer_policy" ){
+        All() : Suite( "balancer_policy" ) {
         }
 
-        void setupTests(){
+        void setupTests() {
             // TODO SERVER-1822
             // add< SizeMaxedShardTest >();
             // add< DrainingShardTest >();
@@ -197,7 +197,7 @@ namespace BalancerPolicyTests {
             // add< BalanceDrainingTest >();
             // add< BalanceEndedDrainingTest >();
             // add< BalanceImpasseTest >();
-        } 
-    } allTests; 
- 
+        }
+    } allTests;
+
 } // namespace BalancerPolicyTests

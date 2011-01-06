@@ -35,68 +35,68 @@
 #include "s/writeback_listener.h"
 
 namespace mongo {
-    
-    ClientInfo::ClientInfo( int clientId ) : _id( clientId ){
+
+    ClientInfo::ClientInfo( int clientId ) : _id( clientId ) {
         _cur = &_a;
         _prev = &_b;
         newRequest();
     }
-    
-    ClientInfo::~ClientInfo(){
-        if ( _lastAccess ){
+
+    ClientInfo::~ClientInfo() {
+        if ( _lastAccess ) {
             scoped_lock lk( _clientsLock );
             Cache::iterator i = _clients.find( _id );
-            if ( i != _clients.end() ){
+            if ( i != _clients.end() ) {
                 _clients.erase( i );
             }
         }
     }
-    
-    void ClientInfo::addShard( const string& shard ){
+
+    void ClientInfo::addShard( const string& shard ) {
         _cur->insert( shard );
         _sinceLastGetError.insert( shard );
     }
-    
-    void ClientInfo::newRequest( AbstractMessagingPort* p ){
 
-        if ( p ){
+    void ClientInfo::newRequest( AbstractMessagingPort* p ) {
+
+        if ( p ) {
             string r = p->remote().toString();
             if ( _remote == "" )
                 _remote = r;
-            else if ( _remote != r ){
+            else if ( _remote != r ) {
                 stringstream ss;
                 ss << "remotes don't match old [" << _remote << "] new [" << r << "]";
                 throw UserException( 13134 , ss.str() );
             }
         }
-        
+
         _lastAccess = (int) time(0);
-        
+
         set<string> * temp = _cur;
         _cur = _prev;
         _prev = temp;
         _cur->clear();
     }
-    
-    void ClientInfo::disconnect(){
+
+    void ClientInfo::disconnect() {
         _lastAccess = 0;
     }
-        
-    ClientInfo * ClientInfo::get( int clientId , bool create ){
-        
+
+    ClientInfo * ClientInfo::get( int clientId , bool create ) {
+
         if ( ! clientId )
             clientId = getClientId();
-        
-        if ( ! clientId ){
+
+        if ( ! clientId ) {
             ClientInfo * info = _tlInfo.get();
-            if ( ! info ){
+            if ( ! info ) {
                 info = new ClientInfo( 0 );
                 _tlInfo.reset( info );
             }
             info->newRequest();
             return info;
         }
-        
+
         scoped_lock lk( _clientsLock );
         Cache::iterator i = _clients.find( clientId );
         if ( i != _clients.end() )
@@ -107,8 +107,8 @@ namespace mongo {
         _clients[clientId] = info;
         return info;
     }
-        
-    void ClientInfo::disconnect( int clientId ){
+
+    void ClientInfo::disconnect( int clientId ) {
         if ( ! clientId )
             return;
 
@@ -123,46 +123,46 @@ namespace mongo {
         _clients.erase( i );
     }
 
-    void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& o ){
+    void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& o ) {
         BSONElement w = o["writeback"];
-        
+
         if ( w.type() != jstOID )
             return;
-        
+
         BSONElement cid = o["connectionId"];
         cout << "ELIOT : " << cid << endl;
-        
-        if ( cid.eoo() ){
+
+        if ( cid.eoo() ) {
             error() << "getLastError writeback can't work because of version mis-match" << endl;
             return;
         }
-        
+
         all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
     }
-    
-    void ClientInfo::_handleWriteBacks( vector<WBInfo>& all ){
+
+    void ClientInfo::_handleWriteBacks( vector<WBInfo>& all ) {
         if ( all.size() == 0 )
             return;
-        
-        for ( unsigned i=0; i<all.size(); i++ ){
+
+        for ( unsigned i=0; i<all.size(); i++ ) {
             WriteBackListener::waitFor( all[i].connectionId , all[i].id );
         }
     }
-    
-    
 
-    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result ){
+
+
+    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result ) {
         set<string> * shards = getPrev();
-        
-        if ( shards->size() == 0 ){
+
+        if ( shards->size() == 0 ) {
             result.appendNull( "err" );
             return true;
         }
-        
+
         vector<WBInfo> writebacks;
-        
+
         // handle single server
-        if ( shards->size() == 1 ){
+        if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
             result.append( "theshard" , theShard.c_str() );
             ShardConnection conn( theShard , "" );
@@ -173,13 +173,13 @@ namespace mongo {
             conn.done();
             result.append( "singleShard" , theShard );
             _addWriteBack( writebacks , res );
-            
+
             // hit other machines just to block
-            for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ){
+            for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ) {
                 string temp = *i;
                 if ( temp == theShard )
                     continue;
-                
+
                 ShardConnection conn( temp , "" );
                 _addWriteBack( writebacks , conn->getLastErrorDetailed() );
                 conn.done();
@@ -188,15 +188,15 @@ namespace mongo {
             _handleWriteBacks( writebacks );
             return ok;
         }
-        
+
         BSONArrayBuilder bbb( result.subarrayStart( "shards" ) );
-        
+
         long long n = 0;
-        
+
         // hit each shard
         vector<string> errors;
         vector<BSONObj> errorObjects;
-        for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
+        for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ) {
             string theShard = *i;
             bbb.append( theShard );
             ShardConnection conn( theShard , "" );
@@ -204,49 +204,51 @@ namespace mongo {
             bool ok = conn->runCommand( "admin" , options , res );
             _addWriteBack( writebacks, res );
             string temp = DBClientWithCommands::getLastErrorString( res );
-            if ( ok == false || temp.size() ){
+            if ( ok == false || temp.size() ) {
                 errors.push_back( temp );
                 errorObjects.push_back( res );
             }
             n += res["n"].numberLong();
             conn.done();
         }
-                
+
         bbb.done();
-                
+
         result.appendNumber( "n" , n );
 
         // hit other machines just to block
-        for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ){
+        for ( set<string>::const_iterator i=sinceLastGetError().begin(); i!=sinceLastGetError().end(); ++i ) {
             string temp = *i;
             if ( shards->count( temp ) )
                 continue;
-                    
+
             ShardConnection conn( temp , "" );
             _addWriteBack( writebacks, conn->getLastErrorDetailed() );
             conn.done();
         }
         clearSinceLastGetError();
-        
-        if ( errors.size() == 0 ){
+
+        if ( errors.size() == 0 ) {
             result.appendNull( "err" );
             _handleWriteBacks( writebacks );
             return true;
         }
-                
+
         result.append( "err" , errors[0].c_str() );
-                
-        { // errs
+
+        {
+            // errs
             BSONArrayBuilder all( result.subarrayStart( "errs" ) );
-            for ( unsigned i=0; i<errors.size(); i++ ){
+            for ( unsigned i=0; i<errors.size(); i++ ) {
                 all.append( errors[i].c_str() );
             }
             all.done();
         }
 
-        { // errObjects
+        {
+            // errObjects
             BSONArrayBuilder all( result.subarrayStart( "errObjects" ) );
-            for ( unsigned i=0; i<errorObjects.size(); i++ ){
+            for ( unsigned i=0; i<errorObjects.size(); i++ ) {
                 all.append( errorObjects[i] );
             }
             all.done();

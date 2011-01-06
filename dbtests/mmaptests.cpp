@@ -26,15 +26,17 @@ namespace MMapTests {
     class LeakTest  {
         const string fn;
     public:
-        LeakTest() : 
-          fn( (path(dbpath) / "testfile.map").string() )
+        LeakTest() :
+            fn( (path(dbpath) / "testfile.map").string() )
         { }
-        ~LeakTest() { 
-            try { boost::filesystem::remove(fn); } catch(...) { }
+        ~LeakTest() {
+            try { boost::filesystem::remove(fn); }
+            catch(...) { }
         }
         void run() {
 
-            try { boost::filesystem::remove(fn); } catch(...) { }
+            try { boost::filesystem::remove(fn); }
+            catch(...) { }
 
             writelock lk;
 
@@ -48,7 +50,7 @@ namespace MMapTests {
                     // write something to the private view as a test
                     strcpy(p, "hello");
                 }
-                if( cmdLine.dur ) { 
+                if( cmdLine.dur ) {
                     char *w = (char *) f.view_write();
                     strcpy(w + 6, "world");
                 }
@@ -77,24 +79,24 @@ namespace MMapTests {
                     assert(p);
                     strcpy(p, "zzz");
                 }
-                if( cmdLine.dur ) { 
+                if( cmdLine.dur ) {
                     char *w = (char *) f.view_write();
                     if( i % 2 == 0 )
                         ++(*w);
                     assert( w[6] == 'w' );
                 }
             }
-            if( t.millis() > 10000 ) { 
+            if( t.millis() > 10000 ) {
                 log() << "warning: MMap LeakTest is unusually slow N:" << N << ' ' << t.millis() << "ms" << endl;
             }
 
         }
     };
-    
+
     class All : public Suite {
     public:
-        All() : Suite( "mmap" ){}
-        void setupTests(){
+        All() : Suite( "mmap" ) {}
+        void setupTests() {
             add< LeakTest >();
         }
     } myall;
@@ -139,10 +141,10 @@ namespace MMapTests {
                 cout << "view unview: " << t.millis() << "ms" << endl;
             }
 
-           f.flush(true);
+            f.flush(true);
 
             /* plain old mmaped writes */
-           {
+            {
                 Timer t;
                 for( int i = 0; i < 10; i++ ) {
                     memset(p+100, 'c', 200 * 1024 * 1024);
@@ -150,10 +152,10 @@ namespace MMapTests {
                 cout << "traditional writes: " << t.millis() << "ms" << endl;
             }
 
-           f.flush(true);
+            f.flush(true);
 
             /* test doing some writes */
-           {
+            {
                 Timer t;
                 char *q = (char *) f.testGetCopyOnWriteView();
                 for( int i = 0; i < 10; i++ ) {
@@ -166,7 +168,7 @@ namespace MMapTests {
             }
 
             /* test doing some writes */
-           {
+            {
                 Timer t;
                 for( int i = 0; i < 10; i++ ) {
                     char *q = (char *) f.testGetCopyOnWriteView();
@@ -179,7 +181,7 @@ namespace MMapTests {
             }
 
             /* more granular */
-           {
+            {
                 Timer t;
                 for( int i = 0; i < 100; i++ ) {
                     char *q = (char *) f.testGetCopyOnWriteView();
@@ -189,17 +191,17 @@ namespace MMapTests {
                 }
 
                 cout << "more granular some writes: " << t.millis() << "ms" << endl;
-           }
+            }
 
-           p[10] = 0;
-           cout << p << endl;
+            p[10] = 0;
+            cout << p << endl;
         }
     };
-    
+
     class All : public Suite {
     public:
-        All() : Suite( "mmap" ){}
-        void setupTests(){
+        All() : Suite( "mmap" ) {}
+        void setupTests() {
             add< CopyOnWriteSpeedTest >();
         }
     } myall;

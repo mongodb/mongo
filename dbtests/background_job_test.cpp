@@ -31,10 +31,10 @@ namespace BackgroundJobTests {
 
     class IncTester : public mongo::BackgroundJob {
     public:
-        explicit IncTester( long long millis , bool selfDelete = false ) 
+        explicit IncTester( long long millis , bool selfDelete = false )
             : BackgroundJob(selfDelete), _val(0), _millis(millis) { GLOBAL_val = 0; }
 
-        void waitAndInc( long long millis ){
+        void waitAndInc( long long millis ) {
             if ( millis )
                 mongo::sleepmillis( millis );
             ++_val;
@@ -48,14 +48,14 @@ namespace BackgroundJobTests {
         string name() const { return "IncTester"; }
 
         void run() { waitAndInc( _millis ); }
-        
+
     private:
         int _val;
         long long _millis;
     };
 
 
-    class NormalCase { 
+    class NormalCase {
     public:
         void run() {
             IncTester tester( 0 /* inc without wait */ );
@@ -85,20 +85,20 @@ namespace BackgroundJobTests {
             BackgroundJob* j = new IncTester( 0 /* inc without wait */ , true /* self delete */  );
             j->go();
 
-            
-            // the background thread should have continued running and this test should pass the 
+
+            // the background thread should have continued running and this test should pass the
             // heap-checker as well
             mongo::sleepmillis( 1000 );
             ASSERT_EQUALS( GLOBAL_val, 1 );
         }
     };
 
-    
-    class BackgroundJobSuite : public Suite{
-    public:
-        BackgroundJobSuite() : Suite( "background_job" ){}
 
-        void setupTests(){
+    class BackgroundJobSuite : public Suite {
+    public:
+        BackgroundJobSuite() : Suite( "background_job" ) {}
+
+        void setupTests() {
             add< NormalCase >();
             add< TimeOutCase >();
             add< SelfDeletingCase >();

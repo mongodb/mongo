@@ -34,8 +34,8 @@ namespace mongo {
     public:
         Module( const string& name );
         virtual ~Module();
-        
-        boost::program_options::options_description_easy_init add_options(){
+
+        boost::program_options::options_description_easy_init add_options() {
             return _options.add_options();
         }
 
@@ -54,10 +54,10 @@ namespace mongo {
          */
         virtual void shutdown() = 0;
 
-        const string& getName(){ return _name; }
-        
+        const string& getName() { return _name; }
+
         // --- static things
-        
+
         static void addOptions( program_options::options_description& options );
         static void configAll( program_options::variables_map& params );
         static void initAll();

@@ -53,7 +53,7 @@ namespace mongo {
         _realloc(a, oldLen);
     }
 
-    void AlignedBuilder::_malloc(unsigned sz) { 
+    void AlignedBuilder::_malloc(unsigned sz) {
         _p._size = sz;
 #if defined(_WIN32)
         void *p = VirtualAlloc(0, sz, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -73,7 +73,7 @@ namespace mongo {
 #endif
     }
 
-    void AlignedBuilder::_realloc(unsigned newSize, unsigned oldLen) { 
+    void AlignedBuilder::_realloc(unsigned newSize, unsigned oldLen) {
         // posix_memalign alignment is not maintained on reallocs, so we can't use realloc().
         AllocationInfo old = _p;
         _malloc(newSize);

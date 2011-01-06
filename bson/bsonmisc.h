@@ -26,7 +26,7 @@ namespace mongo {
             return l.woCompare( r, false ) < 0;
         }
     };
-   
+
     class BSONObjCmp {
     public:
         BSONObjCmp( const BSONObj &_order = BSONObj() ) : order( _order ) {}
@@ -54,26 +54,26 @@ namespace mongo {
 
     FieldCompareResult compareDottedFieldNames( const string& l , const string& r );
 
-/** Use BSON macro to build a BSONObj from a stream 
+    /** Use BSON macro to build a BSONObj from a stream
 
-    e.g., 
-       BSON( "name" << "joe" << "age" << 33 )
+        e.g.,
+           BSON( "name" << "joe" << "age" << 33 )
 
-    with auto-generated object id:
-       BSON( GENOID << "name" << "joe" << "age" << 33 )
- 
-    The labels GT, GTE, LT, LTE, NE can be helpful for stream-oriented construction
-    of a BSONObj, particularly when assembling a Query.  For example,
-    BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
-    { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
-*/
+        with auto-generated object id:
+           BSON( GENOID << "name" << "joe" << "age" << 33 )
+
+        The labels GT, GTE, LT, LTE, NE can be helpful for stream-oriented construction
+        of a BSONObj, particularly when assembling a Query.  For example,
+        BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
+        { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
+    */
 #define BSON(x) (( mongo::BSONObjBuilder(64) << x ).obj())
 
-/** Use BSON_ARRAY macro like BSON macro, but without keys
+    /** Use BSON_ARRAY macro like BSON macro, but without keys
 
-    BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+        BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
 
- */
+     */
 #define BSON_ARRAY(x) (( mongo::BSONArrayBuilder() << x ).arr())
 
     /* Utility class to auto assign object IDs.
@@ -83,14 +83,14 @@ namespace mongo {
     extern struct GENOIDLabeler { } GENOID;
 
     /* Utility class to add a Date element with the current time
-       Example: 
+       Example:
          cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
     */
     extern struct DateNowLabeler { } DATENOW;
 
     /* Utility class to add the minKey (minus infinity) to a given attribute
        Example:
-         cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } } 
+         cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
     */
     extern struct MinKeyLabeler { } MINKEY;
     extern struct MaxKeyLabeler { } MAXKEY;
@@ -106,17 +106,17 @@ namespace mongo {
         template<class T>
         BSONObjBuilder& operator<<( T value );
 
-        /* the value of the element e is appended i.e. for 
+        /* the value of the element e is appended i.e. for
              "age" << GT << someElement
-           one gets 
-             { age : { $gt : someElement's value } } 
+           one gets
+             { age : { $gt : someElement's value } }
         */
         BSONObjBuilder& operator<<( const BSONElement& e );
     private:
         const Label &l_;
         BSONObjBuilderValueStream *s_;
     };
-    
+
     extern Labeler::Label GT;
     extern Labeler::Label GTE;
     extern Labeler::Label LT;
@@ -133,7 +133,7 @@ namespace mongo {
     inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d, const BSONObj& e);
     inline BSONObj OR(const BSONObj& a, const BSONObj& b, const BSONObj& c, const BSONObj& d, const BSONObj& e, const BSONObj& f);
     // definitions in bsonobjbuilder.h b/c of incomplete types
-    
+
     // Utility class to implement BSON( key << val ) as described above.
     class BSONObjBuilderValueStream : public boost::noncopyable {
     public:
@@ -141,20 +141,20 @@ namespace mongo {
         BSONObjBuilderValueStream( BSONObjBuilder * builder );
 
         BSONObjBuilder& operator<<( const BSONElement& e );
-        
-        template<class T> 
+
+        template<class T>
         BSONObjBuilder& operator<<( T value );
 
         BSONObjBuilder& operator<<(DateNowLabeler& id);
 
         BSONObjBuilder& operator<<(MinKeyLabeler& id);
         BSONObjBuilder& operator<<(MaxKeyLabeler& id);
-        
+
         Labeler operator<<( const Labeler::Label &l );
 
         void endField( const char *nextFieldName = 0 );
         bool subobjStarted() const { return _fieldName != 0; }
-        
+
     private:
         const char * _fieldName;
         BSONObjBuilder * _builder;
@@ -163,39 +163,39 @@ namespace mongo {
         BSONObjBuilder *subobj();
         auto_ptr< BSONObjBuilder > _subobj;
     };
-    
+
     /**
        used in conjuction with BSONObjBuilder, allows for proper buffer size to prevent crazy memory usage
      */
     class BSONSizeTracker {
     public:
-        BSONSizeTracker(){
+        BSONSizeTracker() {
             _pos = 0;
             for ( int i=0; i<SIZE; i++ )
                 _sizes[i] = 512; // this is the default, so just be consistent
         }
-        
-        ~BSONSizeTracker(){
+
+        ~BSONSizeTracker() {
         }
-        
-        void got( int size ){
+
+        void got( int size ) {
             _sizes[_pos++] = size;
             if ( _pos >= SIZE )
                 _pos = 0;
         }
-        
+
         /**
          * right now choosing largest size
          */
         int getSize() const {
             int x = 16; // sane min
-            for ( int i=0; i<SIZE; i++ ){
+            for ( int i=0; i<SIZE; i++ ) {
                 if ( _sizes[i] > x )
                     x = _sizes[i];
             }
             return x;
         }
-        
+
     private:
         enum { SIZE = 10 };
         int _pos;

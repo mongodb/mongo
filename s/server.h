@@ -21,9 +21,9 @@
 #include "../db/jsobj.h"
 
 namespace mongo {
-    
+
     extern OID serverID;
-    
+
     // from request.cpp
     void processRequest(Message& m, MessagingPort& p);
 }

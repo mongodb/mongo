@@ -205,11 +205,11 @@ namespace JsonTests {
                 b.appendDBRef( "a", "namespace", oid );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-                              built.jsonString( Strict ) );
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-                              built.jsonString( JS ) );
+                               built.jsonString( JS ) );
                 ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
-                              built.jsonString( TenGen ) );
+                               built.jsonString( TenGen ) );
             }
         };
 
@@ -221,7 +221,7 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.appendDBRef( "a", "namespace", oid );
                 ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"000000000000000000000000\" } }",
-                              b.done().jsonString( Strict ) );
+                               b.done().jsonString( Strict ) );
             }
         };
 
@@ -234,9 +234,9 @@ namespace JsonTests {
                 b.appendOID( "a", &oid );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$oid\" : \"ffffffffffffffffffffffff\" } }",
-                              built.jsonString( Strict ) );
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : ObjectId( \"ffffffffffffffffffffffff\" ) }",
-                              built.jsonString( TenGen ) );
+                               built.jsonString( TenGen ) );
             }
         };
 
@@ -258,12 +258,12 @@ namespace JsonTests {
                 BSONObjBuilder c;
                 c.appendBinData( "a", 2, BinDataGeneral, z );
                 ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YWI=\", \"$type\" : \"00\" } }",
-                              c.done().jsonString( Strict ) );
+                               c.done().jsonString( Strict ) );
 
                 BSONObjBuilder d;
                 d.appendBinData( "a", 1, BinDataGeneral, z );
                 ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"00\" } }",
-                              d.done().jsonString( Strict ) );
+                               d.done().jsonString( Strict ) );
             }
         };
 
@@ -295,7 +295,7 @@ namespace JsonTests {
                 b.appendRegex( "a", "abc", "i" );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"i\" } }",
-                              built.jsonString( Strict ) );
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : /abc/i }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : /abc/i }", built.jsonString( JS ) );
             }
@@ -308,7 +308,7 @@ namespace JsonTests {
                 b.appendRegex( "a", "/\"", "i" );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"/\\\"\", \"$options\" : \"i\" } }",
-                              built.jsonString( Strict ) );
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( JS ) );
             }
@@ -321,7 +321,7 @@ namespace JsonTests {
                 b.appendRegex( "a", "z", "abcgimx" );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"z\", \"$options\" : \"abcgimx\" } }",
-                              built.jsonString( Strict ) );
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : /z/gim }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : /z/gim }", built.jsonString( JS ) );
             }
@@ -329,17 +329,17 @@ namespace JsonTests {
 
         class CodeTests {
         public:
-            void run(){
+            void run() {
                 BSONObjBuilder b;
                 b.appendCode( "x" , "function(){ return 1; }" );
                 BSONObj o = b.obj();
                 ASSERT_EQUALS( "{ \"x\" : function(){ return 1; } }" , o.jsonString() );
             }
         };
-        
+
         class TimestampTests {
         public:
-            void run(){
+            void run() {
                 BSONObjBuilder b;
                 b.appendTimestamp( "x" , 4000 , 10 );
                 BSONObj o = b.obj();
@@ -349,7 +349,7 @@ namespace JsonTests {
 
         class NullString {
         public:
-            void run(){
+            void run() {
                 BSONObjBuilder b;
                 b.append( "x" , "a\0b" , 4 );
                 BSONObj o = b.obj();
@@ -359,7 +359,7 @@ namespace JsonTests {
 
         class AllTypes {
         public:
-            void run(){
+            void run() {
                 OID oid;
                 oid.init();
 
@@ -384,12 +384,12 @@ namespace JsonTests {
                 b.appendTimestamp( "s" , 123123123123123LL );
                 b.append( "t" , 12321312312LL );
                 b.appendMaxKey( "u" );
-                
+
                 BSONObj o = b.obj();
                 cout << o.jsonString() << endl;
             }
         };
-        
+
     } // namespace JsonStringTests
 
     namespace FromJsonTests {
@@ -504,7 +504,7 @@ namespace JsonTests {
             virtual ~FancyNumber() {}
             void run() {
                 ASSERT_EQUALS( int( 1000000 * bson().firstElement().number() ),
-                              int( 1000000 * fromjson( json() ).firstElement().number() ) );
+                               int( 1000000 * fromjson( json() ).firstElement().number() ) );
             }
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -978,8 +978,8 @@ namespace JsonTests {
         };
 
         class NumericTypes : public Base {
-            public:
-            void run(){
+        public:
+            void run() {
                 Base::run();
 
                 BSONObj o = fromjson(json());
@@ -990,12 +990,12 @@ namespace JsonTests {
 
                 ASSERT(o["long"].numberLong() == 9223372036854775807ll);
             }
-            
+
             virtual BSONObj bson() const {
                 return BSON( "int" << 123
-                          << "long" << 9223372036854775807ll // 2**63 - 1
-                          << "double" << 3.14
-                          );
+                             << "long" << 9223372036854775807ll // 2**63 - 1
+                             << "double" << 3.14
+                           );
             }
             virtual string json() const {
                 return "{ \"int\": 123, \"long\": 9223372036854775807, \"double\": 3.14 }";
@@ -1003,8 +1003,8 @@ namespace JsonTests {
         };
 
         class NegativeNumericTypes : public Base {
-            public:
-            void run(){
+        public:
+            void run() {
                 Base::run();
 
                 BSONObj o = fromjson(json());
@@ -1015,12 +1015,12 @@ namespace JsonTests {
 
                 ASSERT(o["long"].numberLong() == -9223372036854775807ll);
             }
-            
+
             virtual BSONObj bson() const {
                 return BSON( "int" << -123
-                          << "long" << -9223372036854775807ll // -1 * (2**63 - 1)
-                          << "double" << -3.14
-                          );
+                             << "long" << -9223372036854775807ll // -1 * (2**63 - 1)
+                             << "double" << -3.14
+                           );
             }
             virtual string json() const {
                 return "{ \"int\": -123, \"long\": -9223372036854775807, \"double\": -3.14 }";
@@ -1029,8 +1029,8 @@ namespace JsonTests {
 
         class EmbeddedDatesBase : public Base  {
         public:
-            
-            virtual void run(){
+
+            virtual void run() {
                 BSONObj o = fromjson( json() );
                 ASSERT_EQUALS( 3 , (o["time.valid"].type()) );
                 BSONObj e = o["time.valid"].embeddedObjectUserCheck();
@@ -1038,7 +1038,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( 9 , e["$lt"].type() );
                 Base::run();
             }
-            
+
             BSONObj bson() const {
                 BSONObjBuilder e;
                 e.appendDate( "$gt" , 1257829200000LL );
@@ -1082,10 +1082,10 @@ namespace JsonTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "json" ){
+        All() : Suite( "json" ) {
         }
 
-        void setupTests(){
+        void setupTests() {
             add< JsonStringTests::Empty >();
             add< JsonStringTests::SingleStringMember >();
             add< JsonStringTests::EscapedCharacters >();
@@ -1116,7 +1116,7 @@ namespace JsonTests {
             add< JsonStringTests::TimestampTests >();
             add< JsonStringTests::NullString >();
             add< JsonStringTests::AllTypes >();
-            
+
             add< FromJsonTests::Empty >();
             add< FromJsonTests::EmptyWithSpace >();
             add< FromJsonTests::SingleString >();

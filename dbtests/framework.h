@@ -49,7 +49,7 @@ namespace mongo {
 
         class TestCase {
         public:
-            virtual ~TestCase(){}
+            virtual ~TestCase() {}
             virtual void run() = 0;
             virtual string getName() = 0;
         };
@@ -57,15 +57,15 @@ namespace mongo {
         template< class T >
         class TestHolderBase : public TestCase {
         public:
-            TestHolderBase(){}
-            virtual ~TestHolderBase(){}
-            virtual void run(){
+            TestHolderBase() {}
+            virtual ~TestHolderBase() {}
+            virtual void run() {
                 auto_ptr<T> t;
                 t.reset( create() );
                 t->run();
             }
             virtual T * create() = 0;
-            virtual string getName(){
+            virtual string getName() {
                 return demangleName( typeid(T) );
             }
         };
@@ -73,7 +73,7 @@ namespace mongo {
         template< class T >
         class TestHolder0 : public TestHolderBase<T> {
         public:
-            virtual T * create(){
+            virtual T * create() {
                 return new T();
             }
         };
@@ -81,8 +81,8 @@ namespace mongo {
         template< class T , typename A  >
         class TestHolder1 : public TestHolderBase<T> {
         public:
-            TestHolder1( const A& a ) : _a(a){}
-            virtual T * create(){
+            TestHolder1( const A& a ) : _a(a) {}
+            virtual T * create() {
                 return new T( _a );
             }
             const A& _a;
@@ -90,25 +90,25 @@ namespace mongo {
 
         class Suite {
         public:
-            Suite( string name ) : _name( name ){
+            Suite( string name ) : _name( name ) {
                 registerSuite( name , this );
                 _ran = 0;
             }
 
             virtual ~Suite() {
-                if ( _ran ){
+                if ( _ran ) {
                     DBDirectClient c;
                     c.dropDatabase( "unittests" );
                 }
             }
 
             template<class T>
-            void add(){
+            void add() {
                 _tests.push_back( new TestHolder0<T>() );
             }
 
             template<class T , typename A >
-            void add( const A& a ){
+            void add( const A& a ) {
                 _tests.push_back( new TestHolder1<T,A>(a) );
             }
 
@@ -137,7 +137,7 @@ namespace mongo {
 
         class MyAssertionException : boost::noncopyable {
         public:
-            MyAssertionException(){
+            MyAssertionException() {
                 ss << "assertion: ";
             }
             stringstream ss;
@@ -148,32 +148,32 @@ namespace mongo {
         class MyAsserts {
         public:
             MyAsserts( const char * aexp , const char * bexp , const char * file , unsigned line )
-                : _aexp( aexp ) , _bexp( bexp ) , _file( file ) , _line( line ){
+                : _aexp( aexp ) , _bexp( bexp ) , _file( file ) , _line( line ) {
 
             }
-            
+
             template<typename A,typename B>
-            void ae( A a , B b ){
+            void ae( A a , B b ) {
                 _gotAssert();
                 if ( a == b )
                     return;
-                
+
                 printLocation();
-                    
+
                 MyAssertionException * e = getBase();
                 e->ss << a << " != " << b << endl;
                 log() << e->ss.str() << endl;
                 throw e;
             }
-            
+
             template<typename A,typename B>
-            void nae( A a , B b ){
+            void nae( A a , B b ) {
                 _gotAssert();
                 if ( a != b )
                     return;
-                
+
                 printLocation();
-                    
+
                 MyAssertionException * e = getBase();
                 e->ss << a << " == " << b << endl;
                 log() << e->ss.str() << endl;
@@ -182,13 +182,13 @@ namespace mongo {
 
 
             void printLocation();
-            
+
         private:
-            
+
             void _gotAssert();
-            
+
             MyAssertionException * getBase();
-            
+
             string _aexp;
             string _bexp;
             string _file;

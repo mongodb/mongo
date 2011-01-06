@@ -32,42 +32,42 @@ namespace mongo {
 
     // ----- Strategy ------
 
-    void Strategy::doWrite( int op , Request& r , const Shard& shard , bool checkVersion ){
+    void Strategy::doWrite( int op , Request& r , const Shard& shard , bool checkVersion ) {
         ShardConnection conn( shard , r.getns() );
         if ( ! checkVersion )
             conn.donotCheckVersion();
-        else if ( conn.setVersion() ){
+        else if ( conn.setVersion() ) {
             conn.done();
             throw StaleConfigException( r.getns() , "doWRite" , true );
         }
         conn->say( r.m() );
         conn.done();
     }
-    
-    void Strategy::doQuery( Request& r , const Shard& shard ){
-        
+
+    void Strategy::doQuery( Request& r , const Shard& shard ) {
+
         ShardConnection dbcon( shard , r.getns() );
         DBClientBase &c = dbcon.conn();
-        
+
         Message response;
         bool ok = c.call( r.m(), response);
         uassert( 10200 , "mongos: error calling db", ok );
-        
+
         {
             QueryResult *qr = (QueryResult *) response.singleData();
-                if ( qr->resultFlags() & ResultFlag_ShardConfigStale ){
-                    dbcon.done();
-                    throw StaleConfigException( r.getns() , "Strategy::doQuery" );
-                }
+            if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
+                dbcon.done();
+                throw StaleConfigException( r.getns() , "Strategy::doQuery" );
+            }
         }
-        
+
         r.reply( response , c.getServerAddress() );
         dbcon.done();
     }
-    
-    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ){
+
+    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ) {
         ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ){
+        if ( dbcon.setVersion() ) {
             dbcon.done();
             throw StaleConfigException( ns , "for insert" );
         }

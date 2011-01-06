@@ -26,20 +26,20 @@
 
 using namespace mongoutils;
 
-namespace mongo { 
+namespace mongo {
 
     extern string dbpath; // --dbpath parm
 
     void _deleteDataFiles(const char *);
 
     namespace dur {
-        
+
         /** read a durop from journal file referenced by br.
             @param opcode the opcode which has already been written from the bufreader
         */
-        shared_ptr<DurOp> DurOp::read(unsigned opcode, BufReader& br) { 
+        shared_ptr<DurOp> DurOp::read(unsigned opcode, BufReader& br) {
             shared_ptr<DurOp> op;
-            switch( opcode ) { 
+            switch( opcode ) {
             case JEntry::OpCode_FileCreated:
                 op = shared_ptr<DurOp>( new FileCreatedOp(br) );
                 break;
@@ -52,7 +52,7 @@ namespace mongo {
             return op;
         }
 
-        void DurOp::serialize(AlignedBuilder& ab) { 
+        void DurOp::serialize(AlignedBuilder& ab) {
             ab.appendNum(_opcode);
             _serialize(ab);
         }
@@ -66,7 +66,7 @@ namespace mongo {
             log.readStr(reservedStr);
         }
 
-        void DropDbOp::_serialize(AlignedBuilder& ab) { 
+        void DropDbOp::_serialize(AlignedBuilder& ab) {
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendNum((unsigned long long) 0); // reserved for future use
             ab.appendStr(_db);
@@ -74,20 +74,18 @@ namespace mongo {
         }
 
         /** throws */
-        void DropDbOp::replay() { 
+        void DropDbOp::replay() {
             log() << "recover replay drop db " << _db << endl;
             _deleteDataFiles(_db.c_str());
         }
 
-        FileCreatedOp::FileCreatedOp(string f, unsigned long long l) : 
-              DurOp(JEntry::OpCode_FileCreated) 
-        { 
+        FileCreatedOp::FileCreatedOp(string f, unsigned long long l) :
+            DurOp(JEntry::OpCode_FileCreated) {
             _p = RelativePath::fromFullPath(f);
             _len = l;
         }
 
-        FileCreatedOp::FileCreatedOp(BufReader& log) : DurOp(JEntry::OpCode_FileCreated) 
-        { 
+        FileCreatedOp::FileCreatedOp(BufReader& log) : DurOp(JEntry::OpCode_FileCreated) {
             unsigned long long reserved;
             log.read(reserved);
             log.read(reserved);
@@ -103,8 +101,8 @@ namespace mongo {
             ab.appendNum(_len);
             ab.appendStr(_p.toString());
         }
-        
-        string FileCreatedOp::toString() { 
+
+        string FileCreatedOp::toString() {
             return str::stream() << "FileCreatedOp " << _p.toString() << ' ' << _len/1024.0/1024.0 << "MB";
         }
 
@@ -113,16 +111,16 @@ namespace mongo {
             return exists( _p.asFullPath() );
         }
 
-        void FileCreatedOp::replay() { 
+        void FileCreatedOp::replay() {
             // i believe the code assumes new files are filled with zeros.  thus we have to recreate the file,
             // or rewrite at least, even if it were the right length.  perhaps one day we should change that
             // although easier to avoid defects if we assume it is zeros perhaps.
             string full = _p.asFullPath();
             if( exists(full) ) {
-                try { 
+                try {
                     remove(full);
                 }
-                catch(std::exception& e) { 
+                catch(std::exception& e) {
                     log(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
                 }
             }
@@ -133,7 +131,7 @@ namespace mongo {
                 try {
                     remove(full);
                 }
-                catch(...) { 
+                catch(...) {
                     log() << "warning could not delete file " << full << endl;
                 }
             }
@@ -145,7 +143,7 @@ namespace mongo {
             scoped_array<char> v( new char[blksz] );
             memset( v.get(), 0, blksz );
             fileofs ofs = 0;
-            while( left ) { 
+            while( left ) {
                 unsigned long long w = left < blksz ? left : blksz;
                 f.write(ofs, v.get(), (unsigned) w);
                 left -= w;

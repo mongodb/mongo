@@ -20,7 +20,7 @@
 #include "stats.h"
 
 namespace mongo {
-    
+
     OpCounters opsNonSharded;
     OpCounters opsSharded;
 

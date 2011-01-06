@@ -26,7 +26,7 @@
 
 #define NOINLINE_DECL __declspec(noinline)
 
-#else 
+#else
 
 #define NOINLINE_DECL
 

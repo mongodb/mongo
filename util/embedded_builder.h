@@ -29,10 +29,10 @@ namespace mongo {
         // parameter in lex ascending order.
         void prepareContext( string &name ) {
             int i = 1, n = _builders.size();
-            while( i < n && 
-                   name.substr( 0, _builders[ i ].first.length() ) == _builders[ i ].first && 
-                   ( name[ _builders[i].first.length() ] == '.' || name[ _builders[i].first.length() ] == 0 )
-                   ){
+            while( i < n &&
+                    name.substr( 0, _builders[ i ].first.length() ) == _builders[ i ].first &&
+                    ( name[ _builders[i].first.length() ] == '.' || name[ _builders[i].first.length() ] == 0 )
+                 ) {
                 name = name.substr( _builders[ i ].first.length() + 1 );
                 ++i;
             }
@@ -83,10 +83,10 @@ namespace mongo {
         }
 
         BSONObjBuilder *back() { return _builders.back().second; }
-        
+
         vector< pair< string, BSONObjBuilder * > > _builders;
         vector< shared_ptr< BSONObjBuilder > > _builderStorage;
 
     };
-    
+
 } //namespace mongo

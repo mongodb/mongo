@@ -25,7 +25,7 @@ namespace mongo {
     set<MongoFile*> MongoFile::mmfiles;
     map<string,MongoFile*> MongoFile::pathToFile;
 
-    /* Create. Must not exist. 
+    /* Create. Must not exist.
     @param zero fill file with zeros when true
     */
     void* MemoryMappedFile::create(string filename, unsigned long long len, bool zero) {
@@ -56,21 +56,21 @@ namespace mongo {
         return map( filename , l, options );
     }
 
-    void printMemInfo( const char * where ){
+    void printMemInfo( const char * where ) {
         cout << "mem info: ";
-        if ( where ) 
-            cout << where << " "; 
+        if ( where )
+            cout << where << " ";
         ProcessInfo pi;
-        if ( ! pi.supported() ){
+        if ( ! pi.supported() ) {
             cout << " not supported" << endl;
             return;
         }
-        
+
         cout << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize() << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) ) << endl;
     }
 
     /* --- MongoFile -------------------------------------------------
-       this is the administrative stuff 
+       this is the administrative stuff
     */
 
     RWLock MongoFile::mmmutex("rw:mmmutex");
@@ -93,7 +93,7 @@ namespace mongo {
         rwlock lk( mmmutex , true );
 
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             (*i)->close();
             pm.hit();
         }
@@ -101,9 +101,9 @@ namespace mongo {
         --closingAllFiles;
     }
 
-    /*static*/ long long MongoFile::totalMappedLength(){
+    /*static*/ long long MongoFile::totalMappedLength() {
         unsigned long long total = 0;
-        
+
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             total += (*i)->length();
@@ -117,35 +117,35 @@ namespace mongo {
     void (*MongoFile::notifyPreFlush)() = nullFunc;
     void (*MongoFile::notifyPostFlush)() = nullFunc;
 
-    /*static*/ int MongoFile::flushAll( bool sync ){
+    /*static*/ int MongoFile::flushAll( bool sync ) {
         notifyPreFlush();
         int x = _flushAll(sync);
         notifyPostFlush();
         return x;
     }
 
-    /*static*/ int MongoFile::_flushAll( bool sync ){
-        if ( ! sync ){
+    /*static*/ int MongoFile::_flushAll( bool sync ) {
+        if ( ! sync ) {
             int num = 0;
             rwlock lk( mmmutex , false );
-            for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+            for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
                 num++;
                 MongoFile * mmf = *i;
                 if ( ! mmf )
                     continue;
-                
+
                 mmf->flush( sync );
             }
             return num;
         }
-        
+
         // want to do it sync
         set<MongoFile*> seen;
-        while ( true ){
+        while ( true ) {
             auto_ptr<Flushable> f;
             {
                 rwlock lk( mmmutex , false );
-                for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+                for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
                     MongoFile * mmf = *i;
                     if ( ! mmf )
                         continue;
@@ -158,18 +158,18 @@ namespace mongo {
             }
             if ( ! f.get() )
                 break;
-            
+
             f->flush();
         }
         return seen.size();
     }
 
-    void MongoFile::created(){
+    void MongoFile::created() {
         rwlock lk( mmmutex , true );
         mmfiles.insert(this);
     }
-    
-    void MongoFile::setFilename(string fn) { 
+
+    void MongoFile::setFilename(string fn) {
         rwlock( mmmutex, true );
         assert( _filename.empty() );
         _filename = fn;
@@ -182,7 +182,7 @@ namespace mongo {
 
     void MongoFile::markAllWritable() {
         rwlock lk( mmmutex , false );
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
             if (mmf) mmf->_lock();
         }
@@ -190,7 +190,7 @@ namespace mongo {
 
     void MongoFile::unmarkAllWritable() {
         rwlock lk( mmmutex , false );
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
             if (mmf) mmf->_unlock();
         }

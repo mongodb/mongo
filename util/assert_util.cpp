@@ -33,12 +33,12 @@ using namespace std;
 namespace mongo {
 
     AssertionCount assertionCount;
-    
+
     AssertionCount::AssertionCount()
-        : regular(0),warning(0),msg(0),user(0),rollovers(0){
+        : regular(0),warning(0),msg(0),user(0),rollovers(0) {
     }
 
-    void AssertionCount::rollover(){
+    void AssertionCount::rollover() {
         rollovers++;
         regular = 0;
         warning = 0;
@@ -46,7 +46,7 @@ namespace mongo {
         user = 0;
     }
 
-    void AssertionCount::condrollover( int newvalue ){
+    void AssertionCount::condrollover( int newvalue ) {
         static int max = (int)pow( 2.0 , 30 );
         if ( newvalue >= max )
             rollover();
@@ -57,15 +57,15 @@ namespace mongo {
             b.append( m , "unknown assertion" );
         else
             b.append( m , msg );
-        
+
         if ( code )
             b.append( c , code );
     }
 
-    
-	string getDbContext();
-	
-	/* "warning" assert -- safe to continue, so we don't throw exception. */
+
+    string getDbContext();
+
+    /* "warning" assert -- safe to continue, so we don't throw exception. */
     void wasserted(const char *msg, const char *file, unsigned line) {
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
@@ -111,15 +111,15 @@ namespace mongo {
         throw MsgAssertionException(msgid, msg);
     }
 
-    void streamNotGood( int code , string msg , std::ios& myios ){
+    void streamNotGood( int code , string msg , std::ios& myios ) {
         stringstream ss;
         // errno might not work on all systems for streams
         // if it doesn't for a system should deal with here
         ss << msg << " stream invalid: " << errnoWithDescription();
         throw UserException( code , ss.str() );
     }
-    
-    string errnoWithPrefix( const char * prefix ){
+
+    string errnoWithPrefix( const char * prefix ) {
         stringstream ss;
         if ( prefix )
             ss << prefix << ": ";
@@ -127,16 +127,16 @@ namespace mongo {
         return ss.str();
     }
 
-    string demangleName( const type_info& typeinfo ){
+    string demangleName( const type_info& typeinfo ) {
 #ifdef _WIN32
         return typeinfo.name();
 #else
         int status;
-        
+
         char * niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
         if ( ! niceName )
             return typeinfo.name();
-        
+
         string s = niceName;
         free(niceName);
         return s;

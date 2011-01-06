@@ -32,13 +32,13 @@ namespace mongo {
         GridFSChunk( BSONObj data );
         GridFSChunk( BSONObj fileId , int chunkNumber , const char * data , int len );
 
-        int len(){
+        int len() {
             int len;
             _data["data"].binDataClean( len );
             return len;
         }
 
-        const char * data( int & len ){
+        const char * data( int & len ) {
             return _data["data"].binDataClean( len );
         }
 
@@ -140,41 +140,41 @@ namespace mongo {
          * @return whether or not this file exists
          * findFile will always return a GriFile, so need to check this
          */
-        bool exists(){
+        bool exists() {
             return ! _obj.isEmpty();
         }
 
-        string getFilename(){
+        string getFilename() {
             return _obj["filename"].str();
         }
 
-        int getChunkSize(){
+        int getChunkSize() {
             return (int)(_obj["chunkSize"].number());
         }
 
-        gridfs_offset getContentLength(){
+        gridfs_offset getContentLength() {
             return (gridfs_offset)(_obj["length"].number());
         }
 
-        string getContentType(){
+        string getContentType() {
             return _obj["contentType"].valuestr();
         }
 
-        Date_t getUploadDate(){
+        Date_t getUploadDate() {
             return _obj["uploadDate"].date();
         }
 
-        string getMD5(){
+        string getMD5() {
             return _obj["md5"].str();
         }
 
-        BSONElement getFileField( const string& name ){
+        BSONElement getFileField( const string& name ) {
             return _obj[name];
         }
 
         BSONObj getMetadata();
 
-        int getNumChunks(){
+        int getNumChunks() {
             return (int) ceil( (double)getContentLength() / (double)getChunkSize() );
         }
 

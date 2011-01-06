@@ -23,7 +23,7 @@
 #include "../../util/hostandport.h"
 #include "health.h"
 
-namespace mongo { 
+namespace mongo {
 
     /* singleton config object is stored here */
     const string rsConfigNs = "local.system.replset";
@@ -31,7 +31,7 @@ namespace mongo {
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
     public:
-        /* if something is misconfigured, throws an exception. 
+        /* if something is misconfigured, throws an exception.
         if couldn't be queried or is just blank, ok() will be false.
         */
         ReplSetConfig(const HostAndPort& h);
@@ -56,10 +56,10 @@ namespace mongo {
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
-            bool operator==(const MemberCfg& r) const { 
-                return _id==r._id && votes == r.votes && h == r.h && priority == r.priority && 
-                    arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
-                    buildIndexes == buildIndexes;
+            bool operator==(const MemberCfg& r) const {
+                return _id==r._id && votes == r.votes && h == r.h && priority == r.priority &&
+                       arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
+                       buildIndexes == buildIndexes;
             }
             bool operator!=(const MemberCfg& r) const { return !(*this == r); }
         };

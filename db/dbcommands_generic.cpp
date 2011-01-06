@@ -52,12 +52,12 @@ namespace mongo {
         CmdBuildInfo() : Command( "buildInfo", true, "buildinfo" ) {}
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "get version #, etc.\n";
             help << "{ buildinfo:1 }";
         }
-        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
             result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             result.appendBool( "debug" , debug );
@@ -66,8 +66,8 @@ namespace mongo {
         }
     } cmdBuildInfo;
 
-    /** experimental. either remove or add support in repl sets also.  in a repl set, getting this setting from the 
-        repl set config could make sense. 
+    /** experimental. either remove or add support in repl sets also.  in a repl set, getting this setting from the
+        repl set config could make sense.
         */
     unsigned replApplyBatchSize = 1;
 
@@ -76,7 +76,7 @@ namespace mongo {
         CmdGet() : Command( "getParameter" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "get administrative option(s)\nexample:\n";
             help << "{ getParameter:1, notablescan:1 }\n";
@@ -89,9 +89,9 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             bool all = *cmdObj.firstElement().valuestrsafe() == '*';
-            
+
             int before = result.len();
-            
+
             if( all || cmdObj.hasElement("quiet") ) {
                 result.append("quiet", cmdLine.quiet );
             }
@@ -106,7 +106,7 @@ namespace mongo {
             }
             if( all || cmdObj.hasElement("replApplyBatchSize") ) {
                 result.append("replApplyBatchSize", replApplyBatchSize);
-            }           
+            }
 
             if ( before == result.len() ) {
                 errmsg = "no option found to get";
@@ -121,7 +121,7 @@ namespace mongo {
         CmdSet() : Command( "setParameter" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "set administrative option(s)\nexample:\n";
             help << "{ setParameter:1, notablescan:true }\n";
@@ -130,7 +130,7 @@ namespace mongo {
             help << "  logLevel\n";
             help << "  quiet\n";
         }
-        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             if( cmdObj.hasElement("notablescan") ) {
                 result.append("was", cmdLine.noTableScan);
@@ -174,63 +174,63 @@ namespace mongo {
 
     class PingCommand : public Command {
     public:
-        PingCommand() : Command( "ping" ){}
+        PingCommand() : Command( "ping" ) {}
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream &help ) const { help << "a way to check that the server is alive. responds immediately even if server is in a db lock."; }
         virtual LockType locktype() const { return NONE; }
         virtual bool requiresAuth() { return false; }
-        virtual bool run(const string& badns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        virtual bool run(const string& badns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
             return true;
         }
     } pingCmd;
-    
+
     class FeaturesCmd : public Command {
     public:
-        FeaturesCmd() : Command( "features", true ){}
+        FeaturesCmd() : Command( "features", true ) {}
         void help(stringstream& h) const { h << "return build level feature settings"; }
         virtual bool slaveOk() const { return true; }
-        virtual bool readOnly(){ return true; }
+        virtual bool readOnly() { return true; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            if ( globalScriptEngine ){
+        virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if ( globalScriptEngine ) {
                 BSONObjBuilder bb( result.subobjStart( "js" ) );
                 result.append( "utf8" , globalScriptEngine->utf8Ok() );
                 bb.done();
             }
-            if ( cmdObj["oidReset"].trueValue() ){
+            if ( cmdObj["oidReset"].trueValue() ) {
                 result.append( "oidMachineOld" , OID::getMachineId() );
                 OID::regenMachineId();
             }
             result.append( "oidMachine" , OID::getMachineId() );
             return true;
         }
-        
+
     } featuresCmd;
 
     class LogRotateCmd : public Command {
     public:
-        LogRotateCmd() : Command( "logRotate" ){}
-        virtual LockType locktype() const { return NONE; } 
+        LogRotateCmd() : Command( "logRotate" ) {}
+        virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             rotateLogs();
             return 1;
-        }        
-        
+        }
+
     } logRotateCmd;
-    
+
     class ListCommandsCmd : public Command {
     public:
         virtual void help( stringstream &help ) const { help << "get a list of all db commands"; }
-        ListCommandsCmd() : Command( "listCommands", false ){}
-        virtual LockType locktype() const { return NONE; } 
+        ListCommandsCmd() : Command( "listCommands", false ) {}
+        virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
-            for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ){
+            for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
                 Command * c = i->second;
 
                 // don't show oldnames
@@ -252,10 +252,10 @@ namespace mongo {
             b.done();
 
             return 1;
-        }        
+        }
 
     } listCommandsCmd;
-    
+
     class CmdShutdown : public Command {
     public:
         virtual bool requiresAuth() { return true; }
@@ -267,7 +267,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype() const { return NONE; } 
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const {
             help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
         }
@@ -277,7 +277,7 @@ namespace mongo {
             if ( c ) {
                 c->shutdown();
             }
-            
+
             log() << "terminating, shutdown command received" << endl;
 
             dbexit( EXIT_CLEAN , "shutdown called" , true ); // this never returns
@@ -298,7 +298,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype() const { return NONE; } 
+        virtual LockType locktype() const { return NONE; }
         CmdForceError() : Command("forceerror") {}
         bool run(const string& dbnamne, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             uassert( 10038 , "forced error", false);

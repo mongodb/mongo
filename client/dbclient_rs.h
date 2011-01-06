@@ -34,7 +34,7 @@ namespace mongo {
      */
     class ReplicaSetMonitor {
     public:
-        
+
         typedef boost::function1<void,const ReplicaSetMonitor*> ConfigChangeHook;
 
         /**
@@ -57,7 +57,7 @@ namespace mongo {
         static void setConfigChangeHook( ConfigChangeHook hook );
 
         ~ReplicaSetMonitor();
-        
+
         /** @return HostAndPort or throws an exception */
         HostAndPort getMaster();
 
@@ -72,7 +72,7 @@ namespace mongo {
         /**
          * notify the monitor that server has faild
          */
-        void notifySlaveFailure( const HostAndPort& server );        
+        void notifySlaveFailure( const HostAndPort& server );
 
         /**
          * checks for current master and new secondaries
@@ -82,18 +82,18 @@ namespace mongo {
         string getName() const { return _name; }
 
         string getServerAddress() const;
-        
+
     private:
         /**
          * This populates a list of hosts from the list of seeds (discarding the
-         * seed list). 
+         * seed list).
          * @param name set name
          * @param servers seeds
          */
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
 
         void _check();
-        
+
         /**
          * Use replSetGetStatus command to make sure hosts in host list are up
          * and readable.  Sets Node::ok appropriately.
@@ -107,7 +107,7 @@ namespace mongo {
          * @param changed if new hosts were added
          */
         void _checkHosts(const BSONObj& hostList, bool& changed);
-        
+
         /**
          * Updates host list.
          * @param c the connection to check
@@ -124,14 +124,14 @@ namespace mongo {
 
         string _name;
         struct Node {
-            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c) , ok(true){}
+            Node( const HostAndPort& a , DBClientConnection* c ) : addr( a ) , conn(c) , ok(true) {}
             HostAndPort addr;
             DBClientConnection* conn;
 
             // if this node is in a failure state
             // used for slave routing
             // this is too simple, should make it better
-            bool ok; 
+            bool ok;
         };
 
         /**
@@ -141,20 +141,20 @@ namespace mongo {
 
         int _master; // which node is the current master.  -1 means no master is known
 
-        
+
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
-        
+
         static ConfigChangeHook _hook;
     };
 
     /** Use this class to connect to a replica set of servers.  The class will manage
        checking for which server in a replica set is master, and do failover automatically.
-       
+
        This can also be used to connect to replica pairs since pairs are a subset of sets
-       
-	   On a failover situation, expect at least one operation to return an error (throw 
-	   an exception) before the failover is complete.  Operations are not retried.
+
+       On a failover situation, expect at least one operation to return an error (throw
+       an exception) before the failover is complete.  Operations are not retried.
     */
     class DBClientReplicaSet : public DBClientBase {
 
@@ -173,33 +173,33 @@ namespace mongo {
         /** Authorize.  Authorizes all nodes as needed
         */
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true );
-        
+
         // ----------- simple functions --------------
 
         /** throws userassertion "no master found" */
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
-        
+
         /** throws userassertion "no master found" */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
         virtual void insert( const string &ns , BSONObj obj );
 
-        /** insert multiple objects.  Note that single object insert is asynchronous, so this version 
+        /** insert multiple objects.  Note that single object insert is asynchronous, so this version
             is only nominally faster and not worth a special effort to try to use.  */
         virtual void insert( const string &ns, const vector< BSONObj >& v );
 
         virtual void remove( const string &ns , Query obj , bool justOne = 0 );
-        
+
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 );
-        
+
         virtual void killCursor( long long cursorID );
-        
+
         // ---- access raw connections ----
-        
+
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
-        
+
         // ---- callback pieces -------
 
         virtual void checkResponse( const char *data, int nReturned ) { checkMaster()->checkResponse( data , nReturned ); }
@@ -217,41 +217,41 @@ namespace mongo {
         string toString() { return getServerAddress(); }
 
         string getServerAddress() const { return _monitor->getServerAddress(); }
-        
-        virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }  
-        
+
+        virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
+
         // ---- low level ------
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true );
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
-        virtual bool callRead( Message& toSend , Message& response ){ return checkMaster()->callRead( toSend , response ); }
+        virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
 
 
-    protected:                
+    protected:
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
 
         DBClientConnection * checkMaster();
         DBClientConnection * checkSlave();
-        
+
         void _auth( DBClientConnection * conn );
 
         ReplicaSetMonitorPtr _monitor;
 
-        HostAndPort _masterHost;        
+        HostAndPort _masterHost;
         scoped_ptr<DBClientConnection> _master;
 
         HostAndPort _slaveHost;
         scoped_ptr<DBClientConnection> _slave;
-        
+
         /**
          * for storing authentication info
          * fields are exactly for DBClientConnection::auth
          */
         struct AuthInfo {
-            AuthInfo( string d , string u , string p , bool di ) 
-                : dbname( d ) , username( u ) , pwd( p ) , digestPassword( di ){}
+            AuthInfo( string d , string u , string p , bool di )
+                : dbname( d ) , username( u ) , pwd( p ) , digestPassword( di ) {}
             string dbname;
             string username;
             string pwd;
@@ -262,8 +262,8 @@ namespace mongo {
         // we can re-auth
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
-        list<AuthInfo> _auths; 
+        list<AuthInfo> _auths;
     };
-    
+
 
 }

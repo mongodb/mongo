@@ -9,7 +9,7 @@ namespace mongo {
 
     // mongo version
     extern const char versionString[];
-    string mongodVersion();    
+    string mongodVersion();
     int versionCmp(StringData rhs, StringData lhs); // like strcmp
 
     const char * gitVersion();

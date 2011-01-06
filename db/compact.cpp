@@ -27,7 +27,7 @@
 #include "curop-inl.h"
 #include "../util/concurrency/task.h"
 
-namespace mongo { 
+namespace mongo {
 
     class CompactJob : public task::Task {
     public:
@@ -44,9 +44,9 @@ namespace mongo {
         DiskLoc _firstExtent;
     };
 
-    // lock & set context first.  this checks that collection still exists, and that it hasn't 
+    // lock & set context first.  this checks that collection still exists, and that it hasn't
     // morphed into a capped collection between locks (which is possible)
-    NamespaceDetails * CompactJob::beginBlock() { 
+    NamespaceDetails * CompactJob::beginBlock() {
         NamespaceDetails *nsd = nsdetails(_ns.c_str());
         if( nsd == 0 ) throw "ns no longer present";
         if( nsd->firstExtent.isNull() )
@@ -60,7 +60,7 @@ namespace mongo {
         unsigned n = 0;
         {
             /* pre-touch records in a read lock so that paging happens in read not write lock.
-               note we are only touching the records though; if indexes aren't in RAM, they will 
+               note we are only touching the records though; if indexes aren't in RAM, they will
                page later.  So the concept is only partial.
                */
             readlock lk;
@@ -69,8 +69,8 @@ namespace mongo {
             NamespaceDetails *nsd = beginBlock();
             if( nsd->firstExtent != _firstExtent )  {
                 // TEMP DEV - stop after 1st extent
-                throw "change of first extent"; 
-            }            
+                throw "change of first extent";
+            }
             DiskLoc loc = nsd->firstExtent.ext()->firstRecord;
             while( !loc.isNull() ) {
                 Record *r = loc.rec();
@@ -86,12 +86,12 @@ namespace mongo {
             for( unsigned i = 0; i < n; i++ ) {
                 if( nsd->firstExtent != _firstExtent )  {
                     // TEMP DEV - stop after 1st extent
-                    throw "change of first extent (or it is now null)"; 
+                    throw "change of first extent (or it is now null)";
                 }
                 DiskLoc loc = nsd->firstExtent.ext()->firstRecord;
                 Record *rec = loc.rec();
                 BSONObj o = loc.obj().getOwned(); // todo: inefficient, double mem copy...
-                try { 
+                try {
                     theDataFileMgr.deleteRecord(_ns.c_str(), rec, loc, false);
                 }
                 catch(DBException&) { throw "error deleting record"; }
@@ -110,7 +110,7 @@ namespace mongo {
         }
     }
 
-    void CompactJob::prep() { 
+    void CompactJob::prep() {
         readlock lk;
         Client::Context ctx(_ns);
         NamespaceDetails *nsd = beginBlock();
@@ -124,21 +124,21 @@ namespace mongo {
     static mutex m("compact");
     static volatile bool running;
 
-    void CompactJob::doWork() { 
+    void CompactJob::doWork() {
         Client::initThread("compact");
         cc().curop()->reset();
         cc().curop()->setNS(_ns.c_str());
         cc().curop()->markCommand();
         sleepsecs(60);
-        try { 
+        try {
             prep();
-            while( _ncompacted < _nrecords ) 
+            while( _ncompacted < _nrecords )
                 doBatch();
         }
-        catch(const char *p) { 
+        catch(const char *p) {
             log() << "info: exception compact " << p << endl;
         }
-        catch(...) { 
+        catch(...) {
             log() << "info: exception compact" << endl;
         }
         mongo::running = false;
@@ -147,11 +147,11 @@ namespace mongo {
 
     /* --- CompactCmd --- */
 
-    class CompactCmd : public Command { 
+    class CompactCmd : public Command {
     public:
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) { 
+        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || db.empty() ) { 
+            if( coll.empty() || db.empty() ) {
                 errmsg = "no collection name specified";
                 return false;
             }
@@ -160,7 +160,7 @@ namespace mongo {
             {
                 readlock lk;
                 Client::Context ctx(ns);
-                if( nsdetails(ns.c_str()) == 0 ) { 
+                if( nsdetails(ns.c_str()) == 0 ) {
                     errmsg = "namespace " + ns + " does not exist";
                     return false;
                 }
@@ -181,15 +181,15 @@ namespace mongo {
 
         virtual LockType locktype() const { return NONE; }
         virtual bool adminOnly() const { return false; }
-        virtual bool slaveOk() const { return true; } 
+        virtual bool slaveOk() const { return true; }
         virtual bool logTheOp() { return false; }
-        virtual void help( stringstream& help ) const { 
+        virtual void help( stringstream& help ) const {
             help << "compact / defragment a collection in the background, slowly, attempting to minimize disruptions to other operations\n"
-                "{ compact : <collection> }";
+                 "{ compact : <collection> }";
         }
         virtual bool requiresAuth() { return true; }
 
-        /** @param webUI expose the command in the web ui as localhost:28017/<name> 
+        /** @param webUI expose the command in the web ui as localhost:28017/<name>
             @param oldName an optional old, deprecated name for the command
         */
         CompactCmd() : Command("compact") { }

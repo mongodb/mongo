@@ -32,25 +32,25 @@ namespace mongo {
 
         class KeyOnly {
         public:
-            
-            KeyOnly() : _stringSize(0){}
+
+            KeyOnly() : _stringSize(0) {}
 
             BSONObj hydrate( const BSONObj& key ) const;
-            
+
             void addNo() { _add( false , "" ); }
             void addYes( const string& name ) { _add( true , name ); }
 
         private:
-            
-            void _add( bool b , const string& name ) { 
-                _include.push_back( b ); 
-                _names.push_back( name ); 
-                _stringSize += name.size(); 
+
+            void _add( bool b , const string& name ) {
+                _include.push_back( b );
+                _names.push_back( name );
+                _stringSize += name.size();
             }
 
             vector<bool> _include; // one entry per field in key.  true iff should be in output
             vector<string> _names; // name of field since key doesn't have names
-            
+
             int _stringSize;
         };
 
@@ -60,31 +60,31 @@ namespace mongo {
             _includeID(true) ,
             _skip(0) ,
             _limit(-1) ,
-            _hasNonSimple(false){
+            _hasNonSimple(false) {
         }
-        
+
         /**
          * called once per lifetime
          * e.g. { "x" : 1 , "a.y" : 1 }
          */
         void init( const BSONObj& spec );
-        
+
         /**
          * @return the spec init was called with
          */
         BSONObj getSpec() const { return _source; }
-        
+
         /**
          * transforms in according to spec
          */
         BSONObj transform( const BSONObj& in ) const;
 
-        
+
         /**
          * transforms in according to spec
          */
         void transform( const BSONObj& in , BSONObjBuilder& b ) const;
-        
+
 
         /**
          * @return if the keyPattern has all the information needed to return then
@@ -93,7 +93,7 @@ namespace mongo {
          *               which has to be handled above this (arrays, geo)
          */
         KeyOnly* checkKey( const BSONObj& keyPattern ) const;
-        
+
     private:
 
         /**

@@ -41,7 +41,7 @@ namespace mongo {
             }
         }
 
-        if( d->nIndexes >= NamespaceDetails::NIndexesMax ) { 
+        if( d->nIndexes >= NamespaceDetails::NIndexesMax ) {
             problem() << "Helper::ensureIndex fails, MaxIndexes exceeded " << ns << '\n';
             return;
         }
@@ -78,7 +78,8 @@ namespace mongo {
                 one_ = c_->current();
                 loc_ = c_->currLoc();
                 setStop();
-            } else {
+            }
+            else {
                 c_->advance();
             }
         }
@@ -96,11 +97,11 @@ namespace mongo {
         BSONObj one_;
         DiskLoc loc_;
     };
-    
-    /* fetch a single object from collection ns that matches query 
+
+    /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    bool Helpers::findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex) { 
+    bool Helpers::findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex) {
         MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
@@ -112,10 +113,10 @@ namespace mongo {
         return true;
     }
 
-    /* fetch a single object from collection ns that matches query 
+    /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) { 
+    DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) {
         MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
@@ -125,7 +126,7 @@ namespace mongo {
     }
 
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
-                           bool * nsFound , bool * indexFound ){
+                           bool * nsFound , bool * indexFound ) {
         dbMutex.assertAtLeastReadLocked();
         Database *database = c.database();
         assert( database );
@@ -134,7 +135,7 @@ namespace mongo {
             return false;
         if ( nsFound )
             *nsFound = 1;
-        
+
         int idxNo = d->findIdIndex();
         if ( idxNo < 0 )
             return false;
@@ -142,9 +143,9 @@ namespace mongo {
             *indexFound = 1;
 
         IndexDetails& i = d->idx( idxNo );
-        
+
         BSONObj key = i.getKeyFromQuery( query );
-        
+
         DiskLoc loc = i.head.btree()->findSingle( i , i.head , key );
         if ( loc.isNull() )
             return false;
@@ -152,12 +153,12 @@ namespace mongo {
         return true;
     }
 
-     DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
-         int idxNo = d->findIdIndex();
-         uassert(13430, "no _id index", idxNo>=0);
-         IndexDetails& i = d->idx( idxNo );        
-         BSONObj key = i.getKeyFromQuery( idquery );
-         return i.head.btree()->findSingle( i , i.head , key );
+    DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
+        int idxNo = d->findIdIndex();
+        uassert(13430, "no _id index", idxNo>=0);
+        IndexDetails& i = d->idx( idxNo );
+        BSONObj key = i.getKeyFromQuery( idquery );
+        return i.head.btree()->findSingle( i , i.head , key );
     }
 
     bool Helpers::isEmpty(const char *ns, bool doAuth) {
@@ -185,17 +186,17 @@ namespace mongo {
     bool Helpers::getLast(const char *ns, BSONObj& result) {
         Client::Context ctx(ns);
         shared_ptr<Cursor> c = findTableScan(ns, reverseNaturalObj);
-        if( !c->ok() ) 
+        if( !c->ok() )
             return false;
         result = c->current();
         return true;
     }
 
-    void Helpers::upsert( const string& ns , const BSONObj& o ){
+    void Helpers::upsert( const string& ns , const BSONObj& o ) {
         BSONElement e = o["_id"];
         assert( e.type() );
         BSONObj id = e.wrap();
-        
+
         OpDebug debug;
         Client::Context context(ns);
         updateObjects(ns.c_str(), o, /*pattern=*/id, /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug );
@@ -213,12 +214,12 @@ namespace mongo {
         _updateObjects(/*god=*/true, ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , logTheOp , debug );
     }
 
-    BSONObj Helpers::toKeyFormat( const BSONObj& o , BSONObj& key ){
+    BSONObj Helpers::toKeyFormat( const BSONObj& o , BSONObj& key ) {
         BSONObjBuilder me;
         BSONObjBuilder k;
 
         BSONObjIterator i( o );
-        while ( i.more() ){
+        while ( i.more() ) {
             BSONElement e = i.next();
             k.append( e.fieldName() , 1 );
             me.appendAs( e , "" );
@@ -226,8 +227,8 @@ namespace mongo {
         key = k.obj();
         return me.obj();
     }
-    
-    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback ){
+
+    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback ) {
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
@@ -240,32 +241,32 @@ namespace mongo {
 
         int ii = nsd->findIndexByKeyPattern( keya );
         assert( ii >= 0 );
-        
+
         long long num = 0;
-        
+
         IndexDetails& i = nsd->idx( ii );
 
         shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
         auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
         cc->setDoingDeletes( true );
-        
-        while ( c->ok() ){
+
+        while ( c->ok() ) {
             DiskLoc rloc = c->currLoc();
             BSONObj key = c->currKey();
 
             if ( callback )
                 callback->goingToDelete( c->current() );
-            
+
             c->advance();
             c->noteLocation();
-            
+
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() );
             theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
             num++;
 
             c->checkLocation();
 
-            if ( yield && ! cc->yieldSometimes() ){
+            if ( yield && ! cc->yieldSometimes() ) {
                 // cursor got finished by someone else, so we're done
                 cc.release(); // if the collection/db is dropped, cc may be deleted
                 break;
@@ -290,11 +291,12 @@ namespace mongo {
                 BSONObjBuilder result;
                 dropCollection( name_, errmsg, result );
             }
-        } catch ( ... ) {
+        }
+        catch ( ... ) {
             problem() << "exception cleaning up DbSet" << endl;
         }
     }
-    
+
     void DbSet::reset( const string &name, const BSONObj &key ) {
         if ( !name.empty() )
             name_ = name;
@@ -303,74 +305,77 @@ namespace mongo {
         Client::Context c( name_.c_str() );
         if ( nsdetails( name_.c_str() ) ) {
             Helpers::emptyCollection( name_.c_str() );
-        } else {
+        }
+        else {
             string err;
             massert( 10303 ,  err, userCreateNS( name_.c_str(), fromjson( "{autoIndexId:false}" ), err, false ) );
         }
-        Helpers::ensureIndex( name_.c_str(), key_, true, "setIdx" );            
+        Helpers::ensureIndex( name_.c_str(), key_, true, "setIdx" );
     }
-    
+
     bool DbSet::get( const BSONObj &obj ) const {
         Client::Context c( name_.c_str() );
         BSONObj temp;
         return Helpers::findOne( name_.c_str(), obj, temp, true );
     }
-    
+
     void DbSet::set( const BSONObj &obj, bool val ) {
         Client::Context c( name_.c_str() );
         if ( val ) {
             try {
                 BSONObj k = obj;
                 theDataFileMgr.insertWithObjMod( name_.c_str(), k, false );
-            } catch ( DBException& ) {
+            }
+            catch ( DBException& ) {
                 // dup key - already in set
             }
-        } else {
+        }
+        else {
             deleteObjects( name_.c_str(), obj, true, false, false );
-        }                        
+        }
     }
 
-    RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) : _out(0){
+    RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) : _out(0) {
         static int NUM = 0;
-        
+
         _root = dbpath;
         if ( a.size() )
             _root /= a;
         if ( b.size() )
             _root /= b;
         assert( a.size() || b.size() );
-        
+
         _file = _root;
-        
+
         stringstream ss;
         ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
         _file /= ss.str();
 
     }
-    
-    RemoveSaver::~RemoveSaver(){
-        if ( _out ){
+
+    RemoveSaver::~RemoveSaver() {
+        if ( _out ) {
             _out->close();
             delete _out;
             _out = 0;
         }
     }
-    
-    void RemoveSaver::goingToDelete( const BSONObj& o ){
-        if ( ! _out ){
+
+    void RemoveSaver::goingToDelete( const BSONObj& o ) {
+        if ( ! _out ) {
             create_directories( _root );
             _out = new ofstream();
             _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
-            if ( ! _out->good() ){
+            if ( ! _out->good() ) {
                 log( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
                 delete _out;
                 _out = 0;
                 return;
             }
-            
+
         }
         _out->write( o.objdata() , o.objsize() );
     }
-    
-        
+
+
 } // namespace mongo

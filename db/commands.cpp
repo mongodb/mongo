@@ -55,7 +55,7 @@ namespace mongo {
         ss << "<td>";
         if( helpStr != "no help defined" ) {
             const char *p = helpStr.c_str();
-            while( *p ) { 
+            while( *p ) {
                 if( *p == '<' ) {
                     ss << "&lt;";
                     p++; continue;
@@ -67,7 +67,7 @@ namespace mongo {
                     p++;
                     continue;
                 }
-                if( strncmp(p, "http:", 5) == 0 ) { 
+                if( strncmp(p, "http:", 5) == 0 ) {
                     ss << "<a href=\"";
                     const char *q = p;
                     while( *q && *q != ' ' && *q != '\n' )
@@ -79,7 +79,7 @@ namespace mongo {
                     while( *q && *q != ' ' && *q != '\n' ) {
                         ss << (*q == '+' ? ' ' : *q);
                         q++;
-                        if( *q == '#' ) 
+                        if( *q == '#' )
                             while( *q && *q != ' ' && *q != '\n' ) q++;
                     }
                     ss << "</a>";
@@ -120,7 +120,7 @@ namespace mongo {
     void Command::help( stringstream& help ) const {
         help << "no help defined";
     }
-    
+
     bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
@@ -145,7 +145,7 @@ namespace mongo {
                 ok = false;
                 errmsg = "access denied - use admin db";
             }
-            else if ( jsobj.getBoolField( "help" ) ){
+            else if ( jsobj.getBoolField( "help" ) ) {
                 stringstream help;
                 help << "help for: " << e.fieldName() << " ";
                 c->help( help );
@@ -161,18 +161,18 @@ namespace mongo {
 
             if (!have_ok)
                 anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
-            
+
             if ( !ok && !have_errmsg) {
                 anObjBuilder.append("errmsg", errmsg);
                 uassert_nothrow(errmsg.c_str());
             }
             return true;
         }
-        
+
         return false;
     }
 
-    Command* Command::findCommand( const string& name ){
+    Command* Command::findCommand( const string& name ) {
         map<string,Command*>::iterator i = _commands->find( name );
         if ( i == _commands->end() )
             return 0;
@@ -180,7 +180,7 @@ namespace mongo {
     }
 
 
-    Command::LockType Command::locktype( const string& name ){
+    Command::LockType Command::locktype( const string& name ) {
         Command * c = findCommand( name );
         if ( ! c )
             return WRITE;
@@ -189,10 +189,10 @@ namespace mongo {
 
     void Command::logIfSlow( const Timer& timer, const string& msg ) {
         int ms = timer.millis();
-        if ( ms > cmdLine.slowMS ){
+        if ( ms > cmdLine.slowMS ) {
             out() << msg << " took " << ms << " ms." << endl;
         }
     }
-    
-    
+
+
 } // namespace mongo

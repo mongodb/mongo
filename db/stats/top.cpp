@@ -22,17 +22,16 @@
 #include "../commands.h"
 
 namespace mongo {
-    
-    Top::UsageData::UsageData( const UsageData& older , const UsageData& newer )
-    {
+
+    Top::UsageData::UsageData( const UsageData& older , const UsageData& newer ) {
         // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
         time  = (newer.time  > older.time)  ? (newer.time  - older.time)  : newer.time;
         count = (newer.count > older.count) ? (newer.count - older.count) : newer.count;
-        
+
     }
 
     Top::CollectionData::CollectionData( const CollectionData& older , const CollectionData& newer )
-        : total( older.total , newer.total ) , 
+        : total( older.total , newer.total ) ,
           readLock( older.readLock , newer.readLock ) ,
           writeLock( older.writeLock , newer.writeLock ) ,
           queries( older.queries , newer.queries ) ,
@@ -40,16 +39,15 @@ namespace mongo {
           insert( older.insert , newer.insert ) ,
           update( older.update , newer.update ) ,
           remove( older.remove , newer.remove ),
-          commands( older.commands , newer.commands ) 
-    {
-        
+          commands( older.commands , newer.commands ) {
+
     }
 
-    void Top::record( const string& ns , int op , int lockType , long long micros , bool command ){
+    void Top::record( const string& ns , int op , int lockType , long long micros , bool command ) {
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         scoped_lock lk(_lock);
-        
-        if ( ( command || op == dbQuery ) && ns == _lastDropped ){
+
+        if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
             _lastDropped = "";
             return;
         }
@@ -59,15 +57,15 @@ namespace mongo {
         _record( _global , op , lockType , micros , command );
     }
 
-    void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ){
+    void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ) {
         c.total.inc( micros );
-        
+
         if ( lockType > 0 )
             c.writeLock.inc( micros );
         else if ( lockType < 0 )
             c.readLock.inc( micros );
-        
-        switch ( op ){
+
+        switch ( op ) {
         case 0:
             // use 0 for unknown, non-specific
             break;
@@ -91,7 +89,7 @@ namespace mongo {
             break;
         case dbKillCursors:
             break;
-        case opReply: 
+        case opReply:
         case dbMsg:
             log() << "unexpected op in Top::record: " << op << endl;
             break;
@@ -101,31 +99,31 @@ namespace mongo {
 
     }
 
-    void Top::collectionDropped( const string& ns ){
+    void Top::collectionDropped( const string& ns ) {
         //cout << "collectionDropped: " << ns << endl;
         scoped_lock lk(_lock);
         _usage.erase(ns);
         _lastDropped = ns;
     }
-    
+
     void Top::cloneMap(Top::UsageMap& out) const {
         scoped_lock lk(_lock);
         out = _usage;
     }
 
-    void Top::append( BSONObjBuilder& b ){
+    void Top::append( BSONObjBuilder& b ) {
         scoped_lock lk( _lock );
         _appendToUsageMap( b , _usage );
     }
 
     void Top::_appendToUsageMap( BSONObjBuilder& b , const UsageMap& map ) const {
-        for ( UsageMap::const_iterator i=map.begin(); i!=map.end(); i++ ){
+        for ( UsageMap::const_iterator i=map.begin(); i!=map.end(); i++ ) {
             BSONObjBuilder bb( b.subobjStart( i->first ) );
-            
+
             const CollectionData& coll = i->second;
-            
+
             _appendStatsEntry( b , "total" , coll.total );
-            
+
             _appendStatsEntry( b , "readLock" , coll.readLock );
             _appendStatsEntry( b , "writeLock" , coll.writeLock );
 
@@ -135,7 +133,7 @@ namespace mongo {
             _appendStatsEntry( b , "update" , coll.update );
             _appendStatsEntry( b , "remove" , coll.remove );
             _appendStatsEntry( b , "commands" , coll.commands );
-            
+
             bb.done();
         }
     }
@@ -149,14 +147,14 @@ namespace mongo {
 
     class TopCmd : public Command {
     public:
-        TopCmd() : Command( "top", true ){}
+        TopCmd() : Command( "top", true ) {}
 
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return READ; } 
+        virtual LockType locktype() const { return READ; }
         virtual void help( stringstream& help ) const { help << "usage by collection"; }
 
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );
                 Top::global.append( b );
@@ -164,11 +162,11 @@ namespace mongo {
             }
             return true;
         }
-        
+
     } topCmd;
 
     Top Top::global;
-    
+
     TopOld::T TopOld::_snapshotStart = TopOld::currentTime();
     TopOld::D TopOld::_snapshotDuration;
     TopOld::UsageMap TopOld::_totalUsage;

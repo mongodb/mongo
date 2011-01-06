@@ -22,7 +22,7 @@
 using namespace mongo;
 
 int main( int argc, const char **argv ) {
-    
+
     const char *port = "27017";
     if ( argc != 1 ) {
         if ( argc != 3 )
@@ -37,12 +37,13 @@ int main( int argc, const char **argv ) {
         throw -11;
     }
 
-    { // clean up old data from any previous tests
+    {
+        // clean up old data from any previous tests
         conn.remove( "test.system.users" , BSONObj() );
     }
 
     conn.insert( "test.system.users" , BSON( "user" << "eliot" << "pwd" << conn.createPasswordDigest( "eliot" , "bar" ) ) );
-    
+
     errmsg.clear();
     bool ok = conn.auth( "test" , "eliot" , "bar" , errmsg );
     if ( ! ok )

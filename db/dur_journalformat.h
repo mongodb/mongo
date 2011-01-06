@@ -25,7 +25,7 @@ namespace mongo {
     namespace dur {
 
 #pragma pack(1)
-        /** beginning header for a journal/j._<n> file 
+        /** beginning header for a journal/j._<n> file
             there is nothing important int this header at this time.  except perhaps version #.
         */
         struct JHeader {
@@ -34,7 +34,7 @@ namespace mongo {
 
             char magic[2]; // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or something...
 
-            // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near 
+            // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near
             // that.  simply incrementing the version # is safe on a fwd basis.
             enum { CurrentVersion = 0x4146 };
             unsigned short _version;
@@ -43,7 +43,7 @@ namespace mongo {
             char n1;          // '\n'
             char ts[20];      // ascii timestamp of file generation.  for user reading, not used by code.
             char n2;          // '\n'
-            char dbpath[128]; // path/filename of this file for human reading and diagnostics.  not used by code. 
+            char dbpath[128]; // path/filename of this file for human reading and diagnostics.  not used by code.
             char n3, n4;      // '\n', '\n'
 
             char reserved3[8034]; // 8KB total for the file header
@@ -61,7 +61,7 @@ namespace mongo {
             unsigned long long seqNumber;  // sequence number that can be used on recovery to not do too much work
         };
 
-        /** an individual write operation within a group commit section.  Either the entire section should 
+        /** an individual write operation within a group commit section.  Either the entire section should
             be applied, or nothing.  (We check the md5 for the whole section before doing anything on recovery.)
         */
         struct JEntry {
@@ -80,14 +80,14 @@ namespace mongo {
             unsigned ofs;  // offset in file
 
             // sentinel and masks for _fileNo
-            enum { 
+            enum {
                 DotNsSuffix = 0x7fffffff, // ".ns" file
                 LocalDbBit  = 0x80000000  // assuming "local" db instead of using the JDbContext
             };
             int _fileNo;   // high bit is set to indicate it should be the <dbpath>/local database
             // char data[len] follows
 
-            const char * srcData() const { 
+            const char * srcData() const {
                 const int *i = &_fileNo;
                 return (const char *) (i+1);
             }
@@ -109,7 +109,7 @@ namespace mongo {
         };
 
         /** group commit section footer. md5 is a key field. */
-        struct JSectFooter { 
+        struct JSectFooter {
             JSectFooter(const void* begin, int len) { // needs buffer to compute hash
                 sentinel = JEntry::OpCode_Footer;
                 reserved = 0;
@@ -137,14 +137,14 @@ namespace mongo {
         };
 
         /** declares "the next entry(s) are for this database / file path prefix" */
-        struct JDbContext { 
+        struct JDbContext {
             JDbContext() : sentinel(JEntry::OpCode_DbContext) { }
             const unsigned sentinel;   // compare to JEntry::len -- zero is our sentinel
             //char dbname[];
         };
 
         /** "last sequence number" */
-        struct LSNFile { 
+        struct LSNFile {
             unsigned ver;
             unsigned reserved2;
             unsigned long long lsn;

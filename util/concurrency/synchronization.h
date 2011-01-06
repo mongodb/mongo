@@ -52,12 +52,12 @@ namespace mongo {
     /** establishes a synchronization point between threads. N threads are waits and one is notifier.
         threadsafe.
     */
-    class NotifyAll : boost::noncopyable { 
+    class NotifyAll : boost::noncopyable {
     public:
         NotifyAll();
 
-        /** awaits the next notifyAll() call by another thread. notifications that precede this 
-            call are ignored -- we are looking for a fresh event. 
+        /** awaits the next notifyAll() call by another thread. notifications that precede this
+            call are ignored -- we are looking for a fresh event.
         */
         void wait();
 

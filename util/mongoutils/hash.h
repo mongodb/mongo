@@ -19,7 +19,7 @@
 
 namespace mongoutils {
 
-    /** @return hash of a pointer to an unsigned. so you get a 32 bit hash out, regardless of whether 
+    /** @return hash of a pointer to an unsigned. so you get a 32 bit hash out, regardless of whether
                 pointers are 32 or 64 bit on the particular platform.
 
         is there a faster way to impl this that hashes just as well?

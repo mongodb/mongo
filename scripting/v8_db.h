@@ -28,32 +28,32 @@
 namespace mongo {
 
     // These functions may depend on the caller creating a handle scope and context scope.
-    
+
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local );
     void installDBTypes( v8::Handle<v8::ObjectTemplate>& global );
     void installDBTypes( v8::Handle<v8::Object>& global );
-    
+
     // the actual globals
-    
+
     mongo::DBClientBase * getConnection( const v8::Arguments& args );
 
     // Mongo members
     v8::Handle<v8::Value> mongoConsLocal(const v8::Arguments& args);
     v8::Handle<v8::Value> mongoConsExternal(const v8::Arguments& args);
-    
+
     v8::Handle<v8::Value> mongoFind(const v8::Arguments& args);
     v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args);
     v8::Handle<v8::Value> mongoRemove(const v8::Arguments& args);
     v8::Handle<v8::Value> mongoUpdate(const v8::Arguments& args);
-    
-    
+
+
     v8::Handle<v8::Value> internalCursorCons(const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorNext(const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorHasNext(const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorObjsLeftInBatch(const v8::Arguments& args);
-    
+
     // DB members
-    
+
     v8::Handle<v8::Value> dbInit(const v8::Arguments& args);
     v8::Handle<v8::Value> collectionInit( const v8::Arguments& args );
     v8::Handle<v8::Value> objectIdInit( const v8::Arguments& args );
@@ -69,10 +69,10 @@ namespace mongo {
     v8::Handle<v8::Value> numberLongToNumber(const v8::Arguments& args);
     v8::Handle<v8::Value> numberLongValueOf(const v8::Arguments& args);
     v8::Handle<v8::Value> numberLongToString(const v8::Arguments& args);
-    
+
     v8::Handle<v8::Value> dbQueryInit( const v8::Arguments& args );
     v8::Handle<v8::Value> dbQueryIndexAccess( uint32_t index , const v8::AccessorInfo& info );
-    
+
     v8::Handle<v8::Value> collectionFallback( v8::Local<v8::String> name, const v8::AccessorInfo &info);
 
     v8::Handle<v8::Value> bsonsize( const v8::Arguments& args );
@@ -80,7 +80,7 @@ namespace mongo {
     // call with v8 mutex:
     void enableV8Interrupt();
     void disableV8Interrupt();
-    
+
     // The implementation below assumes that SERVER-1816 has been fixed - in
     // particular, interrupted() must return true if an interrupt was ever
     // sent; currently that is not the case if a new killop overwrites the data
@@ -96,9 +96,11 @@ namespace mongo {
         string exception;
         try {
             ret = f( args );
-        } catch( const std::exception &e ) {
+        }
+        catch( const std::exception &e ) {
             exception = e.what();
-        } catch( ... ) {
+        }
+        catch( ... ) {
             exception = "unknown exception";
         }
         enableV8Interrupt();
@@ -108,16 +110,16 @@ namespace mongo {
         }
         if ( !exception.empty() ) {
             // technically, ThrowException is supposed to be the last v8 call before returning
-            ret = v8::ThrowException( v8::String::New( exception.c_str() ) );            
+            ret = v8::ThrowException( v8::String::New( exception.c_str() ) );
         }
         return ret;
     }
-    
+
     template < v8::Handle< v8::Value > ( *f ) ( const v8::Arguments& ) >
     v8::Local< v8::FunctionTemplate > newV8Function() {
         return v8::FunctionTemplate::New( v8Callback< f > );
-    }   
-    
+    }
+
     // Preemption is going to be allowed for the v8 mutex, and some of our v8
     // usage is not preemption safe.  So we are using an additional mutex that
     // will not be preempted.  The V8Lock should be used in place of v8::Locker

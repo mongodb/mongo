@@ -23,7 +23,7 @@
 namespace mongo {
 
     /**
-     * Obtains the log file handler and writes the current thread's stack trace to 
+     * Obtains the log file handler and writes the current thread's stack trace to
      * it. This call issues an exit(). The function can safely be called from within a
      * signal handler.
      *

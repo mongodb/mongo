@@ -60,9 +60,9 @@ namespace mongo {
         // For capped case, signal that we are doing initial extent allocation.
         if ( capped )
             cappedLastDelRecLastExtent().setInvalid();
-		assert( sizeof(dataFileVersion) == 2 );
-		dataFileVersion = 0;
-		indexFileVersion = 0;
+        assert( sizeof(dataFileVersion) == 2 );
+        dataFileVersion = 0;
+        indexFileVersion = 0;
         multiKeyIndexBits = 0;
         reservedA = 0;
         extraOffset = 0;
@@ -76,7 +76,7 @@ namespace mongo {
     bool NamespaceIndex::exists() const {
         return !MMF::exists(path());
     }
-    
+
     boost::filesystem::path NamespaceIndex::path() const {
         boost::filesystem::path ret( dir_ );
         if ( directoryperdb )
@@ -93,12 +93,12 @@ namespace mongo {
         if ( !boost::filesystem::exists( dir ) )
             BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( dir ) );
     }
-    
-	unsigned lenForNewNsFiles = 16 * 1024 * 1024;
-    
+
+    unsigned lenForNewNsFiles = 16 * 1024 * 1024;
+
 #if defined(_DEBUG)
     void NamespaceDetails::dump(const Namespace& k) {
-        if( !cmdLine.dur ) 
+        if( !cmdLine.dur )
             cout << "ns offsets which follow will not display correctly with --dur disabled" << endl;
 
         size_t ofs = 1; // 1 is sentinel that the find call below failed
@@ -107,7 +107,7 @@ namespace mongo {
         cout << "ns" << hex << setw(8) << ofs << ' ';
         cout << k.toString() << '\n';
 
-        if( k.isExtra() ) { 
+        if( k.isExtra() ) {
             cout << "ns\t extra" << endl;
             return;
         }
@@ -121,10 +121,10 @@ namespace mongo {
     }
 #endif
 
-    void NamespaceDetails::onLoad(const Namespace& k) { 
+    void NamespaceDetails::onLoad(const Namespace& k) {
         //dump(k);
 
-        if( k.isExtra() ) { 
+        if( k.isExtra() ) {
             /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
             return;
         }
@@ -134,7 +134,7 @@ namespace mongo {
         if( backgroundIndexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();
             NamespaceDetails *d = (NamespaceDetails *) MongoMMF::_switchToWritableView(this);
-            if( backgroundIndexBuildInProgress ) { 
+            if( backgroundIndexBuildInProgress ) {
                 log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
                 d->backgroundIndexBuildInProgress = 0;
             }
@@ -142,7 +142,7 @@ namespace mongo {
         }
     }
 
-    static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) { 
+    static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) {
         v.onLoad(k);
     }
 
@@ -155,38 +155,38 @@ namespace mongo {
            we need to be sure to clear any cached info for the database in
            local.*.
         */
-		/*
+        /*
         if ( "local" != database_ ) {
             DBInfo i(database_.c_str());
             i.dbDropped();
         }
-		*/
+        */
 
-		unsigned long long len = 0;
+        unsigned long long len = 0;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
         void *p = 0;
         if( MMF::exists(nsPath) ) {
             if( f.open(pathString, true) ) {
                 len = f.length();
-                if ( len % (1024*1024) != 0 ){
+                if ( len % (1024*1024) != 0 ) {
                     log() << "bad .ns file: " << pathString << endl;
                     uassert( 10079 ,  "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
                 }
                 p = f.getView();
             }
-		}
-		else {
-			// use lenForNewNsFiles, we are making a new database
-			massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
+        }
+        else {
+            // use lenForNewNsFiles, we are making a new database
+            massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
             maybeMkdir();
-			unsigned long long l = lenForNewNsFiles;
+            unsigned long long l = lenForNewNsFiles;
             if( f.create(pathString, l, true) ) {
                 len = l;
                 assert( len == lenForNewNsFiles );
                 p = f.getView();
             }
-		}
+        }
 
         if ( p == 0 ) {
             /** TODO: this shouldn't terminate? */
@@ -199,7 +199,7 @@ namespace mongo {
         if( checkNsFilesOnLoad )
             ht->iterAll(namespaceOnLoadCallback);
     }
-    
+
     static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
         list<string> * l = (list<string>*)extra;
         if ( ! k.hasDollarSign() )
@@ -208,14 +208,14 @@ namespace mongo {
     void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
         assert( onlyCollections ); // TODO: need to implement this
         //                                  need boost::bind or something to make this less ugly
-        
+
         if ( ht )
             ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
         getDur().assertReading(this);
-		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
+        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
         {
             Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
@@ -236,12 +236,14 @@ namespace mongo {
                         ;
                     i.drec()->nextDeleted.writing() = dloc;
                 }
-            } else {
+            }
+            else {
                 d->nextDeleted = cappedFirstDeletedInCurExtent();
                 getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
                 // always compact() after this so order doesn't matter
             }
-        } else {
+        }
+        else {
             int b = bucket(d->lengthWithHeaders);
             DiskLoc& list = deletedList[b];
             DiskLoc oldHead = list;
@@ -272,14 +274,14 @@ namespace mongo {
         if ( capped == 0 ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
                 // you get the whole thing.
-				//DataFileMgr::grow(loc, regionlen);
+                //DataFileMgr::grow(loc, regionlen);
                 return loc;
             }
         }
 
         /* split off some for further use. */
         getDur().writingInt(r->lengthWithHeaders) = lenToAlloc;
-		//DataFileMgr::grow(loc, lenToAlloc);
+        //DataFileMgr::grow(loc, lenToAlloc);
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
@@ -311,7 +313,7 @@ namespace mongo {
                 int a = cur.a();
                 if ( a < -1 || a >= 100000 ) {
                     problem() << "~~ Assertion - cur out of range in _alloc() " << cur.toString() <<
-                    " a:" << a << " b:" << b << " chain:" << chain << '\n';
+                              " a:" << a << " b:" << b << " chain:" << chain << '\n';
                     sayDbContext();
                     if ( cur == *prev )
                         prev->Null();
@@ -347,7 +349,7 @@ namespace mongo {
                 cur.Null();
             }
             else {
-                /*this defensive check only made sense for the mmap storage engine: 
+                /*this defensive check only made sense for the mmap storage engine:
                   if ( r->nextDeleted.getOfs() == 0 ) {
                     problem() << "~~ Assertion - bad nextDeleted " << r->nextDeleted.toString() <<
                     " b:" << b << " chain:" << chain << ", fixing.\n";
@@ -417,7 +419,7 @@ namespace mongo {
                 out() << '\n';
                 out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->nsDiagnostic.toString() << '\n';
                 out() << "    fr: " << e.ext()->firstRecord.toString() <<
-                     " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
+                      " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
             }
             assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
         }
@@ -451,7 +453,7 @@ namespace mongo {
         assert( i >= 0 && i <= 1 );
         Namespace n(ns);
         Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long
-        
+
         massert( 10350 ,  "allocExtra: base ns missing?", d );
         massert( 10351 ,  "allocExtra: extra already exists", ht->get(extra) == 0 );
 
@@ -471,7 +473,7 @@ namespace mongo {
             *getDur().writing(&extraOffset) = ofs;
             assert( extra() == e );
         }
-        else { 
+        else {
             Extra *hd = extra();
             assert( hd->next(this) == 0 );
             hd->setNext(ofs);
@@ -485,7 +487,7 @@ namespace mongo {
         try {
             id = &idx(nIndexes,true);
         }
-        catch(DBException&) { 
+        catch(DBException&) {
             allocExtra(thisns, nIndexes);
             id = &idx(nIndexes,false);
         }
@@ -497,7 +499,7 @@ namespace mongo {
     }
 
     // must be called when renaming a NS to fix up extra
-    void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) { 
+    void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) {
         extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
         Extra *se = src->extra();
         int n = NIndexesBase;
@@ -511,7 +513,7 @@ namespace mongo {
                 Extra *nxt = allocExtra(thisns, n);
                 e->setNext( nxt->ofsFrom(this) );
                 e = nxt;
-            } 
+            }
             assert( extraOffset );
         }
     }
@@ -530,30 +532,30 @@ namespace mongo {
         }*/
         return -1;
     }
-    
+
     long long NamespaceDetails::storageSize( int * numExtents , BSONArrayBuilder * extentInfo ) const {
         Extent * e = firstExtent.ext();
         assert( e );
-        
+
         long long total = 0;
         int n = 0;
-        while ( e ){
+        while ( e ) {
             total += e->length;
             n++;
-            
-            if ( extentInfo ){
+
+            if ( extentInfo ) {
                 extentInfo->append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
             }
-            
+
             e = e->getNextExtent();
         }
-        
+
         if ( numExtents )
             *numExtents = n;
-        
+
         return total;
     }
-    
+
     NamespaceDetails *NamespaceDetails::writingWithExtra() {
         vector< pair< long long, unsigned > > writeRanges;
         writeRanges.push_back( make_pair( 0, sizeof( NamespaceDetails ) ) );
@@ -562,7 +564,7 @@ namespace mongo {
         }
         return reinterpret_cast< NamespaceDetails* >( getDur().writingRangesAtOffsets( this, writeRanges ) );
     }
-    
+
     /* ------------------------------------------------------------------------- */
 
     mongo::mutex NamespaceDetailsTransient::_qcMutex("qc");
@@ -576,14 +578,14 @@ namespace mongo {
         _keysComputed = false;
         _indexSpecs.clear();
     }
-    
-/*    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = map_[ ns ];
-        if ( t.get() == 0 )
-            t.reset( new NamespaceDetailsTransient(ns) );
-        return *t;
-    }
-*/
+
+    /*    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
+            shared_ptr< NamespaceDetailsTransient > &t = map_[ ns ];
+            if ( t.get() == 0 )
+                t.reset( new NamespaceDetailsTransient(ns) );
+            return *t;
+        }
+    */
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;
@@ -594,7 +596,7 @@ namespace mongo {
             _map[ *i ].reset();
         }
     }
-    
+
     void NamespaceDetailsTransient::computeIndexKeys() {
         _keysComputed = true;
         _indexKeys.clear();
@@ -636,92 +638,92 @@ namespace mongo {
 
     void renameNamespace( const char *from, const char *to ) {
         NamespaceIndex *ni = nsindex( from );
-		assert( ni );
+        assert( ni );
         assert( ni->details( from ) );
         assert( ! ni->details( to ) );
-		
-		// Our namespace and index details will move to a different 
-		// memory location.  The only references to namespace and 
-		// index details across commands are in cursors and nsd
-		// transient (including query cache) so clear these.
-		ClientCursor::invalidate( from );
-		NamespaceDetailsTransient::clearForPrefix( from );
 
-		NamespaceDetails *details = ni->details( from );
-		ni->add_ns( to, *details );
+        // Our namespace and index details will move to a different
+        // memory location.  The only references to namespace and
+        // index details across commands are in cursors and nsd
+        // transient (including query cache) so clear these.
+        ClientCursor::invalidate( from );
+        NamespaceDetailsTransient::clearForPrefix( from );
+
+        NamespaceDetails *details = ni->details( from );
+        ni->add_ns( to, *details );
         NamespaceDetails *todetails = ni->details( to );
-        try { 
+        try {
             todetails->copyingFrom(to, details); // fixes extraOffset
         }
-        catch( DBException& ) { 
+        catch( DBException& ) {
             // could end up here if .ns is full - if so try to clean up / roll back a little
             ni->kill_ns(to);
             throw;
         }
-		ni->kill_ns( from );
-		details = todetails;
-		
-		BSONObj oldSpec;
-		char database[MaxDatabaseNameLen];
-		nsToDatabase(from, database);
-		string s = database;
-		s += ".system.namespaces";
-		assert( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
-		
-		BSONObjBuilder newSpecB;
-		BSONObjIterator i( oldSpec.getObjectField( "options" ) );
-		while( i.more() ) {
-			BSONElement e = i.next();
-			if ( strcmp( e.fieldName(), "create" ) != 0 )
-				newSpecB.append( e );
-			else
-				newSpecB << "create" << to;
-		}
-		BSONObj newSpec = newSpecB.done();    
-		addNewNamespaceToCatalog( to, newSpec.isEmpty() ? 0 : &newSpec );
+        ni->kill_ns( from );
+        details = todetails;
 
-		deleteObjects( s.c_str(), BSON( "name" << from ), false, false, true );
-		// oldSpec variable no longer valid memory
+        BSONObj oldSpec;
+        char database[MaxDatabaseNameLen];
+        nsToDatabase(from, database);
+        string s = database;
+        s += ".system.namespaces";
+        assert( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
 
-		BSONObj oldIndexSpec;
-		s = database;
-		s += ".system.indexes";
-		while( Helpers::findOne( s.c_str(), BSON( "ns" << from ), oldIndexSpec ) ) {
-			BSONObjBuilder newIndexSpecB;
-			BSONObjIterator i( oldIndexSpec );
-			while( i.more() ) {
-				BSONElement e = i.next();
-				if ( strcmp( e.fieldName(), "ns" ) != 0 )
-					newIndexSpecB.append( e );
-				else
-					newIndexSpecB << "ns" << to;
-			}
-			BSONObj newIndexSpec = newIndexSpecB.done();
-			DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
-			int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
-			IndexDetails &indexDetails = details->idx(indexI);
-			string oldIndexNs = indexDetails.indexNamespace();
-			indexDetails.info = newIndexSpecLoc;
-			string newIndexNs = indexDetails.indexNamespace();
-			
-			BtreeBucket::renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
-			deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
-		}
-	}
+        BSONObjBuilder newSpecB;
+        BSONObjIterator i( oldSpec.getObjectField( "options" ) );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( strcmp( e.fieldName(), "create" ) != 0 )
+                newSpecB.append( e );
+            else
+                newSpecB << "create" << to;
+        }
+        BSONObj newSpec = newSpecB.done();
+        addNewNamespaceToCatalog( to, newSpec.isEmpty() ? 0 : &newSpec );
 
-    bool legalClientSystemNS( const string& ns , bool write ){
+        deleteObjects( s.c_str(), BSON( "name" << from ), false, false, true );
+        // oldSpec variable no longer valid memory
+
+        BSONObj oldIndexSpec;
+        s = database;
+        s += ".system.indexes";
+        while( Helpers::findOne( s.c_str(), BSON( "ns" << from ), oldIndexSpec ) ) {
+            BSONObjBuilder newIndexSpecB;
+            BSONObjIterator i( oldIndexSpec );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( strcmp( e.fieldName(), "ns" ) != 0 )
+                    newIndexSpecB.append( e );
+                else
+                    newIndexSpecB << "ns" << to;
+            }
+            BSONObj newIndexSpec = newIndexSpecB.done();
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
+            int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
+            IndexDetails &indexDetails = details->idx(indexI);
+            string oldIndexNs = indexDetails.indexNamespace();
+            indexDetails.info = newIndexSpecLoc;
+            string newIndexNs = indexDetails.indexNamespace();
+
+            BtreeBucket::renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
+            deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
+        }
+    }
+
+    bool legalClientSystemNS( const string& ns , bool write ) {
         if( ns == "local.system.replset" ) return true;
 
         if ( ns.find( ".system.users" ) != string::npos )
             return true;
 
-        if ( ns.find( ".system.js" ) != string::npos ){
+        if ( ns.find( ".system.js" ) != string::npos ) {
             if ( write )
                 Scope::storedFuncMod();
             return true;
         }
-        
+
         return false;
     }
-	
+
 } // namespace mongo

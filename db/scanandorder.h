@@ -57,16 +57,18 @@ namespace mongo {
             if (loc)
                 b.append("$diskLoc", loc->toBSONObj());
             b.done();
-        } else if (loc) {
+        }
+        else if (loc) {
             BSONObjBuilder b( bb );
             b.appendElements(js);
             b.append("$diskLoc", loc->toBSONObj());
             b.done();
-        } else {
+        }
+        else {
             bb.appendBuf((void*) js.objdata(), js.objsize());
         }
     }
-    
+
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
     class ScanAndOrder {
         BestMap best; // key -> full object
@@ -76,9 +78,10 @@ namespace mongo {
         unsigned approxSize;
 
         void _add(BSONObj& k, BSONObj o, DiskLoc* loc) {
-            if (!loc){
+            if (!loc) {
                 best.insert(make_pair(k.getOwned(),o.getOwned()));
-            } else {
+            }
+            else {
                 BSONObjBuilder b;
                 b.appendElements(o);
                 b.append("$diskLoc", loc->toBSONObj());
@@ -99,8 +102,8 @@ namespace mongo {
 
     public:
         ScanAndOrder(int _startFrom, int _limit, BSONObj _order) :
-                best( BSONObjCmp( _order ) ),
-                startFrom(_startFrom), order(_order) {
+            best( BSONObjCmp( _order ) ),
+            startFrom(_startFrom), order(_order) {
             limit = _limit > 0 ? _limit + startFrom : 0x7fffffff;
             approxSize = 0;
         }

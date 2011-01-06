@@ -34,7 +34,7 @@ namespace mongo {
         buf[24] = 0; // don't want the \n
     }
 
-    inline string time_t_to_String(time_t t = time(0) ){
+    inline string time_t_to_String(time_t t = time(0) ) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -76,7 +76,7 @@ namespace mongo {
         Date_t(unsigned long long m): millis(m) {}
         operator unsigned long long&() { return millis; }
         operator const unsigned long long&() const { return millis; }
-        string toString() const { 
+        string toString() const {
             char buf[64];
             time_t_to_String(millis/1000, buf);
             return buf;

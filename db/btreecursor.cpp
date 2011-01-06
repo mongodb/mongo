@@ -26,21 +26,20 @@ namespace mongo {
 
     extern int otherTraceLevel;
 
-    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id, 
+    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id,
                               const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
-            d(_d), idxNo(_idxNo), 
-            startKey( _startKey ),
-            endKey( _endKey ),
-            _endKeyInclusive( endKeyInclusive ),
-            _multikey( d->isMultikey( idxNo ) ),
-            indexDetails( _id ),
-            _order( _id.keyPattern() ),
-            _ordering( Ordering::make( _order ) ),
-            _direction( _direction ),
-            _spec( _id.getSpec() ),
-            _independentFieldRanges( false ),
-            _nscanned( 0 )
-    {
+        d(_d), idxNo(_idxNo),
+        startKey( _startKey ),
+        endKey( _endKey ),
+        _endKeyInclusive( endKeyInclusive ),
+        _multikey( d->isMultikey( idxNo ) ),
+        indexDetails( _id ),
+        _order( _id.keyPattern() ),
+        _ordering( Ordering::make( _order ) ),
+        _direction( _direction ),
+        _spec( _id.getSpec() ),
+        _independentFieldRanges( false ),
+        _nscanned( 0 ) {
         audit();
         init();
         dassert( _dups.size() == 0 );
@@ -48,19 +47,18 @@ namespace mongo {
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction )
         :
-            d(_d), idxNo(_idxNo), 
-            _endKeyInclusive( true ),
-            _multikey( d->isMultikey( idxNo ) ),
-            indexDetails( _id ),
-            _order( _id.keyPattern() ),
-            _ordering( Ordering::make( _order ) ),
-            _direction( _direction ),
-            _bounds( ( assert( _bounds.get() ), _bounds ) ),
-            _boundsIterator( new FieldRangeVector::Iterator( *_bounds  ) ),
-            _spec( _id.getSpec() ),
-            _independentFieldRanges( true ),
-            _nscanned( 0 )
-    {
+        d(_d), idxNo(_idxNo),
+        _endKeyInclusive( true ),
+        _multikey( d->isMultikey( idxNo ) ),
+        indexDetails( _id ),
+        _order( _id.keyPattern() ),
+        _ordering( Ordering::make( _order ) ),
+        _direction( _direction ),
+        _bounds( ( assert( _bounds.get() ), _bounds ) ),
+        _boundsIterator( new FieldRangeVector::Iterator( *_bounds  ) ),
+        _spec( _id.getSpec() ),
+        _independentFieldRanges( true ),
+        _nscanned( 0 ) {
         massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
         startKey = _bounds->startKey();
@@ -90,20 +88,20 @@ namespace mongo {
     }
 
     void BtreeCursor::init() {
-        if ( _spec.getType() ){
+        if ( _spec.getType() ) {
             startKey = _spec.getType()->fixKey( startKey );
             endKey = _spec.getType()->fixKey( endKey );
         }
         bool found;
         bucket = indexDetails.head.btree()->
-            locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, _direction > 0 ? minDiskLoc : maxDiskLoc, _direction);
+                 locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, _direction > 0 ? minDiskLoc : maxDiskLoc, _direction);
         if ( ok() ) {
             _nscanned = 1;
-        }        
+        }
         skipUnusedKeys( false );
         checkEnd();
     }
-    
+
     void BtreeCursor::skipAndCheck() {
         skipUnusedKeys( true );
         while( 1 ) {
@@ -116,7 +114,7 @@ namespace mongo {
             }
         }
     }
-    
+
     bool BtreeCursor::skipOutOfRangeKeysAndCheckEnd() {
         if ( !ok() ) {
             return false;
@@ -125,7 +123,8 @@ namespace mongo {
         if ( ret == -2 ) {
             bucket = DiskLoc();
             return false;
-        } else if ( ret == -1 ) {
+        }
+        else if ( ret == -1 ) {
             ++_nscanned;
             return false;
         }
@@ -133,7 +132,7 @@ namespace mongo {
         advanceTo( currKeyNode().key, ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
         return true;
     }
-    
+
     /* skip unused keys. */
     bool BtreeCursor::skipUnusedKeys( bool mayJump ) {
         int u = 0;
@@ -171,29 +170,30 @@ namespace mongo {
         if ( !endKey.isEmpty() ) {
             int cmp = sgn( endKey.woCompare( currKey(), _order ) );
             if ( ( cmp != 0 && cmp != _direction ) ||
-                ( cmp == 0 && !_endKeyInclusive ) )
+                    ( cmp == 0 && !_endKeyInclusive ) )
                 bucket = DiskLoc();
         }
     }
-    
+
     void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive) {
         bucket.btree()->advanceTo( bucket, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, _ordering, _direction );
     }
-    
+
     bool BtreeCursor::advance() {
         killCurrentOp.checkForInterrupt();
         if ( bucket.isNull() )
             return false;
 
         bucket = bucket.btree()->advance(bucket, keyOfs, _direction, "BtreeCursor::advance");
-        
+
         if ( !_independentFieldRanges ) {
             skipUnusedKeys( false );
             checkEnd();
             if ( ok() ) {
                 ++_nscanned;
             }
-        } else {
+        }
+        else {
             skipAndCheck();
         }
         return ok();
@@ -232,17 +232,17 @@ namespace mongo {
             int x = 0;
             while( 1 ) {
                 if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-                    b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                        if ( !b->k(keyOfs).isUsed() ) {
-                            /* we were deleted but still exist as an unused
-                            marker key. advance.
-                            */
-                            skipUnusedKeys( false );
-                        }
-                        return;
+                        b->k(keyOfs).recordLoc == locAtKeyOfs ) {
+                    if ( !b->k(keyOfs).isUsed() ) {
+                        /* we were deleted but still exist as an unused
+                        marker key. advance.
+                        */
+                        skipUnusedKeys( false );
+                    }
+                    return;
                 }
 
-                /* we check one key earlier too, in case a key was just deleted.  this is 
+                /* we check one key earlier too, in case a key was just deleted.  this is
                    important so that multi updates are reasonably fast.
                    */
                 if( keyOfs == 0 || x++ )

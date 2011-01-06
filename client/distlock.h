@@ -28,16 +28,16 @@ namespace mongo {
     /**
      * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task must be identified by a
      * unique name across the system (e.g., "balancer"). A lock is taken by writing a document in the configdb's locks
-     * collection with that name. 
+     * collection with that name.
      *
-     * To be maintained, each taken lock needs to be revalidaded ("pinged") within a pre-established amount of time. This 
+     * To be maintained, each taken lock needs to be revalidaded ("pinged") within a pre-established amount of time. This
      * class does this maintenance automatically once a DistributedLock object was constructed.
      */
     class DistributedLock {
     public:
 
         /**
-         * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired. 
+         * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired.
          * Construction does trigger a lock "pinging" mechanism, though.
          *
          * @param conn address of config(s) server(s)
@@ -49,7 +49,7 @@ namespace mongo {
         /**
          * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
          * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
-         * 
+         *
          * @param why human readable description of why the lock is being taken (used to log)
          * @param other configdb's lock document that is currently holding the lock, if lock is taken
          * @return true if it managed to grab the lock
@@ -65,15 +65,15 @@ namespace mongo {
         ConnectionString _conn;
         string _name;
         unsigned _takeoverMinutes;
-        
+
         string _ns;
         BSONObj _id;
     };
-    
+
     class dist_lock_try {
     public:
         dist_lock_try( DistributedLock * lock , string why )
-            : _lock(lock){
+            : _lock(lock) {
             _got = _lock->lock_try( why , &_other );
         }
 
@@ -85,11 +85,11 @@ namespace mongo {
 
         bool got() const { return _got; }
         BSONObj other() const { return _other; }
- 
+
     private:
         DistributedLock * _lock;
         bool _got;
-        BSONObj _other;        
+        BSONObj _other;
     };
 
 }

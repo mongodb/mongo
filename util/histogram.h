@@ -65,12 +65,12 @@ namespace mongo {
 
             // use exponential buckets?
             bool            exponential;
-            
-            Options() 
+
+            Options()
                 : numBuckets(0)
                 , bucketSize(0)
                 , initialValue(0)
-                , exponential(false){}
+                , exponential(false) {}
         };
         explicit Histogram( const Options& opts );
         ~Histogram();
@@ -103,7 +103,7 @@ namespace mongo {
          * Return the number of buckets in this histogram.
          */
         boost::uint32_t getBucketsNum() const;
-        
+
     private:
         /**
          * Returns the bucket where 'element' should fall

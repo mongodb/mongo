@@ -34,11 +34,11 @@
 namespace mongo {
 
     /* decls for connections.h */
-    ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());    
+    ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
 }
 
-namespace mongo { 
+namespace mongo {
 
     using namespace mongoutils::html;
     using namespace bson;
@@ -47,7 +47,7 @@ namespace mongo {
     Tee *rsLog = &_rsLog;
     extern bool replSetBlind;
 
-    string ago(time_t t) { 
+    string ago(time_t t) {
         if( t == 0 ) return "";
 
         time_t x = time(0) - t;
@@ -60,14 +60,14 @@ namespace mongo {
             s.precision(2);
             s << x / 60.0 << " mins";
         }
-        else { 
+        else {
             s.precision(2);
             s << x / 3600.0 << " hrs";
         }
         return s.str();
     }
 
-    void Member::summarizeMember(stringstream& s) const { 
+    void Member::summarizeMember(stringstream& s) const {
         s << tr();
         {
             stringstream u;
@@ -92,11 +92,11 @@ namespace mongo {
         }
         s << td(config().votes);
         s << td(config().priority);
-        { 
+        {
             string stateText = state().toString();
             if( _config.hidden )
                 stateText += " (hidden)";
-            if( ok || stateText.empty() ) 
+            if( ok || stateText.empty() )
                 s << td(stateText); // text blank if we've never connected
             else
                 s << td( grey(str::stream() << "(was " << state().toString() << ')', true) );
@@ -107,12 +107,13 @@ namespace mongo {
         s << td( a(q.str(), "", never ? "?" : hbinfo().opTime.toString()) );
         if( hbinfo().skew > INT_MIN ) {
             s << td( grey(str::stream() << hbinfo().skew,!ok) );
-        } else
+        }
+        else
             s << td("");
         s << _tr();
     }
-   
-    string ReplSetImpl::stateAsHtml(MemberState s) { 
+
+    string ReplSetImpl::stateAsHtml(MemberState s) {
         if( s.s == MemberState::RS_STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
         if( s.s == MemberState::RS_PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
         if( s.s == MemberState::RS_SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
@@ -125,7 +126,7 @@ namespace mongo {
         return "";
     }
 
-    string MemberState::toString() const { 
+    string MemberState::toString() const {
         if( s == MemberState::RS_STARTUP ) return "STARTUP";
         if( s == MemberState::RS_PRIMARY ) return "PRIMARY";
         if( s == MemberState::RS_SECONDARY ) return "SECONDARY";
@@ -146,9 +147,9 @@ namespace mongo {
 
         set<string> skip;
         be e = op["ts"];
-        if( e.type() == Date || e.type() == Timestamp ) { 
+        if( e.type() == Date || e.type() == Timestamp ) {
             OpTime ot = e._opTime();
-	    ss << td( time_t_to_String_short( ot.getSecs() ) );
+            ss << td( time_t_to_String_short( ot.getSecs() ) );
             ss << td( ot.toString() );
             skip.insert("ts");
         }
@@ -158,7 +159,8 @@ namespace mongo {
         if( e.type() == NumberLong ) {
             ss << "<td>" << hex << e.Long() << "</td>\n";
             skip.insert("h");
-        } else
+        }
+        else
             ss << td("?");
 
         ss << td(op["op"].valuestrsafe());
@@ -167,7 +169,7 @@ namespace mongo {
         skip.insert("ns");
 
         ss << "<td>";
-        for( bo::iterator i(op); i.more(); ) { 
+        for( bo::iterator i(op); i.more(); ) {
             be e = i.next();
             if( skip.count(e.fieldName()) ) continue;
             ss << e.toString() << ' ';
@@ -175,9 +177,9 @@ namespace mongo {
         ss << "</td></tr>\n";
     }
 
-    void ReplSetImpl::_getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { 
+    void ReplSetImpl::_getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const {
         const Member *m = findById(server_id);
-        if( m == 0 ) { 
+        if( m == 0 ) {
             ss << "Error : can't find a member with id: " << server_id << '\n';
             return;
         }
@@ -191,25 +193,25 @@ namespace mongo {
         DBClientConnection conn(false, 0, /*timeout*/ 20);
         {
             string errmsg;
-            if( !conn.connect(m->fullName(), errmsg) ) { 
+            if( !conn.connect(m->fullName(), errmsg) ) {
                 ss << "couldn't connect to " << m->fullName() << ' ' << errmsg;
                 return;
             }
         }
 
         auto_ptr<DBClientCursor> c = conn.query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
-        if( c.get() == 0 ) { 
+        if( c.get() == 0 ) {
             ss << "couldn't query " << rsoplog;
             return;
         }
         static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
 
         ss << "<style type=\"text/css\" media=\"screen\">"
-            "table { font-size:75% }\n"
+           "table { font-size:75% }\n"
 //            "th { background-color:#bbb; color:#000 }\n"
 //            "td,th { padding:.25em }\n"
-            "</style>\n";
-        
+           "</style>\n";
+
         ss << table(h, true);
         //ss << "<pre>\n";
         int n = 0;
@@ -219,17 +221,17 @@ namespace mongo {
         while( c->more() ) {
             bo o = c->next();
             otLast = o["ts"]._opTime();
-            if( otFirst.isNull() ) 
+            if( otFirst.isNull() )
                 otFirst = otLast;
             say(ss, o);
-            n++;            
+            n++;
         }
         if( n == 0 ) {
             ss << rsoplog << " is empty\n";
         }
-        else { 
+        else {
             auto_ptr<DBClientCursor> c = conn.query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
-            if( c.get() == 0 ) { 
+            if( c.get() == 0 ) {
                 ss << "couldn't query [2] " << rsoplog;
                 return;
             }
@@ -238,7 +240,7 @@ namespace mongo {
             otEnd = o["ts"]._opTime();
             while( 1 ) {
                 stringstream z;
-                if( o["ts"]._opTime() == otLast ) 
+                if( o["ts"]._opTime() == otLast )
                     break;
                 say(z, o);
                 x = z.str() + x;
@@ -261,30 +263,31 @@ namespace mongo {
             ss.precision(3);
             if( h < 72 )
                 ss << h << " hours";
-            else 
+            else
                 ss << h / 24.0 << " days";
             ss << "</p>\n";
         }
     }
 
-    void ReplSetImpl::_summarizeAsHtml(stringstream& s) const { 
+    void ReplSetImpl::_summarizeAsHtml(stringstream& s) const {
         s << table(0, false);
         s << tr("Set name:", _name);
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
         s << _table();
 
-        const char *h[] = {"Member", 
-            "<a title=\"member id in the replset config\">id</a>", 
-            "Up", 
-            "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>", 
-            "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
-            "Votes", "Priority", "State", "Messages", 
-            "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>", 
-            "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>", 
-            0};
+        const char *h[] = {"Member",
+                           "<a title=\"member id in the replset config\">id</a>",
+                           "Up",
+                           "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>",
+                           "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>",
+                           "Votes", "Priority", "State", "Messages",
+                           "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>",
+                           "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>",
+                           0
+                          };
         s << table(h);
 
-        /* this is to sort the member rows by their ordinal _id, so they show up in the same 
+        /* this is to sort the member rows by their ordinal _id, so they show up in the same
            order on all the different web ui's; that is less confusing for the operator. */
         map<int,string> mp;
 
@@ -293,13 +296,13 @@ namespace mongo {
             readlocktry lk("local.replset.minvalid", 300);
             if( lk.got() ) {
                 BSONObj mv;
-                if( Helpers::getSingleton("local.replset.minvalid", mv) ) { 
+                if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
                     myMinValid = "minvalid:" + mv["ts"]._opTime().toString();
                 }
             }
             else myMinValid = ".";
         }
-        catch(...) { 
+        catch(...) {
             myMinValid = "exception fetching minvalid";
         }
 
@@ -307,26 +310,26 @@ namespace mongo {
             stringstream s;
             /* self row */
             s << tr() << td(_self->fullName() + " (me)") <<
-                td(_self->id()) <<
-  	        td("1") <<  //up
-                td(ago(started)) << 
-	        td("") << // last heartbeat
-                td(ToString(_self->config().votes)) << 
-                td(ToString(_self->config().priority)) <<
-                td( stateAsHtml(box.getState()) + (_self->config().hidden?" (hidden)":"") );
+              td(_self->id()) <<
+              td("1") <<  //up
+              td(ago(started)) <<
+              td("") << // last heartbeat
+              td(ToString(_self->config().votes)) <<
+              td(ToString(_self->config().priority)) <<
+              td( stateAsHtml(box.getState()) + (_self->config().hidden?" (hidden)":"") );
             s << td( _hbmsg );
             stringstream q;
             q << "/_replSetOplog?_id=" << _self->id();
             s << td( a(q.str(), myMinValid, theReplSet->lastOpTimeWritten.toString()) );
             s << td(""); // skew
             s << _tr();
-			mp[_self->hbinfo().id()] = s.str();
+            mp[_self->hbinfo().id()] = s.str();
         }
         Member *m = head();
         while( m ) {
-			stringstream s;
+            stringstream s;
             m->summarizeMember(s);
-			mp[m->hbinfo().id()] = s.str();
+            mp[m->hbinfo().id()] = s.str();
             m = m->next();
         }
 
@@ -340,15 +343,15 @@ namespace mongo {
         _rsLog.toHTML( s );
     }
 
-    const Member* ReplSetImpl::findById(unsigned id) const { 
+    const Member* ReplSetImpl::findById(unsigned id) const {
         if( id == _self->id() ) return _self;
         for( Member *m = head(); m; m = m->next() )
-            if( m->id() == id ) 
+            if( m->id() == id )
                 return m;
         return 0;
     }
 
-    void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const { 
+    void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
         vector<BSONObj> v;
 
         // add self
@@ -380,8 +383,9 @@ namespace mongo {
             bb.append("state", (int) m->state().s);
             if( h == 0 ) {
                 // if we can't connect the state info is from the past and could be confusing to show
-                bb.append("stateStr", "(not reachable/healthy)"); 
-            } else {
+                bb.append("stateStr", "(not reachable/healthy)");
+            }
+            else {
                 bb.append("stateStr", m->state().toString());
             }
             bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
@@ -403,8 +407,8 @@ namespace mongo {
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
 
-    static struct Test : public UnitTest { 
-        void run() { 
+    static struct Test : public UnitTest {
+        void run() {
             HealthOptions a,b;
             assert( a == b );
             assert( a.isDefault() );

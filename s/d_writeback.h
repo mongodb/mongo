@@ -31,7 +31,7 @@ namespace mongo {
      *
      * The class is thread safe.
      */
-    class WriteBackManager{
+    class WriteBackManager {
     public:
         WriteBackManager();
         ~WriteBackManager();

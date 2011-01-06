@@ -21,23 +21,23 @@
 
 namespace mongo {
 
-    bool Model::load(BSONObj& query){
+    bool Model::load(BSONObj& query) {
         ScopedDbConnection conn( modelServer() );
 
         BSONObj b = conn->findOne(getNS(), query);
         conn.done();
-        
+
         if ( b.isEmpty() )
             return false;
-        
+
         unserialize(b);
         _id = b["_id"].wrap().getOwned();
         return true;
     }
 
-    void Model::remove( bool safe ){
+    void Model::remove( bool safe ) {
         uassert( 10016 ,  "_id isn't set - needed for remove()" , _id["_id"].type() );
-        
+
         ScopedDbConnection conn( modelServer() );
         conn->remove( getNS() , _id );
 
@@ -46,34 +46,34 @@ namespace mongo {
             errmsg = conn->getLastError();
 
         conn.done();
-        
+
         if ( safe && errmsg.size() )
             throw UserException( 9002 , (string)"error on Model::remove: " + errmsg );
     }
 
-    void Model::save( bool safe ){
+    void Model::save( bool safe ) {
         ScopedDbConnection conn( modelServer() );
 
         BSONObjBuilder b;
         serialize( b );
-        
+
         BSONElement myId;
         {
             BSONObjIterator i = b.iterator();
-            while ( i.more() ){
+            while ( i.more() ) {
                 BSONElement e = i.next();
-                if ( strcmp( e.fieldName() , "_id" ) == 0 ){
+                if ( strcmp( e.fieldName() , "_id" ) == 0 ) {
                     myId = e;
                     break;
                 }
             }
         }
 
-        if ( myId.type() ){
-            if ( _id.isEmpty() ){
+        if ( myId.type() ) {
+            if ( _id.isEmpty() ) {
                 _id = myId.wrap();
             }
-            else if ( myId.woCompare( _id.firstElement() ) ){
+            else if ( myId.woCompare( _id.firstElement() ) ) {
                 stringstream ss;
                 ss << "_id from serialize and stored differ: ";
                 ss << '[' << myId << "] != ";
@@ -82,11 +82,11 @@ namespace mongo {
             }
         }
 
-        if ( _id.isEmpty() ){
+        if ( _id.isEmpty() ) {
             OID oid;
             oid.init();
             b.appendOID( "_id" , &oid );
-            
+
             BSONObj o = b.obj();
             conn->insert( getNS() , o );
             _id = o["_id"].wrap().getOwned();
@@ -94,25 +94,25 @@ namespace mongo {
             log(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
         else {
-            if ( myId.eoo() ){
+            if ( myId.eoo() ) {
                 myId = _id["_id"];
                 b.append( myId );
             }
-            
+
             assert( ! myId.eoo() );
 
             BSONObjBuilder qb;
             qb.append( myId );
-            
+
             BSONObj q = qb.obj();
             BSONObj o = b.obj();
 
             log(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
 
             conn->update( getNS() , q , o , true );
-            
+
         }
-        
+
         string errmsg = "";
         if ( safe )
             errmsg = conn->getLastError();
@@ -123,13 +123,13 @@ namespace mongo {
             throw UserException( 9003 , (string)"error on Model::save: " + errmsg );
     }
 
-    BSONObj Model::toObject(){
+    BSONObj Model::toObject() {
         BSONObjBuilder b;
         serialize( b );
         return b.obj();
     }
 
-    void Model::append( const char * name , BSONObjBuilder& b ){
+    void Model::append( const char * name , BSONObjBuilder& b ) {
         BSONObjBuilder bb( b.subobjStart( name ) );
         serialize( bb );
         bb.done();

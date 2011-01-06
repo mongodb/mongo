@@ -18,15 +18,15 @@
 
 #pragma once
 
-namespace mongo { 
+namespace mongo {
 
-    /** helper to read and parse a block of memory 
+    /** helper to read and parse a block of memory
         methods throw the eof exception if the operation would pass the end of the
         buffer with which we are working.
     */
-    class BufReader : boost::noncopyable { 
+    class BufReader : boost::noncopyable {
     public:
-        class eof : public std::exception { 
+        class eof : public std::exception {
         public:
             virtual const char * what() { return "BufReader eof"; }
         };
@@ -34,10 +34,10 @@ namespace mongo {
         BufReader(const void *p, unsigned len) : _start(p), _pos(p), _end(((char *)_pos)+len) { }
 
         bool atEof() const { return _pos == _end; }
-        
+
         /** read in the object specified, and advance buffer pointer */
         template <typename T>
-        void read(T &t) { 
+        void read(T &t) {
             T* cur = (T*) _pos;
             T *next = cur + 1;
             if( _end < next ) throw eof();
@@ -47,7 +47,7 @@ namespace mongo {
 
         /** verify we can look at t, but do not advance */
         template <typename T>
-        void peek(T &t) { 
+        void peek(T &t) {
             T* cur = (T*) _pos;
             T *next = cur + 1;
             if( _end < next ) throw eof();
@@ -61,13 +61,13 @@ namespace mongo {
         unsigned remaining() const { return (char*)_end -(char*)_pos; }
 
         /** back up by nbytes */
-        void rewind(unsigned nbytes) { 
+        void rewind(unsigned nbytes) {
             _pos = ((char *) _pos) - nbytes;
             assert( _pos >= _start );
         }
 
         /** return current position pointer, and advance by len */
-        const void* skip(unsigned len) { 
+        const void* skip(unsigned len) {
             const char *nxt = ((char *) _pos) + len;
             if( _end < nxt ) throw eof();
             const void *p = _pos;
@@ -77,7 +77,7 @@ namespace mongo {
 
         void readStr(string& s) {
             StringBuilder b;
-            while( 1 ) { 
+            while( 1 ) {
                 char ch;
                 read(ch);
                 if( ch == 0 )

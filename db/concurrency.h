@@ -37,7 +37,7 @@ namespace mongo {
 
     string sayClientState();
     bool haveClient();
-    
+
     class Client;
     Client* curopWaitingForLock( int type );
     void curopGotLock(Client*);
@@ -84,33 +84,33 @@ namespace mongo {
     struct writelock {
         writelock() { dbMutex.lock(); }
         writelock(const string& ns) { dbMutex.lock(); }
-        ~writelock() { 
+        ~writelock() {
             DESTRUCTOR_GUARD(
                 dbunlocking_write();
                 dbMutex.unlock();
             );
         }
     };
-    
+
     struct readlock {
         readlock(const string& ns) {
             dbMutex.lock_shared();
         }
         readlock() { dbMutex.lock_shared(); }
-        ~readlock() { 
+        ~readlock() {
             DESTRUCTOR_GUARD(
                 dbunlocking_read();
                 dbMutex.unlock_shared();
             );
         }
-    };	
+    };
 
     struct readlocktry {
-        readlocktry( const string&ns , int tryms ){
+        readlocktry( const string&ns , int tryms ) {
             _got = dbMutex.lock_shared_try( tryms );
         }
         ~readlocktry() {
-            if ( _got ){
+            if ( _got ) {
                 dbunlocking_read();
                 dbMutex.unlock_shared();
             }
@@ -121,11 +121,11 @@ namespace mongo {
     };
 
     struct writelocktry {
-        writelocktry( const string&ns , int tryms ){
+        writelocktry( const string&ns , int tryms ) {
             _got = dbMutex.lock_try( tryms );
         }
         ~writelocktry() {
-            if ( _got ){
+            if ( _got ) {
                 dbunlocking_read();
                 dbMutex.unlock();
             }
@@ -135,10 +135,10 @@ namespace mongo {
         bool _got;
     };
 
-    struct readlocktryassert : public readlocktry { 
-        readlocktryassert(const string& ns, int tryms) : 
-          readlocktry(ns,tryms) { 
-              uassert(13142, "timeout getting readlock", got());
+    struct readlocktryassert : public readlocktry {
+        readlocktryassert(const string& ns, int tryms) :
+            readlocktry(ns,tryms) {
+            uassert(13142, "timeout getting readlock", got());
         }
     };
 
@@ -146,12 +146,12 @@ namespace mongo {
         if you have a write lock, that's ok too.
     */
     struct atleastreadlock {
-        atleastreadlock( const string& ns ){
+        atleastreadlock( const string& ns ) {
             _prev = dbMutex.getState();
             if ( _prev == 0 )
                 dbMutex.lock_shared();
         }
-        ~atleastreadlock(){
+        ~atleastreadlock() {
             if ( _prev == 0 )
                 dbMutex.unlock_shared();
         }
@@ -159,7 +159,7 @@ namespace mongo {
         int _prev;
     };
 
-    /* parameterized choice of read or write locking 
+    /* parameterized choice of read or write locking
        use readlock and writelock instead of this when statically known which you want
     */
     class mongolock {
@@ -172,21 +172,22 @@ namespace mongo {
             else
                 dbMutex.lock_shared();
         }
-        ~mongolock() { 
+        ~mongolock() {
             DESTRUCTOR_GUARD(
-                if( _writelock ) { 
-                    dbunlocking_write();
-                    dbMutex.unlock();
-                } else {
-                    dbunlocking_read();
-                    dbMutex.unlock_shared();
-                }
+            if( _writelock ) {
+            dbunlocking_write();
+                dbMutex.unlock();
+            }
+            else {
+                dbunlocking_read();
+                dbMutex.unlock_shared();
+            }
             );
         }
         /* this unlocks, does NOT upgrade. that works for our current usage */
         void releaseAndWriteLock();
     };
-    
+
     /* deprecated - use writelock and readlock instead */
     struct dblock : public writelock {
         dblock() : writelock("") { }

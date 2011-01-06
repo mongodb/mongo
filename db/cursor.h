@@ -23,7 +23,7 @@
 #include "matcher.h"
 
 namespace mongo {
-    
+
     class NamespaceDetails;
     class Record;
     class CoveredIndexMatcher;
@@ -31,7 +31,7 @@ namespace mongo {
     /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
        concept and is for the user's cursor.
 
-       WARNING concurrency: the vfunctions below are called back from within a 
+       WARNING concurrency: the vfunctions below are called back from within a
        ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
     */
     class Cursor : boost::noncopyable {
@@ -50,7 +50,7 @@ namespace mongo {
         virtual DiskLoc refLoc() = 0;
 
         /* Implement these if you want the cursor to be "tailable" */
-        
+
         /* Request that the cursor starts tailing after advancing past last record. */
         /* The implementation may or may not honor this request. */
         virtual void setTailable() {}
@@ -77,10 +77,10 @@ namespace mongo {
 
         /* called before query getmore block is iterated */
         virtual void checkLocation() { }
-        
+
         virtual bool supportGetMore() = 0;
         virtual bool supportYields() = 0;
-        
+
         virtual string toString() { return "abstract?"; }
 
         /* used for multikey index traversal to avoid sending back dups. see Matcher::matches().
@@ -88,17 +88,17 @@ namespace mongo {
              if loc has already been sent, returns true.
              otherwise, marks loc as sent.
            @param deep - match was against an array, so we know it is multikey.  this is legacy and kept
-                         for backwards datafile compatibility.  'deep' can be eliminated next time we 
+                         for backwards datafile compatibility.  'deep' can be eliminated next time we
                          force a data file conversion. 7Jul09
         */
         virtual bool getsetdup(DiskLoc loc) = 0;
-        
+
         virtual bool isMultiKey() const = 0;
 
         /**
          * return true if the keys in the index have been modified from the main doc
-         * if you have { a : 1 , b : [ 1 , 2 ] } 
-         * an index on { a : 1 } would not be modified 
+         * if you have { a : 1 , b : [ 1 , 2 ] }
+         * an index on { a : 1 } would not be modified
          * an index on { b : 1 } would be since the values of the array are put in the index
          *                       not the array
          */
@@ -109,12 +109,12 @@ namespace mongo {
         virtual bool capped() const { return false; }
 
         virtual long long nscanned() = 0;
-        
+
         // The implementation may return different matchers depending on the
         // position of the cursor.  If matcher() is nonzero at the start,
         // matcher() should be checked each time advance() is called.
         virtual CoveredIndexMatcher *matcher() const { return 0; }
-        
+
         // A convenience function for setting the value of matcher() manually
         // so it may accessed later.  Implementations which must generate
         // their own matcher() should assert here.
@@ -154,7 +154,7 @@ namespace mongo {
             return j;
         }
         virtual DiskLoc currLoc() { return curr; }
-        virtual DiskLoc refLoc()  { return curr.isNull() ? last : curr; }        
+        virtual DiskLoc refLoc()  { return curr.isNull() ? last : curr; }
         bool advance();
         virtual string toString() { return "BasicCursor"; }
         virtual void setTailable() {
@@ -167,9 +167,9 @@ namespace mongo {
         virtual bool modifiedKeys() const { return false; }
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }
-        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }        
+        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher; }
-        virtual long long nscanned() { return _nscanned; }        
+        virtual long long nscanned() { return _nscanned; }
 
     protected:
         DiskLoc curr, last;

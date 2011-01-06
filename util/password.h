@@ -39,7 +39,7 @@ namespace mongo {
             return false;
         }
 
-        void xparse( boost::any& value_store, 
+        void xparse( boost::any& value_store,
                      const std::vector<std::string>& new_tokens ) const {
             if ( !value_store.empty() )
 #if BOOST_VERSION >= 104200
@@ -49,7 +49,7 @@ namespace mongo {
 #endif
             else if ( !new_tokens.empty() )
                 boost::program_options::typed_value<std::string>::xparse
-                    (value_store, new_tokens);
+                (value_store, new_tokens);
             else
                 value_store = std::string();
         }

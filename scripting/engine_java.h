@@ -163,10 +163,10 @@ namespace mongo {
             JavaJS->scopeInit( s , o );
         }
 
-        void localConnect( const char * dbName ){
+        void localConnect( const char * dbName ) {
             setString("$client", dbName );
         }
-        
+
         double getNumber(const char *field) {
             return JavaJS->scopeGetNumber(s,field);
         }
@@ -183,7 +183,7 @@ namespace mongo {
             return JavaJS->scopeGetType(s,field);
         }
 
-        void setThis( const BSONObj * obj ){
+        void setThis( const BSONObj * obj ) {
             JavaJS->scopeSetThis( s , obj );
         }
 
@@ -200,17 +200,17 @@ namespace mongo {
         void setBoolean(const char *field, bool val ) {
             JavaJS->scopeSetBoolean(s,field,val);
         }
-        
-        ScriptingFunction createFunction( const char * code ){
+
+        ScriptingFunction createFunction( const char * code ) {
             return JavaJS->functionCreate( code );
         }
 
-        int invoke( ScriptingFunction function , const BSONObj& args ){
+        int invoke( ScriptingFunction function , const BSONObj& args ) {
             setObject( "args" , args , true );
             return JavaJS->invoke(s,function);
         }
-        
-        string getError(){
+
+        string getError() {
             return getString( "error" );
         }
 

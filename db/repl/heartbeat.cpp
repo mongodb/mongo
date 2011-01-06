@@ -31,7 +31,7 @@
 #include "../../util/unittest.h"
 #include "../instance.h"
 
-namespace mongo { 
+namespace mongo {
 
     using namespace bson;
 
@@ -42,7 +42,7 @@ namespace mongo {
 
     long long HeartbeatInfo::timeDown() const {
         if( up() ) return 0;
-        if( downSince == 0 ) 
+        if( downSince == 0 )
             return 0; // still waiting on first heartbeat
         return jsTime() - downSince;
     }
@@ -53,10 +53,10 @@ namespace mongo {
         virtual bool adminOnly() const { return false; }
         CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( replSetBlind ) 
+            if( replSetBlind )
                 return false;
 
-            /* we don't call ReplSetCommand::check() here because heartbeat 
+            /* we don't call ReplSetCommand::check() here because heartbeat
                checks many things that are pre-initialization. */
             if( !replSet ) {
                 errmsg = "not running with --replSet";
@@ -66,11 +66,11 @@ namespace mongo {
             /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
             {
                 MessagingPort *mp = cc().port();
-                if( mp ) 
+                if( mp )
                     mp->tag |= 1;
             }
 
-            if( cmdObj["pv"].Int() != 1 ) { 
+            if( cmdObj["pv"].Int() != 1 ) {
                 errmsg = "incompatible replset protocol version";
                 return false;
             }
@@ -86,7 +86,7 @@ namespace mongo {
             }
 
             result.append("rs", true);
-            if( cmdObj["checkEmpty"].trueValue() ) { 
+            if( cmdObj["checkEmpty"].trueValue() ) {
                 result.append("hasData", replHasDatabases());
             }
             if( theReplSet == 0 ) {
@@ -98,7 +98,7 @@ namespace mongo {
                 return false;
             }
 
-            if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) { 
+            if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
                 errmsg = "repl set names do not match (2)";
                 result.append("mismatch", true);
                 return false;
@@ -118,8 +118,8 @@ namespace mongo {
     } cmdReplSetHeartbeat;
 
     /* throws dbexception */
-    bool requestHeartbeat(string setName, string from, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion, bool checkEmpty) { 
-        if( replSetBlind ) { 
+    bool requestHeartbeat(string setName, string from, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion, bool checkEmpty) {
+        if( replSetBlind ) {
             //sleepmillis( rand() );
             return false;
         }
@@ -145,7 +145,7 @@ namespace mongo {
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
 
         string name() const { return "ReplSetHealthPollTask"; }
-        void doWork() { 
+        void doWork() {
             if ( !theReplSet ) {
                 log(2) << "theReplSet not initialized yet, skipping health poll this round" << rsLog;
                 return;
@@ -153,7 +153,7 @@ namespace mongo {
 
             HeartbeatInfo mem = m;
             HeartbeatInfo old = mem;
-            try { 
+            try {
                 BSONObj info;
                 int theirConfigVersion = -10000;
 
@@ -165,9 +165,9 @@ namespace mongo {
 
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();
-                    if( t > after ) 
+                    if( t > after )
                         mem.skew = (int) (t - after);
-                    else if( t < before ) 
+                    else if( t < before )
                         mem.skew = (int) (t - before); // negative
                 }
                 else {
@@ -195,12 +195,12 @@ namespace mongo {
                     be cfg = info["config"];
                     if( cfg.ok() ) {
                         // received a new config
-                        boost::function<void()> f = 
+                        boost::function<void()> f =
                             boost::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
                         theReplSet->mgr->send(f);
                     }
                 }
-                else { 
+                else {
                     down(mem, info.getStringField("errmsg"));
                 }
             }
@@ -217,8 +217,8 @@ namespace mongo {
             static time_t last = 0;
             time_t now = time(0);
             bool changed = mem.changed(old);
-            if( changed ) { 
-                if( old.hbstate != mem.hbstate ) 
+            if( changed ) {
+                if( old.hbstate != mem.hbstate )
                     log() << "replSet member " << h.toString() << ' ' << mem.hbstate.toString() << rsLog;
             }
             if( changed || now-last>4 ) {
@@ -239,12 +239,12 @@ namespace mongo {
         }
     };
 
-    void ReplSetImpl::endOldHealthTasks() { 
+    void ReplSetImpl::endOldHealthTasks() {
         unsigned sz = healthTasks.size();
         for( set<ReplSetHealthPollTask*>::iterator i = healthTasks.begin(); i != healthTasks.end(); i++ )
             (*i)->halt();
         healthTasks.clear();
-        if( sz ) 
+        if( sz )
             DEV log() << "replSet debug: cleared old tasks " << sz << endl;
     }
 
@@ -256,8 +256,8 @@ namespace mongo {
 
     void startSyncThread();
 
-    /** called during repl set startup.  caller expects it to return fairly quickly. 
-        note ReplSet object is only created once we get a config - so this won't run 
+    /** called during repl set startup.  caller expects it to return fairly quickly.
+        note ReplSet object is only created once we get a config - so this won't run
         until the initiation.
     */
     void ReplSetImpl::startThreads() {

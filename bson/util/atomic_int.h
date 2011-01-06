@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    struct AtomicUInt{
+    struct AtomicUInt {
         AtomicUInt() : x(0) {}
         AtomicUInt(unsigned z) : x(z) { }
 
@@ -35,44 +35,44 @@ namespace mongo {
         inline AtomicUInt operator++(int);// postfix++
         inline AtomicUInt operator--(); // --prefix
         inline AtomicUInt operator--(int); // postfix--
-        
+
         inline void zero() { x = 0; } // TODO: this isn't thread safe
-        
+
         volatile unsigned x;
     };
 
 #if defined(_WIN32)
-    AtomicUInt AtomicUInt::operator++(){
+    AtomicUInt AtomicUInt::operator++() {
         // InterlockedIncrement returns the new value
         return InterlockedIncrement((volatile long*)&x); //long is 32bits in Win64
     }
-    AtomicUInt AtomicUInt::operator++(int){
+    AtomicUInt AtomicUInt::operator++(int) {
         return InterlockedIncrement((volatile long*)&x)-1;
     }
-    AtomicUInt AtomicUInt::operator--(){
+    AtomicUInt AtomicUInt::operator--() {
         return InterlockedDecrement((volatile long*)&x);
     }
-    AtomicUInt AtomicUInt::operator--(int){
+    AtomicUInt AtomicUInt::operator--(int) {
         return InterlockedDecrement((volatile long*)&x)+1;
     }
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
     // this is in GCC >= 4.1
-    AtomicUInt AtomicUInt::operator++(){
+    AtomicUInt AtomicUInt::operator++() {
         return __sync_add_and_fetch(&x, 1);
     }
-    AtomicUInt AtomicUInt::operator++(int){
+    AtomicUInt AtomicUInt::operator++(int) {
         return __sync_fetch_and_add(&x, 1);
     }
-    AtomicUInt AtomicUInt::operator--(){
+    AtomicUInt AtomicUInt::operator--() {
         return __sync_add_and_fetch(&x, -1);
     }
-    AtomicUInt AtomicUInt::operator--(int){
+    AtomicUInt AtomicUInt::operator--(int) {
         return __sync_fetch_and_add(&x, -1);
     }
 #elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
     // from boost 1.39 interprocess/detail/atomic.hpp
 
-    inline unsigned atomic_int_helper(volatile unsigned *x, int val){
+    inline unsigned atomic_int_helper(volatile unsigned *x, int val) {
         int r;
         asm volatile
         (
@@ -84,16 +84,16 @@ namespace mongo {
         );
         return r;
     }
-    AtomicUInt AtomicUInt::operator++(){
+    AtomicUInt AtomicUInt::operator++() {
         return atomic_int_helper(&x, 1)+1;
     }
-    AtomicUInt AtomicUInt::operator++(int){
+    AtomicUInt AtomicUInt::operator++(int) {
         return atomic_int_helper(&x, 1);
     }
-    AtomicUInt AtomicUInt::operator--(){
+    AtomicUInt AtomicUInt::operator--() {
         return atomic_int_helper(&x, -1)-1;
     }
-    AtomicUInt AtomicUInt::operator--(int){
+    AtomicUInt AtomicUInt::operator--(int) {
         return atomic_int_helper(&x, -1);
     }
 #else

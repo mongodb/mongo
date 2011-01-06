@@ -23,7 +23,7 @@ function runDiff(a, b) {
     a = reSlash(a);
     b = reSlash(b);
     print("diff " + a + " " + b);
-    return run("diff", a, b);
+    return runProgram("diff", a, b);
 }
 
 function log(str) {
@@ -122,7 +122,7 @@ sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
-assert(ls(path2 + "/journal") == null);
+assert.eq( [], listFiles(path2 + "/journal") );
 
 log("check data matches ns");
 var diff = runDiff(path1 + "/test.ns", path2 + "/test.ns");

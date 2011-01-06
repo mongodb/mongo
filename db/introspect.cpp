@@ -26,8 +26,7 @@
 
 namespace mongo {
 
-    void profile( const char *str, int millis)
-    {
+    void profile( const char *str, int millis) {
         BSONObjBuilder b;
         b.appendDate("ts", jsTime());
         b.append("info", str);

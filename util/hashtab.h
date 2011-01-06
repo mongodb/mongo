@@ -37,8 +37,8 @@ namespace mongo {
 
     template <
     class Key,
-    class Type
-    >
+          class Type
+          >
     class HashTable : boost::noncopyable {
     public:
         const char *name;
@@ -57,9 +57,9 @@ namespace mongo {
         int n;
         int maxChain;
 
-        Node& nodes(int i) { 
+        Node& nodes(int i) {
             Node *nodes = (Node *) _buf;
-            return nodes[i]; 
+            return nodes[i];
         }
 
         int _find(const Key& k, bool& found) {
@@ -88,7 +88,7 @@ namespace mongo {
                     out() << "error: hashtable " << name << " is full n:" << n << endl;
                     return -1;
                 }
-                if( chain >= maxChain ) { 
+                if( chain >= maxChain ) {
                     if ( firstNonUsed >= 0 )
                         return firstNonUsed;
                     out() << "error: hashtable " << name << " max chain reached:" << maxChain << endl;
@@ -109,7 +109,7 @@ namespace mongo {
             _buf = buf;
             //nodes = (Node *) buf;
 
-            if ( sizeof(Node) != 628 ){
+            if ( sizeof(Node) != 628 ) {
                 out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << " sizeof(Key): " << sizeof(Key) << " sizeof(Type):" << sizeof(Type) << endl;
                 assert( sizeof(Node) == 628 );
             }
@@ -152,10 +152,10 @@ namespace mongo {
             n->value = value;
             return true;
         }
-        
+
         typedef void (*IteratorCallback)( const Key& k , Type& v );
-        void iterAll( IteratorCallback callback ){
-            for ( int i=0; i<n; i++ ){
+        void iterAll( IteratorCallback callback ) {
+            for ( int i=0; i<n; i++ ) {
                 if ( ! nodes(i).inUse() )
                     continue;
                 callback( nodes(i).k , nodes(i).value );
@@ -164,14 +164,14 @@ namespace mongo {
 
         // TODO: should probably use boost::bind for this, but didn't want to look at it
         typedef void (*IteratorCallback2)( const Key& k , Type& v , void * extra );
-        void iterAll( IteratorCallback2 callback , void * extra ){
-            for ( int i=0; i<n; i++ ){
+        void iterAll( IteratorCallback2 callback , void * extra ) {
+            for ( int i=0; i<n; i++ ) {
                 if ( ! nodes(i).inUse() )
                     continue;
                 callback( nodes(i).k , nodes(i).value , extra );
             }
         }
-    
+
     };
 
 #pragma pack()

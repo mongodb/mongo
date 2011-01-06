@@ -25,12 +25,12 @@
 #include "dbtests.h"
 
 namespace CursorTests {
-    
+
     namespace BtreeCursorTests {
 
         // The ranges expressed in these tests are impossible given our query
         // syntax, so going to do them a hacky way.
-        
+
         class Base {
         protected:
             FieldRangeVector *vec( int *vals, int len, int direction = 1 ) {
@@ -40,7 +40,8 @@ namespace CursorTests {
                     FieldRangeSet s2( "", _objs.back() );
                     if ( i == 0 ) {
                         s.range( "a" ) = s2.range( "a" );
-                    } else {
+                    }
+                    else {
                         s.range( "a" ) |= s2.range( "a" );
                     }
                 }
@@ -49,7 +50,7 @@ namespace CursorTests {
         private:
             vector< BSONObj > _objs;
         };
-        
+
         class MultiRange : public Base {
         public:
             void run() {
@@ -103,7 +104,7 @@ namespace CursorTests {
                 ASSERT( !c.ok() );
             }
         };
-     
+
         class MultiRangeReverse : public Base {
         public:
             void run() {
@@ -129,7 +130,7 @@ namespace CursorTests {
                 ASSERT( !c.ok() );
             }
         };
-     
+
         class Base2 {
         public:
             virtual ~Base2() { _c.dropCollection( ns() ); }
@@ -167,7 +168,7 @@ namespace CursorTests {
             dblock _lk;
             vector< BSONObj > _objs;
         };
-        
+
         class EqEq : public Base2 {
         public:
             void run() {
@@ -194,7 +195,7 @@ namespace CursorTests {
                 check( BSON( "a" << 4 << "b" << BSON( "$gte" << 1 << "$lte" << 10 ) ) );
             }
             virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
-        };        
+        };
 
         class EqIn : public Base2 {
         public:
@@ -210,7 +211,7 @@ namespace CursorTests {
                 check( BSON( "a" << 4 << "b" << BSON( "$in" << BSON_ARRAY( 5 << 6 << 11 ) ) ) );
             }
             virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
-        };        
+        };
 
         class RangeEq : public Base2 {
         public:
@@ -227,7 +228,7 @@ namespace CursorTests {
                 check( BSON( "a" << BSON( "$gte" << 1 << "$lte" << 10 ) << "b" << 4 ) );
             }
             virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
-        };        
+        };
 
         class RangeIn : public Base2 {
         public:
@@ -244,15 +245,15 @@ namespace CursorTests {
                 check( BSON( "a" << BSON( "$gte" << 1 << "$lte" << 10 ) << "b" << BSON( "$in" << BSON_ARRAY( 4 << 6 ) ) ) );
             }
             virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
-        };        
-        
+        };
+
     } // namespace BtreeCursorTests
-    
+
     class All : public Suite {
     public:
-        All() : Suite( "cursor" ){}
-        
-        void setupTests(){
+        All() : Suite( "cursor" ) {}
+
+        void setupTests() {
             add< BtreeCursorTests::MultiRange >();
             add< BtreeCursorTests::MultiRangeGap >();
             add< BtreeCursorTests::MultiRangeReverse >();

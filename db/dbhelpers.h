@@ -36,7 +36,7 @@ namespace mongo {
     /**
        all helpers assume locking is handled above them
      */
-    struct Helpers { 
+    struct Helpers {
 
         /* ensure the specified index exists.
 
@@ -54,7 +54,7 @@ namespace mongo {
         /* fetch a single object from collection ns that matches query.
            set your db SavedContext first.
 
-           @param query - the query to perform.  note this is the low level portion of query so "orderby : ..." 
+           @param query - the query to perform.  note this is the low level portion of query so "orderby : ..."
                           won't work.
 
            @param requireIndex if true, complain if no index for the query.  a way to guard against
@@ -63,16 +63,16 @@ namespace mongo {
            @return true if object found
         */
         static bool findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex = false);
-        static DiskLoc findOne(const char *ns, const BSONObj &query, bool requireIndex);        
+        static DiskLoc findOne(const char *ns, const BSONObj &query, bool requireIndex);
 
         /**
          * @param foundIndex if passed in will be set to 1 if ns and index found
          * @return true if object found
          */
-        static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result , 
+        static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result ,
                              bool * nsFound = 0 , bool * indexFound = 0 );
 
-        /* uasserts if no _id index. 
+        /* uasserts if no _id index.
            @return null loc if not found */
         static DiskLoc findById(NamespaceDetails *d, BSONObj query);
 
@@ -87,7 +87,7 @@ namespace mongo {
         static void putSingleton(const char *ns, BSONObj obj);
         static void putSingletonGod(const char *ns, BSONObj obj, bool logTheOp);
         static bool getFirst(const char *ns, BSONObj& result) { return getSingleton(ns, result); }
-        static bool getLast(const char *ns, BSONObj& result); // get last object int he collection; e.g. {$natural : -1}        
+        static bool getLast(const char *ns, BSONObj& result); // get last object int he collection; e.g. {$natural : -1}
 
         /**
          * you have to lock
@@ -106,7 +106,7 @@ namespace mongo {
 
         class RemoveCallback {
         public:
-            virtual ~RemoveCallback(){}
+            virtual ~RemoveCallback() {}
             virtual void goingToDelete( const BSONObj& o ) = 0;
         };
         /* removeRange: operation is oplog'd */
@@ -147,13 +147,13 @@ namespace mongo {
         ~RemoveSaver();
 
         void goingToDelete( const BSONObj& o );
-        
+
     private:
         path _root;
         path _file;
         ofstream* _out;
-        
+
     };
 
-    
+
 } // namespace mongo

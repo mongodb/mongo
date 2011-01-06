@@ -21,23 +21,23 @@
 #include "../db/commands.h"
 
 namespace mongo {
-       
+
     class TestDistLockWithSync : public Command {
     public:
-        TestDistLockWithSync() : Command( "_testDistLockWithSyncCluster" ){}
+        TestDistLockWithSync() : Command( "_testDistLockWithSyncCluster" ) {}
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
-        
+
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
+        virtual LockType locktype() const { return NONE; }
 
-        static void runThread(){
-            for ( int i=0; i<1000; i++ ){
-                if ( current->lock_try( "test" ) ){
+        static void runThread() {
+            for ( int i=0; i<1000; i++ ) {
+                if ( current->lock_try( "test" ) ) {
                     gotit++;
-                    for ( int j=0; j<2000; j++ ){
+                    for ( int j=0; j<2000; j++ ) {
                         count++;
                     }
                     current->unlock();
@@ -45,17 +45,17 @@ namespace mongo {
             }
         }
 
-        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             DistributedLock lk( ConnectionString( cmdObj["host"].String() , ConnectionString::SYNC ), "testdistlockwithsync" );
             current = &lk;
             count = 0;
             gotit = 0;
-            
+
             vector<shared_ptr<boost::thread> > l;
-            for ( int i=0; i<4; i++ ){
+            for ( int i=0; i<4; i++ ) {
                 l.push_back( shared_ptr<boost::thread>( new boost::thread( runThread ) ) );
             }
-            
+
             for ( unsigned i=0; i<l.size(); i++ )
                 l[i]->join();
 
@@ -64,7 +64,7 @@ namespace mongo {
             current = 0;
             return count == gotit * 2000;
         }
-        
+
         static DistributedLock * current;
         static int count;
         static int gotit;

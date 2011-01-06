@@ -2,9 +2,9 @@
 
    MongoDB C++ Driver
 
-   Normally one includes dbclient.h, and links against libmongoclient.a, when connecting to MongoDB 
-   from C++.  However, if you have a situation where the pre-built library does not work, you can use 
-   this file instead to build all the necessary symbols.  To do so, include client_lib.cpp in your 
+   Normally one includes dbclient.h, and links against libmongoclient.a, when connecting to MongoDB
+   from C++.  However, if you have a situation where the pre-built library does not work, you can use
+   this file instead to build all the necessary symbols.  To do so, include client_lib.cpp in your
    project.
 
    For example, to build and run simple_client_demo.cpp with GCC and run it:
@@ -30,7 +30,7 @@
 
 #include "../util/md5main.cpp"
 
-#define MONGO_EXPOSE_MACROS 
+#define MONGO_EXPOSE_MACROS
 #include "../pch.h"
 
 #include "../util/assert_util.cpp"
@@ -60,7 +60,7 @@
 #include "../db/nonce.cpp"
 #include "../db/commands.cpp"
 
-extern "C" { 
+extern "C" {
 #include "../util/md5.c"
 }
 

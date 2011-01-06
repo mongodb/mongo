@@ -63,4 +63,5 @@ assert.eq( 16 , x.b.avg , "B2" );
 assert.eq( 18 , x.c.avg , "B3" );
 res.drop();
 
+assert( ! ( "result" in res ) , "B4" )
 

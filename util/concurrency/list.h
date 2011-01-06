@@ -18,64 +18,64 @@
 
 #pragma once
 
-namespace mongo { 
+namespace mongo {
 
-/* this class uses a mutex for writes, but not for reads. 
-   we can get fancier later...
+    /* this class uses a mutex for writes, but not for reads.
+       we can get fancier later...
 
-        struct Member : public List1<Member>::Base {
-            const char *host;
-            int port;
-        };
-        List1<Member> _members;
-        _members.head()->next();
+            struct Member : public List1<Member>::Base {
+                const char *host;
+                int port;
+            };
+            List1<Member> _members;
+            _members.head()->next();
 
-*/
-template<typename T>
-class List1 : boost::noncopyable {
-public:
-    /* next() and head() return 0 at end of list */
-
-    List1() : _head(0), _m("List1"), _orphans(0) { }
-
-    class Base {
-        friend class List1;
-        T *_next;
+    */
+    template<typename T>
+    class List1 : boost::noncopyable {
     public:
-        T* next() const { return _next; }
-    };
+        /* next() and head() return 0 at end of list */
 
-    T* head() const { return _head; }
+        List1() : _head(0), _m("List1"), _orphans(0) { }
 
-    void push(T* t) {
-        scoped_lock lk(_m);
-        t->_next = _head;
-        _head = t; 
-    }
+        class Base {
+            friend class List1;
+            T *_next;
+        public:
+            T* next() const { return _next; }
+        };
 
-    // intentionally leak.
-    void orphanAll() { 
-        _head = 0;
-    }
+        T* head() const { return _head; }
 
-    /* t is not deleted, but is removed from the list. (orphaned) */
-    void orphan(T* t) { 
-        scoped_lock lk(_m);
-        T *&prev = _head;
-        T *n = prev;
-        while( n != t ) {
-            prev = n->_next;
-            n = prev;
+        void push(T* t) {
+            scoped_lock lk(_m);
+            t->_next = _head;
+            _head = t;
         }
-        prev = t->_next;
-        if( ++_orphans > 500 ) 
-            log() << "warning orphans=" << _orphans << '\n';
-    }
 
-private:
-    T *_head;
-    mongo::mutex _m;
-    int _orphans;
-};
+        // intentionally leak.
+        void orphanAll() {
+            _head = 0;
+        }
+
+        /* t is not deleted, but is removed from the list. (orphaned) */
+        void orphan(T* t) {
+            scoped_lock lk(_m);
+            T *&prev = _head;
+            T *n = prev;
+            while( n != t ) {
+                prev = n->_next;
+                n = prev;
+            }
+            prev = t->_next;
+            if( ++_orphans > 500 )
+                log() << "warning orphans=" << _orphans << '\n';
+        }
+
+    private:
+        T *_head;
+        mongo::mutex _m;
+        int _orphans;
+    };
 
 };

@@ -31,17 +31,17 @@ namespace mongo {
         size_t n = files.size();
         for ( size_t i = 0; i < n; i++ )
             delete files[i];
-        if( ccByLoc.size() ) { 
+        if( ccByLoc.size() ) {
             log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
         }
     }
 
     Database::Database(const char *nm, bool& newDb, const string& _path )
-        : name(nm), path(_path), namespaceIndex( path, name ), 
-          profileName(name + ".system.profile")
-    {
-        
-        { // check db name is valid
+        : name(nm), path(_path), namespaceIndex( path, name ),
+          profileName(name + ".system.profile") {
+
+        {
+            // check db name is valid
             size_t L = strlen(nm);
             uassert( 10028 ,  "db name is empty", L > 0 );
             uassert( 10029 ,  "bad db name [1]", *nm != '.' );
@@ -49,38 +49,38 @@ namespace mongo {
             uassert( 10031 ,  "bad char(s) in db name", strchr(nm, ' ') == 0 );
             uassert( 10032 ,  "db name too long", L < 64 );
         }
-        
+
         newDb = namespaceIndex.exists();
         profile = 0;
 
         {
             vector<string> others;
             getDatabaseNames( others , path );
-            
-            for ( unsigned i=0; i<others.size(); i++ ){
+
+            for ( unsigned i=0; i<others.size(); i++ ) {
 
                 if ( strcasecmp( others[i].c_str() , nm ) )
                     continue;
 
                 if ( strcmp( others[i].c_str() , nm ) == 0 )
                     continue;
-                
+
                 stringstream ss;
                 ss << "db already exists with different case other: [" << others[i] << "] me [" << nm << "]";
                 uasserted( DatabaseDifferCaseCode , ss.str() );
             }
         }
 
-        
+
         // If already exists, open.  Otherwise behave as if empty until
         // there's a write, then open.
         if ( ! newDb || cmdLine.defaultProfile ) {
             namespaceIndex.init();
             if( _openAllFiles )
                 openAllFiles();
-            
+
         }
-       
+
 
         magic = 781231;
     }
@@ -96,9 +96,9 @@ namespace mongo {
         return fullName;
     }
 
-    void Database::openAllFiles() { 
+    void Database::openAllFiles() {
         int n = 0;
-        while( exists(n) ) { 
+        while( exists(n) ) {
             getFile(n);
             n++;
         }
@@ -112,7 +112,7 @@ namespace mongo {
 
     MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
         assert(this);
-        
+
         namespaceIndex.init();
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
             out() << "getFile(): n=" << n << endl;
@@ -151,7 +151,7 @@ namespace mongo {
         }
         return preallocateOnly ? 0 : p;
     }
-    
+
     MongoDataFile* Database::addAFile( int sizeNeeded, bool preallocateNextFile ) {
         int n = (int) files.size();
         MongoDataFile *ret = getFile( n, sizeNeeded );
@@ -163,7 +163,7 @@ namespace mongo {
     MongoDataFile* Database::suitableFile( int sizeNeeded, bool preallocate ) {
 
         // check existing files
-        for ( int i=numFiles()-1; i>=0; i-- ){
+        for ( int i=numFiles()-1; i>=0; i-- ) {
             MongoDataFile* f = getFile( i );
             if ( f->getHeader()->unusedLength >= sizeNeeded )
                 return f;
@@ -172,14 +172,14 @@ namespace mongo {
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
             MongoDataFile* f = addAFile( sizeNeeded, preallocate );
-            
+
             if ( f->getHeader()->unusedLength >= sizeNeeded )
                 return f;
 
             if ( f->getHeader()->fileLength >= MongoDataFile::maxSize() ) // this is as big as they get so might as well stop
                 return f;
         }
-        
+
         return 0;
     }
 
@@ -190,37 +190,37 @@ namespace mongo {
         return getFile(n-1);
     }
 
-    
-    Extent* Database::allocExtent( const char *ns, int size, bool capped ) { 
+
+    Extent* Database::allocExtent( const char *ns, int size, bool capped ) {
         Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
-        if( e ) 
+        if( e )
             return e;
         return suitableFile( size, !capped )->createExtent( ns, size, capped );
     }
-    
-    
-    bool Database::setProfilingLevel( int newLevel , string& errmsg ){
+
+
+    bool Database::setProfilingLevel( int newLevel , string& errmsg ) {
         if ( profile == newLevel )
             return true;
-        
-        if ( newLevel < 0 || newLevel > 2 ){
+
+        if ( newLevel < 0 || newLevel > 2 ) {
             errmsg = "profiling level has to be >=0 and <= 2";
             return false;
         }
-        
-        if ( newLevel == 0 ){
+
+        if ( newLevel == 0 ) {
             profile = 0;
             return true;
         }
-        
+
         assert( cc().database() == this );
 
-        if ( ! namespaceIndex.details( profileName.c_str() ) ){
+        if ( ! namespaceIndex.details( profileName.c_str() ) ) {
             log(1) << "creating profile ns: " << profileName << endl;
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", 131072.0 );
-            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , true ) ){
+            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , true ) ) {
                 return false;
             }
         }
@@ -228,15 +228,15 @@ namespace mongo {
         return true;
     }
 
-    void Database::finishInit(){
+    void Database::finishInit() {
         if ( cmdLine.defaultProfile == profile )
             return;
-        
+
         string errmsg;
         massert( 12506 , errmsg , setProfilingLevel( cmdLine.defaultProfile , errmsg ) );
     }
 
-    bool Database::validDBName( const string& ns ){
+    bool Database::validDBName( const string& ns ) {
         if ( ns.size() == 0 || ns.size() > 64 )
             return false;
         size_t good = strcspn( ns.c_str() , "/\\. \"" );
@@ -245,7 +245,7 @@ namespace mongo {
 
     void Database::flushFiles( bool sync ) const {
         dbMutex.assertAtLeastReadLocked();
-        for ( unsigned i=0; i<files.size(); i++ ){
+        for ( unsigned i=0; i<files.size(); i++ ) {
             files[i]->flush( sync );
         }
     }
@@ -257,28 +257,28 @@ namespace mongo {
         return size;
     }
 
-    Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ){
+    Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
         dbMutex.assertWriteLocked();
         DBs& m = _paths[path];
-        
+
         string dbname = _todb( ns );
-        
+
         Database* & db = m[dbname];
-        if ( db ){
+        if ( db ) {
             justCreated = false;
             return db;
         }
-        
+
         log(1) << "Accessing: " << dbname << " for the first time" << endl;
         try {
             db = new Database( dbname.c_str() , justCreated , path );
         }
-        catch ( ... ){
+        catch ( ... ) {
             m.erase( dbname );
             throw;
         }
         _size++;
         return db;
     }
-    
+
 } // namespace mongo

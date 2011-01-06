@@ -23,14 +23,14 @@ namespace mongo {
      *  Background thread dispatching.
      *  subclass and define run()
      *
-     *  It is ok to call go(), that is, run the job, more than once -- if the 
-     *  previous invocation has finished. Thus one pattern of use is to embed 
-     *  a backgroundjob in your object and reuse it (or same thing with 
+     *  It is ok to call go(), that is, run the job, more than once -- if the
+     *  previous invocation has finished. Thus one pattern of use is to embed
+     *  a backgroundjob in your object and reuse it (or same thing with
      *  inheritance).  Each go() call spawns a new thread.
      *
      *  Thread safety:
      *    note when job destructs, the thread is not terminated if still running.
-     *    generally if the thread could still be running, allocate the job dynamically 
+     *    generally if the thread could still be running, allocate the job dynamically
      *    and set deleteSelf to true.
      *
      *    go() and wait() are not thread safe
@@ -54,11 +54,11 @@ namespace mongo {
          * define this to do your work.
          * after this returns, state is set to done.
          * after this returns, deleted if deleteSelf true.
-         * 
-         * NOTE: 
-         *   if run() throws, the exception will be caught within 'this' object and will ultimately lead to the 
+         *
+         * NOTE:
+         *   if run() throws, the exception will be caught within 'this' object and will ultimately lead to the
          *   BackgroundJob's thread being finished, as if run() returned.
-         *   
+         *
          */
         virtual void run() = 0;
 
@@ -71,16 +71,16 @@ namespace mongo {
 
         virtual ~BackgroundJob() { }
 
-        /** 
-         * starts job. 
-         * returns immediatelly after dispatching. 
+        /**
+         * starts job.
+         * returns immediatelly after dispatching.
          *
          * @note the BackgroundJob object must live for as long the thread is still running, ie
          * until getState() returns Done.
          */
         BackgroundJob& go();
 
-        /** 
+        /**
          * wait for completion.
          *
          * @param msTimeOut maximum amount of time to wait in millisecons
