@@ -651,7 +651,7 @@ namespace mongo {
         class MapReduceCommand : public Command {
         public:
             MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
-            virtual bool slaveOk() const { return false; }
+            virtual bool slaveOk() const { return !replSet; }
             virtual bool slaveOverrideOk() { return true; }
 
             virtual void help( stringstream &help ) const {
@@ -684,7 +684,7 @@ namespace mongo {
                     return false;
                 }
 
-                if (state.isOnDisk()) {
+                if (replSet && state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
                     if (!isMaster(dbname.c_str())) {
@@ -815,7 +815,7 @@ namespace mongo {
         class MapReduceFinishCommand : public Command {
         public:
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
-            virtual bool slaveOk() const { return false; }
+            virtual bool slaveOk() const { return !replSet; }
             virtual bool slaveOverrideOk() { return true; }
 
             virtual LockType locktype() const { return NONE; }
