@@ -23,6 +23,14 @@
 
 namespace mongo {
 
+    inline string getFilename(const boost::filesystem::path& p) {
+#if BOOST_FILESYSTEM_VERSION == 2
+        return p.filename();
+#else
+        return p.filename().string();
+#endif
+    }
+
     /* @return a dump of the buffer as hex byte ascii output */
     string hexdump(const char *data, unsigned len);
 

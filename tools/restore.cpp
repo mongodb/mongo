@@ -121,7 +121,7 @@ public:
         log(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
-        string filename = root.filename().string();
+        string filename = getFilename(root);
         if (filename[0] == '.' && filename != ".")
             return;
 
@@ -152,10 +152,10 @@ public:
                 }
 
                 // don't insert oplog
-                if (top_level && !use_db && p.filename().string() == "oplog.bson")
+                if (top_level && !use_db && p.filename() == "oplog.bson")
                     continue;
 
-                if ( p.filename().string() == "system.indexes.bson" )
+                if ( p.filename() == "system.indexes.bson" )
                     indexes = p;
                 else
                     drillDown(p, use_db, use_coll);
@@ -201,7 +201,7 @@ public:
             ns += "." + _coll;
         }
         else {
-            string l = root.filename().string();
+            string l = getFilename(root);
             l = l.substr( 0 , l.find_last_of( "." ) );
             ns += "." + l;
         }

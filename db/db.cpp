@@ -436,7 +436,7 @@ sendmore:
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = boost::filesystem::path(*i).filename().string();
+            string fileName = getFilename(*i);
             if ( boost::filesystem::is_directory( *i ) &&
                     fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );

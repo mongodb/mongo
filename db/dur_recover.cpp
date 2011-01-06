@@ -67,7 +67,7 @@ namespace mongo {
                     i != filesystem::directory_iterator();
                     ++i ) {
                 filesystem::path filepath = *i;
-                string fileName = filesystem::path(*i).filename().string();
+                string fileName = getFilename(filepath);
                 if( str::startsWith(fileName, "j._") ) {
                     unsigned u = str::toUnsigned( str::after(fileName, '_') );
                     if( m.count(u) ) {

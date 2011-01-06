@@ -602,13 +602,13 @@ namespace mongo {
                 i != boost::filesystem::directory_iterator(); ++i ) {
             if ( directoryperdb ) {
                 boost::filesystem::path p = *i;
-                string dbName = p.filename().string();
+                string dbName = getFilename(p);
                 p /= ( dbName + ".ns" );
                 if ( MMF::exists( p ) )
                     names.push_back( dbName );
             }
             else {
-                string fileName = boost::filesystem::path(*i).filename().string();
+                string fileName = getFilename(*i);
                 if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
                     names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
             }
