@@ -23,6 +23,7 @@ namespace mongo {
             ~TempDisableDurability(); // enables durability iff constructor disabled it
         private:
             const bool _wasDur;
+            scoped_lock _lock;
         };
 
         class DurableInterface : boost::noncopyable {
