@@ -70,7 +70,7 @@ namespace mongo {
         void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
-            log() << "FILE_MAP_COPY MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
+            log() << "createPrivateMap failed " << filename() << " " << errnoWithDescription(e) << endl;
         }
         else {
             views.push_back(p);
