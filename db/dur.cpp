@@ -71,6 +71,8 @@ namespace mongo {
 
         Stats stats;
 
+        static mongo::mutex durThreadMutex("durthreadmtx");
+
         void Stats::S::reset() {
             memset(this, 0, sizeof(*this));
         }
@@ -488,6 +490,7 @@ namespace mongo {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
+                    scoped_lock lk2(durThreadMutex);
                     groupCommit();
                     return;
                 }
@@ -496,6 +499,7 @@ namespace mongo {
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
+            scoped_lock lk2(durThreadMutex);
             groupCommit();
         }
 
@@ -517,8 +521,6 @@ namespace mongo {
             }
         }
 
-        mongo::mutex durThreadMutex("durthreadmtx");
-
         CodeBlock durThreadMain;
 
         void durThread() {
@@ -526,28 +528,32 @@ namespace mongo {
             const int HowOftenToGroupCommitMs = 90;
             while( 1) {
                 sleepmillis(10);
-                scoped_lock lk(durThreadMutex);
                 CodeBlock::Within w(durThreadMain);
                 try {
-                    int millis = HowOftenToGroupCommitMs;
                     {
-                        Timer t;
-                        journalRotate(); // note we do this part outside of mongomutex
-                        millis -= t.millis();
-                        assert( millis <= HowOftenToGroupCommitMs );
-                        if( millis < 5 )
-                            millis = 5;
+                        scoped_lock lk2(durThreadMutex);
+
+                        stats.rotate();
+
+                        int millis = HowOftenToGroupCommitMs;
+                        {
+                            Timer t;
+                            journalRotate(); // note we do this part outside of mongomutex
+                            millis -= t.millis();
+                            assert( millis <= HowOftenToGroupCommitMs );
+                            if( millis < 5 )
+                                millis = 5;
+                        }
+
+                        // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
+                        // but is likely also less spiky on our cpu usage, which is good:
+                        sleepmillis(millis/2);
+                        drainSome();
+                        sleepmillis(millis/2);
+                        drainSome();
                     }
 
-                    // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
-                    // but is likely also less spiky on our cpu usage, which is good:
-                    sleepmillis(millis/2);
-                    drainSome();
-                    sleepmillis(millis/2);
-                    drainSome();
-
-                    go();
-                    stats.rotate();
+                    go(); // regrabs durThreadMutex inside of dbMutex
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
