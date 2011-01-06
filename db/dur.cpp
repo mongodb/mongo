@@ -164,22 +164,6 @@ namespace mongo {
             _impl = nonDurableImpl;
         }
 
-        TempDisableDurability::TempDisableDurability() : _wasDur(cmdLine.dur) {
-            dbMutex.assertWriteLocked();
-            if (_wasDur) {
-                DurableInterface::disableDurability();
-                cmdLine.dur = false;
-            }
-        }
-
-        TempDisableDurability::~TempDisableDurability() {
-            dbMutex.assertWriteLocked();
-            if (_wasDur) {
-                cmdLine.dur = true;
-                DurableInterface::enableDurability();
-            }
-        }
-
         bool DurableImpl::commitNow() {
             groupCommit();
             return true;
@@ -527,6 +511,9 @@ namespace mongo {
             views disappear
         */
         void closingFileNotification() {
+            if (!cmdLine.dur)
+                return;
+
             if( dbMutex.atLeastReadLocked() ) {
                 groupCommit();
             }
@@ -538,36 +525,60 @@ namespace mongo {
             }
         }
 
-        static void durThread() {
-            Client::initThread("dur");
-            const int HowOftenToGroupCommitMs = 100;
-            while( 1 ) {
-                try {
-                    int millis = HowOftenToGroupCommitMs;
-                    {
-                        Timer t;
-                        journalRotate(); // note we do this part outside of mongomutex
-                        millis -= t.millis();
-                        if( millis < 5 || millis > HowOftenToGroupCommitMs )
-                            millis = 5;
+
+        class DurThread : boost::noncopyable {
+        public:
+            void start() {
+                assert( _thread == NULL );
+                _keepRunning = true;
+                _thread = new boost::thread(boost::bind(&DurThread::run, this));
+            }
+
+            // This could wait up to 100ms
+            void waitForFinish() {
+                assert( _thread != NULL && _thread->joinable() );
+                _keepRunning = false;
+                _thread->join();
+
+                delete _thread;
+                _thread = NULL;
+            }
+
+        private:
+            void run() {
+                Client::initThread("dur");
+                const int HowOftenToGroupCommitMs = 100;
+                while( _keepRunning ) {
+                    try {
+                        int millis = HowOftenToGroupCommitMs;
+                        {
+                            Timer t;
+                            journalRotate(); // note we do this part outside of mongomutex
+                            millis -= t.millis();
+                            if( millis < 5 || millis > HowOftenToGroupCommitMs )
+                                millis = 5;
+                        }
+
+                        // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
+                        // but is likely also less spiky on our cpu usage, which is good:
+                        sleepmillis(millis/2);
+                        drainSome();
+                        sleepmillis(millis/2);
+                        drainSome();
+
+                        go();
+                        stats.rotate();
                     }
-
-                    // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
-                    // but is likely also less spiky on our cpu usage, which is good:
-                    sleepmillis(millis/2);
-                    drainSome();
-                    sleepmillis(millis/2);
-                    drainSome();
-
-                    go();
-                    stats.rotate();
-                }
-                catch(std::exception& e) {
-                    log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
-                    abort(); // based on myTerminate()
+                    catch(std::exception& e) {
+                        log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
+                        abort(); // based on myTerminate()
+                    }
                 }
             }
-        }
+
+            bool _keepRunning;
+            boost::thread* _thread; // NULL at startup
+        } durThread;
 
         void recover();
 
@@ -599,7 +610,26 @@ namespace mongo {
                 log() << "exception during recovery" << endl;
                 throw;
             }
-            boost::thread t(durThread);
+
+            durThread.start();
+        }
+
+        TempDisableDurability::TempDisableDurability() : _wasDur(cmdLine.dur) {
+            dbMutex.assertWriteLocked();
+            if (_wasDur) {
+                durThread.waitForFinish();
+                DurableInterface::disableDurability();
+                cmdLine.dur = false;
+            }
+        }
+
+        TempDisableDurability::~TempDisableDurability() {
+            dbMutex.assertWriteLocked();
+            if (_wasDur) {
+                cmdLine.dur = true;
+                DurableInterface::enableDurability();
+                durThread.start();
+            }
         }
 
     } // namespace dur
