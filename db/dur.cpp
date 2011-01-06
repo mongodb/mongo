@@ -593,12 +593,17 @@ namespace mongo {
             if (_wasDur) {
                 DurableInterface::disableDurability();
                 cmdLine.dur = false;
+
+                //SyncAndTruncate;
+                MongoFile::flushAll(true);
+                journalCleanup();
             }
         }
 
         TempDisableDurability::~TempDisableDurability() {
             dbMutex.assertWriteLocked();
             if (_wasDur) {
+                assert(!haveJournalFiles());
                 cmdLine.dur = true;
                 DurableInterface::enableDurability();
             }

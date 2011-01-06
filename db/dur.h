@@ -19,7 +19,7 @@ namespace mongo {
 
         class TempDisableDurability : boost::noncopyable {
         public:
-            TempDisableDurability();  // disables durability iff it is enabled
+            TempDisableDurability();  // disables durability and SyncAndTruncate iff it is enabled
             ~TempDisableDurability(); // enables durability iff constructor disabled it
         private:
             const bool _wasDur;
