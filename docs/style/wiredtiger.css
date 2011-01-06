@@ -58,7 +58,8 @@ span.legend {
 }
 
 h3.version {
-        font-size: 90%;
+	background: none;
+        font-size: 110%;
         text-align: center;
 }
 

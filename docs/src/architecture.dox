@@ -1,11 +1,12 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page architecture WiredTiger Architecture
-\image html architecture.png
-\image latex architecture.pdf "WiredTiger Architecture" height=12cm
+/*! @page architecture WiredTiger Architecture
+
+@image html architecture.png
+@image latex architecture.pdf "WiredTiger Architecture" height=12cm
 
 For more details about the WiredTiger architecture, see:
 
-- \subpage design
-- \subpage layout
+- @subpage design
+- @subpage filetypes
  */

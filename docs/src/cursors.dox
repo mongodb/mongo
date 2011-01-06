@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page cursors Cursors
+/*! @page cursors Cursors
 
 Most common operations in WiredTiger are performed using cursors.  A cursor includes:
 
@@ -9,7 +9,26 @@ Most common operations in WiredTiger are performed using cursors.  A cursor incl
 - encoding of fields to store in the data source
 - methods to navigate around and iterate through the data
 
-\section cursor_types Cursor Types
+@section cursor_ranges Positioning a Cursor
+
+- how to put a cursor where you want it
+- first, last, next, prev
+- position after an insert
+- position after errors
+
+@todo write text
+
+"On failure", cursor position is undetermined.  Apps that care need to either dup the cursor, or we could offer a config string that dups on all ops for you...
+
+@section cursor_writes Inserting and Updating
+
+@todo describe insert, update, append, insert-overwrite
+
+@section cursor_dups Duplicate Data Items
+
+@todo describe duplicate data items: how to insert them, how to navigate around them, etc.
+
+@section cursor_types Cursor Types
 
 The following are builtin cursor types:
 <table>
@@ -25,28 +44,30 @@ The following are builtin cursor types:
 <tr><td><tt>statistics:[table:\<tablename\>]</tt></td><td>database or table statistics (key=(string)keyname, data=(string)value)</td></tr>
 </table>
 
-\section cursor_projections Projections
+@section cursor_projections Projections
 
 Cursors on tables, column sets and indices can return a subset of columns.  This is done by listing the column names in parantheses in the <code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields from the listed columns are returned by WT_CURSOR::get_key and WT_CURSOR::get_value.
 
 This is particularly useful with index cursors, because if all columns in the projection are available in the index (including primary key columns, which are the values of the index), there is no need to access any column set.
 
-\section cursor_ranges Restricting the Range of a Scan
+@section cursor_ranges Restricting the Range of a Scan
 
-XXX
+@todo explain how to do a range scan
 
-\section cursor_examples Code Samples
+@section cursor_examples Code Samples
 
-The code below is taken from the complete example program \ex_ref{ex_cursor.c}.
+The code below is taken from the complete example program @ex_ref{ex_cursor.c}.
 
-\dontinclude ex_cursor.c
+@todo expand cursor example description
 
-\skipline open_cursor
+@dontinclude ex_cursor.c
 
-\skipline open_cursor
+@skipline open_cursor
 
-\skipline open_cursor
+@skipline open_cursor
 
-\skipline open_cursor
+@skipline open_cursor
+
+@skipline open_cursor
 
  */

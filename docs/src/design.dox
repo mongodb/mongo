@@ -1,10 +1,12 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page design WiredTiger Design
+/*! @page design WiredTiger Design
+
+@todo rewrite this to describe the WiredTiger architecture with minimal discussion of Berkeley DB.
 
 <h3>Major architectural differences from Berkeley DB:</h3>
-<ol>
 
+<ol>
 <li><b>Support for multi-core architectures</b>:
 architectures have 10's or 100's of cores, with multiple threads per
 core, and touching shared memory kills performance.  Berkeley DB's

@@ -1,30 +1,30 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page extending Extending WiredTiger
+/*! @page extending Extending WiredTiger
 
 - must be in C/C++
 
-\section modules Loadable Modules
+@section modules Loadable Modules
 
-XXX
+@todo describe loadable modules
 
-\section cursor_factory Adding Cursor Types
+@section cursor_factory Adding Cursor Types
 
-XXX
+@todo explain how to add cursor types
 
-\section collations Custom Collators
+@section collations Custom Collators
 
-XXX
+@todo explain custom collators
 
-\section extractors Custom Field Extractors
+@section extractors Custom Field Extractors
 
-XXX
+@todo explain custom extractors
 
-\section extending_example Code Samples
+@section extending_example Code Samples
 
-The code below is taken from the complete example program \ex_ref{ex_extending.c}.
+The code below is taken from the complete example program @ex_ref{ex_extending.c}.
 
-\dontinclude ex_extending.c
-\skip main
-\until ->close
+@dontinclude ex_extending.c
+@skip main
+@until ->close
  */

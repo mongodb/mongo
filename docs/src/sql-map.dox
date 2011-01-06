@@ -7,12 +7,12 @@ sit on top of WiredTiger, as they would on top of any key-value store.
 
 The difference with WiredTiger's API is that the query plan is going to be
 based on fundamental operations including:
-<ol>
-<li>sequential scan through a range;</li>
-<li>join (various flavors);</li>
-<li>sort (group by);</li>
-<li>projection, and so on.</li>
-</ol>
+
+# sequential scan through a range;
+# join (various flavors);
+# sort (group by);
+# projection, and so on.
+
 Those operations would be implemented as different WiredTiger cursor types,
 using WT_CONNECTION::add_cursor_factory.
 

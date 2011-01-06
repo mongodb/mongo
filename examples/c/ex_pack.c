@@ -1,7 +1,8 @@
 /*
- * ex_pack.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_pack.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
- * This is an example demonstrating some basic packing and unpacking.
+ * This is an example demonstrating basic packing and unpacking of fields.
  */
 
 #include <stdio.h>

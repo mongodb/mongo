@@ -1,5 +1,6 @@
 /*
- * ex_access.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_thread.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demonstrating how to create and access a simple table.
  */
@@ -52,8 +53,8 @@ int main()
 	    "key_format=S,value_format=S");
 	ret = session->open_cursor(session, "table:access",
 	    "overwrite", &cursor);
-	ret = cursor->set_key(cursor, "key1");
-	ret = cursor->set_value(cursor, "value1");
+	cursor->set_key(cursor, "key1");
+	cursor->set_value(cursor, "value1");
 	ret = cursor->insert(cursor);
 	ret = session->close(session, NULL);
 

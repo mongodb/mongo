@@ -1,5 +1,6 @@
 /*
- * ex_config.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_config.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demonstrating how to configure various database and table
  * properties.
@@ -28,9 +29,10 @@ int main()
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	session->create_table(session, "access", "key_format=S,value_format=S");
+	ret = session->create_table(session, "access",
+	    "key_format=S,value_format=S");
 
-	session->begin_transaction(session, "priority=100,name=mytxn");
+	ret = session->begin_transaction(session, "priority=100,name=mytxn");
 
 	ret = session->open_cursor(session, "config:", NULL, &cursor);
 

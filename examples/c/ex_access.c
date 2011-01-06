@@ -1,5 +1,6 @@
 /*
- * ex_access.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_access.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demonstrating how to create and access a simple table.
  */
@@ -32,8 +33,8 @@ int main()
 	    &cursor);
 
 	/* Insert a record. */
-	ret = cursor->set_key(cursor, "key1");
-	ret = cursor->set_value(cursor, "value1");
+	cursor->set_key(cursor, "key1");
+	cursor->set_value(cursor, "value1");
 	ret = cursor->insert(cursor);
 
 	/* Show all records. */

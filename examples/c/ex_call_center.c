@@ -1,5 +1,6 @@
 /*
- * ex_call_center.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_call_center.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example application that demonstrates how to map a moderately
  * complex SQL application into WiredTiger.
@@ -93,10 +94,9 @@ int main()
 	 */
 	ret = session->open_cursor(session,
 	    "index:cust_phone(id,name)", NULL, &cursor);
-	ret = cursor->set_key(cursor, "212-555-1000");
-	ret = cursor->search(cursor, &exact);
-	if (exact == 0)
-		ret = cursor->get_value(cursor, &cust.id, &cust.name);
+	cursor->set_key(cursor, "212-555-1000");
+	ret = cursor->search(cursor);
+	ret = cursor->get_value(cursor, &cust.id, &cust.name);
 	printf("Got customer record for %s\n", cust.name);
 	ret = cursor->close(cursor, NULL);
 
@@ -121,11 +121,11 @@ int main()
 	 * call date for a given cust_id.  Search for (cust_id+1,0), then work
 	 * backwards.
 	 */
-	ret = cursor->set_key(cursor, cust.id + 1, 0);
-	ret = cursor->search(cursor, &exact);
+	cursor->set_key(cursor, cust.id + 1, 0);
+	ret = cursor->search_near(cursor, &exact);
 
 	/*
-	 * If the table is empty, the search will return WT_NOTFOUND.
+	 * If the table is empty, search_near will return WT_NOTFOUND.
 	 * Otherwise the cursor will on a matching key if one exists, or on an
 	 * adjacent key.  If the key we find is equal or larger than the search
 	 * key, go back one.

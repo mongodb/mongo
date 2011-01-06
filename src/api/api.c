@@ -32,7 +32,15 @@ __cursor_prev(WT_CURSOR *cursor)
 }
 
 static int
-__cursor_search(WT_CURSOR *cursor, int *exact)
+__cursor_search(WT_CURSOR *cursor)
+{
+	int exact;
+	return (cursor->search_near(cursor, &exact) ||
+	    (exact != 0 ? WT_NOTFOUND : 0));
+}
+
+static int
+__cursor_search_near(WT_CURSOR *cursor, int *exact)
 {
 	return (ENOTSUP);
 }
@@ -65,6 +73,12 @@ __cursor_close(WT_CURSOR *cursor, const char *config)
 }
 
 static int
+__cursor_configure(WT_CURSOR *cursor, const char *config)
+{
+	return (ENOTSUP);
+}
+
+static int
 __session_close(WT_SESSION *session, const char *config)
 {
 	printf("WT_SESSION->close\n");
@@ -88,10 +102,12 @@ __session_open_cursor(WT_SESSION *session, const char *uri, const char *config, 
 		__cursor_next,
 		__cursor_prev,
 		__cursor_search,
+		__cursor_search_near,
 		__cursor_insert,
 		__cursor_update,
 		__cursor_del,
 		__cursor_close,
+		__cursor_configure,
 	};
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)malloc(sizeof(WT_CURSOR_STD));
 	WT_CURSOR *c = &cstd->interface;

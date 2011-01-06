@@ -33,13 +33,13 @@ __curstd_get_value(WT_CURSOR *cursor, ...)
 	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format, ap);
 }
 
-static int
+static void
 __curstd_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	va_list ap;
 	const char *fmt;
 	size_t sz;
-	va_list ap;
 		
 	va_start(ap, cursor);
 	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -52,10 +52,11 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 	}
 	stdc->key.data = stdc->keybuf;
 	stdc->key.size = sz;
-	return wiredtiger_struct_packv(stdc->keybuf, sz, fmt, ap);
+	if (wiredtiger_struct_packv(stdc->keybuf, sz, fmt, ap) == 0)
+		stdc->flags &= ~WT_CURSTD_BADKEY;
 }
 
-static int
+static void
 __curstd_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
@@ -74,7 +75,8 @@ __curstd_set_value(WT_CURSOR *cursor, ...)
 	}
 	stdc->value.data = stdc->valuebuf;
 	stdc->value.size = sz;
-	return wiredtiger_struct_packv(stdc->valuebuf, sz, fmt, ap);
+	if (wiredtiger_struct_packv(stdc->valuebuf, sz, fmt, ap) == 0)
+		stdc->flags &= ~WT_CURSTD_BADVALUE;
 }
 
 void
@@ -91,6 +93,8 @@ __wt_curstd_init(WT_CURSOR_STD *stdc)
 	stdc->keybufsz = 0;
 	stdc->value.data = stdc->valuebuf = NULL;
 	stdc->valuebufsz = 0;
+
+	stdc->flags = WT_CURSTD_BADKEY | WT_CURSTD_BADVALUE;
 }
 
 void

@@ -1,5 +1,6 @@
 /*
- * ex_extending.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_extending.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demonstrating ways to extend WiredTiger with extractors,
  * collators and loadable modules.

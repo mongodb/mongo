@@ -197,6 +197,14 @@ class Iface:
     """
     pass
 
+  def search_near(self, cursor, record):
+    """
+    Parameters:
+     - cursor
+     - record
+    """
+    pass
+
   def insert_record(self, cursor, record):
     """
     Parameters:
@@ -221,6 +229,14 @@ class Iface:
     pass
 
   def close_cursor(self, cursor, config):
+    """
+    Parameters:
+     - cursor
+     - config
+    """
+    pass
+
+  def configure_cursor(self, cursor, config):
     """
     Parameters:
      - cursor
@@ -987,6 +1003,40 @@ class Client(Iface):
       raise result.err
     raise TApplicationException(TApplicationException.MISSING_RESULT, "search failed: unknown result");
 
+  def search_near(self, cursor, record):
+    """
+    Parameters:
+     - cursor
+     - record
+    """
+    self.send_search_near(cursor, record)
+    return self.recv_search_near()
+
+  def send_search_near(self, cursor, record):
+    self._oprot.writeMessageBegin('search_near', TMessageType.CALL, self._seqid)
+    args = search_near_args()
+    args.cursor = cursor
+    args.record = record
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_search_near(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = search_near_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.err != None:
+      raise result.err
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "search_near failed: unknown result");
+
   def insert_record(self, cursor, record):
     """
     Parameters:
@@ -1115,6 +1165,38 @@ class Client(Iface):
       raise result.err
     return
 
+  def configure_cursor(self, cursor, config):
+    """
+    Parameters:
+     - cursor
+     - config
+    """
+    self.send_configure_cursor(cursor, config)
+    self.recv_configure_cursor()
+
+  def send_configure_cursor(self, cursor, config):
+    self._oprot.writeMessageBegin('configure_cursor', TMessageType.CALL, self._seqid)
+    args = configure_cursor_args()
+    args.cursor = cursor
+    args.config = config
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_configure_cursor(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = configure_cursor_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.err != None:
+      raise result.err
+    return
+
 
 class Processor(Iface, TProcessor):
   def __init__(self, handler):
@@ -1143,10 +1225,12 @@ class Processor(Iface, TProcessor):
     self._processMap["move_next"] = Processor.process_move_next
     self._processMap["move_prev"] = Processor.process_move_prev
     self._processMap["search"] = Processor.process_search
+    self._processMap["search_near"] = Processor.process_search_near
     self._processMap["insert_record"] = Processor.process_insert_record
     self._processMap["update_record"] = Processor.process_update_record
     self._processMap["delete_record"] = Processor.process_delete_record
     self._processMap["close_cursor"] = Processor.process_close_cursor
+    self._processMap["configure_cursor"] = Processor.process_configure_cursor
 
   def process(self, iprot, oprot):
     (name, type, seqid) = iprot.readMessageBegin()
@@ -1476,6 +1560,20 @@ class Processor(Iface, TProcessor):
     oprot.writeMessageEnd()
     oprot.trans.flush()
 
+  def process_search_near(self, seqid, iprot, oprot):
+    args = search_near_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = search_near_result()
+    try:
+      result.success = self._handler.search_near(args.cursor, args.record)
+    except WT_ERROR, err:
+      result.err = err
+    oprot.writeMessageBegin("search_near", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
   def process_insert_record(self, seqid, iprot, oprot):
     args = insert_record_args()
     args.read(iprot)
@@ -1528,6 +1626,20 @@ class Processor(Iface, TProcessor):
     except WT_ERROR, err:
       result.err = err
     oprot.writeMessageBegin("close_cursor", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_configure_cursor(self, seqid, iprot, oprot):
+    args = configure_cursor_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = configure_cursor_result()
+    try:
+      self._handler.configure_cursor(args.cursor, args.config)
+    except WT_ERROR, err:
+      result.err = err
+    oprot.writeMessageBegin("configure_cursor", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -4644,6 +4756,150 @@ class search_result:
   def __ne__(self, other):
     return not (self == other)
 
+class search_near_args:
+  """
+  Attributes:
+   - cursor
+   - record
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I32, 'cursor', None, None, ), # 1
+    (2, TType.STRUCT, 'record', (WT_RECORD, WT_RECORD.thrift_spec), None, ), # 2
+  )
+
+  def __init__(self, cursor=None, record=None,):
+    self.cursor = cursor
+    self.record = record
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I32:
+          self.cursor = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.record = WT_RECORD()
+          self.record.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('search_near_args')
+    if self.cursor != None:
+      oprot.writeFieldBegin('cursor', TType.I32, 1)
+      oprot.writeI32(self.cursor)
+      oprot.writeFieldEnd()
+    if self.record != None:
+      oprot.writeFieldBegin('record', TType.STRUCT, 2)
+      self.record.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+    def validate(self):
+      return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class search_near_result:
+  """
+  Attributes:
+   - success
+   - err
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (WT_MOVE_RESULT, WT_MOVE_RESULT.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
+  )
+
+  def __init__(self, success=None, err=None,):
+    self.success = success
+    self.err = err
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = WT_MOVE_RESULT()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.err = WT_ERROR()
+          self.err.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('search_near_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.err != None:
+      oprot.writeFieldBegin('err', TType.STRUCT, 1)
+      self.err.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+    def validate(self):
+      return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class insert_record_args:
   """
   Attributes:
@@ -5147,6 +5403,137 @@ class close_cursor_result:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('close_cursor_result')
+    if self.err != None:
+      oprot.writeFieldBegin('err', TType.STRUCT, 1)
+      self.err.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+    def validate(self):
+      return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class configure_cursor_args:
+  """
+  Attributes:
+   - cursor
+   - config
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I32, 'cursor', None, None, ), # 1
+    (2, TType.STRING, 'config', None, None, ), # 2
+  )
+
+  def __init__(self, cursor=None, config=None,):
+    self.cursor = cursor
+    self.config = config
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I32:
+          self.cursor = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.config = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('configure_cursor_args')
+    if self.cursor != None:
+      oprot.writeFieldBegin('cursor', TType.I32, 1)
+      oprot.writeI32(self.cursor)
+      oprot.writeFieldEnd()
+    if self.config != None:
+      oprot.writeFieldBegin('config', TType.STRING, 2)
+      oprot.writeString(self.config)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+    def validate(self):
+      return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class configure_cursor_result:
+  """
+  Attributes:
+   - err
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
+  )
+
+  def __init__(self, err=None,):
+    self.err = err
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.err = WT_ERROR()
+          self.err.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('configure_cursor_result')
     if self.err != None:
       oprot.writeFieldBegin('err', TType.STRUCT, 1)
       self.err.write(oprot)

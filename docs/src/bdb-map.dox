@@ -1,7 +1,7 @@
 /* vim: set filetype=c.doxygen : */
 
 /*!
- * \defgroup bdbmap WiredTiger for Berkeley DB developers
+ * @defgroup bdbmap WiredTiger for Berkeley DB developers
  *
  * The section explains how to map Oracle Berkeley DB operations onto the
  * WiredTiger API.
@@ -338,7 +338,7 @@ struct DB_LOGC {
 
 /*! Log statistics structure.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b>
  */
 struct DB_LOG_STAT {
 	u_int32_t st_magic;		/*!< Log file magic number. */
@@ -407,7 +407,7 @@ typedef const struct __log_rec_spec {
  *******************************************************/
 /*! Priority values for DB_MPOOLFILE::put, DB_MPOOLFILE::set_priority.
  *
- * <b>Not part of the public WiredTiger API, may be supported via \p config parameter to WT_SESSION::open_cursor.</b>
+ * <b>Not part of the public WiredTiger API, may be supported via @p config parameter to WT_SESSION::open_cursor.</b>
  */
 typedef enum {
 	DB_PRIORITY_UNCHANGED=0,
@@ -468,7 +468,7 @@ struct DB_MPOOLFILE {
 
 /*! Mpool statistics structure.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b>
  */
 struct DB_MPOOL_STAT {
 	u_int32_t st_gbytes;		/*!< Total cache size: GB. */
@@ -520,7 +520,7 @@ struct DB_MPOOL_STAT {
 
 /*! Mpool file statistics structure.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b>
  */
 struct DB_MPOOL_FSTAT {
 	char *file_name;		/*!< File name. */
@@ -567,9 +567,9 @@ struct DB_TXN {
 	u_int32_t id(DB_TXN *);	/*!< <b>Not implemented.</b> */
 	int	  prepare(DB_TXN *, u_int8_t *); /*!< <b>Not required (XA)</b> */
 	int	  set_commit_token(DB_TXN *, DB_TXN_TOKEN *); /*!< <b>Not required (replication)<b> */
-	int	  set_name(DB_TXN *, const char *); /*!< <b>\p config parameter <tt>"name=\<name\>"</tt> to WT_SESSION::begin_transaction</b> */
-	int	  set_priority(DB_TXN *, u_int32_t); /*!< <b>\p config parameter <tt>"priority=\<priority\>"</tt> to WT_SESSION::begin_transaction</b> */
-	int	  set_timeout(DB_TXN *, db_timeout_t, u_int32_t); /*!< <b>\p config parameter <tt>"timeout=\<timeout\>"</tt> to WT_SESSION::begin_transaction</b> */
+	int	  set_name(DB_TXN *, const char *); /*!< <b>@p config parameter <tt>"name=\<name\>"</tt> to WT_SESSION::begin_transaction</b> */
+	int	  set_priority(DB_TXN *, u_int32_t); /*!< <b>@p config parameter <tt>"priority=\<priority\>"</tt> to WT_SESSION::begin_transaction</b> */
+	int	  set_timeout(DB_TXN *, db_timeout_t, u_int32_t); /*!< <b>@p config parameter <tt>"timeout=\<timeout\>"</tt> to WT_SESSION::begin_transaction</b> */
 	/* DB_TXN PUBLIC HANDLE LIST END */
 
 #define	TXN_CHILDCOMMIT		0x00001	/*!< Txn has committed. */
@@ -609,7 +609,7 @@ struct DB_PREPLIST {
 
 /*! Statistics for an active transaction.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b>
  */
 struct DB_TXN_ACTIVE {
 	u_int32_t txnid;		/*!< Transaction ID */
@@ -636,7 +636,7 @@ struct DB_TXN_ACTIVE {
 
 /*! Transaction manager statistics structure.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b>
  */
 struct DB_TXN_STAT {
 	u_int32_t st_nrestores;		/*!< number of restored transactions
@@ -861,7 +861,7 @@ struct DB_REPMGR_STAT {
  */
 struct DB_SEQ_RECORD {
 	u_int32_t	seq_version;	/*!< Version size/number. */
-	u_int32_t	flags;		/*!< DB_SEQ_XXX Flags. */
+	u_int32_t	flags;		/*!< DB_SEQ_* Flags. */
 	db_seq_t	seq_value;	/*!< Current value. */
 	db_seq_t	seq_max;	/*!< Max permitted. */
 	db_seq_t	seq_min;	/*!< Min permitted. */
@@ -870,7 +870,7 @@ struct DB_SEQ_RECORD {
 /*!
  * Handle for a sequence object.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "sequence:<seqname>"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "sequence:<seqname>"</b>
  */
 struct DB_SEQUENCE {
 	/* DB_SEQUENCE PUBLIC HANDLE LIST BEGIN */
@@ -881,20 +881,20 @@ struct DB_SEQUENCE {
 	int		get_flags(DB_SEQUENCE *, u_int32_t *);	/*!< <b>Not implemented (getter).</b> */
 	int		get_key(DB_SEQUENCE *, DBT *);	/*!< <b>Not implemented (getter)</b> */
 	int		get_range(DB_SEQUENCE *, db_seq_t *, db_seq_t *);	/*!< <b>Not implemented (getter).</b> */
-	int		initial_value(DB_SEQUENCE *, db_seq_t);	/*!< <b>Set via \p config parameter of WT_SESSION::open_cursor: <tt>"initial_value=\<x\>"</tt></b> */
+	int		initial_value(DB_SEQUENCE *, db_seq_t);	/*!< <b>Set via @p config parameter of WT_SESSION::open_cursor: <tt>"initial_value=\<x\>"</tt></b> */
 	int		open(DB_SEQUENCE *, DB_TXN *, DBT *, u_int32_t);	/*!< <b>WT_SESSION::open_cursor</b> */
 	int		remove(DB_SEQUENCE *, DB_TXN *, u_int32_t);	/*!< <b>WT_CURSOR::del on the sequences cursor</b> */
-	int		set_cachesize(DB_SEQUENCE *, int32_t);	/*!< <b>Set via the \p config parameter of WT_SESSION::open_cursor: <tt>"cachesize=\<x\>"</tt></b> */
-	int		set_flags(DB_SEQUENCE *, u_int32_t);	/*!< <b>Set via the \p config parameter of  WT_SESSION::open_cursor</b> */
+	int		set_cachesize(DB_SEQUENCE *, int32_t);	/*!< <b>Set via the @p config parameter of WT_SESSION::open_cursor: <tt>"cachesize=\<x\>"</tt></b> */
+	int		set_flags(DB_SEQUENCE *, u_int32_t);	/*!< <b>Set via the @p config parameter of  WT_SESSION::open_cursor</b> */
 	int		set_range(DB_SEQUENCE *, db_seq_t, db_seq_t);	/*!< <b>WT_CURSOR::close</b> */
-	int		stat(DB_SEQUENCE *, DB_SEQUENCE_STAT **, u_int32_t);	/*!< <b>WT_SESSION::open_cursor with the URI \p "statistics:sequence:<seqname>" */
+	int		stat(DB_SEQUENCE *, DB_SEQUENCE_STAT **, u_int32_t);	/*!< <b>WT_SESSION::open_cursor with the URI @p "statistics:sequence:<seqname>" */
 	int		stat_print(DB_SEQUENCE *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	/* DB_SEQUENCE PUBLIC HANDLE LIST END */
 };
 
 /*! Sequence statistics.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:sequence:"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:sequence:"</b>
  */
 struct DB_SEQUENCE_STAT {
 	uintmax_t st_wait;		/*!< Sequence lock granted w/o wait. */
@@ -913,7 +913,7 @@ struct DB_SEQUENCE_STAT {
  *******************************************************/
 /*! Database types
  *
- * <b>Passed in \p config parameter to WT_SESSION::create_table.</b>
+ * <b>Passed in @p config parameter to WT_SESSION::create_table.</b>
  */
 typedef enum {
 	DB_BTREE=1,
@@ -935,9 +935,9 @@ enum {
 	DB_CONSUME_WAIT,	/*!< DB::get, <b>not needed in WiredTiger: no queue.</b> */
 	DB_CURRENT,	/*!< DBC::get, DBC::put, DB_LOGC::get <b>WT_CURRENT</b> */
 	DB_FIRST,	/*!< DBC::get, DB_LOGC::get <b>WT_FIRST</b> */
-	DB_GET_BOTH,	/*!< DB::get, DBC::get <b>WT_CURSOR::search with non-NULL \p value parameter</b> */
+	DB_GET_BOTH,	/*!< DB::get, DBC::get <b>WT_CURSOR::search with non-NULL @p value parameter</b> */
 	DB_GET_BOTHC,	/*!< DBC::get (internal) <b>N/A</b> */
-	DB_GET_BOTH_RANGE,	/*!< DB::get, DBC::get <b>WT_CURSOR::search with non-NULL \p value parameter, returned as <tt>result != WT_CURRENT</tt>. */
+	DB_GET_BOTH_RANGE,	/*!< DB::get, DBC::get <b>WT_CURSOR::search with non-NULL @p value parameter, returned as <tt>result != WT_CURRENT</tt>. */
 	DB_GET_RECNO,	/*!< DBC::get <b>N/A for WiredTiger: no DB_RECNUM equivalent.</b> */
 	DB_JOIN_ITEM,	/*!< DBC::get; don't do primary lookup <b>Special join cursor</b> */
 	DB_KEYFIRST,	/*!< DBC::put <b>not needed in WiredTiger: no unsorted dups.</b> */
@@ -945,14 +945,14 @@ enum {
 	DB_LAST,	/*!< DBC::get, DB_LOGC::get, <b>WT_LAST</b> */
 	DB_NEXT,	/*!< DBC::get, DB_LOGC::get, <b>WT_NEXT</b> */
 	DB_NEXT_DUP,	/*!< DBC::get, <b>default behavior or WT_NEXT</b> */
-	DB_NEXT_NODUP,	/*!< DBC::get, <b>WT_NEXT with \p "nodup" config to WT_SESSION::open_cursor</b>. */
-	DB_NODUPDATA,	/*!< DB::put, DBC::put, <b>WT_CURSOR::insert with \p "nodup" config to WT_SESSION::open_cursor</b> */
+	DB_NEXT_NODUP,	/*!< DBC::get, <b>WT_NEXT with @p "nodup" config to WT_SESSION::open_cursor</b>. */
+	DB_NODUPDATA,	/*!< DB::put, DBC::put, <b>WT_CURSOR::insert with @p "nodup" config to WT_SESSION::open_cursor</b> */
 	DB_NOOVERWRITE,	/*!< DB::put <b>default behavior of WT_CURSOR::insert</b> */
 	DB_OVERWRITE_DUP,	/*!< DBC::put, DB::put; no DB_KEYEXIST <b>WT_CURSOR::update</b> */
 	DB_POSITION,	/*!< DBC::dup <b>default behavior of WT_SESSION::dup_cursor.</b> */
 	DB_PREV,	/*!< DBC::get, DB_LOGC::get <b>WT_PREV</b> */
 	DB_PREV_DUP,	/*!< DBC::get <b>default behavior of WT_PREV</b> */
-	DB_PREV_NODUP,	/*!< DBC::get <b>WT_PREV with \p "nodup" config to WT_SESSION::open_cursor</b> */
+	DB_PREV_NODUP,	/*!< DBC::get <b>WT_PREV with @p "nodup" config to WT_SESSION::open_cursor</b> */
 	DB_SET,	/*!< DBC::get, DB_LOGC::get <b>WT_CURSOR::search default</b> */
 	DB_SET_RANGE,	/*!< DBC::get <b>WT_CURSOR::search returns <tt>result != DB_CURRENT</tt></b> */
 	DB_SET_RECNO,	/*!< DB::get, DBC::get <b>N/A for WiredTiger: no DB_RECNUM equivalent.</b> */
@@ -1087,15 +1087,15 @@ struct DB {
 	int  set_bt_compress(DB *, int (DB *, const DBT *, const DBT *, const DBT *, const DBT *, DBT *), int (DB *, const DBT *, const DBT *, DBT *, DBT *, DBT *)); /*!< <b>Special cursor type</b> */
 	int  set_bt_minkey(DB *, u_int32_t); /*!< <b>Not implemented?</b> */
 	int  set_bt_prefix(DB *, size_t (DB *, const DBT *, const DBT *)); /*!< <b>Not implemented?</b> */
-	int  set_cachesize(DB *, u_int32_t, u_int32_t, int); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  set_create_dir(DB *, const char *); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
+	int  set_cachesize(DB *, u_int32_t, u_int32_t, int); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  set_create_dir(DB *, const char *); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
 	int  set_dup_compare(DB *, int (DB *, const DBT *, const DBT *)); /*!< <b>WT_SCHEMA::dup_cmp</b> */
 	int  set_encrypt(DB *, const char *, u_int32_t); /*!< <b>Not implemented.</b> */
 	void set_errcall(DB *, void (const DB_ENV *, const char *, const char *)); /*!< <b>set WT_SESSION::handle_error</b> */
 	void set_errfile(DB *, FILE *); /*!< <b>Not implemented.</b> */
 	void set_errpfx(DB *, const char *); /*!< <b>Not implemented.</b> */
 	int  set_feedback(DB *, void (DB *, int, int)); /*!< <b>Not implemented.</b> */
-	int  set_flags(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
+	int  set_flags(DB *, u_int32_t); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
 	int  set_h_compare(DB *, int (DB *, const DBT *, const DBT *)); /*!< <b>Not implemented (hash).</b> */
 	int  set_h_ffactor(DB *, u_int32_t); /*!< <b>Not implemented (hash).</b> */
 	int  set_h_hash(DB *, u_int32_t (DB *, const void *, u_int32_t)); /*!< <b>Not implemented (hash).</b> */
@@ -1103,18 +1103,18 @@ struct DB {
 	int  set_lorder(DB *, int); /*!< <b>Not implemented (fixed byte order).</b> */
 	void set_msgcall(DB *, void (const DB_ENV *, const char *)); /*!< <b>Not implemented.</b> */
 	void set_msgfile(DB *, FILE *); /*!< <b>Not implemented.</b> */
-	int  set_pagesize(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
+	int  set_pagesize(DB *, u_int32_t); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
 	int  set_paniccall(DB *, void (DB_ENV *, int)); /*!< <b>Not implemented?</b> */
 	int  set_partition(DB *, u_int32_t, DBT *, u_int32_t (DB *, DBT *key)); /*!< <b>Special cursor type</b> */
 	int  set_partition_dirs(DB *, const char **); /*!< <b>Special cursor type</b> */
-	int  set_priority(DB *, DB_CACHE_PRIORITY); /*!< <b>\p config parameter to WT_SESSION::open_cursor</b> */
+	int  set_priority(DB *, DB_CACHE_PRIORITY); /*!< <b>@p config parameter to WT_SESSION::open_cursor</b> */
 	int  set_q_extentsize(DB *, u_int32_t); /*!< <b>Not implemented (queue).</b> */
 	int  set_re_delim(DB *, int); /*!< <b>Not implemented (recno).</b> */
-	int  set_re_len(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
-	int  set_re_pad(DB *, int); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
+	int  set_re_len(DB *, u_int32_t); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
+	int  set_re_pad(DB *, int); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
 	int  set_re_source(DB *, const char *); /*!< <b>Not implemented (recno).</b> */
 	int  sort_multiple(DB *, DBT *, DBT *, u_int32_t); /*!< <b>Not implemented directly, could be via a bulk cursor.</b> */
-	int  stat(DB *, DB_TXN *, void *, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:table:<tablename>"</b> */
+	int  stat(DB *, DB_TXN *, void *, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:table:<tablename>"</b> */
 	int  stat_print(DB *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	int  sync(DB *, u_int32_t); /*!< <b>Not implemented.  Could be WT_SESSION::sync if needed later.</b> */
 	int  truncate(DB *, DB_TXN *, u_int32_t *, u_int32_t); /*!< <b>WT_SESSION::truncate_table</b> */
@@ -1359,9 +1359,9 @@ struct DBC {
 	int dup(DBC *, DBC **, u_int32_t); /*!< <b>WT_SESSION::dup_cursor</b> */
 	int get(DBC *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::get and WT_CURSOR::search</b> */
 	int get_priority(DBC *, DB_CACHE_PRIORITY *); /*!< <b>Not implemented.</b> */
-	int pget(DBC *, DBT *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::get with \p config parameter to WT_SESSION::open_cursor</b> */
+	int pget(DBC *, DBT *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::get with @p config parameter to WT_SESSION::open_cursor</b> */
 	int put(DBC *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::insert and WT_CURSOR::update</b> */
-	int set_priority(DBC *, DB_CACHE_PRIORITY); /*!< <b>\p config parameter to WT_SESSION::open_cursor</b> */
+	int set_priority(DBC *, DB_CACHE_PRIORITY); /*!< <b>@p config parameter to WT_SESSION::open_cursor</b> */
 	/* DBC PUBLIC HANDLE LIST END */
 
 /*
@@ -1405,7 +1405,7 @@ struct DB_KEY_RANGE {
 
 /*! Btree/Recno statistics structure.
  *
- * <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:table:<tablename>"</b>
+ * <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:table:<tablename>"</b>
  */
 struct DB_BTREE_STAT {
 	u_int32_t bt_magic;		/*!< Magic number. */
@@ -1536,7 +1536,7 @@ struct DB_ENV {
 	u_int32_t flags;
 
 	/* DB_ENV PUBLIC HANDLE LIST BEGIN */
-	int  add_data_dir(DB_ENV *, const char *); /*!< <b>\p "config:" cursor</b> */
+	int  add_data_dir(DB_ENV *, const char *); /*!< <b>@p "config:" cursor</b> */
 	int  cdsgroup_begin(DB_ENV *, DB_TXN **); /*!< <b>Not implemented (CDS).</b> */
 	int  close(DB_ENV *, u_int32_t);
 	int  dbremove(DB_ENV *, DB_TXN *, const char *, const char *, u_int32_t);
@@ -1548,23 +1548,23 @@ struct DB_ENV {
 	int  get_alloc(DB_ENV *, void **(size_t, void **(void *, size_t), void *(void *))); /*!< <b>Not implemented (getter).</b> */
 	int  get_app_dispatch(DB_ENV *, int *(DB_ENV *, DBT *, DB_LSN *, db_recops)); /*!< <b>Not implemented (getter).</b> */
 	int  get_cache_max(DB_ENV *, u_int32_t *, u_int32_t *); /*!< <b>Not required.</b> */
-	int  get_cachesize(DB_ENV *, u_int32_t *, u_int32_t *, int *); /*!< <b>\p "config:" cursor</b> */
-	int  get_create_dir(DB_ENV *, const char **); /*!< <b>\p "config:" cursor</b> */
-	int  get_data_dirs(DB_ENV *, const char ***); /*!< <b>\p "config:" cursor</b> */
+	int  get_cachesize(DB_ENV *, u_int32_t *, u_int32_t *, int *); /*!< <b>@p "config:" cursor</b> */
+	int  get_create_dir(DB_ENV *, const char **); /*!< <b>@p "config:" cursor</b> */
+	int  get_data_dirs(DB_ENV *, const char ***); /*!< <b>@p "config:" cursor</b> */
 	int  get_data_len(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  get_encrypt_flags(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	void get_errcall(DB_ENV *, void *(const DB_ENV *, const char *, const char *)); /*!< <b>Not implemented.</b> */
 	void get_errfile(DB_ENV *, FILE **); /*!< <b>Not implemented.</b> */
 	void get_errpfx(DB_ENV *, const char **); /*!< <b>Not implemented.</b> */
-	int  get_flags(DB_ENV *, u_int32_t *); /*!< <b>\p "config:" cursor</b> */
+	int  get_flags(DB_ENV *, u_int32_t *); /*!< <b>@p "config:" cursor</b> */
 	int  get_feedback(DB_ENV *, void *(DB_ENV *, int, int)); /*!< <b>Not implemented.</b> */
 	int  get_home(DB_ENV *, const char **); /*!< <b>WT_CONNECTION::home</b> */
 	int  get_intermediate_dir_mode(DB_ENV *, const char **); /*!< <b>Not implemented.</b> */
 	int  get_isalive(DB_ENV *, int *(DB_ENV *, pid_t, db_threadid_t, u_int32_t)); /*!< <b>Not implemented.</b> */
-	int  get_lg_bsize(DB_ENV *, u_int32_t *); /*!< <b>\p "config:" cursor</b> */
-	int  get_lg_dir(DB_ENV *, const char **); /*!< <b>\p "config:" cursor</b> */
+	int  get_lg_bsize(DB_ENV *, u_int32_t *); /*!< <b>@p "config:" cursor</b> */
+	int  get_lg_dir(DB_ENV *, const char **); /*!< <b>@p "config:" cursor</b> */
 	int  get_lg_filemode(DB_ENV *, int *); /*!< <b>Not implemented.</b> */
-	int  get_lg_max(DB_ENV *, u_int32_t *) /*!< <b>\p "config:" cursor</b> */;
+	int  get_lg_max(DB_ENV *, u_int32_t *) /*!< <b>@p "config:" cursor</b> */;
 	int  get_lg_regionmax(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  get_lk_conflicts(DB_ENV *, const u_int8_t **, int *); /*!< <b>Not implemented.</b> */
 	int  get_lk_detect(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
@@ -1574,50 +1574,50 @@ struct DB_ENV {
 	int  get_lk_partitions(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  get_lk_priority(DB_ENV *, u_int32_t, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  get_mp_max_openfd(DB_ENV *, int *); /*!< <b>Not implemented.</b> */
-	int  get_mp_max_write(DB_ENV *, int *, db_timeout_t *); /*!< <b>\p "config:" cursor</b> */
+	int  get_mp_max_write(DB_ENV *, int *, db_timeout_t *); /*!< <b>@p "config:" cursor</b> */
 	int  get_mp_mmapsize(DB_ENV *, size_t *); /*!< <b>Not implemented.</b> */
 	int  get_mp_mtxcount(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  get_mp_pagesize(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  get_mp_tablesize(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	void get_msgcall(DB_ENV *, void *(const DB_ENV *, const char *)); /*!< <b>Not implemented.</b> */
 	void get_msgfile(DB_ENV *, FILE **); /*!< <b>Not implemented.</b> */
-	int  get_open_flags(DB_ENV *, u_int32_t *); /*!< <b>\p "config:" cursor</b> */
+	int  get_open_flags(DB_ENV *, u_int32_t *); /*!< <b>@p "config:" cursor</b> */
 	int  get_shm_key(DB_ENV *, long *); /*!< <b>Not implemented.</b> */
-	int  get_thread_count(DB_ENV *, u_int32_t *); /*!< <b>\p "config:" cursor</b> */
+	int  get_thread_count(DB_ENV *, u_int32_t *); /*!< <b>@p "config:" cursor</b> */
 	int  get_thread_id_fn(DB_ENV *, void *(DB_ENV *, pid_t *, db_threadid_t *)); /*!< <b>Not implemented.</b> */
 	int  get_thread_id_string_fn(DB_ENV *, char **(DB_ENV *, pid_t, db_threadid_t, char *)); /*!< <b>Not implemented.</b> */
-	int  get_timeout(DB_ENV *, db_timeout_t *, u_int32_t); /*!< <b>\p "config:" cursor</b> */
-	int  get_tmp_dir(DB_ENV *, const char **); /*!< <b>\p "config:" cursor</b> */
-	int  get_tx_max(DB_ENV *, u_int32_t *); /*!< <b>\p "config:" cursor</b> */
-	int  get_tx_timestamp(DB_ENV *, time_t *); /*!< <b>\p "config:" cursor</b> */
-	int  get_verbose(DB_ENV *, u_int32_t, int *); /*!< <b>\p "config:" cursor</b> */
+	int  get_timeout(DB_ENV *, db_timeout_t *, u_int32_t); /*!< <b>@p "config:" cursor</b> */
+	int  get_tmp_dir(DB_ENV *, const char **); /*!< <b>@p "config:" cursor</b> */
+	int  get_tx_max(DB_ENV *, u_int32_t *); /*!< <b>@p "config:" cursor</b> */
+	int  get_tx_timestamp(DB_ENV *, time_t *); /*!< <b>@p "config:" cursor</b> */
+	int  get_verbose(DB_ENV *, u_int32_t, int *); /*!< <b>@p "config:" cursor</b> */
 	int  is_bigendian(void); /*!< <b>Not implemented.</b> */
 	int  lock_detect(DB_ENV *, u_int32_t, u_int32_t, int *); /*!< <b>Not implemented.</b> */
 	int  lock_get(DB_ENV *, u_int32_t, u_int32_t, DBT *, db_lockmode_t, DB_LOCK *); /*!< <b>Not implemented.</b> */
 	int  lock_id(DB_ENV *, u_int32_t *); /*!< <b>Not implemented.</b> */
 	int  lock_id_free(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int  lock_put(DB_ENV *, DB_LOCK *); /*!< <b>Not implemented.</b> */
-	int  lock_stat(DB_ENV *, DB_LOCK_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b> */
+	int  lock_stat(DB_ENV *, DB_LOCK_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b> */
 	int  lock_stat_print(DB_ENV *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	int  lock_vec(DB_ENV *, u_int32_t, u_int32_t, DB_LOCKREQ *, int, DB_LOCKREQ **); /*!< <b>Not implemented.</b> */
 	int  log_archive(DB_ENV *, char **[], u_int32_t); /*!< <b>WT_SESSION::checkpoint</b> */
 	int  log_cursor(DB_ENV *, DB_LOGC **, u_int32_t); /*!< <b>Not implemented, but could be a special cursor type.</b> */
 	int  log_file(DB_ENV *, const DB_LSN *, char *, size_t); /*!< <b>Not implemented.</b> */
 	int  log_flush(DB_ENV *, const DB_LSN *); /*!< <b>WT_SESSION::checkpoint</b> */
-	int  log_get_config(DB_ENV *, u_int32_t, int *); /*!< <b>\p "config:" cursor</b> */
+	int  log_get_config(DB_ENV *, u_int32_t, int *); /*!< <b>@p "config:" cursor</b> */
 	int  log_printf(DB_ENV *, DB_TXN *, const char *, ...); /*!< <b>Not implemented, but could be a log cursor insert.</b> */
 	int  log_put(DB_ENV *, DB_LSN *, const DBT *, u_int32_t); /*!< <b>Not implemented, but could be a log cursor insert.</b> */
 	int  log_put_record(DB_ENV *, DB *, DB_TXN *, DB_LSN *, u_int32_t, u_int32_t, u_int32_t, u_int32_t, DB_LOG_RECSPEC *, ...); /*!< <b>Not implemented.</b> */
 	int  log_read_record(DB_ENV *, DB **, void *, void *, DB_LOG_RECSPEC *, u_int32_t, void **); /*!< <b>Not implemented.</b> */
-	int  log_set_config(DB_ENV *, u_int32_t, int); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  log_stat(DB_ENV *, DB_LOG_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b> */
+	int  log_set_config(DB_ENV *, u_int32_t, int); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  log_stat(DB_ENV *, DB_LOG_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b> */
 	int  log_stat_print(DB_ENV *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	int  log_verify(DB_ENV *, const DB_LOG_VERIFY_CONFIG *);
 	int  lsn_reset(DB_ENV *, const char *, u_int32_t);
 	int  memp_fcreate(DB_ENV *, DB_MPOOLFILE **, u_int32_t);
 	int  memp_register(DB_ENV *, int, int (*(DB_ENV *, db_pgno_t,
 		void *, DBT *), int (DB_ENV *, db_pgno_t, void *, DBT *)));
-	int  memp_stat(DB_ENV *, DB_MPOOL_STAT **, DB_MPOOL_FSTAT ***, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b> */
+	int  memp_stat(DB_ENV *, DB_MPOOL_STAT **, DB_MPOOL_FSTAT ***, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b> */
 	int  memp_stat_print(DB_ENV *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	int  memp_sync(DB_ENV *, DB_LSN *); /*!< <b>WT_SESSION::checkpoint</b> */
 	int  memp_trickle(DB_ENV *, int, int *);
@@ -1632,7 +1632,7 @@ struct DB_ENV {
 	int  mutex_set_increment(DB_ENV *, u_int32_t);
 	int  mutex_set_max(DB_ENV *, u_int32_t);
 	int  mutex_set_tas_spins(DB_ENV *, u_int32_t);
-	int  mutex_stat(DB_ENV *, DB_MUTEX_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b> */
+	int  mutex_stat(DB_ENV *, DB_MUTEX_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b> */
 	int  mutex_stat_print(DB_ENV *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	int  mutex_unlock(DB_ENV *, db_mutex_t);
 	int  open(DB_ENV *, const char *, u_int32_t, int);
@@ -1671,9 +1671,9 @@ struct DB_ENV {
 	int  set_alloc(DB_ENV *, void *(size_t, void *(void *, size_t), void (void *))); /*!< <b>Not implemented (OS interface)</b> */
 	int  set_app_dispatch(DB_ENV *, int (DB_ENV *, DBT *, DB_LSN *, db_recops)); /*!< <b>Not implemented (application-level logging)</b> */
 	int  set_cache_max(DB_ENV *, u_int32_t, u_int32_t); /*!< <b>Not required.</b> */
-	int  set_cachesize(DB_ENV *, u_int32_t, u_int32_t, int); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  set_create_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
-	int  set_data_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
+	int  set_cachesize(DB_ENV *, u_int32_t, u_int32_t, int); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  set_create_dir(DB_ENV *, const char *); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
+	int  set_data_dir(DB_ENV *, const char *); /*!< <b>@p config parameter to WT_SESSION::create_table</b> */
 	int  set_data_len(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int  set_encrypt(DB_ENV *, const char *, u_int32_t); /*!< <b>Not implemented (encryption).</b> */
 	void set_errcall(DB_ENV *, void (const DB_ENV *, const char *, const char *)); /*!< <b>set WT_SESSION::handle_error</b> */
@@ -1681,21 +1681,21 @@ struct DB_ENV {
 	void set_errpfx(DB_ENV *, const char *); /*!< <b>Not implemented.</b> */
 	int  set_event_notify(DB_ENV *, void (DB_ENV *, u_int32_t, void *)); /*!< <b>Not implemented.</b> */
 	int  set_feedback(DB_ENV *, void (DB_ENV *, int, int)); /*!< <b>Not implemented.</b> */
-	int  set_flags(DB_ENV *, u_int32_t, int); /*!< <b>\p config parameter to ::wt_open</b> */
+	int  set_flags(DB_ENV *, u_int32_t, int); /*!< <b>@p config parameter to ::wt_open</b> */
 	int  set_intermediate_dir_mode(DB_ENV *, const char *); /*!< <b>Not implemented.</b> */
 	int  set_isalive(DB_ENV *, int (DB_ENV *, pid_t, db_threadid_t, u_int32_t)); /*!< <b>Not implemented.</b> */
-	int  set_lg_bsize(DB_ENV *, u_int32_t); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  set_lg_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  set_lg_filemode(DB_ENV *, int); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  set_lg_max(DB_ENV *, u_int32_t); /*!< <b>\p config parameter to ::wt_open</b> */
+	int  set_lg_bsize(DB_ENV *, u_int32_t); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  set_lg_dir(DB_ENV *, const char *); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  set_lg_filemode(DB_ENV *, int); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  set_lg_max(DB_ENV *, u_int32_t); /*!< <b>@p config parameter to ::wt_open</b> */
 	int  set_lg_regionmax(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int  set_lk_conflicts(DB_ENV *, u_int8_t *, int); /*!< <b>Not implemented.</b> */
-	int  set_lk_detect(DB_ENV *, u_int32_t); /*!< <b>If needed, \p config parameter to ::wt_open</b> */
+	int  set_lk_detect(DB_ENV *, u_int32_t); /*!< <b>If needed, @p config parameter to ::wt_open</b> */
 	int  set_lk_max_lockers(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int  set_lk_max_locks(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int  set_lk_max_objects(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
 	int  set_lk_partitions(DB_ENV *, u_int32_t); /*!< <b>Not implemented.</b> */
-	int  set_lk_priority(DB_ENV *, u_int32_t, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::begin_transaction.</b> */
+	int  set_lk_priority(DB_ENV *, u_int32_t, u_int32_t); /*!< <b>@p config parameter to WT_SESSION::begin_transaction.</b> */
 	int  set_mp_max_openfd(DB_ENV *, int); /*!< <b>Not implemented.</b> */
 	int  set_mp_max_write(DB_ENV *, int, db_timeout_t); /*!< <b>Not implemented.</b> */
 	int  set_mp_mmapsize(DB_ENV *, size_t); /*!< <b>Not implemented.</b> */
@@ -1706,11 +1706,11 @@ struct DB_ENV {
 	void set_msgfile(DB_ENV *, FILE *); /*!< <b>Not implemented.</b> */
 	int  set_paniccall(DB_ENV *, void (DB_ENV *, int)); /*!< <b>Not implemented.</b> */
 	int  set_shm_key(DB_ENV *, long); /*!< <b>Not implemented.</b> */
-	int  set_thread_count(DB_ENV *, u_int32_t); /*!< <b>\p config parameter to ::wt_open</b> */
+	int  set_thread_count(DB_ENV *, u_int32_t); /*!< <b>@p config parameter to ::wt_open</b> */
 	int  set_thread_id(DB_ENV *, void (DB_ENV *, pid_t *, db_threadid_t *)); /*!< <b>Not implemented.</b> */
 	int  set_thread_id_string(DB_ENV *, char *(DB_ENV *, pid_t, db_threadid_t, char *)); /*!< <b>Not implemented.</b> */
-	int  set_timeout(DB_ENV *, db_timeout_t, u_int32_t); /*!< <b>\p config parameter to ::wt_open</b> */
-	int  set_tmp_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to ::wt_open</b> */
+	int  set_timeout(DB_ENV *, db_timeout_t, u_int32_t); /*!< <b>@p config parameter to ::wt_open</b> */
+	int  set_tmp_dir(DB_ENV *, const char *); /*!< <b>@p config parameter to ::wt_open</b> */
 	int  set_tx_max(DB_ENV *, u_int32_t); /*!< <b>Not implemented: equivalent to thread count</b> */
 	int  set_tx_timestamp(DB_ENV *, time_t *); /*!< <b>Not implemented.</b> */
 	int  set_verbose(DB_ENV *, u_int32_t, int); /*!< <b>Not implemented.</b> */
@@ -1719,7 +1719,7 @@ struct DB_ENV {
 	int  txn_begin(DB_ENV *, DB_TXN *, DB_TXN **, u_int32_t); /*!< <b>WT_SESSION::begin_transaction</b> */
 	int  txn_checkpoint(DB_ENV *, u_int32_t, u_int32_t, u_int32_t); /*!< <b>WT_SESSION::checkpoint</b> */
 	int  txn_recover(DB_ENV *, DB_PREPLIST *, u_int32_t, u_int32_t *, u_int32_t); /*!< <b>Not implemented</b> */
-	int  txn_stat(DB_ENV *, DB_TXN_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:"</b> */
+	int  txn_stat(DB_ENV *, DB_TXN_STAT **, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI @p "statistics:"</b> */
 	int  txn_stat_print(DB_ENV *, u_int32_t); /*!< <b>Not implemented (easy with cursor interface)</b> */
 	/* DB_ENV PUBLIC HANDLE LIST END */
 };

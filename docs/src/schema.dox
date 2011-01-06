@@ -1,10 +1,10 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page schema Schemas
+/*! @page schema Schemas
 
 The tables we have seen so far have all had simple key/value pairs for records.
 
-\section schema_intro Tables, Rows and Columns
+@section schema_intro Tables, Rows and Columns
 
 A table is a logical representation of data consisting of cells in rows and columns.  For example, a database might have this table.
 
@@ -36,41 +36,45 @@ A column-oriented database stores all of the values of a column together, then t
 
 WiredTiger supports both storage formats, and can mix and match the storage of columns within a logical table.
 
-Applications describe the format of their data by supplying a *schema* to WT_SESSION::create_table.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
+Applications describe the format of their data by supplying a schema to WT_SESSION::create_table.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
 
-\section schema_columns Describing Columns
+@section schema_columns Describing Columns
 
-XXX
+@todo describe how to add columns to a schema
 
-\section schema_indices Adding an Index
+@section schema_column_sets Storing Sets of Columns Together
 
-XXX
+@todo define and describe column sets
 
-\section schema_mapping Column Storage
+@section schema_indices Adding an Index
 
-XXX
+@todo describe how to add indices to a schema
 
-\section schema_examples Code Samples
+@section schema_mapping Column Storage
 
-The code below is taken from the complete example program \ex_ref{ex_schema.c}.
+@todo describe how to store some columns separately
 
-\dontinclude ex_schema.c
-\skip C struct
-\until POP_RECORD
+@section schema_examples Code Samples
 
-\skip open_session
-\until conn->close
+The code below is taken from the complete example program @ex_ref{ex_schema.c}.
 
-The code below is taken from the complete example program \ex_ref{ex_call_center.c}.
+@dontinclude ex_schema.c
+@skip C struct
+@until POP_RECORD
 
-\dontinclude ex_call_center.c
-\skip home
-\until CALL
+@skip open_session
+@until conn->close
 
-\skip create_table
-\until conn->close
+The code below is taken from the complete example program @ex_ref{ex_call_center.c}.
 
-\section schema_advanced Advanced Schemas
+@dontinclude ex_call_center.c
+@skip home
+@until CALL
+
+@skip create_table
+@until conn->close
+
+@section schema_advanced Advanced Schemas
 
 - non-relational data such as multiple index keys per row
 - application-supplied extractors and collators may need to be registered before recovery can run.

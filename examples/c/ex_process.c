@@ -1,5 +1,6 @@
 /*
- * ex_process.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_process.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demonstrating how to connect to a database from multiple
  * processes.

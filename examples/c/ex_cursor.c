@@ -1,5 +1,6 @@
 /*
- * ex_cursor.c Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+ * ex_cursor.c
+ * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
  *
  * This is an example demonstrating some cursor types and operations.
  */

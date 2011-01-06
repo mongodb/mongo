@@ -1,8 +1,8 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! \page config_strings Configuration Strings
+/*! @page config_strings Configuration Strings
 
-\section config_intro Introduction
+@section config_intro Introduction
 
 Many operations in WiredTiger accept a string to configure options.  These strings all have the same format:
 
@@ -12,7 +12,7 @@ Many operations in WiredTiger accept a string to configure options.  These strin
 
 That is, they are simple comma-separated lists of <code>"<key>=<value>"</code> pairs.  If the <code>"=<value>"</code> part is omitted, the value of 1 is assumed.
 
-Values may be nested lists, for example:
+To handle more complex configuration, such as specifying a schema, values may be nested lists using parentheses.  For example:
 
 <pre>
   schema=(keyfmt=S,valuefmt=S,columns=(name,notes))
@@ -24,22 +24,22 @@ Superfluous commas and whitespace in the configuration string are ignored (inclu
 
 Keys are processed in order from left to right, with later settings overriding earlier ones unless multiple settings for a key are permitted.
 
-\section config_examples Code Samples
+@section config_examples Code Samples
 
-The code below is taken from the complete example program \ex_ref{ex_config.c}.
+The code below is taken from the complete example program @ex_ref{ex_config.c}.
 
-\dontinclude ex_config.c
+@dontinclude ex_config.c
 
-Open a connection to a database, creating it if it does not exist and set a cache size of 10MiB:
+Open a connection to a database, creating it if it does not exist and set a cache size of 10MB:
 
-\skip wiredtiger_open
-\until != 0
+@skip wiredtiger_open
+@until != 0
 
 Create a table that uses C language strings for keys and values:
 
-\skipline create_table
+@skipline create_table
 
-Assign a priority to a transaction to reduce aborts and give it a name for debugging:
+Assign a priority to a transaction and give it a name for debugging:
 
-\skipline begin_transaction
+@skipline begin_transaction
 */

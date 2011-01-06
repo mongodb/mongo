@@ -44,10 +44,12 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  WT_MOVE_RESULT move_next(WT_HANDLE cursor)'
   print '  WT_MOVE_RESULT move_prev(WT_HANDLE cursor)'
   print '  WT_MOVE_RESULT search(WT_HANDLE cursor, WT_RECORD record)'
+  print '  WT_MOVE_RESULT search_near(WT_HANDLE cursor, WT_RECORD record)'
   print '  string insert_record(WT_HANDLE cursor, WT_RECORD record)'
   print '  void update_record(WT_HANDLE cursor, string value)'
   print '  void delete_record(WT_HANDLE cursor)'
   print '  void close_cursor(WT_HANDLE cursor, string config)'
+  print '  void configure_cursor(WT_HANDLE cursor, string config)'
   print ''
   sys.exit(0)
 
@@ -236,6 +238,12 @@ elif cmd == 'search':
     sys.exit(1)
   pp.pprint(client.search(eval(args[0]),eval(args[1]),))
 
+elif cmd == 'search_near':
+  if len(args) != 2:
+    print 'search_near requires 2 args'
+    sys.exit(1)
+  pp.pprint(client.search_near(eval(args[0]),eval(args[1]),))
+
 elif cmd == 'insert_record':
   if len(args) != 2:
     print 'insert_record requires 2 args'
@@ -259,6 +267,12 @@ elif cmd == 'close_cursor':
     print 'close_cursor requires 2 args'
     sys.exit(1)
   pp.pprint(client.close_cursor(eval(args[0]),args[1],))
+
+elif cmd == 'configure_cursor':
+  if len(args) != 2:
+    print 'configure_cursor requires 2 args'
+    sys.exit(1)
+  pp.pprint(client.configure_cursor(eval(args[0]),args[1],))
 
 else:
   print 'Unrecognized method %s' % cmd
