@@ -536,7 +536,7 @@ namespace mongo {
 
             // This could wait up to 100ms
             void waitForFinish() {
-                assert( _thread != NULL && _thread->joinable() );
+                assert( _thread != NULL );
                 _keepRunning = false;
                 _thread->join();
 
