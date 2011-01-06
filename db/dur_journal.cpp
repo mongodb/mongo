@@ -104,14 +104,6 @@ namespace mongo {
             return p;
         }
 
-        bool Journal::tryToCloseCurJournalFile() {
-            mutex::try_lock lk(_curLogFileMutex, 2000);
-            if( lk.ok ) {
-                closeCurrentJournalFile();
-            }
-            return lk.ok;
-        }
-
         /** never throws
             @return true if journal dir is not empty
         */
@@ -164,14 +156,13 @@ namespace mongo {
 
         /** at clean shutdown */
         bool okToCleanUp = false; // successful recovery would set this to true
-        void journalCleanup() {
+        void Journal::cleanup() {
             if( !okToCleanUp )
                 return;
 
-            if( !j.tryToCloseCurJournalFile() ) {
-                return;
-            }
             try {
+                scoped_lock lk(_curLogFileMutex);
+                closeCurrentJournalFile();
                 removeJournalFiles();
             }
             catch(std::exception& e) {
@@ -179,6 +170,7 @@ namespace mongo {
                 throw;
             }
         }
+        void journalCleanup() { j.cleanup(); }
 
         /** assure journal/ dir exists. throws. call during startup. */
         void journalMakeDir() {

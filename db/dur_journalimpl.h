@@ -46,12 +46,8 @@ namespace mongo {
 
             boost::filesystem::path getFilePathFor(int filenumber) const;
 
-            /** used at shutdown.
-                @return false if can't close in a timely manner.
-            */
-            bool tryToCloseCurJournalFile();
-
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
+            void cleanup();
 
         private:
             // rotate after reaching this data size in a journal (j._<n>) file
