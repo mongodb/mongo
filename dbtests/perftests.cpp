@@ -286,10 +286,42 @@ namespace PerfTests {
         }
     };
 
+    void t() {
+        for( int i = 0; i < 20; i++ ) {
+            sleepmillis(21);
+            string fn = "/tmp/t1";
+            MongoMMF f;
+            unsigned long long len = 1 * 1024 * 1024;
+            assert( f.create(fn, len, /*sequential*/rand()%2==0) );
+            if( !testIntent ) {
+                char *p = (char *) f.getView();
+                assert(p);
+                // write something to the private view as a test
+                strcpy(p, "hello");
+            }
+            if( cmdLine.dur ) {
+                char *w = (char *) f.view_write();
+                strcpy(w + 6, "world");
+            }
+            MongoFileFinder ff;
+            ASSERT( ff.findByPath(fn) );
+        }
+    }
+
     class All : public Suite {
     public:
-        All() : Suite( "perf" ) {
+        All() : Suite( "perf" )
+        {
         }
+        ~All() { 
+        }
+        Result * run( const string& filter ) { 
+            boost::thread a(t);
+            Result * res = Suite::run(filter); 
+            a.join();
+            return res;
+        }
+
         void setupTests() {
             add< TaskQueueTest >();
             add< InsertDup >();
@@ -302,4 +334,3 @@ namespace PerfTests {
         }
     } myall;
 }
-
