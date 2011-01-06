@@ -729,7 +729,7 @@ namespace mongo {
 
         if( cmdLine.dur ) {
             log() << "shutdown: journalCleanup..." << endl;
-            dur::journalCleanupAtShutdown();
+            dur::journalCleanup();
         }
 
 #if !defined(_WIN32) && !defined(__sunos__)

@@ -164,7 +164,7 @@ namespace mongo {
 
         /** at clean shutdown */
         bool okToCleanUp = false; // successful recovery would set this to true
-        void journalCleanupAtShutdown() {
+        void journalCleanup() {
             if( !okToCleanUp )
                 return;
 
