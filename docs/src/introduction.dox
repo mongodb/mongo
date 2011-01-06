@@ -1,14 +1,12 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! @mainpage Introduction
+/*! @mainpage Programmer's Reference
 
 The WiredTiger Data Store is an extensible platform for data management.  This documentation describes the programming interface to WiredTiger used by developers to construct applications.
 
 We follow SQL terminology: a database is set of tables managed together.  Tables consist of rows, where each row is a key and its associated value.  Tables may optionally have an associated schema, splitting the value into a set of columns.  Tables may also have associated indices, each of which is ordered by one or more columns.
 
 In addition to the traditional row-oriented storage where all columns of a row are stored together, WiredTiger supports column-oriented storage, where one or more columns can be stored individually, allowing more efficient access and storage.
-
-@section intro_details Programmer's Reference
 
 For full details about using WiredTiger, see:
 
@@ -19,3 +17,4 @@ For full details about using WiredTiger, see:
 - @ref wiredtiger.h "The WiredTiger API"\n
   the complete reference manual for the WiredTiger API.
 - @subpage sql_mapping
+*/
