@@ -26,6 +26,7 @@
 #include "../util/timer.h"
 #include "../util/alignedbuilder.h"
 #include "../util/message.h" // getelapsedtimemillis
+#include "../util/concurrency/race.h"
 #include <boost/static_assert.hpp>
 #undef assert
 #define assert MONGO_assert
@@ -54,6 +55,8 @@ namespace mongo {
         path lsnPath() {
             return getJournalDir()/"lsn";
         }
+
+        extern CodeBlock durThreadMain;
 
         /** this should be called when something really bad happens so that we can flag appropriately
         */
@@ -274,6 +277,7 @@ namespace mongo {
         void Journal::updateLSNFile() {
             if( !_writeToLSNNeeded )
                 return;
+            durThreadMain.assertWithin();
             _writeToLSNNeeded = false;
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
@@ -345,6 +349,7 @@ namespace mongo {
         }
         void Journal::rotate() {
             assert( !dbMutex.atLeastReadLocked() );
+            durThreadMain.assertWithin();
 
             j.updateLSNFile();
 
@@ -377,7 +382,6 @@ namespace mongo {
         }
 
         /** write to journal
-            thread: durThread()
         */
         void journal(const AlignedBuilder& b) {
             j.journal(b);

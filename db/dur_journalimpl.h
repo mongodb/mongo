@@ -41,7 +41,6 @@ namespace mongo {
             void rotate();
 
             /** write to journal
-                thread: durThread()
             */
             void journal(const AlignedBuilder& b);
 

@@ -47,6 +47,7 @@
 #include "dur_journal.h"
 #include "dur_commitjob.h"
 #include "dur_recover.h"
+#include "../util/concurrency/race.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
@@ -527,12 +528,15 @@ namespace mongo {
 
         mongo::mutex durThreadMutex("durthreadmtx");
 
+        CodeBlock durThreadMain;
+
         void durThread() {
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 90;
             while( 1) {
                 sleepmillis(10);
                 scoped_lock lk(durThreadMutex);
+                CodeBlock::Within w(durThreadMain);
                 try {
                     int millis = HowOftenToGroupCommitMs;
                     {
