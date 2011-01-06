@@ -57,7 +57,7 @@ if (files.some(function (f) { return f.name.indexOf("lsn") >= 0; })) {
 
 // restart and recover
 tst.log("restart and recover");
-var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 8);
+var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 9);
 tst.log("check data results");
 var d = conn.getDB("test");
 print("count:" + d.foo.count());
