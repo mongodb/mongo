@@ -190,7 +190,6 @@ namespace mongo {
             }
             else if ( cmdObj["out"].type() == Object ) {
                 BSONObj o = cmdObj["out"].embeddedObject();
-                uassert( 13607 , "'out' has to have a single field" , o.nFields() == 1 );
 
                 BSONElement e = o.firstElement();
                 string t = e.fieldName();
@@ -213,17 +212,21 @@ namespace mongo {
                 else {
                     uasserted( 13522 , str::stream() << "unknown out specifier [" << t << "]" );
                 }
+
+                if (o.hasElement("db")) {
+                    outDB = o["db"].String();
+                }
             }
             else {
                 uasserted( 13606 , "'out' has to be a string or an object" );
             }
 
             if ( outType != INMEMORY ) { // setup names
-                tempLong = str::stream() << dbname << ".tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
+                tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << finalShort << "_" << JOB_NUMBER++;
 
                 incLong = tempLong + "_inc";
 
-                finalLong = str::stream() << dbname << "." << finalShort;
+                finalLong = str::stream() << (outDB.empty() ? dbname : outDB) << "." << finalShort;
             }
 
             {
@@ -781,8 +784,18 @@ namespace mongo {
 
                 timingBuilder.append( "total" , t.millis() );
 
-                if ( config.finalShort.size() )
-                    result.append( "result" , config.finalShort );
+                if (!config.outDB.empty()) {
+                    BSONObjBuilder loc;
+                    if ( !config.outDB.empty())
+                        loc.append( "db" , config.outDB );
+                    if ( !config.finalShort.empty() )
+                        loc.append( "collection" , config.finalShort );
+                    result.append("result", loc.obj());
+                }
+                else {
+                    if ( !config.finalShort.empty() )
+                        result.append( "result" , config.finalShort );
+                }
                 result.append( "timeMillis" , t.millis() );
                 countsBuilder.appendNumber( "output" , finalCount );
                 if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );

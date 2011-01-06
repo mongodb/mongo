@@ -569,6 +569,12 @@ MapReduceResult.prototype.convertToSingleObject = function(){
     return z;
 }
 
+DBCollection.prototype.convertToSingleObject = function(valueField){
+    var z = {};
+    this.find().forEach( function(a){ z[a._id] = a[valueField]; } );
+    return z;
+}
+
 /**
 * @param optional object of optional fields;
 */

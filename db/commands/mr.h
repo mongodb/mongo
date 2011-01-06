@@ -176,6 +176,8 @@ namespace mongo {
             string finalShort;
             string finalLong;
 
+            string outDB;
+
             enum { REPLACE , // atomically replace the collection
                    MERGE ,  // merge keys, override dups
                    REDUCE , // merge keys, reduce dups
