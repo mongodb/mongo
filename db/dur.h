@@ -37,9 +37,6 @@ namespace mongo {
             */
             virtual void createdFile(string filename, unsigned long long len) = 0;
 
-            /** Declare a database is about to be dropped */
-            virtual void droppingDb(string db) = 0;
-
             /** Declarations of write intent.
 
                 Use these methods to declare "i'm about to write to x and it should be logged for redo."
@@ -164,7 +161,6 @@ namespace mongo {
             void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges) { return buf; }
             void declareWriteIntent(void *, unsigned) { }
             void createdFile(string filename, unsigned long long len) { }
-            void droppingDb(string db) { }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
             void commitIfNeeded() { }
@@ -177,7 +173,6 @@ namespace mongo {
             void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges);
             void declareWriteIntent(void *, unsigned);
             void createdFile(string filename, unsigned long long len);
-            void droppingDb(string db);
             bool awaitCommit();
             bool commitNow();
             void commitIfNeeded();

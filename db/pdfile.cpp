@@ -1758,7 +1758,10 @@ namespace mongo {
 
         Database::closeDatabase( d->name.c_str(), d->path );
         d = 0; // d is now deleted
-        getDur().droppingDb(db);
+
+        getDur().commitNow();
+        dur::TempDisableDurability holder; //does SyncAndTruncate
+
         _deleteDataFiles( db.c_str() );
     }
 

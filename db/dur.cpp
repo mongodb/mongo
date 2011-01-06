@@ -187,17 +187,6 @@ namespace mongo {
             commitJob.noteOp(op);
         }
 
-        /** indicate that a database is about to be dropped.  call before the actual drop. */
-        void DurableImpl::droppingDb(string db) {
-            shared_ptr<DurOp> op( new DropDbOp(db) );
-
-            // DropDbOp must be in a commit group by itself to ensure proper
-            // sequencing because all DurOps are applied before any WriteOps.
-            groupCommit();
-            commitJob.noteOp(op);
-            groupCommit();
-        }
-
         void* DurableImpl::writingPtr(void *x, unsigned len) {
             void *p = x;
             declareWriteIntent(p, len);
