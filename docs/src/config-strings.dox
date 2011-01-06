@@ -28,6 +28,8 @@ Keys are processed in order from left to right, with later settings overriding e
 
 The code below is taken from the complete example program @ex_ref{ex_config.c}.
 
+@todo improve the example
+
 @dontinclude ex_config.c
 
 Open a connection to a database, creating it if it does not exist and set a cache size of 10MB:

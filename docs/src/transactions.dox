@@ -20,12 +20,14 @@ To configure for transactions, the database must be created with transaction sup
 In WiredTiger, the transactional context is managed by the WT_SESSION class.  Applications call WT_SESSION::begin_transaction to start a new transaction, which is only permitted when no cursors are open.  Operations performed with that WT_SESSION handle are then part of the transaction, and their effects can be committed by calling WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, both of which implicitly close any open cursors.
 
 When transactions are used, operations may fail with additional errors, including ::WT_DEADLOCK, ::WT_UPDATE_CONFLICT, ...
-\todo describe transaction error cases more fully
+
+@todo describe transaction error cases more fully
 
 @section transactions_cc Concurrency Control
 
 WiredTiger uses a timestamp-based optimistic concurrency control algorithm.  This avoids the bottleneck of a centralized lock manager and expensive graph searching to identify deadlock cycles.
-\todo write more about concurrency control 
+
+@todo write more about concurrency control 
 
 @section transaction_isolation Isolation Levels
 

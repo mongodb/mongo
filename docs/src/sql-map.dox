@@ -2,6 +2,8 @@
 
 /*! \page sql_mapping Mapping SQL onto the WiredTiger API
 
+@todo decide whether to keep this page, if so, fill it out
+
 An RDBMS has the SQL language, a parser and a query planner.  All of them
 sit on top of WiredTiger, as they would on top of any key-value store.
 

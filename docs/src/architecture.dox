@@ -2,6 +2,8 @@
 
 /*! @page architecture WiredTiger Architecture
 
+@todo explain the architecture
+
 @image html architecture.png
 @image latex architecture.pdf "WiredTiger Architecture" height=12cm
 

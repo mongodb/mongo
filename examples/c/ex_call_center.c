@@ -137,7 +137,7 @@ int main()
 
 	count = 0;
 	while (call.cust_id == cust.id) {
-		printf("Got call record on date %" PRIu64 ": type %s: %s\n",
+		printf("Got call record on date %llu: type %s: %s\n",
 		    call.call_date, call.call_type, call.notes);
 		if (++count == 3)
 			break;

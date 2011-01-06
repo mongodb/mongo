@@ -2,6 +2,8 @@
 
 /*! @page packing Packing and Unpacking Data
 
+The tables we have seen so far have all had simple key/value pairs for records.
+
 @todo Describe what WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT_CURSOR::set_value are all about.
 
 - native C structs

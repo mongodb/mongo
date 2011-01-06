@@ -2,8 +2,6 @@
 
 /*! @page schema Schemas
 
-The tables we have seen so far have all had simple key/value pairs for records.
-
 @section schema_intro Tables, Rows and Columns
 
 A table is a logical representation of data consisting of cells in rows and columns.  For example, a database might have this table.
