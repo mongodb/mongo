@@ -55,7 +55,7 @@ namespace mongo {
 #endif
         }
     };
-
+    
 #else
 
     class CodeBlock{ 

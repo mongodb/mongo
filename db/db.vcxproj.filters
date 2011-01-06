@@ -291,6 +291,7 @@
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="dur_journalimpl.h" />
+    <ClInclude Include="..\util\concurrency\race.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
