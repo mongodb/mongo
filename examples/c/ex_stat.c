@@ -28,7 +28,7 @@ int main()
 	/* Note: further error checking omitted for clarity. */
 
 	/* Open a cursor on the (virtual) statistics table. */
-	ret = session->open_cursor(session, "statistics:", NULL, &cursor);
+	ret = session->open_cursor(session, "statistics:", NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &key);

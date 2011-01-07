@@ -28,8 +28,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  void close_connection(WT_HANDLE connection, string config)'
   print '  bool is_new(WT_HANDLE connection)'
   print '  void close_session(WT_HANDLE session, string config)'
-  print '  WT_CURSOR_HANDLE open_cursor(WT_HANDLE session, string uri, string config)'
-  print '  WT_CURSOR_HANDLE dup_cursor(WT_HANDLE session, WT_HANDLE cursor, string config)'
+  print '  WT_CURSOR_HANDLE open_cursor(WT_HANDLE session, string uri, WT_HANDLE to_dup, string config)'
   print '  void create_table(WT_HANDLE session, string name, string config)'
   print '  void rename_table(WT_HANDLE session, string oldname, string newname, string config)'
   print '  void drop_table(WT_HANDLE session, string name, string config)'
@@ -49,7 +48,6 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  void update_record(WT_HANDLE cursor, string value)'
   print '  void delete_record(WT_HANDLE cursor)'
   print '  void close_cursor(WT_HANDLE cursor, string config)'
-  print '  void configure_cursor(WT_HANDLE cursor, string config)'
   print ''
   sys.exit(0)
 
@@ -143,16 +141,10 @@ elif cmd == 'close_session':
   pp.pprint(client.close_session(eval(args[0]),args[1],))
 
 elif cmd == 'open_cursor':
-  if len(args) != 3:
-    print 'open_cursor requires 3 args'
+  if len(args) != 4:
+    print 'open_cursor requires 4 args'
     sys.exit(1)
-  pp.pprint(client.open_cursor(eval(args[0]),args[1],args[2],))
-
-elif cmd == 'dup_cursor':
-  if len(args) != 3:
-    print 'dup_cursor requires 3 args'
-    sys.exit(1)
-  pp.pprint(client.dup_cursor(eval(args[0]),eval(args[1]),args[2],))
+  pp.pprint(client.open_cursor(eval(args[0]),args[1],eval(args[2]),args[3],))
 
 elif cmd == 'create_table':
   if len(args) != 3:
@@ -267,12 +259,6 @@ elif cmd == 'close_cursor':
     print 'close_cursor requires 2 args'
     sys.exit(1)
   pp.pprint(client.close_cursor(eval(args[0]),args[1],))
-
-elif cmd == 'configure_cursor':
-  if len(args) != 2:
-    print 'configure_cursor requires 2 args'
-    sys.exit(1)
-  pp.pprint(client.configure_cursor(eval(args[0]),args[1],))
 
 else:
   print 'Unrecognized method %s' % cmd

@@ -25,6 +25,13 @@
 The code below is taken from the complete example program @ex_ref{ex_extending.c}.
 
 @dontinclude ex_extending.c
-@skip main
-@until ->close
+@skip insensitive
+@until nocasecoll
+
+@until pcoll10
+
+@skip add_collator
+@until add_collator
+
+@until conn->close
  */

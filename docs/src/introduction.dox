@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! @mainpage Programmer's Reference
+/*! @mainpage Reference Guide
 
 The WiredTiger Data Store is an extensible platform for data management.  This documentation describes the programming interface to WiredTiger used by developers to construct applications.
 
@@ -14,7 +14,7 @@ For full details about using WiredTiger, see:
   describes the architecture of the WiredTiger engine.
 - @subpage using\n
   explains how to write applications that use WiredTiger.
-- @ref wiredtiger.h "The WiredTiger API"\n
+- @ref wt\n
   the complete reference manual for the WiredTiger API.
 - @subpage sql_mapping
 */

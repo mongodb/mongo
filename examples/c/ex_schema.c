@@ -65,7 +65,8 @@ int main()
 	    "column_set=population(population),"
 	    "index=country_year(country,year)");
 
-	ret = session->open_cursor(session, "table:population", NULL, &cursor);
+	ret = session->open_cursor(session, "table:population",
+	    NULL, NULL, &cursor);
 
 	endp = pop_data + (sizeof (pop_data) / sizeof (pop_data[0]));
 	for (p = pop_data; p < endp; p++) {
@@ -76,7 +77,8 @@ int main()
 
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session,
-	    "index:population.country_year(country,id)", "dup=first", &cursor);
+	    "index:population.country_year(country,id)",
+	    NULL, "dup=first", &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &country);

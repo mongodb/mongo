@@ -31,7 +31,8 @@ int main()
 		 * If we created the database, create the sequence by opening a
 		 * cursor on the sequence view and inserting a new record.
 		 */
-		ret = session->open_cursor(session, "sequence:", NULL, &cursor);
+		ret = session->open_cursor(session, "sequence:",
+		    NULL, NULL, &cursor);
 		cursor->set_key(cursor, "myseq");
 		cursor->set_value(cursor, "cachesize=100,wrap");
 		ret = cursor->insert(cursor);
@@ -39,7 +40,8 @@ int main()
 	}
 
 	/* Use the sequence. */
-	ret = session->open_cursor(session, "sequence:myseq", NULL, &cursor);
+	ret = session->open_cursor(session, "sequence:myseq",
+	    NULL, NULL, &cursor);
 	ret = cursor->insert(cursor);
 	cursor->get_key(cursor, &recno);
 

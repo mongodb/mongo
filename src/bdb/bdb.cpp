@@ -75,12 +75,6 @@ __cursor_close(WT_CURSOR *cursor, const char *config)
 }
 
 static int
-__cursor_configure(WT_CURSOR *cursor, const char *config)
-{
-	return ENOTSUP;
-}
-
-static int
 __session_close(WT_SESSION *session, const char *config)
 {
 	printf("WT_SESSION->close\n");
@@ -89,7 +83,7 @@ __session_close(WT_SESSION *session, const char *config)
 }
 
 static int
-__session_open_cursor(WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp)
+__session_open_cursor(WT_SESSION *session, const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -109,7 +103,6 @@ __session_open_cursor(WT_SESSION *session, const char *uri, const char *config, 
 		__cursor_update,
 		__cursor_del,
 		__cursor_close,
-		__cursor_configure,
 	};
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)malloc(sizeof(WT_CURSOR_STD));
 	WT_CURSOR *c = &cstd->interface;
@@ -124,18 +117,6 @@ __session_open_cursor(WT_SESSION *session, const char *uri, const char *config, 
 	*cursorp = c;
 
 	return (0);
-}
-
-static int
-__session_dup_cursor(WT_SESSION *, WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp)
-{
-	return ENOTSUP;
-}
-
-static int
-__session_add_schema(WT_SESSION *session, const char *name, const char *config)
-{
-	return ENOTSUP;
 }
 
 static int
@@ -242,8 +223,6 @@ __conn_open_session(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, con
 		NULL,
 		__session_close,
 		__session_open_cursor,
-		__session_dup_cursor,
-		__session_add_schema,
 		__session_create_table,
 		__session_rename_table,
 		__session_drop_table,

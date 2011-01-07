@@ -5,8 +5,11 @@
 #ifndef _WIREDTIGER_EXT_H_
 #define _WIREDTIGER_EXT_H_
 
-/*! @file wiredtiger_ext.h
- * Interfaces applications use to extend WiredTiger.
+/*! @defgroup wt_ext WiredTiger Extension API
+ * The functions and interfaces that applications use to customize and extend
+ * the behavior of WiredTiger.
+ *
+ * @{
  */
 
 #include "wiredtiger.h"
@@ -17,7 +20,8 @@ extern "C" {
 
 /*!
  * The interface implemented by applications to provide custom ordering of
- * records.
+ * records.  Applications register their implementation with WiredTiger by
+ * calling WT_CONNECTION::add_collator.
  */
 struct WT_COLLATOR {
 	/*! Callback to compare keys or order duplicate values.
@@ -33,7 +37,7 @@ struct WT_COLLATOR {
 /*!
  * Applications can extend WiredTiger by providing new implementation of the
  * WT_CURSOR class.  This is done by implementing the WT_CURSOR_FACTORY
- * interface, then calling WT_CONNECTION#add_cursor_factory.
+ * interface, then calling WT_CONNECTION::add_cursor_factory.
  *
  * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_FACTORY
  * interface from multiple threads concurrently.  It is the responsibility of
@@ -79,7 +83,8 @@ struct WT_ERROR_HANDLER {
 
 /*!
  * The interface implemented by applications to provide custom extraction of
- * index keys or column set values.
+ * index keys or column set values.  Applications register their implementation
+ * with WiredTiger by calling WT_CONNECTION::add_extractor.
  */
 struct WT_EXTRACTOR {
 	/*! Callback to extract a value for an index or column set.
@@ -102,5 +107,7 @@ extern int wiredtiger_extension_init(WT_CONNECTION *connection,
 #ifdef __cplusplus
 }
 #endif
+
+/*! @} */
 
 #endif /* _WIREDTIGER_EXT_H_ */

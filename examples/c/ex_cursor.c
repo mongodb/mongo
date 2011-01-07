@@ -33,16 +33,17 @@ int main()
 	    "key_format=r,value_format=5sii,"
 	    "columns=(id,country,population,area)");
 
-	ret = session->open_cursor(session, "table:map", NULL, &cursor);
+	ret = session->open_cursor(session, "table:map", NULL, NULL, &cursor);
 	cursor->close(cursor, NULL);
 
-	ret = session->open_cursor(session, "table:map(country,population)", NULL, &cursor);
+	ret = session->open_cursor(session, "table:map(country,population)",
+	    NULL, NULL, &cursor);
 	cursor->close(cursor, NULL);
 
-	ret = session->open_cursor(session, "table:", NULL, &cursor);
+	ret = session->open_cursor(session, "table:", NULL, NULL, &cursor);
 	cursor->close(cursor, NULL);
 
-	ret = session->open_cursor(session, "statistics:", NULL, &cursor);
+	ret = session->open_cursor(session, "statistics:", NULL, NULL, &cursor);
 	cursor->close(cursor, NULL);
 
 	/* Note: closing the connection implicitly closes open session(s). */

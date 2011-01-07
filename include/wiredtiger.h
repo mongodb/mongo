@@ -5,8 +5,11 @@
 #ifndef _WIREDTIGER_H_
 #define _WIREDTIGER_H_
 
-/*! @file wiredtiger.h
- * The complete reference manual for the WiredTiger API.
+/*! @defgroup wt WiredTiger API
+ * The commonly-used functions, classes and methods that applications use to
+ * access and manage data with WiredTiger.
+ *
+ * @{
  */
 
 #include <sys/types.h>
@@ -219,19 +222,6 @@ struct WT_CURSOR {
 	 * @errors
 	 */
 	int __F(close)(WT_CURSOR *cursor, const char *config);
-
-	/*! Change configuration options for the cursor
-	 *
-	 * @param cursor the cursor handle
-	 * @configstart
-	 * @config{dup,,duplicate handling\, one of "all" or "first" or "last";
-	 * 	default "all"}
-	 * @config{overwrite,,if an existing key is inserted\,
-	 * 	overwrite the existing value}
-	 * @configend
-	 * @errors
-	 */
-	int __F(configure)(WT_CURSOR *cursor, const char *config);
 };
 
 /*!
@@ -282,11 +272,16 @@ struct WT_SESSION {
 	 *
 	 * @param session the session handle
 	 * @param uri the data source on which the cursor operates
+	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart
+	 * @config{dup,,duplicate handling\, one of "all" or "first" or "last";
+	 * 	default "all"}
 	 * @config{isolation,,the isolation level for this cursor\, one of
 	 * 	"snapshot" or "read-committed" or "read-uncommitted"; default
 	 * 	"read-committed".  Ignored for transactional cursors}
+	 * @config{overwrite,,if an existing key is inserted\,
+	 * 	overwrite the existing value}
 	 * @config{raw,,ignore the encodings for the key and
 	 * 	value\, manage data as if the formats were \c "u"}
 	 * @configend
@@ -294,54 +289,16 @@ struct WT_SESSION {
 	 * @errors
 	 */
 	int __F(open_cursor)(WT_SESSION *session,
-	    const char *uri, const char *config, WT_CURSOR **cursorp);
-
-	/*! Duplicate a cursor.
-	 *
-	 * @param session the session handle
-	 * @param cursor the cursor handle to duplicate
-	 * @configempty
-	 * @param dupp a pointer to the new cursor
-	 * @errors
-	 */
-	int __F(dup_cursor)(WT_SESSION *session,
-	    WT_CURSOR *cursor, const char *config, WT_CURSOR **dupp);
+	    const char *uri, WT_CURSOR *to_dup,
+	    const char *config, WT_CURSOR **cursorp);
 	/*! @} */
 
 	/*! @name Table operations
 	 * @{
 	 */
-	/*! Add a new schema.
-	 *
-	 * @param session the session handle
-	 * @param name the name of the new schema
-	 * @configstart
-	 * @config{key_format,,The format of the data packed into key items.
-	 * See ::wiredtiger_struct_pack for details.  If not set\, a default
-	 * value of "u" is assumed\, and applications use WT_ITEM to manipulate
-	 * raw byte arrays.}
-	 * @config{value_format,,The format of the data packed into value items.
-	 * See ::wiredtiger_struct_pack for details.  If not set\, a default
-	 * value of "u" is assumed\, and applications use WT_ITEM to manipulate
-	 * raw byte arrays.}
-	 * @config{columns,,Names of the columns in the schema\, comma separated.
-	 * The number of entries must match the total number of values in
-	 * #key_format and #value_format.}
-	 * @config{column_set,,List of the column sets.  Comma-separated list
-	 * 	of the form <code>name(column[\,...])[\,...]</code>.  Each
-	 * 	column set is stored separately\, keyed by the primary key of
-	 * 	the table.  Any column that does not appear in a column set is
-	 * 	stored in an unnamed default column set for the table.}
-	 * @config{index,,List of the indices.  Comma-separated list of the
-	 * 	form <code>name(column[\,...])[\,...]</code>.  Each index is
-	 * 	keyed by the specified columns.}
-	 * @configend
-	 * @errors
-	 */
-	int __F(add_schema)(WT_SESSION *session, const char *name,
-	    const char *config);
-
 	/*! Create a table.
+	 *
+	 * @todo Allow both
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
@@ -419,6 +376,8 @@ struct WT_SESSION {
 	    WT_CURSOR *start, WT_CURSOR *end, const char *config);
 
 	/*! Verify a table.
+	 *
+	 * @todo describe salvage
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
@@ -545,19 +504,19 @@ struct WT_CONNECTION {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the collation to be used in calls to
-	 * WT_SESSION::add_schema
+	 * 	WT_SESSION::create_table
 	 * @param collator the application-supplied collation handler
 	 * @configempty
 	 * @errors
 	 */
-	int __F(add_collation)(WT_CONNECTION *connection,
+	int __F(add_collator)(WT_CONNECTION *connection,
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
 	/*! Add a custom extractor for index keys or column sets.
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the extractor to be used in calls to
-	 * WT_SESSION::add_schema
+	 * 	WT_SESSION::create_table
 	 * @param extractor the application-supplied extractor
 	 * @configempty
 	 * @errors
@@ -803,5 +762,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 #ifdef __cplusplus
 }
 #endif
+
+/*! @} */
 
 #endif /* _WIREDTIGER_H_ */

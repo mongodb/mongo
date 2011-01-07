@@ -92,8 +92,8 @@ int main()
 	 * Specify the columns we want: the customer ID and the name.  This
 	 * means the cursor's value format will be "rS".
 	 */
-	ret = session->open_cursor(session,
-	    "index:cust_phone(id,name)", NULL, &cursor);
+	ret = session->open_cursor(session, "index:cust_phone(id,name)",
+	    NULL, NULL, &cursor);
 	cursor->set_key(cursor, "212-555-1000");
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &cust.id, &cust.name);
@@ -114,7 +114,8 @@ int main()
 	 * getting 3 records.
 	 */
 	ret = session->open_cursor(session,
-	    "index:call_cust_date(cust_id,call_type,notes)", NULL, &cursor);
+	    "index:call_cust_date(cust_id,call_type,notes)",
+	    NULL, NULL, &cursor);
 
 	/*
 	 * The keys in the index are (cust_id,call_date) -- we want the largest

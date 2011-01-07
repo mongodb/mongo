@@ -34,7 +34,7 @@ int main()
 
 	ret = session->begin_transaction(session, "priority=100,name=mytxn");
 
-	ret = session->open_cursor(session, "config:", NULL, &cursor);
+	ret = session->open_cursor(session, "config:", NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &key);

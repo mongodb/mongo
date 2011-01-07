@@ -23,7 +23,7 @@ void *scan_thread(void *arg) {
 	int ret;
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->open_cursor(session, "table:access", NULL, &cursor);
+	ret = session->open_cursor(session, "table:access", NULL, NULL, &cursor);
 
 	/* Show all records. */
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -51,7 +51,7 @@ int main()
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create_table(session, "access",
 	    "key_format=S,value_format=S");
-	ret = session->open_cursor(session, "table:access",
+	ret = session->open_cursor(session, "table:access", NULL,
 	    "overwrite", &cursor);
 	cursor->set_key(cursor, "key1");
 	cursor->set_value(cursor, "value1");

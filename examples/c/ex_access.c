@@ -29,7 +29,7 @@ int main()
 	ret = session->create_table(session, "access",
 	    "key_format=S,value_format=S");
 
-	ret = session->open_cursor(session, "table:access", "overwrite",
+	ret = session->open_cursor(session, "table:access", NULL, "overwrite",
 	    &cursor);
 
 	/* Insert a record. */

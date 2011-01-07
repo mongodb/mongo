@@ -65,20 +65,12 @@ class Iface:
     """
     pass
 
-  def open_cursor(self, session, uri, config):
+  def open_cursor(self, session, uri, to_dup, config):
     """
     Parameters:
      - session
      - uri
-     - config
-    """
-    pass
-
-  def dup_cursor(self, session, cursor, config):
-    """
-    Parameters:
-     - session
-     - cursor
+     - to_dup
      - config
     """
     pass
@@ -229,14 +221,6 @@ class Iface:
     pass
 
   def close_cursor(self, cursor, config):
-    """
-    Parameters:
-     - cursor
-     - config
-    """
-    pass
-
-  def configure_cursor(self, cursor, config):
     """
     Parameters:
      - cursor
@@ -469,21 +453,23 @@ class Client(Iface):
       raise result.err
     return
 
-  def open_cursor(self, session, uri, config):
+  def open_cursor(self, session, uri, to_dup, config):
     """
     Parameters:
      - session
      - uri
+     - to_dup
      - config
     """
-    self.send_open_cursor(session, uri, config)
+    self.send_open_cursor(session, uri, to_dup, config)
     return self.recv_open_cursor()
 
-  def send_open_cursor(self, session, uri, config):
+  def send_open_cursor(self, session, uri, to_dup, config):
     self._oprot.writeMessageBegin('open_cursor', TMessageType.CALL, self._seqid)
     args = open_cursor_args()
     args.session = session
     args.uri = uri
+    args.to_dup = to_dup
     args.config = config
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
@@ -504,42 +490,6 @@ class Client(Iface):
     if result.err != None:
       raise result.err
     raise TApplicationException(TApplicationException.MISSING_RESULT, "open_cursor failed: unknown result");
-
-  def dup_cursor(self, session, cursor, config):
-    """
-    Parameters:
-     - session
-     - cursor
-     - config
-    """
-    self.send_dup_cursor(session, cursor, config)
-    return self.recv_dup_cursor()
-
-  def send_dup_cursor(self, session, cursor, config):
-    self._oprot.writeMessageBegin('dup_cursor', TMessageType.CALL, self._seqid)
-    args = dup_cursor_args()
-    args.session = session
-    args.cursor = cursor
-    args.config = config
-    args.write(self._oprot)
-    self._oprot.writeMessageEnd()
-    self._oprot.trans.flush()
-
-  def recv_dup_cursor(self, ):
-    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
-    if mtype == TMessageType.EXCEPTION:
-      x = TApplicationException()
-      x.read(self._iprot)
-      self._iprot.readMessageEnd()
-      raise x
-    result = dup_cursor_result()
-    result.read(self._iprot)
-    self._iprot.readMessageEnd()
-    if result.success != None:
-      return result.success
-    if result.err != None:
-      raise result.err
-    raise TApplicationException(TApplicationException.MISSING_RESULT, "dup_cursor failed: unknown result");
 
   def create_table(self, session, name, config):
     """
@@ -1165,38 +1115,6 @@ class Client(Iface):
       raise result.err
     return
 
-  def configure_cursor(self, cursor, config):
-    """
-    Parameters:
-     - cursor
-     - config
-    """
-    self.send_configure_cursor(cursor, config)
-    self.recv_configure_cursor()
-
-  def send_configure_cursor(self, cursor, config):
-    self._oprot.writeMessageBegin('configure_cursor', TMessageType.CALL, self._seqid)
-    args = configure_cursor_args()
-    args.cursor = cursor
-    args.config = config
-    args.write(self._oprot)
-    self._oprot.writeMessageEnd()
-    self._oprot.trans.flush()
-
-  def recv_configure_cursor(self, ):
-    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
-    if mtype == TMessageType.EXCEPTION:
-      x = TApplicationException()
-      x.read(self._iprot)
-      self._iprot.readMessageEnd()
-      raise x
-    result = configure_cursor_result()
-    result.read(self._iprot)
-    self._iprot.readMessageEnd()
-    if result.err != None:
-      raise result.err
-    return
-
 
 class Processor(Iface, TProcessor):
   def __init__(self, handler):
@@ -1210,7 +1128,6 @@ class Processor(Iface, TProcessor):
     self._processMap["is_new"] = Processor.process_is_new
     self._processMap["close_session"] = Processor.process_close_session
     self._processMap["open_cursor"] = Processor.process_open_cursor
-    self._processMap["dup_cursor"] = Processor.process_dup_cursor
     self._processMap["create_table"] = Processor.process_create_table
     self._processMap["rename_table"] = Processor.process_rename_table
     self._processMap["drop_table"] = Processor.process_drop_table
@@ -1230,7 +1147,6 @@ class Processor(Iface, TProcessor):
     self._processMap["update_record"] = Processor.process_update_record
     self._processMap["delete_record"] = Processor.process_delete_record
     self._processMap["close_cursor"] = Processor.process_close_cursor
-    self._processMap["configure_cursor"] = Processor.process_configure_cursor
 
   def process(self, iprot, oprot):
     (name, type, seqid) = iprot.readMessageBegin()
@@ -1342,24 +1258,10 @@ class Processor(Iface, TProcessor):
     iprot.readMessageEnd()
     result = open_cursor_result()
     try:
-      result.success = self._handler.open_cursor(args.session, args.uri, args.config)
+      result.success = self._handler.open_cursor(args.session, args.uri, args.to_dup, args.config)
     except WT_ERROR, err:
       result.err = err
     oprot.writeMessageBegin("open_cursor", TMessageType.REPLY, seqid)
-    result.write(oprot)
-    oprot.writeMessageEnd()
-    oprot.trans.flush()
-
-  def process_dup_cursor(self, seqid, iprot, oprot):
-    args = dup_cursor_args()
-    args.read(iprot)
-    iprot.readMessageEnd()
-    result = dup_cursor_result()
-    try:
-      result.success = self._handler.dup_cursor(args.session, args.cursor, args.config)
-    except WT_ERROR, err:
-      result.err = err
-    oprot.writeMessageBegin("dup_cursor", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -1626,20 +1528,6 @@ class Processor(Iface, TProcessor):
     except WT_ERROR, err:
       result.err = err
     oprot.writeMessageBegin("close_cursor", TMessageType.REPLY, seqid)
-    result.write(oprot)
-    oprot.writeMessageEnd()
-    oprot.trans.flush()
-
-  def process_configure_cursor(self, seqid, iprot, oprot):
-    args = configure_cursor_args()
-    args.read(iprot)
-    iprot.readMessageEnd()
-    result = configure_cursor_result()
-    try:
-      self._handler.configure_cursor(args.cursor, args.config)
-    except WT_ERROR, err:
-      result.err = err
-    oprot.writeMessageBegin("configure_cursor", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -2532,6 +2420,7 @@ class open_cursor_args:
   Attributes:
    - session
    - uri
+   - to_dup
    - config
   """
 
@@ -2539,12 +2428,14 @@ class open_cursor_args:
     None, # 0
     (1, TType.I32, 'session', None, None, ), # 1
     (2, TType.STRING, 'uri', None, None, ), # 2
-    (3, TType.STRING, 'config', None, None, ), # 3
+    (3, TType.I32, 'to_dup', None, None, ), # 3
+    (4, TType.STRING, 'config', None, None, ), # 4
   )
 
-  def __init__(self, session=None, uri=None, config=None,):
+  def __init__(self, session=None, uri=None, to_dup=None, config=None,):
     self.session = session
     self.uri = uri
+    self.to_dup = to_dup
     self.config = config
 
   def read(self, iprot):
@@ -2567,6 +2458,11 @@ class open_cursor_args:
         else:
           iprot.skip(ftype)
       elif fid == 3:
+        if ftype == TType.I32:
+          self.to_dup = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
         if ftype == TType.STRING:
           self.config = iprot.readString();
         else:
@@ -2589,8 +2485,12 @@ class open_cursor_args:
       oprot.writeFieldBegin('uri', TType.STRING, 2)
       oprot.writeString(self.uri)
       oprot.writeFieldEnd()
+    if self.to_dup != None:
+      oprot.writeFieldBegin('to_dup', TType.I32, 3)
+      oprot.writeI32(self.to_dup)
+      oprot.writeFieldEnd()
     if self.config != None:
-      oprot.writeFieldBegin('config', TType.STRING, 3)
+      oprot.writeFieldBegin('config', TType.STRING, 4)
       oprot.writeString(self.config)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -2657,161 +2557,6 @@ class open_cursor_result:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('open_cursor_result')
-    if self.success != None:
-      oprot.writeFieldBegin('success', TType.STRUCT, 0)
-      self.success.write(oprot)
-      oprot.writeFieldEnd()
-    if self.err != None:
-      oprot.writeFieldBegin('err', TType.STRUCT, 1)
-      self.err.write(oprot)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-    def validate(self):
-      return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class dup_cursor_args:
-  """
-  Attributes:
-   - session
-   - cursor
-   - config
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.I32, 'session', None, None, ), # 1
-    (2, TType.I32, 'cursor', None, None, ), # 2
-    (3, TType.STRING, 'config', None, None, ), # 3
-  )
-
-  def __init__(self, session=None, cursor=None, config=None,):
-    self.session = session
-    self.cursor = cursor
-    self.config = config
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.I32:
-          self.session = iprot.readI32();
-        else:
-          iprot.skip(ftype)
-      elif fid == 2:
-        if ftype == TType.I32:
-          self.cursor = iprot.readI32();
-        else:
-          iprot.skip(ftype)
-      elif fid == 3:
-        if ftype == TType.STRING:
-          self.config = iprot.readString();
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('dup_cursor_args')
-    if self.session != None:
-      oprot.writeFieldBegin('session', TType.I32, 1)
-      oprot.writeI32(self.session)
-      oprot.writeFieldEnd()
-    if self.cursor != None:
-      oprot.writeFieldBegin('cursor', TType.I32, 2)
-      oprot.writeI32(self.cursor)
-      oprot.writeFieldEnd()
-    if self.config != None:
-      oprot.writeFieldBegin('config', TType.STRING, 3)
-      oprot.writeString(self.config)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-    def validate(self):
-      return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class dup_cursor_result:
-  """
-  Attributes:
-   - success
-   - err
-  """
-
-  thrift_spec = (
-    (0, TType.STRUCT, 'success', (WT_CURSOR_HANDLE, WT_CURSOR_HANDLE.thrift_spec), None, ), # 0
-    (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
-  )
-
-  def __init__(self, success=None, err=None,):
-    self.success = success
-    self.err = err
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 0:
-        if ftype == TType.STRUCT:
-          self.success = WT_CURSOR_HANDLE()
-          self.success.read(iprot)
-        else:
-          iprot.skip(ftype)
-      elif fid == 1:
-        if ftype == TType.STRUCT:
-          self.err = WT_ERROR()
-          self.err.read(iprot)
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('dup_cursor_result')
     if self.success != None:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)
@@ -5403,137 +5148,6 @@ class close_cursor_result:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('close_cursor_result')
-    if self.err != None:
-      oprot.writeFieldBegin('err', TType.STRUCT, 1)
-      self.err.write(oprot)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-    def validate(self):
-      return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class configure_cursor_args:
-  """
-  Attributes:
-   - cursor
-   - config
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.I32, 'cursor', None, None, ), # 1
-    (2, TType.STRING, 'config', None, None, ), # 2
-  )
-
-  def __init__(self, cursor=None, config=None,):
-    self.cursor = cursor
-    self.config = config
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.I32:
-          self.cursor = iprot.readI32();
-        else:
-          iprot.skip(ftype)
-      elif fid == 2:
-        if ftype == TType.STRING:
-          self.config = iprot.readString();
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('configure_cursor_args')
-    if self.cursor != None:
-      oprot.writeFieldBegin('cursor', TType.I32, 1)
-      oprot.writeI32(self.cursor)
-      oprot.writeFieldEnd()
-    if self.config != None:
-      oprot.writeFieldBegin('config', TType.STRING, 2)
-      oprot.writeString(self.config)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-    def validate(self):
-      return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class configure_cursor_result:
-  """
-  Attributes:
-   - err
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.STRUCT, 'err', (WT_ERROR, WT_ERROR.thrift_spec), None, ), # 1
-  )
-
-  def __init__(self, err=None,):
-    self.err = err
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.STRUCT:
-          self.err = WT_ERROR()
-          self.err.read(iprot)
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('configure_cursor_result')
     if self.err != None:
       oprot.writeFieldBegin('err', TType.STRUCT, 1)
       self.err.write(oprot)
