@@ -143,7 +143,7 @@ add_option( "safeshell", "don't let shell scripts run programs (still, don't run
 # dev tools
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
 add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , False , "debugBuildAndLogging" )
-
+add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 
 add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
@@ -225,6 +225,9 @@ env.Append( CPPPATH=[ "." ] )
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
+
+if has_option( "durableDefaultOn" ):
+    env.Append( CPPDEFINES=[ "_DURABLEDEFAULTON" ] )
 
 boostCompiler = GetOption( "boostCompiler" )
 if boostCompiler is None:
