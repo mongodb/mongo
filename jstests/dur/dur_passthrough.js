@@ -71,6 +71,10 @@ function durPassThrough() {
                 return;
             }
             skippingTo = false;
+
+            // to keep memory usage low on 32 bit:
+            db.adminCommand("closeAllDatabases");
+
             runTest(x);
         }
     );
