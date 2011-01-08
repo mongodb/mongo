@@ -60,15 +60,15 @@ namespace ThreadedTests {
 
     class MongoMutexTest : public ThreadedTest<135> {
 #if defined(_DEBUG)
-        enum { N = 10000 };
+        enum { N = 5000 };
 #else
-        enum { N = 80000 };
+        enum { N = 40000 };
 #endif
         MongoMutex *mm;
     public:
         void run() {
             Timer t;
-            cout << "MongoMutexTest" << endl;
+            cout << "MongoMutexTest N:" << N << endl;
             ThreadedTest<135>::run();
             cout << "MongoMutexTest " << t.millis() << "ms" << endl;
         }
