@@ -55,9 +55,13 @@ namespace mongo {
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
 
-        // Locking allows writes. Reads are always allowed
+#if defined(_DEBUG)
         static void markAllWritable();
         static void unmarkAllWritable();
+#else
+        static void markAllWritable() { }
+        static void unmarkAllWritable() { }
+#endif
 
         static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
 
