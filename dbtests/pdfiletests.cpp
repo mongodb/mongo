@@ -354,9 +354,13 @@ namespace PdfileTests {
             //int small = 1024;
 
             unsigned long long l = 0;
+            int n = 0;
             while ( 1 ) {
+                n++;
+                if( n == 5 && sizeof(void*)==4 )
+                    break;
                 MongoDataFile * f = d->addAFile( big , false );
-                cout << f->length() << endl;
+                cout << f->length() << ' ' << n << endl;
                 if ( f->length() == l )
                     break;
                 l = f->length();
