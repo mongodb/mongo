@@ -23,7 +23,7 @@ namespace mongo {
 
     class CodeBlock { 
         volatile int n;
-        DWORD tid;
+        unsigned tid;
         void fail() { 
             log() << "synchronization (race condition) failure" << endl;
             printStackTrace();
