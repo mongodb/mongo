@@ -44,7 +44,7 @@ namespace MMapTests {
                 MongoMMF f;
                 unsigned long long len = 256 * 1024 * 1024;
                 assert( f.create(fn, len, /*sequential*/false) );
-                if( !testIntent ) {
+                {
                     char *p = (char *) f.getView();
                     assert(p);
                     // write something to the private view as a test
@@ -74,7 +74,7 @@ namespace MMapTests {
             for( int i = 0; i < N; i++ ) {
                 MongoMMF f;
                 assert( f.open(fn, i%4==1) );
-                if( !testIntent ) {
+                {
                     char *p = (char *) f.getView();
                     assert(p);
                     strcpy(p, "zzz");

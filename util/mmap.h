@@ -93,12 +93,6 @@ namespace mongo {
         static RWLock mmmutex;
     };
 
-#if !defined(_DEBUG) || defined(_TESTINTENT)
-    // no-ops in production
-    inline void MongoFile::markAllWritable() {}
-    inline void MongoFile::unmarkAllWritable() {}
-#endif
-
     /** look up a MMF by filename. scoped mutex locking convention.
         example:
           MMFFinderByName finder;

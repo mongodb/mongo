@@ -95,15 +95,6 @@
 
 namespace mongo {
 
-# if defined(_TESTINTENT)
-    /** Use _TESTINTENT to test write intent declarations by using a read only view for non-declared operations.
-        We don't do journalling when _TESTINTENT is enabled.
-    */
-    const bool testIntent = true;
-# else
-    const bool testIntent = false;
-# endif
-
     using namespace std;
     using boost::shared_ptr;
 

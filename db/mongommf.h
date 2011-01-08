@@ -50,7 +50,6 @@ namespace mongo {
 
         /* Get the "standard" view (which is the private one).
            @return the private view.
-                   on _TESTINTENT, returns the readonly view
         */
         void* getView();
 
@@ -59,13 +58,7 @@ namespace mongo {
            as a tad of a "warning".  but useful when done with some care, such as during
            initialization.
         */
-        static void* _switchToWritableView(void *private_ptr);
-
-        /** for _TESTINTENT build.
-            translates the read view pointer into a pointer to the corresponding
-            place in the private view.
-        */
-        static void* switchToPrivateView(void *debug_readonly_ptr);
+        //static void* _switchToWritableView(void *private_ptr);
 
         /** for a filename a/b/c.3
             filePath() is "a/b/c"
@@ -93,7 +86,6 @@ namespace mongo {
 
         void *_view_write;
         void *_view_private;
-        void *_view_readonly; // for _DEBUG build
         bool _willNeedRemap;
         RelativePath _p;   // e.g. "somepath/dbname"
         int _fileSuffixNo;  // e.g. 3.  -1="ns"

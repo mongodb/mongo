@@ -30,7 +30,7 @@
 
 namespace mongo {
 
-#define VERIFYTHISLOC dassert( thisLoc.btree() == this || testIntent );
+#define VERIFYTHISLOC dassert( thisLoc.btree() == this );
 
     /**
      * give us a writable version of the btree bucket (declares write intent).

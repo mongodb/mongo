@@ -293,7 +293,7 @@ namespace PerfTests {
             MongoMMF f;
             unsigned long long len = 1 * 1024 * 1024;
             assert( f.create(fn, len, /*sequential*/rand()%2==0) );
-            if( !testIntent ) {
+            {
                 char *p = (char *) f.getView();
                 assert(p);
                 // write something to the private view as a test

@@ -136,11 +136,6 @@ namespace mongo {
             */
             virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 
-            /* assert that we have not (at least so far) declared write intent for p */
-            inline void assertReading(void *p) {
-                dassert( !testIntent || MongoMMF::switchToPrivateView(p) != p );
-            }
-
             static DurableInterface& getDur() { return *_impl; }
 
         private:

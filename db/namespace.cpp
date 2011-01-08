@@ -133,12 +133,12 @@ namespace mongo {
 
         if( backgroundIndexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();
-            NamespaceDetails *d = (NamespaceDetails *) MongoMMF::_switchToWritableView(this);
             if( backgroundIndexBuildInProgress ) {
                 log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
-                d->backgroundIndexBuildInProgress = 0;
+                getDur().writingInt( backgroundIndexBuildInProgress ) = 0;
             }
-            d->capped2.cc2_ptr = 0;
+            if( capped2.cc2_ptr )
+                *getDur().writing(&capped2.cc2_ptr) = 0;
         }
     }
 
@@ -214,7 +214,6 @@ namespace mongo {
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
-        getDur().assertReading(this);
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
         {

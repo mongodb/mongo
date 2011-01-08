@@ -198,8 +198,6 @@ namespace mongo {
 
         void* DurableImpl::writingPtr(void *x, unsigned len) {
             void *p = x;
-            if( testIntent )
-                p = MongoMMF::switchToPrivateView(x);
             declareWriteIntent(p, len);
             return p;
         }
@@ -207,20 +205,16 @@ namespace mongo {
         /** declare intent to write
             @param ofs offset within buf at which we will write
             @param len the length at ofs we will write
-            @return new buffer pointer.  this is modified when testIntent is true.
+            @return new buffer pointer.
         */
         void* DurableImpl::writingAtOffset(void *buf, unsigned ofs, unsigned len) {
             char *p = (char *) buf;
-            if( testIntent )
-                p = (char *) MongoMMF::switchToPrivateView(buf);
             declareWriteIntent(p+ofs, len);
             return p;
         }
 
         void* DurableImpl::writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges ) {
             char *p = (char *) buf;
-            if( testIntent )
-                p = (char *) MongoMMF::switchToPrivateView(buf);
             for( vector< pair< long long, unsigned > >::const_iterator i = ranges.begin();
                     i != ranges.end(); ++i ) {
                 declareWriteIntent( p + i->first, i->second );
@@ -243,9 +237,6 @@ namespace mongo {
         */
 #if 0
         void DurableImpl::debugCheckLastDeclaredWrite() {
-            if( testIntent )
-                return;
-
             static int n;
             ++n;
 
@@ -585,8 +576,6 @@ namespace mongo {
 
             DurableInterface::enableDurability();
 
-            if( testIntent )
-                return;
             journalMakeDir();
             try {
                 recover();
