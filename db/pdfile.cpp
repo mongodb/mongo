@@ -391,7 +391,7 @@ namespace mongo {
 
         if ( preallocateOnly ) {
             if ( cmdLine.prealloc ) {
-                theFileAllocator().requestAllocation( filename, size );
+                FileAllocator::get()->requestAllocation( filename, size );
             }
             return;
         }
@@ -1948,7 +1948,7 @@ namespace mongo {
 
     void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator, const string& path ) {
         if ( afterAllocator )
-            theFileAllocator().waitUntilFinished();
+            FileAllocator::get()->waitUntilFinished();
         string c = database;
         c += '.';
         boost::filesystem::path p(path);

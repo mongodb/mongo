@@ -257,7 +257,7 @@ namespace mongo {
             printSysInfo();
             log() << "random seed: " << seed << endl;
 
-            theFileAllocator().start();
+            FileAllocator::get()->start();
 
             vector<string> suites;
             if (params.count("suites")) {

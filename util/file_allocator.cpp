@@ -258,8 +258,12 @@ namespace mongo {
 
 #endif
 
-    // The mutex contained in this object may be held on shutdown.
-    FileAllocator &theFileAllocator_ = *(new FileAllocator());
-    FileAllocator &theFileAllocator() { return theFileAllocator_; }
+    FileAllocator* FileAllocator::_instance = 0;
+
+    FileAllocator* FileAllocator::get(){
+        if ( ! _instance )
+            _instance = new FileAllocator();
+        return _instance;
+    }
 
 } // namespace mongo

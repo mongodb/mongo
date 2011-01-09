@@ -203,7 +203,7 @@ namespace mongo {
                 return -1;
             }
 
-            theFileAllocator().start();
+            FileAllocator::get()->start();
         }
 
         if ( _params.count( "db" ) )

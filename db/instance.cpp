@@ -712,7 +712,7 @@ namespace mongo {
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
         log() << "shutdown: waiting for fs preallocator..." << endl;
-        theFileAllocator().waitUntilFinished();
+        FileAllocator::get()->waitUntilFinished();
 
         log() << "shutdown: closing all files..." << endl;
         if( cmdLine.dur ) {

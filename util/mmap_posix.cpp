@@ -55,7 +55,7 @@ namespace mongo {
     void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
         // length may be updated by callee.
         setFilename(filename);
-        theFileAllocator().allocateAsap( filename, length );
+        FileAllocator::get()->allocateAsap( filename, length );
         len = length;
 
         massert( 10446 , str::stream() << "mmap: can't map area of size 0 file: " << filename, length > 0 );

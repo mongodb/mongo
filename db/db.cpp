@@ -546,7 +546,7 @@ sendmore:
         acquirePathLock();
         remove_all( dbpath + "/_tmp/" );
 
-        theFileAllocator().start();
+        FileAllocator::get()->start();
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 

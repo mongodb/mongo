@@ -74,7 +74,7 @@ public:
              << "}" << endl;
     }
     ~Runner() {
-        theFileAllocator().waitUntilFinished();
+        FileAllocator::get()->waitUntilFinished();
         client_->dropDatabase( testDb< T >().c_str() );
     }
 };

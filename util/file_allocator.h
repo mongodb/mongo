@@ -22,16 +22,15 @@ namespace mongo {
     /*
      * Handles allocation of contiguous files on disk.  Allocation may be
      * requested asynchronously or synchronously.
+     * singleton
      */
-    class FileAllocator {
+    class FileAllocator : boost::noncopyable {
         /*
          * The public functions may not be called concurrently.  The allocation
          * functions may be called multiple times per file, but only the first
          * size specified per file will be used.
         */
     public:
-        FileAllocator();
-
         void start();
 
         /**
@@ -51,7 +50,13 @@ namespace mongo {
 
         static void ensureLength(int fd , long size);
 
+        /** @return the singletone */
+        static FileAllocator * get();
+
     private:
+
+        FileAllocator();
+
 #if !defined(_WIN32)
         void checkFailure();
 
@@ -73,7 +78,9 @@ namespace mongo {
 
         bool _failed;
 #endif
+        
+        static FileAllocator* _instance;
+
     };
 
-    FileAllocator &theFileAllocator();
 } // namespace mongo
