@@ -41,6 +41,8 @@ namespace mongo {
     boost::thread_specific_ptr<string> _threadName;
 
     unsigned _setThreadName( const char * name ) {
+        if ( ! name ) name = "NONE";
+
         static unsigned N = 0;
 
         if ( strcmp( name , "conn" ) == 0 ) {
