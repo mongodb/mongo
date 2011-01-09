@@ -21,7 +21,7 @@ def foundxulrunner( env , options ):
         
 
     if best is None:
-        print( "warning: using ubuntu without xulrunner-dev.  we reccomend installing it" )
+        print( "warning: using ubuntu without xulrunner-dev.  we recommend installing it" )
         return False
 
     incroot = "/usr/include/" + best + "/"
