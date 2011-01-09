@@ -23,12 +23,10 @@ function verify() {
     log("verify");
     var d = conn.getDB("test");
     var mycount = d.foo.count();
-    print("count:" + mycount);
+    //print("count:" + mycount);
     assert(mycount>2, "count wrong");
 }
 
-// if you do inserts here, you will want to set _id.  otherwise they won't match on different 
-// runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
     log("work");
     x = 'x'; while(x.length < 1024) x+=x;
@@ -39,9 +37,9 @@ function work() {
     // go long enough we will have time to kill it later during recovery
     var j = 2;
     var MaxTime = 15;
-    if (Math.random() < 0.05) {
-        print("doing a longer pass");
-        MaxTime = 90;
+    if (Math.random() < 0.1) {
+        print("dur2.js DOING A LONGER (120 sec) PASS - if an error, try long pass to replicate");
+        MaxTime = 120;
     }
     while (1) {
         d.foo.insert({ _id: j, z: x });
@@ -71,28 +69,24 @@ if( debugging ) {
 }
 
 // directories
-var path2 = "/data/db/" + testname+"dur";
+var path = "/data/db/" + testname+"dur";
 
-// durable version
 log("run mongod with --dur");
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
+conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
 work();
 
-// kill the process hard
+log("kill -9");
 stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
+assert(listFiles(path + "/journal/").length > 0, "journal directory is unexpectantly empty after kill");
 
 // restart and recover
-log("restart and recover");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8, "--master", "--oplogSize", 64);
+log("restart mongod and recover");
+conn = startMongodNoReset("--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8, "--master", "--oplogSize", 64);
 verify();
 
-log("stopping 30002");
+log("stopping mongod 30002");
 stopMongod(30002);
 
-// stopMongod seems to be asynchronous (hmmm) so we sleep here.
-sleep(5000);
-
 print(testname + " SUCCESS");
-

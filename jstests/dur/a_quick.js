@@ -23,9 +23,9 @@ stopMongod(30000);
 
 // durable version
 tst.log("start mongod with dur");
-var conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--durOptions", 8);
+conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--durOptions", 8);
 tst.log("with dur work");
-var d = conn.getDB("test");
+d = conn.getDB("test");
 d.foo.insert({ _id: 123 });
 d.getLastError(); // wait
 
@@ -41,9 +41,12 @@ stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
-// we will force removal of a datafile to be sure we can recreate everythign
+// we will force removal of a datafile to be sure we can recreate everything
 // without it being present.
 removeFile(path2 + "/test.0");
+
+// for that to work, we can't skip anything though:
+removeFile(path2 + "/journal/lsn");
 
 // with the file deleted, we MUST start from the beginning of the journal.
 // thus this check to be careful
@@ -57,9 +60,9 @@ if (files.some(function (f) { return f.name.indexOf("lsn") >= 0; })) {
 
 // restart and recover
 tst.log("restart and recover");
-var conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 9);
+conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 9);
 tst.log("check data results");
-var d = conn.getDB("test");
+d = conn.getDB("test");
 print("count:" + d.foo.count());
 assert(d.foo.count() == 1, "count 1");
 
@@ -103,7 +106,7 @@ if (diff != "") {
     assert(diff == "", "error test.ns files differ");
 }
 
-var diff = tst.diff(path1 + "/test.0", path2 + "/test.0");
+diff = tst.diff(path1 + "/test.0", path2 + "/test.0");
 print("diff of .0 files returns:" + diff);
 if (diff != "") {
     showfiles();

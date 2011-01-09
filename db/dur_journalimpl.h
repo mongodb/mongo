@@ -51,6 +51,8 @@ namespace mongo {
             */
             bool tryToCloseCurJournalFile();
 
+            unsigned long long lastFlushTime() const { return _lastFlushTime; }
+
         private:
             // rotate after reaching this data size in a journal (j._<n>) file
             static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;

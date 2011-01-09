@@ -123,7 +123,7 @@ namespace mongo {
             // JSectHeader
             JSectHeader h;
             h.len = (unsigned) 0xffffffff;  // total length, will fill in later
-            h.seqNumber = 0; // tbd         unsigned long long getLastDataFileFlushTime();
+            h.seqNumber = getLastDataFileFlushTime();
 
             bb.appendStruct(h);
         }

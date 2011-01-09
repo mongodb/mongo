@@ -1,6 +1,4 @@
-/* 
-   test durability
-*/
+/* oplog.js */
 
 var debugging = false;
 var testname = "oplog";
@@ -143,4 +141,3 @@ assert(diff == "", "error test.0 files differ");
 log("check data matches done");
 
 print(testname + " SUCCESS");
-

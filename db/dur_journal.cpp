@@ -186,7 +186,7 @@ namespace mongo {
 
             filesystem::path p = getJournalDir();
             j.dir = p.string();
-            DEV log() << "dev journalMakeDir() " << j.dir << endl;
+            log() << "journal dir=" << j.dir << endl;
             if( !exists(j.dir) ) {
                 try {
                     create_directory(j.dir);
@@ -269,6 +269,10 @@ namespace mongo {
             return 0;
         }
 
+        unsigned long long getLastDataFileFlushTime() {
+            return j.lastFlushTime();
+        }
+
         /** remember "last sequence number" to speed recoveries
             concurrency: called by durThread only.
         */
@@ -284,6 +288,7 @@ namespace mongo {
                 unsigned long long length = sizeof(LSNFile);
                 LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
                 assert(lsnf);
+                log() << "lsn set " << _lastFlushTime << endl;
                 lsnf->set(_lastFlushTime);
             }
             catch(std::exception& e) {

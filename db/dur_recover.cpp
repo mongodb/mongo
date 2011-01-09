@@ -281,11 +281,10 @@ namespace mongo {
             vector<ParsedJournalEntry> entries;
             JournalSectionIterator i(p, len, _recovering);
 
-            if( _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) {
-                log() << "recover skipping application of section " << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
-
-                // TODO: shouldn't we return here?
-                // http://jira.mongodb.org/browse/SERVER-2320
+            //DEV log() << "recovery processSection seq:" << i.seqNumber() << endl;
+            if( _recovering && _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) {
+                log() << "recover skipping application of section seq:" << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+                return;
             }
 
             // first read all entries to make sure this section is valid
