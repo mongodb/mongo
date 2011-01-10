@@ -9,101 +9,6 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_read_serial_func(WT_TOC *);
-
-/*
- * __wt_page_in --
- *	Return a database page, reading as necessary.
- */
-int
-__wt_page_in(WT_TOC *toc,
-    uint32_t addr, uint32_t size, WT_PAGE **pagep, uint32_t flags)
-{
-	DB *db;
-	ENV *env;
-	IDB *idb;
-	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e;
-	WT_PAGE *page;
-	uint32_t i;
-	int found, ret;
-
-	*pagep = NULL;
-
-	db = toc->db;
-	env = toc->env;
-	idb = db->idb;
-	cache = env->ienv->cache;
-
-	WT_ASSERT(env, size % WT_FRAGMENT == 0);
-	WT_ENV_FCHK_ASSERT(env, "__wt_page_in", flags, WT_APIMASK_WT_PAGE_IN);
-
-	/* Search the cache for the page. */
-	found = ret = 0;
-	for (i = WT_CACHE_ENTRY_CHUNK,
-	    e = cache->hb[WT_ADDR_HASH(cache, addr)];;) {
-		if (e->db == db && e->addr == addr &&
-		    (e->state == WT_OK ||
-		    (e->state == WT_DRAIN && F_ISSET(toc, WT_READ_DRAIN)))) {
-			found = 1;
-			break;
-		}
-		WT_CACHE_ENTRY_NEXT(e, i);
-	}
-
-	/* Get a hazard reference -- if that fails, the page isn't available. */
-	if (found && __wt_hazard_set(toc, e, NULL)) {
-		/* Update the generation number. */
-		page = e->page;
-		page->lru = ++cache->lru;
-		*pagep = page;
-
-		WT_STAT_INCR(idb->stats, DB_CACHE_HIT);
-		WT_STAT_INCR(cache->stats, CACHE_HIT);
-		return (0);
-	}
-
-	/* Optionally, only return in-cache entries. */
-	if (LF_ISSET(WT_CACHE_ONLY))
-		return (WT_NOTFOUND);
-
-	/*
-	 * If for any reason, we can't get the page we want, ask the read server
-	 * to get it for us and go to sleep.  The read server is expensive, but
-	 * serializes all the hard cases.
-	 */
-	__wt_cache_read_serial(toc, addr, size, pagep, ret);
-	if (ret == WT_RESTART)
-		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
-	return (ret);
-}
-
-/*
- * __wt_cache_read_serial_func --
- *	Read/allocation serialization function called when a page-in requires
- *	allocation or a read.
- */
-static int
-__wt_cache_read_serial_func(WT_TOC *toc)
-{
-	WT_PAGE **pagep;
-	uint32_t addr, size;
-
-	__wt_cache_read_unpack(toc, addr, size, pagep);
-
-	return (__wt_cache_read_queue(toc, addr, size, pagep));
-}
-
-/*
- * __wt_page_out --
- *	Return a page to the cache.
- */
-void
-__wt_page_out(WT_TOC *toc, WT_PAGE *page)
-{
-	__wt_hazard_clear(toc, page);
-}
-
 /*
  * __wt_page_read --
  *	Read a database page (same as read, but verify the checksum).
@@ -142,14 +47,18 @@ __wt_page_read(DB *db, WT_PAGE *page)
  *	Write a database page.
  */
 int
-__wt_page_write(DB *db, WT_PAGE *page)
+__wt_page_write(WT_TOC *toc, WT_PAGE *page)
 {
+	DB *db;
 	ENV *env;
 	WT_FH *fh;
 	WT_PAGE_HDR *hdr;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	fh = db->idb->fh;
+
+	WT_ASSERT(env, __wt_bt_verify_dsk_page(toc, page) == 0);
 
 	hdr = page->hdr;
 	hdr->checksum = 0;

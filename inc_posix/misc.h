@@ -95,27 +95,10 @@ extern "C" {
 
 /*
  * Macros to handle standard return values and optionally branch to an error
- * label.  One pair returns WT_RESTART, one set retries WT_RESTART: if you
- * have valid information, that is, if you know your addr/size pair is good
- * (for example, because it's taken from a pinned page), you can retry, else
- * you have to return the failure.
- *
- * Generally, addr/size pair locations are not declared volatile, they live
- * on random Btree pages; for that reason, use a memory barrier instruction
- * before retrying the call.  (In other words, some other thread modified
- * the addr/size pair, and caused a WT_RESTART to be returned to us -- the
- * memory barrier is to ensure we get the new values, by flushing our saved
- * information.)
+ * label.
  */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
-		goto err;						\
-} while (0)
-#define	WT_ERR_RESTART(a) do {						\
-	int __ret;							\
-	while ((__ret = (a)) != 0 && __ret == WT_RESTART)		\
-		WT_MEMORY_FLUSH;					\
-	if (__ret != 0)							\
 		goto err;						\
 } while (0)
 #define	WT_RET(a) do {							\
@@ -123,18 +106,20 @@ extern "C" {
 	if ((__ret = (a)) != 0)						\
 		return (__ret);						\
 } while (0)
-#define	WT_RET_RESTART(a) do {						\
-	int __ret;							\
-	while ((__ret = (a)) != 0 && __ret == WT_RESTART)		\
-		WT_MEMORY_FLUSH;					\
-	if (__ret != 0)							\
-		return (__ret);						\
-} while (0)
 #define	WT_TRET(a) do {							\
 	int __ret;							\
 	if ((__ret = (a)) != 0 && ret == 0)				\
 		ret = __ret;						\
 } while (0)
+
+/*
+ * There are lots of places where we release a reference to a page, unless it's
+ * the root page, which remains pinned for the life of the table handle.  It's
+ * common enough to need a macro.
+ */
+#define	WT_PAGE_OUT(toc, p)						\
+	if ((p) != NULL && (p) != (toc)->db->idb->root_page.page)	\
+		__wt_bt_page_out(toc, &(p), 0);
 
 #if defined(__cplusplus)
 }

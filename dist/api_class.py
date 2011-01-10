@@ -80,19 +80,6 @@ methods['env.cache_drain_cnt_set'] = Api(
 	[],
 	['init'], [])
 
-methods['env.cache_hash_size_get'] = Api(
-	'env.cache_hash_size_get',
-	'method, getter',
-	['cache_hash_size/uint32_t *@S'],
-	[],
-	['init'], [])
-methods['env.cache_hash_size_set'] = Api(
-	'env.cache_hash_size_set',
-	'method, setter, verify',
-	['cache_hash_size/uint32_t @S'],
-	[],
-	['init'], [])
-
 methods['env.cache_size_get'] = Api(
 	'env.cache_size_get',
 	'method, getter',
@@ -612,14 +599,11 @@ flags['wiredtiger_env_init'] = [
 flags['bt_build_data_item'] = [
 	'IS_DUP']
 flags['bt_page_out'] = [
-	'DISCARD',
-	'MODIFIED' ]
+	'DISCARD' ]
 flags['bt_search_col'] = [
 	'DATA_OVERWRITE' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
-flags['wt_page_in'] = [
-	'CACHE_ONLY' ]
 
 ###################################################
 # Structure flag declarations

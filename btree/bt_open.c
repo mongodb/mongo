@@ -44,8 +44,8 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 		WT_RET(__wt_bt_desc_read(toc));
 
 		/* If there's a root page, pin it. */
-		if (idb->root_addr != WT_ADDR_INVALID)
-			WT_RET(__wt_bt_root_pin(toc, 1));
+		if (idb->root_off.addr != WT_ADDR_INVALID)
+			WT_RET(__wt_bt_root_pin(toc));
 	}
 
 	return (0);
@@ -261,31 +261,19 @@ __wt_bt_open_verify_page_sizes(DB *db)
 
 /*
  * __wt_bt_root_pin --
- *	Pin/unpin the root page.
+ *	Read in the root page and pin it into memory.
  */
 int
-__wt_bt_root_pin(WT_TOC *toc, int pin)
+__wt_bt_root_pin(WT_TOC *toc)
 {
 	IDB *idb;
-	WT_PAGE *root_page;
 
 	idb = toc->db->idb;
 
-	/*
-	 * Read the root page; the page could be discarded, but not re-written,
-	 * so simply retry any WT_RESTART returns.
-	 */
-	WT_RET_RESTART(__wt_bt_page_in(
-	    toc, idb->root_addr, idb->root_size, 1, &root_page));
-	if (pin) {
-		F_SET(root_page, WT_PINNED);
-		idb->root_page = root_page;
-	} else {
-		F_CLR(root_page, WT_PINNED);
-		idb->root_page = NULL;
-	}
-
-	__wt_bt_page_out(toc, &root_page, 0);
+	/* Get the root page. */
+	WT_RET(__wt_bt_page_in(toc, &idb->root_page, &idb->root_off, 0));
+		F_SET(idb->root_page.page, WT_PINNED);
+	__wt_hazard_clear(toc, idb->root_page.page);
 
 	return (0);
 }

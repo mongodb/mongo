@@ -61,6 +61,8 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 	idb->file_id = ++ienv->next_file_id;
 	__wt_unlock(env, ienv->mtx);
 
+	__wt_bt_gen_ref_pair(&idb->root_page, &idb->root_off, 0, 0);
+
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(idb, WT_RDONLY);
 
@@ -82,7 +84,7 @@ __wt_db_close(WT_TOC *toc, uint32_t flags)
 
 	/* Flush the underlying Btree. */
 	if (!LF_ISSET(WT_NOWRITE))
-		WT_TRET(__wt_bt_sync(toc, NULL, flags));
+		WT_TRET(__wt_bt_sync(toc));
 
 	/* Close the underlying Btree. */
 	ret = __wt_bt_close(toc);

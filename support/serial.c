@@ -94,11 +94,18 @@ __wt_toc_serialize_func(
  *	Server function cleanup.
  */
 void
-__wt_toc_serialize_wrapup(WT_TOC *toc, int ret)
+__wt_toc_serialize_wrapup(WT_TOC *toc, WT_PAGE *page, int ret)
 {
 	ENV *env;
 
 	env = toc->env;
+
+	/*
+	 * If passed a page and the return value is good, we modified the page;
+	 * no need for a memory flush, we'll use the one below.
+	 */
+	if (page != NULL && ret == 0)
+		++page->write_gen;
 
 	/*
 	 * Set the return value and reset the state -- the workQ no longer needs

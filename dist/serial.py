@@ -17,8 +17,8 @@ serial['bt_rcc_expand'] = Serial(
 	'bt_rcc_expand',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'uint16_t/write_gen',
-	 'int/slot',
+	 'uint32_t/write_gen',
+	 'uint32_t/slot',
 	 'WT_RCC_EXPAND **/new_rccexp',
 	 'WT_RCC_EXPAND */exp'])
 
@@ -26,7 +26,7 @@ serial['bt_rcc_expand_repl'] = Serial(
 	'bt_rcc_expand_repl',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'uint16_t/write_gen',
+	 'uint32_t/write_gen',
 	 'WT_RCC_EXPAND */exp',
 	 'WT_REPL */repl'])
 
@@ -34,17 +34,17 @@ serial['bt_item_update'] = Serial(
 	'bt_item_update',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
-	 'uint16_t/write_gen',
-	 'int/slot',
+	 'uint32_t/write_gen',
+	 'uint32_t/slot',
 	 'WT_REPL **/new_repl',
 	 'WT_REPL */repl'])
 
 serial['cache_read'] = Serial(
 	'cache_read',
 	'WT_WORKQ_READ', '0',
-	['uint32_t/addr',
-	 'uint32_t/size',
-	 'WT_PAGE **/pagep'])
+	['WT_REF */ref',
+	 'WT_OFF */off',
+	 'int/dsk_verify'])
 
 # func_serial --
 #	Loop through the serial dictionary and output #defines to schedule

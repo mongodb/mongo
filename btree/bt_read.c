@@ -9,7 +9,6 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_entry_grow(WT_TOC *, uint32_t, WT_CACHE_ENTRY **);
 static int __wt_cache_read(WT_READ_REQ *);
 
 /*
@@ -61,16 +60,21 @@ __wt_workq_read_server(ENV *env, int force)
 }
 
 /*
- * __wt_cache_read_queue --
- *	Enter a new request into the cache read queue.
+ * __wt_cache_read_serial_func --
+ *	Read/allocation serialization function called when a page-in requires
+ *	allocation or a read.
  */
 int
-__wt_cache_read_queue(
-    WT_TOC *toc, uint32_t addr, uint32_t size, WT_PAGE **pagep)
+__wt_cache_read_serial_func(WT_TOC *toc)
 {
 	ENV *env;
 	WT_CACHE *cache;
+	WT_OFF *off;
 	WT_READ_REQ *rr, *rr_end;
+	WT_REF *ref;
+	int dsk_verify;
+
+	__wt_cache_read_unpack(toc, ref, off, dsk_verify);
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -80,7 +84,7 @@ __wt_cache_read_queue(
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 	for (; rr < rr_end; ++rr)
 		if (WT_READ_REQ_ISEMPTY(rr)) {
-			WT_READ_REQ_SET(rr, toc, addr, size, pagep);
+			WT_READ_REQ_SET(rr, toc, ref, off, dsk_verify);
 			return (0);
 		}
 	__wt_api_env_errx(env, "read server request table full");
@@ -151,7 +155,7 @@ __wt_cache_read_server(void *arg)
 				ret = __wt_cache_read(rr);
 
 				WT_READ_REQ_CLR(rr);
-				__wt_toc_serialize_wrapup(toc, ret);
+				__wt_toc_serialize_wrapup(toc, NULL, ret);
 
 				didwork = 1;
 
@@ -177,60 +181,41 @@ err:		__wt_api_env_err(env, ret, "cache read server error");
 
 /*
  * __wt_cache_read --
- *	Read a page into the cache.
+ *	Read a page from the file.
  */
 static int
 __wt_cache_read(WT_READ_REQ *rr)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
 	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e, *empty;
 	WT_FH *fh;
+	WT_OFF *off;
 	WT_PAGE *page;
+	WT_REF *ref;
 	WT_TOC *toc;
-	uint32_t addr, addr_hash, size, i;
+	uint32_t addr, size;
 	int ret;
 
 	toc = rr->toc;
+	ref = rr->ref;
+	off = rr->off;
+	addr = off->addr;
+	size = off->size;
+
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
 	cache = env->ienv->cache;
-	fh = idb->fh;
+	fh = db->idb->fh;
 	ret = 0;
 
-	addr = rr->addr;
-	size = rr->size;
-
 	/*
-	 * Read a page from the file -- allocations end up here too, because
-	 * we have to single-thread extending the file, and we can share page
-	 * allocation and cache insertion code.
-	 *
 	 * Check to see if some other thread brought the page into the cache
-	 * while we waited to run.   We don't care what state the page is in,
-	 * we have to restart the operation since it appears in the cache.
-	 * The obvious problem is the page is waiting to drain.   For all we
-	 * know, the drain server will find a hazard reference and restore the
-	 * page to the cache.
-	 *
-	 * While we're walking the hash bucket, keep track of any empty slots
-	 * we find, we may need one.
+	 * while our request was in the queue.   If the state is anything
+	 * other than empty, it's not our problem.
 	 */
-	empty = NULL;
-	for (i = WT_CACHE_ENTRY_CHUNK,
-	    e = cache->hb[WT_ADDR_HASH(cache, addr)];;) {
-		if (e->state == WT_EMPTY)
-			empty = e;
-		else if (e->db == db && e->addr == addr)
-			return (WT_RESTART);
-
-		WT_CACHE_ENTRY_NEXT(e, i);
-	}
-	WT_STAT_INCR(cache->stats, CACHE_MISS);
-	WT_STAT_INCR(idb->stats, DB_CACHE_MISS);
+	if (ref->state != WT_EMPTY)
+		return (0);
 
 	/*
 	 * The page isn't in the cache, and since we're the only path for the
@@ -245,99 +230,42 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->hdr));
 
 	/* Read the page. */
+	WT_VERBOSE(env, WT_VERB_CACHE,
+	    (env, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
+	WT_STAT_INCR(cache->stats, PAGE_READ);
+
 	page->addr = addr;
 	page->size = size;
-	page->lru = ++cache->lru;
 	WT_ERR(__wt_page_read(db, page));
-
-	/*
-	 * If we found an empty slot in our original hash bucket walk, use it;
-	 * otherwise, look for another one.  If there aren't any empty slots,
-	 * grow the array.
-	 */
-	if (empty == NULL) {
-		addr_hash = WT_ADDR_HASH(cache, addr);
-		for (i = WT_CACHE_ENTRY_CHUNK, e = cache->hb[addr_hash];;) {
-			if (e->state == WT_EMPTY) {
-				empty = e;
-				break;
-			}
-			WT_CACHE_ENTRY_NEXT(e, i);
-		}
-		if (empty == NULL)
-			WT_ERR(__wt_cache_entry_grow(toc, addr_hash, &empty));
-	}
-
-	/*
-	 * Get a hazard reference before we fill in the entry: the cache drain
-	 * server should not pick a new page with a high read-generation, but
-	 * it's theoretically possible.
-	 */
-	__wt_hazard_set(toc, NULL, page);
-	WT_CACHE_ENTRY_SET(empty, db, addr, page, WT_OK);
-
-	WT_VERBOSE(env,
-	    WT_VERB_CACHE, (env, "cache read addr %lu (element %p, page %p)",
-	    (u_long)addr, empty, empty->page));
-
 	WT_CACHE_PAGE_IN(cache, size);
 
-	/* Return the page to the caller. */
-	*rr->pagep = page;
+	/* If the page needs to be verified, that's next. */
+	if (rr->dsk_verify)
+		WT_ERR(__wt_bt_verify_dsk_page(toc, page));
+
+	/* Build the in-memory version of the page. */
+	WT_ERR(__wt_bt_page_inmem(toc, page));
+
+	/*
+	 * Reference the WT_OFF structure that read the page -- typically it's
+	 * the WT_OFF structure on the parent's page.
+	 */
+	page->parent_ref = off;
+
+	/*
+	 * The page is now available -- set the LRU so the page is not selected
+	 * for eviction.
+	 */
+	page->read_gen = ++cache->read_gen;
+	ref->page = page;
+	ref->state = WT_OK;
 
 	return (0);
 
 err:	if (page != NULL) {
 		if (page->hdr != NULL)
 			__wt_free(env, page->hdr, size);
-		__wt_free(env, page, sizeof(*page));
+		__wt_free(env, page, sizeof(WT_PAGE));
 	}
 	return (ret);
-}
-
-/*
- * __wt_cache_entry_grow --
- *	Grow the hash bucket's WT_CACHE_ENTRY array.
- */
-static int
-__wt_cache_entry_grow(WT_TOC *toc, uint32_t bucket, WT_CACHE_ENTRY **emptyp)
-{
-	ENV *env;
-	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e, *new;
-	uint32_t entries;
-
-	env = toc->env;
-	cache = env->ienv->cache;
-
-	/* Allocate the new WT_ENTRY array. */
-	WT_RET(__wt_calloc(env,
-	    (size_t)WT_CACHE_ENTRY_CHUNK + 1, sizeof(WT_CACHE_ENTRY), &new));
-	*emptyp = new;
-
-	/*
-	 * Find the end of the linked list of entries, and append the new
-	 * array.
-	 */
-	for (entries = 0, e = cache->hb[bucket];;) {
-		entries += WT_CACHE_ENTRY_CHUNK;
-		if (e[WT_CACHE_ENTRY_CHUNK].db == NULL) {
-			entries += WT_CACHE_ENTRY_CHUNK;
-			e[WT_CACHE_ENTRY_CHUNK].db = (DB *)new;
-			break;
-		}
-		e = (WT_CACHE_ENTRY *)e[WT_CACHE_ENTRY_CHUNK].db;
-	}
-
-	/* Make it real, it's ready to go. */
-	WT_MEMORY_FLUSH;
-
-	if (WT_STAT(cache->stats, CACHE_MAX_BUCKET_ENTRIES) < entries)
-		WT_STAT_SET(cache->stats, CACHE_MAX_BUCKET_ENTRIES, entries);
-
-	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-	    "growing cache hash bucket %lu to %lu",
-	    (u_long)bucket, (u_long)entries));
-
-	return (0);
 }

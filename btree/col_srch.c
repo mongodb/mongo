@@ -19,13 +19,14 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	DB *db;
 	IDB *idb;
 	WT_COL *cip;
+	WT_OFF *off;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_RCC_EXPAND *exp;
+	WT_REF *ref;
 	WT_REPL *repl;
 	uint64_t record_cnt;
-	uint32_t addr, size, i;
-	uint16_t write_gen;
+	uint32_t i, write_gen;
 	int ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -39,16 +40,15 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 	WT_DB_FCHK(db, "__wt_bt_search_col", flags, WT_APIMASK_BT_SEARCH_COL);
 
-restart:
 	/* Check for a record past the end of the database. */
-	page = idb->root_page;
+	page = idb->root_page.page;
 	if (page->records < recno)
 		return (WT_NOTFOUND);
 
 	/* Search the tree. */
 	for (;;) {
 		/* Save the write generation value before the read. */
-		write_gen = WT_PAGE_WRITE_GEN(page);
+		write_gen = page->write_gen;
 
 		/* Walk the page looking for the record. */
 		hdr = page->hdr;
@@ -88,29 +88,15 @@ restart:
 		if (level == hdr->level)
 			goto done;
 
-		/*
-		 * cip references the subtree containing the record; check for
-		 * an update.
-		 */
-		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			addr = ((WT_OFF *)WT_REPL_DATA(repl))->addr;
-			size = ((WT_OFF *)WT_REPL_DATA(repl))->size;
-		} else {
-			addr = WT_COL_OFF_ADDR(cip);
-			size = WT_COL_OFF_SIZE(cip);
-		}
+		/* cip references the subtree containing the record. */
+		ref = WT_COL_REF(page, cip);
+		off = WT_COL_OFF(cip);
+		WT_ERR(__wt_bt_page_in(toc, ref, off, 0));
 
-		/* Walk down to the next page. */
-		if (page != idb->root_page)
-			__wt_bt_page_out(toc, &page, 0);
-		switch (ret = __wt_bt_page_in(toc, addr, size, 1, &page)) {
-		case 0:
-			break;
-		case WT_RESTART:
-			goto restart;
-		default:
-			goto err;
-		}
+		/* Swap the parent page for the child page. */
+		if (page != idb->root_page.page)
+			__wt_hazard_clear(toc, page);
+		page = ref->page;
 	}
 
 done:	/*
@@ -220,7 +206,6 @@ done:	/*
 notfound:
 	ret = WT_NOTFOUND;
 
-err:	if (page != idb->root_page)
-		__wt_bt_page_out(toc, &page, 0);
+err:	WT_PAGE_OUT(toc, page);
 	return (ret);
 }

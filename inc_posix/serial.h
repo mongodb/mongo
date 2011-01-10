@@ -2,8 +2,8 @@
 
 typedef struct {
 	WT_PAGE * page;
-	uint16_t write_gen;
-	int slot;
+	uint32_t write_gen;
+	uint32_t slot;
 	WT_REPL ** new_repl;
 	WT_REPL * repl;
 } __wt_bt_item_update_args;
@@ -29,8 +29,8 @@ typedef struct {
 
 typedef struct {
 	WT_PAGE * page;
-	uint16_t write_gen;
-	int slot;
+	uint32_t write_gen;
+	uint32_t slot;
 	WT_RCC_EXPAND ** new_rccexp;
 	WT_RCC_EXPAND * exp;
 } __wt_bt_rcc_expand_args;
@@ -56,7 +56,7 @@ typedef struct {
 
 typedef struct {
 	WT_PAGE * page;
-	uint16_t write_gen;
+	uint32_t write_gen;
 	WT_RCC_EXPAND * exp;
 	WT_REPL * repl;
 } __wt_bt_rcc_expand_repl_args;
@@ -79,22 +79,22 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	uint32_t addr;
-	uint32_t size;
-	WT_PAGE ** pagep;
+	WT_REF * ref;
+	WT_OFF * off;
+	int dsk_verify;
 } __wt_cache_read_args;
 #define	__wt_cache_read_serial(\
-    toc, _addr, _size, _pagep, ret) do {\
+    toc, _ref, _off, _dsk_verify, ret) do {\
 	__wt_cache_read_args _args;\
-	_args.addr = _addr;\
-	_args.size = _size;\
-	_args.pagep = _pagep;\
+	_args.ref = _ref;\
+	_args.off = _off;\
+	_args.dsk_verify = _dsk_verify;\
 	(ret) = __wt_toc_serialize_func(toc,\
 	    WT_WORKQ_READ, 0, __wt_cache_read_serial_func, &_args);\
 } while (0)
 #define	__wt_cache_read_unpack(\
-    toc, _addr, _size, _pagep) do {\
-	_addr = ((__wt_cache_read_args *)(toc)->wq_args)->addr;\
-	_size = ((__wt_cache_read_args *)(toc)->wq_args)->size;\
-	_pagep = ((__wt_cache_read_args *)(toc)->wq_args)->pagep;\
+    toc, _ref, _off, _dsk_verify) do {\
+	_ref = ((__wt_cache_read_args *)(toc)->wq_args)->ref;\
+	_off = ((__wt_cache_read_args *)(toc)->wq_args)->off;\
+	_dsk_verify = ((__wt_cache_read_args *)(toc)->wq_args)->dsk_verify;\
 } while (0)

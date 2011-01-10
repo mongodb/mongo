@@ -76,6 +76,7 @@ struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_entry;		typedef struct __wt_page_entry WT_PAGE_ENTRY;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_rcc_expand;		typedef struct __wt_rcc_expand WT_RCC_EXPAND;
+struct __wt_ref;		typedef struct __wt_ref WT_REF;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_row;		typedef struct __wt_row WT_ROW;
 struct __wt_row_insert;		typedef struct __wt_row_insert WT_ROW_INSERT;
@@ -157,7 +158,7 @@ struct __wt_toc {
 
 					/* Search return values: */
 	WT_PAGE  *srch_page;		/*    page */
-	uint16_t srch_write_gen;	/*    page's write-generation */
+	uint32_t srch_write_gen;	/*    page's write-generation */
 	void	 *srch_ip;		/*    WT_{COL,ROW} index */
 	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
 					/* Repeat-compress column store only: */
@@ -363,8 +364,6 @@ struct __env {
 	 */
 	uint32_t cache_drain_cnt;
 
-	uint32_t cache_hash_size;
-
 	uint32_t cache_size;
 
 	uint32_t data_update_initial;
@@ -399,12 +398,6 @@ struct __env {
 	    ENV *, uint32_t *);
 
 	int (*cache_drain_cnt_set)(
-	    ENV *, uint32_t );
-
-	int (*cache_hash_size_get)(
-	    ENV *, uint32_t *);
-
-	int (*cache_hash_size_set)(
 	    ENV *, uint32_t );
 
 	int (*cache_size_get)(
@@ -523,19 +516,17 @@ char	*wiredtiger_version(int *, int *, int *);
  * API flags section: BEGIN
  */
 #define	WT_ASCII_ENGLISH				0x00000008
-#define	WT_CACHE_ONLY					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DATA_OVERWRITE				0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_DISCARD					0x00000002
+#define	WT_DISCARD					0x00000001
 #define	WT_DUPLICATES					0x00000001
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INSERT					0x00000001
 #define	WT_IS_DUP					0x00000001
 #define	WT_MEMORY_CHECK					0x00000001
-#define	WT_MODIFIED					0x00000001
 #define	WT_NOWRITE					0x00000002
 #define	WT_OSWRITE					0x00000001
 #define	WT_PINNED					0x00000001
@@ -556,7 +547,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_BT_BUILD_DATA_ITEM			0x00000001
-#define	WT_APIMASK_BT_PAGE_OUT				0x00000003
+#define	WT_APIMASK_BT_PAGE_OUT				0x00000001
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
@@ -589,7 +580,6 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000001
-#define	WT_APIMASK_WT_PAGE_IN				0x00000001
 #define	WT_APIMASK_WT_TOC				0x00000003
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*

@@ -47,12 +47,8 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_EVICT_HAZARD		    2
 #define	WT_STAT_CACHE_EVICT_MODIFIED		    3
 #define	WT_STAT_CACHE_EVICT_UNMODIFIED		    4
-#define	WT_STAT_CACHE_HASH_BUCKETS		    5
-#define	WT_STAT_CACHE_HIT			    6
-#define	WT_STAT_CACHE_MAX_BUCKET_ENTRIES	    7
-#define	WT_STAT_CACHE_MISS			    8
-#define	WT_STAT_CACHE_PAGES_INUSE		    9
-#define	WT_STAT_CACHE_READ_RESTARTS		   10
+#define	WT_STAT_CACHE_PAGES_INUSE		    5
+#define	WT_STAT_PAGE_READ			    6
 
 /*
  * Statistics entries for DB/IDB database.
@@ -89,16 +85,14 @@ struct __wt_stats {
  */
 #define	WT_STAT_DB_ALLOC			    0
 #define	WT_STAT_DB_ALLOC_FILE			    1
-#define	WT_STAT_DB_CACHE_HIT			    2
-#define	WT_STAT_DB_CACHE_MISS			    3
-#define	WT_STAT_DB_FREE				    4
-#define	WT_STAT_DUPLICATE_ITEMS_INSERTED	    5
-#define	WT_STAT_HUFFMAN_DATA			    6
-#define	WT_STAT_HUFFMAN_KEY			    7
-#define	WT_STAT_ITEMS_INSERTED			    8
-#define	WT_STAT_OVERFLOW_DATA			    9
-#define	WT_STAT_OVERFLOW_KEY			   10
-#define	WT_STAT_REPEAT_COUNT			   11
+#define	WT_STAT_DB_FREE				    2
+#define	WT_STAT_DUPLICATE_ITEMS_INSERTED	    3
+#define	WT_STAT_HUFFMAN_DATA			    4
+#define	WT_STAT_HUFFMAN_KEY			    5
+#define	WT_STAT_ITEMS_INSERTED			    6
+#define	WT_STAT_OVERFLOW_DATA			    7
+#define	WT_STAT_OVERFLOW_KEY			    8
+#define	WT_STAT_REPEAT_COUNT			    9
 
 /*
  * Statistics entries for ENV/IENV handle.
@@ -162,38 +156,36 @@ struct __wt_stats {
 #define	WT_STAT_DB_VERIFY			   37
 #define	WT_STAT_ENV_CACHE_DRAIN_CNT_GET		   38
 #define	WT_STAT_ENV_CACHE_DRAIN_CNT_SET		   39
-#define	WT_STAT_ENV_CACHE_HASH_SIZE_GET		   40
-#define	WT_STAT_ENV_CACHE_HASH_SIZE_SET		   41
-#define	WT_STAT_ENV_CACHE_SIZE_GET		   42
-#define	WT_STAT_ENV_CACHE_SIZE_SET		   43
-#define	WT_STAT_ENV_CLOSE			   44
-#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_GET	   45
-#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_SET	   46
-#define	WT_STAT_ENV_DATA_UPDATE_MAX_GET		   47
-#define	WT_STAT_ENV_DATA_UPDATE_MAX_SET		   48
-#define	WT_STAT_ENV_DB				   49
-#define	WT_STAT_ENV_ERRCALL_GET			   50
-#define	WT_STAT_ENV_ERRCALL_SET			   51
-#define	WT_STAT_ENV_ERRFILE_GET			   52
-#define	WT_STAT_ENV_ERRFILE_SET			   53
-#define	WT_STAT_ENV_ERRPFX_GET			   54
-#define	WT_STAT_ENV_ERRPFX_SET			   55
-#define	WT_STAT_ENV_HAZARD_SIZE_GET		   56
-#define	WT_STAT_ENV_HAZARD_SIZE_SET		   57
-#define	WT_STAT_ENV_MSGCALL_GET			   58
-#define	WT_STAT_ENV_MSGCALL_SET			   59
-#define	WT_STAT_ENV_MSGFILE_GET			   60
-#define	WT_STAT_ENV_MSGFILE_SET			   61
-#define	WT_STAT_ENV_OPEN			   62
-#define	WT_STAT_ENV_STAT_CLEAR			   63
-#define	WT_STAT_ENV_STAT_PRINT			   64
-#define	WT_STAT_ENV_SYNC			   65
-#define	WT_STAT_ENV_TOC				   66
-#define	WT_STAT_ENV_TOC_SIZE_GET		   67
-#define	WT_STAT_ENV_TOC_SIZE_SET		   68
-#define	WT_STAT_ENV_VERBOSE_GET			   69
-#define	WT_STAT_ENV_VERBOSE_SET			   70
-#define	WT_STAT_WT_TOC_CLOSE			   71
+#define	WT_STAT_ENV_CACHE_SIZE_GET		   40
+#define	WT_STAT_ENV_CACHE_SIZE_SET		   41
+#define	WT_STAT_ENV_CLOSE			   42
+#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_GET	   43
+#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_SET	   44
+#define	WT_STAT_ENV_DATA_UPDATE_MAX_GET		   45
+#define	WT_STAT_ENV_DATA_UPDATE_MAX_SET		   46
+#define	WT_STAT_ENV_DB				   47
+#define	WT_STAT_ENV_ERRCALL_GET			   48
+#define	WT_STAT_ENV_ERRCALL_SET			   49
+#define	WT_STAT_ENV_ERRFILE_GET			   50
+#define	WT_STAT_ENV_ERRFILE_SET			   51
+#define	WT_STAT_ENV_ERRPFX_GET			   52
+#define	WT_STAT_ENV_ERRPFX_SET			   53
+#define	WT_STAT_ENV_HAZARD_SIZE_GET		   54
+#define	WT_STAT_ENV_HAZARD_SIZE_SET		   55
+#define	WT_STAT_ENV_MSGCALL_GET			   56
+#define	WT_STAT_ENV_MSGCALL_SET			   57
+#define	WT_STAT_ENV_MSGFILE_GET			   58
+#define	WT_STAT_ENV_MSGFILE_SET			   59
+#define	WT_STAT_ENV_OPEN			   60
+#define	WT_STAT_ENV_STAT_CLEAR			   61
+#define	WT_STAT_ENV_STAT_PRINT			   62
+#define	WT_STAT_ENV_SYNC			   63
+#define	WT_STAT_ENV_TOC				   64
+#define	WT_STAT_ENV_TOC_SIZE_GET		   65
+#define	WT_STAT_ENV_TOC_SIZE_SET		   66
+#define	WT_STAT_ENV_VERBOSE_GET			   67
+#define	WT_STAT_ENV_VERBOSE_SET			   68
+#define	WT_STAT_WT_TOC_CLOSE			   69
 
 /* Statistics section: END */
 

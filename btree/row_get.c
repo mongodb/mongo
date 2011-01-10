@@ -39,7 +39,8 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	 * XXX
 	 * Checking if page_data is NULL isn't the right thing to do
 	 * here.   Re-visit this when we figure out how we handle
-	 * dup inserts into the tree.
+	 * dup inserts into the tree.  Maybe pass NO-DUP flag into the
+	 * search function?
 	 */
 	if (rip->data != NULL) {
 		type = WT_ITEM_TYPE(rip->data);
@@ -54,7 +55,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	}
 	ret = __wt_bt_dbt_return(toc, key, data, 0);
 
-err:	if (page != NULL && page != idb->root_page)
-		__wt_bt_page_out(toc, &page, 0);
+err:	if (page != idb->root_page.page)
+		__wt_hazard_clear(toc, page);
 	return (ret);
 }

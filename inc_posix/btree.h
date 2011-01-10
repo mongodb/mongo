@@ -103,53 +103,23 @@ struct __wt_page_desc {
 	uint64_t recno_offset;		/* 24-31: Offset record number */
 	uint32_t root_addr;		/* 32-35: Root page address */
 	uint32_t root_size;		/* 36-39: Root page length */
-	uint32_t free_addr;		/* 40-43: Free list page address */
-	uint32_t free_size;		/* 44-47: Free list page length */
+	uint64_t records;		/* 40-47: Offset record number */
+	uint32_t free_addr;		/* 48-51: Free list page address */
+	uint32_t free_size;		/* 52-55: Free list page length */
 
 #define	WT_PAGE_DESC_REPEAT	0x01	/* Repeat count compression */
-#define	WT_PAGE_DESC_MASK	0x01	/* Valid bit mask */
-	uint32_t flags;		/* 48-51: Flags */
+	uint32_t flags;			/* 56-59: Flags */
 
-	uint8_t  fixed_len;		/* 51-52: Fixed length byte count */
-	uint8_t  unused1[3];		/* Unused */
+	uint8_t  fixed_len;		/* 60: Fixed length byte count */
+	uint8_t  unused1[3];		/* 61-63: Unused */
 
-	uint32_t unused2[114];		/* Unused */
+	uint32_t unused2[112];		/* Unused */
 };
 /*
  * WT_PAGE_DESC_SIZE is the expected structure size -- we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_PAGE_DESC_SIZE		512
-
-/*
- * WT_REPL --
- *	Updates/deletes for a WT_{COL,ROW} entry.
- */
-struct __wt_repl {
-	WT_TOC_UPDATE *update;		/* update buffer holding this WT_REPL */
-	WT_REPL *next;			/* forward-linked list */
-
-	/*
-	 * We can't store 4GB items:  we're short by a few bytes because each
-	 * change/insert item requires a leading WT_REPL structure.  For that
-	 * reason, we use a max size as an is-deleted flag so we don't have to
-	 * increase the size of this structure.
-	 */
-#define	WT_REPL_DELETED_ISSET(repl)	((repl)->size == UINT32_MAX)
-#define	WT_REPL_DELETED_SET(repl)	((repl)->size = UINT32_MAX)
-	uint32_t size;			/* data length */
-
-	/*
-	 * The data immediately follows the repl structure, and sometimes it's
-	 * a WT_OFF structure.
-	 */
-#define	WT_REPL_DATA(repl)						\
-	((void *)((uint8_t *)repl + sizeof(WT_REPL)))
-#define	WT_REPL_DATA_OFF_ADDR(repl)					\
-	(((WT_OFF *)WT_REPL_DATA(repl))->addr)
-#define	WT_REPL_DATA_OFF_SIZE(repl)					\
-	(((WT_OFF *)WT_REPL_DATA(repl))->size)
-};
 
 /*
  * WT_PAGE --
@@ -165,93 +135,96 @@ struct __wt_page {
 	uint32_t addr;			/* Page's file allocation address */
 	uint32_t size;			/* Page size */
 
-	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
-
 	uint64_t records;		/* Records in this subtree */
 
-	/*
-	 * The page's LRU access generation is set on each cache retrieval and
-	 * used to find pages no longer useful in the cache.
-	 */
-	uint32_t lru;			/* Read generation */
+	WT_OFF	*parent_ref;		/* Page's parent reference */
+
+	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
 
 	/*
-	 * The page modified flag is set by the workQ thread when it modifies
-	 * a page: this means (1) the page has a hazard reference, and (2) no
-	 * other thread is modifying the page when the modified field is set.
-	 * For those reasons, the modified field doesn't need to be an atomic
-	 * set, and could even be a bit flag.
+	 * We maintain 3 "generation" numbers for a page: the disk, read and
+	 * write generations.
 	 *
-	 * The modified set must be flushed before the page's hazard reference
-	 * is released and the cache drain server is able to select this page.
-	 * We rely on the memory flush in __wt_toc_serialize_wrapup() which is
-	 * always called before control returns to the calling thread, that is,
-	 * before control returns to the thread holding the hazard reference,
-	 * so there's no need to flush explicitly.
-	 */
-	uint16_t modified;		/* Page is modified */
-#define	WT_PAGE_MODIFY_ISSET(p)		((p)->modified)
-#define	WT_PAGE_MODIFY_SET(p)		((p)->modified = 1)
-#define	WT_PAGE_MODIFY_CLR(p)		((p)->modified = 0)
-
-	/*
-	 * The page's write-generation value is used to detect workQ changes
-	 * scheduled, but based on out-of-date information.  If two threads
-	 * of control update a single entry on a page, they could both search
-	 * the page in state A, and schedule the change for the workQ.  Since
-	 * the workQ performs the changes serially, one of the changes would
-	 * happen after the page was modified, and so the search state would
-	 * no longer be applicable.
+	 * The read generation is incremented each time the page is searched,
+	 * and acts as an LRU value for each page in the tree; it is read by
+	 * the memory drain server thread to select pages to be discarded from
+	 * the in-memory tree.
 	 *
-	 * The write generation number is updated before the workQ modifies
-	 * a page, and the page search routines copy the write generation
-	 * number in the WT_TOC structure before searching the page.  Based
-	 * on this, the workQ can examine the write generation number and if
-	 * it isn't current, return WT_RESTART to restart the operation.
+	 * The write generation is incremented after the workQ modifies a page
+	 * that is, it tracks page versions.
+	 *	The write generation value is used to detect changes scheduled
+	 * based on out-of-date information.  Two threads of control updating
+	 * the same page could both search the page in state A, and schedule
+	 * the change for the workQ.  Since the workQ performs changes serially,
+	 * one of the changes will happen after the page is modified, and the
+	 * search state for the other thread might no longer be applicable.  To
+	 * avoid this race, page write generations are copied into the search
+	 * stack whenever a page is read, and passed to the workQ thread when a
+	 * modification is scheduled.  The workQ thread compares each page's
+	 * current write generation to the generation copied in the read/search;
+	 * if the two values match, the search occurred on a current version of
+	 * the page and the modification can proceed.  If the two generations
+	 * differ, the workQ thread returns an error and the operation must be
+	 * restarted.
+	 *	The write-generation value could be stored on a per-entry basis
+	 * if there's sufficient contention for the page as a whole.
 	 *
-	 * The write-generation value could be moved to a per-entry basis if
-	 * there's enough contention for a page.
+	 * The disk generation is set to the current write generation before a
+	 * page is reconciled and written to disk.  If the disk generation
+	 * matches the write generation, the page must be clean; otherwise, the
+	 * page was potentially modified after the last write, and must be
+	 * re-written to disk before being discarded.
 	 *
 	 * XXX
-	 * 64KB seems big enough: at some point we're going to have to clean
-	 * up pages as soon as there have been sufficient modifications to
-	 * make our linked lists of inserted items too slow to search, or as
-	 * soon as there's been enough memory allocated in service of page
-	 * modifications (although we should be able to release memory from
-	 * the page replacement array as soon as no running thread/txn might
-	 * want that version of the data).
+	 * These aren't declared volatile: (1) disk-generation is read/written
+	 * only when the page is reconciled -- it could be volatile but we
+	 * explicitly flush it there instead; (2) read-generation gets set a
+	 * lot (on every access), and we don't want to bother flushing it; (3)
+	 * write-generation is written by the workQ when modifying a page, and
+	 * must be flushed in a specific order as the workQ flushes its changes.
+	 *
+	 * XXX
+	 * 32-bit values are probably more than is needed: at some point we may
+	 * need to clean up pages once there have been sufficient modifications
+	 * to make our linked lists of inserted items too slow to search, or as
+	 * soon as enough memory is allocated in service of page modifications
+	 * (although we should be able to release memory from the MVCC list as
+	 * soon as there's no running thread/txn which might want that version
+	 * of the data).   I've used 32-bit types instead of 16-bit types as I
+	 * am not positive a 16-bit write to memory will always be atomic.
 	 */
-	uint16_t write_gen;		/* Write generation */
-#define	WT_PAGE_WRITE_GEN(p)						\
-	((p)->write_gen)
+#define	WT_PAGE_DISK_WRITE(p)		((p)->disk_gen = (p)->write_gen)
+#define	WT_PAGE_IS_MODIFIED(p)		((p)->disk_gen != (p)->write_gen)
+	uint32_t disk_gen;
+	uint32_t read_gen;
+	uint32_t write_gen;
 
 	/*
-	 * Each disk page entry is referenced by an array of WT_ROW/WT_COL
-	 * structures: this is where the on-page index in DB 1.85 and Berkeley
-	 * DB is re-created, when a page is read into the cache.  It's sorted
-	 * by the key, fixed in size, and references data on the page.
+	 * Each in-memory page has an array of WT_ROW/WT_COL structures this is
+	 * where the on-page index in DB 1.85 and Berkeley DB is created when a
+	 * page is read from the file.  It's sorted by the key, fixed in size,
+	 * and references data on the page.
 	 *
 	 * Complications:
 	 *
-	 * In row store leaf pages there may be duplicate data items; in those
+	 * In WT_PAGE_ROW_LEAF pages there may be duplicate data items; in those
 	 * cases, there is a single indx entry per key/data pair, but multiple
-	 * indx entries will reference the same physical key from the original
-	 * on-disk page.
+	 * indx entries reference the same memory location.
 	 *
-	 * In column store repeat-count compressed fixed-length pages, a single
-	 * indx entry may reference a large number of records, because there's
-	 * a single on-page entry that represents many identical records.   (We
-	 * can't expand those entries when the page comes into memory because
-	 * that'd require unacceptable resources as pages are moved to/from the
-	 * cache, including for read-only databases.)  Instead, a single indx
-	 * entry represents all of the identical records.
+	 * In column store repeat-count compressed fixed-length pages (in other
+	 * words, WT_PAGE_COL_RCC pages), a single indx entry may reference a
+	 * large number of records, because there's a single on-page entry that
+	 * represents many identical records.   (We can't expand those entries
+	 * when the page comes into memory because that'd require unacceptable
+	 * resources as pages are moved to/from the cache, including read-only
+	 * files.)  Instead, a single indx entry represents all of the identical
+	 * records originally found on the page.
 	 */
-#define	WT_PAGE_INMEM_SET(p)	((p)->indx_count != 0)
 	uint32_t indx_count;		/* On-disk entry count */
 	union {				/* On-disk entry index */
-		WT_COL *icol;		/* On-disk column store entries */
-		WT_ROW *irow;		/* On-disk row store entries */
-		void *indx;
+		WT_COL	*icol;		/* On-disk column store entries */
+		WT_ROW	*irow;		/* On-disk row store entries */
+		void	*indx;		/* Generic index reference */
 	} u;
 
 	/*
@@ -266,40 +239,140 @@ struct __wt_page {
 	 * is problematical, because the index entry would no longer reference
 	 * a set of identical items.  We handle this by "inserting" a new entry
 	 * into an array that behaves much like the rinsert array.  This is the
-	 * only case where it's possible to insert into a column store -- it's
+	 * only case where it's possible to "insert" into a column store -- it's
 	 * normally only possible to append to a column store as insert requires
-	 * re-numbering all subsequent records.  (Berkeley DB did support that
-	 * functionality, but it never performed well and it isn't useful enough
-	 * to re-implement, IMNSHO.)
+	 * re-numbering all subsequent records.  (Berkeley DB did support the
+	 * re-numbering functionality, but it won't perform well and it isn't
+	 * useful enough to re-implement, IMNSHO.)
 	 */
 	union {
-		WT_REPL **repl;		/* Modification/deletion index */
-					/* RCC expansion index */
-		WT_RCC_EXPAND **rccexp;
-	} ur;
+		WT_REPL	      **repl;	/* Modification/deletion index */
+		WT_RCC_EXPAND **rccexp;	/* RCC expansion index */
+	} u2;
+
+	/*
+	 * Subtree references are stored in the ref array.   When a page that
+	 * references a subtree (where a subtree may be a single page), is read
+	 * into memory, the ref array is populated with entries that can be
+	 * used to bring the subtree page into memory.  That happens both for
+	 * internal page types:
+	 *	WT_PAGE_COL_INT
+	 *	WT_PAGE_DUP_INT
+	 *	WT_PAGE_ROW_INT
+	 * and row-store leaf pages:
+	 *	WT_PAGE_ROW_LEAF
+	 * because row-store leaf pages reference off-page duplicate trees.
+	 */
+	union {
+		WT_REF	 *ref;		/* Internal page references */
+		WT_REF	**dup;		/* Row-store off-page duplicate trees */
+	} u3;
 
 	uint32_t flags;
 };
+/*
+ * WT_PAGE_SIZE is the expected structure size -- we check at startup to ensure
+ * the compiler hasn't inserted padding.  The WT_PAGE structure is in-memory, so
+ * padding it won't break the world, but we don't want to waste space, and there
+ * are a lot of these structures.
+ */
+#define	WT_PAGE_SIZE	(5 * sizeof(void *) + 9 * sizeof(uint32_t))
 
 /*
- * WT_{COL,ROW}_SLOT --
- * There are 3 different arrays which map one-to-one to the original on-disk
- * index: repl, insrow and rccexp.  WT_{COL,ROW}_SLOT returns the offset.
+ * There are 4 different arrays which map one-to-one to the original on-disk
+ * index: repl, rccexp, ref and dup.
  *
- * WT_{COL,ROW}_ARRAY --
- * Return the the appropriate entry for one of the three arrays, or NULL if
- * there's no such entry.
+ * The WT_{COL,ROW}_SLOT macros return the appropriate array slot based on a
+ * WT_{COL,ROW} reference.
  */
-#define	WT_COL_SLOT(page, ip)	((WT_COL *)(ip) - (page)->u.icol)
-#define	WT_COL_ARRAY(page, ip, array)					\
-	((page)->array == NULL ? NULL : page->array[WT_COL_SLOT(page, ip)])
-#define	WT_COL_REPL(page, ip)	WT_COL_ARRAY(page, ip, ur.repl)
-#define	WT_COL_RCCEXP(page, ip)	WT_COL_ARRAY(page, ip, ur.rccexp)
+#define	WT_COL_SLOT(page, ip)	((uint32_t)((WT_COL *)(ip) - (page)->u.icol))
+#define	WT_ROW_SLOT(page, ip)	((uint32_t)((WT_ROW *)(ip) - (page)->u.irow))
 
-#define	WT_ROW_SLOT(page, ip)	((WT_ROW *)(ip) - (page)->u.irow)
-#define	WT_ROW_ARRAY(page, ip, array)					\
-	((page)->array == NULL ? NULL : page->array[WT_ROW_SLOT(page, ip)])
-#define	WT_ROW_REPL(page, ip)	WT_ROW_ARRAY(page, ip, ur.repl)
+/*
+ * The ref array is different from the other three in two ways: first, it
+ * always exists on internal pages, and we don't need to test to see if it's
+ * there.  Second, it's an array of structures, not an array of pointers to
+ * individually allocated structures.  The WT_{COL,ROW}_REF macros return
+ * the appropriate entry based on a WT_{COL,ROW} reference.
+ */
+#define	WT_COL_REF(page, ip)						\
+	(&((page)->u3.ref[WT_COL_SLOT(page, ip)]))
+#define	WT_ROW_REF(page, ip)						\
+	(&((page)->u3.ref[WT_ROW_SLOT(page, ip)]))
+
+/*
+ * The other arrays may not exist, and are arrays of pointers to individually
+ * allocated structures.   The following macros return an array entry if the
+ * array of pointers and the specific structure exist, otherwise NULL.
+ */
+#define	__WT_COL_ARRAY(page, ip, field)					\
+	((page)->field == NULL ? NULL : (page)->field[WT_COL_SLOT(page, ip)])
+#define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u2.repl)
+#define	WT_COL_RCCEXP(page, ip)	__WT_COL_ARRAY(page, ip, u2.rccexp)
+#define	__WT_ROW_ARRAY(page, ip, field)					\
+	((page)->field == NULL ? NULL : (page)->field[WT_ROW_SLOT(page, ip)])
+#define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u2.repl)
+#define	WT_ROW_DUP(page, ip)	__WT_ROW_ARRAY(page, ip, u3.dup)
+
+/*
+ * WT_REF --
+ *	Page references: each references a single page, and it's the structure
+ *	used to determine if it's OK to dereference the pointer to the page.
+ *
+ * There may be many threads traversing these entries; they fall into three
+ * classes: (1) application threads walking through the tree searching database
+ * database pages or calling a method like Db.sync; (2) a server thread reading
+ * a new page into the tree from disk; (3) a server thread draining a page from
+ * the tree to disk.
+ *
+ * Synchronization is based on the WT_REF->state field:
+ * WT_OK:
+ *	The page reference is valid.  Readers check the state field and if it's
+ *	set to WT_OK, they set a hazard reference to the page, flush memory and
+ *	re-confirm the state of the page.  If the page is still WT_OK, they have
+ *	a valid reference and can proceed.
+ * WT_DRAIN:
+ *	The drain server selected this page and is checking hazard references.
+ *	 When the drain server wants to discard a page from the tree, it sets
+ *	the state to WT_DRAIN, flushes memory, then checks hazard references.
+ *	If the drain server finds a hazard reference, it resets the state field
+ *	to WT_OK, restoring the page to the readers.  If the drain server does
+ *	not find a hazard reference, the page is safe to discard.
+ * WT_EMPTY:
+ *      There is no page, and the only way to proceed is for the reader thread
+ *	to set the page reference and change the state to WT_OK.
+ */
+struct __wt_ref {
+	WT_PAGE *page;			/* In-memory page */
+
+#define	WT_OK		0		/* Reference valid */
+#define	WT_DRAIN	1		/* Selected for draining */
+#define	WT_EMPTY	2		/* Not set */
+	uint32_t volatile state;
+};
+
+/*
+ * WT_REPL --
+ *	Updates/deletes for a WT_{COL,ROW} entry.
+ */
+struct __wt_repl {
+	WT_TOC_UPDATE *update;		/* update buffer holding this WT_REPL */
+	WT_REPL *next;			/* forward-linked list */
+
+	/*
+	 * We can't store 4GB items:  we're short by a few bytes because each
+	 * change/insert item requires a leading WT_REPL structure.  For that
+	 * reason, we can use the maximum size as an is-deleted flag and don't
+	 * have to increase the size of this structure for a flag bit.
+	 */
+#define	WT_REPL_DELETED_ISSET(repl)	((repl)->size == UINT32_MAX)
+#define	WT_REPL_DELETED_SET(repl)	((repl)->size = UINT32_MAX)
+	uint32_t size;			/* data length */
+
+	/* The data immediately follows the repl structure. */
+#define	WT_REPL_DATA(repl)						\
+	((void *)((uint8_t *)repl + sizeof(WT_REPL)))
+};
 
 /*
  * WT_PAGE_HDR --
@@ -316,12 +389,12 @@ struct __wt_page {
 struct __wt_page_hdr {
 	/*
 	 * The record number of the first record on the page is stored for two
-	 * reasons: first, we have to find the page's stack when writing a page
-	 * writing leaf pages and second, when salvaging a database it's the
-	 * only way to know where a column-store page fits in the keyspace.
-	 * (We could work around the first reason by storing the base record
-	 * number in the WT_PAGE structure when we read a page into memory, but
-	 * we can't work around the second reason.)
+	 * reasons: first, we have to find the page's stack when reconciling
+	 * leaf pages and second, when salvaging a database it's the only way
+	 * to know where a column-store page fits in the keyspace.  (We could
+	 * work around the first reason by storing the base record number in
+	 * lthe WT_PAGE structure when we read a page into memory, but we can't
+	 * work around the second reason.)
 	 */
 	uint64_t start_recno;		/* 00-07: column-store starting recno */
 	uint32_t lsn[2];		/* 08-15: LSN */
@@ -329,22 +402,21 @@ struct __wt_page_hdr {
 	uint32_t checksum;		/* 16-19: checksum */
 
 	union {
-		uint32_t datalen;	/* 20-23: overflow data length */
 		uint32_t entries;	/* 20-23: number of items on page */
+		uint32_t datalen;	/* 20-23: overflow data length */
 	} u;
 
 #define	WT_PAGE_INVALID		 0	/* Invalid page */
-#define	WT_PAGE_DESCRIPT	 1	/* Database description page */
-#define	WT_PAGE_FREE	 	 2	/* Page on the free list */
-#define	WT_PAGE_COL_FIX		 3	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		 4	/* Col store internal page */
-#define	WT_PAGE_COL_RCC	 	 5	/* Col store repeat-compressed leaf */
-#define	WT_PAGE_COL_VAR		 6	/* Col store var-length leaf page */
-#define	WT_PAGE_DUP_INT		 7	/* Duplicate tree internal page */
-#define	WT_PAGE_DUP_LEAF	 8	/* Duplicate tree leaf page */
-#define	WT_PAGE_OVFL		 9	/* Overflow page */
-#define	WT_PAGE_ROW_INT		10	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	11	/* Row-store leaf page */
+#define	WT_PAGE_FREE	 	 1	/* Page on the free list */
+#define	WT_PAGE_COL_FIX		 2	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		 3	/* Col store internal page */
+#define	WT_PAGE_COL_RCC	 	 4	/* Col store repeat-compressed leaf */
+#define	WT_PAGE_COL_VAR		 5	/* Col store var-length leaf page */
+#define	WT_PAGE_DUP_INT		 6	/* Duplicate tree internal page */
+#define	WT_PAGE_DUP_LEAF	 7	/* Duplicate tree leaf page */
+#define	WT_PAGE_OVFL		 8	/* Overflow page */
+#define	WT_PAGE_ROW_INT		 9	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	10	/* Row-store leaf page */
 	uint8_t type;			/* 24: page type */
 
 	/*
@@ -370,7 +442,7 @@ struct __wt_page_hdr {
 	/*
 	 * It would be possible to decrease the size of the page header by two
 	 * bytes by only writing out the first 26 bytes of the structure to the
-	 * page, but I'm not bothering -- I don't think the space is worth it,
+	 * page, but I'm not bothering -- I don't think the space is worth it
 	 * and having a little bit of on-page data to play with in the future
 	 * can be a good thing.
 	 */
@@ -422,7 +494,7 @@ struct __wt_row {
 	void	 *key;			/* Key */
 	uint32_t size;			/* Key length */
 
-	WT_ITEM	 *data;			/* Data */
+	void	 *data;			/* Data */
 };
 /*
  * WT_ROW_SIZE is the expected structure size -- we check at startup to ensure
@@ -480,12 +552,19 @@ struct __wt_rcc_expand {
 
 /*
  * WT_INDX_FOREACH --
- * Macro to walk the indexes of an in-memory page: works for both WT_ROW and
- * WT_COL, based on the type of ip.
+ *	Walk the indexes of an in-memory page: works for both WT_ROW and WT_COL,
+ * based on the type of ip.
  */
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
+/*
+ * WT_ROW_INDX_IS_DUPLICATE --
+ *	Compare the WT_ROW entry against the previous entry and return 1 if
+ *	it's a duplicate key.
+ */
+#define	WT_ROW_INDX_IS_DUPLICATE(page, ip)				\
+	(((ip) > (page)->u.irow && (ip)->key == ((ip) - 1)->key) ? 1 : 0)
 
 /*
  * WT_ROW_KEY_ON_PAGE --
@@ -501,7 +580,7 @@ struct __wt_rcc_expand {
  */
 #define	WT_REPL_FOREACH(page, replp, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (replp) = (page)->ur.repl; (i) > 0; ++(replp), --(i))
+	    (replp) = (page)->u2.repl; (i) > 0; ++(replp), --(i))
 
 /*
  * WT_RCC_EXPAND_FOREACH --
@@ -510,7 +589,15 @@ struct __wt_rcc_expand {
  */
 #define	WT_RCC_EXPAND_FOREACH(page, exp, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->ur.rccexp; (i) > 0; ++(exp), --(i))
+	    (exp) = (page)->u2.rccexp; (i) > 0; ++(exp), --(i))
+
+/*
+ * WT_DUP_FOREACH --
+ * Macro to walk the off-page duplicate array of an in-memory page.
+ */
+#define	WT_DUP_FOREACH(page, refp, i)					\
+	for ((i) = (page)->indx_count,					\
+	    (refp) = (page)->u3.dup; (i) > 0; ++(refp), --(i))
 
 /*
  * On both row- and column-store internal pages, the on-page data referenced
@@ -518,19 +605,19 @@ struct __wt_rcc_expand {
  * record count and a page addr/size pair.   Macros to reach into the on-page
  * structure and return the values.
  */
+#define	WT_COL_OFF(ip)							\
+	((WT_OFF *)(((WT_COL *)ip)->data))
 #define	WT_COL_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)(((WT_COL *)ip)->data))
-#define	WT_COL_OFF_ADDR(ip)						\
-	(((WT_OFF *)(((WT_COL *)ip)->data))->addr)
-#define	WT_COL_OFF_SIZE(ip)						\
-	(((WT_OFF *)(((WT_COL *)ip)->data))->size)
+	WT_RECORDS(WT_COL_OFF(ip))
 
+#define	WT_ROW_OFF(ip)							\
+	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 #define	WT_ROW_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
+	WT_RECORDS(WT_ROW_OFF(ip))
 #define	WT_ROW_OFF_ADDR(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))->addr)
+	(WT_ROW_OFF(ip)->addr)
 #define	WT_ROW_OFF_SIZE(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))->size)
+	(WT_ROW_OFF(ip)->size)
 
 /*
  * WT_ITEM --

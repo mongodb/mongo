@@ -14,47 +14,65 @@ static void __wt_bt_page_inmem_col_int(WT_PAGE *);
 static void __wt_bt_page_inmem_col_rcc(DB *, WT_PAGE *);
 static void __wt_bt_page_inmem_col_var(WT_PAGE *);
 static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
+static int  __wt_bt_page_inmem_int_ref(WT_TOC *, uint32_t, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_int(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
 
 /*
  * __wt_bt_page_in --
- *	Get a btree page from the cache.
+ *	Acquire a hazard reference to a page; if the page is not in-memory,
+ *	read it from the disk and build an in-memory version.
  */
 int
-__wt_bt_page_in(
-    WT_TOC *toc, uint32_t addr, uint32_t size, int inmem, WT_PAGE **pagep)
+__wt_bt_page_in(WT_TOC *toc, WT_REF *ref, WT_OFF *off, int dsk_verify)
 {
-	DB *db;
-	WT_PAGE *page;
+	WT_CACHE *cache;
+	int ret;
 
-	db = toc->db;
+	cache = toc->env->ienv->cache;
 
-	/*
-	 * We don't know the source of the addr/size pair, so we pass back any
-	 * WT_RESTART failures; the caller has to handle them.
-	 */
-	WT_RET(__wt_page_in(toc, addr, size, &page, 0));
-
-	/* Optionally build the in-memory version of the page. */
-	if (inmem && !WT_PAGE_INMEM_SET(page))
-		WT_RET((__wt_bt_page_inmem(db, page)));
-
-	*pagep = page;
-	return (0);
+	for (;;)
+		switch (ref->state) {
+		case WT_OK:
+			/* The page is in memory, update it's LRU and return. */
+			if (__wt_hazard_set(toc, ref)) {
+				ref->page->read_gen = ++cache->read_gen;
+				return (0);
+			}
+			/* FALLTHROUGH */
+		case WT_DRAIN:
+			/*
+			 * The page is being considered for eviction, wait for
+			 * that to resolve.
+			 */
+			__wt_yield();
+			break;
+		case WT_EMPTY:
+			/* The page isn't in memory, request it be read. */
+			__wt_cache_read_serial(toc, ref, off, dsk_verify, ret);
+			if (ret != 0)
+				return (ret);
+			break;
+		default:
+			break;
+		}
+	/* NOTREACHED */
 }
 
 /*
  * __wt_bt_page_out --
- *	Return a btree page to the cache.
+ *	Release a hazard reference to a page.
  */
 void
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags)
 {
+	ENV *env;
 	WT_PAGE *page;
 
+	env = toc->env;
+
 	WT_ENV_FCHK_ASSERT(
-	    toc->env, "__wt_bt_page_out", flags, WT_APIMASK_BT_PAGE_OUT);
+	    env, "__wt_bt_page_out", flags, WT_APIMASK_BT_PAGE_OUT);
 
 	/*
 	 * Clear the caller's reference so we don't accidentally use a page
@@ -64,15 +82,16 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags)
 	page = *pagep;
 	*pagep = NULL;
 
-	/* The caller may have decided the page isn't worth keeping around. */
-	if (LF_ISSET(WT_DISCARD))
-		page->lru = 0;
+	/* Discard the hazard reference. */
+	__wt_hazard_clear(toc, page);
 
-	/* The caller may have dirtied the page. */
-	if (LF_ISSET(WT_MODIFIED))
-		WT_PAGE_MODIFY_SET(page);
-
-	__wt_page_out(toc, page);
+	/*
+	 * If it's an overflow page, it was never hooked into the tree, free
+	 * the memory.   In some rare cases other pages are standalone, and
+	 * they're discarded as well.
+	 */
+	if (page->hdr->type == WT_PAGE_OVFL || LF_ISSET(WT_DISCARD))
+		__wt_bt_page_discard(toc, page);
 }
 
 /*
@@ -80,14 +99,16 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags)
  *	Build in-memory page information.
  */
 int
-__wt_bt_page_inmem(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 {
+	DB *db;
 	ENV *env;
 	WT_PAGE_HDR *hdr;
 	uint32_t nindx;
 	int ret;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	hdr = page->hdr;
 	ret = 0;
 
@@ -116,6 +137,8 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		 */
 		nindx = hdr->u.entries - 1;
 		break;
+	case WT_PAGE_OVFL:
+		return (0);
 	WT_ILLEGAL_FORMAT(db);
 	}
 
@@ -133,19 +156,32 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
-		WT_RET((__wt_calloc(env,
+		WT_ERR((__wt_calloc(env,
 		    nindx, sizeof(WT_COL), &page->u.icol)));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET((__wt_calloc(env,
+		WT_ERR((__wt_calloc(env,
 		    nindx, sizeof(WT_ROW), &page->u.irow)));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	default:
+		break;
 	}
 
+	/* Allocate reference array for internal pages. */
+	switch (hdr->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		WT_ERR(__wt_bt_page_inmem_int_ref(toc, nindx, page));
+		break;
+	default:
+		break;
+	}
+
+	/* Fill in the structures. */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 		__wt_bt_page_inmem_col_fix(db, page);
@@ -160,17 +196,21 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		__wt_bt_page_inmem_col_var(page);
 		break;
 	case WT_PAGE_DUP_LEAF:
-		ret = __wt_bt_page_inmem_dup_leaf(db, page);
+		WT_ERR(__wt_bt_page_inmem_dup_leaf(db, page));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		ret = __wt_bt_page_inmem_row_int(db, page);
+		WT_ERR(__wt_bt_page_inmem_row_int(db, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		ret = __wt_bt_page_inmem_row_leaf(db, page);
+		WT_ERR(__wt_bt_page_inmem_row_leaf(db, page));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	default:
+		break;
 	}
+	return (0);
+
+err:	__wt_bt_page_discard(toc, page);
 	return (ret);
 }
 
@@ -407,12 +447,15 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 {
+	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
+	WT_REF *ref;
 	WT_ROW *rip;
 	uint32_t i, indx_count;
 	uint64_t records;
 
+	env = db->env;
 	idb = db->idb;
 	records = 0;
 
@@ -465,12 +508,26 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_OFF:
 			rip->data = item;
 			records += WT_ROW_OFF_RECORDS(rip);
+
+			/*
+			 * We need a WT_REF entry for any item referencing an
+			 * off-page duplicate tree.  Create the array of WT_REF
+			 * pointers and fill in a WT_REF structure.
+			 */
+			if (page->u3.dup == NULL)
+				WT_RET(__wt_calloc(env, indx_count,
+				    sizeof(WT_REF *), &page->u3.dup));
+			WT_RET(__wt_calloc(env, 1, sizeof(WT_REF), &ref));
+			ref->state = WT_EMPTY;
+			page->u3.dup[WT_ROW_SLOT(page, rip)] = ref;
+
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
 
 	page->indx_count = indx_count;
 	page->records = records;
+
 	return (0);
 }
 
@@ -495,6 +552,8 @@ __wt_bt_item_process(
 	env = toc->env;
 	idb = db->idb;
 	ovfl = NULL;
+	if (ovfl_ret != NULL)
+		*ovfl_ret = NULL;
 	ret = 0;
 
 	/*
@@ -531,7 +590,7 @@ onpage:		p = WT_ITEM_BYTE(item);
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
 		huffman = idb->huffman_data;
-offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl));
+offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl, 0));
 		p = WT_PAGE_BYTE(ovfl);
 		size = ovfl->hdr->u.datalen;
 		break;
@@ -539,11 +598,13 @@ offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl));
 	}
 
 	/*
+	 * If the item is NOT compressed it's an overflow item (otherwise we
+	 * wouldn't be in this code); return a pointer to the page itself, if
+	 * the user passed in a WT_PAGE reference, otherwise copy it into the
+	 * caller's DBT.
+	 *
 	 * If the item is compressed (on-page or overflow), decode it and copy
-	 * it into the caller's DBT.   If the item is not compressed, it's an
-	 * overflow item (else we wouldn't be here) and return a pointer to the
-	 * page itself, if the user passed in a WT_PAGE reference, otherwise
-	 * copy it into the caller's DBT.
+	 * it into the caller's DBT, never returning a copy of the page.
 	 */
 	if (huffman == NULL) {
 		if (ovfl == NULL || ovfl_ret == NULL) {
@@ -564,4 +625,34 @@ err:	if (ovfl != NULL)
 		__wt_bt_page_out(toc, &ovfl, 0);
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_page_inmem_int_ref --
+ *	Allocate and initialize the reference array for internal pages.
+ */
+static int
+__wt_bt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
+{
+	ENV *env;
+	WT_REF *cp;
+	uint32_t i;
+
+	env = toc->env;
+
+	/*
+	 * Allocate an array of WT_REF structures for internal pages.  In the
+	 * case of an internal page, we know all of the slots are going to be
+	 * filled in -- every slot on the page references a subtree.  In the
+	 * case of row-store leaf pages, the only slots that get filled in are
+	 * slots that reference off-page duplicate trees.   So, if it's an
+	 * internal page, it's a simple one-time allocation; if a leaf page,
+	 * we'll do similar work, but lazily in the routine that fills in the
+	 * in-memory information.
+	 */
+	WT_RET(__wt_calloc(
+	    env, nindx, sizeof(WT_REF), &page->u3.ref));
+	for (i = 0, cp = page->u3.ref; i < nindx; ++i, ++cp)
+		cp->state = WT_EMPTY;
+	return (0);
 }

@@ -21,102 +21,96 @@ static int __wt_bt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
  *	each page.
  */
 int
-__wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
-    uint32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
+__wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
+    int offdup, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
-	DB *db;
+	IDB *idb;
 	WT_COL *cip;
+	WT_OFF *off;
 	WT_PAGE *page;
-	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i;
 	int ret;
 
-	db = toc->db;
-	page = NULL;
-	ret = 0;
+	idb = toc->db->idb;
 
 	/*
-	 * If we can't get the page, including if WT_RESTART is returned, fail
-	 * because we don't know the source of the addr/size pair; our caller
-	 * will have to deal with it.  (In almost all cases, however, our caller
-	 * is a previous incarnation of this function -- which means our caller
-	 * has a pinned page it's reading through.)
+	 * A NULL WT_REF means to start at the top of the tree -- it's just
+	 * a convenience.
 	 */
-	WT_ERR(__wt_bt_page_in(toc, addr, size, 1, &page));
-
-	/* Call the worker function for the page. */
-	WT_ERR(work(toc, page, arg));
+	page = ref == NULL ? idb->root_page.page : ref->page;
 
 	/*
-	 * Walk any internal pages, descending through any off-page reference
-	 * in the local tree (that is, NOT including off-page duplicate trees).
-	 * We could handle off-page duplicate trees by walking the page in this
-	 * function, but that would be slower than recursively calling this
-	 * function from the worker function, which is already walking the page.
+	 * Walk any internal pages, descending through any off-page references.
 	 *
-	 * If the page were to be rewritten/discarded from the cache while
-	 * we're getting it, we can re-try -- re-trying is safe because our
-	 * addr/size information is from a page which can't be discarded
-	 * because of our hazard reference.  If the page was re-written, our
-	 * on-page overflow information will have been updated to the overflow
-	 * page's new address.
+	 * Descending into row-store off-page duplicate trees is optional for
+	 * two reasons. (1) it may be faster to call this function recursively
+	 * from the worker function, which is already walking the page, and (2)
+	 * information for off-page dup trees is split (the key is on the
+	 * row-leaf page, and the data is obviously in the off-page dup tree):
+	 * we need the key when we dump the data, and that would be a hard
+	 * special case in this code.  Functions where it's possible and no
+	 * slower to walk off-page dup trees here can request it be done here.
 	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(page, cip, i) {
-			/*
-			 * cip references the subtree containing the record;
-			 * check for an update.
-			 */
-			do {
-				if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-					addr = WT_REPL_DATA_OFF_ADDR(repl);
-					size = WT_REPL_DATA_OFF_SIZE(repl);
-				} else {
-					addr = WT_COL_OFF_ADDR(cip);
-					size = WT_COL_OFF_SIZE(cip);
-				}
-			} while ((ret = __wt_bt_tree_walk(
-			    toc, addr, size, work, arg)) == WT_RESTART);
+			/* cip references the subtree containing the record */
+			ref = WT_COL_REF(page, cip);
+			off = WT_COL_OFF(cip);
+			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			ret = __wt_bt_tree_walk(toc, ref, offdup, work, arg);
+			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
-				break;
+				return (ret);
 		}
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_INDX_FOREACH(page, rip, i) {
-			/*
-			 * rip references the subtree containing the record;
-			 * check for an update.
-			 */
-			do {
-				if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
-					addr = WT_REPL_DATA_OFF_ADDR(repl);
-					size = WT_REPL_DATA_OFF_SIZE(repl);
-				} else {
-					addr = WT_ROW_OFF_ADDR(rip);
-					size = WT_ROW_OFF_SIZE(rip);
-				}
-			} while ((ret = __wt_bt_tree_walk(
-			    toc, addr, size, work, arg)) == WT_RESTART);
+			/* rip references the subtree containing the record */
+			ref = WT_ROW_REF(page, rip);
+			off = WT_ROW_OFF(rip);
+			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			ret = __wt_bt_tree_walk(toc, ref, offdup, work, arg);
+			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
-				break;
+				return (ret);
 		}
 		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RCC:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
+		if (!offdup)
+			break;
+		WT_INDX_FOREACH(page, rip, i) {
+			if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF)
+				break;
+
+			/*
+			 * Recursively call the tree-walk function for the
+			 * off-page duplicate tree.
+			 */
+			ref = WT_ROW_REF(page, rip);
+			off = WT_ROW_OFF(rip);
+			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			ret = __wt_bt_tree_walk(toc, ref, offdup, work, arg);
+			__wt_hazard_clear(toc, ref->page);
+			if (ret != 0)
+				return (ret);
+		}
 		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	default:
+		break;
 	}
 
-err: if (page != NULL)
-		__wt_bt_page_out(toc, &page, 0);
+	/*
+	 * Don't call the worker function for any page until all of its children
+	 * have been visited.   This allows the walker function to be used for
+	 * the sync method, where reconciling a modified child page modifies the
+	 * parent.
+	 */
+	WT_RET(work(toc, page, arg));
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -355,10 +349,13 @@ static int
 __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
+	WT_OFF *off;
+	WT_REF *ref;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	WT_STATS *stats;
 	uint32_t i;
+	int ret;
 
 	db = toc->db;
 	stats = db->idb->dstats;
@@ -401,14 +398,19 @@ __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
 		case WT_ITEM_OFF:
-			WT_STAT_INCR(stats, DUP_TREE);
 			/*
 			 * Recursively call the tree-walk function for the
 			 * off-page duplicate tree.
 			 */
-			WT_RET_RESTART(__wt_bt_tree_walk(toc,
-			    WT_ROW_OFF_ADDR(rip), WT_ROW_OFF_SIZE(rip),
-			    __wt_bt_stat_page, arg));
+			ref = WT_ROW_REF(page, rip);
+			off = WT_ROW_OFF(rip);
+			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			ret = __wt_bt_tree_walk(
+			    toc, ref, 0, __wt_bt_stat_page, arg);
+			__wt_hazard_clear(toc, ref->page);
+			if (ret != 0)
+				return (ret);
+			WT_STAT_INCR(stats, DUP_TREE);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}

@@ -34,11 +34,9 @@ __wt_bt_stat_desc(WT_TOC *toc);
 int
 __wt_bt_desc_read(WT_TOC *toc);
 int
-__wt_bt_desc_write_root(WT_TOC *toc, uint32_t root_addr, uint32_t root_size);
-int
 __wt_bt_desc_write(WT_TOC *toc);
 void
-__wt_bt_page_discard(ENV *env, WT_PAGE *page);
+__wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags);
@@ -51,8 +49,10 @@ __wt_bt_data_copy_to_dbt(DB *db, uint8_t *data, size_t size, DBT *copy);
 inline void
 __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page,
     void *p, uint8_t **first_freep, uint32_t *space_availp);
+void
+__wt_bt_gen_ref_pair(WT_REF *ref, WT_OFF *off, uint32_t addr, uint32_t size);
 inline int
-__wt_page_write_gen_update(WT_PAGE *page, uint32_t write_gen);
+__wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen);
 const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
@@ -60,16 +60,15 @@ __wt_bt_item_type(WT_ITEM *item);
 int
 __wt_bt_open(WT_TOC *toc, int ok_create);
 int
-__wt_bt_root_pin(WT_TOC *toc, int pin);
+__wt_bt_root_pin(WT_TOC *toc);
 int
-__wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep);
+__wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_PAGE **pagep, int dsk_verify);
 int
-__wt_bt_page_in(
-    WT_TOC *toc, uint32_t addr, uint32_t size, int inmem, WT_PAGE **pagep);
+__wt_bt_page_in(WT_TOC *toc, WT_REF *ref, WT_OFF *off, int dsk_verify);
 void
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags);
 int
-__wt_bt_page_inmem(DB *db, WT_PAGE *page);
+__wt_bt_page_inmem(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_bt_item_process(
     WT_TOC *toc, WT_ITEM *item, WT_PAGE **ovfl_ret, DBT *dbt_ret);
@@ -81,19 +80,19 @@ __wt_bt_rcc_expand_sort(ENV *env,
 int
 __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
-__wt_bt_tree_walk(WT_TOC *toc, uint32_t addr,
-    uint32_t size, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
+__wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
+    int offdup, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
 int
 __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg);
 int
-__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags);
+__wt_bt_sync(WT_TOC *toc);
 int
 __wt_db_verify(WT_TOC *toc, void (*f)(const char *, uint64_t));
 int
 __wt_bt_verify(
     WT_TOC *toc, void (*f)(const char *, uint64_t), FILE *stream);
 int
-__wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
+__wt_bt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data);
 inline int
@@ -128,35 +127,24 @@ void
 __wt_drain_dump(ENV *env, const char *tag);
 int
 __wt_cache_create(ENV *env);
-uint64_t
+inline uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache);
-uint64_t
+inline uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache);
 void
 __wt_cache_stats(ENV *env);
 int
 __wt_cache_destroy(ENV *env);
-void
-__wt_cache_dump(ENV *env);
-int
-__wt_page_in(WT_TOC *toc,
-    uint32_t addr, uint32_t size, WT_PAGE **pagep, uint32_t flags);
-void
-__wt_page_out(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_page_read(DB *db, WT_PAGE *page);
 int
-__wt_page_write(DB *db, WT_PAGE *page);
+__wt_page_write(WT_TOC *toc, WT_PAGE *page);
 void
 __wt_workq_read_server(ENV *env, int force);
 int
-__wt_cache_read_queue(
-    WT_TOC *toc, uint32_t addr, uint32_t size, WT_PAGE **pagep);
+__wt_cache_read_serial_func(WT_TOC *toc);
 void *
 __wt_cache_read_server(void *arg);
-int
-__wt_cache_sync(
-    WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags);
 void
 __wt_api_db_err(DB *db, int error, const char *fmt, ...);
 void
@@ -364,7 +352,7 @@ __wt_db_lockout(DB *db);
 int
 __wt_env_lockout(ENV *env);
 int
-__wt_hazard_set(WT_TOC *toc, WT_CACHE_ENTRY *e, WT_PAGE *page);
+__wt_hazard_set(WT_TOC *toc, WT_REF *ref);
 void
 __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page);
 void
@@ -402,7 +390,7 @@ int
 __wt_toc_serialize_func(
     WT_TOC *toc, wq_state_t op, int spin, int (*func)(WT_TOC *), void *args);
 void
-__wt_toc_serialize_wrapup(WT_TOC *toc, int ret);
+__wt_toc_serialize_wrapup(WT_TOC *toc, WT_PAGE *page, int ret);
 int
 __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp);
 void

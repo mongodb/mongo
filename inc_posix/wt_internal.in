@@ -97,16 +97,15 @@ struct __idb {
 	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
-	uint32_t root_addr;		/* Root page addr */
-	uint32_t root_size;		/* Root page size */
-
+	/* Pages in the tree are WT_CHILD/WT_OFF pairs -- here's the root. */
+	WT_REF	root_page;		/* Root page */
+	WT_OFF	root_off;
 	/*
-	 * The root page is pinned into memory when the database is opened
-	 * and/or created; if the root_page isn't set, there's usually not
-	 * much to do.
+	 * When a database is opened and/or created a hazard reference is taken
+	 * on its root page, and the root page brought into memory.  If no root
+	 * page has been acquired, there's usually not much work to do.
 	 */
-#define	WT_UNOPENED_DATABASE(idb)	((idb)->root_page == NULL ? 1 : 0)
-	WT_PAGE  *root_page;		/* Root page */
+#define	WT_UNOPENED_DATABASE(idb)	((idb)->root_page.page == NULL ? 1 : 0)
 
 	uint32_t free_addr;		/* Free page addr */
 	uint32_t free_size;		/* Free page size */

@@ -66,8 +66,8 @@ __wt_workq_srvr(void *arg)
 				toc->wq_state = WT_WORKQ_READ_SCHED;
 
 				/*
-				 * Call the function (which contacts the server).
-				 * If that call fails, we're done.
+				 * Call the function (which contacts the read
+				 * server).  If that call fails, we're done.
 				 */
 				if (toc->wq_func(toc) != 0)
 					break;
@@ -94,6 +94,5 @@ __wt_workq_srvr(void *arg)
 			__wt_yield();
 		}
 	}
-
 	return (NULL);
 }

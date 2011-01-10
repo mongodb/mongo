@@ -39,13 +39,11 @@ static int
 __wt_bt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 {
 	ENV *env;
-	IDB *idb;
 	WT_PAGE *page;
 	WT_REPL **new_repl, *repl;
 	int ret;
 
 	env = toc->env;
-	idb = toc->db->idb;
 	new_repl = NULL;
 	repl = NULL;
 
@@ -55,7 +53,7 @@ __wt_bt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 	page = toc->srch_page;
 
 	/* Allocate a page replacement array as necessary. */
-	if (page->ur.repl == NULL)
+	if (page->u2.repl == NULL)
 		WT_ERR(__wt_calloc(
 		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
 
@@ -72,11 +70,10 @@ err:		if (repl != NULL)
 	}
 
 	/* Free any replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->ur.repl)
+	if (new_repl != NULL && new_repl != page->u2.repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
-	if (page != NULL && page != idb->root_page)
-		__wt_bt_page_out(toc, &page, ret == 0 ? WT_MODIFIED : 0);
+	WT_PAGE_OUT(toc, page);
 
 	return (0);
 }
@@ -90,39 +87,34 @@ __wt_bt_item_update_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_REPL **new_repl, *repl;
-	uint16_t write_gen;
-	int ret, slot;
+	uint32_t slot, write_gen;
+	int ret;
 
 	__wt_bt_item_update_unpack(toc, page, write_gen, slot, new_repl, repl);
 
 	ret = 0;
 
-	/* Check the page's write-generation, then update it. */
-	WT_ERR(__wt_page_write_gen_update(page, write_gen));
+	/* Check the page's write-generation. */
+	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
 	 * If the page does not yet have a replacement array, our caller passed
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->ur.repl == NULL)
-		page->ur.repl = new_repl;
+	if (page->u2.repl == NULL)
+		page->u2.repl = new_repl;
 
 	/*
 	 * Insert the new WT_REPL as the first item in the forward-linked list
 	 * of replacement structures.  Flush memory to ensure the list is never
 	 * broken.
 	 */
-	repl->next = page->ur.repl[slot];
+	repl->next = page->u2.repl[slot];
 	WT_MEMORY_FLUSH;
-	page->ur.repl[slot] = repl;
-	WT_PAGE_MODIFY_SET(page);
-	/*
-	 * Depend on the memory flush in __wt_toc_serialize_wrapup before the
-	 * calling thread proceeds.
-	 */
+	page->u2.repl[slot] = repl;
 
-err:	__wt_toc_serialize_wrapup(toc, ret);
+err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);
 }
 

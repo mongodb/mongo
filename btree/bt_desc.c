@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_desc_io(WT_TOC *, void *, int);
+
 /*
  * __wt_bt_stat_desc --
  *	Fill in the statistics from the database description.
@@ -16,30 +18,23 @@
 int
 __wt_bt_stat_desc(WT_TOC *toc)
 {
-	WT_PAGE *page;
-	WT_PAGE_DESC *desc;
+	WT_PAGE_DESC desc;
 	WT_STATS *stats;
 
 	stats = toc->db->idb->dstats;
 
-	/*
-	 * Read the database's description page.  The description page doesn't
-	 * move, so simply retry any WT_RESTART return.
-	 */
-	WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
-	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
+	WT_RET(__wt_bt_desc_io(toc, &desc, 1));
 
-	WT_STAT_SET(stats, MAGIC, desc->magic);
-	WT_STAT_SET(stats, MAJOR, desc->majorv);
-	WT_STAT_SET(stats, MINOR, desc->minorv);
-	WT_STAT_SET(stats, INTLMAX, desc->intlmax);
-	WT_STAT_SET(stats, INTLMIN, desc->intlmin);
-	WT_STAT_SET(stats, LEAFMAX, desc->leafmax);
-	WT_STAT_SET(stats, LEAFMIN, desc->leafmin);
-	WT_STAT_SET(stats, BASE_RECNO, desc->recno_offset);
-	WT_STAT_SET(stats, FIXED_LEN, desc->fixed_len);
+	WT_STAT_SET(stats, MAGIC, desc.magic);
+	WT_STAT_SET(stats, MAJOR, desc.majorv);
+	WT_STAT_SET(stats, MINOR, desc.minorv);
+	WT_STAT_SET(stats, INTLMAX, desc.intlmax);
+	WT_STAT_SET(stats, INTLMIN, desc.intlmin);
+	WT_STAT_SET(stats, LEAFMAX, desc.leafmax);
+	WT_STAT_SET(stats, LEAFMIN, desc.leafmin);
+	WT_STAT_SET(stats, BASE_RECNO, desc.recno_offset);
+	WT_STAT_SET(stats, FIXED_LEN, desc.fixed_len);
 
-	__wt_bt_page_out(toc, &page, 0);
 	return (0);
 }
 
@@ -51,27 +46,22 @@ int
 __wt_bt_desc_read(WT_TOC *toc)
 {
 	DB *db;
-	WT_PAGE *page;
-	WT_PAGE_DESC *desc;
+	WT_PAGE_DESC desc;
 
 	db = toc->db;
 
-	/*
-	 * Read the database's description page.  The description page doesn't
-	 * move, so simply retry any WT_RESTART return.
-	 */
-	WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
-	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
+	WT_RET(__wt_bt_desc_io(toc, &desc, 1));
 
-	db->intlmax = desc->intlmax;		/* Update DB handle */
-	db->intlmin = desc->intlmin;
-	db->leafmax = desc->leafmax;
-	db->leafmin = desc->leafmin;
-	db->idb->root_addr = desc->root_addr;
-	db->idb->root_size = desc->root_size;
-	db->idb->free_addr = desc->free_addr;
-	db->idb->free_size = desc->free_size;
-	db->fixed_len = desc->fixed_len;
+	db->intlmax = desc.intlmax;		/* Update DB handle */
+	db->intlmin = desc.intlmin;
+	db->leafmax = desc.leafmax;
+	db->leafmin = desc.leafmin;
+	db->idb->root_off.addr = desc.root_addr;
+	db->idb->root_off.size = desc.root_size;
+	WT_RECORDS(&db->idb->root_off) = desc.records;
+	db->idb->free_addr = desc.free_addr;
+	db->idb->free_size = desc.free_size;
+	db->fixed_len = desc.fixed_len;
 
 	/*
 	 * XXX
@@ -81,32 +71,6 @@ __wt_bt_desc_read(WT_TOC *toc)
 	if (db->fixed_len != 0)
 		F_SET(db->idb, WT_COLUMN);
 
-	__wt_bt_page_out(toc, &page, 0);
-	return (0);
-}
-
-/*
- * __wt_bt_desc_write_root --
- *	Update the root information on the description page.
- */
-int
-__wt_bt_desc_write_root(WT_TOC *toc, uint32_t root_addr, uint32_t root_size)
-{
-	IDB *idb;
-	WT_PAGE *page;
-	WT_PAGE_DESC *desc;
-
-	idb = toc->db->idb;
-
-	/*
-	 * Read the database's description page.  The description page doesn't
-	 * move, so simply retry any WT_RESTART return.
-	 */
-	WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
-	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
-	desc->root_addr = idb->root_addr = root_addr;
-	desc->root_size = idb->root_size = root_size;
-	__wt_bt_page_out(toc, &page, WT_MODIFIED);
 	return (0);
 }
 
@@ -118,59 +82,51 @@ int
 __wt_bt_desc_write(WT_TOC *toc)
 {
 	DB *db;
-	DBT *tmp;
 	IDB *idb;
-	WT_FH *fh;
-	WT_PAGE *page;
-	WT_PAGE_DESC *desc;
+	WT_PAGE_DESC desc;
 	int ret;
 
 	db = toc->db;
 	idb = db->idb;
-	fh = idb->fh;
 	ret = 0;
 
-	/*
-	 * If the file size is 0, allocate a new page, else read the database's
-	 * description page.  The description page doesn't move, so simply retry
-	 * any WT_RESTART return.
-	 *
-	 * XXX
-	 * I'm not currently serializing updates to this page, and I'm pretty
-	 * sure that's a bug -- review this when we start working btree splits.
-	 */
-	tmp = NULL;
-	if (fh->file_size == 0)
-		WT_ERR(__wt_bt_scratch_page(
-		    toc, 512, WT_PAGE_DESCRIPT, WT_NOLEVEL, &page, &tmp));
-	else
-		WT_RET_RESTART(__wt_bt_page_in(toc, 0, 512, 0, &page));
-
-	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
-	desc->magic = WT_BTREE_MAGIC;
-	desc->majorv = WT_BTREE_MAJOR_VERSION;
-	desc->minorv = WT_BTREE_MINOR_VERSION;
-	desc->intlmax = db->intlmax;
-	desc->intlmin = db->intlmin;
-	desc->leafmax = db->leafmax;
-	desc->leafmin = db->leafmin;
-	desc->recno_offset = 0;
-	desc->root_addr = idb->root_addr;
-	desc->root_size = idb->root_size;
-	desc->free_addr = idb->free_addr;
-	desc->free_size = idb->free_size;
-	desc->fixed_len = (uint8_t)db->fixed_len;
-	desc->flags = 0;
+	desc.magic = WT_BTREE_MAGIC;
+	desc.majorv = WT_BTREE_MAJOR_VERSION;
+	desc.minorv = WT_BTREE_MINOR_VERSION;
+	desc.intlmax = db->intlmax;
+	desc.intlmin = db->intlmin;
+	desc.leafmax = db->leafmax;
+	desc.leafmin = db->leafmin;
+	desc.recno_offset = 0;
+	desc.root_addr = idb->root_off.addr;
+	desc.root_size = idb->root_off.size;
+	desc.records = WT_RECORDS(&idb->root_off);
+	desc.free_addr = idb->free_addr;
+	desc.free_size = idb->free_size;
+	desc.fixed_len = (uint8_t)db->fixed_len;
+	desc.flags = 0;
 	if (F_ISSET(idb, WT_REPEAT_COMP))
-		F_SET(desc, WT_PAGE_DESC_REPEAT);
+		F_SET(&desc, WT_PAGE_DESC_REPEAT);
 
-	if (tmp == NULL)
-		__wt_bt_page_out(toc, &page, WT_MODIFIED);
-	else
-		ret = __wt_page_write(db, page);
-
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+	WT_RET(__wt_bt_desc_io(toc, &desc, 0));
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_desc_io --
+ *	Read/write the WT_DESC sector.
+ */
+static int
+__wt_bt_desc_io(WT_TOC *toc, void *p, int is_read)
+{
+	WT_FH *fh;
+	ENV *env;
+
+	fh = toc->db->idb->fh;
+	env = toc->env;
+
+	return (is_read ?
+	    __wt_read(env, fh, (off_t)0, 512, p) :
+	    __wt_write(env, fh, (off_t)0, 512, p));
 }

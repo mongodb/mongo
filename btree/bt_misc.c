@@ -24,6 +24,7 @@ __wt_bt_build_verify(void)
 		{ "WT_ITEM", sizeof(WT_ITEM), WT_ITEM_SIZE },
 		{ "WT_OFF", sizeof(WT_OFF), WT_OFF_SIZE },
 		{ "WT_OVFL", sizeof(WT_OVFL), WT_OVFL_SIZE },
+		{ "WT_PAGE", sizeof(WT_PAGE), WT_PAGE_SIZE },
 		{ "WT_PAGE_DESC", sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE },
 		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), WT_PAGE_HDR_SIZE },
 		{ "WT_ROW", sizeof(WT_ROW), WT_ROW_SIZE }
@@ -115,18 +116,27 @@ __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page,
 }
 
 /*
- * __wt_page_write_gen_update --
- *	Handle the page's write generation number.
+ * __wt_bt_gen_ref_pair --
+ *	Generate a clean WT_REF/WT_OFF pair.
+ */
+void
+__wt_bt_gen_ref_pair(WT_REF *ref, WT_OFF *off, uint32_t addr, uint32_t size)
+{
+	WT_CLEAR(*ref);
+	ref->state = WT_EMPTY;
+	WT_CLEAR(*off);
+	off->addr = addr;
+	off->size = size;
+}
+
+/*
+ * __wt_page_write_gen_check --
+ *	Confirm the page's write generation number is correct.
  */
 inline int
-__wt_page_write_gen_update(WT_PAGE *page, uint32_t write_gen)
+__wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 {
-	if (page->write_gen != write_gen)
-		return (WT_RESTART);
-
-	++page->write_gen;
-	WT_MEMORY_FLUSH;
-	return (0);
+	return (page->write_gen == write_gen ? 0 : WT_RESTART);
 }
 
 /*
@@ -139,8 +149,6 @@ __wt_bt_hdr_type(WT_PAGE_HDR *hdr)
 	switch (hdr->type) {
 	case WT_PAGE_INVALID:
 		return ("invalid");
-	case WT_PAGE_DESCRIPT:
-		return ("database descriptor page");
 	case WT_PAGE_COL_FIX:
 		return ("column-store fixed-length leaf");
 	case WT_PAGE_COL_INT:

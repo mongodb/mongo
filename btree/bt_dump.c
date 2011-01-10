@@ -37,26 +37,16 @@ int
 __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags)
 {
-	DB *db;
-	IDB *idb;
 	WT_DSTUFF dstuff;
 	int ret;
 
-	db = toc->db;
-	idb = db->idb;
-
 	if (LF_ISSET(WT_DEBUG)) {
-#ifdef HAVE_DIAGNOSTIC
 		/*
 		 * We use the verification code to do debugging dumps because
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before blindly reading it.
 		 */
 		return (__wt_bt_verify(toc, f, stream));
-#else
-		__wt_api_db_errx(db, "library not built for debugging");
-		return (WT_ERROR);
-#endif
 	}
 
 	dstuff.p = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
@@ -72,8 +62,7 @@ __wt_db_dump(WT_TOC *toc,
 	 */
 	fprintf(stream, "VERSION=1\n");
 	fprintf(stream, "HEADER=END\n");
-	ret = __wt_bt_tree_walk(
-	    toc, idb->root_addr, idb->root_size, __wt_bt_dump_page, &dstuff);
+	ret = __wt_bt_tree_walk(toc, NULL, 0, __wt_bt_dump_page, &dstuff);
 	fprintf(stream, "DATA=END\n");
 
 	/* Wrap up reporting. */
@@ -347,6 +336,8 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
 	WT_PAGE *key_ovfl, *data_ovfl;
 	WT_ITEM *item;
+	WT_OFF *off;
+	WT_REF *ref;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i;
@@ -433,15 +424,20 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			break;
 		case WT_ITEM_OFF:
-			dp->dupkey = key;
 			/*
-			 * XXX
-			 * If an off-page dup tree is reconciled, then this
-			 * might change underfoot and we could race.
+			 * Set the key for the walk off the off-page duplicate
+			 * tree.
 			 */
-			WT_RET_RESTART(__wt_bt_tree_walk(toc,
-			    WT_ROW_OFF_ADDR(rip), WT_ROW_OFF_SIZE(rip),
-			    __wt_bt_dump_page, dp));
+			dp->dupkey = key;
+
+			ref = WT_ROW_DUP(page, rip);
+			off = WT_ROW_OFF(rip);
+			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			ret = __wt_bt_tree_walk(
+			    toc, ref, 0, __wt_bt_dump_page, dp);
+			__wt_hazard_clear(toc, ref->page);
+			if (ret != 0)
+				goto err;
 			continue;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}

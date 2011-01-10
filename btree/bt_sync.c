@@ -9,18 +9,50 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_tree_sync(WT_TOC *, WT_PAGE *, void *);
+
 /*
  * __wt_bt_sync --
- *	Sync a Btree.
+ *	Sync the tree.
  */
 int
-__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags)
+__wt_bt_sync(WT_TOC *toc)
 {
+	ENV *env;
 	IDB *idb;
+	WT_CACHE *cache;
+	int ret;
 
+	env = toc->env;
 	idb = toc->db->idb;
+	cache = env->ienv->cache;
+
 	if (WT_UNOPENED_DATABASE(idb))
 		return (0);
 
-	return (__wt_cache_sync(toc, f, flags));
+	/*
+	 * The tree walk is depth first, that is, the worker function is not
+	 * called on internal pages until all children have been visited; so,
+	 * we don't have to worry about a page being dirtied after the visit.
+	 *
+	 * Lock out the cache drain thread, though, we don't want it trying
+	 * to reconcile pages we're flushing.
+	 */
+	__wt_lock(env, cache->mtx_reconcile);
+	ret = __wt_bt_tree_walk(toc, NULL, 1, __wt_bt_tree_sync, NULL);
+	__wt_unlock(env, cache->mtx_reconcile);
+	return (ret);
+}
+
+/*
+ * __wt_bt_tree_sync --
+ *	Sync a page.
+ */
+static int
+__wt_bt_tree_sync(WT_TOC *toc, WT_PAGE *page, void *arg)
+{
+	/* Reconcile any dirty pages. */
+	if (WT_PAGE_IS_MODIFIED(page))
+		WT_RET(__wt_bt_rec_page(toc, page));
+	return (0);
 }

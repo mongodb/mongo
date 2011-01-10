@@ -10,7 +10,6 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static void __wt_bt_debug_inmem_col_fix(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_inmem_col_int(WT_PAGE *, FILE *);
 static void __wt_bt_debug_inmem_col_rcc(WT_TOC *, WT_PAGE *, FILE *);
@@ -80,23 +79,27 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
 
 /*
  * __wt_bt_debug_addr --
- *	Dump a page in debugging mode based on its addr/size.
+ *	Dump a file page in debugging mode based on its addr/size.
  */
 int
 __wt_bt_debug_addr(
     WT_TOC *toc, uint32_t addr, uint32_t size, char *ofile, FILE *fp)
 {
-	WT_PAGE *page;
+	WT_OFF off;
+	WT_REF ref;
 	int ret;
 
 	/*
-	 * Addr/size were set by our caller (probably via some debugger).   If
-	 * WT_RESTART is returned, retry, presumably addr/size are valid and
-	 * the page was only discarded, not re-written.
+	 * Addr/size were set by our caller, via the debugger.  Getting a page
+	 * requires a WT_REF/WT_OFF pair; we're not in the tree, fake it.
 	 */
-	WT_RET_RESTART(__wt_bt_page_in(toc, addr, size, 1, &page));
-	ret = __wt_bt_debug_page(toc, page, ofile, fp);
-	__wt_bt_page_out(toc, &page, 0);
+	__wt_bt_gen_ref_pair(&ref, &off, addr, size);
+
+	/* Retrieve the page, dump the information, and discard the page. */
+	WT_RET(__wt_bt_page_in(toc, &ref, &off, 0));
+	ret = __wt_bt_debug_page(toc, ref.page, ofile, fp);
+	__wt_bt_page_out(toc, &ref.page, WT_DISCARD);
+
 	return (ret);
 }
 
@@ -124,8 +127,6 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
   	    __wt_bt_hdr_type(hdr), (u_long)page->size);
 
 	switch (hdr->type) {
-	case WT_PAGE_DESCRIPT:
-		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -149,9 +150,6 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	}
 
 	switch (hdr->type) {
-	case WT_PAGE_DESCRIPT:
-		__wt_bt_debug_desc(page, fp);
-		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -178,41 +176,6 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		(void)fclose(fp);
 
 	return (ret);
-}
-
-/*
- * __wt_bt_debug_desc --
- *	Dump the database description on page 0.
- */
-static void
-__wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
-{
-	WT_PAGE_DESC *desc;
-
-	if (fp == NULL)				/* Default to stderr */
-		fp = stderr;
-
-	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
-	fprintf(fp, "\tdescription record: {\n"),
-	fprintf(fp, "\t\tmagic: %lu, major: %lu, minor: %lu\n",
-	    (u_long)desc->magic, (u_long)desc->majorv, (u_long)desc->minorv);
-	fprintf(fp, "\t\tinternal page min/max size: %lu/%lu\n",
-	    (u_long)desc->intlmin, (u_long)desc->intlmax);
-	fprintf(fp, "\t\tleaf page min/max size: %lu/%lu\n",
-	    (u_long)desc->leafmin, (u_long)desc->leafmax);
-	fprintf(fp, "\t\toffset record: %llu, fixed_len: %lu\n",
-	    (unsigned long long)desc->recno_offset, (u_long)desc->fixed_len);
-	if (desc->root_addr == WT_ADDR_INVALID)
-		fprintf(fp, "\t\troot addr (none)\n");
-	else
-		fprintf(fp, "\t\troot addr %lu, size %lu\n",
-		    (u_long)desc->root_addr, (u_long)desc->root_size);
-	if (desc->free_addr == WT_ADDR_INVALID)
-		fprintf(fp, "\t\tfree addr (none)\n");
-	else
-		fprintf(fp, "\t\tfree addr %lu, size %lu\n",
-		    (u_long)desc->free_addr, (u_long)desc->free_size);
-	fprintf(fp, "\t}\n");
 }
 
 /*
@@ -456,10 +419,10 @@ __wt_bt_debug_rccexp(WT_RCC_EXPAND *exp, FILE *fp)
 	for (; exp != NULL; exp = exp->next) {
 		repl = exp->repl;
 		if (WT_REPL_DELETED_ISSET(repl))
-			fprintf(fp, "\texp: {deleted}\n");
+			fprintf(fp, "\trepl: {deleted}\n");
 		else
 			__wt_bt_debug_pair(
-			    "\texp", WT_REPL_DATA(repl), repl->size, fp);
+			    "\trepl", WT_REPL_DATA(repl), repl->size, fp);
 	}
 }
 

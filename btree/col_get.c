@@ -18,12 +18,10 @@ __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data)
 {
 	DB *db;
 	IDB *idb;
-	WT_PAGE *page;
 	int ret;
 
 	db = toc->db;
 	idb = db->idb;
-	page = NULL;
 
 	/* Search the column store for the key. */
 	if (!F_ISSET(idb, WT_COLUMN)) {
@@ -36,8 +34,7 @@ __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data)
 	WT_ERR(__wt_bt_search_col(toc, recno, WT_NOLEVEL, 0));
 	ret = __wt_bt_dbt_return(toc, NULL, data, 0);
 
-	page = toc->srch_page;
-err:	if (page != NULL && page != idb->root_page)
-		__wt_bt_page_out(toc, &page, 0);
+err:	if (toc->srch_page != idb->root_page.page)
+		__wt_hazard_clear(toc, toc->srch_page);
 	return (ret);
 }

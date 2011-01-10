@@ -20,12 +20,13 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
+	WT_OFF *off;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
+	WT_REF *ref;
 	WT_ROW *rip;
 	WT_REPL *repl;
-	uint32_t addr, base, indx, limit, size;
-	uint16_t write_gen;
+	uint32_t base, indx, limit, write_gen;
 	int cmp, isleaf, ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -40,11 +41,10 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	WT_DB_FCHK(db,
 	    "__wt_bt_search_key_row", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
-restart:
 	/* Search the tree. */
-	for (page = idb->root_page;;) {
+	for (page = idb->root_page.page;;) {
 		/* Copy the write generation value before the read. */
-		write_gen = WT_PAGE_WRITE_GEN(page);
+		write_gen = page->write_gen;
 
 		hdr = page->hdr;
 		isleaf =
@@ -108,29 +108,15 @@ restart:
 		if (isleaf || level == hdr->level)
 			break;
 
-		/*
-		 * rip references the subtree containing the record; check for
-		 * an update.
-		 */
-		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
-			addr = ((WT_OFF *)WT_REPL_DATA(repl))->addr;
-			size = ((WT_OFF *)WT_REPL_DATA(repl))->size;
-		} else {
-			addr = WT_ROW_OFF_ADDR(rip);
-			size = WT_ROW_OFF_SIZE(rip);
-		}
+		/* rip references the subtree containing the record. */
+		ref = WT_ROW_REF(page, rip);
+		off = WT_ROW_OFF(rip);
+		WT_ERR(__wt_bt_page_in(toc, ref, off, 0));
 
-		/* Walk down to the next page. */
-		if (page != idb->root_page)
-			__wt_bt_page_out(toc, &page, 0);
-		switch (ret = __wt_bt_page_in(toc, addr, size, 1, &page)) {
-		case 0:
-			break;
-		case WT_RESTART:
-			goto restart;
-		default:
-			return (ret);
-		}
+		/* Swap the parent page for the child page. */
+		if (page != idb->root_page.page)
+			__wt_hazard_clear(toc, page);
+		page = ref->page;
 	}
 
 	/*
@@ -173,8 +159,7 @@ restart:
 notfound:
 	ret = WT_NOTFOUND;
 
-err:	if (page != idb->root_page)
-		__wt_bt_page_out(toc, &page, 0);
+err:	WT_PAGE_OUT(toc, page);
 	return (ret);
 }
 

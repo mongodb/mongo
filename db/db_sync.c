@@ -16,5 +16,5 @@
 int
 __wt_db_sync(WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags)
 {
-	return (__wt_bt_sync(toc, f, flags));
+	return (__wt_bt_sync(toc));
 }

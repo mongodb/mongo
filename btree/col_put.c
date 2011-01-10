@@ -47,7 +47,6 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
 	WT_PAGE *page;
 	WT_RCC_EXPAND *exp, **new_rccexp;
 	WT_REPL **new_repl, *repl;
@@ -55,7 +54,6 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 
 	env = toc->env;
 	db = toc->db;
-	idb = db->idb;
 
 	page = NULL;
 	exp = NULL;
@@ -93,7 +91,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate a page replacement array if necessary. */
-		if (page->ur.repl == NULL)
+		if (page->u2.repl == NULL)
 			WT_ERR(__wt_calloc(env,
 			    page->indx_count, sizeof(WT_REPL *), &new_repl));
 
@@ -116,7 +114,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 		}
 							/* #3 */
 		/* Allocate a page expansion array as necessary. */
-		if (page->ur.rccexp == NULL)
+		if (page->u2.rccexp == NULL)
 			WT_ERR(__wt_calloc(env, page->indx_count,
 			    sizeof(WT_RCC_EXPAND *), &new_rccexp));
 
@@ -143,16 +141,15 @@ err:		if (exp != NULL)
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
-	if (new_rccexp != NULL && new_rccexp != page->ur.rccexp)
+	if (new_rccexp != NULL && new_rccexp != page->u2.rccexp)
 		__wt_free(env,
 		    new_rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
 
 	/* Free any page replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->ur.repl)
+	if (new_repl != NULL && new_repl != page->u2.repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
-	if (page != NULL && page != idb->root_page)
-		__wt_bt_page_out(toc, &page, ret == 0 ? WT_MODIFIED : 0);
+	WT_PAGE_OUT(toc, page);
 
 	return (0);
 }
@@ -167,39 +164,34 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_RCC_EXPAND **new_rccexp, *exp;
-	int ret, slot;
-	uint16_t write_gen;
-
-	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_rccexp, exp);
+	uint32_t slot, write_gen;
+	int ret;
 
 	ret = 0;
 
-	/* Check the page's write-generation, then update it. */
-	WT_ERR(__wt_page_write_gen_update(page, write_gen));
+	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_rccexp, exp);
+
+	/* Check the page's write-generation. */
+	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
 	 * If the page does not yet have an expansion array, our caller passed
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->ur.rccexp == NULL)
-		page->ur.rccexp = new_rccexp;
+	if (page->u2.rccexp == NULL)
+		page->u2.rccexp = new_rccexp;
 
 	/*
 	 * Insert the new WT_RCC_EXPAND as the first item in the forward-linked
 	 * list of expansion structures.  Flush memory to ensure the list is
 	 * never broken.
 	 */
-	exp->next = page->ur.rccexp[slot];
+	exp->next = page->u2.rccexp[slot];
 	WT_MEMORY_FLUSH;
-	page->ur.rccexp[slot] = exp;
-	WT_PAGE_MODIFY_SET(page);
-	/*
-	 * Depend on the memory flush in __wt_toc_serialize_wrapup before the
-	 * calling thread proceeds.
-	 */
+	page->u2.rccexp[slot] = exp;
 
-err:	__wt_toc_serialize_wrapup(toc, ret);
+err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);
 }
 
@@ -214,15 +206,15 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_RCC_EXPAND *exp;
 	WT_REPL *repl;
-	uint16_t write_gen;
+	uint32_t write_gen;
 	int ret;
-
-	__wt_bt_rcc_expand_repl_unpack(toc, page, write_gen, exp, repl);
 
 	ret = 0;
 
-	/* Check the page's write-generation, then update it. */
-	WT_ERR(__wt_page_write_gen_update(page, write_gen));
+	__wt_bt_rcc_expand_repl_unpack(toc, page, write_gen, exp, repl);
+
+	/* Check the page's write-generation. */
+	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
 	 * Insert the new WT_REPL as the first item in the forward-linked list
@@ -232,13 +224,7 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 	repl->next = exp->repl;
 	WT_MEMORY_FLUSH;
 	exp->repl = repl;
-	WT_PAGE_MODIFY_SET(page);
 
-	/*
-	 * Depend on the memory flush in __wt_toc_serialize_wrapup before the
-	 * calling thread proceeds.
-	 */
-
-err:	__wt_toc_serialize_wrapup(toc, ret);
+err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);
 }

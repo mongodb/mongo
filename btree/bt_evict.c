@@ -52,9 +52,9 @@ __wt_workq_drain_server(ENV *env, int force)
 	    "bytes inuse %s max (%lluMB %s %lluMB), ",
 	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (u_quad)(bytes_inuse / WT_MEGABYTE),
+	    (unsigned long long)(bytes_inuse / WT_MEGABYTE),
 	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    (u_quad)(bytes_max / WT_MEGABYTE)));
+	    (unsigned long long)(bytes_max / WT_MEGABYTE)));
 
 	cache->drain_sleeping = 0;
 	__wt_unlock(env, cache->mtx_drain);
@@ -108,6 +108,7 @@ __wt_cache_drain_server(void *arg)
 		if (!F_ISSET(ienv, WT_SERVER_RUN))
 			break;
 
+#if 0
 		for (;;) {
 			/*
 			 * The cache drain server is a long-running thread; its
@@ -138,6 +139,7 @@ __wt_cache_drain_server(void *arg)
 			} else if (bytes_inuse < bytes_max)
 				break;
 		}
+#endif
 	}
 
 err:	if (cache->drain != NULL)
@@ -155,6 +157,7 @@ err:	if (cache->drain != NULL)
 	return (NULL);
 }
 
+#if 0
 /*
  * __wt_drain_trickle --
  *	Select a group of pages to trickle out.
@@ -189,7 +192,7 @@ __wt_drain_trickle(WT_TOC *toc)
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "cache drain: bucket %lu: review %lu of %llu total pages",
 	    (u_long)cache->bucket_cnt,
-	    (u_long)review_cnt, (u_quad)cache_pages));
+	    (u_long)review_cnt, (unsigned long long)cache_pages));
 
 	/* Allocate more space in the drain list as necessary. */
 	if (review_cnt > cache->drain_len / sizeof(WT_CACHE_ENTRY *))
@@ -536,4 +539,5 @@ __wt_drain_dump(ENV *env, const char *tag)
 	}
 	__wt_mb_discard(&mb);
 }
+#endif
 #endif
