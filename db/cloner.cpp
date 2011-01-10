@@ -130,6 +130,8 @@ namespace mongo {
                     theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
+
+                    getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {
                     log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
@@ -192,6 +194,8 @@ namespace mongo {
                     theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
+
+                    getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {
                     log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
