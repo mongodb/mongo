@@ -99,6 +99,16 @@ namespace mongo {
         uasserted( 13299 , ss.str() );
     }
 
+    void ShardingState::resetShardingState() {
+        scoped_lock lk(_mutex);
+        
+        _enabled = false;
+        _configServer.clear();
+        _shardName.clear();
+        _shardHost.clear();
+        _chunks.clear();
+    }
+
     // TODO we shouldn't need three ways for checking the version. Fix this.
     bool ShardingState::hasVersion( const string& ns ) {
         scoped_lock lk(_mutex);

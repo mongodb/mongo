@@ -20,6 +20,7 @@
 #include "../client.h"
 #include "../../client/dbclient.h"
 #include "../dbhelpers.h"
+#include "../../s/d_logic.h"
 #include "rs.h"
 #include "connections.h"
 
@@ -77,6 +78,12 @@ namespace mongo {
                 log() << "replSet closing client sockets after reqlinquishing primary" << rsLog;
                 MessagingPort::closeAllSockets(1);
             }
+
+            // now that all connections were closed, strip this mongod from all sharding details
+            // if and when it gets promoted to a primary again, only then it should reload the sharding state
+            // the rationale here is that this mongod won't bring stale state when it regains primaryhood
+            shardingState.resetShardingState();
+
         }
         else if( box.getState().startup2() ) {
             // ? add comment

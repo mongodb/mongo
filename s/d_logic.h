@@ -45,6 +45,9 @@ namespace mongo {
         void gotShardName( const string& name );
         void gotShardHost( string host );
 
+        /** Reverts back to a state where this mongod is not sharded. */
+        void resetShardingState(); 
+
         // versioning support
 
         bool hasVersion( const string& ns );
@@ -218,6 +221,7 @@ namespace mongo {
     /**
      * @return true if we took care of the message and nothing else should be done
      */
+    class DbResponse;
     bool handlePossibleShardedMessage( Message &m, DbResponse * dbresponse );
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
