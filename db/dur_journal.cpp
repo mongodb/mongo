@@ -300,7 +300,8 @@ namespace mongo {
 
         // call from within _curLogFileMutex
         void Journal::closeCurrentJournalFile() {
-            assert(_curLogFile);
+            if (!_curLogFile)
+                return;
 
             JFile jf;
             jf.filename = _curLogFile->_name;
@@ -385,7 +386,7 @@ namespace mongo {
             try {
                 mutex::scoped_lock lk(_curLogFileMutex);
                 if( _curLogFile == 0 )
-                    open();
+                    _open();
                 stats.curr->_journaledBytes += b.len();
                 _written += b.len();
                 _curLogFile->synchronousAppend((void *) b.buf(), b.len());
