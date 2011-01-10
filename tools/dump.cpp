@@ -33,6 +33,7 @@ public:
         ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
         ("query,q", po::value<string>() , "json query" )
         ("oplog", "Use oplog for point-in-time snapshotting" )
+        ("repair", "try to recover a crashed database" )
         ;
     }
 
@@ -127,7 +128,141 @@ public:
 
     }
 
+    int repair() {
+        if ( ! hasParam( "dbpath" ) ){
+            cout << "repair mode only works with --dbpath" << endl;
+            return -1;
+        }
+        
+        if ( ! hasParam( "db" ) ){
+            cout << "repair mode only works on 1 db right at a time right now" << endl;
+            return -1;
+        }
+
+        if ( hasParam( "collection" ) ){
+            cout << "repair mode can't work with collection, only on full db" << endl;
+            return -1;
+        }
+
+        string dbname = getParam( "db" );
+        log() << "going to try and recover data from: " << dbname << endl;
+
+        return _repair( dbname  );
+    }
+    
+    DiskLoc _repairExtent( Database* db , string ns, bool forward , DiskLoc eLoc ){
+        LogIndentLevel lil;
+        
+        if ( eLoc.getOfs() <= 0 ){
+            error() << "invalid extent ofs: " << eLoc.getOfs() << endl;
+            return DiskLoc();
+        }
+        
+
+        MongoDataFile * mdf = db->getFile( eLoc.a() );
+
+        Extent * e = mdf->debug_getExtent( eLoc );
+        if ( ! e->isOk() ){
+            warning() << "Extent not ok magic: " << e->magic << " going to try to continue" << endl;
+        }
+        
+        log() << "length:" << e->length << endl;
+        
+        LogIndentLevel lil2;
+        
+        DiskLoc loc = forward ? e->firstRecord : e->lastRecord;
+        while ( ! loc.isNull() ){
+            if ( loc.getOfs() <= 0 ){
+                error() << "offset is 0 for record which should be impossible" << endl;
+                break;
+            }
+            log() << loc << endl;
+            Record* rec = loc.rec();
+            log() << loc.obj() << endl;
+            loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
+        }
+        return forward ? e->xnext : e->xprev;
+        
+    }
+
+    void _repair( Database* db , string ns ){
+        NamespaceDetails * nsd = nsdetails( ns.c_str() );
+        log() << "nrecords: " << nsd->stats.nrecords 
+              << " datasize: " << nsd->stats.datasize 
+              << " firstExtent: " << nsd->firstExtent 
+              << endl;
+        
+        if ( nsd->firstExtent.isNull() ){
+            log() << " ERROR fisrtExtent is null" << endl;
+            return;
+        }
+        
+        if ( ! nsd->firstExtent.isValid() ){
+            log() << " ERROR fisrtExtent is not valid" << endl;
+            return;
+        }
+        
+        try {
+            log() << "forward extent pass" << endl;
+            LogIndentLevel lil;
+            DiskLoc eLoc = nsd->firstExtent;
+            while ( ! eLoc.isNull() ){
+                log() << "extent loc: " << eLoc << endl;
+                eLoc = _repairExtent( db , ns , true , eLoc );
+            }
+        }
+        catch ( DBException& e ){
+            error() << "forward extent pass failed:" << e.toString() << endl;
+        }
+
+        try {
+            log() << "backwards extent pass" << endl;
+            LogIndentLevel lil;
+            DiskLoc eLoc = nsd->lastExtent;
+            while ( ! eLoc.isNull() ){
+                log() << "extent loc: " << eLoc << endl;
+                eLoc = _repairExtent( db , ns , false , eLoc );
+            }
+        }
+        catch ( DBException& e ){
+            error() << "ERROR: backwards extent pass failed:" << e.toString() << endl;
+        }
+
+    }
+    
+    int _repair( string dbname ){
+        dblock lk;
+        Client::Context cx( dbname );
+        Database * db = cx.db();
+        
+        list<string> namespaces;
+        db->namespaceIndex.getNamespaces( namespaces );
+        
+        for ( list<string>::iterator i=namespaces.begin(); i!=namespaces.end(); ++i ){
+            LogIndentLevel lil;
+            string ns = *i;
+            if ( str::endsWith( ns , ".system.namespaces" ) )
+                continue;
+            log() << "trying to recover: " << ns << endl;
+            
+            LogIndentLevel lil2;
+            try {
+                _repair( db , ns );
+            }
+            catch ( DBException& e ){
+                log() << "ERROR recovering: " << ns << " " << e.toString() << endl;
+            }
+        }
+   
+        return 0;
+    }
+
     int run() {
+        
+        if ( hasParam( "repair" ) ){
+            warning() << "repair is a work in progress" << endl;
+            return repair();
+        }
 
         {
             string q = getParam("query");
