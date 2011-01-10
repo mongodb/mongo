@@ -69,18 +69,19 @@ namespace mongo {
         */
         void invoke() {
             mutex::scoped_lock lk2(_invokeMutex);
-
+            int toDrain;
             {
                 // flip queueing to the other queue (we are double buffered)
-                readlocktry lk("", 1);
-                if (lk.got()){
-                    int other = _which ^ 1;
-                    if( _queues[other].empty() )
-                        _which = other;
-                }
+                readlocktry lk("", 5);
+                if( !lk.got() )
+                    return;
+                toDrain = _which;
+                _which = _which ^ 1;
+                wassert( _queues[_which].empty() ); // we are in dbMutex, so it should be/stay empty til we exit dbMutex
             }
 
-            _drain( _queues[_which^1] );
+            _drain( _queues[toDrain] );
+            assert( _queues[toDrain].empty() );
         }
 
     private:
