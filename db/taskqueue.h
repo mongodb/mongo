@@ -54,7 +54,7 @@ namespace mongo {
         /** call to process deferrals.
 
             concurrency: handled herein.  multiple threads could call invoke(), but their efforts will be
-                         serialized.
+                         serialized.  the common case is that there is a single processor calling invoke().
 
             normally, you call this outside of any lock.  but if you want to fully drain the queue,
             call from within a read lock.  for example:
@@ -68,21 +68,20 @@ namespace mongo {
             you can also call invoke periodically to do some work and then pick up later on more.
         */
         void invoke() {
-            if( !dbMutex.lock_shared_try(5) )
-                return;
-
             mutex::scoped_lock lk2(_invokeMutex);
 
-            int toDrain = _which;
-            int x = _which ^ 1;
-            wassert( _queues[x].empty() );
-            _which = x;
+            {
+                // flip queueing to the other queue (we are double buffered)
+                readlocktry lk("", 1);
+                if (lk.got()){
+                    int other = _which ^ 1;
+                    if( _queues[other].empty() )
+                        _which = other;
+                }
+            }
 
-            dbMutex.unlock_shared();
-
-            _drain( _queues[toDrain] );
-            assert( _queues[toDrain].empty() );
-       }
+            _drain( _queues[_which^1] );
+        }
 
     private:
         int _which; // 0 or 1
