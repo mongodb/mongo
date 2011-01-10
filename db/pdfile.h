@@ -82,18 +82,20 @@ namespace mongo {
         /** fsync */
         void flush( bool sync );
 
+        /** only use fore debugging */
+        Extent* debug_getExtent(DiskLoc loc) { return _getExtent( loc ); }
     private:
         void badOfs(int) const;
         void badOfs2(int) const;
         int defaultSize( const char *filename ) const;
 
-        Extent* getExtent(DiskLoc loc);
-        Extent* _getExtent(DiskLoc loc);
+        Extent* getExtent(DiskLoc loc) const;
+        Extent* _getExtent(DiskLoc loc) const;
         Record* recordAt(DiskLoc dl);
         Record* makeRecord(DiskLoc dl, int size);
         void grow(DiskLoc dl, int size);
 
-        char* p() { return (char *) _mb; }
+        char* p() const { return (char *) _mb; }
         DataFileHeader* header() { return (DataFileHeader*) _mb; }
 
         MongoMMF mmf;
@@ -253,7 +255,8 @@ namespace mongo {
         /* like init(), but for a reuse case */
         DiskLoc reuse(const char *nsname);
 
-        void assertOk() { assert(magic == 0x41424344); }
+        bool isOk() const { return magic == 0x41424344; }
+        void assertOk() const { assert(isOk()); }
 
         Record* newRecord(int len);
 
@@ -343,13 +346,13 @@ namespace mongo {
 
 #pragma pack()
 
-    inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
+    inline Extent* MongoDataFile::_getExtent(DiskLoc loc) const {
         loc.assertOk();
         Extent *e = (Extent *) (p()+loc.getOfs());
         return e;
     }
 
-    inline Extent* MongoDataFile::getExtent(DiskLoc loc) {
+    inline Extent* MongoDataFile::getExtent(DiskLoc loc) const {
         Extent *e = _getExtent(loc);
         e->assertOk();
         return e;
