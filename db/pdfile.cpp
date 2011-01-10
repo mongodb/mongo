@@ -1895,6 +1895,8 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
+        dur::TempDisableDurability holder; // SyncAndTruncate before computing freeSpace
+
         boost::intmax_t totalSize = dbSize( dbName );
         boost::intmax_t freeSize = freeSpace( repairpath );
         if ( freeSize > -1 && freeSize < totalSize ) {
@@ -1929,6 +1931,8 @@ namespace mongo {
                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
             return false;
         }
+
+        MongoFile::flushAll(true);
 
         Client::Context ctx( dbName );
         Database::closeDatabase( dbName, dbpath );
