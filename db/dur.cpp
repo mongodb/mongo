@@ -536,12 +536,12 @@ namespace mongo {
                         // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
                         // but is likely also less spiky on our cpu usage, which is good:
                         sleepmillis(millis/2);
-                        drainSome();
+                        commitJob.wi()._deferred.invoke();
                         sleepmillis(millis/2);
-                        drainSome();
+                        commitJob.wi()._deferred.invoke();
                     }
 
-                    go(); // regrabs durThreadMutex inside of dbMutex
+                    go();
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
