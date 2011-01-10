@@ -155,6 +155,7 @@ namespace mongo {
         static mongo::mutex mutex;
         static int doneSetup;
         stringstream ss;
+        int indent;
         LogLevel logLevel;
         static FILE* logfile;
         static boost::scoped_ptr<ostream> stream;
@@ -246,10 +247,15 @@ namespace mongo {
                 globalTees = new vector<Tee*>();
             globalTees->push_back( t );
         }
+        
+        void indentInc(){ indent++; }
+        void indentDec(){ indent--; }
+        int getIndent() const { return indent; }
 
     private:
         static thread_specific_ptr<Logstream> tsp;
         Logstream() {
+            indent = 0;
             _init();
         }
         void _init() {
@@ -428,10 +434,15 @@ namespace mongo {
                 b.appendChar( ']' );
                 b.appendChar( ' ' );
             }
+
+            for ( int i=0; i<indent; i++ )
+                b.appendChar( '\t' );
+
             if ( type[0] ) {
                 b.appendStr( type , false );
                 b.appendStr( ": " , false );
             }
+
             b.appendStr( msg );
 
             string out( b.buf() , b.len() - 1);
@@ -457,5 +468,14 @@ namespace mongo {
         }
         _init();
     }
+
+    struct LogIndentLevel {
+        LogIndentLevel(){
+            Logstream::get().indentInc();
+        }
+        ~LogIndentLevel(){
+            Logstream::get().indentDec();
+        }
+    };
 
 } // namespace mongo
