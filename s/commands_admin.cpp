@@ -399,8 +399,22 @@ namespace mongo {
                         return false;
                     }
 
+                    if ( hasShardIndex ) {
+                        // make sure there are no null entries in the sharding index
+                        BSONObjBuilder cmd;
+                        cmd.append( "checkShardingIndex" , ns );
+                        cmd.append( "keyPattern" , key );
+                        BSONObj cmdObj = cmd.obj();
+                        if ( ! conn->runCommand( "admin" , cmdObj , res )) {
+                            errmsg = res["errmsg"].str();
+                            conn.done();
+                            return false;
+                        }
+                    }
+
                     if ( ! hasShardIndex && ( conn->count( ns ) != 0 ) ) {
                         errmsg = "please create an index over the sharding key before sharding.";
+                        conn.done();
                         return false;
                     }
 

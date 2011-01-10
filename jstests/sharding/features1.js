@@ -160,7 +160,17 @@ assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count 
 // ---- can't shard non-empty collection without index -----
 
 db.foo8.save( { a : 1 } );
+db.getLastError();
 assert( ! s.admin.runCommand( { shardcollection : "test.foo8" , key : { a : 1 } } ).ok , "non-empty collection" );
+
+
+// ---- can't shard non-empty collection with null values in shard key ----
+
+db.foo9.save( { b : 1 } );
+db.getLastError();
+db.foo9.ensureIndex( { a : 1 } );
+assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } } ).ok , "entry with null value" );
+
 
 // --- listDatabases ---
 
