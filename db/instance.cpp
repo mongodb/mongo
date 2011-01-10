@@ -714,12 +714,27 @@ namespace mongo {
         log() << "shutdown: waiting for fs preallocator..." << endl;
         FileAllocator::get()->waitUntilFinished();
 
-        log() << "shutdown: closing all files..." << endl;
         if( cmdLine.dur ) {
-            getDur().commitNow();
+            log() << "shutdown: final commit..." << endl;
+            {
+                int n = 10;
+                while( 1 ) {
+                    writelocktry w("", 20000);
+                    if( w.got() ) { 
+                        getDur().commitNow();
+                        break;
+                    }
+                    if( --n <= 0 ) {
+                        log() << "shutdown: couldn't acquire write lock, aborting" << endl;
+                        abort();
+                    }
+                    log() << "shutdown: waiting for write lock..." << endl;
+                }
+            }
             MemoryMappedFile::flushAll(true);
         }
 
+        log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
