@@ -411,7 +411,6 @@ namespace mongo {
         }
 
         void drainSome() {
-            scoped_lock lk(durThreadMutex);
             Writes& writes = commitJob.wi();
             writes._deferred.invoke();
         }
@@ -534,8 +533,6 @@ namespace mongo {
                                 millis = 5;
                         }
 
-// TODO(mathias): find a way to call drainsome() without deadlocking
-#if 0 
                         // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
                         // but is likely also less spiky on our cpu usage, which is good:
                         sleepmillis(millis/2);
@@ -543,10 +540,6 @@ namespace mongo {
                         sleepmillis(millis/2);
                         drainSome();
                     }
-#else
-                    }
-                    sleepmillis(millis);
-#endif
 
                     go(); // regrabs durThreadMutex inside of dbMutex
                 }

@@ -68,18 +68,19 @@ namespace mongo {
             you can also call invoke periodically to do some work and then pick up later on more.
         */
         void invoke() {
+            mutex::scoped_lock lk2(_invokeMutex);
+
             {
                 // flip queueing to the other queue (we are double buffered)
-                readlock lk;
-                mutex::scoped_lock lk2(_invokeMutex);
-                int other = _which ^ 1;
-                if( _queues[other].empty() )
-                    _which = other;
+                readlocktry lk("", 1);
+                if (lk.got()){
+                    int other = _which ^ 1;
+                    if( _queues[other].empty() )
+                        _which = other;
+                }
             }
-            {
-                mutex::scoped_lock lk(_invokeMutex);
-                _drain( _queues[_which^1] );
-            }
+
+            _drain( _queues[_which^1] );
         }
 
     private:
