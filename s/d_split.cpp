@@ -124,6 +124,80 @@ namespace mongo {
         }
     } cmdMedianKey;
 
+    class CheckShardingIndex : public Command {
+    public:
+        CheckShardingIndex() : Command( "checkShardingIndex" , false ) {}
+        virtual bool slaveOk() const { return false; }
+        virtual LockType locktype() const { return READ; }
+        virtual void help( stringstream &help ) const {
+            help << "Internal command.\n";
+        }
+
+        bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+
+            const char* ns = jsobj.getStringField( "checkShardingIndex" );
+            BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+
+            // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
+            BSONObj min = jsobj.getObjectField( "min" );
+            BSONObj max = jsobj.getObjectField( "max" );
+            if ( min.isEmpty() && max.isEmpty() ) {
+                BSONObjBuilder minBuilder;
+                BSONObjBuilder maxBuilder;
+                BSONForEach(key, keyPattern) {
+                    minBuilder.appendMinKey( key.fieldName() );
+                    maxBuilder.appendMaxKey( key.fieldName() );
+                }
+                min = minBuilder.obj();
+                max = maxBuilder.obj();
+            }
+            else if ( min.isEmpty() || max.isEmpty() ) {
+                errmsg = "either provide both min and max or leave both empty";
+                return false;
+            }
+
+            Client::Context ctx( ns );
+            NamespaceDetails *d = nsdetails( ns );
+            if ( ! d ) {
+                errmsg = "ns not found";
+                return false;
+            }
+
+            IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
+            if ( idx == NULL ) {
+                errmsg = "couldn't find index over splitting key";
+                return false;
+            }
+
+            BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            shared_ptr<Cursor> c( bc );
+            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+            if ( ! cc->ok() ) {
+                // range is empty
+                return true;
+            }
+
+            // for now, the only check is that all shard keys are filled
+            // TODO if $exist for nulls were picking the index, it could be used instead efficiently
+            while ( cc->ok() ) {
+                BSONObj currKey = c->currKey();
+                BSONForEach(key, currKey) {
+                    if ( key.type() == jstNULL ) {
+                        ostringstream os;
+                        os << "found null value in key " << bc->prettyKey( currKey );
+                        log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
+
+                        errmsg = os.str();
+                        return false;
+                    }
+                }
+                cc->advance();
+            }
+
+            return true;
+        }
+    } cmdCheckShardingIndex;
+
     class SplitVector : public Command {
     public:
         SplitVector() : Command( "splitVector" , false ) {}
