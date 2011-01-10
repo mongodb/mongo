@@ -222,6 +222,9 @@ namespace mongo {
             }
             cc->c()->checkLocation();
 
+            if (!canYield)
+                getDur().commitIfNeeded();
+
         }
         while ( cc->ok() );
 
