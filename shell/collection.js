@@ -543,7 +543,9 @@ MapReduceResult = function( db , o ){
     this._o = o;
     this._keys = Object.keySet( o );
     this._db = db;
-    this._coll = this._db.getCollection( this.result );
+    if ( this.result != null ) {
+        this._coll = this._db.getCollection( this.result );
+    }
 }
 
 MapReduceResult.prototype._simpleKeys = function(){
@@ -557,7 +559,9 @@ MapReduceResult.prototype.find = function(){
 }
 
 MapReduceResult.prototype.drop = function(){
-    return this._coll.drop();
+    if ( this._coll ) {
+        return this._coll.drop();
+    }
 }
 
 /**
