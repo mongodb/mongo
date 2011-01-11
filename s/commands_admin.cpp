@@ -957,12 +957,32 @@ namespace mongo {
 
                 BSONObjBuilder temp;
                 temp.append( "name" , name );
-                temp.appendNumber( "size" , size );
+                temp.appendNumber( "sizeOnDisk" , size );
                 temp.appendBool( "empty" , size == 1 );
                 temp.append( "shards" , dbShardInfo[name]->obj() );
 
                 bb.append( temp.obj() );
             }
+            
+            if ( sizes.find( "config" ) == sizes.end() ){
+                ScopedDbConnection conn( configServer.getPrimary() );
+                BSONObj x;
+                if ( conn->simpleCommand( "config" , &x , "dbstats" ) ){
+                    BSONObjBuilder b;
+                    b.append( "name" , "config" );
+                    b.appendBool( "empty" , false );
+                    if ( x["fileSize"].type() )
+                        b.appendAs( x["fileSize"] , "sizeOnDisk" );
+                    else
+                        b.append( "sizeOnDisk" , 1 );
+                    bb.append( b.obj() );
+                }
+                else {
+                    bb.append( BSON( "name" << "config" ) );
+                }
+                conn.done();
+            }
+
             bb.done();
 
             result.appendNumber( "totalSize" , totalSize );
