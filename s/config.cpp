@@ -649,8 +649,8 @@ namespace mongo {
             changeID = id.str();
 
             // send a copy of the message to the log in case it doesn't manage to reach config.changelog
-            Client& c = cc();
-            BSONObj msg = BSON( "_id" << changeID << "server" << getHostNameCached() << "clientAddr" << c.clientAddress(true)
+            Client* c = currentClient.get();
+            BSONObj msg = BSON( "_id" << changeID << "server" << getHostNameCached() << "clientAddr" << (c ? c->clientAddress(true) : "N/A")
                                 << "time" << DATENOW << "what" << what << "ns" << ns << "details" << detail );
             log() << "about to log metadata event: " << msg << endl;
 
