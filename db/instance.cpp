@@ -644,6 +644,7 @@ namespace mongo {
         assert( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
+        getDur().commitIfNeeded();
         return true;
     }
 
@@ -652,6 +653,7 @@ namespace mongo {
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
+        getDur().commitIfNeeded();
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,
