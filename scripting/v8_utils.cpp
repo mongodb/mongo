@@ -307,7 +307,7 @@ namespace mongo {
 
     Handle<v8::Value> GCV8(const Arguments& args) {
         V8Lock l;
-        while( V8::IdleNotification() );
+        while( !V8::IdleNotification() );
         return v8::Undefined();
     }
 

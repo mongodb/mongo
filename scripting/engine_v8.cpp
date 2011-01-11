@@ -458,7 +458,7 @@ namespace mongo {
     void V8Scope::gc() {
         cout << "in gc" << endl;
         V8Lock l;
-        while( V8::IdleNotification() );
+        while( !V8::IdleNotification() );
     }
 
     // ----- db access -----
