@@ -35,7 +35,6 @@
 #include "../db/queryoptimizer.h"
 #include "../db/btree.h"
 #include "../db/repl_block.h"
-#include "../db/dur.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -1342,11 +1341,6 @@ namespace mongo {
                 return false;
             }
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
-
-            // if durability is on, force a write to journal
-            if ( getDur().commitNow() ) {
-                log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << endl;
-            }
 
             return true;
         }
