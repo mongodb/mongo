@@ -124,7 +124,65 @@ namespace mongo {
             _hasWritten = false;
             _wi.clear();
             _ab.reset();
-            _bytesDeclared = 0;
+            _bytes = 0;
         }
+
+        void CommitJob::note(void* p, int len) {
+            // from the point of view of the dur module, it would be fine (i think) to only
+            // be read locked here.  but must be at least read locked to avoid race with
+            // remapprivateview
+            DEV dbMutex.assertWriteLocked();
+            dassert( cmdLine.dur );
+            if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
+                if( !_hasWritten ) {
+                    // you can't be writing if one of these is pending, so this is a verification.
+                    assert( !dbMutex._remapPrivateViewRequested );
+
+                    // we don't bother doing a group commit when nothing is written, so we have a var to track that
+                    _hasWritten = true;
+                }
+
+                /** tips for debugging:
+                        if you have an incorrect diff between data files in different folders
+                        (see jstests/dur/quick.js for example),
+                        turn this on and see what is logged.  if you have a copy of its output from before the
+                        regression, a simple diff of these lines would tell you a lot likely.
+                */
+#if 0 && defined(_DEBUG)
+                {
+                    static int n;
+                    if( ++n < 10000 ) {
+                        size_t ofs;
+                        MongoMMF *mmf = privateViews._find(w.p, ofs);
+                        if( mmf ) {
+                            log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
+                        }
+                        else {
+                            log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
+                        }
+                    }
+                    else if( n == 10000 ) {
+                        log() << "DEBUG stopping write intent logging, too much to log" << endl;
+                    }
+                }
+#endif
+
+                // remember intent. we will journal it in a bit
+                _wi.insertWriteIntent(p, len);
+                wassert( _wi._writes.size() <  2000000 );
+                assert(  _wi._writes.size() < 20000000 );
+
+                {
+                    // a bit over conservative
+                    static size_t lastPos;
+                    size_t x = ((size_t) p) & ~0xfff; // round off to page address (4KB)
+                    if( x != lastPos ) { 
+                        lastPos = x;
+                        _bytes += (len+4095) & ~0xfff;
+                    }
+                }
+            }
+        }
+
     }
 }

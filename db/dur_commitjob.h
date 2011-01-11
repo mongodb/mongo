@@ -162,7 +162,7 @@ namespace mongo {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
-            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytesDeclared(0) { }
+            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
 
             /** record/note an intent to write */
             void note(void* p, int len);
@@ -199,7 +199,7 @@ namespace mongo {
             }
 
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
-            size_t bytes() const { return _bytesDeclared; }
+            size_t bytes() const { return _bytes; }
 
 #if defined(_DEBUG)
             const WriteIntent& lastWrite() const { return _wi._last; }
@@ -209,59 +209,11 @@ namespace mongo {
         private:
             bool _hasWritten;
             Writes _wi; // todo: fix name
-            size_t _bytesDeclared;
+            size_t _bytes;
             NotifyAll _notify; // for getlasterror fsync:true acknowledgements
         };
+
         extern CommitJob commitJob;
 
-        // inlines
-
-        inline void CommitJob::note(void* p, int len) {
-            // from the point of view of the dur module, it would be fine (i think) to only
-            // be read locked here.  but must be at least read locked to avoid race with
-            // remapprivateview
-            DEV dbMutex.assertWriteLocked();
-            dassert( cmdLine.dur );
-            if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
-                if( !_hasWritten ) {
-                    // you can't be writing if one of these is pending, so this is a verification.
-                    assert( !dbMutex._remapPrivateViewRequested );
-
-                    // we don't bother doing a group commit when nothing is written, so we have a var to track that
-                    _hasWritten = true;
-                }
-
-                /** tips for debugging:
-                        if you have an incorrect diff between data files in different folders
-                        (see jstests/dur/quick.js for example),
-                        turn this on and see what is logged.  if you have a copy of its output from before the
-                        regression, a simple diff of these lines would tell you a lot likely.
-                */
-#if 0 && defined(_DEBUG)
-                {
-                    static int n;
-                    if( ++n < 10000 ) {
-                        size_t ofs;
-                        MongoMMF *mmf = privateViews._find(w.p, ofs);
-                        if( mmf ) {
-                            log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
-                        }
-                        else {
-                            log() << "DEBUG note write intent " << w.p << ' ' << w.len << " NOT FOUND IN privateViews" << endl;
-                        }
-                    }
-                    else if( n == 10000 ) {
-                        log() << "DEBUG stopping write intent logging, too much to log" << endl;
-                    }
-                }
-#endif
-
-                // remember intent. we will journal it in a bit
-                _wi.insertWriteIntent(p, len);
-                _bytesDeclared += len;
-                wassert( _wi._writes.size() <  2000000 );
-                assert(  _wi._writes.size() < 20000000 );
-            }
-        }
     }
 }
