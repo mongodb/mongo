@@ -591,6 +591,8 @@ namespace mongo {
         TempDisableDurability::TempDisableDurability() : _wasDur(cmdLine.dur), _lock(durThreadMutex) {
             dbMutex.assertWriteLocked();
             if (_wasDur) {
+                groupCommit();
+
                 DurableInterface::disableDurability();
                 cmdLine.dur = false;
 
