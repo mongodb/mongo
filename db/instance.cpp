@@ -858,7 +858,7 @@ namespace mongo {
                     FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
                     NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
                     (LPTSTR)&msg, 0, NULL);
-                uasserted( 13624 , (char*)msg );
+                uasserted( 13627 , (char*)msg );
             }
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
