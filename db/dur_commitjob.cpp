@@ -131,7 +131,11 @@ namespace mongo {
             _ab.reset();
             privateMapBytes += _bytes;
             _bytes = 0;
+            _nSinceCommitIfNeededCall = 0;
         }
+
+        CommitJob::CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), 
+            _bytes(0), _nSinceCommitIfNeededCall(0) { }
 
         void CommitJob::note(void* p, int len) {
             // from the point of view of the dur module, it would be fine (i think) to only
@@ -184,7 +188,15 @@ namespace mongo {
                     size_t x = ((size_t) p) & ~0xfff; // round off to page address (4KB)
                     if( x != lastPos ) { 
                         lastPos = x;
-                        _bytes += (len+4095) & ~0xfff;
+                        unsigned b = (len+4095) & ~0xfff;
+                        _bytes += b;
+#if defined(_DEBUG)
+                        _nSinceCommitIfNeededCall++;
+                        if( _nSinceCommitIfNeededCall >= 60 ) {
+                            if( _nSinceCommitIfNeededCall % 20 == 0 )
+                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << ' ' << x << " bytes " << b << endl;
+                        }
+#endif
                         uassert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
                     }
                 }

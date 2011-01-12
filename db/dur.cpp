@@ -214,6 +214,9 @@ namespace mongo {
         }
 
         void DurableImpl::commitIfNeeded() {
+#if defined(_DEBUG)
+            commitJob._nSinceCommitIfNeededCall = 0;
+#endif
             if (commitJob.bytes() > UncommittedBytesLimit) // should this also fire if CmdLine::DurAlwaysCommit?
                 groupCommit();
         }
