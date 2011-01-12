@@ -221,9 +221,8 @@ namespace mongo {
                 break;
             }
             cc->c()->checkLocation();
-
-            if (!canYield)
-                getDur().commitIfNeeded();
+            
+            getDur().commitIfNeeded();
 
         }
         while ( cc->ok() );
