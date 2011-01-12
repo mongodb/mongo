@@ -131,17 +131,19 @@ class Iface:
     """
     pass
 
-  def commit_transaction(self, session):
+  def commit_transaction(self, session, config):
     """
     Parameters:
      - session
+     - config
     """
     pass
 
-  def rollback_transaction(self, session):
+  def rollback_transaction(self, session, config):
     """
     Parameters:
      - session
+     - config
     """
     pass
 
@@ -699,18 +701,20 @@ class Client(Iface):
       raise result.err
     return
 
-  def commit_transaction(self, session):
+  def commit_transaction(self, session, config):
     """
     Parameters:
      - session
+     - config
     """
-    self.send_commit_transaction(session)
+    self.send_commit_transaction(session, config)
     self.recv_commit_transaction()
 
-  def send_commit_transaction(self, session):
+  def send_commit_transaction(self, session, config):
     self._oprot.writeMessageBegin('commit_transaction', TMessageType.CALL, self._seqid)
     args = commit_transaction_args()
     args.session = session
+    args.config = config
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
@@ -729,18 +733,20 @@ class Client(Iface):
       raise result.err
     return
 
-  def rollback_transaction(self, session):
+  def rollback_transaction(self, session, config):
     """
     Parameters:
      - session
+     - config
     """
-    self.send_rollback_transaction(session)
+    self.send_rollback_transaction(session, config)
     self.recv_rollback_transaction()
 
-  def send_rollback_transaction(self, session):
+  def send_rollback_transaction(self, session, config):
     self._oprot.writeMessageBegin('rollback_transaction', TMessageType.CALL, self._seqid)
     args = rollback_transaction_args()
     args.session = session
+    args.config = config
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
@@ -1356,7 +1362,7 @@ class Processor(Iface, TProcessor):
     iprot.readMessageEnd()
     result = commit_transaction_result()
     try:
-      self._handler.commit_transaction(args.session)
+      self._handler.commit_transaction(args.session, args.config)
     except WT_ERROR, err:
       result.err = err
     oprot.writeMessageBegin("commit_transaction", TMessageType.REPLY, seqid)
@@ -1370,7 +1376,7 @@ class Processor(Iface, TProcessor):
     iprot.readMessageEnd()
     result = rollback_transaction_result()
     try:
-      self._handler.rollback_transaction(args.session)
+      self._handler.rollback_transaction(args.session, args.config)
     except WT_ERROR, err:
       result.err = err
     oprot.writeMessageBegin("rollback_transaction", TMessageType.REPLY, seqid)
@@ -3468,15 +3474,18 @@ class commit_transaction_args:
   """
   Attributes:
    - session
+   - config
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.I32, 'session', None, None, ), # 1
+    (2, TType.STRING, 'config', None, None, ), # 2
   )
 
-  def __init__(self, session=None,):
+  def __init__(self, session=None, config=None,):
     self.session = session
+    self.config = config
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -3492,6 +3501,11 @@ class commit_transaction_args:
           self.session = iprot.readI32();
         else:
           iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.config = iprot.readString();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -3505,6 +3519,10 @@ class commit_transaction_args:
     if self.session != None:
       oprot.writeFieldBegin('session', TType.I32, 1)
       oprot.writeI32(self.session)
+      oprot.writeFieldEnd()
+    if self.config != None:
+      oprot.writeFieldBegin('config', TType.STRING, 2)
+      oprot.writeString(self.config)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -3587,15 +3605,18 @@ class rollback_transaction_args:
   """
   Attributes:
    - session
+   - config
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.I32, 'session', None, None, ), # 1
+    (2, TType.STRING, 'config', None, None, ), # 2
   )
 
-  def __init__(self, session=None,):
+  def __init__(self, session=None, config=None,):
     self.session = session
+    self.config = config
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -3611,6 +3632,11 @@ class rollback_transaction_args:
           self.session = iprot.readI32();
         else:
           iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.config = iprot.readString();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -3624,6 +3650,10 @@ class rollback_transaction_args:
     if self.session != None:
       oprot.writeFieldBegin('session', TType.I32, 1)
       oprot.writeI32(self.session)
+      oprot.writeFieldEnd()
+    if self.config != None:
+      oprot.writeFieldBegin('config', TType.STRING, 2)
+      oprot.writeString(self.config)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

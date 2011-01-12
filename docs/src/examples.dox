@@ -7,6 +7,9 @@ This is an example of how to create and open a database.
 @example ex_access.c
 Create, insert and access a simple table.
 
+@example ex_all.c
+Demonstrate how to call every method in the API.
+
 @example ex_config.c
 Shows how to configure some properties of the database and tables.
 

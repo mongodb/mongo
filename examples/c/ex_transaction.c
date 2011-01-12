@@ -30,7 +30,7 @@ int main()
 
 	session->begin_transaction(session, NULL);
 	/* ... */
-	session->commit_transaction(session);
+	session->commit_transaction(session, NULL);
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)

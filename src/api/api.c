@@ -155,13 +155,13 @@ __session_begin_transaction(WT_SESSION *session, const char *config)
 }
 
 static int
-__session_commit_transaction(WT_SESSION *session)
+__session_commit_transaction(WT_SESSION *session, const char *config)
 {
 	return ENOTSUP;
 }
 
 static int
-__session_rollback_transaction(WT_SESSION *session)
+__session_rollback_transaction(WT_SESSION *session, const char *config)
 {
 	return ENOTSUP;
 }

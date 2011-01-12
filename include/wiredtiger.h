@@ -101,6 +101,9 @@ struct WT_CURSOR {
 	 */
 	/*! Get the key for the current record.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline get_key
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
@@ -108,12 +111,19 @@ struct WT_CURSOR {
 
 	/*! Get the value for the current record.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline get_value
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(get_value)(WT_CURSOR *cursor, ...);
 
 	/*! Set the key for the next operation.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skip key =
+	 * @until set_key
 	 *
 	 * @param cursor the cursor handle
 	 * 
@@ -124,6 +134,10 @@ struct WT_CURSOR {
 	void __F(set_key)(WT_CURSOR *cursor, ...);
 
 	/*! Set the data for the next operation.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skip value =
+	 * @until set_value
 	 *
 	 * @param cursor the cursor handle
 	 * 
@@ -140,12 +154,18 @@ struct WT_CURSOR {
 	 */
 	/*! Move to the first record.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->first
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(first)(WT_CURSOR *cursor);
 
 	/*! Move to the last record.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->last
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -154,12 +174,18 @@ struct WT_CURSOR {
 
 	/*! Move to the next record.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->next
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(next)(WT_CURSOR *cursor);
 
 	/*! Move to the previous record.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->prev
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -168,12 +194,22 @@ struct WT_CURSOR {
 
 	/*! Search for a record.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skip ->prev
+	 * @skip ->set_key
+	 * @until ->search
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
 	/*! Search for a record.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skip ->search
+	 * @skip ->set_key
+	 * @until }
 	 *
 	 * @param cursor the cursor handle
 	 * @param exactp the status of the search: 0 if an exact match is
@@ -189,6 +225,11 @@ struct WT_CURSOR {
 	 */
 	/*! Insert a record.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skip ->search_near
+	 * @skip ->set_key
+	 * @until ->insert
+	 *
 	 * @todo describe append
 	 * @todo describe how to unconditionally overwrite
 	 *
@@ -202,12 +243,20 @@ struct WT_CURSOR {
 	 * is part of a sorted duplicate set, its position must not change as
 	 * a result of the update.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skip ->insert
+	 * @skip ->set_value
+	 * @until ->update
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
 	/*! Delete the current record.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->del
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -216,6 +265,9 @@ struct WT_CURSOR {
 	/*! @} */
 
 	/*! Close the cursor.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline cursor->close
 	 *
 	 * @param cursor the cursor handle
 	 * @configempty
@@ -237,6 +289,9 @@ struct WT_SESSION {
 	WT_CONNECTION *connection;
 
 	/*! Close the session.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline session->close
 	 *
 	 * @param session the session handle
 	 * @configempty
@@ -270,6 +325,10 @@ struct WT_SESSION {
 	 *
 	 * See @ref cursor_types for more information.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skip cursor;
+	 * @until ->open_cursor
+	 *
 	 * @param session the session handle
 	 * @param uri the data source on which the cursor operates
 	 * @param to_dup a cursor to duplicate
@@ -298,7 +357,10 @@ struct WT_SESSION {
 	 */
 	/*! Create a table.
 	 *
-	 * @todo Allow both
+	 * @todo Allow both sets of syntax for describing schemas.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->create_table
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
@@ -339,6 +401,9 @@ struct WT_SESSION {
 
 	/*! Rename a table.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->rename_table
+	 *
 	 * @param session the session handle
 	 * @param oldname the current name of the table
 	 * @param newname the new name of the table
@@ -350,6 +415,9 @@ struct WT_SESSION {
 
 	/*! Drop (delete) a table.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->drop_table
+	 *
 	 * @param session the session handle
 	 * @param name the name of the table
 	 * @configempty
@@ -359,6 +427,9 @@ struct WT_SESSION {
 	     const char *name, const char *config);
 
 	/*! Truncate a table.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->truncate_table
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
@@ -378,6 +449,9 @@ struct WT_SESSION {
 	/*! Verify a table.
 	 *
 	 * @todo describe salvage
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->verify_table
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
@@ -399,6 +473,11 @@ struct WT_SESSION {
 	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
 	 *
 	 * Ignored if a transaction is in progress.
+	 *
+	 * @todo describe nested transactions / savepoints
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->begin_transaction
 	 *
 	 * @param session the session handle
 	 * @configstart
@@ -422,10 +501,14 @@ struct WT_SESSION {
 	 *
 	 * Ignored if no transaction is in progress.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->commit_transaction
+	 *
 	 * @param session the session handle
+	 * @configempty
 	 * @errors
 	 */
-	int __F(commit_transaction)(WT_SESSION *session);
+	int __F(commit_transaction)(WT_SESSION *session, const char *config);
 
 	/*! Roll back the current transaction.
 	 *
@@ -434,12 +517,19 @@ struct WT_SESSION {
 	 *
 	 * Ignored if no transaction is in progress.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->rollback_transaction
+	 *
 	 * @param session the session handle
+	 * @configempty
 	 * @errors
 	 */
-	int __F(rollback_transaction)(WT_SESSION *session);
+	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
 
 	/*! Flush the cache and/or the log and optionally archive log files.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->checkpoint
 	 *
 	 * @param session the session handle
 	 * @configstart
@@ -474,6 +564,9 @@ struct WT_SESSION {
 struct WT_CONNECTION {
 	/*! Load an extension.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->load_extension
+	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart
@@ -489,6 +582,17 @@ struct WT_CONNECTION {
 
 	/*! Add a new type of cursor.
 	 *
+	 * @dontinclude ex_all.c
+	 *
+	 * First the application has to implement the WT_CURSOR_FACTORY interface
+	 * as follows:
+	 * @skip Implementation of WT_CURSOR_FACTORY
+	 * @until End implementation
+	 *
+	 * Then the implementation is registered with WiredTiger as follows:
+	 * @skip WT_CURSOR_FACTORY
+	 * @until add_cursor_factory
+	 *
 	 * @param connection the connection handle
 	 * @param prefix the prefix for location strings passed to
 	 * WT_SESSION::open_cursor
@@ -502,6 +606,17 @@ struct WT_CONNECTION {
 
 	/*! Add a custom collation function.
 	 *
+	 * @dontinclude ex_all.c
+	 *
+	 * First the application has to implement the WT_COLLATOR interface
+	 * as follows:
+	 * @skip Implementation of WT_COLLATOR
+	 * @until End implementation
+	 *
+	 * Then the implementation is registered with WiredTiger as follows:
+	 * @skip WT_COLLATOR
+	 * @until add_collator
+	 *
 	 * @param connection the connection handle
 	 * @param name the name of the collation to be used in calls to
 	 * 	WT_SESSION::create_table
@@ -513,6 +628,17 @@ struct WT_CONNECTION {
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
 	/*! Add a custom extractor for index keys or column sets.
+	 *
+	 * @dontinclude ex_all.c
+	 *
+	 * First the application has to implement the WT_EXTRACTOR interface
+	 * as follows:
+	 * @skip Implementation of WT_EXTRACTOR
+	 * @until End implementation
+	 *
+	 * Then the implementation is registered with WiredTiger as follows:
+	 * @skip WT_EXTRACTOR
+	 * @until add_extractor
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the extractor to be used in calls to
@@ -529,6 +655,9 @@ struct WT_CONNECTION {
 	 *
 	 * Any open sessions will be closed.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline conn->close
+	 *
 	 * @param connection the connection handle
 	 * @configempty
 	 * @errors
@@ -537,12 +666,19 @@ struct WT_CONNECTION {
 
 	/*! The home directory of the connection.
 	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->get_home
+	 *
 	 * @param connection the connection handle
 	 * @returns a pointer to a string naming the home directory
 	 */
 	const char *__F(get_home)(WT_CONNECTION *connection);
 
 	/*! Did opening this handle create the database?
+	 *
+	 * @dontinclude ex_all.c
+	 * @skip ->is_new
+	 * @until }
 	 *
 	 * @param connection the connection handle
 	 * @returns false (zero) if the connection existed before the call to
@@ -552,6 +688,10 @@ struct WT_CONNECTION {
 	int __F(is_new)(WT_CONNECTION *connection);
 
 	/*! Open a session.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skip session;
+	 * @until open_session
 	 *
 	 * @param connection the connection handle
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
@@ -566,6 +706,10 @@ struct WT_CONNECTION {
 };
 
 /*! Open a connection to a database.
+ *
+ * @dontinclude ex_all.c
+ * @skip conn;
+ * @until wiredtiger_open
  *
  * @param home The path to the database home directory
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
@@ -590,6 +734,9 @@ int wiredtiger_open(const char *home,
     WT_CONNECTION **connectionp);
 
 /*! Get information about an error as a string.
+ *
+ * @dontinclude ex_all.c
+ * @skipline wiredtiger_strerror
  *
  * @param err a return value from a WiredTiger call
  * @returns a string representation of the error
@@ -657,19 +804,13 @@ const char *wiredtiger_strerror(int err);
  * default, big-endian encoding will be used, with no alignment.  This could
  * be used in C as follows:
  *
- * @code
- * char buf[100];
- * ret = wiredtiger_struct_pack(buf, sizeof (buf), "iSh", 42, "hello", -3);
- * @endcode
+ * @dontinclude ex_all.c
+ * @skip char buf
+ * @until wiredtiger_struct_pack
  *
  * Then later, the values can be unpacked as follows:
  *
- * @code
- * int i;
- * char *s;
- * short h;
- * ret = wiredtiger_struct_unpack(buf, sizeof (buf), "iSh", &i, &s, &h);
- * @endcode
+ * @until wiredtiger_struct_unpack
  *
  * @param buffer a pointer to a packed byte array
  * @param size the number of valid bytes in the buffer
@@ -697,6 +838,10 @@ int wiredtiger_struct_packv(void *buffer, size_t size,
  * integers, the calculated sized merely reflects the expected sizes specified
  * in the format string itself.
  *
+ * @dontinclude ex_all.c
+ * @skip size_t size;
+ * @until assert
+ *
  * @param format the data format, see ::wiredtiger_struct_pack
  * @returns the number of bytes needed for the matching call to
  * ::wiredtiger_struct_pack
@@ -717,6 +862,10 @@ size_t wiredtiger_struct_sizev(const char *format, va_list ap);
 /*! Unpack a structure from a buffer.
  *
  * Reverse of ::wiredtiger_struct_pack: gets values out of a packed byte string.
+ *
+ * @dontinclude ex_all.c
+ * @skip int i;
+ * @until wiredtiger_struct_unpack
  *
  * @param buffer a pointer to a packed byte array
  * @param size the number of valid bytes in the buffer
@@ -740,6 +889,10 @@ int wiredtiger_struct_unpackv(const void *buffer, size_t size,
     const char *format, va_list ap);
 
 /*! Get version information.
+ *
+ * @dontinclude ex_all.c
+ * @skip int major
+ * @until wiredtiger_version
  *
  * @param majorp a location where the major version number is returned
  * @param minorp a location where the minor version number is returned

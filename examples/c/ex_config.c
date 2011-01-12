@@ -43,7 +43,7 @@ int main()
 		printf("Got configuration value: %s = %s\n", key, value);
 	}
 
-	ret = session->commit_transaction(session);
+	ret = session->commit_transaction(session, NULL);
 
 	ret = conn->close(conn, NULL);
 

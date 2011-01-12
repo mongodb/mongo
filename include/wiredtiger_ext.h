@@ -31,7 +31,7 @@ struct WT_COLLATOR {
 	 * 	     1 if <code>value1 > value2</code>.
 	 */
 	int (*compare)(WT_SESSION *session, WT_COLLATOR *collator,
-	    const WT_ITEM *value1, const WT_ITEM *value2);
+	    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp);
 };
 
 /*!
@@ -56,14 +56,8 @@ struct WT_CURSOR_FACTORY {
 
 	/*! Callback to initialize a cursor. */
 	int (*init_cursor)(WT_CURSOR_FACTORY *factory,
-	    WT_SESSION *session, const char *obj, WT_CURSOR *cursor);
-
-	/*! Callback to duplicate a cursor.
-	 *
-	 * @errors
-	 */
-	int (*dup_cursor)(WT_CURSOR_FACTORY *factory,
-	    WT_SESSION *session, WT_CURSOR *old_cursor, WT_CURSOR *new_cursor);
+	    WT_SESSION *session, const char *obj, WT_CURSOR *old_cursor,
+	    const char *config, WT_CURSOR *new_cursor);
 };
 
 /*!
