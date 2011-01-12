@@ -24,6 +24,7 @@ namespace mongo {
     namespace dur {
 
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
+        BOOST_STATIC_ASSERT( sizeof(void*)==4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6 );
 
         void Writes::D::go(const Writes::D& d) {
             commitJob.wi()._insertWriteIntent(d.p, d.len);
