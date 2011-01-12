@@ -19,6 +19,7 @@
 #include "mmap.h"
 #include "processinfo.h"
 #include "concurrency/rwlock.h"
+#include "../db/namespace.h"
 
 namespace mongo {
 
@@ -91,6 +92,8 @@ namespace mongo {
         ++closingAllFiles;
 
         rwlock lk( mmmutex , true );
+
+        NamespaceDetailsTransient::clearForPrefix("");
 
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
