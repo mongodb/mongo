@@ -23,6 +23,7 @@
 #include "../util/file.h"
 #include "mongommf.h"
 #include "durop.h"
+#include "../util/file_allocator.h"
 
 using namespace mongoutils;
 
@@ -135,6 +136,7 @@ namespace mongo {
                     log() << "warning could not delete file " << full << endl;
                 }
             }
+            ensureParentDirCreated(full);
             File f;
             f.open(full.c_str());
             massert(13547, str::stream() << "recover couldn't create file " << full, f.is_open());

@@ -83,4 +83,7 @@ namespace mongo {
 
     };
 
+    /** like "mkdir -p" but on parent dir of p rather than p itself */
+    void ensureParentDirCreated(const boost::filesystem::path& p);
+
 } // namespace mongo
