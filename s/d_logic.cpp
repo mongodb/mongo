@@ -43,9 +43,8 @@ using namespace std;
 
 namespace mongo {
 
-    bool handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
-        if ( ! shardingState.enabled() )
-            return false;
+    bool _handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
+        DEV assert( shardingState.enabled() );
 
         int op = m.operation();
         if ( op < 2000

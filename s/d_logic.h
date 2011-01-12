@@ -222,7 +222,15 @@ namespace mongo {
      * @return true if we took care of the message and nothing else should be done
      */
     struct DbResponse;
-    bool handlePossibleShardedMessage( Message &m, DbResponse * dbresponse );
+
+    bool _handlePossibleShardedMessage( Message &m, DbResponse * dbresponse );
+
+    /** What does this do? document please? */
+    inline bool handlePossibleShardedMessage( Message &m, DbResponse * dbresponse ) {
+        if( !shardingState.enabled() ) 
+            return false;
+        return _handlePossibleShardedMessage(m, dbresponse);
+    }
 
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
     void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl );
