@@ -35,6 +35,18 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    void ensureParentDirCreated(const boost::filesystem::path& p){
+        const boost::filesystem::path parent = p.parent_path();
+
+        if (! boost::filesystem::exists(parent)){
+            ensureParentDirCreated(parent);
+            log() << "creating directory " << parent.string() << endl;
+            boost::filesystem::create_directory(parent);
+        }
+
+        assert(boost::filesystem::is_directory(parent));
+    }
+
 #if defined(_WIN32)
     FileAllocator::FileAllocator() {
     }
@@ -183,18 +195,6 @@ namespace mongo {
             if ( *i == name )
                 return true;
         return false;
-    }
-
-    void ensureParentDirCreated(const boost::filesystem::path& p){
-        const boost::filesystem::path parent = p.parent_path();
-
-        if (! boost::filesystem::exists(parent)){
-            ensureParentDirCreated(parent);
-            log() << "creating directory " << parent.string() << endl;
-            boost::filesystem::create_directory(parent);
-        }
-
-        assert(boost::filesystem::is_directory(parent));
     }
 
     void FileAllocator::run( FileAllocator * fa ) {
