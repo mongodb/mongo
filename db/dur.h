@@ -11,6 +11,8 @@ namespace mongo {
 
     namespace dur {
 
+        const unsigned UncommittedBytesLimit = 100 * 1024 * 1024;
+
         /** Call during startup so durability module can initialize
             Throws if fatal error
             Does nothing if cmdLine.dur is false

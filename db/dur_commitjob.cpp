@@ -182,6 +182,7 @@ namespace mongo {
                     if( x != lastPos ) { 
                         lastPos = x;
                         _bytes += (len+4095) & ~0xfff;
+                        uassert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
                     }
                 }
             }
