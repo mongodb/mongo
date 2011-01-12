@@ -97,6 +97,10 @@ namespace mongo {
 
         cmdLine.prealloc = false;
 
+        // The default value may vary depending on compile options, but for tools
+        // we want durability to be disabled.
+        cmdLine.dur = false;
+
         boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
         _name = argv[0];
