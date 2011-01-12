@@ -213,8 +213,10 @@ namespace mongo {
             return p;
         }
 
+        const unsigned UncommittedBytesLimit = 100 * 1024 * 1024;
+
         void DurableImpl::commitIfNeeded() {
-            if (commitJob.bytes() > 50*1024*1024) // should this also fire if CmdLine::DurAlwaysCommit?
+            if (commitJob.bytes() >UncommittedBytesLimit) // should this also fire if CmdLine::DurAlwaysCommit?
                 groupCommit();
         }
 
@@ -347,6 +349,8 @@ namespace mongo {
             OCCASIONALLY log() << "DurParanoid map check " << t.millis() << "ms for " <<  (bytes / (1024*1024)) << "MB" << endl;
         }
 
+        extern size_t privateMapBytes;
+
         /** We need to remap the private views periodically. otherwise they would become very large.
             Call within write lock.
         */
@@ -357,11 +361,6 @@ namespace mongo {
             dbMutex.assertWriteLocked();
             dbMutex._remapPrivateViewRequested = false;
             assert( !commitJob.hasWritten() );
-
-            if( 0 ) {
-                log() << "TEMP remapprivateview disabled for testing - will eventually run oom in this mode if db bigger than ram" << endl;
-                return;
-            }
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write
@@ -375,6 +374,16 @@ namespace mongo {
             unsigned sz = files.size();
             if( sz == 0 )
                 return;
+
+            {
+                // be careful not to use too much memory if the write rate is 
+                // extremely high
+                double f = privateMapBytes / ((double)UncommittedBytesLimit);
+                if( f > fraction ) { 
+                    fraction = f;
+                }
+                privateMapBytes = 0;
+            }
 
             unsigned ntodo = (unsigned) (sz * fraction);
             if( ntodo < 1 ) ntodo = 1;
@@ -549,7 +558,7 @@ namespace mongo {
 
         void releasingWriteLock() {
             try {
-                if (commitJob.bytes() > 100*1024*1024 || cmdLine.durOptions & CmdLine::DurAlwaysCommit)
+                if (commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit)
                     groupCommit();
             }
             catch(std::exception& e) {

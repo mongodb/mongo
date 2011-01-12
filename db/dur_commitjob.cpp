@@ -120,10 +120,13 @@ namespace mongo {
             _wi._ops.push_back(p);
         }
 
+        size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
+
         void CommitJob::reset() {
             _hasWritten = false;
             _wi.clear();
             _ab.reset();
+            privateMapBytes += _bytes;
             _bytes = 0;
         }
 
