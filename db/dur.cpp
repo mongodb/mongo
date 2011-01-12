@@ -368,6 +368,7 @@ namespace mongo {
             // remapping.
             unsigned long long now = curTimeMicros64();
             double fraction = (now-lastRemap)/20000000.0;
+            lastRemap = now;
 
             rwlock lk(MongoFile::mmmutex, false);
             set<MongoFile*>& files = MongoFile::getAllFiles();
