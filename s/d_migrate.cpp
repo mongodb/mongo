@@ -1343,9 +1343,13 @@ namespace mongo {
             }
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
 
-            // if durability is on, force a write to journal
-            if ( getDur().commitNow() ) {
-                log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << endl;
+            {
+                readlock lk(ns);  // commitNow() currently requires it
+
+                // if durability is on, force a write to journal
+                if ( getDur().commitNow() ) {
+                    log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << endl;
+                }
             }
 
             return true;
