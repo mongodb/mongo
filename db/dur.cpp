@@ -588,27 +588,14 @@ namespace mongo {
             boost::thread t(durThread);
         }
 
-        TempDisableDurability::TempDisableDurability() : _wasDur(cmdLine.dur), _lock(durThreadMutex) {
+        void DurableImpl::syncDataAndTruncateJournal() {
             dbMutex.assertWriteLocked();
-            if (_wasDur) {
-                groupCommit();
 
-                DurableInterface::disableDurability();
-                cmdLine.dur = false;
+            groupCommit();
+            MongoFile::flushAll(true);
+            journalCleanup();
 
-                //SyncAndTruncate;
-                MongoFile::flushAll(true);
-                journalCleanup();
-            }
-        }
-
-        TempDisableDurability::~TempDisableDurability() {
-            dbMutex.assertWriteLocked();
-            if (_wasDur) {
-                assert(!haveJournalFiles());
-                cmdLine.dur = true;
-                DurableInterface::enableDurability();
-            }
+            assert(!haveJournalFiles()); // Double check post-conditions
         }
 
     } // namespace dur

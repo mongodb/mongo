@@ -24,15 +24,6 @@ namespace mongo {
          */
         void startup();
 
-        class TempDisableDurability : boost::noncopyable {
-        public:
-            TempDisableDurability();  // disables durability and SyncAndTruncate iff it is enabled
-            ~TempDisableDurability(); // enables durability iff constructor disabled it
-        private:
-            const bool _wasDur;
-            scoped_lock _lock;
-        };
-
         class DurableInterface : boost::noncopyable {
         public:
             virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
@@ -140,6 +131,15 @@ namespace mongo {
             */
             virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 
+            /** Commits pending changes, flushes all changes to main data
+                files, then removes the journal.
+                
+                This is useful as a "barrier" to ensure that writes before this
+                call will never go through recovery and be applied to files
+                that have had changes made after this call applied.
+             */
+            virtual void syncDataAndTruncateJournal() = 0;
+
             static DurableInterface& getDur() { return *_impl; }
 
         private:
@@ -172,6 +172,7 @@ namespace mongo {
             bool commitNow() { return false; }
             void commitIfNeeded() { }
             void setNoJournal(void *dst, void *src, unsigned len);
+            void syncDataAndTruncateJournal() {}
         };
 
         class DurableImpl : public DurableInterface {
@@ -184,6 +185,7 @@ namespace mongo {
             bool commitNow();
             void commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
+            void syncDataAndTruncateJournal();
         };
 
     } // namespace dur
