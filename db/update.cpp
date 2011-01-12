@@ -1280,7 +1280,7 @@ namespace mongo {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
-            uassert( 10156 , "cannot update system collection", legalClientSystemNS( ns , true ) );
+            uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
         return _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug);
     }
