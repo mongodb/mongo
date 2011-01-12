@@ -79,7 +79,8 @@ namespace mongo {
                          boost::program_options::options_description& visible,
                          boost::program_options::options_description& hidden,
                          boost::program_options::positional_options_description& positional,
-                         boost::program_options::variables_map &params ) {
+                         boost::program_options::variables_map &params,
+                         string& cwd ) {
 
 
         {
@@ -157,14 +158,19 @@ namespace mongo {
             }
 
             {
+                // get current working directory
+                char temp[256];
+                assert( getcwd( temp, 256 ) );
+                cwd = temp;
+            }
+
+            {
                 // test logpath
                 logpath = params["logpath"].as<string>();
                 assert( logpath.size() );
-                if ( logpath[0] != '/' ) {
-                    char temp[256];
-                    assert( getcwd( temp , 256 ) );
-                    logpath = (string)temp + "/" + logpath;
-                }
+                if ( logpath[0] != '/' )
+                    logpath = cwd + "/" + logpath;
+
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {
                     cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;

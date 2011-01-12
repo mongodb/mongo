@@ -207,7 +207,8 @@ int main(int argc, char* argv[]) {
     options.add(sharding_options);
     // parse options
     po::variables_map params;
-    if ( ! CmdLine::store( argc , argv , options , hidden , positional , params ) )
+    string cwd;
+    if ( ! CmdLine::store( argc , argv , options , hidden , positional , params, cwd ) )
         return 0;
 
     if ( params.count( "help" ) ) {

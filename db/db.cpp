@@ -794,7 +794,9 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params ) )
+        string cwd;
+
+        if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params, cwd ) )
             return 0;
 
         if (params.count("help")) {
@@ -806,8 +808,12 @@ int main(int argc, char* argv[]) {
             printGitVersion();
             return 0;
         }
-        if ( params.count( "dbpath" ) )
+        if ( params.count( "dbpath" ) ) {
             dbpath = params["dbpath"].as<string>();
+            assert ( dbpath.size() );
+            if ( !cwd.empty() && dbpath[0] != '/' )
+                dbpath = cwd + "/" + dbpath;
+        }
         else
             dbpath = "/data/db/";
 

@@ -111,7 +111,8 @@ namespace mongo {
                            boost::program_options::options_description& visible,
                            boost::program_options::options_description& hidden,
                            boost::program_options::positional_options_description& positional,
-                           boost::program_options::variables_map &output );
+                           boost::program_options::variables_map &output,
+                           string& cwd );
     };
 
     extern CmdLine cmdLine;
