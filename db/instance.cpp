@@ -73,6 +73,9 @@ namespace mongo {
     KillCurrentOp killCurrentOp;
 
     int lockFile = 0;
+#ifdef WIN32
+    HANDLE lockFileHandle;
+#endif
 
     // see FSyncCommand:
     unsigned lockedForWriting;
@@ -746,15 +749,20 @@ namespace mongo {
             dur::journalCleanup();
         }
 
-#if !defined(_WIN32) && !defined(__sunos__)
+#if !defined(__sunos__)
         if ( lockFile ) {
             log() << "shutdown: removing fs lock..." << endl;
             /* This ought to be an unlink(), but Eliot says the last
                time that was attempted, there was a race condition
                with acquirePathLock().  */
+#ifdef WIN32
+            CloseHandle(lockFileHandle);
+            DeleteFileA(( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string().c_str());
+#else
             if( ftruncate( lockFile , 0 ) )
                 log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
             flock( lockFile, LOCK_UN );
+#endif
         }
 #endif
     }
@@ -807,13 +815,17 @@ namespace mongo {
         ::exit(rc);
     }
 
-#if !defined(_WIN32) && !defined(__sunos__)
+#if !defined(__sunos__)
     void writePid(int fd) {
         stringstream ss;
         ss << getpid() << endl;
         string s = ss.str();
         const char * data = s.c_str();
+#ifdef WIN32
+        assert ( _write( fd, data, strlen( data ) ) );
+#else
         assert ( write( fd, data, strlen( data ) ) );
+#endif
     }
 
     void acquirePathLock() {
@@ -825,6 +837,32 @@ namespace mongo {
             oldFile = true;
         }
 
+#ifdef WIN32
+        lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE, 
+            0 /* do not allow anyone else access */, NULL, 
+            CREATE_NEW /* error if file exists */, 0, NULL );
+
+        if (lockFileHandle == INVALID_HANDLE_VALUE) {
+            DWORD code = GetLastError();
+            if (code == ERROR_FILE_EXISTS) {
+                HANDLE tempHandle = CreateFileA( name.c_str(), GENERIC_READ, 
+		        	0, NULL, OPEN_EXISTING, 0, NULL );
+                
+                if (GetLastError() == ERROR_SHARING_VIOLATION) {
+                    uasserted( 13626, "cannot acquire mongod.lock, is there another mongod running?" );
+                }
+            }
+            else {
+                LPVOID msg;
+                FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
+                    NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
+                    (LPTSTR)&msg, 0, NULL);
+                uasserted( 13624 , (char*)msg );
+            }
+        }
+        lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
+#else
         lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
         if( lockFile <= 0 ) {
             uasserted( 10309 , str::stream() << "Unable to create / open lock file for lockfilepath: " << name << ' ' << errnoWithDescription());
@@ -834,6 +872,7 @@ namespace mongo {
             lockFile = 0;
             uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name,  0 );
         }
+#endif
 
         if ( oldFile ) {
             // we check this here because we want to see if we can get the lock
@@ -861,7 +900,11 @@ namespace mongo {
 
             if (!errmsg.empty()) {
                 cout << errmsg << endl;
+#ifdef WIN32
+                CloseHandle( lockFileHandle );
+#else
                 close ( lockFile );
+#endif
                 lockFile = 0;
                 uassert( 12596 , "old lock file" , 0 );
             }
@@ -877,9 +920,15 @@ namespace mongo {
             uasserted(13597, "can't start without --dur enabled when journal/ files are present");
         }
 
+#ifdef WIN32
+        uassert( 13625, "Unable to truncate lock file", SetEndOfFile(lockFileHandle) != 0);
+        writePid( lockFile );
+        _commit( lockFile );
+#else
         uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
         writePid( lockFile );
         fsync( lockFile );
+#endif
     }
 #else
     void acquirePathLock() {

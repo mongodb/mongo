@@ -144,6 +144,9 @@ namespace mongo {
     };
 
     extern int lockFile;
+#ifdef WIN32
+    extern HANDLE lockFileHandle;
+#endif
     void acquirePathLock();
     void maybeCreatePidFile();
 
