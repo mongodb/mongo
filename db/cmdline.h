@@ -97,6 +97,8 @@ namespace mongo {
         bool moveParanoia;     // for move chunk paranoia
         double syncdelay;      // seconds between fsyncs
 
+        string socket;         // UNIX domain socket directory
+
         static void addGlobalOptions( boost::program_options::options_description& general ,
                                       boost::program_options::options_description& hidden );
 

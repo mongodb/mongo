@@ -23,6 +23,7 @@
 #include "security_key.h"
 
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
 namespace mongo {
 
@@ -50,6 +51,7 @@ namespace mongo {
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
 #ifndef _WIN32
+        ("socket", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
 #endif
         ;
@@ -150,6 +152,17 @@ namespace mongo {
         string logpath;
 
 #ifndef _WIN32
+        if (params.count("socket")) {
+            cmdLine.socket = params["socket"].as<string>();
+            if (!fs::is_directory(cmdLine.socket)) {
+                cout << cmdLine.socket << " must be a directory" << endl;
+                ::exit(-1);
+            }
+        }
+        else {
+            cmdLine.socket = "/tmp";
+        }
+        
         if (params.count("fork")) {
             if ( ! params.count( "logpath" ) ) {
                 cout << "--fork has to be used with --logpath" << endl;
