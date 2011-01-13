@@ -11,20 +11,18 @@ namespace mongo {
 
     namespace dur {
 
+        // a smaller limit is likely better on 32 bit
+#if defined(__i386__) || defined(_M_IX86)
+        const unsigned UncommittedBytesLimit = 50 * 1024 * 1024;
+#else
+        const unsigned UncommittedBytesLimit = 100 * 1024 * 1024;
+#endif
+
         /** Call during startup so durability module can initialize
             Throws if fatal error
             Does nothing if cmdLine.dur is false
          */
         void startup();
-
-        class TempDisableDurability : boost::noncopyable {
-        public:
-            TempDisableDurability();  // disables durability and SyncAndTruncate iff it is enabled
-            ~TempDisableDurability(); // enables durability iff constructor disabled it
-        private:
-            const bool _wasDur;
-            scoped_lock _lock;
-        };
 
         class DurableInterface : boost::noncopyable {
         public:
@@ -133,6 +131,15 @@ namespace mongo {
             */
             virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 
+            /** Commits pending changes, flushes all changes to main data
+                files, then removes the journal.
+                
+                This is useful as a "barrier" to ensure that writes before this
+                call will never go through recovery and be applied to files
+                that have had changes made after this call applied.
+             */
+            virtual void syncDataAndTruncateJournal() = 0;
+
             static DurableInterface& getDur() { return *_impl; }
 
         private:
@@ -165,6 +172,7 @@ namespace mongo {
             bool commitNow() { return false; }
             void commitIfNeeded() { }
             void setNoJournal(void *dst, void *src, unsigned len);
+            void syncDataAndTruncateJournal() {}
         };
 
         class DurableImpl : public DurableInterface {
@@ -177,6 +185,7 @@ namespace mongo {
             bool commitNow();
             void commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
+            void syncDataAndTruncateJournal();
         };
 
     } // namespace dur

@@ -221,10 +221,12 @@ namespace mongo {
                 break;
             }
             cc->c()->checkLocation();
-
-            if (!canYield)
+         
+            if( !god ) 
                 getDur().commitIfNeeded();
 
+            if( debug && god && nDeleted == 100 ) 
+                log() << "warning high number of deletes with god=true which could use significant memory" << endl;
         }
         while ( cc->ok() );
 

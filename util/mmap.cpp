@@ -19,6 +19,7 @@
 #include "mmap.h"
 #include "processinfo.h"
 #include "concurrency/rwlock.h"
+#include "../db/namespace.h"
 
 namespace mongo {
 

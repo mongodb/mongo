@@ -162,7 +162,7 @@ namespace mongo {
         public:
             AlignedBuilder _ab; // for direct i/o writes to journal
 
-            CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), _bytes(0) { }
+            CommitJob();
 
             /** record/note an intent to write */
             void note(void* p, int len);
@@ -211,6 +211,8 @@ namespace mongo {
             Writes _wi; // todo: fix name
             size_t _bytes;
             NotifyAll _notify; // for getlasterror fsync:true acknowledgements
+        public:
+            unsigned _nSinceCommitIfNeededCall;
         };
 
         extern CommitJob commitJob;

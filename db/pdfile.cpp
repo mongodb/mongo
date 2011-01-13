@@ -1756,11 +1756,10 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
 
+        getDur().syncDataAndTruncateJournal();
+
         Database::closeDatabase( d->name.c_str(), d->path );
         d = 0; // d is now deleted
-
-        getDur().commitNow();
-        dur::TempDisableDurability holder; //does SyncAndTruncate
 
         _deleteDataFiles( db.c_str() );
     }
@@ -1895,7 +1894,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
-        dur::TempDisableDurability holder; // SyncAndTruncate before computing freeSpace
+        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
         boost::intmax_t totalSize = dbSize( dbName );
         boost::intmax_t freeSize = freeSpace( repairpath );
@@ -1929,6 +1928,9 @@ namespace mongo {
             problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
             if ( !preserveClonedFilesOnFailure )
                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
+
+            getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
+
             return false;
         }
 
@@ -1949,6 +1951,8 @@ namespace mongo {
 
         if ( !backupOriginalFiles )
             BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
+
+        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
         return true;
     }

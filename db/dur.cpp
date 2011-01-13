@@ -213,10 +213,11 @@ namespace mongo {
             return p;
         }
 
-        const unsigned UncommittedBytesLimit = 100 * 1024 * 1024;
-
         void DurableImpl::commitIfNeeded() {
-            if (commitJob.bytes() >UncommittedBytesLimit) // should this also fire if CmdLine::DurAlwaysCommit?
+#if defined(_DEBUG)
+            commitJob._nSinceCommitIfNeededCall = 0;
+#endif
+            if (commitJob.bytes() > UncommittedBytesLimit) // should this also fire if CmdLine::DurAlwaysCommit?
                 groupCommit();
         }
 
@@ -587,25 +588,14 @@ namespace mongo {
             boost::thread t(durThread);
         }
 
-        TempDisableDurability::TempDisableDurability() : _wasDur(cmdLine.dur), _lock(durThreadMutex) {
+        void DurableImpl::syncDataAndTruncateJournal() {
             dbMutex.assertWriteLocked();
-            if (_wasDur) {
-                DurableInterface::disableDurability();
-                cmdLine.dur = false;
 
-                //SyncAndTruncate;
-                MongoFile::flushAll(true);
-                journalCleanup();
-            }
-        }
+            groupCommit();
+            MongoFile::flushAll(true);
+            journalCleanup();
 
-        TempDisableDurability::~TempDisableDurability() {
-            dbMutex.assertWriteLocked();
-            if (_wasDur) {
-                assert(!haveJournalFiles());
-                cmdLine.dur = true;
-                DurableInterface::enableDurability();
-            }
+            assert(!haveJournalFiles()); // Double check post-conditions
         }
 
     } // namespace dur

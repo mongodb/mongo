@@ -35,6 +35,18 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    void ensureParentDirCreated(const boost::filesystem::path& p){
+        const boost::filesystem::path parent = p.branch_path();
+
+        if (! boost::filesystem::exists(parent)){
+            ensureParentDirCreated(parent);
+            log() << "creating directory " << parent.string() << endl;
+            boost::filesystem::create_directory(parent);
+        }
+
+        assert(boost::filesystem::is_directory(parent));
+    }
+
 #if defined(_WIN32)
     FileAllocator::FileAllocator() {
     }
@@ -205,6 +217,7 @@ namespace mongo {
                 }
                 try {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
+                    ensureParentDirCreated(name);
                     long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                     if ( fd <= 0 ) {
                         stringstream ss;
