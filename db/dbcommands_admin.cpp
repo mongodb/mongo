@@ -347,6 +347,9 @@ namespace mongo {
                    we need to be careful to keep that code very fast it's a very common code path when on.
                 */
                 uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
+
+                getDur().syncDataAndTruncateJournal();
+
                 bool ready = false;
                 LockDBJob *l = new LockDBJob(ready);
                 dbMutex.releaseEarly();
