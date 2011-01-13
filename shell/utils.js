@@ -1427,6 +1427,7 @@ help = shellHelper.help = function (x) {
         print("\tremoveFile(f)                   delete a file or directory");
         print("\tload(jsfilename)                load and execute a .js file");
         print("\trun(program[, args...])         spawn a program and wait for its completion");
+        print("\trunProgram(program[, args...])  same as run(), above");
         print("\tsleep(m)                        sleep m milliseconds");
         print("\tgetMemInfo()                    diagnostic");
         return;
