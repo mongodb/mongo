@@ -110,6 +110,9 @@ namespace mongo {
 #endif
 
     inline string makeUnixSockPath(int port) {
+        if (cmdLine.socket.empty()) {
+            cmdLine.socket = "/tmp";
+        }
         return cmdLine.socket + "/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
     }
 

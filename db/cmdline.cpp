@@ -159,9 +159,6 @@ namespace mongo {
                 ::exit(-1);
             }
         }
-        else {
-            cmdLine.socket = "/tmp";
-        }
         
         if (params.count("fork")) {
             if ( ! params.count( "logpath" ) ) {
