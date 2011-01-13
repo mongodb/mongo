@@ -93,8 +93,6 @@ namespace mongo {
 
         rwlock lk( mmmutex , true );
 
-        NamespaceDetailsTransient::clearForPrefix("");
-
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             (*i)->close();

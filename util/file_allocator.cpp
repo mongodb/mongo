@@ -35,12 +35,10 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    extern string dbpath;
     void ensureParentDirCreated(const boost::filesystem::path& p){
         const boost::filesystem::path parent = p.branch_path();
 
         if (! boost::filesystem::exists(parent)){
-            massert(13624, "dbpath doesn't exist", parent != dbpath);
             ensureParentDirCreated(parent);
             log() << "creating directory " << parent.string() << endl;
             boost::filesystem::create_directory(parent);
