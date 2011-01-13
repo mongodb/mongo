@@ -313,7 +313,7 @@ namespace mongo {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
 
             readlock lk( "local.sources" );
-            Client::Context ctx( "local.sources" );
+            Client::Context ctx( "local.sources", dbpath, 0, authed );
             shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ) {
