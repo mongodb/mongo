@@ -130,7 +130,7 @@ namespace mongo {
             dbMutex.assertAtLeastReadLocked();
 
             BSONObj res;
-            if ( Helpers::findOne( NS , ident.obj , res ) ) {
+            if ( !cmdLine.dur && Helpers::findOne( NS , ident.obj , res ) ) {
                 assert( res["syncedTo"].type() );
                 i.owned = false;
                 i.loc = (OpTime*)res["syncedTo"].value();
