@@ -24,11 +24,11 @@
 namespace mongo {
 
     using namespace mongoutils;
-
+    
     /** helper for manipulating host:port connection endpoints.
       */
     struct HostAndPort {
-        HostAndPort() : _port(-1) { }
+        HostAndPort() : _port(CmdLine::DefaultDBPort) { }
 
         /** From a string hostname[:portnumber]
             Throws user assertion if bad config string or bad port #.
@@ -84,7 +84,8 @@ namespace mongo {
     private:
         // invariant (except full obj assignment):
         string _host;
-        int _port; // -1 indicates unspecified
+        // defaults to CmdLine::DefaultDBPort. -1 indicates specifically not set
+        int _port; 
     };
 
     /** returns true if strings seem to be the same hostname.
@@ -166,7 +167,7 @@ namespace mongo {
         else {
             // no port specified.
             _host = p;
-            _port = -1;
+            _port = CmdLine::DefaultDBPort;
         }
     }
 
