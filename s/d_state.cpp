@@ -608,12 +608,12 @@ namespace mongo {
         //   all collections at some point, be sharded or not, will have a version (and a ShardChunkManager)
         //   for now, we remove the sharding state of dropped collection
         //   so delayed request may come in. This has to be fixed.
+        ConfigVersion clientVersion = info->getVersion(ns);
         ConfigVersion version;
-        if ( ! shardingState.hasVersion( ns , version ) ) {
+        if ( ! shardingState.hasVersion( ns , version ) && clientVersion == 0 ) {
             return true;
         }
 
-        ConfigVersion clientVersion = info->getVersion(ns);
 
         if ( version == 0 && clientVersion > 0 ) {
             stringstream ss;
