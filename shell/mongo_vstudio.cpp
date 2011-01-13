@@ -1432,6 +1432,7 @@ const StringData _jscode_raw_utils =
 "print(\"\\tremoveFile(f)                   delete a file or directory\");\n" 
 "print(\"\\tload(jsfilename)                load and execute a .js file\");\n" 
 "print(\"\\trun(program[, args...])         spawn a program and wait for its completion\");\n" 
+"print(\"\\trunProgram(program[, args...])  same as run(), above\");\n" 
 "print(\"\\tsleep(m)                        sleep m milliseconds\");\n" 
 "print(\"\\tgetMemInfo()                    diagnostic\");\n" 
 "return;\n" 
