@@ -56,9 +56,8 @@ namespace mongo {
         if( source == 0 ) return false;
 
         const string hn = source->h().toString();
-        OpTime ts;
+        OplogReader r;
         try {
-            OplogReader r;
             if( !r.connect(hn) ) {
                 log() << "replSet initial sync error can't connect to " << hn << " to read " << rsoplog << rsLog;
                 return false;
@@ -73,9 +72,6 @@ namespace mongo {
                 r.query(rsoplog, queryObj);
             }
             assert( r.haveCursor() );
-
-            /* we lock outside the loop to avoid the overhead of locking on every operation.  server isn't usable yet anyway! */
-            writelock lk("");
 
             {
                 if( !r.more() ) {
@@ -100,11 +96,20 @@ namespace mongo {
                     return false;
                 }
             }
+        }
+        catch(DBException& e) {
+            log() << "replSet initial sync failing: " << e.toString() << rsLog;
+            return false;
+        }
 
-            // todo : use exhaust
-            unsigned long long n = 0;
-            while( 1 ) {
+        /* we lock outside the loop to avoid the overhead of locking on every operation. */
+        writelock lk("");
 
+        // todo : use exhaust
+        OpTime ts;
+        unsigned long long n = 0;
+        while( 1 ) {
+            try {
                 if( !r.more() )
                     break;
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
@@ -139,12 +144,20 @@ namespace mongo {
                     log() << "replSet initialSyncOplogApplication " << n << rsLog;
                 }
             }
-        }
-        catch(DBException& e) {
-            if( ts <= minValid ) {
-                // didn't make it far enough
-                log() << "replSet initial sync failing, error applying oplog " << e.toString() << rsLog;
-                return false;
+            catch (DBException& e) {
+                if( e.getCode() == 11000 || e.getCode() == 11001 ) {
+                    // skip duplicate key exceptions
+                    continue;
+                }
+
+                if( ts <= minValid ) {
+                    // didn't make it far enough
+                    log() << "replSet initial sync failing, error applying oplog " << e.toString() << rsLog;
+                    return false;
+                }
+
+                // otherwise, whatever
+                break;
             }
         }
         return true;
