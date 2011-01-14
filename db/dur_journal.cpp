@@ -130,7 +130,7 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
-                    PRINT(*i);
+                    PRINT(i->string());
                     string fileName = boost::filesystem::path(*i).leaf();
                     PRINT(fileName);
                     if( str::startsWith(fileName, "j._") ) {
@@ -202,7 +202,9 @@ namespace mongo {
         void Journal::_open() {
             assert( _curLogFile == 0 );
             string fname = getFilePathFor(_nextFileNumber).string();
+            PRINT(getThreadName());
             PRINT(fname); //TODO(mathias): remove
+            printStackTrace();
             _curLogFile = new LogFile(fname);
             _nextFileNumber++;
             {
