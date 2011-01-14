@@ -348,15 +348,12 @@ namespace mongo {
             assert( !dbMutex.atLeastReadLocked() );
             durThreadMain.assertWithin();
 
-            j.updateLSNFile();
-
-            if( _curLogFile && _written < DataLimit )
-                return;
-
             scoped_lock lk(_curLogFileMutex);
 
             if ( inShutdown() )
                 return;
+
+            j.updateLSNFile();
 
             if( _curLogFile && _written < DataLimit )
                 return;
