@@ -123,19 +123,14 @@ namespace mongo {
 
         /** throws */
         void removeJournalFiles() {
-            // TODO(mathias): get rid of debugging stuff
             log() << "removeJournalFiles" << endl;
             try {
-                PRINTFL;
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
-                    PRINT(i->string());
                     string fileName = boost::filesystem::path(*i).leaf();
-                    PRINT(fileName);
                     if( str::startsWith(fileName, "j._") ) {
                         try {
-                            PRINTFL;
                             boost::filesystem::remove(*i);
                         }
                         catch(std::exception& e) {
@@ -143,12 +138,9 @@ namespace mongo {
                             throw;
                         }
                     }
-                    PRINTFL;
                 }
                 try {
-                    PRINTFL;
                     boost::filesystem::remove(lsnPath());
-                    PRINTFL;
                 }
                 catch(...) {
                     log() << "couldn't remove " << lsnPath().string() << endl;
@@ -202,9 +194,6 @@ namespace mongo {
         void Journal::_open() {
             assert( _curLogFile == 0 );
             string fname = getFilePathFor(_nextFileNumber).string();
-            PRINT(getThreadName());
-            PRINT(fname); //TODO(mathias): remove
-            printStackTrace();
             _curLogFile = new LogFile(fname);
             _nextFileNumber++;
             {
