@@ -499,7 +499,7 @@ namespace mongo {
                 while ( shardingState.inCriticalMigrateSection() ) {
                     dbtemprelease r;
                     sleepmillis(2);
-                    log() << "waiting till out of critical section" << endl;
+                    OCCASIONALLY log() << "waiting till out of critical section" << endl;
                 }
                 errmsg = "going to older version for global for collection '" + ns + "'";
                 result.append( "ns" , ns );
