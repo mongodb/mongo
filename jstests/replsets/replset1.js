@@ -52,15 +52,7 @@ doTest = function( signal ) {
     replTest.stop( master_id );
 
     // Now let's see who the new master is:
-    var new_master = false;
-    while (!new_master) {
-        try {
-            var new_master = replTest.getMaster();
-        }
-        catch (e) {
-            print(e);
-        }
-    }
+    var new_master = replTest.getMaster();
 
     // Is the new master the same as the old master?
     var new_master_id = replTest.getNodeId( new_master );
