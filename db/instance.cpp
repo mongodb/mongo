@@ -762,8 +762,9 @@ namespace mongo {
                time that was attempted, there was a race condition
                with acquirePathLock().  */
 #ifdef WIN32
+            if( _chsize( lockFile , 0 ) )
+                log() << "couldn't remove fs lock " << getLastError() << endl;
             CloseHandle(lockFileHandle);
-            DeleteFileA(( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string().c_str());
 #else
             if( ftruncate( lockFile , 0 ) )
                 log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
@@ -844,28 +845,17 @@ namespace mongo {
         }
 
 #ifdef WIN32
-        lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE, 
+        lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE,
             0 /* do not allow anyone else access */, NULL, 
-            CREATE_NEW /* error if file exists */, 0, NULL );
+            OPEN_ALWAYS /* success if fh can open */, 0, NULL );
 
         if (lockFileHandle == INVALID_HANDLE_VALUE) {
             DWORD code = GetLastError();
-            if (code == ERROR_FILE_EXISTS) {
-                HANDLE tempHandle = CreateFileA( name.c_str(), GENERIC_READ, 
-		        	0, NULL, OPEN_EXISTING, 0, NULL );
-                
-                if (GetLastError() == ERROR_SHARING_VIOLATION) {
-                    uasserted( 13626, "cannot acquire mongod.lock, is there another mongod running?" );
-                }
-            }
-            else {
-                LPVOID msg;
-                FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
-                    NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
-                    (LPTSTR)&msg, 0, NULL);
-                uasserted( 13627 , (char*)msg );
-            }
+            char *msg;
+            FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+                NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                (LPSTR)&msg, 0, NULL);
+            uasserted( 13627 , msg );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
@@ -927,7 +917,7 @@ namespace mongo {
         }
 
 #ifdef WIN32
-        uassert( 13625, "Unable to truncate lock file", SetEndOfFile(lockFileHandle) != 0);
+        uassert( 13625, "Unable to truncate lock file", _chsize(lockFile, 0) == 0);
         writePid( lockFile );
         _commit( lockFile );
 #else
