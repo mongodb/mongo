@@ -361,6 +361,8 @@ namespace mongo {
                 result.append("info", "now locked against writes, use db.$cmd.sys.unlock.findOne() to unlock");
             }
             else {
+                if (sync)
+                    getDur().commitNow();
                 result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
             }
             return 1;
