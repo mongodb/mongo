@@ -128,6 +128,8 @@ namespace mongo {
             /** write something that doesn't have to be journaled, as this write is "unimportant".
                 a good example is paddingFactor.
                 can be thought of as memcpy(dst,src,len)
+                the dur implementation acquires a mutex in this method, so do not assume it is faster
+                without measuring!
             */
             virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 

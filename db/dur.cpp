@@ -124,27 +124,19 @@ namespace mongo {
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-            // for now, journalled
-            memcpy( writingPtr(dst, len), src, len );
-
-            /* todo before doing this:
-               - finish implementation of _switchToReachableView
-               - performance test it.  privateViews.find() uses a mutex, so that could make
-                 it slow.
-            */
-            /*
-            if( testIntent ) {
-                memcpy(MongoMMF::switchToPrivateView(dst), src, len);
-                return;
-            }
-
-            void *writeView = MongoMMF::_switchToWritableView(dst);
-            memcpy(writeView, src, len);
-            if( memcmp(writeView, src, len) ) {
-                // a copy of the page exists, so need to write it there also
+            // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
+            scoped_lock lk( privateViews._mutex() );
+            size_t ofs;
+            MongoMMF *f = privateViews.find_inlock(dst, ofs);
+            assert(f);
+            void *w = (((char *)f->view_write())+ofs);
+            // first write it to the writable (file) view
+            memcpy(w, src, len);
+            if( memcmp(w, dst, len) ) {
+                // if we get here, a copy-on-write had previously occurred. so write it to the private view too
+                // to keep them in sync.  we do this as we do not want to cause a copy on write unnecessarily.
                 memcpy(dst, src, len);
             }
-            */
         }
 
         /** base declare write intent function that all the helpers call. */
@@ -296,8 +288,11 @@ namespace mongo {
                     _bytes += mmf->length();
 
                     assert( mmf->length() == (unsigned) mmf->length() );
-                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
-                        return; // next file
+                    {
+                        scoped_lock lk( privateViews._mutex() ); // see setNoJournal
+                        if (memcmp(p, w, (unsigned) mmf->length()) == 0)
+                            return; // next file
+                    }
 
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
@@ -330,6 +325,7 @@ namespace mongo {
                         set<WriteIntent>& b = commitJob.writes();
                         (void)b; // mark as unused. Useful for inspection in debugger
 
+                        // should we abort() here so this isn't unnoticed in some circumstances?
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
                     }
                 }

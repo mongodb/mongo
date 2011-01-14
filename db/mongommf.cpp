@@ -139,12 +139,12 @@ namespace mongo {
        as a tad of a "warning".  but useful when done with some care, such as during
        initialization.
     */
-    /* void* MongoMMF::_switchToWritableView(void *p) {
-        RARELY log() << "todo dur not done switchtowritable" << endl;
-        if( debug )
-            return switchToPrivateView(p);
-        return p;
-    }*/
+    void* MongoMMF::_switchToWritableView(void *p) {
+        size_t ofs;
+        MongoMMF *f = privateViews.find(p, ofs);
+        assert( f );
+        return (((char *)f->_view_write)+ofs);
+    }
 
     extern string dbpath;
 

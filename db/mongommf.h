@@ -58,7 +58,7 @@ namespace mongo {
            as a tad of a "warning".  but useful when done with some care, such as during
            initialization.
         */
-        //static void* _switchToWritableView(void *private_ptr);
+        static void* _switchToWritableView(void *private_ptr);
 
         /** for a filename a/b/c.3
             filePath() is "a/b/c"
