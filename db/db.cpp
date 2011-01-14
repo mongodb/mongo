@@ -512,6 +512,8 @@ sendmore:
 
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
+        Client::initThread("initandlisten");
+
         bool is32bit = sizeof(int*) == 4;
 
         {
@@ -550,7 +552,6 @@ sendmore:
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 
-        Client::initThread("initandlisten");
         _diaglog.init();
 
         dur::startup();

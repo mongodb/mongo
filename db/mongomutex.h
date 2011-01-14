@@ -227,7 +227,6 @@ namespace mongo {
 
     /* @return true if was already write locked.  increments recursive lock count. */
     inline bool MongoMutex::_writeLockedAlready() {
-        dassert( haveClient() );
         int s = _state.get();
         if( s > 0 ) {
             _state.set(s+1);
