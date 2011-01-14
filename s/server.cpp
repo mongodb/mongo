@@ -210,6 +210,10 @@ int main(int argc, char* argv[]) {
     if ( ! CmdLine::store( argc , argv , options , hidden , positional , params ) )
         return 0;
 
+    // The default value may vary depending on compile options, but for mongos
+    // we want durability to be disabled.
+    cmdLine.dur = false;
+
     if ( params.count( "help" ) ) {
         cout << options << endl;
         return 0;
