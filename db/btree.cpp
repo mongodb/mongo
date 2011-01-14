@@ -1739,6 +1739,13 @@ namespace mongo {
         b = cur.btreemod();
     }
 
+    void BtreeBuilder::mayCommit() {
+        RARELY {
+            getDur().commitIfNeeded();
+            b = cur.btreemod();
+        }
+    }
+
     void BtreeBuilder::addKey(BSONObj& key, DiskLoc loc) {
         if( !dupsAllowed ) {
             if( n > 0 ) {
@@ -1764,6 +1771,7 @@ namespace mongo {
             }
         }
         n++;
+        mayCommit();
     }
 
     void BtreeBuilder::buildNextLevel(DiskLoc loc) {
@@ -1811,6 +1819,7 @@ namespace mongo {
             }
 
             loc = upStart;
+            mayCommit();
         }
 
         if( levels > 1 )
