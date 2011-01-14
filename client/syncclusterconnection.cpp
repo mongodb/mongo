@@ -121,7 +121,7 @@ namespace mongo {
 
         for ( size_t i = 0; i<_conns.size(); i++ ) {
             BSONObj res = _lastErrors[i];
-            if ( res["ok"].trueValue() && res["fsyncFiles"].numberInt() > 0 )
+            if ( res["ok"].trueValue() && (res["fsyncFiles"].numberInt() > 0 || res.hasElement("waited")))
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];
