@@ -580,6 +580,7 @@ namespace mongo {
             return;
 
         Client::Context ctx(ns);
+        int n = 0;
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
@@ -595,8 +596,13 @@ namespace mongo {
 
             theDataFileMgr.insertWithObjMod(ns, js, false);
             logOp("i", ns, js);
-            globalOpCounters.gotInsert();
+
+            if( ++n % 4 == 0 ) {
+                // if we are inserting quite a few, we may need to commit along the way
+                getDur().commitIfNeeded();
+            }
         }
+        globalOpCounters.incInsertInWriteLock(n);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
