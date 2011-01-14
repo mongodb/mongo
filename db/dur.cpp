@@ -513,7 +513,7 @@ namespace mongo {
         void durThread() {
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 90;
-            while( 1) {
+            while( !inShutdown() ) {
                 sleepmillis(10);
                 CodeBlock::Within w(durThreadMain);
                 try {

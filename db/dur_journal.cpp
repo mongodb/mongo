@@ -365,6 +365,10 @@ namespace mongo {
                 return;
 
             scoped_lock lk(_curLogFileMutex);
+
+            if ( inShutdown() )
+                return;
+
             if( _curLogFile && _written < DataLimit )
                 return;
 
