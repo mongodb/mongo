@@ -21,6 +21,7 @@
 #include "../util/base64.h"
 #include "../util/text.h"
 #include "../util/hex.h"
+#include "../util/ip_addr.h"
 
 #if( BOOST_VERSION >= 104200 )
 //#include <boost/uuid/uuid.hpp>
@@ -670,6 +671,133 @@ namespace mongo {
         { 0 }
     };
 
+    // IpAddr **************************
+
+    JSBool ip_addr_version_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        const IP_Addr* ip = new ((void*)data) IP_Addr;
+        stringstream ss;
+        ss << (unsigned int)ip->getVersion();
+        string ret = ss.str();
+        *vp = c.toval( ret.c_str() );
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_mask_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        const IP_Addr* ip = new ((void*)data) IP_Addr;
+        stringstream ss;
+        ss << (unsigned int)ip->getNetmask();
+        string ret = ss.str();
+        *vp = c.toval( ret.c_str() );
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_mask_setter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        unsigned int mask = (unsigned int)c.toNumber( *vp );
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        IP_Addr* ip = new ((void*)data) IP_Addr;
+        ip->setNetmask(mask);
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "IpAddr needs 1 argument -- IpAddr(ipstr)" );
+            return JS_FALSE;
+        }
+
+        string ip_str = c.toString( argv[ 0 ] );
+
+        IPv4_Addr ip;
+        if (ip.parse(ip_str)) {
+
+            assert( JS_SetPrivate( cx, obj, new BinDataHolder( (const char*)&ip, sizeof(ip) ) ) );
+
+        }
+        else {
+
+            IPv6_Parser ipp;
+            IPv6_Addr ip;
+
+            if (!ipp.parse(ip_str.c_str())) {
+                JS_ReportError( cx, "invalid IP Address string to IpAddr()" );
+                return JS_FALSE;
+            }
+
+            ip = ipp.getIPv6();
+            assert( JS_SetPrivate( cx, obj, new BinDataHolder( (const char*)&ip, sizeof(ip) ) ) );
+
+        }
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "version", c.toval( 0.0 ),
+            ip_addr_version_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'version'" );
+            return JS_FALSE;
+        }
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "mask", c.toval( 0.0 ),
+            ip_addr_mask_getter, ip_addr_mask_setter, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'mask'" );
+            return JS_FALSE;
+        }
+
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        string ret;
+        const IP_Addr* ip = new ((void*)data) IP_Addr;
+        ret = "IpAddr(\"";
+        if (ip->getVersion() == 4) {
+            ret += ((IPv4_Addr*)ip)->print();
+        }
+        else if (ip->getVersion() == 6) {
+            ret += ((IPv6_Addr*)ip)->print();
+        }
+        else {
+            ret += ip->print();
+        }
+        ret += "\")";
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    void ip_addr_finalize( JSContext * cx , JSObject * obj ) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        if ( holder ) {
+            delete ( BinDataHolder* )holder;
+            assert( JS_SetPrivate( cx , obj , 0 ) );
+        }
+    }
+
+    JSClass ip_addr_class = {
+        "IpAddr" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, ip_addr_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec ip_addr_functions[] = {
+        { "toString" , ip_addr_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+
     // BinData **************************
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
@@ -1028,6 +1156,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &ip_addr_class , ip_addr_constructor , 0 , 0 , ip_addr_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );

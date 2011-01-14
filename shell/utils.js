@@ -540,6 +540,13 @@ if ( typeof( UUID ) != "undefined" ){
     }
 }
 
+if ( typeof( IpAddr ) != "undefined" ){
+
+    IpAddr.prototype.tojson = function () {
+        return this.toString();
+    }
+}
+
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
     
@@ -953,7 +960,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
     builtinMethods[BinData] = "hex base64 length subtype".split(' ');
     builtinMethods[NumberLong] = "toNumber".split(' ');
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split(' ');
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval IpAddr isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split(' ');
 
     var isPrivate = function(name){
         if (shellAutocomplete.showPrivate) return false;
