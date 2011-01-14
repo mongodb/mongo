@@ -1502,7 +1502,7 @@ namespace mongo {
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
-                    !replAuthenticate(_conn.get()) ||
+                    (!noauth && !replAuthenticate(_conn.get())) ||
                     !replHandshake(_conn.get()) ) {
                 resetConnection();
                 log() << "repl:  " << errmsg << endl;
