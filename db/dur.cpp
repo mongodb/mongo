@@ -71,8 +71,6 @@ namespace mongo {
 
         Stats stats;
 
-        static mongo::mutex durThreadMutex("durthreadmtx");
-
         void Stats::S::reset() {
             memset(this, 0, sizeof(*this));
         }
@@ -481,7 +479,6 @@ namespace mongo {
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
-                    scoped_lock lk2(durThreadMutex);
                     groupCommit();
                     return;
                 }
@@ -490,7 +487,6 @@ namespace mongo {
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
-            scoped_lock lk2(durThreadMutex);
             groupCommit();
         }
 
@@ -523,8 +519,6 @@ namespace mongo {
                 try {
                     int millis = HowOftenToGroupCommitMs;
                     {
-                        scoped_lock lk2(durThreadMutex);
-
                         stats.rotate();
                         {
                             Timer t;
@@ -543,7 +537,7 @@ namespace mongo {
                         commitJob.wi()._deferred.invoke();
                     }
 
-                    go(); // regrabs durThreadMutex inside of dbMutex
+                    go();
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
