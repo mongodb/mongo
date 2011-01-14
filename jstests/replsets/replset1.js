@@ -55,10 +55,10 @@ doTest = function( signal ) {
     var new_master = false;
     while (!new_master) {
         try {
-            new_master = replTest.getMaster();
+            var new_master = replTest.getMaster();
         }
         catch (e) {
-            print("e: "+e);
+            print(e);
         }
     }
 
@@ -66,19 +66,17 @@ doTest = function( signal ) {
     var new_master_id = replTest.getNodeId( new_master );
 
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
-    var count = 0;
-    while (count < 3) { 
+
+    { 
         // this may fail since it has to reconnect
         try {
             cppconn.foo.findOne()
         }
         catch ( e ){
-            print("e: "+e);
         }
-        count++;
-    }
-    assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
+        assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
 
+    }
 
     // Now let's write some documents to the new master
     for(var i=0; i<1000; i++) {
