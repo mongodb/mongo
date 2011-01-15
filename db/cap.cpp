@@ -404,7 +404,7 @@ namespace mongo {
     void NamespaceDetails::emptyCappedCollection( const char *ns ) {
         DEV assert( this == nsdetails(ns) );
         massert( 13424, "collection must be capped", capped );
-        massert( 13425, "background index build in progress", !backgroundIndexBuildInProgress );
+        massert( 13425, "background index build in progress", !indexBuildInProgress );
         massert( 13426, "indexes present", nIndexes == 0 );
 
         // Clear all references to this namespace.
@@ -435,7 +435,7 @@ namespace mongo {
         t->multiKeyIndexBits = 0;
         t->reservedA = 0;
         t->extraOffset = 0;
-        // backgroundIndexBuildInProgress preserve 0
+        // indexBuildInProgress preserve 0
         memset(t->reserved, 0, sizeof(t->reserved));
 
         // Reset all existing extents and recreate the deleted list.

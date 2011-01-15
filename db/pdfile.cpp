@@ -849,7 +849,7 @@ namespace mongo {
         int n = d->nIndexes;
         for ( int i = 0; i < n; i++ )
             _unindexRecord(d->idx(i), obj, dl, !noWarn);
-        if( d->backgroundIndexBuildInProgress ) {
+        if( d->indexBuildInProgress ) { // background index
             // always pass nowarn here, as this one may be missing for valid reasons as we are concurrently building it
             _unindexRecord(d->idx(n), obj, dl, false);
         }
@@ -1314,18 +1314,18 @@ namespace mongo {
     class RecoverableIndexState {
     public:
         RecoverableIndexState( NamespaceDetails *d ) : _d( d ) {
-            backgroundIndexBuildInProgress() = 1;
+            indexBuildInProgress() = 1;
             nIndexes()--;
         }
         ~RecoverableIndexState() {
             DESTRUCTOR_GUARD (
                 nIndexes()++;
-                backgroundIndexBuildInProgress() = 0;
+                indexBuildInProgress() = 0;
             )
         }
     private:
         int &nIndexes() { return getDur().writingInt( _d->nIndexes ); }
-        int &backgroundIndexBuildInProgress() { return getDur().writingInt( _d->backgroundIndexBuildInProgress ); }
+        int &indexBuildInProgress() { return getDur().writingInt( _d->indexBuildInProgress ); }
         NamespaceDetails *_d;
     };
 
@@ -1340,7 +1340,7 @@ namespace mongo {
         }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
-        assert( d->backgroundIndexBuildInProgress == 0 );
+        assert( d->indexBuildInProgress == 0 );
         assertInWriteLock();
         RecoverableIndexState recoverable( d );
         if( inDBRepair || !background ) {
