@@ -83,7 +83,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[0] = val;
+                    _byte[0] = val;
                     state = PARSE_FIELD2_START;
                     break;
                 }
@@ -96,7 +96,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[0] = val;
+                    _byte[0] = val;
                     state = PARSE_F1_NETMASK_START;
                     break;
                 }
@@ -120,7 +120,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                 if (c == '\0')
                 {
                     // Fail if this is not a class A address
-                    if (m_ip[0] & 0x80)
+                    if (_byte[0] & 0x80)
                         return false;
 
                     m_mask = atoi(field_ptr);
@@ -160,7 +160,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[1] = val;
+                    _byte[1] = val;
                     state = PARSE_FIELD3_START;
                     break;
                 }
@@ -196,7 +196,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                 if (c == '\0')
                 {
                     // Fail if this is not a class A or B address
-                    if ((m_ip[0] & 0xF0) >= 0xC0)
+                    if ((_byte[0] & 0xF0) >= 0xC0)
                         return false;
 
                     val = atoi(field_ptr);
@@ -206,7 +206,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                         return false;
 
                     // Fail Class B address with undersized netmask
-                    if ((val < 16) && ((m_ip[0] & 0xC0) == 0x80))
+                    if ((val < 16) && ((_byte[0] & 0xC0) == 0x80))
                             return false;
 
                     m_mask = val;
@@ -241,7 +241,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[2] = val;
+                    _byte[2] = val;
                     state = PARSE_FIELD4_START;
                     break;
                 }
@@ -254,7 +254,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[2] = val;
+                    _byte[2] = val;
                     state = PARSE_F3_NETMASK_START;
                     break;
                 }
@@ -283,7 +283,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                         return false;
 
                     // Fail Class B address with undersized netmask
-                    if ((val < 16) && ((m_ip[0] & 0xC0) == 0x80))
+                    if ((val < 16) && ((_byte[0] & 0xC0) == 0x80))
                             return false;
 
                     m_mask = val;
@@ -320,7 +320,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[3] = val;
+                    _byte[3] = val;
                     return true;
                 }
 
@@ -332,7 +332,7 @@ bool IPv4_Addr::parse(std::string& p_ipstring)
                     if ((val < 0) || (val > 255))
                         return false;
 
-                    m_ip[3] = val;
+                    _byte[3] = val;
                     state = PARSE_F4_NETMASK_START;
                     break;
                 }

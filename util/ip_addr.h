@@ -58,6 +58,10 @@ class IP_Addr
 }; // end class IP_Addr
 
 
+#define IP_LONG(i) ( ((uint64_t*)_byte)[i] )
+#define IP_WORD(i) ( ((uint32_t*)_byte)[i] )
+#define IP_SHORT(i) ( ((uint16_t*)_byte)[i] )
+
 
 
 class IPv4_Addr : public IP_Addr
@@ -71,7 +75,7 @@ class IPv4_Addr : public IP_Addr
 
     void setZero(void)
     {
-        m_long = 0;
+        IP_WORD(0) = 0;
     }
 
     void init(void)
@@ -93,11 +97,13 @@ class IPv4_Addr : public IP_Addr
 
         if (m_mask < 32)
         {
-            snprintf(s, sizeof(s), "%d.%d.%d.%d/%d", m_ip[0], m_ip[1], m_ip[2], m_ip[3], m_mask);
+            snprintf(s, sizeof(s), "%d.%d.%d.%d/%d",
+                _byte[0], _byte[1], _byte[2], _byte[3], m_mask);
         }
         else
         {
-            snprintf(s, sizeof(s), "%d.%d.%d.%d", m_ip[0], m_ip[1], m_ip[2], m_ip[3]);
+            snprintf(s, sizeof(s), "%d.%d.%d.%d",
+                _byte[0], _byte[1], _byte[2], _byte[3]);
         }
 
         std::string rs = s;
@@ -107,10 +113,7 @@ class IPv4_Addr : public IP_Addr
 
   private:
 
-    union {
-        uint8_t     m_ip[4];
-        uint32_t    m_long;
-    };
+    uint8_t         _byte[4];
 
 }; // end class IPv4_Addr
 
@@ -148,8 +151,8 @@ class IPv6_Addr : public IP_Addr
 
     void setZero(void)
     {
-        _long[0] = 0;
-        _long[1] = 0;
+        IP_LONG(0) = 0;
+        IP_LONG(1) = 0;
     }
 
     void init(void)
@@ -181,41 +184,40 @@ class IPv6_Addr : public IP_Addr
 
     void setAddressIPv4Network(uint32_t addr_)
     {
-        _long[0] = 0;
+        IP_LONG(0) = 0;
 
 #ifdef BIG_ENDIAN
-        _word[2] = 0x0000FFFF;
+        IP_WORD(2) = 0x0000FFFF;
 #else
-        _word[2] = 0xFFFF0000;
+        IP_WORD(2) = 0xFFFF0000;
 #endif
-
-        _word[3] = addr_;
+        IP_WORD(3) = addr_;
     }
 
 
     bool containsIPv4(void) const
     {
 #ifdef BIG_ENDIAN
-        return (_long[0] == 0) && (_word[2] == 0x0000FFFF);
+        return (IP_LONG(0) == 0) && (IP_WORD(2) == 0x0000FFFF);
 #else
-        return (_long[0] == 0) && (_word[2] == 0xFFFF0000);
+        return (IP_LONG(0) == 0) && (IP_WORD(2) == 0xFFFF0000);
 #endif
     }
 
 
     bool isUnspecified(void) const
     {
-        return (_long[0] == 0) && (_long[1] == 0);
+        return (IP_LONG(0) == 0) && (IP_LONG(1) == 0);
     }
 
 
     bool isLoopback(void) const
     {
 #ifdef BIG_ENDIAN
-        if ((_long[0] == 0) && (_long[1] == 0x0000000000000001LL))
+        if ((IP_LONG(0) == 0) && (IP_LONG(1) == 0x0000000000000001LL))
             return true;
 #else
-        if ((_long[0] == 0) && (_long[1] == 0x0100000000000000LL))
+        if ((IP_LONG(0) == 0) && (IP_LONG(1) == 0x0100000000000000LL))
             return true;
 #endif
         return containsIPv4() && (_byte[12] == 127);
@@ -231,9 +233,9 @@ class IPv6_Addr : public IP_Addr
     bool isLinkLocal(void) const
     {
 #ifdef BIG_ENDIAN
-        return (_short[0] & 0xffc0) == 0xfe80;
+        return (IP_SHORT(0) & 0xffc0) == 0xfe80;
 #else
-        return (_short[0] & 0xc0ff) == 0x80fe;
+        return (IP_SHORT(0) & 0xc0ff) == 0x80fe;
 #endif
     }
 
@@ -308,15 +310,11 @@ class IPv6_Addr : public IP_Addr
     // Warning: do not add any other non-static data items to this class!
     // Please note that the address is stored in Network Order.
 
-    union {
-
-        // IPv6 addresses are 128 bits long!
-        uint64_t           _long[2]; 
-        uint32_t           _word[4]; 
-        uint16_t           _short[4*2];
-        uint8_t            _byte[4*4];
-
-    };
+    // IPv6 addresses are 128 bits long!
+    //uint64_t           _long[2]; 
+    //uint32_t           _word[4]; 
+    //uint16_t           _short[4*2];
+    uint8_t            _byte[4*4];
 
 }; // end class IPv6_Addr
 
@@ -324,9 +322,6 @@ class IPv6_Addr : public IP_Addr
 inline bool operator<(const IPv6_Addr& p_a, const IPv6_Addr& p_b)
 {
     
-    // but that would not compare correctly since _long[]
-    // is stored in network order.
-
     if (p_a.getByte(0) < p_b.getByte(0)) return true;
     if (p_a.getByte(0) > p_b.getByte(0)) return false;
 
