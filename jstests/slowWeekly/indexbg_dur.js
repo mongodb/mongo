@@ -51,5 +51,17 @@ while( 1 ) {
     assert.eq( statsSize, nsSize );
     assert( t.validate().valid );
     // TODO check that index namespace is cleaned up as well once that is implemented
+    
+    t.ensureIndex( {i:1} );
+    var statsSize = countFields( t.stats().indexSizes );
+    var nsSize = conn.getDB( testname ).system.indexes.count( {ns:testname+'.'+testname} );
+
+    assert.eq( 2, statsSize );
+    assert.eq( 2, nsSize );
+    
+    exp = t.find( {i:20} ).explain();
+    assert.eq( 1, exp.n );
+    assert.eq( 'BtreeCursor i_1', exp.cursor );
+    
     break;
 }   
