@@ -1739,7 +1739,7 @@ namespace mongo {
         b = cur.btreemod();
     }
 
-    void BtreeBuilder::mayCommit() {
+    void BtreeBuilder::mayCommitProgressDurably() {
         RARELY {
             getDur().commitIfNeeded();
             b = cur.btreemod();
@@ -1771,7 +1771,7 @@ namespace mongo {
             }
         }
         n++;
-        mayCommit();
+        mayCommitProgressDurably();
     }
 
     void BtreeBuilder::buildNextLevel(DiskLoc loc) {
@@ -1819,7 +1819,7 @@ namespace mongo {
             }
 
             loc = upStart;
-            mayCommit();
+            mayCommitProgressDurably();
         }
 
         if( levels > 1 )

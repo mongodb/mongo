@@ -599,7 +599,7 @@ namespace mongo {
 
         void newBucket();
         void buildNextLevel(DiskLoc);
-        void mayCommit();
+        void mayCommitProgressDurably();
 
     public:
         ~BtreeBuilder();
