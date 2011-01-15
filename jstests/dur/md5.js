@@ -70,7 +70,10 @@ fuzzFile( path + "/journal/j._0", 39755 );
 log();
 
 // 100 exit code corresponds to EXIT_UNCAUGHT, which is triggered when there is an exception during recovery.
-assert.eq( 100, runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8 ) );
+// 14 is is sometimes triggered instead due to SERVER-2184
+exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8 );
+print( "exitCode: " + exitCode );
+assert( exitCode == 100 || exitCode == 14 ); 
 
 // TODO Possibly we could check the mongod log to verify that the correct type of exception was thrown.  But
 // that would introduce a dependency on the mongod log format, which we may not want.
