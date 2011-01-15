@@ -33,7 +33,7 @@ class IP_Addr
   public:
 
     IP_Addr() {}
-    virtual ~IP_Addr() {}
+    ~IP_Addr() {}
 
     // Get Accessors
     uint8_t getNetmask(void) const { return m_mask; }
@@ -41,15 +41,13 @@ class IP_Addr
 
     // Set Accessors
     void setNetmask(uint8_t p_mask) { m_mask = p_mask; }
-    virtual void setZero(void) {}
-    virtual void init(void) {}
+#if 0
+    void setZero(void) {}
+    void init(void) {}
+#endif
 
     // Printing
-    virtual std::string print(void) const
-    {
-        std::string err = "Invalid";
-        return err;
-    }
+    std::string print(void) const;
 
 
   protected:
@@ -71,12 +69,12 @@ class IPv4_Addr : public IP_Addr
         m_ip_version = 4;
     }
 
-    virtual void setZero(void)
+    void setZero(void)
     {
         m_long = 0;
     }
 
-    virtual void init(void)
+    void init(void)
     {
         setZero();
         m_mask = 32;
@@ -89,7 +87,7 @@ class IPv4_Addr : public IP_Addr
     bool parse(std::string& p_ipstring);
 
 
-    virtual std::string print(void) const
+    std::string print(void) const
     {
         char s[24];
 
@@ -129,7 +127,7 @@ class IPv6_Addr : public IP_Addr
         m_ip_version = 6;
     }
 
-    virtual ~IPv6_Addr() { }
+    ~IPv6_Addr() { }
 
     // Get Accessors
 
@@ -148,13 +146,13 @@ class IPv6_Addr : public IP_Addr
 
     // Set Accessors
 
-    virtual void setZero(void)
+    void setZero(void)
     {
         _long[0] = 0;
         _long[1] = 0;
     }
 
-    virtual void init(void)
+    void init(void)
     {
         setZero();
         m_mask = 128;
@@ -253,7 +251,7 @@ class IPv6_Addr : public IP_Addr
     bool parse(std::string& p_ipstring);
 
 
-    virtual std::string print(void) const
+    std::string print(void) const
     {
         char s[64];
 
@@ -262,7 +260,7 @@ class IPv6_Addr : public IP_Addr
             if (m_mask < 128)
             {
                 snprintf(s, sizeof(s),
-                    "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%d.%d.%d.%d/%d",
+                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%d.%d.%d.%d/%d",
                     _byte[0], _byte[1], _byte[2], _byte[3],
                     _byte[4], _byte[5], _byte[6], _byte[7], 
                     _byte[8], _byte[9], _byte[10], _byte[11],
@@ -271,7 +269,7 @@ class IPv6_Addr : public IP_Addr
             else
             {
                 snprintf(s, sizeof(s),
-                    "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%d.%d.%d.%d",
+                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%d.%d.%d.%d",
                     _byte[0], _byte[1], _byte[2], _byte[3],
                     _byte[4], _byte[5], _byte[6], _byte[7], 
                     _byte[8], _byte[9], _byte[10], _byte[11],
@@ -283,7 +281,7 @@ class IPv6_Addr : public IP_Addr
             if (m_mask < 128)
             {
                 snprintf(s, sizeof(s),
-                    "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x/%d",
+                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X/%d",
                     _byte[0], _byte[1], _byte[2], _byte[3],
                     _byte[4], _byte[5], _byte[6], _byte[7], 
                     _byte[8], _byte[9], _byte[10], _byte[11],
@@ -292,7 +290,7 @@ class IPv6_Addr : public IP_Addr
             else
             {
                 snprintf(s, sizeof(s),
-                    "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
                     _byte[0], _byte[1], _byte[2], _byte[3],
                     _byte[4], _byte[5], _byte[6], _byte[7], 
                     _byte[8], _byte[9], _byte[10], _byte[11],
@@ -440,6 +438,18 @@ inline bool IPv6_Addr::parse(std::string& p_ipstring)
 {
     IPv6_Parser ipp;
     return ipp.parse(p_ipstring);
+}
+
+inline std::string IP_Addr::print(void) const
+{
+    if (m_ip_version == 4)
+        return ((IPv4_Addr*)this)->print();
+
+    if (m_ip_version == 6)
+        return ((IPv6_Addr*)this)->print();
+
+    std::string err = "Invalid";
+    return err;
 }
 
 #endif // _IP_Addr_HPP_

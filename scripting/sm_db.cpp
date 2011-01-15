@@ -22,6 +22,7 @@
 #include "../util/text.h"
 #include "../util/hex.h"
 #include "../util/ip_addr.h"
+#include "../util/mac_addr.h"
 
 #if( BOOST_VERSION >= 104200 )
 //#include <boost/uuid/uuid.hpp>
@@ -626,9 +627,15 @@ namespace mongo {
                 buf[i] = fromHex(encoded.c_str() + i * 2);
             }
 
+            if ( ! JS_InstanceOf( cx , obj , &uuid_class , 0 ) ) {
+                obj = JS_NewObject( cx , &uuid_class , 0 , 0 );
+                CHECKNEWOBJECT( obj, cx, "uuid_constructor" );
+                *rval = OBJECT_TO_JSVAL( obj );
+            }
+
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
             c.setProperty( obj, "len", c.toval( (double)16 ) );
-            c.setProperty( obj, "type", c.toval( (double)3 ) );
+            c.setProperty( obj, "type", c.toval( (double)bdtUUID ) );
 
             return JS_TRUE;
         }
@@ -719,27 +726,35 @@ namespace mongo {
         }
 
         string ip_str = c.toString( argv[ 0 ] );
+        int len;
+        const char* data;
+        IPv4_Addr ip4;
+        IPv6_Addr ip6;
 
-        IPv4_Addr ip;
-        if (ip.parse(ip_str)) {
-
-            assert( JS_SetPrivate( cx, obj, new BinDataHolder( (const char*)&ip, sizeof(ip) ) ) );
-
+        if (ip4.parse(ip_str)) {
+            len = sizeof(ip4);
+            data = (const char*)&ip4;
         }
         else {
-
             IPv6_Parser ipp;
-            IPv6_Addr ip;
 
             if (!ipp.parse(ip_str.c_str())) {
                 JS_ReportError( cx, "invalid IP Address string to IpAddr()" );
                 return JS_FALSE;
             }
 
-            ip = ipp.getIPv6();
-            assert( JS_SetPrivate( cx, obj, new BinDataHolder( (const char*)&ip, sizeof(ip) ) ) );
-
+            ip6 = ipp.getIPv6();
+            len = sizeof(ip6);
+            data = (const char*)&ip6;
         }
+
+        if ( ! JS_InstanceOf( cx , obj , &ip_addr_class , 0 ) ) {
+            obj = JS_NewObject( cx , &ip_addr_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "ip_addr_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        assert( JS_SetPrivate( cx, obj, new BinDataHolder( data, len ) ) );
 
         if (JS_FALSE == JS_DefineProperty( cx, obj, "version", c.toval( 0.0 ),
             ip_addr_version_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
@@ -753,6 +768,9 @@ namespace mongo {
             return JS_FALSE;
         }
 
+        c.setProperty( obj, "len", c.toval( (double)len ) );
+        c.setProperty( obj, "type", c.toval( (double)bdtIpAddr ) );
+
         return JS_TRUE;
     }
 
@@ -764,15 +782,7 @@ namespace mongo {
         string ret;
         const IP_Addr* ip = new ((void*)data) IP_Addr;
         ret = "IpAddr(\"";
-        if (ip->getVersion() == 4) {
-            ret += ((IPv4_Addr*)ip)->print();
-        }
-        else if (ip->getVersion() == 6) {
-            ret += ((IPv6_Addr*)ip)->print();
-        }
-        else {
-            ret += ip->print();
-        }
+        ret += ip->print();
         ret += "\")";
         return *rval = c.toval( ret.c_str() );
     }
@@ -798,6 +808,77 @@ namespace mongo {
         { 0 }
     };
 
+    // MacAddr **************************
+
+    JSBool mac_addr_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "MacAddr needs 1 argument -- MacAddr(macstr)" );
+            return JS_FALSE;
+        }
+
+        string mac_str = c.toString( argv[ 0 ] );
+        int len;
+        const char* data;
+        MAC_Addr mac;
+
+        if (mac.parse(mac_str)) {
+            len = sizeof(mac);
+            data = (const char*)&mac;
+        }
+        else {
+            JS_ReportError( cx, "invalid MAC Address string to MacAddr()" );
+            return JS_FALSE;
+        }
+
+        if ( ! JS_InstanceOf( cx , obj , &mac_addr_class , 0 ) ) {
+            obj = JS_NewObject( cx , &mac_addr_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "mac_addr_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        assert( JS_SetPrivate( cx, obj, new BinDataHolder( data, len ) ) );
+        c.setProperty( obj, "len", c.toval( (double)len ) );
+        c.setProperty( obj, "type", c.toval( (double)bdtMacAddr ) );
+
+        return JS_TRUE;
+    }
+
+    JSBool mac_addr_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        string ret;
+        const MAC_Addr* mac = new ((void*)data) MAC_Addr;
+        ret = "MacAddr(\"";
+        ret += mac->print();
+        ret += "\")";
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    void mac_addr_finalize( JSContext * cx , JSObject * obj ) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        if ( holder ) {
+            delete ( BinDataHolder* )holder;
+            assert( JS_SetPrivate( cx , obj , 0 ) );
+        }
+    }
+
+    JSClass mac_addr_class = {
+        "MacAddr" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mac_addr_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec mac_addr_functions[] = {
+        { "toString" , mac_addr_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+
     // BinData **************************
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
@@ -808,6 +889,14 @@ namespace mongo {
             int type = (int)c.toNumber( argv[ 0 ] );
             if( type < 0 || type > 255 ) {
                 JS_ReportError( cx , "invalid BinData subtype -- range is 0..255 see bsonspec.org" );
+                return JS_FALSE;
+            }
+            if( type == bdtIpAddr ) {
+                JS_ReportError( cx , "use IpAddr(\"ip addr\") instead" );
+                return JS_FALSE;
+            }
+            if( type == bdtMacAddr ) {
+                JS_ReportError( cx , "use MacAddr(\"mac addr\") instead" );
                 return JS_FALSE;
             }
             string encoded = c.toString( argv[ 1 ] );
@@ -1157,6 +1246,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &ip_addr_class , ip_addr_constructor , 0 , 0 , ip_addr_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &mac_addr_class , mac_addr_constructor , 0 , 0 , mac_addr_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );

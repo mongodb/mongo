@@ -547,6 +547,13 @@ if ( typeof( IpAddr ) != "undefined" ){
     }
 }
 
+if ( typeof( MacAddr ) != "undefined" ){
+
+    MacAddr.prototype.tojson = function () {
+        return this.toString();
+    }
+}
+
 if ( typeof _threadInject != "undefined" ){
     print( "fork() available!" );
     
