@@ -339,7 +339,7 @@ namespace mongo {
         }
 
         long long State::renameIfNeeded() {
-            if ( ! _onDisk )
+            if ( _onDisk == false || _config.outType == Config::INMEMORY )
                 return _temp->size();
 
             dblock lock;
@@ -347,25 +347,22 @@ namespace mongo {
             if ( _config.finalLong == _config.tempLong )
                 return _db.count( _config.finalLong );
 
-            switch ( _config.outType ) {
-            case Config::REPLACE: {
+            if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
                 uassert( 10076 ,  "rename failed" ,
                          _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) );
                 _db.dropCollection( _config.tempLong );
-                break;
             }
-            case Config::MERGE: {
+            else if ( _config.outType == Config::MERGE ) {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
                 }
                 _db.dropCollection( _config.tempLong );
-                break;
             }
-            case Config::REDUCE: {
+            else if ( _config.outType == Config::REDUCE ) {
                 BSONList values;
 
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
@@ -391,11 +388,6 @@ namespace mongo {
                     }
                 }
                 _db.dropCollection( _config.tempLong );
-                break;
-            }
-            case Config::INMEMORY: {
-                return _temp->size();
-            }
             }
 
             return _db.count( _config.finalLong );
