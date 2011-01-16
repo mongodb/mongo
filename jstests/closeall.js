@@ -21,5 +21,6 @@ function f() {
 
 }
 
-f();
-print("SUCCESS closeall.js");
+//f();
+//print("SUCCESS closeall.js");
+print("closeall.js is disabled for now");
