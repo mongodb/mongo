@@ -279,10 +279,12 @@ def runTest(test):
     print "                " + str((t2 - t1) * 1000) + "ms"
     if r != 0:
         raise TestExitFailure(path, r)
-    if Popen([mongod_executable, "msg", "ping", mongod_port], stdout=PIPE).communicate()[0].count( "****ok") == 0:
+    
+    try:
+        c = Connection( "127.0.0.1" , int(mongod_port) )
+    except Exception,e:
         raise TestServerFailure(path)
-    if call([mongod_executable, "msg", "ping", mongod_port]) != 0:
-        raise TestServerFailure(path)
+
     print ""
 
 def run_tests(tests):

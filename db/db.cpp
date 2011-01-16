@@ -299,40 +299,6 @@ sendmore:
         globalScriptEngine->threadDone();
     }
 
-    /* todo: eliminate msg */
-    void msg(const char *m, const char *address, int port, int extras = 0) {
-        SockAddr db(address, port);
-
-        MessagingPort p;
-        if ( !p.connect(db) ) {
-            log() << "msg couldn't connect" << endl;
-            return;
-        }
-
-        Message send;
-        Message response;
-
-        send.setData( dbMsg , m);
-        int len = send.header()->dataLen();
-
-        for ( int i = 0; i < extras; i++ )
-            p.say(/*db, */send);
-
-        Timer t;
-        bool ok = p.call(send, response);
-        double tm = ((double) t.micros()) + 1;
-        log() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
-              << "len: " << len << " data: " << response.singleData()->_data << endl;
-
-        sleepsecs(1);
-
-        p.shutdown();
-    }
-
-    void msg(const char *m, int extras = 0) {
-        msg(m, "127.0.0.1", CmdLine::DefaultDBPort, extras);
-    }
-
     bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
         static DBDirectClient db;
 
