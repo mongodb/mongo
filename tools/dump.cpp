@@ -112,7 +112,7 @@ public:
 
         auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
         while ( cursor->more() ) {
-            BSONObj obj = cursor->next();
+            BSONObj obj = cursor->nextSafe();
             if ( obj.toString().find( ".$" ) != string::npos )
                 continue;
 
