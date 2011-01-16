@@ -432,9 +432,9 @@ namespace mongo {
             num++;
 
             m.hit( o.objsize() );
-
-            fclose( file );
         }
+
+        fclose( file );
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
         out() << "\t "  << m.hits() << " objects found" << endl;
