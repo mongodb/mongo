@@ -729,7 +729,9 @@ namespace mongo {
             {
                 int n = 10;
                 while( 1 ) {
-                    writelocktry w("", 20000);
+                    // we may already be in a read lock from earlier in the call stack, so do read lock here 
+                    // to be consistent with that.
+                    readlocktry w("", 20000);
                     if( w.got() ) { 
                         getDur().commitNow();
                         break;
