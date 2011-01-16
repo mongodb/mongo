@@ -280,13 +280,17 @@ namespace mongo {
                 MemoryMappedFile f; // not a MongoMMF so no closing notification
                 unsigned long long length = sizeof(LSNFile);
                 LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
-                assert(lsnf);
+                if( lsnf == 0 ) { 
+                    // can get 0 if an i/o error
+                    log() << "warning: open of lsn file failed" << endl;
+                    return;
+                }
                 log() << "lsn set " << _lastFlushTime << endl;
                 lsnf->set(_lastFlushTime);
             }
             catch(std::exception& e) {
-                log() << "write to lsn file fails " << e.what() << endl;
-                // don't care if this fails
+                log() << "warning: write to lsn file failed " << e.what() << endl;
+                // keep running (ignore the error). recovery will be slow.
             }
         }
 
