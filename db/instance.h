@@ -103,7 +103,7 @@ namespace mongo {
         ~DbResponse() { delete response; }
     };
 
-    bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
+    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
 
     void getDatabaseNames( vector< string > &names , const string& usePath = dbpath );
 

@@ -221,7 +221,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
 
         // before we lock...
         int op = m.operation();
@@ -234,15 +234,15 @@ namespace mongo {
                 if( strstr(ns, ".$cmd.sys.") ) {
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
-                        return true;
+                        return;
                     }
                     if( strstr(ns, "$cmd.sys.killop") ) {
                         killOp(m, dbresponse);
-                        return true;
+                        return;
                     }
                     if( strstr(ns, "$cmd.sys.unlock") ) {
                         unlockFsync(ns, m, dbresponse);
-                        return true;
+                        return;
                     }
                 }
             }
@@ -279,7 +279,7 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
-                return true;
+                return;
             receivedQuery(c , dbresponse, m );
         }
         else if ( op == dbGetMore ) {
@@ -376,7 +376,6 @@ namespace mongo {
             }
         }
 
-        return true;
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {

@@ -234,19 +234,7 @@ sendmore:
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd ) ) {
-                    log() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
-                    /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
-                    if ( dbMsgPort->farEnd.isLocalHost() ) {
-                        dbMsgPort->shutdown();
-                        sleepmillis(50);
-                        problem() << "exiting end msg" << endl;
-                        dbexit(EXIT_CLEAN);
-                    }
-                    else {
-                        log() << "  (not from localhost, ignoring end msg)" << endl;
-                    }
-                }
+                assembleResponse( m, dbresponse, dbMsgPort->farEnd );
 
                 if ( dbresponse.response ) {
                     dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
@@ -1055,20 +1043,6 @@ int main(int argc, char* argv[]) {
         if (params.count("command")) {
             vector<string> command = params["command"].as< vector<string> >();
 
-            if (command[0].compare("msg") == 0) {
-                const char *m;
-
-                if (command.size() < 3) {
-                    cout << "Too few parameters to 'msg' command" << endl;
-                    cout << visible_options << endl;
-                    return 0;
-                }
-
-                m = command[1].c_str();
-
-                msg(m, "127.0.0.1", atoi(command[2].c_str()));
-                return 0;
-            }
             if (command[0].compare("run") == 0) {
                 if (command.size() > 1) {
                     cout << "Too many parameters to 'run' command" << endl;
