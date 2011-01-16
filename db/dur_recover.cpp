@@ -403,7 +403,7 @@ namespace mongo {
         void recover() {
             // we use a lock so that exitCleanly will wait for us
             // to finish (or at least to notice what is up and stop)
-            readlock lk;
+            writelock lk;
             _recover(); // throws on interruption
         }
 
