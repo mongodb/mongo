@@ -333,6 +333,7 @@ namespace mongo {
 
             result.append( "host" , prettyHostName() );
             result.append("version", versionString);
+            result.append("process","mongod");
             result.append("uptime",(double) (time(0)-started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );

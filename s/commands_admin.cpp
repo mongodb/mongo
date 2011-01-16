@@ -29,6 +29,7 @@
 #include "../util/message.h"
 #include "../util/processinfo.h"
 #include "../util/stringutils.h"
+#include "../util/version.h"
 
 #include "../client/connpool.h"
 
@@ -88,6 +89,9 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; }
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+                result.append( "host" , prettyHostName() );
+                result.append("version", versionString);
+                result.append("process","mongos");
                 result.append("uptime",(double) (time(0)-_started));
                 result.appendDate( "localTime" , jsTime() );
 
