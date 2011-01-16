@@ -93,11 +93,11 @@ namespace mongo {
         }
 #endif
 
+        views.push_back( view );
+
         DEV if (! dbMutex.info().isLocked()) {
             _unlock();
         }
-
-        views.push_back( view );
 
         return view;
     }
@@ -178,11 +178,13 @@ namespace mongo {
     }
 
     void MemoryMappedFile::_lock() {
-        if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ | PROT_WRITE) == 0);
+        if (! views.empty() && isMongoMMF() ) 
+            assert(mprotect(views[0], len, PROT_READ | PROT_WRITE) == 0);
     }
 
     void MemoryMappedFile::_unlock() {
-        if (! views.empty() ) assert(mprotect(views[0], len, PROT_READ) == 0);
+        if (! views.empty() && isMongoMMF() ) 
+            assert(mprotect(views[0], len, PROT_READ) == 0);
     }
 
 } // namespace mongo

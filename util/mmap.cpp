@@ -184,7 +184,7 @@ namespace mongo {
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
-            if (mmf && mmf->isMongoMMF()) mmf->_lock();
+            if (mmf) mmf->_lock();
         }
     }
 
@@ -192,7 +192,7 @@ namespace mongo {
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
-            if (mmf && mmf->isMongoMMF()) mmf->_unlock();
+            if (mmf) mmf->_unlock();
         }
     }
 #endif
