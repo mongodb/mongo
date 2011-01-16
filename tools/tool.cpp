@@ -432,6 +432,8 @@ namespace mongo {
             num++;
 
             m.hit( o.objsize() );
+
+            fclose( file );
         }
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
