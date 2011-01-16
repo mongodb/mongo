@@ -237,7 +237,7 @@ namespace mongo {
 
                 mapper.reset( new JSMapper( cmdObj["map"] ) );
                 reducer.reset( new JSReducer( cmdObj["reduce"] ) );
-                if ( cmdObj["finalize"].type() )
+                if ( cmdObj["finalize"].type() && cmdObj["finalize"].trueValue() )
                     finalizer.reset( new JSFinalizer( cmdObj["finalize"] ) );
 
                 if ( cmdObj["mapparams"].type() == Array ) {
