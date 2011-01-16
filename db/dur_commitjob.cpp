@@ -193,7 +193,7 @@ namespace mongo {
 #if defined(_DEBUG)
                         _nSinceCommitIfNeededCall++;
                         if( _nSinceCommitIfNeededCall >= 80 ) {
-                            if( _nSinceCommitIfNeededCall % 20 == 0 )
+                            if( _nSinceCommitIfNeededCall % 40 == 0 )
                                 log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
                         }
 #endif
