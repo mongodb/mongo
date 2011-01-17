@@ -33,7 +33,7 @@ d.getLastError(); // wait
 // as it will assure that commits happen on a timely basis.  a bunch of the other dur/*js
 // tests use fsync
 tst.log("sleep a bit for a group commit");
-sleep(500);
+sleep(800);
 
 // kill the process hard
 tst.log("kill -9 mongod");
@@ -63,14 +63,15 @@ tst.log("restart and recover");
 conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 9);
 tst.log("check data results");
 d = conn.getDB("test");
-print("count:" + d.foo.count());
-assert(d.foo.count() == 1, "count 1");
+
+var countOk = (d.foo.count() == 1);
+if (!countOk) {
+    print("\n\n\na_quick.js FAIL count " + d.foo.count() + " is wrong\n\n\n");
+    // keep going - want to see if the diff matches.  if so the sleep() above was too short?
+}
 
 tst.log("stop");
 stopMongod(30002);
-
-// stopMongod is asynchronous unfortunately.  wait some.
-// sleep(2000);
 
 // at this point, after clean shutdown, there should be no journal files
 tst.log("check no journal files");
@@ -112,5 +113,7 @@ if (diff != "") {
     showfiles();
     assert(diff == "", "error test.0 files differ");
 }
+
+assert(countOk, "a_quick.js document count after recovery was not the expected value");
 
 tst.success();   
