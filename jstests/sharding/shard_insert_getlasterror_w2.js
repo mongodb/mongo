@@ -73,4 +73,4 @@ print('shard_insert_getlasterror_w2.js SUCCESS')
 }
 
 //Uncomment below to execute
-//go()
+go()
