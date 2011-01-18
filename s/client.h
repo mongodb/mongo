@@ -68,6 +68,7 @@ namespace mongo {
         /**
          * calls getLastError
          * resets shards since get last error
+         * @return if the command was ok or if there was an error
          */
         bool getLastError( const BSONObj& options , BSONObjBuilder& result );
 
