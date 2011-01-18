@@ -156,6 +156,11 @@ namespace mongo {
                 while ( 1 ) {
                     OpTime op(c.getLastOp());
                     
+                    if ( op.isNull() ) {
+                        result.append( "wnote" , "no write has been done on this connection" );
+                        break;
+                    }
+
                     // check this first for w=0 or w=1
                     if ( opReplicatedEnough( op, w ) )
                         break;
@@ -167,10 +172,6 @@ namespace mongo {
                         return true;
                     }
 
-                    if ( op.isNull() ) {
-                        result.append( "err" , "no write has been done on this connection" );
-                        return true;
-                    }
 
                     if ( timeout > 0 && t.millis() >= timeout ) {
                         result.append( "wtimeout" , true );
