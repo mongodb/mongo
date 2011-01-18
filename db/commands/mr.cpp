@@ -452,10 +452,16 @@ namespace mongo {
                 _db.dropCollection( _config.tempLong );
                 _db.dropCollection( _config.incLong );
 
-                writelock l( _config.incLong );
-                Client::Context ctx( _config.incLong );
-                string err;
-                assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+                {
+                    writelock l( _config.incLong );
+                    Client::Context ctx( _config.incLong );
+                    string err;
+                    assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+                }
+
+                BSONObj sortKey = BSON( "0" << 1 );
+                _db.ensureIndex( _config.incLong , sortKey );
+                
             }
 
         }
@@ -493,10 +499,21 @@ namespace mongo {
 
             assert( _temp->size() == 0 );
 
-            // TODO: this is a bit sketchy
-            //       since it could block
             BSONObj sortKey = BSON( "0" << 1 );
-            _db.ensureIndex( _config.incLong , sortKey );
+            {
+                bool foundIndex = false;
+                
+                auto_ptr<DBClientCursor> idx = _db.getIndexes( _config.incLong );
+                while ( idx.get() && idx->more() ){
+                    BSONObj x = idx->next();
+                    if ( sortKey.woCompare( x["key"].embeddedObject() ) == 0 ){
+                        foundIndex = true;
+                        break;
+                    }
+                }
+
+                assert( foundIndex );
+            }
 
             readlock rl( _config.incLong.c_str() );
             Client::Context ctx( _config.incLong );
