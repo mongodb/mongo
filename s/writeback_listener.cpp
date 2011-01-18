@@ -26,6 +26,7 @@
 #include "server.h"
 #include "shard.h"
 #include "util.h"
+#include "client.h"
 
 #include "writeback_listener.h"
 
@@ -139,8 +140,14 @@ namespace mongo {
                         Request r( m , 0 );
                         r.init();
                         r.process();
+                        
+                        BSONObjBuilder b;
+                        if ( ! r.getClientInfo()->getLastError( BSONObj() , b ) ) {
+                            b.appendBool( "commandFailed" , true );
+                        }
+                        gle = b.obj();
 
-                        gle = BSONObj(); // TODO
+                        r.getClientInfo()->clearSinceLastGetError();
                     }
                     catch ( DBException& e ) {
                         error() << "error processing writeback: " << e << endl;
