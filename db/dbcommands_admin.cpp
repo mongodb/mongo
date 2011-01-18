@@ -349,11 +349,20 @@ namespace mongo {
                 */
                 uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
 
+                // todo future: Perhaps we could do this in the background thread.  As is now, writes may interleave between 
+                //              the releaseEarly below and the acquisition of the readlock in the background thread. 
+                //              However the real problem is that it seems complex to unlock here and then have a window for 
+                //              writes before the bg job -- can be done correctly but harder to reason about correctness.
+                //              If this command ran within a read lock in the first place, would it work, and then that 
+                //              would be quite easy?
+                //              Or, could we downgrade the write lock to a read lock, wait for ready, then release?
                 getDur().syncDataAndTruncateJournal();
 
                 bool ready = false;
                 LockDBJob *l = new LockDBJob(ready);
+
                 dbMutex.releaseEarly();
+
                 l->go();
                 // don't return until background thread has acquired the read lock
                 while( !ready ) {
