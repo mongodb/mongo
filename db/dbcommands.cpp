@@ -156,6 +156,9 @@ namespace mongo {
                 while ( 1 ) {
                     OpTime op(c.getLastOp());
 
+                    if ( opReplicatedEnough( op, w ) )
+                        break;
+
                     // if replication isn't enabled (e.g., config servers)
                     if ( ! anyReplEnabled() ) {
                         errmsg = "replication not enabled";
@@ -167,9 +170,6 @@ namespace mongo {
                         result.append( "err" , "no write has been done on this connection" );
                         return true;
                     }
-
-                    if ( opReplicatedEnough( op, w ) )
-                        break;
 
                     if ( timeout > 0 && t.millis() >= timeout ) {
                         result.append( "wtimeout" , true );
