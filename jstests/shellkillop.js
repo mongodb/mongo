@@ -1,5 +1,10 @@
 baseName = "jstests_shellkillop";
 
+// 'retry' should be set to true in contexts where an exception should cause the test to be retried rather than to fail.
+retry = true;
+
+function testShellAutokillop() {
+
 if (_isWindows()) {
     print("shellkillop.js not testing on windows, as functionality is missing there");
     print("shellkillop.js see http://jira.mongodb.org/browse/SERVER-1451");
@@ -20,7 +25,9 @@ else {
     spawn = startMongoProgramNoConnect("mongo", "--autokillop", "--port", myPort(), "--eval", evalStr);
 
     sleep(100);
+    retry = true;
     assert(db[baseName].find({ i: 'abcdefghijkl' }).count() < 100000, "update ran too fast, test won't be valid");
+    retry = false;
 
     stopMongoProgramByPid(spawn);
 
@@ -34,7 +41,25 @@ else {
 	    throw "shellkillop.js op is still running: " + tojson( inprog[i] );
     }
 
+    retry = true;
     assert(db[baseName].find({ i: 'abcdefghijkl' }).count() < 100000, "update ran too fast, test was not valid");
-
-    print("shellkillop.js SUCCESS");
+    retry = false;
 }
+
+}
+
+for( var nTries = 0; nTries < 10 && retry; ++nTries ) {
+    try {
+        testShellAutokillop();
+    } catch (e)  {
+        if ( !retry ) {
+            throw e;
+        }
+        printjson( e );
+        print( "retrying..." );
+    }
+}
+
+assert( !retry, "retried too many times" );
+
+print("shellkillop.js SUCCESS");
