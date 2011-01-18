@@ -211,6 +211,15 @@ namespace mongo {
         b.appendNumber( "totalCreated" , created );
     }
 
+    bool DBConnectionPool::serverNameCompare::operator()( const string& a , const string& b ){
+        string ap = str::before( a , "/" );
+        string bp = str::before( b , "/" );
+        
+        return ap < bp;
+    }
+
+    // ------ ScopedDbConnection ------
+
     ScopedDbConnection * ScopedDbConnection::steal() {
         assert( _conn );
         ScopedDbConnection * n = new ScopedDbConnection( _host , _conn );

@@ -164,8 +164,8 @@ namespace mongo {
             _seenNS.insert( ns );
             checkVersions( ns );
         }
-
-        map<string,Status*> _hosts;
+        
+        map<string,Status*,DBConnectionPool::serverNameCompare> _hosts;
         set<string> _seenNS;
         // -----
 
