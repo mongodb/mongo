@@ -155,7 +155,8 @@ namespace mongo {
                 char buf[32];
                 while ( 1 ) {
                     OpTime op(c.getLastOp());
-
+                    
+                    // check this first for w=0 or w=1
                     if ( opReplicatedEnough( op, w ) )
                         break;
 
