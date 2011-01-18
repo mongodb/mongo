@@ -47,6 +47,12 @@ function go() {
     dba.printShardingStatus()
     printjson (db['foo'].count())
 
+    // Test case where GLE should return an error
+    db.foo.insert({_id:'a', x:1});
+    db.foo.insert({_id:'a', x:1});
+    var x = db.getLastErrorObj(2, 30000)
+    assert.neq(x.err, null, tojson(x));
+
     // Add more data
     for (var i = N; i < 2*N; i++) {
         db['foo'].insert({x: i, text: Text})
