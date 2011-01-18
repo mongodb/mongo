@@ -1,6 +1,6 @@
 // test sorting, mainly a test ver simple with no index
 
-t = db.sorrrt2;
+t = db.sort2;
 t.drop();
 
 t.save({x:1, y:{a:5,b:4}});
