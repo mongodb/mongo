@@ -879,9 +879,18 @@ namespace mongo {
                     state.init();
 
                     BSONList values;
-
-                    if ( config.finalShort.size() )
-                        result.append( "result" , config.finalShort );
+                    if (!config.outDB.empty()) {
+                        BSONObjBuilder loc;
+                        if ( !config.outDB.empty())
+                            loc.append( "db" , config.outDB );
+                        if ( !config.finalShort.empty() )
+                            loc.append( "collection" , config.finalShort );
+                        result.append("result", loc.obj());
+                    }
+                    else {
+                        if ( !config.finalShort.empty() )
+                            result.append( "result" , config.finalShort );
+                    }
 
                     while ( cursor.more() ) {
                         BSONObj t = cursor.next().getOwned();
