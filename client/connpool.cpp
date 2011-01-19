@@ -211,7 +211,7 @@ namespace mongo {
         b.appendNumber( "totalCreated" , created );
     }
 
-    bool DBConnectionPool::serverNameCompare::operator()( const string& a , const string& b ){
+    bool DBConnectionPool::serverNameCompare::operator()( const string& a , const string& b ) const{
         string ap = str::before( a , "/" );
         string bp = str::before( b , "/" );
         

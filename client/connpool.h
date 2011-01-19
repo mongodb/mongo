@@ -101,7 +101,7 @@ namespace mongo {
 
         /** compares server namees, but is smart about replica set names */
         struct serverNameCompare {
-            bool operator()( const string& a , const string& b );
+            bool operator()( const string& a , const string& b ) const;
         };
 
     private:
