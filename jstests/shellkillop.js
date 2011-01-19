@@ -1,7 +1,7 @@
 baseName = "jstests_shellkillop";
 
 // 'retry' should be set to true in contexts where an exception should cause the test to be retried rather than to fail.
-retry = true;
+retry = false;
 
 function testShellAutokillop() {
 
