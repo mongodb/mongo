@@ -33,7 +33,7 @@ d.getLastError(); // wait
 // as it will assure that commits happen on a timely basis.  a bunch of the other dur/*js
 // tests use fsync
 tst.log("sleep a bit for a group commit");
-sleep(800);
+sleep(8000);
 
 // kill the process hard
 tst.log("kill -9 mongod");
