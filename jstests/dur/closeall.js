@@ -34,13 +34,22 @@ function f() {
 	    if (i % 100 == 0)
 	        db1.foo.find();
 	    if( i == 800 )
-	        db1.foo.ensureIndex({x:1});
-	    var res = db2.adminCommand("closeAllDatabases");
+	        db1.foo.ensureIndex({ x: 1 });
+        var res = null;
+        try {
+            res = db2.adminCommand("closeAllDatabases");
+        }
+        catch (e) {
+            print("FAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i);
+            throw e;
+        }
 	    assert( res.ok, "closeAllDatabases res.ok=false");
 	}
 
+	print("closeall.js end test loop.  slave.foo.count:");
 	print(slave.foo.count());
 
+	print("closeall.js shutting down servers");
 	stopMongod(30002);
 	stopMongod(30001);
 }
