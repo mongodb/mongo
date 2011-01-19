@@ -713,6 +713,8 @@ namespace mongo {
                 }
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped
+
+                    // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
                 }
 
             }
