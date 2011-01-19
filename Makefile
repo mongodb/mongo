@@ -2,6 +2,9 @@
 all:
 	scons -j `cat /proc/cpuinfo | grep processor | wc -l` all
 
+debug:
+	scons --d -j `cat /proc/cpuinfo | grep processor | wc -l` all
+
 install: # as root
 	scons --prefix=/opt/mongo install
 
@@ -36,6 +39,7 @@ js.lib: js-1.7.0.tar.gz
 	JS_DIST=/usr make -f Makefile.ref export
 
 clean:
+	scons --clean
 	rm -rf js-1.7.0.tar.gz js
 
 
