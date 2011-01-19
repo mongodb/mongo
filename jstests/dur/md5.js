@@ -71,7 +71,7 @@ log();
 
 // 100 exit code corresponds to EXIT_UNCAUGHT, which is triggered when there is an exception during recovery.
 // 14 is is sometimes triggered instead due to SERVER-2184
-exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8 );
+exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 9 );
 print( "exitCode: " + exitCode );
 assert( exitCode == 100 || exitCode == 14 ); 
 
