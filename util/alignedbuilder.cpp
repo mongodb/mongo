@@ -35,6 +35,10 @@ namespace mongo {
         _p._allocationAddress = p;
         size_t s = (size_t) p;
         size_t sold = s;
+        PRINT(s);
+        PRINT(s%Alignment);
+        PRINT(sold);
+        PRINT(sold%Alignment);
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
         assert( s >= sold ); // begining
