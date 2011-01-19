@@ -711,7 +711,7 @@ namespace mongo {
         log() << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
 
-        log() << "shutdown: going to flush oplog..." << endl;
+        log() << "shutdown: going to flush diaglog..." << endl;
         flushDiagLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
