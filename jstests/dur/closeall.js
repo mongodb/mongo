@@ -14,7 +14,7 @@ function f() {
         N = 300;
 
     // use replication to exercise that code too with a close, and also to test local.sources with a close
-    var conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--durOptions", options, "--master", "--oplogSize", 16);
+    var conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--durOptions", options, "--master", "--oplogSize", 64);
     var connSlave = startMongodEmpty("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", options, "--slave", "--source", "localhost:30001");
 
     var slave = connSlave.getDB(ourdb);
