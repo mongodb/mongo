@@ -42,7 +42,7 @@ namespace mongo {
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
         assert( s >= sold ); // begining
-        assert( (s + sz) <= (sold + Alignment - 1) ); //end
+        assert( (s + sz) <= (sold + sz + Alignment - 1) ); //end
         _p._data = (char *) s;
     }
 
