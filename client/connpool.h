@@ -107,7 +107,8 @@ namespace mongo {
     private:
 
         mongo::mutex _mutex;
-        map<string,PoolForHost,serverNameCompare> _pools; // servername -> pool
+        typedef map<string,PoolForHost,serverNameCompare> PoolMap; // servername -> pool
+        PoolMap _pools;
         list<DBConnectionHook*> _hooks;
         string _name;
 
