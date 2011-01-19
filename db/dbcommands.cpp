@@ -1199,7 +1199,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << " example: { dbStats:1 } ";
+            help << " example: { dbStats:1, scale:1 } ";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             list<string> collections;
@@ -1207,6 +1207,19 @@ namespace mongo {
             if ( d )
                 d->namespaceIndex.getNamespaces( collections );
 
+            int scale = 1;
+            if ( jsobj["scale"].isNumber() ) {
+                scale = jsobj["scale"].numberInt();
+                if ( scale <= 0 ) {
+                    errmsg = "scale has to be > 0";
+                    return false;
+                }
+
+            }
+            else if ( jsobj["scale"].trueValue() ) {
+                errmsg = "scale has to be a number > 0";
+                return false;
+            }
             long long ncollections = 0;
             long long objects = 0;
             long long size = 0;
@@ -1239,13 +1252,13 @@ namespace mongo {
 
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
-            result.append      ( "avgObjSize" , double(size) / double(objects) );
-            result.appendNumber( "dataSize" , size );
-            result.appendNumber( "storageSize" , storageSize);
+            result.append      ( "avgObjSize" , double(size) / double(objects) / scale );
+            result.appendNumber( "dataSize" , double(size) / scale);
+            result.appendNumber( "storageSize" , double(storageSize)/scale);
             result.appendNumber( "numExtents" , numExtents );
             result.appendNumber( "indexes" , indexes );
-            result.appendNumber( "indexSize" , indexSize );
-            result.appendNumber( "fileSize" , d->fileSize() );
+            result.appendNumber( "indexSize" , double(indexSize) / scale);
+            result.appendNumber( "fileSize" , double(d->fileSize()) / scale);
 
             return true;
         }
