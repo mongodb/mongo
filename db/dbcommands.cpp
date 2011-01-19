@@ -906,7 +906,19 @@ namespace mongo {
 
         CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
         bool run(const string& dbname , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            return dbHolder.closeAll( dbpath , result, false );
+            bool ok;
+            try {
+                ok = dbHolder.closeAll( dbpath , result, false );
+            }
+            catch(DBException&) { 
+                throw;
+            }
+            catch(...) { 
+                log() << "ERROR uncaught exception in command closeAllDatabases" << endl;
+                errmsg = "unexpected uncaught exception";
+                return false;
+            }
+            return ok;
         }
     } cmdCloseAllDatabases;
 
