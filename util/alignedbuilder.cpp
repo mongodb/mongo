@@ -27,6 +27,8 @@ namespace mongo {
         uassert(13584, "out of memory AlignedBuilder", _p._allocationAddress);
     }
 
+    BOOST_STATIC_ASSERT(sizeof(void*) == sizeof(size_t));
+
     void AlignedBuilder::mallocSelfAligned(unsigned sz) {
         assert( sz == _p._size );
         void *p = malloc(sz + Alignment - 1);
@@ -35,7 +37,8 @@ namespace mongo {
         size_t sold = s;
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
-        DEV assert( s >= sold );
+        assert( s >= sold ); // begining
+        assert( (s + sz) <= (sold + Alignment - 1) ); //end
         _p._data = (char *) s;
     }
 
