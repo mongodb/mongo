@@ -198,7 +198,7 @@ namespace mongo {
         last = time(0);
 
         assert( dbMutex.atLeastReadLocked() );
-        Client::Context c(rsoplog, dbpath, 0, !noauth);
+        Client::Context c(rsoplog, dbpath, 0, false);
         NamespaceDetails *nsd = nsdetails(rsoplog);
         assert(nsd);
         ReverseCappedCursor u(nsd);
@@ -385,7 +385,7 @@ namespace mongo {
             for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) {
                 string ns = *i;
                 sethbmsg(str::stream() << "rollback 4.1 coll resync " << ns);
-                Client::Context c(*i, dbpath, 0, !noauth);
+                Client::Context c(*i, dbpath, 0, /*doauth*/false);
                 try {
                     bob res;
                     string errmsg;
@@ -442,7 +442,7 @@ namespace mongo {
         sethbmsg("rollback 4.6");
         /** drop collections to drop before doing individual fixups - that might make things faster below actually if there were subsequent inserts to rollback */
         for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) {
-            Client::Context c(*i, dbpath, 0, !noauth);
+            Client::Context c(*i, dbpath, 0, /*doauth*/false);
             try {
                 bob res;
                 string errmsg;
@@ -455,7 +455,7 @@ namespace mongo {
         }
 
         sethbmsg("rollback 4.7");
-        Client::Context c(rsoplog, dbpath, 0, !noauth);
+        Client::Context c(rsoplog, dbpath, 0, /*doauth*/false);
         NamespaceDetails *oplogDetails = nsdetails(rsoplog);
         uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
@@ -478,7 +478,7 @@ namespace mongo {
                     rs.reset( new RemoveSaver( "rollback" , "" , d.ns ) );
 
                 // todo: lots of overhead in context, this can be faster
-                Client::Context c(d.ns, dbpath, 0, !noauth);
+                Client::Context c(d.ns, dbpath, 0, /*doauth*/false);
                 if( i->second.isEmpty() ) {
                     // wasn't on the primary; delete.
                     /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
