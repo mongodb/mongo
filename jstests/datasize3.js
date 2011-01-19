@@ -22,10 +22,12 @@ t.ensureIndex( { x : 1 } )
 for ( i=2; i<100; i++ )
     t.insert( { x : i } )
 
-a = run( { min : { x : 20 } , max : { x : 50 } } )
-b = run( { min : { x : 20 } , max : { x : 50 } , estimate : true } )
+a = run( { min : { x : 20 } , max : { x : 50 } } ).size
+b = run( { min : { x : 20 } , max : { x : 50 } , estimate : true } ).size
 
-assert.eq( a.size , b.size );
+ratio = Math.min( a , b ) / Math.max( a , b );
+
+assert.lt( 0.97 , ratio , "sizes not equal a: " + a + " b: " + b );
 
 
 
