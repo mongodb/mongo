@@ -32,6 +32,7 @@
 #define assert MONGO_assert
 #include "../util/mongoutils/str.h"
 #include "dur_journalimpl.h"
+#include "../util/file.h"
 
 using namespace mongoutils;
 
@@ -217,6 +218,7 @@ namespace mongo {
         }
 
         void LSNFile::set(unsigned long long x) {
+            memset(this, 0, sizeof(*this));
             lsn = x;
             checkbytes = ~x;
         }
@@ -250,10 +252,12 @@ namespace mongo {
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
                 // however, given we actually close the file when writing, that seems unlikely.
-                MemoryMappedFile f;
-                LSNFile *L = static_cast<LSNFile*>(f.map(lsnPath().string().c_str()));
-                assert(L);
-                unsigned long long lsn = L->get();
+                LSNFile L;
+                File f;
+                f.open(lsnPath().string().c_str());
+                assert(f.is_open());
+                f.read(0,(char*)&L, sizeof(L));
+                unsigned long long lsn = L.get();
                 return lsn;
             }
             catch(std::exception& e) {
@@ -277,16 +281,17 @@ namespace mongo {
             try {
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
                 // however, given we actually close the file, that seems unlikely.
-                MemoryMappedFile f; // not a MongoMMF so no closing notification
-                unsigned long long length = sizeof(LSNFile);
-                LSNFile *lsnf = static_cast<LSNFile*>( f.map(lsnPath().string().c_str(), length) );
-                if( lsnf == 0 ) { 
+                File f;
+                f.open(lsnPath().string().c_str());
+                if( !f.is_open() ) { 
                     // can get 0 if an i/o error
                     log() << "warning: open of lsn file failed" << endl;
                     return;
                 }
                 log() << "lsn set " << _lastFlushTime << endl;
-                lsnf->set(_lastFlushTime);
+                LSNFile lsnf;
+                lsnf.set(_lastFlushTime);
+                f.write(0, (char*)&lsnf, sizeof(lsnf));
             }
             catch(std::exception& e) {
                 log() << "warning: write to lsn file failed " << e.what() << endl;
