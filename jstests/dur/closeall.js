@@ -40,6 +40,9 @@ function f() {
 	}
 
 	print(slave.foo.count());
+
+	stopMongod(30002);
+	stopMongod(30001);
 }
 
 f();
