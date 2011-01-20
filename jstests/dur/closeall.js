@@ -40,7 +40,7 @@ function f() {
             res = db2.adminCommand("closeAllDatabases");
         }
         catch (e) {
-            print("FAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i);
+            print("\n\n\nFAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i + "\n\n\n");
             throw e;
         }
 	    assert( res.ok, "closeAllDatabases res.ok=false");
