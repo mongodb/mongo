@@ -39,3 +39,5 @@ r = function( k , v ){
 }
 
 assert.eq( { 1 : 10 * s.length } , t.mapReduce( m , r , "mr_bigobject_out" ).convertToSingleObject() , "A1" )
+
+t.drop()
