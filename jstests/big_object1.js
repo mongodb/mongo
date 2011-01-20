@@ -5,18 +5,18 @@ t.drop();
 if ( db.adminCommand( "buildinfo" ).bits == 64 ){
     
     s = ""
-    while ( s.length < 512 * 1024 ){
+    while ( s.length < 850 * 1024 ){
         s += "x";
     }
     
     x = 0;
     while ( true ){
-        o = { _id : x , a : [] }
-        for ( i=0; i<x; i++ )
-            o.a.push( s )
-        print( Object.bsonsize( o ) )
+        n = { _id : x , a : [] }
+        for ( i=0; i<14+x; i++ )
+            n.a.push( s )
         try {
-            t.insert( o )
+            t.insert( n )
+            o = n
         }
         catch ( e ){
             break;
@@ -27,6 +27,8 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
         x++;
     }
     
+    printjson( t.stats(1024*1024) )
+
     assert.lt( 15 * 1024 * 1024 , Object.bsonsize( o ) , "A1" )
     assert.gt( 17 * 1024 * 1024 , Object.bsonsize( o ) , "A2" )
     
