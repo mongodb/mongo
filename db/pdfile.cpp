@@ -340,14 +340,7 @@ namespace mongo {
         else
             size = 0x7ff00000;
 
-        if ( strstr(filename, "_hudsonSmall") ) {
-            int mult = 1;
-            if ( fileNo > 1 && fileNo < 1000 )
-                mult = fileNo;
-            size = 1024 * 512 * mult;
-            log() << "Warning : using small files for _hudsonSmall" << endl;
-        }
-        else if ( cmdLine.smallfiles ) {
+        if ( cmdLine.smallfiles ) {
             size = size >> 2;
         }
 
