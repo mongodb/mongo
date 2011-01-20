@@ -1402,7 +1402,6 @@ namespace mongo {
             const char *f = e.fieldName();
             try {
                 unsigned u = stringToNum(f);
-                assert( u < 4096 );
                 if( u >= v.size() )
                     v.resize(u+1);
                 v[u] = e;
