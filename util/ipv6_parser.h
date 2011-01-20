@@ -94,7 +94,7 @@ class IPv6_Parser : public RagelBase<uint8_t>
     }
 
 
-    IPv6_Addr getIPv6(void) { return m_working_addr; }
+    IP_Addr getIPv6(void) { return m_working_addr; }
 
 
   private:
@@ -2370,6 +2370,8 @@ case 120:
         m_h_front.clear();
         m_h_back.clear();
         m_working_addr.init();
+        m_working_addr.setVersion(6);
+        m_working_addr.setNetmask(128);
     }
 
 
@@ -2503,7 +2505,7 @@ case 120:
     std::deque<uint16_t>    m_h_front;
     std::deque<uint16_t>    m_h_back;
 
-    IPv6_Addr               m_working_addr;
+    IP_Addr                 m_working_addr;
 
     // Set to true if an error occurred during parsing
     bool                    m_error;
