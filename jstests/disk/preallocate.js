@@ -10,7 +10,11 @@ assert.eq( 0, m.getDBs().totalSize );
 
 m.getDB( baseName ).createCollection( baseName + "1" );
 
-assert.soon( function() { return m.getDBs().totalSize > 100000000; }, "expected second file to bring total size over 100MB" );
+expectedMB = 100;
+if ( m.getDB( baseName ).serverBits() < 64 )
+    expectedMB /= 4;
+
+assert.soon( function() { return m.getDBs().totalSize > expectedMB * 1000000; }, "expected second file to bring total size over " + expected + "MB" );
 
 stopMongod( port );
 
