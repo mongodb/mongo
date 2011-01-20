@@ -687,6 +687,10 @@ namespace mongo {
                 assert( data );
                 JSObject * o;
                 switch (e.binDataType()) {
+                case bdtUUID:
+                    o = JS_NewObject( _context , &uuid_class , 0 , 0 );
+                    CHECKNEWOBJECT(o,_context,"Bindata_IpAddr");
+                    break;
                 case bdtIpAddr:
                     o = JS_NewObject( _context , &ip_addr_class , 0 , 0 );
                     CHECKNEWOBJECT(o,_context,"Bindata_IpAddr");

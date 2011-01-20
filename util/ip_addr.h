@@ -24,8 +24,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <string>
+#include <assert.h>
 
 
+
+#define IP_LONG(i) ( ((uint64_t*)m_addr)[i] )
+#define IP_WORD(i) ( ((uint32_t*)m_addr)[i] )
+#define IP_SHORT(i) ( ((uint16_t*)m_addr)[i] )
 
 
 class IP_Addr
@@ -33,121 +38,60 @@ class IP_Addr
   public:
 
     IP_Addr() {}
-    ~IP_Addr() {}
 
-    // Get Accessors
-    uint8_t getNetmask(void) const { return m_mask; }
-    uint8_t getVersion(void) const { return m_ip_version; }
-
-    // Set Accessors
-    void setNetmask(uint8_t p_mask) { m_mask = p_mask; }
-#if 0
-    void setZero(void) {}
-    void init(void) {}
-#endif
-
-    // Printing
-    std::string print(void) const;
-
-
-  protected:
-
-    uint8_t     m_mask;
-    uint8_t     m_ip_version;
-
-}; // end class IP_Addr
-
-
-#define IP_LONG(i) ( ((uint64_t*)_byte)[i] )
-#define IP_WORD(i) ( ((uint32_t*)_byte)[i] )
-#define IP_SHORT(i) ( ((uint16_t*)_byte)[i] )
-
-
-
-class IPv4_Addr : public IP_Addr
-{
-  public:
-
-    IPv4_Addr()
+    IP_Addr(const char* p_data, uint16_t p_length)
     {
-        m_ip_version = 4;
-    }
-
-    void setZero(void)
-    {
-        IP_WORD(0) = 0;
-    }
-
-    void init(void)
-    {
-        setZero();
-        m_mask = 32;
-    };
-
-    /// Parse the given string into an ip address and optional netmask.
-    /// \param p_ipstring A reference to the text of the IP address to convert.
-    /// \returns true on a successful parse, false on syntax error.
-    ///
-    bool parse(std::string& p_ipstring);
-
-
-    std::string print(void) const
-    {
-        char s[24];
-
-        if (m_mask < 32)
+        if (p_length == 5)
         {
-            snprintf(s, sizeof(s), "%d.%d.%d.%d/%d",
-                _byte[0], _byte[1], _byte[2], _byte[3], m_mask);
+            m_ip_version = 4;
+            m_mask = p_data[0];
+            *(uint32_t*)m_addr = *(uint32_t*)&p_data[1];
+        }
+        else
+        if (p_length == 17)
+        {
+            m_ip_version = 6;
+            m_mask = p_data[0];
+            *(uint64_t*)&m_addr[0] = *(uint64_t*)&p_data[1];
+            *(uint64_t*)&m_addr[8] = *(uint64_t*)&p_data[8+1];
         }
         else
         {
-            snprintf(s, sizeof(s), "%d.%d.%d.%d",
-                _byte[0], _byte[1], _byte[2], _byte[3]);
+            assert(false);
         }
-
-        std::string rs = s;
-        return rs;
     }
 
-
-  private:
-
-    uint8_t         _byte[4];
-
-}; // end class IPv4_Addr
-
-
-
-
-
-class IPv6_Addr : public IP_Addr
-{
-  public:
-
-    IPv6_Addr()
-    {
-        m_ip_version = 6;
-    }
-
-    ~IPv6_Addr() { }
+    ~IP_Addr() {}
 
     // Get Accessors
+    uint8_t getVersion(void) const { return m_ip_version; }
+    uint8_t getNetmask(void) const { return m_mask; }
+    const char* getBinDataPtr(void) { return (const char*)&m_mask; }
+    uint8_t getBinDataLength(void)
+    {
+        if (m_ip_version == 4)
+            return 5;
+        if (m_ip_version == 6)
+            return 17;
+        else
+            assert(false);
+    }
 
     uint8_t getByte(unsigned int i_) const
     {
-        //INTZ_DEBUG_ASSERT(i_ >= 0);
-        //INTZ_DEBUG_ASSERT(i_ < 16);
+        assert(i_ >= 0);
+        assert(i_ < 16);
 
-        return _byte[i_];
+        return m_addr[i_];
     }
 
-    uint8_t* getAddress(void) { return _byte; }
-
-    const uint8_t* getAddress(void) const { return _byte; }
+    uint8_t* getAddress(void) { return m_addr; }
+    const uint8_t* getAddress(void) const { return m_addr; }
 
 
     // Set Accessors
+    void setVersion(uint8_t p_ip_version) { m_ip_version = p_ip_version; }
+    void setNetmask(uint8_t p_mask) { m_mask = p_mask; }
 
     void setZero(void)
     {
@@ -161,143 +105,191 @@ class IPv6_Addr : public IP_Addr
         m_mask = 128;
     }
 
-    void setNetwork(uint8_t* addr_)
-    {
-        memcpy(_byte, addr_, sizeof(*this));
-    }
-
-
     void setByte(uint8_t addr_, unsigned int i_)
     {
-        //INTZ_DEBUG_ASSERT(i_ >= 0);
-        //INTZ_DEBUG_ASSERT(i_ < 16);
+        assert(i_ >= 0);
+        assert(i_ < 16);
 
-        _byte[i_] = addr_;
+        m_addr[i_] = addr_;
     }
 
 
-    void setNetmask(uint8_t mask_)
-    {
-        m_mask = mask_;
-    }
-
-
-    void setAddressIPv4Network(uint32_t addr_)
-    {
-        IP_LONG(0) = 0;
-
-#ifdef BIG_ENDIAN
-        IP_WORD(2) = 0x0000FFFF;
-#else
-        IP_WORD(2) = 0xFFFF0000;
-#endif
-        IP_WORD(3) = addr_;
-    }
-
+    // Category Tests
 
     bool containsIPv4(void) const
     {
+        if (m_ip_version == 6)
+        {
 #ifdef BIG_ENDIAN
-        return (IP_LONG(0) == 0) && (IP_WORD(2) == 0x0000FFFF);
+            return (IP_LONG(0) == 0) && (IP_WORD(2) == 0x0000FFFF);
 #else
-        return (IP_LONG(0) == 0) && (IP_WORD(2) == 0xFFFF0000);
+            return (IP_LONG(0) == 0) && (IP_WORD(2) == 0xFFFF0000);
 #endif
+        }
+
+        return false;
     }
 
 
     bool isUnspecified(void) const
     {
-        return (IP_LONG(0) == 0) && (IP_LONG(1) == 0);
+        if (m_ip_version == 6)
+            return (IP_LONG(0) == 0) && (IP_LONG(1) == 0);
+
+        return false;
     }
 
 
     bool isLoopback(void) const
     {
+        if (m_ip_version == 6)
+        {
 #ifdef BIG_ENDIAN
-        if ((IP_LONG(0) == 0) && (IP_LONG(1) == 0x0000000000000001LL))
-            return true;
+            if ((IP_LONG(0) == 0) && (IP_LONG(1) == 0x0000000000000001LL))
+                return true;
 #else
-        if ((IP_LONG(0) == 0) && (IP_LONG(1) == 0x0100000000000000LL))
-            return true;
+            if ((IP_LONG(0) == 0) && (IP_LONG(1) == 0x0100000000000000LL))
+                return true;
 #endif
-        return containsIPv4() && (_byte[12] == 127);
+            return containsIPv4() && (m_addr[12] == 127);
+        }
+
+        return false;
     }
 
 
     bool isUniqueLocal(void) const
     {
-        return (_byte[0] & 0xfe) == 0xfc;
+        if (m_ip_version == 6)
+            return (m_addr[0] & 0xfe) == 0xfc;
+
+        return false;
     }
 
 
     bool isLinkLocal(void) const
     {
+        if (m_ip_version == 4)
+        {
+            return m_addr[0] == 127;
+        }
+        else
+        if (m_ip_version == 6)
+        {
 #ifdef BIG_ENDIAN
-        return (IP_SHORT(0) & 0xffc0) == 0xfe80;
+            return (IP_SHORT(0) & 0xffc0) == 0xfe80;
 #else
-        return (IP_SHORT(0) & 0xc0ff) == 0x80fe;
+            return (IP_SHORT(0) & 0xc0ff) == 0x80fe;
 #endif
+        }
+        else
+        {
+            assert(false);
+        }
+
+        return false;
     }
 
 
     bool isMulticast(void) const
     {
-        return _byte[0] == 0xff;
+        if (m_ip_version == 4)
+        {
+            uint8_t ipclass = m_addr[0] >> 4;
+            return (ipclass == 0x0E) || (ipclass == 0x0F);
+        }
+        else
+        if (m_ip_version == 6)
+        {
+            return m_addr[0] == 0xff;
+        }
+        else
+        {
+            assert(false);
+        }
+
+        return false;
     }
 
-
-    /// Parse the given string into an ip address and optional netmask.
-    /// \param p_ipstring A reference to the text of the IP address to convert.
+    /// Parse the given IPv4 string into an ip address and optional netmask.
+    /// \param p_ipstring A reference to the text of the IPv4 address to convert.
     /// \returns true on a successful parse, false on syntax error.
     ///
-    bool parse(std::string& p_ipstring);
+    bool parseIPv4(std::string& p_ipstring);
 
+    /// Parse the given IPv6 string into an ip address and optional netmask.
+    /// \param p_ipstring A reference to the text of the IPv6 address to convert.
+    /// \returns true on a successful parse, false on syntax error.
+    ///
+    bool parseIPv6(std::string& p_ipstring);
 
+    // Printing
     std::string print(void) const
     {
         char s[64];
 
-        if (containsIPv4())
+        if (m_ip_version == 4)
         {
-            if (m_mask < 128)
+            if (m_mask < 32)
             {
-                snprintf(s, sizeof(s),
-                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%d.%d.%d.%d/%d",
-                    _byte[0], _byte[1], _byte[2], _byte[3],
-                    _byte[4], _byte[5], _byte[6], _byte[7], 
-                    _byte[8], _byte[9], _byte[10], _byte[11],
-                    _byte[12], _byte[13], _byte[14], _byte[15], m_mask);
+                snprintf(s, sizeof(s), "%d.%d.%d.%d/%d",
+                    m_addr[0], m_addr[1], m_addr[2], m_addr[3], m_mask);
             }
             else
             {
-                snprintf(s, sizeof(s),
-                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%d.%d.%d.%d",
-                    _byte[0], _byte[1], _byte[2], _byte[3],
-                    _byte[4], _byte[5], _byte[6], _byte[7], 
-                    _byte[8], _byte[9], _byte[10], _byte[11],
-                    _byte[12], _byte[13], _byte[14], _byte[15]);
+                snprintf(s, sizeof(s), "%d.%d.%d.%d",
+                    m_addr[0], m_addr[1], m_addr[2], m_addr[3]);
+            }
+        }
+        else
+        if (m_ip_version == 6)
+        {
+            if (containsIPv4())
+            {
+                if (m_mask < 128)
+                {
+                    snprintf(s, sizeof(s),
+                        "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%d.%d.%d.%d/%d",
+                        m_addr[0], m_addr[1], m_addr[2], m_addr[3],
+                        m_addr[4], m_addr[5], m_addr[6], m_addr[7], 
+                        m_addr[8], m_addr[9], m_addr[10], m_addr[11],
+                        m_addr[12], m_addr[13], m_addr[14], m_addr[15], m_mask);
+                }
+                else
+                {
+                    snprintf(s, sizeof(s),
+                        "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%d.%d.%d.%d",
+                        m_addr[0], m_addr[1], m_addr[2], m_addr[3],
+                        m_addr[4], m_addr[5], m_addr[6], m_addr[7], 
+                        m_addr[8], m_addr[9], m_addr[10], m_addr[11],
+                        m_addr[12], m_addr[13], m_addr[14], m_addr[15]);
+                }
+            }
+            else
+            {
+                if (m_mask < 128)
+                {
+                    snprintf(s, sizeof(s),
+                        "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X/%d",
+                        m_addr[0], m_addr[1], m_addr[2], m_addr[3],
+                        m_addr[4], m_addr[5], m_addr[6], m_addr[7], 
+                        m_addr[8], m_addr[9], m_addr[10], m_addr[11],
+                        m_addr[12], m_addr[13], m_addr[14], m_addr[15], m_mask);
+                }
+                else
+                {
+                    snprintf(s, sizeof(s),
+                        "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+                        m_addr[0], m_addr[1], m_addr[2], m_addr[3],
+                        m_addr[4], m_addr[5], m_addr[6], m_addr[7], 
+                        m_addr[8], m_addr[9], m_addr[10], m_addr[11],
+                        m_addr[12], m_addr[13], m_addr[14], m_addr[15]);
+                }
             }
         }
         else
         {
-            if (m_mask < 128)
-            {
-                snprintf(s, sizeof(s),
-                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X/%d",
-                    _byte[0], _byte[1], _byte[2], _byte[3],
-                    _byte[4], _byte[5], _byte[6], _byte[7], 
-                    _byte[8], _byte[9], _byte[10], _byte[11],
-                    _byte[12], _byte[13], _byte[14], _byte[15], m_mask);
-            }
-            else
-            {
-                snprintf(s, sizeof(s),
-                    "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
-                    _byte[0], _byte[1], _byte[2], _byte[3],
-                    _byte[4], _byte[5], _byte[6], _byte[7], 
-                    _byte[8], _byte[9], _byte[10], _byte[11],
-                    _byte[12], _byte[13], _byte[14], _byte[15]);
-            }
+            assert(false);
         }
 
         std::string rs = s;
@@ -305,147 +297,227 @@ class IPv6_Addr : public IP_Addr
     }
 
 
+    // Convert the IP address to its broadcast address using the mask.
+    // ex: 192.168.1.1/24 -> 192.168.1.256
+    IP_Addr broadcast(void) const
+    {
+        IP_Addr bc = *this;
+
+        if (m_ip_version == 4)
+        {
+            if (bc.m_mask < 32)
+            {
+                uint32_t lmask = -1L;
+                lmask >>= bc.m_mask;
+                int idx = 3;
+                while (lmask)
+                {
+                    bc.m_addr[idx--] |= (uint8_t)lmask;
+                    lmask >>= 8;
+                }
+            }
+        }
+        else
+        if (m_ip_version == 6)
+        {
+            if (bc.m_mask < 128)
+            {
+                int s = bc.m_mask - 64;
+                if (s < 0)
+                    s = 0;
+
+                uint64_t llmask = -1LL;
+                llmask >>= s;
+                int idx = 15;
+                while (llmask)
+                {
+                    bc.m_addr[idx--] |= (uint8_t)llmask;
+                    llmask >>= 8;
+                }
+            }
+
+            if (bc.m_mask < 64)
+            {
+                uint64_t llmask = -1LL;
+                llmask >>= bc.m_mask;
+                int idx = 7;
+                while (llmask)
+                {
+                    bc.m_addr[idx--] |= (uint8_t)llmask;
+                    llmask >>= 8;
+                }
+            }
+        }
+        else
+        {
+            assert(false);
+        }
+
+        return bc;
+    }
+
+
+    // Convert the IP address to its network address using the mask.
+    // ex: 192.168.1.1/24 -> 192.168.1.0
+    IP_Addr network(void) const
+    {
+        IP_Addr nw = *this;
+
+        if (m_ip_version == 4)
+        {
+            if (nw.m_mask < 32)
+            {
+                uint32_t lmask = -1L;
+                lmask >>= nw.m_mask;
+                int idx = 3;
+                while (lmask)
+                {
+                    nw.m_addr[idx--] &= ~(uint8_t)lmask;
+                    lmask >>= 8;
+                }
+            }
+        }
+        else
+        if (m_ip_version == 6)
+        {
+            if (nw.m_mask < 128)
+            {
+                int s = nw.m_mask - 64;
+                if (s < 0)
+                    s = 0;
+
+                uint64_t llmask = -1LL;
+                llmask >>= s;
+                int idx = 15;
+                while (llmask)
+                {
+                    nw.m_addr[idx--] &= ~(uint8_t)llmask;
+                    llmask >>= 8;
+                }
+            }
+
+            if (m_mask < 64)
+            {
+                uint64_t llmask = -1LL;
+                llmask >>= nw.m_mask;
+                int idx = 7;
+                while (llmask)
+                {
+                    nw.m_addr[idx--] &= ~(uint8_t)llmask;
+                    llmask >>= 8;
+                }
+            }
+        }
+        else
+        {
+            assert(false);
+        }
+
+        return nw;
+    }
+
+
+
+    // Comparing
+    int compare(const IP_Addr& p_ip) const
+    {
+        if (m_ip_version != p_ip.m_ip_version)
+            return m_ip_version - p_ip.m_ip_version;
+
+        if (m_ip_version == 4)
+        {
+            if (m_addr[0] > p_ip.m_addr[0]) return 1;
+            if (m_addr[0] < p_ip.m_addr[0]) return -1;
+
+            if (m_addr[1] > p_ip.m_addr[1]) return 1;
+            if (m_addr[1] < p_ip.m_addr[1]) return -1;
+
+            if (m_addr[2] > p_ip.m_addr[2]) return 1;
+            if (m_addr[2] < p_ip.m_addr[2]) return -1;
+
+            if (m_addr[3] > p_ip.m_addr[3]) return 1;
+            if (m_addr[3] < p_ip.m_addr[3]) return -1;
+
+            return 0;
+        }
+
+        if (m_ip_version == 6)
+        {
+            return memcmp(m_addr, p_ip.m_addr, sizeof(m_addr));
+        }
+
+        assert(false);
+        return 0;
+    }
+
+
+    bool contains(const IP_Addr& p_ip) const
+    {
+        // Test the lower end
+        IP_Addr lnw = this->network();
+        IP_Addr rnw = p_ip.network();
+
+        if (lnw.compare(rnw) > 0)
+            return false;
+
+        // Test the upper end
+        IP_Addr lbc = this->broadcast();
+        IP_Addr rbc = p_ip.broadcast();
+
+        if (lbc.compare(rbc) < 0)
+            return false;
+
+        return true;
+    }
+
+    bool within(const IP_Addr& p_ip) const
+    {
+        // Test the lower end
+        IP_Addr lnw = this->network();
+        IP_Addr rnw = p_ip.network();
+
+        if (lnw.compare(rnw) < 0)
+            return false;
+
+        // Test the upper end
+        IP_Addr lbc = this->broadcast();
+        IP_Addr rbc = p_ip.broadcast();
+
+        if (lbc.compare(rbc) > 0)
+            return false;
+
+        return true;
+    }
+
   protected:
 
-    // Warning: do not add any other non-static data items to this class!
-    // Please note that the address is stored in Network Order.
+    uint8_t     m_ip_version;
 
-    // IPv6 addresses are 128 bits long!
-    //uint64_t           _long[2]; 
-    //uint32_t           _word[4]; 
-    //uint16_t           _short[4*2];
-    uint8_t            _byte[4*4];
-
-}; // end class IPv6_Addr
+    // The order and size of these must be maintained.
+    // This represents the format of the BSON data for an IP address
+    struct {
+        uint8_t     m_mask;
+        uint8_t     m_addr[16]; // Large enough for an IPv6
+    };
 
 
-inline bool operator<(const IPv6_Addr& p_a, const IPv6_Addr& p_b)
-{
-    
-    if (p_a.getByte(0) < p_b.getByte(0)) return true;
-    if (p_a.getByte(0) > p_b.getByte(0)) return false;
-
-    if (p_a.getByte(1) < p_b.getByte(1)) return true;
-    if (p_a.getByte(1) > p_b.getByte(1)) return false;
-
-    if (p_a.getByte(2) < p_b.getByte(2)) return true;
-    if (p_a.getByte(2) > p_b.getByte(2)) return false;
-
-    if (p_a.getByte(3) < p_b.getByte(3)) return true;
-    if (p_a.getByte(3) > p_b.getByte(3)) return false;
-
-    if (p_a.getByte(4) < p_b.getByte(4)) return true;
-    if (p_a.getByte(4) > p_b.getByte(4)) return false;
-
-    if (p_a.getByte(5) < p_b.getByte(5)) return true;
-    if (p_a.getByte(5) > p_b.getByte(5)) return false;
-
-    if (p_a.getByte(6) < p_b.getByte(6)) return true;
-    if (p_a.getByte(6) > p_b.getByte(6)) return false;
-
-    if (p_a.getByte(7) < p_b.getByte(7)) return true;
-    if (p_a.getByte(7) > p_b.getByte(7)) return false;
-
-    if (p_a.getByte(8) < p_b.getByte(8)) return true;
-    if (p_a.getByte(8) > p_b.getByte(8)) return false;
-
-    if (p_a.getByte(9) < p_b.getByte(9)) return true;
-    if (p_a.getByte(9) > p_b.getByte(9)) return false;
-
-    if (p_a.getByte(10) < p_b.getByte(10)) return true;
-    if (p_a.getByte(10) > p_b.getByte(10)) return false;
-
-    if (p_a.getByte(11) < p_b.getByte(11)) return true;
-    if (p_a.getByte(11) > p_b.getByte(11)) return false;
-
-    if (p_a.getByte(12) < p_b.getByte(12)) return true;
-    if (p_a.getByte(12) > p_b.getByte(12)) return false;
-
-    if (p_a.getByte(13) < p_b.getByte(13)) return true;
-    if (p_a.getByte(13) > p_b.getByte(13)) return false;
-
-    if (p_a.getByte(14) < p_b.getByte(14)) return true;
-    if (p_a.getByte(14) > p_b.getByte(14)) return false;
-
-    if (p_a.getByte(15) < p_b.getByte(15)) return true;
-
-    return false;
-}
+}; // end class IP_Addr
 
 
-
-inline bool operator>(const IPv6_Addr& p_a, const IPv6_Addr& p_b)
-{
-    if (p_a.getByte(0) > p_b.getByte(0)) return true;
-    if (p_a.getByte(0) < p_b.getByte(0)) return false;
-
-    if (p_a.getByte(1) > p_b.getByte(1)) return true;
-    if (p_a.getByte(1) < p_b.getByte(1)) return false;
-
-    if (p_a.getByte(2) > p_b.getByte(2)) return true;
-    if (p_a.getByte(2) < p_b.getByte(2)) return false;
-
-    if (p_a.getByte(3) > p_b.getByte(3)) return true;
-    if (p_a.getByte(3) < p_b.getByte(3)) return false;
-
-    if (p_a.getByte(4) > p_b.getByte(4)) return true;
-    if (p_a.getByte(4) < p_b.getByte(4)) return false;
-
-    if (p_a.getByte(5) > p_b.getByte(5)) return true;
-    if (p_a.getByte(5) < p_b.getByte(5)) return false;
-
-    if (p_a.getByte(6) > p_b.getByte(6)) return true;
-    if (p_a.getByte(6) < p_b.getByte(6)) return false;
-
-    if (p_a.getByte(7) > p_b.getByte(7)) return true;
-    if (p_a.getByte(7) < p_b.getByte(7)) return false;
-
-    if (p_a.getByte(8) > p_b.getByte(8)) return true;
-    if (p_a.getByte(8) < p_b.getByte(8)) return false;
-
-    if (p_a.getByte(9) > p_b.getByte(9)) return true;
-    if (p_a.getByte(9) < p_b.getByte(9)) return false;
-
-    if (p_a.getByte(10) > p_b.getByte(10)) return true;
-    if (p_a.getByte(10) < p_b.getByte(10)) return false;
-
-    if (p_a.getByte(11) > p_b.getByte(11)) return true;
-    if (p_a.getByte(11) < p_b.getByte(11)) return false;
-
-    if (p_a.getByte(12) > p_b.getByte(12)) return true;
-    if (p_a.getByte(12) < p_b.getByte(12)) return false;
-
-    if (p_a.getByte(13) > p_b.getByte(13)) return true;
-    if (p_a.getByte(13) < p_b.getByte(13)) return false;
-
-    if (p_a.getByte(14) > p_b.getByte(14)) return true;
-    if (p_a.getByte(14) < p_b.getByte(14)) return false;
-
-    if (p_a.getByte(15) > p_b.getByte(15)) return true;
-
-
-    return false;
-}
 
 #include "ipv6_parser.h"
 
-inline bool IPv6_Addr::parse(std::string& p_ipstring)
+inline bool IP_Addr::parseIPv6(std::string& p_ipstring)
 {
     IPv6_Parser ipp;
-    return ipp.parse(p_ipstring);
+    if (!ipp.parse(p_ipstring))
+        return false;
+
+    *this = ipp.getIPv6();
+    return true;
 }
 
-inline std::string IP_Addr::print(void) const
-{
-    if (m_ip_version == 4)
-        return ((IPv4_Addr*)this)->print();
 
-    if (m_ip_version == 6)
-        return ((IPv6_Addr*)this)->print();
-
-    std::string err = "Invalid";
-    return err;
-}
 
 #endif // _IP_Addr_HPP_
 

@@ -679,15 +679,17 @@ namespace mongo {
     };
 
     // IpAddr **************************
+    JSBool ip_addr_constructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval);
 
     JSBool ip_addr_version_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
         Convertor c(cx);
         void *holder = JS_GetPrivate( cx, obj );
         assert( holder );
         const char* data = ( ( BinDataHolder* )( holder ) )->c_;
-        const IP_Addr* ip = new ((void*)data) IP_Addr;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
         stringstream ss;
-        ss << (unsigned int)ip->getVersion();
+        ss << (unsigned int)ip.getVersion();
         string ret = ss.str();
         *vp = c.toval( ret.c_str() );
         return JS_TRUE;
@@ -698,9 +700,10 @@ namespace mongo {
         void *holder = JS_GetPrivate( cx, obj );
         assert( holder );
         const char* data = ( ( BinDataHolder* )( holder ) )->c_;
-        const IP_Addr* ip = new ((void*)data) IP_Addr;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
         stringstream ss;
-        ss << (unsigned int)ip->getNetmask();
+        ss << (unsigned int)ip.getNetmask();
         string ret = ss.str();
         *vp = c.toval( ret.c_str() );
         return JS_TRUE;
@@ -709,12 +712,43 @@ namespace mongo {
     JSBool ip_addr_mask_setter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
         Convertor c(cx);
         unsigned int mask = (unsigned int)c.toNumber( *vp );
+        void *old_holder = JS_GetPrivate( cx, obj );
+        assert( old_holder );
+        const char* data = ( ( BinDataHolder* )( old_holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        ip.setNetmask(mask);
+        data = ip.getBinDataPtr();
+        assert( len == ip.getBinDataLength() );
+        assert( JS_SetPrivate( cx, obj, new BinDataHolder( data, len ) ) );
+        delete ( BinDataHolder* )old_holder;
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_broadcast_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
         void *holder = JS_GetPrivate( cx, obj );
         assert( holder );
         const char* data = ( ( BinDataHolder* )( holder ) )->c_;
-        IP_Addr* ip = new ((void*)data) IP_Addr;
-        ip->setNetmask(mask);
-        return JS_TRUE;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        IP_Addr bc = ip.broadcast();
+        std::string bcstr = bc.print();
+        jsval bcval = c.toval( bcstr.c_str() );
+        return ip_addr_constructor( cx, NULL, 1, &bcval, vp );
+    }
+
+    JSBool ip_addr_network_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        IP_Addr nw = ip.network();
+        std::string nwstr = nw.print();
+        jsval nwval = c.toval( nwstr.c_str() );
+        return ip_addr_constructor( cx, NULL, 1, &nwval, vp );
     }
 
     JSBool ip_addr_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
@@ -725,30 +759,21 @@ namespace mongo {
             return JS_FALSE;
         }
 
-        string ip_str = c.toString( argv[ 0 ] );
-        int len;
-        const char* data;
-        IPv4_Addr ip4;
-        IPv6_Addr ip6;
+        std::string ip_str = c.toString( argv[ 0 ] );
+        IP_Addr ip;
 
-        if (ip4.parse(ip_str)) {
-            len = sizeof(ip4);
-            data = (const char*)&ip4;
-        }
-        else {
-            IPv6_Parser ipp;
+        if ( !ip.parseIPv4(ip_str) ) {
 
-            if (!ipp.parse(ip_str.c_str())) {
-                JS_ReportError( cx, "invalid IP Address string to IpAddr()" );
+            if ( !ip.parseIPv6(ip_str) ) {
+                JS_ReportError( cx, "invalid IP Address string to IpAddr(%s)", ip_str.c_str() );
                 return JS_FALSE;
             }
-
-            ip6 = ipp.getIPv6();
-            len = sizeof(ip6);
-            data = (const char*)&ip6;
         }
 
-        if ( ! JS_InstanceOf( cx , obj , &ip_addr_class , 0 ) ) {
+        int len = ip.getBinDataLength();
+        const char* data = ip.getBinDataPtr();
+
+        if ( !obj || !JS_InstanceOf( cx , obj , &ip_addr_class , 0 ) ) {
             obj = JS_NewObject( cx , &ip_addr_class , 0 , 0 );
             CHECKNEWOBJECT( obj, cx, "ip_addr_constructor" );
             *rval = OBJECT_TO_JSVAL( obj );
@@ -768,6 +793,18 @@ namespace mongo {
             return JS_FALSE;
         }
 
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "broadcast", c.toval( 0.0 ),
+            ip_addr_broadcast_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'broadcast'" );
+            return JS_FALSE;
+        }
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "network", c.toval( 0.0 ),
+            ip_addr_network_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'network'" );
+            return JS_FALSE;
+        }
+
         c.setProperty( obj, "len", c.toval( (double)len ) );
         c.setProperty( obj, "type", c.toval( (double)bdtIpAddr ) );
 
@@ -779,10 +816,10 @@ namespace mongo {
         void *holder = JS_GetPrivate( cx, obj );
         assert( holder );
         const char* data = ( ( BinDataHolder* )( holder ) )->c_;
-        string ret;
-        const IP_Addr* ip = new ((void*)data) IP_Addr;
-        ret = "IpAddr(\"";
-        ret += ip->print();
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        std::string ret = "IpAddr(\"";
+        ret += ip.print();
         ret += "\")";
         return *rval = c.toval( ret.c_str() );
     }
@@ -1299,11 +1336,16 @@ namespace mongo {
             return true;
         }
 
-        if ( JS_InstanceOf( c->_context , o , &bindata_class , 0 ) ) {
+        if (  JS_InstanceOf( c->_context , o , &bindata_class , 0 )
+           || JS_InstanceOf( c->_context , o , &uuid_class , 0 )
+           || JS_InstanceOf( c->_context , o , &ip_addr_class , 0 )
+           || JS_InstanceOf( c->_context , o , &mac_addr_class , 0 )
+           ) {
             void *holder = JS_GetPrivate( c->_context , o );
             const char *data = ( ( BinDataHolder * )( holder ) )->c_;
             b.appendBinData( name ,
-                             (int)(c->getNumber( o , "len" )) , (BinDataType)((char)(c->getNumber( o , "type" ) ) ) ,
+                             (int)(c->getNumber( o , "len" )) ,
+                             (BinDataType)((char)(c->getNumber( o , "type" ) ) ) ,
                              data
                            );
             return true;

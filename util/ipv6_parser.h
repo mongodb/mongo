@@ -1,5 +1,5 @@
 
-#line 1 "ipv6_parser.rl"
+#line 1 "util/ipv6_parser.rl"
 #ifndef __IPv6_Parser_RL__
 #define __IPv6_Parser_RL__
 
@@ -39,13 +39,13 @@
 
 
 
-#line 180 "ipv6_parser.rl"
+#line 180 "util/ipv6_parser.rl"
 
 
 
 // Ragel Table Data
 
-#line 49 "ipv6_parser.h"
+#line 49 "util/ipv6_parser.h"
 static const int ipv6_start = 1;
 static const int ipv6_first_final = 121;
 static const int ipv6_error = 0;
@@ -53,7 +53,7 @@ static const int ipv6_error = 0;
 static const int ipv6_en_main = 1;
 
 
-#line 185 "ipv6_parser.rl"
+#line 185 "util/ipv6_parser.rl"
 
 
 
@@ -109,19 +109,19 @@ class IPv6_Parser : public RagelBase<uint8_t>
         m_error = false;
 
         
-#line 113 "ipv6_parser.h"
+#line 113 "util/ipv6_parser.h"
 	{
 	cs = ipv6_start;
 	}
 
-#line 240 "ipv6_parser.rl"
+#line 240 "util/ipv6_parser.rl"
     }
 
     void ragel_exec(void)
     {
         // Ragel write exec begin
         
-#line 125 "ipv6_parser.h"
+#line 125 "util/ipv6_parser.h"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -140,22 +140,22 @@ case 1:
 		goto tr1;
 	goto tr0;
 tr0:
-#line 164 "ipv6_parser.rl"
+#line 164 "util/ipv6_parser.rl"
 	{ parse_error(); }
 	goto st0;
-#line 147 "ipv6_parser.h"
+#line 147 "util/ipv6_parser.h"
 st0:
 cs = 0;
 	goto _out;
 tr1:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st2;
 st2:
 	if ( ++p == pe )
 		goto _test_eof2;
 case 2:
-#line 159 "ipv6_parser.h"
+#line 159 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr4;
 	if ( (*p) < 65u ) {
@@ -205,14 +205,14 @@ case 5:
 		goto tr4;
 	goto tr0;
 tr4:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st6;
 st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 216 "ipv6_parser.h"
+#line 216 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st102;
 	if ( (*p) < 65u ) {
@@ -225,14 +225,14 @@ case 6:
 		goto tr7;
 	goto tr0;
 tr7:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 236 "ipv6_parser.h"
+#line 236 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr10;
 	if ( (*p) < 65u ) {
@@ -282,14 +282,14 @@ case 10:
 		goto tr10;
 	goto tr0;
 tr10:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st11;
 st11:
 	if ( ++p == pe )
 		goto _test_eof11;
 case 11:
-#line 293 "ipv6_parser.h"
+#line 293 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st93;
 	if ( (*p) < 65u ) {
@@ -302,14 +302,14 @@ case 11:
 		goto tr13;
 	goto tr0;
 tr13:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st12;
 st12:
 	if ( ++p == pe )
 		goto _test_eof12;
 case 12:
-#line 313 "ipv6_parser.h"
+#line 313 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr16;
 	if ( (*p) < 65u ) {
@@ -359,14 +359,14 @@ case 15:
 		goto tr16;
 	goto tr0;
 tr16:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st16;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 370 "ipv6_parser.h"
+#line 370 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st84;
 	if ( (*p) < 65u ) {
@@ -379,14 +379,14 @@ case 16:
 		goto tr19;
 	goto tr0;
 tr19:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st17;
 st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 390 "ipv6_parser.h"
+#line 390 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr22;
 	if ( (*p) < 65u ) {
@@ -436,14 +436,14 @@ case 20:
 		goto tr22;
 	goto tr0;
 tr22:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st21;
 st21:
 	if ( ++p == pe )
 		goto _test_eof21;
 case 21:
-#line 447 "ipv6_parser.h"
+#line 447 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st75;
 	if ( (*p) < 65u ) {
@@ -456,14 +456,14 @@ case 21:
 		goto tr25;
 	goto tr0;
 tr25:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st22;
 st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
-#line 467 "ipv6_parser.h"
+#line 467 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr28;
 	if ( (*p) < 65u ) {
@@ -513,14 +513,14 @@ case 25:
 		goto tr28;
 	goto tr0;
 tr28:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st26;
 st26:
 	if ( ++p == pe )
 		goto _test_eof26;
 case 26:
-#line 524 "ipv6_parser.h"
+#line 524 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st66;
 	if ( (*p) < 65u ) {
@@ -533,14 +533,14 @@ case 26:
 		goto tr31;
 	goto tr0;
 tr31:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st27;
 st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 544 "ipv6_parser.h"
+#line 544 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr34;
 	if ( (*p) < 65u ) {
@@ -590,14 +590,14 @@ case 30:
 		goto tr34;
 	goto tr0;
 tr34:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st31;
 st31:
 	if ( ++p == pe )
 		goto _test_eof31;
 case 31:
-#line 601 "ipv6_parser.h"
+#line 601 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st60;
 	if ( (*p) < 65u ) {
@@ -610,16 +610,16 @@ case 31:
 		goto tr39;
 	goto tr0;
 tr37:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st32;
 st32:
 	if ( ++p == pe )
 		goto _test_eof32;
 case 32:
-#line 623 "ipv6_parser.h"
+#line 623 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 46u: goto st33;
 		case 58u: goto tr42;
@@ -684,56 +684,56 @@ case 38:
 		goto st43;
 	goto tr0;
 tr66:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st121;
 tr51:
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_end(); }
 	goto st121;
 tr55:
-#line 53 "ipv6_parser.rl"
+#line 53 "util/ipv6_parser.rl"
 	{ prefix_end(); }
 	goto st121;
 tr74:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st121;
 st121:
 	if ( ++p == pe )
 		goto _test_eof121;
 case 121:
-#line 707 "ipv6_parser.h"
+#line 707 "util/ipv6_parser.h"
 	goto tr0;
 tr67:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st39;
 tr52:
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_end(); }
 	goto st39;
 tr75:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st39;
 st39:
 	if ( ++p == pe )
 		goto _test_eof39;
 case 39:
-#line 725 "ipv6_parser.h"
+#line 725 "util/ipv6_parser.h"
 	if ( 48u <= (*p) && (*p) <= 57u )
 		goto tr54;
 	goto tr0;
 tr54:
-#line 53 "ipv6_parser.rl"
+#line 53 "util/ipv6_parser.rl"
 	{ prefix_start(); }
 	goto st40;
 st40:
 	if ( ++p == pe )
 		goto _test_eof40;
 case 40:
-#line 737 "ipv6_parser.h"
+#line 737 "util/ipv6_parser.h"
 	if ( (*p) == 0u )
 		goto tr55;
 	if ( 48u <= (*p) && (*p) <= 57u )
@@ -849,14 +849,14 @@ case 51:
 		goto tr42;
 	goto tr0;
 tr42:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_front_push(); }
 	goto st52;
 st52:
 	if ( ++p == pe )
 		goto _test_eof52;
 case 52:
-#line 860 "ipv6_parser.h"
+#line 860 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto st57;
 	if ( (*p) < 65u ) {
@@ -869,14 +869,14 @@ case 52:
 		goto tr64;
 	goto tr0;
 tr64:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st53;
 st53:
 	if ( ++p == pe )
 		goto _test_eof53;
 case 53:
-#line 880 "ipv6_parser.h"
+#line 880 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr66;
 		case 47u: goto tr67;
@@ -990,14 +990,14 @@ case 60:
 		goto tr73;
 	goto tr0;
 tr73:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st61;
 st61:
 	if ( ++p == pe )
 		goto _test_eof61;
 case 61:
-#line 1001 "ipv6_parser.h"
+#line 1001 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -1055,14 +1055,14 @@ case 64:
 	}
 	goto tr0;
 tr39:
-#line 48 "ipv6_parser.rl"
+#line 48 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st65;
 st65:
 	if ( ++p == pe )
 		goto _test_eof65;
 case 65:
-#line 1066 "ipv6_parser.h"
+#line 1066 "util/ipv6_parser.h"
 	if ( (*p) == 58u )
 		goto tr42;
 	if ( (*p) < 65u ) {
@@ -1092,16 +1092,16 @@ case 66:
 		goto tr80;
 	goto tr0;
 tr79:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st67;
 st67:
 	if ( ++p == pe )
 		goto _test_eof67;
 case 67:
-#line 1105 "ipv6_parser.h"
+#line 1105 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 46u: goto st33;
@@ -1166,14 +1166,14 @@ case 70:
 	}
 	goto tr0;
 tr82:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st71;
 st71:
 	if ( ++p == pe )
 		goto _test_eof71;
 case 71:
-#line 1177 "ipv6_parser.h"
+#line 1177 "util/ipv6_parser.h"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto tr73;
@@ -1220,14 +1220,14 @@ case 73:
 		goto st72;
 	goto tr0;
 tr80:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1231 "ipv6_parser.h"
+#line 1231 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -1260,16 +1260,16 @@ case 75:
 		goto tr88;
 	goto tr0;
 tr87:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st76;
 st76:
 	if ( ++p == pe )
 		goto _test_eof76;
 case 76:
-#line 1273 "ipv6_parser.h"
+#line 1273 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 46u: goto st33;
@@ -1334,14 +1334,14 @@ case 79:
 	}
 	goto tr0;
 tr90:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st80;
 st80:
 	if ( ++p == pe )
 		goto _test_eof80;
 case 80:
-#line 1345 "ipv6_parser.h"
+#line 1345 "util/ipv6_parser.h"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto tr79;
@@ -1388,14 +1388,14 @@ case 82:
 		goto st81;
 	goto tr0;
 tr88:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st83;
 st83:
 	if ( ++p == pe )
 		goto _test_eof83;
 case 83:
-#line 1399 "ipv6_parser.h"
+#line 1399 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -1428,16 +1428,16 @@ case 84:
 		goto tr96;
 	goto tr0;
 tr95:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st85;
 st85:
 	if ( ++p == pe )
 		goto _test_eof85;
 case 85:
-#line 1441 "ipv6_parser.h"
+#line 1441 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 46u: goto st33;
@@ -1502,14 +1502,14 @@ case 88:
 	}
 	goto tr0;
 tr98:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st89;
 st89:
 	if ( ++p == pe )
 		goto _test_eof89;
 case 89:
-#line 1513 "ipv6_parser.h"
+#line 1513 "util/ipv6_parser.h"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto tr87;
@@ -1556,14 +1556,14 @@ case 91:
 		goto st90;
 	goto tr0;
 tr96:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st92;
 st92:
 	if ( ++p == pe )
 		goto _test_eof92;
 case 92:
-#line 1567 "ipv6_parser.h"
+#line 1567 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -1596,16 +1596,16 @@ case 93:
 		goto tr104;
 	goto tr0;
 tr103:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st94;
 st94:
 	if ( ++p == pe )
 		goto _test_eof94;
 case 94:
-#line 1609 "ipv6_parser.h"
+#line 1609 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 46u: goto st33;
@@ -1670,14 +1670,14 @@ case 97:
 	}
 	goto tr0;
 tr106:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st98;
 st98:
 	if ( ++p == pe )
 		goto _test_eof98;
 case 98:
-#line 1681 "ipv6_parser.h"
+#line 1681 "util/ipv6_parser.h"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto tr95;
@@ -1724,14 +1724,14 @@ case 100:
 		goto st99;
 	goto tr0;
 tr104:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st101;
 st101:
 	if ( ++p == pe )
 		goto _test_eof101;
 case 101:
-#line 1735 "ipv6_parser.h"
+#line 1735 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -1764,16 +1764,16 @@ case 102:
 		goto tr112;
 	goto tr0;
 tr111:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st103;
 st103:
 	if ( ++p == pe )
 		goto _test_eof103;
 case 103:
-#line 1777 "ipv6_parser.h"
+#line 1777 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 46u: goto st33;
@@ -1838,14 +1838,14 @@ case 106:
 	}
 	goto tr0;
 tr114:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st107;
 st107:
 	if ( ++p == pe )
 		goto _test_eof107;
 case 107:
-#line 1849 "ipv6_parser.h"
+#line 1849 "util/ipv6_parser.h"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto tr103;
@@ -1892,14 +1892,14 @@ case 109:
 		goto st108;
 	goto tr0;
 tr112:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st110;
 st110:
 	if ( ++p == pe )
 		goto _test_eof110;
 case 110:
-#line 1903 "ipv6_parser.h"
+#line 1903 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -1939,16 +1939,16 @@ case 112:
 		goto tr121;
 	goto tr0;
 tr120:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
-#line 45 "ipv6_parser.rl"
+#line 45 "util/ipv6_parser.rl"
 	{ ipv4_start(); }
 	goto st113;
 st113:
 	if ( ++p == pe )
 		goto _test_eof113;
 case 113:
-#line 1952 "ipv6_parser.h"
+#line 1952 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 46u: goto st33;
@@ -2013,14 +2013,14 @@ case 116:
 	}
 	goto tr0;
 tr123:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_back_push(); }
 	goto st117;
 st117:
 	if ( ++p == pe )
 		goto _test_eof117;
 case 117:
-#line 2024 "ipv6_parser.h"
+#line 2024 "util/ipv6_parser.h"
 	if ( (*p) < 65u ) {
 		if ( 48u <= (*p) && (*p) <= 57u )
 			goto tr111;
@@ -2067,14 +2067,14 @@ case 119:
 		goto st118;
 	goto tr0;
 tr121:
-#line 51 "ipv6_parser.rl"
+#line 51 "util/ipv6_parser.rl"
 	{ h_start(); }
 	goto st120;
 st120:
 	if ( ++p == pe )
 		goto _test_eof120;
 case 120:
-#line 2078 "ipv6_parser.h"
+#line 2078 "util/ipv6_parser.h"
 	switch( (*p) ) {
 		case 0u: goto tr74;
 		case 47u: goto tr75;
@@ -2216,7 +2216,7 @@ case 120:
 	{
 	switch ( cs ) {
 	case 121: 
-#line 162 "ipv6_parser.rl"
+#line 162 "util/ipv6_parser.rl"
 	{complete_ip();}
 	break;
 	case 1: 
@@ -2339,17 +2339,17 @@ case 120:
 	case 118: 
 	case 119: 
 	case 120: 
-#line 164 "ipv6_parser.rl"
+#line 164 "util/ipv6_parser.rl"
 	{ parse_error(); }
 	break;
-#line 2346 "ipv6_parser.h"
+#line 2346 "util/ipv6_parser.h"
 	}
 	}
 
 	_out: {}
 	}
 
-#line 246 "ipv6_parser.rl"
+#line 246 "util/ipv6_parser.rl"
         // Ragel write exec end
     }
 
