@@ -303,11 +303,11 @@ namespace mongo {
         uassert( 10248 ,  "no connection!" , conn );
 
         string ns = c.toString( argv[0] );
-        BSONObj o = c.toObject( argv[1] );
-
-        // TODO: add _id
 
         try {
+            BSONObj o = c.toObject( argv[1] );
+            // TODO: add _id
+
             conn->insert( ns , o );
             return JS_TRUE;
         }
