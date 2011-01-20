@@ -340,7 +340,7 @@ namespace mongo {
         else
             size = 0x7ff00000;
 
-        if ( cmdLine.smallfiles ) {
+        if ( cmdLine.smallfiles || sizeof( int* ) == 4 ) {
             size = size >> 2;
         }
 
