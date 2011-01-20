@@ -162,16 +162,44 @@ namespace mongo {
             if ( embed.isEmpty() )
                 return;
 
-            _hash( embed ).append( b , "" );
-
-            for ( size_t i=0; i<_other.size(); i++ ) {
-                BSONElement e = obj.getFieldDotted(_other[i]);
-                if ( e.eoo() )
-                    e = _spec->missingField();
-                b.appendAs( e , "" );
-            }
-            keys.insert( b.obj() );
+            BSONObjIterator i(embed);
+            BSONElement x = i.next();
+			if (!x.isABSONObj())
+			{
+				_getKeys(obj, geo, keys);
+			} 
+			else {
+				do {
+					_getKeys(obj, x, keys);
+					if (!i.more())
+						break;
+					x = i.next();
+		            uassert( 13070 , "expecting geo doc/array in geo array" , x.isABSONObj() );
+				} while (true);
+			}
         }
+
+        void _getKeys( const BSONObj &obj, const BSONElement &geo, BSONObjSetDefaultOrder &keys ) const {
+            BSONObjBuilder b(64);
+
+            if ( ! geo.isABSONObj() )
+                return;
+
+            BSONObj embed = geo.embeddedObject();
+            if ( embed.isEmpty() )
+                return;
+
+            BSONObjIterator i(embed);
+			_hash( embed ).append( b , "" );
+
+			for ( size_t i=0; i<_other.size(); i++ ) {
+				BSONElement e = obj.getFieldDotted(_other[i]);
+				if ( e.eoo() )
+					e = _spec->missingField();
+				b.appendAs( e , "" );
+			}
+			keys.insert( b.obj() );
+		}
 
         GeoHash _tohash( const BSONElement& e ) const {
             if ( e.isABSONObj() )
