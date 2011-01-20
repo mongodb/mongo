@@ -52,16 +52,20 @@ function work() {
 //    d.a.reIndex();
 
     // assure writes applied in case we kill -9 on return from this function
-    d.getLastError(); 
+    d.getLastError();
 
     log("endwork");
+    return d;
 }
 
 function verify() { 
     log("verify");
     var d = conn.getDB("test");
-    print("count:" + d.foo.count());
-    assert(d.foo.count() == 2);
+    var ct = d.foo.count();
+    if (ct != 2) {
+        print("\n\n\nFAIL dur1.js count is wrong in verify(): " + ct + "\n\n\n");
+        assert(ct == 2);
+    }
 }
 
 if( debugging ) { 
