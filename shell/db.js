@@ -730,6 +730,10 @@ DB.prototype.version = function(){
     return this.serverBuildInfo().version;
 }
 
+DB.prototype.serverBits = function(){
+    return this.serverBuildInfo().bits;
+}
+
 DB.prototype.listCommands = function(){
     var x = this.runCommand( "listCommands" );
     for ( var name in x.commands ){
