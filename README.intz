@@ -12,12 +12,16 @@ IpAddr - Contains an IPv4 or IPv6 address along with a netmask
     ip4.mask
     ip4 = IpAddr("192.168.1.1/24")
     ip4.mask
+    ip4.network
+    ip4.broadcast
     var ip6 = IpAddr("1234::abcd");
     ip6.mask
     ip6.version
     ip6.mask = 64
     ip6.mask
     var ip6 = IpAddr("1234::abcd/32");
+    ip6.network
+    ip6.broadcast
     ip6 = IpAddr("::192.168.1.1/16");
     db.test.insert({ip: IpAddr("192.168.1.1")})
     db.test.insert({ip: IpAddr("1234::")})

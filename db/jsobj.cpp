@@ -202,9 +202,9 @@ namespace mongo {
                 s << "\" }";
                 break;
             case bdtIpAddr: {
-                const IP_Addr* ip = new ((void*)start) IP_Addr;
+                const IP_Addr ip(start, len);
                 s << "{ \"$ipaddr\" : \"";
-                s << ip->print();
+                s << ip.print();
                 s << "\" }";
                 break;
                 }
@@ -445,10 +445,12 @@ namespace mongo {
             switch (l.binDataType()) {
             case bdtIpAddr: {
                 int lsz;
-                const IP_Addr* lip = new ((void*)l.binData(lsz)) IP_Addr;
+                const char* ldata = l.binData(lsz);
+                IP_Addr lip(ldata, lsz);
                 int rsz;
-                const IP_Addr* rip = new ((void*)r.binData(rsz)) IP_Addr;
-                return lip->compare(*rip);
+                const char* rdata = r.binData(rsz);
+                IP_Addr rip(rdata, rsz);
+                return lip.compare(rip);
                 }
             default: {
                 int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte

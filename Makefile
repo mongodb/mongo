@@ -14,6 +14,7 @@ build_deps:
 	yum -y install boost-devel-static readline-static ncurses-static
 
 MONGO_DB_PATH=/data/db
+MONGOD_LOGFILE=/var/log/mongod
 
 initdb: # as root
 	mkdir -p $(MONGO_DB_PATH)/
@@ -23,7 +24,7 @@ test:
 	scons test && ./test
 
 run_server: # as root
-	/opt/mongo/bin/mongod --dbpath=$(MONGO_DB_PATH)
+	/opt/mongo/bin/mongod --fork --dbpath=$(MONGO_DB_PATH) --logpath=$(MONGOD_LOGFILE)
 
 run_shell:
 	/opt/mongo/bin/mongo
