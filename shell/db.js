@@ -313,12 +313,15 @@ DB.prototype.help = function() {
     return __magicNoPrint;
 }
 
-DB.prototype.printCollectionStats = function(){
+DB.prototype.printCollectionStats = function(scale){
     var mydb = this;
+    if (scale==0) {
+        throw "scale has to be > 0";
+    }
     this.getCollectionNames().forEach(
         function(z){
             print( z );
-            printjson( mydb.getCollection(z).stats() );
+            printjson( mydb.getCollection(z).stats(scale) );
             print( "---" );
         }
     );
