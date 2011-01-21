@@ -122,6 +122,10 @@ assert.soon = function( f, msg, timeout /*ms*/, interval ) {
 
 assert.throws = function( func , params , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
+    
+    if ( params && typeof( params ) == "string" )
+        throw "2nd argument to assert.throws has to be an array"
+    
     try {
         func.apply( null , params );
     }
