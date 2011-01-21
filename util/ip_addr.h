@@ -216,12 +216,22 @@ class IP_Addr
     /// \returns true on a successful parse, false on syntax error.
     ///
     bool parseIPv4(std::string& p_ipstring);
+    bool parseIPv4(const char* p_ipstring)
+    {
+        std::string ipstring = p_ipstring;
+        return parseIPv4(ipstring);
+    }
 
     /// Parse the given IPv6 string into an ip address and optional netmask.
     /// \param p_ipstring A reference to the text of the IPv6 address to convert.
     /// \returns true on a successful parse, false on syntax error.
     ///
     bool parseIPv6(std::string& p_ipstring);
+    bool parseIPv6(const char* p_ipstring)
+    {
+        std::string ipstring = p_ipstring;
+        return parseIPv6(ipstring);
+    }
 
     // Printing
     std::string print(void) const

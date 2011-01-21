@@ -19,14 +19,15 @@
 
 #include "pch.h"
 
-#include "../util/ipv4_addr.h"
+#include "../util/ip_addr.h"
 
 #include "dbtests.h"
 
 
-namespace IPv4AddrTests {
+namespace IPAddrTests {
 
     class Base {
+        dblock lk;
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
@@ -47,7 +48,7 @@ namespace IPv4AddrTests {
         }
     protected:
         static const char *ns() {
-            return "unittests.ipv4addrtests";
+            return "unittests.ipaddrtests";
         }
         static void addIndex( const BSONObj &key ) {
             BSONObjBuilder b;
@@ -65,114 +66,114 @@ namespace IPv4AddrTests {
         static void insert( const BSONObj &o ) {
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize() );
         }
-        IPv4_Addr ip1;
+        IP_Addr ip1;
     };
 
     class SimpleIPv4 : public Base {
     public:
         void run() {
-        //    ASSERT( ip1.parse("192.168.1.2") );
-        //    ASSERT_EQUALS( 192, ip1.m_ip[0] );
-        //    ASSERT_EQUALS( 168, ip1.m_ip[1] );
-        //    ASSERT_EQUALS( 1,   ip1.m_ip[2] );
-        //    ASSERT_EQUALS( 2,   ip1.m_ip[3] );
-        //    ASSERT_EQUALS( 32,  ip1.m_mask );
+            ASSERT( ip1.parseIPv4("192.168.1.2") );
+            ASSERT( 192 == ip1.getByte(0) );
+            ASSERT( 168 == ip1.getByte(1) );
+            ASSERT( 1   == ip1.getByte(2) );
+            ASSERT( 2   == ip1.getByte(3) );
+            ASSERT( 32  == ip1.getNetmask() );
         }
     };
 
     class MalformedIPv4 : public Base {
     public:
         void run() {
-            ASSERT( !ip1.parse("192") );
-            ASSERT( !ip1.parse("192.") );
-            ASSERT( !ip1.parse("192.168") );
-            ASSERT( !ip1.parse("192.168.") );
-            ASSERT( !ip1.parse("192.168.1") );
-            ASSERT( !ip1.parse("192.168.1.") );
-            ASSERT( !ip1.parse("192.168.1.2 ") );
+            ASSERT( !ip1.parseIPv4("192") );
+            ASSERT( !ip1.parseIPv4("192.") );
+            ASSERT( !ip1.parseIPv4("192.168") );
+            ASSERT( !ip1.parseIPv4("192.168.") );
+            ASSERT( !ip1.parseIPv4("192.168.1") );
+            ASSERT( !ip1.parseIPv4("192.168.1.") );
+            ASSERT( !ip1.parseIPv4("192.168.1.2 ") );
         }
     };
 
     class OutOfBoundsIPv4 : public Base {
     public:
         void run() {
-            ASSERT( !ip1.parse("256.1.1.1") );
-            ASSERT( !ip1.parse("1.256.1.1") );
-            ASSERT( !ip1.parse("1.1.256.1") );
-            ASSERT( !ip1.parse("1.1.1.256") );
-            ASSERT( !ip1.parse("0.0.0.0") );
+            ASSERT( !ip1.parseIPv4("256.1.1.1") );
+            ASSERT( !ip1.parseIPv4("1.256.1.1") );
+            ASSERT( !ip1.parseIPv4("1.1.256.1") );
+            ASSERT( !ip1.parseIPv4("1.1.1.256") );
         }
     };
 
     class ClassAIPv4 : public Base {
     public:
         void run() {
-            ASSERT( ip1.parse("1/8") );
-            ASSERT_EQUALS( 8,    ip1.m_mask );
-            ASSERT( ip1.parse("1.2/8") );
-            ASSERT( ip1.parse("1.2.3/8") );
-            ASSERT( ip1.parse("1.2.3.4/8") );
-            ASSERT( ip1.parse("1.2/16") );
-            ASSERT_EQUALS( 16,   ip1.m_mask );
-            ASSERT( ip1.parse("192.168.0.0/16") );
-            ASSERT( ip1.parse("1.2.3/16") );
-            ASSERT( ip1.parse("1.2.3.4/16") );
-            ASSERT( ip1.parse("63/8") );
+            ASSERT( ip1.parseIPv4("1/8") );
+            ASSERT_EQUALS( 8,    ip1.getNetmask() );
+            ASSERT( ip1.parseIPv4("1.2/8") );
+            ASSERT( ip1.parseIPv4("1.2.3/8") );
+            ASSERT( ip1.parseIPv4("1.2.3.4/8") );
+            ASSERT( ip1.parseIPv4("1.2/16") );
+            ASSERT_EQUALS( 16,   ip1.getNetmask() );
+            ASSERT( ip1.parseIPv4("192.168.0.0/16") );
+            ASSERT( ip1.parseIPv4("1.2.3/16") );
+            ASSERT( ip1.parseIPv4("1.2.3.4/16") );
+            ASSERT( ip1.parseIPv4("63/8") );
         }
     };
 
     class ClassAOddIPv4 : public Base {
     public:
         void run() {
-            ASSERT( ip1.parse("1./8") );
-            ASSERT( ip1.parse("1.2./8") );
-            ASSERT( ip1.parse("1.2.3./8") );
-            ASSERT( ip1.parse("1.2.3.4/32") );
+            ASSERT( ip1.parseIPv4("0.0.0.0") );
+            ASSERT( ip1.parseIPv4("1./8") );
+            ASSERT( ip1.parseIPv4("1.2./8") );
+            ASSERT( ip1.parseIPv4("1.2.3./8") );
+            ASSERT( ip1.parseIPv4("1.2.3.4/32") );
         }
     };
 
     class MalformedClassAIPv4 : public Base {
     public:
         void run() {
-            ASSERT( !ip1.parse("1.2.3./7") );
-            ASSERT( !ip1.parse("1.2.3./0") );
-            ASSERT( !ip1.parse("1.2.3./33") );
+            ASSERT( !ip1.parseIPv4("1.2.3./7") );
+            ASSERT( !ip1.parseIPv4("1.2.3./0") );
+            ASSERT( !ip1.parseIPv4("1.2.3./33") );
         }
     };
 
     class ClassBIPv4 : public Base {
     public:
         void run() {
-            ASSERT( ip1.parse("64.2/16") );
-            ASSERT( ip1.parse("64.2.3/16") );
-            ASSERT( ip1.parse("64.2.3.4/16") );
-            ASSERT( ip1.parse("64.2.3/24") );
-            ASSERT( ip1.parse("64.2.3.4/24") );
-            ASSERT( ip1.parse("191.1/16") );
+            ASSERT( ip1.parseIPv4("64.2/16") );
+            ASSERT( ip1.parseIPv4("64.2.3/16") );
+            ASSERT( ip1.parseIPv4("64.2.3.4/16") );
+            ASSERT( ip1.parseIPv4("64.2.3/24") );
+            ASSERT( ip1.parseIPv4("64.2.3.4/24") );
+            ASSERT( ip1.parseIPv4("191.1/16") );
         }
     };
 
     class ClassCIPv4 : public Base {
     public:
         void run() {
-            ASSERT( ip1.parse("192.2.3/24") );
-            ASSERT( ip1.parse("192.2.3.4/24") );
-            ASSERT( ip1.parse("223.1.2/24") );
+            ASSERT( ip1.parseIPv4("192.2.3/24") );
+            ASSERT( ip1.parseIPv4("192.2.3.4/24") );
+            ASSERT( ip1.parseIPv4("223.1.2/24") );
         }
     };
 
     class OtherMalformedIPv4 : public Base {
     public:
         void run() {
-            ASSERT( !ip1.parse("") );
-            ASSERT( !ip1.parse(" ") );
+            ASSERT( !ip1.parseIPv4("") );
+            ASSERT( !ip1.parseIPv4(" ") );
         }
     };
 
 
     class All : public Suite {
     public:
-        All() : Suite( "ipv4" ) {
+        All() : Suite( "ip_addr" ) {
         }
 
         void setupTests() {
@@ -188,5 +189,5 @@ namespace IPv4AddrTests {
         }
     } myall;
 
-} // namespace IPv4AddrTests
+} // namespace IPAddrTests
 

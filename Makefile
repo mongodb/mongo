@@ -21,7 +21,7 @@ initdb: # as root
 	chown `id -u` $(MONGO_DB_PATH)
 
 test:
-	scons test && ./test
+	scons --d test
 
 run_server: # as root
 	/opt/mongo/bin/mongod --fork --dbpath=$(MONGO_DB_PATH) --logpath=$(MONGOD_LOGFILE)
