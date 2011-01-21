@@ -326,6 +326,8 @@ class IP_Addr
                     lmask >>= 8;
                 }
             }
+
+            bc.m_mask = 32;
         }
         else
         if (m_ip_version == 6)
@@ -357,6 +359,8 @@ class IP_Addr
                     llmask >>= 8;
                 }
             }
+
+            bc.m_mask = 128;
         }
         else
         {
@@ -386,6 +390,8 @@ class IP_Addr
                     lmask >>= 8;
                 }
             }
+
+            nw.m_mask = 32;
         }
         else
         if (m_ip_version == 6)
@@ -417,6 +423,8 @@ class IP_Addr
                     llmask >>= 8;
                 }
             }
+
+            nw.m_mask = 128;
         }
         else
         {

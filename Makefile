@@ -21,6 +21,7 @@ initdb: # as root
 	chown `id -u` $(MONGO_DB_PATH)
 
 test:
+	rm -f test
 	scons --d test
 
 run_server: # as root
