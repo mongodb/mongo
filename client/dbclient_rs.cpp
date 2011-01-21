@@ -414,6 +414,9 @@ namespace mongo {
             checkMaster();
         }
         catch (AssertionException&) {
+            if (_master && _monitor) {
+                _monitor->notifyFailure(_masterHost);
+            }
             return false;
         }
         return true;
