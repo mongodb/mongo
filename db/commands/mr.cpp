@@ -279,7 +279,9 @@ namespace mongo {
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
                 string errmsg;
-                assert( userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , true ) );
+                if ( ! userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , true ) ) {
+                    uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
+                }
             }
 
 
@@ -456,7 +458,9 @@ namespace mongo {
                     writelock l( _config.incLong );
                     Client::Context ctx( _config.incLong );
                     string err;
-                    assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
+                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
+                    }
                 }
 
                 BSONObj sortKey = BSON( "0" << 1 );
