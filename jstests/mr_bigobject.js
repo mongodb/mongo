@@ -3,11 +3,11 @@ t = db.mr_bigobject
 t.drop()
 
 s = "";
-while ( s.length < ( 1024 * 1024 ) ){
+while ( s.length < ( 6 * 1024 * 1024 ) ){
     s += "asdasdasd";
 }
 
-for ( i=0; i<10; i++ )
+for ( i=0; i<5; i++ )
     t.insert( { _id : i , s : s } )
 
 m = function(){
@@ -18,7 +18,8 @@ r = function( k , v ){
     return 1;
 }
 
-assert.throws( function(){ t.mapReduce( m , r , "mr_bigobject_out" ); } , null , "emit should fail" )
+assert.throws( function(){ r = t.mapReduce( m , r , "mr_bigobject_out" ); } , null , "emit should fail" )
+
 
 m = function(){
     emit( 1 , this.s );
@@ -38,6 +39,6 @@ r = function( k , v ){
     return total;
 }
 
-assert.eq( { 1 : 10 * s.length } , t.mapReduce( m , r , "mr_bigobject_out" ).convertToSingleObject() , "A1" )
+assert.eq( { 1 : t.count() * s.length } , t.mapReduce( m , r , "mr_bigobject_out" ).convertToSingleObject() , "A1" )
 
 t.drop()
