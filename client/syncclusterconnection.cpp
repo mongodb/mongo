@@ -82,13 +82,16 @@ namespace mongo {
                 if ( _conns[i]->simpleCommand( "admin" , 0 , "fsync" ) )
                     continue;
             }
+            catch ( DBException& e ) {
+                errmsg += e.toString();
+            }
             catch ( std::exception& e ) {
                 errmsg += e.what();
             }
             catch ( ... ) {
             }
             ok = false;
-            errmsg += _conns[i]->toString() + ":" + res.toString();
+            errmsg += " " + _conns[i]->toString() + ":" + res.toString();
         }
         return ok;
     }
