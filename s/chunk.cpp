@@ -27,6 +27,7 @@
 #include "cursors.h"
 #include "grid.h"
 #include "strategy.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -326,7 +327,7 @@ namespace mongo {
             if ( _dataWritten < splitThreshold / 5 )
                 return false;
 
-            log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << endl;
+            log(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
 
             _dataWritten = 0; // reset so we check often enough
 
@@ -334,6 +335,7 @@ namespace mongo {
             ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ , res );
             if ( newShard.get() == NULL ) {
                 // singleSplit would have issued a message if we got here
+                _dataWritten = 0; // this means there wasn't enough data to split, so don't want to try again until considerable more data
                 return false;
             }
 
