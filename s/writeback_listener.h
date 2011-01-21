@@ -37,7 +37,7 @@ namespace mongo {
     public:
         static void init( DBClientBase& conn );
 
-        static void waitFor( ConnectionId connectionId, const OID& oid );
+        static BSONObj waitFor( ConnectionId connectionId, const OID& oid );
 
     protected:
         WriteBackListener( const string& addr );

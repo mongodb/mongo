@@ -1,5 +1,7 @@
 // sharding_balance4.js
 
+// check that doing updates done during a migrate all go to the right place
+
 s = new ShardingTest( "slow_sharding_balance4" , 2 , 1 , 1 , { chunksize : 1 } )
 
 s.adminCommand( { enablesharding : "test" } );
@@ -36,9 +38,8 @@ for ( i=0; i<N*10; i++ ){
 }
 db.getLastError();
 
-s.printChunks( "test.foo" )
-
-for ( var i=0; i<10; i++ ){
+for ( var i=0; i<50; i++ ){
+    s.printChunks( "test.foo" )
     if ( check( "initial:" + i , true ) )
         break;
     sleep( 5000 )
@@ -56,8 +57,12 @@ function check( msg , dontAssert ){
         if ( z && z.x == e )
             continue;
         
-        if ( dontAssert )
+        if ( dontAssert ){
+            if ( z )
+                delete z.s;
+            print( "not asserting for key failure: " + x + " want: " + e + " got: " + tojson(z) )
             return false;
+        }
 
         // we will assert past this point but wait a bit to see if it is because the missing update
         // was being held in the writeback roundtrip
@@ -81,8 +86,13 @@ function check( msg , dontAssert ){
 function diff(){
     var myid = doUpdate( false )
     var le = db.getLastErrorCmd();
+
     if ( le.err )
         print( "ELIOT ELIOT : " + tojson( le ) + "\t" + myid );
+
+    assert( le.updatedExisting , "GLE diff 1: " + tojson(le) )
+    assert.eq( 1 , le.n , "GLE diff 2: " + tojson(le) )
+
 
     if ( Math.random() > .99 ){
         db.getLastError()

@@ -53,22 +53,24 @@ namespace mongo {
     }
 
     /* static */
-    void WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ) {
+    BSONObj WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ) {
         Timer t;
         for ( int i=0; i<5000; i++ ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[connectionId];
                 if ( oid <= s.id ) {
-                    // TODO return gle
-                    return;
+                    assert( oid == s.id );
+                    return s.gle;
                 }
+
             }
             sleepmillis( 10 );
         }
         stringstream ss;
         ss << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms";
         uasserted( 13403 , ss.str() );
+        return BSONObj(); // never gets here
     }
 
     void WriteBackListener::run() {
@@ -139,10 +141,11 @@ namespace mongo {
                     try {
                         Request r( m , 0 );
                         r.init();
+                        r.getClientInfo()->noAutoSplit();
                         r.process();
                         
                         BSONObjBuilder b;
-                        if ( ! r.getClientInfo()->getLastError( BSONObj() , b ) ) {
+                        if ( ! r.getClientInfo()->getLastError( BSON( "getLastError" << 1 ) , b ) ) {
                             b.appendBool( "commandFailed" , true );
                         }
                         gle = b.obj();
