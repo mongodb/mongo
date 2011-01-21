@@ -24,6 +24,9 @@ test:
 	rm -f test
 	scons --d test
 
+test_js_ip_addr: # as root
+	python buildscripts/smoke.py jstests/ipaddr.js
+
 run_server: # as root
 	/opt/mongo/bin/mongod --fork --dbpath=$(MONGO_DB_PATH) --logpath=$(MONGOD_LOGFILE)
 
