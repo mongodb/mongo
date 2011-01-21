@@ -682,13 +682,29 @@ namespace mongo {
                 return OBJECT_TO_JSVAL( o );
             }
             case BinData: {
-                JSObject * o = JS_NewObject( _context , &bindata_class , 0 , 0 );
-                CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
                 int len;
                 const char * data = e.binData( len );
                 assert( data );
+                JSObject * o;
+                switch (e.binDataType()) {
+                case bdtUUID:
+                    o = JS_NewObject( _context , &uuid_class , 0 , 0 );
+                    CHECKNEWOBJECT(o,_context,"Bindata_IpAddr");
+                    break;
+                case bdtIpAddr:
+                    o = JS_NewObject( _context , &ip_addr_class , 0 , 0 );
+                    CHECKNEWOBJECT(o,_context,"Bindata_IpAddr");
+                    break;
+                case bdtMacAddr:
+                    o = JS_NewObject( _context , &mac_addr_class , 0 , 0 );
+                    CHECKNEWOBJECT(o,_context,"Bindata_MacAddr");
+                    break;
+                default:
+                    o = JS_NewObject( _context , &bindata_class , 0 , 0 );
+                    CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
+                    break;
+                } // end switch
                 assert( JS_SetPrivate( _context , o , new BinDataHolder( data , len ) ) );
-
                 setProperty( o , "len" , toval( (double)len ) );
                 setProperty( o , "type" , toval( (double)e.binDataType() ) );
                 return OBJECT_TO_JSVAL( o );

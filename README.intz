@@ -1,0 +1,48 @@
+New Features added by Intrusion Inc (INTZ)
+dnevil@intrusion.com
+
+Added the following data types to BSON and JavaScript:
+
+IpAddr - Contains an IPv4 or IPv6 address along with a netmask
+    Examples to try in the shell:
+    var ip4 = IpAddr("192.168.1.1")
+    ip4.mask
+    ip4.version
+    ip4.mask = 16
+    ip4.mask
+    ip4 = IpAddr("192.168.1.1/24")
+    ip4.mask
+    ip4.network
+    ip4.broadcast
+    var ip6 = IpAddr("1234::abcd");
+    ip6.mask
+    ip6.version
+    ip6.mask = 64
+    ip6.mask
+    var ip6 = IpAddr("1234::abcd/32");
+    ip6.network
+    ip6.broadcast
+    ip6 = IpAddr("::192.168.1.1/16");
+    db.test.insert({ip: IpAddr("192.168.1.1")})
+    db.test.insert({ip: IpAddr("1234::")})
+    db.test.find()
+
+MacAddr - Contains a 6-octet Media Access Control Address (Ethernet hardware address)
+    var mac = MacAddr("00:23:45:ab:cd:ef");
+    db.test.insert({mac: MacAddr("1:2:3:4:5:6")})
+    db.test.find()
+
+UUID is now a native type of JavaScript.  This now works (no need to say 'new UUID(...'
+    var uuid = UUID("123456789abcdef12345678901234567");
+    db.test.insert({uuid: UUID("123456789abcdef12345678901234567")})
+
+Try this from the command line:
+    mongoexport -c test
+
+Conditional Operators and IpAddr
+
+    <   $lt     IpAddr("192.168.1.5") < IpAddr("192.168.1.6")
+    <=  $lte    IpAddr("192.168.1.5") <= IpAddr("192.168.1.5")
+    >   $gt     IpAddr("192.168.2.5") > IpAddr("192.168.1.5")
+    >=  $gte    IpAddr("192.168.2.5") >= IpAddr("192.168.2.5")
+

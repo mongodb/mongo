@@ -100,6 +100,8 @@ namespace mongo {
         ByteArrayDeprecated=2, /* use BinGeneral instead */
         bdtUUID = 3,
         MD5Type=5,
+        bdtIpAddr = 6,
+        bdtMacAddr = 7,
         bdtCustom=128
     };
 
