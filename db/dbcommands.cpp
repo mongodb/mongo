@@ -1840,7 +1840,7 @@ namespace mongo {
             ok = execCommand( c , client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
         }
         else {
-            anObjBuilder.append("errmsg", "no such cmd");
+            anObjBuilder.append("errmsg", str::stream() << "no such cmd: " << e.fieldName() );
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
 
