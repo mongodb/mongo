@@ -19,6 +19,7 @@ assert.eq( ip1.version, 4, "1080");
 
 // Test netmasks with broadcast and network
 ip = IpAddr("::/1")
+assert.eq( ip.version, 6, "1105");
 assert.eq( ip.broadcast, 'IpAddr("7FFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF")', 1100 )
 ip.mask = 15
 assert.eq( ip.broadcast, 'IpAddr("0001:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF:FFFF")', 1110 )

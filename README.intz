@@ -45,7 +45,4 @@ Conditional Operators and IpAddr
     <=  $lte    IpAddr("192.168.1.5") <= IpAddr("192.168.1.5")
     >   $gt     IpAddr("192.168.2.5") > IpAddr("192.168.1.5")
     >=  $gte    IpAddr("192.168.2.5") >= IpAddr("192.168.2.5")
-        $near
-        $within
-        $max_distance
 
