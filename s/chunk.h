@@ -98,6 +98,7 @@ namespace mongo {
         /**
          * if the amount of data written nears the max size of a shard
          * then we check the real size, and if its too big, we split
+         * @return if something was split
          */
         bool splitIfShould( long dataWritten );
 
