@@ -15,7 +15,7 @@ assert.throws( function(){
                            return 1; 
                        } 
             } ).length();
-} , "can't save from $where" );
+} , null , "can't save from $where" );
 
 assert.eq( 0 , db.jni2t.find().length() , "B" )
 

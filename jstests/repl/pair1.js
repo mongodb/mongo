@@ -40,8 +40,8 @@ check = function( s ) {
 // check that slave reads and writes are guarded
 checkSlaveGuard = function( s ) {
     var t = s.getDB( baseName + "-temp" ).temp;
-    assert.throws( t.find().count, {}, "not master" );
-    assert.throws( t.find(), {}, "not master", "find did not assert" );
+    assert.throws( t.find().count, [], "not master" );
+    assert.throws( t.find(), [], "not master", "find did not assert" );
     
     checkError = function() {
         assert.eq( "not master", s.getDB( "admin" ).getLastError() );

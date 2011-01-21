@@ -18,7 +18,7 @@ r = function( k , v ){
     return 1;
 }
 
-assert.throws( function(){ t.mapReduce( m , r , "mr_bigobject_out" ); } , "emit should fail" )
+assert.throws( function(){ t.mapReduce( m , r , "mr_bigobject_out" ); } , null , "emit should fail" )
 
 m = function(){
     emit( 1 , this.s );
