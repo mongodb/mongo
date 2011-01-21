@@ -23,22 +23,23 @@ function tos( o ){
 
 print("Testing mr replace into other DB")
 res = t.mapReduce( m , r , { out : { replace: outCollStr, db: outDbStr } } )
+printjson( res );
 expected = { "1" : 1 , "2" : 2 , "3" : 2 , "4" : 1 };
 outDb = db.getMongo().getDB(outDbStr);
 outColl = outDb[outCollStr];
 str = tos( outColl.convertToSingleObject("value") )
 print("Received result: " + str);
-assert.eq( tos( expected ) , str , "Received wrong result " + str );
+assert.eq( tos( expected ) , str , "A Received wrong result " + str );
 
 print("checking result field");
-assert.eq(res.result.collection, outCollStr, "Wrong collection " + res.result.collection)
-assert.eq(res.result.db, outDbStr, "Wrong db " + res.result.db)
+assert.eq(res.result.collection, outCollStr, "B1 Wrong collection " + res.result.collection)
+assert.eq(res.result.db, outDbStr, "B2 Wrong db " + res.result.db)
 
 print("Replace again and check");
 outColl.save({_id: "5", value : 1});
 t.mapReduce( m , r , { out : { replace: outCollStr, db: outDbStr } } )
 str = tos( outColl.convertToSingleObject("value") )
 print("Received result: " + str);
-assert.eq( tos( expected ) , str , "Received wrong result " + str );
+assert.eq( tos( expected ) , str , "C1 Received wrong result " + str );
 
 

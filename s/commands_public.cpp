@@ -868,9 +868,19 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
+                const string shardedOutputCollection = getTmpName( collection );
+                BSONObj customOut;
+                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut );
+
+                bool customOutDB = ! customOut.isEmpty() && customOut.hasField( "db" );
+
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                    if ( customOutDB ) {
+                        errmsg = "can't use out 'db' with non-sharded db";
+                        return false;
+                    }
                     return passthrough( conf , cmdObj , result );
                 }
 
@@ -886,9 +896,6 @@ namespace mongo {
                 set<Shard> shards;
                 cm->getShardsForQuery( shards , q );
 
-                const string shardedOutputCollection = getTmpName( collection );
-                BSONObj customOut;
-                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut );
 
                 BSONObjBuilder finalCmd;
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
@@ -918,7 +925,7 @@ namespace mongo {
                 // by default the target database is same as input
                 Shard outServer = conf->getPrimary();
                 string outns = fullns;
-                if (!customOut.isEmpty() && customOut.hasField("db")) {
+                if ( customOutDB ) {
                 	// have to figure out shard for the output DB
                 	BSONElement elmt = customOut.getField("db");
                 	string outdb = elmt.valuestrsafe();
@@ -926,6 +933,8 @@ namespace mongo {
                     DBConfigPtr conf2 = grid.getDBConfig( outdb , true );
                 	outServer = conf2->getPrimary();
                 }
+                log() << "customOut: " << customOut << " outServer: " << outServer << endl;
+                        
                 ShardConnection conn( outServer , outns );
                 BSONObj finalResult;
                 bool ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
