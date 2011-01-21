@@ -146,7 +146,7 @@ namespace mongo {
 
 
     HostAndPort ReplicaSetMonitor::getMaster() {
-        if ( _master < 0 )
+        if ( _master < 0 || !_nodes[_master].ok )
             _check();
 
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
