@@ -121,6 +121,26 @@ namespace mongo {
         return *this;
     }
 
+    /* add all the fields from the object specified to this object if they don't exist */
+    inline BSONObjBuilder& BSONObjBuilder::appendElementsUnique(BSONObj x) {
+        set<string> have;
+        {
+            BSONObjIterator i = iterator();
+            while ( i.more() )
+                have.insert( i.next().fieldName() );
+        }
+        
+        BSONObjIterator it(x);
+        while ( it.more() ) {
+            BSONElement e = it.next();
+            if ( have.count( e.fieldName() ) )
+                continue;
+            append(e);
+        }
+        return *this;
+    }
+
+
     inline bool BSONObj::isValid() {
         int x = objsize();
         return x > 0 && x <= BSONObjMaxInternalSize;
@@ -203,6 +223,14 @@ namespace mongo {
         const char * s = _b.buf() + _offset;
         const char * e = _b.buf() + _b.len();
         return BSONObjIterator( s , e );
+    }
+
+    inline bool BSONObjBuilder::hasField( const StringData& name ) const {
+        BSONObjIterator i = iterator();
+        while ( i.more() )
+            if ( strcmp( name.data() , i.next().fieldName() ) == 0 )
+                return true;
+        return false;
     }
 
     /* WARNING: nested/dotted conversions are not 100% reversible
