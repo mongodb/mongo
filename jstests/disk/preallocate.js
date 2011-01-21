@@ -14,7 +14,7 @@ expectedMB = 100;
 if ( m.getDB( baseName ).serverBits() < 64 )
     expectedMB /= 4;
 
-assert.soon( function() { return m.getDBs().totalSize > expectedMB * 1000000; }, "expected second file to bring total size over " + expected + "MB" );
+assert.soon( function() { return m.getDBs().totalSize > expectedMB * 1000000; }, "\n\n\nFAIL preallocate.js expected second file to bring total size over " + expectedMB + "MB" );
 
 stopMongod( port );
 
