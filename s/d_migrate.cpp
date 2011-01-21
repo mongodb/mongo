@@ -218,8 +218,10 @@ namespace mongo {
         }
         
         void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ){
-            if ( ! _active )
+            if ( ! _active ) {
+                RARELY log() << "logOpForSharding got called when inactive for '" << ns << endl;
                 return;
+            }
 
             if ( _ns != ns )
                 return;
