@@ -347,6 +347,11 @@ namespace mongo {
             conn->remove( ns , o , justOne );
             return JS_TRUE;
         }
+        catch ( std::exception& e ) {
+            JS_ReportError( cx , e.what() );
+            return JS_FALSE;
+        }
+        
         catch ( ... ) {
             JS_ReportError( cx , "error doing remove" );
             return JS_FALSE;
