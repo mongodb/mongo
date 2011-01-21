@@ -174,6 +174,11 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
 }
 
 DBCollection.prototype.remove = function( t , justOne ){
+    for ( var k in t ){
+        if ( k == "_id" && typeof( t[k] ) == "undefined" ){
+            throw "can't have _id set to undefined in a remove expression"
+        }
+    }
     this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
 }
 
