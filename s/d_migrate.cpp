@@ -219,16 +219,17 @@ namespace mongo {
         
         void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ){
             if ( ! _active ) {
-                RARELY log() << "logOpForSharding got called when inactive for '" << ns << "'" << endl;
                 return;
             }
 
             if ( _ns != ns )
                 return;
-            
+
             char op = opstr[0];
             if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
                 return;
+
+            RARELY log() << "logOpForSharding got to core portion: '" << ns << "'" << endl;
 
             BSONElement ide;
             if ( patt )
