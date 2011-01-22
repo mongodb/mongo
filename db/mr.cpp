@@ -203,10 +203,8 @@ namespace mongo {
             long long renameIfNeeded( DBDirectClient& db ){
                 if ( finalLong != tempLong ){
                     db.dropCollection( finalLong );
-                    if ( db.count( tempLong ) ){
-                        BSONObj info;
-                        uassert( 10076 ,  "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
-                    }
+                    BSONObj info;
+                    uassert( 10076 ,  "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
                 }
                 return db.count( finalLong );
             }
