@@ -139,18 +139,24 @@ namespace mongo {
 
                     BSONObj gle;
                     try {
+                        
                         Request r( m , 0 );
                         r.init();
-                        r.getClientInfo()->noAutoSplit();
+
+                        ClientInfo * ci = r.getClientInfo();
+                        ci->noAutoSplit();
+
                         r.process();
                         
+                        ci->newRequest(); // this so we flip prev and cur shards
+
                         BSONObjBuilder b;
-                        if ( ! r.getClientInfo()->getLastError( BSON( "getLastError" << 1 ) , b ) ) {
+                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b ) ) {
                             b.appendBool( "commandFailed" , true );
                         }
                         gle = b.obj();
 
-                        r.getClientInfo()->clearSinceLastGetError();
+                        ci->clearSinceLastGetError();
                     }
                     catch ( DBException& e ) {
                         error() << "error processing writeback: " << e << endl;
