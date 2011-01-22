@@ -130,10 +130,20 @@ namespace mongo {
     };
 
     struct OldDataCleanup {
+        static AtomicUInt _numThreads; // how many threads are doing async cleanusp
+
         string ns;
         BSONObj min;
         BSONObj max;
         set<CursorId> initial;
+
+        OldDataCleanup(){
+            _numThreads++;
+        }
+        ~OldDataCleanup(){
+            _numThreads--;
+        }
+
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             writelock lk(ns);
@@ -141,7 +151,10 @@ namespace mongo {
             long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
             log() << "moveChunk deleted: " << num << endl;
         }
+
     };
+
+    AtomicUInt OldDataCleanup::_numThreads = 0;
 
     static const char * const cleanUpThreadName = "cleanupOldData";
 
@@ -507,6 +520,8 @@ namespace mongo {
 
         bool getInCriticalSection() const { scoped_lock l(_m); return _inCriticalSection; }
         void setInCriticalSection( bool b ) { scoped_lock l(_m); _inCriticalSection = b; }
+
+        bool isActive() const { return _getActive(); }
 
     private:
         mutable mongo::mutex _m; // protect _inCriticalSection and _active
@@ -1427,6 +1442,11 @@ namespace mongo {
 
             if ( migrateStatus.getActive() ) {
                 errmsg = "migrate already in progress";
+                return false;
+            }
+            
+            if ( OldDataCleanup::_numThreads > 0 ) {
+                errmsg = "still waiting for a previous migrates data to get cleaned, can't accept new chunks";
                 return false;
             }
 
