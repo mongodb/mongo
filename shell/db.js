@@ -34,7 +34,10 @@ DB.prototype.commandHelp = function( name ){
     var c = {};
     c[name] = 1;
     c.help = true;
-    return this.runCommand( c ).help;
+    var res = this.runCommand( c );
+    if ( ! res.ok )
+        throw res.errmsg;
+    return res.help;
 }
 
 DB.prototype.runCommand = function( obj ){
