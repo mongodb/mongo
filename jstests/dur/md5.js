@@ -58,6 +58,8 @@ work();
 // wait for group commit.
 printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
 
+log("kill -9");
+
 // kill the process hard
 stopMongod(30001, /*signal*/9);
 
@@ -67,13 +69,18 @@ stopMongod(30001, /*signal*/9);
 // This ensures we get an md5 exception instead of some other type of exception.
 fuzzFile( path + "/journal/j._0", 39755 );
 
-log();
+log("run mongod again recovery should fail");
 
 // 100 exit code corresponds to EXIT_UNCAUGHT, which is triggered when there is an exception during recovery.
 // 14 is is sometimes triggered instead due to SERVER-2184
-exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 13 );
+exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", /*9*/13 );
 print( "exitCode: " + exitCode );
 assert( exitCode == 100 || exitCode == 14 ); 
 
 // TODO Possibly we could check the mongod log to verify that the correct type of exception was thrown.  But
 // that would introduce a dependency on the mongod log format, which we may not want.
+
+print("SUCCESS md5.js");
+
+// if we sleep a littler here we may get more out the mongod output logged
+sleep(500);
