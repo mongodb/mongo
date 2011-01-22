@@ -17,7 +17,7 @@ function log(str) {
         print(testname+" step " + step++);
 }
 
-/** Changes here may require updating the byte index of the md5 hash, see fuzzFile comments below. */
+/** Changes here may require updating the byte index of the md5 hash, see File comments below. */
 function work() {
     log("work");
     var d = conn.getDB("test");
@@ -67,7 +67,16 @@ stopMongod(30001, /*signal*/9);
 
 // Bit flip the first byte of the md5sum contained within the opcode footer.
 // This ensures we get an md5 exception instead of some other type of exception.
-fuzzFile( path + "/journal/j._0", 39755 );
+var file = path + "/journal/j._0";
+//run("cp", file, "/tmp/before");
+//fuzzFile(file, 39755);
+
+// journal header is 8192
+// jsectheader is 12
+// so a little beyond that
+fuzzFile(file, 8214);
+
+//run("cp", file, "/tmp/after");
 
 log("run mongod again recovery should fail");
 
