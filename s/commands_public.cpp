@@ -837,6 +837,7 @@ namespace mongo {
                     string fn = e.fieldName();
                     if ( fn == "map" ||
                             fn == "mapreduce" ||
+                            fn == "mapparams" ||
                             fn == "reduce" ||
                             fn == "query" ||
                             fn == "sort" ||
