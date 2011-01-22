@@ -469,6 +469,18 @@ namespace mongo {
             try {
                 _groupCommit();
             }
+            catch(DBException& e ) { 
+                log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
+                abort();
+            }
+            catch(std::ios_base::failure& e) { 
+                log() << "ios_base exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+                abort();
+            }
+            catch(std::bad_alloc& e) { 
+                log() << "bad_alloc exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+                abort();
+            }
             catch(std::exception& e) {
                 log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
                 abort(); // based on myTerminate()
