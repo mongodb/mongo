@@ -397,13 +397,21 @@ namespace mongo {
             RecoveryJob::get().go(journalFiles);
         }
 
+        extern mutex groupCommitMutex;
+
         /** recover from a crash
+            called during startup
             throws on error
         */
         void recover() {
             // we use a lock so that exitCleanly will wait for us
             // to finish (or at least to notice what is up and stop)
             writelock lk;
+
+            // this is so the mutexdebugger doesn't get confused.  we are actually single threaded 
+            // at this point in the program so it wouldn't have been a true problem (I think)
+            scoped_lock lk2(groupCommitMutex);
+
             _recover(); // throws on interruption
         }
 

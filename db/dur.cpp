@@ -418,6 +418,9 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
+        mutex groupCommitMutex("groupCommit");
+
+        /** locking: in read lock when called. */
         static void _groupCommit() {
             stats.curr->_commits++;
 
@@ -426,6 +429,10 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return;
             }
+
+            // we need to make sure two group commits aren't running at the same time
+            // (and we are only read locked in the dbMutex, so it could happen)
+            scoped_lock lk(groupCommitMutex);
 
             PREPLOGBUFFER();
 
@@ -461,17 +468,14 @@ namespace mongo {
                 REMAPPRIVATEVIEW();
             }
         }
+
         /** locking in read lock when called
             @see MongoMMF::close()
         */
-        static mutex groupCommitMutex("groupCommit");
         static void groupCommit() {
             // we need to be at least read locked on the dbMutex so that we know the write intent data 
             // structures are not changing while we work
             dbMutex.assertAtLeastReadLocked();
-
-            // additionally, we need to make sure two group commits aren't running at the same time
-            scoped_lock lk(groupCommitMutex);
 
             try {
                 _groupCommit();
