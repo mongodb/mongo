@@ -312,4 +312,49 @@ namespace mongo {
         return p.release();
     }
 
+    ShardChunkManager::Snapshot ShardChunkManager::snapshot() const {
+        return Snapshot( this );
+    }
+
+    // -----------------------------------
+    // -------  Snapshot -----------------
+    // -----------------------------------
+
+    ShardChunkManager::Snapshot::Snapshot() 
+        : _real(false){
+    }
+
+    ShardChunkManager::Snapshot::Snapshot( const ShardChunkManager* m ) 
+        : _real(true), _key( m->_key ) , _rangesMap( m->_rangesMap ) {
+    }
+
+    ShardChunkManager::Snapshot::Snapshot( const RangeMap& m , const BSONObj& key ) 
+        : _real(true), _key( key ) , _rangesMap( m ) {
+    }
+    
+    bool ShardChunkManager::Snapshot::belongsToMe( const BSONObj& obj ) const {
+        if ( ! _real )
+            return true;
+
+        if ( _rangesMap.size() == 0 )
+            return false;
+
+        BSONObj x = obj.extractFields(_key);
+
+        RangeMap::const_iterator it = _rangesMap.upper_bound( x );
+        if ( it != _rangesMap.begin() )
+            it--;
+
+        return contains( it->first , it->second , x );
+    }
+
+    string ShardChunkManager::Snapshot::toString() const {
+        stringstream ss;
+        ss << "[ShardChunkManager ";
+        if ( _real )
+            ss << " key: " << _key;
+        ss << "]";
+        return ss.str();
+    }
+    
 }  // namespace mongo

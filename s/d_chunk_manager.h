@@ -116,6 +116,9 @@ namespace mongo {
         ShardChunkVersion getVersion() const { return _version; }
         BSONObj getKey() const { return _key.getOwned(); }
         unsigned getNumChunks() const { return _chunksMap.size(); }
+        
+        class Snapshot;
+        Snapshot snapshot() const;
 
     private:
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
@@ -142,6 +145,36 @@ namespace mongo {
 
         /** can only be used in the cloning calls */
         ShardChunkManager() {}
+
+    public:
+
+        /** 
+         * if a query starts before/during a migration, and finished once a migration is done
+         * you need to ensure that you still don't get the new docs
+         * even though they are owned by your shard by the end
+         */
+        class Snapshot {
+        public:
+            Snapshot();
+            Snapshot( const ShardChunkManager * m );
+            Snapshot( const RangeMap& m , const BSONObj& key );
+
+            /**
+             * Checks whether a document belongs to this shard.
+             *
+             * @param obj document containing sharding keys (and, optionally, other attributes)
+             * @return true if shards hold the object
+             */
+            bool belongsToMe( const BSONObj& obj ) const;
+            
+            string toString() const;
+
+        private:
+            bool _real; // if this is actually a real filtering chunk
+            BSONObj _key;            
+            RangeMap _rangesMap;
+        };
+        
 
     };
 

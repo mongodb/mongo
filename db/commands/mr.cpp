@@ -721,13 +721,13 @@ namespace mongo {
                     ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
                     long long mapTime = 0;
                     {
-                        ShardChunkManagerPtr chunkManager;
-                        if ( shardingState.needShardChunkManager( config.ns ) )
-                            chunkManager = shardingState.getShardChunkManager( config.ns );
-
                         readlock lock( config.ns );
                         Client::Context ctx( config.ns );
-
+                        
+                        ShardChunkManager::Snapshot chunkSnapshot;
+                        if ( shardingState.needShardChunkManager( config.ns ) ) 
+                            chunkSnapshot = shardingState.getShardChunkManager( config.ns )->snapshot();
+                        
                         shared_ptr<Cursor> temp = bestGuessCursor( config.ns.c_str(), config.filter, config.sort );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
                         
@@ -749,7 +749,7 @@ namespace mongo {
 
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
-                            if ( chunkManager && ! chunkManager->belongsToMe( o ) )
+                            if ( ! chunkSnapshot.belongsToMe( o ) )
                                 continue;
 
                             if ( config.verbose ) mt.reset();
