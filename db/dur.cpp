@@ -568,6 +568,7 @@ namespace mongo {
                     abort(); // based on myTerminate()
                 }
             }
+            cc().shutdown();
         }
 
         void recover();
