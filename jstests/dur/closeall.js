@@ -40,7 +40,8 @@ function f() {
             res = db2.adminCommand("closeAllDatabases");
         }
         catch (e) {
-            print("\n\n\nFAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i + "\n\n\n");
+            sleep(5000); // sleeping a little makes console output order prettier
+            print("\n\n\nFAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i);
             try {
                 print("getlasterror:");
                 printjson(db2.getLastErrorObj());
@@ -51,6 +52,7 @@ function f() {
             catch (e) {
                 print("got another exception : " + e);
             }
+            print("\n\n\n");
             // sleep a little to capture possible mongod output?
             sleep(2000);
             throw e;
@@ -67,4 +69,5 @@ function f() {
 }
 
 f();
+sleep(500);
 print("SUCCESS closeall.js");
