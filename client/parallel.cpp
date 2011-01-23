@@ -467,10 +467,11 @@ namespace mongo {
     // ---- Future -----
     // -----------------
 
-    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd ) {
+    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
         _server = server;
         _db = db;
         _cmd = cmd;
+        _conn = conn;
         _done = false;
     }
 
@@ -484,9 +485,19 @@ namespace mongo {
         setThreadName( "future" );
 
         try {
-            ScopedDbConnection conn( res->_server );
+            DBClientBase * conn = res->_conn;
+            
+            scoped_ptr<ScopedDbConnection> myconn;
+            if ( ! conn ){
+                myconn.reset( new ScopedDbConnection( res->_server ) );
+                conn = myconn->get();
+            }
+            
             res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
-            conn.done();
+
+            if ( myconn )
+                myconn->done();
+
         }
         catch ( std::exception& e ) {
             error() << "Future::commandThread exception: " << e.what() << endl;
@@ -495,8 +506,8 @@ namespace mongo {
         res->_done = true;
     }
 
-    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd ) {
-        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd ));
+    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
+        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd , conn  ));
         res->_thr.reset( new boost::thread( boost::bind(Future::commandThread, res) ) );
 
         return res;

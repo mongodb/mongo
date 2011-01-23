@@ -269,11 +269,12 @@ namespace mongo {
 
         private:
 
-            CommandResult( const string& server , const string& db , const BSONObj& cmd );
+            CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn );
 
             string _server;
             string _db;
             BSONObj _cmd;
+            DBClientBase * _conn;
 
             scoped_ptr<boost::thread> _thr;
 
@@ -285,8 +286,14 @@ namespace mongo {
         };
 
         static void commandThread(shared_ptr<CommandResult> res);
-
-        static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd );
+        
+        /**
+         * @param server server name
+         * @param db db name
+         * @param cmd cmd to exec
+         * @param conn optional connection to use.  will use standard pooled if non-specified
+         */
+        static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn = 0 );
     };
 
 
