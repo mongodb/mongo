@@ -51,6 +51,8 @@ function f() {
             catch (e) {
                 print("got another exception : " + e);
             }
+            // sleep a little to capture possible mongod output?
+            sleep(2000);
             throw e;
         }
 	    assert( res.ok, "closeAllDatabases res.ok=false");
