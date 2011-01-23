@@ -41,6 +41,16 @@ function f() {
         }
         catch (e) {
             print("\n\n\nFAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i + "\n\n\n");
+            try {
+                print("getlasterror:");
+                printjson(db2.getLastErrorObj());
+                print("trying one more closealldatabases:");
+                res = db2.adminCommand("closeAllDatabases");
+                printjson(res);
+            }
+            catch (e) {
+                print("got another exception : " + e);
+            }
             throw e;
         }
 	    assert( res.ok, "closeAllDatabases res.ok=false");
