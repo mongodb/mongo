@@ -464,14 +464,14 @@ namespace mongo {
         /** locking in read lock when called
             @see MongoMMF::close()
         */
+        static mutex groupCommitMutex("groupCommit");
         static void groupCommit() {
             // we need to be at least read locked on the dbMutex so that we know the write intent data 
             // structures are not changing while we work
             dbMutex.assertAtLeastReadLocked();
 
             // additionally, we need to make sure two group commits aren't running at the same time
-            static mutex m("groupcommit");
-            scoped_lock lk(m);
+            scoped_lock lk(groupCommitMutex);
 
             try {
                 _groupCommit();
