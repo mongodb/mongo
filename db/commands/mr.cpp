@@ -725,8 +725,11 @@ namespace mongo {
                         Client::Context ctx( config.ns );
                         
                         ShardChunkManager::Snapshot chunkSnapshot;
-                        if ( shardingState.needShardChunkManager( config.ns ) ) 
-                            chunkSnapshot = shardingState.getShardChunkManager( config.ns )->snapshot();
+                        if ( shardingState.needShardChunkManager( config.ns ) ) {
+                            ShardChunkManagerPtr p = shardingState.getShardChunkManager( config.ns );
+                            if ( p )
+                                chunkSnapshot = p->snapshot();
+                        }
                         
                         shared_ptr<Cursor> temp = bestGuessCursor( config.ns.c_str(), config.filter, config.sort );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
