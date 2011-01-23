@@ -3375,7 +3375,7 @@ const StringData _jscode_raw_collection =
 "var raw = this._db.runCommand( c );\n" 
 "if ( ! raw.ok ){\n" 
 "__mrerror__ = raw;\n" 
-"throw \"map reduce failed:\" + tostring(raw);\n" 
+"throw \"map reduce failed:\" + tojson(raw);\n" 
 "}\n" 
 "return new MapReduceResult( this._db , raw );\n" 
 "\n" 
