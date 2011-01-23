@@ -127,7 +127,7 @@ if (diff != "") {
 assert(diff == "", "error test.ns files differ");
 
 log("check data matches .0");
-var diff = runDiff(path1 + "/test.0", path2 + "/test.0");
+diff = runDiff(path1 + "/test.0", path2 + "/test.0");
 if (diff != "") {
     print("\n\n\nDIFFERS\n");
     print(diff);
