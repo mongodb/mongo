@@ -600,8 +600,10 @@ DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString )
         Object.extend( c , optionsOrOutString );
 
     var raw = this._db.runCommand( c );
-    if ( ! raw.ok )
-        throw "map reduce failed: " + tojson( raw );
+    if ( ! raw.ok ){
+        __mrerror__ = raw;
+        throw "map reduce failed:" + tostring(raw);
+    }
     return new MapReduceResult( this._db , raw );
 
 }
