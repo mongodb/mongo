@@ -725,7 +725,7 @@ namespace mongo {
         FileAllocator::get()->waitUntilFinished();
 
         if( cmdLine.dur ) {
-            log() << "shutdown: final commit..." << endl;
+            log() << "shutdown: lock for final commit..." << endl;
             {
                 int n = 10;
                 while( 1 ) {
@@ -733,6 +733,7 @@ namespace mongo {
                     // to be consistent with that.
                     readlocktry w("", 20000);
                     if( w.got() ) { 
+                        log() << "shutdown: final commit..." << endl;
                         getDur().commitNow();
                         break;
                     }
