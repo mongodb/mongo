@@ -901,26 +901,46 @@ namespace mongo {
                 BSONObjBuilder finalCmd;
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
                 finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
+                
+                
+                {
+                    // we need to use our connections to the shard
+                    // so filtering is done correctly for un-owned docs
+                    // so we allocate them in our thread
+                    // and hand off
 
-                list< shared_ptr<Future::CommandResult> > futures;
+                    list< shared_ptr<ShardConnection> > shardConns;
 
-                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand ) );
-                }
-
-                BSONObjBuilder shardresults;
-                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
-                    shared_ptr<Future::CommandResult> res = *i;
-                    if ( ! res->join() ) {
-                        errmsg = "mongod mr failed: ";
-                        errmsg += res->result().toString();
-                        return 0;
+                    list< shared_ptr<Future::CommandResult> > futures;
+                    
+                    for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
+                        shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , fullns ) );
+                        futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , temp->get() ) );
+                        shardConns.push_back( temp );
                     }
-                    shardresults.append( res->getServer() , res->result() );
-                }
+                    
+                    bool failed = false;
+                    
+                    BSONObjBuilder shardresults;
+                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
+                        shared_ptr<Future::CommandResult> res = *i;
+                        if ( ! res->join() ) {
+                            error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
+                            result.append( "cause" , res->result() );
+                            errmsg = "mongod mr failed: ";
+                            errmsg += res->result().toString();
+                            failed = true;
+                            continue;
+                        }
+                        shardresults.append( res->getServer() , res->result() );
+                    }
+                    
+                    if ( failed )
+                        return 0;
 
-                finalCmd.append( "shards" , shardresults.obj() );
-                timingBuilder.append( "shards" , t.millis() );
+                    finalCmd.append( "shards" , shardresults.obj() );
+                    timingBuilder.append( "shards" , t.millis() );
+                }
 
                 Timer t2;
                 // by default the target database is same as input
