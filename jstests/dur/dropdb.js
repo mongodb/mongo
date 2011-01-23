@@ -1,5 +1,4 @@
-/* 
-durability test dropping a database
+/* durability test dropping a database
 */
 
 var debugging = false;
@@ -28,15 +27,15 @@ function runDiff(a, b) {
 
 function log(str) {
     if (str)
-        print(testname + " step " + step++ + " " + str);
+        print("\n" + testname + " step " + step++ + " " + str);
     else
-        print(testname + " step " + step++);
+        print("\n" + testname + " step " + step++);
 }
 
 // if you do inserts here, you will want to set _id.  otherwise they won't match on different 
 // runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
-    log("work");
+    log("work (add data, drop database)");
 
     var e = conn.getDB("teste");
     e.foo.insert({ _id: 99 });
@@ -50,20 +49,22 @@ function work() {
     d.foo.insert({ _id: 100 });
 
     // assure writes applied in case we kill -9 on return from this function
-    d.runCommand({ getlasterror: 1, fsync: 1 });
-
-    log("endwork");
+    assert(d.runCommand({ getlasterror: 1, fsync: 1 }).ok, "getlasterror not ok");
 }
 
 function verify() {
     log("verify");
     var d = conn.getDB("test");
-    assert(d.foo.count() == 1,"count1");
+    var count = d.foo.count();
+    if (count != 1) {
+        sleep(5000); // easier to read then
+        print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count + "\n\n\n");
+        assert(false);
+    }
     assert(d.foo.findOne()._id == 100, "100");
 
-    print("\n\ndropdb.js:");
+    print("dropdb.js teste.foo.findOne:");
     printjson(conn.getDB("teste").foo.findOne());
-    print();
 
     var teste = conn.getDB("teste");
     print("dropdb count " + teste.foo.count());
@@ -80,39 +81,37 @@ if (debugging) {
     quit();
 }
 
-log();
-
 // directories
 var path1 = "/data/db/" + testname + "nodur";
 var path2 = "/data/db/" + testname + "dur";
 
 // non-durable version
-log();
+log("mongod nodur");
 conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles");
 work();
 verify();
 stopMongod(30000);
 
 // durable version
-log();
+log("mongod dur");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
 work();
 verify();
 
 // kill the process hard
+log("kill 9");
 stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
-// restart and recover
-log();
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+log("restart and recover");
+conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 9);
+
+log("verify after recovery");
 verify();
 
-log("stop");
+log("stop mongod 30002");
 stopMongod(30002);
-
-// stopMongod seems to be asynchronous (hmmm) so we sleep here.
 sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
