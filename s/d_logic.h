@@ -27,6 +27,9 @@
 
 namespace mongo {
 
+    class Database;
+    class DiskLoc;
+
     typedef ShardChunkVersion ConfigVersion;
     typedef map<string,ConfigVersion> NSVersionMap;
 
