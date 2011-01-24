@@ -829,7 +829,7 @@ namespace mongo {
                 return ss.str();
             }
 
-            BSONObj fixForShards( const BSONObj& orig , const string& output, BSONObj& customOut ) {
+            BSONObj fixForShards( const BSONObj& orig , const string& output, BSONObj& customOut , string& badShardedField ) {
                 BSONObjBuilder b;
                 BSONObjIterator i( orig );
                 while ( i.more() ) {
@@ -856,7 +856,8 @@ namespace mongo {
                     	}
                     }
                     else {
-                        uassert( 10177 ,  (string)"don't know mr field: " + fn , 0 );
+                        badShardedField = fn;
+                        return BSONObj();
                     }
                 }
                 b.append( "out" , output );
@@ -870,8 +871,10 @@ namespace mongo {
                 string fullns = dbName + "." + collection;
 
                 const string shardedOutputCollection = getTmpName( collection );
+
+                string badShardedField;
                 BSONObj customOut;
-                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut );
+                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut , badShardedField );
 
                 bool customOutDB = ! customOut.isEmpty() && customOut.hasField( "db" );
 
@@ -883,6 +886,11 @@ namespace mongo {
                         return false;
                     }
                     return passthrough( conf , cmdObj , result );
+                }
+
+                if ( badShardedField.size() ) {
+                    errmsg = str::stream() << "unknown m/r field for sharding: " << badShardedField;
+                    return false;
                 }
 
                 BSONObjBuilder timingBuilder;
