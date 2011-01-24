@@ -59,11 +59,17 @@ namespace mongo {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[connectionId];
-                if ( oid <= s.id ) {
-                    assert( oid == s.id );
+                if ( oid < s.id ) {
+                    // this means we're waiting for a GLE that already passed.
+                    // it should be impossible becauseonce we call GLE, no other
+                    // writebacks should happen with that connection id
+                    msgasserted( 13633 , str::stream() << "got writeback waitfor for older id " <<
+                                 " oid: " << oid << " s.id: " << s.id << " connectionId: " << connectionId );
+                }
+                else if ( oid == s.id ) {
                     return s.gle;
                 }
-
+                
             }
             sleepmillis( 10 );
         }
