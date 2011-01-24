@@ -165,18 +165,9 @@ namespace mongo {
             _hash( embed ).append( b , "" );
 
             for ( size_t i=0; i<_other.size(); i++ ) {
-            	BSONElementSet eSet;
-                obj.getFieldsDotted(_other[i], eSet);
-
-                // For now, no multikeys
-                uassert( 13626, "no multikeys allowed in geo index", eSet.size() <= 1 );
-
-                BSONElement e;
-                if ( eSet.size() == 0 )
+                BSONElement e = obj.getFieldDotted(_other[i]);
+                if ( e.eoo() )
                     e = _spec->missingField();
-                else if ( eSet.size() == 1 )
-                	e = *(eSet.begin());
-
                 b.appendAs( e , "" );
             }
             keys.insert( b.obj() );
