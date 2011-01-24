@@ -302,6 +302,9 @@ namespace mongo {
         jsassert( args.Length() == 2 , "insert needs 2 args" );
         jsassert( args[1]->IsObject() , "have to insert an object" );
 
+        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+            return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
+
         DBClientBase * conn = getConnection( args );
         GETNS;
 
@@ -330,6 +333,9 @@ namespace mongo {
         jsassert( args.Length() == 2 || args.Length() == 3 , "remove needs 2 args" );
         jsassert( args[1]->IsObject() , "have to remove an object template" );
 
+        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+            return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
+
         DBClientBase * conn = getConnection( args );
         GETNS;
 
@@ -357,6 +363,9 @@ namespace mongo {
         jsassert( args.Length() >= 3 , "update needs at least 3 args" );
         jsassert( args[1]->IsObject() , "1st param to update has to be an object" );
         jsassert( args[2]->IsObject() , "2nd param to update has to be an object" );
+        
+        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+            return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
 
         DBClientBase * conn = getConnection( args );
         GETNS;

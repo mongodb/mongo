@@ -14,7 +14,7 @@ assert.throws( function(){
                            db.jni2t.save( { y : 1 } );
                            return 1; 
                        } 
-            } ).length();
+            } ).forEach( printjson );
 } , null , "can't save from $where" );
 
 assert.eq( 0 , db.jni2t.find().length() , "B" )
