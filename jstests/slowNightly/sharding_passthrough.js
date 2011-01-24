@@ -63,7 +63,7 @@ files.forEach(
      * clean (apitest_dbcollection)
      * logout and getnonce
      */
-	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|unix_socket)\.js$/.test(x.name)) {
+	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|unix_socket\d*)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
