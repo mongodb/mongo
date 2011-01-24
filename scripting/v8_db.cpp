@@ -22,6 +22,7 @@
 #include "util/base64.h"
 #include "util/text.h"
 #include "../client/syncclusterconnection.h"
+#include "../s/d_logic.h"
 #include <iostream>
 
 using namespace std;
@@ -463,6 +464,9 @@ namespace mongo {
         args.This()->Set( v8::String::New( "_db" ) , args[1] );
         args.This()->Set( v8::String::New( "_shortName" ) , args[2] );
         args.This()->Set( v8::String::New( "_fullName" ) , args[3] );
+        
+        if ( haveLocalShardingInfo( toSTLString( args[3] ) ) )
+            return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
 
         for ( int i=0; i<args.Length(); i++ )
             assert( ! args[i]->IsUndefined() );
