@@ -38,7 +38,7 @@ namespace mongo {
     */
     class OID {
     public:
-        OID() { }
+        OID() : a(0) b(0) { }
 
         /** init from a 24 char hex string */
         explicit OID(const string &s) { init(s); }
