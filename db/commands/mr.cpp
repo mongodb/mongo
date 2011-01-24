@@ -724,11 +724,9 @@ namespace mongo {
                         readlock lock( config.ns );
                         Client::Context ctx( config.ns );
                         
-                        ShardChunkManager::Snapshot chunkSnapshot;
+                        ShardChunkManagerPtr chunkManager;
                         if ( shardingState.needShardChunkManager( config.ns ) ) {
-                            ShardChunkManagerPtr p = shardingState.getShardChunkManager( config.ns );
-                            if ( p )
-                                chunkSnapshot = p->snapshot();
+                            chunkManager = shardingState.getShardChunkManager( config.ns );
                         }
                         
                         shared_ptr<Cursor> temp = bestGuessCursor( config.ns.c_str(), config.filter, config.sort );
@@ -752,7 +750,7 @@ namespace mongo {
 
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
-                            if ( ! chunkSnapshot.belongsToMe( o ) )
+                            if ( chunkManager && ! chunkManager->belongsToMe( o ) )
                                 continue;
 
                             if ( config.verbose ) mt.reset();
