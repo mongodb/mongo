@@ -35,12 +35,14 @@ namespace mongo {
     class ReplicaSetMonitorWatcher : public BackgroundJob {
     protected:
         void run() {
-            sleepsecs( 20 );
-            try {
-                ReplicaSetMonitor::checkAll();
-            }
-            catch ( std::exception& e ) {
-                error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+            while ( ! inShutdown() ) {
+                sleepsecs( 20 );
+                try {
+                    ReplicaSetMonitor::checkAll();
+                }
+                catch ( std::exception& e ) {
+                    error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+                }
             }
         }
 
