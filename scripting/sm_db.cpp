@@ -21,6 +21,8 @@
 #include "../util/base64.h"
 #include "../util/text.h"
 #include "../util/hex.h"
+#include "../util/ip_addr.h"
+#include "../util/mac_addr.h"
 
 #if( BOOST_VERSION >= 104200 )
 //#include <boost/uuid/uuid.hpp>
@@ -630,9 +632,15 @@ namespace mongo {
                 buf[i] = fromHex(encoded.c_str() + i * 2);
             }
 
+            if ( ! JS_InstanceOf( cx , obj , &uuid_class , 0 ) ) {
+                obj = JS_NewObject( cx , &uuid_class , 0 , 0 );
+                CHECKNEWOBJECT( obj, cx, "uuid_constructor" );
+                *rval = OBJECT_TO_JSVAL( obj );
+            }
+
             assert( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
             c.setProperty( obj, "len", c.toval( (double)16 ) );
-            c.setProperty( obj, "type", c.toval( (double)3 ) );
+            c.setProperty( obj, "type", c.toval( (double)bdtUUID ) );
 
             return JS_TRUE;
         }
@@ -675,6 +683,244 @@ namespace mongo {
         { 0 }
     };
 
+    // IpAddr **************************
+    JSBool ip_addr_constructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval);
+
+    JSBool ip_addr_version_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        stringstream ss;
+        ss << (unsigned int)ip.getVersion();
+        string ret = ss.str();
+        *vp = c.toval( ret.c_str() );
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_mask_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        stringstream ss;
+        ss << (unsigned int)ip.getNetmask();
+        string ret = ss.str();
+        *vp = c.toval( ret.c_str() );
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_mask_setter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        unsigned int mask = (unsigned int)c.toNumber( *vp );
+        void *old_holder = JS_GetPrivate( cx, obj );
+        assert( old_holder );
+        const char* data = ( ( BinDataHolder* )( old_holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        ip.setNetmask(mask);
+        data = ip.getBinDataPtr();
+        assert( len == ip.getBinDataLength() );
+        assert( JS_SetPrivate( cx, obj, new BinDataHolder( data, len ) ) );
+        delete ( BinDataHolder* )old_holder;
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_broadcast_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        IP_Addr bc = ip.broadcast();
+        std::string bcstr = bc.print();
+        jsval bcval = c.toval( bcstr.c_str() );
+        return ip_addr_constructor( cx, NULL, 1, &bcval, vp );
+    }
+
+    JSBool ip_addr_network_getter(JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        IP_Addr nw = ip.network();
+        std::string nwstr = nw.print();
+        jsval nwval = c.toval( nwstr.c_str() );
+        return ip_addr_constructor( cx, NULL, 1, &nwval, vp );
+    }
+
+    JSBool ip_addr_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "IpAddr needs 1 argument -- IpAddr(ipstr)" );
+            return JS_FALSE;
+        }
+
+        std::string ip_str = c.toString( argv[ 0 ] );
+        IP_Addr ip;
+
+        if ( !ip.parseIPv4(ip_str) ) {
+
+            if ( !ip.parseIPv6(ip_str) ) {
+                JS_ReportError( cx, "invalid IP Address string to IpAddr(%s)", ip_str.c_str() );
+                return JS_FALSE;
+            }
+        }
+
+        int len = ip.getBinDataLength();
+        const char* data = ip.getBinDataPtr();
+
+        if ( !obj || !JS_InstanceOf( cx , obj , &ip_addr_class , 0 ) ) {
+            obj = JS_NewObject( cx , &ip_addr_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "ip_addr_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        assert( JS_SetPrivate( cx, obj, new BinDataHolder( data, len ) ) );
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "version", c.toval( 0.0 ),
+            ip_addr_version_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'version'" );
+            return JS_FALSE;
+        }
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "mask", c.toval( 0.0 ),
+            ip_addr_mask_getter, ip_addr_mask_setter, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'mask'" );
+            return JS_FALSE;
+        }
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "broadcast", c.toval( 0.0 ),
+            ip_addr_broadcast_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'broadcast'" );
+            return JS_FALSE;
+        }
+
+        if (JS_FALSE == JS_DefineProperty( cx, obj, "network", c.toval( 0.0 ),
+            ip_addr_network_getter, NULL, JSPROP_PERMANENT | JSPROP_SHARED )) {
+            JS_ReportError( cx, "IpAddr() failed to define property 'network'" );
+            return JS_FALSE;
+        }
+
+        c.setProperty( obj, "len", c.toval( (double)len ) );
+        c.setProperty( obj, "type", c.toval( (double)bdtIpAddr ) );
+
+        return JS_TRUE;
+    }
+
+    JSBool ip_addr_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        int len = (int)c.getNumber( obj, "len" );
+        IP_Addr ip(data, len);
+        std::string ret = "IpAddr(\"";
+        ret += ip.print();
+        ret += "\")";
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    void ip_addr_finalize( JSContext * cx , JSObject * obj ) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        if ( holder ) {
+            delete ( BinDataHolder* )holder;
+            assert( JS_SetPrivate( cx , obj , 0 ) );
+        }
+    }
+
+    JSClass ip_addr_class = {
+        "IpAddr" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, ip_addr_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec ip_addr_functions[] = {
+        { "toString" , ip_addr_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+
+    // MacAddr **************************
+
+    JSBool mac_addr_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        Convertor c( cx );
+
+        if ( argc != 1 ) {
+            JS_ReportError( cx , "MacAddr needs 1 argument -- MacAddr(macstr)" );
+            return JS_FALSE;
+        }
+
+        string mac_str = c.toString( argv[ 0 ] );
+        int len;
+        const char* data;
+        MAC_Addr mac;
+
+        if (mac.parse(mac_str)) {
+            len = sizeof(mac);
+            data = (const char*)&mac;
+        }
+        else {
+            JS_ReportError( cx, "invalid MAC Address string to MacAddr()" );
+            return JS_FALSE;
+        }
+
+        if ( ! JS_InstanceOf( cx , obj , &mac_addr_class , 0 ) ) {
+            obj = JS_NewObject( cx , &mac_addr_class , 0 , 0 );
+            CHECKNEWOBJECT( obj, cx, "mac_addr_constructor" );
+            *rval = OBJECT_TO_JSVAL( obj );
+        }
+
+        assert( JS_SetPrivate( cx, obj, new BinDataHolder( data, len ) ) );
+        c.setProperty( obj, "len", c.toval( (double)len ) );
+        c.setProperty( obj, "type", c.toval( (double)bdtMacAddr ) );
+
+        return JS_TRUE;
+    }
+
+    JSBool mac_addr_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char* data = ( ( BinDataHolder* )( holder ) )->c_;
+        string ret;
+        const MAC_Addr* mac = new ((void*)data) MAC_Addr;
+        ret = "MacAddr(\"";
+        ret += mac->print();
+        ret += "\")";
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    void mac_addr_finalize( JSContext * cx , JSObject * obj ) {
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        if ( holder ) {
+            delete ( BinDataHolder* )holder;
+            assert( JS_SetPrivate( cx , obj , 0 ) );
+        }
+    }
+
+    JSClass mac_addr_class = {
+        "MacAddr" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, mac_addr_finalize,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec mac_addr_functions[] = {
+        { "toString" , mac_addr_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { 0 }
+    };
+
     // BinData **************************
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
@@ -685,6 +931,14 @@ namespace mongo {
             int type = (int)c.toNumber( argv[ 0 ] );
             if( type < 0 || type > 255 ) {
                 JS_ReportError( cx , "invalid BinData subtype -- range is 0..255 see bsonspec.org" );
+                return JS_FALSE;
+            }
+            if( type == bdtIpAddr ) {
+                JS_ReportError( cx , "use IpAddr(\"ip addr\") instead" );
+                return JS_FALSE;
+            }
+            if( type == bdtMacAddr ) {
+                JS_ReportError( cx , "use MacAddr(\"mac addr\") instead" );
                 return JS_FALSE;
             }
             string encoded = c.toString( argv[ 1 ] );
@@ -1033,6 +1287,8 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &ip_addr_class , ip_addr_constructor , 0 , 0 , ip_addr_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &mac_addr_class , mac_addr_constructor , 0 , 0 , mac_addr_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
@@ -1085,11 +1341,16 @@ namespace mongo {
             return true;
         }
 
-        if ( JS_InstanceOf( c->_context , o , &bindata_class , 0 ) ) {
+        if (  JS_InstanceOf( c->_context , o , &bindata_class , 0 )
+           || JS_InstanceOf( c->_context , o , &uuid_class , 0 )
+           || JS_InstanceOf( c->_context , o , &ip_addr_class , 0 )
+           || JS_InstanceOf( c->_context , o , &mac_addr_class , 0 )
+           ) {
             void *holder = JS_GetPrivate( c->_context , o );
             const char *data = ( ( BinDataHolder * )( holder ) )->c_;
             b.appendBinData( name ,
-                             (int)(c->getNumber( o , "len" )) , (BinDataType)((char)(c->getNumber( o , "type" ) ) ) ,
+                             (int)(c->getNumber( o , "len" )) ,
+                             (BinDataType)((char)(c->getNumber( o , "type" ) ) ) ,
                              data
                            );
             return true;

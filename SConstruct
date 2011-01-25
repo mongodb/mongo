@@ -308,11 +308,12 @@ if has_option( "full" ):
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp  db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/projection.cpp shell/mongo.cpp db/security_key.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
-                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
+                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp", 
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" , "util/processinfo.cpp" ,
-                 "util/concurrency/synchronization.cpp" ]
+                 "util/concurrency/synchronization.cpp", "util/ip_addr.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
+
 
 #mmap stuff
 
@@ -1140,6 +1141,8 @@ if darwin or clientEnv["_HAVEPCAP"]:
 env.JSHeader( "shell/mongo.cpp"  , ["shell/utils.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
 env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
+
+env.Command( "util/ipv6_parser.h", "util/ipv6_parser.rl", "ragel -o $TARGET -G2 -s $SOURCES" )
 
 shellEnv = env.Clone();
 
