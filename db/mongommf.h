@@ -39,6 +39,7 @@ namespace mongo {
         unsigned long long length() const { return MemoryMappedFile::length(); }
 
         string filename() const { return MemoryMappedFile::filename(); }
+
         void flush(bool sync)   { MemoryMappedFile::flush(sync); }
 
         /* Creates with length if DNE, otherwise uses existing file length,
@@ -51,7 +52,13 @@ namespace mongo {
         /* Get the "standard" view (which is the private one).
            @return the private view.
         */
-        void* getView();
+        void* getView() const { return _view_private; }
+        
+        /* Get the "write" view (which is required for writing).
+           @return the write view.
+        */
+        void* view_write() const { return _view_write; }
+
 
         /* switch to _view_write.  normally, this is a bad idea since your changes will not
            show up in _view_private if there have been changes there; thus the leading underscore
@@ -69,8 +76,8 @@ namespace mongo {
             DEV assert( !_p._p.empty() );
             return _p;
         }
+
         int fileSuffixNo() const { return _fileSuffixNo; }
-        void* view_write() { return _view_write; }
 
         /** true if we have written.
             set in PREPLOGBUFFER, it is NOT set immediately on write intent declaration.

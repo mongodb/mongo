@@ -38,10 +38,6 @@ namespace mongo {
         privateViews.add(_view_private, this);
     }
 
-    void* MongoMMF::getView() {
-        return _view_private;
-    }
-
     /** register view. threadsafe */
     void PointerToMMF::add(void *view, MongoMMF *f) {
         mutex::scoped_lock lk(_m);
@@ -182,6 +178,7 @@ namespace mongo {
         if( _view_write ) {
             if( cmdLine.dur ) {
                 _view_private = createPrivateMap();
+                massert( 13636 , "createPrivateMap failed (look in log for error)" , _view_private );
                 privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
             else {
