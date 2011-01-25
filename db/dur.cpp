@@ -283,8 +283,8 @@ namespace mongo {
 
                     if (!p && !w) return;
 
-                    assert(p);
-                    assert(w);
+                    massert( 13634 , str::stream() << "no view for file: " << mmf->filename() , p );
+                    massert( 13635 , str::stream() << "no write view for file: " << mmf->filename() , w );
 
                     _bytes += mmf->length();
 
