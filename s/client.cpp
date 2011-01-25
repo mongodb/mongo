@@ -140,12 +140,17 @@ namespace mongo {
         all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
     }
 
-    vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all ) {
+    vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener ) {
         vector<BSONObj> res;
         
+        if ( fromWriteBackListener ) {
+            warning() << "not doing recusrive writebacks for" << endl;
+            return res;
+        }
+
         if ( all.size() == 0 )
             return res;
-
+        
         for ( unsigned i=0; i<all.size(); i++ ) {
             res.push_back( WriteBackListener::waitFor( all[i].connectionId , all[i].id ) );
         }
@@ -155,7 +160,7 @@ namespace mongo {
 
 
 
-    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result ) {
+    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener ) {
         set<string> * shards = getPrev();
 
         if ( shards->size() == 0 ) {
@@ -192,7 +197,7 @@ namespace mongo {
             clearSinceLastGetError();
             
             if ( writebacks.size() ){
-                vector<BSONObj> v = _handleWriteBacks( writebacks );
+                vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
                 assert( v.size() == 1 );
                 result.appendElements( v[0] );
                 result.appendElementsUnique( res );
@@ -247,7 +252,7 @@ namespace mongo {
 
         if ( errors.size() == 0 ) {
             result.appendNull( "err" );
-            _handleWriteBacks( writebacks );
+            _handleWriteBacks( writebacks , fromWriteBackListener );
             return true;
         }
 
@@ -270,7 +275,7 @@ namespace mongo {
             }
             all.done();
         }
-        _handleWriteBacks( writebacks );
+        _handleWriteBacks( writebacks , fromWriteBackListener );
         return true;
     }
 

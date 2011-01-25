@@ -157,7 +157,7 @@ namespace mongo {
                         ci->newRequest(); // this so we flip prev and cur shards
 
                         BSONObjBuilder b;
-                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b ) ) {
+                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
                             b.appendBool( "commandFailed" , true );
                         }
                         gle = b.obj();

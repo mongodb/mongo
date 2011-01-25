@@ -70,7 +70,7 @@ namespace mongo {
          * resets shards since get last error
          * @return if the command was ok or if there was an error
          */
-        bool getLastError( const BSONObj& options , BSONObjBuilder& result );
+        bool getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener = false );
 
         /** @return if its ok to auto split from this client */
         bool autoSplitOk() const { return _autoSplitOk; }
@@ -90,7 +90,7 @@ namespace mongo {
 
         // for getLastError
         void _addWriteBack( vector<WBInfo>& all , const BSONObj& o );
-        vector<BSONObj> _handleWriteBacks( vector<WBInfo>& all );
+        vector<BSONObj> _handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener );
 
 
         int _id; // unique client id
