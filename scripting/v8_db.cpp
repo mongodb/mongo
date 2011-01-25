@@ -281,9 +281,10 @@ namespace mongo {
             int nToReturn = (int)(args[3]->ToNumber()->Value());
             int nToSkip = (int)(args[4]->ToNumber()->Value());
             int batchSize = (int)(args[5]->ToNumber()->Value());
+            int options = (int)(args[6]->ToNumber()->Value());
             {
                 V8Unlock u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );
@@ -507,10 +508,16 @@ namespace mongo {
             t->Set( v8::String::New( "_skip" ) , Number::New( 0 ) );
 
         if ( args.Length() > 8 && args[8]->IsNumber() )
-            t->Set( v8::String::New( "_batchSize" ) , args[7] );
+            t->Set( v8::String::New( "_batchSize" ) , args[8] );
         else
             t->Set( v8::String::New( "_batchSize" ) , Number::New( 0 ) );
 
+        if ( args.Length() > 9 && args[9]->IsNumber() )
+            t->Set( v8::String::New( "_options" ) , args[9] );
+        else
+            t->Set( v8::String::New( "_options" ) , Number::New( 0 ) );
+
+        
         t->Set( v8::String::New( "_cursor" ) , v8::Null() );
         t->Set( v8::String::New( "_numReturned" ) , v8::Number::New(0) );
         t->Set( v8::String::New( "_special" ) , Boolean::New(false) );

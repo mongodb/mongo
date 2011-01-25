@@ -12,7 +12,7 @@ if ( ! Mongo.prototype ){
 }
 
 if ( ! Mongo.prototype.find )
-    Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
+    Mongo.prototype.find = function( ns , query , fields , limit , skip , batchSize , options ){ throw "find not implemented"; }
 if ( ! Mongo.prototype.insert )
     Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
 if ( ! Mongo.prototype.remove )
