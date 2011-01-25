@@ -761,10 +761,19 @@ int main(int argc, char* argv[]) {
             printGitVersion();
             return 0;
         }
-        if ( params.count( "dbpath" ) )
+        if ( params.count( "dbpath" ) ) {
             dbpath = params["dbpath"].as<string>();
-        else
+            if ( params.count( "fork" ) && dbpath[0] != '/' ) {
+                // we need to change dbpath if we fork since we change
+                // cwd to "/"
+                // fork only exists on *nix
+                // so '/' is safe 
+                dbpath = cmdLine.cwd + "/" + dbpath;
+            }
+        }
+        else {
             dbpath = "/data/db/";
+        }
 
         if ( params.count("directoryperdb")) {
             directoryperdb = true;

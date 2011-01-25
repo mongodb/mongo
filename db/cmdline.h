@@ -39,6 +39,7 @@ namespace mongo {
         }
 
         string binaryName;     // mongod or mongos
+        string cwd;            // cwd of when process started
 
         int port;              // --port
         enum {

@@ -90,7 +90,17 @@ namespace mongo {
             size_t i = cmdLine.binaryName.rfind( '/' );
             if ( i != string::npos )
                 cmdLine.binaryName = cmdLine.binaryName.substr( i + 1 );
+            
+            // setup cwd
+            char buffer[1024];
+#ifdef _WIN32
+            _getcwd( buffer , 1000 );
+#else
+            getcwd( buffer , 1000 );
+#endif
+            cmdLine.cwd = buffer;
         }
+        
 
         /* don't allow guessing - creates ambiguities when some options are
          * prefixes of others. allow long disguises and don't allow guessing
@@ -171,9 +181,7 @@ namespace mongo {
                 logpath = params["logpath"].as<string>();
                 assert( logpath.size() );
                 if ( logpath[0] != '/' ) {
-                    char temp[256];
-                    assert( getcwd( temp , 256 ) );
-                    logpath = (string)temp + "/" + logpath;
+                    logpath = cmdLine.cwd + "/" + logpath;
                 }
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {
