@@ -258,7 +258,7 @@ namespace mongo {
     Handle<Value> mongoFind(const Arguments& args) {
         HandleScope handle_scope;
 
-        jsassert( args.Length() == 6 , "find needs 6 args" );
+        jsassert( args.Length() == 7 , "find needs 7 args" );
         jsassert( args[1]->IsObject() , "needs to be an object" );
         DBClientBase * conn = getConnection( args );
         GETNS;
