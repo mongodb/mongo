@@ -1345,6 +1345,8 @@ def doStyling( env , target , source ):
 
     files = utils.getAllSourceFiles() 
     files = filter( lambda x: not x.endswith( ".c" ) , files )
+    files.remove( "./shell/mongo_vstudio.cpp" )
+
     cmd = "astyle --options=mongo_astyle " + " ".join( files )
     res = utils.execsys( cmd )
     print( res[0] )
