@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "processinfo.h"
+#include "db/jsobj.h"
 
 #include <iostream>
 
@@ -60,7 +61,11 @@ namespace mongo {
         return _wconvertmtos( pmc.WorkingSetSize );
     }
 
-    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
+        PROCESS_MEMORY_COUNTERS pmc;
+        assert( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) );
+		info.append("page_faults",(int)pmc.PageFaultCount);
+	}
 
     bool ProcessInfo::blockCheckSupported() {
         return false;
