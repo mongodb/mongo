@@ -40,6 +40,8 @@ namespace mongo {
 
     /** register view. threadsafe */
     void PointerToMMF::add(void *view, MongoMMF *f) {
+        assert(view);
+        assert(f);
         mutex::scoped_lock lk(_m);
         _views.insert( pair<void*,MongoMMF*>(view,f) );
     }
