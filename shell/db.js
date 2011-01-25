@@ -22,8 +22,8 @@ DB.prototype.getName = function(){
     return this._name;
 }
 
-DB.prototype.stats = function(){
-    return this.runCommand( { dbstats : 1 } );
+DB.prototype.stats = function (scale) {
+    return this.runCommand({ dbstats: 1, scale: scale });
 }
 
 DB.prototype.getCollection = function( name ){
@@ -298,7 +298,7 @@ DB.prototype.help = function() {
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
-    print("\tdb.printCollectionStats()");
+    print("\tdb.printCollectionStats(scale) if scale is specified, anything in byte unit will be scaled by 'scale'");
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.printShardingStatus()");
@@ -309,20 +309,23 @@ DB.prototype.help = function() {
     print("\tdb.serverStatus()");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.shutdownServer()");
-    print("\tdb.stats()");
+    print("\tdb.stats(scale) if scale is specified, anything in byte unit will be scaled by 'scale'");
     print("\tdb.version() current version of the server");
     print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
 
     return __magicNoPrint;
 }
 
-DB.prototype.printCollectionStats = function(){
+DB.prototype.printCollectionStats = function (scale) {
     var mydb = this;
+    if (scale == 0) {
+        throw "scale has to be > 0";
+    }
     this.getCollectionNames().forEach(
-        function(z){
-            print( z );
-            printjson( mydb.getCollection(z).stats() );
-            print( "---" );
+        function (z) {
+            print(z);
+            printjson(mydb.getCollection(z).stats(scale));
+            print("---");
         }
     );
 }
