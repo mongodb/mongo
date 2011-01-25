@@ -22,6 +22,10 @@
 #include "../util/processinfo.h"
 #include "security_key.h"
 
+#ifdef _WIN32
+#include <direct.h>
+#endif
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
