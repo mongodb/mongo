@@ -475,8 +475,8 @@ namespace mongo {
                 }
                 conn.done();
             }
-            catch ( std::exception&  ) {
-                log(LL_WARNING) << " couldn't check on config server:" << _config[i] << " ok for now" << endl;
+            catch ( SocketException& e ) {
+                warning() << " couldn't check on config server:" << _config[i] << " ok for now : " << e.toString() << endl;
             }
             res.push_back(x);
         }
