@@ -682,6 +682,8 @@ namespace mongo {
         readlock lk( ns );
         string errmsg;
         long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg );
+        if ( res == -1 )
+            return 0;
         uassert( 13637 , str::stream() << "count failed in DBDirectClient: " << errmsg , res >= 0 );
         return (unsigned long long )res;
     }
