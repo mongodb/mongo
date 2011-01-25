@@ -268,7 +268,7 @@ namespace mongo {
         protected:
 
             void _insertToInc( BSONObj& o );
-            static void _add( InMemory* im , const BSONObj& a , long& size );
+            static void _add( InMemory* im , const BSONObj& a , long& size, long& dupCount );
 
             scoped_ptr<Scope> _scope;
             const Config& _config;
@@ -278,6 +278,7 @@ namespace mongo {
 
             scoped_ptr<InMemory> _temp;
             long _size; // bytes in _temp
+            long _dupCount; // number of duplicate key entries
 
             long long _numEmits;
         };
