@@ -694,8 +694,10 @@ namespace mongo {
         }
 
         if ( compareOp == BSONObj::opEXISTS ) {
-            return ( e.eoo() ^ ( toMatch.boolean() ^ em.isNot ) ) ? 1 : -1;
-        }
+			bool exists = (toMatch.isBoolean() && toMatch.boolean()) || 
+						  (toMatch.isNumber() && toMatch.numberInt() > 0);
+            return ( e.eoo() ^ (exists ^ em.isNot ) ) ? 1 : -1;
+		}
         else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
                   valuesMatch(e, toMatch, compareOp, em ) ) {
             return 1;
