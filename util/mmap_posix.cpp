@@ -127,11 +127,13 @@ namespace mongo {
                     error() << "mmap private failed with out of memory. (64 bit build)" << endl;
                 }
             }
+            else { 
+                error() << "mmap private failed " << errnoWithDescription() << endl;
+            }
             return 0;
         }
-        else {
-            views.push_back(x);
-        }
+
+        views.push_back(x);
         return x;
     }
 
