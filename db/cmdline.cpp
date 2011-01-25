@@ -98,9 +98,9 @@ namespace mongo {
             // setup cwd
             char buffer[1024];
 #ifdef _WIN32
-            _getcwd( buffer , 1000 );
+            assert( _getcwd( buffer , 1000 ) );
 #else
-            getcwd( buffer , 1000 );
+            assert( getcwd( buffer , 1000 ) );
 #endif
             cmdLine.cwd = buffer;
         }
