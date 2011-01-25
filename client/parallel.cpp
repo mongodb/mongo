@@ -72,40 +72,54 @@ namespace mongo {
             q = concatQuery( q , extra );
         }
 
-        ShardConnection conn( server , _ns );
-
-        if ( conn.setVersion() ) {
+        try {
+            ShardConnection conn( server , _ns );
+            
+            if ( conn.setVersion() ) {
+                conn.done();
+                throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+            }
+            
+            if ( logLevel >= 5 ) {
+                log(5) << "ClusteredCursor::query (" << type() << ") server:" << server
+                       << " ns:" << _ns << " query:" << q << " num:" << num
+                       << " _fields:" << _fields << " options: " << _options << endl;
+            }
+            
+            auto_ptr<DBClientCursor> cursor =
+                conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
+            
+            if ( ! cursor.get() && _options & QueryOption_PartialResults ) {
+                _done = true;
+                conn.done();
+                return cursor;
+            }
+            
+            massert( 13633 , str::stream() << "error querying server: " << server  , cursor.get() );
+            
+            if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
+                conn.done();
+                throw StaleConfigException( _ns , "ClusteredCursor::query" );
+            }
+            
+            if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
+                conn.done();
+                BSONObj o = cursor->next();
+                throw UserException( o["code"].numberInt() , o["$err"].String() );
+            }
+            
+            
+            cursor->attach( &conn );
+            
             conn.done();
-            throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+            return cursor;
         }
-
-        if ( logLevel >= 5 ) {
-            log(5) << "ClusteredCursor::query (" << type() << ") server:" << server
-                   << " ns:" << _ns << " query:" << q << " num:" << num
-                   << " _fields:" << _fields << " options: " << _options << endl;
+        catch ( SocketException& e ) {
+            if ( ! ( _options & QueryOption_PartialResults ) )
+                throw e;
+            _done = true;
+            return auto_ptr<DBClientCursor>();
         }
-
-        auto_ptr<DBClientCursor> cursor =
-            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
-
-        assert( cursor.get() );
-
-        if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-            conn.done();
-            throw StaleConfigException( _ns , "ClusteredCursor::query" );
-        }
-
-        if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
-            conn.done();
-            BSONObj o = cursor->next();
-            throw UserException( o["code"].numberInt() , o["$err"].String() );
-        }
-
-
-        cursor->attach( &conn );
-
-        conn.done();
-        return cursor;
     }
 
     BSONObj ClusteredCursor::explain( const string& server , BSONObj extra ) {

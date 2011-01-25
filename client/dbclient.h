@@ -70,7 +70,13 @@ namespace mongo {
         */
         QueryOption_Exhaust = 1 << 6,
 
-        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust
+        /** When sharded, this means its ok to return partial results
+            Usually we will fail a query if all required shards aren't up
+            If this is set, it'll be a partial result set 
+         */
+        QueryOption_PartialResults = 1 << 7 ,
+
+        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust | QueryOption_PartialResults
 
     };
 
