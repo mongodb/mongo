@@ -433,7 +433,7 @@ namespace mongo {
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */
-        unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
+        virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
 
         string createPasswordDigest( const string &username , const string &clearTextPassword );
 
@@ -699,6 +699,8 @@ namespace mongo {
 
     protected:
         bool isOk(const BSONObj&);
+
+        BSONObj _countCmd(const string &ns, const BSONObj& query, int options, int limit, int skip );
 
         enum QueryOptions availableOptions();
 

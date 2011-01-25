@@ -678,6 +678,14 @@ namespace mongo {
         ClientCursor::erase( id );
     }
 
+    unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
+        readlock lk( ns );
+        string errmsg;
+        long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg );
+        uassert( 13637 , str::stream() << "count failed in DBDirectClient: " << errmsg , res >= 0 );
+        return (unsigned long long )res;
+    }
+
     DBClientBase * createDirectClient() {
         return new DBDirectClient();
     }

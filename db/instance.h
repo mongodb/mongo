@@ -139,7 +139,9 @@ namespace mongo {
         virtual bool callRead( Message& toSend , Message& response ) {
             return call( toSend , response );
         }
-
+        
+        virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
+        
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
     };
 
