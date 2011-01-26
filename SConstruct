@@ -309,7 +309,7 @@ commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp  db/indexkey.cpp db/js
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
-                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" , "util/processinfo.cpp" ,
+                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
                  "util/concurrency/synchronization.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
@@ -323,16 +323,18 @@ elif os.sys.platform == "win32":
 else:
     commonFiles += [ "util/mmap_posix.cpp" ]
 
-if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
-    commonFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
-else:
-    commonFiles += [ "util/processinfo_none.cpp" ]
-
 coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/message_server_port.cpp" , 
+coreServerFiles = [ "util/processinfo.cpp" , "util/message_server_port.cpp" , 
                     "client/parallel.cpp" ,  
                     "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
+
+if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
+    coreServerFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+else:
+    coreServerFiles += [ "util/processinfo_none.cpp" ]
+
+
 
 if has_option( "asio" ):
     coreServerFiles += [ "util/message_server_asio.cpp" ]
