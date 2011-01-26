@@ -384,7 +384,7 @@ namespace mongo {
                         }
 
                         // Not a unique index? Move on.
-                        if ( idx["unique"].eoo() || ! idx["unique"].Bool() )
+                        if ( idx["unique"].eoo() || ! idx["unique"].trueValue() )
                             continue;
 
                         // Shard key is prefix of unique index? Move on.
