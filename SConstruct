@@ -324,15 +324,19 @@ else:
     commonFiles += [ "util/mmap_posix.cpp" ]
 
 coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/processinfo.cpp" , "util/message_server_port.cpp" , 
+coreServerFiles = [ "util/message_server_port.cpp" , 
                     "client/parallel.cpp" ,  
                     "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
 
+processInfoFiles = [ "util/processinfo.cpp" ]
+
 if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
-    coreServerFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+    processInfoFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
 else:
-    coreServerFiles += [ "util/processinfo_none.cpp" ]
+    processInfoFiles += [ "util/processinfo_none.cpp" ]
+
+coreServerFiles += processInfoFiles
 
 
 
@@ -1179,6 +1183,8 @@ elif not onlyServer:
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
         for f in scriptingFiles:
+            shell32BitFiles.append( "32bit/" + str( f ) )
+        for f in processInfoFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
         shellEnv.VariantDir( "32bit" , "." , duplicate=1 )
     else:
