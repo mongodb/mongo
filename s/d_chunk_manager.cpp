@@ -312,5 +312,17 @@ namespace mongo {
         return p.release();
     }
 
+    string ShardChunkManager::toString() const {
+        StringBuilder ss;
+        ss << " ShardChunkManager version: " << _version << " key: " << _key;
+        bool first = true;
+        for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ) {
+            if ( first ) first = false;
+            else ss << " , ";
+
+            ss << i->first << " -> " << i->second;
+        }
+        return ss.str();
+    }
     
 }  // namespace mongo
