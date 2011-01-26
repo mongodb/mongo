@@ -42,7 +42,7 @@ namespace mongo {
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             munmap(*i,len);
         }
-        views.close();
+        views.clear();
 
         if ( fd )
             ::close(fd);
