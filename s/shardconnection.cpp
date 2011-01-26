@@ -229,6 +229,7 @@ namespace mongo {
 
     void ShardConnection::kill() {
         if ( _conn ) {
+            resetShardVersionCB( _conn );
             delete _conn;
             _conn = 0;
             _finishedInit = true;
