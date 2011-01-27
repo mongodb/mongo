@@ -929,8 +929,8 @@ namespace mongo {
                 // 2
                 double farthest = hopper->farthest();
                 GEODEBUGPRINT(hopper->farthest());
-                if (farthest == -1) {
-                    // Nothing found in Phase 1
+                if (hopper->found() < _numWanted) {
+                    // Not enough found in Phase 1
                     farthest = _scanDistance;
                 }
                 else if (_type == GEO_SPHERE) {
