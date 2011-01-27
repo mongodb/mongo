@@ -1248,7 +1248,8 @@ namespace mongo {
                 indexes += nsd->nIndexes;
                 indexSize += getIndexSizeForCollection(dbname, ns);
             }
-
+            
+            result.append      ( "db" , dbname );
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
             result.append      ( "avgObjSize" , double(size) / double(objects) );
