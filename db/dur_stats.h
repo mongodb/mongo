@@ -3,7 +3,7 @@
 namespace mongo {
     namespace dur {
 
-        /** journalling stats.  the model here is that the commit thread is the only writer, and that reads are
+        /** journaling stats.  the model here is that the commit thread is the only writer, and that reads are
             uncommon (from a serverStatus command and such).  Thus, there should not be multicore chatter overhead.
         */
         struct Stats {
