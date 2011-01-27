@@ -132,6 +132,7 @@ namespace mongo {
                 len                 -= sizeof(JSectHeader);
                 md5digest current;
                 md5(begin, len, current);
+                DEV log() << "checkHash len:" << len << " hash:" << toHex(hash, 16) << " current:" << toHex(current, 16) << endl;
                 return (memcmp(hash, current, sizeof(hash)) == 0);
             }
         };

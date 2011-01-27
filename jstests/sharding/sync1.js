@@ -13,14 +13,23 @@ assert.eq( 2 , t.find().count() , "A4" );
 test.checkHashes( "test" , "A3" );
 
 test.tempKill();
-assert.throws( function(){ t.save( { x : 3 } ) } , "B1" )
+assert.throws( function(){ t.save( { x : 3 } ) } , null , "B1" )
 assert.eq( 2 , t.find().itcount() , "B2" );
 test.tempStart();
 test.checkHashes( "test" , "B3" );
 
-
 assert.eq( 2 , t.find().itcount() , "C1" );
-t.remove( { x : 1 } )
+assert.soon( function(){
+    try  {
+        t.remove( { x : 1 } )
+        return true;
+    }
+    catch ( e ){
+        print( e );
+    }
+    return false;
+} )
+t.find().forEach( printjson )
 assert.eq( 1 , t.find().itcount() , "C2" );
 
 test.stop();

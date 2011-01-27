@@ -82,10 +82,25 @@ public:
 
         if ( hasParam( "fields" ) || csv ) {
             needFields();
-            fieldsToReturn = &_fieldsObj;
+            
+            // we can't use just _fieldsObj since we support everything getFieldDotted does
+            
+            set<string> seen;
+            BSONObjBuilder b;
+            
+            BSONObjIterator i( _fieldsObj );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                string f = str::before( e.fieldName() , '.' );
+                if ( seen.insert( f ).second )
+                    b.append( f , 1 );
+            }
+            
+            realFieldsToReturn = b.obj();
+            fieldsToReturn = &realFieldsToReturn;
         }
-
-
+        
+        
         if ( csv && _fields.size() == 0 ) {
             cerr << "csv mode requires a field list" << endl;
             return -1;

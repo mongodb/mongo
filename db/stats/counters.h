@@ -41,6 +41,7 @@ namespace mongo {
         AtomicUInt * getGetMore() { return _getmore; }
         AtomicUInt * getCommand() { return _command; }
 
+        void incInsertInWriteLock(int n) { _insert->x += n; }
         void gotInsert() { _insert[0]++; }
         void gotQuery() { _query[0]++; }
         void gotUpdate() { _update[0]++; }
@@ -54,6 +55,9 @@ namespace mongo {
 
     private:
         BSONObj _obj;
+
+        // todo: there will be a lot of cache line contention on these.  need to do something 
+        //       else eventually.
         AtomicUInt * _insert;
         AtomicUInt * _query;
         AtomicUInt * _update;

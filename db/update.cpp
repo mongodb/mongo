@@ -1043,9 +1043,9 @@ namespace mongo {
         bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
-            if( d && d->backgroundIndexBuildInProgress ) {
+            if( d && d->indexBuildInProgress ) {
                 set<string> bgKeys;
-                d->backgroundIdx().keyPattern().getFieldNames(bgKeys);
+                d->inProgIdx().keyPattern().getFieldNames(bgKeys);
                 mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys) );
             }
             else {

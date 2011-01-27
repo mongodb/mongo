@@ -72,40 +72,54 @@ namespace mongo {
             q = concatQuery( q , extra );
         }
 
-        ShardConnection conn( server , _ns );
-
-        if ( conn.setVersion() ) {
+        try {
+            ShardConnection conn( server , _ns );
+            
+            if ( conn.setVersion() ) {
+                conn.done();
+                throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+            }
+            
+            if ( logLevel >= 5 ) {
+                log(5) << "ClusteredCursor::query (" << type() << ") server:" << server
+                       << " ns:" << _ns << " query:" << q << " num:" << num
+                       << " _fields:" << _fields << " options: " << _options << endl;
+            }
+            
+            auto_ptr<DBClientCursor> cursor =
+                conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
+            
+            if ( ! cursor.get() && _options & QueryOption_PartialResults ) {
+                _done = true;
+                conn.done();
+                return cursor;
+            }
+            
+            massert( 13633 , str::stream() << "error querying server: " << server  , cursor.get() );
+            
+            if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
+                conn.done();
+                throw StaleConfigException( _ns , "ClusteredCursor::query" );
+            }
+            
+            if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
+                conn.done();
+                BSONObj o = cursor->next();
+                throw UserException( o["code"].numberInt() , o["$err"].String() );
+            }
+            
+            
+            cursor->attach( &conn );
+            
             conn.done();
-            throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+            return cursor;
         }
-
-        if ( logLevel >= 5 ) {
-            log(5) << "ClusteredCursor::query (" << type() << ") server:" << server
-                   << " ns:" << _ns << " query:" << q << " num:" << num
-                   << " _fields:" << _fields << " options: " << _options << endl;
+        catch ( SocketException& e ) {
+            if ( ! ( _options & QueryOption_PartialResults ) )
+                throw e;
+            _done = true;
+            return auto_ptr<DBClientCursor>();
         }
-
-        auto_ptr<DBClientCursor> cursor =
-            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
-
-        assert( cursor.get() );
-
-        if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-            conn.done();
-            throw StaleConfigException( _ns , "ClusteredCursor::query" );
-        }
-
-        if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
-            conn.done();
-            BSONObj o = cursor->next();
-            throw UserException( o["code"].numberInt() , o["$err"].String() );
-        }
-
-
-        cursor->attach( &conn );
-
-        conn.done();
-        return cursor;
     }
 
     BSONObj ClusteredCursor::explain( const string& server , BSONObj extra ) {
@@ -467,10 +481,11 @@ namespace mongo {
     // ---- Future -----
     // -----------------
 
-    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd ) {
+    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
         _server = server;
         _db = db;
         _cmd = cmd;
+        _conn = conn;
         _done = false;
     }
 
@@ -484,9 +499,19 @@ namespace mongo {
         setThreadName( "future" );
 
         try {
-            ScopedDbConnection conn( res->_server );
+            DBClientBase * conn = res->_conn;
+            
+            scoped_ptr<ScopedDbConnection> myconn;
+            if ( ! conn ){
+                myconn.reset( new ScopedDbConnection( res->_server ) );
+                conn = myconn->get();
+            }
+            
             res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
-            conn.done();
+
+            if ( myconn )
+                myconn->done();
+
         }
         catch ( std::exception& e ) {
             error() << "Future::commandThread exception: " << e.what() << endl;
@@ -495,8 +520,8 @@ namespace mongo {
         res->_done = true;
     }
 
-    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd ) {
-        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd ));
+    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd , DBClientBase * conn ) {
+        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd , conn  ));
         res->_thr.reset( new boost::thread( boost::bind(Future::commandThread, res) ) );
 
         return res;

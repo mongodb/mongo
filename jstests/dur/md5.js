@@ -17,7 +17,7 @@ function log(str) {
         print(testname+" step " + step++);
 }
 
-/** Changes here may require updating the byte index of the md5 hash, see fuzzFile comments below. */
+/** Changes here may require updating the byte index of the md5 hash, see File comments below. */
 function work() {
     log("work");
     var d = conn.getDB("test");
@@ -55,8 +55,10 @@ log();
 conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8);
 work();
 
-// wait for group commit.  use getLastError(...) later when that is enhanced.
-sleep(400);
+// wait for group commit.
+printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
+
+log("kill -9");
 
 // kill the process hard
 stopMongod(30001, /*signal*/9);
@@ -65,12 +67,34 @@ stopMongod(30001, /*signal*/9);
 
 // Bit flip the first byte of the md5sum contained within the opcode footer.
 // This ensures we get an md5 exception instead of some other type of exception.
-fuzzFile( path + "/journal/j._0", 39755 );
+var file = path + "/journal/j._0";
+//run("cp", file, "/tmp/before");
+//fuzzFile(file, 39755);
 
-log();
+// journal header is 8192
+// jsectheader is 12
+// so a little beyond that
+fuzzFile(file, 8214);
+
+//run("cp", file, "/tmp/after");
+
+log("run mongod again recovery should fail");
 
 // 100 exit code corresponds to EXIT_UNCAUGHT, which is triggered when there is an exception during recovery.
-assert.eq( 100, runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8 ) );
+// 14 is is sometimes triggered instead due to SERVER-2184
+exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", /*9*/13 );
+
+if (exitCode != 100 && exitCode != 14) {
+    print("\n\n\nFAIL md5.js exitCode: " + exitCode + "\n\n\n");
+    // sleep a little longer to get more output maybe
+    sleep(2000);
+    assert(false);
+}
 
 // TODO Possibly we could check the mongod log to verify that the correct type of exception was thrown.  But
 // that would introduce a dependency on the mongod log format, which we may not want.
+
+print("SUCCESS md5.js");
+
+// if we sleep a littler here we may get more out the mongod output logged
+sleep(500);

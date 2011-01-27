@@ -221,7 +221,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
 
         // before we lock...
         int op = m.operation();
@@ -234,15 +234,15 @@ namespace mongo {
                 if( strstr(ns, ".$cmd.sys.") ) {
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
-                        return true;
+                        return;
                     }
                     if( strstr(ns, "$cmd.sys.killop") ) {
                         killOp(m, dbresponse);
-                        return true;
+                        return;
                     }
                     if( strstr(ns, "$cmd.sys.unlock") ) {
                         unlockFsync(ns, m, dbresponse);
-                        return true;
+                        return;
                     }
                 }
             }
@@ -279,7 +279,7 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
-                return true;
+                return;
             receivedQuery(c , dbresponse, m );
         }
         else if ( op == dbGetMore ) {
@@ -376,7 +376,6 @@ namespace mongo {
             }
         }
 
-        return true;
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
@@ -580,6 +579,7 @@ namespace mongo {
             return;
 
         Client::Context ctx(ns);
+        int n = 0;
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
@@ -595,8 +595,13 @@ namespace mongo {
 
             theDataFileMgr.insertWithObjMod(ns, js, false);
             logOp("i", ns, js);
-            globalOpCounters.gotInsert();
+
+            if( ++n % 4 == 0 ) {
+                // if we are inserting quite a few, we may need to commit along the way
+                getDur().commitIfNeeded();
+            }
         }
+        globalOpCounters.incInsertInWriteLock(n);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
@@ -673,6 +678,16 @@ namespace mongo {
         ClientCursor::erase( id );
     }
 
+    unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
+        readlock lk( ns );
+        string errmsg;
+        long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg );
+        if ( res == -1 )
+            return 0;
+        uassert( 13637 , str::stream() << "count failed in DBDirectClient: " << errmsg , res >= 0 );
+        return (unsigned long long )res;
+    }
+
     DBClientBase * createDirectClient() {
         return new DBDirectClient();
     }
@@ -706,7 +721,7 @@ namespace mongo {
         log() << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
 
-        log() << "shutdown: going to flush oplog..." << endl;
+        log() << "shutdown: going to flush diaglog..." << endl;
         flushDiagLog();
 
         /* must do this before unmapping mem or you may get a seg fault */
@@ -720,12 +735,15 @@ namespace mongo {
         FileAllocator::get()->waitUntilFinished();
 
         if( cmdLine.dur ) {
-            log() << "shutdown: final commit..." << endl;
+            log() << "shutdown: lock for final commit..." << endl;
             {
                 int n = 10;
                 while( 1 ) {
-                    writelocktry w("", 20000);
+                    // we may already be in a read lock from earlier in the call stack, so do read lock here 
+                    // to be consistent with that.
+                    readlocktry w("", 20000);
                     if( w.got() ) { 
+                        log() << "shutdown: final commit..." << endl;
                         getDur().commitNow();
                         break;
                     }
@@ -756,8 +774,9 @@ namespace mongo {
                time that was attempted, there was a race condition
                with acquirePathLock().  */
 #ifdef WIN32
+            if( _chsize( lockFile , 0 ) )
+                log() << "couldn't remove fs lock " << getLastError() << endl;
             CloseHandle(lockFileHandle);
-            DeleteFileA(( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string().c_str());
 #else
             if( ftruncate( lockFile , 0 ) )
                 log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
@@ -838,28 +857,17 @@ namespace mongo {
         }
 
 #ifdef WIN32
-        lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE, 
+        lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE,
             0 /* do not allow anyone else access */, NULL, 
-            CREATE_NEW /* error if file exists */, 0, NULL );
+            OPEN_ALWAYS /* success if fh can open */, 0, NULL );
 
         if (lockFileHandle == INVALID_HANDLE_VALUE) {
             DWORD code = GetLastError();
-            if (code == ERROR_FILE_EXISTS) {
-                HANDLE tempHandle = CreateFileA( name.c_str(), GENERIC_READ, 
-		        	0, NULL, OPEN_EXISTING, 0, NULL );
-                
-                if (GetLastError() == ERROR_SHARING_VIOLATION) {
-                    uasserted( 13626, "cannot acquire mongod.lock, is there another mongod running?" );
-                }
-            }
-            else {
-                LPVOID msg;
-                FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
-                    NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
-                    (LPTSTR)&msg, 0, NULL);
-                uasserted( 13627 , (char*)msg );
-            }
+            char *msg;
+            FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+                NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                (LPSTR)&msg, 0, NULL);
+            uasserted( 13627 , msg );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
@@ -914,14 +922,14 @@ namespace mongo {
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
             cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
-            cout << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
+            cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
             cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
             uasserted(13597, "can't start without --dur enabled when journal/ files are present");
         }
 
 #ifdef WIN32
-        uassert( 13625, "Unable to truncate lock file", SetEndOfFile(lockFileHandle) != 0);
+        uassert( 13625, "Unable to truncate lock file", _chsize(lockFile, 0) == 0);
         writePid( lockFile );
         _commit( lockFile );
 #else
@@ -938,7 +946,7 @@ namespace mongo {
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
             cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
-            cout << "It is recommended that you start with journalling enabled so that recovery may occur." << endl;
+            cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
             cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
             uasserted(13618, "can't start without --dur enabled when journal/ files are present");

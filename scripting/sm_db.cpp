@@ -223,7 +223,7 @@ namespace mongo {
     };
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        smuassert( cx , "mongo_find needs 6 args" , argc == 6 );
+        smuassert( cx , "mongo_find needs 7 args" , argc == 7 );
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
         smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
         DBClientWithCommands *conn = connHolder->get();
@@ -239,10 +239,11 @@ namespace mongo {
         int nToSkip = (int) c.toNumber( argv[4] );
         bool slaveOk = c.getBoolean( obj , "slaveOk" );
         int batchSize = (int) c.toNumber( argv[5] );
+        int options = (int)c.toNumber( argv[6] );
 
         try {
 
-            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
             if ( ! cursor.get() ) {
                 log() << "query failed : " << ns << " " << q << " to: " << conn->toString() << endl;
                 JS_ReportError( cx , "error doing query: failed" );
@@ -303,11 +304,11 @@ namespace mongo {
         uassert( 10248 ,  "no connection!" , conn );
 
         string ns = c.toString( argv[0] );
-        BSONObj o = c.toObject( argv[1] );
-
-        // TODO: add _id
 
         try {
+            BSONObj o = c.toObject( argv[1] );
+            // TODO: add _id
+
             conn->insert( ns , o );
             return JS_TRUE;
         }
@@ -347,6 +348,11 @@ namespace mongo {
             conn->remove( ns , o , justOne );
             return JS_TRUE;
         }
+        catch ( std::exception& e ) {
+            JS_ReportError( cx , e.what() );
+            return JS_FALSE;
+        }
+        
         catch ( ... ) {
             JS_ReportError( cx , "error doing remove" );
             return JS_FALSE;
@@ -984,6 +990,12 @@ namespace mongo {
             c.setProperty( obj , "_batchSize" , argv[8] );
         else
             c.setProperty( obj , "_batchSize" , JSVAL_ZERO );
+
+        if ( argc > 9 && JSVAL_IS_NUMBER( argv[9] ) )
+            c.setProperty( obj , "_options" , argv[8] );
+        else
+            c.setProperty( obj , "_options" , JSVAL_ZERO );
+
 
         c.setProperty( obj , "_cursor" , JSVAL_NULL );
         c.setProperty( obj , "_numReturned" , JSVAL_ZERO );

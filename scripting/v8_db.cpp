@@ -22,6 +22,7 @@
 #include "util/base64.h"
 #include "util/text.h"
 #include "../client/syncclusterconnection.h"
+#include "../s/d_logic.h"
 #include <iostream>
 
 using namespace std;
@@ -257,7 +258,7 @@ namespace mongo {
     Handle<Value> mongoFind(const Arguments& args) {
         HandleScope handle_scope;
 
-        jsassert( args.Length() == 6 , "find needs 6 args" );
+        jsassert( args.Length() == 7 , "find needs 7 args" );
         jsassert( args[1]->IsObject() , "needs to be an object" );
         DBClientBase * conn = getConnection( args );
         GETNS;
@@ -280,9 +281,10 @@ namespace mongo {
             int nToReturn = (int)(args[3]->ToNumber()->Value());
             int nToSkip = (int)(args[4]->ToNumber()->Value());
             int batchSize = (int)(args[5]->ToNumber()->Value());
+            int options = (int)(args[6]->ToNumber()->Value());
             {
                 V8Unlock u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );
@@ -301,6 +303,9 @@ namespace mongo {
     v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args) {
         jsassert( args.Length() == 2 , "insert needs 2 args" );
         jsassert( args[1]->IsObject() , "have to insert an object" );
+
+        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+            return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
 
         DBClientBase * conn = getConnection( args );
         GETNS;
@@ -330,6 +335,9 @@ namespace mongo {
         jsassert( args.Length() == 2 || args.Length() == 3 , "remove needs 2 args" );
         jsassert( args[1]->IsObject() , "have to remove an object template" );
 
+        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+            return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
+
         DBClientBase * conn = getConnection( args );
         GETNS;
 
@@ -357,6 +365,9 @@ namespace mongo {
         jsassert( args.Length() >= 3 , "update needs at least 3 args" );
         jsassert( args[1]->IsObject() , "1st param to update has to be an object" );
         jsassert( args[2]->IsObject() , "2nd param to update has to be an object" );
+        
+        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+            return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
 
         DBClientBase * conn = getConnection( args );
         GETNS;
@@ -454,6 +465,9 @@ namespace mongo {
         args.This()->Set( v8::String::New( "_db" ) , args[1] );
         args.This()->Set( v8::String::New( "_shortName" ) , args[2] );
         args.This()->Set( v8::String::New( "_fullName" ) , args[3] );
+        
+        if ( haveLocalShardingInfo( toSTLString( args[3] ) ) )
+            return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
 
         for ( int i=0; i<args.Length(); i++ )
             assert( ! args[i]->IsUndefined() );
@@ -494,10 +508,16 @@ namespace mongo {
             t->Set( v8::String::New( "_skip" ) , Number::New( 0 ) );
 
         if ( args.Length() > 8 && args[8]->IsNumber() )
-            t->Set( v8::String::New( "_batchSize" ) , args[7] );
+            t->Set( v8::String::New( "_batchSize" ) , args[8] );
         else
             t->Set( v8::String::New( "_batchSize" ) , Number::New( 0 ) );
 
+        if ( args.Length() > 9 && args[9]->IsNumber() )
+            t->Set( v8::String::New( "_options" ) , args[9] );
+        else
+            t->Set( v8::String::New( "_options" ) , Number::New( 0 ) );
+
+        
         t->Set( v8::String::New( "_cursor" ) , v8::Null() );
         t->Set( v8::String::New( "_numReturned" ) , v8::Number::New(0) );
         t->Set( v8::String::New( "_special" ) , Boolean::New(false) );

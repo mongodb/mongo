@@ -58,7 +58,7 @@ namespace mongo {
         ClientConnections() {}
 
         ~ClientConnections() {
-            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
+            for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
                 assert( ss );
@@ -105,7 +105,7 @@ namespace mongo {
         }
 
         void sync() {
-            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
+            for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
 
@@ -128,7 +128,7 @@ namespace mongo {
                     s = new Status();
             }
 
-            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
+            for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 if ( ! Shard::isAShard( i->first ) )
                     continue;
                 Status* ss = i->second;
@@ -164,8 +164,9 @@ namespace mongo {
             _seenNS.insert( ns );
             checkVersions( ns );
         }
-
-        map<string,Status*> _hosts;
+        
+        typedef map<string,Status*,DBConnectionPool::serverNameCompare> HostMap;
+        HostMap _hosts;
         set<string> _seenNS;
         // -----
 
@@ -228,6 +229,7 @@ namespace mongo {
 
     void ShardConnection::kill() {
         if ( _conn ) {
+            resetShardVersionCB( _conn );
             delete _conn;
             _conn = 0;
             _finishedInit = true;

@@ -38,12 +38,10 @@ namespace mongo {
         privateViews.add(_view_private, this);
     }
 
-    void* MongoMMF::getView() {
-        return _view_private;
-    }
-
     /** register view. threadsafe */
     void PointerToMMF::add(void *view, MongoMMF *f) {
+        assert(view);
+        assert(f);
         mutex::scoped_lock lk(_m);
         _views.insert( pair<void*,MongoMMF*>(view,f) );
     }
@@ -139,12 +137,12 @@ namespace mongo {
        as a tad of a "warning".  but useful when done with some care, such as during
        initialization.
     */
-    /* void* MongoMMF::_switchToWritableView(void *p) {
-        RARELY log() << "todo dur not done switchtowritable" << endl;
-        if( debug )
-            return switchToPrivateView(p);
-        return p;
-    }*/
+    void* MongoMMF::_switchToWritableView(void *p) {
+        size_t ofs;
+        MongoMMF *f = privateViews.find(p, ofs);
+        assert( f );
+        return (((char *)f->_view_write)+ofs);
+    }
 
     extern string dbpath;
 
@@ -182,6 +180,7 @@ namespace mongo {
         if( _view_write ) {
             if( cmdLine.dur ) {
                 _view_private = createPrivateMap();
+                massert( 13636 , "createPrivateMap failed (look in log for error)" , _view_private );
                 privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
             else {

@@ -154,7 +154,7 @@ namespace mongo {
         unsigned long long reservedA;
         long long extraOffset;                // where the $extra info is located (bytes relative to this)
     public:
-        int backgroundIndexBuildInProgress;   // 1 if in prog
+        int indexBuildInProgress;   // 1 if in prog
         unsigned reservedB;
         // ofs 424 (8)
         struct Capped2 {
@@ -236,7 +236,7 @@ namespace mongo {
         /* when a background index build is in progress, we don't count the index in nIndexes until
            complete, yet need to still use it in _indexRecord() - thus we use this function for that.
         */
-        int nIndexesBeingBuilt() const { return nIndexes + backgroundIndexBuildInProgress; }
+        int nIndexesBeingBuilt() const { return nIndexes + indexBuildInProgress; }
 
         /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so,
                  this isn't thread safe.  TODO
@@ -248,8 +248,8 @@ namespace mongo {
         IndexDetails& idx(int idxNo, bool missingExpected = false );
 
         /** get the IndexDetails for the index currently being built in the background. (there is at most one) */
-        IndexDetails& backgroundIdx() {
-            DEV assert(backgroundIndexBuildInProgress);
+        IndexDetails& inProgIdx() {
+            DEV assert(indexBuildInProgress);
             return idx(nIndexes);
         }
 

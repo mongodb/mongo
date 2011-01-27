@@ -271,6 +271,11 @@ namespace mongo {
 
             dur::startup();
 
+            if( debug && cmdLine.dur ) {
+                cout << "setting cmdLine.durOptions=8" << endl;
+                cmdLine.durOptions = 8;
+            }
+
             int ret = run(suites,filter);
 
 #if !defined(_WIN32) && !defined(__sunos__)

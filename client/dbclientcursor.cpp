@@ -50,10 +50,16 @@ namespace mongo {
             b.appendNum( cursorId );
             toSend.setData( dbGetMore, b.buf(), b.len() );
         }
-        if ( !connector->call( toSend, *m, false ) )
+        if ( !connector->call( toSend, *m, false ) ) {
+            // log msg temp?
+            log() << "DBClientCursor::init call() failed" << endl;
             return false;
-        if ( m->empty() )
+        }
+        if ( m->empty() ) {
+            // log msg temp?
+            log() << "DBClientCursor::init message from call() was empty" << endl;
             return false;
+        }
         dataReceived();
         return true;
     }

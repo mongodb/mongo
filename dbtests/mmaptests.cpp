@@ -25,11 +25,15 @@ namespace MMapTests {
 
     class LeakTest  {
         const string fn;
+        const int optOld;
     public:
         LeakTest() :
-            fn( (path(dbpath) / "testfile.map").string() )
-        { }
+            fn( (path(dbpath) / "testfile.map").string() ), optOld(cmdLine.durOptions)
+        { 
+            cmdLine.durOptions = 0; // DurParanoid doesn't make sense with this test
+        }
         ~LeakTest() {
+            cmdLine.durOptions = optOld;
             try { boost::filesystem::remove(fn); }
             catch(...) { }
         }

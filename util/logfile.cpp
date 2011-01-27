@@ -139,12 +139,12 @@ namespace mongo {
         }
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " errno:" << errno << endl;
-            uasserted(13515, str::stream() << "error appending to file " << _fd << errnoWithDescription());
+            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << " errno:" << errno << endl;
+            uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
         }
 #if !defined(O_SYNC)
         if( fdatasync(_fd) < 0 ) {
-            uasserted(13514, str::stream() << "error appending to file on fsync " << errnoWithDescription());
+            uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
         }
 #endif
     }

@@ -3,7 +3,8 @@
 //
 
 //TODO(mathias) add --master or make another test
-conn = startMongodEmpty("--port", 30200, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "24");
+//conn = startMongodEmpty("--port", 30200, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "24");
+conn = startMongodEmpty("--port", 30200, "--dbpath", "/data/db/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "8");
 db = conn.getDB("test");
 
 var files = listFiles("jstests");

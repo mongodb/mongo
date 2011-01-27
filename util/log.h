@@ -135,18 +135,25 @@ namespace mongo {
         }
         template< class T >
         Nullstream& operator<<(const shared_ptr<T> p ) {
+            T * t = p.get();
+            if ( ! t )
+                *this << "null";
+            else
+                *this << *t;
             return *this;
         }
         template< class T >
         Nullstream& operator<<(const T &t) {
             return operator<<( static_cast<const LazyString&>( LazyStringImpl< T >( t ) ) );
         }
+
         virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
             return *this;
         }
         virtual Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
             return *this;
         }
+
         virtual void flush(Tee *t = 0) {}
     };
     extern Nullstream nullstream;
@@ -225,16 +232,6 @@ namespace mongo {
         }
         Logstream& operator<< (ios_base& (*_hex)(ios_base&)) {
             ss << _hex;
-            return *this;
-        }
-
-        template< class T >
-        Nullstream& operator<<(const shared_ptr<T> p ) {
-            T * t = p.get();
-            if ( ! t )
-                *this << "null";
-            else
-                *this << *t;
             return *this;
         }
 

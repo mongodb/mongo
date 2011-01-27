@@ -63,7 +63,7 @@ namespace mongo {
                     delete loc;
                 }
             }
-            bool owned;
+            bool owned; // true if loc is a pointer of our creation (and not a pointer into a MMF)
             OpTime * loc;
         };
 
@@ -123,7 +123,10 @@ namespace mongo {
             Ident ident(rid,host,ns);
             Info& i = _slaves[ ident ];
             if ( i.loc ) {
-                i.loc[0] = last;
+                if( i.owned )
+                    i.loc[0] = last;
+                else
+                    getDur().setNoJournal(i.loc, &last, sizeof(last));
                 return;
             }
 
@@ -134,7 +137,7 @@ namespace mongo {
                 assert( res["syncedTo"].type() );
                 i.owned = false;
                 i.loc = (OpTime*)res["syncedTo"].value();
-                i.loc[0] = last;
+                getDur().setNoJournal(i.loc, &last, sizeof(last));
                 return;
             }
 

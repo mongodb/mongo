@@ -39,7 +39,8 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
     function testOne( map, reduce, finalize, scope, where, wait ) {
         t.drop();
         t2.drop();
-        // Ensure we have one document for the m/r functions to run on.
+        // Ensure we have 2 documents for the reduce to run
+        t.save( {a:1} );
         t.save( {a:1} );
         db.getLastError();
                 
@@ -89,14 +90,14 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
     /** Test looping in map and reduce functions */
     function runMRTests( loop, where ) {
         test( loop, function( k, v ) { return v[ 0 ]; }, null, null, where );
-        test( function() { emit( this.id, 1 ); }, loop, null, null, where );
+        test( function() { emit( this.a, 1 ); }, loop, null, null, where );
         test( function() { loop(); }, function( k, v ) { return v[ 0 ] }, null, { loop: loop }, where );
     }
 
     /** Test looping in finalize function */
     function runFinalizeTests( loop, where ) {
-        test( function() { emit( this.id, 1 ); }, function( k, v ) { return v[ 0 ] }, loop, null, where );
-        test( function() { emit( this.id, 1 ); }, function( k, v ) { return v[ 0 ] }, function( a, b ) { loop() }, { loop: loop }, where );
+        test( function() { emit( this.a, 1 ); }, function( k, v ) { return v[ 0 ] }, loop, null, where );
+        test( function() { emit( this.a, 1 ); }, function( k, v ) { return v[ 0 ] }, function( a, b ) { loop() }, { loop: loop }, where );
     }
 
     var loop = function() {

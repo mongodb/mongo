@@ -356,11 +356,9 @@ namespace mongo {
 
         // add self
         {
-            HostAndPort h(getHostName(), cmdLine.port);
-
             BSONObjBuilder bb;
             bb.append("_id", (int) _self->id());
-            bb.append("name", h.toString());
+            bb.append("name", _self->fullName());
             bb.append("health", 1.0);
             bb.append("state", (int) box.getState().s);
             bb.append("stateStr", box.getState().toString());

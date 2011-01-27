@@ -66,7 +66,7 @@ namespace mongo {
         multiKeyIndexBits = 0;
         reservedA = 0;
         extraOffset = 0;
-        backgroundIndexBuildInProgress = 0;
+        indexBuildInProgress = 0;
         reservedB = 0;
         capped2.cc2_ptr = 0;
         capped2.fileNumber = 0;
@@ -115,7 +115,7 @@ namespace mongo {
         cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
         cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
         cout << "ns         " << capped << ' ' << paddingFactor << ' ' << flags << ' ' << dataFileVersion << '\n';
-        cout << "ns         " << multiKeyIndexBits << ' ' << backgroundIndexBuildInProgress << '\n';
+        cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildInProgress << '\n';
         cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
         cout << endl;
     }
@@ -131,11 +131,11 @@ namespace mongo {
 
         DEV assertInWriteLock();
 
-        if( backgroundIndexBuildInProgress || capped2.cc2_ptr ) {
+        if( indexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();
-            if( backgroundIndexBuildInProgress ) {
-                log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
-                getDur().writingInt( backgroundIndexBuildInProgress ) = 0;
+            if( indexBuildInProgress ) {
+                log() << "indexBuildInProgress was " << indexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
+                getDur().writingInt( indexBuildInProgress ) = 0;
             }
             if( capped2.cc2_ptr )
                 *getDur().writing(&capped2.cc2_ptr) = 0;

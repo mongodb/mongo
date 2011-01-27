@@ -35,12 +35,14 @@ namespace mongo {
     class ReplicaSetMonitorWatcher : public BackgroundJob {
     protected:
         void run() {
-            sleepsecs( 20 );
-            try {
-                ReplicaSetMonitor::checkAll();
-            }
-            catch ( std::exception& e ) {
-                error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+            while ( ! inShutdown() ) {
+                sleepsecs( 20 );
+                try {
+                    ReplicaSetMonitor::checkAll();
+                }
+                catch ( std::exception& e ) {
+                    error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+                }
             }
         }
 
@@ -53,7 +55,7 @@ namespace mongo {
         string errmsg;
 
         for ( unsigned i=0; i<servers.size(); i++ ) {
-            auto_ptr<DBClientConnection> conn( new DBClientConnection( true ) );
+            auto_ptr<DBClientConnection> conn( new DBClientConnection( true , 0, 5.0 ) );
             if (!conn->connect( servers[i] , errmsg ) ) {
                 log(1) << "error connecting to seed " << servers[i] << ": " << errmsg << endl;
                 // skip seeds that don't work
@@ -146,7 +148,7 @@ namespace mongo {
 
 
     HostAndPort ReplicaSetMonitor::getMaster() {
-        if ( _master < 0 )
+        if ( _master < 0 || !_nodes[_master].ok )
             _check();
 
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
@@ -222,7 +224,7 @@ namespace mongo {
                 continue;
 
             HostAndPort h( toCheck );
-            DBClientConnection * newConn = new DBClientConnection( true );
+            DBClientConnection * newConn = new DBClientConnection( true, 0, 5.0 );
             string temp;
             newConn->connect( h , temp );
             {
@@ -356,20 +358,19 @@ namespace mongo {
     }
 
     DBClientConnection * DBClientReplicaSet::checkMaster() {
-        if ( _master ) {
+        HostAndPort h = _monitor->getMaster();
+
+        if ( h == _masterHost ) {
             // a master is selected.  let's just make sure connection didn't die
             if ( ! _master->isFailed() )
                 return _master.get();
             _monitor->notifyFailure( _masterHost );
         }
 
-        HostAndPort h = _monitor->getMaster();
-        if ( h != _masterHost ) {
-            _masterHost = h;
-            _master.reset( new DBClientConnection( true ) );
-            _master->connect( _masterHost );
-            _auth( _master.get() );
-        }
+        _masterHost = _monitor->getMaster();
+        _master.reset( new DBClientConnection( true ) );
+        _master->connect( _masterHost );
+        _auth( _master.get() );
         return _master.get();
     }
 
@@ -415,6 +416,9 @@ namespace mongo {
             checkMaster();
         }
         catch (AssertionException&) {
+            if (_master && _monitor) {
+                _monitor->notifyFailure(_masterHost);
+            }
             return false;
         }
         return true;

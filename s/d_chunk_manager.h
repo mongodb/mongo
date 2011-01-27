@@ -117,6 +117,7 @@ namespace mongo {
         BSONObj getKey() const { return _key.getOwned(); }
         unsigned getNumChunks() const { return _chunksMap.size(); }
 
+        string toString() const;
     private:
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
         ShardChunkVersion _version;
@@ -142,7 +143,6 @@ namespace mongo {
 
         /** can only be used in the cloning calls */
         ShardChunkManager() {}
-
     };
 
     typedef shared_ptr<ShardChunkManager> ShardChunkManagerPtr;

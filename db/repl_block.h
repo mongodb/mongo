@@ -28,8 +28,11 @@
  */
 namespace mongo {
 
-    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp );
+    void updateSlaveLocation( CurOp& curop, const char * oplog_ns , OpTime lastOp );
+
+    /** @return true if op has made it to w servers */
     bool opReplicatedEnough( OpTime op , int w );
+
     void resetSlaveCache();
     unsigned getSlaveCount();
 }

@@ -829,7 +829,7 @@ namespace mongo {
                 return ss.str();
             }
 
-            BSONObj fixForShards( const BSONObj& orig , const string& output ) {
+            BSONObj fixForShards( const BSONObj& orig , const string& output, BSONObj& customOut , string& badShardedField ) {
                 BSONObjBuilder b;
                 BSONObjIterator i( orig );
                 while ( i.more() ) {
@@ -837,6 +837,7 @@ namespace mongo {
                     string fn = e.fieldName();
                     if ( fn == "map" ||
                             fn == "mapreduce" ||
+                            fn == "mapparams" ||
                             fn == "reduce" ||
                             fn == "query" ||
                             fn == "sort" ||
@@ -847,9 +848,16 @@ namespace mongo {
                     else if ( fn == "out" ||
                               fn == "finalize" ) {
                         // we don't want to copy these
+                    	if (fn == "out" && e.type() == Object) {
+                    		// check if there is a custom output
+                    		BSONObj out = e.embeddedObject();
+                    		if (out.hasField("db"))
+                    			customOut = out;
+                    	}
                     }
                     else {
-                        uassert( 10177 ,  (string)"don't know mr field: " + fn , 0 );
+                        badShardedField = fn;
+                        return BSONObj();
                     }
                 }
                 b.append( "out" , output );
@@ -862,10 +870,27 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
 
+                const string shardedOutputCollection = getTmpName( collection );
+
+                string badShardedField;
+                BSONObj customOut;
+                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection, customOut , badShardedField );
+
+                bool customOutDB = ! customOut.isEmpty() && customOut.hasField( "db" );
+
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                    if ( customOutDB ) {
+                        errmsg = "can't use out 'db' with non-sharded db";
+                        return false;
+                    }
                     return passthrough( conf , cmdObj , result );
+                }
+
+                if ( badShardedField.size() ) {
+                    errmsg = str::stream() << "unknown m/r field for sharding: " << badShardedField;
+                    return false;
                 }
 
                 BSONObjBuilder timingBuilder;
@@ -880,36 +905,70 @@ namespace mongo {
                 set<Shard> shards;
                 cm->getShardsForQuery( shards , q );
 
-                const string shardedOutputCollection = getTmpName( collection );
-
-                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection );
 
                 BSONObjBuilder finalCmd;
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
                 finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
+                
+                
+                {
+                    // we need to use our connections to the shard
+                    // so filtering is done correctly for un-owned docs
+                    // so we allocate them in our thread
+                    // and hand off
 
-                list< shared_ptr<Future::CommandResult> > futures;
+                    vector< shared_ptr<ShardConnection> > shardConns;
 
-                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand ) );
-                }
-
-                BSONObjBuilder shardresults;
-                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
-                    shared_ptr<Future::CommandResult> res = *i;
-                    if ( ! res->join() ) {
-                        errmsg = "mongod mr failed: ";
-                        errmsg += res->result().toString();
-                        return 0;
+                    list< shared_ptr<Future::CommandResult> > futures;
+                    
+                    for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
+                        shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , fullns ) );
+                        assert( temp->get() );
+                        futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , temp->get() ) );
+                        shardConns.push_back( temp );
                     }
-                    shardresults.append( res->getServer() , res->result() );
-                }
+                    
+                    bool failed = false;
+                    
+                    BSONObjBuilder shardresults;
+                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
+                        shared_ptr<Future::CommandResult> res = *i;
+                        if ( ! res->join() ) {
+                            error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
+                            result.append( "cause" , res->result() );
+                            errmsg = "mongod mr failed: ";
+                            errmsg += res->result().toString();
+                            failed = true;
+                            continue;
+                        }
+                        shardresults.append( res->getServer() , res->result() );
+                    }
 
-                finalCmd.append( "shards" , shardresults.obj() );
-                timingBuilder.append( "shards" , t.millis() );
+                    for ( unsigned i=0; i<shardConns.size(); i++ )
+                        shardConns[i]->done();
+
+                    if ( failed )
+                        return 0;
+
+                    finalCmd.append( "shards" , shardresults.obj() );
+                    timingBuilder.append( "shards" , t.millis() );
+                }
 
                 Timer t2;
-                ShardConnection conn( conf->getPrimary() , fullns );
+                // by default the target database is same as input
+                Shard outServer = conf->getPrimary();
+                string outns = fullns;
+                if ( customOutDB ) {
+                	// have to figure out shard for the output DB
+                	BSONElement elmt = customOut.getField("db");
+                	string outdb = elmt.valuestrsafe();
+                	outns = outdb + "." + collection;
+                    DBConfigPtr conf2 = grid.getDBConfig( outdb , true );
+                	outServer = conf2->getPrimary();
+                }
+                log() << "customOut: " << customOut << " outServer: " << outServer << endl;
+                        
+                ShardConnection conn( outServer , outns );
                 BSONObj finalResult;
                 bool ok = conn->runCommand( dbName , finalCmd.obj() , finalResult );
                 conn.done();

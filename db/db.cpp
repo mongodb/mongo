@@ -234,19 +234,7 @@ sendmore:
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd ) ) {
-                    log() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
-                    /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
-                    if ( dbMsgPort->farEnd.isLocalHost() ) {
-                        dbMsgPort->shutdown();
-                        sleepmillis(50);
-                        problem() << "exiting end msg" << endl;
-                        dbexit(EXIT_CLEAN);
-                    }
-                    else {
-                        log() << "  (not from localhost, ignoring end msg)" << endl;
-                    }
-                }
+                assembleResponse( m, dbresponse, dbMsgPort->farEnd );
 
                 if ( dbresponse.response ) {
                     dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
@@ -309,40 +297,6 @@ sendmore:
             if( c ) c->shutdown();
         }
         globalScriptEngine->threadDone();
-    }
-
-    /* todo: eliminate msg */
-    void msg(const char *m, const char *address, int port, int extras = 0) {
-        SockAddr db(address, port);
-
-        MessagingPort p;
-        if ( !p.connect(db) ) {
-            log() << "msg couldn't connect" << endl;
-            return;
-        }
-
-        Message send;
-        Message response;
-
-        send.setData( dbMsg , m);
-        int len = send.header()->dataLen();
-
-        for ( int i = 0; i < extras; i++ )
-            p.say(/*db, */send);
-
-        Timer t;
-        bool ok = p.call(send, response);
-        double tm = ((double) t.micros()) + 1;
-        log() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
-              << "len: " << len << " data: " << response.singleData()->_data << endl;
-
-        sleepsecs(1);
-
-        p.shutdown();
-    }
-
-    void msg(const char *m, int extras = 0) {
-        msg(m, "127.0.0.1", CmdLine::DefaultDBPort, extras);
     }
 
     bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
@@ -512,6 +466,8 @@ sendmore:
 
     void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
+        Client::initThread("initandlisten");
+
         bool is32bit = sizeof(int*) == 4;
 
         {
@@ -550,7 +506,6 @@ sendmore:
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 
-        Client::initThread("initandlisten");
         _diaglog.init();
 
         dur::startup();
@@ -675,38 +630,39 @@ int main(int argc, char* argv[]) {
     CmdLine::addGlobalOptions( general_options , hidden_options );
 
     general_options.add_options()
-    ("dbpath", po::value<string>() , "directory for datafiles")
-    ("directoryperdb", "each database will be stored in a separate directory")
-    ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
-    ("cpu", "periodically show cpu and iowait utilization")
-    ("noauth", "run without security")
     ("auth", "run with security")
-    ("objcheck", "inspect client data for validity on receipt")
-    ("quota", "limits each database to a certain number of files (8 default)")
-    ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
-    ("appsrvpath", po::value<string>(), "root directory for the babble app server")
+    ("cpu", "periodically show cpu and iowait utilization")
+    ("dbpath", po::value<string>() , "directory for datafiles")
+    ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
+    ("directoryperdb", "each database will be stored in a separate directory")
+    ("dur", "enable journaling")
+    ("durOptions", po::value<int>(), "durability diagnostic options")
+    ("ipv6", "enable IPv6 support (disabled by default)")
+    ("jsonp","allow JSONP access via http (has security implications)")
+    ("maxConns",po::value<int>(), "max number of simultaneous connections")
+    ("noauth", "run without security")
     ("nocursors", "diagnostic/debugging option")
     ("nohints", "ignore query hints")
     ("nohttpinterface", "disable http interface")
-    ("rest","turn on simple rest api")
-    ("jsonp","allow JSONP access via http (has security implications)")
-    ("noscripting", "disable scripting engine")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
-    ("smallfiles", "use a smaller default file size")
-    ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-    ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
-    ("sysinfo", "print some diagnostic system information")
-    ("upgrade", "upgrade db if needed")
-    ("repair", "run repair on all dbs")
+    ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
-    ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
-    ("profile",po::value<int>(), "0=off 1=slow, 2=all")
-    ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
-    ("maxConns",po::value<int>(), "max number of simultaneous connections")
 #if !defined(_WIN32)
     ("nounixsocket", "disable listening on unix sockets")
 #endif
-    ("ipv6", "enable IPv6 support (disabled by default)")
+    ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
+    ("objcheck", "inspect client data for validity on receipt")
+    ("profile",po::value<int>(), "0=off 1=slow, 2=all")
+    ("quota", "limits each database to a certain number of files (8 default)")
+    ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
+    ("rest","turn on simple rest api")
+    ("repair", "run repair on all dbs")
+    ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
+    ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
+    ("smallfiles", "use a smaller default file size")
+    ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
+    ("sysinfo", "print some diagnostic system information")
+    ("upgrade", "upgrade db if needed")
     ;
 
 #if defined(_WIN32)
@@ -742,12 +698,11 @@ int main(int argc, char* argv[]) {
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     // these move to unhidden later:
-    ("dur", "enable journaling")
-    ("durOptions", po::value<int>(), "durability diagnostic options")
     ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
     ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
     ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
     ("nodur", "disable journaling (currently the default)")
+    ("appsrvpath", po::value<string>(), "root directory for the babble app server")
     ;
 
 
@@ -810,12 +765,17 @@ int main(int argc, char* argv[]) {
         }
         if ( params.count( "dbpath" ) ) {
             dbpath = params["dbpath"].as<string>();
-            assert ( dbpath.size() );
-            if ( !cwd.empty() && dbpath[0] != '/' )
-                dbpath = cwd + "/" + dbpath;
+            if ( params.count( "fork" ) && dbpath[0] != '/' ) {
+                // we need to change dbpath if we fork since we change
+                // cwd to "/"
+                // fork only exists on *nix
+                // so '/' is safe 
+                dbpath = cmdLine.cwd + "/" + dbpath;
+            }
         }
-        else
+        else {
             dbpath = "/data/db/";
+        }
 
         if ( params.count("directoryperdb")) {
             directoryperdb = true;
@@ -1060,20 +1020,6 @@ int main(int argc, char* argv[]) {
         if (params.count("command")) {
             vector<string> command = params["command"].as< vector<string> >();
 
-            if (command[0].compare("msg") == 0) {
-                const char *m;
-
-                if (command.size() < 3) {
-                    cout << "Too few parameters to 'msg' command" << endl;
-                    cout << visible_options << endl;
-                    return 0;
-                }
-
-                m = command[1].c_str();
-
-                msg(m, "127.0.0.1", atoi(command[2].c_str()));
-                return 0;
-            }
             if (command[0].compare("run") == 0) {
                 if (command.size() > 1) {
                     cout << "Too many parameters to 'run' command" << endl;

@@ -453,13 +453,16 @@ namespace mongo {
     class SocketException : public DBException {
     public:
         const enum Type { CLOSED , RECV_ERROR , SEND_ERROR, RECV_TIMEOUT, SEND_TIMEOUT, FAILED_STATE, CONNECT_ERROR } _type;
-        SocketException( Type t ) : DBException( "socket exception" , 9001 ) , _type(t) { }
+        
+        SocketException( Type t , string server="" , int code = 9001 , string extra="" ) : DBException( "socket exception" , code ) , _type(t) , _server(server), _extra(extra){ }
+        virtual ~SocketException() throw() {}
+
         bool shouldPrint() const { return _type != CLOSED; }
-        virtual string toString() const {
-            stringstream ss;
-            ss << "9001 socket exception " << _type;
-            return ss.str();
-        }
+        virtual string toString() const;
+
+    private:
+        string _server;
+        string _extra;
     };
 
     MSGID nextMessageId();

@@ -68,6 +68,6 @@ if ( db.runCommand( "features" ).readlock ){
               initial: { count: 0 }
             };
     
-    assert.throws( function() { return t.group( p ) }, "write reduce didn't fail" );
+    assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
 }
 
