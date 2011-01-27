@@ -378,7 +378,7 @@ namespace mongo {
             }
             timeBuilder.appendNumber( "after basic" , Listener::getElapsedTimeMillis() - start );
 
-            if ( authed ) {
+            {
 
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
 
@@ -400,7 +400,7 @@ namespace mongo {
                 t.done();
 
             }
-            timeBuilder.appendNumber( "after is authed" , Listener::getElapsedTimeMillis() - start );
+            timeBuilder.appendNumber( "after mem" , Listener::getElapsedTimeMillis() - start );
 
             {
                 BSONObjBuilder bb( result.subobjStart( "connections" ) );
@@ -410,7 +410,7 @@ namespace mongo {
             }
             timeBuilder.appendNumber( "after connections" , Listener::getElapsedTimeMillis() - start );
 
-            if ( authed ) {
+            {
                 BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
                 bb.append("note", "fields vary by platform");
                 ProcessInfo p;
