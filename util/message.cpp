@@ -64,6 +64,20 @@ namespace mongo {
 
     const Listener* Listener::_timeTracker;
 
+    string SocketException::toString() const {
+        stringstream ss;
+        ss << _ei.code << " socket exception [" << _type << "] ";
+        
+        if ( _server.size() )
+            ss << "server [" << _server << "] ";
+        
+        if ( _extra.size() )
+            ss << _extra;
+        
+        return ss.str();
+    }
+
+
     vector<SockAddr> ipToAddrs(const char* ips, int port) {
         vector<SockAddr> out;
         if (*ips == '\0') {

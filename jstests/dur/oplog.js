@@ -99,8 +99,8 @@ log();
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
 work();
 
-// wait for group commit.  use getLastError(...) later when that is enhanced.
-sleep(400);
+// wait for group commit.
+printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
 
 // kill the process hard
 stopMongod(30001, /*signal*/9);

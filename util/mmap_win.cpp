@@ -58,8 +58,12 @@ namespace mongo {
         void *p = MapViewOfFileEx(maphandle, FILE_MAP_COPY, 0, 0,
                                   /*dwNumberOfBytesToMap 0 means to eof*/0 /*len*/,
                                   oldPrivateAddr);
-
-        assert(p);
+        
+        if ( p == 0 ) {
+            DWORD e = GetLastError();
+            log() << "MapViewOfFileEx failed " << filename() << " " << errnoWithDescription(e) << endl;
+            assert(p);
+        }
         assert(p == oldPrivateAddr);
         return p;
     }

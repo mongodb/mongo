@@ -22,7 +22,12 @@
 #include "../util/processinfo.h"
 #include "security_key.h"
 
+#ifdef _WIN32
+#include <direct.h>
+#endif
+
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
 namespace mongo {
 
@@ -50,6 +55,7 @@ namespace mongo {
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
 #ifndef _WIN32
+        ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
 #endif
         ;
@@ -88,7 +94,17 @@ namespace mongo {
             size_t i = cmdLine.binaryName.rfind( '/' );
             if ( i != string::npos )
                 cmdLine.binaryName = cmdLine.binaryName.substr( i + 1 );
+            
+            // setup cwd
+            char buffer[1024];
+#ifdef _WIN32
+            assert( _getcwd( buffer , 1000 ) );
+#else
+            assert( getcwd( buffer , 1000 ) );
+#endif
+            cmdLine.cwd = buffer;
         }
+        
 
         /* don't allow guessing - creates ambiguities when some options are
          * prefixes of others. allow long disguises and don't allow guessing
@@ -150,6 +166,14 @@ namespace mongo {
         string logpath;
 
 #ifndef _WIN32
+        if (params.count("unixSocketPrefix")) {
+            cmdLine.socket = params["unixSocketPrefix"].as<string>();
+            if (!fs::is_directory(cmdLine.socket)) {
+                cout << cmdLine.socket << " must be a directory" << endl;
+                ::exit(-1);
+            }
+        }
+        
         if (params.count("fork")) {
             if ( ! params.count( "logpath" ) ) {
                 cout << "--fork has to be used with --logpath" << endl;
@@ -161,9 +185,7 @@ namespace mongo {
                 logpath = params["logpath"].as<string>();
                 assert( logpath.size() );
                 if ( logpath[0] != '/' ) {
-                    char temp[256];
-                    assert( getcwd( temp , 256 ) );
-                    logpath = (string)temp + "/" + logpath;
+                    logpath = cmdLine.cwd + "/" + logpath;
                 }
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {

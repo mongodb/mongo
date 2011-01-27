@@ -467,7 +467,7 @@ namespace mongo {
             // not sure if this is necessary, maybe just leave the oplog and let
             // the user delete it if they want the space?
             writelock lk(rsoplog);
-            Client::Context c(rsoplog, dbpath, 0, false);
+            Client::Context c(rsoplog);
             NamespaceDetails *d = nsdetails(rsoplog);
             if (d) {
                 string errmsg;

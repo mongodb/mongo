@@ -26,6 +26,7 @@
 #include "server.h"
 #include "shard.h"
 #include "util.h"
+#include "client.h"
 
 #include "writeback_listener.h"
 
@@ -52,22 +53,30 @@ namespace mongo {
     }
 
     /* static */
-    void WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ) {
+    BSONObj WriteBackListener::waitFor( ConnectionId connectionId, const OID& oid ) {
         Timer t;
         for ( int i=0; i<5000; i++ ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[connectionId];
-                if ( oid <= s.id ) {
-                    // TODO return gle
-                    return;
+                if ( oid < s.id ) {
+                    // this means we're waiting for a GLE that already passed.
+                    // it should be impossible becauseonce we call GLE, no other
+                    // writebacks should happen with that connection id
+                    msgasserted( 13633 , str::stream() << "got writeback waitfor for older id " <<
+                                 " oid: " << oid << " s.id: " << s.id << " connectionId: " << connectionId );
                 }
+                else if ( oid == s.id ) {
+                    return s.gle;
+                }
+                
             }
             sleepmillis( 10 );
         }
         stringstream ss;
         ss << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms";
         uasserted( 13403 , ss.str() );
+        return BSONObj(); // never gets here
     }
 
     void WriteBackListener::run() {
@@ -136,11 +145,24 @@ namespace mongo {
 
                     BSONObj gle;
                     try {
+                        
                         Request r( m , 0 );
                         r.init();
-                        r.process();
 
-                        gle = BSONObj(); // TODO
+                        ClientInfo * ci = r.getClientInfo();
+                        ci->noAutoSplit();
+
+                        r.process();
+                        
+                        ci->newRequest(); // this so we flip prev and cur shards
+
+                        BSONObjBuilder b;
+                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
+                            b.appendBool( "commandFailed" , true );
+                        }
+                        gle = b.obj();
+
+                        ci->clearSinceLastGetError();
                     }
                     catch ( DBException& e ) {
                         error() << "error processing writeback: " << e << endl;

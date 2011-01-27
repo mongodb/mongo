@@ -33,7 +33,7 @@ namespace mongo {
             {
                 ScopedDbConnection conn( configServer.getPrimary() );
                 auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , Query() );
-                assert( c.get() );
+                massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
                 }

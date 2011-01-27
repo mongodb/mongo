@@ -90,8 +90,10 @@ namespace BtreeTests {
         }
         void insert( BSONObj &key ) {
             bt()->bt_insert( dl(), recordLoc(), key, Ordering::make(order()), true, id(), true );
+            getDur().commitIfNeeded();
         }
         bool unindex( BSONObj &key ) {
+            getDur().commitIfNeeded();
             return bt()->unindex( dl(), id(), key, recordLoc() );
         }
         static BSONObj simpleKey( char c, int n = 1 ) {
@@ -512,6 +514,7 @@ namespace BtreeTests {
         static DiskLoc make( IndexDetails &id ) {
             DiskLoc ret = addBucket( id );
             is( ret )->init();
+            getDur().commitIfNeeded();
             return ret;
         }
         static ArtificialTree *is( const DiskLoc &l ) {

@@ -146,7 +146,8 @@ DBCollection.prototype.find = function( query , fields , limit , skip ){
 }
 
 DBCollection.prototype.findOne = function( query , fields ){
-    var cursor = this._mongo.find( this._fullName , this._massageObject( query ) || {} , fields , -1 , 0 , 0 );
+    var cursor = this._mongo.find( this._fullName , this._massageObject( query ) || {} , fields , 
+        -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , 0 /* options */ );
     if ( ! cursor.hasNext() )
         return null;
     var ret = cursor.next();
@@ -174,6 +175,11 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
 }
 
 DBCollection.prototype.remove = function( t , justOne ){
+    for ( var k in t ){
+        if ( k == "_id" && typeof( t[k] ) == "undefined" ){
+            throw "can't have _id set to undefined in a remove expression"
+        }
+    }
     this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
 }
 
@@ -197,6 +203,9 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
 DBCollection.prototype.save = function( obj ){
     if ( obj == null || typeof( obj ) == "undefined" ) 
         throw "can't save a null";
+
+    if ( typeof( obj ) == "number" || typeof( obj) == "string" )
+        throw "can't save a number or string"
 
     if ( typeof( obj._id ) == "undefined" ){
         obj._id = new ObjectId();
@@ -592,8 +601,10 @@ DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString )
         Object.extend( c , optionsOrOutString );
 
     var raw = this._db.runCommand( c );
-    if ( ! raw.ok )
-        throw "map reduce failed: " + tojson( raw );
+    if ( ! raw.ok ){
+        __mrerror__ = raw;
+        throw "map reduce failed:" + tojson(raw);
+    }
     return new MapReduceResult( this._db , raw );
 
 }

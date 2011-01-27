@@ -74,8 +74,8 @@ namespace mongo {
             unsigned len; // up to this len
         };
 
-        /** try to remember things we have already marked for journalling.  false negatives are ok if infrequent -
-           we will just log them twice.
+        /** try to remember things we have already marked for journaling.  false negatives are ok if infrequent -
+            we will just log them twice.
         */
         template<int Prime>
         class Already : boost::noncopyable {

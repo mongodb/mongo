@@ -240,8 +240,17 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query, int options, int limit, int skip ) {
-        NamespaceString ns(_ns);
+    unsigned long long DBClientWithCommands::count(const string &myns, const BSONObj& query, int options, int limit, int skip ) {
+        NamespaceString ns(myns);
+        BSONObj cmd = _countCmd( myns , query , options , limit , skip );
+        BSONObj res;
+        if( !runCommand(ns.db.c_str(), cmd, res, options) )
+            uasserted(11010,string("count fails:") + res.toString());
+        return res["n"].numberLong();
+    }
+
+    BSONObj DBClientWithCommands::_countCmd(const string &myns, const BSONObj& query, int options, int limit, int skip ) {
+        NamespaceString ns(myns);
         BSONObjBuilder b;
         b.append( "count" , ns.coll );
         b.append( "query" , query );
@@ -249,11 +258,7 @@ namespace mongo {
             b.append( "limit" , limit );
         if ( skip )
             b.append( "skip" , skip );
-        BSONObj cmd = b.obj();
-        BSONObj res;
-        if( !runCommand(ns.db.c_str(), cmd, res, options) )
-            uasserted(11010,string("count fails:") + res.toString());
-        return res["n"].numberLong();
+        return b.obj();
     }
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");

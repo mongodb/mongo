@@ -11,9 +11,6 @@ for ( i in files ) {
     }
 }
 
-// disable test until SERVER-2332 is addressed
-doIt = false;
-
 if ( !doIt ) {
     print( "path " + startPath + " missing, skipping diskfull test" );
     doIt = false;

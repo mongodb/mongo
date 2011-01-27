@@ -27,6 +27,8 @@
 #include "../matcher.h"
 #include "../clientcursor.h"
 #include "../replpair.h"
+#include "../../s/d_chunk_manager.h"
+#include "../../s/d_logic.h"
 
 #include "mr.h"
 
@@ -58,6 +60,9 @@ namespace mongo {
             _params = state->config().mapParams;
         }
 
+        /**
+         * Applies the map function to an object, which should internally call emit()
+         */
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
             assert( s );
@@ -66,6 +71,10 @@ namespace mongo {
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
 
+        /**
+         * Applies the finalize function to a tuple obj (key, val)
+         * Returns tuple obj {_id: key, value: newval}
+         */
         BSONObj JSFinalizer::finalize( const BSONObj& o ) {
             Scope * s = _func.scope();
 
@@ -81,10 +90,14 @@ namespace mongo {
             return b.obj();
         }
 
+        /**
+         * Reduces a list of tuple objects (key, value) to a single tuple {"0": key, "1": value}
+         */
         BSONObj JSReducer::reduce( const BSONList& tuples ) {
+            if (tuples.size() <= 1)
+                return tuples[0];
             BSONObj key;
             int endSizeEstimate = 16;
-
             _reduce( tuples , key , endSizeEstimate );
 
             BSONObjBuilder b(endSizeEstimate);
@@ -93,17 +106,33 @@ namespace mongo {
             return b.obj();
         }
 
-        BSONObj JSReducer::reduce( const BSONList& tuples , Finalizer * finalizer ) {
+        /**
+         * Reduces a list of tuple object (key, value) to a single tuple {_id: key, value: val}
+         * Also applies a finalizer method if present.
+         */
+        BSONObj JSReducer::finalReduce( const BSONList& tuples , Finalizer * finalizer ) {
 
+            BSONObj res;
             BSONObj key;
-            int endSizeEstimate = 16;
 
-            _reduce( tuples , key , endSizeEstimate );
-
-            BSONObjBuilder b(endSizeEstimate);
-            b.appendAs( key.firstElement() , "_id" );
-            _func.scope()->append( b , "value" , "return" );
-            BSONObj res = b.obj();
+            if (tuples.size() == 1) {
+                // 1 obj, just use it
+                key = tuples[0];
+                BSONObjBuilder b(key.objsize());
+                BSONObjIterator it(key);
+                b.appendAs( it.next() , "_id" );
+                b.appendAs( it.next() , "value" );
+                res = b.obj();
+            }
+            else {
+                // need to reduce
+                int endSizeEstimate = 16;
+                _reduce( tuples , key , endSizeEstimate );
+                BSONObjBuilder b(endSizeEstimate);
+                b.appendAs( key.firstElement() , "_id" );
+                _func.scope()->append( b , "value" , "return" );
+                res = b.obj();
+            }
 
             if ( finalizer ) {
                 res = finalizer->finalize( res );
@@ -112,14 +141,18 @@ namespace mongo {
             return res;
         }
 
+        /**
+         * actually applies a reduce, to a list of tuples (key, value).
+         * After the call, tuples will hold a single tuple {"0": key, "1": value}
+         */
         void JSReducer::_reduce( const BSONList& tuples , BSONObj& key , int& endSizeEstimate ) {
             uassert( 10074 ,  "need values" , tuples.size() );
 
             int sizeEstimate = ( tuples.size() * tuples.begin()->getField( "value" ).size() ) + 128;
 
+            // need to build the reduce args: ( key, [values] )
             BSONObjBuilder reduceArgs( sizeEstimate );
             boost::scoped_ptr<BSONArrayBuilder>  valueBuilder;
-
             int sizeSoFar = 0;
             unsigned n = 0;
             for ( ; n<tuples.size(); n++ ) {
@@ -134,7 +167,7 @@ namespace mongo {
 
                 BSONElement ee = j.next();
 
-                uassert( 13070 , "value to large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
+                uassert( 13070 , "value too large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
                 if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ) {
                     assert( n > 1 ); // if not, inf. loop
@@ -162,8 +195,8 @@ namespace mongo {
             if ( n == tuples.size() )
                 return;
 
-            // the input list was too large
-
+            // the input list was too large, add the rest of elmts to new tuples and reduce again
+            // note: would be better to use loop instead of recursion to avoid stack overflow
             BSONList x;
             for ( ; n < tuples.size(); n++ ) {
                 x.push_back( tuples[n] );
@@ -237,7 +270,7 @@ namespace mongo {
 
                 mapper.reset( new JSMapper( cmdObj["map"] ) );
                 reducer.reset( new JSReducer( cmdObj["reduce"] ) );
-                if ( cmdObj["finalize"].type() )
+                if ( cmdObj["finalize"].type() && cmdObj["finalize"].trueValue() )
                     finalizer.reset( new JSFinalizer( cmdObj["finalize"] ) );
 
                 if ( cmdObj["mapparams"].type() == Array ) {
@@ -268,6 +301,9 @@ namespace mongo {
             }
         }
 
+        /**
+         * Create temporary collection, set up indexes
+         */
         void State::prepTempCollection() {
             if ( ! _onDisk )
                 return;
@@ -279,7 +315,9 @@ namespace mongo {
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
                 string errmsg;
-                assert( userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , true ) );
+                if ( ! userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , true ) ) {
+                    uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
+                }
             }
 
 
@@ -309,6 +347,10 @@ namespace mongo {
 
         }
 
+        /**
+         * For inline mode, appends results to output object.
+         * Makes sure (key, value) tuple is formatted as {_id: key, value: val}
+         */
         void State::appendResults( BSONObjBuilder& final ) {
             if ( _onDisk )
                 return;
@@ -338,8 +380,12 @@ namespace mongo {
             final.append( "results" , res );
         }
 
-        long long State::renameIfNeeded() {
-            if ( ! _onDisk )
+        /**
+         * Does post processing on output collection.
+         * This may involve replacing, merging or reducing.
+         */
+        long long State::postProcessCollection() {
+            if ( _onDisk == false || _config.outType == Config::INMEMORY )
                 return _temp->size();
 
             dblock lock;
@@ -347,25 +393,25 @@ namespace mongo {
             if ( _config.finalLong == _config.tempLong )
                 return _db.count( _config.finalLong );
 
-            switch ( _config.outType ) {
-            case Config::REPLACE: {
+            if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
+                // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
                 uassert( 10076 ,  "rename failed" ,
                          _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) );
                 _db.dropCollection( _config.tempLong );
-                break;
             }
-            case Config::MERGE: {
+            else if ( _config.outType == Config::MERGE ) {
+                // merge: upsert new docs into old collection
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
                 }
                 _db.dropCollection( _config.tempLong );
-                break;
             }
-            case Config::REDUCE: {
+            else if ( _config.outType == Config::REDUCE ) {
+                // reduce: apply reduce op on new result and existing one
                 BSONList values;
 
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
@@ -384,23 +430,21 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        Helpers::upsert( _config.finalLong , _config.reducer->reduce( values , _config.finalizer.get() ) );
+                        Helpers::upsert( _config.finalLong , _config.reducer->finalReduce( values , _config.finalizer.get() ) );
                     }
                     else {
                         Helpers::upsert( _config.finalLong , temp );
                     }
                 }
                 _db.dropCollection( _config.tempLong );
-                break;
-            }
-            case Config::INMEMORY: {
-                return _temp->size();
-            }
             }
 
             return _db.count( _config.finalLong );
         }
 
+        /**
+         * Insert doc in collection
+         */
         void State::insert( const string& ns , BSONObj& o ) {
             assert( _onDisk );
 
@@ -410,6 +454,9 @@ namespace mongo {
             theDataFileMgr.insertAndLog( ns.c_str() , o , false );
         }
 
+        /**
+         * Insert doc into the inc collection
+         */
         void State::_insertToInc( BSONObj& o ) {
             assert( _onDisk );
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
@@ -440,6 +487,9 @@ namespace mongo {
             }
         }
 
+        /**
+         * Initialize the mapreduce operation, creating the inc collection
+         */
         void State::init() {
             // setup js
             _scope.reset(globalScriptEngine->getPooledScope( _config.dbname ).release() );
@@ -460,26 +510,43 @@ namespace mongo {
                 _db.dropCollection( _config.tempLong );
                 _db.dropCollection( _config.incLong );
 
-                writelock l( _config.incLong );
-                Client::Context ctx( _config.incLong );
-                string err;
-                assert( userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+                // create the inc collection and make sure we have index on "0" key
+                {
+                    writelock l( _config.incLong );
+                    Client::Context ctx( _config.incLong );
+                    string err;
+                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
+                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
+                    }
+                }
+
+                BSONObj sortKey = BSON( "0" << 1 );
+                _db.ensureIndex( _config.incLong , sortKey );
+
             }
 
         }
 
+        /**
+         * Applies last reduce and finalize on a list of tuples (key, val)
+         * Inserts single result {_id: key, value: val} into temp collection
+         */
         void State::finalReduce( BSONList& values ) {
-            if ( values.size() == 0 )
+            if ( !_onDisk || values.size() == 0 )
                 return;
 
-            BSONObj key = values.begin()->firstElement().wrap( "_id" );
-            BSONObj res = _config.reducer->reduce( values , _config.finalizer.get() );
-
+            BSONObj res = _config.reducer->finalReduce( values , _config.finalizer.get() );
             insert( _config.tempLong , res );
         }
 
+        /**
+         * Applies last reduce and finalize.
+         * After calling this method, the temp collection will be completed.
+         * If inline, the results will be in the in memory map
+         */
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
             if ( ! _onDisk ) {
+                // all data has already been reduced, just finalize
                 if ( _config.finalizer ) {
                     long size = 0;
                     for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ) {
@@ -499,12 +566,23 @@ namespace mongo {
                 return;
             }
 
+            // use index on "0" to pull sorted data
             assert( _temp->size() == 0 );
-
-            // TODO: this is a bit sketchy
-            //       since it could block
             BSONObj sortKey = BSON( "0" << 1 );
-            _db.ensureIndex( _config.incLong , sortKey );
+            {
+                bool foundIndex = false;
+
+                auto_ptr<DBClientCursor> idx = _db.getIndexes( _config.incLong );
+                while ( idx.get() && idx->more() ) {
+                    BSONObj x = idx->next();
+                    if ( sortKey.woCompare( x["key"].embeddedObject() ) == 0 ) {
+                        foundIndex = true;
+                        break;
+                    }
+                }
+
+                assert( foundIndex );
+            }
 
             readlock rl( _config.incLong.c_str() );
             Client::Context ctx( _config.incLong );
@@ -517,6 +595,7 @@ namespace mongo {
             shared_ptr<Cursor> temp = bestGuessCursor( _config.incLong.c_str() , BSONObj() , sortKey );
             auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , _config.incLong.c_str() ) );
 
+            // iterate over all sorted objects
             while ( cursor->ok() ) {
                 BSONObj o = cursor->current().getOwned();
                 cursor->advance();
@@ -524,6 +603,7 @@ namespace mongo {
                 pm.hit();
 
                 if ( o.woSortOrder( prev , sortKey ) == 0 ) {
+                    // object is same as previous, add to array
                     all.push_back( o );
                     if ( pm->hits() % 1000 == 0 ) {
                         if ( ! cursor->yield() ) {
@@ -536,6 +616,7 @@ namespace mongo {
                 }
 
                 ClientCursor::YieldLock yield (cursor.get());
+                // reduce an finalize array
                 finalReduce( all );
 
                 all.clear();
@@ -554,42 +635,58 @@ namespace mongo {
                 dbtempreleasecond tl;
                 if ( ! tl.unlocked() )
                     log( LL_WARNING ) << "map/reduce can't temp release" << endl;
+                // reduce and finalize last array
                 finalReduce( all );
             }
 
             pm.finished();
         }
 
+        /**
+         * Attempts to reduce objects in the memory map.
+         * A new memory map will be created to hold the results.
+         * If applicable, objects with unique key may be dumped to inc collection.
+         * Input and output objects are both {"0": key, "1": val}
+         */
         void State::reduceInMemory() {
 
             InMemory * n = new InMemory(); // for new data
             long nSize = 0;
+            long dupCount = 0;
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ) {
                 BSONObj key = i->first;
                 BSONList& all = i->second;
 
                 if ( all.size() == 1 ) {
+                    // only 1 value for this key
                     if ( _onDisk ) {
-                        // this key has low cardinality, so just write to db
+                        // this key has low cardinality, so just write to collection
                         writelock l(_config.incLong);
                         Client::Context ctx(_config.incLong.c_str());
                         _insertToInc( *(all.begin()) );
                     }
                     else {
-                        _add( n , all[0] , nSize );
+                        // add to new map
+                        _add( n , all[0] , nSize, dupCount );
                     }
                 }
                 else if ( all.size() > 1 ) {
+                    // several values, reduce and add to map
                     BSONObj res = _config.reducer->reduce( all );
-                    _add( n , res , nSize );
+                    _add( n , res , nSize, dupCount );
                 }
             }
 
+            // swap maps
             _temp.reset( n );
             _size = nSize;
+            _dupCount = dupCount;
         }
 
+        /**
+         * Dumps the entire in memory map to the inc collection.
+         */
         void State::dumpToInc() {
             if ( ! _onDisk )
                 return;
@@ -610,29 +707,37 @@ namespace mongo {
 
         }
 
+        /**
+         * Adds object to in memory map
+         */
         void State::emit( const BSONObj& a ) {
             _numEmits++;
-            _add( _temp.get() , a , _size );
+            _add( _temp.get() , a , _size, _dupCount );
         }
 
-        void State::_add( InMemory* im, const BSONObj& a , long& size ) {
+        void State::_add( InMemory* im, const BSONObj& a , long& size, long& dupCount ) {
             BSONList& all = (*im)[a];
             all.push_back( a );
             size += a.objsize() + 16;
+            if (all.size() > 1)
+            	++dupCount;
         }
 
+        /**
+         * this method checks the size of in memory map and potentially flushes to disk
+         */
         void State::checkSize() {
-            if ( ! _onDisk )
+            if ( _size < 1024 * 50 )
                 return;
 
-            if ( _size < 1024 * 5 )
-                return;
+            // attempt to reduce in memory map, if we've seen duplicates
+            if ( _dupCount > 0) {
+				long before = _size;
+				reduceInMemory();
+				log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
+            }
 
-            long before = _size;
-            reduceInMemory();
-            log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
-
-            if ( _size < 1024 * 15 )
+            if ( ! _onDisk || _size < 1024 * 100 )
                 return;
 
             dumpToInc();
@@ -641,6 +746,9 @@ namespace mongo {
 
         boost::thread_specific_ptr<State*> _tl;
 
+        /**
+         * emit that will be called by js function
+         */
         BSONObj fast_emit( const BSONObj& args ) {
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
             uassert( 13069 , "an emit can't be more than half max bson size" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
@@ -648,6 +756,9 @@ namespace mongo {
             return BSONObj();
         }
 
+        /**
+         * This class represents a map/reduce command executed on a single server
+         */
         class MapReduceCommand : public Command {
         public:
             MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
@@ -709,12 +820,19 @@ namespace mongo {
                         readlock lock( config.ns );
                         Client::Context ctx( config.ns );
 
+                        ShardChunkManagerPtr chunkManager;
+                        if ( shardingState.needShardChunkManager( config.ns ) ) {
+                            chunkManager = shardingState.getShardChunkManager( config.ns );
+                        }
+
+                        // obtain cursor on data to apply mr to, sorted
                         shared_ptr<Cursor> temp = bestGuessCursor( config.ns.c_str(), config.filter, config.sort );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
 
                         Timer mt;
+                        // go through each doc
                         while ( cursor->ok() ) {
-
+                            // make sure we dont process duplicates in case data gets moved around during map
                             if ( cursor->currentIsDup() ) {
                                 cursor->advance();
                                 continue;
@@ -728,14 +846,22 @@ namespace mongo {
                             BSONObj o = cursor->current();
                             cursor->advance();
 
+                            // check to see if this is a new object we don't own yet
+                            // because of a chunk migration
+                            if ( chunkManager && ! chunkManager->belongsToMe( o ) )
+                                continue;
+
+                            // do map
                             if ( config.verbose ) mt.reset();
                             config.mapper->map( o );
                             if ( config.verbose ) mapTime += mt.micros();
 
                             num++;
                             if ( num % 100 == 0 ) {
+                                // try to yield lock regularly
                                 ClientCursor::YieldLock yield (cursor.get());
                                 Timer t;
+                                // check if map needs to be dumped to disk
                                 state.checkSize();
                                 inReduce += t.micros();
 
@@ -755,7 +881,7 @@ namespace mongo {
                     pm.finished();
 
                     killCurrentOp.checkForInterrupt();
-
+                    // update counters
                     countsBuilder.appendNumber( "input" , num );
                     countsBuilder.appendNumber( "emit" , state.numEmits() );
                     if ( state.numEmits() )
@@ -764,12 +890,14 @@ namespace mongo {
                     timingBuilder.append( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
 
-                    // final reduce
                     op->setMessage( "m/r: (2/3) final reduce in memory" );
+                    // do reduce in memory
+                    // this will be the last reduce needed for inline mode
                     state.reduceInMemory();
+                    // if not inline: dump the in memory map to inc collection, all data is on disk
                     state.dumpToInc();
-
                     state.prepTempCollection();
+                    // final reduce
                     state.finalReduce( op , pm );
 
                     _tl.reset();
@@ -779,7 +907,7 @@ namespace mongo {
                     throw;
                 }
 
-                long long finalCount = state.renameIfNeeded();
+                long long finalCount = state.postProcessCollection();
                 state.appendResults( result );
 
                 timingBuilder.append( "total" , t.millis() );
@@ -812,6 +940,9 @@ namespace mongo {
 
         } mapReduceCommand;
 
+        /**
+         * This class represents a map/reduce command executed on the output server of a sharded env
+         */
         class MapReduceFinishCommand : public Command {
         public:
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
@@ -870,9 +1001,18 @@ namespace mongo {
                     state.init();
 
                     BSONList values;
-
-                    if ( config.finalShort.size() )
-                        result.append( "result" , config.finalShort );
+                    if (!config.outDB.empty()) {
+                        BSONObjBuilder loc;
+                        if ( !config.outDB.empty())
+                            loc.append( "db" , config.outDB );
+                        if ( !config.finalShort.empty() )
+                            loc.append( "collection" , config.finalShort );
+                        result.append("result", loc.obj());
+                    }
+                    else {
+                        if ( !config.finalShort.empty() )
+                            result.append( "result" , config.finalShort );
+                    }
 
                     while ( cursor.more() ) {
                         BSONObj t = cursor.next().getOwned();
@@ -888,19 +1028,18 @@ namespace mongo {
                         }
 
 
-                        state.emit( config.reducer->reduce( values , config.finalizer.get() ) );
+                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
                         values.clear();
                         values.push_back( t );
                     }
 
                     if ( values.size() )
-                        state.emit( config.reducer->reduce( values , config.finalizer.get() ) );
+                        state.emit( config.reducer->finalReduce( values , config.finalizer.get() ) );
                 }
 
 
                 state.dumpToInc();
-
-                state.renameIfNeeded();
+                state.postProcessCollection();
                 state.appendResults( result );
 
                 for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {

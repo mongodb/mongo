@@ -155,7 +155,13 @@ namespace mongo {
                 char buf[32];
                 while ( 1 ) {
                     OpTime op(c.getLastOp());
+                    
+                    if ( op.isNull() ) {
+                        result.append( "wnote" , "no write has been done on this connection" );
+                        break;
+                    }
 
+                    // check this first for w=0 or w=1
                     if ( opReplicatedEnough( op, w ) )
                         break;
 
@@ -166,10 +172,6 @@ namespace mongo {
                         return true;
                     }
 
-                    if ( op.isNull() ) {
-                        result.append( "err" , "no write has been done on this connection" );
-                        return true;
-                    }
 
                     if ( timeout > 0 && t.millis() >= timeout ) {
                         result.append( "wtimeout" , true );
@@ -333,6 +335,7 @@ namespace mongo {
 
             result.append( "host" , prettyHostName() );
             result.append("version", versionString);
+            result.append("process","mongod");
             result.append("uptime",(double) (time(0)-started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
@@ -375,7 +378,7 @@ namespace mongo {
             }
             timeBuilder.appendNumber( "after basic" , Listener::getElapsedTimeMillis() - start );
 
-            if ( authed ) {
+            {
 
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
 
@@ -397,7 +400,7 @@ namespace mongo {
                 t.done();
 
             }
-            timeBuilder.appendNumber( "after is authed" , Listener::getElapsedTimeMillis() - start );
+            timeBuilder.appendNumber( "after mem" , Listener::getElapsedTimeMillis() - start );
 
             {
                 BSONObjBuilder bb( result.subobjStart( "connections" ) );
@@ -407,7 +410,7 @@ namespace mongo {
             }
             timeBuilder.appendNumber( "after connections" , Listener::getElapsedTimeMillis() - start );
 
-            if ( authed ) {
+            {
                 BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
                 bb.append("note", "fields vary by platform");
                 ProcessInfo p;
@@ -903,7 +906,19 @@ namespace mongo {
 
         CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
         bool run(const string& dbname , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            return dbHolder.closeAll( dbpath , result, false );
+            bool ok;
+            try {
+                ok = dbHolder.closeAll( dbpath , result, false );
+            }
+            catch(DBException&) { 
+                throw;
+            }
+            catch(...) { 
+                log() << "ERROR uncaught exception in command closeAllDatabases" << endl;
+                errmsg = "unexpected uncaught exception";
+                return false;
+            }
+            return ok;
         }
     } cmdCloseAllDatabases;
 
@@ -1825,7 +1840,7 @@ namespace mongo {
             ok = execCommand( c , client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
         }
         else {
-            anObjBuilder.append("errmsg", "no such cmd");
+            anObjBuilder.append("errmsg", str::stream() << "no such cmd: " << e.fieldName() );
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
 

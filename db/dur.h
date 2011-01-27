@@ -29,7 +29,7 @@ namespace mongo {
             virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
 
             /** Declare that a file has been created
-                Normally writes are applied only after journalling, for safety.  But here the file
+                Normally writes are applied only after journaling, for safety.  But here the file
                 is created first, and the journal will just replay the creation if the create didn't
                 happen because of crashing.
             */
@@ -128,6 +128,8 @@ namespace mongo {
             /** write something that doesn't have to be journaled, as this write is "unimportant".
                 a good example is paddingFactor.
                 can be thought of as memcpy(dst,src,len)
+                the dur implementation acquires a mutex in this method, so do not assume it is faster
+                without measuring!
             */
             virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 

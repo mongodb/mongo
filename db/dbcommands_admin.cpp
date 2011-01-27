@@ -333,12 +333,13 @@ namespace mongo {
         }*/
         virtual void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/fsync+Command"; }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            /* async means do an fsync, but return immediately */
-            bool sync = ! cmdObj["async"].trueValue();
+            bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
             bool lock = cmdObj["lock"].trueValue();
             log() << "CMD fsync:  sync:" << sync << " lock:" << lock << endl;
 
             if( lock ) {
+                // fsync and lock variation 
+
                 uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
                 uassert(12032, "fsync: sync option must be true when using lock", sync);
                 /* With releaseEarly(), we must be extremely careful we don't do anything
@@ -347,17 +348,33 @@ namespace mongo {
                    we need to be careful to keep that code very fast it's a very common code path when on.
                 */
                 uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
+
+                // todo future: Perhaps we could do this in the background thread.  As is now, writes may interleave between 
+                //              the releaseEarly below and the acquisition of the readlock in the background thread. 
+                //              However the real problem is that it seems complex to unlock here and then have a window for 
+                //              writes before the bg job -- can be done correctly but harder to reason about correctness.
+                //              If this command ran within a read lock in the first place, would it work, and then that 
+                //              would be quite easy?
+                //              Or, could we downgrade the write lock to a read lock, wait for ready, then release?
+                getDur().syncDataAndTruncateJournal();
+
                 bool ready = false;
                 LockDBJob *l = new LockDBJob(ready);
+
                 dbMutex.releaseEarly();
+
                 l->go();
-                // don't return until background thread has acquired the write lock
+                // don't return until background thread has acquired the read lock
                 while( !ready ) {
                     sleepmillis(10);
                 }
                 result.append("info", "now locked against writes, use db.$cmd.sys.unlock.findOne() to unlock");
             }
             else {
+                // the simple fsync command case
+
+                if (sync)
+                    getDur().commitNow();
                 result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
             }
             return 1;

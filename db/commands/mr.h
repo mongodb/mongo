@@ -55,7 +55,7 @@ namespace mongo {
 
             virtual BSONObj reduce( const BSONList& tuples ) = 0;
             /** this means its a fianl reduce, even if there is no finalizer */
-            virtual BSONObj reduce( const BSONList& tuples , Finalizer * finalizer ) = 0;
+            virtual BSONObj finalReduce( const BSONList& tuples , Finalizer * finalizer ) = 0;
         };
 
         // ------------  js function implementations -----------
@@ -103,7 +103,7 @@ namespace mongo {
             virtual void init( State * state ) { _func.init( state ); }
 
             virtual BSONObj reduce( const BSONList& tuples );
-            virtual BSONObj reduce( const BSONList& tuples , Finalizer * finalizer );
+            virtual BSONObj finalReduce( const BSONList& tuples , Finalizer * finalizer );
 
         private:
 
@@ -239,7 +239,7 @@ namespace mongo {
             /**
                @return number objects in collection
              */
-            long long renameIfNeeded();
+            long long postProcessCollection();
 
             /**
              * if INMEMORY will append
@@ -268,7 +268,7 @@ namespace mongo {
         protected:
 
             void _insertToInc( BSONObj& o );
-            static void _add( InMemory* im , const BSONObj& a , long& size );
+            static void _add( InMemory* im , const BSONObj& a , long& size, long& dupCount );
 
             scoped_ptr<Scope> _scope;
             const Config& _config;
@@ -278,6 +278,7 @@ namespace mongo {
 
             scoped_ptr<InMemory> _temp;
             long _size; // bytes in _temp
+            long _dupCount; // number of duplicate key entries
 
             long long _numEmits;
         };

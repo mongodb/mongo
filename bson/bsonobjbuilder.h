@@ -104,6 +104,9 @@ namespace mongo {
         /** add all the fields from the object specified to this object */
         BSONObjBuilder& appendElements(BSONObj x);
 
+        /** add all the fields from the object specified to this object if they don't exist already */
+        BSONObjBuilder& appendElementsUnique( BSONObj x );
+
         /** append element to the object we are building */
         BSONObjBuilder& append( const BSONElement& e) {
             assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
@@ -615,6 +618,8 @@ namespace mongo {
         bool owned() const { return &_b == &_buf; }
 
         BSONObjIterator iterator() const ;
+
+        bool hasField( const StringData& name ) const ;
 
         int len() const { return _b.len(); }
 

@@ -184,10 +184,13 @@ namespace mongo {
                             BSONObjIterator j( i.next().Obj() );
                             while( j.more() ) {
                                 BSONElement e = j.next();
-                                if ( strcmp( e.fieldName() , "opid" ) == 0 ) {
+                                if ( str::equals( e.fieldName() , "opid" ) ) {
                                     stringstream ss;
                                     ss << shard.getName() << ':' << e.numberInt();
                                     x.append( "opid" , ss.str() );
+                                }
+                                else if ( str::equals( e.fieldName() , "client" ) ) {
+                                    x.appendAs( e , "client_s" );
                                 }
                                 else {
                                     x.append( e );

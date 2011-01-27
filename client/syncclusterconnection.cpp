@@ -82,13 +82,16 @@ namespace mongo {
                 if ( _conns[i]->simpleCommand( "admin" , 0 , "fsync" ) )
                     continue;
             }
+            catch ( DBException& e ) {
+                errmsg += e.toString();
+            }
             catch ( std::exception& e ) {
                 errmsg += e.what();
             }
             catch ( ... ) {
             }
             ok = false;
-            errmsg += _conns[i]->toString() + ":" + res.toString();
+            errmsg += " " + _conns[i]->toString() + ":" + res.toString();
         }
         return ok;
     }
@@ -121,7 +124,7 @@ namespace mongo {
 
         for ( size_t i = 0; i<_conns.size(); i++ ) {
             BSONObj res = _lastErrors[i];
-            if ( res["ok"].trueValue() && res["fsyncFiles"].numberInt() > 0 )
+            if ( res["ok"].trueValue() && (res["fsyncFiles"].numberInt() > 0 || res.hasElement("waited")))
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];

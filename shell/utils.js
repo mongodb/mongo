@@ -122,6 +122,10 @@ assert.soon = function( f, msg, timeout /*ms*/, interval ) {
 
 assert.throws = function( func , params , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
+    
+    if ( params && typeof( params ) == "string" )
+        throw "2nd argument to assert.throws has to be an array"
+    
     try {
         func.apply( null , params );
     }
@@ -1427,6 +1431,7 @@ help = shellHelper.help = function (x) {
         print("\tremoveFile(f)                   delete a file or directory");
         print("\tload(jsfilename)                load and execute a .js file");
         print("\trun(program[, args...])         spawn a program and wait for its completion");
+        print("\trunProgram(program[, args...])  same as run(), above");
         print("\tsleep(m)                        sleep m milliseconds");
         print("\tgetMemInfo()                    diagnostic");
         return;

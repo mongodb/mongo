@@ -71,8 +71,6 @@ namespace mongo {
 
         Stats stats;
 
-        static mongo::mutex durThreadMutex("durthreadmtx");
-
         void Stats::S::reset() {
             memset(this, 0, sizeof(*this));
         }
@@ -124,27 +122,22 @@ namespace mongo {
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-            // for now, journalled
-            memcpy( writingPtr(dst, len), src, len );
-
-            /* todo before doing this:
-               - finish implementation of _switchToReachableView
-               - performance test it.  privateViews.find() uses a mutex, so that could make
-                 it slow.
-            */
-            /*
-            if( testIntent ) {
-                memcpy(MongoMMF::switchToPrivateView(dst), src, len);
-                return;
-            }
-
-            void *writeView = MongoMMF::_switchToWritableView(dst);
-            memcpy(writeView, src, len);
-            if( memcmp(writeView, src, len) ) {
-                // a copy of the page exists, so need to write it there also
+            // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
+            //
+            // this also makes setNoJournal threadsafe, which is good as we call it from a read (not a write) lock 
+            // in class SlaveTracking
+            scoped_lock lk( privateViews._mutex() );
+            size_t ofs;
+            MongoMMF *f = privateViews.find_inlock(dst, ofs);
+            assert(f);
+            void *w = (((char *)f->view_write())+ofs);
+            // first write it to the writable (file) view
+            memcpy(w, src, len);
+            if( memcmp(w, dst, len) ) {
+                // if we get here, a copy-on-write had previously occurred. so write it to the private view too
+                // to keep them in sync.  we do this as we do not want to cause a copy on write unnecessarily.
                 memcpy(dst, src, len);
             }
-            */
         }
 
         /** base declare write intent function that all the helpers call. */
@@ -178,7 +171,7 @@ namespace mongo {
         }
 
         /** Declare that a file has been created
-            Normally writes are applied only after journalling, for safety.  But here the file
+            Normally writes are applied only after journaling, for safety.  But here the file
             is created first, and the journal will just replay the creation if the create didn't
             happen because of crashing.
         */
@@ -288,16 +281,16 @@ namespace mongo {
                     const char *p = (const char *) mmf->getView();
                     const char *w = (const char *) mmf->view_write();
 
-                    if (!p && !w) return;
-
-                    assert(p);
-                    assert(w);
+                    if (!p || !w) return; // File not fully opened yet
 
                     _bytes += mmf->length();
 
                     assert( mmf->length() == (unsigned) mmf->length() );
-                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
-                        return; // next file
+                    {
+                        scoped_lock lk( privateViews._mutex() ); // see setNoJournal
+                        if (memcmp(p, w, (unsigned) mmf->length()) == 0)
+                            return; // next file
+                    }
 
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
@@ -330,6 +323,7 @@ namespace mongo {
                         set<WriteIntent>& b = commitJob.writes();
                         (void)b; // mark as unused. Useful for inspection in debugger
 
+                        // should we abort() here so this isn't unnoticed in some circumstances?
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
                     }
                 }
@@ -421,6 +415,9 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
+        mutex groupCommitMutex("groupCommit");
+
+        /** locking: in read lock when called. */
         static void _groupCommit() {
             stats.curr->_commits++;
 
@@ -429,6 +426,10 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return;
             }
+
+            // we need to make sure two group commits aren't running at the same time
+            // (and we are only read locked in the dbMutex, so it could happen)
+            scoped_lock lk(groupCommitMutex);
 
             PREPLOGBUFFER();
 
@@ -464,13 +465,29 @@ namespace mongo {
                 REMAPPRIVATEVIEW();
             }
         }
+
         /** locking in read lock when called
             @see MongoMMF::close()
         */
         static void groupCommit() {
+            // we need to be at least read locked on the dbMutex so that we know the write intent data 
+            // structures are not changing while we work
             dbMutex.assertAtLeastReadLocked();
+
             try {
                 _groupCommit();
+            }
+            catch(DBException& e ) { 
+                log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
+                abort();
+            }
+            catch(std::ios_base::failure& e) { 
+                log() << "ios_base exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+                abort();
+            }
+            catch(std::bad_alloc& e) { 
+                log() << "bad_alloc exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+                abort();
             }
             catch(std::exception& e) {
                 log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
@@ -479,13 +496,14 @@ namespace mongo {
         }
 
         static void go() {
-            if( !commitJob.hasWritten() )
+            if( !commitJob.hasWritten() ){
+                commitJob.notifyCommitted();
                 return;
+            }
 
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
-                    scoped_lock lk2(durThreadMutex);
                     groupCommit();
                     return;
                 }
@@ -494,7 +512,6 @@ namespace mongo {
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
             // write lock instead.  otherwise writes could use too much RAM.
             writelock lk;
-            scoped_lock lk2(durThreadMutex);
             groupCommit();
         }
 
@@ -521,14 +538,12 @@ namespace mongo {
         void durThread() {
             Client::initThread("dur");
             const int HowOftenToGroupCommitMs = 90;
-            while( 1) {
+            while( !inShutdown() ) {
                 sleepmillis(10);
                 CodeBlock::Within w(durThreadMain);
                 try {
                     int millis = HowOftenToGroupCommitMs;
                     {
-                        scoped_lock lk2(durThreadMutex);
-
                         stats.rotate();
                         {
                             Timer t;
@@ -547,13 +562,14 @@ namespace mongo {
                         commitJob.wi()._deferred.invoke();
                     }
 
-                    go(); // regrabs durThreadMutex inside of dbMutex
+                    go();
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
                     abort(); // based on myTerminate()
                 }
             }
+            cc().shutdown();
         }
 
         void recover();

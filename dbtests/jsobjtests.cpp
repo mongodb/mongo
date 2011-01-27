@@ -469,6 +469,19 @@ namespace JsobjTests {
             }
         };
 
+        class GetField {
+        public:
+            void run(){
+                BSONObj o = BSON( "a" << 1 <<
+                                  "b" << BSON( "a" << 2 ) <<
+                                  "c" << BSON_ARRAY( BSON( "a" << 3 ) << BSON( "a" << 4 ) ) );
+                ASSERT_EQUALS( 1 , o.getFieldDotted( "a" ).numberInt() );
+                ASSERT_EQUALS( 2 , o.getFieldDotted( "b.a" ).numberInt() );
+                ASSERT_EQUALS( 3 , o.getFieldDotted( "c.0.a" ).numberInt() );
+                ASSERT_EQUALS( 4 , o.getFieldDotted( "c.1.a" ).numberInt() );
+            }
+        };
+
         namespace Validation {
 
             class Base {
@@ -1776,6 +1789,8 @@ namespace JsobjTests {
             add< BSONObjTests::NullString >();
             add< BSONObjTests::AppendAs >();
             add< BSONObjTests::ArrayAppendAs >();
+            add< BSONObjTests::GetField >();
+
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

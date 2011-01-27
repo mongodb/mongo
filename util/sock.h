@@ -23,6 +23,7 @@
 #include <sstream>
 #include "goodies.h"
 #include "../db/jsobj.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
 
@@ -51,6 +52,8 @@ namespace mongo {
 
 #else
 
+    extern CmdLine cmdLine;
+    
 } // namespace mongo
 
 #include <sys/socket.h>
@@ -107,7 +110,7 @@ namespace mongo {
 #endif
 
     inline string makeUnixSockPath(int port) {
-        return "/tmp/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
+        return cmdLine.socket + "/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
     }
 
     inline void setSockTimeouts(int sock, double secs) {

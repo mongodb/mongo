@@ -340,14 +340,7 @@ namespace mongo {
         else
             size = 0x7ff00000;
 
-        if ( strstr(filename, "_hudsonSmall") ) {
-            int mult = 1;
-            if ( fileNo > 1 && fileNo < 1000 )
-                mult = fileNo;
-            size = 1024 * 512 * mult;
-            log() << "Warning : using small files for _hudsonSmall" << endl;
-        }
-        else if ( cmdLine.smallfiles ) {
+        if ( cmdLine.smallfiles ) {
             size = size >> 2;
         }
 
@@ -849,7 +842,7 @@ namespace mongo {
         int n = d->nIndexes;
         for ( int i = 0; i < n; i++ )
             _unindexRecord(d->idx(i), obj, dl, !noWarn);
-        if( d->backgroundIndexBuildInProgress ) {
+        if( d->indexBuildInProgress ) { // background index
             // always pass nowarn here, as this one may be missing for valid reasons as we are concurrently building it
             _unindexRecord(d->idx(n), obj, dl, false);
         }
@@ -1102,7 +1095,6 @@ namespace mongo {
 
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
-        assert( d->backgroundIndexBuildInProgress == 0 );
         CurOp * op = cc().curop();
 
         Timer t;
@@ -1273,12 +1265,8 @@ namespace mongo {
             assertInWriteLock();
             uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , dbMutex.getState() == 1 );
             bgJobsInProgress.insert(d);
-            d->backgroundIndexBuildInProgress = 1;
-            d->nIndexes--;
         }
         void done(const char *ns, NamespaceDetails *d) {
-            d->nIndexes++;
-            d->backgroundIndexBuildInProgress = 0;
             NamespaceDetailsTransient::get_w(ns).addedIndex(); // clear query optimizer cache
             assertInWriteLock();
         }
@@ -1311,6 +1299,29 @@ namespace mongo {
         }
     };
 
+    /**
+     * For the lifetime of this object, an index build is indicated on the specified
+     * namespace and the newest index is marked as absent.  This simplifies
+     * the cleanup required on recovery.
+     */
+    class RecoverableIndexState {
+    public:
+        RecoverableIndexState( NamespaceDetails *d ) : _d( d ) {
+            indexBuildInProgress() = 1;
+            nIndexes()--;
+        }
+        ~RecoverableIndexState() {
+            DESTRUCTOR_GUARD (
+                nIndexes()++;
+                indexBuildInProgress() = 0;
+            )
+        }
+    private:
+        int &nIndexes() { return getDur().writingInt( _d->nIndexes ); }
+        int &indexBuildInProgress() { return getDur().writingInt( _d->indexBuildInProgress ); }
+        NamespaceDetails *_d;
+    };
+
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) {
         tlog() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
@@ -1322,6 +1333,9 @@ namespace mongo {
         }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
+        assert( d->indexBuildInProgress == 0 );
+        assertInWriteLock();
+        RecoverableIndexState recoverable( d );
         if( inDBRepair || !background ) {
             n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
             assert( !idx.head.isNull() );

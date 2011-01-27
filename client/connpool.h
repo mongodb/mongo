@@ -96,8 +96,19 @@ namespace mongo {
         }
     */
     class DBConnectionPool {
+        
+    public:
+
+        /** compares server namees, but is smart about replica set names */
+        struct serverNameCompare {
+            bool operator()( const string& a , const string& b ) const;
+        };
+
+    private:
+
         mongo::mutex _mutex;
-        map<string,PoolForHost> _pools; // servername -> pool
+        typedef map<string,PoolForHost,serverNameCompare> PoolMap; // servername -> pool
+        PoolMap _pools;
         list<DBConnectionHook*> _hooks;
         string _name;
 

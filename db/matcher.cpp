@@ -306,6 +306,8 @@ namespace mongo {
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
             BSONElement e = i.next();
+            
+            uassert( 13629 , "can't have undefined in a query expression" , e.type() != Undefined );
 
             if ( parseOrNor( e, subMatcher ) ) {
                 continue;

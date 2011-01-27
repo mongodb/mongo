@@ -81,10 +81,10 @@ assert.eq( 1 , db.foo3.count() , "eval pre1" );
 assert.eq( 1 , db.foo2.count() , "eval pre2" );
 
 assert.eq( 8 , db.eval( function(){ return db.foo3.findOne().a; } ), "eval 1 " );
-assert.throws( function(){ db.eval( function(){ return db.foo2.findOne().a; } ) } , "eval 2" )
+assert.throws( function(){ db.eval( function(){ return db.foo2.findOne().a; } ) } , null , "eval 2" )
 
 assert.eq( 1 , db.eval( function(){ return db.foo3.count(); } ), "eval 3 " );
-assert.throws( function(){ db.eval( function(){ return db.foo2.count(); } ) } , "eval 4" )
+assert.throws( function(){ db.eval( function(){ return db.foo2.count(); } ) } , null , "eval 4" )
 
 
 // ---- unique shard key ----

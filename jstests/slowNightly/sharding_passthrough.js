@@ -63,7 +63,7 @@ files.forEach(
      * clean (apitest_dbcollection)
      * logout and getnonce
      */
-	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|unix_socket)\.js$/.test(x.name)) {
+	if (/[\/\\](error3|capped.*|splitvector|apitest_db|cursor6|copydb-auth|profile1|dbhash|median|apitest_dbcollection|evalb|evald|eval_nolock|auth1|auth2|unix_socket\d*)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
@@ -73,7 +73,7 @@ files.forEach(
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would fail under sharding " + x.name)	    
 	    return;
 	}

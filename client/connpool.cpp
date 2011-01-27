@@ -135,7 +135,8 @@ namespace mongo {
         uassert( 13071 , (string)"invalid hostname [" + host + "]" + errmsg , cs.isValid() );
 
         c = cs.connect( errmsg );
-        uassert( 11002 ,  _name + ": connect failed " + host + " : " + errmsg , c );
+        if ( ! c )
+            throw SocketException( SocketException::CONNECT_ERROR , host , 11002 , str::stream() << _name << " error: " << errmsg );
         return _finishCreate( host , c );
     }
 
@@ -145,7 +146,7 @@ namespace mongo {
 
     void DBConnectionPool::flush() {
         scoped_lock L(_mutex);
-        for ( map<string,PoolForHost>::iterator i = _pools.begin(); i != _pools.end(); i++ ) {
+        for ( PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++ ) {
             PoolForHost& p = i->second;
             p.flush();
         }
@@ -183,7 +184,7 @@ namespace mongo {
 
         {
             scoped_lock lk( _mutex );
-            for ( map<string,PoolForHost>::iterator i=_pools.begin(); i!=_pools.end(); ++i ) {
+            for ( PoolMap::iterator i=_pools.begin(); i!=_pools.end(); ++i ) {
                 string s = i->first;
                 BSONObjBuilder temp( bb.subobjStart( s ) );
                 temp.append( "available" , i->second.numAvailable() );
@@ -210,6 +211,15 @@ namespace mongo {
         b.append( "totalAvailable" , avail );
         b.appendNumber( "totalCreated" , created );
     }
+
+    bool DBConnectionPool::serverNameCompare::operator()( const string& a , const string& b ) const{
+        string ap = str::before( a , "/" );
+        string bp = str::before( b , "/" );
+        
+        return ap < bp;
+    }
+
+    // ------ ScopedDbConnection ------
 
     ScopedDbConnection * ScopedDbConnection::steal() {
         assert( _conn );

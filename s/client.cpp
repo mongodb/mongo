@@ -39,6 +39,7 @@ namespace mongo {
     ClientInfo::ClientInfo( int clientId ) : _id( clientId ) {
         _cur = &_a;
         _prev = &_b;
+        _autoSplitOk = true;
         newRequest();
     }
 
@@ -123,14 +124,13 @@ namespace mongo {
         _clients.erase( i );
     }
 
-    void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& o ) {
-        BSONElement w = o["writeback"];
+    void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& gle ) {
+        BSONElement w = gle["writeback"];
 
         if ( w.type() != jstOID )
             return;
 
-        BSONElement cid = o["connectionId"];
-        cout << "ELIOT : " << cid << endl;
+        BSONElement cid = gle["connectionId"];
 
         if ( cid.eoo() ) {
             error() << "getLastError writeback can't work because of version mis-match" << endl;
@@ -140,18 +140,27 @@ namespace mongo {
         all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
     }
 
-    void ClientInfo::_handleWriteBacks( vector<WBInfo>& all ) {
-        if ( all.size() == 0 )
-            return;
-
-        for ( unsigned i=0; i<all.size(); i++ ) {
-            WriteBackListener::waitFor( all[i].connectionId , all[i].id );
+    vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener ) {
+        vector<BSONObj> res;
+        
+        if ( fromWriteBackListener ) {
+            warning() << "not doing recusrive writebacks for" << endl;
+            return res;
         }
+
+        if ( all.size() == 0 )
+            return res;
+        
+        for ( unsigned i=0; i<all.size(); i++ ) {
+            res.push_back( WriteBackListener::waitFor( all[i].connectionId , all[i].id ) );
+        }
+
+        return res;
     }
 
 
 
-    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result ) {
+    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener ) {
         set<string> * shards = getPrev();
 
         if ( shards->size() == 0 ) {
@@ -164,14 +173,15 @@ namespace mongo {
         // handle single server
         if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
-            result.append( "theshard" , theShard.c_str() );
+
             ShardConnection conn( theShard , "" );
+            
             BSONObj res;
             bool ok = conn->runCommand( "admin" , options , res );
-            //log() << "\t" << res << endl;
-            result.appendElements( res );
+            res = res.getOwned();
             conn.done();
-            result.append( "singleShard" , theShard );
+            
+
             _addWriteBack( writebacks , res );
 
             // hit other machines just to block
@@ -185,7 +195,19 @@ namespace mongo {
                 conn.done();
             }
             clearSinceLastGetError();
-            _handleWriteBacks( writebacks );
+            
+            if ( writebacks.size() ){
+                vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
+                assert( v.size() == 1 );
+                result.appendElements( v[0] );
+                result.appendElementsUnique( res );
+                result.append( "initialGLEHost" , theShard );
+            }
+            else {
+                result.append( "singleShard" , theShard );
+                result.appendElements( res );
+            }
+
             return ok;
         }
 
@@ -230,7 +252,7 @@ namespace mongo {
 
         if ( errors.size() == 0 ) {
             result.appendNull( "err" );
-            _handleWriteBacks( writebacks );
+            _handleWriteBacks( writebacks , fromWriteBackListener );
             return true;
         }
 
@@ -253,7 +275,7 @@ namespace mongo {
             }
             all.done();
         }
-        _handleWriteBacks( writebacks );
+        _handleWriteBacks( writebacks , fromWriteBackListener );
         return true;
     }
 

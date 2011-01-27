@@ -21,6 +21,7 @@
 #include "chunk.h"
 #include "cursors.h"
 #include "stats.h"
+#include "client.h"
 
 #include "../client/connpool.h"
 #include "../db/commands.h"
@@ -158,7 +159,8 @@ namespace mongo {
                         insert( c->getShard() , r.getns() , o );
 
                         r.gotInsert();
-                        c->splitIfShould( o.objsize() );
+                        if ( r.getClientInfo()->autoSplitOk() )
+                            c->splitIfShould( o.objsize() );
                         gotThrough = true;
                         break;
                     }
@@ -258,7 +260,8 @@ namespace mongo {
                     try {
                         ChunkPtr c = manager->findChunk( chunkFinder );
                         doWrite( dbUpdate , r , c->getShard() );
-                        c->splitIfShould( d.msg().header()->dataLen() );
+                        if ( r.getClientInfo()->autoSplitOk() )
+                            c->splitIfShould( d.msg().header()->dataLen() );
                         break;
                     }
                     catch ( StaleConfigException& e ) {

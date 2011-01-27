@@ -200,6 +200,9 @@ namespace mongo {
 
                 vector<HostAndPort> hosts = servers.getServers();
                 for ( size_t i = 0 ; i < hosts.size() ; i++ ) {
+                    if (!hosts[i].hasPort()) {
+                        hosts[i].setPort(CmdLine::DefaultDBPort);
+                    }
                     string host = hosts[i].toString(); // host:port
                     if ( hostSet.find( host ) == hostSet.end() ) {
                         offendingHost = host;

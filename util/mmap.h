@@ -187,8 +187,6 @@ namespace mongo {
         void* remapPrivateView(void *oldPrivateAddr);
     };
 
-    void printMemInfo( const char * where );
-
     typedef MemoryMappedFile MMF;
 
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */

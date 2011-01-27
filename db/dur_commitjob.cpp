@@ -192,9 +192,9 @@ namespace mongo {
                         _bytes += b;
 #if defined(_DEBUG)
                         _nSinceCommitIfNeededCall++;
-                        if( _nSinceCommitIfNeededCall >= 60 ) {
-                            if( _nSinceCommitIfNeededCall % 20 == 0 )
-                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << ' ' << x << " bytes " << b << endl;
+                        if( _nSinceCommitIfNeededCall >= 80 ) {
+                            if( _nSinceCommitIfNeededCall % 40 == 0 )
+                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
                         }
 #endif
                         uassert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);

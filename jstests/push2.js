@@ -18,3 +18,5 @@ for ( x=0; x<200; x++ ){
 }
 
 assert( gotError , "should have gotten error" );
+
+t.drop();
