@@ -26,16 +26,15 @@
      WRITETOJOURNAL
        we could be unlocked (the main db lock that is...) for this, with sufficient care, but there is some complexity
          have to handle falling behind which would use too much ram (going back into a read lock would suffice to stop that).
-         for now we are in read lock which is not ideal.
+         for now (1.7.5/1.8.0) we are in read lock which is not ideal.
      WRITETODATAFILES
        apply the writes back to the non-private MMF after they are for certain in redo log
      REMAPPRIVATEVIEW
        we could in a write lock quickly flip readers back to the main view, then stay in read lock and do our real
          remapping. with many files (e.g., 1000), remapping could be time consuming (several ms), so we don't want
-         to be too frequent.  tracking time for this step would be wise.
+         to be too frequent.
        there could be a slow down immediately after remapping as fresh copy-on-writes for commonly written pages will
-         be required.  so doing these remaps more incrementally in the future might make sense - but have to be careful
-         not to introduce bugs.
+         be required.  so doing these remaps fractionally is helpful. 
 
      @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
@@ -433,6 +432,9 @@ namespace mongo {
 
             PREPLOGBUFFER();
 
+            // todo : write to the journal outside locks, as this write can be slow.
+            //        however, be careful then about remapprivateview as that cannot be done 
+            //        if new writes are then pending in the private maps.
             WRITETOJOURNAL(commitJob._ab);
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
@@ -450,9 +452,11 @@ namespace mongo {
             //
             DEV assert( !commitJob.hasWritten() );
             if( !dbMutex.isWriteLocked() ) {
-                // this needs done in a write lock thus we do it on the next acquisition of that
-                // instead of here (there is no rush if you aren't writing anyway -- but it must happen,
-                // if it is done, before any uncommitted writes occur).
+                // this needs done in a write lock (as there is a short window during remapping when each view 
+                // might not exist) thus we do it on the next acquisition of that instead of here (there is no 
+                // rush if you aren't writing anyway -- but it must happen, if it is done, before any uncommitted 
+                // writes occur).  If desired, perhpas this can be eliminated on posix as it may be that the remap 
+                // is race-free there.
                 //
                 dbMutex._remapPrivateViewRequested = true;
             }

@@ -33,6 +33,9 @@ namespace mongo {
 
     void MongoMMF::remapThePrivateView() {
         assert( cmdLine.dur );
+
+        // todo 1.9 : it turns out we require that we always remap to the same address.
+        // so the remove / add isn't necessary and can be removed
         privateViews.remove(_view_private);
         _view_private = remapPrivateView(_view_private);
         privateViews.add(_view_private, this);
