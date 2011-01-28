@@ -48,7 +48,9 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_EVICT_MODIFIED		    3
 #define	WT_STAT_CACHE_EVICT_UNMODIFIED		    4
 #define	WT_STAT_CACHE_PAGES_INUSE		    5
-#define	WT_STAT_PAGE_READ			    6
+#define	WT_STAT_OVERFLOW_READ			    6
+#define	WT_STAT_PAGE_READ			    7
+#define	WT_STAT_PAGE_WRITE			    8
 
 /*
  * Statistics entries for DB/IDB database.
@@ -154,38 +156,36 @@ struct __wt_stats {
 #define	WT_STAT_DB_STAT_PRINT			   35
 #define	WT_STAT_DB_SYNC				   36
 #define	WT_STAT_DB_VERIFY			   37
-#define	WT_STAT_ENV_CACHE_DRAIN_CNT_GET		   38
-#define	WT_STAT_ENV_CACHE_DRAIN_CNT_SET		   39
-#define	WT_STAT_ENV_CACHE_SIZE_GET		   40
-#define	WT_STAT_ENV_CACHE_SIZE_SET		   41
-#define	WT_STAT_ENV_CLOSE			   42
-#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_GET	   43
-#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_SET	   44
-#define	WT_STAT_ENV_DATA_UPDATE_MAX_GET		   45
-#define	WT_STAT_ENV_DATA_UPDATE_MAX_SET		   46
-#define	WT_STAT_ENV_DB				   47
-#define	WT_STAT_ENV_ERRCALL_GET			   48
-#define	WT_STAT_ENV_ERRCALL_SET			   49
-#define	WT_STAT_ENV_ERRFILE_GET			   50
-#define	WT_STAT_ENV_ERRFILE_SET			   51
-#define	WT_STAT_ENV_ERRPFX_GET			   52
-#define	WT_STAT_ENV_ERRPFX_SET			   53
-#define	WT_STAT_ENV_HAZARD_SIZE_GET		   54
-#define	WT_STAT_ENV_HAZARD_SIZE_SET		   55
-#define	WT_STAT_ENV_MSGCALL_GET			   56
-#define	WT_STAT_ENV_MSGCALL_SET			   57
-#define	WT_STAT_ENV_MSGFILE_GET			   58
-#define	WT_STAT_ENV_MSGFILE_SET			   59
-#define	WT_STAT_ENV_OPEN			   60
-#define	WT_STAT_ENV_STAT_CLEAR			   61
-#define	WT_STAT_ENV_STAT_PRINT			   62
-#define	WT_STAT_ENV_SYNC			   63
-#define	WT_STAT_ENV_TOC				   64
-#define	WT_STAT_ENV_TOC_SIZE_GET		   65
-#define	WT_STAT_ENV_TOC_SIZE_SET		   66
-#define	WT_STAT_ENV_VERBOSE_GET			   67
-#define	WT_STAT_ENV_VERBOSE_SET			   68
-#define	WT_STAT_WT_TOC_CLOSE			   69
+#define	WT_STAT_ENV_CACHE_SIZE_GET		   38
+#define	WT_STAT_ENV_CACHE_SIZE_SET		   39
+#define	WT_STAT_ENV_CLOSE			   40
+#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_GET	   41
+#define	WT_STAT_ENV_DATA_UPDATE_INITIAL_SET	   42
+#define	WT_STAT_ENV_DATA_UPDATE_MAX_GET		   43
+#define	WT_STAT_ENV_DATA_UPDATE_MAX_SET		   44
+#define	WT_STAT_ENV_DB				   45
+#define	WT_STAT_ENV_ERRCALL_GET			   46
+#define	WT_STAT_ENV_ERRCALL_SET			   47
+#define	WT_STAT_ENV_ERRFILE_GET			   48
+#define	WT_STAT_ENV_ERRFILE_SET			   49
+#define	WT_STAT_ENV_ERRPFX_GET			   50
+#define	WT_STAT_ENV_ERRPFX_SET			   51
+#define	WT_STAT_ENV_HAZARD_SIZE_GET		   52
+#define	WT_STAT_ENV_HAZARD_SIZE_SET		   53
+#define	WT_STAT_ENV_MSGCALL_GET			   54
+#define	WT_STAT_ENV_MSGCALL_SET			   55
+#define	WT_STAT_ENV_MSGFILE_GET			   56
+#define	WT_STAT_ENV_MSGFILE_SET			   57
+#define	WT_STAT_ENV_OPEN			   58
+#define	WT_STAT_ENV_STAT_CLEAR			   59
+#define	WT_STAT_ENV_STAT_PRINT			   60
+#define	WT_STAT_ENV_SYNC			   61
+#define	WT_STAT_ENV_TOC				   62
+#define	WT_STAT_ENV_TOC_SIZE_GET		   63
+#define	WT_STAT_ENV_TOC_SIZE_SET		   64
+#define	WT_STAT_ENV_VERBOSE_GET			   65
+#define	WT_STAT_ENV_VERBOSE_SET			   66
+#define	WT_STAT_WT_TOC_CLOSE			   67
 
 /* Statistics section: END */
 

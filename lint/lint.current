@@ -53,17 +53,13 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
     types)
 
 --- Module:   ../btree/bt_close.c (C)
-_
-}
-../btree/bt_close.c  77  Info 715: Symbol 'arg' (line 68) not referenced
-../btree/bt_close.c  68  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_cmp.c (C)
 
 --- Module:   ../btree/bt_debug.c (C)
                                               _
 	    (unsigned long long)WT_RECORDS(off));
-../btree/bt_debug.c  641  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  632  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -81,7 +77,7 @@ _
 --- Module:   ../btree/bt_dump.c (C)
                                         _
 			key = (DBT *)rip;
-../btree/bt_dump.c  382  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_dump.c  356  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_misc.c (C)
@@ -93,22 +89,22 @@ _
 --- Module:   ../btree/bt_page.c (C)
                                          _
 		records += WT_RECORDS(off);
-../btree/bt_page.c  268  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  237  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                  _
 			records += WT_RECORDS(off);
-../btree/bt_page.c  431  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  401  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                          _
 #...                           WT_RECORDS(WT_ROW_OFF(rip))
 			records += WT_ROW_OFF_RECORDS(rip);
-../btree/bt_page.c  510  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  480  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_reconcile.c (C)
                              _
 	WT_RECORDS(parent_ref) = new->records;
-../btree/bt_reconcile.c  974  Info 740: Unusual pointer cast (incompatible
+../btree/bt_reconcile.c  982  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/bt_ret.c (C)
@@ -116,10 +112,6 @@ _
 --- Module:   ../btree/bt_stat.c (C)
 
 --- Module:   ../btree/bt_sync.c (C)
-_
-}
-../btree/bt_sync.c  58  Info 715: Symbol 'arg' (line 52) not referenced
-../btree/bt_sync.c  52  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_vrfy.c (C)
                                       _
@@ -152,64 +144,66 @@ _
                                                         _
 #...                          WT_RECORDS(WT_ROW_OFF(rip))
 			records = WT_ROW_OFF_RECORDS(rip);
-../btree/bt_vrfy.c  353  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_vrfy.c  352  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...                          WT_RECORDS(WT_ROW_OFF(rip))
 			records = WT_ROW_OFF_RECORDS(rip);
-../btree/bt_vrfy.c  389  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_vrfy.c  387  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                          _
 		cd_ref = (DBT *)child_rip;
-../btree/bt_vrfy.c  473  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_vrfy.c  463  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                           _
 		pd_ref = (DBT *)parent_rip;
-../btree/bt_vrfy.c  486  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_vrfy.c  469  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                  _
 			current->dbt = (DBT *)rip;
-../btree/bt_vrfy.c  588  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_vrfy.c  554  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                        _
 #... ame = (vs->fragbits); register int _start = (addr), _stop = (addr + (frags
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1332  Info 713: Loss of precision (initialization)
+../btree/bt_vrfy.c  1313  Info 713: Loss of precision (initialization)
     (unsigned int to int)
                                                        _
 #...  int _start = (addr), _stop = (addr + (frags - 1)); register int _startbyt
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1332  Info 713: Loss of precision (initialization)
+../btree/bt_vrfy.c  1313  Info 713: Loss of precision (initialization)
     (unsigned int to int)
                                                        _
 #...  - 1)); register int _startbyte = _bit_byte(_start); register int _stopbyt
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1332  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1313  Info 702: Shift right of signed quantity (int)
                                                        _
 #... (_start); register int _stopbyte = _bit_byte(_stop); if (_startbyte == _st
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1332  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1313  Info 702: Shift right of signed quantity (int)
                                                        _
 #... else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++_startbyte < 
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
-../btree/bt_vrfy.c  1332  Info 734: Loss of precision (assignment) (15 bits to
+../btree/bt_vrfy.c  1313  Info 734: Loss of precision (assignment) (15 bits to
     8 bits)
                                                  _
 #... egister int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/bt_vrfy.c  1350  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1331  Info 702: Shift right of signed quantity (int)
                                                  _
 #... != 0xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_l
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/bt_vrfy.c  1350  Info 701: Shift left of signed quantity (int)
+../btree/bt_vrfy.c  1331  Info 701: Shift left of signed quantity (int)
                                                  _
 #... _name[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= frag
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/bt_vrfy.c  1350  Info 722: Suspicious use of ;
+../btree/bt_vrfy.c  1331  Info 722: Suspicious use of ;
                                                  _
 #...                ((vs->fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
 			bit_set(vs->fragbits, ffc);
-../btree/bt_vrfy.c  1352  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  1333  Info 702: Shift right of signed quantity (int)
+
+--- Module:   ../btree/bt_walk.c (C)
 
 --- Module:   ../btree/col_get.c (C)
 

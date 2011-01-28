@@ -23,13 +23,11 @@ __wt_cache_create(ENV *env)
 	ienv = env->ienv;
 	ret = 0;
 
-	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		"cache initialization: %lu MB", (u_long)env->cache_size));
-
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_CACHE), &ienv->cache));
 	cache = ienv->cache;
 
-	WT_ERR(__wt_mtx_alloc(env, "cache drain server", 1, &cache->mtx_drain));
+	WT_ERR(
+	    __wt_mtx_alloc(env, "cache eviction server", 1, &cache->mtx_evict));
 	WT_ERR(__wt_mtx_alloc(env, "cache read server", 1, &cache->mtx_read));
 	WT_ERR(__wt_mtx_alloc(env, "reconciliation", 0, &cache->mtx_reconcile));
 
@@ -54,9 +52,10 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 	uint64_t pages_in, pages_out;
 
 	/*
-	 * Other threads of control may be modifying these fields -- we don't
-	 * need exact values, but we do not want garbage, so read first, then
-	 * use local variables for calculation, ensuring a reasonable return.
+	 * Reading 64-bit fields, potentially on 32-bit machines, and other
+	 * threads of control may be modifying them.  Check them for sanity
+	 * (although "interesting" corruption is vanishingly unlikely, these
+	 * values just increment over time).
 	 */
 	pages_in = cache->stat_pages_in;
 	pages_out = cache->stat_pages_out;
@@ -73,9 +72,10 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 	uint64_t bytes_in, bytes_out;
 
 	/*
-	 * Other threads of control may be modifying these fields -- we don't
-	 * need exact values, but we do not want garbage, so read first, then
-	 * use local variables for calculation, ensuring a reasonable return.
+	 * Reading 64-bit fields, potentially on 32-bit machines, and other
+	 * threads of control may be modifying them.  Check them for sanity
+	 * (although "interesting" corruption is vanishingly unlikely, these
+	 * values just increment over time).
 	 */
 	bytes_in = cache->stat_bytes_in;
 	bytes_out = cache->stat_bytes_out;
@@ -118,8 +118,8 @@ __wt_cache_destroy(ENV *env)
 		return (0);
 
 	/* Discard mutexes. */
-	if (cache->mtx_drain != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_drain);
+	if (cache->mtx_evict != NULL)
+		(void)__wt_mtx_destroy(env, cache->mtx_evict);
 	if (cache->mtx_read != NULL)
 		__wt_mtx_destroy(env, cache->mtx_read);
 	if (cache->mtx_reconcile != NULL)

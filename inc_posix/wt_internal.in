@@ -51,6 +51,7 @@ extern "C" {
 #include "mem.h"
 #include "misc.h"
 #include "stat.h"
+#include "walk.h"
 
 /*******************************************
  * WT_TOC support.
@@ -100,6 +101,9 @@ struct __idb {
 	/* Pages in the tree are WT_CHILD/WT_OFF pairs -- here's the root. */
 	WT_REF	root_page;		/* Root page */
 	WT_OFF	root_off;
+
+	WT_WALK evict_walk;		/* Eviction thread's walk state */
+
 	/*
 	 * When a database is opened and/or created a hazard reference is taken
 	 * on its root page, and the root page brought into memory.  If no root
@@ -126,11 +130,12 @@ struct __ienv {
 	WT_MTX *mtx;			/* Global mutex */
 
 	pthread_t workq_tid;		/* workQ thread ID */
-	pthread_t cache_drain_tid;	/* Cache drain server thread ID */
+	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 	TAILQ_HEAD(
 	    __wt_db_qh, __idb) dbqh;	/* Locked: database list */
+	u_int dbqcnt;			/* Locked: database list count */
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
@@ -161,8 +166,8 @@ struct __ienv {
 	 * the right change is to increase the default).  The method is there
 	 * just in case an application starts failing in the field.
 	 *
-	 * The hazard array is separate from the WT_TOC array because we want to
-	 * be able to easily copy and search it when draining the cache.
+	 * The hazard array is separate from the WT_TOC array because we must be
+	 * able to easily copy and search it when evicting pages from the cache.
 	 */
 	WT_PAGE **hazard;		/* Hazard references array */
 

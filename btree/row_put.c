@@ -218,7 +218,7 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 		/*
 		 * The "in" reference count is artificially incremented by 1 as
 		 * long as an update buffer is referenced by the WT_TOC thread;
-		 * we don't want them freed because a page was drained and their
+		 * we don't want them freed because a page was evicted and the
 		 * count went to 0.  Decrement the reference count on the buffer
 		 * as part of releasing it.  There's a similar reference count
 		 * decrement when the WT_TOC structure is discarded.
@@ -227,7 +227,7 @@ __wt_bt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 		 * There's a race here: if this code, or the WT_TOC structure
 		 * close code, and the page discard code race, it's possible
 		 * neither will realize the buffer is no longer needed and free
-		 * it.  The fix is to involve the cache drain or workQ threads:
+		 * it.  The fix is to involve the eviction or workQ threads:
 		 * they may need a linked list of buffers they review to ensure
 		 * it never happens.  I'm living with this now: it's unlikely
 		 * and it's a memory leak if it ever happens.
