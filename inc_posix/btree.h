@@ -61,10 +61,8 @@ extern "C" {
  * Return database allocation units needed for length (optionally including a
  * page header), rounded to an allocation unit.
  */
-#define	WT_BYTES_TO_ALLOC(db, size)					\
-	((uint32_t)WT_ALIGN((size), (db)->allocsize))
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
-	WT_BYTES_TO_ALLOC(db, (size) + sizeof(WT_PAGE_HDR))
+	((uint32_t)WT_ALIGN((size) + sizeof(WT_PAGE_HDR), (db)->allocsize))
 
 /*
  * The invalid address is the largest possible offset, which isn't a possible
@@ -605,10 +603,6 @@ struct __wt_rcc_expand {
 	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 #define	WT_ROW_OFF_RECORDS(ip)						\
 	WT_RECORDS(WT_ROW_OFF(ip))
-#define	WT_ROW_OFF_ADDR(ip)						\
-	(WT_ROW_OFF(ip)->addr)
-#define	WT_ROW_OFF_SIZE(ip)						\
-	(WT_ROW_OFF(ip)->size)
 
 /*
  * WT_ITEM --

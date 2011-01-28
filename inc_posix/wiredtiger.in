@@ -512,7 +512,6 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_CREATE					0x00000001
 #define	WT_DATA_OVERWRITE				0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_DISCARD					0x00000001
 #define	WT_DUPLICATES					0x00000001
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
@@ -530,8 +529,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_SCRATCH_INUSE				0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_TELEPHONE					0x00000001
-#define	WT_VERB_ALL					0x00000040
-#define	WT_VERB_CACHE					0x00000020
+#define	WT_VERB_ALL					0x00000020
 #define	WT_VERB_EVICT					0x00000010
 #define	WT_VERB_FILEOPS					0x00000008
 #define	WT_VERB_HAZARD					0x00000004
@@ -542,7 +540,6 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_BT_BUILD_DATA_ITEM			0x00000001
-#define	WT_APIMASK_BT_PAGE_OUT				0x00000001
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_BT_TREE_WALK				0x00000003
@@ -571,7 +568,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_SYNC				0x00000000
 #define	WT_APIMASK_ENV_TOC				0x00000000
-#define	WT_APIMASK_ENV_VERBOSE_SET			0x0000007f
+#define	WT_APIMASK_ENV_VERBOSE_SET			0x0000003f
 #define	WT_APIMASK_IDB					0x00000007
 #define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001

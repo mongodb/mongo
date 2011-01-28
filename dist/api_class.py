@@ -278,7 +278,6 @@ methods['env.verbose_set'] = Api(
 	'method, setter, verify',
 	['verbose/uint32_t @S'],
 	['VERB_ALL',
-	 'VERB_CACHE',
 	 'VERB_EVICT',
 	 'VERB_FILEOPS',
 	 'VERB_HAZARD',
@@ -586,8 +585,6 @@ flags['wiredtiger_env_init'] = [
 ###################################################
 flags['bt_build_data_item'] = [
 	'IS_DUP']
-flags['bt_page_out'] = [
-	'DISCARD' ]
 flags['bt_search_col'] = [
 	'DATA_OVERWRITE' ]
 flags['bt_search_key_row'] = [
