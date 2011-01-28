@@ -7,7 +7,7 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 8, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 10, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
 	stats[WT_STAT_CACHE_BYTES_MAX].desc =
@@ -19,7 +19,10 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].desc =
 	    "unmodified pages selected for eviction";
 	stats[WT_STAT_CACHE_PAGES_INUSE].desc = "pages in the cache";
-	stats[WT_STAT_PAGE_READ].desc = "pages read from the file";
+	stats[WT_STAT_OVERFLOW_READ].desc =
+	    "overflow pages read from the file";
+	stats[WT_STAT_PAGE_READ].desc = "pages read from a file";
+	stats[WT_STAT_PAGE_WRITE].desc = "pages written to a file";
 
 	*statsp = stats;
 	return (0);
@@ -31,7 +34,9 @@ __wt_stat_clear_cache_stats(WT_STATS *stats)
 	stats[WT_STAT_CACHE_EVICT_HAZARD].v = 0;
 	stats[WT_STAT_CACHE_EVICT_MODIFIED].v = 0;
 	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].v = 0;
+	stats[WT_STAT_OVERFLOW_READ].v = 0;
 	stats[WT_STAT_PAGE_READ].v = 0;
+	stats[WT_STAT_PAGE_WRITE].v = 0;
 }
 
 int
@@ -206,7 +211,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 71, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 69, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
 	    "db.btree_compare_dup_get";
@@ -252,10 +257,6 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_STAT_PRINT].desc = "db.stat_print";
 	stats[WT_STAT_DB_SYNC].desc = "db.sync";
 	stats[WT_STAT_DB_VERIFY].desc = "db.verify";
-	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_GET].desc =
-	    "env.cache_drain_cnt_get";
-	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_SET].desc =
-	    "env.cache_drain_cnt_set";
 	stats[WT_STAT_ENV_CACHE_SIZE_GET].desc = "env.cache_size_get";
 	stats[WT_STAT_ENV_CACHE_SIZE_SET].desc = "env.cache_size_set";
 	stats[WT_STAT_ENV_CLOSE].desc = "env.close";
@@ -336,8 +337,6 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_STAT_PRINT].v = 0;
 	stats[WT_STAT_DB_SYNC].v = 0;
 	stats[WT_STAT_DB_VERIFY].v = 0;
-	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_GET].v = 0;
-	stats[WT_STAT_ENV_CACHE_DRAIN_CNT_SET].v = 0;
 	stats[WT_STAT_ENV_CACHE_SIZE_GET].v = 0;
 	stats[WT_STAT_ENV_CACHE_SIZE_SET].v = 0;
 	stats[WT_STAT_ENV_CLOSE].v = 0;
