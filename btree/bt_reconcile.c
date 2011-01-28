@@ -65,7 +65,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	/* If the page isn't dirty, we should never have been called. */
 	WT_ASSERT(env, WT_PAGE_IS_MODIFIED(page));
 
-	WT_VERBOSE(env, WT_VERB_CACHE,
+	WT_VERBOSE(env, WT_VERB_EVICT,
 	    (env, "reconcile addr %lu (page %p, type %s)",
 	    (u_long)page->addr, page, __wt_bt_hdr_type(hdr)));
 
@@ -73,26 +73,25 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	 * Update the disk generation before reading the page.  The workQ will
 	 * update the write generation after it makes a change, and if we have
 	 * different disk and write generation numbers, the page may be dirty.
-	 * We don't technically need the flush, unless the drain server ran on
-	 * a different processor before a flush naturally occurred, but there's
-	 * not enough cost to worry about.
+	 * We technically requires a flush (the eviction server might run on a
+	 * different core before a flush naturally occurred).
 	 */
 	WT_PAGE_DISK_WRITE(page);
 	WT_MEMORY_FLUSH;
 
 	/*
-	 * Multiple pages are marked for "draining" by the cache drain server,
-	 * which means nobody can read them -- but, this thread of control has
-	 * to update higher pages in the tree when it writes this page, which
+	 * Multiple pages are marked for eviction by the eviction server, which
+	 * means nobody can read them -- but, this thread of control has to
+	 * update higher pages in the tree when it writes this page, which
 	 * requires reading other pages, which might themselves be marked for
-	 * draining.   Set a flag to allow this thread of control to see pages
-	 * marked for draining -- we know it's safe, because only this thread
+	 * eviction.   Set a flag to allow this thread of control to see pages
+	 * marked for eviction -- we know it's safe, because only this thread
 	 * is writing pages.
 	 *
 	 * Reconciliation is probably running because the cache is full, which
 	 * means reads are locked out -- reconciliation can read, regardless.
 	 */
-	F_SET(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
+	F_SET(toc, WT_READ_EVICT | WT_READ_PRIORITY);
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
@@ -173,16 +172,22 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	WT_ERR(__wt_bt_table_free(toc, page->addr, page->size));
 
 	/*
-	 * Update in-memory address and size.
+	 * Update the backing address.
 	 *
 	 * XXX
-	 * This update is a red flag -- why do we even need this information
-	 * for in-memory pages?
+	 * This is more for diagnostic information than anything else, that is,
+	 * this will match the WT_REF->addr in the parent.
+	 *
+	 * The parent's WT_REF->size may be different, that is, page->size is
+	 * the original page size at the original address and the size of the
+	 * page's buffer in memory, NOT the size of the newly written page at
+	 * the new address.   We may NOT update the size here, otherwise we
+	 * can no longer figure out if WT_ROW/WT_COL items reference on-page
+	 * data vs. allocated data.
 	 */
 	page->addr = new->addr;
-	page->size = new->size;
 
-err:	F_CLR(toc, WT_READ_DRAIN | WT_READ_PRIORITY);
+err:	F_CLR(toc, WT_READ_EVICT | WT_READ_PRIORITY);
 
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -892,8 +897,10 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	ENV *env;
 	int ret;
+	WT_STATS *stats;
 
 	env = toc->env;
+	stats = env->ienv->cache->stats;
 
 	/*
 	 * XXX
@@ -903,7 +910,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 */
 	if (new->hdr->u.entries == 0) {
 		new->addr = WT_ADDR_INVALID;
-		WT_VERBOSE(env, WT_VERB_CACHE, (env,
+		WT_VERBOSE(env, WT_VERB_EVICT, (env,
 		    "reconcile removing empty page %lu", (u_long)page->addr));
 		fprintf(stderr, "PAGE %lu EMPTIED\n", (u_long)page->addr);
 		__wt_abort(env);
@@ -911,7 +918,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		/*
 		 * Allocate file space for the page.
 		 *
-		 * The cache drain server is the only thread allocating space
+		 * The cache eviction server is the only thread allocating space
 		 * from the file, so there's no need to do any serialization.
 		 */
 		WT_RET(__wt_bt_table_alloc(toc, &new->addr, new->size));
@@ -926,8 +933,9 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * thread tries to read down the tree before the write finishes.
 		 */
 		WT_RET(__wt_page_write(toc, new));
+		WT_STAT_INCR(stats, PAGE_WRITE);
 
-		WT_VERBOSE(env, WT_VERB_CACHE,
+		WT_VERBOSE(env, WT_VERB_EVICT,
 		    (env, "reconcile move %lu to %lu, resize %lu to %lu",
 		    (u_long)page->addr, (u_long)new->addr,
 		    (u_long)page->size, (u_long)new->size));
