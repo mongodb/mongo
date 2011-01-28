@@ -11,8 +11,17 @@
 extern "C" {
 #endif
 
-struct __wt_cache_entry;	typedef struct __wt_cache_entry WT_CACHE_ENTRY;
+struct __wt_evict_list;		typedef struct __wt_evict_list WT_EVICT_LIST;
 struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
+
+/*
+ * WT_EVICT_LIST --
+ *	Encapsulation of an eviction choice.
+ */
+struct __wt_evict_list {
+	WT_REF	*ref;				/* WT_REF structure */
+	IDB	*idb;				/* Underlying file object */
+};
 
 /*
  * WT_READ_REQ --
@@ -44,11 +53,11 @@ struct __wt_read_req {
  */
 struct __wt_cache {
 	/*
-	 * The Db.sync method and the cache drain server both want to reconcile
+	 * The Db.sync method and cache eviction server both want to reconcile
 	 * pages, and there are two problems: first, reconciliation updates
-	 * parent pages, which means the Db.sync method and the cache drain
+	 * parent pages, which means the Db.sync method and the cache eviction
 	 * server might update the same parent page at the same time.  Second,
-	 * the Db.sync method and cache drain server might attempt to reconcile
+	 * the Db.sync method and cache eviction server may attempt to reconcile
 	 * the same page at the same time which implies serialization anyway.
 	 * We could probably handle that, but for now, I'm going to make page
 	 * reconciliation single-threaded.
@@ -56,12 +65,12 @@ struct __wt_cache {
 	WT_MTX *mtx_reconcile;		/* Single-thread page reconciliation */
 
 	/*
-	 * The cache thread sets/clears the drain_sleeping flag when blocked
-	 * on the mtx_drain mutex.  The workQ thread uses the drain_sleeping
-	 * flag to wake the cache drain thread as necessary.
+	 * The cache thread sets/clears the evict_sleeping flag when blocked
+	 * on the mtx_evict mutex.  The workQ thread uses the evict_sleeping
+	 * flag to wake the cache eviction thread as necessary.
 	 */
-	WT_MTX *mtx_drain;		/* Cache drain server mutex */
-	u_int volatile drain_sleeping;	/* Sleeping */
+	WT_MTX *mtx_evict;		/* Cache eviction server mutex */
+	u_int volatile evict_sleeping;	/* Sleeping */
 
 	/*
 	 * The I/O thread sets/clears the io_sleeping flag when blocked on the
@@ -70,7 +79,7 @@ struct __wt_cache {
 	 */
 	WT_MTX *mtx_read;		/* Cache read server mutex */
 	u_int volatile read_sleeping;	/* Sleeping */
-	u_int volatile read_lockout;	/* No reading until the cache drains */
+	u_int volatile read_lockout;	/* No reading until memory drains */
 
 	WT_READ_REQ read_request[40];	/* Read requests:
 					   slot available if toc is NULL */
@@ -97,14 +106,13 @@ struct __wt_cache {
 	uint64_t stat_pages_out;
 	uint64_t stat_bytes_out;
 
-	WT_CACHE_ENTRY **drain;		/* List of entries being drained */
-	uint32_t drain_elem;		/* Number of entries in the list */
-	uint32_t drain_len;		/* Bytes in the list */
-	uint32_t bucket_cnt;		/* Drain review: last hash bucket */
+	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
+	uint32_t   evict_elem;		/* Number of elements in the array */
+	uint32_t   evict_len;		/* Bytes in the array */
 
 	WT_PAGE **hazard;		/* Copy of the hazard references */
-	uint32_t hazard_elem;		/* Number of entries in the list */
-	uint32_t hazard_len;		/* Bytes in the list */
+	uint32_t  hazard_elem;		/* Number of entries in the list */
+	uint32_t  hazard_len;		/* Bytes in the list */
 
 	WT_STATS *stats;		/* Cache statistics */
 };

@@ -24,16 +24,16 @@ __wt_hazard_set(WT_TOC *toc, WT_REF *ref)
 	/*
 	 * Do the dance:
 	 *
-	 * The memory location making a page "real" is the WT_REF's state
-	 * which can be reset from WT_OK to WT_DRAIN at any time by the page
-	 * drain server.
+	 * The memory location making a page "real" is the WT_REF's state which
+	 * can be reset from WT_OK to WT_EVICT at any time by the page eviction
+	 * server.
 	 *
-	 * Add the WT_REF reference to the WT_TOC's hazard list (and flush the
-	 * write), then see if the state field is still WT_OK.  If it's still
-	 * WT_OK, we know we can use the page because the page drain server
+	 * Add the WT_REF reference to the WT_TOC's hazard list and flush the
+	 * write, then see if the state field is still WT_OK.  If it's still
+	 * WT_OK, we know we can use the page because the page eviction server
 	 * will see our hazard reference before it discards the buffer (the
-	 * drain server sets the WT_DRAIN state, flushes memory, and then checks
-	 * the hazard references).
+	 * eviction server sets the WT_REF state to WT_EVICT, flushes memory,
+	 * and then checks the hazard references).
 	 */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp) {
 		if (*hp != NULL)
@@ -48,17 +48,17 @@ __wt_hazard_set(WT_TOC *toc, WT_REF *ref)
 
 		/*
 		 * If the cache entry is set, check to see if it's still valid.
-		 * Valid means the state is WT_OK, or the state is WT_DRAIN and
-		 * this thread is allowed to see pages flagged for draining.
+		 * Valid means the state is WT_OK, or the state is WT_EVICT and
+		 * this thread is allowed to see pages flagged for eviction.
 		 */
 		if (ref->state == WT_OK ||
-		    (ref->state == WT_DRAIN && F_ISSET(toc, WT_READ_DRAIN))) {
+		    (ref->state == WT_EVICT && F_ISSET(toc, WT_READ_EVICT))) {
 			WT_VERBOSE(env, WT_VERB_HAZARD,
 			    (env, "toc %p hazard %p: set", toc, ref->page));
 			return (1);
 		}
 
-		/* The cache drain server owns this page, we can't have it. */
+		/* The cache eviction server owns the page, we can't have it. */
 		*hp = NULL;
 		return (0);
 	}
@@ -90,9 +90,9 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
 			/*
 			 * We don't have to flush memory here for correctness;
 			 * it would give the page server thread faster access
-			 * to the block were the block selected to be drained,
+			 * to the block were the block selected to be evicted,
 			 * but the generation number was just set which makes
-			 * it unlikely to be selected for draining.
+			 * it unlikely to be selected for eviction.
 			 */
 			return;
 		}
@@ -119,7 +119,8 @@ __wt_hazard_empty(WT_TOC *toc, const char *name)
 	 * called).   We do this work because it's not expensive, and we don't
 	 * want to let a hazard reference lie around, keeping a page from being
 	 * flushed.  The flush isn't necessary for correctness, but gives the
-	 * cache drain thread immediate access to any page our reference blocks.
+	 * cache eviction thread immediate access to any page our reference
+	 * blocks.
 	 */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp != NULL) {
