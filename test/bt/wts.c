@@ -65,11 +65,11 @@ wts_startup(int logfile)
 	/* Open the log file. */
 	if (logfile) {
 		(void)env->verbose_set(env,
-		    WT_VERB_CACHE |
+		    // WT_VERB_FILEOPS |
 		    // WT_VERB_HAZARD |
 		    // WT_VERB_MUTEX |
-		    WT_VERB_SERVERS |
-		    // WT_VERB_FILEOPS |
+		    // WT_VERB_READ |
+		    // WT_VERB_EVICT |
 		    0);
 		(void)env->msgfile_set(env, g.wts_log);
 	}
