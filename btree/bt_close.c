@@ -43,11 +43,13 @@ __wt_bt_close(WT_TOC *toc)
 	 * called on internal pages until all children have been visited; so,
 	 * we don't have to worry about a page being dirtied after the visit.
 	 *
-	 * Lock out the cache drain thread, though, we don't want it trying
-	 * to reconcile pages we're flushing.
+	 * Lock out the cache evictions thread, though, we don't want it trying
+	 * to evict pages we're flushing.
 	 */
 	__wt_lock(env, cache->mtx_reconcile);
-	WT_TRET(__wt_bt_tree_walk(toc, NULL, 1, __wt_bt_close_page, NULL));
+	WT_TRET(__wt_bt_tree_walk(toc, NULL,
+	    WT_WALK_CACHE | WT_WALK_OFFDUP, __wt_bt_close_page, NULL));
+	__wt_evict_db_clear(toc);
 	__wt_unlock(env, cache->mtx_reconcile);
 
 	/* There's no root page any more, kill the pointer to catch mistakes. */
@@ -67,6 +69,8 @@ __wt_bt_close(WT_TOC *toc)
 static int
 __wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
+	WT_CC_QUIET(arg, NULL);
+
 	/* Reconcile any dirty pages, then discard the page. */
 	if (WT_PAGE_IS_MODIFIED(page))
 		WT_RET(__wt_bt_rec_page(toc, page));
