@@ -26,21 +26,26 @@ static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
 int
 __wt_bt_page_in(WT_TOC *toc, WT_REF *ref, WT_OFF *off, int dsk_verify)
 {
+	ENV *env;
 	WT_CACHE *cache;
 	int ret;
 
-	cache = toc->env->ienv->cache;
+	env = toc->env;
+	cache = env->ienv->cache;
 
 	for (;;)
 		switch (ref->state) {
 		case WT_OK:
-			/* The page is in memory, update it's LRU and return. */
+			/*
+			 * The page is in memory: get a hazard reference, update
+			 * the page's LRU and return.
+			 */
 			if (__wt_hazard_set(toc, ref)) {
 				ref->page->read_gen = ++cache->read_gen;
 				return (0);
 			}
 			/* FALLTHROUGH */
-		case WT_DRAIN:
+		case WT_EVICT:
 			/*
 			 * The page is being considered for eviction, wait for
 			 * that to resolve.
@@ -54,44 +59,10 @@ __wt_bt_page_in(WT_TOC *toc, WT_REF *ref, WT_OFF *off, int dsk_verify)
 				return (ret);
 			break;
 		default:
+			WT_ABORT(env, "WT_REF->state invalid");
 			break;
 		}
 	/* NOTREACHED */
-}
-
-/*
- * __wt_bt_page_out --
- *	Release a hazard reference to a page.
- */
-void
-__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, uint32_t flags)
-{
-	ENV *env;
-	WT_PAGE *page;
-
-	env = toc->env;
-
-	WT_ENV_FCHK_ASSERT(
-	    env, "__wt_bt_page_out", flags, WT_APIMASK_BT_PAGE_OUT);
-
-	/*
-	 * Clear the caller's reference so we don't accidentally use a page
-	 * after discarding our reference, and to make it easy to decide if
-	 * a page is in-use after our return.
-	 */
-	page = *pagep;
-	*pagep = NULL;
-
-	/* Discard the hazard reference. */
-	__wt_hazard_clear(toc, page);
-
-	/*
-	 * If it's an overflow page, it was never hooked into the tree, free
-	 * the memory.   In some rare cases other pages are standalone, and
-	 * they're discarded as well.
-	 */
-	if (page->hdr->type == WT_PAGE_OVFL || LF_ISSET(WT_DISCARD))
-		__wt_bt_page_discard(toc, page);
 }
 
 /*
@@ -137,8 +108,6 @@ __wt_bt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		 */
 		nindx = hdr->u.entries - 1;
 		break;
-	case WT_PAGE_OVFL:
-		return (0);
 	WT_ILLEGAL_FORMAT(db);
 	}
 
@@ -362,10 +331,11 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA_DUP:
-			WT_KEY_SET(rip, WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+			__wt_key_set
+			    (rip, WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			break;
 		case WT_ITEM_DATA_DUP_OVFL:
-			WT_KEY_SET_PROCESS(rip, item);
+			__wt_key_set_process(rip, item);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -417,14 +387,14 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_DUP:
 			if (huffman == NULL) {
-				WT_KEY_SET(rip,
+				__wt_key_set(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_KEY_DUP_OVFL:
-			WT_KEY_SET_PROCESS(rip, item);
+			__wt_key_set_process(rip, item);
 			break;
 		case WT_ITEM_OFF:
 			off = WT_ITEM_BYTE_OFF(item);
@@ -482,9 +452,9 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 				++rip;
 			if (idb->huffman_key != NULL ||
 			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
-				WT_KEY_SET_PROCESS(rip, item);
+				__wt_key_set_process(rip, item);
 			else
-				WT_KEY_SET(rip,
+				__wt_key_set(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 			++indx_count;
 			break;
@@ -495,7 +465,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			 * next slot and copy the previous key.
 			 */
 			if (rip->data != NULL) {
-				WT_KEY_SET(rip + 1, rip->key, rip->size);
+				__wt_key_set(rip + 1, rip->key, rip->size);
 				++rip;
 				++indx_count;
 			}
@@ -537,40 +507,25 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_bt_item_process(
-    WT_TOC *toc, WT_ITEM *item, WT_PAGE **ovfl_ret, DBT *dbt_ret)
+__wt_bt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
 {
 	DB *db;
+	DBT *tmp;
 	ENV *env;
 	IDB *idb;
-	WT_PAGE *ovfl;
-	void *huffman, *p;
 	uint32_t size;
 	int ret;
+	void *huffman, *p;
 
 	db = toc->db;
+	tmp = NULL;
 	env = toc->env;
 	idb = db->idb;
-	ovfl = NULL;
-	if (ovfl_ret != NULL)
-		*ovfl_ret = NULL;
 	ret = 0;
 
 	/*
 	 * 3 cases: compressed on-page item, or compressed or uncompressed
 	 * overflow item.
-	 *
-	 * The return cases are confusing.   If the item is compressed (either
-	 * on-page or overflow, it doesn't matter), then always uncompress it
-	 * and return a copy in the return DBT, and ignore the return WT_PAGE.
-	 * If the item isn't compressed, we're here because it's an overflow
-	 * item.  If the caller passed in a return WT_PAGE, return the page to
-	 * the caller and ignore the return DBT.  If the caller didn't pass in
-	 * a return WT_PAGE, copy the page into the return DBT.
-	 *
-	 * The reason for this is that this function gets called in a couple
-	 * of ways, and the additional complexity is worth it because avoiding
-	 * a copy of an overflow chunk is a pretty good thing.
 	 */
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
@@ -590,39 +545,46 @@ onpage:		p = WT_ITEM_BYTE(item);
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
 		huffman = idb->huffman_data;
-offpage:	WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), &ovfl, 0));
-		p = WT_PAGE_BYTE(ovfl);
-		size = ovfl->hdr->u.datalen;
+offpage:	/*
+		 * It's an overflow item -- if it's not encoded, we can read
+		 * it directly into the user's return DBT, otherwise we have to
+		 * have our own buffer as temporary space, and the decode call
+		 * will put a decoded version into the user's return DBT.
+		 */
+		if (huffman == NULL)
+			tmp = dbt_ret;
+		else
+			WT_RET(__wt_scr_alloc(toc, 0, &tmp));
+		WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), tmp));
+		p = tmp->data;
+		size = tmp->size;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
-	 * If the item is NOT compressed it's an overflow item (otherwise we
-	 * wouldn't be in this code); return a pointer to the page itself, if
-	 * the user passed in a WT_PAGE reference, otherwise copy it into the
-	 * caller's DBT.
+	 * If the item is not compressed, and it's not an overflow item, copy
+	 * it into the caller's DBT.  If the item is not compressed, and it's
+	 * an overflow item, it was already copied into the caller's DBT.
 	 *
-	 * If the item is compressed (on-page or overflow), decode it and copy
-	 * it into the caller's DBT, never returning a copy of the page.
+	 * If the item is compressed, pass it to the decode routines, they'll
+	 * copy a decoded version into the caller's DBT.
 	 */
 	if (huffman == NULL) {
-		if (ovfl == NULL || ovfl_ret == NULL) {
-			if (size > dbt_ret->mem_size)
-				WT_ERR(__wt_realloc(env,
-				    &dbt_ret->mem_size, size, &dbt_ret->data));
+		if (tmp != dbt_ret) {
+			 if (size > dbt_ret->mem_size)
+				 WT_ERR(__wt_realloc(
+				     env, &dbt_ret->mem_size,
+				     size, &dbt_ret->data));
 			memcpy(dbt_ret->data, p, size);
 			dbt_ret->size = size;
-		} else {
-			*ovfl_ret = ovfl;
-			ovfl = NULL;
 		}
 	} else
 		WT_ERR(__wt_huffman_decode(huffman, p, size,
 		    &dbt_ret->data, &dbt_ret->mem_size, &dbt_ret->size));
 
-err:	if (ovfl != NULL)
-		__wt_bt_page_out(toc, &ovfl, 0);
+err:	if (tmp != NULL && tmp != dbt_ret)
+		__wt_scr_release(&tmp);
 
 	return (ret);
 }
@@ -655,4 +617,36 @@ __wt_bt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
 	for (i = 0, cp = page->u3.ref; i < nindx; ++i, ++cp)
 		cp->state = WT_EMPTY;
 	return (0);
+}
+
+/*
+ * __wt_key_process --
+ *	Return if a key requires processing.
+ */
+inline int
+__wt_key_process(WT_ROW *rip)
+{
+	return (rip->size == 0 ? 1 : 0);
+}
+
+/*
+ * __wt_key_set --
+ *	Set a key/size pair, where the key does not require further processing.
+ */
+inline void
+__wt_key_set(WT_ROW *rip, void *key, uint32_t size)
+{
+	rip->key = key;
+	rip->size = size;
+}
+
+/*
+ * __wt_key_set_process --
+ *	Set a key/size pair, where the key requires further processing.
+ */
+inline void
+__wt_key_set_process(WT_ROW *rip, void *key)
+{
+	rip->key = key;
+	rip->size = 0;
 }
