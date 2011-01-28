@@ -61,27 +61,12 @@ struct WT_CURSOR_FACTORY {
 };
 
 /*!
- * The interface implemented by applications in order to handle errors.
- */
-struct WT_ERROR_HANDLER {
-	/*! Callback to handle errors within the session. */
-	int (*handle_error)(WT_ERROR_HANDLER *handler,
-	    int err, const char *errmsg);
-
-	/*! Optional callback to retrieve buffered messages. */
-	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);
-
-	/*! Optional callback to clear buffered messages. */
-	int (*clear_messages)(WT_ERROR_HANDLER *handler);
-};
-
-/*!
  * The interface implemented by applications to provide custom extraction of
- * index keys or column set values.  Applications register their implementation
+ * index keys or column group values.  Applications register their implementation
  * with WiredTiger by calling WT_CONNECTION::add_extractor.
  */
 struct WT_EXTRACTOR {
-	/*! Callback to extract a value for an index or column set.
+	/*! Callback to extract a value for an index or column group.
 	 *
 	 * @errors
 	 */

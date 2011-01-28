@@ -2,6 +2,9 @@
 
 #include "wiredtiger.h"
 
+#include <stdio.h>
+
+#include "config.h"
 #include "cur_std.h"
 #include "extern.h"
 

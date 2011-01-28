@@ -62,8 +62,8 @@ int main()
 	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population),"
-	    "column_set=population(population),"
-	    "index=country_year(country,year)");
+	    "colgroup.population=(population),"
+	    "index.country_year=(country,year)");
 
 	ret = session->open_cursor(session, "table:population",
 	    NULL, NULL, &cursor);

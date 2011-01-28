@@ -40,9 +40,9 @@ Applications describe the format of their data by supplying a schema to WT_SESSI
 
 @todo describe how to add columns to a schema
 
-@section schema_column_sets Storing Sets of Columns Together
+@section schema_column_groups Storing Groups of Columns Together
 
-@todo define and describe column sets
+@todo define and describe column groups
 
 @section schema_indices Adding an Index
 

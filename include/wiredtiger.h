@@ -13,6 +13,7 @@
  */
 
 #include <sys/types.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <stdarg.h>
 
@@ -369,22 +370,16 @@ struct WT_SESSION {
 	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
 	 * 	The number of entries must match the total number of values in
 	 * 	#key_format and #value_format.}
-	 * @config{column_set,,Named set of columns to store together.
-	 * 	Name and comma-separated list of the form
-	 * 	<code>name(column[\,...])</code>.  Multiple column sets can
-	 * 	be specified by repeating the \c "column_set" key in the
-	 * 	configuration string.  Each column set is stored separately\,
-	 * 	keyed by the primary key of the table.  Any column that does
-	 * 	not appear in a column set is stored in an unnamed default
-	 * 	column set for the table.}
+	 * @config{colgroup.\<name\>,,Named group of columns to store together.
+	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
+	 * 	Each column group is stored separately\, keyed by the primary
+	 * 	key of the table.  Any column that does not appear in a column
+	 * 	group is stored in a default unnamed column group for the table.}
 	 * @config{exclusive,,Fail if the table exists (if "no"\, the
 	 * 	default\, verifies that the table exists and has the specified
 	 * 	schema.}
-	 * @config{index,,Named index on a set of columns. Name and
-	 * 	comma-separated list of the form
-	 * 	<code>name(column[\,...])</code>.  Multiple indices can be
-	 * 	specified by repeating the \c "index" key in the configuration
-	 * 	string.}
+	 * @config{index.\<name\>,,Named index on a list of columns.
+	 * 	Comma-separated list of the form <code>(column[\,...])</code>.}
 	 * @config{key_format,,The format of the data packed into key items.
 	 * 	See ::wiredtiger_struct_pack for details.  If not set\, a
 	 * 	default value of \c "u" is assumed\, and applications use the
@@ -627,7 +622,7 @@ struct WT_CONNECTION {
 	int __F(add_collator)(WT_CONNECTION *connection,
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
-	/*! Add a custom extractor for index keys or column sets.
+	/*! Add a custom extractor for index keys or column groups.
 	 *
 	 * @dontinclude ex_all.c
 	 *
@@ -743,6 +738,20 @@ int wiredtiger_open(const char *home,
  */
 const char *wiredtiger_strerror(int err);
 
+/*!
+ * The interface implemented by applications in order to handle errors.
+ */
+struct WT_ERROR_HANDLER {
+	/*! Callback to handle errors within the session. */
+	int (*handle_error)(WT_ERROR_HANDLER *handler,
+	    int err, const char *errmsg);
+
+	/*! Optional callback to retrieve buffered messages. */
+	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);
+
+	/*! Optional callback to clear buffered messages. */
+	int (*clear_messages)(WT_ERROR_HANDLER *handler);
+};
 /*! Pack a structure into a buffer.
  *
  * Uses format strings mostly as specified in the Python struct module:

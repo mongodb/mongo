@@ -68,14 +68,14 @@ int main()
 	    "key_format=r,"
 	    "value_format=SSS,"
 	    "columns=(id,name,address,phone),"
-	    "column_set=cust_address(address),"
-	    "index=cust_phone(phone)");
+	    "colgroup.cust_address=(address),"
+	    "index.cust_phone=(phone)");
 
 	ret = session->create_table(session, "calls",
 	    "key_format=r,"
 	    "value_format=qrrSS,"
 	    "columns=(id,call_date,cust_id,emp_id,call_type,notes),"
-	    "index=call_cust_date(cust_id,call_date)");
+	    "index.calls_cust_date=(cust_id,call_date)");
 
 	/* Omitted: populate the tables with some data. */
 
@@ -92,7 +92,8 @@ int main()
 	 * Specify the columns we want: the customer ID and the name.  This
 	 * means the cursor's value format will be "rS".
 	 */
-	ret = session->open_cursor(session, "index:cust_phone(id,name)",
+	ret = session->open_cursor(session,
+	    "index:cust_phone(id,name)",
 	    NULL, NULL, &cursor);
 	cursor->set_key(cursor, "212-555-1000");
 	ret = cursor->search(cursor);
@@ -114,7 +115,7 @@ int main()
 	 * getting 3 records.
 	 */
 	ret = session->open_cursor(session,
-	    "index:call_cust_date(cust_id,call_type,notes)",
+	    "index:calls_cust_date(cust_id,call_type,notes)",
 	    NULL, NULL, &cursor);
 
 	/*

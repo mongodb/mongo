@@ -14,23 +14,23 @@ from wiredtiger.util import parse_config
 from bsddb3 import db
 
 class Table:
-    def __init__(self, db, name, key_format='u', value_format='u', columns=(,), column_sets=(,), indices=(,)):
+    def __init__(self, db, name, key_format='u', value_format='u', columns=(,), colgroups=(,), indices=(,)):
         self.db = db
         self.name = name
         self.key_format = key_format
         self.value_format = value_format
         self.columns = columns
-        self.column_sets = column_sets
+        self.colgroups = colgroups
         self.indices = indices
 
     def close(self):
         self.db.close(db.DB_NOSYNC)
 
-    def check_schema(self, key_format='u', value_format='u', columns=(,), column_sets=(,), indices=(,)):
+    def check_schema(self, key_format='u', value_format='u', columns=(,), colgroups=(,), indices=(,)):
         if (self.key_format != key_format or
           self.value_format != value_format or
           self.columns != columns or
-          self.column_sets != column_sets or
+          self.colgroups != colgroups or
           self.indices != indices):
             raise 'Schemas don\'t match for table "' + self.name + '"'
 
@@ -126,10 +126,10 @@ class Session:
         for k, v in parse_config(config):
             if k in ('key_format', 'value_format', 'columns'):
                 schema[k] = v
-            elif k == 'column_set':
-                schema['column_sets'] = schema.get('column_sets', (,)) + (v,)
-            elif k == 'index':
-                schema['indices'] = schema.get('indices', (,)) + (v,)
+            elif k.startswith('colgroup'):
+                schema['colgroup'] = schema.get('colgroup', (,)) + (k[len('colgroup')+1:], v)
+            elif k.startswith('index'):
+                schema['indices'] = schema.get('indices', (,)) + (k[len('index')+1:], v)
             else:
                 raise 'Unknown configuration "' + k + '"'
         if name in self.tables:
@@ -185,7 +185,7 @@ class Connection:
 
         # The schema of the schema table.
         self.schematab = Table(schemadb, key_format='S', value_format='SSSSS',
-            columns=('name', 'key_format', 'value_format', 'column_sets', 'indices'))
+            columns=('name', 'key_format', 'value_format', 'colgroups', 'indices'))
 
     def close(self, config=''):
         # Work on a copy of the list because Session.close removes itself

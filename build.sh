@@ -10,6 +10,7 @@ mkdir -p $BUILD
 
 # Core API
 gcc -Iinclude -c src/api/api.c -o $BUILD/api.o
+gcc -Iinclude -c src/api/config.c -o $BUILD/config.o
 gcc -Iinclude -c src/api/cur_std.c -o $BUILD/cur_std.o
 gcc -Iinclude -c src/api/pack.c -o $BUILD/pack.o
 g++ -Iinclude -I$DB_HOME -c src/bdb/bdb.cpp -o $BUILD/bdb.o

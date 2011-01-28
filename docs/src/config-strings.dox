@@ -24,6 +24,32 @@ Superfluous commas and whitespace in the configuration string are ignored (inclu
 
 Keys are processed in order from left to right, with later settings overriding earlier ones unless multiple settings for a key are permitted.
 
+@section config_json JSON compatibility
+
+The parser for configuration strings will accept additional formatting as follows:
+
+- parentheses may be round or square brackets or curly braces: '()', '[]' or '{}'
+- the whole configuration string may optionally be wrapped in parentheses
+- the key/value separator can be a colon: ':'
+- keys and values may be in double quotes: '"'
+- quoted strings are interpreted as UTF-8 values
+
+The result of this relaxed parsing is that applications may pass strings representing valid <a href="http://json.org/">JSON objects</a> wherever configuration strings are required.
+
+For example, in Python, code might look as follows:
+
+\code
+  import json
+  config = json.dumps({
+      "key_format" : "r",
+      "value_format" : "5sHQ",
+      "columns" : ("id", "country", "year", "population"),
+      "colgroup.population" : ["population"],
+      "index.country_year" : ["country", "year"]
+  })
+\endcode
+
+
 @section config_examples Code Samples
 
 The code below is taken from the complete example program @ex_ref{ex_config.c}.
@@ -39,7 +65,8 @@ Open a connection to a database, creating it if it does not exist and set a cach
 
 Create a table that uses C language strings for keys and values:
 
-@skipline create_table
+@skip create_table
+@until ;
 
 Assign a priority to a transaction and give it a name for debugging:
 
