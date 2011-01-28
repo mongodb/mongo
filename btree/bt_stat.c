@@ -16,104 +16,6 @@ static int __wt_bt_stat_page_dup_leaf(WT_TOC *, WT_PAGE *);
 static int __wt_bt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
 
 /*
- * __wt_bt_tree_walk --
- *	Depth-first recursive walk of a btree, calling a worker function on
- *	each page.
- */
-int
-__wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
-    int offdup, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
-{
-	IDB *idb;
-	WT_COL *cip;
-	WT_OFF *off;
-	WT_PAGE *page;
-	WT_ROW *rip;
-	uint32_t i;
-	int ret;
-
-	idb = toc->db->idb;
-
-	/*
-	 * A NULL WT_REF means to start at the top of the tree -- it's just
-	 * a convenience.
-	 */
-	page = ref == NULL ? idb->root_page.page : ref->page;
-
-	/*
-	 * Walk any internal pages, descending through any off-page references.
-	 *
-	 * Descending into row-store off-page duplicate trees is optional for
-	 * two reasons. (1) it may be faster to call this function recursively
-	 * from the worker function, which is already walking the page, and (2)
-	 * information for off-page dup trees is split (the key is on the
-	 * row-leaf page, and the data is obviously in the off-page dup tree):
-	 * we need the key when we dump the data, and that would be a hard
-	 * special case in this code.  Functions where it's possible and no
-	 * slower to walk off-page dup trees here can request it be done here.
-	 */
-	switch (page->hdr->type) {
-	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, cip, i) {
-			/* cip references the subtree containing the record */
-			ref = WT_COL_REF(page, cip);
-			off = WT_COL_OFF(cip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
-			ret = __wt_bt_tree_walk(toc, ref, offdup, work, arg);
-			__wt_hazard_clear(toc, ref->page);
-			if (ret != 0)
-				return (ret);
-		}
-		break;
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(page, rip, i) {
-			/* rip references the subtree containing the record */
-			ref = WT_ROW_REF(page, rip);
-			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
-			ret = __wt_bt_tree_walk(toc, ref, offdup, work, arg);
-			__wt_hazard_clear(toc, ref->page);
-			if (ret != 0)
-				return (ret);
-		}
-		break;
-	case WT_PAGE_ROW_LEAF:
-		if (!offdup)
-			break;
-		WT_INDX_FOREACH(page, rip, i) {
-			if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF)
-				break;
-
-			/*
-			 * Recursively call the tree-walk function for the
-			 * off-page duplicate tree.
-			 */
-			ref = WT_ROW_REF(page, rip);
-			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
-			ret = __wt_bt_tree_walk(toc, ref, offdup, work, arg);
-			__wt_hazard_clear(toc, ref->page);
-			if (ret != 0)
-				return (ret);
-		}
-		break;
-	default:
-		break;
-	}
-
-	/*
-	 * Don't call the worker function for any page until all of its children
-	 * have been visited.   This allows the walker function to be used for
-	 * the sync method, where reconciling a modified child page modifies the
-	 * parent.
-	 */
-	WT_RET(work(toc, page, arg));
-
-	return (0);
-}
-
-/*
  * __wt_bt_stat_page --
  *	Stat any Btree page.
  */
@@ -399,8 +301,11 @@ __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			break;
 		case WT_ITEM_OFF:
 			/*
-			 * Recursively call the tree-walk function for the
-			 * off-page duplicate tree.
+			 * Recursively call the tree-walk code for any off-page
+			 * duplicate trees.  (Check for any off-page duplicate
+			 * trees locally because we already have to walk the
+			 * page, so it's faster than walking the page both here
+			 * and in the tree-walk function.)
 			 */
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
@@ -426,7 +331,7 @@ __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 		 * check it, and I'm not willing to spend the additional pointer
 		 * in the WT_ROW structure.
 		 */
-		if (WT_KEY_PROCESS(rip))
+		if (__wt_key_process(rip))
 			switch (WT_ITEM_TYPE(rip->key)) {
 			case WT_ITEM_KEY_OVFL:
 				WT_STAT_INCR(stats, ITEM_KEY_OVFL);
