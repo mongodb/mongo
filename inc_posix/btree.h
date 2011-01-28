@@ -132,8 +132,8 @@ struct __wt_page {
 	 * need something bigger, but the page-size configuration code limits
 	 * page sizes already.
 	 */
-	uint32_t addr;			/* Page's file allocation address */
-	uint32_t size;			/* Page size */
+	uint32_t addr;			/* Original file allocation address */
+	uint32_t size;			/* Size in bytes */
 
 	uint64_t records;		/* Records in this subtree */
 
@@ -147,8 +147,8 @@ struct __wt_page {
 	 *
 	 * The read generation is incremented each time the page is searched,
 	 * and acts as an LRU value for each page in the tree; it is read by
-	 * the memory drain server thread to select pages to be discarded from
-	 * the in-memory tree.
+	 * the eviction server thread to select pages to be discarded from the
+	 * in-memory tree.
 	 *
 	 * The write generation is incremented after the workQ modifies a page
 	 * that is, it tracks page versions.
@@ -265,6 +265,7 @@ struct __wt_page {
 	 */
 	union {
 		WT_REF	 *ref;		/* Internal page references */
+#define	WT_PAGE_DUP_TREES(p)		((p)->u3.dup != NULL)
 		WT_REF	**dup;		/* Row-store off-page duplicate trees */
 	} u3;
 
@@ -322,7 +323,7 @@ struct __wt_page {
  * There may be many threads traversing these entries; they fall into three
  * classes: (1) application threads walking through the tree searching database
  * database pages or calling a method like Db.sync; (2) a server thread reading
- * a new page into the tree from disk; (3) a server thread draining a page from
+ * a new page into the tree from disk; (3) a server thread evicting a page from
  * the tree to disk.
  *
  * Synchronization is based on the WT_REF->state field:
@@ -331,13 +332,13 @@ struct __wt_page {
  *	set to WT_OK, they set a hazard reference to the page, flush memory and
  *	re-confirm the state of the page.  If the page is still WT_OK, they have
  *	a valid reference and can proceed.
- * WT_DRAIN:
- *	The drain server selected this page and is checking hazard references.
- *	 When the drain server wants to discard a page from the tree, it sets
- *	the state to WT_DRAIN, flushes memory, then checks hazard references.
- *	If the drain server finds a hazard reference, it resets the state field
- *	to WT_OK, restoring the page to the readers.  If the drain server does
- *	not find a hazard reference, the page is safe to discard.
+ * WT_EVICT:
+ *	The eviction server chose this page and is checking hazard references.
+ *	When the eviction server wants to discard a page from the tree, it sets
+ *	state to WT_EVICT, flushes memory, then checks hazard references.  If
+ *	the eviction server finds a hazard reference, it resets the state to
+ *	WT_OK, restoring the page to the readers.  If the eviction server does
+ *	not find a hazard reference, the page is evicted.
  * WT_EMPTY:
  *      There is no page, and the only way to proceed is for the reader thread
  *	to set the page reference and change the state to WT_OK.
@@ -346,8 +347,8 @@ struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
 
 #define	WT_OK		0		/* Reference valid */
-#define	WT_DRAIN	1		/* Selected for draining */
-#define	WT_EMPTY	2		/* Not set */
+#define	WT_EMPTY	1		/* Not set */
+#define	WT_EVICT	2		/* Selected for eviction */
 	uint32_t volatile state;
 };
 
@@ -481,16 +482,6 @@ struct __wt_row {
 	 * Huffman encoded key), the key field points to the on-page key,
 	 * but the size is set to 0 to indicate the key is not yet processed.
 	 */
-#define	WT_KEY_PROCESS(ip)						\
-	((ip)->size == 0)
-#define	WT_KEY_SET(ip, _key, _size) do {				\
-	(ip)->key = (_key);						\
-	(ip)->size = _size;						\
-} while (0)
-#define	WT_KEY_SET_PROCESS(ip, _key) do {				\
-	(ip)->key = (_key);						\
-	(ip)->size = 0;							\
-} while (0)
 	void	 *key;			/* Key */
 	uint32_t size;			/* Key length */
 
@@ -567,14 +558,6 @@ struct __wt_rcc_expand {
 	(((ip) > (page)->u.irow && (ip)->key == ((ip) - 1)->key) ? 1 : 0)
 
 /*
- * WT_ROW_KEY_ON_PAGE --
- * Macro returns if a WT_ROW structure's key references on-page data.
- */
-#define	WT_ROW_KEY_ON_PAGE(page, rip)					\
-	((uint8_t *)(rip)->key >= (uint8_t *)(page)->hdr &&		\
-	    (uint8_t *)(rip)->key < (uint8_t *)(page)->hdr + (page)->size)
-
-/*
  * WT_REPL_FOREACH --
  * Macro to walk the replacement array of an in-memory page.
  */
@@ -592,12 +575,20 @@ struct __wt_rcc_expand {
 	    (exp) = (page)->u2.rccexp; (i) > 0; ++(exp), --(i))
 
 /*
- * WT_DUP_FOREACH --
- * Macro to walk the off-page duplicate array of an in-memory page.
+ * WT_REF_FOREACH --
+ * Macro to walk the off-page subtree array of an in-memory internal page.
  */
-#define	WT_DUP_FOREACH(page, refp, i)					\
+#define	WT_REF_FOREACH(page, ref, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (refp) = (page)->u3.dup; (i) > 0; ++(refp), --(i))
+	    (ref) = (page)->u3.ref; (i) > 0; ++(ref), --(i))
+
+/*
+ * WT_DUP_FOREACH --
+ * Macro to walk the off-page duplicate array of an in-memory row-store page.
+ */
+#define	WT_DUP_FOREACH(page, dupp, i)					\
+	for ((i) = (page)->indx_count,					\
+	    (dupp) = (page)->u3.dup; (i) > 0; ++(dupp), --(i))
 
 /*
  * On both row- and column-store internal pages, the on-page data referenced
