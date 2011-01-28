@@ -209,7 +209,6 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DBT *tmp;
 	WT_COL *cip;
 	WT_ITEM *item;
-	WT_PAGE *ovfl;
 	WT_REPL *repl;
 	uint32_t i;
 	int ret;
@@ -219,7 +218,7 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	huffman = db->idb->huffman_data;
 	ret = 0;
 
-	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
+	WT_RET(__wt_scr_alloc(toc, 0, &tmp));
 	WT_INDX_FOREACH(page, cip, i) {
 		/* Check for replace or deletion. */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
@@ -240,14 +239,8 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
-			if (ovfl == NULL)
-				dp->p(tmp->data, tmp->size, dp->stream);
-			else {
-				dp->p(WT_PAGE_BYTE(ovfl),
-				    ovfl->hdr->u.datalen, dp->stream);
-				__wt_bt_page_out(toc, &ovfl, 0);
-			}
+			WT_ERR(__wt_bt_item_process(toc, item, tmp));
+			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		case WT_ITEM_DEL:
 			break;
@@ -269,7 +262,6 @@ __wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	DBT *dupkey, *tmp;
 	WT_ITEM *item;
-	WT_PAGE *ovfl;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i;
@@ -308,14 +300,8 @@ __wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_DUP_OVFL:
-			WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
-			if (ovfl == NULL)
-				dp->p(tmp->data, tmp->size, dp->stream);
-			else {
-				dp->p(WT_PAGE_BYTE(ovfl),
-				    ovfl->hdr->u.datalen, dp->stream);
-				__wt_bt_page_out(toc, &ovfl, 0);
-			}
+			WT_ERR(__wt_bt_item_process(toc, item, tmp));
+			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}
@@ -334,7 +320,6 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
-	WT_PAGE *key_ovfl, *data_ovfl;
 	WT_ITEM *item;
 	WT_OFF *off;
 	WT_REF *ref;
@@ -346,7 +331,6 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	db = toc->db;
 	key = data = key_tmp = data_tmp = NULL;
-	key_ovfl = data_ovfl = NULL;
 	huffman = db->idb->huffman_data;
 	ret = 0;
 
@@ -365,19 +349,9 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * The key and data variables reference the DBT's we'll print.
 		 * Set the key.
 		 */
-		if (WT_KEY_PROCESS(rip)) {
-			/* Discard any previously held key overflow page. */
-			if (key_ovfl != NULL)
-				__wt_bt_page_out(toc, &key_ovfl, 0);
-			WT_ERR(__wt_bt_item_process(
-			    toc, rip->key, &key_ovfl, key_tmp));
-			if (key_ovfl == NULL)
-				key = key_tmp;
-			else {
-				key_local.data = WT_PAGE_BYTE(key_ovfl);
-				key_local.size = key_ovfl->hdr->u.datalen;
-				key = &key_local;
-			}
+		if (__wt_key_process(rip)) {
+			WT_ERR(__wt_bt_item_process(toc, rip->key, key_tmp));
+			key = key_tmp;
 		} else
 			key = (DBT *)rip;
 
@@ -410,23 +384,16 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-			/* Discard any previously held data overflow page. */
-			if (data_ovfl != NULL)
-				__wt_bt_page_out(toc, &data_ovfl, 0);
-			WT_ERR(__wt_bt_item_process(
-			    toc, item, &data_ovfl, data_tmp));
-			if (data_ovfl == NULL)
-				data = data_tmp;
-			else {
-				data_local.data = WT_PAGE_BYTE(data_ovfl);
-				data_local.size = data_ovfl->hdr->u.datalen;
-				data = &data_local;
-			}
+			WT_ERR(__wt_bt_item_process(toc, item, data_tmp));
+			data = data_tmp;
 			break;
 		case WT_ITEM_OFF:
 			/*
-			 * Set the key for the walk off the off-page duplicate
-			 * tree.
+			 * Set the key and recursively call the tree-walk code
+			 * for any off-page duplicate trees.  (Check for any
+			 * off-page duplicate trees locally because we already
+			 * have to walk the page, so it's faster than walking
+			 * the page both here and in the tree-walk function.)
 			 */
 			dp->dupkey = key;
 
@@ -451,12 +418,6 @@ err:	/* Discard any space allocated to hold off-page key/data items. */
 		__wt_scr_release(&key_tmp);
 	if (data_tmp != NULL)
 		__wt_scr_release(&data_tmp);
-
-	/* Discard any overflow pages we're still holding. */
-	if (key_ovfl != NULL)
-		__wt_bt_page_out(toc, &key_ovfl, 0);
-	if (data_ovfl != NULL)
-		__wt_bt_page_out(toc, &data_ovfl, 0);
 
 	return (ret);
 }
