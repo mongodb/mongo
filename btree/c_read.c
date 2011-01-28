@@ -25,7 +25,7 @@ __wt_workq_read_server(ENV *env, int force)
 
 	/*
 	 * If we're 10% over the maximum cache, shut out reads (which include
-	 * page allocations) until we drain to at least 5% under the maximum
+	 * page allocations) until we evict to at least 5% under the maximum
 	 * cache.  The idea is that we don't want to run on the edge all the
 	 * time -- if we're seriously out of space, get things under control
 	 * before opening up for more reads.
@@ -36,7 +36,7 @@ __wt_workq_read_server(ENV *env, int force)
 		if (bytes_inuse <= bytes_max - (bytes_max / 20))
 			cache->read_lockout = 0;
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
-		WT_VERBOSE(env, WT_VERB_SERVERS, (env,
+		WT_VERBOSE(env, WT_VERB_READ, (env,
 		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
 		    (unsigned long long)bytes_inuse,
 		    (unsigned long long)bytes_max));
@@ -114,11 +114,11 @@ __wt_cache_read_server(void *arg)
 
 	for (;;) {
 		WT_VERBOSE(env,
-		    WT_VERB_SERVERS, (env, "cache read server sleeping"));
+		    WT_VERB_READ, (env, "cache read server sleeping"));
 		cache->read_sleeping = 1;
 		__wt_lock(env, cache->mtx_read);
 		WT_VERBOSE(
-		    env, WT_VERB_SERVERS, (env, "cache read server waking"));
+		    env, WT_VERB_READ, (env, "cache read server waking"));
 
 		/*
 		 * Check for environment exit; do it here, instead of the top of
@@ -130,7 +130,7 @@ __wt_cache_read_server(void *arg)
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
-		 * a valid WT_TOC handle.  If we find a read request, perform
+		 * a valid WT_TOC handle).  If we find a read request, perform
 		 * it, flush the result and clear the request slot, then wake
 		 * up the requesting thread.  The request slot clear doesn't
 		 * need to be flushed, but we have to flush the read result,
@@ -175,7 +175,7 @@ __wt_cache_read_server(void *arg)
 	if (ret != 0)
 err:		__wt_api_env_err(env, ret, "cache read server error");
 
-	WT_VERBOSE(env, WT_VERB_SERVERS, (env, "cache read server exiting"));
+	WT_VERBOSE(env, WT_VERB_READ, (env, "cache read server exiting"));
 	return (NULL);
 }
 
@@ -230,7 +230,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->hdr));
 
 	/* Read the page. */
-	WT_VERBOSE(env, WT_VERB_CACHE,
+	WT_VERBOSE(env, WT_VERB_READ,
 	    (env, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
 	WT_STAT_INCR(cache->stats, PAGE_READ);
 
