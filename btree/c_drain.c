@@ -533,11 +533,20 @@ __wt_evict_state_check(WT_TOC *toc)
 		}
 
 		/* Ignore pages with in-memory subtrees. */
-		if (__wt_evict_page_subtrees(page)) {
-			WT_VERBOSE(env, WT_VERB_EVICT, (env,
-			    "eviction skipped page addr %lu (subtrees)",
-			    page->addr));
-			goto skip;
+		switch (page->hdr->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_DUP_INT:
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			if (__wt_evict_page_subtrees(page)) {
+				WT_VERBOSE(env, WT_VERB_EVICT, (env,
+				    "eviction skipped page addr %lu (subtrees)",
+				    page->addr));
+				goto skip;
+			}
+			break;
+		default:
+			break;
 		}
 
 		continue;
@@ -689,7 +698,6 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 				if (*dupp != NULL && (*dupp)->state != WT_EMPTY)
 					return (1);
 		break;
-	WT_ILLEGAL_FORMAT(db);
 	}
 
 	return (0);
