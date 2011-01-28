@@ -119,7 +119,7 @@ extern "C" {
  */
 #define	WT_PAGE_OUT(toc, p)						\
 	if ((p) != NULL && (p) != (toc)->db->idb->root_page.page)	\
-		__wt_bt_page_out(toc, &(p), 0);
+		__wt_hazard_clear(toc, p);
 
 #if defined(__cplusplus)
 }
