@@ -747,36 +747,6 @@ static int __wt_api_db_verify(
 	return (ret);
 }
 
-static int __wt_api_env_cache_drain_cnt_get(
-	ENV *env,
-	uint32_t *cache_drain_cnt);
-static int __wt_api_env_cache_drain_cnt_get(
-	ENV *env,
-	uint32_t *cache_drain_cnt)
-{
-	IENV *ienv = env->ienv;
-	__wt_lock(env, ienv->mtx);
-	WT_STAT_INCR(ienv->method_stats, ENV_CACHE_DRAIN_CNT_GET);
-	*cache_drain_cnt = env->cache_drain_cnt;
-	__wt_unlock(env, ienv->mtx);
-	return (0);
-}
-
-static int __wt_api_env_cache_drain_cnt_set(
-	ENV *env,
-	uint32_t cache_drain_cnt);
-static int __wt_api_env_cache_drain_cnt_set(
-	ENV *env,
-	uint32_t cache_drain_cnt)
-{
-	IENV *ienv = env->ienv;
-	__wt_lock(env, ienv->mtx);
-	WT_STAT_INCR(ienv->method_stats, ENV_CACHE_DRAIN_CNT_SET);
-	env->cache_drain_cnt = cache_drain_cnt;
-	__wt_unlock(env, ienv->mtx);
-	return (0);
-}
-
 static int __wt_api_env_cache_size_get(
 	ENV *env,
 	uint32_t *cache_size);
@@ -1458,7 +1428,6 @@ __wt_methods_db_open_transition(DB *db)
 void
 __wt_methods_env_config_default(ENV *env)
 {
-	env->cache_drain_cnt = 10;
 	env->cache_size = 20;
 	env->data_update_initial = 8 * 1024;
 	env->data_update_max = 32 * 1024;
@@ -1469,12 +1438,6 @@ __wt_methods_env_config_default(ENV *env)
 void
 __wt_methods_env_lockout(ENV *env)
 {
-	env->cache_drain_cnt_get = (int (*)
-	    (ENV *, uint32_t *))
-	    __wt_env_lockout;
-	env->cache_drain_cnt_set = (int (*)
-	    (ENV *, uint32_t ))
-	    __wt_env_lockout;
 	env->cache_size_get = (int (*)
 	    (ENV *, uint32_t *))
 	    __wt_env_lockout;
@@ -1570,8 +1533,6 @@ __wt_methods_env_lockout(ENV *env)
 void
 __wt_methods_env_init_transition(ENV *env)
 {
-	env->cache_drain_cnt_get = __wt_api_env_cache_drain_cnt_get;
-	env->cache_drain_cnt_set = __wt_api_env_cache_drain_cnt_set;
 	env->cache_size_get = __wt_api_env_cache_size_get;
 	env->cache_size_set = __wt_api_env_cache_size_set;
 	env->close = __wt_api_env_close;
