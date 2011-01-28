@@ -34,8 +34,10 @@ cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for th
 cache_stats['CACHE_EVICT_HAZARD'] = Stat([], 'pages selected for eviction not evicted because of a hazard reference')
 cache_stats['CACHE_EVICT_MODIFIED'] = Stat([], 'modified pages selected for eviction')
 cache_stats['CACHE_EVICT_UNMODIFIED'] = Stat([], 'unmodified pages selected for eviction')
-cache_stats['PAGE_READ'] = Stat([], 'pages read from the file')
 cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'pages in the cache')
+cache_stats['OVERFLOW_READ'] = Stat([], 'overflow pages read from the file')
+cache_stats['PAGE_READ'] = Stat([], 'pages read from a file')
+cache_stats['PAGE_WRITE'] = Stat([], 'pages written to a file')
 
 ##########################################
 # IDB handle statistics
