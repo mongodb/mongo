@@ -81,6 +81,7 @@ __wt_idb_config(DB *db)
 
 	__wt_lock(env, ienv->mtx);		/* Add to the ENV's list */
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
+	++ienv->dbqcnt;
 	__wt_unlock(env, ienv->mtx);
 
 	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
@@ -134,6 +135,8 @@ __wt_idb_destroy(DB *db)
 	/* Diagnostic check: check flags against approved list. */
 	WT_ENV_FCHK_RET(env, "Db.close", idb->flags, WT_APIMASK_IDB, ret);
 
+	__wt_free(env, idb->name, 0);
+
 	if (idb->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
 		if (idb->huffman_data == idb->huffman_key)
@@ -146,13 +149,14 @@ __wt_idb_destroy(DB *db)
 		idb->huffman_data = NULL;
 	}
 
-	/* Free any allocated memory. */
-	__wt_free(env, idb->name, 0);
+	__wt_bt_walk_end(env, &idb->evict_walk);
+
 	__wt_free(env, idb->stats, 0);
 	__wt_free(env, idb->dstats, 0);
 
 	__wt_lock(env, ienv->mtx);		/* Delete from the ENV's list */
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
+	--ienv->dbqcnt;
 	__wt_unlock(env, ienv->mtx);
 
 	__wt_free(env, idb, sizeof(IDB));
