@@ -3,8 +3,8 @@
 #
 # $Id$
 
-btree/bt_bulk.c
 btree/bt_alloc.c
+btree/bt_bulk.c
 btree/bt_close.c
 btree/bt_cmp.c
 btree/bt_debug.c
@@ -20,6 +20,7 @@ btree/bt_ret.c
 btree/bt_stat.c
 btree/bt_sync.c
 btree/bt_vrfy.c
+btree/bt_walk.c
 btree/col_get.c
 btree/col_put.c
 btree/col_srch.c
