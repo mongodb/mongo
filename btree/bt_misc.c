@@ -116,20 +116,6 @@ __wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page,
 }
 
 /*
- * __wt_bt_gen_ref_pair --
- *	Generate a clean WT_REF/WT_OFF pair.
- */
-void
-__wt_bt_gen_ref_pair(WT_REF *ref, WT_OFF *off, uint32_t addr, uint32_t size)
-{
-	WT_CLEAR(*ref);
-	ref->state = WT_EMPTY;
-	WT_CLEAR(*off);
-	off->addr = addr;
-	off->size = size;
-}
-
-/*
  * __wt_page_write_gen_check --
  *	Confirm the page's write generation number is correct.
  */

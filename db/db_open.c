@@ -61,7 +61,17 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 	idb->file_id = ++ienv->next_file_id;
 	__wt_unlock(env, ienv->mtx);
 
-	__wt_bt_gen_ref_pair(&idb->root_page, &idb->root_off, 0, 0);
+	/*
+	 * XXX
+	 * Initialize the root WT_REF/WT_OFF pair to point to the start of
+	 * the file.  This is all wrong, and we'll get the information from
+	 * somewhere else, eventually.
+	 */
+	WT_CLEAR(idb->root_page);
+	idb->root_page.state = WT_EMPTY;
+	WT_CLEAR(idb->root_off);
+	idb->root_off.addr = 0;
+	idb->root_off.size = 0;
 
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(idb, WT_RDONLY);
