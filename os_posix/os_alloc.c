@@ -276,6 +276,7 @@ __wt_mtrack(ENV *env, const void *f, const void *a, const char *file, int line)
 			} while (mp > mtrack->list);
 
 		__wt_api_env_errx(env, "mtrack: %p: not found", f);
+		__wt_attach(env);
 	}
 
 	if (a == NULL)
