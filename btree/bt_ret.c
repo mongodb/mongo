@@ -22,7 +22,7 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	IDB *idb;
 	WT_COL *cip;
 	WT_ITEM *item;
-	WT_PAGE *page, *ovfl_page;
+	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_ROW *rip;
 	WT_REPL *repl;
@@ -33,7 +33,6 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
-	ovfl_page = NULL;
 	callback = data->callback;
 	ret = 0;
 
@@ -68,9 +67,8 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	 * support).
 	 */
 	if (key_return) {
-		if (WT_KEY_PROCESS(rip)) {
-			WT_RET(__wt_bt_item_process(
-			    toc, rip->key, NULL, &toc->key));
+		if (__wt_key_process(rip)) {
+			WT_RET(__wt_bt_item_process(toc, rip->key, &toc->key));
 
 			key->data = toc->key.data;
 			key->size = toc->key.size;
@@ -132,23 +130,9 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DATA_DUP_OVFL:
-			/*
-			 * If there's a callback function, pass the item_process
-			 * function a WT_PAGE reference, that way we never copy
-			 * the data, we pass a pointer into the cache page to
-			 * the callback function.  If there's no callback, then
-			 * don't pass a WT_PAGE reference, might as well let it
-			 * do the copy for us.
-			 */
-			WT_ERR(__wt_bt_item_process(toc, item,
-			    callback == NULL ? NULL : &ovfl_page, &toc->data));
-			if (ovfl_page == NULL) {
-				data_ret = toc->data.data;
-				size_ret = toc->data.size;
-			} else {
-				data_ret = WT_PAGE_BYTE(ovfl_page);
-				size_ret = ovfl_page->hdr->u.datalen;
-			}
+			WT_RET(__wt_bt_item_process(toc, item, &toc->data));
+			data_ret = toc->data.data;
+			size_ret = toc->data.size;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -170,7 +154,7 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 		 */
 		if (data_ret != toc->data.data) {
 			if (toc->data.mem_size < size_ret)
-				WT_ERR(__wt_realloc(env,
+				WT_RET(__wt_realloc(env,
 				    &toc->data.mem_size,
 				    size_ret, &toc->data.data));
 			memcpy(toc->data.data, data_ret, size_ret);
@@ -190,13 +174,6 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 		data->size = size_ret;
 		ret = callback(db, key, data);
 	}
-
-	/*
-	 * Release any overflow page the __wt_bt_item_process function returned
-	 * us.
-	 */
-err:	if (ovfl_page != NULL)
-		__wt_bt_page_out(toc, &ovfl_page, 0);
 
 	return (ret);
 }
