@@ -673,7 +673,6 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 static int
 __wt_evict_page_subtrees(WT_PAGE *page)
 {
-	DB *db;
 	WT_REF *ref, **dupp;
 	uint32_t i;
 
