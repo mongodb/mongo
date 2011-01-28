@@ -59,7 +59,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			 * have been instantiated yet.
 			 */
 			rip = page->u.irow + indx;
-			if (WT_KEY_PROCESS(rip))
+			if (__wt_key_process(rip))
 				WT_ERR(__wt_bt_key_build(toc, page, rip));
 
 			/*
@@ -170,27 +170,27 @@ err:	WT_PAGE_OUT(toc, page);
 static int
 __wt_bt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
 {
-	DBT *dbt, local_dbt;
+	DBT *dbt, _dbt;
 	WT_ROW *rip;
 	WT_ITEM *item;
 	uint32_t i;
 
-	WT_CLEAR(local_dbt);
-	dbt = &local_dbt;
+	WT_CLEAR(_dbt);
+	dbt = &_dbt;
 
 	item = rip_arg->key;
-	WT_RET(__wt_bt_item_process(toc, item, NULL, dbt));
+	WT_RET(__wt_bt_item_process(toc, item, dbt));
 
 	/*
 	 * Update the WT_ROW reference with the processed key.  If there are
 	 * any duplicates of this item, update them as well.
 	 */
-	WT_KEY_SET(rip_arg, dbt->data, dbt->size);
+	__wt_key_set(rip_arg, dbt->data, dbt->size);
 	if (WT_ITEM_TYPE(rip_arg->data) == WT_ITEM_DATA_DUP ||
 	    WT_ITEM_TYPE(rip_arg->data) == WT_ITEM_DATA_DUP_OVFL) {
 		WT_INDX_FOREACH(page, rip, i)
 			if (rip->key == item)
-				WT_KEY_SET(rip, dbt->data, dbt->size);
+				__wt_key_set(rip, dbt->data, dbt->size);
 	}
 
 	return (0);
