@@ -67,19 +67,6 @@ methods['wt_toc.close'] = Api(
 ###################################################
 # ENV method declarations
 ###################################################
-methods['env.cache_drain_cnt_get'] = Api(
-	'env.cache_drain_cnt_get',
-	'method, getter',
-	['cache_drain_cnt/uint32_t *@S'],
-	[],
-	['init'], [])
-methods['env.cache_drain_cnt_set'] = Api(
-	'env.cache_drain_cnt_set',
-	'method, setter',
-	['cache_drain_cnt/uint32_t @S/10'],
-	[],
-	['init'], [])
-
 methods['env.cache_size_get'] = Api(
 	'env.cache_size_get',
 	'method, getter',
@@ -292,10 +279,11 @@ methods['env.verbose_set'] = Api(
 	['verbose/uint32_t @S'],
 	['VERB_ALL',
 	 'VERB_CACHE',
+	 'VERB_EVICT',
+	 'VERB_FILEOPS',
 	 'VERB_HAZARD',
 	 'VERB_MUTEX',
-	 'VERB_FILEOPS',
-	 'VERB_SERVERS'],
+	 'VERB_READ'],
 	['init'], [])
 
 ###################################################
@@ -604,6 +592,9 @@ flags['bt_search_col'] = [
 	'DATA_OVERWRITE' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
+flags['bt_tree_walk'] = [
+	'WALK_CACHE',
+	'WALK_OFFDUP' ]
 
 ###################################################
 # Structure flag declarations
@@ -622,5 +613,5 @@ flags['ienv'] = [
 flags['wt_page'] = [
 	'PINNED' ]
 flags['wt_toc'] = [
-	'READ_DRAIN',
+	'READ_EVICT',
 	'READ_PRIORITY' ]
