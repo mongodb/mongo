@@ -22,6 +22,7 @@ static void __wt_bt_debug_off(WT_OFF *, const char *, FILE *);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_rcc(DB *, WT_PAGE *, FILE *);
+static void __wt_bt_debug_page_hdr(WT_TOC *, WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_bt_debug_pair(const char *, void *, uint32_t, FILE *);
 static void __wt_bt_debug_rccexp(WT_RCC_EXPAND *, FILE *);
@@ -85,20 +86,24 @@ int
 __wt_bt_debug_addr(
     WT_TOC *toc, uint32_t addr, uint32_t size, char *ofile, FILE *fp)
 {
-	WT_OFF off;
-	WT_REF ref;
+	DB *db;
+	DBT *tmp;
+	WT_PAGE *page, _page;
 	int ret;
 
-	/*
-	 * Addr/size were set by our caller, via the debugger.  Getting a page
-	 * requires a WT_REF/WT_OFF pair; we're not in the tree, fake it.
-	 */
-	__wt_bt_gen_ref_pair(&ref, &off, addr, size);
+	db = toc->db;
+	WT_RET(__wt_scr_alloc(toc, size, &tmp));
 
-	/* Retrieve the page, dump the information, and discard the page. */
-	WT_RET(__wt_bt_page_in(toc, &ref, &off, 0));
-	ret = __wt_bt_debug_page(toc, ref.page, ofile, fp);
-	__wt_bt_page_out(toc, &ref.page, WT_DISCARD);
+	WT_CLEAR(_page);
+	page = &_page;
+	page->addr = addr;
+	page->size = tmp->size = size;
+	page->hdr = tmp->data;
+	WT_ERR(__wt_page_read(db, page));
+
+	ret = __wt_bt_debug_page(toc, page, ofile, fp);
+
+err:	__wt_scr_release(&tmp);
 
 	return (ret);
 }
@@ -120,11 +125,7 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
 
-	fprintf(fp,
-	    "addr: %lu-%lu {\n\t%s: size %lu\n",
-	    (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
-  	    __wt_bt_hdr_type(hdr), (u_long)page->size);
+	__wt_bt_debug_page_hdr(toc, page, fp);
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_VAR:
@@ -192,8 +193,7 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
 
-	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1));
+	__wt_bt_debug_page_hdr(toc, page, fp);
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
 	switch (page->hdr->type) {
@@ -347,7 +347,7 @@ __wt_bt_debug_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_INDX_FOREACH(page, rip, i) {
-		if (WT_KEY_PROCESS(rip))
+		if (__wt_key_process(rip))
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
 			__wt_bt_debug_dbt("\tkey", rip, fp);
@@ -377,7 +377,7 @@ __wt_bt_debug_inmem_row_int(WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_INDX_FOREACH(page, rip, i) {
-		if (WT_KEY_PROCESS(rip))
+		if (__wt_key_process(rip))
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
 			__wt_bt_debug_dbt("\tkey", rip, fp);
@@ -565,7 +565,6 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	DB *db;
 	DBT *tmp;
 	IDB *idb;
-	WT_PAGE *ovfl;
 	uint32_t size;
 	uint8_t *p;
 	int ret;
@@ -574,7 +573,6 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		fp = stderr;
 
 	db = toc->db;
-	ovfl = NULL;
 	tmp = NULL;
 	idb = db->idb;
 	ret = 0;
@@ -597,14 +595,9 @@ onpage:		p = WT_ITEM_BYTE(item);
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
 process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
-		WT_ERR(__wt_bt_item_process(toc, item, &ovfl, tmp));
-		if (ovfl == NULL) {
-			p = tmp->data;
-			size = tmp->size;
-		} else {
-			p = WT_PAGE_BYTE(ovfl);
-			size = ovfl->hdr->u.datalen;
-		}
+		WT_ERR(__wt_bt_item_process(toc, item, tmp));
+		p = tmp->data;
+		size = tmp->size;
 		break;
 	case WT_ITEM_DEL:
 		p = (uint8_t *)"deleted";
@@ -619,9 +612,7 @@ process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 
 	__wt_bt_print(p, size, fp);
 
-err:	if (ovfl != NULL)
-		__wt_bt_page_out(toc, &ovfl, 0);
-	if (tmp != NULL)
+err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 	return (ret);
 }
@@ -678,3 +669,22 @@ __wt_bt_debug_pair(const char *tag, void *data, uint32_t size, FILE *fp)
 	fprintf(fp, "}\n");
 }
 #endif
+
+/*
+ * __wt_bt_debug_page_hdr --
+ *	Standard debug page-header output.
+ */
+static void
+__wt_bt_debug_page_hdr(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+{
+	DB *db;
+
+	db = toc->db;
+
+	fprintf(fp,
+	    "addr: %lu-%lu {\n\t%s: size %lu\n",
+	    (u_long)page->addr,
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
+  	    __wt_bt_hdr_type(page->hdr), (u_long)page->size);
+
+}
