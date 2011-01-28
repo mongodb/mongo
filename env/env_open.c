@@ -43,7 +43,7 @@ __wt_env_open(ENV *env, const char *home, mode_t mode)
 	WT_MEMORY_FLUSH;
 
 	WT_ERR(__wt_thread_create(
-	    &ienv->cache_drain_tid, __wt_cache_drain_server, env));
+	    &ienv->cache_evict_tid, __wt_cache_evict_server, env));
 	WT_ERR(__wt_thread_create(
 	    &ienv->cache_read_tid, __wt_cache_read_server, env));
 	WT_ERR(__wt_thread_create(&ienv->workq_tid, __wt_workq_srvr, env));
@@ -99,11 +99,11 @@ __wt_env_close(ENV *env)
 
 	/*
 	 * Force the cache server threads to run and wait for them to exit.
-	 * Wait for the cache drain server first, it potentially schedules work
-	 * for the read thread.
+	 * Wait for the cache eviction server first, it potentially schedules
+	 * work for the read thread.
 	 */
-	__wt_workq_drain_server(env, 1);
-	__wt_thread_join(ienv->cache_drain_tid);
+	__wt_workq_evict_server(env, 1);
+	__wt_thread_join(ienv->cache_evict_tid);
 	__wt_workq_read_server(env, 1);
 	__wt_thread_join(ienv->cache_read_tid);
 
