@@ -164,12 +164,37 @@ namespace mongo {
 
             _hash( embed ).append( b , "" );
 
-            for ( size_t i=0; i<_other.size(); i++ ) {
-                BSONElement e = obj.getFieldDotted(_other[i]);
-                if ( e.eoo() )
-                    e = _spec->missingField();
-                b.appendAs( e , "" );
-            }
+            // Go through all the other index keys
+            for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ){
+
+            	// Get *all* fields for the index key
+				BSONElementSet eSet;
+				obj.getFieldsDotted( *i, eSet );
+
+
+				if ( eSet.size() == 0 )
+					b.appendAs( _spec->missingField(), "" );
+				else if ( eSet.size() == 1 )
+					b.appendAs( *(eSet.begin()), "" );
+				else{
+
+					// If we have more than one key, store as an array of the objects
+					// TODO:  Store multiple keys?
+
+					BSONArrayBuilder aBuilder;
+
+					for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ){
+						aBuilder.append( *ei );
+					}
+
+					BSONArray arr = aBuilder.arr();
+
+					b.append( "", arr );
+
+				}
+
+			}
+
             keys.insert( b.obj() );
         }
 
@@ -276,6 +301,9 @@ namespace mongo {
                 }
             }
             case Array:
+            	// Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
+            	// additional criteria
+            	if ( query.nFields() > 1 ) return USELESS;
                 return HELPFUL;
             default:
                 return USELESS;

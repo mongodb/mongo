@@ -22,5 +22,5 @@ t.insert({ "uid" : 355844 , "loc" : { "x" : 34 , "y" : -4} ,"categories" : [ "sp
 assert.eq( 10 , t.find({ "loc" : { "$within" : { "$center" : [ { "x" : 0 ,"y" : 0} , 50]}} } ).itcount() , "A" );
 assert.eq( 6 , t.find({ "loc" : { "$within" : { "$center" : [ { "x" : 0 ,"y" : 0} , 50]}}, "categories" : "sports" } ).itcount() , "B" );
 
-// FIXME: FAILS : When not a $near or $within query, geo code not activated, and so geoindex with array keys misinterpreted
-//assert.eq( 1 , t.find({ "loc" : { "x" : -36, "y" : -8}, "categories" : "sports" }).itcount(), "C" )
+// When not a $near or $within query, geo index should not be used.  Fails if geo index is used.
+assert.eq( 1 , t.find({ "loc" : { "x" : -36, "y" : -8}, "categories" : "sports" }).itcount(), "C" )
