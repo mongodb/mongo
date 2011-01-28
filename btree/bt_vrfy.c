@@ -296,8 +296,7 @@ __wt_bt_verify_tree(
 			ref = WT_COL_REF(page, cip);
 			off = WT_COL_OFF(cip);
 			records = WT_COL_OFF_RECORDS(cip);
-			if (ref->state != WT_OK || !__wt_hazard_set(toc, ref))
-				WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
+			WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
 			ret = __wt_bt_verify_tree(toc, NULL,
 			    records, start_recno, level - 1, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
@@ -351,8 +350,7 @@ __wt_bt_verify_tree(
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
 			records = WT_ROW_OFF_RECORDS(rip);
-			if (ref->state != WT_OK || !__wt_hazard_set(toc, ref))
-				WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
+			WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
 			ret = __wt_bt_verify_tree(toc, rip,
 			    records, (uint64_t)0, level - 1, ref, vs);
 
@@ -387,8 +385,7 @@ __wt_bt_verify_tree(
 			ref = WT_ROW_DUP(page, rip);
 			off = WT_ROW_OFF(rip);
 			records = WT_ROW_OFF_RECORDS(rip);
-			if (ref->state != WT_OK || !__wt_hazard_set(toc, ref))
-				WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
+			WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
 			ret = __wt_bt_verify_tree(toc, NULL,
 			    records, (uint64_t)0, WT_NOLEVEL, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
@@ -413,8 +410,10 @@ __wt_bt_verify_tree(
 	 * there aren't any internal pages after it.  So, we get here with
 	 * vs->leaf needing to be released.
 	 */
-err:	if (vs->leaf != NULL)
-		__wt_bt_page_out(toc, &vs->leaf, 0);
+err:	if (vs->leaf != NULL) {
+		__wt_hazard_clear(toc, vs->leaf);
+		vs->leaf = NULL;
+	}
 
 	return (ret);
 }
@@ -428,14 +427,12 @@ __wt_bt_verify_pc(
     WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
-	DBT *cd_ref, *pd_ref, *scratch1, *scratch2, tmp1, tmp2;
-	WT_PAGE *child_ovfl_page, *parent_ovfl_page;
+	DBT *cd_ref, *pd_ref, *scratch1, *scratch2;
 	WT_ROW *child_rip;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
 	scratch1 = scratch2 = NULL;
-	child_ovfl_page = parent_ovfl_page = NULL;
 	ret = 0;
 
 	/* Set the comparison function. */
@@ -458,30 +455,16 @@ __wt_bt_verify_pc(
 	 */
 	child_rip = first_entry ?
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
-	if (WT_KEY_PROCESS(child_rip)) {
+	if (__wt_key_process(child_rip)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
-		WT_ERR(__wt_bt_item_process(
-		    toc, child_rip->key, &child_ovfl_page, scratch1));
-		if (child_ovfl_page != NULL) {
-			WT_CLEAR(tmp1);
-			tmp1.data = WT_PAGE_BYTE(child_ovfl_page);
-			tmp1.size = child_ovfl_page->hdr->u.datalen;
-			cd_ref = &tmp1;
-		} else
-			cd_ref = scratch1;
+		WT_ERR(__wt_bt_item_process(toc, child_rip->key, scratch1));
+		cd_ref = scratch1;
 	} else
 		cd_ref = (DBT *)child_rip;
-	if (WT_KEY_PROCESS(parent_rip)) {
+	if (__wt_key_process(parent_rip)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch2));
-		WT_RET(__wt_bt_item_process(
-		    toc, parent_rip->key, &parent_ovfl_page, scratch2));
-		if (parent_ovfl_page != NULL) {
-			WT_CLEAR(tmp2);
-			tmp2.data = WT_PAGE_BYTE(parent_ovfl_page);
-			tmp2.size = parent_ovfl_page->hdr->u.datalen;
-			pd_ref = &tmp2;
-		} else
-			pd_ref = scratch2;
+		WT_RET(__wt_bt_item_process(toc, parent_rip->key, scratch2));
+		pd_ref = scratch2;
 	} else
 		pd_ref = (DBT *)parent_rip;
 
@@ -507,10 +490,6 @@ err:	if (scratch1 != NULL)
 		__wt_scr_release(&scratch1);
 	if (scratch2 != NULL)
 		__wt_scr_release(&scratch2);
-	if (child_ovfl_page != NULL)
-		__wt_bt_page_out(toc, &child_ovfl_page, 0);
-	if (parent_ovfl_page != NULL)
-		__wt_bt_page_out(toc, &parent_ovfl_page, 0);
 
 	return (ret);
 }
@@ -524,8 +503,6 @@ __wt_bt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 {
 	struct {
 		DBT	*dbt;			/* DBT to compare */
-		DBT	 tmp;			/* overflow DBT to compare */
-		WT_PAGE *page;			/* overflow page */
 		DBT	*scratch;		/* scratch buffer */
 	} *current, *last, _a, _b;
 	DB *db;
@@ -569,21 +546,10 @@ __wt_bt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 		 * don't bother instantiating the keys in the tree, there's no
 		 * reason to believe we're going to be working in this database.
 		 */
-		if (WT_KEY_PROCESS(rip)) {
-			/* Discard any previous acquire overflow page. */
-			if (current->page != NULL)
-				__wt_bt_page_out(toc, &current->page, 0);
-
+		if (__wt_key_process(rip)) {
 			WT_RET(__wt_bt_item_process(
-			    toc, rip->key, &current->page, current->scratch));
-			if (current->page != NULL) {
-				WT_CLEAR(current->tmp);
-				current->tmp.data = WT_PAGE_BYTE(current->page);
-				current->tmp.size =
-				    current->page->hdr->u.datalen;
-				current->dbt = &current->tmp;
-			} else
-				current->dbt = current->scratch;
+			    toc, rip->key, current->scratch));
+			current->dbt = current->scratch;
 		} else
 			current->dbt = (DBT *)rip;
 
@@ -605,10 +571,6 @@ err:	if (_a.scratch != NULL)
 		__wt_scr_release(&_a.scratch);
 	if (_b.scratch != NULL)
 		__wt_scr_release(&_b.scratch);
-	if (_a.page != NULL)
-		__wt_bt_page_out(toc, &_a.page, 0);
-	if (_b.page != NULL)
-		__wt_bt_page_out(toc, &_b.page, 0);
 
 	return (ret);
 }
@@ -1197,26 +1159,44 @@ __wt_bt_verify_overflow_common(WT_TOC *toc,
     WT_OVFL *ovfl, uint32_t entry_num, uint32_t addr, WT_VSTUFF *vs)
 {
 	DB *db;
-	WT_PAGE *ovfl_page;
+	DBT *scratch1;
+	WT_PAGE *page, _page;
 	int ret;
 
 	db = toc->db;
+	scratch1 = NULL;
 	ret = 0;
 
+	WT_CLEAR(_page);
+	page = &_page;
+	page->addr = ovfl->addr;
+	page->size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
+
+	/* Allocate enough memory to hold the overflow pages. */
+	WT_RET(__wt_scr_alloc(toc, page->size, &scratch1));
+
+	/* Read the page. */
+	page->hdr = scratch1->data;
+	scratch1->size = page->size;
+	WT_ERR(__wt_page_read(db, page));
+
 	/*
-	 * Read the overflow page: the read server checks the physical layout
-	 * of the page.
+	 * Verify the disk image -- this function would normally be called
+	 * from the asynchronous read server, but overflow pages are read
+	 * synchronously. Regardless, we break the overflow verification code
+	 * into two parts, on-disk format checking and internal checking,
+	 * just so it looks like all of the other page type checking.
 	 */
-	WT_RET(__wt_bt_ovfl_in(toc, ovfl, &ovfl_page, 1));
+	WT_ERR(__wt_bt_verify_dsk_ovfl(toc, page));
 
 	/* Add the fragments. */
-	WT_RET(__wt_bt_verify_addfrag(toc, ovfl_page, vs));
+	WT_ERR(__wt_bt_verify_addfrag(toc, page, vs));
 
 	/*
 	 * The only other thing to check is that the size we have in the page
 	 * matches the size on the underlying overflow page.
 	 */
-	if (ovfl->size != ovfl_page->hdr->u.datalen) {
+	if (ovfl->size != page->hdr->u.datalen) {
 		__wt_api_db_errx(db,
 		    "overflow page reference in item %lu on page at addr %lu "
 		    "does not match the data size on the overflow page",
@@ -1224,7 +1204,8 @@ __wt_bt_verify_overflow_common(WT_TOC *toc,
 		ret = WT_ERROR;
 	}
 
-	__wt_bt_page_out(toc, &ovfl_page, 0);
+err:	__wt_scr_release(&scratch1);
+
 	return (ret);
 }
 
