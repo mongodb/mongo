@@ -13,11 +13,15 @@ extern "C" {
 
 /* Debug byte value */
 #define	WT_DEBUG_BYTE	0xab
+#define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 
 #ifdef HAVE_DIAGNOSTIC
+#define	WT_ABORT(env, e)						\
+	__wt_assert(env, e, __FILE__, __LINE__)
 #define	WT_ASSERT(env, e)						\
 	((e) ? (void)0 : __wt_assert(env, #e, __FILE__, __LINE__))
 #else
+#define	WT_ABORT(env, e)
 #define	WT_ASSERT(env, e)
 #endif
 
