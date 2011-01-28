@@ -13,6 +13,7 @@ static void __wt_bt_page_discard_dup(ENV *, WT_PAGE *);
 static void __wt_bt_page_discard_rccexp(ENV *, WT_PAGE *);
 static void __wt_bt_page_discard_repl(ENV *, WT_PAGE *);
 static void __wt_bt_page_discard_repl_list(ENV *, WT_REPL *);
+static inline int __wt_row_key_on_page(WT_PAGE *, WT_ROW *);
 
 /*
  * __wt_bt_page_discard --
@@ -42,12 +43,12 @@ __wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		 * For each entry, see if the key was an allocation (that is,
 		 * if it points somewhere other than the original page), and
 		 * if so, free the memory.  This test is a superset of the
-		 * WT_KEY_PROCESS test, that is, any key requiring processing
+		 * __wt_key_process test, that is, any key requiring processing
 		 * but not yet processed, must reference on-page information.
 		 */
 		last_key = NULL;
 		WT_INDX_FOREACH(page, rip, i) {
-			if (WT_ROW_KEY_ON_PAGE(page, rip))
+			if (__wt_row_key_on_page(page, rip))
 				continue;
 
 			/*
@@ -107,7 +108,7 @@ __wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
 			    page->indx_count * sizeof(WT_REF));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		if (page->u3.dup != NULL)
+		if (WT_PAGE_DUP_TREES(page))
 			__wt_bt_page_discard_dup(env, page);
 		break;
 	default:
@@ -216,4 +217,18 @@ __wt_bt_page_discard_dup(ENV *env, WT_PAGE *page)
 
 	/* Free the page's array of off-page duplicate references. */
 	__wt_free(env, page->u3.dup, page->indx_count * sizeof(WT_REF *));
+}
+
+/*
+ * __wt_row_key_on_page --
+ *	Return if a WT_ROW structure's key references on-page data.
+ */
+static inline int
+__wt_row_key_on_page(WT_PAGE *page, WT_ROW *rip)
+{
+	uint8_t *p;
+
+	p = rip->key;
+	return (p >= (uint8_t *)page->hdr &&
+	    p < (uint8_t *)page->hdr + page->size ? 1 : 0);
 }
