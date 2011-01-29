@@ -560,7 +560,7 @@ namespace mongo {
                 BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
                 maxVersion = x["lastmod"];
 
-                BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) ).getOwned();
                 assert( currChunk["shard"].type() );
                 assert( currChunk["min"].type() );
                 assert( currChunk["max"].type() );
@@ -688,7 +688,7 @@ namespace mongo {
 
             BSONObj cmd = cmdBuilder.obj();
 
-            log(7) << "splitChunk update: " << cmd << endl;
+            LOG(1) << "splitChunk update: " << cmd << endl;
 
             bool ok;
             BSONObj cmdResult;

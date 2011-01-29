@@ -353,7 +353,7 @@ namespace mongo {
         }
         catch ( std::exception& e ) {
             // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
-            log( LL_WARNING ) << "could have autosplit on collection: " << _manager->getns() << " but: " << e.what() << endl;
+            warning() << "could have autosplit on collection: " << _manager->getns() << " but: " << e.what() << endl;
             return false;
         }
     }
