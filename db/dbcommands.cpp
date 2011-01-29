@@ -1172,26 +1172,27 @@ namespace mongo {
             }
 
             bool verbose = jsobj["verbose"].trueValue();
+            bool adapt = jsobj["humanReadable"].trueValue();
 
             long long size = nsd->stats.datasize / scale;
             result.appendNumber( "count" , nsd->stats.nrecords );
-            result.appendNumber( "size" , size );
+            result.append( "size" , adaptUnit( size , adapt ) );
             if( nsd->stats.nrecords )
-                result.append      ( "avgObjSize" , double(size) / double(nsd->stats.nrecords) );
+                result.append      ( "avgObjSize" , adaptUnit( double(size) / double(nsd->stats.nrecords) , adapt ) );
 
             int numExtents;
             BSONArrayBuilder extents;
 
-            result.appendNumber( "storageSize" , nsd->storageSize( &numExtents , verbose ? &extents : 0  ) / scale );
+            result.append( "storageSize" , adaptUnit( nsd->storageSize( &numExtents , verbose ? &extents : 0  ) , adapt, scale ) );
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
-            result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
+            result.append( "lastExtentSize" , adaptUnit( nsd->lastExtentSize , adapt , scale ) );
             result.append( "paddingFactor" , nsd->paddingFactor );
             result.append( "flags" , nsd->flags );
 
             BSONObjBuilder indexSizes;
-            result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
-            result.append("indexSizes", indexSizes.obj());
+            result.append( "totalIndexSize" , adaptUnit( getIndexSizeForCollection(dbname, ns, &indexSizes, scale) , adapt , scale ) );
+            result.append("indexSizes", adaptUnit( indexSizes.obj() , adapt ));
 
             if ( nsd->capped ) {
                 result.append( "capped" , nsd->capped );
