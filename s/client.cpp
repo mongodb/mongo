@@ -144,7 +144,7 @@ namespace mongo {
         vector<BSONObj> res;
         
         if ( fromWriteBackListener ) {
-            warning() << "not doing recusrive writebacks for" << endl;
+            warning() << "not doing recusrive writeback" << endl;
             return res;
         }
 
@@ -198,16 +198,21 @@ namespace mongo {
             
             if ( writebacks.size() ){
                 vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
-                assert( v.size() == 1 );
-                result.appendElements( v[0] );
-                result.appendElementsUnique( res );
-                result.append( "initialGLEHost" , theShard );
+                if ( v.size() == 0 && fromWriteBackListener ) {
+                    // ok
+                }
+                else {
+                    assert( v.size() == 1 );
+                    result.appendElements( v[0] );
+                    result.appendElementsUnique( res );
+                    result.append( "initialGLEHost" , theShard );
+                }
             }
             else {
                 result.append( "singleShard" , theShard );
                 result.appendElements( res );
             }
-
+            
             return ok;
         }
 
