@@ -15,6 +15,21 @@ run()
 
 echo 'dist/s_all run started...'
 
+reconf=0
+while :
+	do case "$1" in
+	-A)	# Reconfigure the library build.
+		reconf=1
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+test "$reconf" -eq 0 ||
+	(cd ../build_posix &&
+	    run "sh reconf" "Rebuilding GNU tools library build")
+
 run "python api_flags.py" "Building API flags include file"
 run "python api.py" "Building API methods"
 run "python api_err.py" "Building error return API"
