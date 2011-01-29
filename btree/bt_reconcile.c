@@ -79,20 +79,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_PAGE_DISK_WRITE(page);
 	WT_MEMORY_FLUSH;
 
-	/*
-	 * Multiple pages are marked for eviction by the eviction server, which
-	 * means nobody can read them -- but, this thread of control has to
-	 * update higher pages in the tree when it writes this page, which
-	 * requires reading other pages, which might themselves be marked for
-	 * eviction.   Set a flag to allow this thread of control to see pages
-	 * marked for eviction -- we know it's safe, because only this thread
-	 * is writing pages.
-	 *
-	 * Reconciliation is probably running because the cache is full, which
-	 * means reads are locked out -- reconciliation can read, regardless.
-	 */
-	F_SET(toc, WT_READ_EVICT | WT_READ_PRIORITY);
-
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 		/*
@@ -187,9 +173,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	 */
 	page->addr = new->addr;
 
-err:	F_CLR(toc, WT_READ_EVICT | WT_READ_PRIORITY);
-
-	if (tmp != NULL)
+err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);

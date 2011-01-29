@@ -114,6 +114,20 @@ __wt_cache_evict_server(void *arg)
 	WT_ERR(__wt_toc_api_set(env, "CacheReconciliation", NULL, &toc));
 
 	/*
+	 * Multiple pages are marked for eviction by the eviction server, which
+	 * means nobody can read them -- but, this thread of control has to
+	 * update higher pages in the tree when it writes this page, which
+	 * requires reading other pages, which might themselves be marked for
+	 * eviction.   Set a flag to allow this thread of control to see pages
+	 * marked for eviction -- we know it's safe, because only this thread
+	 * is writing pages.
+	 *
+	 * Reconciliation is probably running because the cache is full, which
+	 * means reads are locked out -- reconciliation can read, regardless.
+	 */
+	F_SET(toc, WT_READ_EVICT | WT_READ_PRIORITY);
+
+	/*
 	 * Allocate memory for a copy of the hazard references -- it's a fixed
 	 * size so doesn't need run-time adjustments.
 	 */
