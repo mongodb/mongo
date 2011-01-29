@@ -74,7 +74,6 @@ struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_disk;		typedef struct __wt_page_disk WT_PAGE_DISK;
-struct __wt_page_entry;		typedef struct __wt_page_entry WT_PAGE_ENTRY;
 struct __wt_rcc_expand;		typedef struct __wt_rcc_expand WT_RCC_EXPAND;
 struct __wt_ref;		typedef struct __wt_ref WT_REF;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
