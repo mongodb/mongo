@@ -1222,7 +1222,7 @@ __wt_item_build_data(
 	IDB *idb;
 	WT_STATS *stats;
 
-	 WT_ENV_FCHK_ASSERT(toc->env,
+	 WT_ENV_FCHK(toc->env,
 	    "__wt_item_build_data", flags, WT_APIMASK_BT_BUILD_DATA_ITEM);
 
 	db = toc->db;

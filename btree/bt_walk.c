@@ -50,7 +50,7 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 	uint32_t i;
 	int ret;
 
-	 WT_ENV_FCHK_ASSERT(
+	 WT_ENV_FCHK(
 	     toc->env, "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
 
 	idb = toc->db->idb;

@@ -34,8 +34,6 @@ extern "C" {
 #define	WT_ENV_FCHK(env, name, f, mask)					\
 	if ((f) & ~(mask))						\
 		return (__wt_api_args(env, name));
-#define	WT_ENV_FCHK_ASSERT(env, name, f, mask)				\
-	WT_ASSERT(env, ((f) & ~(mask)) == 0)
 #define	WT_DB_FCHK(db, name, f, mask)					\
 	WT_ENV_FCHK((db)->env, name, f, mask)
 
