@@ -73,7 +73,7 @@ data_gen(DBT *data, int grow_ok)
 	 *
 	 * Add a few extra bytes in order to guarantee we can always offset
 	 * into the buffer by a few extra bytes, used to generate different
-	 * data for column-store repeat-compressed databases.
+	 * data for column-store run-length encoded databases.
 	 */
 	if (blen < g.c_data_max + 10) {
 		if (buf != NULL) {
@@ -103,7 +103,7 @@ data_gen(DBT *data, int grow_ok)
 	switch (g.c_database_type) {
 	case FIX:
 		/*
-		 * If doing repeat compression on the data, use different data
+		 * If doing run-length encoding on the data, use different data
 		 * some percentage of the time, otherwise we'd end up with a
 		 * single chunk of repeated data.   To do that, we just jump
 		 * forward in the buffer by a small, random number of bytes.

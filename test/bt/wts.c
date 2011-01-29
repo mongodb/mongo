@@ -93,7 +93,7 @@ wts_startup(int logfile)
 		if (20 * g.c_data_min > leaf_node_min)
 			g.c_data_min = leaf_node_min / 20;
 		if ((ret = db->column_set(db, g.c_data_min,
-		    NULL, g.c_repeat_comp_pct != 0 ? WT_REPEAT_COMP : 0)) != 0) {
+		    NULL, g.c_repeat_comp_pct != 0 ? WT_RLE : 0)) != 0) {
 			db->err(db, ret, "Db.column_set");
 			return (1);
 		}
