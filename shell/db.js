@@ -22,8 +22,10 @@ DB.prototype.getName = function(){
     return this._name;
 }
 
-DB.prototype.stats = function(){
-    return this.runCommand( { dbstats : 1 } );
+DB.prototype.stats = function( humanReadable ){
+    if ( humanReadable == undefined )
+        humanReadable = 1;
+    return this.runCommand( { dbstats : 1 , humanReadable : humanReadable } );
 }
 
 DB.prototype.getCollection = function( name ){
