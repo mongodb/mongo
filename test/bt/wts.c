@@ -9,7 +9,7 @@
 
 #include "wts.h"
 
-extern void __wt_bt_debug_dbt(const char *, DBT *, FILE *);
+extern void __wt_debug_dbt(const char *, DBT *, FILE *);
 
 static int cb_bulk(DB *, DBT **, DBT **);
 static int wts_del_col(u_int64_t);
@@ -468,8 +468,8 @@ wts_read_row(u_int64_t keyno)
 		fprintf(stderr,
 		    "wts_read_key: read row %llu by key:\n",
 		    (unsigned long long)keyno);
-		__wt_bt_debug_dbt("\tbdb", &bdb_data, stderr);
-		__wt_bt_debug_dbt("\twt", &data, stderr);
+		__wt_debug_dbt("\tbdb", &bdb_data, stderr);
+		__wt_debug_dbt("\twt", &data, stderr);
 		return (1);
 	}
 	return (0);
@@ -543,8 +543,8 @@ wts_read_col(u_int64_t keyno)
 		fprintf(stderr,
 		    "wts_read_recno: read column %llu by recno:\n",
 		    (unsigned long long)keyno);
-		__wt_bt_debug_dbt("\tbdb data", &bdb_data, stderr);
-		__wt_bt_debug_dbt("\t wt data", &data, stderr);
+		__wt_debug_dbt("\tbdb data", &bdb_data, stderr);
+		__wt_debug_dbt("\t wt data", &data, stderr);
 		return (1);
 	}
 
