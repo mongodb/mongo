@@ -144,7 +144,7 @@ namespace mongo {
         vector<BSONObj> res;
         
         if ( fromWriteBackListener ) {
-            warning() << "not doing recusrive writeback" << endl;
+            LOG(1) << "not doing recusrive writeback" << endl;
             return res;
         }
 
