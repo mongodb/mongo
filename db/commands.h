@@ -129,5 +129,10 @@ namespace mongo {
 
     bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
 
+    /** @param v value to process
+     *  @param humanReadable if we have to adapt display
+     *  @param scale if humanReadable is false, then specify a scaling value
+     */
+    string adaptUnit( long double v , bool humanReadable , int scale );
 
 } // namespace mongo
