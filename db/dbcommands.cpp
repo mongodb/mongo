@@ -1249,16 +1249,21 @@ namespace mongo {
                 indexSize += getIndexSizeForCollection(dbname, ns);
             }
             
+            bool adapt = false;
+	    if ( jsobj["humanReadable"].trueValue() ) {
+	        adapt = true;
+            }
+
             result.append      ( "db" , dbname );
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
-            result.append      ( "avgObjSize" , double(size) / double(objects) );
-            result.appendNumber( "dataSize" , size );
-            result.appendNumber( "storageSize" , storageSize);
+            result.append      ( "avgObjSize" , adaptUnit( double(size) / double(objects) , adapt ) );
+            result.append( "dataSize" , adaptUnit( size , adapt ) );
+            result.append( "storageSize" , adaptUnit( storageSize , adapt ) );
             result.appendNumber( "numExtents" , numExtents );
             result.appendNumber( "indexes" , indexes );
-            result.appendNumber( "indexSize" , indexSize );
-            result.appendNumber( "fileSize" , d->fileSize() );
+            result.append( "indexSize" , adaptUnit( indexSize , adapt ) );
+            result.append( "fileSize" , adaptUnit( d->fileSize() , adapt ) );
 
             return true;
         }
