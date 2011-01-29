@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_dbt_return --
+ * __wt_dbt_return --
  *	Retrun a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
+__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 {
 	DB *db;
 	DBT local_key, local_data;
@@ -68,7 +68,7 @@ __wt_bt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_bt_item_process(toc, rip->key, &toc->key));
+			WT_RET(__wt_item_process(toc, rip->key, &toc->key));
 
 			key->data = toc->key.data;
 			key->size = toc->key.size;
@@ -130,7 +130,7 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DATA_DUP_OVFL:
-			WT_RET(__wt_bt_item_process(toc, item, &toc->data));
+			WT_RET(__wt_item_process(toc, item, &toc->data));
 			data_ret = toc->data.data;
 			size_ret = toc->data.size;
 			break;
@@ -143,14 +143,14 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 	/*
 	 * When we get here, data_ret and size_ret are set to the byte string
 	 * and the length we're going to return.   That byte string has been
-	 * decoded, we called __wt_bt_item_process above in all cases where the
+	 * decoded, we called __wt_item_process above in all cases where the
 	 * item could be encoded.
 	 */
 	if (callback == NULL) {
 		/*
 		 * We're copying the key/data pair out to the caller.  If we
 		 * haven't yet copied the data_ret/size_ret pair into the return
-		 * DBT (potentially done by __wt_bt_item_process), do so now.
+		 * DBT (potentially done by __wt_item_process), do so now.
 		 */
 		if (data_ret != toc->data.data) {
 			if (toc->data.mem_size < size_ret)

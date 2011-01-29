@@ -109,6 +109,7 @@ __wt_cache_read_server(void *arg)
 	env = arg;
 	ienv = env->ienv;
 	cache = ienv->cache;
+	ret = 0;
 
 	rr = cache->read_request;
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
@@ -190,7 +191,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 	DB *db;
 	ENV *env;
 	WT_CACHE *cache;
-	WT_FH *fh;
 	WT_OFF *off;
 	WT_PAGE *page;
 	WT_REF *ref;
@@ -207,7 +207,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 	db = toc->db;
 	env = toc->env;
 	cache = env->ienv->cache;
-	fh = db->idb->fh;
 	ret = 0;
 
 	/*
@@ -242,10 +241,10 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 	/* If the page needs to be verified, that's next. */
 	if (rr->dsk_verify)
-		WT_ERR(__wt_bt_verify_dsk_page(toc, page));
+		WT_ERR(__wt_verify_dsk_page(toc, page));
 
 	/* Build the in-memory version of the page. */
-	WT_ERR(__wt_bt_page_inmem(toc, page));
+	WT_ERR(__wt_page_inmem(toc, page));
 
 	/*
 	 * Reference the parent's WT_PAGE and parent's WT_OFF structure that

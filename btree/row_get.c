@@ -28,7 +28,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	page = NULL;
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_bt_search_row(toc, key, WT_NOLEVEL, 0));
+	WT_ERR(__wt_row_search(toc, key, WT_NOLEVEL, 0));
 	page = toc->srch_page;
 	rip = toc->srch_ip;
 
@@ -53,7 +53,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 			goto err;
 		}
 	}
-	ret = __wt_bt_dbt_return(toc, key, data, 0);
+	ret = __wt_dbt_return(toc, key, data, 0);
 
 err:	if (page != idb->root_page.page)
 		__wt_hazard_clear(toc, page);

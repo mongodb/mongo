@@ -30,14 +30,14 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 	/* Clear the database stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_database_stats(idb->dstats);
 	WT_STAT_SET(idb->dstats, TREE_LEVEL, idb->root_page.page->hdr->level);
-	WT_RET(__wt_bt_stat_desc(toc));
+	WT_RET(__wt_desc_stat(toc));
 
 	/*
 	 * Note we do not have a hazard reference for the root page, and that's
 	 * safe -- root pages are pinned into memory when a database is opened,
 	 * and never re-written until the database is closed.
 	 */
-	WT_RET(__wt_bt_tree_walk(toc, NULL, 0, __wt_bt_stat_page, NULL));
+	WT_RET(__wt_tree_walk(toc, NULL, 0, __wt_page_stat, NULL));
 
 	fprintf(stream, "Database statistics: %s\n", idb->name);
 	__wt_stat_print(env, idb->dstats, stream);

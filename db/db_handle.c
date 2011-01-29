@@ -149,7 +149,7 @@ __wt_idb_destroy(DB *db)
 		idb->huffman_data = NULL;
 	}
 
-	__wt_bt_walk_end(env, &idb->evict_walk);
+	__wt_walk_end(env, &idb->evict_walk);
 
 	__wt_free(env, idb->stats, 0);
 	__wt_free(env, idb->dstats, 0);

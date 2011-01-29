@@ -335,13 +335,12 @@ __wt_evict_walk_single(WT_TOC *toc, IDB *idb, uint slot)
 
 	/* If we haven't yet opened a tree-walk structure, do so. */
 	if (idb->evict_walk.tree == NULL)
-restart:	WT_RET(
-		    __wt_bt_walk_begin(toc, &idb->root_page, &idb->evict_walk));
+restart:	WT_RET(__wt_walk_begin(toc, &idb->root_page, &idb->evict_walk));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	do {
 		evict = &cache->evict[slot];
-		WT_RET(__wt_bt_walk_next(toc, &idb->evict_walk, &evict->ref));
+		WT_RET(__wt_walk_next(toc, &idb->evict_walk, &evict->ref));
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
@@ -598,7 +597,7 @@ __wt_evict_write(WT_TOC *toc)
 		 * code.
 		 */
 		toc->db = evict->idb->db;
-		(void)__wt_bt_rec_page(toc, page);
+		(void)__wt_page_reconcile(toc, page);
 	}
 }
 
@@ -662,7 +661,7 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
 		/* The page can no longer be found, free the memory. */
-		__wt_bt_page_discard(toc, page);
+		__wt_page_discard(toc, page);
 	}
 }
 
@@ -696,6 +695,8 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 			WT_DUP_FOREACH(page, dupp, i)
 				if (*dupp != NULL && (*dupp)->state != WT_EMPTY)
 					return (1);
+		break;
+	default:
 		break;
 	}
 
@@ -873,15 +874,15 @@ __wt_evict_tree_dump(WT_TOC *toc, IDB *idb)
 	__wt_mb_add(&mb, "in-memory page list");
 
 	WT_CLEAR(walk);
-	WT_RET(__wt_bt_walk_begin(toc, &idb->root_page, &walk));
+	WT_RET(__wt_walk_begin(toc, &idb->root_page, &walk));
 	for (sep = ':';;) {
-		WT_RET(__wt_bt_walk_next(toc, &walk, &ref));
+		WT_RET(__wt_walk_next(toc, &walk, &ref));
 		if (ref == NULL)
 			break;
 		__wt_mb_add(&mb, "%c %lu", sep, (u_long)ref->page->addr);
 		sep = ',';
 	}
-	__wt_bt_walk_end(env, &walk);
+	__wt_walk_end(env, &walk);
 	__wt_mb_discard(&mb);
 
 	return (0);
@@ -917,24 +918,22 @@ int
 __wt_evict_tree_count(WT_TOC *toc, IDB *idb, uint64_t *nodesp)
 {
 	ENV *env;
-	WT_CACHE *cache;
 	WT_REF *ref;
 	WT_WALK walk;
 	uint64_t nodes;
 
 	env = toc->env;
-	cache = env->ienv->cache;
 
 	WT_CLEAR(walk);
-	WT_RET(__wt_bt_walk_begin(toc, &idb->root_page, &walk));
+	WT_RET(__wt_walk_begin(toc, &idb->root_page, &walk));
 	for (nodes = 0;;) {
-		WT_RET(__wt_bt_walk_next(toc, &walk, &ref));
+		WT_RET(__wt_walk_next(toc, &walk, &ref));
 		if (ref == NULL)
 			break;
 		++nodes;
 	}
 	*nodesp = nodes;
-	__wt_bt_walk_end(env, &walk);
+	__wt_walk_end(env, &walk);
 
 	return (0);
 }

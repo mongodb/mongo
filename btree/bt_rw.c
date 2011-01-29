@@ -58,7 +58,7 @@ __wt_page_write(WT_TOC *toc, WT_PAGE *page)
 	env = toc->env;
 	fh = db->idb->fh;
 
-	WT_ASSERT(env, __wt_bt_verify_dsk_page(toc, page) == 0);
+	WT_ASSERT(env, __wt_verify_dsk_page(toc, page) == 0);
 
 	hdr = page->hdr;
 	hdr->checksum = 0;

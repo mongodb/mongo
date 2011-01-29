@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_search_col --
+ * __wt_col_search --
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
+__wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -38,7 +38,7 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	db = toc->db;
 	idb = db->idb;
 
-	WT_DB_FCHK(db, "__wt_bt_search_col", flags, WT_APIMASK_BT_SEARCH_COL);
+	WT_DB_FCHK(db, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
 
 	/* Check for a record past the end of the database. */
 	page = idb->root_page.page;
@@ -91,7 +91,7 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		/* cip references the subtree containing the record. */
 		ref = WT_COL_REF(page, cip);
 		off = WT_COL_OFF(cip);
-		WT_ERR(__wt_bt_page_in(toc, page, ref, off, 0));
+		WT_ERR(__wt_page_in(toc, page, ref, off, 0));
 
 		/* Swap the parent page for the child page. */
 		if (page != idb->root_page.page)

@@ -9,8 +9,8 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_open_verify(DB *);
-static int __wt_bt_open_verify_page_sizes(DB *);
+static int __wt_open_verify(DB *);
+static int __wt_open_verify_page_sizes(DB *);
 
 /*
  * __wt_bt_open --
@@ -28,7 +28,7 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 	idb = db->idb;
 
 	/* Check page size configuration. */
-	WT_RET(__wt_bt_open_verify(db));
+	WT_RET(__wt_open_verify(db));
 
 	/* Open the fle. */
 	WT_RET(__wt_open(env, idb->name, idb->mode, ok_create, &idb->fh));
@@ -39,32 +39,32 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 	 * page.  (If the file isn't empty, there must be a description page.)
 	 */
 	if (idb->fh->file_size == 0)
-		WT_RET(__wt_bt_desc_write(toc));
+		WT_RET(__wt_desc_write(toc));
 	else {
-		WT_RET(__wt_bt_desc_read(toc));
+		WT_RET(__wt_desc_read(toc));
 
 		/* If there's a root page, pin it. */
 		if (idb->root_off.addr != WT_ADDR_INVALID)
-			WT_RET(__wt_bt_root_pin(toc));
+			WT_RET(__wt_root_pin(toc));
 	}
 
 	return (0);
 }
 
 /*
- * __wt_bt_open_verify --
+ * __wt_open_verify --
  *	Verify anything we can't verify before we're about to open the file;
  *	set defaults as necessary.
  */
 static int
-__wt_bt_open_verify(DB *db)
+__wt_open_verify(DB *db)
 {
 	IDB *idb;
 
 	idb = db->idb;
 
 	/* Verify the page sizes. */
-	WT_RET(__wt_bt_open_verify_page_sizes(db));
+	WT_RET(__wt_open_verify_page_sizes(db));
 
 	/* Verify other configuration combinations. */
 	if (db->fixed_len != 0 && (idb->huffman_key || idb->huffman_data)) {
@@ -78,11 +78,11 @@ __wt_bt_open_verify(DB *db)
 }
 
 /*
- * __wt_bt_open_verify_page_sizes --
+ * __wt_open_verify_page_sizes --
  *	Verify the page sizes.
  */
 static int
-__wt_bt_open_verify_page_sizes(DB *db)
+__wt_open_verify_page_sizes(DB *db)
 {
 	IDB *idb;
 
@@ -260,18 +260,18 @@ __wt_bt_open_verify_page_sizes(DB *db)
 }
 
 /*
- * __wt_bt_root_pin --
+ * __wt_root_pin --
  *	Read in the root page and pin it into memory.
  */
 int
-__wt_bt_root_pin(WT_TOC *toc)
+__wt_root_pin(WT_TOC *toc)
 {
 	IDB *idb;
 
 	idb = toc->db->idb;
 
 	/* Get the root page. */
-	WT_RET(__wt_bt_page_in(toc, NULL, &idb->root_page, &idb->root_off, 0));
+	WT_RET(__wt_page_in(toc, NULL, &idb->root_page, &idb->root_off, 0));
 		F_SET(idb->root_page.page, WT_PINNED);
 	__wt_hazard_clear(toc, idb->root_page.page);
 

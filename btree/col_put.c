@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_col_update(WT_TOC *, uint64_t, DBT *, int);
+static int __wt_col_update(WT_TOC *, uint64_t, DBT *, int);
 
 /*
  * __wt_db_col_del --
@@ -18,7 +18,7 @@ static int __wt_bt_col_update(WT_TOC *, uint64_t, DBT *, int);
 inline int
 __wt_db_col_del(WT_TOC *toc, uint64_t recno)
 {
-	return (__wt_bt_col_update(toc, recno, NULL, 0));
+	return (__wt_col_update(toc, recno, NULL, 0));
 }
 
 /*
@@ -35,15 +35,15 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
 	if (db->fixed_len != 0 && data->size != db->fixed_len)
 		WT_RET(__wt_database_wrong_fixed_size(toc, data->size));
 
-	return (__wt_bt_col_update(toc, recno, data, 1));
+	return (__wt_col_update(toc, recno, data, 1));
 }
 
 /*
- * __wt_bt_col_update --
+ * __wt_col_update --
  *	Column store delete and update.
  */
 static int
-__wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
+__wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 {
 	DB *db;
 	ENV *env;
@@ -62,7 +62,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	repl = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_bt_search_col(
+	WT_RET(__wt_col_search(
 	    toc, recno, WT_NOLEVEL, data_overwrite ? WT_DATA_OVERWRITE : 0));
 	page = toc->srch_page;
 
@@ -96,19 +96,19 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 			    page->indx_count, sizeof(WT_REPL *), &new_repl));
 
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
+		WT_ERR(__wt_repl_alloc(toc, &repl, data));
 
 		/* workQ: schedule insert of the WT_REPL structure. */
-		__wt_bt_item_update_serial(toc, page, toc->srch_write_gen,
+		__wt_item_update_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 		 break;
 	case WT_PAGE_COL_RCC:
 		if (toc->srch_repl != NULL) {		/* #2 */
 			/* Allocate a WT_REPL structure and fill it in. */
-			WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
+			WT_ERR(__wt_repl_alloc(toc, &repl, data));
 
 			/* workQ: schedule insert of the WT_REPL structure. */
-			__wt_bt_rcc_expand_repl_serial(toc, page,
+			__wt_rcc_expand_repl_serial(toc, page,
 			    toc->srch_write_gen, toc->srch_exp, repl, ret);
 			break;
 		}
@@ -119,7 +119,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 			    sizeof(WT_RCC_EXPAND *), &new_rccexp));
 
 		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_bt_repl_alloc(toc, &repl, data));
+		WT_ERR(__wt_repl_alloc(toc, &repl, data));
 
 		/* Allocate a WT_RCC_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc(env, 1, sizeof(WT_RCC_EXPAND), &exp));
@@ -127,7 +127,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 		exp->repl = repl;
 
 		/* Schedule the workQ to link in the WT_RCC_EXPAND structure. */
-		__wt_bt_rcc_expand_serial(toc, page, toc->srch_write_gen,
+		__wt_rcc_expand_serial(toc, page, toc->srch_write_gen,
 		    WT_COL_SLOT(page, toc->srch_ip), new_rccexp, exp, ret);
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
@@ -137,7 +137,7 @@ __wt_bt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 err:		if (exp != NULL)
 			__wt_free(env, exp, sizeof(WT_RCC_EXPAND));
 		if (repl != NULL)
-			__wt_bt_repl_free(toc, repl);
+			__wt_repl_free(toc, repl);
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
@@ -155,12 +155,12 @@ err:		if (exp != NULL)
 }
 
 /*
- * __wt_bt_rcc_expand_serial_func --
+ * __wt_rcc_expand_serial_func --
  *	Server function to expand a repeat-count compressed column store
  *	during a delete.
  */
 int
-__wt_bt_rcc_expand_serial_func(WT_TOC *toc)
+__wt_rcc_expand_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_RCC_EXPAND **new_rccexp, *exp;
@@ -169,7 +169,7 @@ __wt_bt_rcc_expand_serial_func(WT_TOC *toc)
 
 	ret = 0;
 
-	__wt_bt_rcc_expand_unpack(toc, page, write_gen, slot, new_rccexp, exp);
+	__wt_rcc_expand_unpack(toc, page, write_gen, slot, new_rccexp, exp);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
@@ -196,12 +196,12 @@ err:	__wt_toc_serialize_wrapup(toc, page, ret);
 }
 
 /*
- * __wt_bt_rcc_expand_repl_serial_func --
+ * __wt_rcc_expand_repl_serial_func --
  *	Server function to update a WT_REPL entry in an already expanded
  *	repeat-count compressed column store during a delete.
  */
 int
-__wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
+__wt_rcc_expand_repl_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_RCC_EXPAND *exp;
@@ -211,7 +211,7 @@ __wt_bt_rcc_expand_repl_serial_func(WT_TOC *toc)
 
 	ret = 0;
 
-	__wt_bt_rcc_expand_repl_unpack(toc, page, write_gen, exp, repl);
+	__wt_rcc_expand_repl_unpack(toc, page, write_gen, exp, repl);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));

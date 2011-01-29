@@ -83,31 +83,12 @@ __wt_bt_build_verify(void)
 }
 
 /*
- * __wt_bt_data_copy_to_dbt --
- *	Copy a data/length pair into allocated memory in a DBT.
- */
-int
-__wt_bt_data_copy_to_dbt(DB *db, uint8_t *data, size_t size, DBT *copy)
-{
-	ENV *env;
-
-	env = db->env;
-
-	if (copy->data == NULL || copy->mem_size < size)
-		WT_RET(__wt_realloc(env, &copy->mem_size, size, &copy->data));
-	memcpy(copy->data, data, size);
-	copy->size = size;
-
-	return (0);
-}
-
-/*
- * __wt_bt_set_ff_and_sa_from_offset --
+ * __wt_set_ff_and_sa_from_offset --
  *	Set first-free and space-available values from an address positioned
  *	one past the last used byte on the page.
  */
 inline void
-__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page,
+__wt_set_ff_and_sa_from_offset(WT_PAGE *page,
     void *p, uint8_t **first_freep, uint32_t *space_availp)
 {
 	*first_freep = (uint8_t *)p;
@@ -126,11 +107,11 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 }
 
 /*
- * __wt_bt_hdr_type --
+ * __wt_page_type_string --
  *	Return a string representing the page type.
  */
 const char *
-__wt_bt_hdr_type(WT_PAGE_HDR *hdr)
+__wt_page_type_string(WT_PAGE_HDR *hdr)
 {
 	switch (hdr->type) {
 	case WT_PAGE_INVALID:
@@ -160,11 +141,11 @@ __wt_bt_hdr_type(WT_PAGE_HDR *hdr)
 }
 
 /*
- * __wt_bt_item_type --
+ * __wt_item_type_string --
  *	Return a string representing the item type.
  */
 const char *
-__wt_bt_item_type(WT_ITEM *item)
+__wt_item_type_string(WT_ITEM *item)
 {
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:

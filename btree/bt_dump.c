@@ -20,14 +20,14 @@ typedef struct {
 	DBT *dupkey;				/* Offpage duplicate tree key */
 } WT_DSTUFF;
 
-static int  __wt_bt_dump_page(WT_TOC *, WT_PAGE *, void *);
-static void __wt_bt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_bt_dump_page_col_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_bt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_bt_dump_page_dup_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_bt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static void __wt_bt_hexprint(uint8_t *, uint32_t, FILE *);
-static void __wt_bt_print_nl(uint8_t *, uint32_t, FILE *);
+static int  __wt_dump_page(WT_TOC *, WT_PAGE *, void *);
+static void __wt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_dup_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static void __wt_print_byte_string_hex(uint8_t *, uint32_t, FILE *);
+static void __wt_print_byte_string_nl(uint8_t *, uint32_t, FILE *);
 
 /*
  * __wt_db_dump --
@@ -46,10 +46,11 @@ __wt_db_dump(WT_TOC *toc,
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before blindly reading it.
 		 */
-		return (__wt_bt_verify(toc, f, stream));
+		return (__wt_verify(toc, f, stream));
 	}
 
-	dstuff.p = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
+	dstuff.p = flags == WT_PRINTABLES ?
+	    __wt_print_byte_string_nl : __wt_print_byte_string_hex;
 	dstuff.stream = stream;
 	dstuff.f = f;
 	dstuff.fcnt = 0;
@@ -62,7 +63,7 @@ __wt_db_dump(WT_TOC *toc,
 	 */
 	fprintf(stream, "VERSION=1\n");
 	fprintf(stream, "HEADER=END\n");
-	ret = __wt_bt_tree_walk(toc, NULL, 0, __wt_bt_dump_page, &dstuff);
+	ret = __wt_tree_walk(toc, NULL, 0, __wt_dump_page, &dstuff);
 	fprintf(stream, "DATA=END\n");
 
 	/* Wrap up reporting. */
@@ -73,11 +74,11 @@ __wt_db_dump(WT_TOC *toc,
 }
 
 /*
- * __wt_bt_dump_page --
+ * __wt_dump_page --
  *	Depth-first recursive walk of a btree.
  */
 static int
-__wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
 	WT_DSTUFF *dp;
@@ -91,19 +92,19 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_ROW_INT:
 		break;
 	case WT_PAGE_COL_FIX:
-		__wt_bt_dump_page_col_fix(toc, page, dp);
+		__wt_dump_page_col_fix(toc, page, dp);
 		break;
 	case WT_PAGE_COL_RCC:
-		WT_RET(__wt_bt_dump_page_col_rcc(toc, page, dp));
+		WT_RET(__wt_dump_page_col_rcc(toc, page, dp));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_bt_dump_page_col_var(toc, page, dp));
+		WT_RET(__wt_dump_page_col_var(toc, page, dp));
 		break;
 	case WT_PAGE_DUP_LEAF:
-		WT_RET(__wt_bt_dump_page_dup_leaf(toc, page, dp));
+		WT_RET(__wt_dump_page_dup_leaf(toc, page, dp));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bt_dump_page_row_leaf(toc, page, dp));
+		WT_RET(__wt_dump_page_row_leaf(toc, page, dp));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -116,11 +117,11 @@ __wt_bt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 }
 
 /*
- * __wt_bt_dump_page_col_fix --
+ * __wt_dump_page_col_fix --
  *	Dump a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_bt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	WT_COL *cip;
@@ -142,11 +143,11 @@ __wt_bt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 }
 
 /*
- * __wt_bt_dump_page_col_rcc --
+ * __wt_dump_page_col_rcc --
  *	Dump a WT_PAGE_COL_RCC page.
  */
 static int
-__wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	ENV *env;
@@ -170,7 +171,7 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * terminated array of references to WT_RCC_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_RET(__wt_bt_rcc_expand_sort(
+		WT_RET(__wt_rcc_expand_sort(
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
@@ -199,11 +200,11 @@ __wt_bt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 }
 
 /*
- * __wt_bt_dump_page_col_var --
+ * __wt_dump_page_col_var --
  *	Dump a WT_PAGE_COL_VAR page.
  */
 static int
-__wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	DBT *tmp;
@@ -239,7 +240,7 @@ __wt_bt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_ERR(__wt_bt_item_process(toc, item, tmp));
+			WT_ERR(__wt_item_process(toc, item, tmp));
 			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		case WT_ITEM_DEL:
@@ -253,11 +254,11 @@ err:	__wt_scr_release(&tmp);
 }
 
 /*
- * __wt_bt_dump_page_dup_leaf --
+ * __wt_dump_page_dup_leaf --
  *	Dump a WT_PAGE_DUP_LEAF page.
  */
 static int
-__wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	DBT *dupkey, *tmp;
@@ -300,7 +301,7 @@ __wt_bt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_DUP_OVFL:
-			WT_ERR(__wt_bt_item_process(toc, item, tmp));
+			WT_ERR(__wt_item_process(toc, item, tmp));
 			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
@@ -312,11 +313,11 @@ err:	__wt_scr_release(&tmp);
 }
 
 /*
- * __wt_bt_dump_page_row_leaf --
+ * __wt_dump_page_row_leaf --
  *	Dump a WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
@@ -350,7 +351,7 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * Set the key.
 		 */
 		if (__wt_key_process(rip)) {
-			WT_ERR(__wt_bt_item_process(toc, rip->key, key_tmp));
+			WT_ERR(__wt_item_process(toc, rip->key, key_tmp));
 			key = key_tmp;
 		} else
 			key = (DBT *)rip;
@@ -384,7 +385,7 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-			WT_ERR(__wt_bt_item_process(toc, item, data_tmp));
+			WT_ERR(__wt_item_process(toc, item, data_tmp));
 			data = data_tmp;
 			break;
 		case WT_ITEM_OFF:
@@ -399,9 +400,8 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 			ref = WT_ROW_DUP(page, rip);
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
-			ret = __wt_bt_tree_walk(
-			    toc, ref, 0, __wt_bt_dump_page, dp);
+			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			ret = __wt_tree_walk(toc, ref, 0, __wt_dump_page, dp);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				goto err;
@@ -425,26 +425,26 @@ err:	/* Discard any space allocated to hold off-page key/data items. */
 static const char hex[] = "0123456789abcdef";
 
 /*
- * __wt_bt_print_nl --
- *	Output a single key/data entry in printable characters, where possible.
- *	In addition, terminate with a <newline> character, unless the entry is
- *	itself terminated with a <newline> character.
+ * __wt_print_byte_string_nl --
+ *	Output a single byte stringin printable characters, where possible.
+ *	In addition, terminate with a <newline> character, unless the entry
+ *	is itself terminated with a <newline> character.
  */
 static void
-__wt_bt_print_nl(uint8_t *data, uint32_t size, FILE *stream)
+__wt_print_byte_string_nl(uint8_t *data, uint32_t size, FILE *stream)
 {
 	if (data[size - 1] == '\n')
 		--size;
-	__wt_bt_print(data, size, stream);
+	__wt_print_byte_string(data, size, stream);
 	fprintf(stream, "\n");
 }
 
 /*
- * __wt_bt_print --
- *	Output a single key/data entry in printable characters, where possible.
+ * __wt_print_byte_string --
+ *	Output a single byte string in printable characters, where possible.
  */
 void
-__wt_bt_print(uint8_t *data, uint32_t size, FILE *stream)
+__wt_print_byte_string(uint8_t *data, uint32_t size, FILE *stream)
 {
 	int ch;
 
@@ -459,11 +459,11 @@ __wt_bt_print(uint8_t *data, uint32_t size, FILE *stream)
 }
 
 /*
- * __wt_bt_hexprint --
- *	Output a single key/data entry in hex.
+ * __wt_print_byte_string_hex --
+ *	Output a single byte string in hexadecimal characters.
  */
 static void
-__wt_bt_hexprint(uint8_t *data, uint32_t size, FILE *stream)
+__wt_print_byte_string_hex(uint8_t *data, uint32_t size, FILE *stream)
 {
 	for (; size > 0; --size, ++data)
 		fprintf(stream, "%x%x",

@@ -11,8 +11,8 @@
 
 /*
  * There are two tree-walk implementations: a textbook, depth-first recursive
- * tree walk in __wt_bt_tree_walk(), and a non-recursive, depth-first tree walk
- * in __wt_bt_walk_{begin,end,next}().
+ * tree walk in __wt_tree_walk(), and a non-recursive, depth-first tree walk
+ * in __wt_walk_{begin,end,next}().
  *
  * The simple recursive walk is sufficient in most cases -- a hazard reference
  * is obtained on each page in turn, a worker function is called on the page,
@@ -34,12 +34,12 @@
  */
 
 /*
- * __wt_bt_walk_tree --
+ * __wt_tree_walk --
  *	Depth-first recursive walk of a btree, calling a worker function on
  *	each page.
  */
 int
-__wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
+__wt_tree_walk(WT_TOC *toc, WT_REF *ref,
     uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
 	IDB *idb;
@@ -51,7 +51,7 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 	int ret;
 
 	 WT_ENV_FCHK_ASSERT(
-	     toc->env, "__wt_bt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
+	     toc->env, "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
 
 	idb = toc->db->idb;
 
@@ -83,8 +83,8 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				continue;
 
 			off = WT_COL_OFF(cip);
-			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
-			ret = __wt_bt_tree_walk(toc, ref, flags, work, arg);
+			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			ret = __wt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				return (ret);
@@ -99,8 +99,8 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				continue;
 
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
-			ret = __wt_bt_tree_walk(toc, ref, flags, work, arg);
+			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			ret = __wt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				return (ret);
@@ -122,8 +122,8 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				continue;
 
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
-			ret = __wt_bt_tree_walk(toc, ref, flags, work, arg);
+			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			ret = __wt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				return (ret);
@@ -145,11 +145,11 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 }
 
 /*
- * __wt_bt_walk_begin --
+ * __wt_walk_begin --
  *	Start a tree walk.
  */
 int
-__wt_bt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk)
+__wt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk)
 {
 	ENV *env;
 
@@ -172,21 +172,21 @@ __wt_bt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk)
 }
 
 /*
- * __wt_bt_walk_end --
+ * __wt_walk_end --
  *	End a tree walk.
  */
 void
-__wt_bt_walk_end(ENV *env, WT_WALK *walk)
+__wt_walk_end(ENV *env, WT_WALK *walk)
 {
 	__wt_free(env, walk->tree, walk->tree_len);
 }
 
 /*
- * __wt_bt_walk_next --
+ * __wt_walk_next --
  *	Return the next WT_REF/WT_PAGE in the tree, in a non-recursive way.
  */
 int
-__wt_bt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
+__wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 {
 	DB *db;
 	ENV *env;
@@ -217,7 +217,7 @@ __wt_bt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 			return (0);
 		} else {
 			--walk->tree_slot;
-			return (__wt_bt_walk_next(toc, walk, refp));
+			return (__wt_walk_next(toc, walk, refp));
 		}
 	} else
 		if (e->indx == page->indx_count) {
@@ -295,7 +295,7 @@ eop:			e->visited = 1;
 		e->ref = ref;
 		e->indx = 0;
 		e->visited = 0;
-		return (__wt_bt_walk_next(toc, walk, refp));
+		return (__wt_walk_next(toc, walk, refp));
 	default:
 		break;
 	}

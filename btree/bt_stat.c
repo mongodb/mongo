@@ -9,18 +9,18 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_page_col_fix(WT_TOC *, WT_PAGE *);
-static int __wt_bt_stat_page_col_rcc(WT_TOC *, WT_PAGE *);
-static int __wt_bt_stat_page_col_var(WT_TOC *, WT_PAGE *);
-static int __wt_bt_stat_page_dup_leaf(WT_TOC *, WT_PAGE *);
-static int __wt_bt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
+static int __wt_stat_page_col_fix(WT_TOC *, WT_PAGE *);
+static int __wt_stat_page_col_rcc(WT_TOC *, WT_PAGE *);
+static int __wt_stat_page_col_var(WT_TOC *, WT_PAGE *);
+static int __wt_stat_page_dup_leaf(WT_TOC *, WT_PAGE *);
+static int __wt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
 
 /*
- * __wt_bt_stat_page --
+ * __wt_page_stat --
  *	Stat any Btree page.
  */
 int
-__wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
 	IDB *idb;
@@ -39,25 +39,25 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
 		WT_STAT_INCR(stats, PAGE_COL_FIX);
-		WT_RET(__wt_bt_stat_page_col_fix(toc, page));
+		WT_RET(__wt_stat_page_col_fix(toc, page));
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, PAGE_COL_INTERNAL);
 		break;
 	case WT_PAGE_COL_RCC:
 		WT_STAT_INCR(stats, PAGE_COL_RCC);
-		WT_RET(__wt_bt_stat_page_col_rcc(toc, page));
+		WT_RET(__wt_stat_page_col_rcc(toc, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_STAT_INCR(stats, PAGE_COL_VARIABLE);
-		WT_RET(__wt_bt_stat_page_col_var(toc, page));
+		WT_RET(__wt_stat_page_col_var(toc, page));
 		break;
 	case WT_PAGE_DUP_INT:
 		WT_STAT_INCR(stats, PAGE_DUP_INTERNAL);
 		break;
 	case WT_PAGE_DUP_LEAF:
 		WT_STAT_INCR(stats, PAGE_DUP_LEAF);
-		WT_RET(__wt_bt_stat_page_dup_leaf(toc, page));
+		WT_RET(__wt_stat_page_dup_leaf(toc, page));
 		break;
 	case WT_PAGE_OVFL:
 		WT_STAT_INCR(stats, PAGE_OVERFLOW);
@@ -67,7 +67,7 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_STAT_INCR(stats, PAGE_ROW_LEAF);
-		WT_RET(__wt_bt_stat_page_row_leaf(toc, page, arg));
+		WT_RET(__wt_stat_page_row_leaf(toc, page, arg));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -75,11 +75,11 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 }
 
 /*
- * __wt_bt_stat_page_col_fix --
+ * __wt_stat_page_col_fix --
  *	Stat a WT_PAGE_COL_FIX page.
  */
 static int
-__wt_bt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_REPL *repl;
@@ -105,11 +105,11 @@ __wt_bt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_stat_page_col_rcc --
+ * __wt_stat_page_col_rcc --
  *	Stat a WT_PAGE_COL_RCC page.
  */
 static int
-__wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_RCC_EXPAND *exp;
@@ -152,11 +152,11 @@ __wt_bt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_stat_page_col_var --
+ * __wt_stat_page_col_var --
  *	Stat a WT_PAGE_COL_VAR page.
  */
 static int
-__wt_bt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	WT_COL *cip;
@@ -198,11 +198,11 @@ __wt_bt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_stat_page_dup_leaf --
+ * __wt_stat_page_dup_leaf --
  *	Stat a WT_PAGE_DUP_LEAF page.
  */
 static int
-__wt_bt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	WT_REPL *repl;
@@ -244,11 +244,11 @@ __wt_bt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_stat_page_row_leaf --
+ * __wt_stat_page_row_leaf --
  *	Stat a WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
 	WT_OFF *off;
@@ -309,9 +309,8 @@ __wt_bt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			 */
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
-			ret = __wt_bt_tree_walk(
-			    toc, ref, 0, __wt_bt_stat_page, arg);
+			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			ret = __wt_tree_walk(toc, ref, 0, __wt_page_stat, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				return (ret);

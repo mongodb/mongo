@@ -47,7 +47,7 @@ __wt_bt_close(WT_TOC *toc)
 	 * to evict pages we're flushing.
 	 */
 	__wt_lock(env, cache->mtx_reconcile);
-	WT_TRET(__wt_bt_tree_walk(toc, NULL,
+	WT_TRET(__wt_tree_walk(toc, NULL,
 	    WT_WALK_CACHE | WT_WALK_OFFDUP, __wt_bt_close_page, NULL));
 	__wt_evict_db_clear(toc);
 	__wt_unlock(env, cache->mtx_reconcile);
@@ -73,9 +73,14 @@ __wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 
 	/* Reconcile any dirty pages, then discard the page. */
 	if (WT_PAGE_IS_MODIFIED(page))
-		WT_RET(__wt_bt_rec_page(toc, page));
+		WT_RET(__wt_page_reconcile(toc, page));
 
-	__wt_bt_page_discard(toc, page);
+	/*
+	 * The tree walk is depth first, that is, the worker function is not
+	 * called on internal pages until all children have been visited; so,
+	 * we don't have to worry about reading a page after we discard it.
+	 */
+	__wt_page_discard(toc, page);
 
 	return (0);
 }

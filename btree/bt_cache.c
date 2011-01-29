@@ -121,9 +121,9 @@ __wt_cache_destroy(ENV *env)
 	if (cache->mtx_evict != NULL)
 		(void)__wt_mtx_destroy(env, cache->mtx_evict);
 	if (cache->mtx_read != NULL)
-		__wt_mtx_destroy(env, cache->mtx_read);
+		(void)__wt_mtx_destroy(env, cache->mtx_read);
 	if (cache->mtx_reconcile != NULL)
-		__wt_mtx_destroy(env, cache->mtx_reconcile);
+		(void)__wt_mtx_destroy(env, cache->mtx_reconcile);
 
 	/* Discard allocated memory, and clear. */
 	__wt_free(env, cache->stats, 0);

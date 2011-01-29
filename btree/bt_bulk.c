@@ -27,15 +27,16 @@ typedef struct {
 	u_int size;				/* stack size */
 } WT_STACK;
 
-static int __wt_bt_build_key_item(WT_TOC *, DBT *, WT_ITEM *, WT_OVFL *);
-static int __wt_bt_bulk_fix(WT_TOC *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
-static int __wt_bt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
-static int __wt_bt_bulk_stack_put(WT_TOC *, WT_STACK *);
-static int __wt_bt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
-static int __wt_bt_dup_offpage(WT_TOC *, DBT **, DBT **, DBT *, WT_ITEM *, uint32_t, uint32_t, WT_OFF *, int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
+static int __wt_bulk_dbt_copy(ENV *, DBT *, DBT *);
+static int __wt_bulk_dup_offpage(WT_TOC *, DBT **, DBT **, DBT *, WT_ITEM *, uint32_t, uint32_t, WT_OFF *, int (*)(DB *, DBT **, DBT **));
+static int __wt_bulk_fix(WT_TOC *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
+static int __wt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
+static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
+static int __wt_bulk_scratch_page(WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
+static int __wt_bulk_stack_put(WT_TOC *, WT_STACK *);
+static int __wt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_item_build_key(WT_TOC *, DBT *, WT_ITEM *, WT_OVFL *);
 
 /*
  * __wt_db_bulk_load --
@@ -59,7 +60,7 @@ __wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
 	 * first sector, and this file extend makes sure we don't allocate it
 	 * as a table page.
 	 */
-	WT_RET(__wt_bt_table_alloc(toc, &addr, 512));
+	WT_RET(__wt_file_alloc(toc, &addr, 512));
 
 	if (F_ISSET(idb, WT_COLUMN))
 		WT_DB_FCHK(db, "DB.bulk_load", flags, 0);
@@ -69,20 +70,20 @@ __wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
 	 * fixed-length pages.
 	 */
 	if (F_ISSET(idb, WT_COLUMN) && db->fixed_len != 0)
-		WT_RET(__wt_bt_bulk_fix(toc, f, cb));
+		WT_RET(__wt_bulk_fix(toc, f, cb));
 	else
-		WT_RET(__wt_bt_bulk_var(toc, flags, f, cb));
+		WT_RET(__wt_bulk_var(toc, flags, f, cb));
 
 	/* Get a permanent root page reference. */
-	return (__wt_bt_root_pin(toc));
+	return (__wt_root_pin(toc));
 }
 
 /*
- * __wt_bt_bulk_fix
+ * __wt_bulk_fix
  *	Db.bulk_load method for column-store, fixed-length database pages.
  */
 static int
-__wt_bt_bulk_fix(WT_TOC *toc,
+__wt_bulk_fix(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
@@ -111,11 +112,11 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		len += sizeof(uint16_t);
 
 	/* Get a scratch buffer and make it look like our work page. */
-	WT_ERR(__wt_bt_scratch_page(toc, db->leafmin,
+	WT_ERR(__wt_bulk_scratch_page(toc, db->leafmin,
 	    rcc ? WT_PAGE_COL_RCC : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	hdr = page->hdr;
 	hdr->start_recno = 1;
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 
 	while ((ret = cb(db, &key, &data)) == 0) {
@@ -178,15 +179,15 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			 * to its parent and discard it, then switch to the new
 			 * page.
 			 */
-			WT_ERR(__wt_bt_promote(
+			WT_ERR(__wt_bulk_promote(
 			    toc, page, page->records, &stack, 0, NULL));
 			WT_ERR(__wt_page_write(toc, page));
 			hdr->u.entries = 0;
 			page->records = 0;
 			hdr->start_recno = insert_cnt;
 			WT_ERR(
-			    __wt_bt_table_alloc(toc, &page->addr, db->leafmin));
-			__wt_bt_set_ff_and_sa_from_offset(page,
+			    __wt_file_alloc(toc, &page->addr, db->leafmin));
+			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 		}
 
@@ -216,7 +217,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 
 	/* Promote a key from any partially-filled page and write it. */
 	if (hdr->u.entries != 0) {
-		ret = __wt_bt_promote(
+		ret = __wt_bulk_promote(
 		    toc, page, page->records, &stack, 0, NULL);
 		WT_ERR(__wt_page_write(toc, page));
 	}
@@ -225,7 +226,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
+err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
@@ -233,12 +234,12 @@ err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 }
 
 /*
- * __wt_bt_bulk_var --
+ * __wt_bulk_var --
  *	Db.bulk_load method for row or column-store variable-length database
  *	pages.
  */
 static int
-__wt_bt_bulk_var(WT_TOC *toc, uint32_t flags,
+__wt_bulk_var(WT_TOC *toc, uint32_t flags,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
@@ -276,9 +277,9 @@ __wt_bt_bulk_var(WT_TOC *toc, uint32_t flags,
 	WT_ERR(__wt_scr_alloc(toc, 0, &lastkey_copy));
 
 	/* Get a scratch buffer and make it look like our work page. */
-	WT_ERR(__wt_bt_scratch_page(
+	WT_ERR(__wt_bulk_scratch_page(
 	    toc, db->leafmin, type, WT_LLEAF, &page, &tmp1));
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 	if (type == WT_PAGE_COL_VAR)
 		page->hdr->start_recno = 1;
@@ -347,7 +348,7 @@ skip_read:	/*
 		data = &data_copy;
 
 		/* Build the data item we're going to store on the page. */
-		WT_ERR(__wt_bt_build_data_item(
+		WT_ERR(__wt_item_build_data(
 		    toc, data, &data_item, &data_ovfl, 0));
 
 		/*
@@ -395,7 +396,7 @@ skip_read:	/*
 			    (key->size > db->leafitemsize ||
 			    idb->huffman_key != NULL)) {
 				WT_ERR(
-				    __wt_bt_dbt_copy(env, key, lastkey_copy));
+				    __wt_bulk_dbt_copy(env, key, lastkey_copy));
 				lastkey = lastkey_copy;
 			} else
 				lastkey = NULL;
@@ -405,7 +406,7 @@ skip_read:	/*
 
 		/* Build the key item we're going to store on the page. */
 		if (key != NULL)
-			WT_ERR(__wt_bt_build_key_item(
+			WT_ERR(__wt_item_build_key(
 			    toc, key, &key_item, &key_ovfl));
 
 		/*
@@ -415,9 +416,9 @@ skip_read:	/*
 		 */
 		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
 		    WT_ITEM_SPACE_REQ(data->size) > space_avail) {
-			WT_ERR(__wt_bt_scratch_page(toc,
+			WT_ERR(__wt_bulk_scratch_page(toc,
 			    db->leafmin, type, WT_LLEAF, &next, &tmp2));
-			__wt_bt_set_ff_and_sa_from_offset(next,
+			__wt_set_ff_and_sa_from_offset(next,
 			    WT_PAGE_BYTE(next),
 			    &next_first_free, &next_space_avail);
 			if (type == WT_PAGE_COL_VAR)
@@ -494,7 +495,7 @@ skip_read:	/*
 			 * to its parent and discard it, then switch to the new
 			 * page.
 			 */
-			WT_ERR(__wt_bt_promote(
+			WT_ERR(__wt_bulk_promote(
 			    toc, page, page->records, &stack, 0, NULL));
 			WT_ERR(__wt_page_write(toc, page));
 			__wt_scr_release(&tmp1);
@@ -590,7 +591,7 @@ skip_read:	/*
 			 * Move the duplicate set off our page, and read in the
 			 * rest of the off-page duplicate set.
 			 */
-			WT_ERR(__wt_bt_dup_offpage(toc, &key, &data, lastkey,
+			WT_ERR(__wt_bulk_dup_offpage(toc, &key, &data, lastkey,
 			    dup_data,
 			    (uint32_t)(first_free - (uint8_t *)dup_data),
 			    dup_count, &off, cb));
@@ -609,7 +610,7 @@ skip_read:	/*
 			p = (uint8_t *)dup_data;
 			memcpy(p, &data_item, sizeof(data_item));
 			memcpy(p + sizeof(data_item), &off, sizeof(WT_OFF));
-			__wt_bt_set_ff_and_sa_from_offset(page,
+			__wt_set_ff_and_sa_from_offset(page,
 			    (uint8_t *)p + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)),
 			    &first_free, &space_avail);
 
@@ -627,7 +628,7 @@ skip_read:	/*
 
 	/* Promote a key from any partially-filled page and write it. */
 	if (page->hdr->u.entries != 0) {
-		WT_ERR(__wt_bt_promote(
+		WT_ERR(__wt_bulk_promote(
 		    toc, page, page->records, &stack, 0, NULL));
 		WT_ERR(__wt_page_write(toc, page));
 	}
@@ -636,7 +637,7 @@ skip_read:	/*
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
+err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
 	if (lastkey_copy != NULL)
 		__wt_scr_release(&lastkey_copy);
 	if (tmp1 != NULL)
@@ -648,12 +649,12 @@ err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 }
 
 /*
- * __wt_bt_dup_offpage --
+ * __wt_bulk_dup_offpage --
  *	Move the last set of duplicates on the page to a page of their own,
  *	then load the rest of the duplicate set.
  */
 static int
-__wt_bt_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
+__wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
     WT_ITEM *dup_data, uint32_t dup_len, uint32_t dup_count, WT_OFF *off,
     int (*cb)(DB *, DBT **, DBT **))
 {
@@ -707,9 +708,9 @@ __wt_bt_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 	ret = 0;
 
 	/* Get a scratch buffer and make it look like our work page. */
-	WT_ERR(__wt_bt_scratch_page(toc,
+	WT_ERR(__wt_bulk_scratch_page(toc,
 	    db->leafmin, WT_PAGE_DUP_LEAF, WT_LLEAF, &page, &tmp));
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 
 	/* Move the duplicates onto the newly allocated page. */
@@ -744,7 +745,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 		}
 
 		/* Build the data item we're going to store on the page. */
-		WT_ERR(__wt_bt_build_data_item(
+		WT_ERR(__wt_item_build_data(
 		    toc, data, &data_item, &data_ovfl, WT_IS_DUP));
 
 		/*
@@ -760,12 +761,12 @@ __wt_bt_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 			 * If we promoted a key, we might have split, and so
 			 * there may be a new offpage duplicates root page.
 			 */
-			WT_RET(__wt_bt_promote(toc,
+			WT_RET(__wt_bulk_promote(toc,
 			    page, page->records, &stack, 0, &root_addr));
 			WT_ERR(__wt_page_write(toc, page));
 			page->records = 0;
 			page->hdr->u.entries = 0;
-			__wt_bt_set_ff_and_sa_from_offset(page,
+			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 		}
 
@@ -792,7 +793,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 
 	/* Promote a key from the partially-filled page and write it. */
 	WT_ERR(
-	    __wt_bt_promote(toc, page, page->records, &stack, 0, &root_addr));
+	    __wt_bulk_promote(toc, page, page->records, &stack, 0, &root_addr));
 	WT_ERR(__wt_page_write(toc, page));
 
 	/* Fill in the caller's WT_OFF structure. */
@@ -800,7 +801,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 	off->addr = root_addr;
 	off->size = db->intlmin;
 
-err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
+err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
@@ -808,11 +809,11 @@ err:	WT_TRET(__wt_bt_bulk_stack_put(toc, &stack));
 }
 
 /*
- * __wt_bt_promote --
+ * __wt_bulk_promote --
  *	Promote the first entry on a page to its parent.
  */
 static int
-__wt_bt_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
+__wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
     WT_STACK *stack, u_int level, uint32_t *dup_root_addrp)
 {
 	DB *db;
@@ -882,7 +883,7 @@ __wt_bt_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 			 * are larger than leaf nodes), but that's unlikely.
 			 */
 			WT_CLEAR(tmp_ovfl);
-			WT_RET(__wt_bt_bulk_ovfl_copy(toc,
+			WT_RET(__wt_bulk_ovfl_copy(toc,
 			    WT_ITEM_BYTE_OVFL(key_item), &tmp_ovfl));
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
@@ -1009,9 +1010,9 @@ split:		switch (hdr->type) {
 		WT_ILLEGAL_FORMAT(db);
 		}
 
-		WT_ERR(__wt_bt_scratch_page(
+		WT_ERR(__wt_bulk_scratch_page(
 		    toc, db->intlmin, type, hdr->level + 1, &next, &next_tmp));
-		__wt_bt_set_ff_and_sa_from_offset(next,
+		__wt_set_ff_and_sa_from_offset(next,
 		    WT_PAGE_BYTE(next), &next_first_free, &next_space_avail);
 
 		/*
@@ -1046,7 +1047,7 @@ split:		switch (hdr->type) {
 			 * the existing parent page.
 			 */
 			if (stack->elem[level + 1].page == NULL)
-				WT_ERR(__wt_bt_promote(toc, parent,
+				WT_ERR(__wt_bulk_promote(toc, parent,
 				    incr, stack, level + 1, dup_root_addrp));
 			need_promotion = 1;
 
@@ -1136,7 +1137,7 @@ split:		switch (hdr->type) {
 	 * the key from the newly allocated internal page to its parent.
 	 */
 	if (need_promotion)
-		WT_RET(__wt_bt_promote(
+		WT_RET(__wt_bulk_promote(
 		    toc, parent, incr, stack, level + 1, dup_root_addrp));
 	else {
 		/*
@@ -1169,12 +1170,12 @@ err:	if (next_tmp != NULL)
 }
 
 /*
- * __wt_bt_build_key_item --
+ * __wt_item_build_key --
  *	Process an inserted key item and return an WT_ITEM structure and byte
  *	string to be stored on the page.
  */
 static int
-__wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+__wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 {
 	DB *db;
 	IDB *idb;
@@ -1210,7 +1211,7 @@ __wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	if (dbt->size > db->leafitemsize) {
 		WT_STAT_INCR(stats, OVERFLOW_KEY);
 
-		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, ovfl));
+		WT_RET(__wt_bulk_ovfl_write(toc, dbt, ovfl));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1221,12 +1222,12 @@ __wt_bt_build_key_item(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 }
 
 /*
- * __wt_bt_build_data_item --
+ * __wt_item_build_data --
  *	Process an inserted data item and return an WT_ITEM structure and byte
  *	string to be stored on the page.
  */
 int
-__wt_bt_build_data_item(
+__wt_item_build_data(
     WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags)
 {
 	DB *db;
@@ -1234,7 +1235,7 @@ __wt_bt_build_data_item(
 	WT_STATS *stats;
 
 	 WT_ENV_FCHK_ASSERT(toc->env,
-	    "__wt_bt_build_data_item", flags, WT_APIMASK_BT_BUILD_DATA_ITEM);
+	    "__wt_item_build_data", flags, WT_APIMASK_BT_BUILD_DATA_ITEM);
 
 	db = toc->db;
 	idb = db->idb;
@@ -1276,7 +1277,7 @@ __wt_bt_build_data_item(
 
 	/* Create an overflow object if the data won't fit. */
 	if (dbt->size > db->leafitemsize) {
-		WT_RET(__wt_bt_bulk_ovfl_write(toc, dbt, ovfl));
+		WT_RET(__wt_bulk_ovfl_write(toc, dbt, ovfl));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
@@ -1290,12 +1291,12 @@ __wt_bt_build_data_item(
 }
 
 /*
- * __wt_bt_bulk_ovfl_copy --
+ * __wt_bulk_ovfl_copy --
  *	Copy bulk-loaded overflow items in the database, returning the WT_OVFL
  *	structure, filled in.
  */
 static int
-__wt_bt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
+__wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 {
 	DB *db;
 	DBT *tmp;
@@ -1308,7 +1309,7 @@ __wt_bt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 
 	/* Get a scratch buffer and make it look like an overflow page. */
 	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + from->size, db->allocsize);
-	WT_ERR(__wt_bt_scratch_page(
+	WT_ERR(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 	page->hdr->u.datalen = from->size;
 
@@ -1338,12 +1339,12 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_bt_bulk_ovfl_write --
+ * __wt_bulk_ovfl_write --
  *	Store bulk-loaded overflow items in the database, returning the page
  *	addr.
  */
 static int
-__wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
+__wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 {
 	DB *db;
 	DBT *tmp;
@@ -1357,7 +1358,7 @@ __wt_bt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 
 	/* Get a scratch buffer and make it look like our work page. */
 	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + dbt->size, db->allocsize);
-	WT_ERR(__wt_bt_scratch_page(
+	WT_ERR(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 
 	/* Fill in the return information. */
@@ -1378,11 +1379,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_bt_bulk_scratch_page --
+ * __wt_bulk_scratch_page --
  *	Allocate a scratch buffer and make it look like a database page.
  */
-int
-__wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
+static int
+__wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
     uint32_t page_type, uint32_t page_level, WT_PAGE **page_ret, DBT **tmp_ret)
 {
 	DBT *tmp;
@@ -1412,7 +1413,7 @@ __wt_bt_scratch_page(WT_TOC *toc, uint32_t page_size,
 	page = tmp->data;
 	page->hdr = hdr =
 	    (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
-	WT_ERR(__wt_bt_table_alloc(toc, &page->addr, page_size));
+	WT_ERR(__wt_file_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
 	hdr->type = (uint8_t)page_type;
 	hdr->level = (uint8_t)page_level;
@@ -1427,11 +1428,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_bt_bulk_stack_put --
+ * __wt_bulk_stack_put --
  *	Push out the tree's stack of pages.
  */
 static int
-__wt_bt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
+__wt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 {
 	ENV *env;
 	IDB *idb;
@@ -1454,7 +1455,7 @@ __wt_bt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 			idb->root_off.addr = elem->page->addr;
 			idb->root_off.size = elem->page->size;
 			WT_RECORDS(&idb->root_off) = elem->page->records;
-			WT_TRET(__wt_bt_desc_write(toc));
+			WT_TRET(__wt_desc_write(toc));
 		}
 
 		__wt_scr_release(&elem->tmp);
@@ -1465,11 +1466,11 @@ __wt_bt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 }
 
 /*
- * __wt_bt_dbt_copy --
+ * __wt_bulk_dbt_copy --
  *	Get a copy of DBT referenced object.
  */
 static int
-__wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
+__wt_bulk_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 {
 	if (copy->mem_size < orig->size)
 		WT_RET(__wt_realloc(

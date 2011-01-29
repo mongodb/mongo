@@ -13,8 +13,8 @@ class Serial:
 		self.spin = spin
 		self.args = args
 
-serial['bt_rcc_expand'] = Serial(
-	'bt_rcc_expand',
+serial['rcc_expand'] = Serial(
+	'rcc_expand',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'uint32_t/write_gen',
@@ -22,16 +22,16 @@ serial['bt_rcc_expand'] = Serial(
 	 'WT_RCC_EXPAND **/new_rccexp',
 	 'WT_RCC_EXPAND */exp'])
 
-serial['bt_rcc_expand_repl'] = Serial(
-	'bt_rcc_expand_repl',
+serial['rcc_expand_repl'] = Serial(
+	'rcc_expand_repl',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'uint32_t/write_gen',
 	 'WT_RCC_EXPAND */exp',
 	 'WT_REPL */repl'])
 
-serial['bt_item_update'] = Serial(
-	'bt_item_update',
+serial['item_update'] = Serial(
+	'item_update',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'uint32_t/write_gen',

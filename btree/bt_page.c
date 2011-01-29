@@ -9,22 +9,22 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
-static void __wt_bt_page_inmem_col_int(WT_PAGE *);
-static void __wt_bt_page_inmem_col_rcc(DB *, WT_PAGE *);
-static void __wt_bt_page_inmem_col_var(WT_PAGE *);
-static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
-static int  __wt_bt_page_inmem_int_ref(WT_TOC *, uint32_t, WT_PAGE *);
-static int  __wt_bt_page_inmem_row_int(DB *, WT_PAGE *);
-static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
+static void __wt_page_inmem_col_fix(DB *, WT_PAGE *);
+static void __wt_page_inmem_col_int(WT_PAGE *);
+static void __wt_page_inmem_col_rcc(DB *, WT_PAGE *);
+static void __wt_page_inmem_col_var(WT_PAGE *);
+static int  __wt_page_inmem_dup_leaf(DB *, WT_PAGE *);
+static int  __wt_page_inmem_int_ref(WT_TOC *, uint32_t, WT_PAGE *);
+static int  __wt_page_inmem_row_int(DB *, WT_PAGE *);
+static int  __wt_page_inmem_row_leaf(DB *, WT_PAGE *);
 
 /*
- * __wt_bt_page_in --
+ * __wt_page_in --
  *	Acquire a hazard reference to a page; if the page is not in-memory,
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_bt_page_in(
+__wt_page_in(
     WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, WT_OFF *off, int dsk_verify)
 {
 	ENV *env;
@@ -68,11 +68,11 @@ __wt_bt_page_in(
 }
 
 /*
- * __wt_bt_page_inmem --
+ * __wt_page_inmem --
  *	Build in-memory page information.
  */
 int
-__wt_bt_page_inmem(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	ENV *env;
@@ -146,7 +146,7 @@ __wt_bt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_bt_page_inmem_int_ref(toc, nindx, page));
+		WT_ERR(__wt_page_inmem_int_ref(toc, nindx, page));
 		break;
 	default:
 		break;
@@ -155,42 +155,42 @@ __wt_bt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	/* Fill in the structures. */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		__wt_bt_page_inmem_col_fix(db, page);
+		__wt_page_inmem_col_fix(db, page);
 		break;
 	case WT_PAGE_COL_INT:
-		__wt_bt_page_inmem_col_int(page);
+		__wt_page_inmem_col_int(page);
 		break;
 	case WT_PAGE_COL_RCC:
-		__wt_bt_page_inmem_col_rcc(db, page);
+		__wt_page_inmem_col_rcc(db, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		__wt_bt_page_inmem_col_var(page);
+		__wt_page_inmem_col_var(page);
 		break;
 	case WT_PAGE_DUP_LEAF:
-		WT_ERR(__wt_bt_page_inmem_dup_leaf(db, page));
+		WT_ERR(__wt_page_inmem_dup_leaf(db, page));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_bt_page_inmem_row_int(db, page));
+		WT_ERR(__wt_page_inmem_row_int(db, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_bt_page_inmem_row_leaf(db, page));
+		WT_ERR(__wt_page_inmem_row_leaf(db, page));
 		break;
 	default:
 		break;
 	}
 	return (0);
 
-err:	__wt_bt_page_discard(toc, page);
+err:	__wt_page_discard(toc, page);
 	return (ret);
 }
 
 /*
- * __wt_bt_page_inmem_col_fix --
+ * __wt_page_inmem_col_fix --
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static void
-__wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
+__wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
@@ -213,11 +213,11 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_col_int --
+ * __wt_page_inmem_col_int --
  *	Build in-memory index for column-store internal pages.
  */
 static void
-__wt_bt_page_inmem_col_int(WT_PAGE *page)
+__wt_page_inmem_col_int(WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_OFF *off;
@@ -244,12 +244,12 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_col_rcc --
+ * __wt_page_inmem_col_rcc --
  *	Build in-memory index for repeat-compressed, fixed-length column-store
  *	leaf pages.
  */
 static void
-__wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
+__wt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_HDR *hdr;
@@ -276,12 +276,12 @@ __wt_bt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_col_var --
+ * __wt_page_inmem_col_var --
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	column-store trees.
  */
 static void
-__wt_bt_page_inmem_col_var(WT_PAGE *page)
+__wt_page_inmem_col_var(WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_ITEM *item;
@@ -306,12 +306,12 @@ __wt_bt_page_inmem_col_var(WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_dup_leaf --
+ * __wt_page_inmem_dup_leaf --
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	duplicate trees.
  */
 static int
-__wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
+__wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
 	WT_ROW *rip;
 	WT_ITEM *item;
@@ -351,12 +351,12 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_row_int --
+ * __wt_page_inmem_row_int --
  *	Build in-memory index for row-store and off-page duplicate tree
  *	internal pages.
  */
 static int
-__wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
+__wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_ITEM *item;
@@ -413,11 +413,11 @@ __wt_bt_page_inmem_row_int(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_row_leaf --
+ * __wt_page_inmem_row_leaf --
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
+__wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 {
 	ENV *env;
 	IDB *idb;
@@ -504,12 +504,12 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_item_process --
+ * __wt_item_process --
  *	Overflow and/or compressed on-page items need processing before
  *	we look at them.
  */
 int
-__wt_bt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
+__wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
 {
 	DB *db;
 	DBT *tmp;
@@ -557,7 +557,7 @@ offpage:	/*
 			tmp = dbt_ret;
 		else
 			WT_RET(__wt_scr_alloc(toc, 0, &tmp));
-		WT_RET(__wt_bt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), tmp));
+		WT_RET(__wt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), tmp));
 		p = tmp->data;
 		size = tmp->size;
 		break;
@@ -592,11 +592,11 @@ err:	if (tmp != NULL && tmp != dbt_ret)
 }
 
 /*
- * __wt_bt_page_inmem_int_ref --
+ * __wt_page_inmem_int_ref --
  *	Allocate and initialize the reference array for internal pages.
  */
 static int
-__wt_bt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
+__wt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
 {
 	ENV *env;
 	WT_REF *cp;
@@ -622,16 +622,6 @@ __wt_bt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
 }
 
 /*
- * __wt_key_process --
- *	Return if a key requires processing.
- */
-inline int
-__wt_key_process(WT_ROW *rip)
-{
-	return (rip->size == 0 ? 1 : 0);
-}
-
-/*
  * __wt_key_set --
  *	Set a key/size pair, where the key does not require further processing.
  */
@@ -651,4 +641,14 @@ __wt_key_set_process(WT_ROW *rip, void *key)
 {
 	rip->key = key;
 	rip->size = 0;
+}
+
+/*
+ * __wt_key_process --
+ *	Return if a key requires processing.
+ */
+inline int
+__wt_key_process(WT_ROW *rip)
+{
+	return (rip->size == 0 ? 1 : 0);
 }

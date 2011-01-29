@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_ovfl_in --
+ * __wt_ovfl_in --
  *	Read an overflow item from the disk.
  */
 int
-__wt_bt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
+__wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 {
 	DB *db;
 	ENV *env;

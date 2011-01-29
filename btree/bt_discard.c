@@ -9,18 +9,18 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_page_discard_dup(ENV *, WT_PAGE *);
-static void __wt_bt_page_discard_rccexp(ENV *, WT_PAGE *);
-static void __wt_bt_page_discard_repl(ENV *, WT_PAGE *);
-static void __wt_bt_page_discard_repl_list(ENV *, WT_REPL *);
+static void __wt_page_discard_dup(ENV *, WT_PAGE *);
+static void __wt_page_discard_rccexp(ENV *, WT_PAGE *);
+static void __wt_page_discard_repl(ENV *, WT_PAGE *);
+static void __wt_page_discard_repl_list(ENV *, WT_REPL *);
 static inline int __wt_row_key_on_page(WT_PAGE *, WT_ROW *);
 
 /*
- * __wt_bt_page_discard --
+ * __wt_page_discard --
  *	Free all memory associated with a page.
  */
 void
-__wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
+__wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 {
 	ENV *env;
 	WT_ROW *rip;
@@ -82,7 +82,7 @@ __wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 		if (page->u2.repl != NULL)
-			__wt_bt_page_discard_repl(env, page);
+			__wt_page_discard_repl(env, page);
 		break;
 	default:
 		break;
@@ -92,7 +92,7 @@ __wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	switch (type) {
 	case WT_PAGE_COL_RCC:
 		if (page->u2.rccexp != NULL)
-			__wt_bt_page_discard_rccexp(env, page);
+			__wt_page_discard_rccexp(env, page);
 		break;
 	default:
 		break;
@@ -109,7 +109,7 @@ __wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		if (WT_PAGE_DUP_TREES(page))
-			__wt_bt_page_discard_dup(env, page);
+			__wt_page_discard_dup(env, page);
 		break;
 	default:
 		break;
@@ -121,11 +121,11 @@ __wt_bt_page_discard(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_discard_repl --
+ * __wt_page_discard_repl --
  *	Discard the replacement array.
  */
 static void
-__wt_bt_page_discard_repl(ENV *env, WT_PAGE *page)
+__wt_page_discard_repl(ENV *env, WT_PAGE *page)
 {
 	WT_REPL **replp;
 	u_int i;
@@ -136,18 +136,18 @@ __wt_bt_page_discard_repl(ENV *env, WT_PAGE *page)
 	 */
 	WT_REPL_FOREACH(page, replp, i)
 		if (*replp != NULL)
-			__wt_bt_page_discard_repl_list(env, *replp);
+			__wt_page_discard_repl_list(env, *replp);
 
 	/* Free the page's array of replacements. */
 	__wt_free(env, page->u2.repl, page->indx_count * sizeof(WT_REPL *));
 }
 
 /*
- * __wt_bt_page_discard_rccexp --
+ * __wt_page_discard_rccexp --
  *	Discard the repeat-count compressed column store expansion array.
  */
 static void
-__wt_bt_page_discard_rccexp(ENV *env, WT_PAGE *page)
+__wt_page_discard_rccexp(ENV *env, WT_PAGE *page)
 {
 	WT_RCC_EXPAND **expp, *exp, *a;
 	u_int i;
@@ -164,7 +164,7 @@ __wt_bt_page_discard_rccexp(ENV *env, WT_PAGE *page)
 		 * Free the linked list of WT_REPL structures anchored in the
 		 * WT_RCC_EXPAND entry.
 		 */
-		__wt_bt_page_discard_repl_list(env, exp->repl);
+		__wt_page_discard_repl_list(env, exp->repl);
 		do {
 			a = exp->next;
 			__wt_free(env, exp, sizeof(WT_RCC_EXPAND));
@@ -177,12 +177,12 @@ __wt_bt_page_discard_rccexp(ENV *env, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_discard_repl_list --
+ * __wt_page_discard_repl_list --
  *	Walk a WT_REPL forward-linked list and free the per-thread combination
  *	of a WT_REPL structure and its associated data.
  */
 static void
-__wt_bt_page_discard_repl_list(ENV *env, WT_REPL *repl)
+__wt_page_discard_repl_list(ENV *env, WT_REPL *repl)
 {
 	WT_REPL *a;
 	WT_TOC_UPDATE *update;
@@ -198,11 +198,11 @@ __wt_bt_page_discard_repl_list(ENV *env, WT_REPL *repl)
 }
 
 /*
- * __wt_bt_page_discard_dup --
+ * __wt_page_discard_dup --
  *	Walk the off-page duplicates tree array.
  */
 static void
-__wt_bt_page_discard_dup(ENV *env, WT_PAGE *page)
+__wt_page_discard_dup(ENV *env, WT_PAGE *page)
 {
 	WT_REF **dupp;
 	u_int i;
@@ -232,3 +232,4 @@ __wt_row_key_on_page(WT_PAGE *page, WT_ROW *rip)
 	return (p >= (uint8_t *)page->hdr &&
 	    p < (uint8_t *)page->hdr + page->size ? 1 : 0);
 }
+

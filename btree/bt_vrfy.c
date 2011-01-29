@@ -25,22 +25,22 @@ typedef struct {
 	WT_PAGE *leaf;				/* Last leaf-page */
 } WT_VSTUFF;
 
-static int __wt_bt_verify_addfrag(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
-static int __wt_bt_verify_delfmt(DB *, uint32_t, uint32_t);
-static int __wt_bt_verify_dsk_col_fix(DB *, WT_PAGE *);
-static int __wt_bt_verify_dsk_col_int(DB *, WT_PAGE *);
-static int __wt_bt_verify_dsk_col_rcc(DB *, WT_PAGE *);
-static int __wt_bt_verify_dsk_item(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_dsk_ovfl(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_eof(DB *, uint32_t, uint32_t);
-static int __wt_bt_verify_eop(DB *, uint32_t, uint32_t);
-static int __wt_bt_verify_key_order(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_bt_verify_overflow_common(WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_bt_verify_overflow_row(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_bt_verify_pc(WT_TOC *, WT_ROW *, WT_PAGE *, int);
-static int __wt_bt_verify_tree(WT_TOC *, WT_ROW *, uint64_t, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
+static int __wt_verify_addfrag(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_checkfrag(DB *, WT_VSTUFF *);
+static int __wt_verify_delfmt(DB *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_fix(DB *, WT_PAGE *);
+static int __wt_verify_dsk_col_int(DB *, WT_PAGE *);
+static int __wt_verify_dsk_col_rcc(DB *, WT_PAGE *);
+static int __wt_verify_dsk_item(WT_TOC *, WT_PAGE *);
+static int __wt_verify_dsk_ovfl(WT_TOC *, WT_PAGE *);
+static int __wt_verify_eof(DB *, uint32_t, uint32_t);
+static int __wt_verify_eop(DB *, uint32_t, uint32_t);
+static int __wt_verify_key_order(WT_TOC *, WT_PAGE *);
+static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_overflow_common(WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_overflow_row(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_pc(WT_TOC *, WT_ROW *, WT_PAGE *, int);
+static int __wt_verify_tree(WT_TOC *, WT_ROW *, uint64_t, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -49,15 +49,15 @@ static int __wt_bt_verify_tree(WT_TOC *, WT_ROW *, uint64_t, uint64_t, uint32_t,
 int
 __wt_db_verify(WT_TOC *toc, void (*f)(const char *, uint64_t))
 {
-	return (__wt_bt_verify(toc, f, NULL));
+	return (__wt_verify(toc, f, NULL));
 }
 
 /*
- * __wt_bt_verify --
+ * __wt_verify --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_bt_verify(
+__wt_verify(
     WT_TOC *toc, void (*f)(const char *, uint64_t), FILE *stream)
 {
 	DB *db;
@@ -104,10 +104,10 @@ __wt_bt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_bt_verify_tree(toc, NULL, WT_RECORDS(&idb->root_off),
+	WT_ERR(__wt_verify_tree(toc, NULL, WT_RECORDS(&idb->root_off),
 	    (uint64_t)1, WT_NOLEVEL, &idb->root_page, &vstuff));
 
-	WT_ERR(__wt_bt_verify_checkfrag(db, &vstuff));
+	WT_ERR(__wt_verify_checkfrag(db, &vstuff));
 
 err:	/* Wrap up reporting and free allocated memory. */
 	if (vstuff.f != NULL)
@@ -119,14 +119,14 @@ err:	/* Wrap up reporting and free allocated memory. */
 }
 
 /*
- * __wt_bt_verify_tree --
+ * __wt_verify_tree --
  *	Verify a tree, recursively descending through it in depth-first fashion.
  * The page argument was physically verified (so we know it's correctly formed),
  * and the in-memory version built.  Our job is to check logical relationships
  * in the page and in the tree.
  */
 static int
-__wt_bt_verify_tree(
+__wt_verify_tree(
     WT_TOC *toc,		/* Thread of control */
     WT_ROW *parent_rip,		/* Internal key referencing this page, if any */
     uint64_t parent_records,	/* Parent's count of records in this tree */
@@ -157,11 +157,11 @@ __wt_bt_verify_tree(
 		vs->f(toc->name, vs->fcnt);
 
 	/* Update frags list. */
-	WT_ERR(__wt_bt_verify_addfrag(toc, page, vs));
+	WT_ERR(__wt_verify_addfrag(toc, page, vs));
 
 	/* Optionally dump the page in debugging mode. */
 	if (vs->stream != NULL)
-		return (__wt_bt_debug_page(toc, page, NULL, vs->stream));
+		return (__wt_debug_page(toc, page, NULL, vs->stream));
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -262,13 +262,13 @@ __wt_bt_verify_tree(
 	 */
 	switch (hdr->type) {
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_bt_verify_overflow_col(toc, page, vs));
+		WT_RET(__wt_verify_overflow_col(toc, page, vs));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bt_verify_overflow_row(toc, page, vs));
+		WT_RET(__wt_verify_overflow_row(toc, page, vs));
 		break;
 	default:
 		break;
@@ -280,7 +280,7 @@ __wt_bt_verify_tree(
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bt_verify_key_order(toc, page));
+		WT_RET(__wt_verify_key_order(toc, page));
 		break;
 	default:
 		break;
@@ -296,8 +296,8 @@ __wt_bt_verify_tree(
 			ref = WT_COL_REF(page, cip);
 			off = WT_COL_OFF(cip);
 			records = WT_COL_OFF_RECORDS(cip);
-			WT_ERR(__wt_bt_page_in(toc, page, ref, off, 1));
-			ret = __wt_bt_verify_tree(toc, NULL,
+			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
+			ret = __wt_verify_tree(toc, NULL,
 			    records, start_recno, level - 1, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
@@ -325,7 +325,7 @@ __wt_bt_verify_tree(
 		 * be less than the internal node entry's key.
 		 */
 		if (parent_rip != NULL)
-			WT_ERR(__wt_bt_verify_pc(toc, parent_rip, page, 1));
+			WT_ERR(__wt_verify_pc(toc, parent_rip, page, 1));
 
 		/* For each entry in an internal page, verify the subtree. */
 		WT_INDX_FOREACH(page, rip, i) {
@@ -342,7 +342,7 @@ __wt_bt_verify_tree(
 			 */
 			if (vs->leaf != NULL) {
 				WT_ERR(
-				    __wt_bt_verify_pc(toc, rip, vs->leaf, 0));
+				    __wt_verify_pc(toc, rip, vs->leaf, 0));
 				__wt_hazard_clear(toc, vs->leaf);
 				vs->leaf = NULL;
 			}
@@ -350,8 +350,8 @@ __wt_bt_verify_tree(
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
 			records = WT_ROW_OFF_RECORDS(rip);
-			WT_ERR(__wt_bt_page_in(toc, page, ref, off, 1));
-			ret = __wt_bt_verify_tree(toc, rip,
+			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
+			ret = __wt_verify_tree(toc, rip,
 			    records, (uint64_t)0, level - 1, ref, vs);
 
 			/*
@@ -385,8 +385,8 @@ __wt_bt_verify_tree(
 			ref = WT_ROW_DUP(page, rip);
 			off = WT_ROW_OFF(rip);
 			records = WT_ROW_OFF_RECORDS(rip);
-			WT_ERR(__wt_bt_page_in(toc, page, ref, off, 1));
-			ret = __wt_bt_verify_tree(toc, NULL,
+			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
+			ret = __wt_verify_tree(toc, NULL,
 			    records, (uint64_t)0, WT_NOLEVEL, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
@@ -419,11 +419,11 @@ err:	if (vs->leaf != NULL) {
 }
 
 /*
- * __wt_bt_verify_pc --
+ * __wt_verify_pc --
  *	Compare a key on a parent page to a designated entry on a child page.
  */
 static int
-__wt_bt_verify_pc(
+__wt_verify_pc(
     WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
@@ -457,13 +457,13 @@ __wt_bt_verify_pc(
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
 	if (__wt_key_process(child_rip)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
-		WT_ERR(__wt_bt_item_process(toc, child_rip->key, scratch1));
+		WT_ERR(__wt_item_process(toc, child_rip->key, scratch1));
 		cd_ref = scratch1;
 	} else
 		cd_ref = (DBT *)child_rip;
 	if (__wt_key_process(parent_rip)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch2));
-		WT_RET(__wt_bt_item_process(toc, parent_rip->key, scratch2));
+		WT_RET(__wt_item_process(toc, parent_rip->key, scratch2));
 		pd_ref = scratch2;
 	} else
 		pd_ref = (DBT *)parent_rip;
@@ -495,11 +495,11 @@ err:	if (scratch1 != NULL)
 }
 
 /*
- * __wt_bt_verify_key_order --
+ * __wt_verify_key_order --
  *	Check on-page key ordering.
  */
 static int
-__wt_bt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 {
 	struct {
 		DBT	*dbt;			/* DBT to compare */
@@ -547,7 +547,7 @@ __wt_bt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 		 * reason to believe we're going to be working in this database.
 		 */
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_bt_item_process(
+			WT_RET(__wt_item_process(
 			    toc, rip->key, current->scratch));
 			current->dbt = current->scratch;
 		} else
@@ -576,11 +576,11 @@ err:	if (_a.scratch != NULL)
 }
 
 /*
- * __wt_bt_verify_dsk_page --
+ * __wt_verify_dsk_page --
  *	Verify a single Btree page as read from disk.
  */
 int
-__wt_bt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	WT_PAGE_HDR *hdr;
@@ -648,7 +648,7 @@ __wt_bt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 err_level:		__wt_api_db_errx(db,
 			    "%s page at addr %lu has incorrect tree level "
 			    "of %lu",
-			    __wt_bt_hdr_type(hdr),
+			    __wt_page_type_string(hdr),
 			    (u_long)addr, (u_long)hdr->level);
 			return (WT_ERROR);
 		}
@@ -670,19 +670,19 @@ err_level:		__wt_api_db_errx(db,
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bt_verify_dsk_item(toc, page));
+		WT_RET(__wt_verify_dsk_item(toc, page));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_bt_verify_dsk_col_int(db, page));
+		WT_RET(__wt_verify_dsk_col_int(db, page));
 		break;
 	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_bt_verify_dsk_col_fix(db, page));
+		WT_RET(__wt_verify_dsk_col_fix(db, page));
 		break;
 	case WT_PAGE_COL_RCC:
-		WT_RET(__wt_bt_verify_dsk_col_rcc(db, page));
+		WT_RET(__wt_verify_dsk_col_rcc(db, page));
 		break;
 	case WT_PAGE_OVFL:
-		WT_RET(__wt_bt_verify_dsk_ovfl(toc, page));
+		WT_RET(__wt_verify_dsk_ovfl(toc, page));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -691,11 +691,11 @@ err_level:		__wt_api_db_errx(db,
 }
 
 /*
- * __wt_bt_verify_dsk_item --
+ * __wt_verify_dsk_item --
  *	Walk a disk page of WT_ITEMs, and verify them.
  */
 static int
-__wt_bt_verify_dsk_item(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_dsk_item(WT_TOC *toc, WT_PAGE *page)
 {
 	enum { IS_FIRST, WAS_KEY, WAS_DATA, WAS_DUP_DATA } last_item_type;
 	DB *db;
@@ -765,8 +765,8 @@ item_vs_page:			__wt_api_db_errx(db,
 				    "(item %lu on page at addr %lu is a %s "
 				    "item on a %s page)",
 				    (u_long)item_num, (u_long)addr,
-				    __wt_bt_item_type(item),
-				    __wt_bt_hdr_type(hdr));
+				    __wt_item_type_string(item),
+				    __wt_page_type_string(hdr));
 				return (WT_ERROR);
 			}
 			break;
@@ -928,16 +928,16 @@ item_len:			__wt_api_db_errx(db,
 	}
 	return (0);
 
-eof:	return (__wt_bt_verify_eof(db, item_num, addr));
-eop:	return (__wt_bt_verify_eop(db, item_num, addr));
+eof:	return (__wt_verify_eof(db, item_num, addr));
+eop:	return (__wt_verify_eop(db, item_num, addr));
 }
 
 /*
- * __wt_bt_verify_dsk_col_int --
+ * __wt_verify_dsk_col_int --
  *	Walk a WT_PAGE_COL_INT disk page and verify it.
  */
 static int
-__wt_bt_verify_dsk_col_int(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_OFF *off;
@@ -956,23 +956,23 @@ __wt_bt_verify_dsk_col_int(DB *db, WT_PAGE *page)
 
 		/* Check if this entry is entirely on the page. */
 		if ((uint8_t *)off + sizeof(WT_OFF) > end)
-			return (__wt_bt_verify_eop(db, entry_num, addr));
+			return (__wt_verify_eop(db, entry_num, addr));
 
 		/* Check if the reference is past the end-of-file. */
 		if (WT_ADDR_TO_OFF(
 		    db, off->addr) + off->size > idb->fh->file_size)
-			return (__wt_bt_verify_eof(db, entry_num, addr));
+			return (__wt_verify_eof(db, entry_num, addr));
 	}
 
 	return (0);
 }
 
 /*
- * __wt_bt_verify_dsk_col_fix --
+ * __wt_verify_dsk_col_fix --
  *	Walk a WT_PAGE_COL_FIX disk page and verify it.
  */
 static int
-__wt_bt_verify_dsk_col_fix(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_fix(DB *db, WT_PAGE *page)
 {
 	u_int len;
 	uint32_t addr, i, j, entry_num;
@@ -988,7 +988,7 @@ __wt_bt_verify_dsk_col_fix(DB *db, WT_PAGE *page)
 
 		/* Check if this entry is entirely on the page. */
 		if (data + len > end)
-			return (__wt_bt_verify_eop(db, entry_num, addr));
+			return (__wt_verify_eop(db, entry_num, addr));
 
 		/* Deleted items are entirely nul bytes. */
 		p = data;
@@ -1003,15 +1003,15 @@ __wt_bt_verify_dsk_col_fix(DB *db, WT_PAGE *page)
 
 	return (0);
 
-delfmt:	return (__wt_bt_verify_delfmt(db, entry_num, addr));
+delfmt:	return (__wt_verify_delfmt(db, entry_num, addr));
 }
 
 /*
- * __wt_bt_verify_dsk_col_rcc --
+ * __wt_verify_dsk_col_rcc --
  *	Walk a WT_PAGE_COL_RCC disk page and verify it.
  */
 static int
-__wt_bt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 {
 	u_int len;
 	uint32_t addr, i, j, entry_num;
@@ -1029,7 +1029,7 @@ __wt_bt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 
 		/* Check if this entry is entirely on the page. */
 		if (data + len > end)
-			return (__wt_bt_verify_eop(db, entry_num, addr));
+			return (__wt_verify_eop(db, entry_num, addr));
 
 		/* Count must be non-zero. */
 		if (WT_RCC_REPEAT_COUNT(data) == 0) {
@@ -1071,15 +1071,15 @@ __wt_bt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 
 	return (0);
 
-delfmt:	return (__wt_bt_verify_delfmt(db, entry_num, addr));
+delfmt:	return (__wt_verify_delfmt(db, entry_num, addr));
 }
 
 /*
- * __wt_bt_verify_overflow_col --
+ * __wt_verify_overflow_col --
  *	Check on-page column-store overflow references.
  */
 static int
-__wt_bt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_COL *cip;
 	WT_ITEM *item;
@@ -1089,7 +1089,7 @@ __wt_bt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_INDX_FOREACH(page, cip, i) {
 		item = cip->data;
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
-			WT_RET(__wt_bt_verify_overflow_common(
+			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(item),
 			    WT_COL_SLOT(page, cip) + 1, page->addr, vs));
 	}
@@ -1097,11 +1097,11 @@ __wt_bt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 }
 
 /*
- * __wt_bt_verify_overflow_row --
+ * __wt_verify_overflow_row --
  *	Check on-page row-store overflow references.
  */
 static int
-__wt_bt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_ITEM *item;
 	WT_ROW *rip;
@@ -1124,7 +1124,7 @@ __wt_bt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_KEY_DUP_OVFL:
-			WT_RET(__wt_bt_verify_overflow_common(
+			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(item),
 			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
 			break;
@@ -1139,7 +1139,7 @@ __wt_bt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DATA_DUP_OVFL:
-			WT_RET(__wt_bt_verify_overflow_common(
+			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(item),
 			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
 			break;
@@ -1151,11 +1151,11 @@ __wt_bt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 }
 
 /*
- * __wt_bt_verify_overflow_common --
+ * __wt_verify_overflow_common --
  *	Common code that reads in an overflow page and checks it.
  */
 static int
-__wt_bt_verify_overflow_common(WT_TOC *toc,
+__wt_verify_overflow_common(WT_TOC *toc,
     WT_OVFL *ovfl, uint32_t entry_num, uint32_t addr, WT_VSTUFF *vs)
 {
 	DB *db;
@@ -1187,10 +1187,10 @@ __wt_bt_verify_overflow_common(WT_TOC *toc,
 	 * into two parts, on-disk format checking and internal checking,
 	 * just so it looks like all of the other page type checking.
 	 */
-	WT_ERR(__wt_bt_verify_dsk_ovfl(toc, page));
+	WT_ERR(__wt_verify_dsk_ovfl(toc, page));
 
 	/* Add the fragments. */
-	WT_ERR(__wt_bt_verify_addfrag(toc, page, vs));
+	WT_ERR(__wt_verify_addfrag(toc, page, vs));
 
 	/*
 	 * The only other thing to check is that the size we have in the page
@@ -1210,11 +1210,11 @@ err:	__wt_scr_release(&scratch1);
 }
 
 /*
- * __wt_bt_verify_dsk_ovfl --
+ * __wt_verify_dsk_ovfl --
  *	Verify a WT_PAGE_OVFL disk page.
  */
 static int
-__wt_bt_verify_dsk_ovfl(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_dsk_ovfl(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	WT_PAGE_HDR *hdr;
@@ -1247,11 +1247,11 @@ __wt_bt_verify_dsk_ovfl(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_verify_eop --
+ * __wt_verify_eop --
  *	Generic item extends past the end-of-page error.
  */
 static int
-__wt_bt_verify_eop(DB *db, uint32_t entry_num, uint32_t addr)
+__wt_verify_eop(DB *db, uint32_t entry_num, uint32_t addr)
 {
 	__wt_api_db_errx(db,
 	    "item %lu on page at addr %lu extends past the end of the page",
@@ -1260,11 +1260,11 @@ __wt_bt_verify_eop(DB *db, uint32_t entry_num, uint32_t addr)
 }
 
 /*
- * __wt_bt_verify_eof --
+ * __wt_verify_eof --
  *	Generic item references non-existent file pages error.
  */
 static int
-__wt_bt_verify_eof(DB *db, uint32_t entry_num, uint32_t addr)
+__wt_verify_eof(DB *db, uint32_t entry_num, uint32_t addr)
 {
 	__wt_api_db_errx(db,
 	    "off-page item %lu on page at addr %lu references non-existent "
@@ -1274,12 +1274,12 @@ __wt_bt_verify_eof(DB *db, uint32_t entry_num, uint32_t addr)
 }
 
 /*
- * __wt_bt_verify_delfmt --
+ * __wt_verify_delfmt --
  *	WT_PAGE_COL_FIX and WT_PAGE_COL_RCC error where a deleted item has
  *	non-nul bytes.
  */
 static int
-__wt_bt_verify_delfmt(DB *db, uint32_t entry_num, uint32_t addr)
+__wt_verify_delfmt(DB *db, uint32_t entry_num, uint32_t addr)
 {
 	__wt_api_db_errx(db,
 	    "deleted fixed-length entry %lu on page at addr %lu has non-nul "
@@ -1289,12 +1289,12 @@ __wt_bt_verify_delfmt(DB *db, uint32_t entry_num, uint32_t addr)
 }
 
 /*
- * __wt_bt_verify_addfrag --
+ * __wt_verify_addfrag --
  *	Add the WT_PAGE's fragments to the list, and complain if we've already
  *	verified this chunk of the file.
  */
 static int
-__wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	DB *db;
 	uint32_t addr, frags, i;
@@ -1315,11 +1315,11 @@ __wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 }
 
 /*
- * __wt_bt_verify_checkfrag --
+ * __wt_verify_checkfrag --
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_bt_verify_checkfrag(DB *db, WT_VSTUFF *vs)
+__wt_verify_checkfrag(DB *db, WT_VSTUFF *vs)
 {
 	int ffc, ffc_start, ffc_end, frags, ret;
 

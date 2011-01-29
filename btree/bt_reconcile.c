@@ -9,23 +9,23 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_rcc_expand_compare(const void *, const void *);
-static int __wt_bt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_parent_update(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_bt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static inline void __wt_bt_rec_set_page_size(WT_TOC *, WT_PAGE *, uint8_t *);
+static int __wt_rcc_expand_compare(const void *, const void *);
+static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static inline void __wt_rec_set_page_size(WT_TOC *, WT_PAGE *, uint8_t *);
 
 /*
- * __wt_bt_rec_set_page_size --
+ * __wt_rec_set_page_size --
  *	Set the page's size to the minimum number of allocation units.
  */
 static inline void
-__wt_bt_rec_set_page_size(WT_TOC *toc, WT_PAGE *page, uint8_t *first_free)
+__wt_rec_set_page_size(WT_TOC *toc, WT_PAGE *page, uint8_t *first_free)
 {
 	DB *db;
 
@@ -43,11 +43,11 @@ __wt_bt_rec_set_page_size(WT_TOC *toc, WT_PAGE *page, uint8_t *first_free)
 }
 
 /*
- * __wt_bt_rec_page --
+ * __wt_page_reconcile --
  *	Format an in-memory page to its on-disk format, and write it.
  */
 int
-__wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
+__wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	DBT *tmp;
@@ -67,7 +67,7 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	WT_VERBOSE(env, WT_VERB_EVICT,
 	    (env, "reconcile addr %lu (page %p, type %s)",
-	    (u_long)page->addr, page, __wt_bt_hdr_type(hdr)));
+	    (u_long)page->addr, page, __wt_page_type_string(hdr)));
 
 	/*
 	 * Update the disk generation before reading the page.  The workQ will
@@ -143,33 +143,33 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_bt_rec_col_fix(toc, page, new));
+		WT_ERR(__wt_rec_col_fix(toc, page, new));
 		break;
 	case WT_PAGE_COL_RCC:
-		WT_ERR(__wt_bt_rec_col_rcc(toc, page, new));
+		WT_ERR(__wt_rec_col_rcc(toc, page, new));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__wt_bt_rec_col_var(toc, page, new));
+		WT_ERR(__wt_rec_col_var(toc, page, new));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_ERR(__wt_bt_rec_col_int(toc, page, new));
+		WT_ERR(__wt_rec_col_int(toc, page, new));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_bt_rec_row_int(toc, page, new));
+		WT_ERR(__wt_rec_row_int(toc, page, new));
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:
-		WT_ERR(__wt_bt_rec_row(toc, page, new));
+		WT_ERR(__wt_rec_row(toc, page, new));
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	/* Write the new page to disk. */
-	WT_ERR(__wt_bt_rec_page_write(toc, page, new));
+	WT_ERR(__wt_rec_page_write(toc, page, new));
 
 	/* Free the original page -- update the address and size. */
-	WT_ERR(__wt_bt_table_free(toc, page->addr, page->size));
+	WT_ERR(__wt_file_free(toc, page->addr, page->size));
 
 	/*
 	 * Update the backing address.
@@ -196,11 +196,11 @@ err:	F_CLR(toc, WT_READ_EVICT | WT_READ_PRIORITY);
 }
 
 /*
- * __wt_bt_rec_col_int --
+ * __wt_rec_col_int --
  *	Reconcile a column store internal page.
  */
 static int
-__wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_COL *cip;
 	WT_OFF *from;
@@ -210,7 +210,7 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint8_t *first_free;
 
 	hdr = new->hdr;
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	WT_INDX_FOREACH(page, cip, i) {
@@ -227,7 +227,7 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 */
 		if (sizeof(WT_OFF) > space_avail) {
 			fprintf(stderr,
-			   "__wt_bt_rec_col_int: page %lu split\n",
+			   "__wt_rec_col_int: page %lu split\n",
 			   (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
@@ -239,17 +239,17 @@ __wt_bt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	new->records = page->records;
-	__wt_bt_rec_set_page_size(toc, new, first_free);
+	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
 }
 
 /*
- * __wt_bt_rec_row_int --
+ * __wt_rec_row_int --
  *	Reconcile a row store, or off-page duplicate tree, internal page.
  */
 static int
-__wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_ITEM *key_item, *data_item, *next;
 	WT_PAGE_HDR *hdr;
@@ -259,7 +259,7 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint8_t *first_free;
 
 	hdr = new->hdr;
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
@@ -308,7 +308,7 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 */
 		if (len > space_avail) {
 			fprintf(stderr,
-			    "__wt_bt_rec_row_int: page %lu split\n",
+			    "__wt_rec_row_int: page %lu split\n",
 			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
@@ -322,18 +322,18 @@ __wt_bt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	new->records = page->records;
-	__wt_bt_rec_set_page_size(toc, new, first_free);
+	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
 }
 
 /*
- * __wt_bt_rec_col_fix --
+ * __wt_rec_col_fix --
  *	Reconcile a fixed-width column-store leaf page (does not handle
  *	repeat-count compression).
  */
 static int
-__wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
 	DBT *tmp;
@@ -351,7 +351,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	hdr = new->hdr;
 	ret = 0;
 
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
@@ -393,7 +393,7 @@ __wt_bt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	new->records = page->records;
-	__wt_bt_rec_set_page_size(toc, new, first_free);
+	__wt_rec_set_page_size(toc, new, first_free);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -401,11 +401,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_bt_rec_col_rcc --
+ * __wt_rec_col_rcc --
  *	Reconcile a repeat-count compressed, fixed-width column-store leaf page.
  */
 static int
-__wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
 	DBT *tmp;
@@ -429,7 +429,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	last_data = NULL;
 	ret = 0;
 
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
@@ -452,7 +452,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * terminated array of references to WT_RCC_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_ERR(__wt_bt_rcc_expand_sort(
+		WT_ERR(__wt_rcc_expand_sort(
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
@@ -516,7 +516,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			if (len > space_avail) {
 				fprintf(stderr,
-				    "__wt_bt_rec_col_rcc: page %lu split\n",
+				    "__wt_rec_col_rcc: page %lu split\n",
 				    (u_long)page->addr);
 				__wt_abort(env);
 			}
@@ -542,7 +542,7 @@ __wt_bt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	new->records = page->records;
-	__wt_bt_rec_set_page_size(toc, new, first_free);
+	__wt_rec_set_page_size(toc, new, first_free);
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
@@ -555,12 +555,12 @@ err:	if (expsort != NULL)
 }
 
 /*
- * __wt_bt_rcc_expand_compare --
+ * __wt_rcc_expand_compare --
  *	Qsort function: sort WT_RCC_EXPAND structures based on the record
  *	offset, in ascending order.
  */
 static int
-__wt_bt_rcc_expand_compare(const void *a, const void *b)
+__wt_rcc_expand_compare(const void *a, const void *b)
 {
 	WT_RCC_EXPAND *a_exp, *b_exp;
 
@@ -571,12 +571,12 @@ __wt_bt_rcc_expand_compare(const void *a, const void *b)
 }
 
 /*
- * __wt_bt_rcc_expand_sort --
+ * __wt_rcc_expand_sort --
  *	Return the current on-page index's array of WT_RCC_EXPAND structures,
  *	sorted by record offset.
  */
 int
-__wt_bt_rcc_expand_sort(ENV *env,
+__wt_rcc_expand_sort(ENV *env,
     WT_PAGE *page, WT_COL *cip, WT_RCC_EXPAND ***expsortp, uint32_t *np)
 {
 	WT_RCC_EXPAND *exp;
@@ -608,7 +608,7 @@ __wt_bt_rcc_expand_sort(ENV *env,
 	/* Sort the entries. */
 	if (n != 0)
 		qsort(*expsortp, (size_t)n,
-		    sizeof(WT_RCC_EXPAND *), __wt_bt_rcc_expand_compare);
+		    sizeof(WT_RCC_EXPAND *), __wt_rcc_expand_compare);
 
 	/* NULL-terminate the array. */
 	(*expsortp)[n] = NULL;
@@ -617,11 +617,11 @@ __wt_bt_rcc_expand_sort(ENV *env,
 }
 
 /*
- * __wt_bt_rec_col_var --
+ * __wt_rec_col_var --
  *	Reconcile a variable-width column-store leaf page.
  */
 static int
-__wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	DBT *data, data_dbt;
@@ -634,7 +634,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint8_t *first_free;
 
 	hdr = new->hdr;
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	WT_CLEAR(data_dbt);
@@ -658,7 +658,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			} else {
 				data->data = WT_REPL_DATA(repl);
 				data->size = repl->size;
-				WT_RET(__wt_bt_build_data_item(
+				WT_RET(__wt_item_build_data(
 				    toc, data, &data_item, &data_ovfl, 0));
 				len = WT_ITEM_SPACE_REQ(data->size);
 			}
@@ -678,7 +678,7 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 */
 		if (len > space_avail) {
 			fprintf(stderr,
-			    "__wt_bt_rec_col_var: page %lu split\n",
+			    "__wt_rec_col_var: page %lu split\n",
 			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
@@ -700,17 +700,17 @@ __wt_bt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	new->records = page->records;
-	__wt_bt_rec_set_page_size(toc, new, first_free);
+	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
 }
 
 /*
- * __wt_bt_rec_row --
+ * __wt_rec_row --
  *	Reconcile a row-store leaf page.
  */
 static int
-__wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	enum { KEY_ON_PAGE, KEY_NONE } key_loc;
@@ -726,7 +726,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	db = toc->db;
 	hdr = new->hdr;
-	__wt_bt_set_ff_and_sa_from_offset(
+	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	WT_CLEAR(data_dbt);
@@ -784,7 +784,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			data->data = WT_REPL_DATA(repl);
 			data->size = repl->size;
-			WT_RET(__wt_bt_build_data_item(
+			WT_RET(__wt_item_build_data(
 			    toc, data, &data_item, &data_ovfl, 0));
 			data_loc = DATA_OFF_PAGE;
 		} else {
@@ -850,7 +850,7 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * another leaf page and split the parent.
 		 */
 		if (len > space_avail) {
-			fprintf(stderr, "__wt_bt_rec_row: page %lu split\n",
+			fprintf(stderr, "__wt_rec_row: page %lu split\n",
 			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
@@ -883,17 +883,17 @@ __wt_bt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
-	__wt_bt_rec_set_page_size(toc, new, first_free);
+	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
 }
 
 /*
- * __wt_bt_rec_page_write --
+ * __wt_rec_page_write --
  *	Write a newly reconciled page.
  */
 static int
-__wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	ENV *env;
 	int ret;
@@ -921,7 +921,7 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * The cache eviction server is the only thread allocating space
 		 * from the file, so there's no need to do any serialization.
 		 */
-		WT_RET(__wt_bt_table_alloc(toc, &new->addr, new->size));
+		WT_RET(__wt_file_alloc(toc, &new->addr, new->size));
 
 		/*
 		 * Write the page to disk.
@@ -942,8 +942,8 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	}
 
 	/* Update the page's parent. */
-	if ((ret = __wt_bt_rec_parent_update(toc, page, new)) != 0) {
-		(void)__wt_bt_table_free(toc, new->addr, new->size);
+	if ((ret = __wt_rec_parent_update(toc, page, new)) != 0) {
+		(void)__wt_file_free(toc, new->addr, new->size);
 		return (ret);
 	}
 
@@ -951,11 +951,11 @@ __wt_bt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 }
 
 /*
- * __wt_bt_rec_parent_update --
+ * __wt_rec_parent_update --
  *	Update a parent page's reference when a page is reconciled.
  */
 static int
-__wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	IDB *idb;
 	WT_OFF *parent_off;
@@ -969,7 +969,7 @@ __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	if (page->addr == idb->root_off.addr) {
 		  idb->root_off.addr = new->addr;
 		  idb->root_off.size = new->size;
-		  return (__wt_bt_desc_write(toc));
+		  return (__wt_desc_write(toc));
 	 }
 
 	/*

@@ -5,18 +5,22 @@
 
 btree/bt_alloc.c
 btree/bt_bulk.c
+btree/bt_cache.c
 btree/bt_close.c
 btree/bt_cmp.c
 btree/bt_debug.c
 btree/bt_desc.c
 btree/bt_discard.c
 btree/bt_dump.c
+btree/bt_evict.c
 btree/bt_misc.c
 btree/bt_open.c
 btree/bt_ovfl.c
 btree/bt_page.c
+btree/bt_read.c
 btree/bt_reconcile.c
 btree/bt_ret.c
+btree/bt_rw.c
 btree/bt_stat.c
 btree/bt_sync.c
 btree/bt_vrfy.c
@@ -27,10 +31,6 @@ btree/col_srch.c
 btree/row_get.c
 btree/row_put.c
 btree/row_srch.c
-cache/c_drain.c
-cache/c_init.c
-cache/c_page.c
-cache/c_read.c
 db/db_err.c
 db/db_getset.c
 db/db_handle.c

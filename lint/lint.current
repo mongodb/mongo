@@ -5,52 +5,58 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_bulk.c (C)
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  163  Warning 530: Symbol 'last_repeat' (line 96) not
-    initialized
-../btree/bt_bulk.c  96  Info 830: Location cited in prior message
-                                                                          _
-			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  163  Warning 530: Symbol 'last_data' (line 97) not
+../btree/bt_bulk.c  164  Warning 530: Symbol 'last_repeat' (line 97) not
     initialized
 ../btree/bt_bulk.c  97  Info 830: Location cited in prior message
+                                                                          _
+			    memcmp(last_data, data->data, data->size) == 0) {
+../btree/bt_bulk.c  164  Warning 530: Symbol 'last_data' (line 98) not
+    initialized
+../btree/bt_bulk.c  98  Info 830: Location cited in prior message
                                                                             _
 				    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
-../btree/bt_bulk.c  375  Warning 530: Symbol 'dup_data' (line 250) not
+../btree/bt_bulk.c  376  Warning 530: Symbol 'dup_data' (line 251) not
     initialized
-../btree/bt_bulk.c  250  Info 830: Location cited in prior message
+../btree/bt_bulk.c  251  Info 830: Location cited in prior message
                                                                                _
 				    (uint32_t)(first_free - (uint8_t *)dup_key);
-../btree/bt_bulk.c  461  Warning 530: Symbol 'dup_key' (line 250) not
+../btree/bt_bulk.c  462  Warning 530: Symbol 'dup_key' (line 251) not
     initialized
-../btree/bt_bulk.c  250  Info 830: Location cited in prior message
+../btree/bt_bulk.c  251  Info 830: Location cited in prior message
                                                         _
 			page->records += WT_RECORDS(&off);
-../btree/bt_bulk.c  601  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  602  Info 740: Unusual pointer cast (incompatible indirect
     types)
                       _
 	WT_RECORDS(off) = dup_count;
-../btree/bt_bulk.c  799  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  800  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1084  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1085  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1114  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1115  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                _
 				WT_RECORDS((WT_OFF *)elem->data) += incr;
-../btree/bt_bulk.c  1152  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1153  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                       _
 				    (WT_OFF *)WT_ITEM_BYTE(elem->data)) += incr;
-../btree/bt_bulk.c  1157  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1158  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                  _
 			WT_RECORDS(&idb->root_off) = elem->page->records;
-../btree/bt_bulk.c  1456  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1457  Info 740: Unusual pointer cast (incompatible indirect
     types)
+
+--- Module:   ../btree/bt_cache.c (C)
+                                                                        _
+#... ->stats)[WT_STAT_CACHE_BYTES_MAX].v = (env->cache_size * (1048576)); } whi
+	    cache->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
+../btree/bt_cache.c  37  Warning 647: Suspicious truncation
 
 --- Module:   ../btree/bt_close.c (C)
 
@@ -59,7 +65,7 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_debug.c (C)
                                               _
 	    (unsigned long long)WT_RECORDS(off));
-../btree/bt_debug.c  632  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  633  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -77,8 +83,10 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_dump.c (C)
                                         _
 			key = (DBT *)rip;
-../btree/bt_dump.c  356  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_dump.c  357  Info 740: Unusual pointer cast (incompatible indirect
     types)
+
+--- Module:   ../btree/bt_evict.c (C)
 
 --- Module:   ../btree/bt_misc.c (C)
 
@@ -89,25 +97,29 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_page.c (C)
                                          _
 		records += WT_RECORDS(off);
-../btree/bt_page.c  237  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  239  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                  _
 			records += WT_RECORDS(off);
-../btree/bt_page.c  401  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  403  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                          _
 #...                           WT_RECORDS(WT_ROW_OFF(rip))
 			records += WT_ROW_OFF_RECORDS(rip);
-../btree/bt_page.c  480  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  482  Info 740: Unusual pointer cast (incompatible indirect
     types)
+
+--- Module:   ../btree/bt_read.c (C)
 
 --- Module:   ../btree/bt_reconcile.c (C)
                              _
-	WT_RECORDS(parent_ref) = new->records;
+	WT_RECORDS(parent_off) = new->records;
 ../btree/bt_reconcile.c  982  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/bt_ret.c (C)
+
+--- Module:   ../btree/bt_rw.c (C)
 
 --- Module:   ../btree/bt_stat.c (C)
 
@@ -228,16 +240,16 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/row_srch.c (C)
                                                                            _
 				cmp = db->btree_compare(db, key, (DBT *)rip);
-../btree/row_srch.c  78  Info 740: Unusual pointer cast (incompatible indirect
+../btree/row_srch.c  77  Info 740: Unusual pointer cast (incompatible indirect
     types)
                             _
 		if (cmp != 0)
-../btree/row_srch.c  101  Warning 644: Variable 'cmp' (line 30) may not have
+../btree/row_srch.c  100  Warning 644: Variable 'cmp' (line 30) may not have
     been initialized
 ../btree/row_srch.c  30  Info 830: Location cited in prior message
                                           _
 		ref = WT_ROW_REF(page, rip);
-../btree/row_srch.c  112  Info 771: Symbol 'rip' (line 27) conceivably not
+../btree/row_srch.c  111  Info 771: Symbol 'rip' (line 27) conceivably not
     initialized
 ../btree/row_srch.c  27  Info 830: Location cited in prior message
 

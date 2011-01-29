@@ -39,7 +39,7 @@ __wt_bt_sync(WT_TOC *toc)
 	 * to reconcile pages we're flushing.
 	 */
 	__wt_lock(env, cache->mtx_reconcile);
-	ret = __wt_bt_tree_walk(toc, NULL,
+	ret = __wt_tree_walk(toc, NULL,
 	    WT_WALK_CACHE | WT_WALK_OFFDUP, __wt_bt_tree_sync, NULL);
 	__wt_unlock(env, cache->mtx_reconcile);
 	return (ret);
@@ -56,6 +56,6 @@ __wt_bt_tree_sync(WT_TOC *toc, WT_PAGE *page, void *arg)
 
 	/* Reconcile any dirty pages. */
 	if (WT_PAGE_IS_MODIFIED(page))
-		WT_RET(__wt_bt_rec_page(toc, page));
+		WT_RET(__wt_page_reconcile(toc, page));
 	return (0);
 }

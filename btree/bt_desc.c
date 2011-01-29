@@ -9,21 +9,21 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_desc_io(WT_TOC *, void *, int);
+static int __wt_desc_io(WT_TOC *, void *, int);
 
 /*
- * __wt_bt_stat_desc --
+ * __wt_desc_stat --
  *	Fill in the statistics from the database description.
  */
 int
-__wt_bt_stat_desc(WT_TOC *toc)
+__wt_desc_stat(WT_TOC *toc)
 {
 	WT_PAGE_DESC desc;
 	WT_STATS *stats;
 
 	stats = toc->db->idb->dstats;
 
-	WT_RET(__wt_bt_desc_io(toc, &desc, 1));
+	WT_RET(__wt_desc_io(toc, &desc, 1));
 
 	WT_STAT_SET(stats, MAGIC, desc.magic);
 	WT_STAT_SET(stats, MAJOR, desc.majorv);
@@ -39,18 +39,18 @@ __wt_bt_stat_desc(WT_TOC *toc)
 }
 
 /*
- * __wt_bt_desc_read --
+ * __wt_desc_read --
  *	Read the descriptor structure from page 0.
  */
 int
-__wt_bt_desc_read(WT_TOC *toc)
+__wt_desc_read(WT_TOC *toc)
 {
 	DB *db;
 	WT_PAGE_DESC desc;
 
 	db = toc->db;
 
-	WT_RET(__wt_bt_desc_io(toc, &desc, 1));
+	WT_RET(__wt_desc_io(toc, &desc, 1));
 
 	db->intlmax = desc.intlmax;		/* Update DB handle */
 	db->intlmin = desc.intlmin;
@@ -75,11 +75,11 @@ __wt_bt_desc_read(WT_TOC *toc)
 }
 
 /*
- * __wt_bt_desc_write --
+ * __wt_desc_write --
  *	Update the description page.
  */
 int
-__wt_bt_desc_write(WT_TOC *toc)
+__wt_desc_write(WT_TOC *toc)
 {
 	DB *db;
 	IDB *idb;
@@ -108,17 +108,17 @@ __wt_bt_desc_write(WT_TOC *toc)
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		F_SET(&desc, WT_PAGE_DESC_REPEAT);
 
-	WT_RET(__wt_bt_desc_io(toc, &desc, 0));
+	WT_RET(__wt_desc_io(toc, &desc, 0));
 
 	return (ret);
 }
 
 /*
- * __wt_bt_desc_io --
+ * __wt_desc_io --
  *	Read/write the WT_DESC sector.
  */
 static int
-__wt_bt_desc_io(WT_TOC *toc, void *p, int is_read)
+__wt_desc_io(WT_TOC *toc, void *p, int is_read)
 {
 	WT_FH *fh;
 	ENV *env;

@@ -9,14 +9,14 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
+static int __wt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
 
 /*
- * __wt_bt_search_row --
+ * __wt_row_search --
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
+__wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -38,8 +38,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	db = toc->db;
 	idb = db->idb;
 
-	WT_DB_FCHK(db,
-	    "__wt_bt_search_key_row", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
+	WT_DB_FCHK(db, "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
 	/* Search the tree. */
 	for (page = idb->root_page.page;;) {
@@ -60,7 +59,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			 */
 			rip = page->u.irow + indx;
 			if (__wt_key_process(rip))
-				WT_ERR(__wt_bt_key_build(toc, page, rip));
+				WT_ERR(__wt_key_build(toc, page, rip));
 
 			/*
 			 * If we're about to compare an application key with the
@@ -111,7 +110,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		/* rip references the subtree containing the record. */
 		ref = WT_ROW_REF(page, rip);
 		off = WT_ROW_OFF(rip);
-		WT_ERR(__wt_bt_page_in(toc, page, ref, off, 0));
+		WT_ERR(__wt_page_in(toc, page, ref, off, 0));
 
 		/* Swap the parent page for the child page. */
 		if (page != idb->root_page.page)
@@ -164,11 +163,11 @@ err:	WT_PAGE_OUT(toc, page);
 }
 
 /*
- * __wt_bt_key_build --
+ * __wt_key_build --
  *	Instantiate an overflow or compressed key into a WT_ROW structure.
  */
 static int
-__wt_bt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
+__wt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
 {
 	DBT *dbt, _dbt;
 	WT_ROW *rip;
@@ -179,7 +178,7 @@ __wt_bt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
 	dbt = &_dbt;
 
 	item = rip_arg->key;
-	WT_RET(__wt_bt_item_process(toc, item, dbt));
+	WT_RET(__wt_item_process(toc, item, dbt));
 
 	/*
 	 * Update the WT_ROW reference with the processed key.  If there are
