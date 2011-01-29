@@ -353,9 +353,11 @@ namespace mongo {
             splitKeys.push_back( c->currKey() );
             while ( cc->ok() ) {
                 currCount++;
-                if ( currCount > keyCount ) {
-                    BSONObj currKey = c->currKey();
+                BSONObj currKey = c->currKey();
 
+                assert( currKey.woCompare( max ) <= 0 );
+                
+                if ( currCount > keyCount ) {
                     // Do not use this split key if it is the same used in the previous split point.
                     if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
                         tooFrequentKeys.insert( currKey );
