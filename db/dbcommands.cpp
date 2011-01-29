@@ -48,6 +48,37 @@ namespace mongo {
     extern int otherTraceLevel;
     void flushDiagLog();
 
+    std::string adaptUnit( long double v , bool humanReadable , int scale = 1 ) {
+        std::stringstream ss;
+        std::string result = "";
+        if ( humanReadable ) {
+            std::string unit = " bytes";
+            double value = v;
+
+            if ( value > 1024 ) {
+	        value /= 1024;
+                unit = " Kb";
+            }
+            if ( value > 1024 ) {
+	        value /=  1024;
+	        unit = " Mb";
+            }
+            if ( value > 1024 ) {
+	        value /= 1024;
+                unit = " Gb";
+            }
+            value = round( value * 100 ) / 100;
+            ss << value;
+            ss >> result;
+            return result + unit;
+        }
+        else {
+            ss << v / scale;
+            ss >> result;
+            return result;
+        }
+    }
+
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
