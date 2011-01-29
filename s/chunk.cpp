@@ -255,6 +255,7 @@ namespace mongo {
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , res )) {
+            warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
             conn.done();
 
             // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
