@@ -537,7 +537,7 @@ __wt_evict_state_check(WT_TOC *toc)
 		}
 
 		/* Ignore pages with in-memory subtrees. */
-		switch (page->hdr->type) {
+		switch (page->dsk->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_DUP_INT:
 		case WT_PAGE_ROW_INT:
@@ -687,7 +687,7 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 	 * more bytes on every page, (3) how often will an internal page be
 	 * evicted anyway?
 	 */
-	switch (page->hdr->type) {
+	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:

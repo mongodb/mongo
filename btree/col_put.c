@@ -87,7 +87,7 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	 * a new WT_RCC_EXPAND/WT_REPL pair, and link it into the WT_RCC_EXPAND
 	 * array.
 	 */
-	switch (page->hdr->type) {
+	switch (page->dsk->type) {
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate a page replacement array if necessary. */

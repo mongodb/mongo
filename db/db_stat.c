@@ -29,7 +29,7 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_database_stats(idb->dstats);
-	WT_STAT_SET(idb->dstats, TREE_LEVEL, idb->root_page.page->hdr->level);
+	WT_STAT_SET(idb->dstats, TREE_LEVEL, idb->root_page.page->dsk->level);
 	WT_RET(__wt_desc_stat(toc));
 
 	/*

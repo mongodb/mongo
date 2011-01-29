@@ -62,14 +62,14 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 	if (store->mem_size < page->size)
 		WT_RET(__wt_realloc(
 		    env, &store->mem_size, page->size, &store->data));
-	page->hdr = store->data;
+	page->dsk = store->data;
 
 	/* Read the page. */
 	WT_RET(__wt_page_read(db, page));
 
 	/* Copy the actual data in the DBT down to the start of the data. */
 	(void)memmove(store->data,
-	    (uint8_t *)store->data + sizeof(WT_PAGE_HDR), ovfl->size);
+	    (uint8_t *)store->data + sizeof(WT_PAGE_DISK), ovfl->size);
 	store->size = ovfl->size;
 
 	return (0);

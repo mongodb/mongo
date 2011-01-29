@@ -227,7 +227,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * better alignment from the underlying heap memory allocator.
 	 */
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
-	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->hdr));
+	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->dsk));
 
 	/* Read the page. */
 	WT_VERBOSE(env, WT_VERB_READ,
@@ -264,8 +264,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	return (0);
 
 err:	if (page != NULL) {
-		if (page->hdr != NULL)
-			__wt_free(env, page->hdr, size);
+		if (page->dsk != NULL)
+			__wt_free(env, page->dsk, size);
 		__wt_free(env, page, sizeof(WT_PAGE));
 	}
 	return (ret);

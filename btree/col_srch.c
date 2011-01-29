@@ -21,7 +21,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	WT_COL *cip;
 	WT_OFF *off;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_RCC_EXPAND *exp;
 	WT_REF *ref;
 	WT_REPL *repl;
@@ -51,18 +51,18 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		write_gen = page->write_gen;
 
 		/* Walk the page looking for the record. */
-		hdr = page->hdr;
-		switch (hdr->type) {
+		dsk = page->dsk;
+		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			cip = page->u.icol + (recno - hdr->start_recno);
+			cip = page->u.icol + (recno - dsk->start_recno);
 			goto done;
 		case WT_PAGE_COL_RCC:
 			/*
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
-			record_cnt = recno - hdr->start_recno;
+			record_cnt = recno - dsk->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
 				if (record_cnt < WT_RCC_REPEAT_COUNT(cip->data))
 					break;
@@ -75,7 +75,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
-			record_cnt = recno - hdr->start_recno;
+			record_cnt = recno - dsk->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
 				if (record_cnt < WT_COL_OFF_RECORDS(cip))
 					break;
@@ -85,7 +85,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		}
 
 		/* If a level was set, see if we found the asked-for page. */
-		if (level == hdr->level)
+		if (level == dsk->level)
 			goto done;
 
 		/* cip references the subtree containing the record. */
@@ -104,7 +104,7 @@ done:	/*
 	 * first step; the record may have been updated since reading the page
 	 * into the cache.
 	 */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		/* Find the item's WT_REPL slot if it exists. */
 		repl = WT_COL_REPL(page, cip);

@@ -98,8 +98,8 @@ __wt_file_free_write(WT_TOC *toc, uint32_t addr, uint32_t size)
 	WT_CLEAR(_page);
 	page = &_page;
 	page->size = allocsize;
-	page->hdr = tmp->data;
-	page->hdr->type = WT_PAGE_FREE;
+	page->dsk = tmp->data;
+	page->dsk->type = WT_PAGE_FREE;
 	for (; size >= allocsize; size -= allocsize) {
 		page->addr = addr++;
 		WT_ERR(__wt_page_write(toc, page));

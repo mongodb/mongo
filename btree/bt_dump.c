@@ -86,7 +86,7 @@ __wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	db = toc->db;
 	dp = arg;
 
-	switch (page->hdr->type) {
+	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -163,7 +163,7 @@ __wt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	expsort = NULL;
 	n_expsort = 0;
 
-	recno = page->hdr->start_recno;
+	recno = page->dsk->start_recno;
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for

@@ -23,7 +23,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_REPL *repl;
 	void *data_ret;
@@ -37,7 +37,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	ret = 0;
 
 	page = toc->srch_page;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	cip = toc->srch_ip;
 	rip = toc->srch_ip;
 	repl = toc->srch_repl;
@@ -105,7 +105,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	}
 
 	/* Otherwise, take the item from the original page. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		data_ret = cip->data;
 		size_ret = db->fixed_len;

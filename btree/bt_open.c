@@ -230,7 +230,7 @@ __wt_open_verify_page_sizes(DB *db)
 	 * way I can skip the suspense.
 	 */
 #define	WT_MINIMUM_DATA_SPACE(db, s)					\
-	    (((s) - (WT_PAGE_HDR_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
+	    (((s) - (WT_PAGE_DISK_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
 	if (db->intlitemsize > WT_MINIMUM_DATA_SPACE(db, db->intlmin)) {
 		__wt_api_db_errx(db,
 		    "The internal page size is too small for its maximum item "

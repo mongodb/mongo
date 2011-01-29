@@ -140,7 +140,7 @@ __wt_verify_tree(
 	WT_ITEM *item;
 	WT_OFF *off;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint64_t records;
@@ -149,7 +149,7 @@ __wt_verify_tree(
 
 	db = toc->db;
 	page = ref->page;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	ret = 0;
 
 	/* Report progress every 10 pages. */
@@ -195,14 +195,14 @@ __wt_verify_tree(
 	 */
 	is_root = level == WT_NOLEVEL ? 1 : 0;
 	if (is_root)
-		level = hdr->level;
+		level = dsk->level;
 
 	/* Check that tree levels and record counts match up. */
-	if (hdr->level != level) {
+	if (dsk->level != level) {
 		__wt_api_db_errx(db,
 		    "page at addr %lu has a tree level of %lu where the "
 		    "expected level was %lu",
-		    (u_long)page->addr, (u_long)hdr->level, (u_long)level);
+		    (u_long)page->addr, (u_long)dsk->level, (u_long)level);
 		goto err;
 	}
 
@@ -226,17 +226,17 @@ __wt_verify_tree(
 	}
 
 	/* Check the starting record number. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
-		if (hdr->start_recno != start_recno) {
+		if (dsk->start_recno != start_recno) {
 			__wt_api_db_errx(db,
 			    "page at addr %lu has a starting record of %llu "
 			    "where the expected starting record was %llu",
 			    (u_long)page->addr,
-			    (unsigned long long)hdr->start_recno,
+			    (unsigned long long)dsk->start_recno,
 			    (unsigned long long)start_recno);
 			goto err;
 		}
@@ -260,7 +260,7 @@ __wt_verify_tree(
 	 * satisfied in the operating system buffer cache, and not worry about
 	 * it.  Table verify isn't likely to be a performance path anyway.
 	 */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_verify_overflow_col(toc, page, vs));
 		break;
@@ -275,7 +275,7 @@ __wt_verify_tree(
 	}
 
 	/* Check on-page key ordering. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
@@ -287,10 +287,10 @@ __wt_verify_tree(
 	}
 
 	/* Check tree connections and recursively descend the tree. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
-		start_recno = hdr->start_recno;
+		start_recno = dsk->start_recno;
 		WT_INDX_FOREACH(page, cip, i) {
 			/* cip references the subtree containing the record */
 			ref = WT_COL_REF(page, cip);
@@ -436,7 +436,7 @@ __wt_verify_pc(
 	ret = 0;
 
 	/* Set the comparison function. */
-	switch (child->hdr->type) {
+	switch (child->dsk->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 		func = db->btree_compare_dup;
@@ -506,13 +506,13 @@ __wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 		DBT	*scratch;		/* scratch buffer */
 	} *current, *last, _a, _b;
 	DB *db;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	db = toc->db;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	ret = 0;
 
 	WT_CLEAR(_a);
@@ -523,7 +523,7 @@ __wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 	WT_ERR(__wt_scr_alloc(toc, 0, &last->scratch));
 
 	/* Set the comparison function. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 		func = db->btree_compare_dup;
@@ -583,16 +583,16 @@ int
 __wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t addr;
 
 	db = toc->db;
 
-	hdr = page->hdr;
+	dsk = page->dsk;
 	addr = page->addr;
 
 	/* Check the page type. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_FREE:
 		/*
 		 * Free pages are only written in diagnostic mode, and the
@@ -613,7 +613,7 @@ __wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 	default:
 		__wt_api_db_errx(db,
 		    "page at addr %lu has an invalid type of %lu",
-		    (u_long)addr, (u_long)hdr->type);
+		    (u_long)addr, (u_long)dsk->type);
 		return (WT_ERROR);
 	}
 
@@ -621,7 +621,7 @@ __wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 	 * FUTURE:
 	 * Check the LSN against the existing log files.
 	 */
-	if (hdr->lsn[0] != 0 || hdr->lsn[1] != 0) {
+	if (dsk->lsn[0] != 0 || dsk->lsn[1] != 0) {
 		__wt_api_db_errx(db,
 		    "page at addr %lu has non-zero lsn header fields",
 		    (u_long)addr);
@@ -631,32 +631,32 @@ __wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 	/* Ignore the checksum -- it verified when we first read the page. */
 
 	/* Check the page level. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_LEAF:
-		if (hdr->level != WT_LLEAF)
+		if (dsk->level != WT_LLEAF)
 			goto err_level;
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		if (hdr->level <= WT_LLEAF) {
+		if (dsk->level <= WT_LLEAF) {
 err_level:		__wt_api_db_errx(db,
 			    "%s page at addr %lu has incorrect tree level "
 			    "of %lu",
-			    __wt_page_type_string(hdr),
-			    (u_long)addr, (u_long)hdr->level);
+			    __wt_page_type_string(dsk),
+			    (u_long)addr, (u_long)dsk->level);
 			return (WT_ERROR);
 		}
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
+	if (dsk->unused[0] != '\0' || dsk->unused[1] != '\0') {
 		__wt_api_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);
@@ -664,7 +664,7 @@ err_level:		__wt_api_db_errx(db,
 	}
 
 	/* Verify the items on the page. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -702,7 +702,7 @@ __wt_verify_dsk_item(WT_TOC *toc, WT_PAGE *page)
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
 	WT_OFF *off;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	off_t file_size;
 	uint8_t *end;
 	uint32_t addr, i, item_num, item_len, item_type;
@@ -710,8 +710,8 @@ __wt_verify_dsk_item(WT_TOC *toc, WT_PAGE *page)
 	db = toc->db;
 	file_size = db->idb->fh->file_size;
 
-	hdr = page->hdr;
-	end = (uint8_t *)hdr + page->size;
+	dsk = page->dsk;
+	end = (uint8_t *)dsk + page->size;
 	addr = page->addr;
 
 	last_item_type = IS_FIRST;
@@ -730,43 +730,43 @@ __wt_verify_dsk_item(WT_TOC *toc, WT_PAGE *page)
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
-			if (hdr->type != WT_PAGE_ROW_INT &&
-			    hdr->type != WT_PAGE_ROW_LEAF)
+			if (dsk->type != WT_PAGE_ROW_INT &&
+			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_KEY_DUP:
 		case WT_ITEM_KEY_DUP_OVFL:
-			if (hdr->type != WT_PAGE_DUP_INT)
+			if (dsk->type != WT_PAGE_DUP_INT)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
-			if (hdr->type != WT_PAGE_COL_VAR &&
-			    hdr->type != WT_PAGE_ROW_LEAF)
+			if (dsk->type != WT_PAGE_COL_VAR &&
+			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DATA_DUP:
 		case WT_ITEM_DATA_DUP_OVFL:
-			if (hdr->type != WT_PAGE_DUP_LEAF &&
-			    hdr->type != WT_PAGE_ROW_LEAF)
+			if (dsk->type != WT_PAGE_DUP_LEAF &&
+			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DEL:
 			/* Deleted items only appear on column-store pages. */
-			if (hdr->type != WT_PAGE_COL_VAR)
+			if (dsk->type != WT_PAGE_COL_VAR)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_OFF:
-			if (hdr->type != WT_PAGE_DUP_INT &&
-			    hdr->type != WT_PAGE_ROW_INT &&
-			    hdr->type != WT_PAGE_ROW_LEAF) {
+			if (dsk->type != WT_PAGE_DUP_INT &&
+			    dsk->type != WT_PAGE_ROW_INT &&
+			    dsk->type != WT_PAGE_ROW_LEAF) {
 item_vs_page:			__wt_api_db_errx(db,
 				    "illegal item and page type combination "
 				    "(item %lu on page at addr %lu is a %s "
 				    "item on a %s page)",
 				    (u_long)item_num, (u_long)addr,
 				    __wt_item_type_string(item),
-				    __wt_page_type_string(hdr));
+				    __wt_page_type_string(dsk));
 				return (WT_ERROR);
 			}
 			break;
@@ -789,7 +789,7 @@ item_vs_page:			__wt_api_db_errx(db,
 		 * to see if there was anything else on the page.  Skip the
 		 * order check.
 		 */
-		if (hdr->type == WT_PAGE_COL_VAR)
+		if (dsk->type == WT_PAGE_COL_VAR)
 			goto skip_order_check;
 
 		switch (item_type) {
@@ -941,13 +941,13 @@ __wt_verify_dsk_col_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_OFF *off;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint8_t *end;
 	uint32_t addr, i, entry_num;
 
 	idb = db->idb;
-	hdr = page->hdr;
-	end = (uint8_t *)hdr + page->size;
+	dsk = page->dsk;
+	end = (uint8_t *)dsk + page->size;
 	addr = page->addr;
 
 	entry_num = 0;
@@ -979,7 +979,7 @@ __wt_verify_dsk_col_fix(DB *db, WT_PAGE *page)
 	uint8_t *data, *end, *p;
 
 	len = db->fixed_len;
-	end = (uint8_t *)page->hdr + page->size;
+	end = (uint8_t *)page->dsk + page->size;
 	addr = page->addr;
 
 	entry_num = 0;
@@ -1017,7 +1017,7 @@ __wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 	uint32_t addr, i, j, entry_num;
 	uint8_t *data, *end, *last_data, *p;
 
-	end = (uint8_t *)page->hdr + page->size;
+	end = (uint8_t *)page->dsk + page->size;
 	addr = page->addr;
 
 	last_data = NULL;
@@ -1116,7 +1116,7 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	 * an overflow page.   In the case of ROW_LEAF, we have to check both
 	 * the key and the data item.
 	 */
-	check_data = page->hdr->type == WT_PAGE_ROW_LEAF ? 1 : 0;
+	check_data = page->dsk->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
 	/* Walk the in-memory page, verifying overflow items. */
 	WT_INDX_FOREACH(page, rip, i) {
@@ -1176,7 +1176,7 @@ __wt_verify_overflow_common(WT_TOC *toc,
 	WT_RET(__wt_scr_alloc(toc, page->size, &scratch1));
 
 	/* Read the page. */
-	page->hdr = scratch1->data;
+	page->dsk = scratch1->data;
 	scratch1->size = page->size;
 	WT_ERR(__wt_page_read(db, page));
 
@@ -1196,7 +1196,7 @@ __wt_verify_overflow_common(WT_TOC *toc,
 	 * The only other thing to check is that the size we have in the page
 	 * matches the size on the underlying overflow page.
 	 */
-	if (ovfl->size != page->hdr->u.datalen) {
+	if (ovfl->size != page->dsk->u.datalen) {
 		__wt_api_db_errx(db,
 		    "overflow page reference in item %lu on page at addr %lu "
 		    "does not match the data size on the overflow page",
@@ -1217,23 +1217,23 @@ static int
 __wt_verify_dsk_ovfl(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t addr, len;
 	uint8_t *p;
 
 	db = toc->db;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	addr = page->addr;
 
-	if (hdr->u.datalen == 0) {
+	if (dsk->u.datalen == 0) {
 		__wt_api_db_errx(db,
 		    "overflow page at addr %lu has no data", (u_long)addr);
 		return (WT_ERROR);
 	}
 
 	/* Any page data after the overflow record should be nul bytes. */
-	p = (uint8_t *)hdr + (sizeof(WT_PAGE_HDR) + hdr->u.datalen);
-	len = page->size - (sizeof(WT_PAGE_HDR) + hdr->u.datalen);
+	p = (uint8_t *)dsk + (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
+	len = page->size - (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
 	for (; len > 0; ++p, --len)
 		if (*p != '\0') {
 			__wt_api_db_errx(db,

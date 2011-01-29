@@ -22,7 +22,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	IDB *idb;
 	WT_OFF *off;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
 	WT_ROW *rip;
 	WT_REPL *repl;
@@ -45,10 +45,10 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		/* Copy the write generation value before the read. */
 		write_gen = page->write_gen;
 
-		hdr = page->hdr;
+		dsk = page->dsk;
 		isleaf =
-		    hdr->type == WT_PAGE_DUP_LEAF ||
-		    hdr->type == WT_PAGE_ROW_LEAF;
+		    dsk->type == WT_PAGE_DUP_LEAF ||
+		    dsk->type == WT_PAGE_ROW_LEAF;
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -104,7 +104,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		 * If we've reached the leaf page, or we've reached the level
 		 * requested by our caller, we're done.
 		 */
-		if (isleaf || level == hdr->level)
+		if (isleaf || level == dsk->level)
 			break;
 
 		/* rip references the subtree containing the record. */
@@ -125,7 +125,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	 * we're done, return the information.   Otherwise, check to see if the
 	 * item was modified/deleted.
 	 */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		if (LF_ISSET(WT_INSERT))

@@ -90,7 +90,7 @@ __wt_bulk_fix(WT_TOC *toc,
 	DBT *key, *data, *tmp;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_STACK stack;
 	uint64_t insert_cnt;
 	uint32_t len, space_avail;
@@ -114,8 +114,8 @@ __wt_bulk_fix(WT_TOC *toc,
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bulk_scratch_page(toc, db->leafmin,
 	    rcc ? WT_PAGE_COL_RCC : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
-	hdr = page->hdr;
-	hdr->start_recno = 1;
+	dsk = page->dsk;
+	dsk->start_recno = 1;
 	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 
@@ -153,7 +153,7 @@ __wt_bulk_fix(WT_TOC *toc,
 		 * and increment that item's repeat count instead of entering
 		 * new data.
 		 */
-		if (rcc && hdr->u.entries != 0)
+		if (rcc && dsk->u.entries != 0)
 			if (*last_repeat < UINT16_MAX &&
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
@@ -176,16 +176,16 @@ __wt_bulk_fix(WT_TOC *toc,
 			WT_ERR(__wt_bulk_promote(
 			    toc, page, page->records, &stack, 0, NULL));
 			WT_ERR(__wt_page_write(toc, page));
-			hdr->u.entries = 0;
+			dsk->u.entries = 0;
 			page->records = 0;
-			hdr->start_recno = insert_cnt;
+			dsk->start_recno = insert_cnt;
 			WT_ERR(
 			    __wt_file_alloc(toc, &page->addr, db->leafmin));
 			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 		}
 
-		++hdr->u.entries;
+		++dsk->u.entries;
 		++page->records;
 
 		/*
@@ -210,7 +210,7 @@ __wt_bulk_fix(WT_TOC *toc,
 	ret = 0;
 
 	/* Promote a key from any partially-filled page and write it. */
-	if (hdr->u.entries != 0) {
+	if (dsk->u.entries != 0) {
 		ret = __wt_bulk_promote(
 		    toc, page, page->records, &stack, 0, NULL);
 		WT_ERR(__wt_page_write(toc, page));
@@ -276,7 +276,7 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 	if (type == WT_PAGE_COL_VAR)
-		page->hdr->start_recno = 1;
+		page->dsk->start_recno = 1;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (F_ISSET(idb, WT_COLUMN) ) {
@@ -410,7 +410,7 @@ skip_read:	/*
 			    WT_PAGE_BYTE(next),
 			    &next_first_free, &next_space_avail);
 			if (type == WT_PAGE_COL_VAR)
-				next->hdr->start_recno = insert_cnt;
+				next->dsk->start_recno = insert_cnt;
 
 			/*
 			 * If in the middle of loading a set of duplicates, but
@@ -435,9 +435,9 @@ skip_read:	/*
 				 * is the right number of elements to move, that
 				 * is, move (dup_count - 1) + 1 for the key.
 				 */
-				page->hdr->u.entries -= dup_count;
+				page->dsk->u.entries -= dup_count;
 				page->records -= dup_count - 1;
-				next->hdr->u.entries += dup_count;
+				next->dsk->u.entries += dup_count;
 				next->records += dup_count - 1;
 
 				/*
@@ -513,7 +513,7 @@ skip_read:	/*
 
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
-			++page->hdr->u.entries;
+			++page->dsk->u.entries;
 
 			memcpy(first_free, &key_item, sizeof(key_item));
 			memcpy(first_free +
@@ -546,7 +546,7 @@ skip_read:	/*
 		}
 
 		/* Copy the data item onto the page. */
-		++page->hdr->u.entries;
+		++page->dsk->u.entries;
 		memcpy(first_free, &data_item, sizeof(data_item));
 		memcpy(first_free + sizeof(data_item), data->data, data->size);
 		space_avail -= WT_ITEM_SPACE_REQ(data->size);
@@ -585,7 +585,7 @@ skip_read:	/*
 			    dup_count, &off, cb));
 
 			/* Reset the page entry and record counts. */
-			page->hdr->u.entries -= (dup_count - 1);
+			page->dsk->u.entries -= (dup_count - 1);
 			page->records -= dup_count;
 			page->records += WT_RECORDS(&off);
 
@@ -615,7 +615,7 @@ skip_read:	/*
 	ret = 0;
 
 	/* Promote a key from any partially-filled page and write it. */
-	if (page->hdr->u.entries != 0) {
+	if (page->dsk->u.entries != 0) {
 		WT_ERR(__wt_bulk_promote(
 		    toc, page, page->records, &stack, 0, NULL));
 		WT_ERR(__wt_page_write(toc, page));
@@ -703,7 +703,7 @@ __wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 
 	/* Move the duplicates onto the newly allocated page. */
 	page->records = dup_count;
-	page->hdr->u.entries = dup_count;
+	page->dsk->u.entries = dup_count;
 	memcpy(first_free, dup_data, (size_t)dup_len);
 	first_free += dup_len;
 	space_avail -= dup_len;
@@ -753,14 +753,14 @@ __wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 			    page, page->records, &stack, 0, &root_addr));
 			WT_ERR(__wt_page_write(toc, page));
 			page->records = 0;
-			page->hdr->u.entries = 0;
+			page->dsk->u.entries = 0;
 			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 		}
 
 		++dup_count;			/* Total duplicate count */
 		++page->records;		/* On-page key/data count */
-		++page->hdr->u.entries;		/* On-page entry count */
+		++page->dsk->u.entries;		/* On-page entry count */
 
 		/* Copy the data item onto the page. */
 		WT_ITEM_SET_LEN(&data_item, data->size);
@@ -811,7 +811,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 	WT_OFF off;
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_STACK_ELEM *elem;
 	uint32_t next_space_avail;
 	uint8_t *next_first_free;
@@ -821,7 +821,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 
 	db = toc->db;
 	env = toc->env;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	WT_CLEAR(item);
 	next_tmp = NULL;
 	next = parent = NULL;
@@ -836,7 +836,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 	 *
 	 * If it's a column-store page, we don't promote a key at all.
 	 */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
@@ -850,7 +850,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 		case WT_ITEM_DATA_DUP:
 			key->data = WT_ITEM_BYTE(key_item);
 			key->size = WT_ITEM_LEN(key_item);
-			switch (hdr->type) {
+			switch (dsk->type) {
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
 				WT_ITEM_SET(&item, WT_ITEM_KEY, key->size);
@@ -875,7 +875,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 			    WT_ITEM_BYTE_OVFL(key_item), &tmp_ovfl));
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
-			switch (hdr->type) {
+			switch (dsk->type) {
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
 				WT_ITEM_SET(&item,
@@ -980,7 +980,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 	elem = &stack->elem[level];
 	parent = elem->page;
 	if (parent == NULL) {
-split:		switch (hdr->type) {
+split:		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_RCC:
@@ -999,7 +999,7 @@ split:		switch (hdr->type) {
 		}
 
 		WT_ERR(__wt_bulk_scratch_page(
-		    toc, db->intlmin, type, hdr->level + 1, &next, &next_tmp));
+		    toc, db->intlmin, type, dsk->level + 1, &next, &next_tmp));
 		__wt_set_ff_and_sa_from_offset(next,
 		    WT_PAGE_BYTE(next), &next_first_free, &next_space_avail);
 
@@ -1010,7 +1010,7 @@ split:		switch (hdr->type) {
 		 * of the database, it's simpler ot just promote 0 up the tree
 		 * in row store databases.
 		 */
-		next->hdr->start_recno = page->hdr->start_recno;
+		next->dsk->start_recno = page->dsk->start_recno;
 
 		/*
 		 * If we don't have a parent page, it's case #1 -- allocate the
@@ -1064,7 +1064,7 @@ split:		switch (hdr->type) {
 	 *
 	 * If there's room, copy the promoted data onto the parent's page.
 	 */
-	switch (parent->hdr->type) {
+	switch (parent->dsk->type) {
 	case WT_PAGE_COL_INT:
 		if (elem->space_avail < sizeof(WT_OFF))
 			goto split;
@@ -1072,10 +1072,10 @@ split:		switch (hdr->type) {
 		/* Create the WT_OFF reference. */
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
-		off.size = hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		off.size = dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
-		++parent->hdr->u.entries;
+		++parent->dsk->u.entries;
 		parent_data = elem->first_free;
 		memcpy(elem->first_free, &off, sizeof(off));
 		elem->first_free += sizeof(WT_OFF);
@@ -1092,7 +1092,7 @@ split:		switch (hdr->type) {
 			goto split;
 
 		/* Store the key. */
-		++parent->hdr->u.entries;
+		++parent->dsk->u.entries;
 		memcpy(elem->first_free, &item, sizeof(item));
 		memcpy(elem->first_free + sizeof(item), key->data, key->size);
 		elem->first_free += WT_ITEM_SPACE_REQ(key->size);
@@ -1102,10 +1102,10 @@ split:		switch (hdr->type) {
 		WT_ITEM_SET(&item, WT_ITEM_OFF, sizeof(WT_OFF));
 		WT_RECORDS(&off) = page->records;
 		off.addr = page->addr;
-		off.size = hdr->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		off.size = dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
-		++parent->hdr->u.entries;
+		++parent->dsk->u.entries;
 		parent_data = elem->first_free;
 		memcpy(elem->first_free, &item, sizeof(item));
 		memcpy(elem->first_free + sizeof(item), &off, sizeof(off));
@@ -1136,7 +1136,7 @@ split:		switch (hdr->type) {
 		 */
 		for (elem =
 		    &stack->elem[level + 1]; elem->page != NULL; ++elem) {
-			switch (elem->page->hdr->type) {
+			switch (elem->page->dsk->type) {
 			case WT_PAGE_COL_INT:
 				WT_RECORDS((WT_OFF *)elem->data) += incr;
 				break;
@@ -1296,10 +1296,10 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	tmp = NULL;
 
 	/* Get a scratch buffer and make it look like an overflow page. */
-	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + from->size, db->allocsize);
+	size = WT_ALIGN(sizeof(WT_PAGE_DISK) + from->size, db->allocsize);
 	WT_ERR(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
-	page->hdr->u.datalen = from->size;
+	page->dsk->u.datalen = from->size;
 
 	/* Fill in the return information. */
 	to->addr = page->addr;
@@ -1337,7 +1337,7 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 	DB *db;
 	DBT *tmp;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t size;
 	int ret;
 
@@ -1345,7 +1345,7 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 	tmp = NULL;
 
 	/* Get a scratch buffer and make it look like our work page. */
-	size = WT_ALIGN(sizeof(WT_PAGE_HDR) + dbt->size, db->allocsize);
+	size = WT_ALIGN(sizeof(WT_PAGE_DISK) + dbt->size, db->allocsize);
 	WT_ERR(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 
@@ -1354,9 +1354,9 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 	to->size = dbt->size;
 
 	/* Initialize the page header and copy the record into place. */
-	hdr = page->hdr;
-	hdr->u.datalen = dbt->size;
-	memcpy((uint8_t *)hdr + sizeof(WT_PAGE_HDR), dbt->data, dbt->size);
+	dsk = page->dsk;
+	dsk->u.datalen = dbt->size;
+	memcpy((uint8_t *)dsk + sizeof(WT_PAGE_DISK), dbt->data, dbt->size);
 
 	ret = __wt_page_write(toc, page);
 
@@ -1376,7 +1376,7 @@ __wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
 {
 	DBT *tmp;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t size;
 	int ret;
 
@@ -1399,12 +1399,12 @@ __wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
 	 * of the file, which means we can grab file space whenever we want.
 	 */
 	page = tmp->data;
-	page->hdr = hdr =
-	    (WT_PAGE_HDR *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
+	page->dsk = dsk =
+	    (WT_PAGE_DISK *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
 	WT_ERR(__wt_file_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
-	hdr->type = (uint8_t)page_type;
-	hdr->level = (uint8_t)page_level;
+	dsk->type = (uint8_t)page_type;
+	dsk->level = (uint8_t)page_level;
 
 	*page_ret = page;
 	*tmp_ret = tmp;

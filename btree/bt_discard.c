@@ -28,7 +28,7 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	void *last_key;
 
 	env = toc->env;
-	type = page->hdr->type;
+	type = page->dsk->type;
 
 	/* Never discard a dirty page. */
 	WT_ASSERT(env, !WT_PAGE_IS_MODIFIED(page));
@@ -115,8 +115,8 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		break;
 	}
 
-	if (page->hdr != NULL)
-		__wt_free(env, page->hdr, page->size);
+	if (page->dsk != NULL)
+		__wt_free(env, page->dsk, page->size);
 	__wt_free(env, page, sizeof(WT_PAGE));
 }
 
@@ -229,7 +229,7 @@ __wt_row_key_on_page(WT_PAGE *page, WT_ROW *rip)
 	uint8_t *p;
 
 	p = rip->key;
-	return (p >= (uint8_t *)page->hdr &&
-	    p < (uint8_t *)page->hdr + page->size ? 1 : 0);
+	return (p >= (uint8_t *)page->dsk &&
+	    p < (uint8_t *)page->dsk + page->size ? 1 : 0);
 }
 

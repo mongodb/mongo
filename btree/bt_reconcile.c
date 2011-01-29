@@ -39,7 +39,7 @@ __wt_rec_set_page_size(WT_TOC *toc, WT_PAGE *page, uint8_t *first_free)
 	 * checks for entries that extend past the end of the page, and expects
 	 * the WT_PAGE->size field to be valid.
 	 */
-	page->size = WT_ALIGN(first_free - (uint8_t *)page->hdr, db->allocsize);
+	page->size = WT_ALIGN(first_free - (uint8_t *)page->dsk, db->allocsize);
 }
 
 /*
@@ -53,21 +53,21 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	DBT *tmp;
 	ENV *env;
 	WT_PAGE *new, _new;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t max;
 	int ret;
 
 	db = toc->db;
 	tmp = NULL;
 	env = toc->env;
-	hdr = page->hdr;
+	dsk = page->dsk;
 
 	/* If the page isn't dirty, we should never have been called. */
 	WT_ASSERT(env, WT_PAGE_IS_MODIFIED(page));
 
 	WT_VERBOSE(env, WT_VERB_EVICT,
 	    (env, "reconcile addr %lu (page %p, type %s)",
-	    (u_long)page->addr, page, __wt_page_type_string(hdr)));
+	    (u_long)page->addr, page, __wt_page_type_string(dsk)));
 
 	/*
 	 * Update the disk generation before reading the page.  The workQ will
@@ -79,7 +79,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_PAGE_DISK_WRITE(page);
 	WT_MEMORY_FLUSH;
 
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		/*
 		 * Fixed-width pages without repeat count compression cannot
@@ -122,12 +122,12 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	memset(tmp->data, 0, max);
 	new->addr = page->addr;
 	new->size = max;
-	new->hdr = tmp->data;
-	new->hdr->start_recno = hdr->start_recno;
-	new->hdr->type = hdr->type;
-	new->hdr->level = hdr->level;
+	new->dsk = tmp->data;
+	new->dsk->start_recno = dsk->start_recno;
+	new->dsk->type = dsk->type;
+	new->dsk->level = dsk->level;
 
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		WT_ERR(__wt_rec_col_fix(toc, page, new));
 		break;
@@ -188,12 +188,12 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_COL *cip;
 	WT_OFF *from;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i, space_avail;
 	uint8_t *first_free;
 
-	hdr = new->hdr;
+	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
@@ -219,7 +219,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		memcpy(first_free, from, sizeof(WT_OFF));
 		first_free += sizeof(WT_OFF);
 		space_avail -= sizeof(WT_OFF);
-		++hdr->u.entries;
+		++dsk->u.entries;
 	}
 
 	new->records = page->records;
@@ -236,13 +236,13 @@ static int
 __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_ITEM *key_item, *data_item, *next;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
-	hdr = new->hdr;
+	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
@@ -300,7 +300,7 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		memcpy(first_free, key_item, len);
 		first_free += len;
 		space_avail -= len;
-		++hdr->u.entries;
+		++dsk->u.entries;
 
 		key_item = next;
 	}
@@ -323,7 +323,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	DBT *tmp;
 	ENV *env;
 	WT_COL *cip;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i, len, space_avail;
 	uint8_t *data, *first_free;
@@ -332,7 +332,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	db = toc->db;
 	tmp = NULL;
 	env = toc->env;
-	hdr = new->hdr;
+	dsk = new->dsk;
 	ret = 0;
 
 	__wt_set_ff_and_sa_from_offset(
@@ -373,7 +373,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		memcpy(first_free, data, len);
 		first_free += len;
 		space_avail -= len;
-		++hdr->u.entries;
+		++dsk->u.entries;
 	}
 
 	new->records = page->records;
@@ -395,7 +395,7 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	DBT *tmp;
 	ENV *env;
 	WT_COL *cip;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_RCC_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
 	uint64_t recno;
@@ -408,7 +408,7 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	tmp = NULL;
 	env = toc->env;
 	expsort = NULL;
-	hdr = new->hdr;
+	dsk = new->dsk;
 	n_expsort = 0;			/* Necessary for the sort function */
 	last_data = NULL;
 	ret = 0;
@@ -428,7 +428,7 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_FIX_DELETE_SET(WT_RCC_REPEAT_DATA(tmp->data));
 
 	/* Set recno to the first record on the page. */
-	recno = page->hdr->start_recno;
+	recno = page->dsk->start_recno;
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for
@@ -521,7 +521,7 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				memcpy(last_data, data, len);
 			first_free += len;
 			space_avail -= len;
-			++hdr->u.entries;
+			++dsk->u.entries;
 		}
 	}
 
@@ -612,12 +612,12 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL *cip;
 	WT_ITEM data_item;
 	WT_OVFL data_ovfl;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
-	hdr = new->hdr;
+	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
@@ -680,7 +680,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			first_free += len;
 			space_avail -= len;
 		}
-		++hdr->u.entries;
+		++dsk->u.entries;
 	}
 
 	new->records = page->records;
@@ -702,14 +702,14 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	DBT *key, key_dbt, *data, data_dbt;
 	WT_ITEM key_item, data_item, *item;
 	WT_OVFL data_ovfl;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_REPL *repl;
 	uint32_t i, len, space_avail, type;
 	uint8_t *first_free;
 
 	db = toc->db;
-	hdr = new->hdr;
+	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
@@ -844,7 +844,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			memcpy(first_free, key->data, key->size);
 			first_free += key->size;
 			space_avail -= key->size;
-			++hdr->u.entries;
+			++dsk->u.entries;
 			break;
 		case KEY_NONE:
 			break;
@@ -854,7 +854,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			memcpy(first_free, data->data, data->size);
 			first_free += data->size;
 			space_avail -= data->size;
-			++hdr->u.entries;
+			++dsk->u.entries;
 			break;
 		case DATA_OFF_PAGE:
 			memcpy(first_free, &data_item, sizeof(data_item));
@@ -862,7 +862,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			    sizeof(WT_ITEM), data->data, data->size);
 			first_free += WT_ITEM_SPACE_REQ(data->size);
 			space_avail -= WT_ITEM_SPACE_REQ(data->size);
-			++hdr->u.entries;
+			++dsk->u.entries;
 			break;
 		}
 	}
@@ -892,7 +892,7 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * reverse split where the internal page disappears.   That shouldn't
 	 * be difficult, but I haven't written it yet.
 	 */
-	if (new->hdr->u.entries == 0) {
+	if (new->dsk->u.entries == 0) {
 		new->addr = WT_ADDR_INVALID;
 		WT_VERBOSE(env, WT_VERB_EVICT, (env,
 		    "reconcile removing empty page %lu", (u_long)page->addr));

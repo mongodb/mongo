@@ -98,7 +98,7 @@ __wt_debug_addr(
 	page = &_page;
 	page->addr = addr;
 	page->size = tmp->size = size;
-	page->hdr = tmp->data;
+	page->dsk = tmp->data;
 	WT_ERR(__wt_page_read(db, page));
 
 	ret = __wt_debug_page(toc, page, ofile, fp);
@@ -116,18 +116,18 @@ int
 __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	DB *db;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	int do_close, ret;
 
 	db = toc->db;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	ret = 0;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
 	__wt_debug_page_hdr(toc, page, fp);
 
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -140,17 +140,17 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		    "\trecords %llu, starting recno %llu, level %lu, "
 		    "entries %lu, lsn %lu/%lu\n",
 		    (unsigned long long)page->records,
-		    (unsigned long long)hdr->start_recno,
-		    (u_long)hdr->level, (u_long)hdr->u.entries,
-		    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
+		    (unsigned long long)dsk->start_recno,
+		    (u_long)dsk->level, (u_long)dsk->u.entries,
+		    (u_long)dsk->lsn[0], (u_long)dsk->lsn[1]);
 		break;
 	case WT_PAGE_OVFL:
-		fprintf(fp, "size %lu\n", (u_long)hdr->u.datalen);
+		fprintf(fp, "size %lu\n", (u_long)dsk->u.datalen);
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -196,7 +196,7 @@ __wt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	__wt_debug_page_hdr(toc, page, fp);
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
-	switch (page->hdr->type) {
+	switch (page->dsk->type) {
 	case WT_PAGE_COL_FIX:
 		__wt_debug_inmem_col_fix(toc, page, fp);
 		break;
@@ -686,6 +686,6 @@ __wt_debug_page_hdr(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	    "addr: %lu-%lu {\n\t%s: size %lu\n",
 	    (u_long)page->addr,
 	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
-  	    __wt_page_type_string(page->hdr), (u_long)page->size);
+  	    __wt_page_type_string(page->dsk), (u_long)page->size);
 
 }

@@ -73,7 +73,7 @@ __wt_set_ff_and_sa_from_offset(WT_PAGE *page,
 inline int
 __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen);
 const char *
-__wt_page_type_string(WT_PAGE_HDR *hdr);
+__wt_page_type_string(WT_PAGE_DISK *dsk);
 const char *
 __wt_item_type_string(WT_ITEM *item);
 int

@@ -24,19 +24,19 @@ __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
 	IDB *idb;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 
 	db = toc->db;
 	idb = db->idb;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	stats = idb->dstats;
 
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
 	 * a count of the page type.
 	 */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		WT_STAT_INCR(stats, PAGE_COL_FIX);
 		WT_RET(__wt_stat_page_col_fix(toc, page));

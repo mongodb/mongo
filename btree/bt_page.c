@@ -76,29 +76,29 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	ENV *env;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t nindx;
 	int ret;
 
 	db = toc->db;
 	env = toc->env;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	ret = 0;
 
 	WT_ASSERT(env, page->u.indx == NULL);
 
 	/* Determine the maximum number of indexes we'll need for this page. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RCC:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
-		nindx = hdr->u.entries;
+		nindx = dsk->u.entries;
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		nindx = hdr->u.entries / 2;
+		nindx = dsk->u.entries / 2;
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -108,7 +108,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		 * a duplicate set is big enough to be pushed off the page;
 		 * we're conservative here.
 		 */
-		nindx = hdr->u.entries - 1;
+		nindx = dsk->u.entries - 1;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -122,7 +122,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		return (0);
 
 	/* Allocate an array of WT_{ROW,COL}_INDX structures for the page. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RCC:
@@ -142,7 +142,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	}
 
 	/* Allocate reference array for internal pages. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -153,7 +153,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	}
 
 	/* Fill in the structures. */
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		__wt_page_inmem_col_fix(db, page);
 		break;
@@ -193,11 +193,11 @@ static void
 __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t i;
 	uint8_t *p;
 
-	hdr = page->hdr;
+	dsk = page->dsk;
 	cip = page->u.icol;
 
 	/*
@@ -209,7 +209,7 @@ __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 		++cip;
 	}
 
-	page->indx_count = page->records = hdr->u.entries;
+	page->indx_count = page->records = dsk->u.entries;
 }
 
 /*
@@ -221,11 +221,11 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_OFF *off;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint64_t records;
 	uint32_t i;
 
-	hdr = page->hdr;
+	dsk = page->dsk;
 	cip = page->u.icol;
 	records = 0;
 
@@ -239,7 +239,7 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 		records += WT_RECORDS(off);
 	}
 
-	page->indx_count = hdr->u.entries;
+	page->indx_count = dsk->u.entries;
 	page->records = records;
 }
 
@@ -252,12 +252,12 @@ static void
 __wt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint64_t records;
 	uint32_t i;
 	uint8_t *p;
 
-	hdr = page->hdr;
+	dsk = page->dsk;
 	cip = page->u.icol;
 	records = 0;
 
@@ -271,7 +271,7 @@ __wt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 		++cip;
 	}
 
-	page->indx_count = hdr->u.entries;
+	page->indx_count = dsk->u.entries;
 	page->records = records;
 }
 
@@ -285,10 +285,10 @@ __wt_page_inmem_col_var(WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_ITEM *item;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	hdr = page->hdr;
+	dsk = page->dsk;
 	cip = page->u.icol;
 
 	/*
@@ -302,7 +302,7 @@ __wt_page_inmem_col_var(WT_PAGE *page)
 		++cip;
 	}
 
-	page->indx_count = page->records = hdr->u.entries;
+	page->indx_count = page->records = dsk->u.entries;
 }
 
 /*
@@ -315,10 +315,10 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
 	WT_ROW *rip;
 	WT_ITEM *item;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	hdr = page->hdr;
+	dsk = page->dsk;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -345,8 +345,8 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 		++rip;
 	}
 
-	page->indx_count = hdr->u.entries;
-	page->records = hdr->u.entries;
+	page->indx_count = dsk->u.entries;
+	page->records = dsk->u.entries;
 	return (0);
 }
 
@@ -361,19 +361,19 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	IDB *idb;
 	WT_ITEM *item;
 	WT_OFF *off;
-	WT_PAGE_HDR *hdr;
+	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint64_t records;
 	uint32_t i;
 	void *huffman;
 
 	idb = db->idb;
-	hdr = page->hdr;
+	dsk = page->dsk;
 	rip = page->u.irow;
 	records = 0;
 
 	huffman =
-	    hdr->type == WT_PAGE_DUP_INT ? idb->huffman_data : idb->huffman_key;
+	    dsk->type == WT_PAGE_DUP_INT ? idb->huffman_data : idb->huffman_key;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -407,7 +407,7 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 		WT_ILLEGAL_FORMAT(db);
 		}
 
-	page->indx_count = hdr->u.entries / 2;
+	page->indx_count = dsk->u.entries / 2;
 	page->records = records;
 	return (0);
 }

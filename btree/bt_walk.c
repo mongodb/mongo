@@ -74,7 +74,7 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 	 * no slower to walk off-page dupliate trees in this code can request
 	 * it be done here.
 	 */
-	switch (page->hdr->type) {
+	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(page, cip, i) {
 			/* cip references the subtree containing the record */
@@ -229,7 +229,7 @@ eop:			e->visited = 1;
 
 	/* Find the next WT_REF/WT_PAGE pair present in the cache. */
 	for (;;) {
-		switch (page->hdr->type) {
+		switch (page->dsk->type) {
 		case WT_PAGE_ROW_LEAF:
 			ref = page->u3.dup[e->indx];
 			break;
@@ -264,7 +264,7 @@ eop:			e->visited = 1;
 	 * case we traverse those pages.
 	 */
 	child = ref->page;
-	switch (child->hdr->type) {
+	switch (child->dsk->type) {
 	case WT_PAGE_ROW_LEAF:
 		/*
 		 * Check for off-page duplicates -- if there are any, push them

@@ -62,7 +62,7 @@ extern "C" {
  * page header), rounded to an allocation unit.
  */
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
-	((uint32_t)WT_ALIGN((size) + sizeof(WT_PAGE_HDR), (db)->allocsize))
+	((uint32_t)WT_ALIGN((size) + sizeof(WT_PAGE_DISK), (db)->allocsize))
 
 /*
  * The invalid address is the largest possible offset, which isn't a possible
@@ -138,7 +138,7 @@ struct __wt_page {
 	WT_PAGE	*parent;		/* Page's parent */
 	WT_OFF	*parent_off;		/* Page's parent reference */
 
-	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
+	WT_PAGE_DISK *dsk;		/* Page's on-disk representation */
 
 	/*
 	 * We maintain 3 "generation" numbers for a page: the disk, read and
@@ -376,9 +376,9 @@ struct __wt_repl {
 };
 
 /*
- * WT_PAGE_HDR --
+ * WT_PAGE_DISK --
  *
- * All on-disk database pages have a common header, declared as the WT_PAGE_HDR
+ * All on-disk database pages have a common header, declared as the WT_PAGE_DISK
  * structure.  The header has no version number or mode bits, and the page type
  * and/or flags value will have to be modified when changes are made to the page
  * layout.  (The page type appears early in the header to make this simpler.)
@@ -387,7 +387,7 @@ struct __wt_repl {
  *
  * For more information on page layouts and types, see the file btree_layout.
  */
-struct __wt_page_hdr {
+struct __wt_page_disk {
 	/*
 	 * The record number of the first record on the page is stored for two
 	 * reasons: first, we have to find the page's stack when reconciling
@@ -450,18 +450,18 @@ struct __wt_page_hdr {
 	uint8_t unused[2];		/* 26-27: unused padding */
 };
 /*
- * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
+ * WT_PAGE_DISK_SIZE is the expected structure size --  we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  * The size must also be a multiple of a 4-byte boundary, because the header
  * is followed by WT_ITEM structures, which require 4-byte alignment.
  */
-#define	WT_PAGE_HDR_SIZE		28
+#define	WT_PAGE_DISK_SIZE		28
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.
  */
 #define	WT_PAGE_BYTE(page)						\
-	((void *)(((uint8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE))
+	((void *)(((uint8_t *)(page)->dsk) + WT_PAGE_DISK_SIZE))
 
 /*
  * WT_ROW --
@@ -753,7 +753,7 @@ struct __wt_item {
 /* WT_ITEM_FOREACH is a loop that walks the items on a page */
 #define	WT_ITEM_FOREACH(page, item, i)					\
 	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
-	    (i) = (page)->hdr->u.entries;				\
+	    (i) = (page)->dsk->u.entries;				\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
 
 /*
@@ -783,7 +783,7 @@ struct __wt_off {
 /* WT_OFF_FOREACH is a loop that walks offpage references on a page */
 #define	WT_OFF_FOREACH(page, offp, i)					\
 	for ((offp) = (WT_OFF *)WT_PAGE_BYTE(page),			\
-	    (i) = (page)->hdr->u.entries; (i) > 0; ++(offp), --(i))
+	    (i) = (page)->dsk->u.entries; (i) > 0; ++(offp), --(i))
 
 /*
  * Btree overflow items reference another page, and so the data is another
@@ -810,7 +810,7 @@ struct __wt_ovfl {
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
 #define	WT_FIX_FOREACH(db, page, p, i)					\
 	for ((p) = WT_PAGE_BYTE(page),					\
-	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
+	    (i) = (page)->dsk->u.entries; (i) > 0; --(i),		\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len)
 
 /*
@@ -819,7 +819,7 @@ struct __wt_ovfl {
  */
 #define	WT_RCC_REPEAT_FOREACH(db, page, p, i)				\
 	for ((p) = WT_PAGE_BYTE(page),					\
-	    (i) = (page)->hdr->u.entries; (i) > 0; --(i),		\
+	    (i) = (page)->dsk->u.entries; (i) > 0; --(i),		\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len + sizeof(uint16_t))
 
 /*

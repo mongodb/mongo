@@ -26,7 +26,7 @@ __wt_bt_build_verify(void)
 		{ "WT_OVFL", sizeof(WT_OVFL), WT_OVFL_SIZE },
 		{ "WT_PAGE", sizeof(WT_PAGE), WT_PAGE_SIZE },
 		{ "WT_PAGE_DESC", sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE },
-		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), WT_PAGE_HDR_SIZE },
+		{ "WT_PAGE_DISK", sizeof(WT_PAGE_DISK), WT_PAGE_DISK_SIZE },
 		{ "WT_ROW", sizeof(WT_ROW), WT_ROW_SIZE }
 	};
 	static const struct {
@@ -35,7 +35,7 @@ __wt_bt_build_verify(void)
 	} align_check[] = {
 		{ "WT_OFF", sizeof(WT_OFF), sizeof(uint32_t) },
 		{ "WT_OVFL", sizeof(WT_OVFL), sizeof(uint32_t) },
-		{ "WT_PAGE_HDR", sizeof(WT_PAGE_HDR), sizeof(uint32_t) },
+		{ "WT_PAGE_DISK", sizeof(WT_PAGE_DISK), sizeof(uint32_t) },
 		{ "WT_TOC_UPDATE", sizeof(WT_TOC_UPDATE), sizeof(uint32_t) }
 	};
 	u_int i;
@@ -93,7 +93,7 @@ __wt_set_ff_and_sa_from_offset(WT_PAGE *page,
 {
 	*first_freep = (uint8_t *)p;
 	*space_availp =
-	    page->size - (uint32_t)((uint8_t *)p - (uint8_t *)page->hdr);
+	    page->size - (uint32_t)((uint8_t *)p - (uint8_t *)page->dsk);
 }
 
 /*
@@ -111,9 +111,9 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
  *	Return a string representing the page type.
  */
 const char *
-__wt_page_type_string(WT_PAGE_HDR *hdr)
+__wt_page_type_string(WT_PAGE_DISK *dsk)
 {
-	switch (hdr->type) {
+	switch (dsk->type) {
 	case WT_PAGE_INVALID:
 		return ("invalid");
 	case WT_PAGE_COL_FIX:
