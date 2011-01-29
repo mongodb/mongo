@@ -11,7 +11,7 @@
 
 static void __wt_page_inmem_col_fix(DB *, WT_PAGE *);
 static void __wt_page_inmem_col_int(WT_PAGE *);
-static void __wt_page_inmem_col_rcc(DB *, WT_PAGE *);
+static void __wt_page_inmem_col_rle(DB *, WT_PAGE *);
 static void __wt_page_inmem_col_var(WT_PAGE *);
 static int  __wt_page_inmem_dup_leaf(DB *, WT_PAGE *);
 static int  __wt_page_inmem_int_ref(WT_TOC *, uint32_t, WT_PAGE *);
@@ -91,7 +91,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 		nindx = dsk->u.entries;
@@ -125,7 +125,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		WT_ERR((__wt_calloc(env,
 		    nindx, sizeof(WT_COL), &page->u.icol)));
@@ -160,8 +160,8 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 		__wt_page_inmem_col_int(page);
 		break;
-	case WT_PAGE_COL_RCC:
-		__wt_page_inmem_col_rcc(db, page);
+	case WT_PAGE_COL_RLE:
+		__wt_page_inmem_col_rle(db, page);
 		break;
 	case WT_PAGE_COL_VAR:
 		__wt_page_inmem_col_var(page);
@@ -244,12 +244,12 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 }
 
 /*
- * __wt_page_inmem_col_rcc --
- *	Build in-memory index for repeat-compressed, fixed-length column-store
+ * __wt_page_inmem_col_rle --
+ *	Build in-memory index for fixed-length, run-length encoded, column-store
  *	leaf pages.
  */
 static void
-__wt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
+__wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -265,8 +265,8 @@ __wt_page_inmem_col_rcc(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	WT_RCC_REPEAT_FOREACH(db, page, p, i) {
-		records += WT_RCC_REPEAT_COUNT(p);
+	WT_RLE_REPEAT_FOREACH(db, page, p, i) {
+		records += WT_RLE_REPEAT_COUNT(p);
 		cip->data = p;
 		++cip;
 	}

@@ -9,10 +9,10 @@
 
 #include "wt_internal.h"
 
-static int __wt_rcc_expand_compare(const void *, const void *);
+static int __wt_rle_expand_compare(const void *, const void *);
 static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_rec_col_rcc(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -82,12 +82,12 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		/*
-		 * Fixed-width pages without repeat count compression cannot
-		 * change size.
+		 * Fixed-width pages without run-length encoding cannot change
+		 * size.
 		 */
 		max = page->size;
 		break;
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
@@ -131,8 +131,8 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_FIX:
 		WT_ERR(__wt_rec_col_fix(toc, page, new));
 		break;
-	case WT_PAGE_COL_RCC:
-		WT_ERR(__wt_rec_col_rcc(toc, page, new));
+	case WT_PAGE_COL_RLE:
+		WT_ERR(__wt_rec_col_rle(toc, page, new));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_ERR(__wt_rec_col_var(toc, page, new));
@@ -313,8 +313,8 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 /*
  * __wt_rec_col_fix --
- *	Reconcile a fixed-width column-store leaf page (does not handle
- *	repeat-count compression).
+ *	Reconcile a fixed-width, column-store leaf page (does not handle
+ *	run-length encoding).
  */
 static int
 __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
@@ -365,8 +365,8 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		/*
 		 * When reconciling a fixed-width page that doesn't support
-		 * repeat count compression, the on-page information cannot
-		 * change size -- there's no reason to ever split such a page.
+		 * run-length encoding, the on-page information can't change
+		 * size -- there's no reason to ever split such a page.
 		 */
 		WT_ASSERT(env, len <= space_avail);
 
@@ -385,18 +385,18 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_rec_col_rcc --
- *	Reconcile a repeat-count compressed, fixed-width column-store leaf page.
+ * __wt_rec_col_rle --
+ *	Reconcile a fixed-width, run-length encoded, column-store leaf page.
  */
 static int
-__wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	DB *db;
 	DBT *tmp;
 	ENV *env;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_RCC_EXPAND *exp, **expsort, **expp;
+	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
 	uint64_t recno;
 	uint32_t i, len, n_expsort, space_avail;
@@ -424,8 +424,8 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	len = db->fixed_len + sizeof(uint16_t);
 	WT_ERR(__wt_scr_alloc(toc, len, &tmp));
 	memset(tmp->data, 0, len);
-	WT_RCC_REPEAT_COUNT(tmp->data) = 1;
-	WT_FIX_DELETE_SET(WT_RCC_REPEAT_DATA(tmp->data));
+	WT_RLE_REPEAT_COUNT(tmp->data) = 1;
+	WT_FIX_DELETE_SET(WT_RLE_REPEAT_DATA(tmp->data));
 
 	/* Set recno to the first record on the page. */
 	recno = page->dsk->start_recno;
@@ -433,26 +433,26 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
-		 * terminated array of references to WT_RCC_EXPAND structures,
+		 * terminated array of references to WT_RLE_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_ERR(__wt_rcc_expand_sort(
+		WT_ERR(__wt_rle_expand_sort(
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
 		 *
 		 * Generate entries for the new page: loop through the repeat
-		 * records, checking for WT_RCC_EXPAND entries that match the
+		 * records, checking for WT_RLE_EXPAND entries that match the
 		 * current record number.
 		 */
-		nrepeat = WT_RCC_REPEAT_COUNT(cip->data);
+		nrepeat = WT_RLE_REPEAT_COUNT(cip->data);
 		for (expp = expsort, n = 1;
 		    n <= nrepeat; n += repeat_count, recno += repeat_count) {
 			from_repl = 0;
 			if ((exp = *expp) != NULL && recno == exp->recno) {
 				++expp;
 
-				/* Use the WT_RCC_EXPAND's WT_REPL field. */
+				/* Use the WT_RLE_EXPAND's WT_REPL field. */
 				repl = exp->repl;
 				if (WT_REPL_DELETED_ISSET(repl))
 					data = tmp->data;
@@ -468,9 +468,9 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 					data = cip->data;
 				/*
 				 * The repeat count is the number of records
-				 * up to the next WT_RCC_EXPAND record, or
+				 * up to the next WT_RLE_EXPAND record, or
 				 * up to the end of this entry if we have no
-				 * more WT_RCC_EXPAND records.
+				 * more WT_RLE_EXPAND records.
 				 */
 				if (exp == NULL)
 					repeat_count = (nrepeat - n) + 1;
@@ -485,10 +485,10 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * repeat count where possible.
 			 */
 			if (last_data != NULL &&
-			    memcmp(WT_RCC_REPEAT_DATA(last_data),
-			    WT_RCC_REPEAT_DATA(data), db->fixed_len) == 0 &&
-			    WT_RCC_REPEAT_COUNT(last_data) < UINT16_MAX) {
-				WT_RCC_REPEAT_COUNT(last_data) += repeat_count;
+			    memcmp(WT_RLE_REPEAT_DATA(last_data),
+			    WT_RLE_REPEAT_DATA(data), db->fixed_len) == 0 &&
+			    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
+				WT_RLE_REPEAT_COUNT(last_data) += repeat_count;
 				continue;
 			}
 
@@ -500,7 +500,7 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			if (len > space_avail) {
 				fprintf(stderr,
-				    "__wt_rec_col_rcc: page %lu split\n",
+				    "__wt_rec_col_rle: page %lu split\n",
 				    (u_long)page->addr);
 				__wt_abort(env);
 			}
@@ -514,8 +514,8 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			last_data = first_free;
 			if (from_repl) {
-				WT_RCC_REPEAT_COUNT(last_data) = repeat_count;
-				memcpy(WT_RCC_REPEAT_DATA(
+				WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
+				memcpy(WT_RLE_REPEAT_DATA(
 				    last_data), data, db->fixed_len);
 			} else
 				memcpy(last_data, data, len);
@@ -530,7 +530,7 @@ __wt_rec_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
-		__wt_free(env, expsort, n_expsort * sizeof(WT_RCC_EXPAND *));
+		__wt_free(env, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
 
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -539,36 +539,36 @@ err:	if (expsort != NULL)
 }
 
 /*
- * __wt_rcc_expand_compare --
- *	Qsort function: sort WT_RCC_EXPAND structures based on the record
+ * __wt_rle_expand_compare --
+ *	Qsort function: sort WT_RLE_EXPAND structures based on the record
  *	offset, in ascending order.
  */
 static int
-__wt_rcc_expand_compare(const void *a, const void *b)
+__wt_rle_expand_compare(const void *a, const void *b)
 {
-	WT_RCC_EXPAND *a_exp, *b_exp;
+	WT_RLE_EXPAND *a_exp, *b_exp;
 
-	a_exp = *(WT_RCC_EXPAND **)a;
-	b_exp = *(WT_RCC_EXPAND **)b;
+	a_exp = *(WT_RLE_EXPAND **)a;
+	b_exp = *(WT_RLE_EXPAND **)b;
 
 	return (a_exp->recno > b_exp->recno ? 1 : 0);
 }
 
 /*
- * __wt_rcc_expand_sort --
- *	Return the current on-page index's array of WT_RCC_EXPAND structures,
+ * __wt_rle_expand_sort --
+ *	Return the current on-page index's array of WT_RLE_EXPAND structures,
  *	sorted by record offset.
  */
 int
-__wt_rcc_expand_sort(ENV *env,
-    WT_PAGE *page, WT_COL *cip, WT_RCC_EXPAND ***expsortp, uint32_t *np)
+__wt_rle_expand_sort(ENV *env,
+    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np)
 {
-	WT_RCC_EXPAND *exp;
+	WT_RLE_EXPAND *exp;
 	uint16_t n;
 
 	/* Figure out how big the array needs to be. */
 	for (n = 0,
-	    exp = WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next, ++n)
+	    exp = WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next, ++n)
 		;
 
 	/*
@@ -578,21 +578,21 @@ __wt_rcc_expand_sort(ENV *env,
 	if (n >= *np) {
 		if (*expsortp != NULL)
 			__wt_free(
-			    env, *expsortp, *np * sizeof(WT_RCC_EXPAND *));
+			    env, *expsortp, *np * sizeof(WT_RLE_EXPAND *));
 		WT_RET(__wt_calloc(
-		    env, n + 10, sizeof(WT_RCC_EXPAND *), expsortp));
+		    env, n + 10, sizeof(WT_RLE_EXPAND *), expsortp));
 		*np = n + 10;
 	}
 
-	/* Enter the WT_RCC_EXPAND structures into the array. */
+	/* Enter the WT_RLE_EXPAND structures into the array. */
 	for (n = 0,
-	    exp = WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next, ++n)
+	    exp = WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next, ++n)
 		(*expsortp)[n] = exp;
 
 	/* Sort the entries. */
 	if (n != 0)
 		qsort(*expsortp, (size_t)n,
-		    sizeof(WT_RCC_EXPAND *), __wt_rcc_expand_compare);
+		    sizeof(WT_RLE_EXPAND *), __wt_rle_expand_compare);
 
 	/* NULL-terminate the array. */
 	(*expsortp)[n] = NULL;

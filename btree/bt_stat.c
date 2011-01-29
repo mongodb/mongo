@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_stat_page_col_fix(WT_TOC *, WT_PAGE *);
-static int __wt_stat_page_col_rcc(WT_TOC *, WT_PAGE *);
+static int __wt_stat_page_col_rle(WT_TOC *, WT_PAGE *);
 static int __wt_stat_page_col_var(WT_TOC *, WT_PAGE *);
 static int __wt_stat_page_dup_leaf(WT_TOC *, WT_PAGE *);
 static int __wt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
@@ -44,9 +44,9 @@ __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, PAGE_COL_INTERNAL);
 		break;
-	case WT_PAGE_COL_RCC:
-		WT_STAT_INCR(stats, PAGE_COL_RCC);
-		WT_RET(__wt_stat_page_col_rcc(toc, page));
+	case WT_PAGE_COL_RLE:
+		WT_STAT_INCR(stats, PAGE_COL_RLE);
+		WT_RET(__wt_stat_page_col_rle(toc, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_STAT_INCR(stats, PAGE_COL_VARIABLE);
@@ -105,14 +105,14 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_stat_page_col_rcc --
- *	Stat a WT_PAGE_COL_RCC page.
+ * __wt_stat_page_col_rle --
+ *	Stat a WT_PAGE_COL_RLE page.
  */
 static int
-__wt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_RCC_EXPAND *exp;
+	WT_RLE_EXPAND *exp;
 	WT_REPL *repl;
 	WT_STATS *stats;
 	uint32_t i;
@@ -121,12 +121,12 @@ __wt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 
 	/* Walk the page, counting data items. */
 	WT_INDX_FOREACH(page, cip, i) {
-		if (WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
+		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
 			WT_STAT_INCRV(stats,
-			    ITEM_COL_DELETED, WT_RCC_REPEAT_COUNT(cip->data));
+			    ITEM_COL_DELETED, WT_RLE_REPEAT_COUNT(cip->data));
 		else
 			WT_STAT_INCRV(stats,
-			    ITEM_TOTAL_DATA, WT_RCC_REPEAT_COUNT(cip->data));
+			    ITEM_TOTAL_DATA, WT_RLE_REPEAT_COUNT(cip->data));
 
 		/*
 		 * Check for corrections.
@@ -136,11 +136,11 @@ __wt_stat_page_col_rcc(WT_TOC *toc, WT_PAGE *page)
 		 * records, or updates a deleted record two times in a row --
 		 * we'll incorrectly count the records as unique, when they are
 		 * changes to the same record.  I'm not fixing it as I don't
-		 * expect the WT_COL_RCCEXP data structure to be permanent, it's
+		 * expect the WT_COL_RLEEXP data structure to be permanent, it's
 		 * too likely to become a linked list in bad cases.
 		 */
 		for (exp =
-		    WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next) {
+		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next) {
 			repl = exp->repl;
 			if (WT_REPL_DELETED_ISSET(repl))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);

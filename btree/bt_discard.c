@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static void __wt_page_discard_dup(ENV *, WT_PAGE *);
-static void __wt_page_discard_rccexp(ENV *, WT_PAGE *);
+static void __wt_page_discard_rleexp(ENV *, WT_PAGE *);
 static void __wt_page_discard_repl(ENV *, WT_PAGE *);
 static void __wt_page_discard_repl_list(ENV *, WT_REPL *);
 static inline int __wt_row_key_on_page(WT_PAGE *, WT_ROW *);
@@ -67,7 +67,7 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		__wt_free(env, page->u.icol, page->indx_count * sizeof(WT_COL));
 		break;
@@ -88,11 +88,11 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		break;
 	}
 
-	/* Free the repeat-count compressed column store expansion array. */
+	/* Free the run-length encoded column store expansion array. */
 	switch (type) {
-	case WT_PAGE_COL_RCC:
-		if (page->u2.rccexp != NULL)
-			__wt_page_discard_rccexp(env, page);
+	case WT_PAGE_COL_RLE:
+		if (page->u2.rleexp != NULL)
+			__wt_page_discard_rleexp(env, page);
 		break;
 	default:
 		break;
@@ -143,37 +143,37 @@ __wt_page_discard_repl(ENV *env, WT_PAGE *page)
 }
 
 /*
- * __wt_page_discard_rccexp --
- *	Discard the repeat-count compressed column store expansion array.
+ * __wt_page_discard_rleexp --
+ *	Discard the run-length encoded column store expansion array.
  */
 static void
-__wt_page_discard_rccexp(ENV *env, WT_PAGE *page)
+__wt_page_discard_rleexp(ENV *env, WT_PAGE *page)
 {
-	WT_RCC_EXPAND **expp, *exp, *a;
+	WT_RLE_EXPAND **expp, *exp, *a;
 	u_int i;
 
 	/*
-	 * For each non-NULL slot in the page's repeat-count compressed column
-	 * store expansion array, free the linked list of WT_RCC_EXPAND
+	 * For each non-NULL slot in the page's run-length encoded column
+	 * store expansion array, free the linked list of WT_RLE_EXPAND
 	 * structures anchored in that slot.
 	 */
-	WT_RCC_EXPAND_FOREACH(page, expp, i) {
+	WT_RLE_EXPAND_FOREACH(page, expp, i) {
 		if ((exp = *expp) == NULL)
 			continue;
 		/*
 		 * Free the linked list of WT_REPL structures anchored in the
-		 * WT_RCC_EXPAND entry.
+		 * WT_RLE_EXPAND entry.
 		 */
 		__wt_page_discard_repl_list(env, exp->repl);
 		do {
 			a = exp->next;
-			__wt_free(env, exp, sizeof(WT_RCC_EXPAND));
+			__wt_free(env, exp, sizeof(WT_RLE_EXPAND));
 		} while ((exp = a) != NULL);
 	}
 
 	/* Free the page's expansion array. */
 	__wt_free(
-	    env, page->u2.rccexp, page->indx_count * sizeof(WT_RCC_EXPAND *));
+	    env, page->u2.rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
 }
 
 /*

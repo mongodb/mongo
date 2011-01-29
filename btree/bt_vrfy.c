@@ -30,7 +30,7 @@ static int __wt_verify_checkfrag(DB *, WT_VSTUFF *);
 static int __wt_verify_delfmt(DB *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(DB *, WT_PAGE *);
 static int __wt_verify_dsk_col_int(DB *, WT_PAGE *);
-static int __wt_verify_dsk_col_rcc(DB *, WT_PAGE *);
+static int __wt_verify_dsk_col_rle(DB *, WT_PAGE *);
 static int __wt_verify_dsk_item(WT_TOC *, WT_PAGE *);
 static int __wt_verify_dsk_ovfl(WT_TOC *, WT_PAGE *);
 static int __wt_verify_eof(DB *, uint32_t, uint32_t);
@@ -229,7 +229,7 @@ __wt_verify_tree(
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		if (dsk->start_recno != start_recno) {
 			__wt_api_db_errx(db,
@@ -601,7 +601,7 @@ __wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 		return (0);
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -633,7 +633,7 @@ __wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
 	/* Check the page level. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_OVFL:
@@ -678,8 +678,8 @@ err_level:		__wt_api_db_errx(db,
 	case WT_PAGE_COL_FIX:
 		WT_RET(__wt_verify_dsk_col_fix(db, page));
 		break;
-	case WT_PAGE_COL_RCC:
-		WT_RET(__wt_verify_dsk_col_rcc(db, page));
+	case WT_PAGE_COL_RLE:
+		WT_RET(__wt_verify_dsk_col_rle(db, page));
 		break;
 	case WT_PAGE_OVFL:
 		WT_RET(__wt_verify_dsk_ovfl(toc, page));
@@ -1007,11 +1007,11 @@ delfmt:	return (__wt_verify_delfmt(db, entry_num, addr));
 }
 
 /*
- * __wt_verify_dsk_col_rcc --
- *	Walk a WT_PAGE_COL_RCC disk page and verify it.
+ * __wt_verify_dsk_col_rle --
+ *	Walk a WT_PAGE_COL_RLE disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_rle(DB *db, WT_PAGE *page)
 {
 	u_int len;
 	uint32_t addr, i, j, entry_num;
@@ -1024,7 +1024,7 @@ __wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 	len = db->fixed_len + sizeof(uint16_t);
 
 	entry_num = 0;
-	WT_RCC_REPEAT_FOREACH(db, page, data, i) {
+	WT_RLE_REPEAT_FOREACH(db, page, data, i) {
 		++entry_num;
 
 		/* Check if this entry is entirely on the page. */
@@ -1032,7 +1032,7 @@ __wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 			return (__wt_verify_eop(db, entry_num, addr));
 
 		/* Count must be non-zero. */
-		if (WT_RCC_REPEAT_COUNT(data) == 0) {
+		if (WT_RLE_REPEAT_COUNT(data) == 0) {
 			__wt_api_db_errx(db,
 			    "fixed-length entry %lu on page at addr "
 			    "%lu has a repeat count of 0",
@@ -1041,7 +1041,7 @@ __wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 		}
 
 		/* Deleted items are entirely nul bytes. */
-		p = WT_RCC_REPEAT_DATA(data);
+		p = WT_RLE_REPEAT_DATA(data);
 		if (WT_FIX_DELETE_ISSET(p)) {
 			if (*p != WT_FIX_DELETE_BYTE)
 				goto delfmt;
@@ -1055,9 +1055,9 @@ __wt_verify_dsk_col_rcc(DB *db, WT_PAGE *page)
 		 * missed an opportunity for compression -- complain.
 		 */
 		if (last_data != NULL &&
-		    memcmp(WT_RCC_REPEAT_DATA(last_data),
-		    WT_RCC_REPEAT_DATA(data), db->fixed_len) == 0 &&
-		    WT_RCC_REPEAT_COUNT(last_data) < UINT16_MAX) {
+		    memcmp(WT_RLE_REPEAT_DATA(last_data),
+		    WT_RLE_REPEAT_DATA(data), db->fixed_len) == 0 &&
+		    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
 			__wt_api_db_errx(db,
 			    "fixed-length entries %lu and %lu on page "
 			    "at addr %lu are identical and should have "
@@ -1275,7 +1275,7 @@ __wt_verify_eof(DB *db, uint32_t entry_num, uint32_t addr)
 
 /*
  * __wt_verify_delfmt --
- *	WT_PAGE_COL_FIX and WT_PAGE_COL_RCC error where a deleted item has
+ *	WT_PAGE_COL_FIX and WT_PAGE_COL_RLE error where a deleted item has
  *	non-nul bytes.
  */
 static int

@@ -74,7 +74,7 @@ struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_disk;		typedef struct __wt_page_disk WT_PAGE_DISK;
-struct __wt_rcc_expand;		typedef struct __wt_rcc_expand WT_RCC_EXPAND;
+struct __wt_rle_expand;		typedef struct __wt_rle_expand WT_RLE_EXPAND;
 struct __wt_ref;		typedef struct __wt_ref WT_REF;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_row;		typedef struct __wt_row WT_ROW;
@@ -152,8 +152,8 @@ struct __wt_toc {
 	uint32_t srch_write_gen;	/*    page's write-generation */
 	void	 *srch_ip;		/*    WT_{COL,ROW} index */
 	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
-					/* Repeat-compress column store only: */
-	WT_RCC_EXPAND *srch_exp;	/*    WT_RCC_EXPAND array index */
+					/* RLE column store only: */
+	WT_RLE_EXPAND *srch_exp;	/*    WT_RLE_EXPAND array index */
 
 
 	/*
@@ -516,7 +516,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_RDONLY					0x00000002
 #define	WT_READ_EVICT					0x00000002
 #define	WT_READ_PRIORITY				0x00000001
-#define	WT_REPEAT_COMP					0x00000001
+#define	WT_RLE						0x00000001
 #define	WT_SCRATCH_INUSE				0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_TELEPHONE					0x00000001

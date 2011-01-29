@@ -54,8 +54,8 @@ __wt_db_btree_dup_offpage_set_verify(DB *db, uint32_t dup_offpage)
  *	Verify arguments to the Db.column_set method.
  */
 int
-__wt_db_column_set_verify(DB *db,
-    uint32_t fixed_len, const char *dictionary, uint32_t flags)
+__wt_db_column_set_verify(
+    DB *db, uint32_t fixed_len, const char *dictionary, uint32_t flags)
 {
 	ENV *env;
 	IDB *idb;
@@ -70,20 +70,16 @@ __wt_db_column_set_verify(DB *db,
 	WT_RET(__wt_api_arg_max(
 	    env, "DB.column_set", "fixed_len", fixed_len, 255));
 
-	/*
-	 * Dictionary and repeat compression are incompatible with variable
-	 * length records.
-	 */
-	if (fixed_len == 0 &&
-	    (dictionary != NULL || LF_ISSET(WT_REPEAT_COMP))) {
+	/* Run-length encoding is incompatible with variable length records. */
+	if (fixed_len == 0 && LF_ISSET(WT_RLE)) {
 		__wt_api_db_errx(db,
-		    "Repeated record count and dictionary compression are "
-		    "incompatible with variable length column-store records");
+		    "Run-length encoding is incompatible with variable length "
+		    "column-store records");
 		return (WT_ERROR);
 	}
 
-	if (LF_ISSET(WT_REPEAT_COMP))
-		F_SET(idb, WT_REPEAT_COMP);
+	if (LF_ISSET(WT_RLE))
+		F_SET(idb, WT_RLE);
 	F_SET(idb, WT_COLUMN);
 	return (0);
 }

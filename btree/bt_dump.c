@@ -22,7 +22,7 @@ typedef struct {
 
 static int  __wt_dump_page(WT_TOC *, WT_PAGE *, void *);
 static void __wt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_col_rcc(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_rle(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_dup_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
@@ -94,8 +94,8 @@ __wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_COL_FIX:
 		__wt_dump_page_col_fix(toc, page, dp);
 		break;
-	case WT_PAGE_COL_RCC:
-		WT_RET(__wt_dump_page_col_rcc(toc, page, dp));
+	case WT_PAGE_COL_RLE:
+		WT_RET(__wt_dump_page_col_rle(toc, page, dp));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_dump_page_col_var(toc, page, dp));
@@ -143,16 +143,16 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 }
 
 /*
- * __wt_dump_page_col_rcc --
- *	Dump a WT_PAGE_COL_RCC page.
+ * __wt_dump_page_col_rle --
+ *	Dump a WT_PAGE_COL_RLE page.
  */
 static int
-__wt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	ENV *env;
 	WT_COL *cip;
-	WT_RCC_EXPAND *exp, **expsort, **expp;
+	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
 	uint64_t recno;
 	uint32_t i, n_expsort;
@@ -168,18 +168,18 @@ __wt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
-		 * terminated array of references to WT_RCC_EXPAND structures,
+		 * terminated array of references to WT_RLE_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_RET(__wt_rcc_expand_sort(
+		WT_RET(__wt_rle_expand_sort(
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
 		 * Dump the records.   We use the WT_REPL entry for records in
-		 * in the WT_RCC_EXPAND array, and original data otherwise.
+		 * in the WT_RLE_EXPAND array, and original data otherwise.
 		 */
 		for (expp = expsort,
-		    n_repeat = WT_RCC_REPEAT_COUNT(cip->data);
+		    n_repeat = WT_RLE_REPEAT_COUNT(cip->data);
 		    n_repeat > 0; --n_repeat, ++recno)
 			if ((exp = *expp) != NULL && exp->recno == recno) {
 				++expp;
@@ -189,12 +189,12 @@ __wt_dump_page_col_rcc(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 				dp->p(
 				    WT_REPL_DATA(repl), repl->size, dp->stream);
 			} else
-				dp->p(WT_RCC_REPEAT_DATA(cip->data),
+				dp->p(WT_RLE_REPEAT_DATA(cip->data),
 				    db->fixed_len, dp->stream);
 	}
 	/* Free the sort array. */
 	if (expsort != NULL)
-		__wt_free(env, expsort, n_expsort * sizeof(WT_RCC_EXPAND *));
+		__wt_free(env, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
 
 	return (0);
 }

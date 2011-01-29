@@ -104,8 +104,8 @@ __wt_cache_read_server(void *arg);
 int
 __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page);
 int
-__wt_rcc_expand_sort(ENV *env,
-    WT_PAGE *page, WT_COL *cip, WT_RCC_EXPAND ***expsortp, uint32_t *np);
+__wt_rle_expand_sort(ENV *env,
+    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np);
 int
 __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
@@ -139,9 +139,9 @@ __wt_db_col_del(WT_TOC *toc, uint64_t recno);
 inline int
 __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data);
 int
-__wt_rcc_expand_serial_func(WT_TOC *toc);
+__wt_rle_expand_serial_func(WT_TOC *toc);
 int
-__wt_rcc_expand_repl_serial_func(WT_TOC *toc);
+__wt_rle_expand_repl_serial_func(WT_TOC *toc);
 int
 __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags);
 int
@@ -167,8 +167,8 @@ __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int);
 int
 __wt_db_btree_dup_offpage_set_verify(DB *db, uint32_t dup_offpage);
 int
-__wt_db_column_set_verify(DB *db,
-    uint32_t fixed_len, const char *dictionary, uint32_t flags);
+__wt_db_column_set_verify(
+    DB *db, uint32_t fixed_len, const char *dictionary, uint32_t flags);
 int
 __wt_env_db(ENV *env, DB **dbp);
 int

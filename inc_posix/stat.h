@@ -73,7 +73,7 @@ struct __wt_stats {
 #define	WT_STAT_MINOR				   15
 #define	WT_STAT_PAGE_COL_FIX			   16
 #define	WT_STAT_PAGE_COL_INTERNAL		   17
-#define	WT_STAT_PAGE_COL_RCC			   18
+#define	WT_STAT_PAGE_COL_RLE			   18
 #define	WT_STAT_PAGE_COL_VARIABLE		   19
 #define	WT_STAT_PAGE_DUP_INTERNAL		   20
 #define	WT_STAT_PAGE_DUP_LEAF			   21

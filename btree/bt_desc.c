@@ -105,8 +105,8 @@ __wt_desc_write(WT_TOC *toc)
 	desc.free_size = idb->free_size;
 	desc.fixed_len = (uint8_t)db->fixed_len;
 	desc.flags = 0;
-	if (F_ISSET(idb, WT_REPEAT_COMP))
-		F_SET(&desc, WT_PAGE_DESC_REPEAT);
+	if (F_ISSET(idb, WT_RLE))
+		F_SET(&desc, WT_PAGE_DESC_RLE);
 
 	WT_RET(__wt_desc_io(toc, &desc, 0));
 

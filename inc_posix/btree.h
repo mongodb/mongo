@@ -105,7 +105,7 @@ struct __wt_page_desc {
 	uint32_t free_addr;		/* 48-51: Free list page address */
 	uint32_t free_size;		/* 52-55: Free list page length */
 
-#define	WT_PAGE_DESC_REPEAT	0x01	/* Repeat count compression */
+#define	WT_PAGE_DESC_RLE	0x01	/* Run-length encoding */
 	uint32_t flags;			/* 56-59: Flags */
 
 	uint8_t  fixed_len;		/* 60: Fixed length byte count */
@@ -211,8 +211,8 @@ struct __wt_page {
 	 * cases, there is a single indx entry per key/data pair, but multiple
 	 * indx entries reference the same memory location.
 	 *
-	 * In column store repeat-count compressed fixed-length pages (in other
-	 * words, WT_PAGE_COL_RCC pages), a single indx entry may reference a
+	 * In column store fixed-length run-length encoded pages (that is,
+	 * WT_PAGE_COL_RLE type pages), a single indx entry may reference a
 	 * large number of records, because there's a single on-page entry that
 	 * represents many identical records.   (We can't expand those entries
 	 * when the page comes into memory because that'd require unacceptable
@@ -235,8 +235,8 @@ struct __wt_page {
 	 * single entry, the WT_REPL structures are formed into a forward-linked
 	 * list.
 	 *
-	 * Modifying (or deleting) repeat-count compressed column store records
-	 * is problematical, because the index entry would no longer reference
+	 * Modifying (or deleting) run-length encoded column store records is
+	 * problematical, because the index entry would no longer reference
 	 * a set of identical items.  We handle this by "inserting" a new entry
 	 * into an array that behaves much like the rinsert array.  This is the
 	 * only case where it's possible to "insert" into a column store -- it's
@@ -247,7 +247,7 @@ struct __wt_page {
 	 */
 	union {
 		WT_REPL	      **repl;	/* Modification/deletion index */
-		WT_RCC_EXPAND **rccexp;	/* RCC expansion index */
+		WT_RLE_EXPAND **rleexp;	/* RLE expansion index */
 	} u2;
 
 	/*
@@ -281,7 +281,7 @@ struct __wt_page {
 
 /*
  * There are 4 different arrays which map one-to-one to the original on-disk
- * index: repl, rccexp, ref and dup.
+ * index: repl, rleexp, ref and dup.
  *
  * The WT_{COL,ROW}_SLOT macros return the appropriate array slot based on a
  * WT_{COL,ROW} reference.
@@ -309,7 +309,7 @@ struct __wt_page {
 #define	__WT_COL_ARRAY(page, ip, field)					\
 	((page)->field == NULL ? NULL : (page)->field[WT_COL_SLOT(page, ip)])
 #define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u2.repl)
-#define	WT_COL_RCCEXP(page, ip)	__WT_COL_ARRAY(page, ip, u2.rccexp)
+#define	WT_COL_RLEEXP(page, ip)	__WT_COL_ARRAY(page, ip, u2.rleexp)
 #define	__WT_ROW_ARRAY(page, ip, field)					\
 	((page)->field == NULL ? NULL : (page)->field[WT_ROW_SLOT(page, ip)])
 #define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u2.repl)
@@ -411,7 +411,7 @@ struct __wt_page_disk {
 #define	WT_PAGE_FREE	 	 1	/* Page on the free list */
 #define	WT_PAGE_COL_FIX		 2	/* Col store fixed-len leaf */
 #define	WT_PAGE_COL_INT		 3	/* Col store internal page */
-#define	WT_PAGE_COL_RCC	 	 4	/* Col store repeat-compressed leaf */
+#define	WT_PAGE_COL_RLE	 	 4	/* Col store run-length encoded leaf */
 #define	WT_PAGE_COL_VAR		 5	/* Col store var-length leaf page */
 #define	WT_PAGE_DUP_INT		 6	/* Duplicate tree internal page */
 #define	WT_PAGE_DUP_LEAF	 7	/* Duplicate tree leaf page */
@@ -529,16 +529,16 @@ struct __wt_col {
 #define	WT_COL_SIZE	(sizeof(void *))
 
 /*
- * WT_RCC_EXPAND --
- * The WT_RCC_EXPAND structure describes the in-memory information about a
- * replaced key/data pair on a repeat-compressed, column store database page.
+ * WT_RLE_EXPAND --
+ * The WT_RLE_EXPAND structure describes the in-memory information about a
+ * replaced key/data pair on a run-length encoded, column store database page.
  */
-struct __wt_rcc_expand {
+struct __wt_rle_expand {
 	uint64_t recno;			/* recno */
 
 	WT_REPL *repl;                  /* modifications/deletions */
 
-	WT_RCC_EXPAND *next;		/* forward-linked list */
+	WT_RLE_EXPAND *next;		/* forward-linked list */
 };
 
 /*
@@ -566,13 +566,13 @@ struct __wt_rcc_expand {
 	    (replp) = (page)->u2.repl; (i) > 0; ++(replp), --(i))
 
 /*
- * WT_RCC_EXPAND_FOREACH --
- * Macro to walk the repeat-count compressed column store expansion  array of
- * an in-memory page.
+ * WT_RLE_EXPAND_FOREACH --
+ * Macro to walk the run-length encoded column store expansion  array of an
+ * in-memory page.
  */
-#define	WT_RCC_EXPAND_FOREACH(page, exp, i)				\
+#define	WT_RLE_EXPAND_FOREACH(page, exp, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->u2.rccexp; (i) > 0; ++(exp), --(i))
+	    (exp) = (page)->u2.rleexp; (i) > 0; ++(exp), --(i))
 
 /*
  * WT_REF_FOREACH --
@@ -611,7 +611,7 @@ struct __wt_rcc_expand {
  *	Trailing data length (in bytes) plus item type.
  *
  * After the page header, on pages with variable-length data, there are
- * variable-length items (all page types except WT_PAGE_COL_{INT,FIX,RCC}),
+ * variable-length items (all page types except WT_PAGE_COL_{INT,FIX,RLE}),
  * comprised of a list of WT_ITEMs in sorted order.  Or, specifically, 4
  * bytes followed by a variable length chunk.
  *
@@ -685,9 +685,9 @@ struct __wt_item {
  *
  * WT_PAGE_COL_INT (Column-store internal page):
  * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length items):
- * WT_PAGE_COL_RCC (Column-store leaf page storing fixed-length items):
+ * WT_PAGE_COL_RLE (Column-store leaf page storing fixed-length items):
  * WT_PAGE_OVFL (Overflow page):
- *	These pages contain fixed-sized structures (WT_PAGE_COL_{INT,FIX,RCC}),
+ *	These pages contain fixed-sized structures (WT_PAGE_COL_{INT,FIX,RLE}),
  *	or a string of bytes (WT_PAGE_OVFL), not WT_ITEM structures.
  *
  * There are currently 10 item types, requiring 4 bits, with 6 values unused.
@@ -814,28 +814,28 @@ struct __wt_ovfl {
 	    (p) = (uint8_t *)(p) + (db)->fixed_len)
 
 /*
- * WT_RCC_REPEAT_FOREACH is a loop that walks fixed-length, repeat-compressed
+ * WT_RLE_REPEAT_FOREACH is a loop that walks fixed-length, run-length encoded
  * entries on a page.
  */
-#define	WT_RCC_REPEAT_FOREACH(db, page, p, i)				\
+#define	WT_RLE_REPEAT_FOREACH(db, page, p, i)				\
 	for ((p) = WT_PAGE_BYTE(page),					\
 	    (i) = (page)->dsk->u.entries; (i) > 0; --(i),		\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len + sizeof(uint16_t))
 
 /*
- * WT_RCC_REPEAT_COUNT and WT_RCC_REPEAT_DATA reference the data and count
- * values for fixed-length, repeat-compressed page entries.
+ * WT_RLE_REPEAT_COUNT and WT_RLE_REPEAT_DATA reference the data and count
+ * values for fixed-length, run-length encoded page entries.
  */
-#define	WT_RCC_REPEAT_COUNT(p)	(*(uint16_t *)(p))
-#define	WT_RCC_REPEAT_DATA(p)	((uint8_t *)(p) + sizeof(uint16_t))
+#define	WT_RLE_REPEAT_COUNT(p)	(*(uint16_t *)(p))
+#define	WT_RLE_REPEAT_DATA(p)	((uint8_t *)(p) + sizeof(uint16_t))
 
 /*
- * WT_RCC_REPEAT_ITERATE is a loop that walks fixed-length, repeat-compressed
+ * WT_RLE_REPEAT_ITERATE is a loop that walks fixed-length, run-length encoded
  * references on a page, visiting each entry the appropriate number of times.
  */
-#define	WT_RCC_REPEAT_ITERATE(db, page, p, i, j)			\
-	WT_RCC_REPEAT_FOREACH(db, page, p, i)				\
-		for ((j) = WT_RCC_REPEAT_COUNT(p); (j) > 0; --(j))
+#define	WT_RLE_REPEAT_ITERATE(db, page, p, i, j)			\
+	WT_RLE_REPEAT_FOREACH(db, page, p, i)				\
+		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 
 #if defined(__cplusplus)
 }

@@ -96,7 +96,7 @@ __wt_bulk_fix(WT_TOC *toc,
 	uint32_t len, space_avail;
 	uint16_t *last_repeat;
 	uint8_t *first_free, *last_data;
-	int rcc, ret;
+	int rle, ret;
 
 	db = toc->db;
 	tmp = NULL;
@@ -104,16 +104,16 @@ __wt_bulk_fix(WT_TOC *toc,
 	insert_cnt = 0;
 	WT_CLEAR(stack);
 
-	rcc = F_ISSET(idb, WT_REPEAT_COMP) ? 1 : 0;
+	rle = F_ISSET(idb, WT_RLE) ? 1 : 0;
 
 	/* Figure out how large is the chunk we're storing on the page. */
 	len = db->fixed_len;
-	if (rcc)
+	if (rle)
 		len += sizeof(uint16_t);
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bulk_scratch_page(toc, db->leafmin,
-	    rcc ? WT_PAGE_COL_RCC : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
+	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	dsk = page->dsk;
 	dsk->start_recno = 1;
 	__wt_set_ff_and_sa_from_offset(
@@ -148,12 +148,12 @@ __wt_bulk_fix(WT_TOC *toc,
 		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
 
 		/*
-		 * If doing repeat compression, check to see if this record
+		 * If doing run-length encoding, check to see if this record
 		 * matches the last data inserted.   If there's a match try
 		 * and increment that item's repeat count instead of entering
 		 * new data.
 		 */
-		if (rcc && dsk->u.entries != 0)
+		if (rle && dsk->u.entries != 0)
 			if (*last_repeat < UINT16_MAX &&
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
@@ -189,10 +189,10 @@ __wt_bulk_fix(WT_TOC *toc,
 		++page->records;
 
 		/*
-		 * Copy the data item onto the page -- if we're doing repeat
-		 * compression, track the location of the item for comparison.
+		 * Copy the data item onto the page -- if doing run-length
+		 * encoding, track the location of the item for comparison.
 		 */
-		if (rcc) {
+		if (rle) {
 			last_repeat = (uint16_t *)first_free;
 			*last_repeat = 1;
 			first_free += sizeof(uint16_t);
@@ -895,7 +895,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		key = NULL;
 		break;
@@ -983,7 +983,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 split:		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
-		case WT_PAGE_COL_RCC:
+		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 			type = WT_PAGE_COL_INT;
 			break;

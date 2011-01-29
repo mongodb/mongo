@@ -120,8 +120,8 @@ __wt_page_type_string(WT_PAGE_DISK *dsk)
 		return ("column-store fixed-length leaf");
 	case WT_PAGE_COL_INT:
 		return ("column-store internal");
-	case WT_PAGE_COL_RCC:
-		return ("column-store fixed-length repeat-compressed leaf");
+	case WT_PAGE_COL_RLE:
+		return ("column-store fixed-length run-length encoded leaf");
 	case WT_PAGE_COL_VAR:
 		return ("column-store variable-length leaf");
 	case WT_PAGE_DUP_INT:

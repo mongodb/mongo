@@ -22,7 +22,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	WT_OFF *off;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_RCC_EXPAND *exp;
+	WT_RLE_EXPAND *exp;
 	WT_REF *ref;
 	WT_REPL *repl;
 	uint64_t record_cnt;
@@ -57,16 +57,16 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		case WT_PAGE_COL_VAR:
 			cip = page->u.icol + (recno - dsk->start_recno);
 			goto done;
-		case WT_PAGE_COL_RCC:
+		case WT_PAGE_COL_RLE:
 			/*
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
 			record_cnt = recno - dsk->start_recno;
 			WT_INDX_FOREACH(page, cip, i) {
-				if (record_cnt < WT_RCC_REPEAT_COUNT(cip->data))
+				if (record_cnt < WT_RLE_REPEAT_COUNT(cip->data))
 					break;
-				record_cnt -= WT_RCC_REPEAT_COUNT(cip->data);
+				record_cnt -= WT_RLE_REPEAT_COUNT(cip->data);
 			}
 			goto done;
 		case WT_PAGE_COL_INT:
@@ -130,10 +130,10 @@ done:	/*
 			if (WT_FIX_DELETE_ISSET(cip->data))
 				goto notfound;
 		break;
-	case WT_PAGE_COL_RCC:
+	case WT_PAGE_COL_RLE:
 		/* Find the item's WT_COL_EXP slot if it exists. */
 		for (exp =
-		    WT_COL_RCCEXP(page, cip); exp != NULL; exp = exp->next)
+		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next)
 			if (exp->recno == recno)
 				break;
 
@@ -159,7 +159,7 @@ done:	/*
 			toc->srch_exp = exp;
 			toc->srch_repl = exp->repl;
 		} else
-			if (WT_FIX_DELETE_ISSET(WT_RCC_REPEAT_DATA(cip->data)))
+			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
 				goto notfound;
 		break;
 	case WT_PAGE_COL_VAR:

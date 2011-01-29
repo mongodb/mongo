@@ -428,7 +428,7 @@ methods['db.column_set'] = Api(
 	['fixed_len/uint32_t @S',
 	 'dictionary/const char *@S',
 	 'flags/uint32_t @S'],
-	[ 'REPEAT_COMP' ],
+	[ 'RLE' ],
 	['init'], ['open'])
 
 methods['db.dump'] = Api(
@@ -603,7 +603,7 @@ flags['env'] = [
 flags['idb'] = [
 	'COLUMN',
 	'RDONLY',
-	'REPEAT_COMP' ]
+	'RLE' ]
 flags['ienv'] = [
 	'SERVER_RUN',
 	'WORKQ_RUN' ]

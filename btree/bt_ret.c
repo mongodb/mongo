@@ -110,8 +110,8 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 		data_ret = cip->data;
 		size_ret = db->fixed_len;
 		break;
-	case WT_PAGE_COL_RCC:
-		data_ret = WT_RCC_REPEAT_DATA(cip->data);
+	case WT_PAGE_COL_RLE:
+		data_ret = WT_RLE_REPEAT_DATA(cip->data);
 		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:

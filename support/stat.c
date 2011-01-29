@@ -66,7 +66,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_PAGE_COL_FIX].desc =
 	    "column-store fixed-size leaf pages";
 	stats[WT_STAT_PAGE_COL_INTERNAL].desc = "column-store internal pages";
-	stats[WT_STAT_PAGE_COL_RCC].desc =
+	stats[WT_STAT_PAGE_COL_RLE].desc =
 	    "column-store repeat-count compressed fixed-size leaf pages";
 	stats[WT_STAT_PAGE_COL_VARIABLE].desc =
 	    "column-store variable-size leaf pages";
@@ -102,7 +102,7 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 	stats[WT_STAT_MINOR].v = 0;
 	stats[WT_STAT_PAGE_COL_FIX].v = 0;
 	stats[WT_STAT_PAGE_COL_INTERNAL].v = 0;
-	stats[WT_STAT_PAGE_COL_RCC].v = 0;
+	stats[WT_STAT_PAGE_COL_RLE].v = 0;
 	stats[WT_STAT_PAGE_COL_VARIABLE].v = 0;
 	stats[WT_STAT_PAGE_DUP_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_DUP_LEAF].v = 0;
