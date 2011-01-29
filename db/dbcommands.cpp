@@ -1223,7 +1223,7 @@ namespace mongo {
 
             BSONObjBuilder indexSizes;
             result.append( "totalIndexSize" , adaptUnit( getIndexSizeForCollection(dbname, ns, &indexSizes, scale) , adapt , scale ) );
-            result.append("indexSizes", adaptUnit( indexSizes.obj() , adapt ));
+            result.append("indexSizes", indexSizes.obj() );
 
             if ( nsd->capped ) {
                 result.append( "capped" , nsd->capped );
