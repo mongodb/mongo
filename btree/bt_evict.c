@@ -139,21 +139,12 @@ __wt_cache_evict_server(void *arg)
 			break;
 
 		for (;;) {
-			/*
-			 * The cache eviction server is a long-running thread;
-			 * its TOC must "enter" and "leave" the library
-			 * periodically in order to be a good thread citizen.
-			 */
-			WT_TOC_GEN_SET(toc);
-
 			/* Single-thread reconciliation. */
 			__wt_lock(env, cache->mtx_reconcile);
 			ret = __wt_evict(toc);
 			__wt_unlock(env, cache->mtx_reconcile);
 			if (ret != 0)
 				goto err;
-
-			WT_TOC_GEN_CLR(toc);
 
 			/*
 			 * If we've locked out reads, keep evicting until we

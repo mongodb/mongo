@@ -57,15 +57,6 @@ extern "C" {
  * WT_TOC support.
  *******************************************/
 /*
- * Set/clear the WT_TOC's generation number; done in the API level, as well as
- * periodically by long-running operations.
- */
-#define	WT_TOC_GEN_CLR(toc)						\
-	(toc)->gen = UINT32_MAX
-#define	WT_TOC_GEN_SET(toc)						\
-	(toc)->gen = (toc)->env->ienv->api_gen
-
-/*
  * WT_TOC_UPDATE --
  *	A structure to accumulate database changes on a per-thread basis.
  */

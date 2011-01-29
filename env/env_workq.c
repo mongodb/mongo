@@ -19,7 +19,6 @@ __wt_workq_srvr(void *arg)
 	ENV *env;
 	IENV *ienv;
 	WT_TOC **tp, *toc;
-	uint32_t low_gen;
 	int chk_read, read_force, request;
 
 	env = (ENV *)arg;
@@ -30,11 +29,8 @@ __wt_workq_srvr(void *arg)
 		++ienv->api_gen;
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 
-		low_gen = UINT32_MAX;
 		chk_read = read_force = request = 0;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
-			if (toc->gen < low_gen)
-				low_gen = toc->gen;
 			switch (toc->wq_state) {
 			case WT_WORKQ_NONE:
 				break;

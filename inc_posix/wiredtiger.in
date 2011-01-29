@@ -135,14 +135,6 @@ struct __wt_toc {
 	DBT	*scratch;		/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
 
-	/*
-	 * Each WT_TOC structure is assigned a generation number as it enters
-	 * the WiredTiger API, and the generation is cleared as it leaves the
-	 * API.  The value is used to determine when chunks of memory are known
-	 * to be unreferenced, and can be discarded.
-	 */
-	uint32_t volatile gen;		/* API generation */
-
 					/* WT_TOC workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
 	int	  wq_ret;		/* Return value */

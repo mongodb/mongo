@@ -42,7 +42,6 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	memset(toc, 0, sizeof(WT_TOC));
 
 	toc->env = env;
-	toc->gen = UINT32_MAX;
 	toc->hazard = ienv->hazard + slot * env->hazard_size;
 
 	WT_RET(__wt_mtx_alloc(env, "toc", 1, &toc->mtx));
@@ -152,7 +151,6 @@ __wt_toc_api_set(ENV *env, const char *name, DB *db, WT_TOC **tocp)
 	}
 	toc->db = db;
 	toc->name = name;
-	WT_TOC_GEN_SET(toc);
 	return (0);
 }
 
@@ -171,8 +169,6 @@ __wt_toc_api_clr(WT_TOC *toc, const char *name, int islocal)
 
 	if (islocal)
 		return (toc->close(toc, 0));
-
-	WT_TOC_GEN_CLR(toc);
 
 	toc->db = NULL;
 	toc->name = NULL;
@@ -196,8 +192,7 @@ __wt_toc_dump(ENV *env)
 	__wt_mb_add(&mb, "%s\n", ienv->sep);
 	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 		__wt_mb_add(&mb,
-		    "toc: %p (gen: %lu) {\n\tworkq func: ",
-		    toc, (u_long)toc->gen);
+		    "toc: %p {\n\tworkq func: ", toc);
 		if (toc->wq_func == NULL)
 			__wt_mb_add(&mb, "none");
 		else

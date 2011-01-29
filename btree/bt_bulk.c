@@ -148,12 +148,6 @@ __wt_bulk_fix(WT_TOC *toc,
 		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
 
 		/*
-		 * Bulk load is a long-running operation, update the generation
-		 * number so we don't tie memory down.
-		 */
-		WT_TOC_GEN_SET(toc);
-
-		/*
 		 * If doing repeat compression, check to see if this record
 		 * matches the last data inserted.   If there's a match try
 		 * and increment that item's repeat count instead of entering
@@ -314,12 +308,6 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
 		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
-
-		/*
-		 * Bulk load is a long-running operation, update the generation
-		 * number so we don't tie memory down.
-		 */
-		WT_TOC_GEN_SET(toc);
 
 		/*
 		 * We don't have a key to store on the page if we're building a
