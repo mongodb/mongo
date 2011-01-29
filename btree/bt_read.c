@@ -70,11 +70,12 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 	ENV *env;
 	WT_CACHE *cache;
 	WT_OFF *off;
+	WT_PAGE *parent;
 	WT_READ_REQ *rr, *rr_end;
 	WT_REF *ref;
 	int dsk_verify;
 
-	__wt_cache_read_unpack(toc, ref, off, dsk_verify);
+	__wt_cache_read_unpack(toc, parent, ref, off, dsk_verify);
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -84,7 +85,7 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 	for (; rr < rr_end; ++rr)
 		if (WT_READ_REQ_ISEMPTY(rr)) {
-			WT_READ_REQ_SET(rr, toc, ref, off, dsk_verify);
+			WT_READ_REQ_SET(rr, toc, parent, ref, off, dsk_verify);
 			return (0);
 		}
 	__wt_api_env_errx(env, "read server request table full");
@@ -247,10 +248,11 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_ERR(__wt_bt_page_inmem(toc, page));
 
 	/*
-	 * Reference the WT_OFF structure that read the page -- typically it's
-	 * the WT_OFF structure on the parent's page.
+	 * Reference the parent's WT_PAGE and parent's WT_OFF structure that
+	 * read the page.
 	 */
-	page->parent_ref = off;
+	page->parent = rr->parent;
+	page->parent_off = off;
 
 	/*
 	 * The page is now available -- set the LRU so the page is not selected

@@ -24,7 +24,8 @@ static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_bt_page_in(WT_TOC *toc, WT_REF *ref, WT_OFF *off, int dsk_verify)
+__wt_bt_page_in(
+    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, WT_OFF *off, int dsk_verify)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -54,7 +55,8 @@ __wt_bt_page_in(WT_TOC *toc, WT_REF *ref, WT_OFF *off, int dsk_verify)
 			break;
 		case WT_EMPTY:
 			/* The page isn't in memory, request it be read. */
-			__wt_cache_read_serial(toc, ref, off, dsk_verify, ret);
+			__wt_cache_read_serial(
+			    toc, parent, ref, off, dsk_verify, ret);
 			if (ret != 0)
 				return (ret);
 			break;

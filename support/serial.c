@@ -105,7 +105,7 @@ __wt_toc_serialize_wrapup(WT_TOC *toc, WT_PAGE *page, int ret)
 	 * no need for a memory flush, we'll use the one below.
 	 */
 	if (page != NULL && ret == 0)
-		++page->write_gen;
+		WT_PAGE_SET_MODIFIED(page);
 
 	/*
 	 * Set the return value and reset the state -- the workQ no longer needs

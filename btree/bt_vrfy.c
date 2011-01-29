@@ -296,7 +296,7 @@ __wt_bt_verify_tree(
 			ref = WT_COL_REF(page, cip);
 			off = WT_COL_OFF(cip);
 			records = WT_COL_OFF_RECORDS(cip);
-			WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
+			WT_ERR(__wt_bt_page_in(toc, page, ref, off, 1));
 			ret = __wt_bt_verify_tree(toc, NULL,
 			    records, start_recno, level - 1, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
@@ -350,7 +350,7 @@ __wt_bt_verify_tree(
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
 			records = WT_ROW_OFF_RECORDS(rip);
-			WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
+			WT_ERR(__wt_bt_page_in(toc, page, ref, off, 1));
 			ret = __wt_bt_verify_tree(toc, rip,
 			    records, (uint64_t)0, level - 1, ref, vs);
 
@@ -385,7 +385,7 @@ __wt_bt_verify_tree(
 			ref = WT_ROW_DUP(page, rip);
 			off = WT_ROW_OFF(rip);
 			records = WT_ROW_OFF_RECORDS(rip);
-			WT_ERR(__wt_bt_page_in(toc, ref, off, 1));
+			WT_ERR(__wt_bt_page_in(toc, page, ref, off, 1));
 			ret = __wt_bt_verify_tree(toc, NULL,
 			    records, (uint64_t)0, WT_NOLEVEL, ref, vs);
 			__wt_hazard_clear(toc, ref->page);

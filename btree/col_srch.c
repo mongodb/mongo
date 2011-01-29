@@ -91,7 +91,7 @@ __wt_bt_search_col(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		/* cip references the subtree containing the record. */
 		ref = WT_COL_REF(page, cip);
 		off = WT_COL_OFF(cip);
-		WT_ERR(__wt_bt_page_in(toc, ref, off, 0));
+		WT_ERR(__wt_bt_page_in(toc, page, ref, off, 0));
 
 		/* Swap the parent page for the child page. */
 		if (page != idb->root_page.page)

@@ -29,14 +29,16 @@ struct __wt_evict_list {
  */
 struct __wt_read_req {
 	WT_TOC *toc;				/* Requesting thread */
+	WT_PAGE *parent;			/* Parent */
 	WT_REF *ref;				/* Address */
 	WT_OFF *off;				/* Bytes */
 	int	dsk_verify;			/* Verify the disk image */
 };
 #define	WT_READ_REQ_ISEMPTY(r)						\
 	((r)->toc == NULL)
-#define	WT_READ_REQ_SET(r, _toc, _ref, _off, _dsk_verify) do {		\
+#define	WT_READ_REQ_SET(r, _toc, _parent, _ref, _off, _dsk_verify) do {	\
 	(r)->ref = _ref;						\
+	(r)->parent = _parent;						\
 	(r)->off = _off;						\
 	(r)->dsk_verify = _dsk_verify;					\
 	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\

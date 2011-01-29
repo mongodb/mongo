@@ -399,7 +399,7 @@ __wt_bt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 			ref = WT_ROW_DUP(page, rip);
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
 			ret = __wt_bt_tree_walk(
 			    toc, ref, 0, __wt_bt_dump_page, dp);
 			__wt_hazard_clear(toc, ref->page);

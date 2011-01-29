@@ -135,7 +135,8 @@ struct __wt_page {
 
 	uint64_t records;		/* Records in this subtree */
 
-	WT_OFF	*parent_ref;		/* Page's parent reference */
+	WT_PAGE	*parent;		/* Page's parent */
+	WT_OFF	*parent_off;		/* Page's parent reference */
 
 	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
 
@@ -193,6 +194,7 @@ struct __wt_page {
 	 */
 #define	WT_PAGE_DISK_WRITE(p)		((p)->disk_gen = (p)->write_gen)
 #define	WT_PAGE_IS_MODIFIED(p)		((p)->disk_gen != (p)->write_gen)
+#define	WT_PAGE_SET_MODIFIED(p)		(++(p)->write_gen)
 	uint32_t disk_gen;
 	uint32_t read_gen;
 	uint32_t write_gen;
@@ -275,7 +277,7 @@ struct __wt_page {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_PAGE_SIZE	(5 * sizeof(void *) + 9 * sizeof(uint32_t))
+#define	WT_PAGE_SIZE	(6 * sizeof(void *) + 9 * sizeof(uint32_t))
 
 /*
  * There are 4 different arrays which map one-to-one to the original on-disk

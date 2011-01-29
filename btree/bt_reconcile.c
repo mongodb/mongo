@@ -958,7 +958,7 @@ static int
 __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	IDB *idb;
-	WT_OFF *parent_ref;
+	WT_OFF *parent_off;
 
 	idb = toc->db->idb;
 
@@ -978,10 +978,24 @@ __wt_bt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * problem.   Only a single thread ever reconciles a page at a time, and
 	 * pages cannot leave memory while they have children.
 	 */
-	parent_ref = page->parent_ref;
-	WT_RECORDS(parent_ref) = new->records;
-	parent_ref->addr = new->addr;
-	parent_ref->size = new->size;
+	parent_off = page->parent_off;
+	WT_RECORDS(parent_off) = new->records;
+	parent_off->addr = new->addr;
+	parent_off->size = new->size;
+
+	/*
+	 * Mark the parent page as dirty.
+	 *
+	 * There's no chance we need to flush this write -- the eviction thread
+	 * is the only thread that eventually cares if the page is dirty or not,
+	 * and it's our update that's making it dirty.   (The workQ thread does
+	 * have to flush its set-modified update, of course).
+	 *
+	 * We don't care if we race with the workQ; if the workQ thread races
+	 * with us, the page will still be marked dirty and that's all we care
+	 * about.
+	 */
+	WT_PAGE_SET_MODIFIED(page->parent);
 
 	return (0);
 }

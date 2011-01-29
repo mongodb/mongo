@@ -42,7 +42,8 @@ serial['bt_item_update'] = Serial(
 serial['cache_read'] = Serial(
 	'cache_read',
 	'WT_WORKQ_READ', '0',
-	['WT_REF */ref',
+	['WT_PAGE */parent',
+	 'WT_REF */ref',
 	 'WT_OFF */off',
 	 'int/dsk_verify'])
 

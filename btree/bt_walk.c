@@ -83,7 +83,7 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				continue;
 
 			off = WT_COL_OFF(cip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
 			ret = __wt_bt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
@@ -99,7 +99,7 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				continue;
 
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
 			ret = __wt_bt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
@@ -122,7 +122,7 @@ __wt_bt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				continue;
 
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_bt_page_in(toc, ref, off, 0));
+			WT_RET(__wt_bt_page_in(toc, page, ref, off, 0));
 			ret = __wt_bt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
