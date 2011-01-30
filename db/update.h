@@ -32,8 +32,8 @@ namespace mongo {
      */
     struct Mod {
         // See opFromStr below
-        //        0    1    2     3         4     5          6    7      8       9       10    11        12           13
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO } op;
+        //        0    1    2     3         4     5          6    7      8       9       10    11        12           13         14   15
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO, MIN, MAX } op;
 
         static const char* modNames[];
         static unsigned modNamesNum;
@@ -282,6 +282,13 @@ namespace mongo {
             case 'i': {
                 if ( fn[2] == 'n' && fn[3] == 'c' && fn[4] == 0 )
                     return Mod::INC;
+                break;
+            }
+            case 'm': {
+                if ( fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 )
+                    return Mod::MIN;
+                if ( fn[2] == 'a' && fn[3] == 'x' && fn[4] == 0 )
+                    return Mod::MAX;
                 break;
             }
             case 's': {

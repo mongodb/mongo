@@ -31,7 +31,7 @@
 namespace mongo {
 
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename"
+                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename", "$min", "$max"
                                   };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
@@ -418,6 +418,28 @@ namespace mongo {
                 }
                 break;
 
+            case Mod::MIN:
+                uassert( 10144 ,  "Cannot apply $min modifier to non-number", e.isNumber() || e.eoo() );
+                if ( mss->amIInPlacePossible( e.isNumber() ) ) {
+                    // check more typing info here
+                    if ( m.elt.type() != e.type() ) {
+                        // if i'm comparing with a double, then the storage has to be a double
+                        mss->amIInPlacePossible( m.elt.type() != NumberDouble );
+                    }
+                }
+                break;
+
+            case Mod::MAX:
+                uassert( 10146 ,  "Cannot apply $max modifier to non-number", e.isNumber() || e.eoo() );
+                if ( mss->amIInPlacePossible( e.isNumber() ) ) {
+                    // check more typing info here
+                    if ( m.elt.type() != e.type() ) {
+                        // if i'm comparing with a double, then the storage has to be a double
+                        mss->amIInPlacePossible( m.elt.type() != NumberDouble );
+                    }
+                }
+                break;
+
             case Mod::SET:
                 mss->amIInPlacePossible( m.elt.type() == e.type() &&
                                          m.elt.valuesize() == e.valuesize() );
@@ -585,6 +607,28 @@ namespace mongo {
                     m.m->incrementMe( m.old );
                 m.fixedOpName = "$set";
                 m.fixed = &(m.old);
+                break;
+            case Mod::MIN:
+                if ( isOnDisk ) {
+                    if ( compareElementValues( m.m->elt, m.old ) < 0 ) {
+                      BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
+                    }
+                } else {
+                    if ( compareElementValues( m.m->elt, m.old ) < 0 ) {
+                      BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
+                    }
+                }
+                break;
+            case Mod::MAX:
+                if ( isOnDisk ) {
+                    if ( compareElementValues( m.m->elt, m.old ) > 0 ) {
+                      BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
+                    }
+                } else {
+                    if ( compareElementValues( m.m->elt, m.old ) > 0 ) {
+                      BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
+                    }
+                }
                 break;
             case Mod::SET:
                 if ( isOnDisk )

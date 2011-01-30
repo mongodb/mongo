@@ -239,6 +239,31 @@ namespace UpdateTests {
         }
     };
 
+    class Min : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,'f':5}" ) );
+            client().update( ns(), Query(), BSON( "$min" << BSON( "f" << 3 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:3}" ) ) == 0 );
+
+            client().insert( ns(), fromjson( "{'_id':1,'f':5}" ) );
+            client().update( ns(), Query(), BSON( "$min" << BSON( "f" << 7 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:5}" ) ) == 0 );
+        }
+    };
+
+    class Max : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,'f':5}" ) );
+            client().update( ns(), Query(), BSON( "$max" << BSON( "f" << 3 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:5}" ) ) == 0 );
+
+            client().insert( ns(), fromjson( "{'_id':1,'f':5}" ) );
+            client().update( ns(), Query(), BSON( "$max" << BSON( "f" << 7 ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:7}" ) ) == 0 );
+        }
+    };
     class MultiInc : public SetBase {
     public:
 
