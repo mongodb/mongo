@@ -580,6 +580,8 @@ namespace mongo {
 
             case Mod::INC:
                 ms.fixedOpName = "$set";
+            case Mod::MIN:
+            case Mod::MAX:
             case Mod::SET: {
                 m._checkForAppending( m.elt );
                 b.appendAs( m.elt, m.shortFieldName );

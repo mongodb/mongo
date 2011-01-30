@@ -105,6 +105,22 @@ namespace mongo {
             break;
         }
 
+        case MIN: {
+            if ( compareElementValues( elt, in ) < 0 ) {
+              b.appendAs( elt , shortFieldName );
+            } else {
+              b.appendAs( in , shortFieldName );
+            }
+            break;
+        }
+        case MAX: {
+            if ( compareElementValues( elt, in ) > 0 ) {
+              b.appendAs( elt , shortFieldName );
+            } else {
+              b.appendAs( in , shortFieldName );
+            }
+            break;
+        }
         case SET: {
             _checkForAppending( elt );
             b.appendAs( elt , shortFieldName );
