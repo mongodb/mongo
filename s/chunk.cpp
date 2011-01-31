@@ -1078,10 +1078,10 @@ namespace mongo {
 
         int nc = numChunks();
 
-        if ( nc < 10 ) {
+        if ( nc < 16 ) {
             splitThreshold = max( splitThreshold / 4 , minChunkSize );
         }
-        else if ( nc < 20 ) {
+        else if ( nc < 32 ) {
             splitThreshold = max( splitThreshold / 2 , minChunkSize );
         }
 
