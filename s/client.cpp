@@ -230,8 +230,9 @@ namespace mongo {
             BSONObj res;
             bool ok = conn->runCommand( "admin" , options , res );
             _addWriteBack( writebacks, res );
+            
             string temp = DBClientWithCommands::getLastErrorString( res );
-            if ( ok == false || temp.size() ) {
+            if ( conn->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
                 errors.push_back( temp );
                 errorObjects.push_back( res );
             }
