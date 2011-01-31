@@ -319,9 +319,9 @@ namespace mongo {
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
 
         /**
-         * @return - A new FieldRangeSet based on this FieldRangeSet, but with only
+         * @param return - A new FieldRangeSet based on this FieldRangeSet, but with only
          * a subset of the fields.
-         * @fields - Only fields which are represented as field names in this object
+         * @param fields - Only fields which are represented as field names in this object
          * will be included in the returned FieldRangeSet.
          */
         FieldRangeSet *subset( const BSONObj &fields ) const;
@@ -355,9 +355,9 @@ namespace mongo {
     class FieldRangeVector {
     public:
         /**
-         * @frs The valid ranges for all fields, as defined by the query spec
-         * @keyPattern The index key pattern
-         * @direction The direction of index traversal
+         * @param frs The valid ranges for all fields, as defined by the query spec
+         * @prarm keyPattern The index key pattern
+         * @param direction The direction of index traversal
          */
         FieldRangeVector( const FieldRangeSet &frs, const BSONObj &keyPattern, int direction )
             :_keyPattern( keyPattern ), _direction( direction >= 0 ? 1 : -1 ) {
@@ -520,7 +520,7 @@ namespace mongo {
          * removes the field ranges it covers from all subsequent or clauses.  As a
          * side effect, this function may invalidate the return values of topFrs()
          * calls made before this function was called.
-         * @indexSpec - Keys of the index that was used to satisfy the last or
+         * @param indexSpec - Keys of the index that was used to satisfy the last or
          * clause.  Used to determine the range of keys that were scanned.  If
          * empty we do not constrain the previous clause's ranges using index keys,
          * which may reduce opportunities for range elimination.
