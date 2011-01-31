@@ -108,6 +108,7 @@ namespace mongo {
             throw "rollback too large";
 
         DocID d;
+        // NOTE The assigned ns value may become invalid if we yield.
         d.ns = ourObj.getStringField("ns");
         if( *d.ns == 0 ) {
             log() << "replSet WARNING ignoring op on rollback no ns TODO : " << ourObj.toString() << rsLog;
