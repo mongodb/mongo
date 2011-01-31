@@ -1300,7 +1300,7 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	tmp = NULL;
 
 	/* Get a scratch buffer and make it look like an overflow page. */
-	size = WT_ALIGN(sizeof(WT_PAGE_DISK) + from->size, db->allocsize);
+	size = WT_ALIGN(WT_PAGE_DISK_SIZE + from->size, db->allocsize);
 	WT_RET(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 	page->dsk->u.datalen = from->size;
@@ -1342,7 +1342,7 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 	tmp = NULL;
 
 	/* Get a scratch buffer and make it look like our work page. */
-	size = WT_ALIGN(sizeof(WT_PAGE_DISK) + dbt->size, db->allocsize);
+	size = WT_ALIGN(WT_PAGE_DISK_SIZE + dbt->size, db->allocsize);
 	WT_ERR(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 
@@ -1353,7 +1353,7 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 	/* Initialize the page header and copy the record into place. */
 	dsk = page->dsk;
 	dsk->u.datalen = dbt->size;
-	memcpy((uint8_t *)dsk + sizeof(WT_PAGE_DISK), dbt->data, dbt->size);
+	memcpy((uint8_t *)dsk + WT_PAGE_DISK_SIZE, dbt->data, dbt->size);
 
 	ret = __wt_page_write(toc, page);
 

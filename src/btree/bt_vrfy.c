@@ -1220,8 +1220,8 @@ __wt_verify_dsk_ovfl(
 	}
 
 	/* Any page data after the overflow record should be nul bytes. */
-	p = (uint8_t *)dsk + (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
-	len = size - (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
+	p = (uint8_t *)dsk + (WT_PAGE_DISK_SIZE + dsk->u.datalen);
+	len = size - (WT_PAGE_DISK_SIZE + dsk->u.datalen);
 	for (; len > 0; ++p, --len)
 		if (*p != '\0') {
 			__wt_api_db_errx(db,

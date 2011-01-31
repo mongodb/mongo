@@ -114,7 +114,7 @@ struct __wt_page_desc {
 	uint32_t unused2[112];		/* Unused */
 };
 /*
- * WT_PAGE_DESC_SIZE is the expected structure size -- we check at startup to
+ * WT_PAGE_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_PAGE_DESC_SIZE		512
@@ -271,13 +271,18 @@ struct __wt_page {
 
 	uint32_t flags;
 };
+
 /*
- * WT_PAGE_SIZE is the expected structure size -- we check at startup to ensure
+ * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure
  * the compiler hasn't inserted padding.  The WT_PAGE structure is in-memory, so
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
+ *
+ * The compiler will pad this to be a multiple of the pointer size, so take
+ * that into account.
  */
-#define	WT_PAGE_SIZE	(6 * sizeof(void *) + 9 * sizeof(uint32_t))
+#define	WT_PAGE_SIZE							\
+    WT_ALIGN((6 * sizeof(void *) + 9 * sizeof(uint32_t)), sizeof (void *))
 
 /*
  * There are 4 different arrays which map one-to-one to the original on-disk
@@ -441,19 +446,21 @@ struct __wt_page_disk {
 	uint8_t level;			/* 25: tree level */
 
 	/*
-	 * It would be possible to decrease the size of the page header by two
+	 * It would be possible to decrease the size of the page header by six
 	 * bytes by only writing out the first 26 bytes of the structure to the
 	 * page, but I'm not bothering -- I don't think the space is worth it
 	 * and having a little bit of on-page data to play with in the future
 	 * can be a good thing.
 	 */
-	uint8_t unused[2];		/* 26-27: unused padding */
+	uint8_t unused[2];		/* 26-31: unused padding */
 };
+
 /*
- * WT_PAGE_DISK_SIZE is the expected structure size --  we check at startup to
+ * WT_PAGE_DISK_SIZE is the expected structure size --  we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
- * The size must also be a multiple of a 4-byte boundary, because the header
- * is followed by WT_ITEM structures, which require 4-byte alignment.
+ * The size must also be a multiple of 8 bytes, because compilers will pad it
+ * to align the 64-bit fields to an 8 byte boundary.  Also, the header is
+ * followed by WT_ITEM structures, which require 4-byte alignment.
  */
 #define	WT_PAGE_DISK_SIZE		28
 
@@ -490,7 +497,7 @@ struct __wt_row {
 	void	 *data;			/* Data */
 };
 /*
- * WT_ROW_SIZE is the expected structure size -- we check at startup to ensure
+ * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure
  * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
@@ -523,7 +530,7 @@ struct __wt_col {
 	void	 *data;			/* on-page data */
 };
 /*
- * WT_COL_SIZE is the expected structure size --  we check at startup to ensure
+ * WT_COL_SIZE is the expected structure size --  we verify the build to ensure
  * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
@@ -640,7 +647,7 @@ struct __wt_item {
 	uint32_t __item_chunk;
 };
 /*
- * WT_ITEM_SIZE is the expected structure size --  we check at startup to make
+ * WT_ITEM_SIZE is the expected structure size --  we verify the build to make
  * sure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_ITEM_SIZE	4
@@ -778,7 +785,7 @@ struct __wt_off {
 	uint32_t size;			/* Subtree root page length */
 };
 /*
- * WT_OFF_SIZE is the expected structure size -- we check at startup to
+ * WT_OFF_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_OFF_SIZE	16
@@ -797,7 +804,7 @@ struct __wt_ovfl {
 	uint32_t size;			/* Overflow length */
 };
 /*
- * WT_OVFL_SIZE is the expected structure size --  we check at startup to
+ * WT_OVFL_SIZE is the expected structure size --  we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_OVFL_SIZE	8

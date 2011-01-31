@@ -31,11 +31,6 @@ __wt_library_init(void)
 	 */
 	__wt_err_stream = stderr;
 
-	/*
-	 * Check the build & compiler itself before going further.
-	 */
-	WT_RET(__wt_bt_build_verify());
-
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debug code the compiler might optimize out. */
 	WT_RET(__wt_breakpoint());

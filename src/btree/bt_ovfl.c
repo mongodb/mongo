@@ -65,7 +65,7 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 
 	/* Copy the actual data in the DBT down to the start of the data. */
 	(void)memmove(store->data,
-	    (uint8_t *)store->data + sizeof(WT_PAGE_DISK), ovfl->size);
+	    (uint8_t *)store->data + WT_PAGE_DISK_SIZE, ovfl->size);
 	store->size = ovfl->size;
 
 	return (0);

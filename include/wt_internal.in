@@ -179,6 +179,7 @@ struct __ienv {
 
 #include "serial.h"
 #include "extern.h"
+#include "verify_build.h"
 
 #if defined(__cplusplus)
 }

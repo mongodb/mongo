@@ -62,8 +62,6 @@ int
 __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp);
 int
 __wt_evict_tree_count(WT_TOC *toc, IDB *idb, uint64_t *nodesp);
-int
-__wt_bt_build_verify(void);
 inline void
 __wt_set_ff_and_sa_from_offset(WT_PAGE *page,
     void *p, uint8_t **first_freep, uint32_t *space_availp);
