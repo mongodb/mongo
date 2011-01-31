@@ -1,6 +1,6 @@
 
 
-t = db.mr2;
+t = db.mr_optim;
 t.drop();
 
 for (var i = 0; i < 1000; ++i) {
@@ -30,7 +30,7 @@ function reformat( r ){
     return x;
 }
 
-res = t.mapReduce( m , r , { out : "mr_optim" } );
+res = t.mapReduce( m , r , { out : "mr_optim_out" } );
 printjson( res )
 x = reformat( res );
 for (var key in x) {
