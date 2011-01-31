@@ -161,9 +161,11 @@ __wt_verify_tree(
 	/* Update frags list. */
 	WT_ERR(__wt_verify_addfrag(toc, page->addr, page->size, vs));
 
+#ifdef DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (vs->stream != NULL)
 		return (__wt_debug_page(toc, page, NULL, vs->stream));
+#endif
 
 	/*
 	 * The page's physical structure was verified when it was read into
