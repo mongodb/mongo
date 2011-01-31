@@ -1,5 +1,5 @@
 /**
- * Test for SERVER-2417 - should preallocate a database file while we are
+ * Test for SERVER-2417 - should not preallocate a database file while we are
  * dropping its directory in directoryperdb mode.
  */
 
@@ -32,8 +32,8 @@ for( var i = 0; i < 3000; ++i ) {
 }
 
 // Due to our write pattern, we expect db2's .3 file to be queued up in the file
-// allocator behind db's .3 file at the time db2 is dropped.  This will cause
-// db2's dir to be recreated until SERVER-2417 is fixed.
+// allocator behind db's .3 file at the time db2 is dropped.  This will
+// (incorrectly) cause db2's dir to be recreated until SERVER-2417 is fixed.
 db2.dropDatabase();
 
 checkDb2DirAbsent();
