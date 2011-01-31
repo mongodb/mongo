@@ -28,14 +28,19 @@ typedef struct {
 } WT_STACK;
 
 static int __wt_bulk_dbt_copy(ENV *, DBT *, DBT *);
-static int __wt_bulk_dup_offpage(WT_TOC *, DBT **, DBT **, DBT *, WT_ITEM *, uint32_t, uint32_t, WT_OFF *, int (*)(DB *, DBT **, DBT **));
-static int __wt_bulk_fix(WT_TOC *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bulk_dup_offpage(WT_TOC *, DBT **, DBT **, DBT *, WT_ITEM *,
+		uint32_t, uint32_t, WT_OFF *, int (*)(DB *, DBT **, DBT **));
+static int __wt_bulk_fix(WT_TOC *, void (*)(const char *,
+		uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
-static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
-static int __wt_bulk_scratch_page(WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
+static int __wt_bulk_promote(
+		WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int, uint32_t *);
+static int __wt_bulk_scratch_page(
+		WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
 static int __wt_bulk_stack_put(WT_TOC *, WT_STACK *);
-static int __wt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bulk_var(WT_TOC *, uint32_t, void (*)(const char *,
+		uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_item_build_key(WT_TOC *, DBT *, WT_ITEM *, WT_OVFL *);
 
 /*

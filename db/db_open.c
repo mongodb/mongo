@@ -49,7 +49,6 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 	IENV *ienv;
 	IDB *idb;
 
-
 	env = db->env;
 	ienv = env->ienv;
 	idb = db->idb;

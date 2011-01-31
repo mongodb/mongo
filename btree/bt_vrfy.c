@@ -37,10 +37,12 @@ static int __wt_verify_eof(DB *, uint32_t, uint32_t);
 static int __wt_verify_eop(DB *, uint32_t, uint32_t);
 static int __wt_verify_key_order(WT_TOC *, WT_PAGE *);
 static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_overflow_common(WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_overflow_common(
+		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_overflow_row(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_pc(WT_TOC *, WT_ROW *, WT_PAGE *, int);
-static int __wt_verify_tree(WT_TOC *, WT_ROW *, uint64_t, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
+static int __wt_verify_tree(WT_TOC *,
+		WT_ROW *, uint64_t, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --

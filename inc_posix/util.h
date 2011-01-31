@@ -24,4 +24,4 @@
 		    WIREDTIGER_VERSION_MINOR, __major, __minor);	\
 		return (EXIT_FAILURE);					\
 	}								\
-} while(0)
+} while (0)

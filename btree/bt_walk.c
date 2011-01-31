@@ -226,7 +226,6 @@ eop:			e->visited = 1;
 			return (0);
 		}
 
-
 	/* Find the next WT_REF/WT_PAGE pair present in the cache. */
 	for (;;) {
 		switch (page->dsk->type) {

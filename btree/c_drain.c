@@ -908,7 +908,6 @@ __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp)
 	return (0);
 }
 
-
 /*
  * __wt_evict_tree_count
  *	Return a count of nodes in the tree.

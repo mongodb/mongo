@@ -232,4 +232,3 @@ __wt_row_key_on_page(WT_PAGE *page, WT_ROW *rip)
 	return (p >= (uint8_t *)page->dsk &&
 	    p < (uint8_t *)page->dsk + page->size ? 1 : 0);
 }
-

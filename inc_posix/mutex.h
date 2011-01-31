@@ -68,10 +68,10 @@ extern void *__wt_addr;
 #define	WT_MEMORY_FLUSH
 #elif defined(sun)
 #include <atomic.h>
-#define WT_MEMORY_FLUSH							\
+#define	WT_MEMORY_FLUSH							\
 	membar_enter()
 #elif defined(sparc) && defined(__GNUC__)
-#define WT_MEMORY_FLUSH							\
+#define	WT_MEMORY_FLUSH							\
 	({asm volatile("stbar");})
 #elif (defined(x86_64) || defined(__x86_64__)) && defined(__GNUC__)
 #define	WT_MEMORY_FLUSH							\

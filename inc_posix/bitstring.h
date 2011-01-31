@@ -101,7 +101,7 @@ typedef	unsigned char bitstr_t;
 	} else { \
 		_name[_startbyte] |= 0xff << ((_start)&0x7); \
 		while (++_startbyte < _stopbyte) \
-	    		_name[_startbyte] = 0xff; \
+			_name[_startbyte] = 0xff; \
 		_name[_stopbyte] |= 0xff >> (7 - (_stop&0x7)); \
 	} \
 } while (0)

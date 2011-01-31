@@ -238,7 +238,6 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 		update->in = 1;
 	}
 
-
 no_allocation:
 	/* Copy the WT_REPL structure into place. */
 	repl = (WT_REPL *)update->first_free;

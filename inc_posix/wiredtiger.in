@@ -155,7 +155,6 @@ struct __wt_toc {
 					/* RLE column store only: */
 	WT_RLE_EXPAND *srch_exp;	/*    WT_RLE_EXPAND array index */
 
-
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * WT_TOC methods: BEGIN

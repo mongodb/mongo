@@ -656,6 +656,6 @@ __wt_debug_page_hdr(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	    "addr: %lu-%lu {\n\t%s: size %lu\n",
 	    (u_long)page->addr,
 	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
-  	    __wt_page_type_string(page->dsk), (u_long)page->size);
+	    __wt_page_type_string(page->dsk), (u_long)page->size);
 
 }

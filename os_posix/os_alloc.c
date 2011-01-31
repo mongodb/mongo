@@ -354,6 +354,6 @@ __wt_mtrack_dump(ENV *env)
 		if (mp->addr != NULL)
 			__wt_api_env_errx(env,
 			    "mtrack: %p {%s/%d}: never freed",
-			        mp->addr, mp->file, mp->line);
+				mp->addr, mp->file, mp->line);
 }
 #endif

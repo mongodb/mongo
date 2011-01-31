@@ -64,7 +64,6 @@ __wt_env_config(ENV *env)
 	return (0);
 }
 
-
 /*
  * __wt_ienv_config --
  *	Set configuration for a just-created IENV handle.

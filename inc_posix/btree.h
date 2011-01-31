@@ -408,10 +408,10 @@ struct __wt_page_disk {
 	} u;
 
 #define	WT_PAGE_INVALID		 0	/* Invalid page */
-#define	WT_PAGE_FREE	 	 1	/* Page on the free list */
+#define	WT_PAGE_FREE		 1	/* Page on the free list */
 #define	WT_PAGE_COL_FIX		 2	/* Col store fixed-len leaf */
 #define	WT_PAGE_COL_INT		 3	/* Col store internal page */
-#define	WT_PAGE_COL_RLE	 	 4	/* Col store run-length encoded leaf */
+#define	WT_PAGE_COL_RLE		 4	/* Col store run-length encoded leaf */
 #define	WT_PAGE_COL_VAR		 5	/* Col store var-length leaf page */
 #define	WT_PAGE_DUP_INT		 6	/* Duplicate tree internal page */
 #define	WT_PAGE_DUP_LEAF	 7	/* Duplicate tree leaf page */
