@@ -157,7 +157,19 @@ namespace mongo {
                     OpTime op(c.getLastOp());
                     
                     if ( op.isNull() ) {
-                        result.append( "wnote" , "no write has been done on this connection" );
+                        if ( anyReplEnabled() ) {
+                            result.append( "wnote" , "no write has been done on this connection" );
+                        }
+                        else if ( w <= 1 ) {
+                            // don't do anything
+                            // w=1 and no repl, so this is fine
+                        }
+                        else {
+                            // w=2 and no repl
+                            result.append( "wnote" , "no replication has been enabled, so w=2+ won't work" );
+                            result.append( "err", "norepl" );
+                            return true; 
+                        }
                         break;
                     }
 
@@ -167,7 +179,6 @@ namespace mongo {
 
                     // if replication isn't enabled (e.g., config servers)
                     if ( ! anyReplEnabled() ) {
-                        errmsg = "replication not enabled";
                         result.append( "err", "norepl" );
                         return true;
                     }
