@@ -58,6 +58,7 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
     }
 
+    /** Simple QueryOp implementation to return first match.  Does not support yielding. */
     class FindOne : public QueryOp {
     public:
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
@@ -252,7 +253,6 @@ namespace mongo {
 
         while ( c->ok() ) {
             DiskLoc rloc = c->currLoc();
-            BSONObj key = c->currKey();
 
             if ( callback )
                 callback->goingToDelete( c->current() );
