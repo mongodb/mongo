@@ -25,13 +25,10 @@ check()
 	fi
 
 	# Check for a correct copyright header.
-	if `sed -e 6q ../$1 | diff - $t > /dev/null` &&
-	    `sed -e 7q -e d ../$1 | \
-	    egrep '^ \* \\$\Id: .* Exp \\$$' > /dev/null`; then
+	if `sed -e 6q ../$1 | diff - $t > /dev/null`; then
 		return;
 	fi
 
-	# Complain.
 	echo "$1: copyright information is incorrect"
 }
 
