@@ -59,7 +59,7 @@ src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
 src/os_posix/os_yield.c
-src/support/api.c
+src/support/api_int.c
 src/support/cksum.c
 src/support/err.c
 src/support/hazard.c

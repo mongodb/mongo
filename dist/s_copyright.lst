@@ -3,6 +3,6 @@ skip	include/bitstring.h
 skip	include/extern.h
 skip	include/queue.h
 skip	include/serial.h
-skip	src/support/api.c
+skip	src/support/api_int.c
 skip	src/support/stat.c
 skip	src/support/strerror.c

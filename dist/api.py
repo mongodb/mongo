@@ -362,7 +362,7 @@ api = api_class.methods
 flags = api_class.flags
 
 #####################################################################
-# Update api.c, the API source file.
+# Update api_int.c, the API source file.
 #####################################################################
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
@@ -390,7 +390,7 @@ func_method_lockout('wt_toc', 'WT_TOC *wt_toc', tfile)
 func_method_transition('wt_toc', 'WT_TOC *wt_toc', tfile)
 
 tfile.close()
-compare_srcfile(tmp_file, '../src/support/api.c')
+compare_srcfile(tmp_file, '../src/support/api_int.c')
 
 #####################################################################
 # Update wiredtiger.in file with WT_TOC/DB methods and DB/ENV getter/setter
