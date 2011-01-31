@@ -1252,7 +1252,7 @@ namespace mongo {
             result.append      ( "db" , dbname );
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
-            result.append      ( "avgObjSize" , double(size) / double(objects) );
+            result.append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
             result.appendNumber( "dataSize" , size );
             result.appendNumber( "storageSize" , storageSize);
             result.appendNumber( "numExtents" , numExtents );
