@@ -18,8 +18,9 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 {
 	DB *db;
 	ENV *env;
-	WT_PAGE *page, _page;
+	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
+	uint32_t size;
 
 	env = toc->env;
 	db = toc->db;
@@ -52,20 +53,15 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 	 * or add a new field to the DBT that flags the start of the allocated
 	 * buffer, instead of using the "data" field to indicate both the start
 	 * of the data and the start of the allocated memory.
+	 *
+	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
-	WT_CLEAR(_page);
-	page = &_page;
-	page->addr = ovfl->addr;
-	page->size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
-
-	/* Re-allocate memory as necessary to hold the overflow pages. */
-	if (store->mem_size < page->size)
-		WT_RET(__wt_realloc(
-		    env, &store->mem_size, page->size, &store->data));
-	page->dsk = store->data;
+	size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
+	if (store->mem_size < size)
+		WT_RET(__wt_realloc(env, &store->mem_size, size, &store->data));
 
 	/* Read the page. */
-	WT_RET(__wt_page_read(db, page));
+	WT_RET(__wt_page_disk_read(toc, store->data, ovfl->addr, size));
 
 	/* Copy the actual data in the DBT down to the start of the data. */
 	(void)memmove(store->data,

@@ -204,7 +204,7 @@ __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	WT_FIX_FOREACH(db, page, p, i) {
+	WT_FIX_FOREACH(db, dsk, p, i) {
 		cip->data = p;
 		++cip;
 	}
@@ -233,7 +233,7 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains WT_OFF structures.
 	 */
-	WT_OFF_FOREACH(page, off, i) {
+	WT_OFF_FOREACH(dsk, off, i) {
 		cip->data = off;
 		++cip;
 		records += WT_RECORDS(off);
@@ -265,7 +265,7 @@ __wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	WT_RLE_REPEAT_FOREACH(db, page, p, i) {
+	WT_RLE_REPEAT_FOREACH(db, dsk, p, i) {
 		records += WT_RLE_REPEAT_COUNT(p);
 		cip->data = p;
 		++cip;
@@ -297,7 +297,7 @@ __wt_page_inmem_col_var(WT_PAGE *page)
 	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
 	 * (WT_ITEM_DEL) items.
 	 */
-	WT_ITEM_FOREACH(page, item, i) {
+	WT_ITEM_FOREACH(dsk, item, i) {
 		cip->data = item;
 		++cip;
 	}
@@ -330,7 +330,7 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	 * as data.  Set both the WT_ROW key and data fields.
 	 */
 	rip = page->u.irow;
-	WT_ITEM_FOREACH(page, item, i) {
+	WT_ITEM_FOREACH(dsk, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA_DUP:
 			__wt_key_set
@@ -384,7 +384,7 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	 * (WT_ITEM_KEY_DUP/WT_ITEM_DATA_KEY_DUP_OVFL) items.  In both cases,
 	 * offpage references are WT_ITEM_OFF items.
 	 */
-	WT_ITEM_FOREACH(page, item, i)
+	WT_ITEM_FOREACH(dsk, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_DUP:
@@ -422,6 +422,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
+	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
 	WT_ROW *rip;
 	uint32_t i, indx_count;
@@ -429,6 +430,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 
 	env = db->env;
 	idb = db->idb;
+	dsk = page->dsk;
 	records = 0;
 
 	/*
@@ -444,7 +446,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 */
 	rip = NULL;
 	indx_count = 0;
-	WT_ITEM_FOREACH(page, item, i)
+	WT_ITEM_FOREACH(dsk, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:

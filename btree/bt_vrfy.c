@@ -25,14 +25,14 @@ typedef struct {
 	WT_PAGE *leaf;				/* Last leaf-page */
 } WT_VSTUFF;
 
-static int __wt_verify_addfrag(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(DB *, WT_VSTUFF *);
 static int __wt_verify_delfmt(DB *, uint32_t, uint32_t);
-static int __wt_verify_dsk_col_fix(DB *, WT_PAGE *);
-static int __wt_verify_dsk_col_int(DB *, WT_PAGE *);
-static int __wt_verify_dsk_col_rle(DB *, WT_PAGE *);
-static int __wt_verify_dsk_item(WT_TOC *, WT_PAGE *);
-static int __wt_verify_dsk_ovfl(WT_TOC *, WT_PAGE *);
+static int __wt_verify_dsk_col_fix(DB *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_int(DB *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_rle(DB *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_item(WT_TOC *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_ovfl(WT_TOC *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_eof(DB *, uint32_t, uint32_t);
 static int __wt_verify_eop(DB *, uint32_t, uint32_t);
 static int __wt_verify_key_order(WT_TOC *, WT_PAGE *);
@@ -157,7 +157,7 @@ __wt_verify_tree(
 		vs->f(toc->name, vs->fcnt);
 
 	/* Update frags list. */
-	WT_ERR(__wt_verify_addfrag(toc, page, vs));
+	WT_ERR(__wt_verify_addfrag(toc, page->addr, page->size, vs));
 
 	/* Optionally dump the page in debugging mode. */
 	if (vs->stream != NULL)
@@ -423,8 +423,7 @@ err:	if (vs->leaf != NULL) {
  *	Compare a key on a parent page to a designated entry on a child page.
  */
 static int
-__wt_verify_pc(
-    WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
+__wt_verify_pc(WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
 	DBT *cd_ref, *pd_ref, *scratch1, *scratch2;
@@ -580,16 +579,12 @@ err:	if (_a.scratch != NULL)
  *	Verify a single Btree page as read from disk.
  */
 int
-__wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_dsk_page(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	DB *db;
-	WT_PAGE_DISK *dsk;
-	uint32_t addr;
 
 	db = toc->db;
-
-	dsk = page->dsk;
-	addr = page->addr;
 
 	/* Check the page type. */
 	switch (dsk->type) {
@@ -670,19 +665,19 @@ err_level:		__wt_api_db_errx(db,
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_dsk_item(toc, page));
+		WT_RET(__wt_verify_dsk_item(toc, dsk, addr, size));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_verify_dsk_col_int(db, page));
+		WT_RET(__wt_verify_dsk_col_int(db, dsk, addr, size));
 		break;
 	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_verify_dsk_col_fix(db, page));
+		WT_RET(__wt_verify_dsk_col_fix(db, dsk, addr, size));
 		break;
 	case WT_PAGE_COL_RLE:
-		WT_RET(__wt_verify_dsk_col_rle(db, page));
+		WT_RET(__wt_verify_dsk_col_rle(db, dsk, addr, size));
 		break;
 	case WT_PAGE_OVFL:
-		WT_RET(__wt_verify_dsk_ovfl(toc, page));
+		WT_RET(__wt_verify_dsk_ovfl(toc, dsk, addr, size));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -695,28 +690,26 @@ err_level:		__wt_api_db_errx(db,
  *	Walk a disk page of WT_ITEMs, and verify them.
  */
 static int
-__wt_verify_dsk_item(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_dsk_item(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	enum { IS_FIRST, WAS_KEY, WAS_DATA, WAS_DUP_DATA } last_item_type;
 	DB *db;
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
 	WT_OFF *off;
-	WT_PAGE_DISK *dsk;
 	off_t file_size;
 	uint8_t *end;
-	uint32_t addr, i, item_num, item_len, item_type;
+	uint32_t i, item_num, item_len, item_type;
 
 	db = toc->db;
 	file_size = db->idb->fh->file_size;
 
-	dsk = page->dsk;
-	end = (uint8_t *)dsk + page->size;
-	addr = page->addr;
+	end = (uint8_t *)dsk + size;
 
 	last_item_type = IS_FIRST;
 	item_num = 0;
-	WT_ITEM_FOREACH(page, item, i) {
+	WT_ITEM_FOREACH(dsk, item, i) {
 		++item_num;
 
 		/* Check if this item is entirely on the page. */
@@ -937,21 +930,18 @@ eop:	return (__wt_verify_eop(db, item_num, addr));
  *	Walk a WT_PAGE_COL_INT disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_int(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_int(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	IDB *idb;
 	WT_OFF *off;
-	WT_PAGE_DISK *dsk;
 	uint8_t *end;
-	uint32_t addr, i, entry_num;
+	uint32_t i, entry_num;
 
 	idb = db->idb;
-	dsk = page->dsk;
-	end = (uint8_t *)dsk + page->size;
-	addr = page->addr;
+	end = (uint8_t *)dsk + size;
 
 	entry_num = 0;
-	WT_OFF_FOREACH(page, off, i) {
+	WT_OFF_FOREACH(dsk, off, i) {
 		++entry_num;
 
 		/* Check if this entry is entirely on the page. */
@@ -972,18 +962,17 @@ __wt_verify_dsk_col_int(DB *db, WT_PAGE *page)
  *	Walk a WT_PAGE_COL_FIX disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_fix(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_fix(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	u_int len;
-	uint32_t addr, i, j, entry_num;
+	uint32_t i, j, entry_num;
 	uint8_t *data, *end, *p;
 
 	len = db->fixed_len;
-	end = (uint8_t *)page->dsk + page->size;
-	addr = page->addr;
+	end = (uint8_t *)dsk + size;
 
 	entry_num = 0;
-	WT_FIX_FOREACH(db, page, data, i) {
+	WT_FIX_FOREACH(db, dsk, data, i) {
 		++entry_num;
 
 		/* Check if this entry is entirely on the page. */
@@ -1011,20 +1000,19 @@ delfmt:	return (__wt_verify_delfmt(db, entry_num, addr));
  *	Walk a WT_PAGE_COL_RLE disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_rle(DB *db, WT_PAGE *page)
+__wt_verify_dsk_col_rle(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	u_int len;
-	uint32_t addr, i, j, entry_num;
+	uint32_t i, j, entry_num;
 	uint8_t *data, *end, *last_data, *p;
 
-	end = (uint8_t *)page->dsk + page->size;
-	addr = page->addr;
+	end = (uint8_t *)dsk + size;
 
 	last_data = NULL;
 	len = db->fixed_len + sizeof(uint16_t);
 
 	entry_num = 0;
-	WT_RLE_REPEAT_FOREACH(db, page, data, i) {
+	WT_RLE_REPEAT_FOREACH(db, dsk, data, i) {
 		++entry_num;
 
 		/* Check if this entry is entirely on the page. */
@@ -1156,29 +1144,27 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
  */
 static int
 __wt_verify_overflow_common(WT_TOC *toc,
-    WT_OVFL *ovfl, uint32_t entry_num, uint32_t addr, WT_VSTUFF *vs)
+    WT_OVFL *ovfl, uint32_t entry_num, uint32_t page_ref_addr, WT_VSTUFF *vs)
 {
 	DB *db;
 	DBT *scratch1;
-	WT_PAGE *page, _page;
+	WT_PAGE_DISK *dsk;
+	uint32_t addr, size;
 	int ret;
 
 	db = toc->db;
 	scratch1 = NULL;
 	ret = 0;
 
-	WT_CLEAR(_page);
-	page = &_page;
-	page->addr = ovfl->addr;
-	page->size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
+	addr = ovfl->addr;
+	size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
 
 	/* Allocate enough memory to hold the overflow pages. */
-	WT_RET(__wt_scr_alloc(toc, page->size, &scratch1));
+	WT_RET(__wt_scr_alloc(toc, size, &scratch1));
 
 	/* Read the page. */
-	page->dsk = scratch1->data;
-	scratch1->size = page->size;
-	WT_ERR(__wt_page_read(db, page));
+	dsk = scratch1->data;
+	WT_ERR(__wt_page_disk_read(toc, dsk, addr, size));
 
 	/*
 	 * Verify the disk image -- this function would normally be called
@@ -1187,20 +1173,20 @@ __wt_verify_overflow_common(WT_TOC *toc,
 	 * into two parts, on-disk format checking and internal checking,
 	 * just so it looks like all of the other page type checking.
 	 */
-	WT_ERR(__wt_verify_dsk_ovfl(toc, page));
+	WT_ERR(__wt_verify_dsk_ovfl(toc, dsk, addr, size));
 
 	/* Add the fragments. */
-	WT_ERR(__wt_verify_addfrag(toc, page, vs));
+	WT_ERR(__wt_verify_addfrag(toc, addr, size, vs));
 
 	/*
 	 * The only other thing to check is that the size we have in the page
 	 * matches the size on the underlying overflow page.
 	 */
-	if (ovfl->size != page->dsk->u.datalen) {
+	if (ovfl->size != dsk->u.datalen) {
 		__wt_api_db_errx(db,
 		    "overflow page reference in item %lu on page at addr %lu "
 		    "does not match the data size on the overflow page",
-		    (u_long)entry_num, (u_long)addr);
+		    (u_long)entry_num, (u_long)page_ref_addr);
 		ret = WT_ERROR;
 	}
 
@@ -1214,16 +1200,14 @@ err:	__wt_scr_release(&scratch1);
  *	Verify a WT_PAGE_OVFL disk page.
  */
 static int
-__wt_verify_dsk_ovfl(WT_TOC *toc, WT_PAGE *page)
+__wt_verify_dsk_ovfl(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	DB *db;
-	WT_PAGE_DISK *dsk;
-	uint32_t addr, len;
+	uint32_t len;
 	uint8_t *p;
 
 	db = toc->db;
-	dsk = page->dsk;
-	addr = page->addr;
 
 	if (dsk->u.datalen == 0) {
 		__wt_api_db_errx(db,
@@ -1233,7 +1217,7 @@ __wt_verify_dsk_ovfl(WT_TOC *toc, WT_PAGE *page)
 
 	/* Any page data after the overflow record should be nul bytes. */
 	p = (uint8_t *)dsk + (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
-	len = page->size - (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
+	len = size - (sizeof(WT_PAGE_DISK) + dsk->u.datalen);
 	for (; len > 0; ++p, --len)
 		if (*p != '\0') {
 			__wt_api_db_errx(db,
@@ -1294,15 +1278,14 @@ __wt_verify_delfmt(DB *db, uint32_t entry_num, uint32_t addr)
  *	verified this chunk of the file.
  */
 static int
-__wt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_addfrag(WT_TOC *toc, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
 	DB *db;
-	uint32_t addr, frags, i;
+	uint32_t frags, i;
 
 	db = toc->db;
 
-	addr = page->addr;
-	frags = WT_OFF_TO_ADDR(db, page->size);
+	frags = WT_OFF_TO_ADDR(db, size);
 	for (i = 0; i < frags; ++i)
 		if (bit_test(vs->fragbits, addr + i)) {
 			__wt_api_db_errx(db,

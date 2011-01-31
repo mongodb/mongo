@@ -458,10 +458,12 @@ struct __wt_page_disk {
 #define	WT_PAGE_DISK_SIZE		28
 
 /*
- * WT_PAGE_BYTE is the first usable data byte on the page.
+ * WT_PAGE_BYTE/WT_PAGE_DISK_BYTE: the first usable data byte on the page.
  */
 #define	WT_PAGE_BYTE(page)						\
-	((void *)(((uint8_t *)(page)->dsk) + WT_PAGE_DISK_SIZE))
+	WT_PAGE_DISK_BYTE((page)->dsk)
+#define	WT_PAGE_DISK_BYTE(dsk)						\
+	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
 
 /*
  * WT_ROW --
@@ -549,6 +551,7 @@ struct __wt_rle_expand {
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
+
 /*
  * WT_ROW_INDX_IS_DUPLICATE --
  *	Compare the WT_ROW entry against the previous entry and return 1 if
@@ -751,9 +754,9 @@ struct __wt_item {
 	((WT_ITEM *)((uint8_t *)(item) + WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item))))
 
 /* WT_ITEM_FOREACH is a loop that walks the items on a page */
-#define	WT_ITEM_FOREACH(page, item, i)					\
-	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
-	    (i) = (page)->dsk->u.entries;				\
+#define	WT_ITEM_FOREACH(dsk, item, i)					\
+	for ((item) = (WT_ITEM *)WT_PAGE_DISK_BYTE(dsk),		\
+	    (i) = dsk->u.entries;					\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
 
 /*
@@ -781,9 +784,9 @@ struct __wt_off {
 #define	WT_OFF_SIZE	16
 
 /* WT_OFF_FOREACH is a loop that walks offpage references on a page */
-#define	WT_OFF_FOREACH(page, offp, i)					\
-	for ((offp) = (WT_OFF *)WT_PAGE_BYTE(page),			\
-	    (i) = (page)->dsk->u.entries; (i) > 0; ++(offp), --(i))
+#define	WT_OFF_FOREACH(dsk, offp, i)					\
+	for ((offp) = (WT_OFF *)WT_PAGE_DISK_BYTE(dsk),			\
+	    (i) = dsk->u.entries; (i) > 0; ++(offp), --(i))
 
 /*
  * Btree overflow items reference another page, and so the data is another
@@ -808,18 +811,18 @@ struct __wt_ovfl {
 #define	WT_FIX_DELETE_SET(b)	(((uint8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
 
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
-#define	WT_FIX_FOREACH(db, page, p, i)					\
-	for ((p) = WT_PAGE_BYTE(page),					\
-	    (i) = (page)->dsk->u.entries; (i) > 0; --(i),		\
+#define	WT_FIX_FOREACH(db, dsk, p, i)					\
+	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
+	    (i) = dsk->u.entries; (i) > 0; --(i),			\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len)
 
 /*
  * WT_RLE_REPEAT_FOREACH is a loop that walks fixed-length, run-length encoded
  * entries on a page.
  */
-#define	WT_RLE_REPEAT_FOREACH(db, page, p, i)				\
-	for ((p) = WT_PAGE_BYTE(page),					\
-	    (i) = (page)->dsk->u.entries; (i) > 0; --(i),		\
+#define	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)				\
+	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
+	    (i) = dsk->u.entries; (i) > 0; --(i),			\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len + sizeof(uint16_t))
 
 /*
@@ -833,8 +836,8 @@ struct __wt_ovfl {
  * WT_RLE_REPEAT_ITERATE is a loop that walks fixed-length, run-length encoded
  * references on a page, visiting each entry the appropriate number of times.
  */
-#define	WT_RLE_REPEAT_ITERATE(db, page, p, i, j)			\
-	WT_RLE_REPEAT_FOREACH(db, page, p, i)				\
+#define	WT_RLE_REPEAT_ITERATE(db, dsk, p, i, j)				\
+	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)				\
 		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 
 #if defined(__cplusplus)

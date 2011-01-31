@@ -881,10 +881,8 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	ENV *env;
 	int ret;
-	WT_STATS *stats;
 
 	env = toc->env;
-	stats = env->ienv->cache->stats;
 
 	/*
 	 * XXX
@@ -917,7 +915,6 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * thread tries to read down the tree before the write finishes.
 		 */
 		WT_RET(__wt_page_write(toc, new));
-		WT_STAT_INCR(stats, PAGE_WRITE);
 
 		WT_VERBOSE(env, WT_VERB_EVICT,
 		    (env, "reconcile move %lu to %lu, resize %lu to %lu",

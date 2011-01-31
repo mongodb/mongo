@@ -963,8 +963,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 #define	WT_STACK_ALLOC_INCR	20
 #endif
 	if (stack->size == 0 || level == stack->size - 1) {
-		uint32_t
-		    bytes_allocated = stack->size * sizeof(WT_STACK_ELEM);
+		uint32_t bytes_allocated = stack->size * sizeof(WT_STACK_ELEM);
 		WT_RET(__wt_realloc(env, &bytes_allocated,
 		    (stack->size + WT_STACK_ALLOC_INCR) * sizeof(WT_STACK_ELEM),
 		    &stack->elem));
@@ -1297,7 +1296,7 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 
 	/* Get a scratch buffer and make it look like an overflow page. */
 	size = WT_ALIGN(sizeof(WT_PAGE_DISK) + from->size, db->allocsize);
-	WT_ERR(__wt_bulk_scratch_page(
+	WT_RET(__wt_bulk_scratch_page(
 	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
 	page->dsk->u.datalen = from->size;
 
@@ -1306,22 +1305,15 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	to->size = from->size;
 
 	/*
-	 * Re-set the page's address and read the page into our scratch buffer.
-	 * This is sleazy, but this way we can still use the underlying cache
-	 * page-read functions, without allocating two chunks of memory.
-	 */
-	page->addr = from->addr;
-	WT_ERR(__wt_page_read(db, page));
-
-	/*
-	 * Move back to the new address, and write our copy of the page to a
+	 * Read the page into our scratch buffer, then write it out to the
 	 * new location.
 	 */
-	page->addr = to->addr;
-	ret = __wt_page_write(toc, page);
+	if ((ret =
+	    __wt_page_disk_read(toc, page->dsk, from->addr, from->size)) == 0)
+		ret =
+		    __wt_page_disk_write(toc, page->dsk, to->addr, from->size);
 
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
+	__wt_scr_release(&tmp);
 
 	return (ret);
 }

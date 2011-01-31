@@ -188,11 +188,11 @@ err:		__wt_api_env_err(env, ret, "cache read server error");
 static int
 __wt_cache_read(WT_READ_REQ *rr)
 {
-	DB *db;
 	ENV *env;
 	WT_CACHE *cache;
 	WT_OFF *off;
 	WT_PAGE *page;
+	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
 	WT_TOC *toc;
 	uint32_t addr, size;
@@ -204,7 +204,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 	addr = off->addr;
 	size = off->size;
 
-	db = toc->db;
 	env = toc->env;
 	cache = env->ienv->cache;
 	ret = 0;
@@ -227,31 +226,32 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * better alignment from the underlying heap memory allocator.
 	 */
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
-	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &page->dsk));
+	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &dsk));
 
 	/* Read the page. */
 	WT_VERBOSE(env, WT_VERB_READ,
 	    (env, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
-	WT_STAT_INCR(cache->stats, PAGE_READ);
 
-	page->addr = addr;
-	page->size = size;
-	WT_ERR(__wt_page_read(db, page));
+	WT_ERR(__wt_page_disk_read(toc, dsk, addr, size));
 	WT_CACHE_PAGE_IN(cache, size);
 
 	/* If the page needs to be verified, that's next. */
 	if (rr->dsk_verify)
-		WT_ERR(__wt_verify_dsk_page(toc, page));
+		WT_ERR(__wt_verify_dsk_page(toc, dsk, addr, size));
+
+	/*
+	 * Fill in the WT_PAGE addr, size.
+	 * Reference the parent's WT_PAGE and parent's WT_OFF structures.
+	 * Reference the underlying disk page.
+	 */
+	page->addr = addr;
+	page->size = size;
+	page->parent = rr->parent;
+	page->parent_off = off;
+	page->dsk = dsk;
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(toc, page));
-
-	/*
-	 * Reference the parent's WT_PAGE and parent's WT_OFF structure that
-	 * read the page.
-	 */
-	page->parent = rr->parent;
-	page->parent_off = off;
 
 	/*
 	 * The page is now available -- set the LRU so the page is not selected

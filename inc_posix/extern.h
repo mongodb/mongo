@@ -28,9 +28,6 @@ __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
-__wt_debug_addr(
-    WT_TOC *toc, uint32_t addr, uint32_t size, char *ofile, FILE *fp);
-int
 __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 int
 __wt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
@@ -109,9 +106,13 @@ __wt_rle_expand_sort(ENV *env,
 int
 __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
-__wt_page_read(DB *db, WT_PAGE *page);
-int
+__wt_page_disk_read(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+inline int
 __wt_page_write(WT_TOC *toc, WT_PAGE *page);
+int
+__wt_page_disk_write(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
 __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg);
 int
@@ -122,7 +123,8 @@ int
 __wt_verify(
     WT_TOC *toc, void (*f)(const char *, uint64_t), FILE *stream);
 int
-__wt_verify_dsk_page(WT_TOC *toc, WT_PAGE *page);
+__wt_verify_dsk_page(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
 __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
     uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);

@@ -85,7 +85,7 @@ static int
 __wt_file_free_write(WT_TOC *toc, uint32_t addr, uint32_t size)
 {
 	DBT *tmp;
-	WT_PAGE *page, _page;
+	WT_PAGE_DISK *dsk;
 	uint32_t allocsize;
 	int ret;
 
@@ -95,15 +95,10 @@ __wt_file_free_write(WT_TOC *toc, uint32_t addr, uint32_t size)
 	WT_RET(__wt_scr_alloc(toc, allocsize, &tmp));
 	memset(tmp->data, 0, allocsize);
 
-	WT_CLEAR(_page);
-	page = &_page;
-	page->size = allocsize;
-	page->dsk = tmp->data;
-	page->dsk->type = WT_PAGE_FREE;
-	for (; size >= allocsize; size -= allocsize) {
-		page->addr = addr++;
-		WT_ERR(__wt_page_write(toc, page));
-	}
+	dsk = tmp->data;
+	dsk->type = WT_PAGE_FREE;
+	for (; size >= allocsize; size -= allocsize)
+		WT_ERR(__wt_page_disk_write(toc, dsk, addr++, allocsize));
 
 err:	__wt_scr_release(&tmp);
 	return (ret);
