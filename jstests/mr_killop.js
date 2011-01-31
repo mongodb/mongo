@@ -16,7 +16,7 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
         for ( var i in p ) {
             var o = p[ i ];
             if ( where ) {
-                if ( o.active && o.ns == "test.jstests_mr_killop" && o.query && o.query.query && o.query.query.$where ) {
+                if ( o.active && o.ns == "test.jstests_mr_killop" && o.query && o.query.$where ) {
                     return o.opid;
                 }
             } else {
@@ -74,9 +74,13 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
         assert.soon( function() { o = op( where ); return o != -1 } );
 
         db.killOp( o );
+        debug( "did kill" );
+        var killTime = new Date();
         
         // When the map reduce op is killed, the spawned shell will exit
         s();
+        debug( "parallel shell completed" );
+        assert.gt( 20000, new Date() - killTime, "op killed by timeout, not explicitly" );
         
         assert.eq( -1, op( where ) );
     }
@@ -118,7 +122,7 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
 
     /** Test that we can kill the child op of a map reduce op */
     var loop = function() {
-        db.jstests_mr_killop.count( {$where:function() { while( 1 ) { ; } }} );
+        db.jstests_mr_killop.find( {$where:function() { while( 1 ) { ; } }} ).toArray();
     }
     runMRTests( loop, true );
 
