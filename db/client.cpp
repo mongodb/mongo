@@ -477,12 +477,13 @@ namespace mongo {
             *readers = r;
 
         int time = r * 100;
-        time += r * 500;
+        time += w * 500;
 
         time = min( time , 1000000 );
 
         // there has been a kill request for this op - we should yield to allow the op to stop
-        if ( killCurrentOp.checkForInterruptNoAssert( false ) ) {
+        // This function returns empty string if we aren't interrupted
+        if ( killCurrentOp.checkForInterruptNoAssert( false )[0] != '\0' ) {
             return 100;
         }
 
