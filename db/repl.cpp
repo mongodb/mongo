@@ -637,7 +637,7 @@ namespace mongo {
         }
     }
 
-    static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
+    static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, ReplSource::SourceVector &old) {
         if ( !s.syncedTo.isNull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
@@ -758,7 +758,7 @@ namespace mongo {
                     }
                 }
             }
-            addSourceToList(v, tmp, c->current(), old);
+            addSourceToList(v, tmp, old);
             c->advance();
         }
 
