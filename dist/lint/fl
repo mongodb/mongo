@@ -19,9 +19,9 @@ f()
 	    "-esym(534,fprintf,memcpy,memset)" \
 	    "-function(exit,__wt_abort)" \
 	    "-libdir(.)" \
-	    "-libdir(../inc_posix)" \
+	    "-libdir(../include)" \
 	    "-wlib(0)" \
-	     "-i../build_posix" "-i../inc_posix" "-i/usr/include" $1
+	     "-i../build_posix" "-i../include" "-i/usr/include" $1
 }
 
 update=0
@@ -36,11 +36,11 @@ while :
 done
 
 # List of source files.
-l="../btree/*.c ../db/*.c ../env/*.c ../os_posix/*.c ../support/*.c"
+l="../../src/btree/*.c ../../src/db/*.c ../../src/env/*.c ../../src/os_posix/*.c ../../src/support/*.c"
 
 # Don't lint all of them.
 l=`echo $l |
-    sed -e 's/\.\.\/support\/simple_setup.c//'`
+    grep -v '../src/support/simple_setup.c/'`
 l=`ls $l`
 
 if [ $# -ne 0 ]; then

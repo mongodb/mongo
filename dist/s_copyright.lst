@@ -1,8 +1,8 @@
 add	LICENSE
-skip	inc_posix/bitstring.h
-skip	inc_posix/extern.h
-skip	inc_posix/queue.h
-skip	inc_posix/serial.h
-skip	support/api.c
-skip	support/stat.c
-skip	support/strerror.c
+skip	include/bitstring.h
+skip	include/extern.h
+skip	include/queue.h
+skip	include/serial.h
+skip	src/support/api.c
+skip	src/support/stat.c
+skip	src/support/strerror.c

@@ -25,14 +25,16 @@ check()
 	fi
 
 	# Check for a correct copyright header.
-	if `sed -e 6q ../$1 | diff - $t > /dev/null`; then
+	if `sed -e 6q ../$1 | diff - $t > /dev/null` &&
+	    `sed -e 7q -e d ../$1 | \
+	    egrep '^ \* \\$\Id' > /dev/null`; then
 		return;
 	fi
 
 	echo "$1: copyright information is incorrect"
 }
 
-l="`cd .. && echo inc_posix/*.h inc_posix/*.in`"
+l="`cd .. && echo include/*.h include/*.in`"
 l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.lst`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 	check $i

@@ -20,7 +20,7 @@ list = err_build()
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../inc_posix/wiredtiger.in', 'r'):
+for line in open('../include/wiredtiger.in', 'r'):
 	if not skip:
 		tfile.write(line)
 	if line.count('Error return section: END'):
@@ -39,7 +39,7 @@ for line in open('../inc_posix/wiredtiger.in', 'r'):
 			v -= 1
 		tfile.write('/*\n')
 tfile.close()
-compare_srcfile(tmp_file, '../inc_posix/wiredtiger.in')
+compare_srcfile(tmp_file, '../include/wiredtiger.in')
 
 # Output the wiredtiger_strerror code.
 tmp_file = '__tmp'
@@ -82,4 +82,4 @@ tfile.write('\t(void)snprintf(errbuf, sizeof(errbuf), ' +\
 tfile.write('\treturn (errbuf);\n')
 tfile.write('}\n')
 tfile.close()
-compare_srcfile(tmp_file, '../support/strerror.c')
+compare_srcfile(tmp_file, '../src/support/strerror.c')
