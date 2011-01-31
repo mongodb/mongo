@@ -13,7 +13,7 @@ indent()
 
 run()
 {
-	echo -n "$2 ..."
+	printf "$2 ..."
 	indent "$1" > $t
 	test -s $t && (echo && cat $t) || echo ' OK'
 }
