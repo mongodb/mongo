@@ -265,7 +265,7 @@ namespace mongo {
     } cmdResync;
 
     bool anyReplEnabled() {
-        return replPair || replSettings.slave || replSettings.master;
+        return replPair || replSettings.slave || replSettings.master || theReplSet;
     }
 
     bool replAuthenticate(DBClientBase *conn);
