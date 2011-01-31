@@ -58,11 +58,25 @@ function go() {
         db['foo'].insert({x: i, text: Text})
         var x = db.getLastErrorObj(2, 30000)  // wait to be copied to at least one secondary
             if (i % 30 == 0) print(i)
-        if (i % 30 == 0 || x.err != null) printjson(x);
+        if (i % 100 == 0 || x.err != null) printjson(x);
         assert.eq(x.err, null, tojson(x));
     }
-    // BUG: above getLastError fails on about every 170 inserts
 
+    // take down the slave and make sure it fails over
+    repset1.stop(1);
+    repset1.stop(2);
+    db.getMongo().setSlaveOk();
+    print("trying some queries");
+    assert.soon(function() { try {
+                db.foo.find().next();
+            }
+            catch(e) {
+                print(e);
+                return false;
+            }
+            return true;
+        });
+    
     // Done
     routerSpec.end()
     configsetSpec.end()

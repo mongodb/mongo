@@ -375,19 +375,18 @@ namespace mongo {
     }
 
     DBClientConnection * DBClientReplicaSet::checkSlave() {
-        if ( _slave ) {
+        HostAndPort h = _monitor->getSlave();
+
+        if ( h == _slaveHost ) {
             if ( ! _slave->isFailed() )
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
         }
 
-        HostAndPort h = _monitor->getSlave();
-        if ( h != _slaveHost ) {
-            _slaveHost = h;
-            _slave.reset( new DBClientConnection( true ) );
-            _slave->connect( _slaveHost );
-            _auth( _slave.get() );
-        }
+        _slaveHost = _monitor->getSlave();
+        _slave.reset( new DBClientConnection( true ) );
+        _slave->connect( _slaveHost );
+        _auth( _slave.get() );
         return _slave.get();
     }
 
