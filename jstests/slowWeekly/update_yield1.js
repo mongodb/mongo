@@ -27,7 +27,7 @@ while ( true ){
     timeUpdate();
     time = timeUpdate();
     print( N + "\t" + time );
-    if ( time > 2000 )
+    if ( time > 8000 )
         break;
     
     N *= 2;
@@ -47,13 +47,14 @@ num = 0;
 start = new Date();
 while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
     var me = Date.timeFunc( function(){ t.findOne(); } );
+    if (me > 50) print("time: " + me);
     
     if ( num++ == 0 ){
         var x = db.currentOp()
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
     }
 
-    assert.gt( 50 , me );
+    assert.gt( 2000 , me );
 }
 
 join();
