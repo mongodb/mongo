@@ -403,6 +403,9 @@ struct __wt_page_disk {
 	 * work around the second reason.)
 	 */
 	uint64_t start_recno;		/* 00-07: column-store starting recno */
+
+#define	WT_LSN_FILE	0		/* File is lsn[0], offset is lsn[1] */
+#define	WT_LSN_OFF	0
 	uint32_t lsn[2];		/* 08-15: LSN */
 
 	uint32_t checksum;		/* 16-19: checksum */

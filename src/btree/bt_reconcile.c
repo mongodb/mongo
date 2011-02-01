@@ -127,6 +127,24 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	new->dsk->type = dsk->type;
 	new->dsk->level = dsk->level;
 
+	/*
+	 * We increment the page LSN in non-transactional stores so it's easy to
+	 * to identify newer versions of pages during salvage: both pages are
+	 * likely to be internally consistent, and might have the same initial
+	 * and last keys, so we need a way to know the most recent state of the
+	 * page.  Alternatively, we could use the internal page reference, but
+	 * that means looking at the internal pages which I don't want to do,
+	 * and that's not quite as good anyway, because the internal page may
+	 * not have been written after the leaf page was updated.
+	 */
+	if (dsk->lsn[WT_LSN_OFF] == UINT32_MAX) {
+		new->dsk->lsn[WT_LSN_FILE] = dsk->lsn[WT_LSN_FILE] + 1;
+		new->dsk->lsn[WT_LSN_OFF] = 0;
+	} else {
+		new->dsk->lsn[WT_LSN_FILE] = dsk->lsn[WT_LSN_FILE];
+		new->dsk->lsn[WT_LSN_OFF] = dsk->lsn[WT_LSN_OFF] + 1;
+	}
+
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		WT_ERR(__wt_rec_col_fix(toc, page, new));
