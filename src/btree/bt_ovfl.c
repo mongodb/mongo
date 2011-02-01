@@ -18,7 +18,6 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 {
 	DB *db;
 	ENV *env;
-	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 	uint32_t size;
 
