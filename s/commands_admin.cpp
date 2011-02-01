@@ -1021,10 +1021,10 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
-        virtual void help( stringstream& help ) const { help << "Not supported sharded"; }
+        virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
 
         bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {        
-            errmsg = "replSetGetStatus doesn't work sharded";
+            errmsg = "replSetGetStatus is not supported through mongos";
             return false;
         }
     } cmdReplSetGetStatus;
