@@ -52,4 +52,6 @@ run "sh ./s_copyright" "Checking for incorrect copyright notices"
 run "sh ./s_define" "Checking for unused #defines"
 run "sh ./s_types" "Checking for incorrect types"
 
+run "sh ./s_docs" "Generating documentation"
+
 echo 'dist/s_all run finished'

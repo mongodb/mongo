@@ -595,7 +595,7 @@ WARN_LOGFILE           = doxygen.log
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = ../include/wiredtiger.h \
+INPUT                  = ../include/wiredtiger.in \
                          ../include/wiredtiger_ext.h \
                          src
 

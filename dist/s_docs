@@ -1,0 +1,4 @@
+#! /bin/sh
+
+# Run doxygen to generate HTML documentation.
+cd ../docs && (cat Doxyfile ; echo "QUIET=YES") | doxygen -
