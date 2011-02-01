@@ -122,7 +122,7 @@ void add_factory(WT_CONNECTION *conn)
 /* Implementation of WT_COLLATOR for WT_CONNECTION::add_collator. */
 static int
 my_compare(WT_SESSION *session, WT_COLLATOR *collator,
-    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp)
+    const WT_DATAITEM *value1, const WT_DATAITEM *value2, int *cmp)
 {
 	*cmp = strcmp((const char *)value1->data, (const char *)value2->data);
 	return (0);
@@ -141,7 +141,8 @@ void add_collator(WT_CONNECTION *conn)
 /* Implementation of WT_EXTRACTOR for WT_CONNECTION::add_extractor. */
 static int
 my_extract(WT_SESSION *session, WT_EXTRACTOR *extractor,
-    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *result)
+    const WT_DATAITEM *key, const WT_DATAITEM *value,
+    WT_DATAITEM *result)
 {
 	*result = *value;
 	return (0);

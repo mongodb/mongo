@@ -1,4 +1,8 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
+void
+__wt_curstd_init(WT_CURSOR_STD *stdc);
+void
+__wt_curstd_close(WT_CURSOR_STD *c);
 int
 __wt_file_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
 int

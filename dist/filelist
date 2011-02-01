@@ -3,6 +3,11 @@
 #
 # $Id$
 
+src/api/api.c
+src/api/cur_std.c
+src/api/pack.c
+src/api/version.c
+src/api/strerror.c
 src/btree/bt_alloc.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
@@ -70,5 +75,3 @@ src/support/progress.c
 src/support/scratch.c
 src/support/serial.c
 src/support/stat.c
-src/support/strerror.c
-src/support/version.c

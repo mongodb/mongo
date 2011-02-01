@@ -76,7 +76,7 @@ for f in sorted(name_mask.items()):
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../include/wiredtiger.in', 'r'):
+for line in open('../include/api_int.h', 'r'):
 	if skip:
 		if line.count('API flags section: END'):
 			tfile.write('/*\n' + line)
@@ -88,6 +88,6 @@ for line in open('../include/wiredtiger.in', 'r'):
 		tfile.write(' */\n')
 		tfile.write(flag_info)
 tfile.close()
-compare_srcfile(tmp_file, '../include/wiredtiger.in')
+compare_srcfile(tmp_file, '../include/api_int.h')
 
 os.remove(tmp_file)

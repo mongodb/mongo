@@ -1,11 +1,13 @@
-/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
 
-#include <sys/errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "wt_int.h"
+#include "wt_internal.h"
 
 static int
 __cursor_first(WT_CURSOR *cursor)
@@ -266,20 +268,4 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *conf
 	/* TODO: c->home = strdup(home); */
 	*connectionp = c;
 	return 0;
-}
-
-const char *
-wiredtiger_strerror(int err)
-{
-	/* TODO */
-	return "unknown error";
-}
-
-const char *
-wiredtiger_version(int *majorp, int *minorp, int *patchp)
-{
-	/* TODO */
-	*majorp = *minorp = 0;
-	*patchp = 1;
-	return "0.0.1";
 }

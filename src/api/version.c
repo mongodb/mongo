@@ -13,7 +13,7 @@
  * wiredtiger_version --
  *	Return library version information.
  */
-char *
+const char *
 wiredtiger_version(int *majorp, int *minorp, int *patchp)
 {
 	if (majorp != NULL)

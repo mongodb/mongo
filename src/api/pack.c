@@ -1,6 +1,13 @@
-/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
 
-#include "wiredtiger.h"
+#include "wt_internal.h"
 
 size_t wiredtiger_struct_sizev(const char *fmt, va_list ap)
 {

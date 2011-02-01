@@ -1,12 +1,8 @@
 /* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
 
-#include <sys/errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <db.h>
-#include "wt_int.h"
+
+#include "wt_internal.h"
 
 /* We're putting all of these functions into "C" structures. */
 extern "C" {

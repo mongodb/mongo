@@ -6,7 +6,7 @@
  * wiredtiger_strerror --
  *	Return a string for any error value.
  */
-char *
+const char *
 wiredtiger_strerror(int error)
 {
 	static char errbuf[64];

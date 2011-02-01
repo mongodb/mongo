@@ -1,12 +1,32 @@
 wtdir = $(prefix)/wt
 wt_LIBRARIES = libwiredtiger.a
+LDADD = libwiredtiger.a -lpthread
 
 wt_PROGRAMS = db_dump db_load db_stat db_verify
 db_dump_SOURCES = ../src/utilities/db_dump/util_dump.c ../src/support/simple_setup.c
 db_load_SOURCES = ../src/utilities/db_load/util_load.c ../src/support/simple_setup.c
 db_stat_SOURCES = ../src/utilities/db_stat/util_stat.c ../src/support/simple_setup.c
 db_verify_SOURCES = ../src/utilities/db_verify/util_verify.c ../src/support/simple_setup.c
-LDADD = libwiredtiger.a -lpthread
+
+noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
+	ex_extending ex_hello ex_pack ex_process ex_schema ex_sequence \
+	ex_stat ex_thread ex_tpcb ex_transaction
+
+ex_access_SOURCES = ../examples/c/ex_access.c
+ex_all_SOURCES = ../examples/c/ex_all.c
+ex_call_center_SOURCES = ../examples/c/ex_call_center.c
+ex_config_SOURCES = ../examples/c/ex_config.c
+ex_cursor_SOURCES = ../examples/c/ex_cursor.c
+ex_extending_SOURCES = ../examples/c/ex_extending.c
+ex_hello_SOURCES = ../examples/c/ex_hello.c
+ex_pack_SOURCES = ../examples/c/ex_pack.c
+ex_process_SOURCES = ../examples/c/ex_process.c
+ex_schema_SOURCES = ../examples/c/ex_schema.c
+ex_sequence_SOURCES = ../examples/c/ex_sequence.c
+ex_stat_SOURCES = ../examples/c/ex_stat.c
+ex_thread_SOURCES = ../examples/c/ex_thread.c
+ex_tpcb_SOURCES = ../examples/c/ex_tpcb.c
+ex_transaction_SOURCES = ../examples/c/ex_transaction.c
 
 include_HEADERS= wiredtiger.h
 INCLUDES= -I../include

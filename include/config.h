@@ -1,4 +1,11 @@
-/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
 
 typedef struct WT_CONFIG WT_CONFIG;
 typedef struct WT_CONFIG_ITEM WT_CONFIG_ITEM;

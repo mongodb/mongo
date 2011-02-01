@@ -9,7 +9,7 @@
 
 #include <stdlib.h>
 
-#include "wiredtiger.h"
+#include "wt_internal.h"
 
 extern const char *progname;
 

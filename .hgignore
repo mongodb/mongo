@@ -2,7 +2,9 @@
 \.swp$
 \.pyc$
 \.class$
-^build.*/.*
+^build.*/(\.deps|COPYING|ChangeLog|INSTALL|Makefile.*|NEWS|README)
+^build.*/(aclocal\.m4|config\..*|configure|stamp-h1|w.*\.h)
+^build_posix/gnu-support/(depcomp|install-sh|missing)
 docs/doxygen.log
 docs/html
 docs/java

@@ -15,7 +15,7 @@ const char *home = "WT_TEST";
 
 /* Case insensitive comparator. */
 static int __compare_nocase(WT_SESSION *session, WT_COLLATOR *collator, 
-    const WT_ITEM *v1, const WT_ITEM *v2)
+    const WT_DATAITEM *v1, const WT_DATAITEM *v2)
 {
 	const char *s1 = v1->data;
 	const char *s2 = v2->data;
@@ -38,7 +38,7 @@ typedef struct {
 } PREFIX_COLLATOR;
 
 static int __compare_prefixes(WT_SESSION *session, WT_COLLATOR *collator, 
-    const WT_ITEM *v1, const WT_ITEM *v2)
+    const WT_DATAITEM *v1, const WT_DATAITEM *v2)
 {
 	PREFIX_COLLATOR *pcoll = (PREFIX_COLLATOR *)collator;
 	const char *s1 = v1->data;

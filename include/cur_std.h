@@ -1,14 +1,21 @@
-/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
 
 struct WT_CURSOR_STD;	typedef struct WT_CURSOR_STD WT_CURSOR_STD;
 
 struct WT_CURSOR_STD {
 	WT_CURSOR interface;
 
-	WT_ITEM key;
+	WT_DATAITEM key;
 	void *keybuf;
 	size_t keybufsz;
-	WT_ITEM value;
+	WT_DATAITEM value;
 	void *valuebuf;
 	size_t valuebufsz;
 

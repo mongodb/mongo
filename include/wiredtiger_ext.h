@@ -1,9 +1,16 @@
-/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
 
 /* vim: set filetype=c.doxygen : */
 
-#ifndef _WIREDTIGER_EXT_H_
-#define _WIREDTIGER_EXT_H_
+#ifndef __WIREDTIGER_EXT_H_
+#define __WIREDTIGER_EXT_H_
 
 /*! @defgroup wt_ext WiredTiger Extension API
  * The functions and interfaces that applications use to customize and extend
@@ -31,7 +38,7 @@ struct WT_COLLATOR {
 	 * 	     1 if <code>value1 > value2</code>.
 	 */
 	int (*compare)(WT_SESSION *session, WT_COLLATOR *collator,
-	    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp);
+	    const WT_DATAITEM *value1, const WT_DATAITEM *value2, int *cmp);
 };
 
 /*!
@@ -71,7 +78,8 @@ struct WT_EXTRACTOR {
 	 * @errors
 	 */
 	int (*extract)(WT_SESSION *session, WT_EXTRACTOR *extractor,
-	    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *result);
+	    const WT_DATAITEM *key, const WT_DATAITEM *value,
+	    WT_DATAITEM *result);
 };
 
 /*! Entry point to an extension, implemented by loadable modules.
@@ -89,4 +97,4 @@ extern int wiredtiger_extension_init(WT_CONNECTION *connection,
 
 /*! @} */
 
-#endif /* _WIREDTIGER_EXT_H_ */
+#endif /* __WIREDTIGER_EXT_H_ */

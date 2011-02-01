@@ -1,11 +1,13 @@
-/* Copyright (c) 2010 WiredTiger, Inc.  All rights reserved. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * $Id$
+ */
 
-#include <sys/errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "wt_int.h"
+#include "wt_internal.h"
 
 static int
 __curstd_get_key(WT_CURSOR *cursor, ...)
@@ -40,7 +42,7 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	const char *fmt;
 	size_t sz;
-		
+
 	va_start(ap, cursor);
 	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format;
 	sz = wiredtiger_struct_sizev(fmt, ap);

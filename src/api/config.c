@@ -25,7 +25,7 @@
 // 
 // Both are relatively easy to transform into portable C99, but a pain until // the interface is stable.
 
-#include <wt_int.h>
+#include "wt_internal.h"
 
 int
 config_init(WT_CONFIG *conf, const char *confstr, int len)
