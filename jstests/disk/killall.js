@@ -5,7 +5,7 @@ port = allocatePorts( 1 )[ 0 ]
 
 var baseName = "jstests_disk_killall";
 
-var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
+var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface" );
 
 m.getDB( "test" ).getCollection( baseName ).save( {} );
 m.getDB( "test" ).getLastError();
