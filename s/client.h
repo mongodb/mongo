@@ -42,7 +42,7 @@ namespace mongo {
         /**
          * @return remote socket address of the client
          */
-        string getRemote() const { return _remote; }
+        HostAndPort getRemote() const { return _remote; }
 
         /**
          * notes that this client use this shard
@@ -94,7 +94,7 @@ namespace mongo {
 
 
         int _id; // unique client id
-        string _remote; // server:port of remote socket end
+        HostAndPort _remote; // server:port of remote socket end
 
         // we use _a and _b to store shards we've talked to on the current request and the previous
         // we use 2 so we can flip for getLastError type operations

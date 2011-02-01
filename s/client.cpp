@@ -61,12 +61,12 @@ namespace mongo {
     void ClientInfo::newRequest( AbstractMessagingPort* p ) {
 
         if ( p ) {
-            string r = p->remote().toString();
-            if ( _remote == "" )
+            HostAndPort r = p->remote();
+            if ( _remote.port() == -1 )
                 _remote = r;
             else if ( _remote != r ) {
                 stringstream ss;
-                ss << "remotes don't match old [" << _remote << "] new [" << r << "]";
+                ss << "remotes don't match old [" << _remote.toString() << "] new [" << r.toString() << "]";
                 throw UserException( 13134 , ss.str() );
             }
         }
