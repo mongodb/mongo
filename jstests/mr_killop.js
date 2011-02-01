@@ -75,12 +75,10 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
 
         db.killOp( o );
         debug( "did kill" );
-        var killTime = new Date();
         
         // When the map reduce op is killed, the spawned shell will exit
         s();
         debug( "parallel shell completed" );
-        assert.gt( 20000, new Date() - killTime, "op killed by timeout, not explicitly" );
         
         assert.eq( -1, op( where ) );
     }
