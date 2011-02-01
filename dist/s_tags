@@ -24,7 +24,8 @@ for i in -d -t -w; do
 done
 
 rm -f tags
-ctags $flags ../include/*.in ../src/*/*.[ch] 2>/dev/null
+(cd ../src/btree && ctags -f ../../dist/tags $flags \
+    ../../include/*.in ../../include/*.h ../*/*.[ch] 2>/dev/null)
 chmod 444 tags
 
 # Link to the tags file from standard build and source directories.
@@ -32,5 +33,5 @@ dirs="build_posix `python -c\
      'from dist import directory_files;\
      directory_files();'`"
 for i in $dirs include; do
-	(cd ../$i && rm -f tags && ln -s ../dist/tags .)
+	(cd ../$i && rm -f tags && ln -s ../../dist/tags .)
 done
