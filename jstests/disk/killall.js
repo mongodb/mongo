@@ -1,6 +1,8 @@
 // running ops should be killed
 // dropped collection should be ok after restart
 
+if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-2076
+
 port = allocatePorts( 1 )[ 0 ]
 
 var baseName = "jstests_disk_killall";
@@ -36,3 +38,5 @@ m.getDB( "test" ).getCollection( baseName ).stats();
 m.getDB( "test" ).getCollection( baseName ).drop();
 
 stopMongod( port );
+
+}
