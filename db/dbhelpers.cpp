@@ -266,6 +266,8 @@ namespace mongo {
 
             c->checkLocation();
 
+            getDur().commitIfNeeded();
+
             if ( yield && ! cc->yieldSometimes() ) {
                 // cursor got finished by someone else, so we're done
                 cc.release(); // if the collection/db is dropped, cc may be deleted
