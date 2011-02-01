@@ -45,7 +45,7 @@ run "python serial.py" "Building serial function support"
 
 run "sh ./s_prototypes" "Building prototypes for include files"
 run "sh ./s_readme" "Building README file"
-#run "sh ./s_tags" "Building tags files"
+run "sh ./s_tags" "Building tags files"
 run "sh ./s_whitespace" "Removing trailing whitespace from source files"
 
 run "sh ./s_copyright" "Checking for incorrect copyright notices"
