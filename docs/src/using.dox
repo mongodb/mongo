@@ -1,0 +1,18 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! @page using Using WiredTiger
+
+This section explains how to use WiredTiger by developing a sequence of example programs:
+
+- @subpage basic_api
+- @subpage config_strings
+- @subpage packing
+- @subpage schema
+- @subpage cursors
+- @subpage threads
+- @subpage processes
+- @subpage transactions
+- @subpage tuning
+- @subpage command_line
+- @subpage extending
+ */

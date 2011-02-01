@@ -1,0 +1,74 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! @page config_strings Configuration Strings
+
+@section config_intro Introduction
+
+Many operations in WiredTiger accept a string to configure options.  These strings all have the same format:
+
+<pre>
+  [key['='value]][','[key['='value]]]*
+</pre>
+
+That is, they are simple comma-separated lists of <code>"<key>=<value>"</code> pairs.  If the <code>"=<value>"</code> part is omitted, the value of 1 is assumed.
+
+To handle more complex configuration, such as specifying a schema, values may be nested lists using parentheses.  For example:
+
+<pre>
+  schema=(keyfmt=S,valuefmt=S,columns=(name,notes))
+</pre>
+
+Empty configuration strings may be represented in C or C++ by passing <code>NULL</code>.
+
+Superfluous commas and whitespace in the configuration string are ignored (including at the beginning and end of the string), so it is always safe to combine two configuration strings by concatenating them with a comma in between.
+
+Keys are processed in order from left to right, with later settings overriding earlier ones unless multiple settings for a key are permitted.
+
+@section config_json JSON compatibility
+
+The parser for configuration strings will accept additional formatting as follows:
+
+- parentheses may be round or square brackets or curly braces: '()', '[]' or '{}'
+- the whole configuration string may optionally be wrapped in parentheses
+- the key/value separator can be a colon: ':'
+- keys and values may be in double quotes: '"'
+- quoted strings are interpreted as UTF-8 values
+
+The result of this relaxed parsing is that applications may pass strings representing valid <a href="http://json.org/">JSON objects</a> wherever configuration strings are required.
+
+For example, in Python, code might look as follows:
+
+\code
+  import json
+  config = json.dumps({
+      "key_format" : "r",
+      "value_format" : "5sHQ",
+      "columns" : ("id", "country", "year", "population"),
+      "colgroup.population" : ["population"],
+      "index.country_year" : ["country", "year"]
+  })
+\endcode
+
+
+@section config_examples Code Samples
+
+The code below is taken from the complete example program @ex_ref{ex_config.c}.
+
+@todo improve the example
+
+@dontinclude ex_config.c
+
+Open a connection to a database, creating it if it does not exist and set a cache size of 10MB:
+
+@skip wiredtiger_open
+@until != 0
+
+Create a table that uses C language strings for keys and values:
+
+@skip create_table
+@until ;
+
+Assign a priority to a transaction and give it a name for debugging:
+
+@skipline begin_transaction
+*/

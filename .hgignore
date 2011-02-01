@@ -1,0 +1,12 @@
+\.o$
+\.swp$
+\.pyc$
+\.class$
+^build.*/.*
+docs/doxygen.log
+docs/html
+docs/java
+docs/latex
+docs/python
+src/server/WiredTiger_server
+src/server/gen-py

@@ -1,0 +1,79 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! @page schema Schemas
+
+@section schema_intro Tables, Rows and Columns
+
+A table is a logical representation of data consisting of cells in rows and columns.  For example, a database might have this table.
+
+<table>
+<tr><th>EmpId</th><th>Lastname</th><th>Firstname</th><th>Salary</th></tr>
+<tr><td>1</td><td>Smith</td><td>Joe</td><td>40000</td></tr>
+<tr><td>2</td><td>Jones</td><td>Mary</td><td>50000</td></tr>
+<tr><td>3</td><td>Johnson</td><td>Cathy</td><td>44000</td></tr>
+</table>
+
+This simple table includes an employee identifier, last name and first name, and a salary.
+
+A row-oriented database would store all of the values in a row together, then the values in the next row, and so on:
+
+<pre>
+      1,Smith,Joe,40000;
+      2,Jones,Mary,50000;
+      3,Johnson,Cathy,44000;
+</pre>
+
+A column-oriented database stores all of the values of a column together, then the values of the next column, and so on:
+
+<pre>
+      1,2,3;
+      Smith,Jones,Johnson;
+      Joe,Mary,Cathy;
+      40000,50000,44000;
+</pre>
+
+WiredTiger supports both storage formats, and can mix and match the storage of columns within a logical table.
+
+Applications describe the format of their data by supplying a schema to WT_SESSION::create_table.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
+
+@section schema_columns Describing Columns
+
+@todo describe how to add columns to a schema
+
+@section schema_column_groups Storing Groups of Columns Together
+
+@todo define and describe column groups
+
+@section schema_indices Adding an Index
+
+@todo describe how to add indices to a schema
+
+@section schema_mapping Column Storage
+
+@todo describe how to store some columns separately
+
+@section schema_examples Code Samples
+
+The code below is taken from the complete example program @ex_ref{ex_schema.c}.
+
+@dontinclude ex_schema.c
+@skip C struct
+@until POP_RECORD
+
+@skip open_session
+@until conn->close
+
+The code below is taken from the complete example program @ex_ref{ex_call_center.c}.
+
+@dontinclude ex_call_center.c
+@skip home
+@until CALL
+
+@skip create_table
+@until conn->close
+
+@section schema_advanced Advanced Schemas
+
+- non-relational data such as multiple index keys per row
+- application-supplied extractors and collators may need to be registered before recovery can run.
+ */

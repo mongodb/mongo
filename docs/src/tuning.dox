@@ -1,0 +1,11 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! @page tuning Performance Tuning
+
+- Performance monitoring with statistics
+- Cache size
+- Page size ranges
+- Log buffer sizing
+
+@todo write this page
+ */

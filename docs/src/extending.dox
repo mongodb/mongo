@@ -1,0 +1,37 @@
+/* vim: set filetype=c.doxygen : */
+
+/*! @page extending Extending WiredTiger
+
+- must be in C/C++
+
+@section modules Loadable Modules
+
+@todo describe loadable modules
+
+@section cursor_factory Adding Cursor Types
+
+@todo explain how to add cursor types
+
+@section collations Custom Collators
+
+@todo explain custom collators
+
+@section extractors Custom Field Extractors
+
+@todo explain custom extractors
+
+@section extending_example Code Samples
+
+The code below is taken from the complete example program @ex_ref{ex_extending.c}.
+
+@dontinclude ex_extending.c
+@skip insensitive
+@until nocasecoll
+
+@until pcoll10
+
+@skip add_collator
+@until add_collator
+
+@until conn->close
+ */
