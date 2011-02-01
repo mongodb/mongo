@@ -3,10 +3,10 @@ wt_LIBRARIES = libwiredtiger.a
 LDADD = libwiredtiger.a -lpthread
 
 wt_PROGRAMS = db_dump db_load db_stat db_verify
-db_dump_SOURCES = ../src/utilities/db_dump/util_dump.c ../src/support/simple_setup.c
-db_load_SOURCES = ../src/utilities/db_load/util_load.c ../src/support/simple_setup.c
-db_stat_SOURCES = ../src/utilities/db_stat/util_stat.c ../src/support/simple_setup.c
-db_verify_SOURCES = ../src/utilities/db_verify/util_verify.c ../src/support/simple_setup.c
+db_dump_SOURCES = ../src/utilities/util_dump.c ../src/support/simple_setup.c
+db_load_SOURCES = ../src/utilities/util_load.c ../src/support/simple_setup.c
+db_stat_SOURCES = ../src/utilities/util_stat.c ../src/support/simple_setup.c
+db_verify_SOURCES = ../src/utilities/util_verify.c ../src/support/simple_setup.c
 
 noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
 	ex_extending ex_hello ex_pack ex_process ex_schema ex_sequence \
