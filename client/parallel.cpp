@@ -357,7 +357,7 @@ namespace mongo {
         _cursors = 0;
 
         if ( ! _sortKey.isEmpty() && ! _fields.isEmpty() ) {
-            // we need to make sure the sort key is in the project
+            // we need to make sure the sort key is in the projection
 
             set<string> sortKeyFields;
             _sortKey.getFieldNames(sortKeyFields);
