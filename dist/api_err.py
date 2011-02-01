@@ -44,42 +44,44 @@ compare_srcfile(tmp_file, '../include/wiredtiger.in')
 # Output the wiredtiger_strerror code.
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
-tfile.write('/* DO NOT EDIT: automatically built by dist/api_err.py. */\n\n')
-tfile.write('#include "wt_internal.h"\n\n')
-tfile.write('/*\n')
-tfile.write(' * wiredtiger_strerror --\n')
-tfile.write(' *\tReturn a string for any error value.\n')
-tfile.write(' */\n')
-tfile.write('char *\n')
-tfile.write('wiredtiger_strerror(int error)\n')
-tfile.write('{\n')
-tfile.write('\tstatic char errbuf[64];\n')
-tfile.write('\tchar *p;\n\n')
-tfile.write('\tif (error == 0)\n')
-tfile.write('\t\treturn ("Successful return: 0");\n\n')
-tfile.write('\tswitch (error) {\n')
+tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 
-# We don't want our error returns to conflict with any other
-# package, so use an uncommon range, specifically, -31,800 to
-# -31,999.
-v = -31800
+#include "wt_internal.h"
+
+/*
+ * wiredtiger_strerror --
+ *	Return a string for any error value.
+ */
+const char *
+wiredtiger_strerror(int error)
+{
+	static char errbuf[64];
+	char *p;
+
+	if (error == 0)
+		return ("Successful return: 0");
+
+	switch (error) {
+''')
+
 for l in list:
 	tfile.write('\tcase ' + l[0] + ':\n')
 	tfile.write('\t\treturn ("' + l[0] + ': ' + l[1] + '");\n')
-	v -= 1
 
-tfile.write('\tdefault:\n')
-tfile.write('\t\tif (error > 0 && (p = strerror(error)) != NULL)\n')
-tfile.write('\t\t\treturn (p);\n')
-tfile.write('\t\tbreak;\n')
-tfile.write('\t}\n\n')
-tfile.write('\t/*\n')
-tfile.write('\t * !!!\n')
-tfile.write('\t * Not thread-safe, but this is never supposed to happen.\n')
-tfile.write('\t */\n')
-tfile.write('\t(void)snprintf(errbuf, sizeof(errbuf), ' +\
-    '"Unknown error: %d", error);\n')
-tfile.write('\treturn (errbuf);\n')
-tfile.write('}\n')
+tfile.write('''\
+	default:
+		if (error > 0 && (p = strerror(error)) != NULL)
+			return (p);
+		break;
+	}
+
+	/*
+	 * !!!
+	 * Not thread-safe, but this is never supposed to happen.
+	 */
+	(void)snprintf(errbuf, sizeof(errbuf), "Unknown error: %d", error);
+	return (errbuf);
+}
+''')
 tfile.close()
-compare_srcfile(tmp_file, '../src/support/strerror.c')
+compare_srcfile(tmp_file, '../src/api/strerror.c')
