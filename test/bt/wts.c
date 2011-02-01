@@ -9,7 +9,7 @@
 
 #include "wts.h"
 
-extern void __wt_debug_dbt(const char *, DBT *, FILE *);
+extern void __wt_debug_dbt(const char *, void *, FILE *);
 
 static int cb_bulk(DB *, DBT **, DBT **);
 static int wts_del_col(u_int64_t);

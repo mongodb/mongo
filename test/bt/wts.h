@@ -22,7 +22,7 @@
 #ifdef BDB
 #include "build_unix/db.h"
 #else
-#include "wiredtiger.h"
+#include "wt_internal.h"
 #endif
 
 /* General purpose. */
