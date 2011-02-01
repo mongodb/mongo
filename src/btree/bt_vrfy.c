@@ -620,12 +620,6 @@ __wt_verify_dsk_page(
 	 * FUTURE:
 	 * Check the LSN against the existing log files.
 	 */
-	if (dsk->lsn[0] != 0 || dsk->lsn[1] != 0) {
-		__wt_api_db_errx(db,
-		    "page at addr %lu has non-zero lsn header fields",
-		    (u_long)addr);
-		return (WT_ERROR);
-	}
 
 	/* Ignore the checksum -- it verified when we first read the page. */
 
