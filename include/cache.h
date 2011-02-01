@@ -75,8 +75,8 @@ struct __wt_cache {
 	u_int volatile evict_sleeping;	/* Sleeping */
 
 	/*
-	 * The I/O thread sets/clears the io_sleeping flag when blocked on the
-	 * mtx_io mutex.  The cache thread uses the io_sleeping flag to wake
+	 * The I/O thread sets/clears the read_sleeping flag when blocked on the
+	 * mtx_read mutex.  The cache thread uses the read_sleeping flag to wake
 	 * the I/O thread as necessary.
 	 */
 	WT_MTX *mtx_read;		/* Cache read server mutex */
