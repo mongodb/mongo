@@ -66,13 +66,15 @@ assert.eq( 0 , x.inprog.length , "weird 2" );
 
 join = startParallelShell( "db.update_yield1.update( { $atomic : true } , { $inc : { n : 1 } } , false , true ); db.getLastError()" );
 
-assert.soon( 
-    function(){
-        return db.currentOp().inprog.length > 0;
-    } , "never doing update 2"
-);
+sleep(1000); // wait for shell startup ops to finish
 
-t.findOne();
+var x = db.currentOp();
+printjson(x);
+assert.eq(1, x.inprog.length, "never doing update 2");
+assert.eq("update", x.inprog[0].op);
+
+t.findOne(); // should wait for update to finish
+
 var x = db.currentOp()
 assert.eq( 0 , x.inprog.length , "should have been atomic" );
 
