@@ -152,6 +152,10 @@ namespace mongo {
 
         long long _bytesIn;
         long long _bytesOut;
+        
+        // this is the parsed version of farEnd
+        // mutable because its initialized only on call to remote()
+        mutable HostAndPort _farEndParsed; 
 
     public:
         SockAddr farEnd;
