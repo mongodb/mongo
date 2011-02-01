@@ -29,7 +29,7 @@ rm -f tags
 chmod 444 tags
 
 # Link to the tags file from standard build and source directories.
-dirs="build_posix `python -c\
+dirs="`python -c\
      'from dist import directory_files;\
      directory_files();'`"
 for i in $dirs include; do
