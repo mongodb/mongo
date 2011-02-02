@@ -115,7 +115,7 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		    (u_long)dsk->lsn[0], (u_long)dsk->lsn[1]);
 		break;
 	case WT_PAGE_OVFL:
-		fprintf(fp, "size %lu\n", (u_long)dsk->u.datalen);
+		fprintf(fp, "\tdata size %lu\n", (u_long)dsk->u.datalen);
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
