@@ -1024,6 +1024,9 @@ namespace mongo {
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
 
         bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {        
+            if ( jsobj["forShell"].trueValue() )
+                lastError.disableForCommand();
+
             errmsg = "replSetGetStatus is not supported through mongos";
             return false;
         }
