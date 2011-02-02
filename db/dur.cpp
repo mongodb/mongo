@@ -113,6 +113,7 @@ namespace mongo {
                 curr->_dtMillis = (unsigned) (dt/1000);
                 _lastRotate = now;
                 curr = other();
+                curr->reset();
             }
         }
 
