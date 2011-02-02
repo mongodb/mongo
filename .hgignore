@@ -3,6 +3,7 @@
 \.pyc$
 \.class$
 ^build.*/(\.deps|COPYING|ChangeLog|INSTALL|Makefile.*|NEWS|README)
+^build.*/(ex_.*|lib.*|wt_.*)
 ^build.*/(aclocal\.m4|config\..*|configure|stamp-h1|w.*\.h)
 ^build_posix/gnu-support/(depcomp|install-sh|missing)
 docs/doxygen.log
