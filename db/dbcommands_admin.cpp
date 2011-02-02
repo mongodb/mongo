@@ -31,6 +31,8 @@
 #include "btree.h"
 #include "curop-inl.h"
 #include "../util/background.h"
+#include "../util/logfile.h"
+#include "../util/alignedbuilder.h"
 #include "../scripting/engine.h"
 
 namespace mongo {
@@ -65,6 +67,58 @@ namespace mongo {
         }
 
     } cleanCmd;
+
+    namespace dur {
+        filesystem::path getJournalDir();
+    }
+ 
+    class JournalLatencyTestCmd : public Command {
+    public:
+        JournalLatencyTestCmd() : Command( "journalLatencyTest" ) {}
+
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool adminOnly() const { return true; }
+        virtual void help(stringstream& h) const { h << "test how long to write and fsync to a test file in the journal/ directory"; }
+
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            filesystem::path p = dur::getJournalDir();
+            p /= "journalLatencyTest";
+        
+            // remove file if already present
+            try { 
+                remove(p);
+            }
+            catch(...) { }
+
+            {
+                LogFile f(p.string());
+                AlignedBuilder b(1024 * 1024);
+                {
+                    Timer t;
+                    for( int i = 0 ; i < 100; i++ ) { 
+                        f.synchronousAppend(b.buf(), 8192);
+                    }
+                    result.append("timeMillis8KB", t.millis() / 100.0);
+                }
+                {
+                    Timer t;
+                    for( int i = 0 ; i < 20; i++ ) { 
+                        f.synchronousAppend(b.buf(), 1024 * 1024);
+                    }
+                    result.append("timeMillis1MB", t.millis() / 20.0);
+                }
+            }
+
+            try { 
+                remove(p);
+            }
+            catch(...) { }
+
+            return 1;
+        }
+
+    } journalLatencyTestCmd;
 
     class ValidateCmd : public Command {
     public:
