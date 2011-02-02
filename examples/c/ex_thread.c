@@ -11,12 +11,15 @@
 
 #include <wiredtiger.h>
 
+void *scan_thread(void *arg);
+
 const char *home = "WT_TEST";
 #define	NUM_THREADS	10
 
 WT_CONNECTION *conn;
 
-void *scan_thread(void *arg) {
+void *scan_thread(void *arg)
+{
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	const char *key, *value;

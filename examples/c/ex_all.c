@@ -12,6 +12,13 @@
 
 #include <wiredtiger_ext.h>
 
+void cursor_ops(WT_CURSOR *cursor);
+void session_ops(WT_SESSION *session);
+void add_factory(WT_CONNECTION *conn);
+void add_collator(WT_CONNECTION *conn);
+void add_extractor(WT_CONNECTION *conn);
+void connection_ops(WT_CONNECTION *conn);
+
 const char *home = "WT_TEST";
 
 void
@@ -41,12 +48,11 @@ cursor_ops(WT_CURSOR *cursor)
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0) {
-		if (exact < 0)
-			; /* Found a match less than the search key. */
-		else if (exact > 0)
-			; /* Found a match greater than the search key. */
-		else
-			; /* When exact == 0, we found an exact match. */
+		/*
+		 * if (exact > 0), we found a match greater than the search key,
+		 * if (exact < 0), we found a match less than the search key,
+		 * otherwise, exact == 0 and we found an exact match.
+		 */
 	}
 
 	cursor->set_key(cursor, key);
@@ -109,7 +115,8 @@ my_init_cursor(WT_CURSOR_FACTORY *factory, WT_SESSION *session,
 }
 /* End implementation of WT_CURSOR_FACTORY. */
 
-void add_factory(WT_CONNECTION *conn)
+void
+add_factory(WT_CONNECTION *conn)
 {
 	int ret;
 
@@ -129,7 +136,8 @@ my_compare(WT_SESSION *session, WT_COLLATOR *collator,
 }
 /* End implementation of WT_COLLATOR. */
 
-void add_collator(WT_CONNECTION *conn)
+void
+add_collator(WT_CONNECTION *conn)
 {
 	int ret;
 
@@ -149,7 +157,8 @@ my_extract(WT_SESSION *session, WT_EXTRACTOR *extractor,
 }
 /* End implementation of WT_EXTRACTOR. */
 
-void add_extractor(WT_CONNECTION *conn)
+void
+add_extractor(WT_CONNECTION *conn)
 {
 	int ret;
 
