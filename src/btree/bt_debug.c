@@ -639,7 +639,6 @@ __wt_debug_pair(const char *tag, void *data, uint32_t size, FILE *fp)
 	__wt_print_byte_string(data, size, fp);
 	fprintf(fp, "}\n");
 }
-#endif
 
 /*
  * __wt_debug_page_hdr --
@@ -659,3 +658,4 @@ __wt_debug_page_hdr(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	    __wt_page_type_string(page->dsk), (u_long)page->size);
 
 }
+#endif
