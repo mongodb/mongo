@@ -306,4 +306,17 @@ namespace mongo {
         }
     } cmdForceError;
 
+    class AvailableQueryOptions : public Command {
+    public:
+        AvailableQueryOptions() : Command( "availableQueryOptions" , false , "availablequeryoptions" ) {}
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool requiresAuth() { return false; }
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            result << "options" << QueryOption_AllSupported;
+            return true;
+        }
+    } availableQueryOptionsCmd;
+
+
 }
