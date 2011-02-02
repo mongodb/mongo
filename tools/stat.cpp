@@ -597,7 +597,15 @@ namespace mongo {
             {
                 string orig = getParam( "host" );
                 if ( orig == "" )
-                    orig = "localhost:27017";
+                    orig = "localhost";
+                
+                if ( orig.find( ":" ) == string::npos ) {
+                    if ( hasParam( "port" ) )
+                        orig += ":" + _params["port"].as<string>();
+                    else 
+                        orig += ":27017";
+                }
+                
                 StringSplitter ss( orig.c_str() , "," );
                 while ( ss.more() ) {
                     string host = ss.next();
