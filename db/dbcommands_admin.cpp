@@ -102,6 +102,20 @@ namespace mongo {
                     result.append("timeMillis8KB", t.millis() / 100.0);
                 }
                 {
+                    const int N = 50;
+                    Timer t2;
+                    long long x = 0;
+                    for( int i = 0 ; i < N; i++ ) { 
+                        Timer t;
+                        f.synchronousAppend(b.buf(), 8192);
+                        x += t.micros();
+                        sleepmillis(4);
+                    }
+                    long long y = t2.micros() - 4*N*1000;
+                    // not really trusting the timer granularity on all platforms so whichever is higher of x and y
+                    result.append("timeMillis8KBWithPauses", max(x,y) / (N*1000.0));
+                }
+                {
                     Timer t;
                     for( int i = 0 ; i < 20; i++ ) { 
                         f.synchronousAppend(b.buf(), 1024 * 1024);
