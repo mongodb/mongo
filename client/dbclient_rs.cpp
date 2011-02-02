@@ -50,7 +50,7 @@ namespace mongo {
 
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _name( name ) , _master(-1) {
+        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
 
         string errmsg;
 
@@ -148,13 +148,36 @@ namespace mongo {
 
 
     HostAndPort ReplicaSetMonitor::getMaster() {
-        if ( _master < 0 || !_nodes[_master].ok )
+        bool good = false;
+        {
+            scoped_lock lk( _lock );
+            good = _master >= 0 && _nodes[_master].ok;
+        }
+
+        if ( ! good )
             _check();
 
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
 
         scoped_lock lk( _lock );
         return _nodes[_master].addr;
+    }
+    
+    HostAndPort ReplicaSetMonitor::getSlave( const HostAndPort& prev ) {
+        // make sure its valid 
+        if ( prev.port() > 0 ) {
+            scoped_lock lk( _lock );
+            for ( unsigned i=0; i<_nodes.size(); i++ ) {
+                if ( prev != _nodes[i].addr ) 
+                    continue;
+
+                if ( _nodes[i].ok ) 
+                    return prev;
+                break;
+            }
+        }
+        
+        return getSlave();
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
@@ -235,8 +258,11 @@ namespace mongo {
             changed = true;
         }
     }
+    
+    
 
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose ) {
+        scoped_lock lk( _checkConnectionLock );
         bool isMaster = false;
         bool changed = false;
         try {
@@ -369,20 +395,24 @@ namespace mongo {
 
         _masterHost = _monitor->getMaster();
         _master.reset( new DBClientConnection( true ) );
-        _master->connect( _masterHost );
+        string errmsg;
+        if ( ! _master->connect( _masterHost , errmsg ) ) {
+            _monitor->notifyFailure( _masterHost );
+            uasserted( 13639 , str::stream() << "can't connect to new replica set master [" << _masterHost.toString() << "] err: " << errmsg );
+        }
         _auth( _master.get() );
         return _master.get();
     }
 
     DBClientConnection * DBClientReplicaSet::checkSlave() {
-        HostAndPort h = _monitor->getSlave();
+        HostAndPort h = _monitor->getSlave( _slaveHost );
 
         if ( h == _slaveHost ) {
             if ( ! _slave->isFailed() )
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
         }
-
+        
         _slaveHost = _monitor->getSlave();
         _slave.reset( new DBClientConnection( true ) );
         _slave->connect( _slaveHost );

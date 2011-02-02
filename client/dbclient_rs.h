@@ -66,8 +66,12 @@ namespace mongo {
          */
         void notifyFailure( const HostAndPort& server );
 
+        /** @return prev if its still ok, and if not returns a random slave that is ok for reads */
+        HostAndPort getSlave( const HostAndPort& prev );
+
         /** @return a random slave that is ok for reads */
         HostAndPort getSlave();
+
 
         /**
          * notify the monitor that server has faild
@@ -121,6 +125,7 @@ namespace mongo {
         int _find( const HostAndPort& server ) const ;
 
         mutable mongo::mutex _lock; // protects _nodes
+        mutable mongo::mutex  _checkConnectionLock;
 
         string _name;
         struct Node {
