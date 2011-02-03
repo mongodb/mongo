@@ -1478,6 +1478,7 @@ namespace mongo {
         BSONObj me;
         {
             dblock l;
+            // local.me is an identifier for a server for getLastError w:2+
             if ( ! Helpers::getSingleton( "local.me" , me ) ) {
                 BSONObjBuilder b;
                 b.appendOID( "_id" , 0 , true );
