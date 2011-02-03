@@ -140,7 +140,13 @@ namespace mongo {
             uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
         }
 
-        if( fdatasync(_fd) < 0 ) {
+        if( 
+#if defined(__linux__)
+           fdatasync(_fd) < 0 
+#else
+           fsync(_fd)
+#endif
+            ) {
             uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
         }
 
