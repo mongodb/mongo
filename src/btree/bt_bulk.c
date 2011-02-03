@@ -1428,6 +1428,9 @@ __wt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 	idb = toc->db->idb;
 	ret = 0;
 
+	if (stack->elem == NULL)
+		return (0);
+
 	for (elem = stack->elem; elem->page != NULL; ++elem) {
 		WT_TRET(__wt_page_write(toc, elem->page));
 

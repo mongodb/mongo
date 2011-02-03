@@ -72,24 +72,18 @@ __wt_env_close(ENV *env)
 	ret = secondary_err = 0;
 
 	/* Complain if DB handles weren't closed. */
-	if (TAILQ_FIRST(&ienv->dbqh) != NULL) {
-		TAILQ_FOREACH(idb, &ienv->dbqh, q) {
-			__wt_api_env_errx(env,
-			    "Env handle has open Db handles: %s",
-			    idb->name);
-			WT_TRET(idb->db->close(idb->db, 0));
-		}
+	while ((idb = TAILQ_FIRST(&ienv->dbqh)) != NULL) {
+		__wt_api_env_errx(env,
+		    "Env handle has open Db handles: %s", idb->name);
+		WT_TRET(idb->db->close(idb->db, 0));
 		secondary_err = WT_ERROR;
 	}
 
 	/* Complain if files weren't closed. */
-	if (TAILQ_FIRST(&ienv->fhqh) != NULL) {
-		TAILQ_FOREACH(fh, &ienv->fhqh, q) {
-			__wt_api_env_errx(env,
-			    "Env handle has open file handles: %s",
-			    fh->name);
-			WT_TRET(__wt_close(env, fh));
-		}
+	while ((fh = TAILQ_FIRST(&ienv->fhqh)) != NULL) {
+		__wt_api_env_errx(env,
+		    "Env handle has open file handles: %s", fh->name);
+		WT_TRET(__wt_close(env, fh));
 		secondary_err = WT_ERROR;
 	}
 
