@@ -26,7 +26,7 @@ static void __wt_mtrack(
  *	ANSI calloc function.
  */
 int
-__wt_calloc_func(ENV *env, uint32_t number, uint32_t size, void *retp
+__wt_calloc_func(ENV *env, size_t number, size_t size, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -61,14 +61,14 @@ __wt_calloc_func(ENV *env, uint32_t number, uint32_t size, void *retp
  */
 int
 __wt_realloc_func(ENV *env,
-    uint32_t *bytes_allocated_ret, uint32_t bytes_to_allocate, void *retp
+    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
     )
 {
 	void *p;
-	uint32_t bytes_allocated;
+	size_t bytes_allocated;
 
 	/*
 	 * !!!
@@ -89,7 +89,7 @@ __wt_realloc_func(ENV *env,
 	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
 	WT_ASSERT(env, bytes_allocated < bytes_to_allocate);
 
-	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL) {
+	if ((p = realloc(p, bytes_to_allocate)) == NULL) {
 		__wt_api_env_err(env, errno, "memory allocation");
 		return (WT_ERROR);
 	}
@@ -106,8 +106,11 @@ __wt_realloc_func(ENV *env,
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
 
 	/* Update caller's bytes allocated value. */
-	if (bytes_allocated_ret != NULL)
-		*bytes_allocated_ret = bytes_to_allocate;
+	if (bytes_allocated_ret != NULL) {
+		WT_ASSERT(env,
+		    bytes_to_allocate == (uint32_t)bytes_to_allocate);
+		*bytes_allocated_ret = (uint32_t)bytes_to_allocate;
+	}
 
 #ifdef	HAVE_DIAGNOSTIC
 	__wt_mtrack(env, *(void **)retp, p, file, line);
@@ -158,7 +161,7 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 void
 __wt_free_func(ENV *env, void *p_arg
 #ifdef HAVE_DIAGNOSTIC
-    , uint32_t len
+    , size_t len
 #endif
     )
 {

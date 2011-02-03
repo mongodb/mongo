@@ -443,7 +443,7 @@ __wt_verify_dsk_col_rle(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 	end = (uint8_t *)dsk + size;
 
 	last_data = NULL;
-	len = db->fixed_len + sizeof(uint16_t);
+	len = db->fixed_len + WT_SIZEOF32(uint16_t);
 
 	entry_num = 0;
 	WT_RLE_REPEAT_FOREACH(db, dsk, data, i) {

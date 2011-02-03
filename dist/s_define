@@ -15,7 +15,7 @@ sed -e '/^$/d' -e '/^#/d' < s_define.list
 for i in \
     `cat ../src/include/*.h ../src/include/*.in |
      egrep '^#define' |
-     sed 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' |
+     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
      sort -u`; do
 	if `egrep -w "$i" $l > /dev/null`; then
 		continue

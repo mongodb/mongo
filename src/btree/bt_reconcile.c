@@ -215,7 +215,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		memcpy(first_free, from, sizeof(WT_OFF_RECORD));
 		first_free += sizeof(WT_OFF_RECORD);
-		space_avail -= sizeof(WT_OFF_RECORD);
+		space_avail -= WT_SIZEOF32(WT_OFF_RECORD);
 		++dsk->u.entries;
 	}
 
@@ -406,7 +406,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * WT_TOC's scratch buffer is big enough.  Clear the buffer's contents
 	 * and set the delete flag.
 	 */
-	len = db->fixed_len + sizeof(uint16_t);
+	len = db->fixed_len + WT_SIZEOF32(uint16_t);
 	WT_ERR(__wt_scr_alloc(toc, len, &tmp));
 	memset(tmp->data, 0, len);
 	WT_RLE_REPEAT_COUNT(tmp->data) = 1;

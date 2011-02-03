@@ -51,7 +51,8 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 		stdc->keybufsz = sz;
 	}
 	stdc->key.data = stdc->keybuf;
-	stdc->key.size = sz;
+	WT_ASSERT(NULL, sz <= UINT32_MAX);
+	stdc->key.size = (uint32_t)sz;
 	if (wiredtiger_struct_packv(stdc->keybuf, sz, fmt, ap) == 0)
 		stdc->flags &= ~WT_CURSTD_BADKEY;
 }
@@ -74,7 +75,8 @@ __curstd_set_value(WT_CURSOR *cursor, ...)
 		stdc->valuebufsz = sz;
 	}
 	stdc->value.data = stdc->valuebuf;
-	stdc->value.size = sz;
+	WT_ASSERT(NULL, sz <= UINT32_MAX);
+	stdc->value.size = (uint32_t)sz;
 	if (wiredtiger_struct_packv(stdc->valuebuf, sz, fmt, ap) == 0)
 		stdc->flags &= ~WT_CURSTD_BADVALUE;
 }

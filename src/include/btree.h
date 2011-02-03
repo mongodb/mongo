@@ -58,7 +58,7 @@ extern "C" {
  * header), rounded to an allocation unit.
  */
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
-	((uint32_t)WT_ALIGN((size) + sizeof(WT_PAGE_DISK), (db)->allocsize))
+	(WT_ALIGN((size) + sizeof(WT_PAGE_DISK), (db)->allocsize))
 
 /*
  * The invalid and deleted addresses are special addresses and limit the

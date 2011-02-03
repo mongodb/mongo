@@ -319,7 +319,7 @@ eop:			e->visited = 1;
 		++e->indx;
 
 		/* Check to see if we grew past the end of our stack. */
-		elem = walk->tree_len / sizeof(WT_WALK_ENTRY);
+		elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
 		if (walk->tree_slot >= elem)
 			WT_RET(__wt_realloc(env, &walk->tree_len,
 			    (elem + 20) * sizeof(WT_WALK_ENTRY), &walk->tree));

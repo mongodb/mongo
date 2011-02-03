@@ -15,6 +15,14 @@ extern "C" {
 #define	WT_MILLION	(1000000)
 
 /*
+ * 32-bit version of sizeof.  Many sizes that cannot be larger than 2**32 are
+ * stored in uint32_t variables to save bytes.  To avoid warnings with
+ * conversion from size_t to uint32_t, we use this macro for sizeof
+ * calculations in 32-bit space.
+ */
+#define	WT_SIZEOF32(e)	((uint32_t)sizeof(e))
+
+/*
  * Align a number to a specified power-of-2.
  *
  * The calculation is done using the largest unsigned integer type, usually

@@ -317,7 +317,7 @@ __wt_block_write(WT_TOC *toc)
 
 	/* Initialize the page's header. */
 	dsk = tmp->data;
-	dsk->u.datalen = total_entries * sizeof(WT_FREE_ENTRY);
+	dsk->u.datalen = total_entries * WT_SIZEOF32(WT_FREE_ENTRY);
 	dsk->type = WT_PAGE_FREELIST;
 	dsk->level = WT_NOLEVEL;
 

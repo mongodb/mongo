@@ -48,7 +48,7 @@ __wt_scr_alloc(WT_TOC *toc, uint32_t size, DBT **dbtp)
 		}
 
 	/* Resize the array, we need more scratch buffers. */
-	allocated = toc->scratch_alloc * sizeof(DBT);
+	allocated = toc->scratch_alloc * WT_SIZEOF32(DBT);
 	WT_ERR(__wt_realloc(env, &allocated,
 	    (toc->scratch_alloc + 10) * sizeof(DBT), &toc->scratch));
 	toc->scratch_alloc += 10;

@@ -107,8 +107,8 @@ struct __wt_cache {
 	uint64_t stat_bytes_out;
 
 	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
-	uint32_t   evict_elem;		/* Number of elements in the array */
-	uint32_t   evict_len;		/* Bytes in the array */
+	uint32_t evict_elem;		/* Number of elements in the array */
+	uint32_t evict_len;		/* Bytes in the array */
 
 	WT_PAGE **hazard;		/* Copy of the hazard references */
 	uint32_t  hazard_elem;		/* Number of entries in the list */

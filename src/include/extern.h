@@ -266,14 +266,14 @@ __wt_workq_srvr(void *arg);
 void
 __wt_abort(ENV *env);
 int
-__wt_calloc_func(ENV *env, uint32_t number, uint32_t size, void *retp
+__wt_calloc_func(ENV *env, size_t number, size_t size, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
     );
 int
 __wt_realloc_func(ENV *env,
-    uint32_t *bytes_allocated_ret, uint32_t bytes_to_allocate, void *retp
+    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -287,7 +287,7 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 void
 __wt_free_func(ENV *env, void *p_arg
 #ifdef HAVE_DIAGNOSTIC
-    , uint32_t len
+    , size_t len
 #endif
     );
 int

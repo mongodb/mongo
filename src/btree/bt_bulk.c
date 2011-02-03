@@ -115,7 +115,7 @@ __wt_bulk_fix(WT_TOC *toc,
 	/* Figure out how large is the chunk we're storing on the page. */
 	len = db->fixed_len;
 	if (rle)
-		len += sizeof(uint16_t);
+		len += WT_SIZEOF32(uint16_t);
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bulk_scratch_page(toc, db->leafmin,
@@ -201,7 +201,7 @@ __wt_bulk_fix(WT_TOC *toc,
 			last_repeat = (uint16_t *)first_free;
 			*last_repeat = 1;
 			first_free += sizeof(uint16_t);
-			space_avail -= sizeof(uint16_t);
+			space_avail -= WT_SIZEOF32(uint16_t);
 			last_data = first_free;
 		}
 		memcpy(first_free, data->data, data->size);
@@ -973,7 +973,8 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 #define	WT_STACK_ALLOC_INCR	20
 #endif
 	if (stack->size == 0 || level == stack->size - 1) {
-		uint32_t bytes_allocated = stack->size * sizeof(WT_STACK_ELEM);
+		uint32_t bytes_allocated =
+		    stack->size * WT_SIZEOF32(WT_STACK_ELEM);
 		WT_RET(__wt_realloc(env, &bytes_allocated,
 		    (stack->size + WT_STACK_ALLOC_INCR) * sizeof(WT_STACK_ELEM),
 		    &stack->elem));
@@ -1089,7 +1090,7 @@ split:		switch (dsk->type) {
 		parent_data = elem->first_free;
 		memcpy(elem->first_free, &off_record, sizeof(off_record));
 		elem->first_free += sizeof(WT_OFF_RECORD);
-		elem->space_avail -= sizeof(WT_OFF_RECORD);
+		elem->space_avail -= WT_SIZEOF32(WT_OFF_RECORD);
 
 		/* Track the last entry on the page for record count updates. */
 		stack->elem[level].data = parent_data;
@@ -1379,7 +1380,7 @@ __wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
 	 * WT_PAGE structure plus the page itself, and clear the memory so
 	 * it's never random bytes.
 	 */
-	size = page_size + sizeof(WT_PAGE);
+	size = page_size + WT_SIZEOF32(WT_PAGE);
 	WT_ERR(__wt_scr_alloc(toc, size, &tmp));
 	memset(tmp->data, 0, size);
 

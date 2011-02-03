@@ -19,7 +19,7 @@ int	usage(void);
 
 struct {
 	int pagesize_set;
-	u_long allocsize, intlmin, intlmax, leafmin, leafmax;
+	uint32_t allocsize, intlmin, intlmax, leafmin, leafmax;
 } config;
 
 int
@@ -159,27 +159,27 @@ format:		fprintf(stderr,
 		return (1);
 	}
 	if (strcmp(opt, "allocsize") == 0) {
-		config.allocsize = v;
+		config.allocsize = (uint32_t)v;
 		config.pagesize_set = 1;
 		return (0);
 	}
 	if (strcmp(opt, "intlmin") == 0) {
-		config.intlmin = v;
+		config.intlmin = (uint32_t)v;
 		config.pagesize_set = 1;
 		return (0);
 	}
 	if (strcmp(opt, "intlmax") == 0) {
-		config.intlmax = v;
+		config.intlmax = (uint32_t)v;
 		config.pagesize_set = 1;
 		return (0);
 	}
 	if (strcmp(opt, "leafmin") == 0) {
-		config.leafmin = v;
+		config.leafmin = (uint32_t)v;
 		config.pagesize_set = 1;
 		return (0);
 	}
 	if (strcmp(opt, "leafmax") == 0) {
-		config.leafmax = v;
+		config.leafmax = (uint32_t)v;
 		config.pagesize_set = 1;
 		return (0);
 	}
@@ -232,8 +232,8 @@ config_set(DB *db)
 int
 bulk_read(DBT *dbt, int iskey)
 {
-	static u_int64_t line = 0;
-	size_t len;
+	static unsigned long long line = 0;
+	uint32_t len;
 	int ch;
 
 	++line;

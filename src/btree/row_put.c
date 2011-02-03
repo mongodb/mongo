@@ -194,7 +194,7 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * allocate as it's necessary.
 	 */
 	if (align_size > env->data_update_max) {
-		alloc_size = sizeof(WT_TOC_UPDATE) + align_size;
+		alloc_size = WT_SIZEOF32(WT_TOC_UPDATE) + align_size;
 		single_use = 1;
 	} else {
 		alloc_size = __wt_nlpo2(
@@ -204,7 +204,7 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	WT_RET(__wt_calloc(env, 1, alloc_size, &update));
 
 	update->len = alloc_size;
-	update->space_avail = alloc_size - sizeof(WT_TOC_UPDATE);
+	update->space_avail = alloc_size - WT_SIZEOF32(WT_TOC_UPDATE);
 	update->first_free = (uint8_t *)update + sizeof(WT_TOC_UPDATE);
 
 	/*

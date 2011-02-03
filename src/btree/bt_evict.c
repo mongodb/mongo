@@ -132,7 +132,7 @@ __wt_cache_evict_server(void *arg)
 	cache->hazard_elem = env->toc_size * env->hazard_size;
 	WT_ERR(__wt_calloc(
 	    env, cache->hazard_elem, sizeof(WT_PAGE *), &cache->hazard));
-	cache->hazard_len = cache->hazard_elem * sizeof(WT_PAGE *);
+	cache->hazard_len = cache->hazard_elem * WT_SIZEOF32(WT_PAGE *);
 
 	for (;;) {
 		WT_VERBOSE(env,
@@ -743,7 +743,7 @@ static int
 __wt_evict_compare_lru(const void *a, const void *b)
 {
 	WT_REF *a_ref, *b_ref;
-	uint32_t a_lru, b_lru;
+	uint64_t a_lru, b_lru;
 
 	/*
 	 * There may be NULL references in the array; sort them as greater than

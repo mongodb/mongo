@@ -34,7 +34,7 @@ typedef struct __wt_mbuf {
 
 	char  *first;			/* Allocated message buffer */
 	char  *next;			/* Next available byte of the buffer */
-	size_t len;			/* Allocated length of the buffer */
+	uint32_t len;			/* Allocated length of the buffer */
 } WT_MBUF;
 
 /*
