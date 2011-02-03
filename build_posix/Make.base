@@ -15,5 +15,8 @@ noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
 include_HEADERS= wiredtiger.h
 INCLUDES= -I../src/include
 
+Makefile.am: Make.base makemake ../dist/filelist
+	@sh makemake
+
 ../src/include/extern.h: $(libwiredtiger_a_SOURCES)
 	@cd ../dist && sh s_prototypes && touch $@
