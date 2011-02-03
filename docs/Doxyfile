@@ -596,7 +596,6 @@ WARN_LOGFILE           = doxygen.log
 # with spaces.
 
 INPUT                  = ../include/wiredtiger.in \
-                         ../include/wiredtiger_ext.h \
                          src
 
 # This tag can be used to specify the character encoding of the source files 

@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <wiredtiger_ext.h>
+#include <wiredtiger.h>
 
 void cursor_ops(WT_CURSOR *cursor);
 void session_ops(WT_SESSION *session);

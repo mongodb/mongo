@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <wiredtiger_ext.h>
+#include <wiredtiger.h>
 
 const char *home = "WT_TEST";
 
