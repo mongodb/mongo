@@ -8,10 +8,10 @@ from dist import compare_srcfile
 # Read the source file and build a list of items.
 def err_build():
 	l = []
-	err_re = re.compile(r'\b(WT_([A-Z]|_)+)\t(.*)')
+	err_re = re.compile(r'\b(WT_(?:[A-Z]|_)+)\t(.*)')
 	for match in err_re.finditer(open('api_err', 'r').read()):
-		l += [[match.group(1), match.group(3)]]
-	return (l)
+		l.append(match.groups())
+	return l
 
 # Read the source file and build a list of items.
 list = err_build()
@@ -34,8 +34,9 @@ for line in open('../include/wiredtiger.in', 'r'):
 		# package, so use an uncommon range, specifically, -31,800 to
 		# -31,999.
 		v = -31800
-		for l in list:
-			tfile.write('#define\t' + l[0] + '\t' + str(v) + '\n')
+		for name, msg in list:
+			tfile.write('/*! %s. */\n' % msg)
+			tfile.write('#define\t%s\t%d\n' % (name, v))
 			v -= 1
 		tfile.write('/*\n')
 tfile.close()

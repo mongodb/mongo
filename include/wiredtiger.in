@@ -957,10 +957,15 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * DO NOT EDIT: automatically built by dist/api_err.py.
  * Error return section: BEGIN
  */
+/*! non-specific WiredTiger error. */
 #define	WT_ERROR	-31800
+/*! database item not found. */
 #define	WT_NOTFOUND	-31801
+/*! modification attempted of a read-only database. */
 #define	WT_READONLY	-31802
+/*! restart the operation (internal). */
 #define	WT_RESTART	-31803
+/*! buffer too small. */
 #define	WT_TOOSMALL	-31804
 /*
  * Error return section: END
