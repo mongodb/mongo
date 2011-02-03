@@ -48,7 +48,7 @@ def print_def(title, list):
 tmp_file = '__tmp'
 f = open(tmp_file, 'w')
 skip = 0
-for line in open('../include/stat.h', 'r'):
+for line in open('../src/include/stat.h', 'r'):
 	if not skip:
 		f.write(line)
 	if line.count('Statistics section: END'):
@@ -64,7 +64,7 @@ for line in open('../include/stat.h', 'r'):
 		print_def('FH handle', stat_class.fh_stats)
 		print_def('Methods', method_stats)
 f.close()
-compare_srcfile(tmp_file, '../include/stat.h')
+compare_srcfile(tmp_file, '../src/include/stat.h')
 
 # print_func --
 #	Print the functions for the stat.c file.

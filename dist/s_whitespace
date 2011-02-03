@@ -6,7 +6,7 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-inc=`cd .. && echo include/*.h include/*.in dist/*.py dist/s_*`
+inc=`cd .. && echo src/include/*.h src/include/*.in dist/*.py dist/s_*`
 (
 for f in `sed -e '/^[a-z]/! d' filelist` $inc; do
 	f="../$f"

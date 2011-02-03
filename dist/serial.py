@@ -93,6 +93,6 @@ tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/serial.py. */\n')
 func_serial(tfile)
 tfile.close()
-compare_srcfile(tmp_file, '../include/serial.h')
+compare_srcfile(tmp_file, '../src//include/serial.h')
 
 os.remove(tmp_file)

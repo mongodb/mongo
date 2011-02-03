@@ -13,4 +13,4 @@ noinst_PROGRAMS = ex_access ex_all ex_call_center ex_config ex_cursor \
 	ex_stat ex_thread ex_tpcb ex_transaction
 
 include_HEADERS= wiredtiger.h
-INCLUDES= -I../include
+INCLUDES= -I../src/include

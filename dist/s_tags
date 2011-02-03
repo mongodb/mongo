@@ -17,21 +17,27 @@ type ctags > /dev/null 2>&1 || {
 # Use the -d, -t and -w flags to ctags if available.
 flags=""
 echo "f() { int a; }" > $t
-for i in -d -t -w; do
+for i in -d -t -w --langauge-force=C; do
 	if ctags $i $t 2>/dev/null; then
 		flags="$i $flags"
 	fi
 done
 
+# Generate a tags file for the build directory
+(cd ../build_posix
 rm -f tags
-(cd ../src/btree && ctags -f ../../dist/tags $flags \
-    ../../include/*.in ../../include/*.h ../*/*.[ch] 2>/dev/null)
-chmod 444 tags
+ctags $flags ../src/include/*.in ../src/include/*.h ../src/*/*.[ch] 2>/dev/null
+chmod 444 tags)
+
+# Put the shared tags file in the include directory, it's at the same level in
+# the tree as the other source files.
+(cd ../src/include
+rm -f tags
+ctags $flags ../include/*.in ../include/*.h ../*/*.[ch] 2>/dev/null
+chmod 444 tags)
 
 # Link to the tags file from standard build and source directories.
-dirs="`python -c\
-     'from dist import directory_files;\
-     directory_files();'`"
-for i in $dirs include; do
-	(cd ../$i && rm -f tags && ln -s ../../dist/tags .)
+dirs="`python -c 'from dist import directory_files; directory_files();'`"
+for i in $dirs; do
+	(cd ../$i && rm -f tags && ln -s ../include/tags .)
 done

@@ -20,7 +20,7 @@ list = err_build()
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../include/wiredtiger.in', 'r'):
+for line in open('../src/include/wiredtiger.in', 'r'):
 	if not skip:
 		tfile.write(line)
 	if line.count('Error return section: END'):
@@ -40,7 +40,7 @@ for line in open('../include/wiredtiger.in', 'r'):
 			v -= 1
 		tfile.write('/*\n')
 tfile.close()
-compare_srcfile(tmp_file, '../include/wiredtiger.in')
+compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
 # Output the wiredtiger_strerror code.
 tmp_file = '__tmp'

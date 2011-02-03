@@ -8,14 +8,14 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 # List of files to search.
 l=`sed -e 's,#.*,,' -e 's,^,\.\./,' filelist`
-l="$l ../include/verify_build.h"
+l="$l ../src/include/verify_build.h"
 
 (
 # Copy out the list of #defines we don't use, but it's OK.
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
 for i in \
-    `cat ../include/*.h ../include/*.in |
+    `cat ../src/include/*.h ../src/include/*.in |
      egrep '^#define' |
      sed 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' |
      sort -u`; do
@@ -37,7 +37,7 @@ done
 
 l=`echo $l | sed -e 's/\.\.\/support\/stat.c//'`
 for i in \
-    `cat ../include/stat.h |
+    `cat ../src/include/stat.h |
      egrep '^#define' |
      sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
 	 -e '/^WT_STAT_INCR$/d' \

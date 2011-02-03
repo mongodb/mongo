@@ -13,3 +13,4 @@ docs/latex
 docs/python
 src/server/WiredTiger_server
 src/server/gen-py
+/tags$

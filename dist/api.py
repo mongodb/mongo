@@ -398,7 +398,7 @@ compare_srcfile(tmp_file, '../src/support/api_int.c')
 #####################################################################
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../include/wiredtiger.in', 'r'):
+for line in open('../src/include/wiredtiger.in', 'r'):
 	if skip:
 		if line.count('DB methods: END') or\
 		    line.count('ENV methods: END') or\
@@ -431,6 +431,6 @@ for line in open('../include/wiredtiger.in', 'r'):
 		func_struct_variable_all('env', tfile)
 
 tfile.close()
-compare_srcfile(tmp_file, '../include/wiredtiger.in')
+compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
 os.remove(tmp_file)

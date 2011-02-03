@@ -133,7 +133,7 @@ STRIP_FROM_PATH        =
 # definition is used. Otherwise one should specify the include paths that 
 # are normally passed to the compiler using the -I flag.
 
-STRIP_FROM_INC_PATH    = ../include/
+STRIP_FROM_INC_PATH    = ../src/include/
 
 # If the SHORT_NAMES tag is set to YES, doxygen will generate much shorter 
 # (but less readable) file names. This can be useful if your file system 
@@ -595,7 +595,7 @@ WARN_LOGFILE           = doxygen.log
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = ../include/wiredtiger.in \
+INPUT                  = ../src/include/wiredtiger.in \
                          src
 
 # This tag can be used to specify the character encoding of the source files 

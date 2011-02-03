@@ -72,6 +72,6 @@ AC_CHECK_FUNCS(fcntl pthread_yield)
 
 AC_CONFIG_FILES([
 	Makefile
-	wiredtiger.h:../include/wiredtiger.in
-	wt_internal.h:../include/wt_internal.in])
+	wiredtiger.h:../src/include/wiredtiger.in
+	wt_internal.h:../src/include/wt_internal.in])
 AC_OUTPUT
