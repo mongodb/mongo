@@ -168,7 +168,7 @@ public:
 
     int run() {
         string filename = getParam( "file" );
-        long long fileSize = -1;
+        long long fileSize = 0;
 
         istream * in = &cin;
 

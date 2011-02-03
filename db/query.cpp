@@ -863,6 +863,7 @@ namespace mongo {
             }
 
             if ( _pq.isExplain() ) {
+                massert( 13638, "client cursor dropped during explain query yield", _c.get() );
                 _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(),
                               _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields ,
                               _nChunkSkips, _keyFieldsOnly.get() > 0 );

@@ -196,7 +196,7 @@ namespace mongo {
         BSONObj doRow( const BSONObj& a , const BSONObj& b ) {
             BSONObjBuilder result;
 
-            if ( b["opcounters"].type() == Object ) {
+            if ( a["opcounters"].isABSONObj() && b["opcounters"].isABSONObj() ) {
                 BSONObj ax = a["opcounters"].embeddedObject();
                 BSONObj bx = b["opcounters"].embeddedObject();
 
@@ -285,7 +285,7 @@ namespace mongo {
                 _append( result , "ar|aw" , 7 , temp.str() );
             }
 
-            if ( b["network"].isABSONObj() ) {
+            if ( a["network"].isABSONObj() && b["network"].isABSONObj() ) {
                 BSONObj ax = a["network"].embeddedObject();
                 BSONObj bx = b["network"].embeddedObject();
                 _appendNet( result , "netIn" , diff( "bytesIn" , ax , bx ) );
@@ -597,7 +597,15 @@ namespace mongo {
             {
                 string orig = getParam( "host" );
                 if ( orig == "" )
-                    orig = "localhost:27017";
+                    orig = "localhost";
+                
+                if ( orig.find( ":" ) == string::npos ) {
+                    if ( hasParam( "port" ) )
+                        orig += ":" + _params["port"].as<string>();
+                    else 
+                        orig += ":27017";
+                }
+                
                 StringSplitter ss( orig.c_str() , "," );
                 while ( ss.more() ) {
                     string host = ss.next();

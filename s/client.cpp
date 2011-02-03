@@ -61,12 +61,12 @@ namespace mongo {
     void ClientInfo::newRequest( AbstractMessagingPort* p ) {
 
         if ( p ) {
-            string r = p->remote().toString();
-            if ( _remote == "" )
+            HostAndPort r = p->remote();
+            if ( _remote.port() == -1 )
                 _remote = r;
             else if ( _remote != r ) {
                 stringstream ss;
-                ss << "remotes don't match old [" << _remote << "] new [" << r << "]";
+                ss << "remotes don't match old [" << _remote.toString() << "] new [" << r.toString() << "]";
                 throw UserException( 13134 , ss.str() );
             }
         }
@@ -144,7 +144,7 @@ namespace mongo {
         vector<BSONObj> res;
         
         if ( fromWriteBackListener ) {
-            warning() << "not doing recusrive writebacks for" << endl;
+            LOG(1) << "not doing recusrive writeback" << endl;
             return res;
         }
 
@@ -198,16 +198,21 @@ namespace mongo {
             
             if ( writebacks.size() ){
                 vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
-                assert( v.size() == 1 );
-                result.appendElements( v[0] );
-                result.appendElementsUnique( res );
-                result.append( "initialGLEHost" , theShard );
+                if ( v.size() == 0 && fromWriteBackListener ) {
+                    // ok
+                }
+                else {
+                    assert( v.size() == 1 );
+                    result.appendElements( v[0] );
+                    result.appendElementsUnique( res );
+                    result.append( "initialGLEHost" , theShard );
+                }
             }
             else {
                 result.append( "singleShard" , theShard );
                 result.appendElements( res );
             }
-
+            
             return ok;
         }
 
@@ -225,8 +230,9 @@ namespace mongo {
             BSONObj res;
             bool ok = conn->runCommand( "admin" , options , res );
             _addWriteBack( writebacks, res );
+            
             string temp = DBClientWithCommands::getLastErrorString( res );
-            if ( ok == false || temp.size() ) {
+            if ( conn->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
                 errors.push_back( temp );
                 errorObjects.push_back( res );
             }

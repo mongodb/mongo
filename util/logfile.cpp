@@ -113,9 +113,6 @@ namespace mongo {
 #if defined(O_NOATIME)
                    | O_NOATIME
 #endif
-#if defined(O_SYNC)
-                   | O_SYNC
-#endif
                    ,
                    S_IRUSR | S_IWUSR);
         if( _fd < 0 ) {
@@ -142,11 +139,11 @@ namespace mongo {
             log() << "write fails written:" << written << " len:" << len << " buf:" << buf << " errno:" << errno << endl;
             uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
         }
-#if !defined(O_SYNC)
+
         if( fdatasync(_fd) < 0 ) {
             uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
         }
-#endif
+
     }
 
 }

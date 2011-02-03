@@ -157,7 +157,19 @@ namespace mongo {
                     OpTime op(c.getLastOp());
                     
                     if ( op.isNull() ) {
-                        result.append( "wnote" , "no write has been done on this connection" );
+                        if ( anyReplEnabled() ) {
+                            result.append( "wnote" , "no write has been done on this connection" );
+                        }
+                        else if ( w <= 1 ) {
+                            // don't do anything
+                            // w=1 and no repl, so this is fine
+                        }
+                        else {
+                            // w=2 and no repl
+                            result.append( "wnote" , "no replication has been enabled, so w=2+ won't work" );
+                            result.append( "err", "norepl" );
+                            return true; 
+                        }
                         break;
                     }
 
@@ -167,7 +179,6 @@ namespace mongo {
 
                     // if replication isn't enabled (e.g., config servers)
                     if ( ! anyReplEnabled() ) {
-                        errmsg = "replication not enabled";
                         result.append( "err", "norepl" );
                         return true;
                     }
@@ -1248,10 +1259,11 @@ namespace mongo {
                 indexes += nsd->nIndexes;
                 indexSize += getIndexSizeForCollection(dbname, ns);
             }
-
+            
+            result.append      ( "db" , dbname );
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
-            result.append      ( "avgObjSize" , double(size) / double(objects) );
+            result.append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
             result.appendNumber( "dataSize" , size );
             result.appendNumber( "storageSize" , storageSize);
             result.appendNumber( "numExtents" , numExtents );
@@ -1648,18 +1660,6 @@ namespace mongo {
             return true;
         }
     } cmdSleep;
-
-    class AvailableQueryOptions : public Command {
-    public:
-        AvailableQueryOptions() : Command( "availablequeryoptions" ) {}
-        virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            result << "options" << QueryOption_AllSupported;
-            return true;
-        }
-    } availableQueryOptionsCmd;
 
     // just for testing
     class CapTrunc : public Command {

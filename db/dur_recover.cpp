@@ -283,7 +283,10 @@ namespace mongo {
 
             //DEV log() << "recovery processSection seq:" << i.seqNumber() << endl;
             if( _recovering && _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) {
-                log() << "recover skipping application of section seq:" << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+                if( i.seqNumber() != _lastSeqMentionedInConsoleLog ) {
+                    log() << "recover skipping application of section seq:" << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+                    _lastSeqMentionedInConsoleLog = i.seqNumber();
+                }
                 return;
             }
 

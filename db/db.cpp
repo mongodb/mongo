@@ -799,7 +799,6 @@ int main(int argc, char* argv[]) {
         }
         if( params.count("dur") ) {
             cmdLine.dur = true;
-            // log() << "***** WARNING --dur should not be used yet except for testing" << endl;
         }
         if (params.count("durOptions")) {
             cmdLine.durOptions = params["durOptions"].as<int>();

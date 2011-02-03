@@ -487,7 +487,9 @@ string sayReplSetMemberState() {
             }
         }
     }
-    catch(...) { }
+    catch( std::exception& e ) {
+        log(1) << "error in sayReplSetMemberState:" << e.what() << endl;
+    }
     return "";
 }
 
@@ -527,6 +529,7 @@ int _main(int argc, char* argv[]) {
      "password for authentication")
     ("help,h", "show this usage information")
     ("version", "show version information")
+    ("verbose", "increase verbosity")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ;
 
@@ -625,6 +628,9 @@ int _main(int argc, char* argv[]) {
     }
     if (params.count("ipv6")) {
         mongo::enableIPv6();
+    }
+    if (params.count("verbose")) {
+        logLevel = 1;
     }
 
     if ( ! mongo::cmdLine.quiet )

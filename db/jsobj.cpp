@@ -741,16 +741,18 @@ namespace mongo {
 
     BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
         const char *p = strchr(name, '.');
-        string left;
+        
+        BSONElement sub;
+
         if ( p ) {
-            left = string(name, p-name);
+            sub = getField( string(name, p-name) );
             name = p + 1;
         }
         else {
-            left = string(name);
+            sub = getField( name );
             name = name + strlen(name);
         }
-        BSONElement sub = getField(left.c_str());
+
         if ( sub.eoo() )
             return nullElement;
         else if ( sub.type() == Array || name[0] == '\0')
