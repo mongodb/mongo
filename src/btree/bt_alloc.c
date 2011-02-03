@@ -10,6 +10,7 @@
 #include "wt_internal.h"
 
 static void __wt_block_extend(WT_TOC *, uint32_t *, uint32_t);
+static int __wt_block_truncate(WT_TOC *);
 
 /*
  * __wt_block_alloc --
@@ -273,6 +274,9 @@ __wt_block_write(WT_TOC *toc)
 	idb = db->idb;
 	tmp = NULL;
 
+	/* Truncate the file if possible. */
+	WT_RET(__wt_block_truncate(toc));
+
 	/*
 	 * We allocate room for all of the free-list entries, plus 2 more.  The
 	 * first additional entry is for the free-list pages themselves, and the
@@ -335,4 +339,47 @@ err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);
+}
+
+/*
+ * __wt_block_truncate --
+ *	Truncate the file if the last part of the file isn't in use.
+ */
+static int
+__wt_block_truncate(WT_TOC *toc)
+{
+	DB *db;
+	IDB *idb;
+	ENV *env;
+	WT_FH *fh;
+	WT_FREE_ENTRY *fe;
+	int need_trunc;
+
+	db = toc->db;
+	idb = db->idb;
+	env = toc->env;
+	fh = idb->fh;
+
+	/*
+	 * Repeatedly check the last element in the free-list, truncating the
+	 * file if the last free-list element is also at the end of the file.
+	 */
+	need_trunc = 0;
+	while ((fe = TAILQ_LAST(&idb->freeqa, __wt_free_qah)) != NULL) {
+		if (WT_ADDR_TO_OFF(db, fe->addr) + fe->size != fh->file_size)
+			break;
+		fh->file_size -= fe->size;
+		need_trunc = 1;
+
+		TAILQ_REMOVE(&idb->freeqa, fe, qa);
+		TAILQ_REMOVE(&idb->freeqs, fe, qs);
+
+		--idb->freelist_entries;
+		__wt_free(env, fe, sizeof(WT_FREE_ENTRY));
+	}
+
+	if (need_trunc)
+		WT_RET(__wt_ftruncate(toc, fh, fh->file_size));
+
+	return (0);
 }

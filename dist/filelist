@@ -58,6 +58,7 @@ src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_filesize.c
 src/os_posix/os_fsync.c
+src/os_posix/os_ftruncate.c
 src/os_posix/os_mtx.c
 src/os_posix/os_open.c
 src/os_posix/os_rw.c

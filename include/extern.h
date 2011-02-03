@@ -294,6 +294,8 @@ __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
 __wt_fsync(ENV *env, WT_FH *fh);
 int
+__wt_ftruncate(WT_TOC *toc, WT_FH *fh, off_t len);
+int
 __wt_mtx_alloc(ENV *env, const char *name, int is_locked, WT_MTX **mtxp);
 void
 __wt_lock(ENV *env, WT_MTX *mtx);
