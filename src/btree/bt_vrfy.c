@@ -28,13 +28,14 @@ typedef struct {
 static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(DB *, WT_VSTUFF *);
 static int __wt_verify_delfmt(DB *, uint32_t, uint32_t);
+static int __wt_verify_dsk_chunk(WT_TOC *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_fix(DB *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_int(DB *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_rle(DB *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_item(WT_TOC *, WT_PAGE_DISK *, uint32_t, uint32_t);
-static int __wt_verify_dsk_ovfl(WT_TOC *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_eof(DB *, uint32_t, uint32_t);
 static int __wt_verify_eop(DB *, uint32_t, uint32_t);
+static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_key_order(WT_TOC *, WT_PAGE *);
 static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_common(
@@ -108,6 +109,8 @@ __wt_verify(
 	/* Verify the tree, starting at the root. */
 	WT_ERR(__wt_verify_tree(toc, NULL, WT_RECORDS(&idb->root_off),
 	    (uint64_t)1, WT_NOLEVEL, &idb->root_page, &vstuff));
+
+	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
 	WT_ERR(__wt_verify_checkfrag(db, &vstuff));
 
@@ -592,18 +595,13 @@ __wt_verify_dsk_page(
 
 	/* Check the page type. */
 	switch (dsk->type) {
-	case WT_PAGE_FREE:
-		/*
-		 * Free pages are only written in diagnostic mode, and the
-		 * type is the only thing that can be verified about them.
-		 */
-		return (0);
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -625,11 +623,15 @@ __wt_verify_dsk_page(
 
 	/* Check the page level. */
 	switch (dsk->type) {
+	case WT_PAGE_FREELIST:
+	case WT_PAGE_OVFL:
+		if (dsk->level != WT_NOLEVEL)
+			goto err_level;
+		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_LEAF:
 		if (dsk->level != WT_LLEAF)
 			goto err_level;
@@ -674,8 +676,9 @@ err_level:		__wt_api_db_errx(db,
 	case WT_PAGE_COL_RLE:
 		WT_RET(__wt_verify_dsk_col_rle(db, dsk, addr, size));
 		break;
+	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
-		WT_RET(__wt_verify_dsk_ovfl(toc, dsk, addr, size));
+		WT_RET(__wt_verify_dsk_chunk(toc, dsk, addr, size));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -1171,7 +1174,7 @@ __wt_verify_overflow_common(WT_TOC *toc,
 	 * into two parts, on-disk format checking and internal checking,
 	 * just so it looks like all of the other page type checking.
 	 */
-	WT_ERR(__wt_verify_dsk_ovfl(toc, dsk, addr, size));
+	WT_ERR(__wt_verify_dsk_chunk(toc, dsk, addr, size));
 
 	/* Add the fragments. */
 	WT_ERR(__wt_verify_addfrag(toc, addr, size, vs));
@@ -1194,11 +1197,11 @@ err:	__wt_scr_release(&scratch1);
 }
 
 /*
- * __wt_verify_dsk_ovfl --
- *	Verify a WT_PAGE_OVFL disk page.
+ * __wt_verify_dsk_chunk --
+ *	Verify the WT_PAGE_FREELIST and WT_PAGE_OVFL disk pages.
  */
 static int
-__wt_verify_dsk_ovfl(
+__wt_verify_dsk_chunk(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	DB *db;
@@ -1207,21 +1210,26 @@ __wt_verify_dsk_ovfl(
 
 	db = toc->db;
 
+	/*
+	 * Overflow and freelist pages are roughly identical, both are simply
+	 * chunks of data.   This routine should also be used for any chunks
+	 * of data we store in the file in the future.
+	 */
 	if (dsk->u.datalen == 0) {
 		__wt_api_db_errx(db,
-		    "overflow page at addr %lu has no data", (u_long)addr);
+		    "%s page at addr %lu has no data",
+		    __wt_page_type_string(dsk), (u_long)addr);
 		return (WT_ERROR);
 	}
 
-	/* Any page data after the overflow record should be nul bytes. */
+	/* Any data after the data chunk should be nul bytes. */
 	p = (uint8_t *)dsk + (WT_PAGE_DISK_SIZE + dsk->u.datalen);
 	len = size - (WT_PAGE_DISK_SIZE + dsk->u.datalen);
 	for (; len > 0; ++p, --len)
 		if (*p != '\0') {
 			__wt_api_db_errx(db,
-			    "overflow page at addr %lu has non-zero trailing "
-			    "bytes",
-			    (u_long)addr);
+			    "%s page at addr %lu has non-zero trailing bytes",
+			    __wt_page_type_string(dsk), (u_long)addr);
 			return (WT_ERROR);
 		}
 
@@ -1268,6 +1276,23 @@ __wt_verify_delfmt(DB *db, uint32_t entry_num, uint32_t addr)
 	    "bytes",
 	    (u_long)entry_num, (u_long)addr);
 	return (WT_ERROR);
+}
+
+/*
+ * __wt_verify_freelist --
+ *	Add the freelist fragments to the list of verified fragments.
+ */
+static int
+__wt_verify_freelist(WT_TOC *toc, WT_VSTUFF *vs)
+{
+	IDB *idb;
+	WT_FREE_ENTRY *fe;
+
+	idb = toc->db->idb;
+
+	TAILQ_FOREACH(fe, &idb->freeqa, qa)
+		WT_RET(__wt_verify_addfrag(toc, fe->addr, fe->size, vs));
+	return (0);
 }
 
 /*

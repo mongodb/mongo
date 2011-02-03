@@ -55,6 +55,9 @@ __wt_bt_close(WT_TOC *toc)
 	/* There's no root page any more, kill the pointer to catch mistakes. */
 	idb->root_page.page = NULL;
 
+	/* Write out the free list. */
+	WT_TRET(__wt_block_write(toc));
+
 	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(env, idb->fh));
 	idb->fh = NULL;

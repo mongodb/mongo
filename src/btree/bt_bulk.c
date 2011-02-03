@@ -65,7 +65,7 @@ __wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
 	 * first sector, and this file extend makes sure we don't allocate it
 	 * as a table page.
 	 */
-	WT_RET(__wt_file_alloc(toc, &addr, 512));
+	WT_RET(__wt_block_alloc(toc, &addr, 512));
 
 	if (F_ISSET(idb, WT_COLUMN))
 		WT_DB_FCHK(db, "DB.bulk_load", flags, 0);
@@ -185,7 +185,7 @@ __wt_bulk_fix(WT_TOC *toc,
 			page->records = 0;
 			dsk->start_recno = insert_cnt;
 			WT_ERR(
-			    __wt_file_alloc(toc, &page->addr, db->leafmin));
+			    __wt_block_alloc(toc, &page->addr, db->leafmin));
 			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 		}
@@ -1302,7 +1302,7 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	/* Get a scratch buffer and make it look like an overflow page. */
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE + from->size, db->allocsize);
 	WT_RET(__wt_bulk_scratch_page(
-	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
+	    toc, size, WT_PAGE_OVFL, WT_NOLEVEL, &page, &tmp));
 	page->dsk->u.datalen = from->size;
 
 	/* Fill in the return information. */
@@ -1344,7 +1344,7 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 	/* Get a scratch buffer and make it look like our work page. */
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE + dbt->size, db->allocsize);
 	WT_ERR(__wt_bulk_scratch_page(
-	    toc, size, WT_PAGE_OVFL, WT_LLEAF, &page, &tmp));
+	    toc, size, WT_PAGE_OVFL, WT_NOLEVEL, &page, &tmp));
 
 	/* Fill in the return information. */
 	to->addr = page->addr;
@@ -1398,7 +1398,7 @@ __wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
 	page = tmp->data;
 	page->dsk = dsk =
 	    (WT_PAGE_DISK *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
-	WT_ERR(__wt_file_alloc(toc, &page->addr, page_size));
+	WT_ERR(__wt_block_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
 	dsk->type = (uint8_t)page_type;
 	dsk->level = (uint8_t)page_level;

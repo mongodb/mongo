@@ -126,24 +126,8 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	new->dsk->start_recno = dsk->start_recno;
 	new->dsk->type = dsk->type;
 	new->dsk->level = dsk->level;
-
-	/*
-	 * We increment the page LSN in non-transactional stores so it's easy to
-	 * to identify newer versions of pages during salvage: both pages are
-	 * likely to be internally consistent, and might have the same initial
-	 * and last keys, so we need a way to know the most recent state of the
-	 * page.  Alternatively, we could use the internal page reference, but
-	 * that means looking at the internal pages which I don't want to do,
-	 * and that's not quite as good anyway, because the internal page may
-	 * not have been written after the leaf page was updated.
-	 */
-	if (dsk->lsn[WT_LSN_OFF] == UINT32_MAX) {
-		new->dsk->lsn[WT_LSN_FILE] = dsk->lsn[WT_LSN_FILE] + 1;
-		new->dsk->lsn[WT_LSN_OFF] = 0;
-	} else {
-		new->dsk->lsn[WT_LSN_FILE] = dsk->lsn[WT_LSN_FILE];
-		new->dsk->lsn[WT_LSN_OFF] = dsk->lsn[WT_LSN_OFF] + 1;
-	}
+	new->dsk->lsn_file = dsk->lsn_file;
+	new->dsk->lsn_off = dsk->lsn_off;
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -173,7 +157,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_ERR(__wt_rec_page_write(toc, page, new));
 
 	/* Free the original page -- update the address and size. */
-	WT_ERR(__wt_file_free(toc, page->addr, page->size));
+	WT_ERR(__wt_block_free(toc, page->addr, page->size));
 
 	/*
 	 * Update the backing address.
@@ -207,7 +191,6 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL *cip;
 	WT_OFF *from;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	uint32_t i, space_avail;
 	uint8_t *first_free;
 
@@ -216,10 +199,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	WT_INDX_FOREACH(page, cip, i) {
-		if ((repl = WT_COL_REPL(page, cip)) != NULL)
-			from = WT_REPL_DATA(repl);
-		else
-			from = cip->data;
+		from = cip->data;
 
 		/*
 		 * XXX
@@ -255,7 +235,6 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_ITEM *key_item, *data_item, *next;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
@@ -265,29 +244,28 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
-	 * We have to walk both the WT_ROW structures as well as the original
-	 * page: the problem is keys that require processing.  When a page is
-	 * read into memory from a simple database, the WT_ROW key/size pair
-	 * is set to reference an on-page group of bytes in the key's WT_ITEM
-	 * structure.  As Btree keys are immutable, that original WT_ITEM is
-	 * usually what we want to write, and we can pretty easily find it by
-	 * moving to immediately before the on-page key.
+	 * We have to walk the original disk page as well as the current page:
+	 * the problem is keys that require processing.
 	 *
-	 * Keys that require processing are harder (for example, a Huffman
-	 * encoded key).  When we have to use a key that requires processing,
-	 * we process the key and set the WT_ROW key/size pair to reference
+	 * When a page is read into memory from a file, the WT_ROW is set to
+	 * reference an on-page group of bytes in the key and data WT_ITEM
+	 * structures.  As Btree keys are immutable, and the key's WT_OFF data
+	 * is updated in place, those original WT_ITEMs are usually what we
+	 * want write, and we can find them pretty easily.
+	 *
+	 * When we have to use a key that requires processing (for example, a
+	 * Huffman encoded key), we set the WT_ROW key/size pair to reference
 	 * the allocated memory that holds the key.  At that point we've lost
-	 * any reference to the original WT_ITEM structure, which is what we
-	 * want to re-write when reconciling the page.  We don't want to make
-	 * the WT_ROW structure bigger by another sizeof(void *) bytes, so we
-	 * walk the original page at the same time we walk the WT_PAGE array
-	 * when reconciling the page so we can find the original WT_ITEM.
+	 * any reference to the original WT_ITEM structure.
+	 *
+	 * We don't want grow the WT_ROW structure by another (void *) bytes,
+	 * so walk both the original page and the current WT_PAGE array when
+	 * reconciling the page so we can find the original WT_ITEM.
 	 */
 	key_item = WT_PAGE_BYTE(page);
 	WT_INDX_FOREACH(page, rip, i) {
 		/*
-		 * Copy the paired items off the old page into the new page; if
-		 * the page has been replaced, update its information.
+		 * Copy the paired items off the old page into the new page.
 		 *
 		 * XXX
 		 * Internal pages can't grow, yet, so we could more easily just
@@ -296,15 +274,12 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * grow.
 		 */
 		data_item = WT_ITEM_NEXT(key_item);
-		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-			memcpy(WT_ITEM_BYTE(data_item),
-			    WT_REPL_DATA(repl), sizeof(WT_OFF));
 		next = WT_ITEM_NEXT(data_item);
 		len = (uint32_t)((uint8_t *)next - (uint8_t *)key_item);
 
 		/*
 		 * XXX
-		 * We don't yet handle splits:  we allocated the maximum page
+		 * We don't yet handle splits: we allocated the maximum page
 		 * size, but it still wasn't enough.  We must allocate another
 		 * page and split the parent.
 		 */
@@ -318,7 +293,7 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		memcpy(first_free, key_item, len);
 		first_free += len;
 		space_avail -= len;
-		++dsk->u.entries;
+		dsk->u.entries += 2;
 
 		key_item = next;
 	}
@@ -626,15 +601,17 @@ static int
 __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
+	DB *db;
 	DBT *data, data_dbt;
 	WT_COL *cip;
-	WT_ITEM data_item;
-	WT_OVFL data_ovfl;
+	WT_ITEM data_item, *item;
+	WT_OVFL data_ovfl, *ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
+	db = toc->db;
 	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
@@ -648,7 +625,18 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data: it's either a replacement value
 		 * or the original on-page item.
 		 */
+		item = cip->data;
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+			/*
+			 * If we replaced an overflow item, we need to free the
+			 * file space used by the original.
+			 */
+			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL) {
+				ovfl = WT_ITEM_BYTE_OVFL(item);
+				WT_RET(__wt_block_free(toc, ovfl->addr,
+				    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
+			}
+
 			/*
 			 * Check for deletion, else build the data's WT_ITEM
 			 * chunk from the most recent replacement value.
@@ -666,8 +654,8 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			}
 			data_loc = DATA_OFF_PAGE;
 		} else {
-			data->data = cip->data;
-			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(cip->data));
+			data->data = item;
+			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
 			len = data->size;
 			data_loc = DATA_ON_PAGE;
 		}
@@ -719,7 +707,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	DB *db;
 	DBT *key, key_dbt, *data, data_dbt;
 	WT_ITEM key_item, data_item, *item;
-	WT_OVFL data_ovfl;
+	WT_OVFL data_ovfl, *ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_REPL *repl;
@@ -777,6 +765,19 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
+			/*
+			 * If we replaced an overflow item, we need to free the
+			 * file space used by the original.
+			 */
+			switch (WT_ITEM_TYPE(rip->data)) {
+			case WT_ITEM_DATA_OVFL:
+			case WT_ITEM_DATA_DUP_OVFL:
+				ovfl = WT_ITEM_BYTE_OVFL(rip->data);
+				WT_RET(__wt_block_free(toc, ovfl->addr,
+				    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
+			}
+
+			/* If this pair were deleted, we're done. */
 			if (WT_REPL_DELETED_ISSET(repl))
 				continue;
 
@@ -789,6 +790,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			WT_RET(__wt_item_build_data(
 			    toc, data, &data_item, &data_ovfl, 0));
 			data_loc = DATA_OFF_PAGE;
+
 		} else {
 			/* Copy the item off the page. */
 			data->data = rip->data;
@@ -885,6 +887,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
+	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
@@ -921,7 +924,7 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * The cache eviction server is the only thread allocating space
 		 * from the file, so there's no need to do any serialization.
 		 */
-		WT_RET(__wt_file_alloc(toc, &new->addr, new->size));
+		WT_RET(__wt_block_alloc(toc, &new->addr, new->size));
 
 		/*
 		 * Write the page to disk.
@@ -942,7 +945,7 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	/* Update the page's parent. */
 	if ((ret = __wt_rec_parent_update(toc, page, new)) != 0) {
-		(void)__wt_file_free(toc, new->addr, new->size);
+		(void)__wt_block_free(toc, new->addr, new->size);
 		return (ret);
 	}
 
@@ -968,6 +971,7 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	if (page->addr == idb->root_off.addr) {
 		  idb->root_off.addr = new->addr;
 		  idb->root_off.size = new->size;
+		  WT_RECORDS(&idb->root_off) = new->records;
 		  return (__wt_desc_write(toc));
 	 }
 

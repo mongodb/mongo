@@ -61,6 +61,8 @@ __wt_page_type_string(WT_PAGE_DISK *dsk)
 		return ("row-store internal");
 	case WT_PAGE_ROW_LEAF:
 		return ("row-store leaf");
+	case WT_PAGE_FREELIST:
+		return ("freelist");
 	default:
 		break;
 	}

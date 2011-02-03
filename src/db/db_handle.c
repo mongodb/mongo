@@ -77,7 +77,10 @@ __wt_idb_config(DB *db)
 	ienv = env->ienv;
 
 	idb->db = db;
-	idb->root_off.addr = idb->free_addr = WT_ADDR_INVALID;
+	idb->root_off.addr = idb->free_off.addr = WT_ADDR_INVALID;
+
+	TAILQ_INIT(&idb->freeqa);		/* Free queues */
+	TAILQ_INIT(&idb->freeqs);
 
 	__wt_lock(env, ienv->mtx);		/* Add to the ENV's list */
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);

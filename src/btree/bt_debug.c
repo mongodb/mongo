@@ -112,7 +112,7 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		    (unsigned long long)page->records,
 		    (unsigned long long)dsk->start_recno,
 		    (u_long)dsk->level, (u_long)dsk->u.entries,
-		    (u_long)dsk->lsn[0], (u_long)dsk->lsn[1]);
+		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	case WT_PAGE_OVFL:
 		fprintf(fp, "\tdata size %lu\n", (u_long)dsk->u.datalen);

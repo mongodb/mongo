@@ -48,6 +48,9 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 			WT_RET(__wt_root_pin(toc));
 	}
 
+	/* Read the free-list into memory. */
+	WT_RET(__wt_block_read(toc));
+
 	return (0);
 }
 

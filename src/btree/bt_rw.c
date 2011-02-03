@@ -74,6 +74,23 @@ __wt_page_disk_write(
 	fh = db->idb->fh;
 	stats = env->ienv->cache->stats;
 
+	/*
+	 * We increment the page LSN in non-transactional stores so it's easy
+	 * to identify newer versions of pages during salvage: both pages are
+	 * likely to be internally consistent, and might have the same initial
+	 * and last keys, so we need a way to know the most recent state of the
+	 * page.  Alternatively, we could check to see which leaf is referenced
+	 * by the internal page, which implies salvaging internal pages (which
+	 * I don't want to do), and it's not quite as good anyway, because the
+	 * internal page may not have been written to disk after the leaf page
+	 * was updated.
+	 */
+	if (dsk->lsn_off == UINT32_MAX) {
+		++dsk->lsn_file;
+		dsk->lsn_off = 0;
+	} else
+		++dsk->lsn_off;
+
 	WT_ASSERT(env, __wt_verify_dsk_page(toc, dsk, addr, size) == 0);
 
 	WT_STAT_INCR(stats, PAGE_WRITE);

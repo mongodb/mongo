@@ -404,9 +404,8 @@ struct __wt_page_disk {
 	 */
 	uint64_t start_recno;		/* 00-07: column-store starting recno */
 
-#define	WT_LSN_FILE	0		/* File is lsn[0], offset is lsn[1] */
-#define	WT_LSN_OFF	0
-	uint32_t lsn[2];		/* 08-15: LSN */
+	uint32_t lsn_file;		/* 08-11: LSN file */
+	uint32_t lsn_off;		/* 12-15: LSN file offset */
 
 	uint32_t checksum;		/* 16-19: checksum */
 
@@ -416,16 +415,16 @@ struct __wt_page_disk {
 	} u;
 
 #define	WT_PAGE_INVALID		 0	/* Invalid page */
-#define	WT_PAGE_FREE		 1	/* Page on the free list */
-#define	WT_PAGE_COL_FIX		 2	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		 3	/* Col store internal page */
-#define	WT_PAGE_COL_RLE		 4	/* Col store run-length encoded leaf */
-#define	WT_PAGE_COL_VAR		 5	/* Col store var-length leaf page */
-#define	WT_PAGE_DUP_INT		 6	/* Duplicate tree internal page */
-#define	WT_PAGE_DUP_LEAF	 7	/* Duplicate tree leaf page */
-#define	WT_PAGE_OVFL		 8	/* Overflow page */
-#define	WT_PAGE_ROW_INT		 9	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	10	/* Row-store leaf page */
+#define	WT_PAGE_COL_FIX		 1	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		 2	/* Col store internal page */
+#define	WT_PAGE_COL_RLE		 3	/* Col store run-length encoded leaf */
+#define	WT_PAGE_COL_VAR		 4	/* Col store var-length leaf page */
+#define	WT_PAGE_DUP_INT		 5	/* Duplicate tree internal page */
+#define	WT_PAGE_DUP_LEAF	 6	/* Duplicate tree leaf page */
+#define	WT_PAGE_OVFL		 7	/* Page of untyped data */
+#define	WT_PAGE_ROW_INT		 8	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	 9	/* Row-store leaf page */
+#define	WT_PAGE_FREELIST	10	/* Free-list page */
 	uint8_t type;			/* 24: page type */
 
 	/*

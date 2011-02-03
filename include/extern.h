@@ -4,9 +4,13 @@ __wt_curstd_init(WT_CURSOR_STD *stdc);
 void
 __wt_curstd_close(WT_CURSOR_STD *c);
 int
-__wt_file_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
+__wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
 int
-__wt_file_free(WT_TOC *toc, uint32_t addr, uint32_t size);
+__wt_block_free(WT_TOC *toc, uint32_t addr, uint32_t size);
+int
+__wt_block_read(WT_TOC *toc);
+int
+__wt_block_write(WT_TOC *toc);
 int
 __wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));

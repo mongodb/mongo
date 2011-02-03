@@ -61,6 +61,7 @@ idb_dstats = {}
 idb_dstats['BASE_RECNO'] = Stat([], 'base record number')
 idb_dstats['DUP_TREE'] = Stat([], 'duplicate data off-page trees')
 idb_dstats['FIXED_LEN'] = Stat([], 'database fixed-record size')
+idb_dstats['FREELIST_ENTRIES'] = Stat([], 'number of entries in the freelist')
 idb_dstats['INTLMAX'] = Stat([], 'maximum internal page size')
 idb_dstats['INTLMIN'] = Stat([], 'minimum internal page size')
 idb_dstats['ITEM_COL_DELETED'] = Stat([], 'column store deleted data items')
