@@ -9,14 +9,14 @@ OBJS=	bdb.o config.o t.o util.o wts.o
 
 all: t tags
 
-t: ${OBJS} ${LIB}
+t: ${OBJS} ${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 	cc -g -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB}
 
 clean:
 	rm -f t ${OBJS}
 	rm -f DUMP LOG flexlint.out memory.out
 
-realclean: clean
+distclean realclean: clean
 	rm -f __* *.core
 
 tags: ${SRCS}
@@ -26,7 +26,7 @@ bdb.o:
 	${CC} ${CFLAGS} -I${BDB} -c $< -o $@
 
 config.o t.o util.o wts.o:
-	${CC} ${CFLAGS} -I../../build_posix -I../../include  -c $< -o $@
+	${CC} ${CFLAGS} -I../../build_posix -I../include  -c $< -o $@
 
-${OBJS}: wts.h
+${OBJS}: ${SRCS} wts.h
 config.o: config.h
