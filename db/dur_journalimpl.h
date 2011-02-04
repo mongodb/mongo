@@ -50,8 +50,11 @@ namespace mongo {
             void cleanup();
 
         private:
-            // rotate after reaching this data size in a journal (j._<n>) file
-            static const unsigned long long DataLimit = 1 * 1024 * 1024 * 1024;
+            // Rotate after reaching this data size in a journal (j._<n>) file
+            // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
+            // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
+            // work.  (and should as-is)
+            static const unsigned long long DataLimit = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
 
             /** open a journal file to journal operations to. */
             void open();
