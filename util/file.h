@@ -116,7 +116,9 @@ namespace mongo {
 #else
 
     class File : public FileInterface {
+    public:
         int fd;
+    private:
         bool _bad;
         void err(bool ok) {
             if( !ok && !_bad ) {

@@ -203,6 +203,11 @@ namespace mongo {
                     // work anyway.
                     limit = 16 * 1024 * 1024;
                 }
+
+#if defined(POSIX_FADV_DONTNEED)
+		  posix_fadvise(f.fd, 0, limit, POSIX_FADV_DONTNEED);
+#endif
+
                 scoped_ptr<char> data( new char[SZ] );
                 for( fileofs o = 0; o < limit; o += SZ ) { 
                     f.write(o, data.get(), SZ);
