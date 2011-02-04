@@ -79,6 +79,9 @@ var jfiles = listFiles(path2 + "/journal");
 if (jfiles.length) {
     print("sleeping more waiting for mongod to stop");
     sleep(10000);
+    removeFile(path2 + "/journal/prealloc.0");
+    removeFile(path2 + "/journal/prealloc.1");
+    removeFile(path2 + "/journal/prealloc.2");
     jfiles = listFiles(path2 + "/journal");
 
     if (jfiles.length) {
