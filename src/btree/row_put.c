@@ -166,10 +166,10 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * check the total required space for this item.
 	 */
 	size = data == NULL ? 0 : data->size;
-	if (UINT32_MAX - size < sizeof(WT_REPL) + sizeof(uint32_t))
+	if (size > UINT32_MAX - (sizeof(WT_REPL) + sizeof(uint32_t)))
 		return (__wt_file_item_too_big(db));
 	align_size = WT_ALIGN(size + sizeof(WT_REPL), sizeof(uint32_t));
-	if (UINT32_MAX - align_size < sizeof(WT_TOC_UPDATE))
+	if (align_size > UINT32_MAX - sizeof(WT_TOC_UPDATE))
 		return (__wt_file_item_too_big(db));
 
 	/*

@@ -39,7 +39,7 @@ static WT_COLLATOR nocasecoll = { __compare_nocase };
  */
 typedef struct {
 	WT_COLLATOR iface;
-	int maxlen;
+	size_t maxlen;
 } PREFIX_COLLATOR;
 
 static int

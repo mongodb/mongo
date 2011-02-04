@@ -17,8 +17,8 @@ struct WT_CURSOR_STD {
 	void *valuebuf;
 	size_t valuebufsz;
 
-#define	WT_CURSTD_BADKEY	0x1
-#define	WT_CURSTD_BADVALUE	0x2
-#define	WT_CURSTD_RAW		0x4
+#define	WT_CURSTD_BADKEY	0x1U
+#define	WT_CURSTD_BADVALUE	0x2U
+#define	WT_CURSTD_RAW		0x4U
 	uint32_t flags;
 };
