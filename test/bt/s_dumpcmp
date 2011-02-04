@@ -1,5 +1,7 @@
 #! /bin/sh
 
+bdb=../../../db-4.8.26/build_unix
+
 colflag=0
 while :
 	do case "$1" in
@@ -18,11 +20,11 @@ if test $# -ne 0; then
 fi
 
 if test $colflag -eq 0; then
-	../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
+	$bdb/db_dump -p __wt.bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e 's/^ //' > __wt.bdb_dump
 else
-	../../db-4.8.26/build_unix/db_dump -p __wt.bdb |
+	$bdb/db_dump -p __wt.bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e 's/^ //' |
 	    sed -n \
