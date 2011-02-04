@@ -62,14 +62,14 @@ namespace mongo {
                   GENERIC_WRITE,
                   FILE_SHARE_READ,
                   NULL,
-                  CREATE_NEW, //OPEN_ALWAYS,
+                  OPEN_ALWAYS,
                   FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
                   NULL);
         if( _fd == INVALID_HANDLE_VALUE ) {
             DWORD e = GetLastError();
             uasserted(13518, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription(e));
         }
-        SetFilePointer(_fd, 0, 0, FILE_END);
+        SetFilePointer(_fd, 0, 0, FILE_BEGIN);
     }
 
     LogFile::~LogFile() {
@@ -104,9 +104,8 @@ namespace mongo {
 
     LogFile::LogFile(string name) : _name(name) {
         _fd = open(name.c_str(),
-                   O_APPEND
-                   | O_CREAT | O_EXCL
-                   | O_RDWR
+                   O_CREAT
+                   | O_WRONLY
 #if defined(O_DIRECT)
                    | O_DIRECT
 #endif
@@ -118,6 +117,7 @@ namespace mongo {
         if( _fd < 0 ) {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
+
     }
 
     LogFile::~LogFile() {

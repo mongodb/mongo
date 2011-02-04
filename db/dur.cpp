@@ -596,6 +596,8 @@ namespace mongo {
             }
         }
 
+        void preallocateFiles();
+
         /** at startup, recover, and then start the journal threads */
         void startup() {
             if( !cmdLine.dur )
@@ -611,6 +613,8 @@ namespace mongo {
                 log() << "exception during recovery" << endl;
                 throw;
             }
+
+            preallocateFiles();
 
             boost::thread t(durThread);
         }

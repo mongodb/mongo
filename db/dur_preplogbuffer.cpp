@@ -28,6 +28,7 @@
 #include "cmdline.h"
 #include "dur.h"
 #include "dur_journal.h"
+#include "dur_journalimpl.h"
 #include "dur_commitjob.h"
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
@@ -39,6 +40,8 @@ using namespace mongoutils;
 
 namespace mongo {
     namespace dur {
+
+        extern Journal j;
 
         RelativePath local = RelativePath::fromRelativePath("local");
 
@@ -124,6 +127,7 @@ namespace mongo {
             JSectHeader h;
             h.len = (unsigned) 0xffffffff;  // total length, will fill in later
             h.seqNumber = getLastDataFileFlushTime();
+            h.fileId = j.curFileId();
 
             bb.appendStruct(h);
         }

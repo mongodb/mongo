@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../util/concurrency/mvar.h"
+#include "../util/logfile.h"
 
 namespace mongo {
     namespace dur {
@@ -49,13 +49,15 @@ namespace mongo {
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
             void cleanup();
 
-        private:
             // Rotate after reaching this data size in a journal (j._<n>) file
             // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
             // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
             // work.  (and should as-is)
             static const unsigned long long DataLimit = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
 
+            unsigned long long curFileId() const { return _curFileId; }
+
+        private:
             /** open a journal file to journal operations to. */
             void open();
 
@@ -69,6 +71,7 @@ namespace mongo {
             mutex _curLogFileMutex;
 
             LogFile *_curLogFile; // use _curLogFileMutex
+            unsigned long long _curFileId; // current file id see JHeader::fileId
 
             struct JFile {
                 string filename;

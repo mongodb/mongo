@@ -42,10 +42,12 @@ namespace mongo {
 
     namespace dur {
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
-        BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 12 );
+        BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 20 );
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
         BOOST_STATIC_ASSERT( sizeof(LSNFile) == 88 );
+
+        void removeOldJournalFile(path p);
 
         filesystem::path getJournalDir() {
             filesystem::path p(dbpath);
@@ -75,9 +77,14 @@ namespace mongo {
             magic[0] = 'j'; magic[1] = '\n';
             _version = CurrentVersion;
             memset(ts, 0, sizeof(ts));
-            strncpy(ts, time_t_to_String_short(time(0)).c_str(), sizeof(ts)-1);
+            time_t t = time(0);
+            strncpy(ts, time_t_to_String_short(t).c_str(), sizeof(ts)-1);
             memset(dbpath, 0, sizeof(dbpath));
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
+            {
+                fileId = t&0xffffffff;
+                fileId |= ((unsigned long long)getRandomNumber()) << 32;
+            }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
             n1 = n2 = n3 = n4 = '\n';
@@ -94,6 +101,7 @@ namespace mongo {
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
+            _curFileId = 0;
             _preFlushTime = 0;
             _lastFlushTime = 0;
             _writeToLSNNeeded = false;
@@ -132,7 +140,7 @@ namespace mongo {
                     string fileName = boost::filesystem::path(*i).leaf();
                     if( str::startsWith(fileName, "j._") ) {
                         try {
-                            boost::filesystem::remove(*i);
+                            removeOldJournalFile(*i);
                         }
                         catch(std::exception& e) {
                             log() << "couldn't remove " << fileName << ' ' << e.what() << endl;
@@ -174,6 +182,75 @@ namespace mongo {
         }
         void journalCleanup() { j.cleanup(); }
 
+        void preallocateFiles() {
+            for( int i = 0; i <= 2; i++ ) {
+                string fn = str::stream() << "prealloc." << i;
+                filesystem::path filepath = getJournalDir() / fn;
+                File f;
+                f.open(filepath.string().c_str());
+                uassert(10000, str::stream() << "couldn't open " << filepath.string(), f.is_open());
+                if( f.len() )
+                    continue;
+
+                // preallocate
+                log() << "preallocating a journal file " << filepath.string() << endl;
+                const unsigned SZ = 1024 * 1024;
+                unsigned long long limit = Journal::DataLimit;
+                if( debug && i == 1 ) { 
+                    // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
+                    // case, so we force exercising here when _DEBUG is set by arbitrarily stopping prealloc at a low 
+                    // limit for a file.  also we want to be able to change in the future the constant without a lot of
+                    // work anyway.
+                    limit = 16 * 1024 * 1024;
+                }
+                scoped_ptr<char> data( new char[SZ] );
+                for( fileofs o = 0; o < limit; o += SZ ) { 
+                    f.write(o, data.get(), SZ);
+                    uassert(10000, str::stream() << "error writing to " << filepath.string(), !f.bad());
+                }
+            }
+        }
+
+        void removeOldJournalFile(path p) { 
+            try {
+                for( int i = 0; i <= 2; i++ ) {
+                    string fn = str::stream() << "prealloc." << i;
+                    filesystem::path filepath = getJournalDir() / fn;
+                    if( !filesystem::exists(filepath) ) {
+                        // we can recycle this file into this prealloc file location
+                        boost::filesystem::rename(p, filepath);
+                        return;
+                    }
+                }
+            } catch(...) { 
+                log() << "warning exception in dur::removeOldJournalFile " << p.string() << endl;
+                // fall through and try to delete the file
+            }
+
+            // already have 3 prealloc files, so delete this file
+            try {
+                boost::filesystem::remove(p);
+            }
+            catch(...) { 
+                log() << "warning exception removing " << p.string() << endl;
+            }
+        }
+
+        // find a prealloc.<n> file, presumably to take and use
+        path findPrealloced() { 
+            try {
+                for( int i = 0; i <= 2; i++ ) {
+                    string fn = str::stream() << "prealloc." << i;
+                    filesystem::path filepath = getJournalDir() / fn;
+                    if( filesystem::exists(filepath) )
+                        return filepath;
+                }
+            } catch(...) { 
+                log() << "warning exception in dur::findPrealloced()" << endl;
+            }
+            return path();
+        }
+
         /** assure journal/ dir exists. throws. call during startup. */
         void journalMakeDir() {
             j.init();
@@ -193,12 +270,37 @@ namespace mongo {
         }
 
         void Journal::_open() {
+            _curFileId = 0;
             assert( _curLogFile == 0 );
-            string fname = getFilePathFor(_nextFileNumber).string();
-            _curLogFile = new LogFile(fname);
+            path fname = getFilePathFor(_nextFileNumber);
+
+            // if we have a prealloced file, use it 
+            {
+                path p = findPrealloced();
+                if( !p.empty() ) { 
+                    try { 
+                        {
+                            // JHeader::fileId must be updated before renaming to be race-safe
+                            LogFile f(p.string());
+                            JHeader h(p.string());
+                            AlignedBuilder b(8192);
+                            b.appendStruct(h);
+                            f.synchronousAppend(b.buf(), b.len());
+                        }
+                        boost::filesystem::rename(p, fname);
+                    }
+                    catch(...) { 
+                        log() << "warning couldn't write to / rename file " << p.string() << endl;
+                    }
+                }
+            }
+
+            _curLogFile = new LogFile(fname.string());
             _nextFileNumber++;
             {
-                JHeader h(fname);
+                JHeader h(fname.string());
+                _curFileId = h.fileId;
+                assert(_curFileId);
                 AlignedBuilder b(8192);
                 b.appendStruct(h);
                 _curLogFile->synchronousAppend(b.buf(), b.len());
@@ -334,8 +436,7 @@ namespace mongo {
                     // eligible for deletion
                     path p( f.filename );
                     log() << "old journal file will be removed: " << f.filename << endl;
-
-                    remove(p);
+                    removeOldJournalFile(p);
                 }
                 else {
                     break;
