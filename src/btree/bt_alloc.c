@@ -230,6 +230,7 @@ __wt_block_read(WT_TOC *toc)
 	int ret;
 
 	idb = toc->db->idb;
+	ret = 0;
 
 	/* Make sure there's a free-list to read. */
 	if (idb->free_off.addr == WT_ADDR_INVALID)
@@ -239,7 +240,7 @@ __wt_block_read(WT_TOC *toc)
 	WT_RET(__wt_scr_alloc(toc, idb->free_off.size, &tmp));
 
 	/* Read in the free-list. */
-	WT_RET(__wt_page_disk_read(
+	WT_ERR(__wt_page_disk_read(
 	    toc, tmp->data, idb->free_off.addr, idb->free_off.size));
 
 	/* Insert the free-list items into the linked list. */
@@ -250,7 +251,7 @@ __wt_block_read(WT_TOC *toc)
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
-	return (0);
+	return (ret);
 }
 
 /*
