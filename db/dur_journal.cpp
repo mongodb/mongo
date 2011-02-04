@@ -213,6 +213,9 @@ namespace mongo {
                     f.write(o, data.get(), SZ);
                     uassert(13641, str::stream() << "error writing to " << filepath.string(), !f.bad());
                 }
+
+		// perhaps not necessary but will make the logging and behavior more readily understood
+		f.fsync();
             }
         }
 
