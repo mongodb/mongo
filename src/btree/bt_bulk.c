@@ -150,7 +150,7 @@ __wt_bulk_fix(WT_TOC *toc,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
-		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
+		WT_STAT_INCR(idb->stats, FILE_ITEMS_INSERTED);
 
 		/*
 		 * If doing run-length encoding, check to see if this record
@@ -163,7 +163,6 @@ __wt_bulk_fix(WT_TOC *toc,
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
 				++page->records;
-				WT_STAT_INCR(idb->stats, REPEAT_COUNT);
 				continue;
 			}
 
@@ -312,7 +311,7 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
-		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
+		WT_STAT_INCR(idb->stats, FILE_ITEMS_INSERTED);
 
 		/*
 		 * We don't have a key to store on the page if we're building a
@@ -374,7 +373,7 @@ skip_read:	/*
 			    WT_ITEM_TYPE(&data_item) == WT_ITEM_DATA ?
 			    WT_ITEM_DATA_DUP : WT_ITEM_DATA_DUP_OVFL);
 
-			WT_STAT_INCR(idb->stats, DUPLICATE_ITEMS_INSERTED);
+			WT_STAT_INCR(idb->stats, FILE_DUPLICATE_ITEMS_INSERTED);
 
 			key = NULL;
 		} else {
@@ -726,8 +725,8 @@ __wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 			    db, "zero-length keys are not supported");
 			return (WT_ERROR);
 		}
-		WT_STAT_INCR(idb->stats, ITEMS_INSERTED);
-		WT_STAT_INCR(idb->stats, DUPLICATE_ITEMS_INSERTED);
+		WT_STAT_INCR(idb->stats, FILE_ITEMS_INSERTED);
+		WT_STAT_INCR(idb->stats, FILE_DUPLICATE_ITEMS_INSERTED);
 
 		/* Loading duplicates, so a key change means we're done. */
 		if (lastkey->size != key->size ||
@@ -1194,20 +1193,19 @@ __wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 		    &toc->key.data, &toc->key.mem_size, &toc->key.size));
 		if (toc->key.size > dbt->size)
 			WT_STAT_INCRV(stats,
-			    HUFFMAN_KEY, toc->key.size - dbt->size);
+			    FILE_HUFFMAN_KEY, toc->key.size - dbt->size);
 		dbt->data = toc->key.data;
 		dbt->size = toc->key.size;
 	}
 
 	/* Create an overflow object if the data won't fit. */
 	if (dbt->size > db->leafitemsize) {
-		WT_STAT_INCR(stats, OVERFLOW_KEY);
-
 		WT_RET(__wt_bulk_ovfl_write(toc, dbt, ovfl));
 
 		dbt->data = ovfl;
 		dbt->size = sizeof(*ovfl);
 		WT_ITEM_SET(item, WT_ITEM_KEY_OVFL, dbt->size);
+		WT_STAT_INCR(stats, FILE_OVERFLOW_KEY);
 	} else
 		WT_ITEM_SET(item, WT_ITEM_KEY, dbt->size);
 	return (0);
@@ -1262,7 +1260,7 @@ __wt_item_build_data(
 		    &toc->data.data, &toc->data.mem_size, &toc->data.size));
 		if (toc->data.size > dbt->size)
 			WT_STAT_INCRV(stats,
-			    HUFFMAN_DATA, toc->data.size - dbt->size);
+			    FILE_HUFFMAN_DATA, toc->data.size - dbt->size);
 		dbt->data = toc->data.data;
 		dbt->size = toc->data.size;
 	}
@@ -1275,7 +1273,7 @@ __wt_item_build_data(
 		dbt->size = sizeof(*ovfl);
 		WT_ITEM_SET_TYPE(item, LF_ISSET(WT_IS_DUP) ?
 		    WT_ITEM_DATA_DUP_OVFL : WT_ITEM_DATA_OVFL);
-		WT_STAT_INCR(stats, OVERFLOW_DATA);
+		WT_STAT_INCR(stats, FILE_OVERFLOW_DATA);
 	}
 
 	WT_ITEM_SET_LEN(item, dbt->size);

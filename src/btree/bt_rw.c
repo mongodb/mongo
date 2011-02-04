@@ -20,16 +20,16 @@ __wt_page_disk_read(
 	DB *db;
 	ENV *env;
 	WT_FH *fh;
-	WT_STATS *stats;
 	off_t offset;
 	uint32_t checksum;
 
 	db = toc->db;
 	env = toc->env;
 	fh = db->idb->fh;
-	stats = env->ienv->cache->stats;
 
-	WT_STAT_INCR(stats, PAGE_READ);
+
+	WT_STAT_INCR(db->idb->stats, FILE_PAGE_READ);
+	WT_STAT_INCR(env->ienv->cache->stats, CACHE_PAGE_READ);
 
 	offset = WT_ADDR_TO_OFF(db, addr);
 	WT_RET(__wt_read(env, fh, offset, size, dsk));
@@ -67,12 +67,11 @@ __wt_page_disk_write(
 	DB *db;
 	ENV *env;
 	WT_FH *fh;
-	WT_STATS *stats;
 
 	db = toc->db;
 	env = toc->env;
 	fh = db->idb->fh;
-	stats = env->ienv->cache->stats;
+
 
 	/*
 	 * We increment the page LSN in non-transactional stores so it's easy
@@ -93,7 +92,8 @@ __wt_page_disk_write(
 
 	WT_ASSERT(env, __wt_verify_dsk_page(toc, dsk, addr, size) == 0);
 
-	WT_STAT_INCR(stats, PAGE_WRITE);
+	WT_STAT_INCR(db->idb->stats, FILE_PAGE_WRITE);
+	WT_STAT_INCR(env->ienv->cache->stats, CACHE_PAGE_WRITE);
 
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, size);

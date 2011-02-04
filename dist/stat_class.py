@@ -29,30 +29,32 @@ ienv_stats['WORKQ_YIELD'] = Stat([], 'workQ yields')
 # Cache handle statistics
 ##########################################
 cache_stats = {}
-cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes in the cache')
-cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
-cache_stats['CACHE_EVICT_HAZARD'] = Stat([], 'pages selected for eviction not evicted because of a hazard reference')
-cache_stats['CACHE_EVICT_MODIFIED'] = Stat([], 'modified pages selected for eviction')
-cache_stats['CACHE_EVICT_UNMODIFIED'] = Stat([], 'unmodified pages selected for eviction')
-cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'pages in the cache')
-cache_stats['OVERFLOW_READ'] = Stat([], 'overflow pages read from the file')
-cache_stats['PAGE_READ'] = Stat([], 'pages read from a file')
-cache_stats['PAGE_WRITE'] = Stat([], 'pages written to a file')
+cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'cache: bytes currently held in the cache')
+cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'cache: maximum bytes configured')
+cache_stats['CACHE_EVICT_HAZARD'] = Stat([], 'cache: pages selected for eviction not evicted because of a hazard reference')
+cache_stats['CACHE_EVICT_MODIFIED'] = Stat([], 'cache: modified pages selected for eviction')
+cache_stats['CACHE_EVICT_UNMODIFIED'] = Stat([], 'cache: unmodified pages selected for eviction')
+cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'cache: pages currently held in the cache')
+cache_stats['CACHE_OVERFLOW_READ'] = Stat([], 'cache: overflow pages read from the file')
+cache_stats['CACHE_PAGE_READ'] = Stat([], 'cache: pages read from a file')
+cache_stats['CACHE_PAGE_WRITE'] = Stat([], 'cache: pages written to a file')
 
 ##########################################
 # IDB handle statistics
 ##########################################
 idb_stats = {}
-idb_stats['DB_ALLOC'] = Stat([], 'database allocations')
-idb_stats['DB_ALLOC_FILE'] = Stat([], 'database extensions')
-idb_stats['DB_FREE'] = Stat([], 'database frees')
-idb_stats['DUPLICATE_ITEMS_INSERTED'] = Stat([], 'duplicate key/data pairs inserted')
-idb_stats['HUFFMAN_DATA'] = Stat([], 'huffman data compression in bytes')
-idb_stats['HUFFMAN_KEY'] = Stat([], 'huffman key compression in bytes')
-idb_stats['ITEMS_INSERTED'] = Stat([], 'key/data pairs inserted')
-idb_stats['OVERFLOW_DATA'] = Stat([], 'overflow data items inserted')
-idb_stats['OVERFLOW_KEY'] = Stat([], 'overflow key items inserted')
-idb_stats['REPEAT_COUNT'] = Stat([], 'repeat value compression count')
+idb_stats['FILE_ALLOC'] = Stat([], 'file: block allocations')
+idb_stats['FILE_DUPLICATE_ITEMS_INSERTED'] = Stat([], 'file: duplicate key/data pairs inserted')
+idb_stats['FILE_EXTEND'] = Stat([], 'file: block allocations require file extension')
+idb_stats['FILE_FREE'] = Stat([], 'file: block frees')
+idb_stats['FILE_HUFFMAN_DATA'] = Stat([], 'file: huffman data compression in bytes')
+idb_stats['FILE_HUFFMAN_KEY'] = Stat([], 'file: huffman key compression in bytes')
+idb_stats['FILE_ITEMS_INSERTED'] = Stat([], 'file: key/data pairs inserted')
+idb_stats['FILE_OVERFLOW_DATA'] = Stat([], 'file: overflow data items inserted')
+idb_stats['FILE_OVERFLOW_KEY'] = Stat([], 'file: overflow key items inserted')
+idb_stats['FILE_OVERFLOW_READ'] = Stat([], 'file: overflow pages read from the file')
+idb_stats['FILE_PAGE_READ'] = Stat([], 'file: pages read from a file')
+idb_stats['FILE_PAGE_WRITE'] = Stat([], 'file: pages written to a file')
 
 ##########################################
 # IDB database statistics

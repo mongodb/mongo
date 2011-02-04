@@ -30,7 +30,7 @@ __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 
 	WT_ASSERT(env, size % db->allocsize == 0);
 
-	WT_STAT_INCR(idb->stats, DB_ALLOC);
+	WT_STAT_INCR(idb->stats, FILE_ALLOC);
 
 	TAILQ_FOREACH(fe, &idb->freeqa, qa) {
 		if (fe->size < size)
@@ -99,7 +99,7 @@ __wt_block_extend(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 	*addrp = WT_OFF_TO_ADDR(db, fh->file_size);
 	fh->file_size += size;
 
-	WT_STAT_INCR(idb->stats, DB_ALLOC_FILE);
+	WT_STAT_INCR(idb->stats, FILE_EXTEND);
 }
 
 /*
@@ -123,7 +123,7 @@ __wt_block_free(WT_TOC *toc, uint32_t addr, uint32_t size)
 
 	WT_ASSERT(env, size % db->allocsize == 0);
 
-	WT_STAT_INCR(stats, DB_FREE);
+	WT_STAT_INCR(stats, FILE_FREE);
 	++idb->freelist_entries;
 
 	/* Allocate memory for the new entry. */

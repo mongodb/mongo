@@ -9,20 +9,23 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 
 	WT_RET(__wt_calloc(env, 10, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
+	stats[WT_STAT_CACHE_BYTES_INUSE].desc =
+	    "cache: bytes currently held in the cache";
 	stats[WT_STAT_CACHE_BYTES_MAX].desc =
-	    "maximum bytes configured for the cache";
+	    "cache: maximum bytes configured";
 	stats[WT_STAT_CACHE_EVICT_HAZARD].desc =
-	    "pages selected for eviction not evicted because of a hazard reference";
+	    "cache: pages selected for eviction not evicted because of a hazard reference";
 	stats[WT_STAT_CACHE_EVICT_MODIFIED].desc =
-	    "modified pages selected for eviction";
+	    "cache: modified pages selected for eviction";
 	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].desc =
-	    "unmodified pages selected for eviction";
-	stats[WT_STAT_CACHE_PAGES_INUSE].desc = "pages in the cache";
-	stats[WT_STAT_OVERFLOW_READ].desc =
-	    "overflow pages read from the file";
-	stats[WT_STAT_PAGE_READ].desc = "pages read from a file";
-	stats[WT_STAT_PAGE_WRITE].desc = "pages written to a file";
+	    "cache: unmodified pages selected for eviction";
+	stats[WT_STAT_CACHE_OVERFLOW_READ].desc =
+	    "cache: overflow pages read from the file";
+	stats[WT_STAT_CACHE_PAGES_INUSE].desc =
+	    "cache: pages currently held in the cache";
+	stats[WT_STAT_CACHE_PAGE_READ].desc = "cache: pages read from a file";
+	stats[WT_STAT_CACHE_PAGE_WRITE].desc =
+	    "cache: pages written to a file";
 
 	*statsp = stats;
 	return (0);
@@ -34,9 +37,9 @@ __wt_stat_clear_cache_stats(WT_STATS *stats)
 	stats[WT_STAT_CACHE_EVICT_HAZARD].v = 0;
 	stats[WT_STAT_CACHE_EVICT_MODIFIED].v = 0;
 	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].v = 0;
-	stats[WT_STAT_OVERFLOW_READ].v = 0;
-	stats[WT_STAT_PAGE_READ].v = 0;
-	stats[WT_STAT_PAGE_WRITE].v = 0;
+	stats[WT_STAT_CACHE_OVERFLOW_READ].v = 0;
+	stats[WT_STAT_CACHE_PAGE_READ].v = 0;
+	stats[WT_STAT_CACHE_PAGE_WRITE].v = 0;
 }
 
 int
@@ -120,19 +123,28 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 11, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_DB_ALLOC].desc = "database allocations";
-	stats[WT_STAT_DB_ALLOC_FILE].desc = "database extensions";
-	stats[WT_STAT_DB_FREE].desc = "database frees";
-	stats[WT_STAT_DUPLICATE_ITEMS_INSERTED].desc =
-	    "duplicate key/data pairs inserted";
-	stats[WT_STAT_HUFFMAN_DATA].desc = "huffman data compression in bytes";
-	stats[WT_STAT_HUFFMAN_KEY].desc = "huffman key compression in bytes";
-	stats[WT_STAT_ITEMS_INSERTED].desc = "key/data pairs inserted";
-	stats[WT_STAT_OVERFLOW_DATA].desc = "overflow data items inserted";
-	stats[WT_STAT_OVERFLOW_KEY].desc = "overflow key items inserted";
-	stats[WT_STAT_REPEAT_COUNT].desc = "repeat value compression count";
+	stats[WT_STAT_FILE_ALLOC].desc = "file: block allocations";
+	stats[WT_STAT_FILE_DUPLICATE_ITEMS_INSERTED].desc =
+	    "file: duplicate key/data pairs inserted";
+	stats[WT_STAT_FILE_EXTEND].desc =
+	    "file: block allocations require file extension";
+	stats[WT_STAT_FILE_FREE].desc = "file: block frees";
+	stats[WT_STAT_FILE_HUFFMAN_DATA].desc =
+	    "file: huffman data compression in bytes";
+	stats[WT_STAT_FILE_HUFFMAN_KEY].desc =
+	    "file: huffman key compression in bytes";
+	stats[WT_STAT_FILE_ITEMS_INSERTED].desc =
+	    "file: key/data pairs inserted";
+	stats[WT_STAT_FILE_OVERFLOW_DATA].desc =
+	    "file: overflow data items inserted";
+	stats[WT_STAT_FILE_OVERFLOW_KEY].desc =
+	    "file: overflow key items inserted";
+	stats[WT_STAT_FILE_OVERFLOW_READ].desc =
+	    "file: overflow pages read from the file";
+	stats[WT_STAT_FILE_PAGE_READ].desc = "file: pages read from a file";
+	stats[WT_STAT_FILE_PAGE_WRITE].desc = "file: pages written to a file";
 
 	*statsp = stats;
 	return (0);
@@ -141,16 +153,18 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 void
 __wt_stat_clear_db_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_DB_ALLOC].v = 0;
-	stats[WT_STAT_DB_ALLOC_FILE].v = 0;
-	stats[WT_STAT_DB_FREE].v = 0;
-	stats[WT_STAT_DUPLICATE_ITEMS_INSERTED].v = 0;
-	stats[WT_STAT_HUFFMAN_DATA].v = 0;
-	stats[WT_STAT_HUFFMAN_KEY].v = 0;
-	stats[WT_STAT_ITEMS_INSERTED].v = 0;
-	stats[WT_STAT_OVERFLOW_DATA].v = 0;
-	stats[WT_STAT_OVERFLOW_KEY].v = 0;
-	stats[WT_STAT_REPEAT_COUNT].v = 0;
+	stats[WT_STAT_FILE_ALLOC].v = 0;
+	stats[WT_STAT_FILE_DUPLICATE_ITEMS_INSERTED].v = 0;
+	stats[WT_STAT_FILE_EXTEND].v = 0;
+	stats[WT_STAT_FILE_FREE].v = 0;
+	stats[WT_STAT_FILE_HUFFMAN_DATA].v = 0;
+	stats[WT_STAT_FILE_HUFFMAN_KEY].v = 0;
+	stats[WT_STAT_FILE_ITEMS_INSERTED].v = 0;
+	stats[WT_STAT_FILE_OVERFLOW_DATA].v = 0;
+	stats[WT_STAT_FILE_OVERFLOW_KEY].v = 0;
+	stats[WT_STAT_FILE_OVERFLOW_READ].v = 0;
+	stats[WT_STAT_FILE_PAGE_READ].v = 0;
+	stats[WT_STAT_FILE_PAGE_WRITE].v = 0;
 }
 
 int

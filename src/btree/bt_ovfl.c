@@ -18,12 +18,11 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 {
 	DB *db;
 	ENV *env;
-	WT_STATS *stats;
 	uint32_t size;
 
 	env = toc->env;
 	db = toc->db;
-	stats = env->ienv->cache->stats;
+
 
 	/*
 	 * Read an overflow page, using an overflow structure from a page for
@@ -36,7 +35,8 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 	WT_VERBOSE(env, WT_VERB_READ, (env,
 	    "overflow read addr/size %lu/%lu",
 	    (u_long)ovfl->addr, (u_long)ovfl->size));
-	WT_STAT_INCR(stats, OVERFLOW_READ);
+	WT_STAT_INCR(db->idb->stats, FILE_OVERFLOW_READ);
+	WT_STAT_INCR(env->ienv->cache->stats, CACHE_OVERFLOW_READ);
 
 	/*
 	 * The only caller that wants a copy of the overflow pages (as opposed

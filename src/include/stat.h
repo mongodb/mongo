@@ -47,10 +47,10 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_EVICT_HAZARD		    2
 #define	WT_STAT_CACHE_EVICT_MODIFIED		    3
 #define	WT_STAT_CACHE_EVICT_UNMODIFIED		    4
-#define	WT_STAT_CACHE_PAGES_INUSE		    5
-#define	WT_STAT_OVERFLOW_READ			    6
-#define	WT_STAT_PAGE_READ			    7
-#define	WT_STAT_PAGE_WRITE			    8
+#define	WT_STAT_CACHE_OVERFLOW_READ		    5
+#define	WT_STAT_CACHE_PAGES_INUSE		    6
+#define	WT_STAT_CACHE_PAGE_READ			    7
+#define	WT_STAT_CACHE_PAGE_WRITE		    8
 
 /*
  * Statistics entries for DB/IDB database.
@@ -86,16 +86,18 @@ struct __wt_stats {
 /*
  * Statistics entries for DB/IDB handle.
  */
-#define	WT_STAT_DB_ALLOC			    0
-#define	WT_STAT_DB_ALLOC_FILE			    1
-#define	WT_STAT_DB_FREE				    2
-#define	WT_STAT_DUPLICATE_ITEMS_INSERTED	    3
-#define	WT_STAT_HUFFMAN_DATA			    4
-#define	WT_STAT_HUFFMAN_KEY			    5
-#define	WT_STAT_ITEMS_INSERTED			    6
-#define	WT_STAT_OVERFLOW_DATA			    7
-#define	WT_STAT_OVERFLOW_KEY			    8
-#define	WT_STAT_REPEAT_COUNT			    9
+#define	WT_STAT_FILE_ALLOC			    0
+#define	WT_STAT_FILE_DUPLICATE_ITEMS_INSERTED	    1
+#define	WT_STAT_FILE_EXTEND			    2
+#define	WT_STAT_FILE_FREE			    3
+#define	WT_STAT_FILE_HUFFMAN_DATA		    4
+#define	WT_STAT_FILE_HUFFMAN_KEY		    5
+#define	WT_STAT_FILE_ITEMS_INSERTED		    6
+#define	WT_STAT_FILE_OVERFLOW_DATA		    7
+#define	WT_STAT_FILE_OVERFLOW_KEY		    8
+#define	WT_STAT_FILE_OVERFLOW_READ		    9
+#define	WT_STAT_FILE_PAGE_READ			   10
+#define	WT_STAT_FILE_PAGE_WRITE			   11
 
 /*
  * Statistics entries for ENV/IENV handle.
