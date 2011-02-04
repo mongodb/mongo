@@ -188,7 +188,7 @@ namespace mongo {
                 filesystem::path filepath = getJournalDir() / fn;
                 File f;
                 f.open(filepath.string().c_str());
-                uassert(10000, str::stream() << "couldn't open " << filepath.string(), f.is_open());
+                uassert(13640, str::stream() << "couldn't open " << filepath.string(), f.is_open());
                 if( f.len() )
                     continue;
 
@@ -206,7 +206,7 @@ namespace mongo {
                 scoped_ptr<char> data( new char[SZ] );
                 for( fileofs o = 0; o < limit; o += SZ ) { 
                     f.write(o, data.get(), SZ);
-                    uassert(10000, str::stream() << "error writing to " << filepath.string(), !f.bad());
+                    uassert(13641, str::stream() << "error writing to " << filepath.string(), !f.bad());
                 }
             }
         }
