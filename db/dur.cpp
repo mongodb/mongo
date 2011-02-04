@@ -91,6 +91,7 @@ namespace mongo {
                        "journaledMB" << _journaledBytes / 1000000.0 <<
                        "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
                        "commitsInWriteLock" << _commitsInWriteLock <<
+                       "earlyCommits" << _earlyCommits << 
                        "timeMs" <<
                        BSON( "dt" << _dtMillis <<
                              "prepLogBuffer" << (unsigned) (_prepLogBufferMicros/1000) <<
@@ -161,6 +162,7 @@ namespace mongo {
         }
 
         bool DurableImpl::commitNow() {
+            stats.curr->_earlyCommits++;
             groupCommit();
             return true;
         }
@@ -210,8 +212,10 @@ namespace mongo {
 #if defined(_DEBUG)
             commitJob._nSinceCommitIfNeededCall = 0;
 #endif
-            if (commitJob.bytes() > UncommittedBytesLimit) // should this also fire if CmdLine::DurAlwaysCommit?
+            if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
+                stats.curr->_earlyCommits++;
                 groupCommit();
+            }
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
@@ -581,8 +585,10 @@ namespace mongo {
 
         void releasingWriteLock() {
             try {
-                if (commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit)
+                if (commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit) {
+                    stats.curr->_earlyCommits++;
                     groupCommit();
+                }
             }
             catch(std::exception& e) {
                 log() << "exception in dur::releasingWriteLock causing immediate shutdown: " << e.what() << endl;

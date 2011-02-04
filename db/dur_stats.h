@@ -16,6 +16,7 @@ namespace mongo {
                 void reset();
 
                 unsigned _commits;
+                unsigned _earlyCommits; // count of early commits from commitIfNeeded() or from getDur().commitNow()
                 unsigned long long _journaledBytes;
                 unsigned long long _writeToDataFilesBytes;
 
