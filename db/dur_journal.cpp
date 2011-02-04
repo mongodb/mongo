@@ -194,7 +194,7 @@ namespace mongo {
 
                 // preallocate
                 log() << "preallocating a journal file " << filepath.string() << endl;
-                const unsigned SZ = 1024 * 1024;
+                const unsigned BLKSZ = 1024 * 1024;
                 unsigned long long limit = Journal::DataLimit;
                 if( debug && i == 1 ) { 
                     // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
@@ -208,10 +208,14 @@ namespace mongo {
 		posix_fadvise(f.fd, 0, limit, POSIX_FADV_DONTNEED);
 #endif
 
-                scoped_ptr<char> data( new char[SZ] );
-                for( fileofs o = 0; o < limit; o += SZ ) { 
-                    f.write(o, data.get(), SZ);
+                scoped_ptr<char> data( new char[BLKSZ] );
+                for( fileofs o = 0; o < limit; o += BLKSZ ) { 
+                    f.write(o, data.get(), BLKSZ);
                     uassert(13641, str::stream() << "error writing to " << filepath.string(), !f.bad());
+		    if( o % 128*BLKSZ == 0 ) { 
+		      // in case DONTNEED above isn't available, or is not smart on a given OS
+		      f.fsync();
+		    }
                 }
 
 		// perhaps not necessary but will make the logging and behavior more readily understood
