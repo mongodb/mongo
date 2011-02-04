@@ -365,7 +365,7 @@ namespace mongo {
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) {
-                bool abruptEnd = processFile(files[i]);
+	      /*bool abruptEnd = */processFile(files[i]);
                 /*if( abruptEnd && i+1 < files.size() ) {
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();
