@@ -15,7 +15,7 @@ struct WT_CONFIG
 	const char *cur;
 
 	int depth, top;
-	void **go;
+	int8_t *go;
 };
 
 struct WT_CONFIG_ITEM

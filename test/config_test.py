@@ -14,7 +14,7 @@ def parse(s):
         ret = config.config_next(c, k, v)
 
     # XXX hard-coding WT_NOTFOUND until we fix this
-    if ret != -10001:
+    if ret != -31801:
         print "Last call to config_next failed with %d" % ret
 
 if __name__ == '__main__':

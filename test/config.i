@@ -1,7 +1,7 @@
 %module config
 
 %{
-#include <wt_int.h>
+#include <wt_internal.h>
 %}
 
 typedef struct WT_CONFIG WT_CONFIG;
