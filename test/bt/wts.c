@@ -32,21 +32,25 @@ wts_startup(int logfile)
 	int ret;
 	char *p;
 
-	if (g.wts_log != NULL) {
-		(void)fclose(g.wts_log);
-		g.wts_log = NULL;
-	}
 	if (logfile) {
+		if (g.wts_log != NULL) {
+			(void)fclose(g.wts_log);
+			g.wts_log = NULL;
+		}
+
 		p = fname("log");
 		if ((g.wts_log = fopen(p, "w")) == NULL) {
 			fprintf(stderr,
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
+	}
+
+	if (g.wts_log != NULL) {
 		fprintf(
 		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
 		(void)time(&now);
-		fprintf(g.wts_log, "%s", ctime(&now));
+		fprintf(g.wts_log, "WT startup: %s", ctime(&now));
 		fprintf(
 		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
 	}
@@ -138,8 +142,18 @@ void
 wts_teardown()
 {
 	WT_TOC *toc;
+	time_t now;
 
 	toc = g.wts_toc;
+
+	if (g.wts_log != NULL) {
+		fprintf(
+		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+		(void)time(&now);
+		fprintf(g.wts_log, "WT teardown: %s", ctime(&now));
+		fprintf(
+		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+	}
 
 	assert(wts_sync() == 0);
 	assert(toc->close(toc, 0) == 0);

@@ -103,9 +103,19 @@ main(int argc, char *argv[])
 
 			if (wts_ops())		/* Random operations */
 				goto err;
+
+			if (wts_verify())	/* Verify the database */
+				goto err;
+
+			wts_teardown();		/* Close and  re-open */
+			if (wts_startup(0))
+				goto err;
+
+			if (wts_verify())	/* Verify the database */
+				goto err;
 		}
 
-skip_ops:	if (wts_stats())		/* Optional statistics */
+skip_ops:	if (wts_stats())		/* Statistics */
 			goto err;
 						/* Close the databases */
 		track("shutting down BDB", (u_int64_t)0);
