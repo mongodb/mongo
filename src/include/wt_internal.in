@@ -56,7 +56,6 @@ struct __wt_toc_update;		typedef struct __wt_toc_update WT_TOC_UPDATE;
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
