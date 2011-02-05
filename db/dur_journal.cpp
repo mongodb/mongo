@@ -182,19 +182,19 @@ namespace mongo {
         }
         void journalCleanup() { j.cleanup(); }
 
-        void preallocateFiles() {
+        // throws
+        void _preallocateFiles() {
             for( int i = 0; i <= 2; i++ ) {
                 string fn = str::stream() << "prealloc." << i;
                 filesystem::path filepath = getJournalDir() / fn;
-                File f;
-                f.open(filepath.string().c_str());
-                uassert(13640, str::stream() << "couldn't open " << filepath.string(), f.is_open());
-                if( f.len() )
+
+                if( exists(filepath) ) 
                     continue;
 
-                // preallocate
-                log() << "preallocating a journal file " << filepath.string() << endl;
                 const unsigned BLKSZ = 1024 * 1024;
+                log() << "preallocating a journal file " << filepath.string() << endl;
+                LogFile f(filepath.string());
+                AlignedBuilder b(BLKSZ);
                 unsigned long long limit = Journal::DataLimit;
                 if( debug && i == 1 ) { 
                     // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
@@ -203,23 +203,17 @@ namespace mongo {
                     // work anyway.
                     limit = 16 * 1024 * 1024;
                 }
-
-#if defined(POSIX_FADV_DONTNEED)
-		posix_fadvise(f.fd, 0, limit, POSIX_FADV_DONTNEED);
-#endif
-
-                scoped_ptr<char> data( new char[BLKSZ] );
-                for( fileofs o = 0; o < limit; o += BLKSZ ) { 
-                    f.write(o, data.get(), BLKSZ);
-                    uassert(13641, str::stream() << "error writing to " << filepath.string(), !f.bad());
-		    if( o % 128*BLKSZ == 0 ) { 
-		      // in case DONTNEED above isn't available, or is not smart on a given OS
-		      f.fsync();
-		    }
+                for( unsigned long long x = 0; x < limit; x += BLKSZ ) { 
+                    f.synchronousAppend(b.buf(), BLKSZ);
                 }
-
-		// perhaps not necessary but will make the logging and behavior more readily understood
-		f.fsync();
+            }
+        }
+        void preallocateFiles() {
+            try {
+                _preallocateFiles();
+            }
+            catch(...) { 
+                log() << "warning caught exception in preallocateFiles, continuing" << endl;
             }
         }
 
