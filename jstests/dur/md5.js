@@ -85,7 +85,7 @@ log("run mongod again recovery should fail");
 exitCode = runMongoProgram( "mongod", "--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", /*9*/13 );
 
 if (exitCode != 100 && exitCode != 14) {
-    print("\n\n\nFAIL md5.js exitCode: " + exitCode + "\n\n\n");
+    print("\n\n\nFAIL md5.js expected mongod to fail but didn't? mongod exitCode: " + exitCode + "\n\n\n");
     // sleep a little longer to get more output maybe
     sleep(2000);
     assert(false);
