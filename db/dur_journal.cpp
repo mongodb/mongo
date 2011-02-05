@@ -47,6 +47,8 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
         BOOST_STATIC_ASSERT( sizeof(LSNFile) == 88 );
 
+        bool _preallocateIsFaster = false;
+
         void removeOldJournalFile(path p);
 
         filesystem::path getJournalDir() {
@@ -182,6 +184,37 @@ namespace mongo {
         }
         void journalCleanup() { j.cleanup(); }
 
+        bool preallocateIsFaster() {
+            bool faster = false;
+            filesystem::path p = getJournalDir() / "tempLatencyTest";
+            try { remove(p); } catch(...) { }
+            try {
+                AlignedBuilder b(8192);
+                int millis[2];
+                const int N = 100;
+                for( int pass = 0; pass < 2; pass++ ) {
+                    LogFile f(p.string());
+                    Timer t;
+                    for( int i = 0 ; i < N; i++ ) { 
+                        f.synchronousAppend(b.buf(), 8192);
+                    }
+                    millis[pass] = t.millis();
+                    // second time through, file exists and is prealloc case
+                }
+                int diff = millis[0] - millis[1];
+                if( diff > 2 * N ) {
+                    // at least 2ms faster for prealloc case?
+                    faster = true;
+                    log() << "preallocateIsFaster=true " << diff / (1.0*N) << endl;
+                }
+            }
+            catch(...) {
+                log() << "info preallocateIsFaster couldn't run; returning false" << endl;
+            }
+            try { remove(p); } catch(...) { }
+            return faster;
+        }
+
         // throws
         void preallocateFile(filesystem::path p, unsigned long long len) {
             if( exists(p) ) 
@@ -215,6 +248,10 @@ namespace mongo {
         }
 
         void preallocateFiles() {
+            _preallocateIsFaster = preallocateIsFaster();
+            if( !_preallocateIsFaster )
+                return;
+
             try {
                 _preallocateFiles();
             }
@@ -224,19 +261,21 @@ namespace mongo {
         }
 
         void removeOldJournalFile(path p) { 
-            try {
-                for( int i = 0; i <= 2; i++ ) {
-                    string fn = str::stream() << "prealloc." << i;
-                    filesystem::path filepath = getJournalDir() / fn;
-                    if( !filesystem::exists(filepath) ) {
-                        // we can recycle this file into this prealloc file location
-                        boost::filesystem::rename(p, filepath);
-                        return;
+            if( _preallocateIsFaster ) {
+                try {
+                    for( int i = 0; i <= 2; i++ ) {
+                        string fn = str::stream() << "prealloc." << i;
+                        filesystem::path filepath = getJournalDir() / fn;
+                        if( !filesystem::exists(filepath) ) {
+                            // we can recycle this file into this prealloc file location
+                            boost::filesystem::rename(p, filepath);
+                            return;
+                        }
                     }
+                } catch(...) { 
+                    log() << "warning exception in dur::removeOldJournalFile " << p.string() << endl;
+                    // fall through and try to delete the file
                 }
-            } catch(...) { 
-                log() << "warning exception in dur::removeOldJournalFile " << p.string() << endl;
-                // fall through and try to delete the file
             }
 
             // already have 3 prealloc files, so delete this file
