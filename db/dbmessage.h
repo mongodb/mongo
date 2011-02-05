@@ -63,7 +63,7 @@ namespace mongo {
     */
     class DbMessage {
     public:
-        DbMessage(const Message& _m) : m(_m) {
+        DbMessage(const Message& _m) : m(_m) , mark(0) {
             // for received messages, Message has only one buffer
             theEnd = _m.singleData()->_data + _m.header()->dataLen();
             char *r = _m.singleData()->_data;
@@ -93,6 +93,16 @@ namespace mongo {
 
         int getQueryNToReturn() const {
             return getInt( 1 );
+        }
+
+        /**
+         * get an int64 at specified offsetBytes after ns
+         */
+        long long getInt64( int offsetBytes ) const {
+            const char * x = afterNS();
+            x += offsetBytes;
+            const long long * ll = (const long long*)x;
+            return ll[0];
         }
 
         void resetPull() { nextjsobj = data; }
@@ -156,6 +166,7 @@ namespace mongo {
         }
 
         void markReset() {
+            assert( mark );
             nextjsobj = mark;
         }
 
