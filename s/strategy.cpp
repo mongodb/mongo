@@ -49,8 +49,10 @@ namespace mongo {
         ShardConnection dbcon( shard , r.getns() );
         DBClientBase &c = dbcon.conn();
 
+        string actualServer;
+
         Message response;
-        bool ok = c.call( r.m(), response);
+        bool ok = c.call( r.m(), response, true , &actualServer );
         uassert( 10200 , "mongos: error calling db", ok );
 
         {
@@ -61,7 +63,7 @@ namespace mongo {
             }
         }
 
-        r.reply( response , c.getServerAddress() );
+        r.reply( response , actualServer.size() ? actualServer : c.getServerAddress() );
         dbcon.done();
     }
 

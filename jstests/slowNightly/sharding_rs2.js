@@ -93,7 +93,7 @@ db.getLastError( 3 , 10000 );
 
 assert.eq( 100 , ts.count() , "B4" )
 assert.eq( 100 , ts.find().itcount() , "B5" )
-//assert.eq( 100 , ts.find().batchSize(5).itcount() , "B6" )
+assert.eq( 100 , ts.find().batchSize(5).itcount() , "B6" )
 
 // --- sharded ----
 
