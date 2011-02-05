@@ -310,6 +310,30 @@ namespace mongo {
         return true;
     }
 
+    BSONElement ClientCursor::getFieldDotted( const string& name , bool * fromKey ) {
+
+        map<string,int>::const_iterator i = _indexedFields.find( name );
+        if ( i == _indexedFields.end() ) {
+            if ( fromKey )
+                *fromKey = false;
+            return current().getFieldDotted( name );
+        }
+        
+        int x = i->second;
+
+        BSONObjIterator it( currKey() );
+        while ( x && it.more() ) {
+            it.next();
+            x--;
+        }
+        assert( x == 0 );
+
+        if ( fromKey )
+            *fromKey = true;
+        return it.next();
+    }
+
+
     /* call when cursor's location changes so that we can update the
        cursorsbylocation map.  if you are locked and internally iterating, only
        need to call when you are ready to "unlock".
