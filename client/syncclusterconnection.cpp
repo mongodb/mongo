@@ -313,7 +313,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool SyncClusterConnection::call( Message &toSend, Message &response, bool assertOk ) {
+    bool SyncClusterConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         uassert( 8006 , "SyncClusterConnection::call can only be used directly for dbQuery" ,
                  toSend.operation() == dbQuery );
 
@@ -323,8 +323,11 @@ namespace mongo {
         for ( size_t i=0; i<_conns.size(); i++ ) {
             try {
                 bool ok = _conns[i]->call( toSend , response , assertOk );
-                if ( ok )
+                if ( ok ) {
+                    if ( actualServer )
+                        *actualServer = _connAddresses[i];
                     return ok;
+                }
                 log() << "call failed to: " << _conns[i]->toString() << " no data" << endl;
             }
             catch ( ... ) {

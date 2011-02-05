@@ -526,7 +526,7 @@ namespace mongo {
     }
 
 
-    bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk ) {
+    bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( toSend.operation() == dbQuery ) {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm( toSend );
@@ -534,10 +534,15 @@ namespace mongo {
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
                 for ( int i=0; i<2; i++ ) {
                     try {
-                        return checkSlave()->call( toSend , response , assertOk );
+                        DBClientConnection* s = checkSlave();
+                        if ( actualServer )
+                            *actualServer = s->getServerAddress();
+                        return s->call( toSend , response , assertOk );
                     }
                     catch ( DBException & ) {
                         log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                        if ( actualServer )
+                            *actualServer = "";
                     }
                 }
             }

@@ -127,7 +127,7 @@ namespace mongo {
         virtual string getServerAddress() const {
             return "localhost"; // TODO: should this have the port?
         }
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend ) {
             // don't need to piggy back when connected locally
