@@ -68,15 +68,16 @@ stopMongod(30001, /*signal*/9);
 // Bit flip the first byte of the md5sum contained within the opcode footer.
 // This ensures we get an md5 exception instead of some other type of exception.
 var file = path + "/journal/j._0";
-//run("cp", file, "/tmp/before");
-//fuzzFile(file, 39755);
+
+// if test fails, uncomment these "cp" lines to debug:
+// run("cp", file, "/tmp/before");
 
 // journal header is 8192
-// jsectheader is 12
+// jsectheader is 20
 // so a little beyond that
-fuzzFile(file, 8214);
+fuzzFile(file, 8214+8);
 
-//run("cp", file, "/tmp/after");
+// run("cp", file, "/tmp/after");
 
 log("run mongod again recovery should fail");
 
