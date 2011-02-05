@@ -359,7 +359,7 @@ namespace mongo {
         }
 
         BSONObj info;
-        uassert( 13053 , "help failed" , _commandOnActive( "admin" , BSON( name << "1" << "help" << 1 ) , info ) );
+        uassert( 13053 , str::stream() << "help failed: " << info , _commandOnActive( "admin" , BSON( name << "1" << "help" << 1 ) , info ) );
 
         int lockType = info["lockType"].numberInt();
 
