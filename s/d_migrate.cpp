@@ -264,6 +264,8 @@ namespace mongo {
         }
 
         void done() {
+            readlock lk( _ns );
+
             _deleted.clear();
             _reload.clear();
             _cloneLocs.clear();
@@ -461,9 +463,10 @@ namespace mongo {
             }
 
             if ( isLargeChunk ) {
-                errmsg = str::stream() << "can't move chunk of size (aprox) " << recCount * avgRecSize
-                         << " because maximum size allowed to move is " << maxChunkSize;
-                log( LL_WARNING ) << errmsg << endl;
+                warning() << "can't move chunk of size (aprox) " << recCount * avgRecSize
+                          << " because maximum size allowed to move is " << maxChunkSize
+                          << " ns: " << _ns << " " << _min << " -> " << _max
+                          << endl;
                 return false;
             }
 
