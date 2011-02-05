@@ -522,7 +522,7 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::killCursor( long long cursorID ) {
-        checkMaster()->killCursor( cursorID );
+        assert(0);
     }
 
 
