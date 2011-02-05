@@ -183,18 +183,25 @@ namespace mongo {
         void journalCleanup() { j.cleanup(); }
 
         // throws
+        void preallocateFile(filesystem::path p, unsigned long long len) {
+            if( exists(p) ) 
+                return;
+
+            const unsigned BLKSZ = 1024 * 1024;
+            log() << "preallocating a journal file " << p.string() << endl;
+            LogFile f(p.string());
+            AlignedBuilder b(BLKSZ);
+            for( unsigned long long x = 0; x < len; x += BLKSZ ) { 
+                f.synchronousAppend(b.buf(), BLKSZ);
+            }
+        }
+
+        // throws
         void _preallocateFiles() {
             for( int i = 0; i <= 2; i++ ) {
                 string fn = str::stream() << "prealloc." << i;
                 filesystem::path filepath = getJournalDir() / fn;
 
-                if( exists(filepath) ) 
-                    continue;
-
-                const unsigned BLKSZ = 1024 * 1024;
-                log() << "preallocating a journal file " << filepath.string() << endl;
-                LogFile f(filepath.string());
-                AlignedBuilder b(BLKSZ);
                 unsigned long long limit = Journal::DataLimit;
                 if( debug && i == 1 ) { 
                     // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
@@ -203,11 +210,10 @@ namespace mongo {
                     // work anyway.
                     limit = 16 * 1024 * 1024;
                 }
-                for( unsigned long long x = 0; x < limit; x += BLKSZ ) { 
-                    f.synchronousAppend(b.buf(), BLKSZ);
-                }
+                preallocateFile(filepath, limit);
             }
         }
+
         void preallocateFiles() {
             try {
                 _preallocateFiles();
