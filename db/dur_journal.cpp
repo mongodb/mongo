@@ -47,7 +47,7 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(JEntry) == 12 );
         BOOST_STATIC_ASSERT( sizeof(LSNFile) == 88 );
 
-        bool _preallocateIsFaster = false;
+        bool usingPreallocate = false;
 
         void removeOldJournalFile(path p);
 
@@ -248,20 +248,21 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            _preallocateIsFaster = preallocateIsFaster();
-            if( !_preallocateIsFaster )
-                return;
-
-            try {
-                _preallocateFiles();
-            }
-            catch(...) { 
-                log() << "warning caught exception in preallocateFiles, continuing" << endl;
+            if( preallocateIsFaster() ||
+                exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
+                exists(getJournalDir()/"prealloc.1") ) {
+                    usingPreallocate = true;
+                    try {
+                        _preallocateFiles();
+                    }
+                    catch(...) { 
+                        log() << "warning caught exception in preallocateFiles, continuing" << endl;
+                    }
             }
         }
 
         void removeOldJournalFile(path p) { 
-            if( _preallocateIsFaster ) {
+            if( usingPreallocate ) {
                 try {
                     for( int i = 0; i <= 2; i++ ) {
                         string fn = str::stream() << "prealloc." << i;
