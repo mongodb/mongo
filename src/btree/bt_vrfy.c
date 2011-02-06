@@ -1106,31 +1106,34 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 
 	/* Walk the in-memory page, verifying overflow items. */
 	WT_INDX_FOREACH(page, rip, i) {
-		item = rip->key;
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_KEY_DUP_OVFL:
-			WT_RET(__wt_verify_overflow_common(
-			    toc, WT_ITEM_BYTE_OVFL(item),
-			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
-			break;
-		default:
-			break;
+		if (!WT_ROW_INDX_IS_DUPLICATE(page, rip)) {
+			item = rip->key;
+			switch (WT_ITEM_TYPE(item)) {
+			case WT_ITEM_KEY_OVFL:
+			case WT_ITEM_KEY_DUP_OVFL:
+				WT_RET(__wt_verify_overflow_common(
+				    toc, WT_ITEM_BYTE_OVFL(item),
+				    WT_ROW_SLOT(page, rip) + 1, page->addr,
+				    vs));
+				break;
+			default:
+				break;
+			}
 		}
 
-		if (!check_data)
-			continue;
-
-		item = rip->data;
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DATA_DUP_OVFL:
-			WT_RET(__wt_verify_overflow_common(
-			    toc, WT_ITEM_BYTE_OVFL(item),
-			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
-			break;
-		default:
-			break;
+		if (check_data) {
+			item = rip->data;
+			switch (WT_ITEM_TYPE(item)) {
+			case WT_ITEM_DATA_OVFL:
+			case WT_ITEM_DATA_DUP_OVFL:
+				WT_RET(__wt_verify_overflow_common(
+				    toc, WT_ITEM_BYTE_OVFL(item),
+				    WT_ROW_SLOT(page, rip) + 1, page->addr,
+				    vs));
+				break;
+			default:
+				break;
+			}
 		}
 	}
 	return (0);
