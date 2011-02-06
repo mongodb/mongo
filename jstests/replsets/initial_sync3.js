@@ -30,11 +30,8 @@ replTest.initiate({
 
 var master = replTest.getMaster();
 
-
 print("Initial sync");
 master.getDB("foo").bar.baz.insert({x:1});
-
-replTest.awaitReplication();
 
 print("Make sure everyone's secondary");
 wait(function() {
@@ -56,5 +53,35 @@ wait(function() {
     
   });
 
+replTest.awaitReplication();
+
 replTest.stopSet();
 
+print("reconfig");
+
+var rs2 = new ReplSetTest( {name: 'reconfig-isync3', nodes: 3} );
+rs2.startSet();
+rs2.initiate();
+
+master = rs2.getMaster();
+var config = master.getDB("local").system.replset.findOne();
+config.version++;
+config.members[0].initialSync = {state : 2};
+config.members[1].initialSync = {state : 1};
+try {
+    master.getDB("admin").runCommand({replSetReconfig : config});
+}
+catch(e) {
+    print("trying to reconfigure: "+e);
+}
+
+master = rs2.getMaster();
+config = master.getDB("local").system.replset.findOne();
+
+assert(typeof(config.members[0].initialSync) == "object");
+assert.eq(config.members[0].initialSync.state, 2);
+assert.eq(config.members[1].initialSync.state, 1);
+
+rs2.stopSet();
+
+print("initialSync3 success!");
