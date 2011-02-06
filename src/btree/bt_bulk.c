@@ -1290,33 +1290,34 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 {
 	DB *db;
 	DBT *tmp;
-	WT_PAGE *page;
 	uint32_t size;
 	int ret;
 
 	db = toc->db;
 	tmp = NULL;
 
-	/* Get a scratch buffer and make it look like an overflow page. */
+	/* Get a scratch buffer of the appropriate size. */
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE + from->size, db->allocsize);
-	WT_RET(__wt_bulk_scratch_page(
-	    toc, size, WT_PAGE_OVFL, WT_NOLEVEL, &page, &tmp));
-	page->dsk->u.datalen = from->size;
+	WT_RET(__wt_scr_alloc(toc, size, &tmp));
 
-	/* Fill in the return information. */
-	to->addr = page->addr;
+	/*
+	 * Fill in the return information.
+	 *
+	 * We don't run the pages through the cache -- that means passing a lot
+	 * of messages we don't want to bother with.  We're the only user of the
+	 * file, which means we can grab file space whenever we want.
+	 */
+	WT_ERR(__wt_block_alloc(toc, &to->addr, size));
 	to->size = from->size;
 
 	/*
-	 * Read the page into our scratch buffer, then write it out to the
-	 * new location.
+	 * Read the overflow page into our scratch buffer and write it out to
+	 * the new location, without change.
 	 */
-	if ((ret =
-	    __wt_page_disk_read(toc, page->dsk, from->addr, from->size)) == 0)
-		ret =
-		    __wt_page_disk_write(toc, page->dsk, to->addr, from->size);
+	if ((ret = __wt_page_disk_read(toc, tmp->data, from->addr, size)) == 0)
+		ret = __wt_page_disk_write(toc, tmp->data, to->addr, size);
 
-	__wt_scr_release(&tmp);
+err:	__wt_scr_release(&tmp);
 
 	return (ret);
 }
