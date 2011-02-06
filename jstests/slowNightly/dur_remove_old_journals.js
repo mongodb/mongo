@@ -34,13 +34,19 @@ sleep(sleepSecs*1000);
 files = listFiles(PATH + "/journal")
 printjson(files);
 
-assert.eq(2, files.length); // j._2 and lsn
-
-files.forEach(function(file){
-    assert.eq('string', typeof(file.name));    // sanity checking
-
-    assert(!(/j\._[01]/.test(file.name)), "Old journal file still exists: " + file.name);
+var nfiles = 0;
+files.forEach(function (file) {
+    assert.eq('string', typeof (file.name));    // sanity checking
+    if (/prealloc/.test(file.name)) {
+        ;
+    }
+    else {
+        nfiles++;
+        assert(!(/j\._[01]/.test(file.name)), "Old journal file still exists: " + file.name);
+    }
 })
+
+assert.eq(2, nfiles); // j._2 and lsn
 
 stopMongod(30001);
 
