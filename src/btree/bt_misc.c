@@ -77,24 +77,24 @@ const char *
 __wt_item_type_string(WT_ITEM *item)
 {
 	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_KEY:
-		return ("key");
-	case WT_ITEM_KEY_OVFL:
-		return ("key-overflow");
-	case WT_ITEM_KEY_DUP:
-		return ("key-duplicate");
-	case WT_ITEM_KEY_DUP_OVFL:
-		return ("key-duplicate-overflow");
 	case WT_ITEM_DATA:
 		return ("data");
-	case WT_ITEM_DATA_OVFL:
-		return ("data-overflow");
 	case WT_ITEM_DATA_DUP:
 		return ("data-duplicate");
 	case WT_ITEM_DATA_DUP_OVFL:
 		return ("data-duplicate-overflow");
+	case WT_ITEM_DATA_OVFL:
+		return ("data-overflow");
 	case WT_ITEM_DEL:
 		return ("deleted");
+	case WT_ITEM_KEY:
+		return ("key");
+	case WT_ITEM_KEY_DUP:
+		return ("key-duplicate");
+	case WT_ITEM_KEY_DUP_OVFL:
+		return ("key-duplicate-overflow");
+	case WT_ITEM_KEY_OVFL:
+		return ("key-overflow");
 	case WT_ITEM_OFF:
 		return ("off-page");
 	default:
