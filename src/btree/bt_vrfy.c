@@ -1108,9 +1108,17 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_INDX_FOREACH(page, rip, i) {
 		if (!WT_ROW_INDX_IS_DUPLICATE(page, rip)) {
 			item = rip->key;
+
+			/*
+			 * WT_ITEM_DATA_XXX types are listed because the data
+			 * items for off-page duplicate trees are sorted, and
+			 * the WT_ROW "key" item actually reference data items.
+			 */
 			switch (WT_ITEM_TYPE(item)) {
-			case WT_ITEM_KEY_OVFL:
+			case WT_ITEM_DATA_DUP_OVFL:
+			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_KEY_DUP_OVFL:
+			case WT_ITEM_KEY_OVFL:
 				WT_RET(__wt_verify_overflow_common(
 				    toc, WT_ITEM_BYTE_OVFL(item),
 				    WT_ROW_SLOT(page, rip) + 1, page->addr,
