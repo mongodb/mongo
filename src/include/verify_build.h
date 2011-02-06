@@ -43,10 +43,11 @@ __wt_verify_build(void)
 	 */
 	STATIC_ASSERT(sizeof(WT_COL) == WT_COL_SIZE);
 	STATIC_ASSERT(sizeof(WT_ITEM) == WT_ITEM_SIZE);
-	STATIC_ASSERT(sizeof(WT_PAGE) == WT_PAGE_SIZE);
 	STATIC_ASSERT(sizeof(WT_OFF) == WT_OFF_SIZE);
 	STATIC_ASSERT(sizeof(WT_OVFL) == WT_OVFL_SIZE);
+	STATIC_ASSERT(sizeof(WT_PAGE) == WT_PAGE_SIZE);
 	STATIC_ASSERT(sizeof(WT_PAGE_DESC) == WT_PAGE_DESC_SIZE);
+	STATIC_ASSERT(sizeof(WT_ROW) == WT_ROW_SIZE);
 
 	/*
 	 * The page header is special: the compiler will pad it to a multiple
