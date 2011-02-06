@@ -600,11 +600,14 @@ namespace mongo {
 
                 jsval myarray = OBJECT_TO_JSVAL( array );
 
-                for ( int i=0; i<n; i++ ) {
-                    jsval v = toval( embed[i] );
-                    assert( JS_SetElement( _context , array , i , &v ) );
+                int i=0;
+                BSONObjIterator it(embed);
+                while(it.more()) {
+                    BSONElement e = it.next();
+                    jsval v = toval( e );
+                    assert( JS_SetElement( _context , array , i++ , &v ) );
                 }
-
+                
                 return myarray;
             }
             case jstOID: {
