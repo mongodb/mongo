@@ -93,23 +93,32 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
 	switch (dsk->type) {
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
 		fprintf(fp,
-		    "\tstarting recno %llu, level %lu, entries %lu, "
+		    "%s page: starting recno %llu, level %lu, entries %lu, "
 		    "lsn %lu/%lu\n",
+		    __wt_page_type_string(dsk),
 		    (unsigned long long)dsk->start_recno,
 		    (u_long)dsk->level, (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		fprintf(fp,
+		    "%s page: level %lu, entries %lu, lsn %lu/%lu\n",
+		    __wt_page_type_string(dsk),
+		    (u_long)dsk->level, (u_long)dsk->u.entries,
+		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
+		break;
 	case WT_PAGE_OVFL:
-		fprintf(fp, "\tdata size %lu\n", (u_long)dsk->u.datalen);
+		fprintf(fp, "%s page: data size %lu, lsn %lu/%lu\n",
+		    __wt_page_type_string(dsk), (u_long)dsk->u.datalen,
+		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
