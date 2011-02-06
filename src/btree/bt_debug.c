@@ -14,16 +14,15 @@ static void __wt_debug_dsk_col_fix(DB *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(DB *, WT_PAGE_DISK *, FILE *);
 static int  __wt_debug_dsk_item(WT_TOC *, WT_PAGE_DISK *, FILE *);
-static void __wt_debug_inmem_col_fix(WT_TOC *, WT_PAGE *, FILE *);
-static void __wt_debug_inmem_col_int(WT_PAGE *, FILE *);
-static void __wt_debug_inmem_col_rle(WT_TOC *, WT_PAGE *, FILE *);
-static int  __wt_debug_inmem_col_var(WT_TOC *, WT_PAGE *, FILE *);
-static void __wt_debug_inmem_row_int(WT_PAGE *, FILE *);
-static int  __wt_debug_inmem_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
+static void __wt_debug_page_col_fix(WT_TOC *, WT_PAGE *, FILE *);
+static void __wt_debug_page_col_int(WT_PAGE *, FILE *);
+static void __wt_debug_page_col_rle(WT_TOC *, WT_PAGE *, FILE *);
+static int  __wt_debug_page_col_var(WT_TOC *, WT_PAGE *, FILE *);
+static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
+static int  __wt_debug_page_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
 static int  __wt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_debug_off(WT_OFF *, const char *, FILE *);
-static void __wt_debug_page_hdr(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_debug_pair(const char *, void *, uint32_t, FILE *);
 static void __wt_debug_repl(WT_REPL *, FILE *);
 static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
@@ -79,23 +78,19 @@ __wt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_debug_page --
- *	Dump a page in debugging mode.
+ * __wt_debug_disk --
+ *	Dump a disk page in debugging mode.
  */
 int
-__wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
+__wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
 {
-	WT_PAGE_DISK *dsk;
 	DB *db;
 	int do_close, ret;
 
 	db = toc->db;
-	dsk = page->dsk;
 	ret = 0;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
-
-	__wt_debug_page_hdr(toc, page, fp);
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
@@ -107,9 +102,8 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_INT:
 		fprintf(fp,
-		    "\trecords %llu, starting recno %llu, level %lu, "
-		    "entries %lu, lsn %lu/%lu\n",
-		    (unsigned long long)page->records,
+		    "\tstarting recno %llu, level %lu, entries %lu, "
+		    "lsn %lu/%lu\n",
 		    (unsigned long long)dsk->start_recno,
 		    (u_long)dsk->level, (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
@@ -141,8 +135,6 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		break;
 	}
 
-	fprintf(fp, "}\n");
-
 	if (do_close)
 		(void)fclose(fp);
 
@@ -150,11 +142,11 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem --
+ * __wt_debug_page --
  *	Dump the in-memory information for a page.
  */
 int
-__wt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
+__wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	DB *db;
 	int do_close;
@@ -163,29 +155,33 @@ __wt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
-	__wt_debug_page_hdr(toc, page, fp);
+	fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu, records %llu\n",
+	    (u_long)page->addr,
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
+	    __wt_page_type_string(page->dsk), (u_long)page->size,
+	    (unsigned long long)page->records);
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_FIX:
-		__wt_debug_inmem_col_fix(toc, page, fp);
+		__wt_debug_page_col_fix(toc, page, fp);
 		break;
 	case WT_PAGE_COL_INT:
-		__wt_debug_inmem_col_int(page, fp);
+		__wt_debug_page_col_int(page, fp);
 		break;
 	case WT_PAGE_COL_RLE:
-		__wt_debug_inmem_col_rle(toc, page, fp);
+		__wt_debug_page_col_rle(toc, page, fp);
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_debug_inmem_col_var(toc, page, fp));
+		WT_RET(__wt_debug_page_col_var(toc, page, fp));
 		break;
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_debug_inmem_row_leaf(toc, page, fp));
+		WT_RET(__wt_debug_page_row_leaf(toc, page, fp));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		__wt_debug_inmem_row_int(page, fp);
+		__wt_debug_page_row_int(page, fp);
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -201,11 +197,11 @@ __wt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem_col_fix --
+ * __wt_debug_page_col_fix --
  *	Dump an in-memory WT_PAGE_COL_FIX page.
  */
 static void
-__wt_debug_inmem_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_REPL *repl;
@@ -230,11 +226,11 @@ __wt_debug_inmem_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem_col_int --
+ * __wt_debug_page_col_int --
  *	Dump an in-memory WT_PAGE_COL_INT page.
  */
 static void
-__wt_debug_inmem_col_int(WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	uint32_t i;
@@ -247,11 +243,11 @@ __wt_debug_inmem_col_int(WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem_col_rle --
+ * __wt_debug_page_col_rle --
  *	Dump an in-memory WT_PAGE_COL_RLE page.
  */
 static void
-__wt_debug_inmem_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_RLE_EXPAND *exp;
@@ -278,11 +274,11 @@ __wt_debug_inmem_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem_col_var --
+ * __wt_debug_page_col_var --
  *	Dump an in-memory WT_PAGE_COL_VAR page.
  */
 static int
-__wt_debug_inmem_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_REPL *repl;
@@ -303,11 +299,11 @@ __wt_debug_inmem_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem_row_leaf --
+ * __wt_debug_page_row_leaf --
  *	Dump an in-memory WT_PAGE_DUP_LEAF or WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_debug_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_REPL *repl;
 	WT_ROW *rip;
@@ -334,11 +330,11 @@ __wt_debug_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_debug_inmem_row_int --
+ * __wt_debug_page_row_int --
  *	Dump an in-memory WT_PAGE_DUP_INT or WT_PAGE_ROW_INT page.
  */
 static void
-__wt_debug_inmem_row_int(WT_PAGE *page, FILE *fp)
+__wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 {
 	WT_ROW *rip;
 	uint32_t i;
@@ -638,24 +634,5 @@ __wt_debug_pair(const char *tag, void *data, uint32_t size, FILE *fp)
 	fprintf(fp, "%lu {",  (u_long)size);
 	__wt_print_byte_string(data, size, fp);
 	fprintf(fp, "}\n");
-}
-
-/*
- * __wt_debug_page_hdr --
- *	Standard debug page-header output.
- */
-static void
-__wt_debug_page_hdr(WT_TOC *toc, WT_PAGE *page, FILE *fp)
-{
-	DB *db;
-
-	db = toc->db;
-
-	fprintf(fp,
-	    "addr: %lu-%lu {\n\t%s: size %lu\n",
-	    (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
-	    __wt_page_type_string(page->dsk), (u_long)page->size);
-
 }
 #endif
