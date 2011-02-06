@@ -773,18 +773,20 @@ item_vs_page:			__wt_api_db_errx(db,
 		}
 
 		/*
-		 * Check the item type ordering.   For row-stores, check for:
+		 * Only row-store leaf pages require item type ordering checks,
+		 * other page types don't have ordering relationships between
+		 * their WT_ITEM entries, so we can skip those tests.
+		 */
+		if (dsk->type != WT_PAGE_ROW_LEAF)
+			goto skip_order_check;
+
+		/*
+		 * For row-stores leaf pages, check for:
 		 *	two keys in a row,
 		 *	two non-dup data items in a row,
 		 *	inter-mixed dup and non-dup data items,
 		 *	a data item as the first item on a page.
-		 *
-		 * Column-stores only have data items and we already checked to
-		 * see if this item has the wrong type, skip the order check.
 		 */
-		if (dsk->type == WT_PAGE_COL_VAR)
-			goto skip_order_check;
-
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_DUP:
