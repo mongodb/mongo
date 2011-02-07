@@ -85,8 +85,9 @@ main(int argc, char *argv[])
 			goto err;
 
 		/* XXX: can't get dups, don't have cursor ops yet. */
-		if (g.c_duplicates_pct != 0)
+		if (g.c_ops == 0 || g.c_duplicates_pct != 0)
 			goto skip_ops;
+
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
 			switch (g.c_database_type) {
