@@ -7,12 +7,12 @@ b __wt_assert
 #b __wt_breakpoint
 b __wt_database_format
 
-define dp
-print __wt_bt_debug_page(toc, $arg0, 0, 0)
+define pd
+print __wt_debug_disk(toc, $arg0, "/tmp/o", 0)
 end
-define fp
-print __wt_bt_debug_page(toc, $arg0, "/tmp/o", 0)
+define pp
+print __wt_debug_page(toc, $arg0, "/tmp/o", 0)
 end
 define dumpfile
-print __wt_bt_debug_dump(toc, "/tmp/o", 0)
+print __wt_debug_dump(toc, "/tmp/o", 0)
 end
