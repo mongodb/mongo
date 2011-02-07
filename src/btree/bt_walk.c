@@ -137,8 +137,8 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 	/*
 	 * Don't call the worker function for any page until all of its children
 	 * have been visited.   This allows the walker function to be used for
-	 * the sync method, where reconciling a modified child page modifies the
-	 * parent.
+	 * the close/sync methods, where reconciling a modified child page will
+	 * modify its parent.
 	 */
 	WT_RET(work(toc, page, arg));
 
