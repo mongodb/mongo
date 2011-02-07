@@ -100,7 +100,7 @@ namespace mongo {
                     string name = i->first;
                     if ( seen.count( name ) )
                         continue;
-                    LOG(0) << "checking replica set: " << name << endl;
+                    LOG(1) << "checking replica set: " << name << endl;
                     seen.insert( name );
                     m = i->second;
                     break;
