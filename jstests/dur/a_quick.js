@@ -7,6 +7,22 @@
 testname = "a_quick";
 load("jstests/_tst.js");
 
+function checkNoJournalFiles(path, pass) {
+    var files = listFiles(path);
+    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+        if (pass == null) {
+            // wait a bit longer for mongod to potentially finish if it is still running.
+            sleep(10000);
+            return checkNoJournalFiles(path, 1);
+        }   
+        print("\n\n\n");
+        print("FAIL path:" + path);
+        print("unexpected files:");
+        printjson(files);
+        assert(false, "FAIL a journal/lsn file is present which is unexpected");
+    }
+}
+
 // directories
 var path1 = "/data/db/quicknodur";
 var path2 = "/data/db/quickdur";
@@ -75,22 +91,7 @@ stopMongod(30002);
 
 // at this point, after clean shutdown, there should be no journal files
 tst.log("check no journal files");
-var jfiles = listFiles(path2 + "/journal");
-if (jfiles.length) {
-    print("sleeping more waiting for mongod to stop");
-    sleep(10000);
-    removeFile(path2 + "/journal/prealloc.0");
-    removeFile(path2 + "/journal/prealloc.1");
-    removeFile(path2 + "/journal/prealloc.2");
-    jfiles = listFiles(path2 + "/journal");
-
-    if (jfiles.length) {
-        print("ERROR journal dir " + path2 + "/journal is not empty:");
-        printjson(jfiles);
-        print("\n\n");  
-        assert(jfiles.length == 0, "journal dir not empty");
-    }
-}
+checkNoJournalFiles(path2 + "/journal");
 
 tst.log("check data matches");
 var diff = tst.diff(path1 + "/test.ns", path2 + "/test.ns");

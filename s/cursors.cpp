@@ -139,9 +139,9 @@ namespace mongo {
                         << endl;
     }
 
-    ShardedClientCursorPtr CursorCache::get( long long id ) {
+    ShardedClientCursorPtr CursorCache::get( long long id ) const {
         scoped_lock lk( _mutex );
-        MapSharded::iterator i = _cursors.find( id );
+        MapSharded::const_iterator i = _cursors.find( id );
         if ( i == _cursors.end() ) {
             OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
             return ShardedClientCursorPtr();
@@ -167,6 +167,16 @@ namespace mongo {
         scoped_lock lk( _mutex );
         _refs[id] = server;
     }
+
+    string CursorCache::getRef( long long id ) const {
+        assert( id );
+        scoped_lock lk( _mutex );
+        MapNormal::const_iterator i = _refs.find( id );
+        if ( i == _refs.end() )
+            return "";
+        return i->second;
+    }
+
 
     long long CursorCache::genId() {
         while ( true ) {
@@ -236,7 +246,7 @@ namespace mongo {
         }
     }
 
-    void CursorCache::appendInfo( BSONObjBuilder& result ) {
+    void CursorCache::appendInfo( BSONObjBuilder& result ) const {
         scoped_lock lk( _mutex );
         result.append( "sharded" , (int)_cursors.size() );
         result.appendNumber( "shardedEver" , _shardedTotal );

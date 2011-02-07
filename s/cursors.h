@@ -74,22 +74,25 @@ namespace mongo {
         CursorCache();
         ~CursorCache();
 
-        ShardedClientCursorPtr get( long long id );
+        ShardedClientCursorPtr get( long long id ) const;
         void store( ShardedClientCursorPtr cursor );
         void remove( long long id );
 
         void storeRef( const string& server , long long id );
 
+        /** @return the server for id or "" */
+        string getRef( long long id ) const ;
+        
         void gotKillCursors(Message& m );
 
-        void appendInfo( BSONObjBuilder& result );
+        void appendInfo( BSONObjBuilder& result ) const ;
 
         long long genId();
 
         void doTimeouts();
         void startTimeoutThread();
     private:
-        mongo::mutex _mutex;
+        mutable mongo::mutex _mutex;
 
         MapSharded _cursors;
         MapNormal _refs;

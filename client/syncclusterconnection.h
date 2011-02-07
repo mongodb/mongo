@@ -75,7 +75,7 @@ namespace mongo {
 
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi );
 
-        virtual bool call( Message &toSend, Message &response, bool assertOk );
+        virtual bool call( Message &toSend, Message &response, bool assertOk , string * actualServer );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );
 

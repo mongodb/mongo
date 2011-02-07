@@ -347,7 +347,8 @@ namespace mongo {
     class DBConnector {
     public:
         virtual ~DBConnector() {}
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
+        /** actualServer is set to the actual server where they call went if there was a choice (SlaveOk) */
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 ) = 0;
         virtual void say( Message &toSend ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
         virtual void checkResponse( const char* data, int nReturned ) {}
@@ -891,7 +892,7 @@ namespace mongo {
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
         virtual void say( Message &toSend );
-        virtual bool call( Message &toSend, Message &response, bool assertOk = true );
+        virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
         virtual void checkResponse( const char *data, int nReturned );
         void setSoTimeout(double to) { _so_timeout = to; }

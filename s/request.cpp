@@ -154,7 +154,14 @@ namespace mongo {
         assert( _didInit );
         long long cursor =response.header()->getCursor();
         if ( cursor ) {
-            cursorCache.storeRef( fromServer , cursor );
+            if ( fromServer.size() ) {
+                cursorCache.storeRef( fromServer , cursor );
+            }
+            else {
+                // probably a getMore
+                // make sure we have a ref for this
+                assert( cursorCache.getRef( cursor ).size() );
+            }
         }
         _p->reply( _m , response , _id );
     }

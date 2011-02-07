@@ -644,7 +644,7 @@ namespace mongo {
         return false;
     }
 
-    bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
+    bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;

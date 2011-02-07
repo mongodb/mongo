@@ -81,7 +81,7 @@ printjson( after )
 
 assert.eq( before.query + 10 , after.query , "B3" )
 
-// --- sharded ----
+// --- add more data ----
 
 db.foo.ensureIndex( { x : 1 } )
 
@@ -89,6 +89,13 @@ for ( i=0; i<100; i++ ){
     if ( i == 17 ) continue;
     db.foo.insert( { x : i } )
 }
+db.getLastError( 3 , 10000 );
+
+assert.eq( 100 , ts.count() , "B4" )
+assert.eq( 100 , ts.find().itcount() , "B5" )
+assert.eq( 100 , ts.find().batchSize(5).itcount() , "B6" )
+
+// --- sharded ----
 
 assert.eq( 100 , db.foo.count() , "C1" )
 
@@ -141,6 +148,11 @@ for ( i=0; i<10; i++ )
 after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
 assert.eq( before.query + 10 , after.query , "E3" )
+
+assert.eq( 100 , ts.count() , "E4" )
+assert.eq( 100 , ts.find().itcount() , "E5" )
+printjson( ts.find().batchSize(5).explain() )
+assert.eq( 100 , ts.find().batchSize(5).itcount() , "E6" )
 
 
 

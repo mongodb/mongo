@@ -7,6 +7,22 @@ var testname = "manyRestarts";
 var step = 1;
 var conn = null;
 
+function checkNoJournalFiles(path, pass) {
+    var files = listFiles(path);
+    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+        if (pass == null) {
+            // wait a bit longer for mongod to potentially finish if it is still running.
+            sleep(10000);
+            return checkNoJournalFiles(path, 1);
+        }
+        print("\n\n\n");
+        print("FAIL path:" + path);
+        print("unexpected files:");
+        printjson(files);
+        assert(false, "FAIL a journal/lsn file is present which is unexpected");
+    }
+}
+
 function runDiff(a, b) {
     function reSlash(s) {
         var x = s;
@@ -137,7 +153,7 @@ sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
-assert.eq( [], listFiles(path2 + "/journal"), "error seems to be journal files present after a clean mongod shutdown" );
+checkNoJournalFiles(path2 + "/journal");
 
 log("check data matches ns");
 var diff = runDiff(path1 + "/test.ns", path2 + "/test.ns");

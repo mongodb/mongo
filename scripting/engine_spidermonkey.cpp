@@ -592,17 +592,17 @@ namespace mongo {
                 if ( embed.isEmpty() ) {
                     return OBJECT_TO_JSVAL( JS_NewArrayObject( _context , 0 , 0 ) );
                 }
-
-                int n = embed.nFields();
-
-                JSObject * array = JS_NewArrayObject( _context , n , 0 );
+                
+                JSObject * array = JS_NewArrayObject( _context , 1 , 0 );
                 CHECKJSALLOC( array );
 
                 jsval myarray = OBJECT_TO_JSVAL( array );
 
-                for ( int i=0; i<n; i++ ) {
-                    jsval v = toval( embed[i] );
-                    assert( JS_SetElement( _context , array , i , &v ) );
+                BSONObjIterator i( embed );
+                while ( i.more() ){
+                    const BSONElement& e = i.next();
+                    jsval v = toval( e );
+                    assert( JS_SetElement( _context , array , atoi(e.fieldName()) , &v ) );
                 }
 
                 return myarray;

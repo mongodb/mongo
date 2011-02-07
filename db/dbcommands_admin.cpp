@@ -91,7 +91,8 @@ namespace mongo {
             }
             catch(...) { }
 
-            {
+            BSONObjBuilder bb[2];
+            for( int pass = 0; pass < 2; pass++ ) {
                 LogFile f(p.string());
                 AlignedBuilder b(1024 * 1024);
                 {
@@ -99,7 +100,7 @@ namespace mongo {
                     for( int i = 0 ; i < 100; i++ ) { 
                         f.synchronousAppend(b.buf(), 8192);
                     }
-                    result.append("timeMillis8KB", t.millis() / 100.0);
+                    bb[pass].append("8KB", t.millis() / 100.0);
                 }
                 {
                     const int N = 50;
@@ -113,16 +114,19 @@ namespace mongo {
                     }
                     long long y = t2.micros() - 4*N*1000;
                     // not really trusting the timer granularity on all platforms so whichever is higher of x and y
-                    result.append("timeMillis8KBWithPauses", max(x,y) / (N*1000.0));
+                    bb[pass].append("8KBWithPauses", max(x,y) / (N*1000.0));
                 }
                 {
                     Timer t;
                     for( int i = 0 ; i < 20; i++ ) { 
                         f.synchronousAppend(b.buf(), 1024 * 1024);
                     }
-                    result.append("timeMillis1MB", t.millis() / 20.0);
+                    bb[pass].append("1MB", t.millis() / 20.0);
                 }
+                // second time around, we are prealloced.
             }
+            result.append("timeMillis", bb[0].obj());
+            result.append("timeMillisWithPrealloc", bb[1].obj());
 
             try { 
                 remove(p);
@@ -131,7 +135,6 @@ namespace mongo {
 
             return 1;
         }
-
     } journalLatencyTestCmd;
 
     class ValidateCmd : public Command {

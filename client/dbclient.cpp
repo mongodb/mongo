@@ -859,7 +859,7 @@ namespace mongo {
         port().recv(m);
     }
 
-    bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
+    bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         /* todo: this is very ugly messagingport::call returns an error code AND can throw
                  an exception.  we should make it return void and just throw an exception anytime
                  it fails

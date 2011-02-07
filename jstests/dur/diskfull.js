@@ -16,6 +16,22 @@ if ( !doIt ) {
     doIt = false;
 }
 
+function checkNoJournalFiles(path, pass) {
+    var files = listFiles(path);
+    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+        if (pass == null) {
+            // wait a bit longer for mongod to potentially finish if it is still running.
+            sleep(10000);
+            return checkNoJournalFiles(path, 1);
+        }
+        print("\n\n\n");
+        print("FAIL path:" + path);
+        print("unexpected files:");
+        printjson(files);
+        assert(false, "FAIL a journal/lsn file is present which is unexpected");
+    }
+}
+
 /** Clear dbpath without removing and recreating diskfulltest directory, as resetDbpath does */
 function clear() {
     files = listFiles( startPath );
@@ -90,7 +106,7 @@ function runSecondMongdAndRecover() {
     
     // at this point, after clean shutdown, there should be no journal files
     log("check no journal files");
-    assert.eq( [], listFiles( startPath + "/journal/" ), "error seem to be journal files present after a clean mongod shutdown" );
+    checkNoJournalFiles(startPath + "/journal/");
     
     log();    
 }
