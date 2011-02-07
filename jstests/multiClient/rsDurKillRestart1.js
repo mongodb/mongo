@@ -26,7 +26,7 @@ function checkEqual (value, expected) {
 }
 
 function deploy() {
-    var rs = new ReplSetTest({nodes: 3, oplogSize: 40})
+    var rs = new ReplSetTest({nodes: 3, oplogSize: 1000})
     rs.startSet({dur: null})
     var cfg = rs.getReplSetConfig()
     cfg.members[2]['arbiterOnly'] = true
@@ -50,52 +50,70 @@ function loadInitialData(rs) {
     confirmWrite(db)
 }
 
-function rsMaster(rs) {
-    var prevMaster = rs.liveNodes.master
-    if (!prevMaster) return rs.getMaster()
-    var rec = prevMaster.getDB('admin').runCommand({ismaster: 1})
-    if (rec && rec.ok && rec['ismaster']) return prevMaster
-    return rs.getMaster()
+function newMasterConnection(ports) {
+    for (var i = 0; i < ports.length; i++) {
+      try {
+       print ('Try connect to '+ i)
+        var conn = new Mongo("127.0.0.1:" + ports[i])
+        var rec = conn.getDB('admin').runCommand({ismaster: 1})
+        if (rec && rec.ok && rec['ismaster']) {
+         print ('Connected ' + i)
+            return conn }
+        // else close conn
+      } catch(e) {}
+    }
+    throw 'no master: ' + ports
 }
 
-function queryAndUpdateData(rs) {return function(z) {return function(i) {
-  try {
-    sleep((z + 5) * 1000)
-    print('update ' + z + ' round ' + i)
-    var db
+function rsMaster(ports, oldConn) {
     try {
-        var master = rsMaster(rs)
-        if (!master) {print('no master, retry soon'); return}
-        db = master.getDB('test')
-    } catch (e) {
-        print ('get master failed (down primary), retry soon: ' + e)
-        return
+        var rec = oldConn.getDB('admin').runCommand({ismaster: 1})
+        if (rec['ismaster']) return oldConn
+    } catch (e) {}
+    return newMasterConnection(ports)
+}
+
+function queryAndUpdateData(ports) {return function(z) {
+    var conn = null
+    return function(i) {
+      function printFailure(e) {print ('Q&U' + z + '-' + i + ': ' + e)}
+      try {
+        sleep(1000 + (z * 500))
+        print('update ' + z + ' round ' + i)
+        var db
+        try {
+            conn = rsMaster(ports, conn)
+            db = conn.getDB('test')
+        } catch (e) {
+            printFailure(e)
+            return
+        }
+        var n
+        try {
+            db['col'].update({}, {$push: {'z': z}}, false, true)
+            n = db['col'].count({'z': z})
+        } catch (e) {
+            printFailure(e)
+            return
+        }
+        checkEqual (n, N)
+        sleep(1000)
+        try {
+            db['col'].update({}, {$pull: {'z': z}}, false, true)
+            n = db['col'].count({'z': z})
+        } catch (e) {
+            printFailure(e)
+            return
+        }
+        checkEqual (n, 0)
+      } catch (e) {throw ('(Q&U' + z + '-' + i + ') ' + e)}
     }
-    var n
-    try {
-        db['col'].update({}, {$push: {'z': z}}, false, true)
-        n = db['col'].count({'z': z})
-    } catch (e) {
-        print('query failed (down primary), retry soon: ' + e)
-        return
-    }
-    checkEqual (n, N)
-    sleep(1000)
-    try {
-        db['col'].update({}, {$pull: {'z': z}}, false, true)
-        n = db['col'].count({'z': z})
-    } catch (e) {
-        print('query failed (down primary), retry soon: ' + e)
-        return
-    }
-    checkEqual (n, 0)
-  } catch (e) {throw ('(Q&U' + z + '-' + i + ') ' + e)}
-}}}
+}}
 
 function killer(rs) {return function(i) {
   try {
-    sleep(random(60) * 1000)
-    var r = random(rs.ports.length)
+    sleep(random(30) * 1000)
+    var r = random(rs.ports.length - 1)
     print('Killing ' + r)
     stopMongod(rs.getPort(r), 9)  // hard kill
     sleep(random(30) * 1000)
@@ -104,10 +122,16 @@ function killer(rs) {return function(i) {
   } catch (e) {throw ('(Killer-' + i + ') ' + e)}
 }}
 
+function rsPorts(rs) {
+    ports = new Array()
+    for (var i = 0; i < rs.ports.length; i++) ports[i] = rs.getPort(i)
+    return ports
+}
+
 function go(numRounds) {
     var rs = deploy()
     loadInitialData(rs)
-    var jobs = map(queryAndUpdateData(rs), [1,2,3,4,5])
+    var jobs = map(queryAndUpdateData(rsPorts(rs)), [1,2,3,4,5])
     parallel (numRounds, jobs, [killer(rs)])
     sleep (2000)
     rs.stopSet()

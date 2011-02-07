@@ -1,4 +1,4 @@
-/* NOTE: Request mongo shell to be built with V8 javascript engine,
+/* NOTE: Requires mongo shell to be built with V8 javascript engine,
 which implements concurrent threads via fork() */
 
 // Fork and start
