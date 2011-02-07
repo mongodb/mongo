@@ -529,7 +529,7 @@ __wt_evict_state_check(WT_TOC *toc)
 		page = ref->page;
 
 		/* Ignore pinned pages. */
-		if (F_ISSET(page, WT_PINNED)) {
+		if (WT_PAGE_IS_PINNED(page)) {
 			WT_VERBOSE(env, WT_VERB_EVICT, (env,
 			    "eviction skipped page addr %lu (pinned)",
 			    page->addr));

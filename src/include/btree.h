@@ -150,6 +150,18 @@ struct __wt_page {
 	 * the eviction server thread to select pages to be discarded from the
 	 * in-memory tree.
 	 *
+	 * The read generation is a 64-bit value; incremented every time the
+	 * page is searched, a 32-bit value could overflow.
+	 *
+	 * We pin the root page of each tree in memory using an out-of-band LRU
+	 * value.   If we ever add a flags field to this structure, the pinned
+	 * flag could move there.
+	 */
+#define	WT_PAGE_SET_PIN(p)		(p)->read_gen = UINT64_MAX
+#define	WT_PAGE_IS_PINNED(p)	((p)->read_gen == UINT64_MAX)
+	 uint64_t read_gen;
+
+	/*
 	 * The write generation is incremented after the workQ modifies a page
 	 * that is, it tracks page versions.
 	 *	The write generation value is used to detect changes scheduled
@@ -197,7 +209,6 @@ struct __wt_page {
 #define	WT_PAGE_IS_MODIFIED(p)		((p)->disk_gen != (p)->write_gen)
 #define	WT_PAGE_SET_MODIFIED(p)		(++(p)->write_gen)
 	uint32_t disk_gen;
-	uint32_t read_gen;
 	uint32_t write_gen;
 
 	/*
@@ -269,8 +280,6 @@ struct __wt_page {
 #define	WT_PAGE_DUP_TREES(p)		((p)->u3.dup != NULL)
 		WT_REF	**dup;		/* Row-store off-page duplicate trees */
 	} u3;
-
-	uint32_t flags;
 };
 
 /*

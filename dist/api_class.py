@@ -607,8 +607,6 @@ flags['idb'] = [
 flags['ienv'] = [
 	'SERVER_RUN',
 	'WORKQ_RUN' ]
-flags['wt_page'] = [
-	'PINNED' ]
 flags['wt_toc'] = [
 	'READ_EVICT',
 	'READ_PRIORITY' ]

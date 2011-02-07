@@ -275,7 +275,7 @@ __wt_root_pin(WT_TOC *toc)
 
 	/* Get the root page. */
 	WT_RET(__wt_page_in(toc, NULL, &idb->root_page, &idb->root_off, 0));
-		F_SET(idb->root_page.page, WT_PINNED);
+		WT_PAGE_SET_PIN(idb->root_page.page);
 	__wt_hazard_clear(toc, idb->root_page.page);
 
 	return (0);
