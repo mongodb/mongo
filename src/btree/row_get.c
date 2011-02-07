@@ -14,11 +14,11 @@
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 {
-	IDB *idb;
+	BTREE *btree;
 	WT_PAGE *page;
 	int ret;
 
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	page = NULL;
 
 	/* Search the btree for the key. */
@@ -27,7 +27,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 
 	ret = __wt_dbt_return(toc, key, data, 0);
 
-err:	if (page != idb->root_page.page)
+err:	if (page != btree->root_page.page)
 		__wt_hazard_clear(toc, page);
 	return (ret);
 }

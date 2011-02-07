@@ -18,7 +18,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	DB *db;
 	DBT local_key, local_data;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE *page;
@@ -31,7 +31,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
+	btree = db->btree;
 	callback = data->callback;
 	ret = 0;
 
@@ -120,7 +120,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 		item = rip->data;
 item_set:	switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
-			if (idb->huffman_data == NULL) {
+			if (btree->huffman_data == NULL) {
 				data_ret = WT_ITEM_BYTE(item);
 				size_ret = WT_ITEM_LEN(item);
 			}

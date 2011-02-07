@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_idb_open(DB *, const char *, mode_t, uint32_t);
+static int __wt_db_btree_open(DB *, const char *, mode_t, uint32_t);
 
 /*
  * __wt_db_open --
@@ -24,8 +24,8 @@ __wt_db_open(WT_TOC *toc, const char *name, mode_t mode, uint32_t flags)
 
 	WT_STAT_INCR(env->ienv->stats, FILE_OPEN);
 
-	/* Initialize the IDB structure. */
-	WT_RET(__wt_db_idb_open(db, name, mode, flags));
+	/* Initialize the BTREE structure. */
+	WT_RET(__wt_db_btree_open(db, name, mode, flags));
 
 	/* Open the underlying Btree. */
 	WT_RET(__wt_bt_open(toc, LF_ISSET(WT_CREATE) ? 1 : 0));
@@ -37,25 +37,25 @@ __wt_db_open(WT_TOC *toc, const char *name, mode_t mode, uint32_t flags)
 }
 
 /*
- * __wt_db_idb_open --
- *	Routine to intialize any IDB values based on a DB value during open.
+ * __wt_db_btree_open --
+ *	Routine to intialize any BTREE values based on a DB value during open.
  */
 static int
-__wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
+__wt_db_btree_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 {
 	ENV *env;
 	IENV *ienv;
-	IDB *idb;
+	BTREE *btree;
 
 	env = db->env;
 	ienv = env->ienv;
-	idb = db->idb;
+	btree = db->btree;
 
-	WT_RET(__wt_strdup(env, name, &idb->name));
-	idb->mode = mode;
+	WT_RET(__wt_strdup(env, name, &btree->name));
+	btree->mode = mode;
 
 	__wt_lock(env, ienv->mtx);
-	idb->file_id = ++ienv->next_file_id;
+	btree->file_id = ++ienv->next_file_id;
 	__wt_unlock(env, ienv->mtx);
 
 	/*
@@ -64,14 +64,14 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 	 * This is all wrong, and we'll get the information from somewhere
 	 * else, eventually.
 	 */
-	WT_CLEAR(idb->root_page);
+	WT_CLEAR(btree->root_page);
 
 	/* Initialize the zero-length WT_ITEM. */
-	WT_ITEM_SET_TYPE(&idb->empty_item, WT_ITEM_DATA);
-	WT_ITEM_SET_LEN(&idb->empty_item, 0);
+	WT_ITEM_SET_TYPE(&btree->empty_item, WT_ITEM_DATA);
+	WT_ITEM_SET_LEN(&btree->empty_item, 0);
 
 	if (LF_ISSET(WT_RDONLY))
-		F_SET(idb, WT_RDONLY);
+		F_SET(btree, WT_RDONLY);
 
 	return (0);
 }

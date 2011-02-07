@@ -101,13 +101,6 @@ struct __wt_toc_buffer {
 };
 
 /*******************************************
- * Cursor handle information that doesn't persist.
- *******************************************/
-struct __idbc {
-	DBC *dbc;			/* Public object */
-};
-
-/*******************************************
  * File handle information that doesn't persist.
  *******************************************/
 /*
@@ -122,9 +115,9 @@ struct __wt_free_entry {
 	uint32_t size;				/* Size */
 };
 
-struct __idb {
+struct __btree {
 	DB *db;				/* Public object */
-	TAILQ_ENTRY(__idb) q;		/* Linked list of files */
+	TAILQ_ENTRY(__btree) q;		/* Linked list of databases */
 
 	char	 *name;			/* File name */
 	mode_t	  mode;			/* File create mode */
@@ -137,7 +130,7 @@ struct __idb {
 	 * its root page, and the root page brought into memory.  If no root
 	 * page has been acquired, there's usually not much work to do.
 	 */
-#define	WT_UNOPENED_FILE(idb)		((idb)->root_page.state != WT_REF_CACHE)
+#define	WT_UNOPENED_FILE(btree)		((btree)->root_page.state != WT_REF_CACHE)
 	WT_REF		root_page;	/* Root page reference */
 
 	uint32_t free_addr;		/* Free page */
@@ -154,8 +147,8 @@ struct __idb {
 
 	WT_ITEM empty_item;		/* Empty data item */
 
-	WT_STATS *stats;		/* IDB handle statistics */
-	WT_STATS *dstats;		/* File statistics */
+	WT_STATS *stats;		/* Btree handle statistics */
+	WT_STATS *fstats;		/* File statistics */
 
 	uint32_t flags;
 };
@@ -170,9 +163,8 @@ struct __ienv {
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
-	TAILQ_HEAD(
-	    __wt_db_qh, __idb) dbqh;	/* Locked: file list */
-	u_int dbqcnt;			/* Locked: file list count */
+	TAILQ_HEAD(__wt_db_qh, __btree) dbqh;	/* Locked: database list */
+	u_int dbqcnt;			/* Locked: database list count */
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */

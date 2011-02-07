@@ -16,18 +16,18 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
+	btree = db->btree;
 
-	fprintf(stream, "File statistics: %s\n", idb->name);
-	__wt_stat_print(env, idb->stats, stream);
+	fprintf(stream, "File statistics: %s\n", btree->name);
+	__wt_stat_print(env, btree->stats, stream);
 
 	/* Clear the file stats, then call Btree stat to fill them in. */
-	__wt_stat_clear_file_stats(idb->dstats);
-	WT_STAT_SET(idb->dstats, FREELIST_ENTRIES, idb->freelist_entries);
+	__wt_stat_clear_btree_file_stats(btree->fstats);
+	WT_STAT_SET(btree->fstats, FREELIST_ENTRIES, btree->freelist_entries);
 	WT_RET(__wt_desc_stat(toc));
 
 	/*
@@ -37,14 +37,14 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 	 */
 	WT_RET(__wt_tree_walk(toc, NULL, 0, __wt_page_stat, NULL));
 
-	fprintf(stream, "File statistics: %s\n", idb->name);
-	__wt_stat_print(env, idb->dstats, stream);
+	fprintf(stream, "File statistics: %s\n", btree->name);
+	__wt_stat_print(env, btree->fstats, stream);
 
 	/* Underlying file handle statistics. */
-	if (idb->fh != NULL) {
+	if (btree->fh != NULL) {
 		fprintf(stream,
-		    "Underlying file I/O statistics: %s\n", idb->name);
-		__wt_stat_print(env, idb->fh->stats, stream);
+		    "Underlying file I/O statistics: %s\n", btree->name);
+		__wt_stat_print(env, btree->fh->stats, stream);
 	}
 
 	return (0);
@@ -57,14 +57,14 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 int
 __wt_db_stat_clear(DB *db)
 {
-	IDB *idb;
+	BTREE *btree;
 
-	idb = db->idb;
+	btree = db->btree;
 
-	__wt_stat_clear_db_stats(idb->stats);
-	__wt_stat_clear_file_stats(idb->dstats);
-	if (idb->fh != NULL)
-		__wt_stat_clear_fh_stats(idb->fh->stats);
+	__wt_stat_clear_btree_handle_stats(btree->stats);
+	__wt_stat_clear_btree_file_stats(btree->fstats);
+	if (btree->fh != NULL)
+		__wt_stat_clear_fh_stats(btree->fh->stats);
 
 	return (0);
 }

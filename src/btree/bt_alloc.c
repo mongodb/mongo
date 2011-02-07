@@ -19,18 +19,18 @@ __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
 
 	env = toc->env;
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 
 	WT_ASSERT(env, size % db->allocsize == 0);
 
-	WT_STAT_INCR(idb->stats, FILE_ALLOC);
+	WT_STAT_INCR(btree->stats, FILE_ALLOC);
 
-	TAILQ_FOREACH(fe, &idb->freeqa, qa) {
+	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
 		if (fe->size < size)
 			continue;
 
@@ -42,9 +42,9 @@ __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 		 * free the entry.
 		 */
 		if (fe->size == size) {
-			TAILQ_REMOVE(&idb->freeqa, fe, qa);
-			TAILQ_REMOVE(&idb->freeqs, fe, qs);
-			--idb->freelist_entries;
+			TAILQ_REMOVE(&btree->freeqa, fe, qa);
+			TAILQ_REMOVE(&btree->freeqs, fe, qs);
+			--btree->freelist_entries;
 			__wt_free(env, fe, sizeof(WT_FREE_ENTRY));
 			return (0);
 		}
@@ -56,17 +56,17 @@ __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 		 */
 		fe->addr += size / db->allocsize;
 		fe->size -= size;
-		TAILQ_REMOVE(&idb->freeqs, fe, qs);
+		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 		new = fe;
-		TAILQ_FOREACH(fe, &idb->freeqs, qs) {
+		TAILQ_FOREACH(fe, &btree->freeqs, qs) {
 			if (new->size > fe->size)
 				continue;
 			if (new->size < fe->size || new->addr < fe->addr)
 				break;
 		}
 		if (fe == NULL)
-			TAILQ_INSERT_TAIL(&idb->freeqs, new, qs);
+			TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
 		else
 			TAILQ_INSERT_BEFORE(fe, new, qs);
 		return (0);
@@ -86,18 +86,18 @@ static void
 __wt_block_extend(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_FH *fh;
 
 	db = toc->db;
-	idb = db->idb;
-	fh = idb->fh;
+	btree = db->btree;
+	fh = btree->fh;
 
 	/* Extend the file. */
 	*addrp = WT_OFF_TO_ADDR(db, fh->file_size);
 	fh->file_size += size;
 
-	WT_STAT_INCR(idb->stats, FILE_EXTEND);
+	WT_STAT_INCR(btree->stats, FILE_EXTEND);
 }
 
 /*
@@ -109,20 +109,20 @@ __wt_block_free(WT_TOC *toc, uint32_t addr, uint32_t size)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
 	WT_STATS *stats;
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
-	stats = idb->stats;
+	btree = db->btree;
+	stats = btree->stats;
 	new = NULL;
 
 	WT_ASSERT(env, size % db->allocsize == 0);
 
 	WT_STAT_INCR(stats, FILE_FREE);
-	++idb->freelist_entries;
+	++btree->freelist_entries;
 
 	/* Allocate memory for the new entry. */
 	WT_RET(__wt_calloc_def(env, 1, &new));
@@ -133,7 +133,7 @@ combine:/*
 	 * Insert the entry at the appropriate place in the address list after
 	 * checking to see if it ajoins adjacent entries.
 	 */
-	TAILQ_FOREACH(fe, &idb->freeqa, qa) {
+	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
 		/*
 		 * If the freed entry follows (but doesn't immediate follow)
 		 * the list entry, continue -- this is a fast test to get us
@@ -152,9 +152,9 @@ combine:/*
 		if (new->addr + (new->size / db->allocsize) == fe->addr) {
 			fe->addr = new->addr;
 			fe->size += new->size;
-			TAILQ_REMOVE(&idb->freeqs, fe, qs);
+			TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
-			--idb->freelist_entries;
+			--btree->freelist_entries;
 			__wt_free(env, new, sizeof(WT_FREE_ENTRY));
 			new = fe;
 			break;
@@ -168,10 +168,10 @@ combine:/*
 		 */
 		if (fe->addr + (fe->size / db->allocsize) == new->addr) {
 			fe->size += new->size;
-			TAILQ_REMOVE(&idb->freeqa, fe, qa);
-			TAILQ_REMOVE(&idb->freeqs, fe, qs);
+			TAILQ_REMOVE(&btree->freeqa, fe, qa);
+			TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
-			--idb->freelist_entries;
+			--btree->freelist_entries;
 			__wt_free(env, new, sizeof(WT_FREE_ENTRY));
 
 			new = fe;
@@ -191,7 +191,7 @@ combine:/*
 	 * list entry, append it.
 	 */
 	if (fe == NULL)
-		TAILQ_INSERT_TAIL(&idb->freeqa, new, qa);
+		TAILQ_INSERT_TAIL(&btree->freeqa, new, qa);
 
 	/*
 	 * The variable new now references a WT_FREE_ENTRY structure not linked
@@ -201,14 +201,14 @@ combine:/*
 	 * (the latter so we tend to write pages at the start of the file when
 	 * possible).
 	 */
-	TAILQ_FOREACH(fe, &idb->freeqs, qs) {
+	TAILQ_FOREACH(fe, &btree->freeqs, qs) {
 		if (new->size > fe->size)
 			continue;
 		if (new->size < fe->size || new->addr < fe->addr)
 			break;
 	}
 	if (fe == NULL)
-		TAILQ_INSERT_TAIL(&idb->freeqs, new, qs);
+		TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
 	else
 		TAILQ_INSERT_BEFORE(fe, new, qs);
 
@@ -223,22 +223,23 @@ int
 __wt_block_read(WT_TOC *toc)
 {
 	DBT *tmp;
-	IDB *idb;
+	BTREE *btree;
 	uint32_t *p;
 	int ret;
 
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	ret = 0;
 
 	/* Make sure there's a free-list to read. */
-	if (idb->free_addr == WT_ADDR_INVALID)
+	if (btree->free_addr == WT_ADDR_INVALID)
 		return (0);
 
 	/* Get a scratch buffer and make it look like our work page. */
-	WT_RET(__wt_scr_alloc(toc, idb->free_size, &tmp));
+	WT_RET(__wt_scr_alloc(toc, btree->free_size, &tmp));
 
 	/* Read in the free-list. */
-	WT_ERR(__wt_disk_read(toc, tmp->data, idb->free_addr, idb->free_size));
+	WT_ERR(__wt_disk_read(
+	    toc, tmp->data, btree->free_addr, btree->free_size));
 
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)((uint8_t *)
@@ -260,7 +261,7 @@ __wt_block_write(WT_TOC *toc)
 {
 	DB *db;
 	DBT *tmp;
-	IDB *idb;
+	BTREE *btree;
 	ENV *env;
 	WT_FREE_ENTRY *fe;
 	WT_PAGE_DISK *dsk;
@@ -269,7 +270,7 @@ __wt_block_write(WT_TOC *toc)
 
 	env = toc->env;
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	tmp = NULL;
 
 	/* Truncate the file if possible. */
@@ -280,14 +281,14 @@ __wt_block_write(WT_TOC *toc)
 	 * first additional entry is for the free-list pages themselves, and the
 	 * second is for a list-terminating WT_ADDR_INVALID entry.
 	 */
-	total_entries = idb->freelist_entries + 2;
+	total_entries = btree->freelist_entries + 2;
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE +
 	     total_entries * sizeof(WT_FREE_ENTRY), db->allocsize);
 
 	/* Allocate room at the end of the file. */
 	__wt_block_extend(toc, &addr, size);
-	idb->free_addr = addr;
-	idb->free_size = size;
+	btree->free_addr = addr;
+	btree->free_size = size;
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_RET(__wt_scr_alloc(toc, size, &tmp));
@@ -310,7 +311,7 @@ __wt_block_write(WT_TOC *toc)
 	 * back in.
 	 */
 	p = WT_PAGE_DISK_BYTE(dsk);
-	TAILQ_FOREACH_REVERSE(fe, &idb->freeqa, __wt_free_qah, qa) {
+	TAILQ_FOREACH_REVERSE(fe, &btree->freeqa, __wt_free_qah, qa) {
 		*p++ = fe->addr;
 		*p++ = fe->size;
 	}
@@ -319,11 +320,11 @@ __wt_block_write(WT_TOC *toc)
 	*p++ = WT_ADDR_INVALID;		/* The list terminating value. */
 
 	/* Discard the free-list entries. */
-	while ((fe = TAILQ_FIRST(&idb->freeqa)) != NULL) {
-		TAILQ_REMOVE(&idb->freeqa, fe, qa);
-		TAILQ_REMOVE(&idb->freeqs, fe, qs);
+	while ((fe = TAILQ_FIRST(&btree->freeqa)) != NULL) {
+		TAILQ_REMOVE(&btree->freeqa, fe, qa);
+		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
-		--idb->freelist_entries;
+		--btree->freelist_entries;
 		__wt_free(env, fe, sizeof(WT_FREE_ENTRY));
 	}
 
@@ -346,32 +347,32 @@ static int
 __wt_block_truncate(WT_TOC *toc)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	ENV *env;
 	WT_FH *fh;
 	WT_FREE_ENTRY *fe;
 	int need_trunc;
 
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	env = toc->env;
-	fh = idb->fh;
+	fh = btree->fh;
 
 	/*
 	 * Repeatedly check the last element in the free-list, truncating the
 	 * file if the last free-list element is also at the end of the file.
 	 */
 	need_trunc = 0;
-	while ((fe = TAILQ_LAST(&idb->freeqa, __wt_free_qah)) != NULL) {
+	while ((fe = TAILQ_LAST(&btree->freeqa, __wt_free_qah)) != NULL) {
 		if (WT_ADDR_TO_OFF(db, fe->addr) + fe->size != fh->file_size)
 			break;
 		fh->file_size -= fe->size;
 		need_trunc = 1;
 
-		TAILQ_REMOVE(&idb->freeqa, fe, qa);
-		TAILQ_REMOVE(&idb->freeqs, fe, qs);
+		TAILQ_REMOVE(&btree->freeqa, fe, qa);
+		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
-		--idb->freelist_entries;
+		--btree->freelist_entries;
 		__wt_free(env, fe, sizeof(WT_FREE_ENTRY));
 	}
 
@@ -385,18 +386,18 @@ __wt_block_truncate(WT_TOC *toc)
 void
 __wt_debug_block(WT_TOC *toc)
 {
-	IDB *idb;
+	BTREE *btree;
 	WT_FREE_ENTRY *fe;
 
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 
 	fprintf(stderr, "Freelist by addr:");
-	TAILQ_FOREACH(fe, &idb->freeqa, qa)
+	TAILQ_FOREACH(fe, &btree->freeqa, qa)
 		fprintf(stderr,
 		    " {%lu/%lu}", (u_long)fe->addr, (u_long)fe->size);
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Freelist by size:");
-	TAILQ_FOREACH(fe, &idb->freeqs, qs)
+	TAILQ_FOREACH(fe, &btree->freeqs, qs)
 		fprintf(stderr,
 		    " {%lu/%lu}", (u_long)fe->addr, (u_long)fe->size);
 	fprintf(stderr, "\n");

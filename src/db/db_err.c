@@ -15,7 +15,7 @@
 	if ((db)->errcall != NULL)					\
 		__wt_msg_call((void *)((db)->errcall),			\
 		    (void *)(db), (db)->errpfx,				\
-		    (db)->idb == NULL ? NULL : (db)->idb->name,		\
+		    (db)->btree == NULL ? NULL : (db)->btree->name,		\
 		    error, fmt, __ap);					\
 	va_end(__ap);							\
 									\
@@ -28,7 +28,7 @@
 									\
 	va_start(__ap, fmt);						\
 	__wt_msg_stream((db)->errfile, (db)->errpfx,			\
-	    (db)->idb == NULL ? NULL : (db)->idb->name,			\
+	    (db)->btree == NULL ? NULL : (db)->btree->name,			\
 	    error, fmt, __ap);						\
 	va_end(__ap);							\
 }

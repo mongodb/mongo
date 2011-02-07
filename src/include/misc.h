@@ -60,15 +60,15 @@ extern "C" {
 
 /* Read-only file check. */
 #define	WT_DB_RDONLY(db, name)						\
-	if (F_ISSET((db)->idb, WT_RDONLY))				\
+	if (F_ISSET((db)->btree, WT_RDONLY))				\
 		return (__wt_file_readonly(db, name));
 
 /* Column- and row-only file check. */
 #define	WT_DB_ROW_ONLY(db, name)					\
-	if (F_ISSET((db)->idb, WT_COLUMN))				\
+	if (F_ISSET((db)->btree, WT_COLUMN))				\
 		return (__wt_file_method_type(db, name, 1));
 #define	WT_DB_COL_ONLY(db, name)					\
-	if (!F_ISSET((db)->idb, WT_COLUMN))				\
+	if (!F_ISSET((db)->btree, WT_COLUMN))				\
 		return (__wt_file_method_type(db, name, 0));
 
 /*
@@ -141,7 +141,7 @@ extern "C" {
  * common enough to need a macro.
  */
 #define	WT_PAGE_OUT(toc, p)						\
-	if ((p) != NULL && (p) != (toc)->db->idb->root_page.page)	\
+	if ((p) != NULL && (p) != (toc)->db->btree->root_page.page)	\
 		__wt_hazard_clear(toc, p);
 
 #if defined(__cplusplus)

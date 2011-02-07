@@ -31,12 +31,12 @@ __wt_db_column_set_verify(
     DB *db, uint32_t fixed_len, const char *dictionary, uint32_t flags)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 
 	WT_UNUSED(dictionary);
 
 	env = db->env;
-	idb = db->idb;
+	btree = db->btree;
 
 	/*
 	 * The fixed-length number of bytes is stored in a single byte, which
@@ -54,7 +54,7 @@ __wt_db_column_set_verify(
 	}
 
 	if (LF_ISSET(WT_RLE))
-		F_SET(idb, WT_RLE);
-	F_SET(idb, WT_COLUMN);
+		F_SET(btree, WT_RLE);
+	F_SET(btree, WT_COLUMN);
 	return (0);
 }

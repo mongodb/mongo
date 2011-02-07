@@ -18,7 +18,7 @@ struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
  */
 struct __wt_evict_list {
 	WT_REF	*ref;				/* WT_REF structure */
-	IDB	*idb;				/* Underlying file object */
+	BTREE	*btree;				/* Underlying file object */
 };
 
 /*

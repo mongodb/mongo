@@ -17,7 +17,7 @@ int
 __wt_db_bulk_load(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_item_build_data(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
+__wt_item_build_value(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
 int
 __wt_cache_create(ENV *env);
 void
@@ -62,11 +62,11 @@ __wt_evict_dump(WT_TOC *toc);
 int
 __wt_evict_cache_dump(WT_TOC *toc);
 int
-__wt_evict_tree_dump(WT_TOC *toc, IDB *idb);
+__wt_evict_tree_dump(WT_TOC *toc, BTREE *btree);
 int
 __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp);
 int
-__wt_evict_tree_count(WT_TOC *toc, IDB *idb, uint64_t *nodesp);
+__wt_evict_tree_count(WT_TOC *toc, BTREE *btree, uint64_t *nodesp);
 const char *
 __wt_page_type_string(WT_PAGE_DISK *dsk);
 const char *
@@ -397,17 +397,17 @@ __wt_toc_serialize_func(
 void
 __wt_toc_serialize_wrapup(WT_TOC *toc, WT_PAGE *page, int ret);
 int
+__wt_stat_alloc_btree_handle_stats(ENV *env, WT_STATS **statsp);
+void
+__wt_stat_clear_btree_handle_stats(WT_STATS *stats);
+int
+__wt_stat_alloc_btree_file_stats(ENV *env, WT_STATS **statsp);
+void
+__wt_stat_clear_btree_file_stats(WT_STATS *stats);
+int
 __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_cache_stats(WT_STATS *stats);
-int
-__wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp);
-void
-__wt_stat_clear_file_stats(WT_STATS *stats);
-int
-__wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp);
-void
-__wt_stat_clear_db_stats(WT_STATS *stats);
 int
 __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp);
 void

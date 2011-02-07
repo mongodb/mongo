@@ -115,7 +115,7 @@ __wt_verify_dsk_item(
 
 	db = toc->db;
 	func = db->btree_compare;
-	huffman = db->idb->huffman_key;
+	huffman = db->btree->huffman_key;
 	ret = 0;
 
 	WT_CLEAR(_a);
@@ -125,7 +125,7 @@ __wt_verify_dsk_item(
 	last = &_b;
 	WT_ERR(__wt_scr_alloc(toc, 0, &last->scratch));
 
-	file_size = db->idb->fh->file_size;
+	file_size = db->btree->fh->file_size;
 	end = (uint8_t *)dsk + size;
 
 	last_item_type = IS_FIRST;
@@ -355,12 +355,12 @@ err:	if (_a.scratch != NULL)
 static int
 __wt_verify_dsk_col_int(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	IDB *idb;
+	BTREE *btree;
 	WT_OFF_RECORD *off_record;
 	uint8_t *end;
 	uint32_t i, entry_num;
 
-	idb = db->idb;
+	btree = db->btree;
 	end = (uint8_t *)dsk + size;
 
 	entry_num = 0;
@@ -373,7 +373,7 @@ __wt_verify_dsk_col_int(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 
 		/* Check if the reference is past the end-of-file. */
 		if (WT_ADDR_TO_OFF(db,
-		    off_record->addr) + off_record->size > idb->fh->file_size)
+		    off_record->addr) + off_record->size > btree->fh->file_size)
 			return (__wt_err_eof(db, entry_num, addr));
 	}
 

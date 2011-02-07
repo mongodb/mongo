@@ -16,7 +16,7 @@ int
 __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_PAGE *page;
@@ -35,12 +35,12 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
 	toc->srch_write_gen = 0;
 
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 
 	WT_DB_FCHK(db, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
 
 	/* Search the tree. */
-	for (page = idb->root_page.page;;) {
+	for (page = btree->root_page.page;;) {
 		/*
 		 * Copy the page's write generation value before reading
 		 * anything on the page.
@@ -110,7 +110,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
 		switch (ret = __wt_page_in(toc, page, &cref->ref, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
-			if (page != idb->root_page.page)
+			if (page != btree->root_page.page)
 				__wt_hazard_clear(toc, page);
 			break;
 		case WT_PAGE_DELETED:

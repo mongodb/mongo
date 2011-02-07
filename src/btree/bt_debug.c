@@ -568,7 +568,7 @@ __wt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
 	DB *db;
 	DBT *tmp;
-	IDB *idb;
+	BTREE *btree;
 	uint32_t size;
 	uint8_t *p;
 	int ret;
@@ -578,16 +578,16 @@ __wt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 
 	db = toc->db;
 	tmp = NULL;
-	idb = db->idb;
+	btree = db->btree;
 	ret = 0;
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
-		if (idb->huffman_key != NULL)
+		if (btree->huffman_key != NULL)
 			goto process;
 		goto onpage;
 	case WT_ITEM_DATA:
-		if (idb->huffman_data != NULL)
+		if (btree->huffman_data != NULL)
 			goto process;
 onpage:		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);

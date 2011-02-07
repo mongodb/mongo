@@ -40,7 +40,7 @@ int
 __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
     uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
-	IDB *idb;
+	BTREE *btree;
 	WT_COL_REF *cref;
 	WT_ROW_REF *rref;
 	WT_REF *ref;
@@ -50,11 +50,11 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 	 WT_ENV_FCHK(
 	     toc->env, "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
 
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (page == NULL)
-		page = idb->root_page.page;
+		page = btree->root_page.page;
 
 	/* Walk internal pages, descending through any off-page references. */
 	switch (page->dsk->type) {

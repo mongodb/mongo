@@ -14,7 +14,7 @@
 int
 __wt_env_stat_print(ENV *env, FILE *stream)
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 
 	ienv = env->ienv;
@@ -28,8 +28,8 @@ __wt_env_stat_print(ENV *env, FILE *stream)
 	fprintf(stream, "Environment method statistics:\n");
 	__wt_stat_print(env, ienv->method_stats, stream);
 
-	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		WT_RET(idb->db->stat_print(idb->db, stream, 0));
+	TAILQ_FOREACH(btree, &ienv->dbqh, q)
+		WT_RET(btree->db->stat_print(btree->db, stream, 0));
 	return (0);
 }
 
@@ -40,15 +40,15 @@ __wt_env_stat_print(ENV *env, FILE *stream)
 int
 __wt_env_stat_clear(ENV *env)
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	int ret;
 
 	ienv = env->ienv;
 	ret = 0;
 
-	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		WT_TRET(__wt_db_stat_clear(idb->db));
+	TAILQ_FOREACH(btree, &ienv->dbqh, q)
+		WT_TRET(__wt_db_stat_clear(btree->db));
 
 	__wt_stat_clear_env_stats(ienv->stats);
 	__wt_stat_clear_cache_stats(ienv->cache->stats);

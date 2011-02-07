@@ -47,11 +47,11 @@ __wt_db_bulk_load(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	uint32_t addr;
 
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 
 	/*
 	 * XXX
@@ -66,7 +66,7 @@ __wt_db_bulk_load(WT_TOC *toc,
 	 * There are two styles of bulk-load: variable length pages or
 	 * fixed-length pages.
 	 */
-	if (F_ISSET(idb, WT_COLUMN) && db->fixed_len != 0)
+	if (F_ISSET(btree, WT_COLUMN) && db->fixed_len != 0)
 		WT_RET(__wt_bulk_fix(toc, f, cb));
 	else
 		WT_RET(__wt_bulk_var(toc, f, cb));
@@ -85,7 +85,7 @@ __wt_bulk_fix(WT_TOC *toc,
 {
 	DB *db;
 	DBT *key, *data, *tmp;
-	IDB *idb;
+	BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_STACK stack;
@@ -96,14 +96,14 @@ __wt_bulk_fix(WT_TOC *toc,
 	int rle, ret;
 
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	insert_cnt = 0;
 	last_data = NULL;	/* Avoid "uninitialized" warning. */
 	last_repeat = NULL;	/* Avoid "uninitialized" warning. */
 	WT_CLEAR(stack);
 	tmp = NULL;
 
-	rle = F_ISSET(idb, WT_RLE) ? 1 : 0;
+	rle = F_ISSET(btree, WT_RLE) ? 1 : 0;
 
 	/* Figure out how large is the chunk we're storing on the page. */
 	len = db->fixed_len;
@@ -143,7 +143,7 @@ __wt_bulk_fix(WT_TOC *toc,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
-		WT_STAT_INCR(idb->stats, FILE_ITEMS_INSERTED);
+		WT_STAT_INCR(btree->stats, FILE_ITEMS_INSERTED);
 
 		/*
 		 * If doing run-length encoding, check to see if this record
@@ -225,12 +225,12 @@ static int
 __wt_bulk_var(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
 {
+	BTREE *btree;
 	DB *db;
-	DBT *key, *data, key_copy, data_copy;
+	DBT *key, *value, key_copy, value_copy;
 	DBT *tmp;
-	IDB *idb;
-	WT_ITEM key_item, data_item;
-	WT_OVFL key_ovfl, data_ovfl;
+	WT_ITEM key_item, value_item;
+	WT_OVFL key_ovfl, value_ovfl;
 	WT_PAGE *page;
 	WT_STACK stack;
 	uint64_t insert_cnt;
@@ -240,16 +240,16 @@ __wt_bulk_var(WT_TOC *toc,
 
 	db = toc->db;
 	tmp = NULL;
-	idb = db->idb;
+	btree = db->btree;
 	ret = 0;
 
 	WT_CLEAR(stack);
 	insert_cnt = 0;
-	is_column = F_ISSET(idb, WT_COLUMN) ? 1 : 0;
+	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
 
-	WT_CLEAR(data_copy);
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
+	WT_CLEAR(value_copy);
 
 	/* Get a scratch buffer and make it look like our work page. */
 	page_type = is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
@@ -259,8 +259,8 @@ __wt_bulk_var(WT_TOC *toc,
 	if (is_column)
 		page->dsk->recno = 1;
 
-	while ((ret = cb(db, &key, &data)) == 0) {
-		if (F_ISSET(idb, WT_COLUMN) ) {
+	while ((ret = cb(db, &key, &value)) == 0) {
+		if (F_ISSET(btree, WT_COLUMN) ) {
 			if (key != NULL) {
 				__wt_api_db_errx(db,
 				    "column-store keys are implied and should "
@@ -285,14 +285,14 @@ __wt_bulk_var(WT_TOC *toc,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(toc->name, insert_cnt);
-		WT_STAT_INCR(idb->stats, FILE_ITEMS_INSERTED);
+		WT_STAT_INCR(btree->stats, FILE_ITEMS_INSERTED);
 
 		/*
 		 * We don't have a key to store on the page if we're building a
 		 * column-store; the check from here on is if "key == NULL".
 		 *
-		 * We don't store data items if the length of the data item is
-		 * 0; the check from here on is if "data == NULL".
+		 * We don't store values if the length of the value is 0;
+		 * the check from here on is if "value == NULL".
 		 *
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
 		 * copy them carefully, all we want is a pointer and a length.
@@ -302,32 +302,32 @@ __wt_bulk_var(WT_TOC *toc,
 			key_copy.size = key->size;
 			key = &key_copy;
 		}
-		if (data->size == 0 && !is_column)
-			data = NULL;
+		if (value->size == 0 && !is_column)
+			value = NULL;
 		else {
-			data_copy.data = data->data;
-			data_copy.size = data->size;
-			data = &data_copy;
+			value_copy.data = value->data;
+			value_copy.size = value->size;
+			value = &value_copy;
 		}
 
-		/* Build the key/data items we're going to store on the page. */
+		/* Build the key/value items we're going to store on the page. */
 		if (key != NULL)
 			WT_ERR(__wt_item_build_key(
 			    toc, key, &key_item, &key_ovfl));
-		if (data != NULL)
-			WT_ERR(__wt_item_build_data(
-			    toc, data, &data_item, &data_ovfl));
+		if (value != NULL)
+			WT_ERR(__wt_item_build_value(
+			    toc, value, &value_item, &value_ovfl));
 
 		/*
-		 * We now have the key/data items to store on the page.  If
+		 * We now have the key/value items to store on the page.  If
 		 * there is insufficient space on the current page, allocate
 		 * a new one.
 		 */
 		space_req = 0;
 		if (key != NULL)
 			space_req += WT_ITEM_SPACE_REQ(key->size);
-		if (data != NULL)
-			space_req += WT_ITEM_SPACE_REQ(data->size);
+		if (value != NULL)
+			space_req += WT_ITEM_SPACE_REQ(value->size);
 		if (space_req > space_avail) {
 			/*
 			 * We've finished with the page: promote its first key
@@ -365,13 +365,13 @@ __wt_bulk_var(WT_TOC *toc,
 		}
 
 		/* Copy the data item onto the page. */
-		if (data != NULL) {
+		if (value != NULL) {
 			++page->dsk->u.entries;
-			memcpy(first_free, &data_item, sizeof(data_item));
+			memcpy(first_free, &value_item, sizeof(value_item));
 			memcpy(first_free +
-			    sizeof(data_item), data->data, data->size);
-			space_avail -= WT_ITEM_SPACE_REQ(data->size);
-			first_free += WT_ITEM_SPACE_REQ(data->size);
+			    sizeof(value_item), value->data, value->size);
+			space_avail -= WT_ITEM_SPACE_REQ(value->size);
+			first_free += WT_ITEM_SPACE_REQ(value->size);
 		}
 	}
 
@@ -703,12 +703,12 @@ static int
 __wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_STATS *stats;
 
 	db = toc->db;
-	idb = db->idb;
-	stats = idb->stats;
+	btree = db->btree;
+	stats = btree->stats;
 
 	/*
 	 * We're called with a DBT that references a data/size pair.  We can
@@ -721,9 +721,9 @@ __wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	 */
 
 	/* Optionally compress the data using the Huffman engine. */
-	if (idb->huffman_key != NULL) {
+	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(
-		    idb->huffman_key, dbt->data, dbt->size,
+		    btree->huffman_key, dbt->data, dbt->size,
 		    &toc->key.data, &toc->key.mem_size, &toc->key.size));
 		if (toc->key.size > dbt->size)
 			WT_STAT_INCRV(stats,
@@ -746,20 +746,20 @@ __wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 }
 
 /*
- * __wt_item_build_data --
+ * __wt_item_build_value --
  *	Process an inserted data item and return an WT_ITEM structure and byte
  *	string to be stored on the page.
  */
 int
-__wt_item_build_data(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+__wt_item_build_value(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_STATS *stats;
 
 	db = toc->db;
-	idb = db->idb;
-	stats = idb->stats;
+	btree = db->btree;
+	stats = btree->stats;
 
 	/*
 	 * We're called with a DBT that references a data/size pair.  We can
@@ -783,9 +783,9 @@ __wt_item_build_data(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	}
 
 	/* Optionally compress the data using the Huffman engine. */
-	if (idb->huffman_data != NULL) {
+	if (btree->huffman_data != NULL) {
 		WT_RET(__wt_huffman_encode(
-		    idb->huffman_data, dbt->data, dbt->size,
+		    btree->huffman_data, dbt->data, dbt->size,
 		    &toc->data.data, &toc->data.mem_size, &toc->data.size));
 		if (toc->data.size > dbt->size)
 			WT_STAT_INCRV(stats,
@@ -944,12 +944,12 @@ static int
 __wt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_STACK_ELEM *elem;
 	int ret;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	ret = 0;
 
 	if (stack->elem == NULL)
@@ -964,8 +964,8 @@ __wt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 		 * and the descriptor record.
 		 */
 		if ((elem + 1)->page == NULL) {
-			idb->root_page.addr = elem->page->addr;
-			idb->root_page.size = elem->page->size;
+			btree->root_page.addr = elem->page->addr;
+			btree->root_page.size = elem->page->size;
 			WT_TRET(__wt_desc_write(toc));
 		}
 

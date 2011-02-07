@@ -59,7 +59,7 @@ err:	(void)__wt_env_close(env);
 int
 __wt_env_close(ENV *env)
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	WT_FH *fh;
 	int ret, secondary_err;
@@ -70,10 +70,10 @@ __wt_env_close(ENV *env)
 	ret = secondary_err = 0;
 
 	/* Complain if DB handles weren't closed. */
-	while ((idb = TAILQ_FIRST(&ienv->dbqh)) != NULL) {
+	while ((btree = TAILQ_FIRST(&ienv->dbqh)) != NULL) {
 		__wt_api_env_errx(env,
-		    "Env handle has open Db handles: %s", idb->name);
-		WT_TRET(idb->db->close(idb->db, 0));
+		    "Env handle has open Db handles: %s", btree->name);
+		WT_TRET(btree->db->close(btree->db, 0));
 		secondary_err = WT_ERROR;
 	}
 

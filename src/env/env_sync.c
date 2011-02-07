@@ -14,15 +14,15 @@
 int
 __wt_env_sync(ENV *env, void (*f)(const char *, uint64_t))
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	int ret;
 
 	ienv = env->ienv;
 	ret = 0;
 
-	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		WT_TRET(idb->db->sync(idb->db, f, 0));
+	TAILQ_FOREACH(btree, &ienv->dbqh, q)
+		WT_TRET(btree->db->sync(btree->db, f, 0));
 
 	return (ret);
 }

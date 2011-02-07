@@ -19,7 +19,7 @@ __wt_desc_stat(WT_TOC *toc)
 	WT_PAGE_DESC desc;
 	WT_STATS *stats;
 
-	stats = toc->db->idb->dstats;
+	stats = toc->db->btree->fstats;
 
 	WT_RET(__wt_desc_io(toc, &desc, 1));
 
@@ -54,10 +54,10 @@ __wt_desc_read(WT_TOC *toc)
 	db->intlmin = desc.intlmin;
 	db->leafmax = desc.leafmax;
 	db->leafmin = desc.leafmin;
-	db->idb->root_page.addr = desc.root_addr;
-	db->idb->root_page.size = desc.root_size;
-	db->idb->free_addr = desc.free_addr;
-	db->idb->free_size = desc.free_size;
+	db->btree->root_page.addr = desc.root_addr;
+	db->btree->root_page.size = desc.root_size;
+	db->btree->free_addr = desc.free_addr;
+	db->btree->free_size = desc.free_size;
 	db->fixed_len = desc.fixed_len;
 
 	/*
@@ -66,7 +66,7 @@ __wt_desc_read(WT_TOC *toc)
 	 * to update open/configuration information in a reasonable way.
 	 */
 	if (db->fixed_len != 0)
-		F_SET(db->idb, WT_COLUMN);
+		F_SET(db->btree, WT_COLUMN);
 
 	return (0);
 }
@@ -79,12 +79,12 @@ int
 __wt_desc_write(WT_TOC *toc)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_PAGE_DESC desc;
 	int ret;
 
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	ret = 0;
 
 	WT_CLEAR(desc);
@@ -96,13 +96,13 @@ __wt_desc_write(WT_TOC *toc)
 	desc.leafmax = db->leafmax;
 	desc.leafmin = db->leafmin;
 	desc.recno_offset = 0;
-	desc.root_addr = idb->root_page.addr;
-	desc.root_size = idb->root_page.size;
-	desc.free_addr = idb->free_addr;
-	desc.free_size = idb->free_size;
+	desc.root_addr = btree->root_page.addr;
+	desc.root_size = btree->root_page.size;
+	desc.free_addr = btree->free_addr;
+	desc.free_size = btree->free_size;
 	desc.fixed_len = (uint8_t)db->fixed_len;
 	desc.flags = 0;
-	if (F_ISSET(idb, WT_RLE))
+	if (F_ISSET(btree, WT_RLE))
 		F_SET(&desc, WT_PAGE_DESC_RLE);
 
 	WT_RET(__wt_desc_io(toc, &desc, 0));
@@ -120,7 +120,7 @@ __wt_desc_io(WT_TOC *toc, void *p, int is_read)
 	WT_FH *fh;
 	ENV *env;
 
-	fh = toc->db->idb->fh;
+	fh = toc->db->btree->fh;
 	env = toc->env;
 
 	return (is_read ?

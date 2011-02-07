@@ -19,22 +19,22 @@ int
 __wt_env_db(ENV *env, DB **dbp)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	int ret;
 
 	db = NULL;
-	idb = NULL;
+	btree = NULL;
 
-	/* Create the DB and IDB structures. */
+	/* Create the DB and BTREE structures. */
 	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
-	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
+	WT_ERR(__wt_calloc(env, 1, sizeof(BTREE), &btree));
 
 	/* Connect everything together. */
-	db->idb = idb;
-	idb->db = db;
+	db->btree = btree;
+	btree->db = db;
 	db->env = env;
 
-	/* Configure the DB and the IDB. */
+	/* Configure the DB and the BTREE. */
 	WT_ERR(__wt_db_config(db));
 	WT_ERR(__wt_idb_config(db));
 
@@ -61,32 +61,32 @@ __wt_db_config(DB *db)
 
 /*
  * __wt_idb_config --
- *	Set configuration for a just-created IDB handle.
+ *	Set configuration for a just-created BTREE handle.
  */
 static int
 __wt_idb_config(DB *db)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 
 	env = db->env;
-	idb = db->idb;
+	btree = db->btree;
 	ienv = env->ienv;
 
-	idb->db = db;
-	idb->root_page.addr = idb->free_addr = WT_ADDR_INVALID;
+	btree->db = db;
+	btree->root_page.addr = btree->free_addr = WT_ADDR_INVALID;
 
-	TAILQ_INIT(&idb->freeqa);		/* Free queues */
-	TAILQ_INIT(&idb->freeqs);
+	TAILQ_INIT(&btree->freeqa);		/* Free queues */
+	TAILQ_INIT(&btree->freeqs);
 
 	__wt_lock(env, ienv->mtx);		/* Add to the ENV's list */
-	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
+	TAILQ_INSERT_TAIL(&ienv->dbqh, btree, q);
 	++ienv->dbqcnt;
 	__wt_unlock(env, ienv->mtx);
 
-	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
-	WT_RET(__wt_stat_alloc_file_stats(env, &idb->dstats));
+	WT_RET(__wt_stat_alloc_btree_handle_stats(env, &btree->stats));
+	WT_RET(__wt_stat_alloc_btree_file_stats(env, &btree->fstats));
 
 	return (0);
 }
@@ -103,7 +103,7 @@ __wt_db_destroy(DB *db)
 
 	env = db->env;
 
-	/* Discard the underlying IDB object. */
+	/* Discard the underlying BTREE object. */
 	ret = __wt_idb_destroy(db);
 
 	/* Discard the DB object. */
@@ -114,54 +114,54 @@ __wt_db_destroy(DB *db)
 
 /*
  * __wt_idb_destroy --
- *	IDB handle destructor.
+ *	BTREE handle destructor.
  */
 static int
 __wt_idb_destroy(DB *db)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	int ret;
 
 	env = db->env;
-	idb = db->idb;
+	btree = db->btree;
 	ienv = env->ienv;
 	ret = 0;
 
 	/* Check that there's something to close. */
-	if (idb == NULL)
+	if (btree == NULL)
 		return (0);
 
 	/* Diagnostic check: check flags against approved list. */
-	WT_ENV_FCHK_RET(env, "Db.close", idb->flags, WT_APIMASK_IDB, ret);
+	WT_ENV_FCHK_RET(env, "Db.close", btree->flags, WT_APIMASK_IDB, ret);
 
-	__wt_free(env, idb->name, 0);
+	__wt_free(env, btree->name, 0);
 
-	if (idb->huffman_key != NULL) {
+	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
-		if (idb->huffman_data == idb->huffman_key)
-			idb->huffman_data = NULL;
-		__wt_huffman_close(env, idb->huffman_key);
-		idb->huffman_key = NULL;
+		if (btree->huffman_data == btree->huffman_key)
+			btree->huffman_data = NULL;
+		__wt_huffman_close(env, btree->huffman_key);
+		btree->huffman_key = NULL;
 	}
-	if (idb->huffman_data != NULL) {
-		__wt_huffman_close(env, idb->huffman_data);
-		idb->huffman_data = NULL;
+	if (btree->huffman_data != NULL) {
+		__wt_huffman_close(env, btree->huffman_data);
+		btree->huffman_data = NULL;
 	}
 
-	__wt_walk_end(env, &idb->evict_walk);
+	__wt_walk_end(env, &btree->evict_walk);
 
-	__wt_free(env, idb->stats, 0);
-	__wt_free(env, idb->dstats, 0);
+	__wt_free(env, btree->stats, 0);
+	__wt_free(env, btree->fstats, 0);
 
 	__wt_lock(env, ienv->mtx);		/* Delete from the ENV's list */
-	TAILQ_REMOVE(&ienv->dbqh, idb, q);
+	TAILQ_REMOVE(&ienv->dbqh, btree, q);
 	--ienv->dbqcnt;
 	__wt_unlock(env, ienv->mtx);
 
-	__wt_free(env, idb, sizeof(IDB));
-	db->idb = NULL;
+	__wt_free(env, btree, sizeof(BTREE));
+	db->btree = NULL;
 	return (ret);
 }
 

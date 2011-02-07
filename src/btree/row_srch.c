@@ -44,7 +44,7 @@ int
 __wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
@@ -61,13 +61,13 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags)
 
 	cmp = 0;
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	rip = NULL;
 
 	WT_DB_FCHK(db, "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
 	/* Search the tree. */
-	for (page = idb->root_page.page;;) {
+	for (page = btree->root_page.page;;) {
 		/*
 		 * Copy the page's write generation value before reading
 		 * anything on the page.
@@ -163,7 +163,7 @@ deleted_retry:	/* rref references the subtree containing the record. */
 		switch (ret = __wt_page_in(toc, page, &rref->ref, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
-			if (page != idb->root_page.page)
+			if (page != btree->root_page.page)
 				__wt_hazard_clear(toc, page);
 			break;
 		case WT_PAGE_DELETED:

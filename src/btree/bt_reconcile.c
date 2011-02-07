@@ -896,7 +896,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page)
 			} else {
 				data->data = WT_UPDATE_DATA(upd);
 				data->size = upd->size;
-				WT_RET(__wt_item_build_data(
+				WT_RET(__wt_item_build_value(
 				    toc, data, &data_item, &data_ovfl));
 				len = WT_ITEM_SPACE_REQ(data->size);
 			}
@@ -1019,7 +1019,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 	uint32_t entries, i, len, space_avail;
 	uint8_t *first_free;
 
-	empty_item = &toc->db->idb->empty_item;
+	empty_item = &toc->db->btree->empty_item;
 
 	WT_CLEAR(key_dbt);
 	key = &key_dbt;
@@ -1075,7 +1075,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 			else {
 				data->data = WT_UPDATE_DATA(upd);
 				data->size = upd->size;
-				WT_RET(__wt_item_build_data(
+				WT_RET(__wt_item_build_value(
 				    toc, data, &data_item, &data_ovfl));
 				data_loc = DATA_OFF_PAGE;
 				len += WT_ITEM_SPACE_REQ(data->size);
@@ -1148,15 +1148,15 @@ static int
 __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_REC_LIST *r;
 	WT_STATS *stats;
 	uint32_t addr, size;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	r = &toc->env->ienv->cache->reclist;
-	stats = idb->stats;
+	stats = btree->stats;
 
 	/*
 	 * Because WiredTiger's pages grow without splitting, we're replacing a
@@ -1213,8 +1213,8 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page)
 	 * there's no parent.
 	 */
 	if (page->parent == NULL) {
-		  idb->root_page.addr = addr;
-		  idb->root_page.size = size;
+		  btree->root_page.addr = addr;
+		  btree->root_page.size = size;
 		  return (__wt_desc_write(toc));
 	 }
 

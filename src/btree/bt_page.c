@@ -276,7 +276,7 @@ static int
 __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_ITEM *item;
 	WT_OFF *off;
 	WT_PAGE_DISK *dsk;
@@ -285,9 +285,10 @@ __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 	void *huffman;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	dsk = page->dsk;
-	huffman = idb->huffman_key;
+	env = toc->env;
+	huffman = btree->huffman_key;
 
 	/*
 	 * Internal row-store page entries map one-to-two to the number of
@@ -336,14 +337,14 @@ static int
 __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	dsk = page->dsk;
 
 	/*
@@ -371,7 +372,7 @@ __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
 			++nindx;
 			if (rip->key != NULL)
 				++rip;
-			if (idb->huffman_key != NULL ||
+			if (btree->huffman_key != NULL ||
 			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
 				__wt_key_set_process(rip, item);
 			else
@@ -383,7 +384,7 @@ __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
 			 * implies a zero-length data item.  Initialize the
 			 * slot as if it's going to happen.
 			 */
-			rip->data = &idb->empty_item;
+			rip->data = &btree->empty_item;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
@@ -406,7 +407,7 @@ __wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
 	DB *db;
 	DBT *tmp;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	uint32_t size;
 	int ret;
 	void *huffman, *p;
@@ -414,7 +415,7 @@ __wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
 	db = toc->db;
 	tmp = NULL;
 	env = toc->env;
-	idb = db->idb;
+	btree = db->btree;
 	ret = 0;
 
 	/*
@@ -423,18 +424,18 @@ __wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
 	 */
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
-		huffman = idb->huffman_key;
+		huffman = btree->huffman_key;
 		goto onpage;
 	case WT_ITEM_KEY_OVFL:
-		huffman = idb->huffman_key;
+		huffman = btree->huffman_key;
 		goto offpage;
 	case WT_ITEM_DATA:
-		huffman = idb->huffman_data;
+		huffman = btree->huffman_data;
 onpage:		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_DATA_OVFL:
-		huffman = idb->huffman_data;
+		huffman = btree->huffman_data;
 offpage:	/*
 		 * It's an overflow item -- if it's not encoded, we can read
 		 * it directly into the user's return DBT, otherwise we have to

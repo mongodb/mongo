@@ -65,13 +65,13 @@ __wt_verify(
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_VSTUFF vstuff;
 	int ret;
 
 	env = toc->env;
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	ret = 0;
 
 	WT_CLEAR(vstuff);
@@ -90,7 +90,7 @@ __wt_verify(
 	 * don't overflow.   I don't ever expect to see this error message, but
 	 * better safe than sorry.
 	 */
-	vstuff.frags = WT_OFF_TO_ADDR(db, idb->fh->file_size);
+	vstuff.frags = WT_OFF_TO_ADDR(db, btree->fh->file_size);
 	if (vstuff.frags > INT_MAX) {
 		__wt_api_db_errx(db, "file is too large to verify");
 		goto err;
@@ -107,8 +107,8 @@ __wt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(
-	    toc, NULL, idb->root_page.page, (uint64_t)1, &vstuff));
+	WT_ERR(__wt_verify_tree(toc, NULL,
+	    btree->root_page.page, (uint64_t)1,&vstuff));
 
 	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
@@ -503,14 +503,14 @@ err:	__wt_scr_release(&scratch1);
 static int
 __wt_verify_freelist(WT_TOC *toc, WT_VSTUFF *vs)
 {
+	BTREE *btree;
 	ENV *env;
-	IDB *idb;
 	WT_CACHE *cache;
 	WT_FREE_ENTRY *fe;
 	int ret;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	cache = env->ienv->cache;
 	ret = 0;
 
@@ -526,7 +526,7 @@ __wt_verify_freelist(WT_TOC *toc, WT_VSTUFF *vs)
 	 * freelist, and that's owned and operated by the eviction thread.
 	 */
 	__wt_lock(env, cache->mtx_reconcile);
-	TAILQ_FOREACH(fe, &idb->freeqa, qa)
+	TAILQ_FOREACH(fe, &btree->freeqa, qa)
 		WT_TRET(__wt_verify_addfrag(toc, fe->addr, fe->size, vs));
 	__wt_unlock(env, cache->mtx_reconcile);
 

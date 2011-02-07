@@ -19,7 +19,7 @@ static void __wt_evict_set(WT_TOC *);
 static void __wt_evict_state_check(WT_TOC *);
 static int  __wt_evict_subtrees(WT_PAGE *);
 static int  __wt_evict_walk(WT_TOC *);
-static int  __wt_evict_walk_single(WT_TOC *, IDB *, u_int);
+static int  __wt_evict_walk_single(WT_TOC *, BTREE *, u_int);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_evict_hazard_validate(ENV *, WT_PAGE *);
@@ -48,7 +48,7 @@ static void __wt_evict_hazard_validate(ENV *, WT_PAGE *);
  */
 #define	WT_EVICT_CLR(p) do {						\
 	(p)->ref = NULL;						\
-	(p)->idb = WT_DEBUG_POINT;					\
+	(p)->btree = WT_DEBUG_POINT;					\
 } while (0)
 
 /*
@@ -278,7 +278,7 @@ static int
 __wt_evict_walk(WT_TOC *toc)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	WT_CACHE *cache;
 	u_int elem, i;
@@ -304,8 +304,8 @@ __wt_evict_walk(WT_TOC *toc)
 		cache->evict_elem = elem;
 
 		i = WT_EVICT_WALK_BASE;
-		TAILQ_FOREACH(idb, &ienv->dbqh, q) {
-			if ((ret = __wt_evict_walk_single(toc, idb, i)) != 0)
+		TAILQ_FOREACH(btree, &ienv->dbqh, q) {
+			if ((ret = __wt_evict_walk_single(toc, btree, i)) != 0)
 				break;
 			i += WT_EVICT_WALK_PER_TABLE;
 		}
@@ -319,7 +319,7 @@ __wt_evict_walk(WT_TOC *toc)
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__wt_evict_walk_single(WT_TOC *toc, IDB *idb, u_int slot)
+__wt_evict_walk_single(WT_TOC *toc, BTREE *btree, u_int slot)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -334,13 +334,14 @@ __wt_evict_walk_single(WT_TOC *toc, IDB *idb, u_int slot)
 	i = restarted_once = 0;
 
 	/* If we haven't yet opened a tree-walk structure, do so. */
-	if (idb->evict_walk.tree == NULL)
-restart:	WT_RET(__wt_walk_begin(toc, &idb->root_page, &idb->evict_walk));
+	if (btree->evict_walk.tree == NULL)
+restart:	WT_RET(__wt_walk_begin(toc,
+		    &btree->root_page, &btree->evict_walk));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	do {
 		evict = &cache->evict[slot];
-		WT_RET(__wt_walk_next(toc, &idb->evict_walk, &evict->ref));
+		WT_RET(__wt_walk_next(toc, &btree->evict_walk, &evict->ref));
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
@@ -353,7 +354,7 @@ restart:	WT_RET(__wt_walk_begin(toc, &idb->root_page, &idb->evict_walk));
 			goto restart;
 		}
 
-		evict->idb = idb;
+		evict->btree = btree;
 		++slot;
 	} while (++i < WT_EVICT_WALK_PER_TABLE);
 
@@ -368,14 +369,14 @@ void
 __wt_evict_db_clear(WT_TOC *toc)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	u_int i;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	ienv = env->ienv;
 	cache = ienv->cache;
 
@@ -386,7 +387,7 @@ __wt_evict_db_clear(WT_TOC *toc)
 	if (cache->evict == NULL)
 		return;
 	WT_EVICT_FOREACH(cache, evict, i)
-		if (evict->ref != NULL && evict->idb == idb)
+		if (evict->ref != NULL && evict->btree == btree)
 			WT_EVICT_CLR(evict);
 }
 
@@ -660,7 +661,7 @@ __wt_evict_dirty(WT_TOC *toc)
 		 * a separate DB/IDB handle down through the reconciliation
 		 * code.
 		 */
-		toc->db = evict->idb->db;
+		toc->db = evict->btree->db;
 		WT_ERR(__wt_page_reconcile(toc, page));
 
 		/*
@@ -872,13 +873,13 @@ __wt_evict_dump(WT_TOC *toc)
 int
 __wt_evict_cache_dump(WT_TOC *toc)
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 
 	ienv = toc->env->ienv;
 
-	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		WT_RET(__wt_evict_tree_dump(toc, idb));
+	TAILQ_FOREACH(btree, &ienv->dbqh, q)
+		WT_RET(__wt_evict_tree_dump(toc, btree));
 	return (0);
 }
 
@@ -887,7 +888,7 @@ __wt_evict_cache_dump(WT_TOC *toc)
  *	Dump an in-memory tree.
  */
 int
-__wt_evict_tree_dump(WT_TOC *toc, IDB *idb)
+__wt_evict_tree_dump(WT_TOC *toc, BTREE *btree)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -901,7 +902,7 @@ __wt_evict_tree_dump(WT_TOC *toc, IDB *idb)
 
 	WT_VERBOSE(env, WT_VERB_EVICT, (env,
 	    "%s: pages inuse %llu, bytes inuse (%llu), max (%llu)",
-	    idb->name,
+	    btree->name,
 	    __wt_cache_pages_inuse(cache),
 	    __wt_cache_bytes_inuse(cache),
 	    WT_STAT(cache->stats, CACHE_BYTES_MAX)));
@@ -910,7 +911,7 @@ __wt_evict_tree_dump(WT_TOC *toc, IDB *idb)
 	__wt_mb_add(&mb, "in-memory page list");
 
 	WT_CLEAR(walk);
-	WT_RET(__wt_walk_begin(toc, &idb->root_page, &walk));
+	WT_RET(__wt_walk_begin(toc, &btree->root_page, &walk));
 	for (sep = ':';;) {
 		WT_RET(__wt_walk_next(toc, &walk, &ref));
 		if (ref == NULL)
@@ -931,15 +932,15 @@ __wt_evict_tree_dump(WT_TOC *toc, IDB *idb)
 int
 __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp)
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	uint64_t nodes;
 
 	ienv = toc->env->ienv;
 
 	*nodesp = 0;
-	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
-		WT_RET(__wt_evict_tree_count(toc, idb, &nodes));
+	TAILQ_FOREACH(btree, &ienv->dbqh, q) {
+		WT_RET(__wt_evict_tree_count(toc, btree, &nodes));
 		*nodesp += nodes;
 	}
 	return (0);
@@ -950,7 +951,7 @@ __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp)
  *	Return a count of nodes in the tree.
  */
 int
-__wt_evict_tree_count(WT_TOC *toc, IDB *idb, uint64_t *nodesp)
+__wt_evict_tree_count(WT_TOC *toc, BTREE *btree, uint64_t *nodesp)
 {
 	ENV *env;
 	WT_REF *ref;
@@ -960,7 +961,7 @@ __wt_evict_tree_count(WT_TOC *toc, IDB *idb, uint64_t *nodesp)
 	env = toc->env;
 
 	WT_CLEAR(walk);
-	WT_RET(__wt_walk_begin(toc, &idb->root_page, &walk));
+	WT_RET(__wt_walk_begin(toc, &btree->root_page, &walk));
 	for (nodes = 0;;) {
 		WT_RET(__wt_walk_next(toc, &walk, &ref));
 		if (ref == NULL)

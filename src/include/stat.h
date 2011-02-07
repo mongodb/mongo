@@ -38,20 +38,22 @@ struct __wt_stats {
 /* Statistics section: BEGIN */
 
 /*
- * Statistics entries for CACHE handle.
+ * Statistics entries for BTREE handle.
  */
-#define	WT_STAT_CACHE_BYTES_INUSE		    0
-#define	WT_STAT_CACHE_BYTES_MAX			    1
-#define	WT_STAT_CACHE_EVICT_HAZARD		    2
-#define	WT_STAT_CACHE_EVICT_MODIFIED		    3
-#define	WT_STAT_CACHE_EVICT_UNMODIFIED		    4
-#define	WT_STAT_CACHE_OVERFLOW_READ		    5
-#define	WT_STAT_CACHE_PAGES_INUSE		    6
-#define	WT_STAT_CACHE_PAGE_READ			    7
-#define	WT_STAT_CACHE_PAGE_WRITE		    8
+#define	WT_STAT_FILE_ALLOC			    0
+#define	WT_STAT_FILE_EXTEND			    1
+#define	WT_STAT_FILE_FREE			    2
+#define	WT_STAT_FILE_HUFFMAN_DATA		    3
+#define	WT_STAT_FILE_HUFFMAN_KEY		    4
+#define	WT_STAT_FILE_ITEMS_INSERTED		    5
+#define	WT_STAT_FILE_OVERFLOW_DATA		    6
+#define	WT_STAT_FILE_OVERFLOW_KEY		    7
+#define	WT_STAT_FILE_OVERFLOW_READ		    8
+#define	WT_STAT_FILE_PAGE_READ			    9
+#define	WT_STAT_FILE_PAGE_WRITE			   10
 
 /*
- * Statistics entries for DB/IDB file.
+ * Statistics entries for BTREE file.
  */
 #define	WT_STAT_BASE_RECNO			    0
 #define	WT_STAT_FIXED_LEN			    1
@@ -79,22 +81,20 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_SPLIT_LEAF			   23
 
 /*
- * Statistics entries for DB/IDB handle.
+ * Statistics entries for CACHE handle.
  */
-#define	WT_STAT_FILE_ALLOC			    0
-#define	WT_STAT_FILE_EXTEND			    1
-#define	WT_STAT_FILE_FREE			    2
-#define	WT_STAT_FILE_HUFFMAN_DATA		    3
-#define	WT_STAT_FILE_HUFFMAN_KEY		    4
-#define	WT_STAT_FILE_ITEMS_INSERTED		    5
-#define	WT_STAT_FILE_OVERFLOW_DATA		    6
-#define	WT_STAT_FILE_OVERFLOW_KEY		    7
-#define	WT_STAT_FILE_OVERFLOW_READ		    8
-#define	WT_STAT_FILE_PAGE_READ			    9
-#define	WT_STAT_FILE_PAGE_WRITE			   10
+#define	WT_STAT_CACHE_BYTES_INUSE		    0
+#define	WT_STAT_CACHE_BYTES_MAX			    1
+#define	WT_STAT_CACHE_EVICT_HAZARD		    2
+#define	WT_STAT_CACHE_EVICT_MODIFIED		    3
+#define	WT_STAT_CACHE_EVICT_UNMODIFIED		    4
+#define	WT_STAT_CACHE_OVERFLOW_READ		    5
+#define	WT_STAT_CACHE_PAGES_INUSE		    6
+#define	WT_STAT_CACHE_PAGE_READ			    7
+#define	WT_STAT_CACHE_PAGE_WRITE		    8
 
 /*
- * Statistics entries for ENV/IENV handle.
+ * Statistics entries for IENV handle.
  */
 #define	WT_STAT_FILE_OPEN			    0
 #define	WT_STAT_MEMALLOC			    1

@@ -14,7 +14,7 @@
 int
 __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
-	IDB *idb;
+	BTREE *btree;
 	IENV *ienv;
 	WT_FH *fh;
 	int f, fd, ret;
@@ -26,10 +26,10 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 
 	/* Increment the reference count if we already have the file open. */
 	__wt_lock(env, ienv->mtx);
-	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
-		if ((fh = idb->fh) == NULL)
+	TAILQ_FOREACH(btree, &ienv->dbqh, q) {
+		if ((fh = btree->fh) == NULL)
 			continue;
-		if (strcmp(name, idb->name) == 0) {
+		if (strcmp(name, btree->name) == 0) {
 			++fh->refcnt;
 			*fhp = fh;
 			break;

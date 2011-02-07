@@ -17,15 +17,15 @@ int
 __wt_bt_sync(WT_TOC *toc)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	WT_CACHE *cache;
 	int ret;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 	cache = env->ienv->cache;
 
-	if (WT_UNOPENED_FILE(idb))
+	if (WT_UNOPENED_FILE(btree))
 		return (0);
 
 	/*

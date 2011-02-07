@@ -19,30 +19,30 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 {
 	DB *db;
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
+	btree = db->btree;
 
 	/* Check page size configuration. */
 	WT_RET(__wt_open_verify(db));
 
 	/* Open the fle. */
-	WT_RET(__wt_open(env, idb->name, idb->mode, ok_create, &idb->fh));
+	WT_RET(__wt_open(env, btree->name, btree->mode, ok_create, &btree->fh));
 
 	/*
 	 * If the file size is 0, write a description page; if the file size
 	 * is non-zero, update the DB handle based on the on-disk description
 	 * page.  (If the file isn't empty, there must be a description page.)
 	 */
-	if (idb->fh->file_size == 0)
+	if (btree->fh->file_size == 0)
 		WT_RET(__wt_desc_write(toc));
 	else {
 		WT_RET(__wt_desc_read(toc));
 
 		/* If there's a root page, pin it. */
-		if (idb->root_page.addr != WT_ADDR_INVALID)
+		if (btree->root_page.addr != WT_ADDR_INVALID)
 			WT_RET(__wt_root_pin(toc));
 	}
 
@@ -60,15 +60,15 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 static int
 __wt_open_verify(DB *db)
 {
-	IDB *idb;
+	BTREE *btree;
 
-	idb = db->idb;
+	btree = db->btree;
 
 	/* Verify the page sizes. */
 	WT_RET(__wt_open_verify_page_sizes(db));
 
 	/* Verify other configuration combinations. */
-	if (db->fixed_len != 0 && (idb->huffman_key || idb->huffman_data)) {
+	if (db->fixed_len != 0 && (btree->huffman_key || btree->huffman_data)) {
 		__wt_api_db_errx(db,
 		    "Fixed-size column-store files may not be Huffman encoded");
 		return (WT_ERROR);
@@ -84,9 +84,9 @@ __wt_open_verify(DB *db)
 static int
 __wt_open_verify_page_sizes(DB *db)
 {
-	IDB *idb;
+	BTREE *btree;
 
-	idb = db->idb;
+	btree = db->btree;
 
 	/*
 	 * The application can set lots of page sizes.  It's complicated, so
@@ -241,7 +241,7 @@ __wt_open_verify_page_sizes(DB *db)
 	 * A fixed-size column-store should be able to store at least 20
 	 * objects on a page, otherwise it just doesn't make sense.
 	 */
-	if (F_ISSET(idb, WT_COLUMN) &&
+	if (F_ISSET(btree, WT_COLUMN) &&
 	    db->fixed_len != 0 && db->leafmin / db->fixed_len < 20) {
 		__wt_api_db_errx(db,
 		    "The leaf page size cannot store at least 20 fixed-length "
@@ -259,15 +259,15 @@ __wt_open_verify_page_sizes(DB *db)
 int
 __wt_root_pin(WT_TOC *toc)
 {
-	IDB *idb;
+	BTREE *btree;
 
-	idb = toc->db->idb;
+	btree = toc->db->btree;
 
 	/* Get the root page, which had better be there. */
-	WT_RET(__wt_page_in(toc, NULL, &idb->root_page, 0));
+	WT_RET(__wt_page_in(toc, NULL, &btree->root_page, 0));
 
-	WT_PAGE_SET_PIN(idb->root_page.page);
-	__wt_hazard_clear(toc, idb->root_page.page);
+	WT_PAGE_SET_PIN(btree->root_page.page);
+	__wt_hazard_clear(toc, btree->root_page.page);
 
 	return (0);
 }

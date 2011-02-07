@@ -160,11 +160,11 @@ __wt_db_huffman_set(DB *db,
     uint8_t const *huffman_table, u_int huffman_table_size, uint32_t flags)
 {
 	ENV *env;
-	IDB *idb;
+	BTREE *btree;
 	uint8_t phone[256];
 
 	env = db->env;
-	idb = db->idb;
+	btree = db->btree;
 
 	switch (LF_ISSET(WT_ASCII_ENGLISH | WT_TELEPHONE)) {
 	case WT_ASCII_ENGLISH:
@@ -203,29 +203,29 @@ err:		return (__wt_api_args(env, "Db.huffman_set"));
 	 * an application error to set the Huffman table twice, but hey, I just
 	 * work here.
 	 */
-	if (LF_ISSET(WT_HUFFMAN_KEY) && idb->huffman_key != NULL) {
+	if (LF_ISSET(WT_HUFFMAN_KEY) && btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
-		if (idb->huffman_data == idb->huffman_key)
-			idb->huffman_data = NULL;
-		__wt_huffman_close(env, idb->huffman_key);
-		idb->huffman_key = NULL;
+		if (btree->huffman_data == btree->huffman_key)
+			btree->huffman_data = NULL;
+		__wt_huffman_close(env, btree->huffman_key);
+		btree->huffman_key = NULL;
 	}
-	if (LF_ISSET(WT_HUFFMAN_DATA) && idb->huffman_data != NULL) {
-		__wt_huffman_close(env, idb->huffman_data);
-		idb->huffman_data = NULL;
+	if (LF_ISSET(WT_HUFFMAN_DATA) && btree->huffman_data != NULL) {
+		__wt_huffman_close(env, btree->huffman_data);
+		btree->huffman_data = NULL;
 	}
 	if (LF_ISSET(WT_HUFFMAN_KEY)) {
 		WT_RET(__wt_huffman_open(env,
-		     huffman_table, huffman_table_size, &idb->huffman_key));
+		     huffman_table, huffman_table_size, &btree->huffman_key));
 		/* Key and data may use the same table. */
 		if (LF_ISSET(WT_HUFFMAN_DATA)) {
-			idb->huffman_data = idb->huffman_key;
+			btree->huffman_data = btree->huffman_key;
 			LF_CLR(WT_HUFFMAN_DATA);
 		}
 	}
 	if (LF_ISSET(WT_HUFFMAN_DATA))
 		WT_RET(__wt_huffman_open(env,
-		    huffman_table, huffman_table_size, &idb->huffman_data));
+		    huffman_table, huffman_table_size, &btree->huffman_data));
 
 	return (0);
 }

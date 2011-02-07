@@ -21,14 +21,14 @@ int
 __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
-	IDB *idb;
+	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 
 	db = toc->db;
-	idb = db->idb;
+	btree = db->btree;
 	dsk = page->dsk;
-	stats = idb->dstats;
+	stats = btree->fstats;
 
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
@@ -79,7 +79,7 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 	uint32_t i;
 
 	dsk = page->dsk;
-	stats = toc->db->idb->dstats;
+	stats = toc->db->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i)
@@ -112,7 +112,7 @@ __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 	void *cipdata;
 
 	dsk = page->dsk;
-	stats = toc->db->idb->dstats;
+	stats = toc->db->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
@@ -163,7 +163,7 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 
 	db = toc->db;
 	dsk = page->dsk;
-	stats = db->idb->dstats;
+	stats = db->btree->fstats;
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
@@ -210,7 +210,7 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 
 	arg = NULL;				/* Shut the compiler up. */
 	db = toc->db;
-	stats = db->idb->dstats;
+	stats = db->btree->fstats;
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking

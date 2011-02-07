@@ -220,7 +220,7 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	db = toc->db;
 	dsk = page->dsk;
-	huffman = db->idb->huffman_data;
+	huffman = db->btree->huffman_data;
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(toc, 0, &tmp));
@@ -275,7 +275,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	db = toc->db;
 	key = data = key_tmp = data_tmp = NULL;
-	huffman = db->idb->huffman_data;
+	huffman = db->btree->huffman_data;
 	ret = 0;
 
 	WT_ERR(__wt_scr_alloc(toc, 0, &key_tmp));

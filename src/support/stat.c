@@ -3,47 +3,53 @@
 #include "wt_internal.h"
 
 int
-__wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_btree_handle_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 10, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 12, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_CACHE_BYTES_INUSE].desc =
-	    "cache: bytes currently held in the cache";
-	stats[WT_STAT_CACHE_BYTES_MAX].desc =
-	    "cache: maximum bytes configured";
-	stats[WT_STAT_CACHE_EVICT_HAZARD].desc =
-	    "cache: pages selected for eviction not evicted because of a hazard reference";
-	stats[WT_STAT_CACHE_EVICT_MODIFIED].desc =
-	    "cache: modified pages selected for eviction";
-	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].desc =
-	    "cache: unmodified pages selected for eviction";
-	stats[WT_STAT_CACHE_OVERFLOW_READ].desc =
-	    "cache: overflow pages read from the file";
-	stats[WT_STAT_CACHE_PAGES_INUSE].desc =
-	    "cache: pages currently held in the cache";
-	stats[WT_STAT_CACHE_PAGE_READ].desc = "cache: pages read from a file";
-	stats[WT_STAT_CACHE_PAGE_WRITE].desc =
-	    "cache: pages written to a file";
+	stats[WT_STAT_FILE_ALLOC].desc = "file: block allocations";
+	stats[WT_STAT_FILE_EXTEND].desc =
+	    "file: block allocations require file extension";
+	stats[WT_STAT_FILE_FREE].desc = "file: block frees";
+	stats[WT_STAT_FILE_HUFFMAN_DATA].desc =
+	    "file: huffman data compression in bytes";
+	stats[WT_STAT_FILE_HUFFMAN_KEY].desc =
+	    "file: huffman key compression in bytes";
+	stats[WT_STAT_FILE_ITEMS_INSERTED].desc =
+	    "file: key/data pairs inserted";
+	stats[WT_STAT_FILE_OVERFLOW_DATA].desc =
+	    "file: overflow data items inserted";
+	stats[WT_STAT_FILE_OVERFLOW_KEY].desc =
+	    "file: overflow key items inserted";
+	stats[WT_STAT_FILE_OVERFLOW_READ].desc =
+	    "file: overflow pages read from the file";
+	stats[WT_STAT_FILE_PAGE_READ].desc = "file: pages read from a file";
+	stats[WT_STAT_FILE_PAGE_WRITE].desc = "file: pages written to a file";
 
 	*statsp = stats;
 	return (0);
 }
 
 void
-__wt_stat_clear_cache_stats(WT_STATS *stats)
+__wt_stat_clear_btree_handle_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_CACHE_EVICT_HAZARD].v = 0;
-	stats[WT_STAT_CACHE_EVICT_MODIFIED].v = 0;
-	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].v = 0;
-	stats[WT_STAT_CACHE_OVERFLOW_READ].v = 0;
-	stats[WT_STAT_CACHE_PAGE_READ].v = 0;
-	stats[WT_STAT_CACHE_PAGE_WRITE].v = 0;
+	stats[WT_STAT_FILE_ALLOC].v = 0;
+	stats[WT_STAT_FILE_EXTEND].v = 0;
+	stats[WT_STAT_FILE_FREE].v = 0;
+	stats[WT_STAT_FILE_HUFFMAN_DATA].v = 0;
+	stats[WT_STAT_FILE_HUFFMAN_KEY].v = 0;
+	stats[WT_STAT_FILE_ITEMS_INSERTED].v = 0;
+	stats[WT_STAT_FILE_OVERFLOW_DATA].v = 0;
+	stats[WT_STAT_FILE_OVERFLOW_KEY].v = 0;
+	stats[WT_STAT_FILE_OVERFLOW_READ].v = 0;
+	stats[WT_STAT_FILE_PAGE_READ].v = 0;
+	stats[WT_STAT_FILE_PAGE_WRITE].v = 0;
 }
 
 int
-__wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_btree_file_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
@@ -84,7 +90,7 @@ __wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
 }
 
 void
-__wt_stat_clear_file_stats(WT_STATS *stats)
+__wt_stat_clear_btree_file_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
 	stats[WT_STAT_FIXED_LEN].v = 0;
@@ -113,49 +119,43 @@ __wt_stat_clear_file_stats(WT_STATS *stats)
 }
 
 int
-__wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 12, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 10, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_FILE_ALLOC].desc = "file: block allocations";
-	stats[WT_STAT_FILE_EXTEND].desc =
-	    "file: block allocations require file extension";
-	stats[WT_STAT_FILE_FREE].desc = "file: block frees";
-	stats[WT_STAT_FILE_HUFFMAN_DATA].desc =
-	    "file: huffman data compression in bytes";
-	stats[WT_STAT_FILE_HUFFMAN_KEY].desc =
-	    "file: huffman key compression in bytes";
-	stats[WT_STAT_FILE_ITEMS_INSERTED].desc =
-	    "file: key/data pairs inserted";
-	stats[WT_STAT_FILE_OVERFLOW_DATA].desc =
-	    "file: overflow data items inserted";
-	stats[WT_STAT_FILE_OVERFLOW_KEY].desc =
-	    "file: overflow key items inserted";
-	stats[WT_STAT_FILE_OVERFLOW_READ].desc =
-	    "file: overflow pages read from the file";
-	stats[WT_STAT_FILE_PAGE_READ].desc = "file: pages read from a file";
-	stats[WT_STAT_FILE_PAGE_WRITE].desc = "file: pages written to a file";
+	stats[WT_STAT_CACHE_BYTES_INUSE].desc =
+	    "cache: bytes currently held in the cache";
+	stats[WT_STAT_CACHE_BYTES_MAX].desc =
+	    "cache: maximum bytes configured";
+	stats[WT_STAT_CACHE_EVICT_HAZARD].desc =
+	    "cache: pages selected for eviction not evicted because of a hazard reference";
+	stats[WT_STAT_CACHE_EVICT_MODIFIED].desc =
+	    "cache: modified pages selected for eviction";
+	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].desc =
+	    "cache: unmodified pages selected for eviction";
+	stats[WT_STAT_CACHE_OVERFLOW_READ].desc =
+	    "cache: overflow pages read from the file";
+	stats[WT_STAT_CACHE_PAGES_INUSE].desc =
+	    "cache: pages currently held in the cache";
+	stats[WT_STAT_CACHE_PAGE_READ].desc = "cache: pages read from a file";
+	stats[WT_STAT_CACHE_PAGE_WRITE].desc =
+	    "cache: pages written to a file";
 
 	*statsp = stats;
 	return (0);
 }
 
 void
-__wt_stat_clear_db_stats(WT_STATS *stats)
+__wt_stat_clear_cache_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_FILE_ALLOC].v = 0;
-	stats[WT_STAT_FILE_EXTEND].v = 0;
-	stats[WT_STAT_FILE_FREE].v = 0;
-	stats[WT_STAT_FILE_HUFFMAN_DATA].v = 0;
-	stats[WT_STAT_FILE_HUFFMAN_KEY].v = 0;
-	stats[WT_STAT_FILE_ITEMS_INSERTED].v = 0;
-	stats[WT_STAT_FILE_OVERFLOW_DATA].v = 0;
-	stats[WT_STAT_FILE_OVERFLOW_KEY].v = 0;
-	stats[WT_STAT_FILE_OVERFLOW_READ].v = 0;
-	stats[WT_STAT_FILE_PAGE_READ].v = 0;
-	stats[WT_STAT_FILE_PAGE_WRITE].v = 0;
+	stats[WT_STAT_CACHE_EVICT_HAZARD].v = 0;
+	stats[WT_STAT_CACHE_EVICT_MODIFIED].v = 0;
+	stats[WT_STAT_CACHE_EVICT_UNMODIFIED].v = 0;
+	stats[WT_STAT_CACHE_OVERFLOW_READ].v = 0;
+	stats[WT_STAT_CACHE_PAGE_READ].v = 0;
+	stats[WT_STAT_CACHE_PAGE_WRITE].v = 0;
 }
 
 int

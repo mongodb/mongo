@@ -40,9 +40,9 @@ cache_stats = {
 }
 
 ##########################################
-# IDB handle statistics
+# BTREE handle statistics
 ##########################################
-idb_stats = {
+btree_stats = {
     'FILE_ALLOC' : Stat('file: block allocations'),
     'FILE_EXTEND' : Stat('file: block allocations require file extension'),
     'FILE_FREE' : Stat('file: block frees'),
@@ -57,9 +57,9 @@ idb_stats = {
 }
 
 ##########################################
-# IDB file statistics
+# BTREE file statistics
 ##########################################
-idb_dstats = {
+btree_fstats = {
     'BASE_RECNO' : Stat('base record number'),
     'FIXED_LEN' : Stat('fixed-record size'),
     'FREELIST_ENTRIES' : Stat('number of entries in the freelist'),

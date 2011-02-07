@@ -10,12 +10,10 @@
  * it's easier to keep them in one place and incrementally increase the risk
  * of stepping on the application's name space.
  *******************************************/
-struct __db;			typedef struct __db DB;
-struct __dbc;			typedef struct __dbc DBC;
 struct __dbt;			typedef struct __dbt DBT;
+struct __db;			typedef struct __db DB;
+struct __btree;			typedef struct __btree BTREE;
 struct __env;			typedef struct __env ENV;
-struct __idb;			typedef struct __idb IDB;
-struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
 
 /*******************************************
@@ -38,7 +36,7 @@ struct __dbt {
  *******************************************/
 struct __db {
 	ENV	*env;			/* Enclosing environment */
-	IDB	*idb;			/* Private object */
+	BTREE	*btree;			/* Private object */
 
 	void	*app_private;		/* Application-private information */
 
@@ -177,13 +175,6 @@ struct __db {
 	 * DB methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
-};
-
-/*******************************************
- * Cursor handle
- *******************************************/
-struct __dbc {
-	IDBC *idbc;			/* Private object */
 };
 
 /*******************************************
