@@ -517,7 +517,8 @@ struct __wt_row {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_ROW_SIZE	(2 * sizeof(void *) + sizeof(uint32_t))
+#define	WT_ROW_SIZE							\
+	WT_ALIGN(2 * sizeof(void *) + sizeof(uint32_t), sizeof(void *))
 
 /*
  * WT_ROW_INSERT --
