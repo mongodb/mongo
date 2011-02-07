@@ -959,13 +959,15 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
 
 	env = toc->env;
-	idb = toc->db->idb;
+	db = toc->db;
+	idb = db->idb;
 
 	/*
 	 * If we're writing the root of the tree, then we have to update the
@@ -997,7 +999,7 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		off->addr = new->addr;
 		off->size = new->size;
 		break;
-	default:
+	WT_ILLEGAL_FORMAT(db);
 		break;
 	}
 
