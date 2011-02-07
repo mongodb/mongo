@@ -988,6 +988,7 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_LEAF:
 		off_record = page->parent_off;
 		off_record->addr = new->addr;
 		off_record->size = new->size;
@@ -1000,7 +1001,6 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		off->size = new->size;
 		break;
 	WT_ILLEGAL_FORMAT(db);
-		break;
 	}
 
 	/*
