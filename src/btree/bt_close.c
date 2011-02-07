@@ -74,15 +74,17 @@ __wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	WT_CC_QUIET(arg, NULL);
 
-	/* Reconcile any dirty pages, then discard the page. */
+	/*
+	 * Reconcile any dirty pages, then discard the page.
+	 *
+	 * The tree walk is depth first, that is, the worker function is not
+	 * called on internal pages until all children have been visited; so,
+	 * we don't have to worry about reconciling a page that still has a
+	 * child page, or reading a page after we discard it,
+	 */
 	if (WT_PAGE_IS_MODIFIED(page))
 		WT_RET(__wt_page_reconcile(toc, page));
 
-	/*
-	 * The tree walk is depth first, that is, the worker function is not
-	 * called on internal pages until all children have been visited; so,
-	 * we don't have to worry about reading a page after we discard it.
-	 */
 	__wt_page_discard(toc, page);
 
 	return (0);
