@@ -73,8 +73,10 @@ function verify() {
     var d = conn.getDB("test");
     var count = d.foo.count();
     if (count != 1) {
-        sleep(5000); // easier to read then
-        print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count + "\n\n\n");
+	print("going to fail, count mismatch in verify()");
+        sleep(10000); // easier to read the output this way
+        print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count);
+	print(d.foo.count() + "\n\n\n");
         assert(false);
     }
     assert(d.foo.findOne()._id == 100, "100");
