@@ -737,7 +737,7 @@ if ( typeof _threadInject != "undefined" ){
                             "__parallelTests__fun.apply( 0, __parallelTests__argv );" +
                             "__parallelTests__passed = true;" +
                          "} catch ( e ) {" +
-                            "print( e );" +
+                            "print( '********** Parallel Test FAILED: ' + tojson(e) );" +
                          "}" +
                          "return __parallelTests__passed;" +
                          "}"
