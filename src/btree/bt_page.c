@@ -266,9 +266,9 @@ __wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
 	 * The page contains fixed-length objects.
 	 */
 	WT_RLE_REPEAT_FOREACH(db, dsk, p, i) {
-		records += WT_RLE_REPEAT_COUNT(p);
 		cip->data = p;
 		++cip;
+		records += WT_RLE_REPEAT_COUNT(p);
 	}
 
 	page->indx_count = dsk->u.entries;
@@ -346,7 +346,6 @@ __wt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	}
 
 	page->indx_count = dsk->u.entries;
-	page->records = dsk->u.entries;
 	return (0);
 }
 
@@ -360,17 +359,14 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_ITEM *item;
-	WT_OFF *off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
-	uint64_t records;
 	uint32_t i;
 	void *huffman;
 
 	idb = db->idb;
 	dsk = page->dsk;
 	rip = page->u.irow;
-	records = 0;
 
 	huffman =
 	    dsk->type == WT_PAGE_DUP_INT ? idb->huffman_data : idb->huffman_key;
@@ -399,8 +395,6 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 			__wt_key_set_process(rip, item);
 			break;
 		case WT_ITEM_OFF:
-			off = WT_ITEM_BYTE_OFF(item);
-			records += WT_RECORDS(off);
 			rip->data = item;
 			++rip;
 			break;
@@ -408,7 +402,6 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 		}
 
 	page->indx_count = dsk->u.entries / 2;
-	page->records = records;
 	return (0);
 }
 
@@ -426,12 +419,10 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	WT_REF *ref;
 	WT_ROW *rip;
 	uint32_t i, indx_count;
-	uint64_t records;
 
 	env = db->env;
 	idb = db->idb;
 	dsk = page->dsk;
-	records = 0;
 
 	/*
 	 * Walk a row-store page of WT_ITEMs, building indices and finding the
@@ -477,11 +468,9 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 			rip->data = item;
-			++records;
 			break;
 		case WT_ITEM_OFF:
 			rip->data = item;
-			records += WT_ROW_OFF_RECORDS(rip);
 
 			/*
 			 * We need a WT_REF entry for any item referencing an
@@ -500,7 +489,6 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		}
 
 	page->indx_count = indx_count;
-	page->records = records;
 
 	return (0);
 }

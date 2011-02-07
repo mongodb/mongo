@@ -22,6 +22,8 @@ typedef struct {
 	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
 
+	uint64_t duptree;			/* Dup tree record count */
+
 	WT_PAGE *leaf;				/* Last leaf-page */
 } WT_VSTUFF;
 
@@ -149,7 +151,7 @@ __wt_verify_tree(
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint64_t records;
-	uint32_t i;
+	uint32_t i, item_num;
 	int is_root, ret;
 
 	db = toc->db;
@@ -214,7 +216,7 @@ __wt_verify_tree(
 	}
 
 	/*
-	 * Check the record counts.
+	 * Check the starting record number and record counts.
 	 *
 	 * Confirm the number of records found on this page (by summing the
 	 * WT_OFF structure record counts) matches the WT_OFF structure record
@@ -223,16 +225,6 @@ __wt_verify_tree(
 	 * but we did that when building the in-memory version of the page,
 	 * there's no reason to do it again.
 	 */
-	if (page->records != parent_records) {
-		__wt_api_db_errx(db,
-		    "page at addr %lu has a record count of %llu where the "
-		    "expected record count was %llu",
-		    (u_long)page->addr, page->records,
-		    (unsigned long long)parent_records);
-		goto err;
-	}
-
-	/* Check the starting record number. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
@@ -245,6 +237,35 @@ __wt_verify_tree(
 			    (u_long)page->addr,
 			    (unsigned long long)dsk->start_recno,
 			    (unsigned long long)start_recno);
+			goto err;
+		}
+		if (page->records != parent_records) {
+			__wt_api_db_errx(db,
+			    "page at addr %lu has a record count of %llu where "
+			    "the expected record count was %llu",
+			    (u_long)page->addr, page->records,
+			    (unsigned long long)parent_records);
+			goto err;
+		}
+		break;
+	case WT_PAGE_DUP_LEAF:
+		/*
+		 * The only row-store record count we maintain is a total count
+		 * of the data items held in each off-page duplicate tree.
+		 * Keep track of how many records on each duplicate tree leaf
+		 * page and check it against the parent row-store leaf page
+		 * stored count when the traversal is complete.
+		 */
+		vs->duptree += dsk->u.entries;
+		/* FALLTHROUGH */
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		if (page->records != 0) {
+			__wt_api_db_errx(db,
+			    "page at addr %lu has a record count of %llu where "
+			    "no record count was expected",
+			    (u_long)page->addr, page->records);
 			goto err;
 		}
 		break;
@@ -356,10 +377,9 @@ __wt_verify_tree(
 			/* rip references the subtree containing the record */
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
-			records = WT_ROW_OFF_RECORDS(rip);
 			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
 			ret = __wt_verify_tree(toc, rip,
-			    records, (uint64_t)0, level - 1, ref, vs);
+			    (uint64_t)0, (uint64_t)0, level - 1, ref, vs);
 
 			/*
 			 * Remaining special handling of the last verified leaf
@@ -379,7 +399,10 @@ __wt_verify_tree(
 		 * For each entry in a row-store leaf page, verify any off-page
 		 * duplicates tree.
 		 */
+		item_num = 0;
 		WT_INDX_FOREACH(page, rip, i) {
+			++item_num;
+
 			/* Ignore anything except off-page duplicate trees. */
 			if ((repl = WT_ROW_REPL(
 			    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
@@ -389,15 +412,28 @@ __wt_verify_tree(
 				continue;
 
 			/* Verify the off-page duplicate tree. */
+			vs->duptree = 0;
+
 			ref = WT_ROW_DUP(page, rip);
 			off = WT_ROW_OFF(rip);
-			records = WT_ROW_OFF_RECORDS(rip);
 			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
 			ret = __wt_verify_tree(toc, NULL,
-			    records, (uint64_t)0, WT_NOLEVEL, ref, vs);
+			    (uint64_t)0, (uint64_t)0, WT_NOLEVEL, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				goto err;
+
+			if (vs->duptree != WT_RECORDS(off)) {
+				__wt_api_db_errx(db,
+				    "off-page duplicate tree referenced from "
+				    "item %lu of page %lu has a record count "
+				    "of %llu when a record count of %llu was "
+				    "expected",
+				    (u_long)item_num, (u_long)page->addr,
+				    (unsigned long long)vs->duptree,
+				    (unsigned long long)WT_RECORDS(off));
+				goto err;
+			}
 		}
 		/* FALLTHROUGH */
 	case WT_PAGE_DUP_LEAF:

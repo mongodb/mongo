@@ -164,11 +164,23 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
-	fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu, records %llu\n",
+	fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu",
 	    (u_long)page->addr,
 	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
-	    __wt_page_type_string(page->dsk), (u_long)page->size,
-	    (unsigned long long)page->records);
+	    __wt_page_type_string(page->dsk), (u_long)page->size);
+	switch (page->dsk->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
+		fprintf(stderr,
+		    ", records %llu", (unsigned long long)page->records);
+		break;
+	default:
+		break;
+	}
+	fprintf(stderr, "\n");
+
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
 	switch (page->dsk->type) {

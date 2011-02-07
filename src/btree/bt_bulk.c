@@ -1103,7 +1103,7 @@ split:		switch (dsk->type) {
 
 		/* Create the WT_ITEM(WT_OFF) reference. */
 		WT_ITEM_SET(&item, WT_ITEM_OFF, sizeof(WT_OFF));
-		WT_RECORDS(&off) = page->records;
+		WT_RECORDS(&off) = 0;
 		off.addr = page->addr;
 		off.size = dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
@@ -1145,8 +1145,6 @@ split:		switch (dsk->type) {
 				break;
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_DUP_INT:
-				WT_RECORDS(
-				    (WT_OFF *)WT_ITEM_BYTE(elem->data)) += incr;
 				break;
 			WT_ILLEGAL_FORMAT(db);
 			}

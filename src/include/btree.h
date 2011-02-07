@@ -133,6 +133,7 @@ struct __wt_page {
 	uint32_t addr;			/* Original file allocation address */
 	uint32_t size;			/* Size in bytes */
 
+	/* Record count is only maintained for column-store files. */
 	uint64_t records;		/* Records in this subtree */
 
 	WT_PAGE	*parent;		/* Page's parent */
@@ -615,8 +616,6 @@ struct __wt_rle_expand {
 
 #define	WT_ROW_OFF(ip)							\
 	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
-#define	WT_ROW_OFF_RECORDS(ip)						\
-	WT_RECORDS(WT_ROW_OFF(ip))
 
 /*
  * WT_ITEM --
