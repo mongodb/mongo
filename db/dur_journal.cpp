@@ -184,14 +184,14 @@ namespace mongo {
         }
         void journalCleanup() { j.cleanup(); }
 
-        bool preallocateIsFaster() {
+        bool _preallocateIsFaster() {
             bool faster = false;
             filesystem::path p = getJournalDir() / "tempLatencyTest";
             try { remove(p); } catch(...) { }
             try {
                 AlignedBuilder b(8192);
                 int millis[2];
-                const int N = 100;
+                const int N = 50;
                 for( int pass = 0; pass < 2; pass++ ) {
                     LogFile f(p.string());
                     Timer t;
@@ -213,6 +213,9 @@ namespace mongo {
             }
             try { remove(p); } catch(...) { }
             return faster;
+        }
+        bool preallocateIsFaster() {
+            return _preallocateIsFaster() && _preallocateIsFaster() && _preallocateIsFaster(); 
         }
 
         // throws
