@@ -552,8 +552,10 @@ namespace mongo {
         void Journal::journal(const AlignedBuilder& b) {
             try {
                 mutex::scoped_lock lk(_curLogFileMutex);
-                if( _curLogFile == 0 )
-                    _open();
+
+                // must already be open -- so that _curFileId is correct for previous buffer building
+                assert( _curLogFile );
+
                 stats.curr->_journaledBytes += b.len();
                 _written += b.len();
                 _curLogFile->synchronousAppend((void *) b.buf(), b.len());

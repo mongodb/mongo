@@ -183,6 +183,7 @@ namespace mongo {
         }
         void PREPLOGBUFFER() {
             Timer t;
+            j.assureLogFileOpen(); // so fileId is set
             _PREPLOGBUFFER();
             stats.curr->_prepLogBufferMicros += t.micros();
         }

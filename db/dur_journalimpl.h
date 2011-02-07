@@ -57,6 +57,12 @@ namespace mongo {
 
             unsigned long long curFileId() const { return _curFileId; }
 
+            void assureLogFileOpen() {
+                mutex::scoped_lock lk(_curLogFileMutex);
+                if( _curLogFile == 0 )
+                    _open();
+            }
+
         private:
             /** open a journal file to journal operations to. */
             void open();
