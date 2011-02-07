@@ -118,7 +118,7 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 			 * Recursively call the tree-walk function for the
 			 * off-page duplicate tree.
 			 */
-			ref = WT_ROW_REF(page, rip);
+			ref = WT_ROW_DUP(page, rip);
 			if (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK)
 				continue;
 

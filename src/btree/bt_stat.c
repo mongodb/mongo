@@ -307,7 +307,7 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			 * page, so it's faster than walking the page both here
 			 * and in the tree-walk function.)
 			 */
-			ref = WT_ROW_REF(page, rip);
+			ref = WT_ROW_DUP(page, rip);
 			off_record = WT_ROW_OFF_RECORD(rip);
 			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
 			ret = __wt_tree_walk(toc, ref, 0, __wt_page_stat, arg);
