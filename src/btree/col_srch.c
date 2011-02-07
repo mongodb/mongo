@@ -19,7 +19,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	DB *db;
 	IDB *idb;
 	WT_COL *cip;
-	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp;
@@ -90,8 +90,8 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 		/* cip references the subtree containing the record. */
 		ref = WT_COL_REF(page, cip);
-		off = WT_COL_OFF(cip);
-		WT_ERR(__wt_page_in(toc, page, ref, off, 0));
+		off_record = WT_COL_OFF(cip);
+		WT_ERR(__wt_page_in(toc, page, ref, off_record, 0));
 
 		/* Swap the parent page for the child page. */
 		if (page != idb->root_page.page)

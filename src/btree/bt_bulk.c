@@ -29,7 +29,8 @@ typedef struct {
 
 static int __wt_bulk_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bulk_dup_offpage(WT_TOC *, DBT **, DBT **, DBT *, WT_ITEM *,
-		uint32_t, uint32_t, WT_OFF *, int (*)(DB *, DBT **, DBT **));
+		uint32_t, uint32_t, WT_OFF_RECORD *,
+		int (*)(DB *, DBT **, DBT **));
 static int __wt_bulk_fix(WT_TOC *, void (*)(const char *,
 		uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
@@ -247,14 +248,14 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 	ENV *env;
 	IDB *idb;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
-	WT_OFF off;
+	WT_OFF_RECORD off_record;
 	WT_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	WT_STACK stack;
 	uint64_t insert_cnt;
 	uint32_t dup_count, dup_space, len, next_space_avail, space_avail;
-	uint8_t *first_free, *next_first_free, *p, type;
-	int ret;
+	uint8_t *first_free, *next_first_free, *p, page_type;
+	int is_column, ret;
 
 	db = toc->db;
 	tmp1 = tmp2 = NULL;
@@ -265,7 +266,7 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 	WT_CLEAR(stack);
 	dup_space = dup_count = 0;
 	insert_cnt = 0;
-	type = F_ISSET(idb, WT_COLUMN) ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
+	is_column = F_ISSET(idb, WT_COLUMN) ? 1 : 0;
 
 	lastkey = &lastkey_std;
 	WT_CLEAR(data_copy);
@@ -275,11 +276,12 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 	WT_ERR(__wt_scr_alloc(toc, 0, &lastkey_copy));
 
 	/* Get a scratch buffer and make it look like our work page. */
+	page_type = is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
 	WT_ERR(__wt_bulk_scratch_page(
-	    toc, db->leafmin, type, WT_LLEAF, &page, &tmp1));
+	    toc, db->leafmin, page_type, WT_LLEAF, &page, &tmp1));
 	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
-	if (type == WT_PAGE_COL_VAR)
+	if (is_column)
 		page->dsk->start_recno = 1;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
@@ -409,11 +411,11 @@ skip_read:	/*
 		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
 		    WT_ITEM_SPACE_REQ(data->size) > space_avail) {
 			WT_ERR(__wt_bulk_scratch_page(toc,
-			    db->leafmin, type, WT_LLEAF, &next, &tmp2));
+			    db->leafmin, page_type, WT_LLEAF, &next, &tmp2));
 			__wt_set_ff_and_sa_from_offset(next,
 			    WT_PAGE_BYTE(next),
 			    &next_first_free, &next_space_avail);
-			if (type == WT_PAGE_COL_VAR)
+			if (is_column)
 				next->dsk->start_recno = insert_cnt;
 
 			/*
@@ -586,24 +588,25 @@ skip_read:	/*
 			WT_ERR(__wt_bulk_dup_offpage(toc, &key, &data, lastkey,
 			    dup_data,
 			    (uint32_t)(first_free - (uint8_t *)dup_data),
-			    dup_count, &off, cb));
+			    dup_count, &off_record, cb));
 
 			/* Reset the page entry and record counts. */
 			page->dsk->u.entries -= (dup_count - 1);
-			page->records -= dup_count;
-			page->records += WT_RECORDS(&off);
 
 			/*
-			 * Replace the duplicate set with a WT_OFF structure,
-			 * that is, we've replaced dup_count entries with a
-			 * single entry.
+			 * Replace the set of duplicates with a WT_OFF_RECORD
+			 * structure, that is, we've replaced dup_count entries
+			 * with a single offpage reference.
 			 */
-			WT_ITEM_SET(&data_item, WT_ITEM_OFF, sizeof(WT_OFF));
+			WT_ITEM_SET(&data_item,
+			    WT_ITEM_OFF_RECORD, sizeof(WT_OFF_RECORD));
 			p = (uint8_t *)dup_data;
 			memcpy(p, &data_item, sizeof(data_item));
-			memcpy(p + sizeof(data_item), &off, sizeof(WT_OFF));
+			memcpy(p + sizeof(data_item),
+			    &off_record, sizeof(WT_OFF_RECORD));
 			__wt_set_ff_and_sa_from_offset(page,
-			    (uint8_t *)p + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)),
+			    (uint8_t *)p +
+			    WT_ITEM_SPACE_REQ(sizeof(WT_OFF_RECORD)),
 			    &first_free, &space_avail);
 
 			/* Reset local counters. */
@@ -646,8 +649,9 @@ err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
  *	then load the rest of the duplicate set.
  */
 static int
-__wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
-    WT_ITEM *dup_data, uint32_t dup_len, uint32_t dup_count, WT_OFF *off,
+__wt_bulk_dup_offpage(
+    WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey, WT_ITEM *dup_data,
+    uint32_t dup_len, uint32_t dup_count, WT_OFF_RECORD *off_record,
     int (*cb)(DB *, DBT **, DBT **))
 {
 	DB *db;
@@ -689,8 +693,8 @@ __wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 	 *	On-page reference to the first duplicate data item in the set.
 	 * dup_count --
 	 *	Count of duplicates in the set.
-	 * off --
-	 *	Callers WT_OFF structure, which we have to fill in.
+	 * off_record --
+	 *	Callers WT_OFF_RECORD structure, which we have to fill in.
 	 * cb --
 	 *	User's callback function.
 	 */
@@ -789,9 +793,9 @@ __wt_bulk_dup_offpage(WT_TOC *toc, DBT **keyp, DBT **datap, DBT *lastkey,
 	WT_ERR(__wt_page_write(toc, page));
 
 	/* Fill in the caller's WT_OFF structure. */
-	WT_RECORDS(off) = dup_count;
-	off->addr = root_addr;
-	off->size = db->intlmin;
+	WT_RECORDS(off_record) = dup_count;
+	off_record->addr = root_addr;
+	off_record->size = db->intlmin;
 
 err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
@@ -813,6 +817,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 	ENV *env;
 	WT_ITEM *key_item, item;
 	WT_OFF off;
+	WT_OFF_RECORD off_record;
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	WT_PAGE_DISK *dsk;
@@ -1069,20 +1074,21 @@ split:		switch (dsk->type) {
 	 */
 	switch (parent->dsk->type) {
 	case WT_PAGE_COL_INT:
-		if (elem->space_avail < sizeof(WT_OFF))
+		if (elem->space_avail < sizeof(WT_OFF_RECORD))
 			goto split;
 
-		/* Create the WT_OFF reference. */
-		WT_RECORDS(&off) = page->records;
-		off.addr = page->addr;
-		off.size = dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		/* Create the WT_OFF_RECORD reference. */
+		WT_RECORDS(&off_record) = page->records;
+		off_record.addr = page->addr;
+		off_record.size =
+		    dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
 		/* Store the data item. */
 		++parent->dsk->u.entries;
 		parent_data = elem->first_free;
-		memcpy(elem->first_free, &off, sizeof(off));
-		elem->first_free += sizeof(WT_OFF);
-		elem->space_avail -= sizeof(WT_OFF);
+		memcpy(elem->first_free, &off_record, sizeof(off_record));
+		elem->first_free += sizeof(WT_OFF_RECORD);
+		elem->space_avail -= sizeof(WT_OFF_RECORD);
 
 		/* Track the last entry on the page for record count updates. */
 		stack->elem[level].data = parent_data;
@@ -1103,7 +1109,6 @@ split:		switch (dsk->type) {
 
 		/* Create the WT_ITEM(WT_OFF) reference. */
 		WT_ITEM_SET(&item, WT_ITEM_OFF, sizeof(WT_OFF));
-		WT_RECORDS(&off) = 0;
 		off.addr = page->addr;
 		off.size = dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
 
@@ -1138,18 +1143,11 @@ split:		switch (dsk->type) {
 		 * page, so proceed from there to the root.
 		 */
 		for (elem =
-		    &stack->elem[level + 1]; elem->page != NULL; ++elem) {
-			switch (elem->page->dsk->type) {
-			case WT_PAGE_COL_INT:
-				WT_RECORDS((WT_OFF *)elem->data) += incr;
-				break;
-			case WT_PAGE_ROW_INT:
-			case WT_PAGE_DUP_INT:
-				break;
-			WT_ILLEGAL_FORMAT(db);
+		    &stack->elem[level + 1]; elem->page != NULL; ++elem)
+			if (elem->page->dsk->type == WT_PAGE_COL_INT) {
+				elem->page->records += incr;
+				WT_RECORDS((WT_OFF_RECORD *)elem->data) += incr;
 			}
-			elem->page->records += incr;
-		}
 	}
 
 err:	if (next_tmp != NULL)

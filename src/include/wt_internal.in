@@ -30,6 +30,7 @@ struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_off;		typedef struct __wt_off WT_OFF;
+struct __wt_off_record;		typedef struct __wt_off_record WT_OFF_RECORD;
 struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
@@ -130,8 +131,8 @@ struct __idb {
 	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
-	WT_REF	root_page;		/* Root page reference */
-	WT_OFF	root_off;		/* Root page location */
+	WT_REF		root_page;	/* Root page reference */
+	WT_OFF_RECORD	root_off;	/* Root page location */
 
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 

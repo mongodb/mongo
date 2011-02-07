@@ -189,7 +189,7 @@ static int
 __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_COL *cip;
-	WT_OFF *from;
+	WT_OFF_RECORD *from;
 	WT_PAGE_DISK *dsk;
 	uint32_t i, space_avail;
 	uint8_t *first_free;
@@ -207,16 +207,16 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * size, but it still wasn't enough.  We must allocate another
 		 * page and split the parent.
 		 */
-		if (sizeof(WT_OFF) > space_avail) {
+		if (sizeof(WT_OFF_RECORD) > space_avail) {
 			fprintf(stderr,
 			   "__wt_rec_col_int: page %lu split\n",
 			   (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
 
-		memcpy(first_free, from, sizeof(WT_OFF));
-		first_free += sizeof(WT_OFF);
-		space_avail -= sizeof(WT_OFF);
+		memcpy(first_free, from, sizeof(WT_OFF_RECORD));
+		first_free += sizeof(WT_OFF_RECORD);
+		space_avail -= sizeof(WT_OFF_RECORD);
 		++dsk->u.entries;
 	}
 
@@ -959,9 +959,12 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
+	ENV *env;
 	IDB *idb;
-	WT_OFF *parent_off;
+	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 
+	env = toc->env;
 	idb = toc->db->idb;
 
 	/*
@@ -976,15 +979,27 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 }
 
 	/*
-	 * Update the relevant WT_OFF structure.  There are two memory locations
-	 * that change (address and size), and we could race, but that's not a
-	 * problem.   Only a single thread ever reconciles a page at a time, and
-	 * pages cannot leave memory while they have children.
+	 * Update the relevant WT_OFF/WT_OFF_RECORD structure.  There are two
+	 * memory locations that change (address and size), and we could race,
+	 * but that's not a problem.   Only a single thread ever reconciles a
+	 * page at a time, and pages cannot leave memory if they have children.
 	 */
-	parent_off = page->parent_off;
-	WT_RECORDS(parent_off) = new->records;
-	parent_off->addr = new->addr;
-	parent_off->size = new->size;
+	switch (page->dsk->type) {
+	case WT_PAGE_COL_INT:
+		off_record = page->parent_off;
+		off_record->addr = new->addr;
+		off_record->size = new->size;
+		WT_ASSERT(env, WT_RECORDS(off_record) == new->records);
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		off = page->parent_off;
+		off->addr = new->addr;
+		off->size = new->size;
+		break;
+	default:
+		break;
+	}
 
 	/*
 	 * Mark the parent page as dirty.

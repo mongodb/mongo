@@ -45,6 +45,7 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 	IDB *idb;
 	WT_COL *cip;
 	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	uint32_t i;
@@ -82,8 +83,8 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 			if (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK)
 				continue;
 
-			off = WT_COL_OFF(cip);
-			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			off_record = WT_COL_OFF(cip);
+			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
 			ret = __wt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
@@ -110,7 +111,7 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 		if (!LF_ISSET(WT_WALK_OFFDUP))
 			break;
 		WT_INDX_FOREACH(page, rip, i) {
-			if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF)
+			if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF_RECORD)
 				break;
 
 			/*
@@ -121,8 +122,8 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 			if (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK)
 				continue;
 
-			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			off_record = WT_ROW_OFF_RECORD(rip);
+			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
 			ret = __wt_tree_walk(toc, ref, flags, work, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)

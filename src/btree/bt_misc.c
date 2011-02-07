@@ -97,6 +97,8 @@ __wt_item_type_string(WT_ITEM *item)
 		return ("key-overflow");
 	case WT_ITEM_OFF:
 		return ("off-page");
+	case WT_ITEM_OFF_RECORD:
+		return ("off-page-records");
 	default:
 		break;
 	}

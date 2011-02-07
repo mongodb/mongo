@@ -69,10 +69,10 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 {
 	ENV *env;
 	WT_CACHE *cache;
-	WT_OFF *off;
 	WT_PAGE *parent;
 	WT_READ_REQ *rr, *rr_end;
 	WT_REF *ref;
+	void *off;
 	int dsk_verify;
 
 	__wt_cache_read_unpack(toc, parent, ref, off, dsk_verify);
@@ -190,7 +190,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 {
 	ENV *env;
 	WT_CACHE *cache;
-	WT_OFF *off;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
@@ -200,9 +199,13 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 	toc = rr->toc;
 	ref = rr->ref;
-	off = rr->off;
-	addr = off->addr;
-	size = off->size;
+
+	/*
+	 * We're passed a reference to a WT_OFF or a WT_OFF_RECORD structure;
+	 * the initial addr/size pair fields are the same, get what we came for.
+	 */
+	addr = ((WT_OFF *)rr->off)->addr;
+	size = ((WT_OFF *)rr->off)->size;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -241,13 +244,13 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 	/*
 	 * Fill in the WT_PAGE addr, size.
-	 * Reference the parent's WT_PAGE and parent's WT_OFF structures.
+	 * Reference the parent's WT_PAGE and WT_OFF/WT_OFF_RECORD structures.
 	 * Reference the underlying disk page.
 	 */
 	page->addr = addr;
 	page->size = size;
 	page->parent = rr->parent;
-	page->parent_off = off;
+	page->parent_off = rr->off;
 	page->dsk = dsk;
 
 	/* Build the in-memory version of the page. */

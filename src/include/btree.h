@@ -136,8 +136,13 @@ struct __wt_page {
 	/* Record count is only maintained for column-store files. */
 	uint64_t records;		/* Records in this subtree */
 
+	/*
+	 * Two links to the parent's WT_PAGE structure -- the physical parent
+	 * page, and the WT_OFF or WT_OFF_RECORD structure used to find this
+	 * page.
+	 */
 	WT_PAGE	*parent;		/* Page's parent */
-	WT_OFF	*parent_off;		/* Page's parent reference */
+	void	*parent_off;		/* Page's parent reference */
 
 	WT_PAGE_DISK *dsk;		/* Page's on-disk representation */
 
@@ -157,7 +162,7 @@ struct __wt_page {
 	 * value.   If we ever add a flags field to this structure, the pinned
 	 * flag could move there.
 	 */
-#define	WT_PAGE_SET_PIN(p)		(p)->read_gen = UINT64_MAX
+#define	WT_PAGE_SET_PIN(p)	((p)->read_gen = UINT64_MAX)
 #define	WT_PAGE_IS_PINNED(p)	((p)->read_gen == UINT64_MAX)
 	 uint64_t read_gen;
 
@@ -311,10 +316,8 @@ struct __wt_page {
  * individually allocated structures.  The WT_{COL,ROW}_REF macros return
  * the appropriate entry based on a WT_{COL,ROW} reference.
  */
-#define	WT_COL_REF(page, ip)						\
-	(&((page)->u3.ref[WT_COL_SLOT(page, ip)]))
-#define	WT_ROW_REF(page, ip)						\
-	(&((page)->u3.ref[WT_ROW_SLOT(page, ip)]))
+#define	WT_COL_REF(page, ip)	(&((page)->u3.ref[WT_COL_SLOT(page, ip)]))
+#define	WT_ROW_REF(page, ip)	(&((page)->u3.ref[WT_ROW_SLOT(page, ip)]))
 
 /*
  * The other arrays may not exist, and are arrays of pointers to individually
@@ -613,18 +616,23 @@ struct __wt_rle_expand {
 	    (dupp) = (page)->u3.dup; (i) > 0; ++(dupp), --(i))
 
 /*
- * On both row- and column-store internal pages, the on-page data referenced
- * by the WT_ROW/WT_COL data field is a WT_OFF structure, which contains a
- * record count and a page addr/size pair.   Macros to reach into the on-page
- * structure and return the values.
+ * On row-store internal pages, the on-page data referenced by the WT_ROW field
+ * is a WT_OFF structure, which contains a page addr/size pair.
  */
-#define	WT_COL_OFF(ip)							\
-	((WT_OFF *)(((WT_COL *)ip)->data))
-#define	WT_COL_OFF_RECORDS(ip)						\
-	WT_RECORDS(WT_COL_OFF(ip))
-
 #define	WT_ROW_OFF(ip)							\
 	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
+#define	WT_ROW_OFF_RECORD(ip)						\
+	((WT_OFF_RECORD *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
+
+/*
+ * On column-store internal pages, the on-page data referenced by the WT_COL
+ * field is a WT_OFF_RECORD structure which contains a page addr/size pair
+ * and a total record count.
+ */
+#define	WT_COL_OFF(ip)							\
+	((WT_OFF_RECORD *)(((WT_COL *)ip)->data))
+#define	WT_COL_OFF_RECORDS(ip)						\
+	WT_RECORDS(WT_COL_OFF(ip))
 
 /*
  * WT_ITEM --
@@ -667,14 +675,18 @@ struct __wt_item {
  * items, each of which has an overflow form.  Items are followed by additional
  * data, which varies by type: a key, duplicate key, data or duplicate item is
  * followed by a set of bytes; a WT_OVFL structure follows an overflow form.
- * There are two additional types: First, a deleted type (a place-holder for
- * deleted items where the item cannot be removed, for example, an column store
- * item that must remain to preserve the record count).   Second, a subtree
- * reference for keys that reference subtrees of information (for example, an
- * internal Btree page has a key and a reference to the tree that contains all
- * key/data pairs greater than the internal page's key, or, a leaf Btree page
- * where a key references all of the duplicate data items for the key when the
- * duplicate data items can no longer fit onto the Btree leaf page).
+ * There are 2 additional types: (1) a deleted type (a place-holder for deleted
+ * items where the item cannot be removed, for example, an column store item
+ * that must remain to preserve the record count); (2a) a subtree reference for
+ * keys that reference subtrees without an associated record count (a row-store
+ * internal page has a key/reference pairs for the tree containing all key/data
+ * pairs greater than the key); (2b) a subtree reference for keys that reference
+ * subtrees with an associated record count (a column-store internal page has
+ * a reference for the tree containing all records greater than the specified
+ * record, or leaf Btree pages where a key references a set of duplicate data
+ * items for the key when the duplicate data items no longer fit onto the leaf
+ * page itself -- offpage duplicate data sets are counted, which is why Btree
+ * leaf pages fall under 2b, and not 2a).
  *
  * Here's the usage by page type:
  *
@@ -687,10 +699,11 @@ struct __wt_item {
  *    WT_ITEM_KEY_OVFL item followed by a WT_ITEM_DATA or WT_ITEM_DATA_OVFL
  *    item);
  * -- Variable-length key and set of duplicates moved into a separate tree
- *    (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL item followed by a WT_ITEM_OFF item);
+ *    (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL item followed by a WT_ITEM_OFF_RECORD
+ *    item);
  * -- Variable-length key and set of duplicates not yet moved into a separate
- *    tree (a WT_ITEM_KEY/KEY_OVFL item followed by two or more
- *    WT_ITEM_DATA_DUP or WT_ITEM_DATA_DUP_OVFL items).
+ *    tree (a WT_ITEM_KEY/KEY_OVFL item followed by two or more WT_ITEM_DATA_DUP
+ *    or WT_ITEM_DATA_DUP_OVFL items).
  *
  * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
  * -- Variable-length duplicate key and offpage-reference pairs (a
@@ -710,16 +723,26 @@ struct __wt_item {
  *	These pages contain fixed-sized structures (WT_PAGE_COL_{INT,FIX,RLE}),
  *	or a string of bytes (WT_PAGE_OVFL), not WT_ITEM structures.
  *
- * There are currently 10 item types, requiring 4 bits, with 6 values unused.
+ * There are currently 11 item types, using 4 bits, with 5 values unused.  If
+ * we run out of bits, we could compress the item types in a couple of ways:
  *
- * We could compress the item types in a couple of ways.  We could merge the
- * WT_ITEM_KEY and WT_ITEM_KEY_DUP types, but that would require we know the
- * underlying page type in order to know how an item might be encoded (that
- * is, if it's an off-page duplicate key, encoded using the Huffman data coder,
- * or a Btree row store key, encoded using the Huffman key encoder). We could
- * also use a bit to mean overflow, merging all overflow types into a single
- * bit plus the ""primary" item type, but that would require more bit shuffling
+ * We could merge the WT_ITEM_KEY and WT_ITEM_KEY_DUP types, but that requires
+ * we know the page's type in order to know how an item might be encoded (that
+ * is, if it's an off-page duplicate key, it's encoded using the Huffman data
+ * coder, or if it's a Btree row store key, it's encoded using the Huffman key
+ * encoder).
+ *
+ * We could use a single bit to mean overflow, merging all overflow types into
+ * that bit plus the "primary" item type, but that requires more bit shuffling
  * than the current scheme.
+ *
+ * We could combine WT_ITEM_OFF and WT_ITEM_OFF_RECORD types, again, by using
+ * the underlying page type to know what kind of off-page reference it is (if
+ * it's a row-store leaf or column-store internal, it's a WT_ITEM_OFF_RECORD,
+ * if it's a row-store internal, it's a WT_ITEM_OFF).
+ *
+ * All of these changes require some amount of compatibility work because they
+ * involved on-page format information.
  */
 #define	WT_ITEM_KEY		0x00000000 /* Key */
 #define	WT_ITEM_KEY_OVFL	0x01000000 /* Key: overflow */
@@ -731,6 +754,7 @@ struct __wt_item {
 #define	WT_ITEM_DATA_DUP_OVFL	0x07000000 /* Data: duplicate overflow */
 #define	WT_ITEM_DEL		0x08000000 /* Deleted */
 #define	WT_ITEM_OFF		0x09000000 /* Off-page reference */
+#define	WT_ITEM_OFF_RECORD	0x0a000000 /* Off-page reference with records */
 
 #define	WT_ITEM_TYPE(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x0f000000)
@@ -749,12 +773,13 @@ struct __wt_item {
 
 /*
  * On row-store pages, the on-page data referenced by the WT_ROW data field
- * may be a WT_OVFL (which contains the address for the start of the overflow
- * pages and its length), or a WT_OFF structure.  These macros do the cast
- * to the right type.
+ * may be WT_OFF, WT_OFF_RECORD or WT_OVFL structures.  These macros do the
+ * cast to the right type.
  */
 #define	WT_ITEM_BYTE_OFF(addr)						\
 	((WT_OFF *)(WT_ITEM_BYTE(addr)))
+#define	WT_ITEM_BYTE_OFF_RECORD(addr)					\
+	((WT_OFF_RECORD *)(WT_ITEM_BYTE(addr)))
 #define	WT_ITEM_BYTE_OVFL(addr)						\
 	((WT_OVFL *)(WT_ITEM_BYTE(addr)))
 
@@ -778,19 +803,19 @@ struct __wt_item {
 
 /*
  * WT_OFF --
- *	Btree internal items and offpage duplicates reference another tree.
+ *	Row-store internal pages reference subtrees with no record count.
+ *
+ * WT_OFF_RECORD --
+ *	Column-store internal pages, and row-store leaf pages with offpage
+ * duplicate references, reference subtrees, including total record counts
+ * for the subtree.
+ *
+ * !!!
+ * Note the initial two fields of the WT_OFF and WT_OFF_RECORD fields are the
+ * same -- this is deliberate, and we use it to pass references to places that
+ * only care about the addr/size information.
  */
 struct __wt_off {
-/*
- * Solaris and the gcc compiler on Linux pad the WT_OFF structure because of the
- * 64-bit records field.   This is an on-disk structure, which means we have to
- * have a fixed size, without padding, so we declare it as two 32-bit fields and
- * cast it.  We haven't yet found a compiler that aligns the 32-bit fields such
- * that a cast won't work; if we find one, we'll have to go to bit masks, or to
- * reading/write the bytes to/from a local variable.
- */
-#define	WT_RECORDS(offp)	(*(uint64_t *)(&(offp)->__record_chunk[0]))
-	uint32_t __record_chunk[2];	/* Subtree record count */
 	uint32_t addr;			/* Subtree root page address */
 	uint32_t size;			/* Subtree root page length */
 };
@@ -798,12 +823,37 @@ struct __wt_off {
  * WT_OFF_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_OFF_SIZE	16
+#define	WT_OFF_SIZE	8
+/*
+ *
+ * Compilers pad the WT_OFF_RECORD structure because of the 64-bit record count
+ * field.  This is an on-disk structure, which means we require a fixed size,
+ * so we declare it as two 32-bit fields and cast it.  We haven't yet found a
+ * compiler that aligns the 32-bit fields such that a cast won't work; if we
+ * find one, we'll have to go to bit masks, or to copying bytes to/from a local
+ * variable.
+ */
+struct __wt_off_record {
+	uint32_t addr;			/* Subtree root page address */
+	uint32_t size;			/* Subtree root page length */
 
-/* WT_OFF_FOREACH is a loop that walks offpage references on a page */
+#define	WT_RECORDS(offp)	(*(uint64_t *)(&(offp)->__record_chunk[0]))
+	uint32_t __record_chunk[2];	/* Subtree record count */
+};
+/*
+ * WT_OFF_RECORD_SIZE is the expected structure size -- we verify the build to
+ * ensure the compiler hasn't inserted padding (which would break the world).
+ */
+#define	WT_OFF_RECORD_SIZE	16
+
+/*
+ * WT_OFF_FOREACH --
+ *	Walks WT_OFF/WT_OFF_RECORD references on a page, incrementing a pointer
+ *	based on its declared type.
+ */
 #define	WT_OFF_FOREACH(dsk, offp, i)					\
-	for ((offp) = (WT_OFF *)WT_PAGE_DISK_BYTE(dsk),			\
-	    (i) = dsk->u.entries; (i) > 0; ++(offp), --(i))
+	for ((offp) = WT_PAGE_DISK_BYTE(dsk),				\
+	    (i) = (dsk)->u.entries; (i) > 0; ++(offp), --(i))
 
 /*
  * Btree overflow items reference another page, and so the data is another

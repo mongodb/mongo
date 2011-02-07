@@ -251,7 +251,7 @@ static int
 __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
-	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_REF *ref;
 	WT_REPL *repl;
 	WT_ROW *rip;
@@ -299,7 +299,7 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
-		case WT_ITEM_OFF:
+		case WT_ITEM_OFF_RECORD:
 			/*
 			 * Recursively call the tree-walk code for any off-page
 			 * duplicate trees.  (Check for any off-page duplicate
@@ -308,8 +308,8 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			 * and in the tree-walk function.)
 			 */
 			ref = WT_ROW_REF(page, rip);
-			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			off_record = WT_ROW_OFF_RECORD(rip);
+			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
 			ret = __wt_tree_walk(toc, ref, 0, __wt_page_stat, arg);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)

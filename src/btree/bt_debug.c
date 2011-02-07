@@ -14,15 +14,14 @@ static void __wt_debug_dsk_col_fix(DB *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(DB *, WT_PAGE_DISK *, FILE *);
 static int  __wt_debug_dsk_item(WT_TOC *, WT_PAGE_DISK *, FILE *);
+static int  __wt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
+static int  __wt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_debug_page_col_fix(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_debug_page_col_int(WT_PAGE *, FILE *);
 static void __wt_debug_page_col_rle(WT_TOC *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_var(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
-static int  __wt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
-static int  __wt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
-static void __wt_debug_off(WT_OFF *, const char *, FILE *);
 static void __wt_debug_pair(const char *, void *, uint32_t, FILE *);
 static void __wt_debug_repl(WT_REPL *, FILE *);
 static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
@@ -254,13 +253,18 @@ static void
 __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
+	WT_OFF_RECORD *off_record;
 	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, cip, i)
-		__wt_debug_off(cip->data, "\t", fp);
+	WT_INDX_FOREACH(page, cip, i) {
+		off_record = cip->data;
+		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
+		    (u_long)off_record->addr, (u_long)off_record->size,
+		    (unsigned long long)WT_RECORDS(off_record));
+	  }
 }
 
 /*
@@ -357,6 +361,7 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 static void
 __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 {
+	WT_OFF *off;
 	WT_ROW *rip;
 	uint32_t i;
 
@@ -368,8 +373,9 @@ __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
 			__wt_debug_dbt("\tkey", rip, fp);
-
-		__wt_debug_off(rip->data, "\t", fp);
+		off = rip->data;
+		fprintf(fp, "\toffpage: addr %lu, size %lu\n",
+		    (u_long)off->addr, (u_long)off->size);
 	}
 }
 
@@ -439,6 +445,8 @@ static int
 __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
 	DB *db;
+	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_OVFL *ovfl;
 
 	if (fp == NULL)				/* Default to stderr */
@@ -450,25 +458,31 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	    __wt_item_type_string(item), (u_long)WT_ITEM_LEN(item));
 
 	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_KEY:
-	case WT_ITEM_KEY_DUP:
 	case WT_ITEM_DATA:
 	case WT_ITEM_DATA_DUP:
+	case WT_ITEM_DEL:
+	case WT_ITEM_KEY:
+	case WT_ITEM_KEY_DUP:
 		break;
-	case WT_ITEM_KEY_OVFL:
-	case WT_ITEM_KEY_DUP_OVFL:
-	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DATA_DUP_OVFL:
+	case WT_ITEM_DATA_OVFL:
+	case WT_ITEM_KEY_DUP_OVFL:
+	case WT_ITEM_KEY_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
 		fprintf(fp, ", addr %lu, size %lu",
 		    (u_long)ovfl->addr, (u_long)ovfl->size);
 		break;
-	case WT_ITEM_DEL:
-		fprintf(fp, "\n");
-		return (0);
 	case WT_ITEM_OFF:
-		__wt_debug_off(WT_ITEM_BYTE_OFF(item), ", ", fp);
-		return (0);
+		off = WT_ITEM_BYTE_OFF(item);
+		fprintf(fp, ", offpage: addr %lu, size %lu\n",
+		    (u_long)off->addr, (u_long)off->size);
+		break;
+	case WT_ITEM_OFF_RECORD:
+		off_record = WT_ITEM_BYTE_OFF_RECORD(item);
+		fprintf(fp, ", offpage: addr %lu, size %lu, records %llu\n",
+		    (u_long)off_record->addr, (u_long)off_record->size,
+		    (unsigned long long)WT_RECORDS(off_record));
+		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
@@ -485,14 +499,16 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 static void
 __wt_debug_dsk_col_int(WT_PAGE_DISK *dsk, FILE *fp)
 {
-	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_OFF_FOREACH(dsk, off, i)
-		__wt_debug_off(off, "\t", fp);
+	WT_OFF_FOREACH(dsk, off_record, i)
+		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
+		    (u_long)off_record->addr, (u_long)off_record->size,
+		    (unsigned long long)WT_RECORDS(off_record));
 }
 
 /*
@@ -593,7 +609,11 @@ process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 		break;
 	case WT_ITEM_OFF:
 		p = (uint8_t *)"offpage";
-		size = 7;
+		size = sizeof("offpage") - 1;
+		break;
+	case WT_ITEM_OFF_RECORD:
+		p = (uint8_t *)"offpage_record";
+		size = sizeof("offpage_record") - 1;
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
@@ -603,21 +623,6 @@ process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 	return (ret);
-}
-
-/*
- * __wt_debug_off --
- *	Dump a WT_OFF structure.
- */
-static void
-__wt_debug_off(WT_OFF *off, const char *prefix, FILE *fp)
-{
-	if (fp == NULL)				/* Default to stderr */
-		fp = stderr;
-
-	fprintf(fp, "%soffpage: addr %lu, size %lu, records %llu\n",
-	    prefix, (u_long)off->addr, (u_long)off->size,
-	    (unsigned long long)WT_RECORDS(off));
 }
 
 /*

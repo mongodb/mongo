@@ -322,7 +322,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
 	WT_ITEM *item;
-	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_REF *ref;
 	WT_REPL *repl;
 	WT_ROW *rip;
@@ -388,7 +388,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			WT_ERR(__wt_item_process(toc, item, data_tmp));
 			data = data_tmp;
 			break;
-		case WT_ITEM_OFF:
+		case WT_ITEM_OFF_RECORD:
 			/*
 			 * Set the key and recursively call the tree-walk code
 			 * for any off-page duplicate trees.  (Check for any
@@ -399,8 +399,8 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			dp->dupkey = key;
 
 			ref = WT_ROW_DUP(page, rip);
-			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off, 0));
+			off_record = WT_ROW_OFF_RECORD(rip);
+			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
 			ret = __wt_tree_walk(toc, ref, 0, __wt_dump_page, dp);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)

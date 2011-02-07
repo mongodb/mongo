@@ -146,6 +146,7 @@ __wt_verify_tree(
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
@@ -219,11 +220,11 @@ __wt_verify_tree(
 	 * Check the starting record number and record counts.
 	 *
 	 * Confirm the number of records found on this page (by summing the
-	 * WT_OFF structure record counts) matches the WT_OFF structure record
-	 * count in our parent.  Use the in-memory record count for internal
-	 * pages -- we could sum the record counts as we walk the page below,
-	 * but we did that when building the in-memory version of the page,
-	 * there's no reason to do it again.
+	 * WT_OFF_RECORD structure record counts) matches the WT_OFF_RECORD
+	 * structure record count in our parent.  Use the in-memory record
+	 * count for internal pages -- we could sum the record counts as we
+	 * walk the page below, but we did that when building the in-memory
+	 * version of the page, there's no reason to do it again.
 	 */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -322,9 +323,9 @@ __wt_verify_tree(
 		WT_INDX_FOREACH(page, cip, i) {
 			/* cip references the subtree containing the record */
 			ref = WT_COL_REF(page, cip);
-			off = WT_COL_OFF(cip);
+			off_record = WT_COL_OFF(cip);
 			records = WT_COL_OFF_RECORDS(cip);
-			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
+			WT_ERR(__wt_page_in(toc, page, ref, off_record, 1));
 			ret = __wt_verify_tree(toc, NULL,
 			    records, start_recno, level - 1, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
@@ -408,22 +409,22 @@ __wt_verify_tree(
 			    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
 				continue;
 			item = rip->data;
-			if (WT_ITEM_TYPE(item) != WT_ITEM_OFF)
+			if (WT_ITEM_TYPE(item) != WT_ITEM_OFF_RECORD)
 				continue;
 
 			/* Verify the off-page duplicate tree. */
 			vs->duptree = 0;
 
 			ref = WT_ROW_DUP(page, rip);
-			off = WT_ROW_OFF(rip);
-			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
+			off_record = WT_ROW_OFF_RECORD(rip);
+			WT_ERR(__wt_page_in(toc, page, ref, off_record, 1));
 			ret = __wt_verify_tree(toc, NULL,
 			    (uint64_t)0, (uint64_t)0, WT_NOLEVEL, ref, vs);
 			__wt_hazard_clear(toc, ref->page);
 			if (ret != 0)
 				goto err;
 
-			if (vs->duptree != WT_RECORDS(off)) {
+			if (vs->duptree != WT_RECORDS(off_record)) {
 				__wt_api_db_errx(db,
 				    "off-page duplicate tree referenced from "
 				    "item %lu of page %lu has a record count "
@@ -431,7 +432,7 @@ __wt_verify_tree(
 				    "expected",
 				    (u_long)item_num, (u_long)page->addr,
 				    (unsigned long long)vs->duptree,
-				    (unsigned long long)WT_RECORDS(off));
+				    (unsigned long long)WT_RECORDS(off_record));
 				goto err;
 			}
 		}
@@ -735,6 +736,7 @@ __wt_verify_dsk_item(
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
 	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	off_t file_size;
 	uint8_t *end;
 	uint32_t i, item_num, item_len, item_type;
@@ -789,7 +791,11 @@ __wt_verify_dsk_item(
 		case WT_ITEM_OFF:
 			if (dsk->type != WT_PAGE_DUP_INT &&
 			    dsk->type != WT_PAGE_ROW_INT &&
-			    dsk->type != WT_PAGE_ROW_LEAF) {
+			    dsk->type != WT_PAGE_ROW_LEAF)
+				goto item_vs_page;
+			break;
+		case WT_ITEM_OFF_RECORD:
+			if (dsk->type != WT_PAGE_ROW_LEAF) {
 item_vs_page:			__wt_api_db_errx(db,
 				    "illegal item and page type combination "
 				    "(item %lu on page at addr %lu is a %s "
@@ -817,7 +823,7 @@ item_vs_page:			__wt_api_db_errx(db,
 			goto skip_order_check;
 
 		/*
-		 * For row-stores leaf pages, check for:
+		 * For row-store leaf pages, check for:
 		 *	two keys in a row,
 		 *	two non-dup data items in a row,
 		 *	inter-mixed dup and non-dup data items,
@@ -842,12 +848,12 @@ item_vs_page:			__wt_api_db_errx(db,
 		case WT_ITEM_DATA_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DEL:
-		case WT_ITEM_OFF:
+		case WT_ITEM_OFF_RECORD:
 			switch (item_type) {
 			case WT_ITEM_DATA:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DEL:
-			case WT_ITEM_OFF:
+			case WT_ITEM_OFF_RECORD:
 				switch (last_item_type) {
 				case IS_FIRST:
 					goto first_data;
@@ -916,7 +922,11 @@ skip_order_check:
 				goto item_len;
 			break;
 		case WT_ITEM_OFF:
-			if (item_len != sizeof(WT_OFF)) {
+			if (item_len != sizeof(WT_OFF))
+				goto item_len;
+			break;
+		case WT_ITEM_OFF_RECORD:
+			if (item_len != sizeof(WT_OFF_RECORD)) {
 item_len:			__wt_api_db_errx(db,
 				    "item %lu on page at addr %lu has an "
 				    "incorrect length",
@@ -945,8 +955,14 @@ item_len:			__wt_api_db_errx(db,
 			break;
 		case WT_ITEM_OFF:
 			off = WT_ITEM_BYTE_OFF(item);
-			if (WT_ADDR_TO_OFF(db, off->addr) +
-			    off->size > file_size)
+			if (WT_ADDR_TO_OFF(db,
+			    off->addr) + off->size > file_size)
+				goto eof;
+			break;
+		case WT_ITEM_OFF_RECORD:
+			off_record = WT_ITEM_BYTE_OFF_RECORD(item);
+			if (WT_ADDR_TO_OFF(db,
+			    off_record->addr) + off_record->size > file_size)
 				goto eof;
 			break;
 		default:
@@ -967,7 +983,7 @@ static int
 __wt_verify_dsk_col_int(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	IDB *idb;
-	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	uint8_t *end;
 	uint32_t i, entry_num;
 
@@ -975,16 +991,16 @@ __wt_verify_dsk_col_int(DB *db, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 	end = (uint8_t *)dsk + size;
 
 	entry_num = 0;
-	WT_OFF_FOREACH(dsk, off, i) {
+	WT_OFF_FOREACH(dsk, off_record, i) {
 		++entry_num;
 
 		/* Check if this entry is entirely on the page. */
-		if ((uint8_t *)off + sizeof(WT_OFF) > end)
+		if ((uint8_t *)off_record + sizeof(WT_OFF_RECORD) > end)
 			return (__wt_verify_eop(db, entry_num, addr));
 
 		/* Check if the reference is past the end-of-file. */
-		if (WT_ADDR_TO_OFF(
-		    db, off->addr) + off->size > idb->fh->file_size)
+		if (WT_ADDR_TO_OFF(db,
+		    off_record->addr) + off_record->size > idb->fh->file_size)
 			return (__wt_verify_eof(db, entry_num, addr));
 	}
 

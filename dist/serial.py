@@ -44,7 +44,7 @@ serial['cache_read'] = Serial(
 	'WT_WORKQ_READ', '0',
 	['WT_PAGE */parent',
 	 'WT_REF */ref',
-	 'WT_OFF */off',
+	 'void */off',
 	 'int/dsk_verify'])
 
 # func_serial --

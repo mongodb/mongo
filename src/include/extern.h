@@ -87,7 +87,7 @@ int
 __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store);
 int
 __wt_page_in(
-    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, WT_OFF *off, int dsk_verify);
+    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off, int dsk_verify);
 int
 __wt_page_inmem(WT_TOC *toc, WT_PAGE *page);
 int

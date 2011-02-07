@@ -25,7 +25,7 @@ static int  __wt_page_inmem_row_leaf(DB *, WT_PAGE *);
  */
 int
 __wt_page_in(
-    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, WT_OFF *off, int dsk_verify)
+    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off, int dsk_verify)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -209,7 +209,8 @@ __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 		++cip;
 	}
 
-	page->indx_count = page->records = dsk->u.entries;
+	page->indx_count = dsk->u.entries;
+	page->records = page->indx_count;
 }
 
 /*
@@ -220,7 +221,7 @@ static void
 __wt_page_inmem_col_int(WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_OFF *off;
+	WT_OFF_RECORD *off_record;
 	WT_PAGE_DISK *dsk;
 	uint64_t records;
 	uint32_t i;
@@ -231,12 +232,12 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains WT_OFF structures.
+	 * The page contains WT_OFF_RECORD structures.
 	 */
-	WT_OFF_FOREACH(dsk, off, i) {
-		cip->data = off;
+	WT_OFF_FOREACH(dsk, off_record, i) {
+		cip->data = off_record;
 		++cip;
-		records += WT_RECORDS(off);
+		records += WT_RECORDS(off_record);
 	}
 
 	page->indx_count = dsk->u.entries;
@@ -302,7 +303,8 @@ __wt_page_inmem_col_var(WT_PAGE *page)
 		++cip;
 	}
 
-	page->indx_count = page->records = dsk->u.entries;
+	page->indx_count = dsk->u.entries;
+	page->records = page->indx_count;
 }
 
 /*
@@ -433,7 +435,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * single on-page (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item;
 	 * a group of duplicate data items where each duplicate is an on-page
 	 * (WT_ITEM_DATA_DUP) or overflow (WT_ITEM_DUP_OVFL) item; or an offpage
-	 * reference (WT_ITEM_OFF).
+	 * reference (WT_ITEM_OFF_RECORDS).
 	 */
 	rip = NULL;
 	indx_count = 0;
@@ -469,7 +471,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DATA_OVFL:
 			rip->data = item;
 			break;
-		case WT_ITEM_OFF:
+		case WT_ITEM_OFF_RECORD:
 			rip->data = item;
 
 			/*
