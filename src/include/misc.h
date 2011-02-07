@@ -16,9 +16,16 @@ extern "C" {
 #define	WT_MEGABYTE	(1048576)
 #define	WT_MILLION	(1000000)
 
-/* Align a number to a specified power-of-2. */
+/*
+ * Align a number to a specified power-of-2.
+ *
+ * The calculation is done using the largest unsigned integer type, usually
+ * a 64-bit type, and that results in conversion complaints; cast the result
+ * to a uint32_t because that's the size of a piece of data in the WiredTiger
+ * engine.
+ */
 #define	WT_ALIGN(n, v)							\
-	(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
+	((uint32_t)(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1)))
 
 /* Min, max. */
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
@@ -27,12 +34,17 @@ extern "C" {
 /* Elements in an array. */
 #define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
-/* Flag check for API functions. */
+/*
+ * Flag check for API functions.
+ * Explicitly cast the hex bit mask to an unsigned value to avoid complaints
+ * about implicit conversions of integers.  Using the largest unsigned type,
+ * there's no defined bit mask type or maximum value.
+ */
 #define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
-	if ((f) & ~(mask))						\
+	if ((f) & ~((uintmax_t)(mask)))					\
 		ret = __wt_api_args(env, name);
 #define	WT_ENV_FCHK(env, name, f, mask)					\
-	if ((f) & ~(mask))						\
+	if ((f) & ~((uintmax_t)(mask)))					\
 		return (__wt_api_args(env, name));
 #define	WT_DB_FCHK(db, name, f, mask)					\
 	WT_ENV_FCHK((db)->env, name, f, mask)

@@ -1001,8 +1001,8 @@ split:		switch (dsk->type) {
 		WT_ILLEGAL_FORMAT(db);
 		}
 
-		WT_ERR(__wt_bulk_scratch_page(
-		    toc, db->intlmin, type, dsk->level + 1, &next, &next_tmp));
+		WT_ERR(__wt_bulk_scratch_page(toc, db->intlmin,
+		    type, (uint32_t)dsk->level + 1, &next, &next_tmp));
 		__wt_set_ff_and_sa_from_offset(next,
 		    WT_PAGE_BYTE(next), &next_first_free, &next_space_avail);
 
