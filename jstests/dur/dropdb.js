@@ -122,6 +122,11 @@ stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
+// we will force removal of a datafile to be sure we can recreate everything.
+removeFile(path2 + "/test.0");
+// the trick above is only valid if journals haven't rotated out, and also if lsn isn't skipping
+removeFile(path2 + "/lsn");
+
 log("restart and recover");
 conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 9);
 
