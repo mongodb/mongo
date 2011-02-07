@@ -319,6 +319,9 @@ namespace mongo {
                     }
                     uassert(13537, "journal header invalid", h.valid());
                     fileId = h.fileId;
+                    if(cmdLine.durOptions & CmdLine::DurDumpJournal) { 
+                        log() << "JHeader::fileId=" << fileId << endl;
+                    }
                 }
 
                 // read sections
@@ -328,6 +331,7 @@ namespace mongo {
                     if( h.fileId != fileId ) {
                         if( debug || (cmdLine.durOptions & CmdLine::DurDumpJournal) ) {
                             log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
+                            log() << "  sect len:" << h.len << " seqnum:" << h.seqNumber << endl;
                         }
                         return true;
                     }
