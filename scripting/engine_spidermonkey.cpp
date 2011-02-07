@@ -1445,8 +1445,7 @@ namespace mongo {
                 }
             }
 
-            if ( assertOnError )
-                uassert( 10228 ,  name + " exec failed" , worked );
+            uassert( 10228 ,  str::stream() << name + " exec failed: " << _error , worked || ! assertOnError );
 
             if ( reportError && ! _error.empty() ) {
                 // cout << "exec error: " << _error << endl;
