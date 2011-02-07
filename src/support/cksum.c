@@ -120,10 +120,10 @@ __wt_cksum(void *chunk, uint32_t bytes)
 	uint8_t *data;
 
 	data = chunk;
-	result = *data++ << 24;
-	result |= *data++ << 16;
-	result |= *data++ << 8;
-	result |= *data++;
+	result  = (uint32_t)*data++ << 24;
+	result |= (uint32_t)*data++ << 16;
+	result |= (uint32_t)*data++ << 8;
+	result |= (uint32_t)*data++;
 	result = ~result;
 	bytes -= 4;
 
