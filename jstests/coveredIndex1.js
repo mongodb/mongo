@@ -1,5 +1,5 @@
 
-t = db["users"];
+t = db["jstests_coveredIndex1"];
 t.remove( {} );
 
 t.save({fn: "john", ln: "doe"})

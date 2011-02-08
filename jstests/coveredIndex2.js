@@ -1,4 +1,4 @@
-t = db["test"];
+t = db["jstests_coveredIndex2"];
 t.remove( {} );
 
 t.save({a: 1})
