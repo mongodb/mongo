@@ -885,16 +885,30 @@ namespace mongo {
         if ( oldFile ) {
             // we check this here because we want to see if we can get the lock
             // if we can't, then its probably just another mongod running
-
+            
             string errmsg;
             if (cmdLine.dur) {
                 if (!dur::haveJournalFiles()) {
-                    errmsg = str::stream()
-                             << "************** \n"
-                             << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                             << "but there are no journal files to recover.\n"
-                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
-                             << "*************";
+                    
+                    vector<string> dbnames;
+                    getDatabaseNames( dbnames );
+                    
+                    if ( dbnames.size() == 0 ) {
+                        // this means that mongod crashed
+                        // between initial startup and when journaling was initialized
+                        // it is safe to continue
+                    }
+                    else {
+                        errmsg = str::stream()
+                            << "************** \n"
+                            << "old lock file: " << name << ".  probably means unclean shutdown\n"
+                            << "but there are no journal files to recover.\n"
+                            << "this is likely human error of filesystem corruption.\n"
+                            << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                            << "*************";
+                    }
+
+
                 }
             }
             else {
