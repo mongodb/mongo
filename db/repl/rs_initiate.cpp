@@ -62,6 +62,11 @@ namespace mongo {
         }
 
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
+            // we know we're up
+            if (i->h.isSelf()) {
+                continue;
+            }
+
             BSONObj res;
             {
                 bool ok = false;
