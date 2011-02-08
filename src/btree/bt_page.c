@@ -420,11 +420,12 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
 	WT_ROW *rip;
-	uint32_t i, indx_count;
+	uint32_t i, indx_count, off_page_dups;
 
 	env = db->env;
 	idb = db->idb;
 	dsk = page->dsk;
+	off_page_dups = 0;
 
 	/*
 	 * Walk a row-store page of WT_ITEMs, building indices and finding the
@@ -473,24 +474,29 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			break;
 		case WT_ITEM_OFF_RECORD:
 			rip->data = item;
-
-			/*
-			 * We need a WT_REF entry for any item referencing an
-			 * off-page duplicate tree.  Create the array of WT_REF
-			 * pointers and fill in a WT_REF structure.
-			 */
-			if (page->u3.dup == NULL)
-				WT_RET(__wt_calloc(env, indx_count,
-				    sizeof(WT_REF *), &page->u3.dup));
-			WT_RET(__wt_calloc(env, 1, sizeof(WT_REF), &ref));
-			ref->state = WT_EMPTY;
-			page->u3.dup[WT_ROW_SLOT(page, rip)] = ref;
-
+			off_page_dups = 1;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
 
 	page->indx_count = indx_count;
+
+	if (!off_page_dups)
+		return (0);
+
+	/*
+	 * Items that reference off-page duplicate trees need WT_REF structures.
+	 * Create an array of WT_REF pointers, referencing individual WT_REF
+	 * structures.
+	 */
+	WT_RET(__wt_calloc(env, indx_count, sizeof(WT_REF *), &page->u3.dup));
+	WT_INDX_FOREACH(page, rip, i) {
+		if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF_RECORD)
+			continue;
+		WT_RET(__wt_calloc(env, 1, sizeof(WT_REF), &ref));
+		ref->state = WT_EMPTY;
+		page->u3.dup[WT_ROW_SLOT(page, rip)] = ref;
+	}
 
 	return (0);
 }
