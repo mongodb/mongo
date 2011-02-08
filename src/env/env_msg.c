@@ -90,6 +90,7 @@ __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...)
 {
 	va_list ap;
 	size_t current, len, remain;
+	int ret;
 
 	va_start(ap, fmt);
 
@@ -102,9 +103,8 @@ __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...)
 		 * more memory.
 		 */
 		if (remain <= len) {
-			if (__wt_realloc(mbp->env,
-			    &mbp->len, mbp->len + len * 2, &mbp->first))
-				return;
+			WT_ERR(__wt_realloc(mbp->env,
+			    &mbp->len, mbp->len + len * 2, &mbp->first));
 			mbp->next = mbp->first + current;
 			remain = mbp->len - current;
 		}
@@ -118,6 +118,8 @@ __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...)
 			break;
 		}
 	}
+
+err:	va_end(ap);
 }
 
 /*
