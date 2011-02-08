@@ -108,20 +108,29 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 		}
 		break;
 	case WT_PAGE_ROW_LEAF:
-		if (!LF_ISSET(WT_WALK_OFFDUP))
+		if (!WT_PAGE_DUP_TREES(page) || !LF_ISSET(WT_WALK_OFFDUP))
 			break;
 		WT_INDX_FOREACH(page, rip, i) {
-			if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF_RECORD)
-				break;
+			/*
+			 * If only walking pages in the cache, skip any off-page
+			 * duplicate pages not already in the cache.
+			 *
+			 * The test for ref == NULL is necessary because some
+			 * elements of the array won't be initialized, as they
+			 * don't reference off-page duplicate trees.  There is
+			 * an alternative, test WT_ITEM_TYPE(rip->data) for an
+			 * item of teyp WT_ITEM_OFF_RECORD, because then we'd
+			 * know this u3.dup array slot must have been filled in.
+			 */
+			ref = WT_ROW_DUP(page, rip);
+			if (ref == NULL ||
+			    (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK))
+				continue;
 
 			/*
 			 * Recursively call the tree-walk function for the
 			 * off-page duplicate tree.
 			 */
-			ref = WT_ROW_DUP(page, rip);
-			if (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK)
-				continue;
-
 			off_record = WT_ROW_OFF_RECORD(rip);
 			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
 			ret = __wt_tree_walk(toc, ref, flags, work, arg);
