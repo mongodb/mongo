@@ -742,7 +742,7 @@ const StringData _jscode_raw_utils =
 "\"__parallelTests__fun.apply( 0, __parallelTests__argv );\" +\n" 
 "\"__parallelTests__passed = true;\" +\n" 
 "\"} catch ( e ) {\" +\n" 
-"\"print( e );\" +\n" 
+"\"print( '********** Parallel Test FAILED: ' + tojson(e) );\" +\n" 
 "\"}\" +\n" 
 "\"return __parallelTests__passed;\" +\n" 
 "\"}\"\n" 
