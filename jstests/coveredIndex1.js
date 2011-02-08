@@ -1,6 +1,6 @@
 
 t = db["jstests_coveredIndex1"];
-t.remove( {} );
+t.drop();
 
 t.save({fn: "john", ln: "doe"})
 t.save({fn: "jack", ln: "doe"})

@@ -1,5 +1,5 @@
 t = db["jstests_coveredIndex2"];
-t.remove( {} );
+t.drop();
 
 t.save({a: 1})
 t.save({a: 2})
