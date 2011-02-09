@@ -138,7 +138,7 @@ namespace mongo {
                         db->getChunkManager( ns , true );
                     }
 
-                    // do reequest and then call getLastError
+                    // do request and then call getLastError
                     // we have to call getLastError so we can return the right fields to the user if they decide to call getLastError
 
                     BSONObj gle;
