@@ -73,10 +73,8 @@ namespace mongo {
             }
             sleepmillis( 10 );
         }
-        stringstream ss;
-        ss << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms";
-        uasserted( 13403 , ss.str() );
-        return BSONObj(); // never gets here
+        uasserted( 13403 , str::stream() << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms" );
+        throw 1; // never gets here
     }
 
     void WriteBackListener::run() {
