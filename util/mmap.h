@@ -83,7 +83,13 @@ namespace mongo {
         virtual Flushable * prepareFlush() = 0;
 
         void created(); /* subclass must call after create */
-        void destroyed(); /* subclass must call in destructor */
+
+        /* subclass must call in destructor (or at close).
+           removes this from pathToFile and other maps
+           safe to call more than once, albeit might be wasted work
+           ideal to call close to the close, if the close is well before object destruction
+        */
+        void destroyed(); 
 
         virtual unsigned long long length() const = 0;
 

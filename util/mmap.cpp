@@ -63,6 +63,11 @@ namespace mongo {
 
     RWLock MongoFile::mmmutex("rw:mmmutex");
 
+    /* subclass must call in destructor (or at close).
+        removes this from pathToFile and other maps
+        safe to call more than once, albeit might be wasted work
+        ideal to call close to the close, if the close is well before object destruction
+    */
     void MongoFile::destroyed() {
         rwlock lk( mmmutex , true );
         mmfiles.erase(this);
