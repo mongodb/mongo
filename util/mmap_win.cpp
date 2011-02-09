@@ -133,6 +133,7 @@ namespace mongo {
             if ( fd == INVALID_HANDLE_VALUE ) {
                 DWORD e = GetLastError();
                 log() << "Create/OpenFile failed " << filename << " errno:" << e << endl;
+                destroyed();
                 return 0;
             }
         }
@@ -148,6 +149,7 @@ namespace mongo {
             if ( maphandle == NULL ) {
                 DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
                 log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
+                destroyed();
                 close();
                 return 0;
             }
@@ -162,6 +164,7 @@ namespace mongo {
         if ( view == 0 ) {
             DWORD e = GetLastError();
             log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
+            destroyed();
             close();
         }
         else {
