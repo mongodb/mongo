@@ -984,10 +984,16 @@ namespace mongo {
 
                 bool ok;
                 BSONObj cmdResult;
-                {
+                try {
                     ScopedDbConnection conn( shardingState.getConfigServer() );
                     ok = conn->runCommand( "config" , cmd , cmdResult );
                     conn.done();
+                }
+                catch ( DBException& e ) {
+                    ok = false;
+                    BSONObjBuilder b;
+                    e.getInfo().append( b );
+                    cmdResult = b.obj();
                 }
 
                 if ( ! ok ) {
