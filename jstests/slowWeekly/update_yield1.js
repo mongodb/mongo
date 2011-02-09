@@ -76,6 +76,6 @@ assert.eq("update", x.inprog[0].op);
 t.findOne(); // should wait for update to finish
 
 var x = db.currentOp()
-assert.eq( 0 , x.inprog.length , "should have been atomic" );
+assert.eq( [] , x.inprog , "should have been atomic" );
 
 join();
