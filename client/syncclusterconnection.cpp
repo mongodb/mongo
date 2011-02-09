@@ -180,7 +180,7 @@ namespace mongo {
                     if ( isOk( temp ) )
                         continue;
                     stringstream ss;
-                    ss << "write $cmd failed on a shard: " << temp.jsonString();
+                    ss << "write $cmd failed on a node: " << temp.jsonString();
                     ss << " " << _conns[i]->toString();
                     throw UserException( 13105 , ss.str() );
                 }
