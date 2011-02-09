@@ -184,7 +184,7 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
-int main(int argc, char* argv[]) {
+int _main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     mongosCommand = argv[0];
 
@@ -329,6 +329,23 @@ int main(int argc, char* argv[]) {
 
     dbexit( EXIT_CLEAN );
     return 0;
+}
+int main(int argc, char* argv[]) {
+    try {
+        return _main(argc, argv);
+    }
+    catch(DBException& e) { 
+        cout << "uncaught exception in mongos main:" << endl;
+        cout << e.toString() << endl;
+    }
+    catch(std::exception& e) { 
+        cout << "uncaught exception in mongos main:" << endl;
+        cout << e.what() << endl;
+    }
+    catch(...) { 
+        cout << "uncaught exception in mongos main" << endl;
+    }
+    return 20;
 }
 
 #undef exit
