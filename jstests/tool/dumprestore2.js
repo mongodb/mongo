@@ -8,6 +8,9 @@ c.save( { a : 22 } );
 assert.eq( 1 , c.count() , "setup2" );
 t.stop();
 
+// SERVER-2501 on Windows the mongod may still be running at this point, so we wait for it to stop.
+sleep( 5000 );
+
 t.runTool( "dump" , "--dbpath" , t.dbpath , "--out" , t.ext );
 
 resetDbpath( t.dbpath );
