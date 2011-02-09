@@ -40,6 +40,8 @@ struct __db {
 
 	void	*app_private;		/* Application-private information */
 
+	TAILQ_ENTRY(__db) q;		/* List of handles in a session */
+
 	uint32_t flags;
 
 	/*
@@ -183,9 +185,7 @@ struct __db {
 struct __env {
 	IENV	*ienv;			/* Private object */
 
-	void	*app_private;		/* Application-private information */
-
-	 uint32_t flags;
+	WT_ERROR_HANDLER *error_handler;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -317,6 +317,8 @@ struct __env {
 	 * ENV methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
+
+	uint32_t flags;
 };
 
 /*******************************************

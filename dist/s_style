@@ -8,7 +8,7 @@ extra=`cd .. && echo src/include/*.h src/include/*.in dist/*.py`
 (
 for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	f="../$f"
-	if grep "while (0);" $f > /dev/null; then
+	if grep "^[^}]*while (0);" $f > /dev/null; then
 		echo "$f: while (0) has trailing semi-colon"
 	fi
 	if grep "%dl|%ul|%xl" $f > /dev/null; then

@@ -1,8 +1,25 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
+int
+__wt_config_init(WT_CONFIG *conf, const char *str, size_t len);
+int
+__wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
+int
+__wt_curbulk_init(ICURSOR_BULK *cbulk);
 void
-__wt_curstd_init(WT_CURSOR_STD *stdc);
+__wt_curdump_init(WT_CURSOR_STD *stdc);
 void
-__wt_curstd_close(WT_CURSOR_STD *c);
+__wt_scratch_init(WT_SCRATCH *scratch);
+int
+__wt_scratch_grow(ENV *env, WT_SCRATCH *scratch, size_t sz);
+void
+__wt_scratch_free(ENV *env, WT_SCRATCH *scratch);
+int
+__wt_curstd_close(WT_CURSOR *cursor, const char *config);
+void
+__wt_curstd_init(WT_CURSOR_STD *cstd);
+int
+__wt_curtable_open(WT_SESSION *session,
+    const char *uri, const char *config, WT_CURSOR **cursorp);
 int
 __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
 int
@@ -17,7 +34,14 @@ int
 __wt_db_bulk_load(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_item_build_value(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
+__wt_bulk_init(ICURSOR_BULK *cbulk);
+int
+__wt_bulk_var_insert(ICURSOR_BULK *cbulk);
+int
+__wt_bulk_end(ICURSOR_BULK *cbulk);
+int
+__wt_item_build_value(WT_TOC *toc,
+    WT_DATAITEM *dbt, WT_ITEM *item, WT_OVFL *ovfl);
 int
 __wt_cache_create(ENV *env);
 void
@@ -123,7 +147,7 @@ __wt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk);
 void
 __wt_walk_end(ENV *env, WT_WALK *walk);
 int
-__wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp);
+__wt_walk_next(WT_TOC *toc, WT_WALK *walk, uint32_t flags, WT_REF **refp);
 int
 __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data);
 int
@@ -357,6 +381,10 @@ __wt_db_lockout(DB *db);
 int
 __wt_env_lockout(ENV *env);
 int
+__wt_errv(ENV *env, ISESSION *isession, int error, const char *fmt, va_list ap);
+int
+__wt_err(ENV *env, ISESSION *isession, int error, const char *fmt, ...);
+int
 __wt_hazard_set(WT_TOC *toc, WT_REF *ref);
 void
 __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page);
@@ -371,7 +399,7 @@ int
 __wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol);
 int
 __wt_huffman_encode(void *huffman_arg,
-    uint8_t *from, uint32_t from_len,
+    const uint8_t *from, uint32_t from_len,
     void *top, uint32_t *to_len, uint32_t *out_bytes_used);
 int
 __wt_huffman_decode(void *huffman_arg,

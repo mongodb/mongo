@@ -5,16 +5,20 @@
  *	All rights reserved.
  */
 
-#include "wt_internal.h"
+#include "wiredtiger.h"
 #include "util.h"
 
 const char *progname;
 
-int	bulk_callback(DB *, DBT **, DBT **);
-int	bulk_read(DBT *dbt, int);
-int	config_read(char **);
-int	config_read_single(char *);
-int	config_set(DB *);
+struct record_t {
+	WT_DATAITEM key;
+	size_t   key_memsize;
+
+	WT_DATAITEM value;
+	size_t   value_memsize;
+};
+
+int	bulk_read(struct record_t *);
 int	usage(void);
 
 struct {
@@ -25,27 +29,31 @@ struct {
 int
 main(int argc, char *argv[])
 {
-	DB *db;
-	int ch, ret, text_input, tret, verbose;
-	char **config_list, **next;
+	extern char *optarg;
+	extern int optind;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
+	struct record_t record;
+	const char *tablename, *table_config, *home;
+	char cursor_config[100], datasink[100];
+	unsigned long insert_count;
+	int ch, debug, ret, text_input, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
 
-	/*
-	 * We can't handle configuration-line information until we've opened
-	 * the DB handle, so we need a place to store it for now.
-	 */
-	if ((config_list = calloc((size_t)argc + 1, sizeof(char *))) == NULL) {
-		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
-		return (EXIT_FAILURE);
-	}
-	next = config_list;
+	conn = NULL;
+	table_config = NULL;
+	home = NULL;
+	debug = text_input = verbose = 0;
 
-	text_input = verbose = 0;
-	while ((ch = getopt(argc, argv, "c:f:TVv")) != EOF)
+	while ((ch = getopt(argc, argv, "c:f:h:TVv")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
-			*next++ = optarg;
+			table_config = optarg;
+			break;
+		case 'd':			/* command-line option */
+			debug = 1;
 			break;
 		case 'f':			/* input file */
 			if (freopen(optarg, "r", stdin) == NULL) {
@@ -53,6 +61,9 @@ main(int argc, char *argv[])
 				    progname, optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
+			break;
+		case 'h':			/* command-line option */
+			home = optarg;
 			break;
 		case 'T':
 			text_input = 1;
@@ -73,13 +84,7 @@ main(int argc, char *argv[])
 	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
-
-	/*
-	 * Read through the command-line configuration options and convert
-	 * to the config structure.
-	 */
-	if (config_read(config_list) != 0)
-		goto err;
+	tablename = *argv;
 
 	/*
 	 * Right now, we only support text input -- require the T option to
@@ -91,190 +96,118 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
-		if (config_set(db) != 0)
-			goto err;
+	if ((ret = wiredtiger_open(home, NULL, NULL, &conn)) != 0 ||
+	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		goto err;
 
-		(void)remove(*argv);
+	if ((ret = session->drop_table(session, tablename, "force")) != 0)
+		goto err;
 
-		if ((ret = db->open(db, *argv, 0600, WT_CREATE)) != 0) {
-			db->err(db, ret, "Db.open: %s", *argv);
-			goto err;
-		}
+	if ((ret = session->create_table(session,
+	    tablename, table_config)) != 0)
+		goto err;
 
-		if ((ret = db->bulk_load(db,
-		    verbose ? __wt_progress : NULL, bulk_callback)) != 0) {
-			db->err(db, ret, "Db.bulk_load");
-			goto err;
-		}
-		if (verbose)
-			printf("\n");
+	snprintf(datasink, sizeof(datasink), "table:%s", tablename);
+	snprintf(cursor_config, sizeof(cursor_config), "bulk,dump=%s%s",
+	    text_input ? "print" : "raw", debug ? ",debug" : "");
+
+	if ((ret = session->open_cursor(session, datasink, NULL,
+	    cursor_config, &cursor)) != 0) {
+		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
+		    progname, tablename, wiredtiger_strerror(ret));
+		goto err;
 	}
+
+	insert_count = 0;
+	record.key.data = record.value.data = NULL;
+	record.key_memsize = record.value_memsize = 0;
+
+	while ((ret = bulk_read(&record)) == 0) {
+                /* Report on progress every 100 inserts. */
+                if (++insert_count % 100 == 0 && verbose) {
+                        printf("\r\t%s: %lu\n", tablename, insert_count);
+			fflush(stdout);
+		}
+	
+		cursor->set_key(cursor, &record.key);
+		cursor->set_value(cursor, &record.value);
+		if ((ret = cursor->insert(cursor)) != 0) {
+			fprintf(stderr, "%s: cursor insert(%s) failed: %s\n",
+			    progname, tablename, wiredtiger_strerror(ret));
+			goto err;
+		}
+	}
+
+	if (verbose)
+		printf("\n");
 
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
+	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-/*
- * config_read --
- *	Convert command-line options into the config structure.
- */
-int
-config_read(char **list)
-{
-	int ret;
-
-	for (; *list != NULL; ++list)
-		if ((ret = config_read_single(*list)) != 0)
-			return (ret);
-	return (0);
-}
-
-/*
- * config_read_single --
- *	Process a single command-line configuration option, converting it into
- *	the config structure.
- */
-int
-config_read_single(char *opt)
-{
-	u_long v;
-	char *p, *ep;
-
-	/* Get pointers to the two parts of an X=Y format string. */
-	if ((p = strchr(opt, '=')) == NULL || p[1] == '\0')
-		goto format;
-	*p++ = '\0';
-	v = strtoul(p, &ep, 10);
-	if (v == ULONG_MAX && errno == ERANGE) {
-format:		fprintf(stderr,
-		    "%s: -c option %s is not correctly formatted\n",
-		    progname, opt);
-		return (1);
-	}
+/* XXX supported config options (all uint32_t:
 	if (strcmp(opt, "allocsize") == 0) {
-		config.allocsize = (uint32_t)v;
-		config.pagesize_set = 1;
-		return (0);
-	}
 	if (strcmp(opt, "intlmin") == 0) {
-		config.intlmin = (uint32_t)v;
-		config.pagesize_set = 1;
-		return (0);
-	}
 	if (strcmp(opt, "intlmax") == 0) {
-		config.intlmax = (uint32_t)v;
-		config.pagesize_set = 1;
-		return (0);
-	}
 	if (strcmp(opt, "leafmin") == 0) {
-		config.leafmin = (uint32_t)v;
-		config.pagesize_set = 1;
-		return (0);
-	}
 	if (strcmp(opt, "leafmax") == 0) {
-		config.leafmax = (uint32_t)v;
-		config.pagesize_set = 1;
-		return (0);
-	}
-
-	fprintf(stderr,
-	    "%s: -c option %s has an unknown keyword\n", progname, opt);
-	return (1);
-}
+*/
 
 /*
- * config_set --
- *	Set the command-line configuration options on the DB handle.
+ * bulk_read_line --
+ *	Read a line from stdin into a WT_DATAITEM.
  */
-int
-config_set(DB *db)
+static int
+bulk_read_line(WT_DATAITEM *item, size_t *memsize, int iskey)
 {
-	u_int32_t allocsize, intlmin, intlmax, leafmin, leafmax;
-	int ret;
+	static unsigned long long line = 0;
+	uint8_t *buf;
+	uint32_t len;
+	int ch;
 
-	if (config.pagesize_set) {
-		if ((ret = db->btree_pagesize_get(db,
-		    &allocsize, &intlmin, &intlmax, &leafmin, &leafmax)) != 0) {
-			db->err(db, ret, "Db.btree_pagesize_get");
-			return (1);
+	buf = (uint8_t *)item->data;
+	for (len = 0;; ++len) {
+		if ((ch = getchar()) == EOF) {
+			if (iskey && len == 0)
+				return (WT_NOTFOUND);
+			fprintf(stderr, "%s: corrupted input at line %llu\n",
+			    progname, line + 1);
+			return (WT_ERROR);
 		}
-		if (config.allocsize != 0)
-			allocsize = config.allocsize;
-		if (config.intlmin != 0)
-			intlmin = config.intlmin;
-		if (config.intlmax != 0)
-			intlmax = config.intlmax;
-		if (config.leafmin != 0)
-			leafmin = config.leafmin;
-		if (config.leafmax != 0)
-			leafmax = config.leafmax;
-		if ((ret = db->btree_pagesize_set(db,
-		    allocsize, intlmin, intlmax, leafmin, leafmax)) != 0) {
-			db->err(db, ret, "Db.btree_pagesize_set");
-			return (1);
+		if (ch == '\n') {
+			++line;
+			break;
 		}
+		if (len >= *memsize) {
+			if ((buf = realloc(buf, len + 128)) == NULL)
+				return (errno);
+			*memsize = len + 128;
+		}
+		buf[len] = (uint8_t)ch;
 	}
-
+	item->data = buf;
+	item->size = len;
 	return (0);
 }
 
 /*
  * bulk_read --
- *	Read a line from stdin into a DBT.
+ *	Read a key/value pair from stdin
  */
 int
-bulk_read(DBT *dbt, int iskey)
+bulk_read(struct record_t *r)
 {
-	static unsigned long long line = 0;
-	uint32_t len;
-	int ch;
-
-	++line;
-	for (len = 0;; ++len) {
-		if ((ch = getchar()) == EOF) {
-			if (iskey && len == 0)
-				return (1);
-			fprintf(stderr, "%s: corrupted input at line %llu\n",
-			    progname, line);
-			return (WT_ERROR);
-		}
-		if (ch == '\n')
-			break;
-		if (len >= dbt->mem_size) {
-			if ((dbt->data = realloc(dbt->data, len + 128)) == NULL)
-				return (errno);
-			dbt->mem_size = len + 128;
-		}
-		((u_int8_t *)(dbt->data))[len] = (u_int8_t)ch;
-	}
-	dbt->size = len;
-	return (0);
-}
-
-/*
- * bulk_callback --
- *	Bulk-load callback function.
- */
-int
-bulk_callback(DB *db, DBT **keyp, DBT **datap)
-{
-	static DBT key, data;
 	int ret;
 
-	WT_UNUSED(db);
-
-	if ((ret = bulk_read(&key, 1)) != 0)
+	if ((ret = bulk_read_line(&r->key, &r->key_memsize, 1)) != 0)
 		return (ret);
-	if ((ret = bulk_read(&data, 0)) != 0)
+	if ((ret = bulk_read_line(&r->value, &r->value_memsize, 0)) != 0)
 		return (ret);
 
-	*keyp = &key;
-	*datap = &data;
 	return (0);
 }
 

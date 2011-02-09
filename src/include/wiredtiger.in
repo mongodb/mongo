@@ -801,7 +801,7 @@ const char *wiredtiger_strerror(int err);
 struct WT_ERROR_HANDLER {
 	/*! Callback to handle errors within the session. */
 	int (*handle_error)(WT_ERROR_HANDLER *handler,
-	    int err, const char *errmsg);
+	    int error, const char *errmsg);
 
 	/*! Optional callback to retrieve buffered messages. */
 	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);

@@ -8,35 +8,17 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-/*
- * WT_STACK --
- *	We maintain a stack of parent pages as we build the tree, encapsulated
- *	in this structure.
- */
-typedef struct {
-	WT_PAGE	*page;				/* page header */
-	uint8_t	*first_free;			/* page's first free byte */
-	uint32_t space_avail;			/* page's space available */
-
-	DBT	*tmp;				/* page-in-a-buffer */
-	void	*data;				/* last on-page WT_COL/WT_ROW */
-} WT_STACK_ELEM;
-typedef struct {
-	WT_STACK_ELEM *elem;			/* stack */
-	u_int size;				/* stack size */
-} WT_STACK;
-
 static int __wt_bulk_fix(WT_TOC *, void (*)(const char *,
 		uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
-static int __wt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
+static int __wt_bulk_ovfl_write(WT_TOC *, WT_DATAITEM *, WT_OVFL *);
 static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
 		WT_TOC *, uint32_t, uint32_t, WT_PAGE **, DBT **);
 static int __wt_bulk_stack_put(WT_TOC *, WT_STACK *);
 static int __wt_bulk_var(WT_TOC *, void (*)(const char *,
 		uint64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_item_build_key(WT_TOC *, DBT *, WT_ITEM *, WT_OVFL *);
+static int __wt_item_build_key(WT_TOC *, WT_DATAITEM *, WT_ITEM *, WT_OVFL *);
 
 /*
  * __wt_db_bulk_load --
@@ -312,11 +294,11 @@ __wt_bulk_var(WT_TOC *toc,
 
 		/* Build the key/value items we're going to store on the page. */
 		if (key != NULL)
-			WT_ERR(__wt_item_build_key(
-			    toc, key, &key_item, &key_ovfl));
+			WT_ERR(__wt_item_build_key(toc,
+			    (WT_DATAITEM *)key, &key_item, &key_ovfl));
 		if (value != NULL)
-			WT_ERR(__wt_item_build_value(
-			    toc, value, &value_item, &value_ovfl));
+			WT_ERR(__wt_item_build_value(toc,
+			    (WT_DATAITEM *)value, &value_item, &value_ovfl));
 
 		/*
 		 * We now have the key/value items to store on the page.  If
@@ -393,6 +375,226 @@ __wt_bulk_var(WT_TOC *toc,
 err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
+
+	return (ret);
+}
+
+int
+__wt_bulk_init(ICURSOR_BULK *cbulk)
+{
+	BTREE *btree;
+	DB *db;
+	ISESSION *isession;
+	WT_TOC *toc;
+	uint32_t addr;
+	int is_column;
+
+	db = cbulk->ctable.db;
+	btree = db->btree;
+	isession = (ISESSION *)cbulk->ctable.cstd.iface.session;
+	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
+	toc = isession->toc;
+
+	toc->db = db;
+
+	/*
+	 * XXX
+	 * Write out the description record -- this goes away when we figure
+	 * out how the table schema is going to work, but for now, we use the
+	 * first sector, and this file extend makes sure we don't allocate it
+	 * as a table page.
+	 */
+	WT_RET(__wt_block_alloc(toc, &addr, 512));
+
+	cbulk->tmp = NULL;
+
+	WT_CLEAR(cbulk->stack);
+	cbulk->insert_cnt = 0;
+
+	/* Get a scratch buffer and make it look like our work page. */
+	WT_RET(__wt_bulk_scratch_page(toc, db->leafmin,
+	    is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF,
+	    &cbulk->page, &cbulk->tmp));
+	__wt_init_ff_and_sa(cbulk->page,
+	    &cbulk->first_free, &cbulk->space_avail);
+	if (is_column)
+		cbulk->page->dsk->recno = 1;
+
+	return (0);
+}
+
+/*
+ * __wt_bulk_var_insert --
+ *	Db.bulk_load method for row or column-store variable-length file pages.
+ */
+int
+__wt_bulk_var_insert(ICURSOR_BULK *cbulk)
+{
+	BTREE *btree;
+	DB *db;
+	ISESSION *isession;
+	WT_CURSOR_STD *cstd;
+	WT_DATAITEM *key, *value, key_copy, value_copy;
+	WT_ITEM key_item, value_item;
+	WT_OVFL key_ovfl, value_ovfl;
+	WT_TOC *toc;
+	uint32_t space_req;
+	int is_column;
+
+	cstd = &cbulk->ctable.cstd;
+	db = cbulk->ctable.db;
+	btree = db->btree;
+	isession = (ISESSION *)cstd->iface.session;
+	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
+	toc = isession->toc;
+
+	WT_CLEAR(key_copy);
+	WT_CLEAR(key_item);
+	WT_CLEAR(value_copy);
+
+#if 0
+	/* XXX move checking to the cursor layer */
+	if (F_ISSET(btree, WT_COLUMN) ) {
+		if (key != NULL) {
+			__wt_api_db_errx(db,
+			    "column-store keys are implied and should "
+			    "not be returned by the bulk load input "
+			    "routine");
+			ret = WT_ERROR;
+			goto err;
+		}
+	} else {
+		if (key == NULL) {
+			ret = WT_ERROR;
+			goto err;
+		}
+		if (key != NULL && key->size == 0) {
+			__wt_api_db_errx(db,
+			    "zero-length keys are not supported");
+			ret = WT_ERROR;
+			goto err;
+		}
+	}
+#endif
+
+	WT_STAT_INCR(btree->stats, FILE_ITEMS_INSERTED);
+
+	/*
+	 * We don't have a key to store on the page if we're building a
+	 * column-store; the check from here on is if "key == NULL".
+	 *
+	 * We don't store values if the length of the value is 0;
+	 * the check from here on is if "value == NULL".
+	 */
+	if (is_column)
+		key = NULL;
+	else {
+		key_copy = cstd->key.item;
+		key = &key_copy;
+	}
+	if (cstd->value.item.size == 0 && !is_column)
+		value = NULL;
+	else {
+		value_copy = cstd->value.item;
+		value = &value_copy;
+	}
+
+	/* Build the key/value items we're going to store on the page. */
+	if (key != NULL)
+		WT_RET(__wt_item_build_key(toc, key, &key_item, &key_ovfl));
+	if (value != NULL)
+		WT_RET(__wt_item_build_value(toc,
+		    value, &value_item, &value_ovfl));
+
+	/*
+	 * We now have the key/value items to store on the page.  If
+	 * there is insufficient space on the current page, allocate
+	 * a new one.
+	 */
+	space_req = 0;
+	if (key != NULL)
+		space_req += WT_ITEM_SPACE_REQ(key->size);
+	if (value != NULL)
+		space_req += WT_ITEM_SPACE_REQ(value->size);
+	if (space_req > cbulk->space_avail) {
+		/*
+		 * We've finished with the page: promote its first key
+		 * to its parent and discard it, then switch to the new
+		 * page.
+		 */
+		WT_RET(__wt_bulk_promote(toc, cbulk->page, &cbulk->stack, 0));
+		WT_RET(__wt_page_write(toc, cbulk->page));
+		__wt_scr_release(&cbulk->tmp);
+
+		/*
+		 * XXX
+		 * The obvious speed-up here is to re-initialize page
+		 * instead of discarding it and acquiring it again as
+		 * as soon as the just-allocated page fills up.  I am
+		 * not doing that deliberately: eventually we'll use
+		 * asynchronous I/O in bulk load, which means the page
+		 * won't be reusable until the I/O completes.
+		 */
+		WT_RET(__wt_bulk_scratch_page(toc, db->leafmin,
+		    is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF,
+		    &cbulk->page, &cbulk->tmp));
+		__wt_init_ff_and_sa(cbulk->page,
+		    &cbulk->first_free, &cbulk->space_avail);
+		if (is_column)
+			cbulk->page->dsk->recno = ++cbulk->insert_cnt;
+	}
+
+	/* Copy the key item onto the page. */
+	if (key != NULL) {
+		++cbulk->page->dsk->u.entries;
+		memcpy(cbulk->first_free, &key_item, sizeof(key_item));
+		memcpy(cbulk->first_free +
+		    sizeof(key_item), key->data, key->size);
+		cbulk->space_avail -= WT_ITEM_SPACE_REQ(key->size);
+		cbulk->first_free += WT_ITEM_SPACE_REQ(key->size);
+	}
+
+	/* Copy the data item onto the page. */
+	if (value != NULL) {
+		++cbulk->page->dsk->u.entries;
+		memcpy(cbulk->first_free, &value_item, sizeof(value_item));
+		memcpy(cbulk->first_free +
+		    sizeof(value_item), value->data, value->size);
+		cbulk->space_avail -= WT_ITEM_SPACE_REQ(value->size);
+		cbulk->first_free += WT_ITEM_SPACE_REQ(value->size);
+	}
+
+	return (0);
+}
+
+int
+__wt_bulk_end(ICURSOR_BULK *cbulk)
+{
+	BTREE *btree;
+	DB *db;
+	ISESSION *isession;
+	WT_TOC *toc;
+	int ret;
+
+	db = cbulk->ctable.db;
+	btree = db->btree;
+	isession = (ISESSION *)cbulk->ctable.cstd.iface.session;
+	toc = isession->toc;
+	ret = 0;
+
+	/* Promote a key from any partially-filled page and write it. */
+	if (cbulk->page->dsk->u.entries != 0) {
+		WT_ERR(__wt_bulk_promote(toc, cbulk->page, &cbulk->stack, 0));
+		WT_ERR(__wt_page_write(toc, cbulk->page));
+	}
+
+err:	WT_TRET(__wt_bulk_stack_put(toc, &cbulk->stack));
+	if (cbulk->tmp != NULL)
+		__wt_scr_release(&cbulk->tmp);
+
+	/* Get a permanent root page reference. */
+	if (ret == 0)
+		ret = __wt_root_pin(toc);
 
 	return (ret);
 }
@@ -564,6 +766,7 @@ split:		switch (dsk->type) {
 		case WT_PAGE_ROW_LEAF:
 			type = WT_PAGE_ROW_INT;
 			break;
+		WT_ILLEGAL_FORMAT(db);
 		}
 
 		WT_ERR(__wt_bulk_scratch_page(
@@ -700,7 +903,7 @@ err:	if (next_tmp != NULL)
  *	string to be stored on the page.
  */
 static int
-__wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+__wt_item_build_key(WT_TOC *toc, WT_DATAITEM *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 {
 	DB *db;
 	BTREE *btree;
@@ -751,7 +954,8 @@ __wt_item_build_key(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
  *	string to be stored on the page.
  */
 int
-__wt_item_build_value(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl)
+__wt_item_build_value(WT_TOC *toc,
+    WT_DATAITEM *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 {
 	DB *db;
 	BTREE *btree;
@@ -855,7 +1059,7 @@ err:	__wt_scr_release(&tmp);
  *	Store bulk-loaded overflow items in the file, returning the page addr.
  */
 static int
-__wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
+__wt_bulk_ovfl_write(WT_TOC *toc, WT_DATAITEM *dbt, WT_OVFL *to)
 {
 	DB *db;
 	DBT *tmp;

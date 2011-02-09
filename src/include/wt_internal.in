@@ -16,6 +16,28 @@ extern "C" {
 #include "wiredtiger_config.h"
 
 /*******************************************
+ * WiredTiger system include files.
+ *******************************************/
+#include <sys/stat.h>
+#include <sys/uio.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <pthread.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+/*******************************************
+ * WiredTiger externally maintained include files.
+ *******************************************/
+#include "queue.h"
+#include "bitstring.h"
+
+/*******************************************
  * Forward structure declarations for internal structures.
  *******************************************/
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
@@ -46,27 +68,10 @@ struct __wt_toc_buffer;		typedef struct __wt_toc_buffer WT_TOC_BUFFER;
 struct __wt_update;		typedef struct __wt_update WT_UPDATE;
 
 #include "api_int.h"
+#include "cur_std.h"
 
-/*******************************************
- * WiredTiger system include files.
- *******************************************/
-#include <sys/stat.h>
-#include <sys/uio.h>
-
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <pthread.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-/*******************************************
- * WiredTiger externally maintained include files.
- *******************************************/
-#include "queue.h"
-#include "bitstring.h"
+#include "walk.h"
+#include "api_impl.h"
 
 /*******************************************
  * WiredTiger internal include files.
@@ -76,13 +81,11 @@ struct __wt_update;		typedef struct __wt_update WT_UPDATE;
 #include "btree.h"
 #include "cache.h"
 #include "config.h"
-#include "cur_std.h"
 #include "debug.h"
 #include "fh.h"
 #include "mem.h"
 #include "misc.h"
 #include "stat.h"
-#include "walk.h"
 
 /*******************************************
  * WT_TOC support.

@@ -130,6 +130,11 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 	size_t len;
 	void *p;
 
+	if (str == NULL) {
+		*(void **)retp = NULL;
+		return (0);
+	}
+
 	/*
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.

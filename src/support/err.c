@@ -241,3 +241,49 @@ __wt_env_lockout(ENV *env)
 	    "environment has been opened.");
 	return (WT_ERROR);
 }
+
+int
+__wt_errv(ENV *env, ISESSION *isession, int error, const char *fmt, va_list ap)
+{
+	WT_ERROR_HANDLER *handler;
+	char *end, *p;
+
+	/*
+	 * !!!
+	 * SECURITY:
+	 * Buffer placed at the end of the stack in case snprintf overflows.
+	 */
+	char s[2048];
+
+	s[0] = '\0';
+	p = s;
+	end = s + sizeof(s);
+
+	/* TODO: prefix? */
+	if (p < end)
+		p += vsnprintf(p, end - p, fmt, ap);
+	if (error != 0 && p < end)
+		p += snprintf(p, end - p, ": %s", wiredtiger_strerror(error));
+
+	if (isession != NULL && isession->error_handler != NULL)
+		handler = isession->error_handler;
+	else {
+		WT_ASSERT(env, env != NULL && env->error_handler != NULL);
+		handler = env->error_handler;
+	}
+
+	return (handler->handle_error(handler, error, s));
+}
+
+int
+__wt_err(ENV *env, ISESSION *isession, int error, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = __wt_errv(env, isession, error, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}

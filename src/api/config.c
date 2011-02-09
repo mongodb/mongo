@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 int
-config_init(WT_CONFIG *conf, const char *str, int len)
+__wt_config_init(WT_CONFIG *conf, const char *str, size_t len)
 {
 	conf->orig = conf->cur = str;
 	conf->end = str + len;
@@ -282,7 +282,7 @@ static int8_t goesc[256] = {
 };
 
 int
-config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+__wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;

@@ -5,6 +5,11 @@
  *	All rights reserved.
  */
 
+#include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 /* Utility introduction: get the program name, and check the version. */
 #define	WT_UTILITY_INTRO(prog, argv) do {				\
 	int __major, __minor;						\

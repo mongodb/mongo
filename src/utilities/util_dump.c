@@ -5,7 +5,7 @@
  *	All rights reserved.
  */
 
-#include "wt_internal.h"
+#include "wiredtiger.h"
 #include "util.h"
 
 const char *progname;
@@ -15,17 +15,26 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	DB *db;
-	u_int32_t flags;
-	int ch, ret, tret;
+	extern char *optarg;
+	extern int optind;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
+	WT_DATAITEM key, value;
+	const char *tablename, *home;
+	char cursor_config[100], datasrc[100];
+	int ch, debug, printable, ret, tret;
 
 	WT_UTILITY_INTRO(progname, argv);
 
-	flags = 0;
-	while ((ch = getopt(argc, argv, "df:p")) != EOF)
+	conn = NULL;
+	home = NULL;
+	debug = printable = 0;
+
+	while ((ch = getopt(argc, argv, "df:h:p")) != EOF)
 		switch (ch) {
 		case 'd':
-			flags = WT_DEBUG;
+			debug = 1;
 			break;
 		case 'f':			/* output file */
 			if (freopen(optarg, "w", stdout) == NULL) {
@@ -34,8 +43,11 @@ main(int argc, char *argv[])
 				return (EXIT_FAILURE);
 			}
 			break;
+		case 'h':			/* home directory */
+			home = optarg;
+			break;
 		case 'p':
-			flags = WT_PRINTABLES;
+			printable = 1;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
@@ -50,22 +62,42 @@ main(int argc, char *argv[])
 	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
+	tablename = *argv;
 
-	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
-		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
-			db->err(db, ret, "Db.open: %s", *argv);
-			goto err;
-		}
-		if ((ret = db->dump(db, stdout, NULL, flags)) != 0) {
-			db->err(db, ret, "Db.dump");
-			goto err;
-		}
+	if ((ret = wiredtiger_open(home, NULL, NULL, &conn)) != 0 ||
+	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		goto err;
+
+	snprintf(datasrc, sizeof(datasrc), "table:%s", tablename);
+	snprintf(cursor_config, sizeof(cursor_config), "dump=%s%s",
+	    printable ? "print" : "raw", debug ? ",debug" : "");
+
+	if ((ret = session->open_cursor(session, datasrc, NULL,
+	    cursor_config, &cursor)) != 0) {
+		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
+		    progname, datasrc, wiredtiger_strerror(ret));
+		goto err;
+	}
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		cursor->get_key(cursor, &key);
+		fwrite(key.data, key.size, 1, stdout);
+		fwrite("\n", 1, 1, stdout);
+		cursor->get_value(cursor, &value);
+		fwrite(value.data, value.size, 1, stdout);
+		fwrite("\n", 1, 1, stdout);
+	}
+
+	if (ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
+		    progname, datasrc, wiredtiger_strerror(ret));
+		goto err;
 	}
 
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
+	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

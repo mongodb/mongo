@@ -341,7 +341,8 @@ restart:	WT_RET(__wt_walk_begin(toc,
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	do {
 		evict = &cache->evict[slot];
-		WT_RET(__wt_walk_next(toc, &btree->evict_walk, &evict->ref));
+		WT_RET(__wt_walk_next(toc,
+		    &btree->evict_walk, WT_WALK_CACHE, &evict->ref));
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
@@ -913,7 +914,7 @@ __wt_evict_tree_dump(WT_TOC *toc, BTREE *btree)
 	WT_CLEAR(walk);
 	WT_RET(__wt_walk_begin(toc, &btree->root_page, &walk));
 	for (sep = ':';;) {
-		WT_RET(__wt_walk_next(toc, &walk, &ref));
+		WT_RET(__wt_walk_next(toc, &walk, WT_WALK_CACHE, &ref));
 		if (ref == NULL)
 			break;
 		__wt_mb_add(&mb, "%c %lu", sep, (u_long)ref->page->addr);
@@ -963,7 +964,7 @@ __wt_evict_tree_count(WT_TOC *toc, BTREE *btree, uint64_t *nodesp)
 	WT_CLEAR(walk);
 	WT_RET(__wt_walk_begin(toc, &btree->root_page, &walk));
 	for (nodes = 0;;) {
-		WT_RET(__wt_walk_next(toc, &walk, &ref));
+		WT_RET(__wt_walk_next(toc, &walk, WT_WALK_CACHE, &ref));
 		if (ref == NULL)
 			break;
 		++nodes;

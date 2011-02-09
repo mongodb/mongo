@@ -171,13 +171,16 @@ __wt_walk_end(ENV *env, WT_WALK *walk)
  *	Return the next WT_REF/WT_PAGE in the tree, in a non-recursive way.
  */
 int
-__wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
+__wt_walk_next(WT_TOC *toc, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 {
 	ENV *env;
+	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_REF *ref;
+	WT_ROW_REF *rref;
 	WT_WALK_ENTRY *e;
 	u_int elem;
+	int ret;
 
 	env = toc->env;
 
@@ -199,7 +202,7 @@ __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 			return (0);
 		} else {
 			--walk->tree_slot;
-			return (__wt_walk_next(toc, walk, refp));
+			return (__wt_walk_next(toc, walk, flags, refp));
 		}
 	} else
 		if (e->indx == page->indx_count) {
@@ -216,11 +219,21 @@ eop:			e->visited = 1;
 	case WT_PAGE_COL_INT:
 		/* Find the next subtree present in the cache. */
 		for (;;) {
-			ref = &page->u.col_int.t[e->indx].ref;
+			cref = &page->u.col_int.t[e->indx];
+			ref = &cref->ref;
 
 			/* We only care about pages in the cache. */
 			if (ref->state == WT_REF_CACHE)
 				break;
+			else if (ref->state != WT_REF_DELETED &&
+			    !LF_ISSET(WT_WALK_CACHE)) {
+				if ((ret = __wt_page_in(toc, page, ref, 0)) == 0)
+					break;			/* Valid page */
+				else if (ret == WT_PAGE_DELETED)
+					ret = 0;
+				else
+					return (ret);
+			}
 
 			/*
 			 * If we don't find another WT_REF entry, do the
@@ -233,11 +246,21 @@ eop:			e->visited = 1;
 	case WT_PAGE_ROW_INT:
 		/* Find the next subtree present in the cache. */
 		for (;;) {
-			ref = &page->u.row_int.t[e->indx].ref;
+			rref = &page->u.row_int.t[e->indx];
+			ref = &rref->ref;
 
 			/* We only care about pages in the cache. */
 			if (ref->state == WT_REF_CACHE)
 				break;
+			else if (ref->state != WT_REF_DELETED &&
+			    !LF_ISSET(WT_WALK_CACHE)) {
+				if ((ret = __wt_page_in(toc, page, ref, 0)) == 0)
+					break;			/* Valid page */
+				else if (ret == WT_PAGE_DELETED)
+					ret = 0;
+				else
+					return (ret);
+			}
 
 			/*
 			 * If we don't find another WT_REF entry, do the
@@ -268,7 +291,7 @@ eop:			e->visited = 1;
 		e->ref = ref;
 		e->indx = 0;
 		e->visited = 0;
-		return (__wt_walk_next(toc, walk, refp));
+		return (__wt_walk_next(toc, walk, flags, refp));
 	}
 
 	/* Return the child page, it's not interesting for further traversal. */

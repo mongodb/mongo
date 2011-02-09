@@ -421,7 +421,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol)
  */
 int
 __wt_huffman_encode(void *huffman_arg,
-    uint8_t *from, uint32_t from_len,
+    const uint8_t *from, uint32_t from_len,
     void *top, uint32_t *to_len, uint32_t *out_bytes_used)
 {
 	ENV *env;

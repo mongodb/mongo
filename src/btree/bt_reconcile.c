@@ -848,8 +848,8 @@ static int
 __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
-	DBT *data, data_dbt;
 	WT_COL *cip;
+	WT_DATAITEM *data, data_dbt;
 	WT_ITEM data_item, *item;
 	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
@@ -1010,7 +1010,7 @@ static int
 __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
-	DBT *key, key_dbt, *data, data_dbt;
+	WT_DATAITEM *key, key_dbt, *data, data_dbt;
 	WT_ITEM data_item, *empty_item, *key_item;
 	WT_OVFL data_ovfl;
 	WT_ROW *rip;

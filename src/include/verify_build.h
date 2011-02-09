@@ -80,4 +80,3 @@ __wt_verify_build(void)
 }
 
 #undef ALIGN_CHECK
-#undef STATIC_ASSERT

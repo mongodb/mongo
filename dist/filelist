@@ -4,7 +4,11 @@
 
 src/api/api.c
 src/api/config.c
+src/api/cur_bulk.c
+src/api/cur_dump.c
 src/api/cur_std.c
+src/api/cur_table.c
+src/api/err_file.c
 src/api/pack.c
 src/api/strerror.c
 src/api/version.c

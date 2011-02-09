@@ -7,109 +7,184 @@
 
 #include "wt_internal.h"
 
+void
+__wt_scratch_init(WT_SCRATCH *scratch)
+{
+	scratch->item.data = scratch->buf = NULL;
+	scratch->bufsz = scratch->item.size = 0;
+}
+
+int
+__wt_scratch_grow(ENV *env, WT_SCRATCH *scratch, size_t sz)
+{
+	if (sz > scratch->bufsz)
+		WT_RET(__wt_realloc(env, &scratch->bufsz, sz, &scratch->buf));
+
+	scratch->item.data = scratch->buf;
+	WT_ASSERT(env, sz < UINT32_MAX);
+	scratch->item.size = (uint32_t)sz;
+	return (0);
+}
+
+void
+__wt_scratch_free(ENV *env, WT_SCRATCH *scratch)
+{
+
+	if (scratch->buf != NULL)
+		__wt_free(env, scratch->buf, scratch->bufsz);
+
+	scratch->item.data = NULL;
+	scratch->bufsz = scratch->item.size = 0;
+}
+
 static int
 __curstd_get_key(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
+	WT_DATAITEM *item;
 	const char *fmt;
 	va_list ap;
+	int ret;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	return wiredtiger_struct_unpackv(stdc->key.data, stdc->key.size,
-	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format, ap);
+	fmt = F_ISSET(cstd, WT_CURSTD_RAW) ? "u" : cursor->key_format;
+	item = &cstd->key.item;
+	ret = wiredtiger_struct_unpackv(item->data, item->size, fmt, ap);
+	va_end(ap);
+
+	return (ret);
 }
 
 static int
 __curstd_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
+	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
+	WT_DATAITEM *item;
 	const char *fmt;
 	va_list ap;
+	int ret;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format;
-	return wiredtiger_struct_unpackv(stdc->value.data, stdc->value.size,
-	    F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format, ap);
+	fmt = F_ISSET(cstd, WT_CURSTD_RAW) ? "u" : cursor->value_format;
+	item = &cstd->value.item;
+	ret = wiredtiger_struct_unpackv(item->data, item->size, fmt, ap);
+	va_end(ap);
+
+	return (ret);
 }
 
 static void
 __curstd_set_key(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
-	va_list ap;
-	const char *fmt;
+	ENV *env;
+	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
+	WT_DATAITEM *item;
+	const char *fmt, *str;
 	size_t sz;
+	va_list ap;
+
+	env = ((ICONNECTION *)cursor->session->connection)->env;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	sz = wiredtiger_struct_sizev(fmt, ap);
-	if (stdc->keybufsz < sz) {
-		stdc->keybuf = (stdc->keybuf == NULL) ?
-		    malloc(sz) : realloc(stdc->keybuf, sz);
-		/* TODO ENOMEM */
-		stdc->keybufsz = sz;
+	fmt = F_ISSET(cstd, WT_CURSTD_RAW) ? "u" : cursor->key_format;
+	if (fmt[0] == 'S' && fmt[1] == '\0') {
+		str = va_arg(ap, const char *);
+		sz = strlen(str) + 1;
+		cstd->key.item.data = str;
+	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
+		item = va_arg(ap, WT_DATAITEM *);
+		sz = item->size;
+		cstd->key.item.data = item->data;
+	} else {
+		sz = wiredtiger_struct_sizev(fmt, ap);
+		if (__wt_scratch_grow(env, &cstd->key, sz) == 0 &&
+		    wiredtiger_struct_packv(cstd->key.buf, sz, fmt, ap) == 0)
+			F_CLR(cstd, WT_CURSTD_BADKEY);
+		else {
+			F_SET(cstd, WT_CURSTD_BADKEY);
+			return;
+		}
+		cstd->key.item.data = cstd->key.buf;
 	}
-	stdc->key.data = stdc->keybuf;
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
-	stdc->key.size = (uint32_t)sz;
-	if (wiredtiger_struct_packv(stdc->keybuf, sz, fmt, ap) == 0)
-		stdc->flags &= ~WT_CURSTD_BADKEY;
+	cstd->key.item.size = (uint32_t)sz;
+	va_end(ap);
 }
 
 static void
 __curstd_set_value(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
-	const char *fmt;
+	ENV *env;
+	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
+	WT_DATAITEM *item;
+	const char *fmt, *str;
 	size_t sz;
 	va_list ap;
 
+	env = ((ICONNECTION *)cursor->session->connection)->env;
+
 	va_start(ap, cursor);
-	fmt = F_ISSET(stdc, WT_CURSTD_RAW) ? "u" : cursor->value_format;
-	sz = wiredtiger_struct_sizev(fmt, ap);
-	if (stdc->valuebufsz < sz) {
-		stdc->valuebuf = (stdc->valuebuf == NULL) ?
-		    malloc(sz) : realloc(stdc->valuebuf, sz);
-		/* TODO ENOMEM */
-		stdc->valuebufsz = sz;
+	fmt = F_ISSET(cstd, WT_CURSTD_RAW) ? "u" : cursor->value_format;
+	if (fmt[0] == 'S' && fmt[1] == '\0') {
+		str = va_arg(ap, const char *);
+		sz = strlen(str) + 1;
+		cstd->value.item.data = str;
+	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
+		item = va_arg(ap, WT_DATAITEM *);
+		sz = item->size;
+		cstd->value.item.data = item->data;
+	} else {
+		sz = wiredtiger_struct_sizev(fmt, ap);
+		if (__wt_scratch_grow(env, &cstd->value, sz) == 0 &&
+		    wiredtiger_struct_packv(cstd->value.buf, sz, fmt, ap) == 0)
+			F_CLR(cstd, WT_CURSTD_BADVALUE);
+		else {
+			F_SET(cstd, WT_CURSTD_BADVALUE);
+			return;
+		}
+		cstd->value.item.data = cstd->value.buf;
 	}
-	stdc->value.data = stdc->valuebuf;
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
-	stdc->value.size = (uint32_t)sz;
-	if (wiredtiger_struct_packv(stdc->valuebuf, sz, fmt, ap) == 0)
-		stdc->flags &= ~WT_CURSTD_BADVALUE;
+	cstd->value.item.size = (uint32_t)sz;
+	va_end(ap);
+}
+
+int
+__wt_curstd_close(WT_CURSOR *cursor, const char *config)
+{
+	ENV *env;
+	ISESSION *isession;
+	WT_CURSOR_STD *cstd;
+	int ret;
+
+	WT_UNUSED(config);
+
+	cstd = (WT_CURSOR_STD *)cursor;
+	env = ((ICONNECTION *)cursor->session->connection)->env;
+	isession = (ISESSION *)cursor->session;
+	ret = 0;
+
+	__wt_scratch_free(env, &cstd->key);
+	__wt_scratch_free(env, &cstd->value);
+
+	TAILQ_REMOVE(&isession->cursors, cstd, q);
+	__wt_free(NULL, cursor, sizeof(ICURSOR_TABLE));
+
+	return (ret);
 }
 
 void
-__wt_curstd_init(WT_CURSOR_STD *stdc)
+__wt_curstd_init(WT_CURSOR_STD *cstd)
 {
-	WT_CURSOR *c = &stdc->interface;
+	WT_CURSOR *c = &cstd->iface;
 
 	c->get_key = __curstd_get_key;
 	c->get_value = __curstd_get_value;
 	c->set_key = __curstd_set_key;
 	c->set_value = __curstd_set_value;
 
-	stdc->key.data = stdc->keybuf = NULL;
-	stdc->keybufsz = 0;
-	stdc->value.data = stdc->valuebuf = NULL;
-	stdc->valuebufsz = 0;
+	cstd->value.item.data = cstd->value.buf = NULL;
+	cstd->value.bufsz = 0;
 
-	stdc->flags = WT_CURSTD_BADKEY | WT_CURSTD_BADVALUE;
-}
-
-void
-__wt_curstd_close(WT_CURSOR_STD *c)
-{
-	if (c->key.data != NULL) {
-		free((void *)c->key.data);
-		c->key.data = NULL;
-		c->keybufsz = 0;
-	}
-	if (c->value.data != NULL) {
-		free((void *)c->value.data);
-		c->value.data = NULL;
-		c->valuebufsz = 0;
-	}
+	cstd->flags = WT_CURSTD_BADKEY | WT_CURSTD_BADVALUE;
 }
