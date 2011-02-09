@@ -97,6 +97,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
+        assert( fd == 0 && len == 0 ); // can't open more than once
         setFilename(filenameIn);
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
@@ -147,6 +148,7 @@ namespace mongo {
             if ( maphandle == NULL ) {
                 DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
                 log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
+                close();
                 return 0;
             }
         }
@@ -160,6 +162,7 @@ namespace mongo {
         if ( view == 0 ) {
             DWORD e = GetLastError();
             log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
+            close();
         }
         else {
             views.push_back(view);
