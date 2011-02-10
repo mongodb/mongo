@@ -56,6 +56,10 @@ namespace mongo {
             secs = a;
             i = b;
         }
+        OpTime( const OpTime& other ) { 
+            secs = other.secs;
+            i = other.i;
+        }
         OpTime() {
             secs = 0;
             i = 0;

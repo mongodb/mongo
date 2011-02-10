@@ -60,7 +60,7 @@ namespace mongo {
             Info() : loc(0) {}
             ~Info() {
                 if ( loc && owned ) {
-                    delete[] loc;
+                    delete loc;
                 }
             }
             bool owned; // true if loc is a pointer of our creation (and not a pointer into a MMF)
@@ -142,8 +142,7 @@ namespace mongo {
             }
 
             i.owned = true;
-            i.loc = new OpTime[1];
-            i.loc[0] = last;
+            i.loc = new OpTime(last);
             _dirty = true;
 
             if ( ! _started ) {
