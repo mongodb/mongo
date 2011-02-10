@@ -154,7 +154,7 @@ namespace mongo {
                 sz /= 1024;
             }
 
-            if ( sz > 1024 ) {
+            if ( sz >= 1000 ) {
                 string s = str::stream() << (int)sz << unit;
                 _append( result , name , width , s );
                 return;
