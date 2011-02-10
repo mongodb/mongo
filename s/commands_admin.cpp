@@ -598,6 +598,9 @@ namespace mongo {
                     result.append( "cause" , res );
                     return false;
                 }
+                
+                // pre-emptively reload the config to get new version info
+                config->getChunkManager( ns , true );
 
                 result.append( "millis" , t.millis() );
                 return true;
