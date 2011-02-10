@@ -522,6 +522,10 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::killCursor( long long cursorID ) {
+        // we should neve call killCursor on a replica set conncetion
+        // since we don't know which server it belongs to
+        // can't assume master because of slave ok
+        // and can have a cursor survive a master change
         assert(0);
     }
 
@@ -547,7 +551,11 @@ namespace mongo {
                 }
             }
         }
-        return checkMaster()->call( toSend , response , assertOk );
+        
+        DBClientConnection* m = checkMaster();
+        if ( actualServer )
+            *actualServer = m->getServerAddress();
+        return m->call( toSend , response , assertOk );
     }
 
 }

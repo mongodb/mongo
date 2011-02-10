@@ -902,11 +902,15 @@ namespace mongo {
 
         Message m;
         m.setData( dbKillCursors , b.buf() , b.len() );
-
-        sayPiggyBack( m );
+        
+        if ( _lazyKillCursor )
+            sayPiggyBack( m );
+        else
+            say(m);
     }
 
     AtomicUInt DBClientConnection::_numConnections;
+    bool DBClientConnection::_lazyKillCursor = true;
 
 
     bool serverAlive( const string &uri ) {

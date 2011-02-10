@@ -95,6 +95,9 @@ assert.eq( 100 , ts.count() , "B4" )
 assert.eq( 100 , ts.find().itcount() , "B5" )
 assert.eq( 100 , ts.find().batchSize(5).itcount() , "B6" )
 
+t.find().batchSize(3).next();
+gc(); gc(); gc();
+
 // --- sharded ----
 
 assert.eq( 100 , db.foo.count() , "C1" )

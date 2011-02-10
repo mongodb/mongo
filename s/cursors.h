@@ -98,6 +98,8 @@ namespace mongo {
         MapNormal _refs;
 
         long long _shardedTotal;
+
+        static int _myLogLevel;
     };
 
     extern CursorCache cursorCache;

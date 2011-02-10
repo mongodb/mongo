@@ -276,12 +276,16 @@ int _main(int argc, char* argv[]) {
             return 9;
         }
     }
+    
+    // set some global state
 
     pool.addHook( &shardingConnectionHook );
     pool.setName( "mongos connectionpool" );
+    
+    DBClientConnection::setLazyKillCursor( false );
 
     ReplicaSetMonitor::setConfigChangeHook( boost::bind( &ConfigServer::replicaSetChange , &configServer , _1 ) );
-
+    
     if ( argc <= 1 ) {
         usage( argv );
         return 3;

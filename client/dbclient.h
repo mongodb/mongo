@@ -900,6 +900,9 @@ namespace mongo {
         static int getNumConnections() {
             return _numConnections;
         }
+        
+        static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
+        static bool getLazyKillCursor() { return _lazyKillCursor; }
 
     protected:
         friend class SyncClusterConnection;
@@ -924,6 +927,7 @@ namespace mongo {
         bool _connect( string& errmsg );
 
         static AtomicUInt _numConnections;
+        static bool _lazyKillCursor; // lazy means we piggy back kill cursors on next op
     };
 
     /** pings server to check if it's up
