@@ -901,9 +901,9 @@ namespace mongo {
                     else {
                         errmsg = str::stream()
                             << "************** \n"
-                            << "old lock file: " << name << ".  probably means unclean shutdown\n"
+                            << "old lock file: " << name << ".  probably means unclean shutdown,\n"
                             << "but there are no journal files to recover.\n"
-                            << "this is likely human error of filesystem corruption.\n"
+                            << "this is likely human error or filesystem corruption.\n"
                             << "found " << dbnames.size() << " dbs.\n"
                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
                             << "*************";
