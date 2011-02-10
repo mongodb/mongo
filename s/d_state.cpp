@@ -369,6 +369,8 @@ namespace mongo {
 
         virtual LockType locktype() const { return NONE; }
 
+        virtual bool slaveOk() const { return true; }
+
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             ShardedConnectionInfo::reset();
             return true;
