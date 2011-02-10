@@ -1473,6 +1473,9 @@ namespace mongo {
                         q = Query(b.obj());
                     }
 
+                    if (q.isComplex()) // update doesn't work with complex queries
+                        q = Query(q.getFilter().getOwned());
+
                     BSONElement update = cmdObj["update"];
                     uassert(12516, "must specify remove or update", !update.eoo());
                     db.update(ns, q, update.embeddedObjectUserCheck());
