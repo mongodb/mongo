@@ -808,7 +808,7 @@ namespace mongo {
                     state.init();
 
                     {
-                        State** s = new State*[1];
+                        State** s = (State**)malloc( sizeof(State*) );
                         s[0] = &state;
                         _tl.reset( s );
                     }
