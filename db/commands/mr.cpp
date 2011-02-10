@@ -650,7 +650,7 @@ namespace mongo {
          */
         void State::reduceInMemory() {
 
-            InMemory * n = new InMemory(); // for new data
+            auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
             long dupCount = 0;
 
@@ -668,18 +668,18 @@ namespace mongo {
                     }
                     else {
                         // add to new map
-                        _add( n , all[0] , nSize, dupCount );
+                        _add( n.get() , all[0] , nSize, dupCount );
                     }
                 }
                 else if ( all.size() > 1 ) {
                     // several values, reduce and add to map
                     BSONObj res = _config.reducer->reduce( all );
-                    _add( n , res , nSize, dupCount );
+                    _add( n.get() , res , nSize, dupCount );
                 }
             }
 
             // swap maps
-            _temp.reset( n );
+            _temp.reset( n.release() );
             _size = nSize;
             _dupCount = dupCount;
         }
