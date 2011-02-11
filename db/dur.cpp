@@ -585,6 +585,9 @@ namespace mongo {
 
         void releasingWriteLock() {
             try {
+#if defined(_DEBUG)
+                commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
+#endif
                 if (commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit) {
                     stats.curr->_earlyCommits++;
                     groupCommit();
