@@ -112,7 +112,9 @@ namespace mongo {
     */
     bool replHasDatabases();
 
-    /** "embedded" calls to the local server directly. */
+    /** "embedded" calls to the local server directly. 
+        Caller does not need to lock, that is handled within.
+     */
     class DBDirectClient : public DBClientBase {
     public:
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
