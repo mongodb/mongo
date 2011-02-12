@@ -391,20 +391,36 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		case WT_ITEM_OFF_RECORD:
 			/*
 			 * Set the key and recursively call the tree-walk code
-			 * for any off-page duplicate trees.  (Check for any
-			 * off-page duplicate trees locally because we already
-			 * have to walk the page, so it's faster than walking
-			 * the page both here and in the tree-walk function.)
+			 * for any off-page duplicate trees.
+			 *
+			 * Check for off-page duplicate trees locally because
+			 * we already have to walk the page, so it's faster
+			 * than walking the page both here and in the tree-walk
+			 * function, plus we have to pass the duplicate key to
+			 * the underlying worker function.
 			 */
 			dp->dupkey = key;
 
 			ref = WT_ROW_DUP(page, rip);
 			off_record = WT_ROW_OFF_RECORD(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
-			ret = __wt_tree_walk(toc, ref, 0, __wt_dump_page, dp);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret =
+			    __wt_page_in(toc, page, ref, off_record, 0)) {
+			case 0:				/* Valid page */
+				ret = __wt_tree_walk(
+				    toc, ref, 0, __wt_dump_page, dp);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				goto err;
+
+			/*
+			 * This item is not separately dumped -- continue with
+			 * the main page-walking loop.
+			 */
 			continue;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}
