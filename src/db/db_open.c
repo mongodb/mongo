@@ -67,7 +67,7 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 	 * somewhere else, eventually.
 	 */
 	WT_CLEAR(idb->root_page);
-	idb->root_page.state = WT_EMPTY;
+	idb->root_page.state = WT_REF_DISK;
 	WT_CLEAR(idb->root_off);
 	idb->root_off.addr = 0;
 	idb->root_off.size = 0;
