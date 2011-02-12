@@ -251,7 +251,7 @@ done_duplicates:
 
 	/*
 	 * Discarding pages is done in 5 steps:
-	 *	Set the WT_EVICT state
+	 *	Set the WT_REF_EVICT state
 	 *	Check for any hazard references
 	 *	Discard clean pages
 	 *	Reconcile dirty pages (making them clean)
@@ -397,7 +397,7 @@ __wt_evict_db_clear(WT_TOC *toc)
 
 /*
  * __wt_evict_set --
- *	Set the WT_EVICT flag on a set of pages.
+ *	Set the WT_REF_EVICT flag on a set of pages.
  */
 static void
 __wt_evict_set(WT_TOC *toc)
@@ -422,7 +422,7 @@ __wt_evict_set(WT_TOC *toc)
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
-		ref->state = WT_EVICT;
+		ref->state = WT_REF_EVICT;
 	}
 }
 
@@ -494,7 +494,7 @@ __wt_evict_hazard_check(WT_TOC *toc)
 			 * Discard our reference.
 			 */
 			ref->page->read_gen = ++cache->read_gen;
-			ref->state = WT_OK;
+			ref->state = WT_REF_CACHE;
 			WT_EVICT_CLR(evict);
 		}
 	}
@@ -561,7 +561,7 @@ skip:		/*
 		 * Discard our reference.
 		 */
 		page->read_gen = ++cache->read_gen;
-		ref->state = WT_OK;
+		ref->state = WT_REF_CACHE;
 		WT_EVICT_CLR(evict);
 	}
 }
@@ -657,7 +657,7 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 		 * No memory flush needed, the state field is declared volatile.
 		 */
 		ref->page = NULL;
-		ref->state = WT_EMPTY;
+		ref->state = WT_REF_DISK;
 
 		/* Remove the entry from the eviction list. */
 		WT_EVICT_CLR(evict);
@@ -692,13 +692,14 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_REF_FOREACH(page, ref, i)
-			if (ref->state != WT_EMPTY)
+			if (ref->state == WT_REF_CACHE)
 				return (1);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		if (WT_PAGE_DUP_TREES(page))
 			WT_DUP_FOREACH(page, dupp, i)
-				if (*dupp != NULL && (*dupp)->state != WT_EMPTY)
+				if (*dupp != NULL &&
+				    (*dupp)->state == WT_REF_CACHE)
 					return (1);
 		break;
 	default:
