@@ -633,6 +633,9 @@ namespace mongo {
 
                 killCurrentOp.checkForInterrupt();
             }
+            
+            // we need to release here since we temp release below
+            cursor.release();
 
             {
                 dbtempreleasecond tl;
