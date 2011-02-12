@@ -33,6 +33,7 @@
 namespace mongo {
 
     map<string,WriteBackListener*> WriteBackListener::_cache;
+    set<string> WriteBackListener::_seenSets;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
     map<ConnectionId,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
@@ -44,11 +45,38 @@ namespace mongo {
 
     /* static */
     void WriteBackListener::init( DBClientBase& conn ) {
+        
+        if ( conn.type() != ConnectionString::SET ) {
+            init( conn.getServerAddress() );
+            return;
+        }
+
+
+        {
+            scoped_lock lk( _cacheLock );
+            if ( _seenSets.count( conn.getServerAddress() ) )
+                return;
+        }
+
+        // we want to do writebacks on all rs nodes
+        string errmsg;
+        ConnectionString cs = ConnectionString::parse( conn.getServerAddress() , errmsg );
+        uassert( 13641 , str::stream() << "can't parse host [" << conn.getServerAddress() << "]" , cs.isValid() );
+
+        vector<HostAndPort> hosts = cs.getServers();
+        
+        for ( unsigned i=0; i<hosts.size(); i++ )
+            init( hosts[i].toString() );
+
+    }
+    
+    /* static */
+    void WriteBackListener::init( const string& host ) {
         scoped_lock lk( _cacheLock );
-        WriteBackListener*& l = _cache[conn.getServerAddress()];
+        WriteBackListener*& l = _cache[host];
         if ( l )
             return;
-        l = new WriteBackListener( conn.getServerAddress() );
+        l = new WriteBackListener( host );
         l->go();
     }
 
@@ -79,8 +107,13 @@ namespace mongo {
 
     void WriteBackListener::run() {
         int secsToSleep = 0;
-        while ( ! inShutdown() && Shard::isMember( _addr ) ) {
-
+        while ( ! inShutdown() ) {
+            
+            if ( ! Shard::isAShardNode( _addr ) ) {
+                log(1) << _addr << " is not a shard node" << endl;
+                sleepsecs( 60 );
+                continue;
+            }
 
             try {
                 ScopedDbConnection conn( _addr );

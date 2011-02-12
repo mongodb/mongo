@@ -129,7 +129,7 @@ namespace mongo {
             }
 
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
-                if ( ! Shard::isAShard( i->first ) )
+                if ( ! Shard::isAShardNode( i->first ) )
                     continue;
                 Status* ss = i->second;
                 assert( ss );

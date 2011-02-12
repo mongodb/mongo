@@ -86,13 +86,7 @@ namespace mongo {
             }
 
         }
-
-        bool isMember( const string& addr ) {
-            scoped_lock lk( _mutex );
-            map<string,Shard>::iterator i = _lookup.find( addr );
-            return i != _lookup.end();
-        }
-
+        
         const Shard& find( const string& ident ) {
             string mykey = ident;
 
@@ -128,7 +122,7 @@ namespace mongo {
             if ( setAddr )
                 _lookup[addr] = s;
         }
-
+        
         void remove( const string& name ) {
             scoped_lock lk( _mutex );
             for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ) {
@@ -141,12 +135,12 @@ namespace mongo {
                 }
             }
         }
-
-        void getAllShards( vector<Shard>& all ) {
+        
+        void getAllShards( vector<Shard>& all ) const {
             scoped_lock lk( _mutex );
             std::set<string> seen;
-            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
-                Shard s = i->second;
+            for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                const Shard& s = i->second;
                 if ( s.getName() == "config" )
                     continue;
                 if ( seen.count( s.getName() ) )
@@ -155,15 +149,46 @@ namespace mongo {
                 all.push_back( s );
             }
         }
+        
+        bool isAShardNode( const string& addr ) const {
+            scoped_lock lk( _mutex );      
+            
+            // check direct nods or set names
+            map<string,Shard>::const_iterator i = _lookup.find( addr );
+            if ( i != _lookup.end() )
+                return true;
+            
+            // check for set nodes
+            for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                const Shard& s = i->second;     
+                if ( s.containsNode( addr ) )
+                    return true;
+            }
+
+            return false;
+        }
 
     private:
         map<string,Shard> _lookup;
-        mongo::mutex _mutex;
+        mutable mongo::mutex _mutex;
     } staticShardInfo;
+
+    void Shard::_setAddr( const string& addr ) {
+        _addr = addr;
+        if ( _addr.size() ) {
+            _cs = ConnectionString( addr , ConnectionString::SET );
+            if ( _cs.type() == ConnectionString::SET ) {
+                string x = _cs.getSetName();
+                if ( x.size() == 0 )
+                    x = _name;
+                _rs = ReplicaSetMonitor::get( x , _cs.getServers() );
+            }
+        }
+    }
 
     void Shard::setAddress( const string& addr , bool authoritative ) {
         assert( _name.size() );
-        _addr = addr;
+        _setAddr( addr );
         if ( authoritative )
             staticShardInfo.set( _name , _addr , true , false );
     }
@@ -172,17 +197,27 @@ namespace mongo {
         const Shard& s = staticShardInfo.find( ident );
         uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
-        _addr = s._addr;
+        _setAddr( s._addr );
         _maxSize = s._maxSize;
         _isDraining = s._isDraining;
+    }
+
+    bool Shard::containsNode( const string& node ) const {
+        if ( _addr == node )
+            return true;
+        
+        if ( _rs && _rs->contains( node ) )
+            return true;
+
+        return false;
     }
 
     void Shard::getAllShards( vector<Shard>& all ) {
         staticShardInfo.getAllShards( all );
     }
 
-    bool Shard::isAShard( const string& ident ) {
-        return staticShardInfo.isMember( ident );
+    bool Shard::isAShardNode( const string& ident ) {
+        return staticShardInfo.isAShardNode( ident );
     }
 
     void Shard::printShardInfo( ostream& out ) {
@@ -215,10 +250,6 @@ namespace mongo {
         staticShardInfo.reload();
     }
 
-
-    bool Shard::isMember( const string& addr ) {
-        return staticShardInfo.isMember( addr );
-    }
 
     void Shard::removeShard( const string& name ) {
         staticShardInfo.remove( name );

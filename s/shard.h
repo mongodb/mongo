@@ -39,6 +39,7 @@ namespace mongo {
 
         Shard( const string& name , const string& addr, long long maxSize = 0 , bool isDraining = false )
             : _name(name) , _addr( addr ) , _maxSize( maxSize ) , _isDraining( isDraining ) {
+            _setAddr( addr );
         }
 
         Shard( const string& ident ) {
@@ -46,11 +47,13 @@ namespace mongo {
         }
 
         Shard( const Shard& other )
-            : _name( other._name ) , _addr( other._addr ) , _maxSize( other._maxSize ) , _isDraining( other._isDraining ) {
+            : _name( other._name ) , _addr( other._addr ) , _cs( other._cs ) , 
+              _maxSize( other._maxSize ) , _isDraining( other._isDraining ) , _rs( other._rs ) {
         }
 
         Shard( const Shard* other )
-            : _name( other->_name ) , _addr( other->_addr ), _maxSize( other->_maxSize ) , _isDraining( other->_isDraining ) {
+            : _name( other->_name ) , _addr( other->_addr ), _cs( other->_cs ) , 
+              _maxSize( other->_maxSize ) , _isDraining( other->_isDraining ) , _rs( other->_rs ) {
         }
 
         static Shard make( const string& ident ) {
@@ -58,8 +61,6 @@ namespace mongo {
             s.reset( ident );
             return s;
         }
-
-        static bool isAShard( const string& ident );
 
         /**
          * @param ident either name or address
@@ -131,10 +132,17 @@ namespace mongo {
         BSONObj runCommand( const string& db , const BSONObj& cmd ) const ;
 
         ShardStatus getStatus() const ;
+        
+        /**
+         * mostly for replica set
+         * retursn true if node is the shard 
+         * of if the replica set contains node
+         */
+        bool containsNode( const string& node ) const;
 
         static void getAllShards( vector<Shard>& all );
         static void printShardInfo( ostream& out );
-
+        
         /**
          * @parm current - shard where the chunk/database currently lives in
          * @return the currently emptiest shard, if best then current, or EMPTY
@@ -145,15 +153,20 @@ namespace mongo {
 
         static void removeShard( const string& name );
 
-        static bool isMember( const string& addr );
+        static bool isAShardNode( const string& ident );
 
         static Shard EMPTY;
-
+        
     private:
+        
+        void _setAddr( const string& addr );
+        
         string    _name;
         string    _addr;
+        ConnectionString _cs;
         long long _maxSize;    // in MBytes, 0 is unlimited
         bool      _isDraining; // shard is currently being removed
+        ReplicaSetMonitorPtr _rs;
     };
 
     class ShardStatus {
