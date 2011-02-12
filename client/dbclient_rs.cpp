@@ -148,8 +148,8 @@ namespace mongo {
     
 
     void ReplicaSetMonitor::notifyFailure( const HostAndPort& server ) {
-        if ( _master >= 0 ) {
-            scoped_lock lk( _lock );
+        scoped_lock lk( _lock );
+        if ( _master >= 0 && _master < (int)_nodes.size() ) {
             if ( server == _nodes[_master].addr )
                 _master = -1;
         }
