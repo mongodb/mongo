@@ -214,9 +214,9 @@ __wt_cache_read(WT_READ_REQ *rr)
 	/*
 	 * Check to see if some other thread brought the page into the cache
 	 * while our request was in the queue.   If the state is anything
-	 * other than empty, it's not our problem.
+	 * other than on-disk, it's not our problem.
 	 */
-	if (ref->state != WT_EMPTY)
+	if (ref->state != WT_REF_DISK)
 		return (0);
 
 	/*
@@ -262,7 +262,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 */
 	page->read_gen = ++cache->read_gen;
 	ref->page = page;
-	ref->state = WT_OK;
+	ref->state = WT_REF_CACHE;
 
 	return (0);
 
