@@ -147,7 +147,7 @@ config_file(char *name)
 		for (p = buf; *p != '\0' && *p != '\n'; ++p)
 			;
 		*p = '\0';
-		if (p == buf)
+		if (buf[0] == '\0' || buf[0] == '#')
 			continue;
 		config_single(buf);
 	}
