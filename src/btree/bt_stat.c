@@ -309,11 +309,20 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			 */
 			ref = WT_ROW_DUP(page, rip);
 			off_record = WT_ROW_OFF_RECORD(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
-			ret = __wt_tree_walk(toc, ref, 0, __wt_page_stat, arg);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret =
+			    __wt_page_in(toc, page, ref, off_record, 0)) {
+			case 0:				/* Valid page */
+				ret = __wt_tree_walk(
+				    toc, ref, 0, __wt_page_stat, arg);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				return (ret);
+
 			WT_STAT_INCR(stats, DUP_TREE);
 			break;
 		WT_ILLEGAL_FORMAT(db);

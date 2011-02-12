@@ -961,12 +961,14 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 #define	WT_ERROR	-31800
 /*! database item not found. */
 #define	WT_NOTFOUND	-31801
+/*! requested page was deleted. */
+#define	WT_PAGE_DELETED	-31802
 /*! modification attempted of a read-only database. */
-#define	WT_READONLY	-31802
+#define	WT_READONLY	-31803
 /*! restart the operation (internal). */
-#define	WT_RESTART	-31803
+#define	WT_RESTART	-31804
 /*! buffer too small. */
-#define	WT_TOOSMALL	-31804
+#define	WT_TOOSMALL	-31805
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

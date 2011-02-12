@@ -5,6 +5,8 @@ void
 __wt_curstd_close(WT_CURSOR_STD *c);
 int
 __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
+inline int
+__wt_block_free_ovfl(WT_TOC *toc, WT_OVFL *ovfl);
 int
 __wt_block_free(WT_TOC *toc, uint32_t addr, uint32_t size);
 int
@@ -75,6 +77,8 @@ __wt_set_ff_and_sa_from_offset(WT_PAGE *page,
     void *p, uint8_t **first_freep, uint32_t *space_availp);
 inline int
 __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen);
+inline WT_ITEM *
+__wt_key_item_next(WT_ITEM *key_item);
 const char *
 __wt_page_type_string(WT_PAGE_DISK *dsk);
 const char *

@@ -80,13 +80,22 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 		WT_INDX_FOREACH(page, cip, i) {
 			/* cip references the subtree containing the record */
 			ref = WT_COL_REF(page, cip);
-			if (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK)
+			if (LF_ISSET(WT_WALK_CACHE) &&
+			    ref->state != WT_REF_CACHE)
 				continue;
 
 			off_record = WT_COL_OFF(cip);
-			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
-			ret = __wt_tree_walk(toc, ref, flags, work, arg);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret =
+			    __wt_page_in(toc, page, ref, off_record, 0)) {
+			case 0:				/* Valid page */
+				ret =
+				    __wt_tree_walk(toc, ref, flags, work, arg);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				return (ret);
 		}
@@ -96,13 +105,21 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 		WT_INDX_FOREACH(page, rip, i) {
 			/* rip references the subtree containing the record */
 			ref = WT_ROW_REF(page, rip);
-			if (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK)
+			if (LF_ISSET(WT_WALK_CACHE) &&
+			    ref->state != WT_REF_CACHE)
 				continue;
 
 			off = WT_ROW_OFF(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off, 0));
-			ret = __wt_tree_walk(toc, ref, flags, work, arg);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret = __wt_page_in(toc, page, ref, off, 0)) {
+			case 0:				/* Valid page */
+				ret =
+				    __wt_tree_walk(toc, ref, flags, work, arg);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				return (ret);
 		}
@@ -124,7 +141,8 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 			 */
 			ref = WT_ROW_DUP(page, rip);
 			if (ref == NULL ||
-			    (LF_ISSET(WT_WALK_CACHE) && ref->state != WT_OK))
+			    (LF_ISSET(WT_WALK_CACHE) &&
+			    ref->state != WT_REF_CACHE))
 				continue;
 
 			/*
@@ -132,9 +150,17 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 			 * off-page duplicate tree.
 			 */
 			off_record = WT_ROW_OFF_RECORD(rip);
-			WT_RET(__wt_page_in(toc, page, ref, off_record, 0));
-			ret = __wt_tree_walk(toc, ref, flags, work, arg);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret =
+			    __wt_page_in(toc, page, ref, off_record, 0)) {
+			case 0:				/* Valid page */
+				ret =
+				    __wt_tree_walk(toc, ref, flags, work, arg);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				return (ret);
 		}
@@ -257,7 +283,7 @@ eop:			e->visited = 1;
 		 *
 		 * We only care about pages in the cache.
 		 */
-		if (ref != NULL && ref->state == WT_OK)
+		if (ref != NULL && ref->state == WT_REF_CACHE)
 			break;
 
 		/*

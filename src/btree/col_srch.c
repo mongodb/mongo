@@ -91,11 +91,24 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		/* cip references the subtree containing the record. */
 		ref = WT_COL_REF(page, cip);
 		off_record = WT_COL_OFF(cip);
-		WT_ERR(__wt_page_in(toc, page, ref, off_record, 0));
-
-		/* Swap the parent page for the child page. */
-		if (page != idb->root_page.page)
-			__wt_hazard_clear(toc, page);
+		switch (ret = __wt_page_in(toc, page, ref, off_record, 0)) {
+		case 0:				/* Valid page */
+			/* Swap the parent page for the child page. */
+			if (page != idb->root_page.page)
+				__wt_hazard_clear(toc, page);
+			break;
+		case WT_PAGE_DELETED:
+			/*
+			 * !!!
+			 * See __wt_rec_page_delete() for an explanation of page
+			 * deletion.  As there are no real deletions of entries
+			 * in column-store files, pages should never be deleted,
+			 * and this shouldn't happen.
+			 */
+			goto notfound;
+		default:
+			goto err;
+		}
 		page = ref->page;
 	}
 

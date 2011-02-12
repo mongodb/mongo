@@ -20,6 +20,8 @@ wiredtiger_strerror(int error)
 		return ("WT_ERROR: non-specific WiredTiger error");
 	case WT_NOTFOUND:
 		return ("WT_NOTFOUND: database item not found");
+	case WT_PAGE_DELETED:
+		return ("WT_PAGE_DELETED: requested page was deleted");
 	case WT_READONLY:
 		return ("WT_READONLY: modification attempted of a read-only database");
 	case WT_RESTART:

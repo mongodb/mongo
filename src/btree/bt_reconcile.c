@@ -9,15 +9,16 @@
 
 #include "wt_internal.h"
 
-static int __wt_rle_expand_compare(const void *, const void *);
 static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_page_delete(WT_TOC *, WT_PAGE *);
 static int __wt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_rec_row(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, uint32_t, uint32_t);
+static int __wt_rec_row_leaf(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rle_expand_compare(const void *, const void *);
 static inline void __wt_rec_set_page_size(WT_TOC *, WT_PAGE *, uint8_t *);
 
 /*
@@ -148,7 +149,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_DUP_LEAF:
-		WT_ERR(__wt_rec_row(toc, page, new));
+		WT_ERR(__wt_rec_row_leaf(toc, page, new));
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
@@ -156,7 +157,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	/* Write the new page to disk. */
 	WT_ERR(__wt_rec_page_write(toc, page, new));
 
-	/* Free the original page -- update the address and size. */
+	/* Free the original disk page. */
 	WT_ERR(__wt_block_free(toc, page->addr, page->size));
 
 	/*
@@ -164,14 +165,14 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	 *
 	 * XXX
 	 * This is more for diagnostic information than anything else, that is,
-	 * this will match the WT_REF->addr in the parent.
+	 * it changes the page's addr to match the parent page's WT_REF->addr.
 	 *
 	 * The parent's WT_REF->size may be different, that is, page->size is
 	 * the original page size at the original address and the size of the
 	 * page's buffer in memory, NOT the size of the newly written page at
-	 * the new address.   We may NOT update the size here, otherwise we
-	 * can no longer figure out if WT_ROW/WT_COL items reference on-page
-	 * data vs. allocated data.
+	 * the new address.   Do NOT update the size here, otherwise we could
+	 * no longer figure out if WT_ROW/WT_COL items reference on-page data
+	 * vs. allocated data.
 	 */
 	page->addr = new->addr;
 
@@ -233,37 +234,34 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
+	DB *db;
 	WT_ITEM *key_item, *data_item, *next;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
+	db = toc->db;
 	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
 	/*
-	 * We have to walk the original disk page as well as the current page:
-	 * the problem is keys that require processing.
-	 *
-	 * When a page is read into memory from a file, the WT_ROW is set to
-	 * reference an on-page group of bytes in the key and data WT_ITEM
-	 * structures.  As Btree keys are immutable, and the key's WT_OFF data
-	 * is updated in place, those original WT_ITEMs are usually what we
-	 * want write, and we can find them pretty easily.
-	 *
-	 * When we have to use a key that requires processing (for example, a
-	 * Huffman encoded key), we set the WT_ROW key/size pair to reference
-	 * the allocated memory that holds the key.  At that point we've lost
-	 * any reference to the original WT_ITEM structure.
-	 *
-	 * We don't want grow the WT_ROW structure by another (void *) bytes,
-	 * so walk both the original page and the current WT_PAGE array when
-	 * reconciling the page so we can find the original WT_ITEM.
+	 * We have to walk both the WT_ROW structures and the original page --
+	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
-	key_item = WT_PAGE_BYTE(page);
-	WT_INDX_FOREACH(page, rip, i) {
+	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
+		/*
+		 * Skip deleted pages; if we delete an overflow key, free the
+		 * underlying file space.
+		 */
+		if (WT_ROW_OFF(rip)->addr == WT_ADDR_DELETED) {
+			if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+				WT_RET(__wt_block_free_ovfl(
+				    toc, WT_ITEM_BYTE_OVFL(key_item)));
+			continue;
+		}
+
 		/*
 		 * Copy the paired items off the old page into the new page.
 		 *
@@ -294,8 +292,6 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		first_free += len;
 		space_avail -= len;
 		dsk->u.entries += 2;
-
-		key_item = next;
 	}
 
 	new->records = page->records;
@@ -605,7 +601,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	DBT *data, data_dbt;
 	WT_COL *cip;
 	WT_ITEM data_item, *item;
-	WT_OVFL data_ovfl, *ovfl;
+	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i, len, space_avail;
@@ -628,14 +624,12 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		item = cip->data;
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
 			/*
-			 * If we replaced an overflow item, we need to free the
-			 * file space used by the original.
+			 * If we replace or delete an overflow data item, free
+			 * free the underlying file space.
 			 */
-			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL) {
-				ovfl = WT_ITEM_BYTE_OVFL(item);
-				WT_RET(__wt_block_free(toc, ovfl->addr,
-				    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
-			}
+			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
+				WT_RET(__wt_block_free_ovfl(
+				    toc, WT_ITEM_BYTE_OVFL(item)));
 
 			/*
 			 * Check for deletion, else build the data's WT_ITEM
@@ -696,18 +690,18 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 }
 
 /*
- * __wt_rec_row --
+ * __wt_rec_row_leaf --
  *	Reconcile a row-store leaf page.
  */
 static int
-__wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	enum { KEY_ON_PAGE, KEY_NONE } key_loc;
 	DB *db;
 	DBT *key, key_dbt, *data, data_dbt;
-	WT_ITEM key_item, data_item, *item;
-	WT_OVFL data_ovfl, *ovfl;
+	WT_ITEM data_item, *key_item;
+	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_REPL *repl;
@@ -722,7 +716,6 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_CLEAR(data_dbt);
 	WT_CLEAR(key_dbt);
 	WT_CLEAR(data_item);
-	WT_CLEAR(key_item);
 
 	key = &key_dbt;
 	data = &data_dbt;
@@ -731,55 +724,38 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * Walk the page, accumulating key/data groups (groups, because a key
 	 * can reference a duplicate data set).
 	 *
-	 * We have to walk both the WT_ROW structures as well as the original
-	 * page: the problem is keys that require processing.  When a page is
-	 * read into memory from a simple database, the WT_ROW key/size pair
-	 * is set to reference an on-page group of bytes in the key's WT_ITEM
-	 * structure.  As Btree keys are immutable, that original WT_ITEM is
-	 * usually what we want to write, and we can pretty easily find it by
-	 * moving to immediately before the on-page key.
-	 *
-	 * Keys that require processing are harder (for example, a Huffman
-	 * encoded key).  When we have to use a key that requires processing,
-	 * we process the key and set the WT_ROW key/size pair to reference
-	 * the allocated memory that holds the key.  At that point we've lost
-	 * any reference to the original WT_ITEM structure, which is what we
-	 * want to re-write when reconciling the page.  We don't want to make
-	 * the WT_ROW structure bigger by another sizeof(void *) bytes, so we
-	 * walk the original page at the same time we walk the WT_PAGE array
-	 * when reconciling the page so we can find the original WT_ITEM.
+	 * We have to walk both the WT_ROW structures and the original page --
+	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
-	item = NULL;
-	WT_INDX_FOREACH(page, rip, i) {
-		/* Move to the next key on the original page. */
-		if (item == NULL)
-			item = (WT_ITEM *)WT_PAGE_BYTE(page);
-		else
-			do {
-				item = WT_ITEM_NEXT(item);
-			} while (WT_ITEM_TYPE(item) != WT_ITEM_KEY &&
-			    WT_ITEM_TYPE(item) != WT_ITEM_KEY_OVFL);
-
+	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
 		/*
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
 		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
 			/*
-			 * If we replaced an overflow item, we need to free the
-			 * file space used by the original.
+			 * If we replaced or deleted an overflow data item, free
+			 * the underlying file space.
 			 */
 			switch (WT_ITEM_TYPE(rip->data)) {
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DATA_DUP_OVFL:
-				ovfl = WT_ITEM_BYTE_OVFL(rip->data);
-				WT_RET(__wt_block_free(toc, ovfl->addr,
-				    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
+				WT_RET(__wt_block_free_ovfl(
+				    toc, WT_ITEM_BYTE_OVFL(rip->data)));
+				break;
 			}
 
-			/* If this pair were deleted, we're done. */
-			if (WT_REPL_DELETED_ISSET(repl))
+			/*
+			 * If this key/data pair was deleted, we're done.  If
+			 * the key was an overflow item, free the underlying
+			 * file space.
+			 */
+			if (WT_REPL_DELETED_ISSET(repl)) {
+				if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+					WT_RET(__wt_block_free_ovfl(
+					    toc, WT_ITEM_BYTE_OVFL(key_item)));
 				continue;
+			}
 
 			/*
 			 * Build the data's WT_ITEM chunk from the most recent
@@ -825,8 +801,8 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			key_loc = KEY_NONE;
 		} else {
 			/* Take the key's WT_ITEM from the original page. */
-			key->data = item;
-			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
+			key->data = key_item;
+			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
 			key_loc = KEY_ON_PAGE;
 		}
 
@@ -854,7 +830,7 @@ __wt_rec_row(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * another leaf page and split the parent.
 		 */
 		if (len > space_avail) {
-			fprintf(stderr, "__wt_rec_row: page %lu split\n",
+			fprintf(stderr, "__wt_rec_row_leaf: page %lu split\n",
 			    (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
@@ -905,19 +881,22 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	env = toc->env;
 
-	/*
-	 * XXX
-	 * We fail if the page gets emptied -- we'll need to do some kind of
-	 * reverse split where the internal page disappears.   That shouldn't
-	 * be difficult, but I haven't written it yet.
-	 */
 	if (new->dsk->u.entries == 0) {
-		new->addr = WT_ADDR_INVALID;
-		WT_VERBOSE(env, WT_VERB_EVICT, (env,
-		    "reconcile removing empty page %lu", (u_long)page->addr));
-		fprintf(stderr, "PAGE %lu EMPTIED\n", (u_long)page->addr);
-		__wt_abort(env);
+		/*
+		 * We don't need to allocate file space or write the page if
+		 * the page has been emptied.
+		 */
+		WT_VERBOSE(env, WT_VERB_EVICT,
+		    (env, "reconcile delete page %lu, size %lu",
+		    (u_long)page->addr, (u_long)page->size));
+
+		WT_RET(__wt_rec_page_delete(toc, page));
 	} else {
+		WT_VERBOSE(env, WT_VERB_EVICT,
+		    (env, "reconcile move %lu to %lu, resize %lu to %lu",
+		    (u_long)page->addr, (u_long)new->addr,
+		    (u_long)page->size, (u_long)new->size));
+
 		/*
 		 * Allocate file space for the page.
 		 *
@@ -935,21 +914,150 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * (2) discard the newly-clean in-memory version, (3) another
 		 * thread tries to read down the tree before the write finishes.
 		 */
-		WT_RET(__wt_page_write(toc, new));
+		WT_ERR(__wt_page_write(toc, new));
 
-		WT_VERBOSE(env, WT_VERB_EVICT,
-		    (env, "reconcile move %lu to %lu, resize %lu to %lu",
-		    (u_long)page->addr, (u_long)new->addr,
-		    (u_long)page->size, (u_long)new->size));
-	}
-
-	/* Update the page's parent. */
-	if ((ret = __wt_rec_parent_update(toc, page, new)) != 0) {
-		(void)__wt_block_free(toc, new->addr, new->size);
-		return (ret);
+		/* Update the page's parent. */
+		WT_ERR(__wt_rec_parent_update(toc, page, new->addr, new->size));
 	}
 
 	return (0);
+
+err:	(void)__wt_block_free(toc, new->addr, new->size);
+	return (ret);
+}
+
+/*
+ * __wt_rec_page_delete --
+ *	Delete a page from the tree.
+ */
+static int
+__wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
+{
+	DB *db;
+	WT_COL *cip;
+	WT_PAGE *parent;
+	WT_PAGE_DISK *dsk;
+	WT_ROW *rip;
+	uint32_t i;
+
+	/*
+	 * An evicted page has no entries, therefore we want to delete it.
+	 *
+	 * First, set the parent page's address for the page to a special,
+	 * non-existent address; at some point, when the WT_REF->state on the
+	 * parent page is reset to WT_REF_DISK, the non-existent address will
+	 * cause any future request for the page to return WT_PAGE_DELETED as
+	 * an error.
+	 */
+	 WT_RET(__wt_rec_parent_update(toc, page, WT_ADDR_DELETED, 0));
+
+	/*
+	 * Now, the tricky part.  Any future reader/writer of the page has to
+	 * deal with deleted pages.
+	 *
+	 * Threads sequentially reading pages (for example, any dump/statistics
+	 * threads), skip deleted pages and continue on.  There are no threads
+	 * sequentially writing pages, so this is a pretty simple case.
+	 *
+	 * Threads binarily searching the tree (for example, threads retrieving
+	 * or storing key/data pairs) are a harder problem.  Imagine a thread
+	 * ending up on an deleted page entry, in other words, a thread getting
+	 * the WT_PAGE_DELETED error returned from the page-get function while
+	 * descending the tree.
+	 *
+	 * If that thread is a reader, it's simple and we can return not-found,
+	 * obviously the key doesn't exist in the tree.
+	 *
+	 * If the thread is a writer, we first try to switch from the deleted
+	 * entry to a lower page entry.  This works because deleting a page
+	 * from the tree's key range is equivalent to merging the page's key
+	 * range into the previous page's key range.
+	 *
+	 * For example, imagine a parent page with 3 child pages: the parent has
+	 * 3 keys A, C, and E, and the child pages have the key ranges A-B, C-D
+	 * and E-F.  If the page with C-D is deleted, the parent's reference
+	 * for the key C is marked deleted and the page with the key range A-B
+	 * immediately extends to the range A-D because future searches for keys
+	 * starting with C or D will compare greater than A and less than E, and
+	 * will descend into the page referenced by the key A.  In other words,
+	 * the search key associated with any page is the lowest key associated
+	 * with the page and there's no upper bound.   By switching our writing
+	 * thread to the lower entry, we're mimicing what will happen on future
+	 * searches.
+	 *
+	 * If there's no lower page entry (if, in the example, we deleted the
+	 * key A and the child page with the range A-B), the thread switches to
+	 * the next larger page entry.  This works because the search algorithm
+	 * that landed us on this page ignores any lower boundary for the first
+	 * entry in the page.  In other words, if there's no lower entry on the
+	 * page, then the next larger entry, as the lowest entry on the page,
+	 * holds the lowest keys referenced from this page.  Again, by switching
+	 * our writing thread to the larger entry, we're mimicing what happens
+	 * on future searches.
+	 *
+	 * If there's no entry at all, either smaller or larger (that is, the
+	 * parent no longer references any valid entries at all, it gets hard).
+	 * In that case, we can't fix our writer's position: our writer is in
+	 * the wrong part of the tree, a section of the tree being discarded.
+	 * In this case, we return the WT_RESTART error up the call stack and
+	 * restart the search operation.  Unfortunately, that's not sufficient:
+	 * a restarted search will only come back into the same page without
+	 * any valid entries, encounter the same error, and infinitely loop.
+	 *
+	 * To break the infinite loop, we mark the parent's parent reference as
+	 * deleted, too.  That way, our restarted search will hit a deleted
+	 * entry and be indirected to some other entry, and not back down into
+	 * the same page.  A few additional points:
+	 *
+	 * First, we have to repeat this check all the way up the tree, until
+	 * we reach the root or a page that has non-deleted entries.  In other
+	 * words, deleting our parent it our parent's parent page might just
+	 * result in another page in our search path without any valid entries,
+	 * and its the existence of a page of deleted references that results
+	 * in the infinite loop.
+	 *
+	 * Second, we're discarding a chunk of the tree, because no search can
+	 * ever reach it.  That's OK: those pages will eventually be selected
+	 * for eviction, we're re-discover that they have no entries, and we'll
+	 * discard their contents then.
+	 *
+	 * So, let's get to it: walk the chain of parent pages from the current
+	 * page, stopping at the root or the first page with valid entries and
+	 * deleting as we go.
+	 */
+	db = toc->db;
+	if ((parent = page->parent) == NULL)
+		return (0);
+	dsk = parent->dsk;
+
+	/*
+	 * Search the current parent page for a valid child page entry.  We can
+	 * do this because there's a valid child for the page in the tree (so it
+	 * can't be evicted), and we're the eviction thread and no other thread
+	 * deletes pages from the tree, so the address fields can't change from
+	 * underneath us.  If we find a valid page entry, we're done, we've gone
+	 * as far up the tree as we need to go.
+	 */
+	switch (dsk->type) {
+	case WT_PAGE_COL_INT:
+		WT_INDX_FOREACH(parent, cip, i)
+			if (WT_COL_OFF(cip)->addr != WT_ADDR_DELETED)
+				return (0);
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		WT_INDX_FOREACH(parent, rip, i)
+			if (WT_ROW_OFF(rip)->addr != WT_ADDR_DELETED)
+				return (0);
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
+
+	/*
+	 * The current page has no valid child page entries -- lather, rinse,
+	 * repeat.
+	 */
+	return (__wt_rec_page_delete(toc, parent));
 }
 
 /*
@@ -957,15 +1065,13 @@ __wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
  *	Update a parent page's reference when a page is reconciled.
  */
 static int
-__wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	DB *db;
-	ENV *env;
 	IDB *idb;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
 
-	env = toc->env;
 	db = toc->db;
 	idb = db->idb;
 
@@ -974,9 +1080,8 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * descriptor record, there's no parent to update.
 	 */
 	if (page->addr == idb->root_off.addr) {
-		  idb->root_off.addr = new->addr;
-		  idb->root_off.size = new->size;
-		  WT_RECORDS(&idb->root_off) = new->records;
+		  idb->root_off.addr = addr;
+		  idb->root_off.size = size;
 		  return (__wt_desc_write(toc));
 	 }
 
@@ -990,15 +1095,14 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_LEAF:
 		off_record = page->parent_off;
-		off_record->addr = new->addr;
-		off_record->size = new->size;
-		WT_ASSERT(env, WT_RECORDS(off_record) == new->records);
+		off_record->addr = addr;
+		off_record->size = size;
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		off = page->parent_off;
-		off->addr = new->addr;
-		off->size = new->size;
+		off->addr = addr;
+		off->size = size;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}

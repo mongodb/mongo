@@ -22,10 +22,11 @@ extern "C" {
  * We use 32-bit unsigned integers to store file locations on database pages,
  * and all such file locations are counts of database allocation units.  In
  * the code these are called "addrs".  To simplify bookkeeping, page sizes must
- * be a multiple of the allocation unit size.
+ * be a multiple of the allocation unit size.  There are two special addresses,
+ * one for pages which don't exist, and one for pages that have been deleted.
  *
- * This means the minimum maximum database file size is 2TB (2^9 x 2^32), and
- * the maximum maximum database file size is 512PB (2^27 x 2^32).
+ * The minimum maximum database file size is almost 2TB (2^9 x (2^32 - 2)),
+ * and the maximum maximum database file size is almost 512PB (2^27 x 2^32 - 2).
  *
  * In summary, small database allocation units limit the database file size,
  * (but minimize wasted space when storing overflow items), and when the
@@ -65,9 +66,10 @@ extern "C" {
 	((uint32_t)WT_ALIGN((size) + sizeof(WT_PAGE_DISK), (db)->allocsize))
 
 /*
- * The invalid address is the largest possible offset, which isn't a possible
- * database address.
+ * The invalid and deleted addresses are special addresses and limit the
+ * maximum size of a database.
  */
+#define	WT_ADDR_DELETED		(UINT32_MAX - 1)
 #define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
@@ -345,28 +347,35 @@ struct __wt_page {
  * the tree to disk.
  *
  * Synchronization is based on the WT_REF->state field:
- * WT_OK:
- *	The page reference is valid.  Readers check the state field and if it's
- *	set to WT_OK, they set a hazard reference to the page, flush memory and
- *	re-confirm the state of the page.  If the page is still WT_OK, they have
- *	a valid reference and can proceed.
- * WT_EVICT:
+ * WT_REF_CACHE:
+ *	The page is in the cache and the page reference is valid.  Readers check
+ *	the state field and if it's WT_REF_CACHE, they set a hazard reference
+ *	to the page, flush memory and re-confirm the state of the page.  If the
+ *	page state is still WT_REF_CACHE, the reader has a valid reference and
+ *	can proceed.
+ * WT_REF_DISK:
+ *      The page is on disk, but needs to be read into the cache before use.
+ * WT_REF_EVICT:
  *	The eviction server chose this page and is checking hazard references.
  *	When the eviction server wants to discard a page from the tree, it sets
  *	state to WT_EVICT, flushes memory, then checks hazard references.  If
  *	the eviction server finds a hazard reference, it resets the state to
- *	WT_OK, restoring the page to the readers.  If the eviction server does
- *	not find a hazard reference, the page is evicted.
- * WT_EMPTY:
- *      There is no page, and the only way to proceed is for the reader thread
- *	to set the page reference and change the state to WT_OK.
+ *	WT_CACHE, restoring the page to the readers.  If the eviction server
+ *	does not find a hazard reference, the page is then evicted.  Regardless,
+ *	the page will revert to one of the WT_REF_{CACHE,DISK} states.
  */
 struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
 
-#define	WT_OK		0		/* Reference valid */
-#define	WT_EMPTY	1		/* Not set */
-#define	WT_EVICT	2		/* Selected for eviction */
+/*
+ * !!!
+ * WT_REF_DISK has a value of 0: if we forget to initialize a WT_REF structure
+ * in the code somewhere, we'll be in the correct default state (as long as the
+ * memory was cleared during allocation).
+ */
+#define	WT_REF_CACHE	1		/* Page is in cache */
+#define	WT_REF_DISK	0		/* Page is on disk */
+#define	WT_REF_EVICT	2		/* Cache page selected for eviction */
 	uint32_t volatile state;
 };
 
@@ -574,6 +583,36 @@ struct __wt_rle_expand {
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
+
+/*
+ * WT_INDX_AND_KEY_FOREACH --
+ *	Walk the indexes of a row-store in-memory page at the same time walking
+ * the underlying page's key WT_ITEMs.
+ *
+ * This macro is necessary for when we have to walk both the WT_ROW structures
+ * as well as the original page: the problem is keys that require processing.
+ * When a page is read into memory from a file, the WT_ROW key/size pair is set
+ * is set to reference an on-page group of bytes in the key's WT_ITEM structure.
+ * For uncompressed, small, simple keys, those bytes are usually what we want to
+ * access, and the WT_ROW structure points to them.
+ *
+ * Keys that require processing are harder (for example, a Huffman encoded or
+ * overflow key).  When we actually use a key requiring processing, we process
+ * the key and set the WT_ROW key/size pair to reference the allocated memory
+ * that holds the key.  At that point we've lost any reference to the original
+ * WT_ITEM structure.  If we need the original key (for example, if reconciling
+ * the page, or verifying or freeing overflow references, the WT_ROW structure
+ * no longer gets us there.  As these are relatively rare operations performed
+ * on (hopefully!) relatively rare key types, we don't want to grow the WT_ROW
+ * structure by sizeof(void *).  Instead, walk the original page at the same
+ * time we walk the WT_PAGE array so we can find the original key WT_ITEM.
+ */
+#define	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i)			\
+	for ((key_item) = WT_PAGE_BYTE(page),				\
+	    (rip) = (page)->u.irow, (i) = (page)->indx_count;		\
+	    (i) > 0;							\
+	    ++(rip),							\
+	    key_item = --(i) == 0 ? NULL : __wt_key_item_next(key_item))
 
 /*
  * WT_ROW_INDX_IS_DUPLICATE --

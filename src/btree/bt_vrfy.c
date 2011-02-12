@@ -321,16 +321,25 @@ __wt_verify_tree(
 		/* For each entry in an internal page, verify the subtree. */
 		start_recno = dsk->start_recno;
 		WT_INDX_FOREACH(page, cip, i) {
+			records = WT_COL_OFF_RECORDS(cip);
+
 			/* cip references the subtree containing the record */
 			ref = WT_COL_REF(page, cip);
 			off_record = WT_COL_OFF(cip);
-			records = WT_COL_OFF_RECORDS(cip);
-			WT_ERR(__wt_page_in(toc, page, ref, off_record, 1));
-			ret = __wt_verify_tree(toc, NULL,
-			    records, start_recno, level - 1, ref, vs);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret =
+			    __wt_page_in(toc, page, ref, off_record, 1)) {
+			case 0:				/* Valid page */
+				ret = __wt_verify_tree(toc, NULL,
+				    records, start_recno, level - 1, ref, vs);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				goto err;
+
 			start_recno += records;
 		}
 		break;
@@ -375,22 +384,30 @@ __wt_verify_tree(
 				__wt_hazard_clear(toc, vs->leaf);
 				vs->leaf = NULL;
 			}
+
 			/* rip references the subtree containing the record */
 			ref = WT_ROW_REF(page, rip);
 			off = WT_ROW_OFF(rip);
-			WT_ERR(__wt_page_in(toc, page, ref, off, 1));
-			ret = __wt_verify_tree(toc, rip,
-			    (uint64_t)0, (uint64_t)0, level - 1, ref, vs);
-
-			/*
-			 * Remaining special handling of the last verified leaf
-			 * page: if we kept a reference to that page, don't
-			 * release the hazard reference until after comparing
-			 * the last key on that page against the next key in the
-			 * tree.
-			 */
-			if (vs->leaf != ref->page)
-				__wt_hazard_clear(toc, ref->page);
+			switch (ret = __wt_page_in(toc, page, ref, off, 1)) {
+			case 0:				/* Valid page */
+				ret = __wt_verify_tree(
+				    toc, rip, (uint64_t)0,
+				    (uint64_t)0, level - 1, ref, vs);
+				/*
+				 * Remaining special handling of the last
+				 * verified leaf page: if we kept a reference
+				 * to that page, don't release the hazard
+				 * reference until after comparing the last key
+				 * on that page against the next key in the
+				 * tree.
+				 */
+				if (vs->leaf != ref->page)
+					__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				goto err;
 		}
@@ -417,10 +434,18 @@ __wt_verify_tree(
 
 			ref = WT_ROW_DUP(page, rip);
 			off_record = WT_ROW_OFF_RECORD(rip);
-			WT_ERR(__wt_page_in(toc, page, ref, off_record, 1));
-			ret = __wt_verify_tree(toc, NULL,
-			    (uint64_t)0, (uint64_t)0, WT_NOLEVEL, ref, vs);
-			__wt_hazard_clear(toc, ref->page);
+			switch (ret =
+			    __wt_page_in(toc, page, ref, off_record, 1)) {
+			case 0:				/* Valid page */
+				ret = __wt_verify_tree(
+				    toc, NULL, (uint64_t)0,
+				    (uint64_t)0, WT_NOLEVEL, ref, vs);
+				__wt_hazard_clear(toc, ref->page);
+				break;
+			case WT_PAGE_DELETED:
+				ret = 0;		/* Skip deleted pages */
+				break;
+			}
 			if (ret != 0)
 				goto err;
 
@@ -1141,7 +1166,7 @@ __wt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 static int
 __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
-	WT_ITEM *item;
+	WT_ITEM *data_item, *key_item;
 	WT_ROW *rip;
 	uint32_t i;
 	int check_data;
@@ -1156,23 +1181,26 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	 */
 	check_data = page->dsk->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
-	/* Walk the in-memory page, verifying overflow items. */
-	WT_INDX_FOREACH(page, rip, i) {
+	/*
+	 * Walk the in-memory page, verifying overflow items.
+	 *
+	 * We have to walk the original disk page as well as the current page:
+	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
+	 */
+	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
 		if (!WT_ROW_INDX_IS_DUPLICATE(page, rip)) {
-			item = rip->key;
-
 			/*
 			 * WT_ITEM_DATA_XXX types are listed because the data
 			 * items for off-page duplicate trees are sorted, and
 			 * the WT_ROW "key" item actually reference data items.
 			 */
-			switch (WT_ITEM_TYPE(item)) {
+			switch (WT_ITEM_TYPE(key_item)) {
 			case WT_ITEM_DATA_DUP_OVFL:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_KEY_DUP_OVFL:
 			case WT_ITEM_KEY_OVFL:
 				WT_RET(__wt_verify_overflow_common(
-				    toc, WT_ITEM_BYTE_OVFL(item),
+				    toc, WT_ITEM_BYTE_OVFL(key_item),
 				    WT_ROW_SLOT(page, rip) + 1, page->addr,
 				    vs));
 				break;
@@ -1182,12 +1210,12 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		}
 
 		if (check_data) {
-			item = rip->data;
-			switch (WT_ITEM_TYPE(item)) {
+			data_item = rip->data;
+			switch (WT_ITEM_TYPE(data_item)) {
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DATA_DUP_OVFL:
 				WT_RET(__wt_verify_overflow_common(
-				    toc, WT_ITEM_BYTE_OVFL(item),
+				    toc, WT_ITEM_BYTE_OVFL(data_item),
 				    WT_ROW_SLOT(page, rip) + 1, page->addr,
 				    vs));
 				break;

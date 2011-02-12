@@ -24,7 +24,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
-	WT_ROW *rip;
+	WT_ROW *rip, *t;
 	WT_REPL *repl;
 	uint32_t base, indx, limit, write_gen;
 	int cmp, isleaf, ret;
@@ -107,14 +107,50 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		if (isleaf || level == dsk->level)
 			break;
 
-		/* rip references the subtree containing the record. */
+deleted_retry:	/* rip references the subtree containing the record. */
 		ref = WT_ROW_REF(page, rip);
 		off = WT_ROW_OFF(rip);
-		WT_ERR(__wt_page_in(toc, page, ref, off, 0));
-
-		/* Swap the parent page for the child page. */
-		if (page != idb->root_page.page)
-			__wt_hazard_clear(toc, page);
+		switch (ret = __wt_page_in(toc, page, ref, off, 0)) {
+		case 0:				/* Valid page */
+			/* Swap the parent page for the child page. */
+			if (page != idb->root_page.page)
+				__wt_hazard_clear(toc, page);
+			break;
+		case WT_PAGE_DELETED:
+			/*
+			 * !!!
+			 * See __wt_rec_page_delete() for an explanation of page
+			 * deletion.  In this code, we first do an easy test --
+			 * if we're a reader, we're done because we know the
+			 * key/data pair doesn't exist.
+			 */
+			if (!LF_ISSET(WT_INSERT))
+				goto notfound;
+			/*
+			 * If we're a writer, there are 3 steps: (1) move to a
+			 * lower valid page entry; (2) if that isn't possible,
+			 * move to a larger valid page entry; (3) if that isn't
+			 * possible, restart the operation.
+			 */
+			for (t = rip,
+			    indx = WT_ROW_SLOT(page, rip);
+			    indx > 0; --indx, --t)
+				if (WT_ROW_OFF(t)->addr != WT_ADDR_DELETED) {
+					rip = t;
+					goto deleted_retry;
+				}
+			for (t = rip,
+			    indx = WT_ROW_SLOT(page, rip);
+			    indx < page->indx_count; ++indx, ++t)
+				if (WT_ROW_OFF(t)->addr != WT_ADDR_DELETED) {
+					rip = t;
+					goto deleted_retry;
+				}
+			ret = WT_RESTART;
+			/* FALLTHROUGH */
+		default:
+			goto err;
+		}
 		page = ref->page;
 	}
 
