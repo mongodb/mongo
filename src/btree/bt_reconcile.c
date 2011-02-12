@@ -234,14 +234,12 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	DB *db;
 	WT_ITEM *key_item, *data_item, *next;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
-	db = toc->db;
 	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
@@ -348,9 +346,9 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			else				/* Replaced data */
 				data = WT_REPL_DATA(repl);
 		} else if (WT_FIX_DELETE_ISSET(cip->data))
-			data = tmp->data;		/* On-page deleted */
+			data = tmp->data;		/* On-disk deleted */
 		else
-			data = cip->data;		/* On-page data */
+			data = cip->data;		/* On-disk data */
 
 		/*
 		 * When reconciling a fixed-width page that doesn't support
@@ -597,7 +595,6 @@ static int
 __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
-	DB *db;
 	DBT *data, data_dbt;
 	WT_COL *cip;
 	WT_ITEM data_item, *item;
@@ -607,7 +604,6 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
-	db = toc->db;
 	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
@@ -1069,6 +1065,7 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	DB *db;
 	IDB *idb;
+	WT_PAGE *parent;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
 
@@ -1088,18 +1085,28 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 	/*
 	 * Update the relevant WT_OFF/WT_OFF_RECORD structure.  There are two
 	 * memory locations that change (address and size), and we could race,
-	 * but that's not a problem.   Only a single thread ever reconciles a
-	 * page at a time, and pages cannot leave memory if they have children.
+	 * but that's not a problem.   Only a single thread reconciles pages,
+	 * and pages cannot leave memory if they have children.
 	 */
-	switch (page->dsk->type) {
+	parent = page->parent;
+	switch (parent->dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Two page types have WT_OFF_RECORD structures: column-store
+		 * internal pages, and row-store leaf pages (their references
+		 * to off-page duplicate trees).
+		 */
 		off_record = page->parent_off;
 		off_record->addr = addr;
 		off_record->size = size;
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
+		/*
+		 * Two page types have WT_OFF structures: row-store internal
+		 * pages and off-page duplicate tree internal pages.
+		 */
 		off = page->parent_off;
 		off->addr = addr;
 		off->size = size;
@@ -1119,7 +1126,7 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 	 * with us, the page will still be marked dirty and that's all we care
 	 * about.
 	 */
-	WT_PAGE_SET_MODIFIED(page->parent);
+	WT_PAGE_SET_MODIFIED(parent);
 
 	return (0);
 }
