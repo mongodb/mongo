@@ -103,6 +103,21 @@ __wt_block_extend(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 }
 
 /*
+ * __wt_block_free_ovfl --
+ *	Free an chunk of space, referenced by an overflow structure, to the
+ *	underlying file.
+ */
+inline int
+__wt_block_free_ovfl(WT_TOC *toc, WT_OVFL *ovfl)
+{
+	DB *db;
+
+	db = toc->db;
+	return (__wt_block_free(
+	    toc, ovfl->addr, WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
+}
+
+/*
  * __wt_block_free --
  *	Free a chunk of space to the underlying file.
  */
