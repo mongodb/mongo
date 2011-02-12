@@ -407,6 +407,7 @@ namespace mongo {
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
+                    getDur().commitIfNeeded();
                 }
                 _db.dropCollection( _config.tempLong );
             }
@@ -435,6 +436,7 @@ namespace mongo {
                     else {
                         Helpers::upsert( _config.finalLong , temp );
                     }
+                    getDur().commitIfNeeded();
                 }
                 _db.dropCollection( _config.tempLong );
             }
@@ -460,6 +462,7 @@ namespace mongo {
         void State::_insertToInc( BSONObj& o ) {
             assert( _onDisk );
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
+            getDur().commitIfNeeded();
         }
 
         State::State( const Config& c ) : _config( c ), _size(0), _numEmits(0) {
