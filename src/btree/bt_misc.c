@@ -34,6 +34,24 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 }
 
 /*
+ * __wt_key_item_next --
+ *	Helper function for the WT_INDX_AND_KEY_FOREACH macro, move to the
+ *	next key WT_ITEM on the page.
+ */
+inline WT_ITEM *
+__wt_key_item_next(WT_ITEM *key_item)
+{
+	/* Move to the next key WT_ITEM on the page. */
+	do {
+		key_item = WT_ITEM_NEXT(key_item);
+	} while (
+	    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY &&
+	    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY_OVFL);
+
+	return (key_item);
+}
+
+/*
  * __wt_page_type_string --
  *	Return a string representing the page type.
  */
