@@ -157,7 +157,7 @@ int
 __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	DB *db;
-	WT_PAGE_DSK *dsk;
+	WT_PAGE_DISK *dsk;
 	int do_close;
 
 	db = toc->db;
