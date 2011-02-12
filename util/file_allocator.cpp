@@ -209,6 +209,7 @@ namespace mongo {
                 string name;
                 long size;
                 {
+					size = 0;
                     scoped_lock lk( fa->_pendingMutex );
                     if ( fa->_pending.size() == 0 )
                         break;
