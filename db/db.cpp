@@ -734,8 +734,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    UnitTest::runTests();
-
     if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
 
@@ -1048,6 +1046,7 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
+    UnitTest::runTests();
     initAndListen(cmdLine.port, appsrvPath);
     dbexit(EXIT_CLEAN);
     return 0;
