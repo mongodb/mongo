@@ -174,13 +174,13 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		fprintf(stderr,
+		fprintf(fp,
 		    ", records %llu", (unsigned long long)page->records);
 		break;
 	default:
 		break;
 	}
-	fprintf(stderr, "\n");
+	fprintf(fp, "\n");
 
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
@@ -476,12 +476,12 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		break;
 	case WT_ITEM_OFF:
 		off = WT_ITEM_BYTE_OFF(item);
-		fprintf(fp, ", offpage: addr %lu, size %lu\n",
+		fprintf(fp, ", offpage: addr %lu, size %lu",
 		    (u_long)off->addr, (u_long)off->size);
 		break;
 	case WT_ITEM_OFF_RECORD:
 		off_record = WT_ITEM_BYTE_OFF_RECORD(item);
-		fprintf(fp, ", offpage: addr %lu, size %lu, records %llu\n",
+		fprintf(fp, ", offpage: addr %lu, size %lu, records %llu",
 		    (u_long)off_record->addr, (u_long)off_record->size,
 		    (unsigned long long)WT_RECORDS(off_record));
 		break;
