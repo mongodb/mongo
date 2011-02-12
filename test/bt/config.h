@@ -39,7 +39,7 @@ static CONFIG c[] = {
 	{ "leaf_node_max",	0,		0,		9,	17,		&g.c_leaf_node_max },
 	{ "leaf_node_min",	0,		0,		9,	17,		&g.c_leaf_node_min },
 	{ "ops",		0,		0,		0,	M(2),		&g.c_ops },
-	{ "repeat_comp_pct",	C_FIX,		0,		10,	90,		&g.c_repeat_comp_pct },
+	{ "repeat_comp_pct",	C_FIX,		0,		0,	90,		&g.c_repeat_comp_pct },
 	{ "rows",		0,		0,		100,	M(1),		&g.c_rows },
 	{ "runs",		0,		C_IGNORE,	0,	UINT_MAX,	&g.c_runs },
 	{ "write_pct",		0,		0,		0,	45,		&g.c_write_pct },
