@@ -120,6 +120,10 @@ namespace mongo {
     public:
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
 
+        ConnectionString() {
+            _type = INVALID;
+        }
+
         ConnectionString( const HostAndPort& server ) {
             _type = MASTER;
             _servers.push_back( server );
@@ -163,29 +167,21 @@ namespace mongo {
 
         bool isValid() const { return _type != INVALID; }
 
-        string toString() const {
-            return _string;
-        }
-
+        string toString() const { return _string; }
+        
         DBClientBase* connect( string& errmsg ) const;
 
-        string getSetName() const {
-            return _setName;
-        }
+        string getSetName() const { return _setName; }
 
-        vector<HostAndPort> getServers() const {
-            return _servers;
-        }
+        vector<HostAndPort> getServers() const { return _servers; }
+        
+        ConnectionType type() const { return _type; }
 
         static ConnectionString parse( const string& url , string& errmsg );
 
         static string typeToString( ConnectionType type );
 
     private:
-
-        ConnectionString() {
-            _type = INVALID;
-        }
 
         void _fillServers( string s ) {
             string::size_type idx;

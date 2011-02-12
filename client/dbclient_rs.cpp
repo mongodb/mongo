@@ -120,7 +120,7 @@ namespace mongo {
         massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 );
         _hook = hook;
     }
-
+    
     string ReplicaSetMonitor::getServerAddress() const {
         StringBuilder ss;
         if ( _name.size() )
@@ -136,6 +136,16 @@ namespace mongo {
         }
         return ss.str();
     }
+
+    bool ReplicaSetMonitor::contains( const string& server ) const {
+        scoped_lock lk( _lock );
+        for ( unsigned i=0; i<_nodes.size(); i++ ) {
+            if ( _nodes[i].addr == server )
+                return true;
+        }
+        return false;
+    }
+    
 
     void ReplicaSetMonitor::notifyFailure( const HostAndPort& server ) {
         if ( _master >= 0 ) {

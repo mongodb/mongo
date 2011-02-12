@@ -86,6 +86,8 @@ namespace mongo {
         string getName() const { return _name; }
 
         string getServerAddress() const;
+        
+        bool contains( const string& server ) const;
 
     private:
         /**
