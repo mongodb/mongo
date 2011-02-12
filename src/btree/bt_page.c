@@ -36,7 +36,7 @@ __wt_page_in(
 
 	for (;;)
 		switch (ref->state) {
-		case WT_OK:
+		case WT_REF_CACHE:
 			/*
 			 * The page is in memory: get a hazard reference, update
 			 * the page's LRU and return.
@@ -46,15 +46,27 @@ __wt_page_in(
 				return (0);
 			}
 			/* FALLTHROUGH */
-		case WT_EVICT:
+		case WT_REF_EVICT:
 			/*
 			 * The page is being considered for eviction, wait for
 			 * that to resolve.
 			 */
 			__wt_yield();
 			break;
-		case WT_EMPTY:
-			/* The page isn't in memory, request it be read. */
+		case WT_REF_DISK:
+			/*
+			 * The page isn't in memory, request it be read.  There
+			 * is one additional special case: if the page were to
+			 * be emptied and reconciled, it may have been deleted,
+			 * in which case we return that fact.
+			 *
+			 * Note, the underlying read server does not check for
+			 * this case: it's not necessary, because the address
+			 * was set to WT_ADDR_DELETED before the WT_REF entry
+			 * was reset to WT_REF_DISK.
+			 */
+			if (((WT_OFF *)off)->addr == WT_ADDR_DELETED)
+				return (WT_PAGE_DELETED);
 			__wt_cache_read_serial(
 			    toc, parent, ref, off, dsk_verify, ret);
 			if (ret != 0)
@@ -494,7 +506,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		if (WT_ITEM_TYPE(rip->data) != WT_ITEM_OFF_RECORD)
 			continue;
 		WT_RET(__wt_calloc(env, 1, sizeof(WT_REF), &ref));
-		ref->state = WT_EMPTY;
+		ref->state = WT_REF_DISK;
 		page->u3.dup[WT_ROW_SLOT(page, rip)] = ref;
 	}
 
@@ -615,7 +627,7 @@ __wt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
 	WT_RET(__wt_calloc(
 	    env, nindx, sizeof(WT_REF), &page->u3.ref));
 	for (i = 0, cp = page->u3.ref; i < nindx; ++i, ++cp)
-		cp->state = WT_EMPTY;
+		cp->state = WT_REF_DISK;
 	return (0);
 }
 
