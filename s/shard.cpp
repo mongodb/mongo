@@ -160,6 +160,9 @@ namespace mongo {
             
             // check for set nodes
             for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                if ( i->first == "config" )
+                    continue;
+
                 const Shard& s = i->second;     
                 if ( s.containsNode( addr ) )
                     return true;
