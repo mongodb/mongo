@@ -21,6 +21,8 @@
 
 #include "background.h"
 
+#include "mongoutils/str.h"
+
 namespace mongo {
 
     // both the BackgroundJob and the internal thread point to JobStatus
@@ -43,7 +45,7 @@ namespace mongo {
     void BackgroundJob::jobBody( boost::shared_ptr<JobStatus> status ) {
         {
             scoped_lock l( status->m );
-            assert( status->state == NotStarted );
+            massert( 13643 , mongoutils::str::stream() << "backgroundjob already started: " << name() , status->state == NotStarted );
             status->state = Running;
         }
 
