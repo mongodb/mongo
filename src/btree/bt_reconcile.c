@@ -423,8 +423,8 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * terminated array of references to WT_RLE_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_ERR(__wt_rle_expand_sort(
-		    env, page, cip, &expsort, &n_expsort));
+		WT_ERR(
+		    __wt_rle_expand_sort(env, page, cip, &expsort, &n_expsort));
 
 		/*
 		 *
