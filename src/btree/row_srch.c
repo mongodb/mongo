@@ -42,7 +42,10 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 
 	/* Search the tree. */
 	for (page = idb->root_page.page;;) {
-		/* Copy the write generation value before the read. */
+		/*
+		 * Copy the page's write generation value before reading
+		 * anything on the page.
+		 */
 		write_gen = page->write_gen;
 
 		dsk = page->dsk;

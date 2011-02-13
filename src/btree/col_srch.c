@@ -47,7 +47,10 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 	/* Search the tree. */
 	for (;;) {
-		/* Save the write generation value before the read. */
+		/*
+		 * Copy the page's write generation value before reading
+		 * anything on the page.
+		 */
 		write_gen = page->write_gen;
 
 		/* Walk the page looking for the record. */
