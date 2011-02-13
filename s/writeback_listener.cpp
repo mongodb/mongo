@@ -46,11 +46,16 @@ namespace mongo {
     /* static */
     void WriteBackListener::init( DBClientBase& conn ) {
         
+        if ( conn.type() == ConnectionString::SYNC ) {
+            // don't want write back listeners for config servers
+            return;
+        }
+
         if ( conn.type() != ConnectionString::SET ) {
             init( conn.getServerAddress() );
             return;
         }
-
+        
 
         {
             scoped_lock lk( _cacheLock );
