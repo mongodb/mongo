@@ -33,6 +33,9 @@ namespace mongo {
 
     // global background job responsible for checking every X amount of time
     class ReplicaSetMonitorWatcher : public BackgroundJob {
+    public:
+        virtual string name() const { return "ReplicaSetMonitorWatcher"; }
+
     protected:
         void run() {
             while ( ! inShutdown() ) {
