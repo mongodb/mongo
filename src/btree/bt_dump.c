@@ -151,15 +151,17 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	ENV *env;
+	FILE *fp;
 	WT_COL *cip;
-	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_REPL *repl;
+	WT_RLE_EXPAND *exp, **expsort, **expp;
 	uint64_t recno;
 	uint32_t i, n_expsort;
 	uint16_t n_repeat;
 
 	db = toc->db;
 	env = toc->env;
+	fp = dp->stream;
 	expsort = NULL;
 	n_expsort = 0;
 
@@ -184,13 +186,14 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			if ((exp = *expp) != NULL && exp->recno == recno) {
 				++expp;
 				repl = exp->repl;
-				if (WT_REPL_DELETED_ISSET(repl))
-					continue;
-				dp->p(
-				    WT_REPL_DATA(repl), repl->size, dp->stream);
+				if (!WT_REPL_DELETED_ISSET(repl))
+					dp->p(
+					    WT_REPL_DATA(repl), repl->size, fp);
 			} else
-				dp->p(WT_RLE_REPEAT_DATA(cip->data),
-				    db->fixed_len, dp->stream);
+				if (!WT_FIX_DELETE_ISSET(
+				    WT_RLE_REPEAT_DATA(cip->data)))
+					dp->p(WT_RLE_REPEAT_DATA(
+					    cip->data), db->fixed_len, fp);
 	}
 	/* Free the sort array. */
 	if (expsort != NULL)
