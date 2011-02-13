@@ -115,6 +115,9 @@ namespace mongo {
     void DBConfig::enableSharding() {
         if ( _shardingEnabled )
             return;
+        
+        assert( _name != "config" );
+
         scoped_lock lk( _lock );
         _shardingEnabled = true;
         _save();
