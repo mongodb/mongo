@@ -51,6 +51,12 @@ namespace mongo {
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
         : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
+        
+        uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
+
+        if ( _name.size() == 0 ) {
+            warning() << "replica set name empty, first node: " << servers[0] << endl;
+        }
 
         string errmsg;
 

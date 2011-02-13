@@ -174,7 +174,7 @@ namespace mongo {
                 }
 
                 _checkLast();
-
+                
                 for ( size_t i=0; i<all.size(); i++ ) {
                     BSONObj temp = all[i];
                     if ( isOk( temp ) )
@@ -182,6 +182,8 @@ namespace mongo {
                     stringstream ss;
                     ss << "write $cmd failed on a node: " << temp.jsonString();
                     ss << " " << _conns[i]->toString();
+                    ss << " ns: " << ns;
+                    ss << " cmd: " << query.toString();
                     throw UserException( 13105 , ss.str() );
                 }
 
