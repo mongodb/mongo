@@ -982,7 +982,7 @@ namespace mongo {
                 BSONObj cmd = cmdBuilder.obj();
                 log(7) << "moveChunk update: " << cmd << endl;
 
-                bool ok;
+                bool ok = false;
                 BSONObj cmdResult;
                 try {
                     ScopedDbConnection conn( shardingState.getConfigServer() );
@@ -1005,7 +1005,7 @@ namespace mongo {
                     // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
                     // that the old state (before migrating) be brought in
 
-                    log( LL_WARNING ) << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
+                    warning() << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
                     sleepsecs( 10 );
 
                     try {
@@ -1021,9 +1021,9 @@ namespace mongo {
 
                         }
                         else {
-                            log( LL_ERROR ) << "moveChunk commit failed: version is at"
+                            error() << "moveChunk commit failed: version is at"
                                             << checkVersion << " instead of " << nextVersion << endl;
-                            log( LL_ERROR ) << "TERMINATING" << endl;
+                            error() << "TERMINATING" << endl;
                             dbexit( EXIT_SHARDING_ERROR );
                         }
 
@@ -1031,8 +1031,8 @@ namespace mongo {
 
                     }
                     catch ( ... ) {
-                        log( LL_ERROR ) << "moveChunk failed to get confirmation of commit" << endl;
-                        log( LL_ERROR ) << "TERMINATING" << endl;
+                        error() << "moveChunk failed to get confirmation of commit" << endl;
+                        error() << "TERMINATING" << endl;
                         dbexit( EXIT_SHARDING_ERROR );
                     }
                 }
