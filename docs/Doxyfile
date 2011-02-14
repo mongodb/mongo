@@ -1,4 +1,4 @@
-# Doxyfile 1.7.2
+# Doxyfile 1.7.3
 
 # This file describes the settings to be used by the documentation system
 # doxygen (www.doxygen.org) for a project
@@ -33,12 +33,25 @@ PROJECT_NAME           = WiredTiger
 
 PROJECT_NUMBER         = "Version 1.0"
 
+# Using the PROJECT_BRIEF tag one can provide an optional one line description
+# for a project that appears at the top of each page and should give viewer
+# a quick idea about the purpose of the project. Keep the description short.
+
+PROJECT_BRIEF          = 
+
+# With the PROJECT_LOGO tag one can specify an logo or icon that is 
+# included in the documentation. The maximum height of the logo should not 
+# exceed 55 pixels and the maximum width should not exceed 200 pixels. 
+# Doxygen will copy the logo to the output directory.
+
+PROJECT_LOGO           = 
+
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) 
 # base path where the generated documentation will be put. 
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = .
+OUTPUT_DIRECTORY       = 
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -57,7 +70,7 @@ CREATE_SUBDIRS         = NO
 # Croatian, Czech, Danish, Dutch, Esperanto, Farsi, Finnish, French, German, 
 # Greek, Hungarian, Italian, Japanese, Japanese-en (Japanese with English 
 # messages), Korean, Korean-en, Lithuanian, Norwegian, Macedonian, Persian, 
-# Polish, Portuguese, Romanian, Russian, Serbian, Serbian-Cyrilic, Slovak, 
+# Polish, Portuguese, Romanian, Russian, Serbian, Serbian-Cyrillic, Slovak, 
 # Slovene, Spanish, Swedish, Ukrainian, and Vietnamese.
 
 OUTPUT_LANGUAGE        = English
@@ -294,7 +307,7 @@ TYPEDEF_HIDES_STRUCT   = YES
 # For small to medium size projects (<1000 input files) the default value is 
 # probably good enough. For larger projects a too small cache size can cause 
 # doxygen to be busy swapping symbols to and from disk most of the time 
-# causing a significant performance penality. 
+# causing a significant performance penalty. 
 # If the system has enough physical memory increasing the cache will improve the 
 # performance by keeping more symbols in memory. Note that the value works on 
 # a logarithmic scale so increasing the size by one will roughly double the 
@@ -453,6 +466,15 @@ SORT_GROUP_NAMES       = YES
 
 SORT_BY_SCOPE_NAME     = YES
 
+# If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to
+# do proper type resolution of all parameters of a function it will reject a 
+# match between the prototype and the implementation of a member function even
+# if there is only one candidate or it is obvious which candidate to choose
+# by doing a simple string match. By disabling STRICT_PROTO_MATCHING doxygen 
+# will still accept a match between prototype and implementation in such cases.
+
+STRICT_PROTO_MATCHING  = NO
+
 # The GENERATE_TODOLIST tag can be used to enable (YES) or 
 # disable (NO) the todo list. This list is created by putting \todo 
 # commands in the documentation.
@@ -508,7 +530,7 @@ SHOW_DIRECTORIES       = NO
 # This will remove the Files entry from the Quick Index and from the 
 # Folder Tree View (if specified). The default is YES.
 
-SHOW_FILES             = YES
+SHOW_FILES             = NO
 
 # Set the SHOW_NAMESPACES tag to NO to disable the generation of the 
 # Namespaces page.  This will remove the Namespaces entry from the Quick Index 
@@ -612,7 +634,7 @@ INPUT_ENCODING         = UTF-8
 # blank the following patterns are tested: 
 # *.c *.cc *.cxx *.cpp *.c++ *.d *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh 
 # *.hxx *.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.dox *.py 
-# *.f90 *.f *.vhd *.vhdl
+# *.f90 *.f *.for *.vhd *.vhdl
 
 FILE_PATTERNS          = *.c \
                          *.cc \
@@ -659,7 +681,7 @@ RECURSIVE              = YES
 EXCLUDE                = src/bdb-map.dox
 
 # The EXCLUDE_SYMLINKS tag can be used select whether or not files or 
-# directories that are symbolic links (a Unix filesystem feature) are excluded 
+# directories that are symbolic links (a Unix file system feature) are excluded 
 # from the input.
 
 EXCLUDE_SYMLINKS       = NO
@@ -720,8 +742,8 @@ INPUT_FILTER           =
 # basis.  Doxygen will compare the file name with each pattern and apply the 
 # filter if there is a match.  The filters are a list of the form: 
 # pattern=filter (like *.cpp=my_cpp_filter). See INPUT_FILTER for further 
-# info on how filters are used. If FILTER_PATTERNS is empty, INPUT_FILTER 
-# is applied to all files.
+# info on how filters are used. If FILTER_PATTERNS is empty or if 
+# non of the patterns match the file name, INPUT_FILTER is applied.
 
 FILTER_PATTERNS        = 
 
@@ -730,6 +752,14 @@ FILTER_PATTERNS        =
 # files to browse (i.e. when SOURCE_BROWSER is set to YES).
 
 FILTER_SOURCE_FILES    = NO
+
+# The FILTER_SOURCE_PATTERNS tag can be used to specify source filters per file 
+# pattern. A pattern will override the setting for FILTER_PATTERN (if any) 
+# and it is also possible to disable source filtering for a specific pattern 
+# using *.ext= (so without naming a filter). This option only has effect when 
+# FILTER_SOURCE_FILES is enabled.
+
+FILTER_SOURCE_PATTERNS = 
 
 #---------------------------------------------------------------------------
 # configuration options related to source browsing
@@ -807,7 +837,7 @@ COLS_IN_ALPHA_INDEX    = 5
 # The IGNORE_PREFIX tag can be used to specify one or more prefixes that 
 # should be ignored while generating the index headers.
 
-IGNORE_PREFIX          = 
+IGNORE_PREFIX          = WT_
 
 #---------------------------------------------------------------------------
 # configuration options related to the HTML output
@@ -865,7 +895,7 @@ HTML_COLORSTYLE_HUE    = 34
 # the colors in the HTML output. For a value of 0 the output will use 
 # grayscales only. A value of 255 will produce the most vivid colors.
 
-HTML_COLORSTYLE_SAT    = 87
+HTML_COLORSTYLE_SAT    = 81
 
 # The HTML_COLORSTYLE_GAMMA tag controls the gamma correction applied to 
 # the luminance component of the colors in the HTML output. Values below 
@@ -1432,15 +1462,15 @@ PREDEFINED             = DOXYGEN
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then 
 # this tag can be used to specify a list of macro names that should be expanded. 
 # The macro definition that is found in the sources will be used. 
-# Use the PREDEFINED tag if you want to use a different macro definition.
+# Use the PREDEFINED tag if you want to use a different macro definition that
+# overrules the definition found in the source code.
 
 EXPAND_AS_DEFINED      = 
 
 # If the SKIP_FUNCTION_MACROS tag is set to YES (the default) then 
-# doxygen's preprocessor will remove all function-like macros that are alone 
-# on a line, have an all uppercase name, and do not end with a semicolon. Such 
-# function macros are typically used for boiler-plate code, and will confuse 
-# the parser if not removed.
+# doxygen's preprocessor will remove all references to function-like macros 
+# that are alone on a line, have an all uppercase name, and do not end with a 
+# semicolon, because these will confuse the parser if not removed.
 
 SKIP_FUNCTION_MACROS   = YES
 
@@ -1529,11 +1559,10 @@ HAVE_DOT               = NO
 
 DOT_NUM_THREADS        = 0
 
-# By default doxygen will write a font called FreeSans.ttf to the output 
-# directory and reference it in all dot files that doxygen generates. This 
-# font does not include all possible unicode characters however, so when you need 
-# these (or just want a differently looking font) you can specify the font name 
-# using DOT_FONTNAME. You need need to make sure dot is able to find the font, 
+# By default doxygen will write a font called Helvetica to the output 
+# directory and reference it in all dot files that doxygen generates. 
+# When you want a differently looking font you can specify the font name 
+# using DOT_FONTNAME. You need to make sure dot is able to find the font, 
 # which can be done by putting it in a standard location or by setting the 
 # DOTFONTPATH environment variable or by setting DOT_FONTPATH to the directory 
 # containing the font.
@@ -1625,7 +1654,7 @@ GRAPHICAL_HIERARCHY    = YES
 DIRECTORY_GRAPH        = YES
 
 # The DOT_IMAGE_FORMAT tag can be used to set the image format of the images 
-# generated by dot. Possible values are png, jpg, or gif. 
+# generated by dot. Possible values are png, svg, gif or svg. 
 # If left blank png will be used.
 
 DOT_IMAGE_FORMAT       = png

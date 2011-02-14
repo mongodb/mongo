@@ -5,8 +5,31 @@
 <title>$title</title>
 <link href="$relpath$tabs.css" rel="stylesheet" type="text/css"/>
 <link href="$relpath$search/search.css" rel="stylesheet" type="text/css"/>
-<script type="text/javaScript" src="$relpath$search/search.js"></script>
+<script type="text/javascript" src="$relpath$search/search.js"></script>
+<link href="navtree.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="navtree.js"></script>
+<script type="text/javascript" src="resize.js"></script>
+<script type="text/javascript">
+$(document).ready(initResizable);
+</script>
 <link href="$relpath$wiredtiger.css" rel="stylesheet" type="text/css"/>
 </head>
 <body onload='searchBox.OnSelectItem(0);'>
-<div class="logo"><a href="http://wiredtiger.com/"><img src="$relpath$images/LogoFinal-header.png" alt="WiredTiger" /></a></div>
+
+<div id="top">
+<div id="titlearea">
+<table cellspacing="0" cellpadding="0">
+ <tbody>
+ <tr style="height: 56px;">
+  <td style="padding-left: 0.5em;">
+    <div class="logo"><a href="http://wiredtiger.com/"><img src="$relpath$images/LogoFinal-header.png" alt="WiredTiger" /></a></div>
+  </td>
+  <td>
+	  <h1>&nbsp;$projectnumber</h1>
+  </td>
+ </tr>
+ </tbody>
+</table>
+</div>
+	

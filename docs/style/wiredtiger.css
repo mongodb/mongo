@@ -58,7 +58,7 @@ span.legend {
 }
 
 h3.version {
-	background: none;
+        background: none;
         font-size: 110%;
         text-align: center;
 }
@@ -630,7 +630,7 @@ table.doxtable th {
 	font-size: 11px;
 	background-image:url('tab_b.png');
 	background-repeat:repeat-x;
-	height:30px;
+	height:36px;
 	line-height:30px;
 	color:#8AA0CC;
 	border:solid 1px #C2CDE4;
@@ -644,14 +644,14 @@ table.doxtable th {
 	list-style-type:none;
 	float:left;
 	padding-left:10px;
-	padding-right: 15px;
+	padding-right:15px;
 	background-image:url('bc_s.png');
 	background-repeat:no-repeat;
 	background-position:right;
 	color:#364D7C;
 }
 
-.navpath a
+.navpath li.navelem a
 {
 	height:32px;
 	display:block;
@@ -659,10 +659,24 @@ table.doxtable th {
 	outline: none;
 }
 
-.navpath a:hover
+.navpath li.navelem a:hover
 {
 	color:#6884BD;
 }
+
+.navpath li.footer
+{
+        list-style-type:none;
+        float:right;
+        padding-left:10px;
+        padding-right:15px;
+        background-image:none;
+        background-repeat:no-repeat;
+        background-position:right;
+        color:#364D7C;
+        font-size: 8pt;
+}
+
 
 div.summary
 {
@@ -674,6 +688,19 @@ div.summary
 }       
 
 div.summary a
+{
+	white-space: nowrap;
+}
+
+div.ingroups
+{
+	font-size: 8pt;
+	padding-left: 5px;
+	width: 50%;
+	text-align: left;
+}
+
+div.ingroups a
 {
 	white-space: nowrap;
 }
@@ -695,5 +722,92 @@ div.headertitle
 div.logo
 {
 	padding: 5px 5px 5px 10px;
+}
+
+dl
+{
+        padding: 0 0 0 10px;
+}
+
+dl.note, dl.warning, dl.attention, dl.pre, dl.post, dl.invariant, dl.deprecated, dl.todo, dl.test, dl.bug
+{
+        border-left:4px solid;
+        padding: 0 0 0 6px;
+}
+
+dl.note
+{
+        border-color: #D0D000;
+}
+
+dl.warning, dl.attention
+{
+        border-color: #FF0000;
+}
+
+dl.pre, dl.post, dl.invariant
+{
+        border-color: #00D000;
+}
+
+dl.deprecated
+{
+        border-color: #505050;
+}
+
+dl.todo
+{
+        border-color: #00C0E0;
+}
+
+dl.test
+{
+        border-color: #3030E0;
+}
+
+dl.bug
+{
+        border-color: #C08050;
+}
+
+#projectlogo
+{
+	text-align: center;
+	vertical-align: bottom;
+	border-collapse: separate;
+}
+ 
+#projectlogo img
+{ 
+	border: 0px none;
+}
+ 
+#projectname
+{
+	font: 300% arial,sans-serif;
+	margin: 0px;
+	padding: 0px;
+}
+    
+#projectbrief
+{
+	font: 120% arial,sans-serif;
+	margin: 0px;
+	padding: 0px;
+}
+
+#projectnumber
+{
+	font: 50% arial,sans-serif;
+	margin: 0px;
+	padding: 0px;
+}
+
+#titlearea
+{
+	padding: 0px;
+	margin: 0px;
+	width: 100%;
+	border-bottom: 1px solid #5373B4;
 }
 
