@@ -1,6 +1,6 @@
 /* vim: set filetype=c.doxygen : */
 
-/*! @page filetypes Table File Formats
+/*! @page fileformats Table File Formats
 
 @todo rewrite this to describe the WiredTiger row- and column-store features in detail, including page sizing calculations for given key/value sizes
 

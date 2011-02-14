@@ -10,5 +10,5 @@
 For more details about the WiredTiger architecture, see:
 
 - @subpage design
-- @subpage filetypes
+- @subpage fileformats
  */
