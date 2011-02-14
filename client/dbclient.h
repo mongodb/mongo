@@ -154,13 +154,18 @@ namespace mongo {
         }
 
         ConnectionString( const string& s , ConnectionType favoredMultipleType ) {
+            _type = INVALID;
+            
             _fillServers( s );
-            if ( _servers.size() == 1 ) {
+            if ( _type != INVALID ) {
+                // set already
+            }
+            else if ( _servers.size() == 1 ) {
                 _type = MASTER;
             }
             else {
                 _type = favoredMultipleType;
-                assert( _type != MASTER );
+                assert( _type == SET || _type == SYNC );
             }
             _finishInit();
         }
@@ -183,26 +188,8 @@ namespace mongo {
 
     private:
 
-        void _fillServers( string s ) {
-            string::size_type idx;
-            while ( ( idx = s.find( ',' ) ) != string::npos ) {
-                _servers.push_back( s.substr( 0 , idx ) );
-                s = s.substr( idx + 1 );
-            }
-            _servers.push_back( s );
-        }
-
-        void _finishInit() {
-            stringstream ss;
-            if ( _type == SET )
-                ss << _setName << "/";
-            for ( unsigned i=0; i<_servers.size(); i++ ) {
-                if ( i > 0 )
-                    ss << ",";
-                ss << _servers[i].toString();
-            }
-            _string = ss.str();
-        }
+        void _fillServers( string s );
+        void _finishInit();
 
         ConnectionType _type;
         vector<HostAndPort> _servers;

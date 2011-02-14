@@ -31,6 +31,39 @@
 
 namespace mongo {
 
+    void ConnectionString::_fillServers( string s ) {
+        
+        {
+            string::size_type idx = s.find( '/' );
+            if ( idx != string::npos ) {
+                _setName = s.substr( 0 , idx );
+                s = s.substr( idx + 1 );
+                _type = SET;
+            }
+        }
+
+        string::size_type idx;
+        while ( ( idx = s.find( ',' ) ) != string::npos ) {
+            _servers.push_back( s.substr( 0 , idx ) );
+            s = s.substr( idx + 1 );
+        }
+        _servers.push_back( s );
+
+    }
+    
+    void ConnectionString::_finishInit() {
+        stringstream ss;
+        if ( _type == SET )
+            ss << _setName << "/";
+        for ( unsigned i=0; i<_servers.size(); i++ ) {
+            if ( i > 0 )
+                ss << ",";
+            ss << _servers[i].toString();
+        }
+        _string = ss.str();
+    }
+
+
     DBClientBase* ConnectionString::connect( string& errmsg ) const {
         switch ( _type ) {
         case MASTER: {

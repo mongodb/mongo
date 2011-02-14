@@ -161,6 +161,22 @@ namespace ClientTests {
             ASSERT( db.runCommand( "unittests", BSON( "collstats" << "clienttests.create" ), info ) );
         }
     };
+    
+    class ConnectionStringTests {
+    public:
+        void run() {
+            {
+                ConnectionString s( "a/b,c,d" , ConnectionString::SET );
+                ASSERT_EQUALS( ConnectionString::SET , s.type() );
+                ASSERT_EQUALS( "a" , s.getSetName() );
+                vector<HostAndPort> v = s.getServers();
+                ASSERT_EQUALS( 3U , v.size() );
+                ASSERT_EQUALS( "b" , v[0].host() );
+                ASSERT_EQUALS( "c" , v[1].host() );
+                ASSERT_EQUALS( "d" , v[2].host() );
+            }
+        }
+    };
 
     class All : public Suite {
     public:
@@ -174,6 +190,7 @@ namespace ClientTests {
             add<CS_10>();
             add<PushBack>();
             add<Create>();
+            add<ConnectionStringTests>();
         }
 
     } all;
