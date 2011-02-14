@@ -34,8 +34,21 @@ namespace mongo {
     // global background job responsible for checking every X amount of time
     class ReplicaSetMonitorWatcher : public BackgroundJob {
     public:
-        virtual string name() const { return "ReplicaSetMonitorWatcher"; }
+        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") {}
 
+        virtual string name() const { return "ReplicaSetMonitorWatcher"; }
+        
+        void safeGo() {
+            // check outside of lock for speed
+            if ( getState() == BackgroundJob::Running )
+                return;
+            
+            scoped_lock lk( _safego );
+            if ( getState() == BackgroundJob::Running )
+                return;
+            
+            go();
+        }
     protected:
         void run() {
             while ( ! inShutdown() ) {
@@ -48,6 +61,8 @@ namespace mongo {
                 }
             }
         }
+
+        mongo::mutex _safego;
 
     } replicaSetMonitorWatcher;
 
@@ -93,8 +108,7 @@ namespace mongo {
         if ( ! m )
             m.reset( new ReplicaSetMonitor( name , servers ) );
 
-        if ( replicaSetMonitorWatcher.getState() == BackgroundJob::NotStarted )
-            replicaSetMonitorWatcher.go();
+        replicaSetMonitorWatcher.safeGo();
 
         return m;
     }
