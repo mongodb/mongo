@@ -266,6 +266,7 @@ namespace mongo {
                 hn = m->h().toString();
                 if (m->hbinfo().up() && m->state().readable() &&
                         (m->hbinfo().opTime > lastOpTimeWritten) &&
+                        m->config().slaveDelay == 0 &&
                         _getOplogReader(r, hn)) {
                     target = m;
                     break;
