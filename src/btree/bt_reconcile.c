@@ -957,7 +957,7 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	 *
 	 * Threads binarily searching the tree (for example, threads retrieving
 	 * or storing key/data pairs) are a harder problem.  Imagine a thread
-	 * ending up on an deleted page entry, in other words, a thread getting
+	 * ending up on a deleted page entry, in other words, a thread getting
 	 * the WT_PAGE_DELETED error returned from the page-get function while
 	 * descending the tree.
 	 *
@@ -992,7 +992,7 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	 * on future searches.
 	 *
 	 * If there's no entry at all, either smaller or larger (that is, the
-	 * parent no longer references any valid entries at all, it gets hard).
+	 * parent no longer references any valid entries at all), it gets hard.
 	 * In that case, we can't fix our writer's position: our writer is in
 	 * the wrong part of the tree, a section of the tree being discarded.
 	 * In this case, we return the WT_RESTART error up the call stack and
@@ -1007,7 +1007,7 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	 *
 	 * First, we have to repeat this check all the way up the tree, until
 	 * we reach the root or a page that has non-deleted entries.  In other
-	 * words, deleting our parent it our parent's parent page might just
+	 * words, deleting our parent in our parent's parent page might just
 	 * result in another page in our search path without any valid entries,
 	 * and its the existence of a page of deleted references that results
 	 * in the infinite loop.
