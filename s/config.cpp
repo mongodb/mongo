@@ -448,7 +448,7 @@ namespace mongo {
 
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
-        _primary.setAddress( fullString , true );
+        _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
         log(1) << " config string : " << fullString << endl;
 
         return true;

@@ -114,13 +114,12 @@ namespace mongo {
             return i->second;
         }
 
-        void set( const string& name , const string& addr , bool setName = true , bool setAddr = true ) {
-            Shard s(name,addr);
+        void set( const string& name , const Shard& s , bool setName = true , bool setAddr = true ) {
             scoped_lock lk( _mutex );
             if ( setName )
                 _lookup[name] = s;
             if ( setAddr )
-                _lookup[addr] = s;
+	        _lookup[s.getConnString()] = s;
         }
         
         void remove( const string& name ) {
@@ -180,27 +179,36 @@ namespace mongo {
         _addr = addr;
         if ( _addr.size() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
-            if ( _cs.type() == ConnectionString::SET ) {
-                string x = _cs.getSetName();
-                if ( x.size() == 0 )
-                    x = _name;
-                _rs = ReplicaSetMonitor::get( x , _cs.getServers() );
-            }
-        }
+	    _rsInit();
+	}
     }
 
-    void Shard::setAddress( const string& addr , bool authoritative ) {
+    void Shard::_rsInit() {
+      if ( _cs.type() == ConnectionString::SET ) {
+	string x = _cs.getSetName();
+	if ( x.size() == 0 ) {
+	  warning() << "no set name for shard: " << _name << " " << _cs.toString() << endl;
+	}
+	assert( x.size() );
+	_rs = ReplicaSetMonitor::get( x , _cs.getServers() );
+      }
+    }
+
+    void Shard::setAddress( const ConnectionString& cs) {
         assert( _name.size() );
-        _setAddr( addr );
-        if ( authoritative )
-            staticShardInfo.set( _name , _addr , true , false );
+	_addr = cs.toString();
+	_cs = cs;
+	_rsInit();
+	staticShardInfo.set( _name , *this , true , false );
     }
 
     void Shard::reset( const string& ident ) {
         const Shard& s = staticShardInfo.find( ident );
         uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
-        _setAddr( s._addr );
+	_addr = s._addr;
+	_cs = s._cs;
+	_rsInit();
         _maxSize = s._maxSize;
         _isDraining = s._isDraining;
     }

@@ -67,7 +67,7 @@ namespace mongo {
          */
         void reset( const string& ident );
 
-        void setAddress( const string& addr , bool authoritative = false );
+        void setAddress( const ConnectionString& cs );
 
         string getName() const {
             assert( _name.size() );
@@ -159,6 +159,7 @@ namespace mongo {
         
     private:
         
+	void _rsInit();
         void _setAddr( const string& addr );
         
         string    _name;
