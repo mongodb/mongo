@@ -59,8 +59,10 @@ namespace mongo {
         return s;
     }
 
-    void distLockPingThread( ConnectionString addr ) {
+    void _distLockPingThread( ConnectionString addr ) {
         setThreadName( "LockPinger" );
+        
+        log() << "creating dist lock ping thread for: " << addr << endl;
 
         static int loops = 0;
         while( ! inShutdown() ) {
@@ -78,8 +80,8 @@ namespace mongo {
                               true );
                 string err = conn->getLastError();
                 if ( ! err.empty() ) {
-                    log( LL_WARNING ) << "dist_lock process: " << process << " pinging: " << addr << " failed: "
-                                      << err << endl;
+                    warning() << "dist_lock process: " << process << " pinging: " << addr << " failed: "
+                              << err << endl;
                     conn.done();
                     sleepsecs(30);
                     continue;
@@ -102,8 +104,8 @@ namespace mongo {
                 conn->remove( lockPingNS , BSON( "_id" << BSON( "$nin" << pids ) << "ping" << LT << fourDays ) );
                 err = conn->getLastError();
                 if ( ! err.empty() ) {
-                    log ( LL_WARNING ) << "dist_lock cleanup request from process: " << process << " to: " << addr
-                                       << " failed: " << err << endl;
+                    warning() << "dist_lock cleanup request from process: " << process << " to: " << addr
+                              << " failed: " << err << endl;
                     conn.done();
                     sleepsecs(30);
                     continue;
@@ -117,13 +119,26 @@ namespace mongo {
                 conn.done();
             }
             catch ( std::exception& e ) {
-                log( LL_WARNING ) << "dist_lock exception during ping: " << e.what() << endl;
+                warning() << "dist_lock exception during ping: " << e.what() << endl;
             }
 
-            log(4) << "dist_lock pinged successfully for: " << process << endl;
+            log( loops % 10 == 0 ? 0 : 1) << "dist_lock pinged successfully for: " << process << endl;
             sleepsecs(30);
         }
     }
+
+    void distLockPingThread( ConnectionString addr ) {
+        try {
+            _distLockPingThread( addr );
+        }
+        catch ( std::exception& e ) {
+            error() << "unexpected error in distLockPingThread: " << e.what() << endl;
+        }
+        catch ( ... ) {
+            error() << "unexpected unknown error in distLockPingThread" << endl;
+        }
+    }
+
 
     class DistributedLockPinger {
     public:
