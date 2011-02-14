@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page packing Packing and Unpacking Data
 
 The tables we have seen so far have all had simple key/value pairs for records.

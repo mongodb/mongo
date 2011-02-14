@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*!
 @example ex_hello.c
 This is an example of how to create and open a database.

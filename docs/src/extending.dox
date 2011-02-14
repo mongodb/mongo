@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page extending Extending WiredTiger
 
 - must be in C/C++

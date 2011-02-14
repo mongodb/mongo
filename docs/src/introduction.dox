@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @mainpage Reference Guide
 
 The WiredTiger Data Store is an extensible platform for data management.  This documentation describes the programming interface to WiredTiger used by developers to construct applications.

@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page cursors Cursors
 
 Most common operations in WiredTiger are performed using cursors.  A cursor includes:

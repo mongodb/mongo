@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page design WiredTiger Design
 
 @todo rewrite this to describe the WiredTiger architecture with minimal discussion of Berkeley DB.

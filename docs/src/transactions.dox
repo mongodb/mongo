@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page transactions Transactions
 
 Note: the initial release of WiredTiger does not include support for transactions.  This page describes the behavior of a future release.

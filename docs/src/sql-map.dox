@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! \page sql_mapping Mapping SQL onto the WiredTiger API
 
 @todo decide whether to keep this page, if so, fill it out

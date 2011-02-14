@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page using Using WiredTiger
 
 This section explains how to use WiredTiger by developing a sequence of example programs:

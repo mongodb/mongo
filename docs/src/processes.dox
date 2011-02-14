@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page processes Sharing Between Processes
 
 WiredTiger includes a server that provides remote access to databases.  The primary process to open a database can optionally start a server that handles requests from other processes.

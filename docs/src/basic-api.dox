@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page basic_api Getting Started with the API
 
 WiredTiger applications will generally use the following classes to access and manage data:

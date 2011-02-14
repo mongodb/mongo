@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page tuning Performance Tuning
 
 - Performance monitoring with statistics

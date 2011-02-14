@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*! @page architecture WiredTiger Architecture
 
 @todo explain the architecture

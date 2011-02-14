@@ -1,5 +1,3 @@
-/* vim: set filetype=c.doxygen : */
-
 /*!
  * @defgroup bdbmap WiredTiger for Berkeley DB developers
  *
