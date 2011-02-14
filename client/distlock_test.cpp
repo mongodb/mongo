@@ -37,37 +37,55 @@ namespace mongo {
             for ( int i=0; i<1000; i++ ) {
                 if ( current->lock_try( "test" ) ) {
                     gotit++;
+                    int before = count;
                     for ( int j=0; j<2000; j++ ) {
                         count++;
+                        if ( j % 1000 == 0 ) {
+                            //sleepmillis(1);
+                        }
                     }
+                    int after = count;
+                    if ( before + 2000 != after ) {
+                        errors++;
+                        error() << " before: " << before << " after: " << after << endl;
+                    }
+                        
                     current->unlock();
                 }
             }
         }
-
+        
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            Timer t;
             DistributedLock lk( ConnectionString( cmdObj["host"].String() , ConnectionString::SYNC ), "testdistlockwithsync" );
             current = &lk;
             count = 0;
             gotit = 0;
+            errors = 0;
 
             vector<shared_ptr<boost::thread> > l;
             for ( int i=0; i<4; i++ ) {
                 l.push_back( shared_ptr<boost::thread>( new boost::thread( runThread ) ) );
             }
-
+            
             for ( unsigned i=0; i<l.size(); i++ )
                 l[i]->join();
 
+            current = 0;
+
             result.append( "count" , count );
             result.append( "gotit" , gotit );
-            current = 0;
-            return count == gotit * 2000;
-        }
+            result.append( "errors" , errors );
+            result.append( "timeMS" , t.millis() );
 
+            return count == gotit * 2000 && errors == 0;
+        }
+        
+        // variables for test
         static DistributedLock * current;
         static int count;
         static int gotit;
+        static int errors;
 
     } testDistLockWithSyncCmd;
 
@@ -75,6 +93,7 @@ namespace mongo {
     DistributedLock * TestDistLockWithSync::current;
     int TestDistLockWithSync::count;
     int TestDistLockWithSync::gotit;
+    int TestDistLockWithSync::errors;
 
 
 }
