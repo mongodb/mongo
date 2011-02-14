@@ -34,19 +34,20 @@ namespace mongo {
     // global background job responsible for checking every X amount of time
     class ReplicaSetMonitorWatcher : public BackgroundJob {
     public:
-        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") {}
+        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") , _started(false) {}
 
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
         
         void safeGo() {
             // check outside of lock for speed
-            if ( getState() == BackgroundJob::Running )
+            if ( _started )
                 return;
             
             scoped_lock lk( _safego );
-            if ( getState() == BackgroundJob::Running )
+            if ( _started )
                 return;
-            
+            _started = true;
+
             go();
         }
     protected:
@@ -63,6 +64,7 @@ namespace mongo {
         }
 
         mongo::mutex _safego;
+        bool _started;
 
     } replicaSetMonitorWatcher;
 
