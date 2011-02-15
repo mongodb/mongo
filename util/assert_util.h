@@ -149,6 +149,10 @@ namespace mongo {
 #define MONGO_uassert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
 #define uassert MONGO_uassert
 
+    /* user assert with helpful message handling */
+#define MONGO_uassert_msg(msgid, msg, expr) { if(!(expr)){ stringstream ss; ss << msg; mongo::uasserted(msgid, ss.str()); } }
+#define uassert_msg MONGO_uassert_msg
+
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
 #define wassert MONGO_wassert
@@ -210,3 +214,16 @@ namespace mongo {
     } catch ( ... ) { \
         problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << endl; \
     }
+
+    /* Some useful utility defines, allowing more concise exception handling */
+#define MONGO_throw_exception(code, type, msg) { stringstream ss; ss << msg; throw type(ss.str().c_str(), code); }
+#define m_throw_exception MONGO_throw_exception
+
+#define MONGO_caused_by(e) ( string("\n  caused by : ") + e.toString() )
+#define m_caused_by MONGO_caused_by
+
+#define MONGO_error_message(e) ( string("\n  error message : ") + e )
+#define m_error_message MONGO_error_message
+
+#define MONGO_chain_exception(code, e, type, msg) { stringstream ss; ss << msg; ss << MONGO_caused_by(e); throw type(ss.str().c_str(), code); }
+#define m_chain_exception MONGO_chain_exception

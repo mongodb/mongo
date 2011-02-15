@@ -697,9 +697,18 @@ namespace mongo {
 
             // 2.
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
-            dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
+            dist_lock_try dlk;
+
+            try{
+            	dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
+            }
+            catch( LockException& e ){
+            	errmsg = string("Error locking distributed lock for migration.") + m_caused_by(e);
+            	return false;
+            }
+
             if ( ! dlk.got() ) {
-                errmsg = "the collection's metadata lock is taken";
+                errmsg = "The collection's metadata lock is already taken.";
                 result.append( "who" , dlk.other() );
                 return false;
             }

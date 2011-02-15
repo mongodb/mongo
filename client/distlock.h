@@ -23,7 +23,41 @@
 #include "redef_macros.h"
 #include "syncclusterconnection.h"
 
+#define LOCK_LOG_LEVEL 0
+#define LLL LOCK_LOG_LEVEL
+
+#define LOCK_TIMEOUT (15 * 60 * 1000)
+#define LOCK_SKEW_FACTOR (30)
+#define LOCK_PING (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
+#define MAX_LOCK_NET_SKEW (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
+#define MAX_LOCK_CLOCK_SKEW (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
+#define NUM_LOCK_SKEW_CHECKS (3)
+
+// The maximum clock skew we need to handle between config servers is
+// 2 * MAX_LOCK_NET_SKEW + MAX_LOCK_CLOCK_SKEW.
+
+// Net effect of *this* clock being slow is effectively a multiplier on the max net skew
+// and a linear increase or decrease of the max clock skew.
+
 namespace mongo {
+
+    /**
+     * Exception class to encapsulate exceptions while managing distributed locks
+     */
+    class LockException : public DBException {
+    public:
+	LockException( const char * msg , int code ) : DBException(msg, code) {}
+	virtual ~LockException() throw() { }
+    };
+
+    /**
+     * Indicates an error in retrieving time values from remote servers.
+     */
+    class TimeNotFoundException : public LockException {
+    public:
+        TimeNotFoundException( const char * msg , int code ) : LockException(msg, code) {}
+        virtual ~TimeNotFoundException() throw() { }
+    };
 
     /**
      * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task must be identified by a
@@ -42,9 +76,13 @@ namespace mongo {
          *
          * @param conn address of config(s) server(s)
          * @param name identifier for the lock
-         * @param takeoverMinutes how long can the log go "unpinged" before a new attempt to lock steals it (in minutes)
+         * @param lockTimeout how long can the log go "unpinged" before a new attempt to lock steals it (in minutes).
+         * @param lockPing how long to wait between lock pings
+         * @param legacy use legacy logic
+         *
          */
-        DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 15 );
+        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false, bool legacy = false);
+        ~DistributedLock(){};
 
         /**
          * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
@@ -61,17 +99,75 @@ namespace mongo {
          */
         void unlock();
 
+
+        Date_t getRemoteTime();
+
+        bool isRemoteTimeSkewed();
+
+        const string& getProcessId();
+
+        const ConnectionString& getRemoteConnection();
+
+        /**
+         * Check the skew between a cluster of servers
+         */
+        static bool checkSkew( const ConnectionString& cluster, unsigned skewChecks = NUM_LOCK_SKEW_CHECKS, unsigned long long maxClockSkew = MAX_LOCK_CLOCK_SKEW, unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
+
+        /**
+         * Get the remote time from a server or cluster
+         */
+        static Date_t remoteTime( const ConnectionString& cluster, unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
+
+        static bool killPinger( DistributedLock& lock );
+
+        /**
+         * Namespace for lock pings
+         */
+        static const string lockPingNS;
+
+        /**
+         * Namespace for locks
+         */
+        static const string locksNS;
+
     private:
         ConnectionString _conn;
         string _name;
-        unsigned _takeoverMinutes;
-
+        // TODO:  This shouldn't be a field, just constant?
         string _ns;
         BSONObj _id;
+
+        // Timeout for lock, usually LOCK_TIMEOUT
+        unsigned long long _lockTimeout;
+        // Deprecated
+        unsigned _takeoverMinutes;
+        unsigned long long _maxClockSkew;
+        unsigned long long _maxNetSkew;
+        unsigned long long _lockPing;
+
+        // Data from last check of process with ping time
+        boost::tuple<string, Date_t, Date_t> _lastPingCheck;
+
+        // Process id, in case we need to customize this
+        string _processId;
+        // May or may not exist, depending on startup
+        boost::thread::id _threadId;
+
     };
+
 
     class dist_lock_try {
     public:
+
+    	dist_lock_try() : _lock(NULL), _got(false) {}
+
+    	// Needed so we can handle lock exceptions in context of lock try.
+    	dist_lock_try( const dist_lock_try& that) : _lock(that._lock), _got(that._got), _other(that._other) {
+    		// Make sure the lock ownership passes to this object,
+    		// so we only unlock once.
+    		((dist_lock_try&) that)._got = false;
+    	}
+
         dist_lock_try( DistributedLock * lock , string why )
             : _lock(lock) {
             _got = _lock->lock_try( why , &_other );

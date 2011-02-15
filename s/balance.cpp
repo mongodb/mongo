@@ -267,7 +267,7 @@ namespace mongo {
             break;
         }
 
-        // getConnectioString and the constructor of a DistributedLock do not throw, which is what we expect on while
+        // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
         ConnectionString config = configServer.getConnectionString();
         DistributedLock balanceLock( config , "balancer" );
@@ -329,6 +329,7 @@ namespace mongo {
                 continue;
             }
         }
+
     }
 
 }  // namespace mongo

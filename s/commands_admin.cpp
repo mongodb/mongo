@@ -203,7 +203,6 @@ namespace mongo {
             MoveDatabasePrimaryCommand() : GridAdminCmd("movePrimary") { }
             virtual void help( stringstream& help ) const {
                 help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
-                // TODO: locking?
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string dbname = cmdObj.firstElement().valuestrsafe();
@@ -241,10 +240,23 @@ namespace mongo {
                     return false;
                 }
 
-                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString()
+                log() << "Moving " << dbname << " primary from: " << config->getPrimary().toString()
                       << " to: " << s.toString() << endl;
 
-                // TODO LOCKING: this is not safe with multiple mongos
+                // Locking enabled now...
+		DistributedLock lockSetup( configServer.getConnectionString(), dbname + "-movePrimary" );
+		dist_lock_try dlk;
+
+		// Distributed locking added.
+		try{
+		    dlk = dist_lock_try( &lockSetup , string("Moving primary shard of ") + dbname );
+		}
+		catch( LockException& e ){
+		    errmsg = string("Error locking distributed lock to move primary shard of ") + dbname + m_caused_by(e);
+		    warning() << errmsg << endl;
+		    return false;
+		}
+
 
                 ScopedDbConnection toconn( s.getConnString() );
 

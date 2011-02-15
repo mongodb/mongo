@@ -571,7 +571,16 @@ namespace mongo {
             //
 
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC) , ns );
-            dist_lock_try dlk( &lockSetup, string("split-") + min.toString() );
+            dist_lock_try dlk;
+
+            try{
+            	dlk = dist_lock_try( &lockSetup, string("split-") + min.toString() );
+            }
+            catch( LockException& e ){
+            	errmsg = string("Error locking distributed lock for split.") + m_caused_by(e);
+            	return false;
+            }
+
             if ( ! dlk.got() ) {
                 errmsg = "the collection's metadata lock is taken";
                 result.append( "who" , dlk.other() );

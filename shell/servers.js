@@ -329,6 +329,19 @@ ShardingTest.prototype.getOther = function( one ){
     return this._connections[0];
 }
 
+ShardingTest.prototype.getAnother = function( one ){
+    if(this._connections.length < 2)
+    	throw "getAnother() only works with multiple servers";
+	
+	if ( one._mongo )
+        one = one._mongo
+    
+    for(var i = 0; i < this._connections.length; i++){
+    	if(this._connections[i] == one)
+    		return this._connections[(i + 1) % this._connections.length];
+    }
+}
+
 ShardingTest.prototype.getFirstOther = function( one ){
     for ( var i=0; i<this._connections.length; i++ ){
         if ( this._connections[i] != one )

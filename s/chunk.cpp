@@ -824,7 +824,14 @@ namespace mongo {
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
 
-        dist_lock_try dlk( &_nsLock  , "drop" );
+        dist_lock_try dlk;
+        try{
+        	dlk = dist_lock_try( &_nsLock  , "drop" );
+        }
+        catch( LockException& e ){
+        	uassert_msg( 70008, "Error locking distributed lock for chunk drop." << m_caused_by(e), false);
+        }
+
         uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
 
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
