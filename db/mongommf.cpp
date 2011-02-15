@@ -97,7 +97,7 @@ namespace mongo {
             size_t x = (size_t) m;
             if( x % MemoryMappedFile::ChunkSize == 0 ) {
                 void *end = (void*) (x+_len);
-                log() << "mapaligned " << m << '-' << end << " len:" << _len << endl;
+                DEV log() << "mapaligned " << m << '-' << end << " len:" << _len << endl;
                 return m;
             }
 
@@ -137,7 +137,6 @@ namespace mongo {
 
         unmapped(oldPrivateAddr);
 
-        cout << "unmapping " << oldPrivateAddr << ' ' << len << endl;
         bool ok = UnmapViewOfFile(oldPrivateAddr);
         assert(ok);
 
