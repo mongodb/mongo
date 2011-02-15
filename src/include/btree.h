@@ -745,7 +745,7 @@ struct __wt_item {
  *
  * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
  * -- Variable-length duplicate key and offpage-reference pairs (a
- *    WT_ITEM_KEY_DUP or WT_ITEM_DATA_DUPKEY_OVFL item followed by a
+ *    WT_ITEM_KEY_DUP or WT_ITEM_KEY_DUP_OVFL item followed by a
  *    WT_ITEM_OFF item).
  *
  * WT_PAGE_DUP_LEAF (row-store offpage duplicates leaf pages):
