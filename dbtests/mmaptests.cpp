@@ -52,6 +52,8 @@ namespace MMapTests {
                     char *p = (char *) f.getView();
                     assert(p);
                     // write something to the private view as a test
+                    if( cmdLine.dur ) 
+                        MemoryMappedFile::makeWritable(p, 6);
                     strcpy(p, "hello");
                 }
                 if( cmdLine.dur ) {
@@ -81,6 +83,8 @@ namespace MMapTests {
                 {
                     char *p = (char *) f.getView();
                     assert(p);
+                    if( cmdLine.dur ) 
+                        MemoryMappedFile::makeWritable(p, 4);
                     strcpy(p, "zzz");
                 }
                 if( cmdLine.dur ) {

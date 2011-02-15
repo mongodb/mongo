@@ -21,6 +21,7 @@
 #include "taskqueue.h"
 
 namespace mongo {
+
     namespace dur {
 
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
@@ -144,6 +145,8 @@ namespace mongo {
             DEV dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
             if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
+                MemoryMappedFile::makeWritable(p, len);
+
                 if( !_hasWritten ) {
                     // you can't be writing if one of these is pending, so this is a verification.
                     assert( !dbMutex._remapPrivateViewRequested );
@@ -183,8 +186,8 @@ namespace mongo {
                 assert(  _wi._writes.size() < 20000000 );
 
                 {
-                    // a bit over conservative
-                    static size_t lastPos;
+                    // a bit over conservative in counting pagebytes used
+                    static size_t lastPos; // note this doesn't reset with each commit, but that is ok we aren't being that precise
                     size_t x = ((size_t) p) & ~0xfff; // round off to page address (4KB)
                     if( x != lastPos ) { 
                         lastPos = x;

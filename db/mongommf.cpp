@@ -31,6 +31,131 @@ using namespace mongoutils;
 
 namespace mongo {
 
+#if defined(_WIN32)
+    extern mutex mapViewMutex;
+
+    __declspec(noinline) void makeChunkWritable(size_t chunkno) { 
+        scoped_lock lk(mapViewMutex);
+
+        if( writable.get(chunkno) )
+            return;
+
+        size_t loc = chunkno * MemoryMappedFile::ChunkSize;
+        void *Loc = (void*) loc;
+        size_t ofs;
+        MongoMMF *mmf = privateViews.find( (void *) (loc), ofs );
+        MemoryMappedFile *f = (MemoryMappedFile*) mmf;
+        assert(f);
+
+        size_t len = MemoryMappedFile::ChunkSize;
+        assert( mmf->getView() <= Loc );
+        if( ofs + len > f->length() ) {
+            // at the very end of the map
+            len = f->length() - ofs;
+        }
+        else { 
+            ;
+        }
+
+        // todo: check this goes away on remap
+        DWORD old;
+        bool ok = VirtualProtect(Loc, len, PAGE_WRITECOPY, &old);
+        if( !ok ) {
+            DWORD e = GetLastError();
+            cout << "virtualprotect " << Loc << ' ' << len << ' ' << e << endl;
+            assert(false);
+        }
+
+        writable.set(chunkno);
+    }
+
+    // align so that there is only one map per chunksize so our bitset works right
+    void* mapaligned(HANDLE h, unsigned long long _len) {
+        void *loc = 0;
+        int n = 0;
+        while( 1 ) { 
+            n++;
+            void *m = MapViewOfFileEx(h, FILE_MAP_READ, 0, 0, 0, loc);
+            if( m == 0 ) {
+                DWORD e = GetLastError();
+                if( n == 0 ) { 
+                    // if first fails, it isn't going to work
+                    log() << "mapaligned errno: " << e << endl;
+                    break;
+                }
+                if( debug && n == 1 ) { 
+                    log() << "mapaligned info e:" << e << " at n=1" << endl;
+                }
+                if( n > 98 ) {
+                    log() << "couldn't align mapped view of file len:" << _len/1024.0/1024.0 << "MB errno:" << e << endl;
+                    break;
+                }
+                loc = (void*) (((size_t)loc)+MemoryMappedFile::ChunkSize);
+                continue;
+            }
+
+            size_t x = (size_t) m;
+            if( x % MemoryMappedFile::ChunkSize == 0 ) {
+                void *end = (void*) (x+_len);
+                log() << "mapaligned " << m << '-' << end << " len:" << _len << endl;
+                return m;
+            }
+
+            UnmapViewOfFile(m);
+            x = ((x+MemoryMappedFile::ChunkSize-1) / MemoryMappedFile::ChunkSize) * MemoryMappedFile::ChunkSize;
+            loc = (void*) x;
+            if( n % 20 == 0 ) { 
+                log() << "warning mapaligned n=20" << endl;
+            }
+            if( n > 100 ) {
+                log() << "couldn't align mapped view of file len:" << _len/1024.0/1024.0 << "MB" << endl;
+                break;
+            }
+        }
+        return 0;
+    }
+
+    void* MemoryMappedFile::createPrivateMap() {
+        assert( maphandle );
+        scoped_lock lk(mapViewMutex);
+        void *p = mapaligned(maphandle, len);
+        if ( p == 0 ) {
+            DWORD e = GetLastError();
+            log() << "createPrivateMap failed " << filename() << " " << errnoWithDescription(e) << endl;
+        }
+        else {
+            views.push_back(p);
+        }
+        return p;
+    }
+
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        // the mutex is to assure we get the same address on the remap
+        dbMutex.assertWriteLocked();
+
+        scoped_lock lk(mapViewMutex);
+
+        unmapped(oldPrivateAddr);
+
+        cout << "unmapping " << oldPrivateAddr << ' ' << len << endl;
+        bool ok = UnmapViewOfFile(oldPrivateAddr);
+        assert(ok);
+
+        // we want the new address to be the same as the old address in case things keep pointers around (as namespaceindex does).
+        void *p = MapViewOfFileEx(maphandle, FILE_MAP_READ, 0, 0,
+                                  /*dwNumberOfBytesToMap 0 means to eof*/0 /*len*/,
+                                  oldPrivateAddr);
+        
+        if ( p == 0 ) {
+            DWORD e = GetLastError();
+            log() << "MapViewOfFileEx failed " << filename() << " " << errnoWithDescription(e) << endl;
+            assert(p);
+        }
+        assert(p == oldPrivateAddr);
+        return p;
+    }
+#endif
+
     void MongoMMF::remapThePrivateView() {
         assert( cmdLine.dur );
 
@@ -183,7 +308,9 @@ namespace mongo {
         if( _view_write ) {
             if( cmdLine.dur ) {
                 _view_private = createPrivateMap();
-                massert( 13636 , "createPrivateMap failed (look in log for error)" , _view_private );
+                if( _view_private == 0 ) {
+                    massert( 13636 , "createPrivateMap failed (look in log for error)" , false );
+                }
                 privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
             else {

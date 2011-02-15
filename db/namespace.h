@@ -293,7 +293,9 @@ namespace mongo {
          */
         IndexDetails& addIndex(const char *thisns, bool resetTransient=true);
 
-        void aboutToDeleteAnIndex() { flags &= ~Flag_HaveIdIndex;  }
+        void aboutToDeleteAnIndex() { 
+            *getDur().writing(&flags) = flags & ~Flag_HaveIdIndex;
+        }
 
         /* returns index of the first index in which the field is present. -1 if not present. */
         int fieldIsIndexed(const char *fieldName);

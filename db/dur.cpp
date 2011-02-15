@@ -123,10 +123,13 @@ namespace mongo {
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
+            MemoryMappedFile::makeWritable(dst, len);
+
             // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
             //
             // this also makes setNoJournal threadsafe, which is good as we call it from a read (not a write) lock 
             // in class SlaveTracking
+            //
             scoped_lock lk( privateViews._mutex() );
             size_t ofs;
             MongoMMF *f = privateViews.find_inlock(dst, ofs);

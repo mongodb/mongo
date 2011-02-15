@@ -19,10 +19,21 @@
 #include "mmap.h"
 #include "text.h"
 #include <windows.h>
+#include "../db/mongommf.h"
+#include "../db/concurrency.h"
 
 namespace mongo {
 
     mutex mapViewMutex("mapView");
+    ourbitset writable;
+
+    /** notification on unmapping so we can clear writable bits */
+    void MemoryMappedFile::unmapped(void *p) {
+        for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
+            writable.clear(i);
+            assert( !writable.get(i) );
+        }
+    }
 
     MemoryMappedFile::MemoryMappedFile()
         : _flushMutex(new mutex("flushMutex")) {
@@ -34,6 +45,7 @@ namespace mongo {
 
     void MemoryMappedFile::close() {
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
+            unmapped(*i);
             UnmapViewOfFile(*i);
         }
         views.clear();
@@ -46,41 +58,6 @@ namespace mongo {
     }
 
     unsigned long long mapped = 0;
-
-    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        // the mutex is to assure we get the same address on the remap
-        scoped_lock lk(mapViewMutex);
-
-        bool ok = UnmapViewOfFile(oldPrivateAddr);
-        assert(ok);
-
-        // we want the new address to be the same as the old address in case things keep pointers around (as namespaceindex does).
-        void *p = MapViewOfFileEx(maphandle, FILE_MAP_COPY, 0, 0,
-                                  /*dwNumberOfBytesToMap 0 means to eof*/0 /*len*/,
-                                  oldPrivateAddr);
-        
-        if ( p == 0 ) {
-            DWORD e = GetLastError();
-            log() << "MapViewOfFileEx failed " << filename() << " " << errnoWithDescription(e) << endl;
-            assert(p);
-        }
-        assert(p == oldPrivateAddr);
-        return p;
-    }
-
-    void* MemoryMappedFile::createPrivateMap() {
-        assert( maphandle );
-        scoped_lock lk(mapViewMutex);
-        void *p = MapViewOfFile(maphandle, FILE_MAP_COPY, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
-        if ( p == 0 ) {
-            DWORD e = GetLastError();
-            log() << "createPrivateMap failed " << filename() << " " << errnoWithDescription(e) << endl;
-        }
-        else {
-            views.push_back(p);
-        }
-        return p;
-    }
 
     void* MemoryMappedFile::createReadOnlyMap() {
         assert( maphandle );
