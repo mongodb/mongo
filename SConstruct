@@ -378,10 +378,18 @@ for x in os.listdir( "db/modules/" ):
     print( "adding module: " + x )
     moduleNames.append( x )
     modRoot = "db/modules/" + x + "/"
-    serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
+
     modBuildFile = modRoot + "build.py"
+    myModule = None
     if os.path.exists( modBuildFile ):
-        modules += [ imp.load_module( "module_" + x , open( modBuildFile , "r" ) , modBuildFile , ( ".py" , "r" , imp.PY_SOURCE  ) ) ]
+        myModule = imp.load_module( "module_" + x , open( modBuildFile , "r" ) , modBuildFile , ( ".py" , "r" , imp.PY_SOURCE  ) )
+        modules.append( myModule )
+        
+    if myModule and "customIncludes" in dir(myModule) and myModule.customIncludes:
+        pass
+    else:
+        serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
+
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
@@ -867,7 +875,10 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     removeIfInList( myenv["LIBS"] , "wpcap" )
 
     for m in modules:
-        m.configure( conf , myenv )
+        if "customIncludes" in dir(m) and m.customIncludes:
+            m.configure( conf , myenv , serverOnlyFiles )
+        else:
+            m.configure( conf , myenv )
 
     # XP_* is for spidermonkey.
     # this is outside of usesm block so don't have to rebuild for java
