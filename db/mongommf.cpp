@@ -62,7 +62,7 @@ namespace mongo {
         bool ok = VirtualProtect(Loc, len, PAGE_WRITECOPY, &old);
         if( !ok ) {
             DWORD e = GetLastError();
-            cout << "virtualprotect " << Loc << ' ' << len << ' ' << e << endl;
+            log() << "VirtualProtect failed " << Loc << ' ' << len << ' ' << errnoWithDescription(e) << endl;
             assert(false);
         }
 
@@ -137,8 +137,11 @@ namespace mongo {
 
         unmapped(oldPrivateAddr);
 
-        bool ok = UnmapViewOfFile(oldPrivateAddr);
-        assert(ok);
+        if( !UnmapViewOfFile(oldPrivateAddr) ) {
+            DWORD e = GetLastError();
+            log() << "UnMapViewOfFile failed " << filename() << ' ' << errnoWithDescription(e) << endl;
+            assert(false);
+        }
 
         // we want the new address to be the same as the old address in case things keep pointers around (as namespaceindex does).
         void *p = MapViewOfFileEx(maphandle, FILE_MAP_READ, 0, 0,
