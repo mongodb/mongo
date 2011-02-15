@@ -867,60 +867,47 @@ item_vs_page:			__wt_api_db_errx(db,
 				last_item_type = WAS_KEY;
 			break;
 		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_DUP:
-		case WT_ITEM_DATA_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DEL:
 		case WT_ITEM_OFF_RECORD:
-			switch (item_type) {
-			case WT_ITEM_DATA:
-			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_DEL:
-			case WT_ITEM_OFF_RECORD:
-				switch (last_item_type) {
-				case IS_FIRST:
-					goto first_data;
-				case WAS_DATA:
-					__wt_api_db_errx(db,
-					    "item %lu on page at addr %lu is "
-					    "the first of two adjacent data "
-					    "items",
-					    (u_long)item_num - 1, (u_long)addr);
-					return (WT_ERROR);
-				case WAS_DUP_DATA:
-					goto mixed_order;
-				case WAS_KEY:
-					last_item_type = WAS_DATA;
-					break;
-				}
-				break;
-			case WT_ITEM_DATA_DUP:
-			case WT_ITEM_DATA_DUP_OVFL:
-				switch (last_item_type) {
-				case IS_FIRST:
-first_data:				__wt_api_db_errx(db,
-					    "page at addr %lu begins with a "
-					    "data item",
-					    (u_long)addr);
-					return (WT_ERROR);
-				case WAS_DATA:
-mixed_order:				__wt_api_db_errx(db,
-					    "item %lu on page at addr %lu is "
-					    "the first of mixed duplicate and "
-					    "non-duplicate data items",
-					    (u_long)item_num - 1, (u_long)addr);
-					return (WT_ERROR);
-				case WAS_DUP_DATA:
-				case WAS_KEY:
-					last_item_type = WAS_DUP_DATA;
-					break;
-				}
-				break;
-			default:			/* lint */
+			switch (last_item_type) {
+			case IS_FIRST:
+				goto first_data;
+			case WAS_DATA:
+				__wt_api_db_errx(db,
+				    "item %lu on page at addr %lu is "
+				    "the first of two adjacent data "
+				    "items",
+				    (u_long)item_num - 1, (u_long)addr);
+				return (WT_ERROR);
+			case WAS_DUP_DATA:
+				goto mixed_order;
+			case WAS_KEY:
+				last_item_type = WAS_DATA;
 				break;
 			}
 			break;
-		default:				/* lint */
+		case WT_ITEM_DATA_DUP:
+		case WT_ITEM_DATA_DUP_OVFL:
+			switch (last_item_type) {
+			case IS_FIRST:
+first_data:				__wt_api_db_errx(db,
+				    "page at addr %lu begins with a "
+				    "data item",
+				    (u_long)addr);
+				return (WT_ERROR);
+			case WAS_DATA:
+mixed_order:				__wt_api_db_errx(db,
+				    "item %lu on page at addr %lu is "
+				    "the first of mixed duplicate and "
+				    "non-duplicate data items",
+				    (u_long)item_num - 1, (u_long)addr);
+				return (WT_ERROR);
+			case WAS_DUP_DATA:
+			case WAS_KEY:
+				last_item_type = WAS_DUP_DATA;
+				break;
+			}
 			break;
 		}
 
