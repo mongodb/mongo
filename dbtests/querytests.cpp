@@ -1020,6 +1020,8 @@ namespace QueryTests {
         }
 
         void run() {
+            unsigned startNumCursors = ClientCursor::numCursors();
+
             BSONObj info;
             ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "size" << 10000 << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
@@ -1037,6 +1039,8 @@ namespace QueryTests {
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
             }
+
+            ASSERT_EQUALS( startNumCursors, ClientCursor::numCursors() );
         }
 
     private:
