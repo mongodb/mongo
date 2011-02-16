@@ -247,7 +247,7 @@ namespace mongo {
         unsigned a = p/ChunkSize;
         unsigned b = (p+len)/ChunkSize;
         for( unsigned i = a; i <= b; i++ ) {
-            if( !writable.get(a) ) {
+            if( !writable.get(i) ) {
                 makeChunkWritable(i);
             }
         }
