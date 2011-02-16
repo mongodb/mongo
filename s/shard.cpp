@@ -110,7 +110,7 @@ namespace mongo {
 
             scoped_lock lk( _mutex );
             map<string,Shard>::iterator i = _lookup.find( mykey );
-            uassert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
+            massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
             return i->second;
         }
 
@@ -204,7 +204,7 @@ namespace mongo {
 
     void Shard::reset( const string& ident ) {
         const Shard& s = staticShardInfo.find( ident );
-        uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
+        massert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
         _addr = s._addr;
         _cs = s._cs;
