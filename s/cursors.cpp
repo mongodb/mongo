@@ -140,6 +140,7 @@ namespace mongo {
     }
 
     ShardedClientCursorPtr CursorCache::get( long long id ) const {
+        LOG(_myLogLevel) << "CursorCache::get id: " << id << endl;
         scoped_lock lk( _mutex );
         MapSharded::const_iterator i = _cursors.find( id );
         if ( i == _cursors.end() ) {
@@ -151,6 +152,7 @@ namespace mongo {
     }
 
     void CursorCache::store( ShardedClientCursorPtr cursor ) {
+        LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
         assert( cursor->getId() );
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
@@ -161,7 +163,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
         _cursors.erase( id );
     }
-
+    
     void CursorCache::storeRef( const string& server , long long id ) {
         LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
         assert( id );

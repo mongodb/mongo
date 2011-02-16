@@ -60,7 +60,7 @@ namespace mongo {
                     const ServerAndQuery& s = *i;
                     ss << "       " << s.toString() << '\n';
                 }
-                log() << ss.str();
+                log() << ss.str() << endl;
             }
 
             ClusteredCursor * cursor = 0;
