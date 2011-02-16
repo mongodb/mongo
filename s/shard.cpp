@@ -206,9 +206,9 @@ namespace mongo {
         const Shard& s = staticShardInfo.find( ident );
         uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
-	_addr = s._addr;
-	_cs = s._cs;
-	_rsInit();
+        _addr = s._addr;
+        _cs = s._cs;
+        _rsInit();
         _maxSize = s._maxSize;
         _isDraining = s._isDraining;
     }
