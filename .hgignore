@@ -6,11 +6,11 @@
 ^build.*/(ex_.*|lib.*|wt_.*)
 ^build.*/(aclocal\.m4|config\..*|configure|stamp-h1|w.*\.h)
 ^build_posix/gnu-support/(depcomp|install-sh|missing)
-docs/doxygen.log
-docs/html
-docs/java
-docs/latex
-docs/python
+^docs/(doxygen.log|installdox|search)
+^docs/[^/]*\.(css|html|js|png)$
+^docs/java
+^docs/latex
+^docs/python
 src/server/WiredTiger_server
 src/server/gen-py
 /tags$
