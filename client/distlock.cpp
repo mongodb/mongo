@@ -209,6 +209,10 @@ namespace mongo {
 
                 unsigned long long elapsed = jsTime() - lastPing["ping"].Date(); // in ms
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
+                
+                if ( elapsed > ( 60 * 24 * 365 * 100 ) /* 100 years */ ) {
+                    warning() << "distlock elapsed time seems impossible: " << lastPing << endl;
+                }
 
                 if ( elapsed <= _takeoverMinutes ) {
                     log(1) << "dist_lock lock failed because taken by: " << o << " elapsed minutes: " << elapsed << endl;
