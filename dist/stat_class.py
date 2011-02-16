@@ -1,5 +1,3 @@
-# $Id$
-#
 # Auto-generate statistics #defines, with allocation, clear and print functions.
 #
 # The XXX_stats dictionaries are a set of objects consisting of comma-separated

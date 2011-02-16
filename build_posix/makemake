@@ -2,8 +2,6 @@
 #
 # Copyright (c) 2008-2010 WiredTiger, Inc.
 #	All rights reserved.
-#
-# $Id$
 
 # Build Makefile.am
 filelist=../dist/filelist

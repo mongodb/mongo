@@ -14,7 +14,6 @@ cat > $t <<ENDOFTEXT
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
 ENDOFTEXT
 
 check()
@@ -25,9 +24,7 @@ check()
 	fi
 
 	# Check for a correct copyright header.
-	if `sed -e 6q ../$1 | diff - $t > /dev/null` &&
-	    `sed -e 7q -e d ../$1 | \
-	    egrep '^ \* \\$\Id' > /dev/null`; then
+	if `sed -e 5q ../$1 | diff - $t > /dev/null` ; then
 		return;
 	fi
 

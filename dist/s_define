@@ -1,6 +1,4 @@
 #! /bin/sh
-#
-# $Id$
 
 # Complain about unused #defines.
 t=__wt.$$

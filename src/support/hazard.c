@@ -3,8 +3,6 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
  */
 
 #include "wt_internal.h"

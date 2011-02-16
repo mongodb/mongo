@@ -1,5 +1,3 @@
-# $Id$
-
 # Read the api_flags file and output a C header file using the minimum
 # number of distinct bits to ensure flags don't collide.
 #

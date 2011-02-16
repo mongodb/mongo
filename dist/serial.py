@@ -1,5 +1,3 @@
-# $Id$
-
 # Output serialization #defines.
 
 import os

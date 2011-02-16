@@ -1,8 +1,11 @@
-/*
- * ex_cursor.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example demonstrating some cursor types and operations.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_cursor.c
+ *	This is an example demonstrating some cursor types and operations.
  */
 
 #include <stdio.h>

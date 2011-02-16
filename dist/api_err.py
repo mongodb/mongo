@@ -1,5 +1,3 @@
-# $Id$
-
 # Read the api_err file and output C #defines and associated error code.
 
 import re

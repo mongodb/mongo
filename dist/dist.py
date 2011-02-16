@@ -1,5 +1,3 @@
-# $Id$
-
 import filecmp, os, re, shutil
 
 # source_files_list --

@@ -1,9 +1,12 @@
-/*
- * ex_schema.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example application demonstrating how to create and access
- * tables using a schema.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_schema.c
+ *	This is an example application demonstrating how to create and access
+ *	tables using a schema.
  */
 
 #include <stdio.h>

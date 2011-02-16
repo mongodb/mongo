@@ -1,9 +1,12 @@
-/*
- * ex_config.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example demonstrating how to configure various database and table
- * properties.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_config.c
+ *	This is an example demonstrating how to configure various database and
+ *	table properties.
  */
 
 #include <stdio.h>

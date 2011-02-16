@@ -3,8 +3,6 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
  */
 
 struct WT_CURSOR_STD;	typedef struct WT_CURSOR_STD WT_CURSOR_STD;

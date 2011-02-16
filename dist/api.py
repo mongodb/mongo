@@ -1,5 +1,3 @@
-# $Id$
-#
 # Read the api file and output C for the WT_TOC/DB structures, getter/setter
 # functions, and other API initialization.
 

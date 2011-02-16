@@ -1,10 +1,12 @@
-/*
- * ex_access.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example demonstrating how to create and access a simple table.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_access.c
+ * 	demonstrates how to create and access a simple table.
  */
-
 #include <stdio.h>
 #include <string.h>
 

@@ -1,5 +1,3 @@
-# $Id$
-
 # A simple python script to build a file that can be bulk-loaded into a
 # WiredTiger database for smoke-testing.
 

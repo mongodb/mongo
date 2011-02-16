@@ -1,9 +1,15 @@
-/*
- * ex_hello.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example containing a call to every method in the WiredTiger API.
- * It doesn't do anything very useful, just demonstrates how to call each method.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_hello.c
+ *	Containing a call to every method in the WiredTiger API.
+ *
+ *	It doesn't do anything very useful, just demonstrates how to call each
+ *	method.  This file is used to populate the API reference with code
+ *	fragments.
  */
 
 #include <assert.h>

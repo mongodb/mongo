@@ -1,8 +1,11 @@
-/*
- * ex_stat.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example demonstrating how to query a database's statistics.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_stat.c
+ *	This is an example demonstrating how to query a database's statistics.
  */
 
 #include <stdio.h>

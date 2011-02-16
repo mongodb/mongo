@@ -1,7 +1,5 @@
-# Copyright (c) 2008 WiredTiger Software.
+# Copyright (c) 2008-2011 WiredTiger Software.
 #	All rights reserved.
-#
-# $Id$
 
 # AM_SIGNED_TYPES, AM_UNSIGNED_TYPES --
 #	Search standard type names for something of the same size and

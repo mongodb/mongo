@@ -1,5 +1,3 @@
-# $Id$
-
 # Read a memory.out file and output a list of memory errors.
 
 import string, sys

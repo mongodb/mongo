@@ -1,5 +1,3 @@
-# $Id$
-#
 # This file lists all of the errors returned by the WiredTiger library, and is
 # and is processed to create the #defines and the function that lists their
 # associated strings.

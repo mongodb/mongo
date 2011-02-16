@@ -1,5 +1,3 @@
-# $Id$
-
 # Read the source files and output the statistics #defines and allocation code.
 
 import re, string, sys

@@ -3,9 +3,9 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
- *
+ */
+
+/*
  *   Huffman Encoder/Decoder v1.0
  *   Author Brian Pollack <brian@brians.com>
  */

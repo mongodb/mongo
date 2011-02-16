@@ -1,9 +1,12 @@
-/*
- * ex_process.c
- * Copyright (c) 2010 WiredTiger, Inc.  All rights reserved.
+/*-
+ * See the file LICENSE for redistribution information.
  *
- * This is an example demonstrating how to connect to a database from multiple
- * processes.
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * ex_process.c
+ *	This is an example demonstrating how to connect to a database from
+ *	multiple processes.
  */
 
 #include <stdio.h>

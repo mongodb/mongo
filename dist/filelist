@@ -1,7 +1,5 @@
 # filelist --
 #	List of source files for WiredTiger library.
-#
-# $Id$
 
 src/api/api.c
 src/api/cur_std.c

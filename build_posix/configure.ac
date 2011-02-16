@@ -1,4 +1,5 @@
-# $Id$
+# Copyright (c) 2008-2011 WiredTiger Software.
+#	All rights reserved.
 
 PACKAGE=wiredtiger
 AC_INIT(WiredTiger, [__EDIT_WIREDTIGER_VERSION__],

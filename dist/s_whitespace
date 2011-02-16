@@ -1,6 +1,4 @@
 #! /bin/sh
-#
-# $Id$
 
 # Remove trailing whitespace from source files.
 t=__wt.$$

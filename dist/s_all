@@ -1,6 +1,4 @@
 #! /bin/sh
-#
-# $Id$
 
 # Run standard scripts.
 t=__wt.$$

@@ -1,5 +1,3 @@
-# $Id$
-#
 # Auto-generate everything we can:
 #	flag values
 #	getter/setter code

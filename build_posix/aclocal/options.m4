@@ -1,7 +1,5 @@
-# Copyright (c) 2008 WiredTiger Software.
+# Copyright (c) 2008-2011 WiredTiger Software.
 #	All rights reserved.
-#
-# $Id$
 
 # Optional configuration.
 AC_DEFUN([AM_OPTIONS], [
