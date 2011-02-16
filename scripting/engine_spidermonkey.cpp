@@ -1175,6 +1175,7 @@ namespace mongo {
             }
 
             if ( _context ) {
+                // This is expected to reclaim _global as well.
                 JS_DestroyContext( _context );
                 _context = 0;
             }
