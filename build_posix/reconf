@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# Copyright (c) 2008-2010 WiredTiger, Inc.
+# Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 
 t=/tmp/__configure.$$
