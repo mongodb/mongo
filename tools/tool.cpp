@@ -389,7 +389,7 @@ namespace mongo {
         unsigned long long num = 0;
         unsigned long long processed = 0;
 
-        const int BUF_SIZE = 1024 * 1024 * 5;
+        const int BUF_SIZE = BSONObjMaxUserSize + ( 1024 * 1024 );
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 
