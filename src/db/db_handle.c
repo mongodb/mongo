@@ -86,7 +86,7 @@ __wt_idb_config(DB *db)
 	__wt_unlock(env, ienv->mtx);
 
 	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
-	WT_RET(__wt_stat_alloc_database_stats(env, &idb->dstats));
+	WT_RET(__wt_stat_alloc_file_stats(env, &idb->dstats));
 
 	return (0);
 }

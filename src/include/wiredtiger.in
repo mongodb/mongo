@@ -957,11 +957,11 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 /*! non-specific WiredTiger error. */
 #define	WT_ERROR	-31800
-/*! database item not found. */
+/*! item not found. */
 #define	WT_NOTFOUND	-31801
 /*! requested page was deleted. */
 #define	WT_PAGE_DELETED	-31802
-/*! modification attempted of a read-only database. */
+/*! modification attempted of a read-only value. */
 #define	WT_READONLY	-31803
 /*! restart the operation (internal). */
 #define	WT_RESTART	-31804

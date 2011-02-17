@@ -86,7 +86,7 @@ struct __wt_toc_update;		typedef struct __wt_toc_update WT_TOC_UPDATE;
  *******************************************/
 /*
  * WT_TOC_UPDATE --
- *	A structure to accumulate database changes on a per-thread basis.
+ *	A structure to accumulate file changes on a per-thread basis.
  */
 struct __wt_toc_update {
 	uint32_t len;				/* Buffer original size */
@@ -105,7 +105,7 @@ struct __idbc {
 };
 
 /*******************************************
- * Database handle information that doesn't persist.
+ * File handle information that doesn't persist.
  *******************************************/
 /*
  * WT_FREE_ENTRY  --
@@ -121,10 +121,10 @@ struct __wt_free_entry {
 
 struct __idb {
 	DB *db;				/* Public object */
-	TAILQ_ENTRY(__idb) q;		/* Linked list of databases */
+	TAILQ_ENTRY(__idb) q;		/* Linked list of files */
 
-	char	 *name;			/* Database name */
-	mode_t	  mode;			/* Database file create mode */
+	char	 *name;			/* File name */
+	mode_t	  mode;			/* File create mode */
 
 	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
@@ -135,11 +135,11 @@ struct __idb {
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 
 	/*
-	 * When a database is opened and/or created a hazard reference is taken
-	 * on its root page, and the root page brought into memory.  If no root
+	 * When a file is opened and/or created a hazard reference is taken on
+	 * its root page, and the root page brought into memory.  If no root
 	 * page has been acquired, there's usually not much work to do.
 	 */
-#define	WT_UNOPENED_DATABASE(idb)	((idb)->root_page.page == NULL ? 1 : 0)
+#define	WT_UNOPENED_FILE(idb)		((idb)->root_page.page == NULL ? 1 : 0)
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */
@@ -149,8 +149,8 @@ struct __idb {
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
 
-	WT_STATS *stats;		/* Database handle statistics */
-	WT_STATS *dstats;		/* Database file statistics */
+	WT_STATS *stats;		/* IDB handle statistics */
+	WT_STATS *dstats;		/* File statistics */
 
 	uint32_t flags;
 };
@@ -166,8 +166,8 @@ struct __ienv {
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 	TAILQ_HEAD(
-	    __wt_db_qh, __idb) dbqh;	/* Locked: database list */
-	u_int dbqcnt;			/* Locked: database list count */
+	    __wt_db_qh, __idb) dbqh;	/* Locked: file list */
+	u_int dbqcnt;			/* Locked: file list count */
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */

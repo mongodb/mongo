@@ -34,7 +34,7 @@ struct __dbt {
 };
 
 /*******************************************
- * Database handle
+ * File handle
  *******************************************/
 struct __db {
 	ENV	*env;			/* Enclosing environment */
@@ -203,7 +203,7 @@ struct __dbc {
 };
 
 /*******************************************
- * Database environment handle
+ * Environment handle
  *******************************************/
 struct __env {
 	IENV	*ienv;			/* Private object */
@@ -378,7 +378,7 @@ struct __wt_toc {
 
 	void	*app_private;		/* Application-private information */
 
-	DB	*db;			/* Current database */
+	DB	*db;			/* Current file */
 	DBT	 key, data;		/* Returned key/data pairs */
 
 	DBT	*scratch;		/* Temporary memory for any function */

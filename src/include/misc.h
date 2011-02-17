@@ -47,18 +47,18 @@ extern "C" {
 #define	WT_DB_FCHK(db, name, f, mask)					\
 	WT_ENV_FCHK((db)->env, name, f, mask)
 
-/* Read-only database check. */
+/* Read-only file check. */
 #define	WT_DB_RDONLY(db, name)						\
 	if (F_ISSET((db)->idb, WT_RDONLY))				\
-		return (__wt_database_readonly(db, name));
+		return (__wt_file_readonly(db, name));
 
-/* Column- and row-only database check. */
+/* Column- and row-only file check. */
 #define	WT_DB_ROW_ONLY(db, name)					\
 	if (F_ISSET((db)->idb, WT_COLUMN))				\
-		return (__wt_database_method_type(db, name, 1));
+		return (__wt_file_method_type(db, name, 1));
 #define	WT_DB_COL_ONLY(db, name)					\
 	if (!F_ISSET((db)->idb, WT_COLUMN))				\
-		return (__wt_database_method_type(db, name, 0));
+		return (__wt_file_method_type(db, name, 0));
 
 /*
  * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a
@@ -94,10 +94,10 @@ extern "C" {
 
 #define	WT_ILLEGAL_FORMAT(db)						\
 	default:							\
-		return (__wt_database_format(db))
+		return (__wt_file_format(db))
 #define	WT_ILLEGAL_FORMAT_ERR(db, ret)					\
 	default:							\
-		ret = __wt_database_format(db);				\
+		ret = __wt_file_format(db);				\
 		goto err
 
 /*

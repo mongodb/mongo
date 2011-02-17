@@ -52,7 +52,7 @@ __wt_debug_set_fp(const char *ofile, FILE **fpp, int *close_varp)
 
 /*
  * __wt_debug_dump --
- *	Dump a database in debugging mode.
+ *	Dump a file in debugging mode.
  */
 int
 __wt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)

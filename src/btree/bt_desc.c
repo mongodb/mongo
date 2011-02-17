@@ -11,7 +11,7 @@ static int __wt_desc_io(WT_TOC *, void *, int);
 
 /*
  * __wt_desc_stat --
- *	Fill in the statistics from the database description.
+ *	Fill in the statistics from the file's description.
  */
 int
 __wt_desc_stat(WT_TOC *toc)

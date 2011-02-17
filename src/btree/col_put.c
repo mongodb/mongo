@@ -31,7 +31,7 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
 	db = toc->db;
 
 	if (db->fixed_len != 0 && data->size != db->fixed_len)
-		WT_RET(__wt_database_wrong_fixed_size(toc, data->size));
+		WT_RET(__wt_file_wrong_fixed_size(toc, data->size));
 
 	return (__wt_col_update(toc, recno, data, 1));
 }

@@ -10,25 +10,24 @@ extern "C" {
 #endif
 
 /*
- * In WiredTiger there are "database allocation units", which is the smallest
- * database chunk that can be allocated.  The smallest database allocation unit
- * is 512B; the largest is 128MB.  (The maximum of 128MB is enforced by the
- * software, it could be set as high as 4GB.)  Btree leaf and internal pages,
- * as well as overflow chunks, are allocated in groups of 1 or more allocation
- * units.
+ * In WiredTiger there are "file allocation units", which is the smallest file
+ * chunk that can be allocated.  The smallest file allocation unit is 512B; the
+ * largest is 128MB.  (The maximum of 128MB is enforced by the software, it
+ * could be set as high as 4GB.)  Btree leaf and internal pages, as well as
+ * overflow chunks, are allocated in groups of 1 or more allocation units.
  *
- * We use 32-bit unsigned integers to store file locations on database pages,
- * and all such file locations are counts of database allocation units.  In
- * the code these are called "addrs".  To simplify bookkeeping, page sizes must
- * be a multiple of the allocation unit size.  There are two special addresses,
+ * We use 32-bit unsigned integers to store file locations on file pages, and
+ * all such file locations are counts of file allocation units.  In the code
+ * these are called "addrs".  To simplify bookkeeping, page sizes must be a
+ * multiple of the allocation unit size.  There are two special addresses,
  * one for pages which don't exist, and one for pages that have been deleted.
  *
- * The minimum maximum database file size is almost 2TB (2^9 x (2^32 - 2)),
- * and the maximum maximum database file size is almost 512PB (2^27 x 2^32 - 2).
+ * The minimum maximum file size is almost 2TB (2^9 x (2^32 - 2)), and the
+ * maximum maximum file size is almost 512PB (2^27 x 2^32 - 2).
  *
- * In summary, small database allocation units limit the database file size,
- * (but minimize wasted space when storing overflow items), and when the
- * allocation unit grows, the maximum size of the database grows as well.
+ * In summary, small file allocation units limit the file size, (but minimize
+ * wasted space when storing overflow items), and when the allocation unit
+ * grows, the maximum size of the file grows as well.
  *
  * The minimum btree leaf and internal page sizes are 512B, the maximum 256MB.
  * (The maximum of 256MB is enforced by the software, it could be set as high
@@ -44,11 +43,9 @@ extern "C" {
 #define	WT_BTREE_PAGE_SIZE_MAX		(256 * WT_MEGABYTE)
 
 /*
- * Underneath the database layer is the cache and file layers.  In both, sizes
- * are stored as numbers of bytes.   In the cache layer, 32-bits is too small
- * (a cache might be larger than 4GB), so we use a 64-bit type.  In the file
- * layer, 32-bits might also be too small, but we have a standard type known to
- * hold the size of a file, an off_t.
+ * Underneath the Btree code is the OS layer, where sizes are stored as numbers
+ * of bytes.   In the OS layer, 32-bits is too small (a file might be larger
+ * than 4GB), so we use a standard type known to hold the size of a file, off_t.
  */
 /* Convert a data address to/from a byte offset. */
 #define	WT_ADDR_TO_OFF(db, addr)					\
@@ -57,23 +54,23 @@ extern "C" {
 	((uint32_t)((off) / (db)->allocsize))
 
 /*
- * Return database allocation units needed for length (optionally including a
- * page header), rounded to an allocation unit.
+ * Return file allocation units needed for length (optionally including a page
+ * header), rounded to an allocation unit.
  */
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
 	((uint32_t)WT_ALIGN((size) + sizeof(WT_PAGE_DISK), (db)->allocsize))
 
 /*
  * The invalid and deleted addresses are special addresses and limit the
- * maximum size of a database.
+ * maximum size of a file.
  */
 #define	WT_ADDR_DELETED		(UINT32_MAX - 1)
 #define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
- * The database itself needs a chunk of memory that describes it.   Here's
- * the structure.  This structure is written into the first 512 bytes of
- * the file.
+ * The file needs a description, here's the structure.  At the moment, this
+ * structure is written into the first 512 bytes of the file, but that will
+ * change in the future.
  *
  * !!!
  * Field order is important: there's a 8-byte type in the middle, and the
@@ -121,8 +118,7 @@ struct __wt_page_desc {
 
 /*
  * WT_PAGE --
- * The WT_PAGE structure describes the in-memory information about a database
- * page.
+ * The WT_PAGE structure describes the in-memory information about a file page.
  */
 struct __wt_page {
 	/*
@@ -339,10 +335,10 @@ struct __wt_page {
  *	used to determine if it's OK to dereference the pointer to the page.
  *
  * There may be many threads traversing these entries; they fall into three
- * classes: (1) application threads walking through the tree searching database
- * database pages or calling a method like Db.sync; (2) a server thread reading
- * a new page into the tree from disk; (3) a server thread evicting a page from
- * the tree to disk.
+ * classes: (1) application threads walking through the tree searching file
+ * pages or calling a method like Db.sync; (2) a server thread reading a new
+ * page into the tree from disk; (3) a server thread evicting a page from the
+ * tree to disk.
  *
  * Synchronization is based on the WT_REF->state field:
  * WT_REF_CACHE:
@@ -403,7 +399,7 @@ struct __wt_repl {
 /*
  * WT_PAGE_DISK --
  *
- * All on-disk database pages have a common header, declared as the WT_PAGE_DISK
+ * All on-disk pages have a common header, defined by the WT_PAGE_DISK
  * structure.  The header has no version number or mode bits, and the page type
  * and/or flags value will have to be modified when changes are made to the page
  * layout.  (The page type appears early in the header to make this simpler.)
@@ -416,11 +412,11 @@ struct __wt_page_disk {
 	/*
 	 * The record number of the first record on the page is stored for two
 	 * reasons: first, we have to find the page's stack when reconciling
-	 * leaf pages and second, when salvaging a database it's the only way
-	 * to know where a column-store page fits in the keyspace.  (We could
-	 * work around the first reason by storing the base record number in
-	 * lthe WT_PAGE structure when we read a page into memory, but we can't
-	 * work around the second reason.)
+	 * leaf pages and second, when salvaging a file it's the only way to
+	 * know where a column-store page fits in the keyspace.  (We could work
+	 * around the first reason by storing the base record number in the
+	 * WT_PAGE structure when we read a page into memory, but we can't work
+	 * around the second reason.)
 	 */
 	uint64_t start_recno;		/* 00-07: column-store starting recno */
 
@@ -449,11 +445,12 @@ struct __wt_page_disk {
 
 	/*
 	 * WiredTiger is no-overwrite: each time a page is written, it's written
-	 * to an unused disk location so torn writes don't corrupt the database.
+	 * to an unused disk location so torn writes don't corrupt the file.
 	 * This means that writing a page requires updating the page's parent to
 	 * reference the new location.  We don't want to repeatedly write the
-	 * parent on a database flush, so we sort the pages for writing based on
-	 * their level in the tree.
+	 * parent on an all-file flush, so we sort the pages for writing based
+	 * on their level in the tree and start writing with the lower levels,
+	 * working our way up to the root.
 	 *
 	 * We don't need the tree level on disk and we could move this field to
 	 * the WT_PAGE structure -- that said, it's only a byte, and it's a lot
@@ -497,7 +494,7 @@ struct __wt_page_disk {
 /*
  * WT_ROW --
  * The WT_ROW structure describes the in-memory information about a single
- * key/data pair on a row store database page.
+ * key/data pair on a row-store file page.
  */
 struct __wt_row {
 	/*
@@ -530,7 +527,7 @@ struct __wt_row {
 /*
  * WT_ROW_INSERT --
  * The WT_ROW_INSERT structure describes the in-memory information about an
- * inserted key/data pair on a row store database page.
+ * inserted key/data pair on a row-store file page.
  */
 struct __wt_row_insert {
 	WT_ROW	entry;			/* key/data pair */
@@ -542,7 +539,7 @@ struct __wt_row_insert {
 /*
  * WT_COL --
  * The WT_COL structure describes the in-memory information about a single
- * item on a column-store database page.
+ * item on a column-store file page.
  */
 struct __wt_col {
 	/*
@@ -563,7 +560,7 @@ struct __wt_col {
 /*
  * WT_RLE_EXPAND --
  * The WT_RLE_EXPAND structure describes the in-memory information about a
- * replaced key/data pair on a run-length encoded, column store database page.
+ * replaced key/data pair on a run-length encoded, column-store file page.
  */
 struct __wt_rle_expand {
 	uint64_t recno;			/* recno */
@@ -687,7 +684,7 @@ struct __wt_rle_expand {
  *
  * We encode the length and type in a 4-byte value to minimize the on-page
  * footprint as well as maintain alignment of the bytes that follow the item.
- * (The trade-off is this limits on-page database key or data items to 16MB.)
+ * (The trade-off is this limits on-page file key or data items to 16MB.)
  * The bottom 24-bits are the length of the subsequent data, the next 4-bits are
  * the type, and the top 4-bits are unused.   We could use the unused 4-bits to
  * provide more length, but 16MB seems sufficient for on-page items.

@@ -9,7 +9,7 @@
 
 /*
  * __wt_db_sync --
- *	Flush a database to the backing file.
+ *	Flush pages to the backing file.
  */
 int
 __wt_db_sync(WT_TOC *toc, void (*f)(const char *, uint64_t), uint32_t flags)

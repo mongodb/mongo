@@ -366,15 +366,15 @@ int
 __wt_api_arg_max(ENV *env,
     const char *name, const char *arg_name, uint32_t v, uint32_t max);
 int
-__wt_database_method_type(DB *db, const char *name, int column_err);
+__wt_file_method_type(DB *db, const char *name, int column_err);
 int
-__wt_database_wrong_fixed_size(WT_TOC *toc, uint32_t len);
+__wt_file_wrong_fixed_size(WT_TOC *toc, uint32_t len);
 int
-__wt_database_readonly(DB *db, const char *name);
+__wt_file_readonly(DB *db, const char *name);
 int
-__wt_database_format(DB *db);
+__wt_file_format(DB *db);
 int
-__wt_database_item_too_big(DB *db);
+__wt_file_item_too_big(DB *db);
 int
 __wt_wt_toc_lockout(WT_TOC *toc);
 int
@@ -426,9 +426,9 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_cache_stats(WT_STATS *stats);
 int
-__wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp);
+__wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp);
 void
-__wt_stat_clear_database_stats(WT_STATS *stats);
+__wt_stat_clear_file_stats(WT_STATS *stats);
 int
 __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp);
 void

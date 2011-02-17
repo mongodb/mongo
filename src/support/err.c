@@ -137,73 +137,71 @@ __wt_api_arg_max(ENV *env,
 }
 
 /*
- * __wt_database_method_type --
+ * __wt_file_method_type --
  *	Print a standard error message on attempts to call methods inappropriate
- *	for a database type.
+ *	for a file type.
  */
 int
-__wt_database_method_type(DB *db, const char *name, int column_err)
+__wt_file_method_type(DB *db, const char *name, int column_err)
 {
 	__wt_api_db_errx(db,
-	    "%s: this method is not supported for a %s database",
+	    "%s: this method is not supported for a %s file",
 	    name, column_err ? "column store" : "row store");
 	return (WT_ERROR);
 }
 
 /*
- * __wt_database_wrong_fixed_size --
+ * __wt_file_wrong_fixed_size --
  *	Print a standard error message on attempts to put the wrong size element
- *	into a fixed-size database.
+ *	into a fixed-size file.
  */
 int
-__wt_database_wrong_fixed_size(WT_TOC *toc, uint32_t len)
+__wt_file_wrong_fixed_size(WT_TOC *toc, uint32_t len)
 {
 	DB *db;
 
 	db = toc->db;
 
 	__wt_api_db_errx(db,
-	    "%s: length of %lu does not match fixed-length database "
-	    "configuration of %lu",
+	    "%s: length of %lu does not match fixed-length file configuration "
+	    "of %lu",
 	     toc->name, (u_long)len, (u_long)db->fixed_len);
 	return (WT_ERROR);
 }
 
 /*
- * __wt_database_readonly --
- *	Print a standard error message on attempts to modify a read-only
- *	database.
+ * __wt_file_readonly --
+ *	Print a standard error message on attempts to modify a read-only file.
  */
 int
-__wt_database_readonly(DB *db, const char *name)
+__wt_file_readonly(DB *db, const char *name)
 {
 	__wt_api_db_errx(db,
-	    "%s: the database was opened read-only and may not be modified",
-	    name);
+	    "%s: the file was opened read-only and may not be modified", name);
 	return (WT_READONLY);
 }
 
 /*
- * __wt_database_format --
- *	Print a standard error message when a database format error is
- *	suddenly discovered.
+ * __wt_file_format --
+ *	Print a standard error message when a file format error is suddenly
+ *	discovered.
  */
 int
-__wt_database_format(DB *db)
+__wt_file_format(DB *db)
 {
-	__wt_api_db_errx(db, "the database is corrupted; use the Db.salvage"
-	    " method or the db_salvage utility to repair the database");
+	__wt_api_db_errx(db, "the file is corrupted; use the Db.salvage"
+	    " method or the db_salvage utility to repair the file");
 	return (WT_ERROR);
 }
 
 /*
- * __wt_database_item_too_big --
+ * __wt_file_item_too_big --
  *	Print a standard error message when an element is too large to store.
  */
 int
-__wt_database_item_too_big(DB *db)
+__wt_file_item_too_big(DB *db)
 {
-	__wt_api_db_errx(db, "the item is too large for the database to store");
+	__wt_api_db_errx(db, "the item is too large for the file to store");
 	return (WT_ERROR);
 }
 
@@ -238,8 +236,8 @@ __wt_env_lockout(ENV *env)
 	    "An unavailable handle method was called; the handle method is "
 	    "not available for some reason, for example, handle methods are "
 	    "restricted after an error, or configuration methods may be "
-	    "restricted after the database or environment have been opened, "
-	    "or operational methods may be restricted until the database or "
+	    "restricted after the file or environment have been opened, "
+	    "or operational methods may be restricted until the file or "
 	    "environment has been opened.");
 	return (WT_ERROR);
 }

@@ -56,7 +56,7 @@ for line in open('../src/include/stat.h', 'r'):
 		f.write('\n')
 		skip = 1
 		print_def('CACHE handle', stat_class.cache_stats)
-		print_def('DB/IDB database', stat_class.idb_dstats)
+		print_def('DB/IDB file', stat_class.idb_dstats)
 		print_def('DB/IDB handle', stat_class.idb_stats)
 		print_def('ENV/IENV handle', stat_class.ienv_stats)
 		print_def('FH handle', stat_class.fh_stats)
@@ -104,7 +104,7 @@ f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
 print_func('CACHE', stat_class.cache_stats)
-print_func('DATABASE', stat_class.idb_dstats)
+print_func('FILE', stat_class.idb_dstats)
 print_func('DB', stat_class.idb_stats)
 print_func('ENV', stat_class.ienv_stats)
 print_func('FH', stat_class.fh_stats)

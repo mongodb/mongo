@@ -92,7 +92,7 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 
 /*
  * __wt_cache_read_server --
- *	Thread to do database reads.
+ *	Thread to do file reads.
  */
 void *
 __wt_cache_read_server(void *arg)

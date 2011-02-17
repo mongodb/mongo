@@ -17,9 +17,9 @@
  * In other words, the readers are key, and they are known to be indifferent
  * to the serialization code modifying the data.
  *
- * An example of #1 is updating the size of a database file.  The size is only
- * changed in serialized code, and never read by anything else.  An example of
- * #2 is updating a 32-bit value, because readers by definition get consistent
+ * An example of #1 is updating the size of a file.  The size is only changed
+ * in single-threaded code, and never read by anything else.  An example of #2
+ * is updating a 32-bit value, because readers by definition get consistent
  * views of 32-bit memory locations.   An example of #3 is updating a 64-bit
  * value (such as the bytes allocated in the cache).  While there is a small
  * possibility a reader will see a corrupted value, the value is only used for

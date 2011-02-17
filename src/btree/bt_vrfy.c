@@ -186,9 +186,8 @@ __wt_verify_tree(
 	 */
 
 	/*
-	 * If passed a level of WT_NOLEVEL, that is, the only level that can't
-	 * possibly be a valid database page level, this is the root page of
-	 * the tree.
+	 * If passed a level of WT_NOLEVEL (that is, the only level that can't
+	 * possibly be a valid page level), this is the root page of the tree.
 	 *
 	 * If it's the root, use this page's level to initialize expected the
 	 * values for the rest of the tree.
@@ -509,7 +508,7 @@ __wt_verify_pc(WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 	/*
 	 * The two keys we're going to compare may be overflow keys -- don't
 	 * bother instantiating the keys in the tree, there's no reason to
-	 * believe we're going to be working in this database.
+	 * believe we're going to be doing real operations in this file.
 	 */
 	child_rip = first_entry ?
 	    child->u.irow : child->u.irow + (child->indx_count - 1);
@@ -602,7 +601,8 @@ __wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 		/*
 		 * The two keys we're going to compare may be overflow keys --
 		 * don't bother instantiating the keys in the tree, there's no
-		 * reason to believe we're going to be working in this database.
+		 * reason to believe we're going to be doing real operations
+		 * in this file.
 		 */
 		if (__wt_key_process(rip)) {
 			WT_RET(__wt_item_process(

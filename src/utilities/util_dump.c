@@ -49,7 +49,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* The remaining argument is the database name. */
+	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
 
@@ -76,6 +76,6 @@ int
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dpV] [-f output-file] database\n", progname);
+	    "usage: %s [-dpV] [-f output-file] file\n", progname);
 	return (EXIT_FAILURE);
 }

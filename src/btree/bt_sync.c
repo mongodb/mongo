@@ -25,7 +25,7 @@ __wt_bt_sync(WT_TOC *toc)
 	idb = toc->db->idb;
 	cache = env->ienv->cache;
 
-	if (WT_UNOPENED_DATABASE(idb))
+	if (WT_UNOPENED_FILE(idb))
 		return (0);
 
 	/*

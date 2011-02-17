@@ -22,7 +22,7 @@ __wt_db_open(WT_TOC *toc, const char *name, mode_t mode, uint32_t flags)
 	env = toc->env;
 	db = toc->db;
 
-	WT_STAT_INCR(env->ienv->stats, DATABASE_OPEN);
+	WT_STAT_INCR(env->ienv->stats, FILE_OPEN);
 
 	/* Initialize the IDB structure. */
 	WT_RET(__wt_db_idb_open(db, name, mode, flags));

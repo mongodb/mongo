@@ -38,7 +38,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 	WT_DB_FCHK(db, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
 
-	/* Check for a record past the end of the database. */
+	/* Check for a record past the end of the file. */
 	page = idb->root_page.page;
 	if (page->records < recno)
 		return (WT_NOTFOUND);

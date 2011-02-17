@@ -84,7 +84,7 @@ __wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
 
 /*
  * __wt_bulk_fix
- *	Db.bulk_load method for column-store, fixed-length database pages.
+ *	Db.bulk_load method for column-store, fixed-length file pages.
  */
 static int
 __wt_bulk_fix(WT_TOC *toc,
@@ -126,13 +126,13 @@ __wt_bulk_fix(WT_TOC *toc,
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
 			__wt_api_db_errx(db,
-			    "column database keys are implied and so should "
-			    "not be set by the bulk load input routine");
+			    "column-store keys are implied and should not "
+			    "be set by the bulk load input routine");
 			ret = WT_ERROR;
 			goto err;
 		}
 		if (data->size != db->fixed_len)
-			WT_ERR(__wt_database_wrong_fixed_size(toc, data->size));
+			WT_ERR(__wt_file_wrong_fixed_size(toc, data->size));
 
 		/*
 		 * We use the high bit of the data field as a "deleted" value,
@@ -141,7 +141,7 @@ __wt_bulk_fix(WT_TOC *toc,
 		if (WT_FIX_DELETE_ISSET(data->data)) {
 			__wt_api_db_errx(db,
 			    "the first bit may not be stored in fixed-length "
-			    "column-store database items");
+			    "column-store file items");
 			ret = WT_ERROR;
 			goto err;
 		}
@@ -232,7 +232,7 @@ err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
 
 /*
  * __wt_bulk_var --
- *	Db.bulk_load method for row or column-store variable-length database
+ *	Db.bulk_load method for row or column-store variable-length file
  *	pages.
  */
 static int
@@ -286,9 +286,9 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 		if (F_ISSET(idb, WT_COLUMN) ) {
 			if (key != NULL) {
 				__wt_api_db_errx(db,
-				    "column database keys are implied and "
-				    "so should not be returned by the bulk "
-				    "load input routine");
+				    "column-store keys are implied and should "
+				    "not be returned by the bulk load input "
+				    "routine");
 				ret = WT_ERROR;
 				goto err;
 			}
@@ -837,7 +837,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, uint64_t incr,
 	/*
 	 * If it's a row-store, get a copy of the first item on the page -- it
 	 * might be an overflow item, in which case we need to make a copy for
-	 * the database.  Most versions of Berkeley DB tried to reference count
+	 * the parent.  Most versions of Berkeley DB tried to reference count
 	 * overflow items if they were promoted to internal pages.  That turned
 	 * out to be hard to get right, so I'm not doing it again.
 	 *
@@ -1010,11 +1010,11 @@ split:		switch (dsk->type) {
 		    WT_PAGE_BYTE(next), &next_first_free, &next_space_avail);
 
 		/*
-		 * Column stores set the starting record number to the starting
-		 * record number of the promoted leaf -- the new leaf is always
-		 * the first record in the new parent's page.  Ignore the type
-		 * of the database, it's simpler ot just promote 0 up the tree
-		 * in row store databases.
+		 * Column-store pages set the starting record number to the
+		 * starting record number of the promoted leaf -- the new leaf
+		 * is always the first record in the new parent's page.  Ignore
+		 * the type of the file, it's simpler to just promote 0 up the
+		 * tree in in row-store files.
 		 */
 		next->dsk->start_recno = page->dsk->start_recno;
 
@@ -1276,7 +1276,7 @@ __wt_item_build_data(
 
 /*
  * __wt_bulk_ovfl_copy --
- *	Copy bulk-loaded overflow items in the database, returning the WT_OVFL
+ *	Copy bulk-loaded overflow items in the file, returning the WT_OVFL
  *	structure, filled in.
  */
 static int
@@ -1318,8 +1318,7 @@ err:	__wt_scr_release(&tmp);
 
 /*
  * __wt_bulk_ovfl_write --
- *	Store bulk-loaded overflow items in the database, returning the page
- *	addr.
+ *	Store bulk-loaded overflow items in the file, returning the page addr.
  */
 static int
 __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
@@ -1358,7 +1357,7 @@ err:	if (tmp != NULL)
 
 /*
  * __wt_bulk_scratch_page --
- *	Allocate a scratch buffer and make it look like a database page.
+ *	Allocate a scratch buffer and make it look like a file page.
  */
 static int
 __wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,

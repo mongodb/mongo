@@ -43,7 +43,7 @@ __wt_stat_clear_cache_stats(WT_STATS *stats)
 }
 
 int
-__wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
@@ -51,7 +51,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_DUP_TREE].desc = "duplicate data off-page trees";
-	stats[WT_STAT_FIXED_LEN].desc = "database fixed-record size";
+	stats[WT_STAT_FIXED_LEN].desc = "fixed-record size";
 	stats[WT_STAT_FREELIST_ENTRIES].desc =
 	    "number of entries in the freelist";
 	stats[WT_STAT_INTLMAX].desc = "maximum internal page size";
@@ -87,7 +87,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 }
 
 void
-__wt_stat_clear_database_stats(WT_STATS *stats)
+__wt_stat_clear_file_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
 	stats[WT_STAT_DUP_TREE].v = 0;
@@ -174,7 +174,7 @@ __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp)
 
 	WT_RET(__wt_calloc(env, 9, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_DATABASE_OPEN].desc = "database open";
+	stats[WT_STAT_FILE_OPEN].desc = "file open";
 	stats[WT_STAT_MEMALLOC].desc = "memory allocations";
 	stats[WT_STAT_MEMFREE].desc = "memory frees";
 	stats[WT_STAT_MTX_LOCK].desc = "mutex lock calls";
@@ -190,7 +190,7 @@ __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp)
 void
 __wt_stat_clear_env_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_DATABASE_OPEN].v = 0;
+	stats[WT_STAT_FILE_OPEN].v = 0;
 	stats[WT_STAT_MEMALLOC].v = 0;
 	stats[WT_STAT_MEMFREE].v = 0;
 	stats[WT_STAT_MTX_LOCK].v = 0;

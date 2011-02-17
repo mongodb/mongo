@@ -152,7 +152,7 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 *
 	 * XXX
 	 * Figure out how much space we need: this code limits the maximum size
-	 * of a data item stored in the database.  In summary, for a big item we
+	 * of a data item stored in the file.  In summary, for a big item we
 	 * have to store a WT_TOC_UPDATE structure, the WT_REPL structure and
 	 * the data, all in an allocated buffer.   We only pass a 32-bit value
 	 * to our allocation routine, so we can't store an item bigger than the
@@ -160,17 +160,17 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * the WT_REPL structure and data item are aligned to a 32-bit boundary.
 	 * We could fix this, but it's unclear it's worth the effort -- document
 	 * you can store a (4GB - 20B) item max, and you're done, because it's
-	 * insane to store a 4GB item in the database anyway.
+	 * insane to store a 4GB item in the file anyway.
 	 *
 	 * Check first we won't overflow when calculating an aligned size, then
 	 * check the total required space for this item.
 	 */
 	size = data == NULL ? 0 : data->size;
 	if (UINT32_MAX - size < sizeof(WT_REPL) + sizeof(uint32_t))
-		return (__wt_database_item_too_big(db));
+		return (__wt_file_item_too_big(db));
 	align_size = WT_ALIGN(size + sizeof(WT_REPL), sizeof(uint32_t));
 	if (UINT32_MAX - align_size < sizeof(WT_TOC_UPDATE))
-		return (__wt_database_item_too_big(db));
+		return (__wt_file_item_too_big(db));
 
 	/*
 	 * If we already have a buffer and the data fits, just copy the WT_REPL
@@ -188,10 +188,10 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 *
 	 * XXX
 	 * I have no reason for the 4x the request size, I just hate to allocate
-	 * a buffer for every change to the database.  A better approach would
-	 * be to grow the allocation buffer as the thread makes more changes; if
-	 * a thread is doing lots of work, give it lots of memory, otherwise
-	 * only allocate as it's necessary.
+	 * a buffer for every change to the file.  A better approach would be to
+	 * grow the allocation buffer as the thread makes more changes; if a
+	 * thread is doing lots of work, give it lots of memory, otherwise only
+	 * allocate as it's necessary.
 	 */
 	if (align_size > env->data_update_max) {
 		alloc_size = sizeof(WT_TOC_UPDATE) + align_size;

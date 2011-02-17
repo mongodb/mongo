@@ -70,8 +70,7 @@ __wt_open_verify(DB *db)
 	/* Verify other configuration combinations. */
 	if (db->fixed_len != 0 && (idb->huffman_key || idb->huffman_data)) {
 		__wt_api_db_errx(db,
-		    "Fixed size column-store databases may not be Huffman "
-		    "compressed");
+		    "Fixed-size column-store files may not be Huffman encoded");
 		return (WT_ERROR);
 	}
 
@@ -92,10 +91,10 @@ __wt_open_verify_page_sizes(DB *db)
 	/*
 	 * The application can set lots of page sizes.  It's complicated, so
 	 * instead of verifying the relationships when they're set, verify
-	 * then when the database is opened and we know we have the final
-	 * values.  (Besides, if we verify the relationships when they're set,
-	 * the application has to set them in a specific order or we'd need
-	 * one set function that took 10 parameters.)
+	 * then when the file is opened and we know we have the final values.
+	 *  (Besides, if we verify the relationships when they're set, the
+	 * application has to set them in a specific order or we'd need one
+	 * set function that took 10 parameters.)
 	 *
 	 * If the values haven't been set, set the defaults.
 	 *

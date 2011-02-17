@@ -22,23 +22,23 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 	env = toc->env;
 	idb = db->idb;
 
-	fprintf(stream, "Database handle statistics: %s\n", idb->name);
+	fprintf(stream, "File statistics: %s\n", idb->name);
 	__wt_stat_print(env, idb->stats, stream);
 
-	/* Clear the database stats, then call Btree stat to fill them in. */
-	__wt_stat_clear_database_stats(idb->dstats);
+	/* Clear the file stats, then call Btree stat to fill them in. */
+	__wt_stat_clear_file_stats(idb->dstats);
 	WT_STAT_SET(idb->dstats, TREE_LEVEL, idb->root_page.page->dsk->level);
 	WT_STAT_SET(idb->dstats, FREELIST_ENTRIES, idb->freelist_entries);
 	WT_RET(__wt_desc_stat(toc));
 
 	/*
 	 * Note we do not have a hazard reference for the root page, and that's
-	 * safe -- root pages are pinned into memory when a database is opened,
-	 * and never re-written until the database is closed.
+	 * safe -- root pages are pinned into memory when a file is opened, and
+	 * never re-written until the file is closed.
 	 */
 	WT_RET(__wt_tree_walk(toc, NULL, 0, __wt_page_stat, NULL));
 
-	fprintf(stream, "Database statistics: %s\n", idb->name);
+	fprintf(stream, "File statistics: %s\n", idb->name);
 	__wt_stat_print(env, idb->dstats, stream);
 
 	/* Underlying file handle statistics. */
@@ -63,7 +63,7 @@ __wt_db_stat_clear(DB *db)
 	idb = db->idb;
 
 	__wt_stat_clear_db_stats(idb->stats);
-	__wt_stat_clear_database_stats(idb->dstats);
+	__wt_stat_clear_file_stats(idb->dstats);
 	if (idb->fh != NULL)
 		__wt_stat_clear_fh_stats(idb->fh->stats);
 

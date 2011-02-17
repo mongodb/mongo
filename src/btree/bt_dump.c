@@ -56,8 +56,8 @@ __wt_db_dump(WT_TOC *toc,
 
 	/*
 	 * Note we do not have a hazard reference for the root page, and that's
-	 * safe -- root pages are pinned into memory when a database is opened,
-	 * and never re-written until the database is closed.
+	 * safe -- root pages are pinned into memory when a file is opened, and
+	 * never re-written until the file is closed.
 	 */
 	fprintf(stream, "VERSION=1\n");
 	fprintf(stream, "HEADER=END\n");

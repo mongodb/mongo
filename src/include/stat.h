@@ -51,7 +51,7 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_PAGE_WRITE		    8
 
 /*
- * Statistics entries for DB/IDB database.
+ * Statistics entries for DB/IDB file.
  */
 #define	WT_STAT_BASE_RECNO			    0
 #define	WT_STAT_DUP_TREE			    1
@@ -100,7 +100,7 @@ struct __wt_stats {
 /*
  * Statistics entries for ENV/IENV handle.
  */
-#define	WT_STAT_DATABASE_OPEN			    0
+#define	WT_STAT_FILE_OPEN			    0
 #define	WT_STAT_MEMALLOC			    1
 #define	WT_STAT_MEMFREE				    2
 #define	WT_STAT_MTX_LOCK			    3

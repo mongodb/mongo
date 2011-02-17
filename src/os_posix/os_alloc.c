@@ -15,8 +15,8 @@ static void __wt_mtrack(
 /*
  * There's no malloc interface, WiredTiger never calls malloc.  The problem is
  * an application might: allocate memory, write secret stuff into it, free the
- * memory, we allocate the memory, and then use it for a database page or log
- * record and write it to disk.  That would result in the secret stuff being
+ * memory, then we allocate the memory and use it for a file page or log record,
+ * and then write it to disk.  That would result in the secret stuff being
  * protected by the WiredTiger permission mechanisms, potentially inappropriate
  * for the secret stuff.
  */
@@ -96,11 +96,11 @@ __wt_realloc_func(ENV *env,
 
 	/*
 	 * Clear the allocated memory -- an application might: allocate memory,
-	 * write secret stuff into it, free the memory, we re-allocate the
-	 * memory, then use it for a database page or log record and write it
-	 * to disk.  That would result in the secret stuff being protected by
-	 * the WiredTiger permission mechanisms, potentially inappropriate for
-	 * the secret stuff.
+	 * write secret stuff into it, free the memory, then we re-allocate the
+	 * memory and use it for a file page or log record, and then write it to
+	 * disk.  That would result in the secret stuff being protected by the
+	 * WiredTiger permission mechanisms, potentially inappropriate for the
+	 * secret stuff.
 	 */
 	memset((uint8_t *)
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);

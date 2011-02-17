@@ -32,8 +32,7 @@ __wt_bt_close(WT_TOC *toc)
 	 * nor can close be called while other threads are in the tree -- the
 	 * higher level API has to ensure this.
 	 */
-
-	if (WT_UNOPENED_DATABASE(idb))
+	if (WT_UNOPENED_FILE(idb))
 		return (0);
 
 	/*

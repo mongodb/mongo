@@ -72,7 +72,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* The remaining argument is the database name. */
+	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
 
@@ -191,7 +191,7 @@ format:		fprintf(stderr,
 
 /*
  * config_set --
- *	Set the command-line configuration options on the database handle.
+ *	Set the command-line configuration options on the DB handle.
  */
 int
 config_set(DB *db)
@@ -284,7 +284,7 @@ int
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-TVv] [-c configuration] [-f input-file] database\n",
+	    "usage: %s [-TVv] [-c configuration] [-f input-file] file\n",
 	    progname);
 	return (EXIT_FAILURE);
 }

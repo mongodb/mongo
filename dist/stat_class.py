@@ -14,7 +14,7 @@ class Stat:
 # IENV handle statistics
 ##########################################
 ienv_stats = {}
-ienv_stats['DATABASE_OPEN'] = Stat([], 'database open')
+ienv_stats['FILE_OPEN'] = Stat([], 'file open')
 ienv_stats['MEMALLOC'] = Stat([], 'memory allocations')
 ienv_stats['MEMFREE'] = Stat([], 'memory frees')
 ienv_stats['MTX_LOCK'] = Stat([], 'mutex lock calls')
@@ -55,12 +55,12 @@ idb_stats['FILE_PAGE_READ'] = Stat([], 'file: pages read from a file')
 idb_stats['FILE_PAGE_WRITE'] = Stat([], 'file: pages written to a file')
 
 ##########################################
-# IDB database statistics
+# IDB file statistics
 ##########################################
 idb_dstats = {}
 idb_dstats['BASE_RECNO'] = Stat([], 'base record number')
 idb_dstats['DUP_TREE'] = Stat([], 'duplicate data off-page trees')
-idb_dstats['FIXED_LEN'] = Stat([], 'database fixed-record size')
+idb_dstats['FIXED_LEN'] = Stat([], 'fixed-record size')
 idb_dstats['FREELIST_ENTRIES'] = Stat([], 'number of entries in the freelist')
 idb_dstats['INTLMAX'] = Stat([], 'maximum internal page size')
 idb_dstats['INTLMIN'] = Stat([], 'minimum internal page size')
