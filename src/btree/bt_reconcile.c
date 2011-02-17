@@ -182,7 +182,7 @@ err:	if (tmp != NULL)
 
 /*
  * __wt_rec_col_int --
- *	Reconcile a column store internal page.
+ *	Reconcile a column-store internal page.
  */
 static int
 __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
@@ -227,7 +227,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 /*
  * __wt_rec_row_int --
- *	Reconcile a row store, or off-page duplicate tree, internal page.
+ *	Reconcile a row-store, or off-page duplicate tree, internal page.
  */
 static int
 __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)

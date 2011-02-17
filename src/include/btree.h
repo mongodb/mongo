@@ -224,7 +224,7 @@ struct __wt_page {
 	 * cases, there is a single indx entry per key/data pair, but multiple
 	 * indx entries reference the same memory location.
 	 *
-	 * In column store fixed-length run-length encoded pages (that is,
+	 * In column-store fixed-length run-length encoded pages (that is,
 	 * WT_PAGE_COL_RLE type pages), a single indx entry may reference a
 	 * large number of records, because there's a single on-page entry that
 	 * represents many identical records.   (We can't expand those entries
@@ -235,8 +235,8 @@ struct __wt_page {
 	 */
 	uint32_t indx_count;		/* On-disk entry count */
 	union {				/* On-disk entry index */
-		WT_COL	*icol;		/* On-disk column store entries */
-		WT_ROW	*irow;		/* On-disk row store entries */
+		WT_COL	*icol;		/* On-disk column-store entries */
+		WT_ROW	*irow;		/* On-disk row-store entries */
 		void	*indx;		/* Generic index reference */
 	} u;
 
@@ -248,12 +248,12 @@ struct __wt_page {
 	 * single entry, the WT_REPL structures are formed into a forward-linked
 	 * list.
 	 *
-	 * Modifying (or deleting) run-length encoded column store records is
+	 * Modifying (or deleting) run-length encoded column-store records is
 	 * problematical, because the index entry would no longer reference
 	 * a set of identical items.  We handle this by "inserting" a new entry
 	 * into an array that behaves much like the rinsert array.  This is the
-	 * only case where it's possible to "insert" into a column store -- it's
-	 * normally only possible to append to a column store as insert requires
+	 * only case where it's possible to "insert" into a column-store -- it's
+	 * normally only possible to append to a column-store as insert requires
 	 * re-numbering all subsequent records.  (Berkeley DB did support the
 	 * re-numbering functionality, but it won't perform well and it isn't
 	 * useful enough to re-implement, IMNSHO.)
@@ -627,7 +627,7 @@ struct __wt_rle_expand {
 
 /*
  * WT_RLE_EXPAND_FOREACH --
- * Macro to walk the run-length encoded column store expansion  array of an
+ * Macro to walk the run-length encoded column-store expansion  array of an
  * in-memory page.
  */
 #define	WT_RLE_EXPAND_FOREACH(page, exp, i)				\
@@ -711,7 +711,7 @@ struct __wt_item {
  * data, which varies by type: a key, duplicate key, data or duplicate item is
  * followed by a set of bytes; a WT_OVFL structure follows an overflow form.
  * There are 2 additional types: (1) a deleted type (a place-holder for deleted
- * items where the item cannot be removed, for example, an column store item
+ * items where the item cannot be removed, for example, an column-store item
  * that must remain to preserve the record count); (2a) a subtree reference for
  * keys that reference subtrees without an associated record count (a row-store
  * internal page has a key/reference pairs for the tree containing all key/data
@@ -764,7 +764,7 @@ struct __wt_item {
  * We could merge the WT_ITEM_KEY and WT_ITEM_KEY_DUP types, but that requires
  * we know the page's type in order to know how an item might be encoded (that
  * is, if it's an off-page duplicate key, it's encoded using the Huffman data
- * coder, or if it's a Btree row store key, it's encoded using the Huffman key
+ * coder, or if it's a Btree row-store key, it's encoded using the Huffman key
  * encoder).
  *
  * We could use a single bit to mean overflow, merging all overflow types into
@@ -905,7 +905,7 @@ struct __wt_ovfl {
 #define	WT_OVFL_SIZE	8
 
 /*
- * On-page "deleted" flags for fixed-length column store data items -- steal
+ * On-page "deleted" flags for fixed-length column-store data items -- steal
  * the top bit of the data.
  */
 #define	WT_FIX_DELETE_BYTE	0x80

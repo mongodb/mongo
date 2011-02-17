@@ -57,7 +57,7 @@ __wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_INTLMAX].desc = "maximum internal page size";
 	stats[WT_STAT_INTLMIN].desc = "minimum internal page size";
 	stats[WT_STAT_ITEM_COL_DELETED].desc =
-	    "column store deleted data items";
+	    "column-store deleted data items";
 	stats[WT_STAT_ITEM_DATA_OVFL].desc = "total overflow data items";
 	stats[WT_STAT_ITEM_DUP_DATA].desc = "total duplicate data items";
 	stats[WT_STAT_ITEM_KEY_OVFL].desc = "total overflow keys";

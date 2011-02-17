@@ -21,7 +21,7 @@ __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data)
 	db = toc->db;
 	idb = db->idb;
 
-	/* Search the column store for the key. */
+	/* Search the column-store for the key. */
 	if (!F_ISSET(idb, WT_COLUMN)) {
 		__wt_api_db_errx(db,
 		    "row-store records cannot be retrieved by record number");

@@ -112,7 +112,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
-		 * Row store leaf pages support duplicates, so the real worst
+		 * Row-store leaf pages support duplicates, so the real worst
 		 * case is one key plus some number of duplicate data items.
 		 * The number is configurable, that is, you can configure when
 		 * a duplicate set is big enough to be pushed off the page;
@@ -388,7 +388,7 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 	 *
 	 * The page contains sorted key/offpage-reference pairs.  Keys are row
 	 * store internal pages with on-page/overflow (WT_ITEM_KEY/KEY_OVFL)
-	 * items, or row store duplicate internal pages with on-page/overflow
+	 * items, or row-store duplicate internal pages with on-page/overflow
 	 * (WT_ITEM_KEY_DUP/WT_ITEM_DATA_KEY_DUP_OVFL) items.  In both cases,
 	 * offpage references are WT_ITEM_OFF items.
 	 */

@@ -402,7 +402,7 @@ struct __wt_toc {
 	uint32_t srch_write_gen;	/*    page's write-generation */
 	void	 *srch_ip;		/*    WT_{COL,ROW} index */
 	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
-					/* RLE column store only: */
+					/* RLE column-store only: */
 	WT_RLE_EXPAND *srch_exp;	/*    WT_RLE_EXPAND array index */
 
 	/*

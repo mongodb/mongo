@@ -86,7 +86,7 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		break;
 	}
 
-	/* Free the run-length encoded column store expansion array. */
+	/* Free the run-length encoded column-store expansion array. */
 	switch (type) {
 	case WT_PAGE_COL_RLE:
 		if (page->u2.rleexp != NULL)
@@ -142,7 +142,7 @@ __wt_page_discard_repl(ENV *env, WT_PAGE *page)
 
 /*
  * __wt_page_discard_rleexp --
- *	Discard the run-length encoded column store expansion array.
+ *	Discard the run-length encoded column-store expansion array.
  */
 static void
 __wt_page_discard_rleexp(ENV *env, WT_PAGE *page)

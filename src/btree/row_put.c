@@ -31,7 +31,7 @@ __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data)
 
 /*
  * __wt_row_update --
- *	Row store delete and update.
+ *	Row-store delete and update.
  */
 static int
 __wt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)

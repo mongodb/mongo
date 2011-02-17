@@ -245,7 +245,7 @@ __wt_open_verify_page_sizes(DB *db)
 	}
 
 	/*
-	 * A fixed-size column store should be able to store at least 20
+	 * A fixed-size column-store should be able to store at least 20
 	 * objects on a page, otherwise it just doesn't make sense.
 	 */
 	if (F_ISSET(idb, WT_COLUMN) &&

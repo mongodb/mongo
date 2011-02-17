@@ -399,7 +399,7 @@ __wt_debug_repl(WT_REPL *repl, FILE *fp)
 
 /*
  * __wt_debug_rleexp --
- *	Dump a column store expansion array.
+ *	Dump a column-store expansion array.
  */
 static void
 __wt_debug_rleexp(WT_RLE_EXPAND *exp, FILE *fp)

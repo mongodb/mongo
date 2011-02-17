@@ -38,7 +38,7 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
 
 /*
  * __wt_col_update --
- *	Column store delete and update.
+ *	Column-store delete and update.
  */
 static int
 __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
@@ -65,22 +65,22 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	page = toc->srch_page;
 
 	/*
-	 * Run-length encoded (RLE) column store operations are hard because
+	 * Run-length encoded (RLE) column-store operations are hard because
 	 * each original on-disk index for an RLE can represent large numbers
 	 * of records, and we're only deleting a single one of those records,
 	 * which means working in the WT_RLE_EXPAND array.  All other column
 	 * store deletes are simple changes where a new WT_REPL entry is added
 	 * to the page's modification array.  There are three code paths:
 	 *
-	 * 1: column store deletes other than RLE column stores: delete an entry
+	 * 1: column-store deletes other than RLE column stores: delete an entry
 	 * from the on-disk page by creating a new WT_REPL entry, and linking it
 	 * into the WT_REPL array.
 	 *
-	 * 2: an RLE column store delete of an already modified record: create
+	 * 2: an RLE column-store delete of an already modified record: create
 	 * a new WT_REPL entry, and link it to the WT_RLE_EXPAND entry's WT_REPL
 	 * list.
 	 *
-	 * 3: an RLE column store delete of a record not yet modified: create
+	 * 3: an RLE column-store delete of a record not yet modified: create
 	 * a new WT_RLE_EXPAND/WT_REPL pair, and link it into the WT_RLE_EXPAND
 	 * array.
 	 */
@@ -153,7 +153,7 @@ err:		if (exp != NULL)
 
 /*
  * __wt_rle_expand_serial_func --
- *	Server function to expand a run-length encoded column store during a
+ *	Server function to expand a run-length encoded column-store during a
  *	delete.
  */
 int
@@ -195,7 +195,7 @@ err:	__wt_toc_serialize_wrapup(toc, page, ret);
 /*
  * __wt_rle_expand_repl_serial_func --
  *	Server function to update a WT_REPL entry in an already expanded
- *	run-length encoded column store during a delete.
+ *	run-length encoded column-store during a delete.
  */
 int
 __wt_rle_expand_repl_serial_func(WT_TOC *toc)

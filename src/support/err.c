@@ -146,7 +146,7 @@ __wt_file_method_type(DB *db, const char *name, int column_err)
 {
 	__wt_api_db_errx(db,
 	    "%s: this method is not supported for a %s file",
-	    name, column_err ? "column store" : "row store");
+	    name, column_err ? "column-store" : "row-store");
 	return (WT_ERROR);
 }
 
