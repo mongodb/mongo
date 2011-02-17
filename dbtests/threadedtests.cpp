@@ -155,6 +155,12 @@ namespace ThreadedTests {
             ASSERT_EQUALS(2u, u--);
             ASSERT_EQUALS(0u, --u);
             ASSERT_EQUALS(0u, u);
+            
+            u++;
+            ASSERT( u > 0 );
+
+            u--;
+            ASSERT( ! ( u > 0 ) );
         }
     };
 
