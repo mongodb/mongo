@@ -73,7 +73,7 @@ data_gen(DBT *data, int grow_ok)
 	 *
 	 * Add a few extra bytes in order to guarantee we can always offset
 	 * into the buffer by a few extra bytes, used to generate different
-	 * data for column-store run-length encoded databases.
+	 * data for column-store run-length encoded files.
 	 */
 	if (blen < g.c_data_max + 10) {
 		if (buf != NULL) {
@@ -100,7 +100,7 @@ data_gen(DBT *data, int grow_ok)
 	sprintf(buf, "%010u", ++r);
 	buf[10] = '/';
 
-	switch (g.c_database_type) {
+	switch (g.c_file_type) {
 	case FIX:
 		/*
 		 * If doing run-length encoding on the data, use different data

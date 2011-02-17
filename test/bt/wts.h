@@ -33,7 +33,7 @@
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % ((max + 1) - (min)) + (min))
 
-#define	FIX		1			/* Database types */
+#define	FIX		1			/* File types */
 #define	ROW		2
 #define	VAR		3
 
@@ -61,7 +61,7 @@ typedef struct {
 	u_int32_t c_cache;			/* Config values */
 	u_int32_t c_data_max;
 	u_int32_t c_data_min;
-	u_int32_t c_database_type;
+	u_int32_t c_file_type;
 	u_int32_t c_delete_pct;
 	u_int32_t c_duplicates_pct;
 	u_int32_t c_huffman_data;

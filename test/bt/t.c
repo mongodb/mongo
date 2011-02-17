@@ -72,7 +72,7 @@ main(int argc, char *argv[])
 		config_setup();
 		key_gen_setup();
 
-		bdb_startup();			/* Initial database config */
+		bdb_startup();			/* Initial file config */
 		if (wts_startup(log))
 			return (EXIT_FAILURE);
 
@@ -81,7 +81,7 @@ main(int argc, char *argv[])
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 
-		if (wts_verify())		/* Verify the database */
+		if (wts_verify())		/* Verify the file */
 			goto err;
 
 		/* XXX: can't get dups, don't have cursor ops yet. */
@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
-			switch (g.c_database_type) {
+			switch (g.c_file_type) {
 			case ROW:
 				if (wts_read_row_scan())
 					goto err;
@@ -105,20 +105,20 @@ main(int argc, char *argv[])
 			if (wts_ops())		/* Random operations */
 				goto err;
 
-			if (wts_verify())	/* Verify the database */
+			if (wts_verify())	/* Verify the file */
 				goto err;
 
 			wts_teardown();		/* Close and  re-open */
 			if (wts_startup(0))
 				goto err;
 
-			if (wts_verify())	/* Verify the database */
+			if (wts_verify())	/* Verify the file */
 				goto err;
 		}
 
 skip_ops:	if (wts_stats())		/* Statistics */
 			goto err;
-						/* Close the databases */
+						/* Close the file */
 		track("shutting down BDB", (u_int64_t)0);
 		bdb_teardown();	
 

@@ -88,7 +88,7 @@ wts_startup(int logfile)
 		return (1);
 	}
 
-	switch (g.c_database_type) {
+	switch (g.c_file_type) {
 	case FIX:
 		/*
 		 * XXX
@@ -168,7 +168,7 @@ wts_bulk_load()
 
 	db = g.wts_db;
 
-	switch (g.c_database_type) {
+	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
 		ret = db->bulk_load(db, 0, track, cb_bulk);
@@ -194,7 +194,7 @@ wts_dump()
 
 	db = g.wts_db;
 
-	/* Dump the WiredTiger database. */
+	/* Dump the WiredTiger file. */
 	track("dump", (u_int64_t)0);
 	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
@@ -208,7 +208,7 @@ wts_dump()
 	(void)fclose(fp);
 
 	track("dump comparison", (u_int64_t)0);
-	switch (g.c_database_type) {
+	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
 		p = "sh ./s_dumpcmp -c";
@@ -314,7 +314,7 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 		key_gen(&key, g.key_cnt);
 	data_gen(&data, 1);
 
-	switch (g.c_database_type) {
+	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
 		*keyp = NULL;
@@ -359,7 +359,7 @@ wts_ops()
 		 */
 		op = wts_rand() % 100;
 		if ((u_int32_t)op < g.c_delete_pct) {
-			switch (g.c_database_type) {
+			switch (g.c_file_type) {
 			case ROW:
 				if (wts_del_row(keyno))
 					return (1);
@@ -371,7 +371,7 @@ wts_ops()
 				break;
 			}
 		} else if ((u_int32_t)op < g.c_delete_pct + g.c_write_pct) {
-			switch (g.c_database_type) {
+			switch (g.c_file_type) {
 			case ROW:
 				if (wts_put_row(keyno))
 					return (1);
@@ -384,7 +384,7 @@ wts_ops()
 			}
 		}
 
-		switch (g.c_database_type) {
+		switch (g.c_file_type) {
 		case ROW:
 			if (wts_read_row(keyno))
 				return (1);
@@ -404,7 +404,7 @@ wts_ops()
 
 /*
  * wts_read_key_scan --
- *	Read and verify elements in a row database.
+ *	Read and verify elements in a row-store file.
  */
 int
 wts_read_row_scan()
@@ -440,7 +440,7 @@ wts_read_row_scan()
 
 /*
  * wts_read_row --
- *	Read and verify a single element in a row database.
+ *	Read and verify a single element in a row-store file.
  */
 static int
 wts_read_row(u_int64_t keyno)
@@ -491,7 +491,7 @@ wts_read_row(u_int64_t keyno)
 
 /*
  * wts_read_col_scan --
- *	Read and verify elements in a column database.
+ *	Read and verify elements in a column-store file.
  */
 int
 wts_read_col_scan()
@@ -516,7 +516,7 @@ wts_read_col_scan()
 
 /*
  * wts_read_col --
- *	Read and verify a single element in a column database.
+ *	Read and verify a single element in a column-store file.
  */
 static int
 wts_read_col(u_int64_t keyno)
@@ -567,7 +567,7 @@ wts_read_col(u_int64_t keyno)
 
 /*
  * wts_put_row --
- *	Replace an element in a row database.
+ *	Replace an element in a row-store file.
  */
 static int
 wts_put_row(u_int64_t keyno)
@@ -605,7 +605,7 @@ wts_put_row(u_int64_t keyno)
 
 /*
  * wts_put_col --
- *	Replace an element in a column database.
+ *	Replace an element in a column-store file.
  */
 static int
 wts_put_col(u_int64_t keyno)
@@ -642,7 +642,7 @@ wts_put_col(u_int64_t keyno)
 
 /*
  * wts_del_row --
- *	Delete an element from a row database.
+ *	Delete an element from a row-store file.
  */
 static int
 wts_del_row(u_int64_t keyno)
@@ -679,7 +679,7 @@ wts_del_row(u_int64_t keyno)
 
 /*
  * wts_del_col --
- *	Delete an element from a column database.
+ *	Delete an element from a column-store file.
  */
 static int
 wts_del_col(u_int64_t keyno)

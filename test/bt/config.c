@@ -27,18 +27,18 @@ config_setup(void)
 	if (!g.replay)
 		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
-	/* Pick a database type next, other items depend on it. */
-	cp = config_find("database_type");
+	/* Pick a file type next, other items depend on it. */
+	cp = config_find("file_type");
 	if (!(cp->flags & C_FIXED))
 		switch (MMRAND(0, 2)) {
 		case 0:
-			g.c_database_type = FIX;
+			g.c_file_type = FIX;
 			break;
 		case 1:
-			g.c_database_type = VAR;
+			g.c_file_type = VAR;
 			break;
 		case 2:
-			g.c_database_type = ROW;
+			g.c_file_type = ROW;
 			break;
 		}
 
@@ -112,15 +112,15 @@ config_dump(int error_display)
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
 		if (cp->type_mask != 0 &&
-		    ((g.c_database_type == FIX && !(cp->type_mask & C_FIX)) ||
-		    (g.c_database_type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.c_database_type == VAR && !(cp->type_mask & C_VAR))))
+		    ((g.c_file_type == FIX && !(cp->type_mask & C_FIX)) ||
+		    (g.c_file_type == ROW && !(cp->type_mask & C_ROW)) ||
+		    (g.c_file_type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
 		else {
-			if (!strcmp(cp->name, "database_type"))
+			if (!strcmp(cp->name, "file_type"))
 				fprintf(fp,
-				    "# database type: %s\n", config_dtype());
+				    "# file type: %s\n", config_dtype());
 			fprintf(fp, "%s=%lu\n", cp->name, (u_long)*cp->v);
 		}
 
@@ -195,14 +195,14 @@ config_translate(char *s)
 	if (isdigit(s[0]))
 		return (uint32_t)atoi(s);
 
-	/* Currently, all we translate are the database type names. */
-	if (strcmp(s, "row") == 0 || strcmp(s, "row store") == 0)
+	/* Currently, all we translate are the file type names. */
+	if (strcmp(s, "row") == 0 || strcmp(s, "row-store") == 0)
 		return ((uint32_t)ROW);
 	if (strcmp(s, "vlcs") == 0 ||
-	    strcmp(s, "variable-length column store") == 0)
+	    strcmp(s, "variable-length column-store") == 0)
 		return ((uint32_t)VAR);
 	if (strcmp(s, "flcs") == 0 ||
-	    strcmp(s, "fixed-length column store") == 0)
+	    strcmp(s, "fixed-length column-store") == 0)
 		return ((uint32_t)FIX);
 
 	fprintf(stderr, "%s: %s: unknown configuration value\n", g.progname, s);
@@ -231,20 +231,20 @@ config_find(const char *s)
 
 /*
  * config_dtype --
- *	Return the database type as a string.
+ *	Return the file type as a string.
  */
 static const char *
 config_dtype()
 {
-	switch (g.c_database_type) {
+	switch (g.c_file_type) {
 	case FIX:
-		return ("fixed-length column store");
+		return ("fixed-length column-store");
 	case VAR:
-		return ("variable-length column store");
+		return ("variable-length column-store");
 	case ROW:
-		return ("row store");
+		return ("row-store");
 	default:
 		break;
 	}
-	return ("error: UNKNOWN DATABASE TYPE");
+	return ("error: UNKNOWN FILE TYPE");
 }

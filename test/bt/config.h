@@ -5,10 +5,10 @@
 typedef struct {
 	const char	*name;			/* Configuration item */
 
-#define	C_FIX		0x01			/* Database types */
+#define	C_FIX		0x01			/* File types */
 #define	C_VAR		0x02
 #define	C_ROW		0x04
-	u_int8_t	 type_mask;		/* Database type mask */
+	u_int8_t	 type_mask;		/* File type mask */
 
 #define	C_BOOL		0x01			/* Value is a boolean, yes/no if roll 1 between 1 and N. */
 #define	C_FIXED		0x02			/* Value was set from command-line or file, ignore for this run. */
@@ -27,7 +27,7 @@ static CONFIG c[] = {
 	{ "cache",		0,		0,		1,	30,		&g.c_cache },
 	{ "data_max",		C_ROW|C_VAR,	0,		32,	4096,		&g.c_data_max },
 	{ "data_min",		0,		0,		10,	32,		&g.c_data_min },
-	{ "database_type",	0,		C_IGNORE,	1,	3,		&g.c_database_type },
+	{ "file_type",	0,		C_IGNORE,	1,	3,		&g.c_file_type },
 	{ "delete_pct",		0,		0,		0,	45,		&g.c_delete_pct },
 	{ "duplicates_pct",	C_ROW,		C_IGNORE,	0,	80,		&g.c_duplicates_pct },
 	{ "huffman_data",	C_ROW|C_VAR,	C_BOOL,		0,	10,		&g.c_huffman_data },
