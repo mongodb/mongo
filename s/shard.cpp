@@ -1,20 +1,20 @@
 // shard.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ *    Copyright (C) 2008 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "pch.h"
 #include "shard.h"
@@ -218,27 +218,27 @@ namespace mongo {
         _addr = addr;
         if ( _addr.size() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
-	    _rsInit();
-	}
+            _rsInit();
+        }
     }
 
     void Shard::_rsInit() {
-      if ( _cs.type() == ConnectionString::SET ) {
-	string x = _cs.getSetName();
-	if ( x.size() == 0 ) {
-	  warning() << "no set name for shard: " << _name << " " << _cs.toString() << endl;
-	}
-	assert( x.size() );
-	_rs = ReplicaSetMonitor::get( x , _cs.getServers() );
-      }
+        if ( _cs.type() == ConnectionString::SET ) {
+            string x = _cs.getSetName();
+            if ( x.size() == 0 ) {
+                warning() << "no set name for shard: " << _name << " " << _cs.toString() << endl;
+            }
+            assert( x.size() );
+            _rs = ReplicaSetMonitor::get( x , _cs.getServers() );
+        }
     }
 
     void Shard::setAddress( const ConnectionString& cs) {
         assert( _name.size() );
-	_addr = cs.toString();
-	_cs = cs;
-	_rsInit();
-	staticShardInfo.set( _name , *this , true , false );
+        _addr = cs.toString();
+        _cs = cs;
+        _rsInit();
+        staticShardInfo.set( _name , *this , true , false );
     }
 
     void Shard::reset( const string& ident ) {
