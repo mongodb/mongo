@@ -54,7 +54,7 @@ namespace mongo {
             virtual void init( State * state ) = 0;
 
             virtual BSONObj reduce( const BSONList& tuples ) = 0;
-            /** this means its a fianl reduce, even if there is no finalizer */
+            /** this means its a final reduce, even if there is no finalizer */
             virtual BSONObj finalReduce( const BSONList& tuples , Finalizer * finalizer ) = 0;
         };
 
@@ -67,7 +67,7 @@ namespace mongo {
         class JSFunction : boost::noncopyable {
         public:
             /**
-             * @param type (map|reduce|finalzie)
+             * @param type (map|reduce|finalize)
              */
             JSFunction( string type , const BSONElement& e );
             virtual ~JSFunction() {}
