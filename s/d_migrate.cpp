@@ -140,6 +140,13 @@ namespace mongo {
         OldDataCleanup(){
             _numThreads++;
         }
+        OldDataCleanup( const OldDataCleanup& other ) {
+            ns = other.ns;
+            min = other.min.getOwned();
+            max = other.max.getOwned();
+            initial = other.initial;
+            _numThreads++;
+        }
         ~OldDataCleanup(){
             _numThreads--;
         }
@@ -1458,7 +1465,10 @@ namespace mongo {
             }
             
             if ( OldDataCleanup::_numThreads > 0 ) {
-                errmsg = "still waiting for a previous migrates data to get cleaned, can't accept new chunks";
+                errmsg = 
+                    str::stream() 
+                    << "still waiting for a previous migrates data to get cleaned, can't accept new chunks, num threads: " 
+                    << OldDataCleanup::_numThreads;
                 return false;
             }
 
