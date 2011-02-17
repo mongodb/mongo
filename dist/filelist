@@ -4,8 +4,8 @@
 src/api/api.c
 src/api/cur_std.c
 src/api/pack.c
-src/api/version.c
 src/api/strerror.c
+src/api/version.c
 src/btree/bt_alloc.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
@@ -27,6 +27,7 @@ src/btree/bt_rw.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
 src/btree/bt_vrfy.c
+src/btree/bt_vrfy_dsk.c
 src/btree/bt_walk.c
 src/btree/col_get.c
 src/btree/col_put.c

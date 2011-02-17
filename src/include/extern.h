@@ -136,6 +136,9 @@ int
 __wt_verify_dsk_page(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
+__wt_verify_dsk_chunk(
+    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+int
 __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
     uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
 int
