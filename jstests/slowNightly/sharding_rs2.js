@@ -157,6 +157,7 @@ assert.eq( 100 , ts.find().itcount() , "E5" )
 printjson( ts.find().batchSize(5).explain() )
 assert.eq( 100 , ts.find().batchSize(5).itcount() , "E6" )
 
+printjson( db.adminCommand( "getShardMap" ) );
 
 
 s.stop()

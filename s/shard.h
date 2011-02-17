@@ -68,6 +68,8 @@ namespace mongo {
         void reset( const string& ident );
 
         void setAddress( const ConnectionString& cs );
+        
+        ConnectionString getAddress() const { return _cs; }
 
         string getName() const {
             assert( _name.size() );

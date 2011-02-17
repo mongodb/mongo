@@ -20,6 +20,7 @@
 #include "shard.h"
 #include "config.h"
 #include "request.h"
+#include "../db/commands.h"
 #include <set>
 
 namespace mongo {
@@ -76,13 +77,7 @@ namespace mongo {
 
                 Shard s( name , host , maxSize , isDraining );
                 _lookup[name] = s;
-                _lookup[host] = s;
-
-                // add rs name to lookup (if it exists)
-                size_t pos;
-                if ((pos = host.find('/', 0)) != string::npos) {
-                    _lookup[host.substr(0, pos)] = s;
-                }
+                _installHost( host , s );
             }
 
         }
@@ -119,7 +114,22 @@ namespace mongo {
             if ( setName )
                 _lookup[name] = s;
             if ( setAddr )
-	        _lookup[s.getConnString()] = s;
+                _installHost( s.getConnString() , s );
+        }
+
+        void _installHost( const string& host , const Shard& s ) {
+            _lookup[host] = s;
+            
+            const ConnectionString& cs = s.getAddress();
+            if ( cs.type() == ConnectionString::SET ) {
+                if ( cs.getSetName().size() )
+                    _lookup[ cs.getSetName() ] = s;
+                
+                vector<HostAndPort> servers = cs.getServers();
+                for ( unsigned i=0; i<servers.size(); i++ ) {
+                    _lookup[ servers[i].toString() ] = s;
+                }
+            }
         }
         
         void remove( const string& name ) {
@@ -169,11 +179,40 @@ namespace mongo {
 
             return false;
         }
+        
+        bool getShardMap( BSONObjBuilder& result , string& errmsg ) const {
+            scoped_lock lk( _mutex );
+
+            BSONObjBuilder b( _lookup.size() + 50 );
+
+            for ( map<string,Shard>::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
+                b.append( i->first , i->second.getConnString() );
+            }
+            
+            result.append( "map" , b.obj() );
+            
+            return true;
+        }
 
     private:
         map<string,Shard> _lookup;
         mutable mongo::mutex _mutex;
     } staticShardInfo;
+
+    
+    class CmdGetShardMap : public Command {
+    public:
+        CmdGetShardMap() : Command( "getShardMap" ){}
+        virtual void help( stringstream &help ) const { help<<"internal"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+
+        virtual bool run(const string&, mongo::BSONObj&, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
+            return staticShardInfo.getShardMap( result , errmsg );
+        }
+    } cmdGetShardMap;
+    
 
     void Shard::_setAddr( const string& addr ) {
         _addr = addr;
