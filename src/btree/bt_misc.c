@@ -33,22 +33,33 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 
 /*
  * __wt_key_item_next --
- *	Helper function for the WT_INDX_AND_KEY_FOREACH macro, move to the
- *	next key WT_ITEM on the page.
+ *	Move to the next key WT_ITEM on the page (helper function for the
+ *	WT_INDX_AND_KEY_FOREACH macro).
  */
 inline WT_ITEM *
 __wt_key_item_next(WT_PAGE *page, WT_ROW *rip, WT_ITEM *key_item)
 {
-	/* If it's a duplicate entry, we're pointing to the appropriate key. */
-	if (WT_ROW_INDX_IS_DUPLICATE(page, rip))
-		return (key_item);
-
-	/* Move to the next key WT_ITEM on the page. */
-	do {
+	/*
+	 * On row-store leaf pages check for duplicate entries, in which case
+	 * we're already referencing the correct key.
+	 *
+	 * On row-store off-page duplicate tree leaf pages, just move to the
+	 * next entry.
+	 */
+	switch (page->dsk->type) {
+	case WT_PAGE_DUP_LEAF:
 		key_item = WT_ITEM_NEXT(key_item);
-	} while (
-	    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY &&
-	    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY_OVFL);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		if (WT_ROW_INDX_IS_DUPLICATE(page, rip))
+			return (key_item);
+		do {
+			key_item = WT_ITEM_NEXT(key_item);
+		} while (
+		    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY &&
+		    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY_OVFL);
+		break;
+	}
 
 	return (key_item);
 }
