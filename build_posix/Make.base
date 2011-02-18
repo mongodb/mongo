@@ -18,5 +18,7 @@ INCLUDES= -I../src/include
 Makefile.am: Make.base makemake ../dist/filelist
 	@sh makemake
 
-../src/include/extern.h: $(libwiredtiger_a_SOURCES)
+../src/include/extern.h: prototype.chk
+
+prototype.chk: $(libwiredtiger_a_SOURCES)
 	@cd ../dist && sh s_prototypes && touch $@
