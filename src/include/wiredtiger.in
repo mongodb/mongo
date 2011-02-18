@@ -47,9 +47,9 @@ extern "C" {
 @uintptr_t_decl@
 
 #ifdef DOXYGEN
-#define __F(func) func
+#define	__F(func) func
 #else
-#define __F(func) (*func)
+#define	__F(func) (*func)
 #endif
 
 /*! @defgroup wt WiredTiger API

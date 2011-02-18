@@ -296,7 +296,7 @@ config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 		conf->go = gostruct;
 
 	while (conf->cur < conf->end) {
-		switch(conf->go[(int)*conf->cur]) {
+		switch (conf->go[(int)*conf->cur]) {
 		case A_LOOP:
 			break;
 

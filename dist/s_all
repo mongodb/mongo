@@ -41,14 +41,15 @@ run "python api_err.py" "Building error return API"
 run "python stat.py" "Building statistics support"
 run "python serial.py" "Building serial function support"
 
-run "sh ./s_prototypes" "Building prototypes for include files"
+run "sh ./s_prototypes" "Building function prototypes"
 run "sh ./s_readme" "Building README file"
 run "sh ./s_tags" "Building tags files"
-run "sh ./s_whitespace" "Removing trailing whitespace from source files"
 
-run "sh ./s_copyright" "Checking for incorrect copyright notices"
-run "sh ./s_define" "Checking for unused #defines"
-run "sh ./s_types" "Checking for incorrect types"
+run "sh ./s_copyright" "Checking copyright notices"
+run "sh ./s_define" "Checking unused #defines"
+run "sh ./s_style" "Checking style"
+run "sh ./s_types" "Checking incorrect types"
+run "sh ./s_whitespace" "Checking whitespace"
 
 run "sh ./s_docs" "Generating documentation"
 

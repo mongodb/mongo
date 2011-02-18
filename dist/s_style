@@ -1,0 +1,37 @@
+#! /bin/sh
+
+# General style correction and cleanup..
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+extra=`cd .. && echo src/include/*.h src/include/*.in dist/*.py`
+(
+for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
+	f="../$f"
+	if grep "while (0);" $f > /dev/null; then
+		echo "$f: while (0) has trailing semi-colon"
+	fi
+	if grep "%dl|%ul|%xl" $f > /dev/null; then
+		echo "$f: bad printf format: %[dux]l"
+	fi
+	if grep "(unsigned)" $f > /dev/null; then
+		echo "$f: (unsigned) cast is wrong"
+	fi
+	tr -cd '[:alnum:][:space:][:punct:]' < $f |
+	unexpand |
+	sed -e 's/){/) {/' \
+	    -e 's/\([	 ]\)exit (/\1exit(/g' \
+	    -e 's/\([	 ]\)for(/\1for (/' \
+	    -e 's/\([	 ]\)if(/\1if (/' \
+	    -e 's/\([	 ]\)index(/\1strchr(/' \
+	    -e 's/\([	 ]\)return(/\1return (/' \
+	    -e 's/\([	 ]\)rindex(/\1strrchr(/' \
+	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
+	    -e 's/\([	 ]\)switch(/\1switch (/' \
+	    -e 's/\([	 ]\)while(/\1while (/' \
+	    -e 's/(void) /(void)/' \
+	    -e 's/(unsigned)/(unsigned int)/' \
+	    -e 's/^#define /#define	/' >$t
+
+	cmp $t $f > /dev/null 2>&1 || (echo "$f" && cp $t $f)
+done)

@@ -55,7 +55,7 @@ __wt_verify_build(void)
 	 * to avoid writing 4 extra bytes to the file.
 	 */
 	STATIC_ASSERT(sizeof(WT_PAGE_DISK) ==
-	    WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof (void *)));
+	    WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof(void *)));
 
 	/* There are also structures that must be aligned correctly. */
 #define	ALIGN_CHECK(s, a)	STATIC_ASSERT(WT_ALIGN((s), (a)) == (s))

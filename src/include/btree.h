@@ -293,7 +293,7 @@ struct __wt_page {
  * that into account.
  */
 #define	WT_PAGE_SIZE							\
-    WT_ALIGN((6 * sizeof(void *) + 9 * sizeof(uint32_t)), sizeof (void *))
+    WT_ALIGN((6 * sizeof(void *) + 9 * sizeof(uint32_t)), sizeof(void *))
 
 /*
  * There are 4 different arrays which map one-to-one to the original on-disk
