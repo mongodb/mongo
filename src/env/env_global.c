@@ -61,5 +61,7 @@ __wt_attach(ENV *env)
 	    "process ID %lld: waiting for debugger...", (long long)getpid());
 	while (__wt_debugger_attach == 0)
 		__wt_sleep(10, 0);
+#else
+	WT_UNUSED(env);
 #endif
 }

@@ -9,16 +9,29 @@
 
 size_t wiredtiger_struct_sizev(const char *fmt, va_list ap)
 {
+	WT_UNUSED(fmt);
+	WT_UNUSED(ap);
+
 	return 0;
 }
 
 int wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 {
+	WT_UNUSED(buffer);
+	WT_UNUSED(size);
+	WT_UNUSED(fmt);
+	WT_UNUSED(ap);
+
 	return 0;
 }
 
 int wiredtiger_struct_unpackv(const void *buffer, size_t size, const char *fmt, va_list ap)
 {
+	WT_UNUSED(buffer);
+	WT_UNUSED(size);
+	WT_UNUSED(fmt);
+	WT_UNUSED(ap);
+
 	return 0;
 }
 

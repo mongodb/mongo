@@ -108,6 +108,9 @@ session_ops(WT_SESSION *session)
 static int
 my_cursor_size(WT_CURSOR_FACTORY *factory, const char *obj, size_t *sizep)
 {
+	(void)factory;
+	(void)obj;
+
 	*sizep = sizeof (WT_CURSOR);
 	return (0);
 }
@@ -117,6 +120,14 @@ my_init_cursor(WT_CURSOR_FACTORY *factory, WT_SESSION *session,
     const char *obj, WT_CURSOR *old_cursor, const char *config,
     WT_CURSOR *new_cursor)
 {
+	/* Unused parameters */
+	(void)factory;
+	(void)session;
+	(void)obj;
+	(void)old_cursor;
+	(void)config;
+	(void)new_cursor;
+
 	return (0);
 }
 /* End implementation of WT_CURSOR_FACTORY. */
@@ -137,6 +148,10 @@ static int
 my_compare(WT_SESSION *session, WT_COLLATOR *collator,
     const WT_DATAITEM *value1, const WT_DATAITEM *value2, int *cmp)
 {
+	/* Unused parameters */
+	(void)session;
+	(void)collator;
+
 	*cmp = strcmp((const char *)value1->data, (const char *)value2->data);
 	return (0);
 }
@@ -158,6 +173,11 @@ my_extract(WT_SESSION *session, WT_EXTRACTOR *extractor,
     const WT_DATAITEM *key, const WT_DATAITEM *value,
     WT_DATAITEM *result)
 {
+	/* Unused parameters */
+	(void)session;
+	(void)extractor;
+	(void)key;
+
 	*result = *value;
 	return (0);
 }

@@ -58,6 +58,8 @@ __wt_db_column_set_verify(
 	ENV *env;
 	IDB *idb;
 
+	WT_UNUSED(dictionary);
+
 	env = db->env;
 	idb = db->idb;
 
