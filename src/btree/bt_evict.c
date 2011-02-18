@@ -17,7 +17,7 @@ static int  __wt_evict_page_subtrees(WT_PAGE *);
 static void __wt_evict_set(WT_TOC *);
 static void __wt_evict_state_check(WT_TOC *);
 static int  __wt_evict_walk(WT_TOC *);
-static int  __wt_evict_walk_single(WT_TOC *, IDB *, uint);
+static int  __wt_evict_walk_single(WT_TOC *, IDB *, u_int);
 static void __wt_evict_write(WT_TOC *);
 
 #ifdef HAVE_DIAGNOSTIC
@@ -200,7 +200,7 @@ __wt_evict(WT_TOC *toc)
 	ENV *env;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	uint elem, i, j;
+	u_int elem, i, j;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -284,7 +284,7 @@ __wt_evict_walk(WT_TOC *toc)
 	IDB *idb;
 	IENV *ienv;
 	WT_CACHE *cache;
-	uint elem, i;
+	u_int elem, i;
 	int ret;
 
 	env = toc->env;
@@ -322,7 +322,7 @@ __wt_evict_walk(WT_TOC *toc)
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__wt_evict_walk_single(WT_TOC *toc, IDB *idb, uint slot)
+__wt_evict_walk_single(WT_TOC *toc, IDB *idb, u_int slot)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -375,7 +375,7 @@ __wt_evict_db_clear(WT_TOC *toc)
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	uint i;
+	u_int i;
 
 	env = toc->env;
 	idb = toc->db->idb;
@@ -404,7 +404,7 @@ __wt_evict_set(WT_TOC *toc)
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_REF *ref;
-	uint i;
+	u_int i;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -439,7 +439,7 @@ __wt_evict_hazard_check(WT_TOC *toc)
 	WT_PAGE **hazard, **end_hazard, *page;
 	WT_REF *ref;
 	WT_STATS *stats;
-	uint i;
+	u_int i;
 
 	env = toc->env;
 	ienv = env->ienv;
@@ -510,7 +510,7 @@ __wt_evict_state_check(WT_TOC *toc)
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
 	WT_REF *ref;
-	uint i;
+	u_int i;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -576,7 +576,7 @@ __wt_evict_write(WT_TOC *toc)
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
 	WT_REF *ref;
-	uint i;
+	u_int i;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -617,7 +617,7 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_STATS *stats;
-	uint i;
+	u_int i;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -814,7 +814,7 @@ __wt_evict_dump(WT_TOC *toc)
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_MBUF mb;
-	uint n;
+	u_int n;
 	int sep;
 
 	env = toc->env;

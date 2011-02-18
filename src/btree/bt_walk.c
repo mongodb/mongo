@@ -227,7 +227,7 @@ __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 	WT_PAGE *page, *child;
 	WT_REF *ref;
 	WT_WALK_ENTRY *e;
-	uint elem;
+	u_int elem;
 
 	env = toc->env;
 	db = toc->db;

@@ -20,8 +20,8 @@ struct __wt_walk_entry {
 
 struct __wt_walk {
 	WT_WALK_ENTRY *tree;
-	uint	tree_len;	/* Tree stack in bytes */
-	uint	tree_slot;	/* Current tree stack slot */
+	u_int	tree_len;	/* Tree stack in bytes */
+	u_int	tree_slot;	/* Current tree stack slot */
 };
 
 #if defined(__cplusplus)
