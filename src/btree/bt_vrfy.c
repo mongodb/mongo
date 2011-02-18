@@ -688,7 +688,7 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 			/*
 			 * WT_ITEM_DATA_XXX types are listed because the data
 			 * items for off-page duplicate trees are sorted, and
-			 * the WT_ROW "key" item actually reference data items.
+			 * the WT_ROW "key" item actually references data items.
 			 */
 			switch (WT_ITEM_TYPE(key_item)) {
 			case WT_ITEM_DATA_DUP_OVFL:
