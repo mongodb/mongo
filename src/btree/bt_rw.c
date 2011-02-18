@@ -25,7 +25,6 @@ __wt_page_disk_read(
 	env = toc->env;
 	fh = db->idb->fh;
 
-
 	WT_STAT_INCR(db->idb->stats, FILE_PAGE_READ);
 	WT_STAT_INCR(env->ienv->cache->stats, CACHE_PAGE_READ);
 
@@ -69,7 +68,6 @@ __wt_page_disk_write(
 	db = toc->db;
 	env = toc->env;
 	fh = db->idb->fh;
-
 
 	/*
 	 * We increment the page LSN in non-transactional stores so it's easy

@@ -187,7 +187,6 @@ struct WT_CURSOR {
 	void __F(set_value)(WT_CURSOR *cursor, ...);
 	/*! @} */
 
-
 	/*! @name Cursor positioning
 	 * @{
 	 */
@@ -257,7 +256,6 @@ struct WT_CURSOR {
 	 */
 	int __F(search_near)(WT_CURSOR *cursor, int *exactp);
 	/*! @} */
-
 
 	/*! @name Data modification
 	 * @{
@@ -682,7 +680,6 @@ struct WT_CONNECTION {
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
 	    WT_EXTRACTOR *extractor, const char *config);
-
 
 	/*! Close a connection.
 	 *

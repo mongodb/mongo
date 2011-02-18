@@ -21,7 +21,6 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 	env = toc->env;
 	db = toc->db;
 
-
 	/*
 	 * Read an overflow page, using an overflow structure from a page for
 	 * which we (better) have a hazard reference.

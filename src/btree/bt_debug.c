@@ -180,7 +180,6 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	}
 	fprintf(fp, "\n");
 
-
 	/* Dump the WT_{ROW,COL}_INDX array. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
