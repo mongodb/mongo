@@ -407,7 +407,7 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 			__wt_key_set_process(rip, item);
 			break;
 		case WT_ITEM_OFF:
-			rip->data = item;
+			rip->data = WT_ITEM_BYTE(item);
 			++rip;
 			break;
 		WT_ILLEGAL_FORMAT(db);
@@ -483,7 +483,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 			rip->data = item;
 			break;
 		case WT_ITEM_OFF_RECORD:
-			rip->data = item;
+			rip->data = WT_ITEM_BYTE(item);
 			off_page_dups = 1;
 			break;
 		WT_ILLEGAL_FORMAT(db);

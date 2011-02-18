@@ -259,7 +259,7 @@ __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_INDX_FOREACH(page, cip, i) {
-		off_record = cip->data;
+		off_record = WT_COL_OFF(cip);
 		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
 		    (u_long)off_record->addr, (u_long)off_record->size,
 		    (unsigned long long)WT_RECORDS(off_record));
@@ -372,7 +372,7 @@ __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
 			__wt_debug_dbt("\tkey", rip, fp);
-		off = rip->data;
+		off = WT_ROW_OFF(rip);
 		fprintf(fp, "\toffpage: addr %lu, size %lu\n",
 		    (u_long)off->addr, (u_long)off->size);
 	}

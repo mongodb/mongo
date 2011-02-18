@@ -597,7 +597,7 @@ struct __wt_rle_expand {
  * that holds the key.  At that point we've lost any reference to the original
  * WT_ITEM structure.  If we need the original key (for example, if reconciling
  * the page, or verifying or freeing overflow references, the WT_ROW structure
- * no longer gets us there.  As these are relatively rare operations performed
+ * no longer gets us there).  As these are relatively rare operations performed
  * on (hopefully!) relatively rare key types, we don't want to grow the WT_ROW
  * structure by sizeof(void *).  Instead, walk the original page at the same
  * time we walk the WT_PAGE array so we can find the original key WT_ITEM.
@@ -656,9 +656,9 @@ struct __wt_rle_expand {
  * is a WT_OFF structure, which contains a page addr/size pair.
  */
 #define	WT_ROW_OFF(ip)							\
-	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
+	((WT_OFF *)(((WT_ROW *)ip)->data))
 #define	WT_ROW_OFF_RECORD(ip)						\
-	((WT_OFF_RECORD *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
+	((WT_OFF_RECORD *)(((WT_ROW *)ip)->data))
 
 /*
  * On column-store internal pages, the on-page data referenced by the WT_COL
