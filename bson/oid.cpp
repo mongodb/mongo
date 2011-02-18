@@ -31,7 +31,7 @@ namespace mongo {
         unsigned pid;
 #if defined(_WIN32)
         pid = (unsigned short) GetCurrentProcessId();
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__sunos__)
         pid = (unsigned short) getpid();
 #else
         pid = (unsigned short) security.getNonce();
