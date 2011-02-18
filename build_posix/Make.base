@@ -21,4 +21,4 @@ Makefile.am: Make.base makemake ../dist/filelist
 ../src/include/extern.h: prototype.chk
 
 prototype.chk: $(libwiredtiger_a_SOURCES)
-	@cd ../dist && sh s_prototypes && touch $@
+	@(cd ../dist && sh s_prototypes) && touch $@
