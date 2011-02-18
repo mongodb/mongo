@@ -41,15 +41,16 @@ __wt_key_item_next(WT_PAGE *page, WT_ROW *rip, WT_ITEM *key_item)
 {
 	/*
 	 * On row-store leaf pages check for duplicate entries, in which case
-	 * we're already referencing the correct key.
+	 * we're already referencing the correct key, and when moving forward,
+	 * skip items until we find another key.
 	 *
-	 * On row-store off-page duplicate tree leaf pages, just move to the
-	 * next entry.
+	 * On row-store and duplicate internal pages, skip over the next item,
+	 * the key/value items appear in key/WT_OFF pairs.
+	 *
+	 * On off-page duplicate leaf pages, move to the next entry, there are
+	 * no other kinds of entries.
 	 */
 	switch (page->dsk->type) {
-	case WT_PAGE_DUP_LEAF:
-		key_item = WT_ITEM_NEXT(key_item);
-		break;
 	case WT_PAGE_ROW_LEAF:
 		if (WT_ROW_INDX_IS_DUPLICATE(page, rip))
 			return (key_item);
@@ -58,6 +59,13 @@ __wt_key_item_next(WT_PAGE *page, WT_ROW *rip, WT_ITEM *key_item)
 		} while (
 		    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY &&
 		    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY_OVFL);
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_DUP_INT:
+		key_item = WT_ITEM_NEXT(key_item);
+		/* FALLTHROUGH */
+	case WT_PAGE_DUP_LEAF:
+		key_item = WT_ITEM_NEXT(key_item);
 		break;
 	}
 
