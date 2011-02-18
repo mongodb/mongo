@@ -1,11 +1,59 @@
 /*! @page packing Packing and Unpacking Data
 
-The tables we have seen so far have all had simple key/value pairs for records.
-
-@todo Describe what WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT_CURSOR::set_value are all about.
-
 - native C structs
 - portability between programming languages
+
+WiredTiger's data packing uses format strings mostly as specified in the Python
+struct module:
+  http://docs.python.org/library/struct
+
+The first character of the format string can be used to indicate the byte
+order, size and alignment of the packed data, according to the following
+table:
+
+<table>
+@hrow{Character, Byte order, Size, Alignment}
+@row{<tt>.</tt>, big-endian, packed, none}
+@row{<tt>&gt;</tt>, big-endian, standard, none}
+@row{<tt>\@</tt>, native, native, native}
+</table>
+
+If the first character is not one of these, '.' (big-endian, packed) is
+assumed: it naturally sorts in lexicographic order, and the packed format
+uses variable-sized encoding of values to reduce the data size.
+
+Format characters:
+<table>
+@hrow{Format, C Type, Java type, Java type, Standard size}
+@row{x, pad byte, N/A, N/A, 1}
+@row{c, char, char, string of length 1, 1}
+@row{b, signed char, byte, integer, 1}
+@row{B, unsigned char, byte, integer, 1}
+@row{?, _Bool, boolean, bool, 1}
+@row{h, short, short, integer, 2}
+@row{H, unsigned short, short, integer, 2}
+@row{i, int, int, integer, 4}
+@row{I, unsigned int, int, integer, 4}
+@row{l, long, int, integer, 4}
+@row{L, unsigned long, int, integer, 4}
+@row{q, long long, long, integer, 8}
+@row{Q, unsigned long long, long, integer, 8}
+@row{f, float, float, float, 4}
+@row{d, double, double, float, 8}
+@row{r, ::wiredtiger_recno_t, long, integer, 8}
+@row{s, char[], String, string, fixed length}
+@row{S, char[], String, string, variable}
+@row{u, WT_DATAITEM, byte[], string, variable}
+</table>
+
+The <code>'S'</code> type is encoded as a C language string terminated by a
+NUL character.
+
+The <code>'u'</code> type is for raw byte arrays: if it appears at the end
+of a format string (including in the default <code>"u"</code> format for
+untyped tables), the size is not stored explicitly.  When <code>'u'</code>
+appears within a format string, the size is stored as a 32-bit integer in
+the same byte order as the rest of the format string, followed by the data.
 
 @section config_examples Code Samples
 

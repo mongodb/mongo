@@ -6,5 +6,16 @@ type doxygen > /dev/null 2>&1 || {
 	return 1
 }
 
+filter=
+while :
+	do case "$1" in
+	-b)     # Include the Berkeley DB cross-reference
+		filter="| sed 's,src/bdb-map.dox,,'"
+		shift;;
+	*)
+		break;;
+	esac
+done
+
 # Run doxygen to generate HTML documentation.
-cd ../docs && (cat Doxyfile ; echo "QUIET=YES") | doxygen -
+cd ../docs && (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen -

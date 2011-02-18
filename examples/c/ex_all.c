@@ -25,8 +25,6 @@ void add_collator(WT_CONNECTION *conn);
 void add_extractor(WT_CONNECTION *conn);
 void connection_ops(WT_CONNECTION *conn);
 
-const char *home = "WT_TEST";
-
 void
 cursor_ops(WT_CURSOR *cursor)
 {
@@ -223,7 +221,8 @@ int main(void)
 	int ret;
 
 	WT_CONNECTION *conn;
-	ret = wiredtiger_open("wt_data", NULL, "create,transactional", &conn);
+	const char *home = "WT_TEST";
+	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 
 	fprintf(stderr, "Error during operation: %s\n", wiredtiger_strerror(ret));
 

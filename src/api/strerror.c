@@ -16,6 +16,8 @@ wiredtiger_strerror(int error)
 		return ("Successful return: 0");
 
 	switch (error) {
+	case WT_DEADLOCK:
+		return ("WT_DEADLOCK: conflict with concurrent operation");
 	case WT_ERROR:
 		return ("WT_ERROR: non-specific WiredTiger error");
 	case WT_NOTFOUND:

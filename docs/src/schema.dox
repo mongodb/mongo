@@ -1,5 +1,7 @@
 /*! @page schema Schemas
 
+The tables we have seen so far have all had simple key/value pairs for records.  We now explain how to deal with more complex data in WiredTiger.
+
 @section schema_intro Tables, Rows and Columns
 
 A table is a logical representation of data consisting of cells in rows and columns.  For example, a database might have this table.
@@ -33,6 +35,16 @@ A column-oriented database stores all of the values of a column together, then t
 WiredTiger supports both storage formats, and can mix and match the storage of columns within a logical table.
 
 Applications describe the format of their data by supplying a schema to WT_SESSION::create_table.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
+
+@section schema_types Column types
+
+@todo decribe types
+
+See @ref packing for a complete list of types.
+
+@section schema_data_access Columns in key and values
+
+@todo Describe how to use WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and WT_CURSOR::set_value to access columns.
 
 @section schema_columns Describing Columns
 

@@ -53,7 +53,7 @@ extern "C" {
 #endif
 
 /*! @defgroup wt WiredTiger API
- * The commonly-used functions, classes and methods that applications use to
+ * The commonly-used functions, handles and methods that applications use to
  * access and manage data with WiredTiger.
  *
  * @{
@@ -99,19 +99,22 @@ struct WT_DATAITEM {
 };
 
 /*!
- * The WT_CURSOR class is the interface to a cursor.
+ * A WT_CURSOR handle is the interface to a cursor.
  *
  * Cursors allow data to be searched, stepped through and updated: the
- * so-called CRUD operations (create, read, update and delete).  Data is
- * represented by WT_DATAITEM pairs.
+ * so-called CRUD operations (create, read, update and delete).
  *
- * WT_CURSOR represents a cursor over a collection of data.  Cursors are opened
- * in the context of a session (which may have an associated transaction), and
- * can query and update records.  In the common case, a cursor is used to
- * access records in a table.  However, cursors can be used on subsets of
- * tables (such as a single column or a projection of multiple columns), as an
- * interface to statistics, configuration data or application-specific data
- * sources.  See WT_SESSION::open_cursor for more information.
+ * Raw data is represented by key/value pairs of WT_DATAITEM structures, but
+ * cursors can also provide access to fields within the key and value if the
+ * formats are described in the WT_SESSION::create_table method.
+ *
+ * A cursor can be positioned in a collection of data.  Cursors are opened in
+ * the context of a session (which may have an associated transaction), and can
+ * query and update records.  In the common case, a cursor is used to access
+ * records in a table.  However, cursors can be used on subsets of tables (such
+ * as a single column or a projection of multiple columns), as an interface to
+ * statistics, configuration data or application-specific data sources.  See
+ * WT_SESSION::open_cursor for more information.
  *
  * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
  * it may only be used within the same thread as the encapsulating WT_SESSION.
@@ -120,18 +123,16 @@ struct WT_CURSOR {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
 
 	/*!
-	 * The format of the data packed into key items.  See
-	 * ::wiredtiger_struct_pack for details.  If not set, a default value
-	 * of "u" is assumed, and applications use WT_DATAITEM to manipulate raw
-	 * byte arrays.
+	 * The format of the data packed into key items.  See @ref packing for
+	 * details.  If not set, a default value of "u" is assumed, and
+	 * applications use WT_DATAITEM to manipulate raw byte arrays.
 	 */
 	const char *key_format;
 
 	/*!
-	 * The format of the data packed into value items.  See
-	 * ::wiredtiger_struct_pack for details.  If not set, a default value
-	 * of "u" is assumed, and applications use WT_DATAITEM to manipulate raw
-	 * byte arrays.
+	 * The format of the data packed into value items.  See @ref packing
+	 * for details.  If not set, a default value of "u" is assumed, and
+	 * applications use WT_DATAITEM to manipulate raw byte arrays.
 	 */
 	const char *value_format;
 
@@ -303,6 +304,10 @@ struct WT_CURSOR {
 
 	/*! Close the cursor.
 	 *
+	 * This releases the resources associated with the cursor handle.
+	 * Cursors are closed implicitly by ending the enclosing transaction or
+	 * closing the session in which they were opened.
+	 *
 	 * @dontinclude ex_all.c
 	 * @skipline cursor->close
 	 *
@@ -325,7 +330,11 @@ struct WT_SESSION {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
 
-	/*! Close the session.
+	/*! Close the session handle.
+	 *
+	 * This will release the resources associated with the session handle,
+	 * including rolling any active transactions and closing any cursors
+	 * that remain open in the session.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline session->close
@@ -342,13 +351,22 @@ struct WT_SESSION {
 
 	/*! Open a cursor.
 	 *
-	 * Cursors may be opened on ordinary tables.  A cache of recently-used
-	 * tables will be maintained in the WT_SESSION to make this fast.
+	 * Open a new cursor on the specified data source.  An existing cursor
+	 * can be duplicated by passing it as the \c to_dup parameter.  Cursor
+	 * handles should be closed by calling WT_CURSOR::close to release
+	 * resources associated with the cursor.
 	 *
-	 * However, cursors can be opened on any data source, regardless of
-	 * whether it is ultimately stored in a table.  Some cursor types may
-	 * have limited functionality (e.g., be read-only, or not support
-	 * transactional updates).
+	 * Cursors are opened in the context of the current transaction.  The
+	 * cursor must be closed before the transaction can end.  If
+	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction
+	 * are called with cursors open in the transaction, the cursor handles
+	 * will be closed implicitly and must not be accessed again.
+	 *
+	 * Cursors are commonly opened on ordinary tables.  However, cursors
+	 * can be opened on any data source, regardless of whether it is
+	 * ultimately stored in a table.  Some cursor types may have limited
+	 * functionality (e.g., be read-only, or not support transactional
+	 * updates).
 	 *
 	 * These are some of the common builtin cursor types:
 	 *   <table>
@@ -409,7 +427,7 @@ struct WT_SESSION {
 	 * @config{columns,,List of the column names.
 	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
 	 * 	The number of entries must match the total number of values in
-	 * 	#key_format and #value_format.}
+	 * 	\c key_format and \c value_format.}
 	 * @config{colgroup.\<name\>,,Named group of columns to store together.
 	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
 	 * 	Each column group is stored separately\, keyed by the primary
@@ -421,11 +439,11 @@ struct WT_SESSION {
 	 * @config{index.\<name\>,,Named index on a list of columns.
 	 * 	Comma-separated list of the form <code>(column[\,...])</code>.}
 	 * @config{key_format,,The format of the data packed into key items.
-	 * 	See ::wiredtiger_struct_pack for details.  If not set\, a
+	 * 	See @ref packing for details.  If not set\, a
 	 * 	default value of \c "u" is assumed\, and applications use the
 	 * 	WT_DATAITEM struct to manipulate raw byte arrays.}
 	 * @config{value_format,,The format of the data packed into value
-	 * 	items.  See ::wiredtiger_struct_pack for details.  If not set\,
+	 * 	items.  See @ref packing for details.  If not set\,
 	 * 	a default value of \c "u" is assumed\, and applications use the
 	 * 	WT_DATAITEM struct to manipulate raw byte arrays.}
 	 * @configend
@@ -793,57 +811,7 @@ struct WT_ERROR_HANDLER {
 };
 /*! Pack a structure into a buffer.
  *
- * Uses format strings mostly as specified in the Python struct module:
- *   http://docs.python.org/library/struct
- *
- * The first character of the format string can be used to indicate the byte
- * order, size and alignment of the packed data, according to the following
- * table:
- *
- * <table>
- * \hrow{Character, Byte order, Size, Alignment}
- * \row{<tt>\@</tt>, native, native, native}
- * \row{<tt>=</tt>, native, standard, none}
- * \row{<tt>&lt;</tt>, little-endian, standard, none}
- * \row{<tt>&gt;</tt>, big-endian, standard, none}
- * \row{<tt>!</tt>, network (= big-endian), standard, none}
- * </table>
- *
- * If the first character is not one of these, '>' (big-endian) is assumed, in
- * part because it naturally sorts in lexicographic order.
- *
- * Format characters:
- * <table>
- * \hrow{Format, C Type, Java type, Java type, Standard size}
- * \row{x, pad byte, N/A, N/A, 1}
- * \row{c, char, char, string of length 1, 1}
- * \row{b, signed char, byte, integer, 1}
- * \row{B, unsigned char, byte, integer, 1}
- * \row{?, _Bool, boolean, bool, 1}
- * \row{h, short, short, integer, 2}
- * \row{H, unsigned short, short, integer, 2}
- * \row{i, int, int, integer, 4}
- * \row{I, unsigned int, int, integer, 4}
- * \row{l, long, int, integer, 4}
- * \row{L, unsigned long, int, integer, 4}
- * \row{q, long long, long, integer, 8}
- * \row{Q, unsigned long long, long, integer, 8}
- * \row{f, float, float, float, 4}
- * \row{d, double, double, float, 8}
- * \row{r, ::wiredtiger_recno_t, long, integer, 8}
- * \row{s, char[], String, string, fixed length}
- * \row{S, char[], String, string, variable}
- * \row{u, WT_DATAITEM, byte[], string, variable}
- * </table>
- *
- * The <code>'S'</code> type is encoded as a C language string terminated by a
- * NUL character.
- *
- * The <code>'u'</code> type is for raw byte arrays: if it appears at the end
- * of a format string (including in the default <code>"u"</code> format for
- * untyped tables), the size is not stored explicitly.  When <code>'u'</code>
- * appears within a format string, the size is stored as a 32-bit integer in
- * the same byte order as the rest of the format string, followed by the data.
+ * See @ref packing for a description of the permitted format strings.
  *
  * @section pack_examples Packing Examples
  *
@@ -956,18 +924,20 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * DO NOT EDIT: automatically built by dist/api_err.py.
  * Error return section: BEGIN
  */
+/*! conflict with concurrent operation. */
+#define	WT_DEADLOCK	-31800
 /*! non-specific WiredTiger error. */
-#define	WT_ERROR	-31800
+#define	WT_ERROR	-31801
 /*! item not found. */
-#define	WT_NOTFOUND	-31801
+#define	WT_NOTFOUND	-31802
 /*! requested page was deleted. */
-#define	WT_PAGE_DELETED	-31802
+#define	WT_PAGE_DELETED	-31803
 /*! attempt to modify a read-only value. */
-#define	WT_READONLY	-31803
+#define	WT_READONLY	-31804
 /*! restart the operation (internal). */
-#define	WT_RESTART	-31804
+#define	WT_RESTART	-31805
 /*! buffer too small. */
-#define	WT_TOOSMALL	-31805
+#define	WT_TOOSMALL	-31806
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

@@ -4,7 +4,6 @@ This section explains how to use WiredTiger by developing a sequence of example 
 
 - @subpage basic_api
 - @subpage config_strings
-- @subpage packing
 - @subpage schema
 - @subpage cursors
 - @subpage threads
@@ -12,5 +11,6 @@ This section explains how to use WiredTiger by developing a sequence of example 
 - @subpage transactions
 - @subpage tuning
 - @subpage command_line
+- @subpage packing
 - @subpage extending
  */

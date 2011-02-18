@@ -17,7 +17,7 @@ To configure for transactions, the database must be created with transaction sup
 
 In WiredTiger, the transactional context is managed by the WT_SESSION class.  Applications call WT_SESSION::begin_transaction to start a new transaction, which is only permitted when no cursors are open.  Operations performed with that WT_SESSION handle are then part of the transaction, and their effects can be committed by calling WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, both of which implicitly close any open cursors.
 
-When transactions are used, operations may fail with additional errors, including ::WT_DEADLOCK, ::WT_UPDATE_CONFLICT, ...
+When transactions are used, operations may fail with additional errors such as ::WT_DEADLOCK.
 
 @todo describe transaction error cases more fully
 

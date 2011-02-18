@@ -5,6 +5,7 @@
 # The format:
 #	error<tab>string
 
+WT_DEADLOCK	conflict with concurrent operation
 WT_ERROR	non-specific WiredTiger error
 WT_NOTFOUND	item not found
 WT_PAGE_DELETED	requested page was deleted
