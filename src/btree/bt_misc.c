@@ -37,8 +37,12 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
  *	next key WT_ITEM on the page.
  */
 inline WT_ITEM *
-__wt_key_item_next(WT_ITEM *key_item)
+__wt_key_item_next(WT_PAGE *page, WT_ROW *rip, WT_ITEM *key_item)
 {
+	/* If it's a duplicate entry, we're pointing to the appropriate key. */
+	if (WT_ROW_INDX_IS_DUPLICATE(page, rip))
+		return (key_item);
+
 	/* Move to the next key WT_ITEM on the page. */
 	do {
 		key_item = WT_ITEM_NEXT(key_item);

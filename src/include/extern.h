@@ -78,7 +78,7 @@ __wt_set_ff_and_sa_from_offset(WT_PAGE *page,
 inline int
 __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen);
 inline WT_ITEM *
-__wt_key_item_next(WT_ITEM *key_item);
+__wt_key_item_next(WT_PAGE *page, WT_ROW *rip, WT_ITEM *key_item);
 const char *
 __wt_page_type_string(WT_PAGE_DISK *dsk);
 const char *

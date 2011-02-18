@@ -607,7 +607,8 @@ struct __wt_rle_expand {
 	    (rip) = (page)->u.irow, (i) = (page)->indx_count;		\
 	    (i) > 0;							\
 	    ++(rip),							\
-	    key_item = --(i) == 0 ? NULL : __wt_key_item_next(key_item))
+	    key_item = --(i) == 0 ?					\
+	    NULL : __wt_key_item_next(page, rip, key_item))
 
 /*
  * WT_ROW_INDX_IS_DUPLICATE --
