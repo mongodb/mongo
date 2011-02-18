@@ -560,8 +560,15 @@ DB.prototype.toString = function(){
 
 DB.prototype.isMaster = function () { return this.runCommand("isMaster"); }
 
-DB.prototype.currentOp = function(){
-    return db.$cmd.sys.inprog.findOne();
+DB.prototype.currentOp = function( arg ){
+    var q = {}
+    if ( arg ) {
+        if ( typeof( arg ) == "object" )
+            Object.extend( q , arg );
+        else if ( arg )
+            q["$all"] = true;
+    }
+    return db.$cmd.sys.inprog.findOne( q );
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
