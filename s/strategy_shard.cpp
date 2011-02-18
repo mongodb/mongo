@@ -190,8 +190,6 @@ namespace mongo {
             bool upsert = flags & UpdateOption_Upsert;
             bool multi = flags & UpdateOption_Multi;
 
-            uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! ( upsert && multi ) );
-
             if (upsert) {
                 uassert(8012, "can't upsert something without shard key",
                         (manager->hasShardKey(toupdate) ||

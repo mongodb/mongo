@@ -42,5 +42,12 @@ assert.eq(err.code, 13123, 'key error code 2');
 coll.update({_id:1, key:1}, {$set: {foo:2}});
 assert.isnull(db.getLastError(), 'getLastError reset');
 
+coll.update( { key : 17 } , { $inc : { x : 5 } } , true  );
+assert.eq( 5 , coll.findOne( { key : 17 } ).x , "up1" )
+
+coll.update( { key : 18 } , { $inc : { x : 5 } } , true , true );
+assert.eq( 5 , coll.findOne( { key : 18 } ).x , "up2" )
+
+
 s.stop()
 
