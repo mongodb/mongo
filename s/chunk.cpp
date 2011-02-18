@@ -234,7 +234,7 @@ namespace mongo {
     }
 
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) {
-        const size_t maxSplitPoints = 256;
+        const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
         uassert( 13332 , "need a split key to split chunk" , !m.empty() );
