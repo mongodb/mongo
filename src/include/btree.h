@@ -656,9 +656,9 @@ struct __wt_rle_expand {
  * is a WT_OFF structure, which contains a page addr/size pair.
  */
 #define	WT_ROW_OFF(ip)							\
-	((WT_OFF *)(((WT_ROW *)ip)->data))
+	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 #define	WT_ROW_OFF_RECORD(ip)						\
-	((WT_OFF_RECORD *)(((WT_ROW *)ip)->data))
+	((WT_OFF_RECORD *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 
 /*
  * On column-store internal pages, the on-page data referenced by the WT_COL
