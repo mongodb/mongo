@@ -148,12 +148,17 @@ namespace mongo {
                     pool.release( addr , conn );
                 }
                 else {
-                    log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+                    error() << "unset sharding failed : " << res << endl;
                     delete conn;
                 }
             }
+            catch ( SocketException& e ) {
+                // server down or something
+                LOG(1) << "socket exception trying to unset sharding: " << e.toString() << endl;
+                delete conn;
+            }
             catch ( std::exception& e ) {
-                log(LL_ERROR) << "couldn't unset sharding : " << e.what() << endl;
+                error() << "couldn't unset sharding : " << e.what() << endl;
                 delete conn;
             }
         }
