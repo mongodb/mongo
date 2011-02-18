@@ -29,6 +29,10 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
 	    -e 's/\([	 ]\)switch(/\1switch (/' \
 	    -e 's/\([	 ]\)while(/\1while (/' \
+	    -e 's/\([	 ,]\)u_int8_t\([	 ,]\)/\1uint8_t\2/g' \
+	    -e 's/\([	 ,]\)u_int16_t\([	 ,]\)/\1uint16_t\2/g' \
+	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
+	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/(void) /(void)/' \
 	    -e 's/(unsigned)/(unsigned int)/' \
 	    -e 's/^#define /#define	/' >$t
