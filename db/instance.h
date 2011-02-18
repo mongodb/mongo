@@ -112,7 +112,9 @@ namespace mongo {
     */
     bool replHasDatabases();
 
-    /** "embedded" calls to the local server directly. */
+    /** "embedded" calls to the local server directly. 
+        Caller does not need to lock, that is handled within.
+     */
     class DBDirectClient : public DBClientBase {
     public:
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
@@ -127,7 +129,7 @@ namespace mongo {
         virtual string getServerAddress() const {
             return "localhost"; // TODO: should this have the port?
         }
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend ) {
             // don't need to piggy back when connected locally
@@ -139,7 +141,9 @@ namespace mongo {
         virtual bool callRead( Message& toSend , Message& response ) {
             return call( toSend , response );
         }
-
+        
+        virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
+        
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
     };
 

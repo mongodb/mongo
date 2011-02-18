@@ -59,8 +59,10 @@ namespace mongo {
         return s;
     }
 
-    void distLockPingThread( ConnectionString addr ) {
+    void _distLockPingThread( ConnectionString addr ) {
         setThreadName( "LockPinger" );
+        
+        log() << "creating dist lock ping thread for: " << addr << endl;
 
         static int loops = 0;
         while( ! inShutdown() ) {
@@ -78,8 +80,8 @@ namespace mongo {
                               true );
                 string err = conn->getLastError();
                 if ( ! err.empty() ) {
-                    log( LL_WARNING ) << "dist_lock process: " << process << " pinging: " << addr << " failed: "
-                                      << err << endl;
+                    warning() << "dist_lock process: " << process << " pinging: " << addr << " failed: "
+                              << err << endl;
                     conn.done();
                     sleepsecs(30);
                     continue;
@@ -102,8 +104,8 @@ namespace mongo {
                 conn->remove( lockPingNS , BSON( "_id" << BSON( "$nin" << pids ) << "ping" << LT << fourDays ) );
                 err = conn->getLastError();
                 if ( ! err.empty() ) {
-                    log ( LL_WARNING ) << "dist_lock cleanup request from process: " << process << " to: " << addr
-                                       << " failed: " << err << endl;
+                    warning() << "dist_lock cleanup request from process: " << process << " to: " << addr
+                              << " failed: " << err << endl;
                     conn.done();
                     sleepsecs(30);
                     continue;
@@ -117,13 +119,26 @@ namespace mongo {
                 conn.done();
             }
             catch ( std::exception& e ) {
-                log( LL_WARNING ) << "dist_lock exception during ping: " << e.what() << endl;
+                warning() << "dist_lock exception during ping: " << e.what() << endl;
             }
 
-            log(4) << "dist_lock pinged successfully for: " << process << endl;
+            log( loops % 10 == 0 ? 0 : 1) << "dist_lock pinged successfully for: " << process << endl;
             sleepsecs(30);
         }
     }
+
+    void distLockPingThread( ConnectionString addr ) {
+        try {
+            _distLockPingThread( addr );
+        }
+        catch ( std::exception& e ) {
+            error() << "unexpected error in distLockPingThread: " << e.what() << endl;
+        }
+        catch ( ... ) {
+            error() << "unexpected unknown error in distLockPingThread" << endl;
+        }
+    }
+
 
     class DistributedLockPinger {
     public:
@@ -167,7 +182,7 @@ namespace mongo {
 
         {
             // make sure its there so we can use simple update logic below
-            BSONObj o = conn->findOne( _ns , _id );
+            BSONObj o = conn->findOne( _ns , _id ).getOwned();
             if ( o.isEmpty() ) {
                 try {
                     log(4) << "dist_lock inserting initial doc in " << _ns << " for lock " << _name << endl;
@@ -177,28 +192,41 @@ namespace mongo {
                     log() << "dist_lock could not insert initial doc: " << e << endl;
                 }
             }
-
+            
             else if ( o["state"].numberInt() > 0 ) {
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ) {
                     // if a lock is taken but there's no ping for it, we're in an inconsistent situation
                     // if the lock holder (mongos or d)  does not exist anymore, the lock could safely be removed
                     // but we'd require analysis of the situation before a manual intervention
-                    log(LL_ERROR) << "config.locks: " << _name << " lock is taken by old process? "
-                                  << "remove the following lock if the process is not active anymore: " << o << endl;
+                    error() << "config.locks: " << _name << " lock is taken by old process? "
+                            << "remove the following lock if the process is not active anymore: " << o << endl;
                     *other = o;
-                    other->getOwned();
                     conn.done();
                     return false;
                 }
 
-                unsigned long long elapsed = jsTime() - lastPing["ping"].Date(); // in ms
+                unsigned long long now = jsTime();
+                unsigned long long pingTime = lastPing["ping"].Date();
+                
+                if ( now < pingTime ) {
+                    // clock skew
+                    warning() << "dist_lock has detected clock skew of " << ( pingTime - now ) << "ms" << endl;
+                    *other = o;
+                    conn.done();
+                    return false;
+                }
+                
+                unsigned long long elapsed = now - pingTime;
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
-
+                
+                if ( elapsed > ( 60 * 24 * 365 * 100 ) /* 100 years */ ) {
+                    warning() << "distlock elapsed time seems impossible: " << lastPing << endl;
+                }
+                
                 if ( elapsed <= _takeoverMinutes ) {
                     log(1) << "dist_lock lock failed because taken by: " << o << " elapsed minutes: " << elapsed << endl;
                     *other = o;
-                    other->getOwned();
                     conn.done();
                     return false;
                 }
@@ -207,8 +235,8 @@ namespace mongo {
                 conn->update( _ns , _id , BSON( "$set" << BSON( "state" << 0 ) ) );
                 string err = conn->getLastError();
                 if ( ! err.empty() ) {
-                    log( LL_WARNING ) << "dist_lock take over from: " << o << " failed: " << err << endl;
-                    *other = o;
+                    warning() << "dist_lock take over from: " << o << " failed: " << err << endl;
+                    *other = o.getOwned();
                     other->getOwned();
                     conn.done();
                     return false;

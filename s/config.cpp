@@ -115,6 +115,9 @@ namespace mongo {
     void DBConfig::enableSharding() {
         if ( _shardingEnabled )
             return;
+        
+        assert( _name != "config" );
+
         scoped_lock lk( _lock );
         _shardingEnabled = true;
         _save();
@@ -445,7 +448,7 @@ namespace mongo {
 
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
-        _primary.setAddress( fullString , true );
+        _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
         log(1) << " config string : " << fullString << endl;
 
         return true;
@@ -475,8 +478,8 @@ namespace mongo {
                 }
                 conn.done();
             }
-            catch ( std::exception&  ) {
-                log(LL_WARNING) << " couldn't check on config server:" << _config[i] << " ok for now" << endl;
+            catch ( SocketException& e ) {
+                warning() << " couldn't check on config server:" << _config[i] << " ok for now : " << e.toString() << endl;
             }
             res.push_back(x);
         }

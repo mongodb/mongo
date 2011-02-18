@@ -61,12 +61,12 @@ namespace mongo {
     void ClientInfo::newRequest( AbstractMessagingPort* p ) {
 
         if ( p ) {
-            string r = p->remote().toString();
-            if ( _remote == "" )
+            HostAndPort r = p->remote();
+            if ( _remote.port() == -1 )
                 _remote = r;
             else if ( _remote != r ) {
                 stringstream ss;
-                ss << "remotes don't match old [" << _remote << "] new [" << r << "]";
+                ss << "remotes don't match old [" << _remote.toString() << "] new [" << r.toString() << "]";
                 throw UserException( 13134 , ss.str() );
             }
         }
@@ -140,12 +140,17 @@ namespace mongo {
         all.push_back( WBInfo( cid.numberLong() , w.OID() ) );
     }
 
-    vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all ) {
+    vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener ) {
         vector<BSONObj> res;
         
+        if ( fromWriteBackListener ) {
+            LOG(1) << "not doing recusrive writeback" << endl;
+            return res;
+        }
+
         if ( all.size() == 0 )
             return res;
-
+        
         for ( unsigned i=0; i<all.size(); i++ ) {
             res.push_back( WriteBackListener::waitFor( all[i].connectionId , all[i].id ) );
         }
@@ -155,7 +160,7 @@ namespace mongo {
 
 
 
-    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result ) {
+    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener ) {
         set<string> * shards = getPrev();
 
         if ( shards->size() == 0 ) {
@@ -192,17 +197,22 @@ namespace mongo {
             clearSinceLastGetError();
             
             if ( writebacks.size() ){
-                vector<BSONObj> v = _handleWriteBacks( writebacks );
-                assert( v.size() == 1 );
-                result.appendElements( v[0] );
-                result.appendElementsUnique( res );
-                result.append( "initialGLEHost" , theShard );
+                vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
+                if ( v.size() == 0 && fromWriteBackListener ) {
+                    // ok
+                }
+                else {
+                    assert( v.size() == 1 );
+                    result.appendElements( v[0] );
+                    result.appendElementsUnique( res );
+                    result.append( "initialGLEHost" , theShard );
+                }
             }
             else {
                 result.append( "singleShard" , theShard );
                 result.appendElements( res );
             }
-
+            
             return ok;
         }
 
@@ -220,8 +230,9 @@ namespace mongo {
             BSONObj res;
             bool ok = conn->runCommand( "admin" , options , res );
             _addWriteBack( writebacks, res );
+            
             string temp = DBClientWithCommands::getLastErrorString( res );
-            if ( ok == false || temp.size() ) {
+            if ( conn->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
                 errors.push_back( temp );
                 errorObjects.push_back( res );
             }
@@ -247,7 +258,7 @@ namespace mongo {
 
         if ( errors.size() == 0 ) {
             result.appendNull( "err" );
-            _handleWriteBacks( writebacks );
+            _handleWriteBacks( writebacks , fromWriteBackListener );
             return true;
         }
 
@@ -270,7 +281,7 @@ namespace mongo {
             }
             all.done();
         }
-        _handleWriteBacks( writebacks );
+        _handleWriteBacks( writebacks , fromWriteBackListener );
         return true;
     }
 

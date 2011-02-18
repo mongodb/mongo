@@ -15,7 +15,7 @@ namespace mongo {
          */
         class RecoveryJob : boost::noncopyable {
         public:
-            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") {}
+            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") { _lastSeqMentionedInConsoleLog = 1; }
             void go(vector<path>& files);
             ~RecoveryJob();
             void processSection(const void *, unsigned len);
@@ -33,6 +33,7 @@ namespace mongo {
             list<boost::shared_ptr<MongoMMF> > _mmfs;
 
             unsigned long long _lastDataSyncedFromLastRun;
+            unsigned long long _lastSeqMentionedInConsoleLog;
 
             mongo::mutex _mx; // protects _mmfs
 

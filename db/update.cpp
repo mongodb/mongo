@@ -359,7 +359,7 @@ namespace mongo {
 
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
         DEBUGUPDATE( "\t start prepare" );
-        ModSetState * mss = new ModSetState( obj );
+        auto_ptr<ModSetState> mss( new ModSetState( obj ) );
 
 
         // Perform this check first, so that we don't leave a partially modified object on uassert.
@@ -492,7 +492,7 @@ namespace mongo {
 
         DEBUGUPDATE( "\t mss\n" << mss->toString() << "\t--" );
 
-        return auto_ptr<ModSetState>( mss );
+        return mss;
     }
 
     void ModState::appendForOpLog( BSONObjBuilder& b ) const {

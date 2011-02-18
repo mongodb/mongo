@@ -57,25 +57,17 @@ namespace mongo {
         return map( filename , l, options );
     }
 
-    void printMemInfo( const char * where ) {
-        cout << "mem info: ";
-        if ( where )
-            cout << where << " ";
-        ProcessInfo pi;
-        if ( ! pi.supported() ) {
-            cout << " not supported" << endl;
-            return;
-        }
-
-        cout << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize() << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) ) << endl;
-    }
-
     /* --- MongoFile -------------------------------------------------
        this is the administrative stuff
     */
 
     RWLock MongoFile::mmmutex("rw:mmmutex");
 
+    /* subclass must call in destructor (or at close).
+        removes this from pathToFile and other maps
+        safe to call more than once, albeit might be wasted work
+        ideal to call close to the close, if the close is well before object destruction
+    */
     void MongoFile::destroyed() {
         rwlock lk( mmmutex , true );
         mmfiles.erase(this);

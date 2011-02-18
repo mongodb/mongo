@@ -129,7 +129,7 @@ namespace mongo {
             }
 
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
-                if ( ! Shard::isAShard( i->first ) )
+                if ( ! Shard::isAShardNode( i->first ) )
                     continue;
                 Status* ss = i->second;
                 assert( ss );
@@ -148,12 +148,17 @@ namespace mongo {
                     pool.release( addr , conn );
                 }
                 else {
-                    log(LL_ERROR) << " couldn't unset sharding :( " << res << endl;
+                    error() << "unset sharding failed : " << res << endl;
                     delete conn;
                 }
             }
+            catch ( SocketException& e ) {
+                // server down or something
+                LOG(1) << "socket exception trying to unset sharding: " << e.toString() << endl;
+                delete conn;
+            }
             catch ( std::exception& e ) {
-                log(LL_ERROR) << "couldn't unset sharding : " << e.what() << endl;
+                error() << "couldn't unset sharding : " << e.what() << endl;
                 delete conn;
             }
         }
@@ -229,6 +234,7 @@ namespace mongo {
 
     void ShardConnection::kill() {
         if ( _conn ) {
+            resetShardVersionCB( _conn );
             delete _conn;
             _conn = 0;
             _finishedInit = true;

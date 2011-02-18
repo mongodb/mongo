@@ -6,6 +6,22 @@ var testname = "dropdb";
 var step = 1;
 var conn = null;
 
+function checkNoJournalFiles(path, pass) {
+    var files = listFiles(path);
+    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+        if (pass == null) {
+            // wait a bit longer for mongod to potentially finish if it is still running.
+            sleep(10000);
+            return checkNoJournalFiles(path, 1);
+        }
+        print("\n\n\n");
+        print("FAIL path:" + path);
+        print("unexpected files:");
+        printjson(files);
+        assert(false, "FAIL a journal/lsn file is present which is unexpected");
+    }
+}
+
 function runDiff(a, b) {
     function reSlash(s) {
         var x = s;
@@ -57,8 +73,10 @@ function verify() {
     var d = conn.getDB("test");
     var count = d.foo.count();
     if (count != 1) {
-        sleep(5000); // easier to read then
-        print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count + "\n\n\n");
+	print("going to fail, count mismatch in verify()");
+        sleep(10000); // easier to read the output this way
+        print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count);
+	print(d.foo.count() + "\n\n\n");
         assert(false);
     }
     assert(d.foo.findOne()._id == 100, "100");
@@ -104,6 +122,11 @@ stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
+// we will force removal of a datafile to be sure we can recreate everything.
+removeFile(path2 + "/test.0");
+// the trick above is only valid if journals haven't rotated out, and also if lsn isn't skipping
+removeFile(path2 + "/lsn");
+
 log("restart and recover");
 conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 9);
 
@@ -116,7 +139,7 @@ sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files");
-assert.eq( [], listFiles(path2 + "/journal") );
+checkNoJournalFiles(path2 + "/journal");
 
 log("check data matches ns");
 var diff = runDiff(path1 + "/test.ns", path2 + "/test.ns");

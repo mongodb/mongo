@@ -76,6 +76,21 @@ namespace mongo {
             // the move requires acquiring the collection metadata's lock, which can fail
             log() << "balacer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
                   << " chunk: " << chunkToMove << endl;
+
+            if ( res["chunkTooBig"].trueValue() ) {
+                // reload just to be safe
+                cm = cfg->getChunkManager( chunkInfo.ns );
+                assert( cm );
+                c = cm->findChunk( chunkToMove["min"].Obj() );
+                
+                log() << "forcing a split because migrate failed for size reasons" << endl;
+                
+                res = BSONObj();
+                c->singleSplit( true , res );
+                log() << "forced split results: " << res << endl;
+
+                // TODO: if the split fails, mark as jumbo SERVER-2571
+            }
         }
 
         return movedCount;

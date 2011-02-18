@@ -31,6 +31,39 @@
 
 namespace mongo {
 
+    void ConnectionString::_fillServers( string s ) {
+        
+        {
+            string::size_type idx = s.find( '/' );
+            if ( idx != string::npos ) {
+                _setName = s.substr( 0 , idx );
+                s = s.substr( idx + 1 );
+                _type = SET;
+            }
+        }
+
+        string::size_type idx;
+        while ( ( idx = s.find( ',' ) ) != string::npos ) {
+            _servers.push_back( s.substr( 0 , idx ) );
+            s = s.substr( idx + 1 );
+        }
+        _servers.push_back( s );
+
+    }
+    
+    void ConnectionString::_finishInit() {
+        stringstream ss;
+        if ( _type == SET )
+            ss << _setName << "/";
+        for ( unsigned i=0; i<_servers.size(); i++ ) {
+            if ( i > 0 )
+                ss << ",";
+            ss << _servers[i].toString();
+        }
+        _string = ss.str();
+    }
+
+
     DBClientBase* ConnectionString::connect( string& errmsg ) const {
         switch ( _type ) {
         case MASTER: {
@@ -240,8 +273,17 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query, int options, int limit, int skip ) {
-        NamespaceString ns(_ns);
+    unsigned long long DBClientWithCommands::count(const string &myns, const BSONObj& query, int options, int limit, int skip ) {
+        NamespaceString ns(myns);
+        BSONObj cmd = _countCmd( myns , query , options , limit , skip );
+        BSONObj res;
+        if( !runCommand(ns.db.c_str(), cmd, res, options) )
+            uasserted(11010,string("count fails:") + res.toString());
+        return res["n"].numberLong();
+    }
+
+    BSONObj DBClientWithCommands::_countCmd(const string &myns, const BSONObj& query, int options, int limit, int skip ) {
+        NamespaceString ns(myns);
         BSONObjBuilder b;
         b.append( "count" , ns.coll );
         b.append( "query" , query );
@@ -249,11 +291,7 @@ namespace mongo {
             b.append( "limit" , limit );
         if ( skip )
             b.append( "skip" , skip );
-        BSONObj cmd = b.obj();
-        BSONObj res;
-        if( !runCommand(ns.db.c_str(), cmd, res, options) )
-            uasserted(11010,string("count fails:") + res.toString());
-        return res["n"].numberLong();
+        return b.obj();
     }
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
@@ -854,7 +892,7 @@ namespace mongo {
         port().recv(m);
     }
 
-    bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk ) {
+    bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         /* todo: this is very ugly messagingport::call returns an error code AND can throw
                  an exception.  we should make it return void and just throw an exception anytime
                  it fails
@@ -897,11 +935,15 @@ namespace mongo {
 
         Message m;
         m.setData( dbKillCursors , b.buf() , b.len() );
-
-        sayPiggyBack( m );
+        
+        if ( _lazyKillCursor )
+            sayPiggyBack( m );
+        else
+            say(m);
     }
 
     AtomicUInt DBClientConnection::_numConnections;
+    bool DBClientConnection::_lazyKillCursor = true;
 
 
     bool serverAlive( const string &uri ) {

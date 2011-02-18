@@ -62,14 +62,14 @@ namespace mongo {
                   GENERIC_WRITE,
                   FILE_SHARE_READ,
                   NULL,
-                  CREATE_NEW, //OPEN_ALWAYS,
+                  OPEN_ALWAYS,
                   FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
                   NULL);
         if( _fd == INVALID_HANDLE_VALUE ) {
             DWORD e = GetLastError();
             uasserted(13518, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription(e));
         }
-        SetFilePointer(_fd, 0, 0, FILE_END);
+        SetFilePointer(_fd, 0, 0, FILE_BEGIN);
     }
 
     LogFile::~LogFile() {
@@ -104,23 +104,20 @@ namespace mongo {
 
     LogFile::LogFile(string name) : _name(name) {
         _fd = open(name.c_str(),
-                   O_APPEND
-                   | O_CREAT | O_EXCL
-                   | O_RDWR
+                   O_CREAT
+                   | O_WRONLY
 #if defined(O_DIRECT)
                    | O_DIRECT
 #endif
 #if defined(O_NOATIME)
                    | O_NOATIME
 #endif
-#if defined(O_SYNC)
-                   | O_SYNC
-#endif
                    ,
                    S_IRUSR | S_IWUSR);
         if( _fd < 0 ) {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
+
     }
 
     LogFile::~LogFile() {
@@ -139,14 +136,20 @@ namespace mongo {
         }
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " errno:" << errno << endl;
-            uasserted(13515, str::stream() << "error appending to file " << _fd << errnoWithDescription());
+            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << " errno:" << errno << endl;
+            uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
         }
-#if !defined(O_SYNC)
-        if( fdatasync(_fd) < 0 ) {
-            uasserted(13514, str::stream() << "error appending to file on fsync " << errnoWithDescription());
-        }
+
+        if( 
+#if defined(__linux__)
+           fdatasync(_fd) < 0 
+#else
+           fsync(_fd)
 #endif
+            ) {
+            uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
+        }
+
     }
 
 }

@@ -139,9 +139,10 @@ namespace mongo {
                         << endl;
     }
 
-    ShardedClientCursorPtr CursorCache::get( long long id ) {
+    ShardedClientCursorPtr CursorCache::get( long long id ) const {
+        LOG(_myLogLevel) << "CursorCache::get id: " << id << endl;
         scoped_lock lk( _mutex );
-        MapSharded::iterator i = _cursors.find( id );
+        MapSharded::const_iterator i = _cursors.find( id );
         if ( i == _cursors.end() ) {
             OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
             return ShardedClientCursorPtr();
@@ -151,6 +152,7 @@ namespace mongo {
     }
 
     void CursorCache::store( ShardedClientCursorPtr cursor ) {
+        LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
         assert( cursor->getId() );
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
@@ -161,12 +163,24 @@ namespace mongo {
         scoped_lock lk( _mutex );
         _cursors.erase( id );
     }
-
+    
     void CursorCache::storeRef( const string& server , long long id ) {
+        LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
         assert( id );
         scoped_lock lk( _mutex );
         _refs[id] = server;
     }
+
+    string CursorCache::getRef( long long id ) const {
+        LOG(_myLogLevel) << "CursorCache::getRef id: " << id << endl;
+        assert( id );
+        scoped_lock lk( _mutex );
+        MapNormal::const_iterator i = _refs.find( id );
+        if ( i == _refs.end() )
+            return "";
+        return i->second;
+    }
+
 
     long long CursorCache::genId() {
         while ( true ) {
@@ -205,6 +219,8 @@ namespace mongo {
         long long * cursors = (long long *)x;
         for ( int i=0; i<n; i++ ) {
             long long id = cursors[i];
+            LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
+
             if ( ! id ) {
                 log( LL_WARNING ) << " got cursor id of 0 to kill" << endl;
                 continue;
@@ -229,6 +245,8 @@ namespace mongo {
                 _refs.erase( j );
             }
 
+            LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
+
             assert( server.size() );
             ScopedDbConnection conn( server );
             conn->killCursor( id );
@@ -236,7 +254,7 @@ namespace mongo {
         }
     }
 
-    void CursorCache::appendInfo( BSONObjBuilder& result ) {
+    void CursorCache::appendInfo( BSONObjBuilder& result ) const {
         scoped_lock lk( _mutex );
         result.append( "sharded" , (int)_cursors.size() );
         result.appendNumber( "shardedEver" , _shardedTotal );
@@ -258,6 +276,8 @@ namespace mongo {
     }
 
     CursorCache cursorCache;
+
+    int CursorCache::_myLogLevel = 3;
 
     class CursorTimeoutTask : public task::Task {
     public:

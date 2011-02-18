@@ -36,6 +36,7 @@ namespace mongo {
     class WriteBackListener : public BackgroundJob {
     public:
         static void init( DBClientBase& conn );
+        static void init( const string& host );
 
         static BSONObj waitFor( ConnectionId connectionId, const OID& oid );
 
@@ -47,9 +48,10 @@ namespace mongo {
 
     private:
         string _addr;
-
+        
         static mongo::mutex _cacheLock; // protects _cache
         static map<string,WriteBackListener*> _cache; // server to listener
+        static set<string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes
 
         struct WBStatus {
             OID id;

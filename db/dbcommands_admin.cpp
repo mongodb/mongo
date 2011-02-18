@@ -31,6 +31,8 @@
 #include "btree.h"
 #include "curop-inl.h"
 #include "../util/background.h"
+#include "../util/logfile.h"
+#include "../util/alignedbuilder.h"
 #include "../scripting/engine.h"
 
 namespace mongo {
@@ -65,6 +67,75 @@ namespace mongo {
         }
 
     } cleanCmd;
+
+    namespace dur {
+        filesystem::path getJournalDir();
+    }
+ 
+    class JournalLatencyTestCmd : public Command {
+    public:
+        JournalLatencyTestCmd() : Command( "journalLatencyTest" ) {}
+
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool adminOnly() const { return true; }
+        virtual void help(stringstream& h) const { h << "test how long to write and fsync to a test file in the journal/ directory"; }
+
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            filesystem::path p = dur::getJournalDir();
+            p /= "journalLatencyTest";
+        
+            // remove file if already present
+            try { 
+                remove(p);
+            }
+            catch(...) { }
+
+            BSONObjBuilder bb[2];
+            for( int pass = 0; pass < 2; pass++ ) {
+                LogFile f(p.string());
+                AlignedBuilder b(1024 * 1024);
+                {
+                    Timer t;
+                    for( int i = 0 ; i < 100; i++ ) { 
+                        f.synchronousAppend(b.buf(), 8192);
+                    }
+                    bb[pass].append("8KB", t.millis() / 100.0);
+                }
+                {
+                    const int N = 50;
+                    Timer t2;
+                    long long x = 0;
+                    for( int i = 0 ; i < N; i++ ) { 
+                        Timer t;
+                        f.synchronousAppend(b.buf(), 8192);
+                        x += t.micros();
+                        sleepmillis(4);
+                    }
+                    long long y = t2.micros() - 4*N*1000;
+                    // not really trusting the timer granularity on all platforms so whichever is higher of x and y
+                    bb[pass].append("8KBWithPauses", max(x,y) / (N*1000.0));
+                }
+                {
+                    Timer t;
+                    for( int i = 0 ; i < 20; i++ ) { 
+                        f.synchronousAppend(b.buf(), 1024 * 1024);
+                    }
+                    bb[pass].append("1MB", t.millis() / 20.0);
+                }
+                // second time around, we are prealloced.
+            }
+            result.append("timeMillis", bb[0].obj());
+            result.append("timeMillisWithPrealloc", bb[1].obj());
+
+            try { 
+                remove(p);
+            }
+            catch(...) { }
+
+            return 1;
+        }
+    } journalLatencyTestCmd;
 
     class ValidateCmd : public Command {
     public:
@@ -291,7 +362,7 @@ namespace mongo {
     class FSyncCommand : public Command {
         class LockDBJob : public BackgroundJob {
         protected:
-            string name() { return "lockdbjob"; }
+            virtual string name() const { return "lockdbjob"; }
             void run() {
                 Client::initThread("fsyncjob");
                 Client& c = cc();

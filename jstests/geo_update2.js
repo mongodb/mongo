@@ -1,5 +1,5 @@
 
-t = db.geo_update1
+t = db.geo_update2
 t.drop()
 
 for(var x = 0; x < 10; x++ ) { 

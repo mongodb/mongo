@@ -44,7 +44,7 @@ namespace mongo {
          * @param name identifier for the lock
          * @param takeoverMinutes how long can the log go "unpinged" before a new attempt to lock steals it (in minutes)
          */
-        DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 10 );
+        DistributedLock( const ConnectionString& conn , const string& name , unsigned takeoverMinutes = 15 );
 
         /**
          * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please

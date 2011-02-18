@@ -407,6 +407,7 @@ namespace mongo {
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
+                    getDur().commitIfNeeded();
                 }
                 _db.dropCollection( _config.tempLong );
             }
@@ -435,6 +436,7 @@ namespace mongo {
                     else {
                         Helpers::upsert( _config.finalLong , temp );
                     }
+                    getDur().commitIfNeeded();
                 }
                 _db.dropCollection( _config.tempLong );
             }
@@ -460,6 +462,7 @@ namespace mongo {
         void State::_insertToInc( BSONObj& o ) {
             assert( _onDisk );
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
+            getDur().commitIfNeeded();
         }
 
         State::State( const Config& c ) : _config( c ), _size(0), _numEmits(0) {
@@ -630,6 +633,9 @@ namespace mongo {
 
                 killCurrentOp.checkForInterrupt();
             }
+            
+            // we need to release here since we temp release below
+            cursor.release();
 
             {
                 dbtempreleasecond tl;
@@ -650,8 +656,9 @@ namespace mongo {
          */
         void State::reduceInMemory() {
 
-            InMemory * n = new InMemory(); // for new data
+            auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
+            long dupCount = 0;
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ) {
                 BSONObj key = i->first;
@@ -667,19 +674,20 @@ namespace mongo {
                     }
                     else {
                         // add to new map
-                        _add( n , all[0] , nSize );
+                        _add( n.get() , all[0] , nSize, dupCount );
                     }
                 }
                 else if ( all.size() > 1 ) {
                     // several values, reduce and add to map
                     BSONObj res = _config.reducer->reduce( all );
-                    _add( n , res , nSize );
+                    _add( n.get() , res , nSize, dupCount );
                 }
             }
 
             // swap maps
-            _temp.reset( n );
+            _temp.reset( n.release() );
             _size = nSize;
+            _dupCount = dupCount;
         }
 
         /**
@@ -710,31 +718,32 @@ namespace mongo {
          */
         void State::emit( const BSONObj& a ) {
             _numEmits++;
-            _add( _temp.get() , a , _size );
+            _add( _temp.get() , a , _size, _dupCount );
         }
 
-        void State::_add( InMemory* im, const BSONObj& a , long& size ) {
+        void State::_add( InMemory* im, const BSONObj& a , long& size, long& dupCount ) {
             BSONList& all = (*im)[a];
             all.push_back( a );
             size += a.objsize() + 16;
+            if (all.size() > 1)
+            	++dupCount;
         }
 
         /**
          * this method checks the size of in memory map and potentially flushes to disk
          */
         void State::checkSize() {
-            if ( ! _onDisk )
+            if ( _size < 1024 * 50 )
                 return;
 
-            // the limits to flush to disk are rather low, a few KB, may need to increase
-            if ( _size < 1024 * 5 )
-                return;
+            // attempt to reduce in memory map, if we've seen duplicates
+            if ( _dupCount > 0) {
+				long before = _size;
+				reduceInMemory();
+				log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
+            }
 
-            long before = _size;
-            reduceInMemory();
-            log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
-
-            if ( _size < 1024 * 15 )
+            if ( ! _onDisk || _size < 1024 * 100 )
                 return;
 
             dumpToInc();
@@ -805,7 +814,7 @@ namespace mongo {
                     state.init();
 
                     {
-                        State** s = new State*[1];
+                        State** s = new State*();
                         s[0] = &state;
                         _tl.reset( s );
                     }

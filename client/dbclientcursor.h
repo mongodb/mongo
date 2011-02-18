@@ -121,9 +121,9 @@ namespace mongo {
             return (resultFlags & flag) != 0;
         }
 
-        DBClientCursor( DBConnector *_connector, const string &_ns, BSONObj _query, int _nToReturn,
+        DBClientCursor( DBClientBase* client, const string &_ns, BSONObj _query, int _nToReturn,
                         int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions , int bs ) :
-            connector(_connector),
+            _client(client),
             ns(_ns),
             query(_query),
             nToReturn(_nToReturn),
@@ -140,8 +140,8 @@ namespace mongo {
             _ownCursor( true ) {
         }
 
-        DBClientCursor( DBConnector *_connector, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
-            connector(_connector),
+        DBClientCursor( DBClientBase* client, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
+            _client(client),
             ns(_ns),
             nToReturn( _nToReturn ),
             haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
@@ -170,7 +170,7 @@ namespace mongo {
         friend class DBClientConnection;
         bool init();
         int nextBatchSize();
-        DBConnector *connector;
+        DBClientBase* _client;
         string ns;
         BSONObj query;
         int nToReturn;

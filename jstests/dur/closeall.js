@@ -2,11 +2,12 @@
 // this is also a test of recoverFromYield() as that will get exercised by the update
 
 function f() {
+    var variant = (new Date()) % 4;
     var path = "/data/db/closeall";
     var path2 = "/data/db/closeall_slave";
     var ourdb = "closealltest";
 
-    print("closeall.js start mongod");
+    print("closeall.js start mongod variant:" + variant);
     var options = (new Date()-0)%2==0 ? 8 : 0;
     print("closeall.js --durOptions " + options);
     var N = 1000;
@@ -37,6 +38,12 @@ function f() {
 	        db1.foo.ensureIndex({ x: 1 });
         var res = null;
         try {
+	    if( variant == 1 )
+		sleep(0);
+	    else if( variant == 2 ) 
+		sleep(1);
+	    else if( variant == 3 && i % 10 == 0 )
+		print(i);
             res = db2.adminCommand("closeAllDatabases");
         }
         catch (e) {

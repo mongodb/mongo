@@ -100,6 +100,9 @@ namespace mongo {
                 a.append(*i);
             b.appendArray("tags", a.done());
         }
+        if( !initialSync.isEmpty() ) {
+            b << "initialSync" << initialSync;
+        }
         return b.obj();
     }
 
@@ -327,7 +330,7 @@ namespace mongo {
                         m.tags.insert( v[i].String() );
                 }
                 if( mobj.hasElement("initialSync")) {
-                    m.initialSync = mobj["initialSync"].Obj();
+                    m.initialSync = mobj["initialSync"].Obj().getOwned();
                 }
                 m.check();
             }

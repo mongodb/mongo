@@ -236,6 +236,13 @@ namespace mongo {
          */
         bool getFieldsDotted( const string& name, BSONElementSet &ret );
 
+        /**
+         * same as BSONObj::getFieldDotted
+         * if it can be retrieved from key, it is
+         * @return if this was retrieved from key
+         */
+        BSONElement getFieldDotted( const string& name , bool * fromKey = 0 );
+
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
 
         bool currentMatches() {

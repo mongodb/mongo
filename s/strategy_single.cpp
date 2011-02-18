@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "request.h"
+#include "cursors.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
 
@@ -83,14 +84,16 @@ namespace mongo {
         virtual void getMore( Request& r ) {
             const char *ns = r.getns();
 
-            log(3) << "single getmore: " << ns << endl;
+            LOG(3) << "single getmore: " << ns << endl;
 
-            ShardConnection conn( r.primaryShard() , ns );
+            long long id = r.d().getInt64( 4 );
+
+            ShardConnection conn( cursorCache.getRef( id ) , ns );
 
             Message response;
             bool ok = conn->callRead( r.m() , response);
             uassert( 10204 , "dbgrid: getmore: error calling db", ok);
-            r.reply( response , conn->getServerAddress() );
+            r.reply( response , "" /*conn->getServerAddress() */ );
 
             conn.done();
 
@@ -184,10 +187,13 @@ namespace mongo {
                             BSONObjIterator j( i.next().Obj() );
                             while( j.more() ) {
                                 BSONElement e = j.next();
-                                if ( strcmp( e.fieldName() , "opid" ) == 0 ) {
+                                if ( str::equals( e.fieldName() , "opid" ) ) {
                                     stringstream ss;
                                     ss << shard.getName() << ':' << e.numberInt();
                                     x.append( "opid" , ss.str() );
+                                }
+                                else if ( str::equals( e.fieldName() , "client" ) ) {
+                                    x.appendAs( e , "client_s" );
                                 }
                                 else {
                                     x.append( e );

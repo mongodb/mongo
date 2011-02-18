@@ -266,6 +266,7 @@ namespace mongo {
                 hn = m->h().toString();
                 if (m->hbinfo().up() && m->state().readable() &&
                         (m->hbinfo().opTime > lastOpTimeWritten) &&
+                        m->config().slaveDelay == 0 &&
                         _getOplogReader(r, hn)) {
                     target = m;
                     break;
@@ -359,8 +360,15 @@ namespace mongo {
                         /* todo: too stale capability */
                     }
 
-                    if( !target->hbinfo().hbstate.readable() ) {
-                        return;
+                    {
+                        const Member *primary = box.getPrimary();
+                        
+                        if( !target->hbinfo().hbstate.readable() ||
+                            // if we are not syncing from the primary, return (if
+                            // it's up) so that we can try accessing it again
+                            (target != primary && primary != 0)) {
+                            return;
+                        }
                     }
                 }
                 if( !r.more() )

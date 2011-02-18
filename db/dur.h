@@ -29,7 +29,7 @@ namespace mongo {
             virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
 
             /** Declare that a file has been created
-                Normally writes are applied only after journalling, for safety.  But here the file
+                Normally writes are applied only after journaling, for safety.  But here the file
                 is created first, and the journal will just replay the creation if the create didn't
                 happen because of crashing.
             */

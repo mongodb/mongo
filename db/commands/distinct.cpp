@@ -33,6 +33,7 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            Timer t;
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             string key = cmdObj["key"].valuestrsafe();
@@ -137,6 +138,7 @@ namespace mongo {
                 b.appendNumber( "n" , n );
                 b.appendNumber( "nscanned" , nscanned );
                 b.appendNumber( "nscannedObjects" , nscannedObjects );
+                b.appendNumber( "timems" , t.millis() );
                 result.append( "stats" , b.obj() );
             }
 

@@ -1,12 +1,22 @@
 
 import os
 
+# options 
 AddOption( "--extrapath",
            dest="extrapath",
            type="string",
            nargs=1,
            action="store",
            help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
+
+AddOption( "--prefix",
+           dest="prefix",
+           type="string",
+           nargs=1,
+           action="store",
+           default="/usr/local",
+           help="installation root" )
+
 
 env = Environment()
 
@@ -36,6 +46,7 @@ elif "linux2" == os.sys.platform:
 
 if nix:
     env.Append( CPPFLAGS=" -O3" )
+    env.Append( LIBS=["pthread"] )
 if linux:
     env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
@@ -44,19 +55,37 @@ conf = Configure(env)
 for lib in boostLibs:
     if not conf.CheckLib("boost_%s-mt" % lib):
         conf.CheckLib("boost_%s" % lib)
+
+dirs = [ "" , "bson/" , "bson/util/" , 
+         "client/"  , "s/" , "shell/" , 
+         "db/" , 
+         "scripting/" , 
+         "util/" , "util/concurrency/" , "util/mongoutils/" ]
+
 allClientFiles = []
-allClientFiles += Glob( "mongo/*.cpp" )
-allClientFiles += Glob( "mongo/bson/*.cpp" )
-allClientFiles += Glob( "mongo/client/*.cpp" )
-allClientFiles += Glob( "mongo/s/*.cpp" )
-allClientFiles += Glob( "mongo/shell/*.cpp" )
-allClientFiles += Glob( "mongo/db/*.cpp" )
-allClientFiles += Glob( "mongo/scripting/*.cpp" )
-allClientFiles += Glob( "mongo/util/*.cpp" )
+for x in dirs:
+    allClientFiles += Glob( "mongo/" + x + "*.cpp" )
 allClientFiles += Glob( "mongo/util/*.c" )
 
-env.SharedLibrary( "mongoclient" , allClientFiles )
-env.Library( "mongoclient" , allClientFiles )
+libs = []
+libs += env.SharedLibrary( "mongoclient" , allClientFiles )
+libs += env.Library( "mongoclient" , allClientFiles )
+
+# install
+
+prefix = GetOption( "prefix" )
+
+for x in libs:
+    env.Install( prefix + "/lib/" , str(x) )
+
+for x in dirs:
+    x = "mongo/" + x
+    env.Install( prefix + "/include/" + x , Glob( x + "*.h" ) )
+
+env.Alias( "install" , prefix )
+
+
+# example setup
 
 clientTests = []
 clientEnv = env.Clone();

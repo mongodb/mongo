@@ -327,7 +327,9 @@ namespace mongo {
 
         void init(int fileno, int filelength) {
             if ( uninitialized() ) {
-                assert(filelength > 32768 );
+                if( !(filelength > 32768 ) ) { 
+                    massert(13640, str::stream() << "DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:" << fileno, false);
+                }
                 assert( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;

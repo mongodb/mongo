@@ -42,7 +42,7 @@ namespace mongo {
         /**
          * @return remote socket address of the client
          */
-        string getRemote() const { return _remote; }
+        HostAndPort getRemote() const { return _remote; }
 
         /**
          * notes that this client use this shard
@@ -70,7 +70,7 @@ namespace mongo {
          * resets shards since get last error
          * @return if the command was ok or if there was an error
          */
-        bool getLastError( const BSONObj& options , BSONObjBuilder& result );
+        bool getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener = false );
 
         /** @return if its ok to auto split from this client */
         bool autoSplitOk() const { return _autoSplitOk; }
@@ -90,11 +90,11 @@ namespace mongo {
 
         // for getLastError
         void _addWriteBack( vector<WBInfo>& all , const BSONObj& o );
-        vector<BSONObj> _handleWriteBacks( vector<WBInfo>& all );
+        vector<BSONObj> _handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener );
 
 
         int _id; // unique client id
-        string _remote; // server:port of remote socket end
+        HostAndPort _remote; // server:port of remote socket end
 
         // we use _a and _b to store shards we've talked to on the current request and the previous
         // we use 2 so we can flip for getLastError type operations

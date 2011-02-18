@@ -48,7 +48,7 @@ namespace mongo {
          */
         explicit BackgroundJob(bool selfDelete = false);
 
-        virtual string name() const { return ""; }
+        virtual string name() const = 0;
 
         /**
          * define this to do your work.

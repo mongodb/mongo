@@ -602,6 +602,9 @@ namespace mongo {
 
             DWORD tmp;
             if(GetExitCodeProcess(h, &tmp)) {
+                if ( tmp == STILL_ACTIVE ) {
+                    return false;
+                }
                 CloseHandle(h);
                 handles.erase(pid);
                 if (exit_code)

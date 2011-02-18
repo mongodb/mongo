@@ -70,8 +70,7 @@ namespace mongo {
             _qp( qp ),
             _findingStart( true ),
             _findingStartMode(),
-            _findingStartTimer( 0 ),
-            _findingStartCursor( 0 )
+            _findingStartTimer( 0 )
         { init(); }
         bool done() const { return !_findingStart; }
         shared_ptr<Cursor> cRelease() { return _c; }
@@ -140,7 +139,7 @@ namespace mongo {
         void recoverFromYield() {
             if ( _findingStartCursor ) {
                 if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
-                    _findingStartCursor = 0;
+                    _findingStartCursor.reset( 0 );
                 }
             }
         }
@@ -151,7 +150,7 @@ namespace mongo {
         FindingStartMode _findingStartMode;
         auto_ptr< CoveredIndexMatcher > _matcher;
         Timer _findingStartTimer;
-        ClientCursor * _findingStartCursor;
+        ClientCursor::CleanupPointer _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
         DiskLoc startLoc( const DiskLoc &rec ) {
@@ -185,19 +184,16 @@ namespace mongo {
         }
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() ) {
             shared_ptr<Cursor> c = _qp.newCursor( startLoc );
-            _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns());
+            _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns()) );
         }
         void destroyClientCursor() {
-            if ( _findingStartCursor ) {
-                ClientCursor::erase( _findingStartCursor->cursorid() );
-                _findingStartCursor = 0;
-            }
+            _findingStartCursor.reset( 0 );
         }
         void init() {
             // Use a ClientCursor here so we can release db mutex while scanning
             // oplog (can take quite a while with large oplogs).
             shared_ptr<Cursor> c = _qp.newReverseCursor();
-            _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns(), BSONObj());
+            _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns(), BSONObj()) );
             _findingStartTimer.reset();
             _findingStartMode = Initial;
             BSONElement tsElt = _qp.originalQuery()[ "ts" ];

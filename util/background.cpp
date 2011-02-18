@@ -21,6 +21,8 @@
 
 #include "background.h"
 
+#include "mongoutils/str.h"
+
 namespace mongo {
 
     // both the BackgroundJob and the internal thread point to JobStatus
@@ -41,9 +43,10 @@ namespace mongo {
 
     // Background object can be only be destroyed after jobBody() ran
     void BackgroundJob::jobBody( boost::shared_ptr<JobStatus> status ) {
+        LOG(1) << "BackgroundJob starting: " << name() << endl;
         {
             scoped_lock l( status->m );
-            assert( status->state == NotStarted );
+            massert( 13643 , mongoutils::str::stream() << "backgroundjob already started: " << name() , status->state == NotStarted );
             status->state = Running;
         }
 

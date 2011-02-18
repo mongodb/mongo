@@ -917,12 +917,13 @@ namespace mongo {
                     // so we allocate them in our thread
                     // and hand off
 
-                    list< shared_ptr<ShardConnection> > shardConns;
+                    vector< shared_ptr<ShardConnection> > shardConns;
 
                     list< shared_ptr<Future::CommandResult> > futures;
                     
                     for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
                         shared_ptr<ShardConnection> temp( new ShardConnection( i->getConnString() , fullns ) );
+                        assert( temp->get() );
                         futures.push_back( Future::spawnCommand( i->getConnString() , dbName , shardedCommand , temp->get() ) );
                         shardConns.push_back( temp );
                     }
@@ -942,7 +943,10 @@ namespace mongo {
                         }
                         shardresults.append( res->getServer() , res->result() );
                     }
-                    
+
+                    for ( unsigned i=0; i<shardConns.size(); i++ )
+                        shardConns[i]->done();
+
                     if ( failed )
                         return 0;
 

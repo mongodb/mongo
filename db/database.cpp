@@ -39,6 +39,7 @@ namespace mongo {
     Database::Database(const char *nm, bool& newDb, const string& _path )
         : name(nm), path(_path), namespaceIndex( path, name ),
           profileName(name + ".system.profile") {
+        try {
 
         {
             // check db name is valid
@@ -83,6 +84,12 @@ namespace mongo {
 
 
         magic = 781231;
+        } catch(...) { 
+            // since destructor won't be called:
+            for ( size_t i = 0; i < files.size(); i++ )
+                delete files[i];
+            throw;
+        }
     }
 
     boost::filesystem::path Database::fileName( int n ) const {

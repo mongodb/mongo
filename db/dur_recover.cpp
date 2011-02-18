@@ -283,7 +283,10 @@ namespace mongo {
 
             //DEV log() << "recovery processSection seq:" << i.seqNumber() << endl;
             if( _recovering && _lastDataSyncedFromLastRun > i.seqNumber() + ExtraKeepTimeMs ) {
-                log() << "recover skipping application of section seq:" << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+                if( i.seqNumber() != _lastSeqMentionedInConsoleLog ) {
+                    log() << "recover skipping application of section seq:" << i.seqNumber() << " < lsn:" << _lastDataSyncedFromLastRun << endl;
+                    _lastSeqMentionedInConsoleLog = i.seqNumber();
+                }
                 return;
             }
 
@@ -303,6 +306,7 @@ namespace mongo {
         */
         bool RecoveryJob::processFileBuffer(const void *p, unsigned len) {
             try {
+                unsigned long long fileId;
                 BufReader br(p,len);
 
                 {
@@ -314,12 +318,23 @@ namespace mongo {
                         uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
                     }
                     uassert(13537, "journal header invalid", h.valid());
+                    fileId = h.fileId;
+                    if(cmdLine.durOptions & CmdLine::DurDumpJournal) { 
+                        log() << "JHeader::fileId=" << fileId << endl;
+                    }
                 }
 
                 // read sections
                 while ( !br.atEof() ) {
                     JSectHeader h;
                     br.peek(h);
+                    if( h.fileId != fileId ) {
+                        if( debug || (cmdLine.durOptions & CmdLine::DurDumpJournal) ) {
+                            log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
+                            log() << "  sect len:" << h.len << " seqnum:" << h.seqNumber << endl;
+                        }
+                        return true;
+                    }
                     processSection(br.skip(h.len), h.len);
 
                     // ctrl c check
@@ -354,12 +369,12 @@ namespace mongo {
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) {
-                bool abruptEnd = processFile(files[i]);
-                if( abruptEnd && i+1 < files.size() ) {
+	      /*bool abruptEnd = */processFile(files[i]);
+                /*if( abruptEnd && i+1 < files.size() ) {
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();
                     uasserted(13535, "recover abrupt journal file end");
-                }
+                }*/
             }
 
             close();

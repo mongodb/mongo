@@ -147,9 +147,11 @@ namespace mongo {
         ~StaticObserver() { _destroyingStatics = true; }
     };
 
-    // On pthread systems, it is an error to destroy a mutex while held.  Static global
-    // mutexes may be held upon shutdown in our implementation, and this way we avoid
-    // destroying them.
+    /** On pthread systems, it is an error to destroy a mutex while held.  Static global
+     * mutexes may be held upon shutdown in our implementation, and this way we avoid
+     * destroying them.
+     * NOT recursive.
+     */
     class mutex : boost::noncopyable {
     public:
 #if defined(_DEBUG)

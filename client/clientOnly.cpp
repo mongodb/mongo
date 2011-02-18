@@ -63,7 +63,7 @@ namespace mongo {
         assert(0);
     }
 
-    bool Shard::isAShard( const string& ident ) {
+    bool Shard::isAShardNode( const string& ident ) {
         assert(0);
         return false;
     }

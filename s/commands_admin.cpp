@@ -384,7 +384,7 @@ namespace mongo {
                         }
 
                         // Not a unique index? Move on.
-                        if ( idx["unique"].eoo() || ! idx["unique"].Bool() )
+                        if ( idx["unique"].eoo() || ! idx["unique"].trueValue() )
                             continue;
 
                         // Shard key is prefix of unique index? Move on.
@@ -598,6 +598,9 @@ namespace mongo {
                     result.append( "cause" , res );
                     return false;
                 }
+                
+                // pre-emptively reload the config to get new version info
+                config->getChunkManager( ns , true );
 
                 result.append( "millis" , t.millis() );
                 return true;
@@ -1013,5 +1016,23 @@ namespace mongo {
         }
     } cmdCloseAllDatabases;
 
+
+    class CmdReplSetGetStatus : public Command {
+    public:
+        CmdReplSetGetStatus() : Command("replSetGetStatus"){}
+        virtual bool logTheOp() { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
+
+        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {        
+            if ( jsobj["forShell"].trueValue() )
+                lastError.disableForCommand();
+
+            errmsg = "replSetGetStatus is not supported through mongos";
+            return false;
+        }
+    } cmdReplSetGetStatus;
 
 } // namespace mongo

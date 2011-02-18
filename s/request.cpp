@@ -59,6 +59,8 @@ namespace mongo {
             return;
         }
 
+        uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
+
         _config = grid.getDBConfig( getns() );
         if ( reload )
             uassert( 10192 ,  "db config reload failed!" , _config->reload() );
@@ -154,7 +156,14 @@ namespace mongo {
         assert( _didInit );
         long long cursor =response.header()->getCursor();
         if ( cursor ) {
-            cursorCache.storeRef( fromServer , cursor );
+            if ( fromServer.size() ) {
+                cursorCache.storeRef( fromServer , cursor );
+            }
+            else {
+                // probably a getMore
+                // make sure we have a ref for this
+                assert( cursorCache.getRef( cursor ).size() );
+            }
         }
         _p->reply( _m , response , _id );
     }

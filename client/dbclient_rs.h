@@ -66,8 +66,12 @@ namespace mongo {
          */
         void notifyFailure( const HostAndPort& server );
 
+        /** @return prev if its still ok, and if not returns a random slave that is ok for reads */
+        HostAndPort getSlave( const HostAndPort& prev );
+
         /** @return a random slave that is ok for reads */
         HostAndPort getSlave();
+
 
         /**
          * notify the monitor that server has faild
@@ -82,6 +86,8 @@ namespace mongo {
         string getName() const { return _name; }
 
         string getServerAddress() const;
+        
+        bool contains( const string& server ) const;
 
     private:
         /**
@@ -121,6 +127,7 @@ namespace mongo {
         int _find( const HostAndPort& server ) const ;
 
         mutable mongo::mutex _lock; // protects _nodes
+        mutable mongo::mutex  _checkConnectionLock;
 
         string _name;
         struct Node {
@@ -222,7 +229,7 @@ namespace mongo {
 
         // ---- low level ------
 
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
 

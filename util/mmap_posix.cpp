@@ -42,6 +42,7 @@ namespace mongo {
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             munmap(*i,len);
         }
+        views.clear();
 
         if ( fd )
             ::close(fd);
@@ -127,11 +128,13 @@ namespace mongo {
                     error() << "mmap private failed with out of memory. (64 bit build)" << endl;
                 }
             }
+            else { 
+                error() << "mmap private failed " << errnoWithDescription() << endl;
+            }
             return 0;
         }
-        else {
-            views.push_back(x);
-        }
+
+        views.push_back(x);
         return x;
     }
 

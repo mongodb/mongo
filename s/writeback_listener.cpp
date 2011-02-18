@@ -33,6 +33,7 @@
 namespace mongo {
 
     map<string,WriteBackListener*> WriteBackListener::_cache;
+    set<string> WriteBackListener::_seenSets;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
     map<ConnectionId,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
@@ -44,11 +45,43 @@ namespace mongo {
 
     /* static */
     void WriteBackListener::init( DBClientBase& conn ) {
+        
+        if ( conn.type() == ConnectionString::SYNC ) {
+            // don't want write back listeners for config servers
+            return;
+        }
+
+        if ( conn.type() != ConnectionString::SET ) {
+            init( conn.getServerAddress() );
+            return;
+        }
+        
+
+        {
+            scoped_lock lk( _cacheLock );
+            if ( _seenSets.count( conn.getServerAddress() ) )
+                return;
+        }
+
+        // we want to do writebacks on all rs nodes
+        string errmsg;
+        ConnectionString cs = ConnectionString::parse( conn.getServerAddress() , errmsg );
+        uassert( 13641 , str::stream() << "can't parse host [" << conn.getServerAddress() << "]" , cs.isValid() );
+
+        vector<HostAndPort> hosts = cs.getServers();
+        
+        for ( unsigned i=0; i<hosts.size(); i++ )
+            init( hosts[i].toString() );
+
+    }
+    
+    /* static */
+    void WriteBackListener::init( const string& host ) {
         scoped_lock lk( _cacheLock );
-        WriteBackListener*& l = _cache[conn.getServerAddress()];
+        WriteBackListener*& l = _cache[host];
         if ( l )
             return;
-        l = new WriteBackListener( conn.getServerAddress() );
+        l = new WriteBackListener( host );
         l->go();
     }
 
@@ -73,16 +106,19 @@ namespace mongo {
             }
             sleepmillis( 10 );
         }
-        stringstream ss;
-        ss << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms";
-        uasserted( 13403 , ss.str() );
-        return BSONObj(); // never gets here
+        uasserted( 13403 , str::stream() << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms" );
+        throw 1; // never gets here
     }
 
     void WriteBackListener::run() {
         int secsToSleep = 0;
-        while ( ! inShutdown() && Shard::isMember( _addr ) ) {
-
+        while ( ! inShutdown() ) {
+            
+            if ( ! Shard::isAShardNode( _addr ) ) {
+                log(1) << _addr << " is not a shard node" << endl;
+                sleepsecs( 60 );
+                continue;
+            }
 
             try {
                 ScopedDbConnection conn( _addr );
@@ -140,7 +176,7 @@ namespace mongo {
                         db->getChunkManager( ns , true );
                     }
 
-                    // do reequest and then call getLastError
+                    // do request and then call getLastError
                     // we have to call getLastError so we can return the right fields to the user if they decide to call getLastError
 
                     BSONObj gle;
@@ -157,7 +193,7 @@ namespace mongo {
                         ci->newRequest(); // this so we flip prev and cur shards
 
                         BSONObjBuilder b;
-                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b ) ) {
+                        if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
                             b.appendBool( "commandFailed" , true );
                         }
                         gle = b.obj();

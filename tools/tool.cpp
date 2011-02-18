@@ -48,7 +48,7 @@ namespace mongo {
 
         if ( access & REMOTE_SERVER )
             _options->add_options()
-            ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
+            ("host,h",po::value<string>(), "mongo host to connect to ( <set name>/s1,s2 for sets)" )
             ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
             ("ipv6", "enable IPv6 support (disabled by default)")
 
@@ -389,7 +389,7 @@ namespace mongo {
         unsigned long long num = 0;
         unsigned long long processed = 0;
 
-        const int BUF_SIZE = 1024 * 1024 * 5;
+        const int BUF_SIZE = BSONObjMaxUserSize + ( 1024 * 1024 );
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 

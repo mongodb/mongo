@@ -265,7 +265,7 @@ namespace mongo {
     } cmdResync;
 
     bool anyReplEnabled() {
-        return replPair || replSettings.slave || replSettings.master;
+        return replPair || replSettings.slave || replSettings.master || theReplSet;
     }
 
     bool replAuthenticate(DBClientBase *conn);
@@ -637,7 +637,7 @@ namespace mongo {
         }
     }
 
-    static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, const BSONObj &spec, ReplSource::SourceVector &old) {
+    static void addSourceToList(ReplSource::SourceVector &v, ReplSource& s, ReplSource::SourceVector &old) {
         if ( !s.syncedTo.isNull() ) { // Don't reuse old ReplSource if there was a forced resync.
             for ( ReplSource::SourceVector::iterator i = old.begin(); i != old.end();  ) {
                 if ( s == **i ) {
@@ -758,7 +758,7 @@ namespace mongo {
                     }
                 }
             }
-            addSourceToList(v, tmp, c->current(), old);
+            addSourceToList(v, tmp, old);
             c->advance();
         }
 
@@ -1478,6 +1478,7 @@ namespace mongo {
         BSONObj me;
         {
             dblock l;
+            // local.me is an identifier for a server for getLastError w:2+
             if ( ! Helpers::getSingleton( "local.me" , me ) ) {
                 BSONObjBuilder b;
                 b.appendOID( "_id" , 0 , true );

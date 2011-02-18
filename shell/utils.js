@@ -680,7 +680,8 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/evalf.js",
                                    "jstests/killop.js",
                                    "jstests/run_program1.js",
-                                   "jstests/notablescan.js"] );
+                                   "jstests/notablescan.js",
+                                   "jstests/drop2.js"] );
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js",
@@ -751,7 +752,7 @@ if ( typeof _threadInject != "undefined" ){
                             "__parallelTests__fun.apply( 0, __parallelTests__argv );" +
                             "__parallelTests__passed = true;" +
                          "} catch ( e ) {" +
-                            "print( e );" +
+                            "print( '********** Parallel Test FAILED: ' + tojson(e) );" +
                          "}" +
                          "return __parallelTests__passed;" +
                          "}"

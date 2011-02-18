@@ -174,14 +174,16 @@ namespace mongo {
                 }
 
                 _checkLast();
-
+                
                 for ( size_t i=0; i<all.size(); i++ ) {
                     BSONObj temp = all[i];
                     if ( isOk( temp ) )
                         continue;
                     stringstream ss;
-                    ss << "write $cmd failed on a shard: " << temp.jsonString();
+                    ss << "write $cmd failed on a node: " << temp.jsonString();
                     ss << " " << _conns[i]->toString();
+                    ss << " ns: " << ns;
+                    ss << " cmd: " << query.toString();
                     throw UserException( 13105 , ss.str() );
                 }
 
@@ -302,7 +304,15 @@ namespace mongo {
                 if ( a == b )
                     continue;
 
-                throw UpdateNotTheSame( 8017 , "update not consistent" , _connAddresses , _lastErrors );
+                throw UpdateNotTheSame( 8017 , 
+                                        str::stream() 
+                                        << "update not consistent " 
+                                        << " ns: " << ns
+                                        << " query: " << query.toString()
+                                        << " update: " << obj
+                                        << " gle1: " << _lastErrors[0]
+                                        << " gle2: " << _lastErrors[i] ,
+                                        _connAddresses , _lastErrors );
             }
         }
     }
@@ -313,7 +323,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool SyncClusterConnection::call( Message &toSend, Message &response, bool assertOk ) {
+    bool SyncClusterConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         uassert( 8006 , "SyncClusterConnection::call can only be used directly for dbQuery" ,
                  toSend.operation() == dbQuery );
 
@@ -323,8 +333,11 @@ namespace mongo {
         for ( size_t i=0; i<_conns.size(); i++ ) {
             try {
                 bool ok = _conns[i]->call( toSend , response , assertOk );
-                if ( ok )
+                if ( ok ) {
+                    if ( actualServer )
+                        *actualServer = _connAddresses[i];
                     return ok;
+                }
                 log() << "call failed to: " << _conns[i]->toString() << " no data" << endl;
             }
             catch ( ... ) {
@@ -359,7 +372,7 @@ namespace mongo {
         }
 
         BSONObj info;
-        uassert( 13053 , "help failed" , _commandOnActive( "admin" , BSON( name << "1" << "help" << 1 ) , info ) );
+        uassert( 13053 , str::stream() << "help failed: " << info , _commandOnActive( "admin" , BSON( name << "1" << "help" << 1 ) , info ) );
 
         int lockType = info["lockType"].numberInt();
 

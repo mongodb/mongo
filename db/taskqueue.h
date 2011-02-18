@@ -69,7 +69,7 @@ namespace mongo {
         */
         void invoke() {
             mutex::scoped_lock lk2(_invokeMutex);
-            int toDrain;
+            int toDrain = 0;
             {
                 // flip queueing to the other queue (we are double buffered)
                 readlocktry lk("", 5);

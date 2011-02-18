@@ -192,10 +192,17 @@ namespace BasicTests {
 
         void run() {
             Timer t;
-            sleepsecs( 1 );
-            ASSERT_EQUALS( 1 , t.seconds() );
+            int matches = 0;
+            for( int p = 0; p < 3; p++ ) {
+                sleepsecs( 1 );
+                int sec = t.seconds();
+                if( sec == 1 ) 
+                    matches++;
+                ASSERT( sec >= 0 && sec <= 2 );
+                t.reset();
+            }
+            ASSERT( matches >= 2 );
 
-            t.reset();
             sleepmicros( 1527123 );
             ASSERT( t.micros() > 1000000 );
             ASSERT( t.micros() < 2000000 );

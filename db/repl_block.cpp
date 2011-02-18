@@ -142,8 +142,7 @@ namespace mongo {
             }
 
             i.owned = true;
-            i.loc = new OpTime[1];
-            i.loc[0] = last;
+            i.loc = new OpTime(last);
             _dirty = true;
 
             if ( ! _started ) {

@@ -83,7 +83,13 @@ namespace mongo {
         virtual Flushable * prepareFlush() = 0;
 
         void created(); /* subclass must call after create */
-        void destroyed(); /* subclass must call in destructor */
+
+        /* subclass must call in destructor (or at close).
+           removes this from pathToFile and other maps
+           safe to call more than once, albeit might be wasted work
+           ideal to call close to the close, if the close is well before object destruction
+        */
+        void destroyed(); 
 
         virtual unsigned long long length() const = 0;
 
@@ -166,6 +172,14 @@ namespace mongo {
         void* createReadOnlyMap();
         void* createPrivateMap();
 
+        /** make the private map range writable (necessary for our windows implementation) */
+        static void makeWritable(void *, unsigned len)
+#if defined(_WIN32)
+            ;
+#else
+        { }
+#endif
+
     private:
         static void updateLength( const char *filename, unsigned long long &length );
 
@@ -176,6 +190,12 @@ namespace mongo {
 
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
+        void unmapped(void *privateView);
+    public:
+        static const unsigned ChunkSize = 64 * 1024 * 1024;
+        static const unsigned NChunks = 1024 * 1024;
+#else
+        void unmapped(void *privateView) { }
 #endif
 
     protected:
@@ -187,8 +207,6 @@ namespace mongo {
         void* remapPrivateView(void *oldPrivateAddr);
     };
 
-    void printMemInfo( const char * where );
-
     typedef MemoryMappedFile MMF;
 
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
@@ -198,5 +216,43 @@ namespace mongo {
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
+
+#if defined(_WIN32)    
+    class ourbitset {
+        volatile unsigned bits[MemoryMappedFile::NChunks]; // volatile as we are doing double check locking
+    public:
+        ourbitset() { 
+            memset((void*) bits, 0, sizeof(bits));
+        }
+        bool get(unsigned i) const { 
+            unsigned x = i / 32;
+            assert( x < MemoryMappedFile::NChunks );
+            return bits[x] & (1 << (i%32));
+        }
+        void set(unsigned i) { 
+            unsigned x = i / 32;
+            assert( x < MemoryMappedFile::NChunks );
+            bits[x] |= (1 << (i%32));
+        }
+        void clear(unsigned i) { 
+            unsigned x = i / 32;
+            assert( x < MemoryMappedFile::NChunks );
+            bits[x] &= ~(1 << (i%32));
+        }
+    };
+    extern ourbitset writable;
+    void makeChunkWritable(size_t chunkno);
+    inline void MemoryMappedFile::makeWritable(void *_p, unsigned len) {
+        size_t p = (size_t) _p;
+        unsigned a = p/ChunkSize;
+        unsigned b = (p+len)/ChunkSize;
+        for( unsigned i = a; i <= b; i++ ) {
+            if( !writable.get(i) ) {
+                makeChunkWritable(i);
+            }
+        }
+    }
+
+#endif
 
 } // namespace mongo

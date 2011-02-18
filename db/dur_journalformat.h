@@ -36,7 +36,7 @@ namespace mongo {
 
             // x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near
             // that.  simply incrementing the version # is safe on a fwd basis.
-            enum { CurrentVersion = 0x4146 };
+            enum { CurrentVersion = 0x4147 };
             unsigned short _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
@@ -46,11 +46,13 @@ namespace mongo {
             char dbpath[128]; // path/filename of this file for human reading and diagnostics.  not used by code.
             char n3, n4;      // '\n', '\n'
 
-            char reserved3[8034]; // 8KB total for the file header
+            unsigned long long fileId; // unique identifier that will be in each JSectHeader. important as we recycle prealloced files
+
+            char reserved3[8026]; // 8KB total for the file header
             char txt2[2];         // "\n\n" at the end
 
             bool versionOk() const { return _version == CurrentVersion; }
-            bool valid() const { return magic[0] == 'j' && txt2[1] == '\n'; }
+            bool valid() const { return magic[0] == 'j' && txt2[1] == '\n' && fileId; }
         };
 
         /** "Section" header.  A section corresponds to a group commit.
@@ -59,6 +61,7 @@ namespace mongo {
         struct JSectHeader {
             unsigned len;                  // length in bytes of the whole section
             unsigned long long seqNumber;  // sequence number that can be used on recovery to not do too much work
+            unsigned long long fileId;     // matches JHeader::fileId
         };
 
         /** an individual write operation within a group commit section.  Either the entire section should

@@ -33,6 +33,23 @@ namespace mongo {
 
     // global background job responsible for checking every X amount of time
     class ReplicaSetMonitorWatcher : public BackgroundJob {
+    public:
+        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") , _started(false) {}
+
+        virtual string name() const { return "ReplicaSetMonitorWatcher"; }
+        
+        void safeGo() {
+            // check outside of lock for speed
+            if ( _started )
+                return;
+            
+            scoped_lock lk( _safego );
+            if ( _started )
+                return;
+            _started = true;
+
+            go();
+        }
     protected:
         void run() {
             while ( ! inShutdown() ) {
@@ -46,11 +63,20 @@ namespace mongo {
             }
         }
 
+        mongo::mutex _safego;
+        bool _started;
+
     } replicaSetMonitorWatcher;
 
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _name( name ) , _master(-1) {
+        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
+        
+        uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
+
+        if ( _name.size() == 0 ) {
+            warning() << "replica set name empty, first node: " << servers[0] << endl;
+        }
 
         string errmsg;
 
@@ -84,8 +110,7 @@ namespace mongo {
         if ( ! m )
             m.reset( new ReplicaSetMonitor( name , servers ) );
 
-        if ( replicaSetMonitorWatcher.getState() == BackgroundJob::NotStarted )
-            replicaSetMonitorWatcher.go();
+        replicaSetMonitorWatcher.safeGo();
 
         return m;
     }
@@ -100,7 +125,7 @@ namespace mongo {
                     string name = i->first;
                     if ( seen.count( name ) )
                         continue;
-                    LOG(0) << "checking replica set: " << name << endl;
+                    LOG(1) << "checking replica set: " << name << endl;
                     seen.insert( name );
                     m = i->second;
                     break;
@@ -120,7 +145,7 @@ namespace mongo {
         massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 );
         _hook = hook;
     }
-
+    
     string ReplicaSetMonitor::getServerAddress() const {
         StringBuilder ss;
         if ( _name.size() )
@@ -137,9 +162,19 @@ namespace mongo {
         return ss.str();
     }
 
+    bool ReplicaSetMonitor::contains( const string& server ) const {
+        scoped_lock lk( _lock );
+        for ( unsigned i=0; i<_nodes.size(); i++ ) {
+            if ( _nodes[i].addr == server )
+                return true;
+        }
+        return false;
+    }
+    
+
     void ReplicaSetMonitor::notifyFailure( const HostAndPort& server ) {
-        if ( _master >= 0 ) {
-            scoped_lock lk( _lock );
+        scoped_lock lk( _lock );
+        if ( _master >= 0 && _master < (int)_nodes.size() ) {
             if ( server == _nodes[_master].addr )
                 _master = -1;
         }
@@ -148,13 +183,36 @@ namespace mongo {
 
 
     HostAndPort ReplicaSetMonitor::getMaster() {
-        if ( _master < 0 || !_nodes[_master].ok )
+        bool good = false;
+        {
+            scoped_lock lk( _lock );
+            good = _master >= 0 && _nodes[_master].ok;
+        }
+
+        if ( ! good )
             _check();
 
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
 
         scoped_lock lk( _lock );
         return _nodes[_master].addr;
+    }
+    
+    HostAndPort ReplicaSetMonitor::getSlave( const HostAndPort& prev ) {
+        // make sure its valid 
+        if ( prev.port() > 0 ) {
+            scoped_lock lk( _lock );
+            for ( unsigned i=0; i<_nodes.size(); i++ ) {
+                if ( prev != _nodes[i].addr ) 
+                    continue;
+
+                if ( _nodes[i].ok ) 
+                    return prev;
+                break;
+            }
+        }
+        
+        return getSlave();
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
@@ -235,8 +293,11 @@ namespace mongo {
             changed = true;
         }
     }
+    
+    
 
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose ) {
+        scoped_lock lk( _checkConnectionLock );
         bool isMaster = false;
         bool changed = false;
         try {
@@ -369,25 +430,28 @@ namespace mongo {
 
         _masterHost = _monitor->getMaster();
         _master.reset( new DBClientConnection( true ) );
-        _master->connect( _masterHost );
+        string errmsg;
+        if ( ! _master->connect( _masterHost , errmsg ) ) {
+            _monitor->notifyFailure( _masterHost );
+            uasserted( 13639 , str::stream() << "can't connect to new replica set master [" << _masterHost.toString() << "] err: " << errmsg );
+        }
         _auth( _master.get() );
         return _master.get();
     }
 
     DBClientConnection * DBClientReplicaSet::checkSlave() {
-        if ( _slave ) {
+        HostAndPort h = _monitor->getSlave( _slaveHost );
+
+        if ( h == _slaveHost ) {
             if ( ! _slave->isFailed() )
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
         }
-
-        HostAndPort h = _monitor->getSlave();
-        if ( h != _slaveHost ) {
-            _slaveHost = h;
-            _slave.reset( new DBClientConnection( true ) );
-            _slave->connect( _slaveHost );
-            _auth( _slave.get() );
-        }
+        
+        _slaveHost = _monitor->getSlave();
+        _slave.reset( new DBClientConnection( true ) );
+        _slave->connect( _slaveHost );
+        _auth( _slave.get() );
         return _slave.get();
     }
 
@@ -493,11 +557,15 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::killCursor( long long cursorID ) {
-        checkMaster()->killCursor( cursorID );
+        // we should neve call killCursor on a replica set conncetion
+        // since we don't know which server it belongs to
+        // can't assume master because of slave ok
+        // and can have a cursor survive a master change
+        assert(0);
     }
 
 
-    bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk ) {
+    bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( toSend.operation() == dbQuery ) {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm( toSend );
@@ -505,15 +573,24 @@ namespace mongo {
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
                 for ( int i=0; i<2; i++ ) {
                     try {
-                        return checkSlave()->call( toSend , response , assertOk );
+                        DBClientConnection* s = checkSlave();
+                        if ( actualServer )
+                            *actualServer = s->getServerAddress();
+                        return s->call( toSend , response , assertOk );
                     }
                     catch ( DBException & ) {
                         log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                        if ( actualServer )
+                            *actualServer = "";
                     }
                 }
             }
         }
-        return checkMaster()->call( toSend , response , assertOk );
+        
+        DBClientConnection* m = checkMaster();
+        if ( actualServer )
+            *actualServer = m->getServerAddress();
+        return m->call( toSend , response , assertOk );
     }
 
 }

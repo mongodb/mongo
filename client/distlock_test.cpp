@@ -34,47 +34,71 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
 
         static void runThread() {
-            for ( int i=0; i<1000; i++ ) {
+            while ( keepGoing ) {
                 if ( current->lock_try( "test" ) ) {
-                    gotit++;
-                    for ( int j=0; j<2000; j++ ) {
-                        count++;
+                    count++;
+                    int before = count;
+                    sleepmillis( 3 );
+                    int after = count;
+                    
+                    if ( after != before ) {
+                        error() << " before: " << before << " after: " << after << endl;
                     }
+                    
                     current->unlock();
                 }
             }
         }
-
+        
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            Timer t;
             DistributedLock lk( ConnectionString( cmdObj["host"].String() , ConnectionString::SYNC ), "testdistlockwithsync" );
             current = &lk;
             count = 0;
             gotit = 0;
-
+            errors = 0;
+            keepGoing = true;
+            
             vector<shared_ptr<boost::thread> > l;
             for ( int i=0; i<4; i++ ) {
                 l.push_back( shared_ptr<boost::thread>( new boost::thread( runThread ) ) );
             }
+            
+            int secs = 10;
+            if ( cmdObj["secs"].isNumber() )
+                secs = cmdObj["secs"].numberInt();
+            sleepsecs( secs );
+            keepGoing = false;
 
             for ( unsigned i=0; i<l.size(); i++ )
                 l[i]->join();
 
+            current = 0;
+
             result.append( "count" , count );
             result.append( "gotit" , gotit );
-            current = 0;
-            return count == gotit * 2000;
-        }
+            result.append( "errors" , errors );
+            result.append( "timeMS" , t.millis() );
 
+            return errors == 0;
+        }
+        
+        // variables for test
         static DistributedLock * current;
-        static int count;
         static int gotit;
+        static int errors;
+        static AtomicUInt count;
+        
+        static bool keepGoing;
 
     } testDistLockWithSyncCmd;
 
 
     DistributedLock * TestDistLockWithSync::current;
-    int TestDistLockWithSync::count;
+    AtomicUInt TestDistLockWithSync::count;
     int TestDistLockWithSync::gotit;
+    int TestDistLockWithSync::errors;
+    bool TestDistLockWithSync::keepGoing;
 
 
 }

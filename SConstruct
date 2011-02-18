@@ -308,8 +308,8 @@ if has_option( "full" ):
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp  db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/projection.cpp shell/mongo.cpp db/security_key.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
-                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp", 
-                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" , "util/processinfo.cpp" ,
+                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
+                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
                  "util/concurrency/synchronization.cpp", "util/ip_addr.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
@@ -324,16 +324,22 @@ elif os.sys.platform == "win32":
 else:
     commonFiles += [ "util/mmap_posix.cpp" ]
 
-if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
-    commonFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
-else:
-    commonFiles += [ "util/processinfo_none.cpp" ]
-
 coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/message_server_port.cpp" , 
                     "client/parallel.cpp" ,  
                     "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
+
+processInfoFiles = [ "util/processinfo.cpp" ]
+
+if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
+    processInfoFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+else:
+    processInfoFiles += [ "util/processinfo_none.cpp" ]
+
+coreServerFiles += processInfoFiles
+
+
 
 if has_option( "asio" ):
     coreServerFiles += [ "util/message_server_asio.cpp" ]
@@ -360,7 +366,7 @@ coreServerFiles += scriptingFiles
 
 coreShardFiles = [ "s/config.cpp" , "s/grid.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" , "s/client.cpp" , "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" , "s/writeback_listener.cpp" , "s/shard_version.cpp" ]
-serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" , "s/d_split.cpp" , "client/distlock_test.cpp" , "s/d_chunk_manager.cpp" , "s/d_background_splitter.cpp" ]
+serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" , "s/d_split.cpp" , "client/distlock_test.cpp" , "s/d_chunk_manager.cpp" ]
 
 serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
 
@@ -373,10 +379,18 @@ for x in os.listdir( "db/modules/" ):
     print( "adding module: " + x )
     moduleNames.append( x )
     modRoot = "db/modules/" + x + "/"
-    serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
+
     modBuildFile = modRoot + "build.py"
+    myModule = None
     if os.path.exists( modBuildFile ):
-        modules += [ imp.load_module( "module_" + x , open( modBuildFile , "r" ) , modBuildFile , ( ".py" , "r" , imp.PY_SOURCE  ) ) ]
+        myModule = imp.load_module( "module_" + x , open( modBuildFile , "r" ) , modBuildFile , ( ".py" , "r" , imp.PY_SOURCE  ) )
+        modules.append( myModule )
+        
+    if myModule and "customIncludes" in dir(myModule) and myModule.customIncludes:
+        pass
+    else:
+        serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
+
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
 
@@ -862,7 +876,10 @@ def doConfigure( myenv , needPcre=True , shell=False ):
     removeIfInList( myenv["LIBS"] , "wpcap" )
 
     for m in modules:
-        m.configure( conf , myenv )
+        if "customIncludes" in dir(m) and m.customIncludes:
+            m.configure( conf , myenv , serverOnlyFiles )
+        else:
+            m.configure( conf , myenv )
 
     # XP_* is for spidermonkey.
     # this is outside of usesm block so don't have to rebuild for java
@@ -1181,6 +1198,8 @@ elif not onlyServer:
             shell32BitFiles.append( "32bit/" + str( f ) )
         for f in scriptingFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
+        for f in processInfoFiles:
+            shell32BitFiles.append( "32bit/" + str( f ) )
         shellEnv.VariantDir( "32bit" , "." , duplicate=1 )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )
@@ -1348,6 +1367,8 @@ def doStyling( env , target , source ):
 
     files = utils.getAllSourceFiles() 
     files = filter( lambda x: not x.endswith( ".c" ) , files )
+    files.remove( "./shell/mongo_vstudio.cpp" )
+
     cmd = "astyle --options=mongo_astyle " + " ".join( files )
     res = utils.execsys( cmd )
     print( res[0] )

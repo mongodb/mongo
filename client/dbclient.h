@@ -70,7 +70,13 @@ namespace mongo {
         */
         QueryOption_Exhaust = 1 << 6,
 
-        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust
+        /** When sharded, this means its ok to return partial results
+            Usually we will fail a query if all required shards aren't up
+            If this is set, it'll be a partial result set 
+         */
+        QueryOption_PartialResults = 1 << 7 ,
+
+        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust | QueryOption_PartialResults
 
     };
 
@@ -114,6 +120,10 @@ namespace mongo {
     public:
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
 
+        ConnectionString() {
+            _type = INVALID;
+        }
+
         ConnectionString( const HostAndPort& server ) {
             _type = MASTER;
             _servers.push_back( server );
@@ -144,32 +154,33 @@ namespace mongo {
         }
 
         ConnectionString( const string& s , ConnectionType favoredMultipleType ) {
+            _type = INVALID;
+            
             _fillServers( s );
-            if ( _servers.size() == 1 ) {
+            if ( _type != INVALID ) {
+                // set already
+            }
+            else if ( _servers.size() == 1 ) {
                 _type = MASTER;
             }
             else {
                 _type = favoredMultipleType;
-                assert( _type != MASTER );
+                assert( _type == SET || _type == SYNC );
             }
             _finishInit();
         }
 
         bool isValid() const { return _type != INVALID; }
 
-        string toString() const {
-            return _string;
-        }
-
+        string toString() const { return _string; }
+        
         DBClientBase* connect( string& errmsg ) const;
 
-        string getSetName() const {
-            return _setName;
-        }
+        string getSetName() const { return _setName; }
 
-        vector<HostAndPort> getServers() const {
-            return _servers;
-        }
+        vector<HostAndPort> getServers() const { return _servers; }
+        
+        ConnectionType type() const { return _type; }
 
         static ConnectionString parse( const string& url , string& errmsg );
 
@@ -177,30 +188,8 @@ namespace mongo {
 
     private:
 
-        ConnectionString() {
-            _type = INVALID;
-        }
-
-        void _fillServers( string s ) {
-            string::size_type idx;
-            while ( ( idx = s.find( ',' ) ) != string::npos ) {
-                _servers.push_back( s.substr( 0 , idx ) );
-                s = s.substr( idx + 1 );
-            }
-            _servers.push_back( s );
-        }
-
-        void _finishInit() {
-            stringstream ss;
-            if ( _type == SET )
-                ss << _setName << "/";
-            for ( unsigned i=0; i<_servers.size(); i++ ) {
-                if ( i > 0 )
-                    ss << ",";
-                ss << _servers[i].toString();
-            }
-            _string = ss.str();
-        }
+        void _fillServers( string s );
+        void _finishInit();
 
         ConnectionType _type;
         vector<HostAndPort> _servers;
@@ -341,7 +330,8 @@ namespace mongo {
     class DBConnector {
     public:
         virtual ~DBConnector() {}
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true ) = 0;
+        /** actualServer is set to the actual server where they call went if there was a choice (SlaveOk) */
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 ) = 0;
         virtual void say( Message &toSend ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
         virtual void checkResponse( const char* data, int nReturned ) {}
@@ -427,7 +417,7 @@ namespace mongo {
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */
-        unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
+        virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
 
         string createPasswordDigest( const string &username , const string &clearTextPassword );
 
@@ -694,6 +684,8 @@ namespace mongo {
     protected:
         bool isOk(const BSONObj&);
 
+        BSONObj _countCmd(const string &ns, const BSONObj& query, int options, int limit, int skip );
+
         enum QueryOptions availableOptions();
 
     private:
@@ -883,7 +875,7 @@ namespace mongo {
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
         virtual void say( Message &toSend );
-        virtual bool call( Message &toSend, Message &response, bool assertOk = true );
+        virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
         virtual void checkResponse( const char *data, int nReturned );
         void setSoTimeout(double to) { _so_timeout = to; }
@@ -891,6 +883,9 @@ namespace mongo {
         static int getNumConnections() {
             return _numConnections;
         }
+        
+        static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
+        static bool getLazyKillCursor() { return _lazyKillCursor; }
 
     protected:
         friend class SyncClusterConnection;
@@ -915,6 +910,7 @@ namespace mongo {
         bool _connect( string& errmsg );
 
         static AtomicUInt _numConnections;
+        static bool _lazyKillCursor; // lazy means we piggy back kill cursors on next op
     };
 
     /** pings server to check if it's up

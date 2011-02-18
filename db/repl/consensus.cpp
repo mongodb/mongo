@@ -154,7 +154,7 @@ namespace mongo {
             log() << "couldn't find member with id " << whoid << rsLog;
             vote = -10000;
         }
-        else if( primary && primary->hbinfo().opTime > hopeful->hbinfo().opTime ) {
+        else if( primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime ) {
             // other members might be aware of more up-to-date nodes
             log() << hopeful->fullName() << " is trying to elect itself but " <<
                   primary->fullName() << " is already primary and more up-to-date" << rsLog;

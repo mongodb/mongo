@@ -140,6 +140,13 @@ namespace mongo {
         OldDataCleanup(){
             _numThreads++;
         }
+        OldDataCleanup( const OldDataCleanup& other ) {
+            ns = other.ns;
+            min = other.min.getOwned();
+            max = other.max.getOwned();
+            initial = other.initial;
+            _numThreads++;
+        }
         ~OldDataCleanup(){
             _numThreads--;
         }
@@ -264,6 +271,8 @@ namespace mongo {
         }
 
         void done() {
+            readlock lk( _ns );
+
             _deleted.clear();
             _reload.clear();
             _cloneLocs.clear();
@@ -399,7 +408,7 @@ namespace mongo {
          * @param errmsg filled with textual description of error if this call return false
          * @return false if approximate chunk size is too big to move or true otherwise
          */
-        bool storeCurrentLocs( long long maxChunkSize , string& errmsg ) {
+        bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
             readlock l( _ns );
             Client::Context ctx( _ns );
             NamespaceDetails *d = nsdetails( _ns.c_str() );
@@ -461,9 +470,13 @@ namespace mongo {
             }
 
             if ( isLargeChunk ) {
-                errmsg = str::stream() << "can't move chunk of size (aprox) " << recCount * avgRecSize
-                         << " because maximum size allowed to move is " << maxChunkSize;
-                log( LL_WARNING ) << errmsg << endl;
+                warning() << "can't move chunk of size (aprox) " << recCount * avgRecSize
+                          << " because maximum size allowed to move is " << maxChunkSize
+                          << " ns: " << _ns << " " << _min << " -> " << _max
+                          << endl;
+                result.appendBool( "chunkTooBig" , true );
+                result.appendNumber( "chunkSize" , (long long)(recCount * avgRecSize) );
+                errmsg = "chunk too big to move";
                 return false;
             }
 
@@ -757,7 +770,7 @@ namespace mongo {
             MigrateStatusHolder statusHolder( ns , min , max );
             {
                 // this gets a read lock, so we know we have a checkpoint for mods
-                if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg ) )
+                if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
                     return false;
 
                 ScopedDbConnection connTo( to );
@@ -979,12 +992,18 @@ namespace mongo {
                 BSONObj cmd = cmdBuilder.obj();
                 log(7) << "moveChunk update: " << cmd << endl;
 
-                bool ok;
+                bool ok = false;
                 BSONObj cmdResult;
-                {
+                try {
                     ScopedDbConnection conn( shardingState.getConfigServer() );
                     ok = conn->runCommand( "config" , cmd , cmdResult );
                     conn.done();
+                }
+                catch ( DBException& e ) {
+                    ok = false;
+                    BSONObjBuilder b;
+                    e.getInfo().append( b );
+                    cmdResult = b.obj();
                 }
 
                 if ( ! ok ) {
@@ -996,7 +1015,7 @@ namespace mongo {
                     // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
                     // that the old state (before migrating) be brought in
 
-                    log( LL_WARNING ) << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
+                    warning() << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << endl;
                     sleepsecs( 10 );
 
                     try {
@@ -1012,9 +1031,9 @@ namespace mongo {
 
                         }
                         else {
-                            log( LL_ERROR ) << "moveChunk commit failed: version is at"
+                            error() << "moveChunk commit failed: version is at"
                                             << checkVersion << " instead of " << nextVersion << endl;
-                            log( LL_ERROR ) << "TERMINATING" << endl;
+                            error() << "TERMINATING" << endl;
                             dbexit( EXIT_SHARDING_ERROR );
                         }
 
@@ -1022,8 +1041,8 @@ namespace mongo {
 
                     }
                     catch ( ... ) {
-                        log( LL_ERROR ) << "moveChunk failed to get confirmation of commit" << endl;
-                        log( LL_ERROR ) << "TERMINATING" << endl;
+                        error() << "moveChunk failed to get confirmation of commit" << endl;
+                        error() << "TERMINATING" << endl;
                         dbexit( EXIT_SHARDING_ERROR );
                     }
                 }
@@ -1446,7 +1465,10 @@ namespace mongo {
             }
             
             if ( OldDataCleanup::_numThreads > 0 ) {
-                errmsg = "still waiting for a previous migrates data to get cleaned, can't accept new chunks";
+                errmsg = 
+                    str::stream() 
+                    << "still waiting for a previous migrates data to get cleaned, can't accept new chunks, num threads: " 
+                    << OldDataCleanup::_numThreads;
                 return false;
             }
 

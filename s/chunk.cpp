@@ -234,7 +234,7 @@ namespace mongo {
     }
 
     ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) {
-        const size_t maxSplitPoints = 256;
+        const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
         uassert( 13332 , "need a split key to split chunk" , !m.empty() );
@@ -255,6 +255,7 @@ namespace mongo {
         BSONObj cmdObj = cmd.obj();
 
         if ( ! conn->runCommand( "admin" , cmdObj , res )) {
+            warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
             conn.done();
 
             // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
@@ -353,7 +354,7 @@ namespace mongo {
         }
         catch ( std::exception& e ) {
             // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
-            log( LL_WARNING ) << "could have autosplit on collection: " << _manager->getns() << " but: " << e.what() << endl;
+            warning() << "could have autosplit on collection: " << _manager->getns() << " but: " << e.what() << endl;
             return false;
         }
     }
