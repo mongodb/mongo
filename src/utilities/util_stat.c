@@ -15,8 +15,6 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	extern char *optarg;
-	extern int optind;
 	DB *db;
 	int ch, ret, tret;
 
@@ -58,7 +56,7 @@ err:		ret = 1;
 }
 
 int
-usage()
+usage(void)
 {
 	(void)fprintf(stderr, "usage: %s [-V] file\n", progname);
 	return (EXIT_FAILURE);

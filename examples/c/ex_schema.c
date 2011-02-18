@@ -32,7 +32,7 @@ POP_RECORD pop_data[] = {
 	{ "AU", 2008, 21431800 }
 };
 
-int main()
+int main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;

@@ -42,7 +42,7 @@ void *scan_thread(void *arg)
 	return (arg);
 }
 
-int main()
+int main(void)
 {
 	WT_SESSION *session;
 	WT_CURSOR *cursor;

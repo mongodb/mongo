@@ -25,11 +25,9 @@ struct {
 int
 main(int argc, char *argv[])
 {
-	extern char *optarg;
-	extern int optind;
 	DB *db;
 	int ch, ret, text_input, tret, verbose;
-	char **config_list, **config_next;
+	char **config_list, **next;
 
 	WT_UTILITY_INTRO(progname, argv);
 
@@ -37,17 +35,17 @@ main(int argc, char *argv[])
 	 * We can't handle configuration-line information until we've opened
 	 * the DB handle, so we need a place to store it for now.
 	 */
-	if ((config_next =
-	    config_list = calloc(argc + 1, sizeof(char *))) == NULL) {
+	if ((config_list = calloc(argc + 1, sizeof(char *))) == NULL) {
 		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
 		return (EXIT_FAILURE);
 	}
+	next = config_list;
 
 	text_input = verbose = 0;
 	while ((ch = getopt(argc, argv, "c:f:TVv")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
-			*config_next++ = optarg;
+			*next++ = optarg;
 			break;
 		case 'f':			/* input file */
 			if (freopen(optarg, "r", stdin) == NULL) {
@@ -281,7 +279,7 @@ bulk_callback(DB *db, DBT **keyp, DBT **datap)
 }
 
 int
-usage()
+usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s [-TVv] [-c configuration] [-f input-file] file\n",

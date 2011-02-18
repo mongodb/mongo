@@ -15,14 +15,15 @@
 
 const char *home = "WT_TEST";
 
-int main()
+int main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 
 	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wiredtiger_open(home, NULL, "create,transactional", &conn)) != 0)
+	if ((ret =
+	    wiredtiger_open(home, NULL, "create,transactional", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 

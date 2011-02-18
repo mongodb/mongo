@@ -58,7 +58,7 @@ __compare_prefixes(WT_SESSION *session, WT_COLLATOR *collator,
 
 static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes}, 10 };
 
-int main()
+int main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;

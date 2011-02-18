@@ -50,7 +50,7 @@ typedef struct {
 	char *notes;
 } CALL;
 
-int main()
+int main(void)
 {
 	int count, exact, ret;
 	WT_CONNECTION *conn;

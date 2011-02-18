@@ -7,16 +7,15 @@
 
 #include "wt_internal.h"
 
+extern FILE *__wt_err_stream;
+
 void
 wiredtiger_err_stream(FILE *stream)
 {
-	extern FILE *__wt_err_stream;
-
 	__wt_err_stream = stream;
 }
 
 #define	WT_ENV_ERR(env, error, fmt) {					\
-	extern FILE *__wt_err_stream;					\
 	va_list __ap;							\
 	/*								\
 	 * Support error messages even when we don't yet have an ENV	\

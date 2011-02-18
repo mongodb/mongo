@@ -216,9 +216,10 @@ connection_ops(WT_CONNECTION *conn)
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	session_ops(session);
-};
+}
 
-int main() {
+int main(void)
+{
 	int ret;
 
 	WT_CONNECTION *conn;

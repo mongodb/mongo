@@ -9,8 +9,6 @@
 
 #include "wt_internal.h"
 
-extern const char *progname;
-
 static ENV *__env;
 
 /*

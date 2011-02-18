@@ -212,7 +212,7 @@ struct __ienv {
 	WT_MTRACK *mtrack;		/* Memory tracking information */
 #endif
 
-	char *sep;			/* Display separator line */
+	const char *sep;		/* Display separator line */
 	char err_buf[32];		/* Last-ditch error buffer */
 
 	uint32_t flags;

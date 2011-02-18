@@ -15,7 +15,7 @@
 
 const char *home = "WT_TEST";
 
-int main()
+int main(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;

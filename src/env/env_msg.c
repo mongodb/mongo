@@ -7,8 +7,9 @@
 
 #include "wt_internal.h"
 
+extern FILE *__wt_err_stream;
+
 #define	WT_MSG(env, fmt) {						\
-	extern FILE *__wt_err_stream;					\
 	va_list __ap;							\
 	/*								\
 	 * Support messages even when we don't yet have an ENV handle,	\

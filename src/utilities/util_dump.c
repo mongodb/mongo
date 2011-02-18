@@ -15,8 +15,6 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	extern char *optarg;
-	extern int optind;
 	DB *db;
 	u_int32_t flags;
 	int ch, ret, tret;
@@ -73,7 +71,7 @@ err:		ret = 1;
 }
 
 int
-usage()
+usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s [-dpV] [-f output-file] file\n", progname);
