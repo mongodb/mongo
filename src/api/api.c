@@ -10,24 +10,32 @@
 static int
 __cursor_first(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
 static int
 __cursor_last(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
 static int
 __cursor_next(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
 static int
 __cursor_prev(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
@@ -42,24 +50,33 @@ __cursor_search(WT_CURSOR *cursor)
 static int
 __cursor_search_near(WT_CURSOR *cursor, int *exact)
 {
+	WT_UNUSED(cursor);
+	WT_UNUSED(exact);
+
 	return (ENOTSUP);
 }
 
 static int
 __cursor_insert(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
 static int
 __cursor_update(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
 static int
 __cursor_del(WT_CURSOR *cursor)
 {
+	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 
@@ -67,6 +84,9 @@ static int
 __cursor_close(WT_CURSOR *cursor, const char *config)
 {
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
+
+	WT_UNUSED(config);
+
 	__wt_curstd_close(cstd);
 	free(cursor);
 	return (0);
@@ -75,6 +95,8 @@ __cursor_close(WT_CURSOR *cursor, const char *config)
 static int
 __session_close(WT_SESSION *session, const char *config)
 {
+	WT_UNUSED(config);
+
 	printf("WT_SESSION->close\n");
 	free(session);
 	return (0);
@@ -105,6 +127,10 @@ __session_open_cursor(WT_SESSION *session, const char *uri, WT_CURSOR *to_dup, c
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)malloc(sizeof(WT_CURSOR_STD));
 	WT_CURSOR *c = &cstd->interface;
 
+	WT_UNUSED(uri);
+	WT_UNUSED(to_dup);
+	WT_UNUSED(config);
+
 	printf("WT_SESSION->open_cursor\n");
 	if (cstd == NULL)
 		return (ENOMEM);
@@ -120,6 +146,10 @@ __session_open_cursor(WT_SESSION *session, const char *uri, WT_CURSOR *to_dup, c
 static int
 __session_create_table(WT_SESSION *session, const char *name, const char *config)
 {
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+	WT_UNUSED(config);
+
 	printf("WT_SESSION->create_table\n");
 	return (ENOTSUP);
 }
@@ -127,93 +157,149 @@ __session_create_table(WT_SESSION *session, const char *name, const char *config
 static int
 __session_rename_table(WT_SESSION *session, const char *oldname, const char *newname, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(oldname);
+	WT_UNUSED(newname);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __session_drop_table(WT_SESSION *session, const char *name, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __session_truncate_table(WT_SESSION *session, const char *name, WT_CURSOR *start, WT_CURSOR *end, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+	WT_UNUSED(start);
+	WT_UNUSED(end);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __session_verify_table(WT_SESSION *session, const char *name, const char *config)
 {
-	return 0;
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+	WT_UNUSED(config);
+
+	return (0);
 }
 
 static int
 __session_begin_transaction(WT_SESSION *session, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __session_commit_transaction(WT_SESSION *session, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __session_rollback_transaction(WT_SESSION *session, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __session_checkpoint(WT_SESSION *session, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(session);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __conn_load_extension(WT_CONNECTION *connection, const char *path, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(connection);
+	WT_UNUSED(path);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __conn_add_cursor_factory(WT_CONNECTION *connection, const char *prefix, WT_CURSOR_FACTORY *factory, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(connection);
+	WT_UNUSED(prefix);
+	WT_UNUSED(factory);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __conn_add_collator(WT_CONNECTION *connection, const char *name, WT_COLLATOR *collator, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(connection);
+	WT_UNUSED(name);
+	WT_UNUSED(collator);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static int
 __conn_add_extractor(WT_CONNECTION *connection, const char *name, WT_EXTRACTOR *extractor, const char *config)
 {
-	return ENOTSUP;
+	WT_UNUSED(connection);
+	WT_UNUSED(name);
+	WT_UNUSED(extractor);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
 }
 
 static const char *
-__conn_get_home(WT_CONNECTION *conn)
+__conn_get_home(WT_CONNECTION *connection)
 {
-	return NULL;
+	WT_UNUSED(connection);
+
+	return (NULL);
 }
 
 static int
-__conn_is_new(WT_CONNECTION *conn)
+__conn_is_new(WT_CONNECTION *connection)
 {
-	return 0;
+	WT_UNUSED(connection);
+
+	return (0);
 }
 
 static int
-__conn_close(WT_CONNECTION *conn, const char *config)
+__conn_close(WT_CONNECTION *connection, const char *config)
 {
+	WT_UNUSED(config);
+
 	printf("WT_CONNECTION->close\n");
-	free(conn);
-	return 0;
+	free(connection);
+	return (0);
 }
 
 static int
@@ -235,13 +321,16 @@ __conn_open_session(WT_CONNECTION *connection, WT_ERROR_HANDLER *errhandler, con
 	};
 	WT_SESSION *s = (WT_SESSION *)malloc(sizeof(WT_SESSION));
 
+	WT_UNUSED(errhandler);
+	WT_UNUSED(config);
+
 	printf("WT_CONNECTION->open_session\n");
 	if (s == NULL)
-		return ENOMEM;
+		return (ENOMEM);
 	*s = stds;
 	s->connection = connection;
 	*sessionp = s;
-	return 0;
+	return (0);
 }
 
 int
@@ -259,11 +348,15 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *errhandler, const char *conf
 	};
 	WT_CONNECTION *c = (WT_CONNECTION *)malloc(sizeof(WT_CONNECTION));
 
+	WT_UNUSED(home);
+	WT_UNUSED(errhandler);
+	WT_UNUSED(config);
+
 	printf("wiredtiger_open\n");
 	if (c == NULL)
-		return ENOMEM;
+		return (ENOMEM);
 	*c = stdc;
 	/* TODO: c->home = strdup(home); */
 	*connectionp = c;
-	return 0;
+	return (0);
 }

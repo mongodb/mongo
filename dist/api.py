@@ -53,7 +53,7 @@ def func_method_lockout(handle, decl, f):
 		    i[1].method, i[1].config, i[1].args, 'lockout', f)
 		quiet = 0;
 	if quiet:
-		f.write('\tWT_CC_QUIET(' + handle + ', NULL);\n')
+		f.write('\tWT_UNUSED(' + handle + ');\n')
 	f.write('}\n\n')
 
 # func_method_transition --
