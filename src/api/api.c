@@ -183,12 +183,12 @@ __conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *conf
 }
 
 static int
-__conn_add_cursor_factory(WT_CONNECTION *wt_conn,
-    const char *prefix, WT_CURSOR_FACTORY *factory, const char *config)
+__conn_add_cursor_type(WT_CONNECTION *wt_conn,
+    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config)
 {
 	WT_UNUSED(wt_conn);
 	WT_UNUSED(prefix);
-	WT_UNUSED(factory);
+	WT_UNUSED(ctype);
 	WT_UNUSED(config);
 
 	return (ENOTSUP);
@@ -313,7 +313,7 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 	static int library_init = 0;
 	static WT_CONNECTION stdc = {
 		__conn_load_extension,
-		__conn_add_cursor_factory,
+		__conn_add_cursor_type,
 		__conn_add_collator,
 		__conn_add_extractor,
 		__conn_close,

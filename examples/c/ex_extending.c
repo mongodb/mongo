@@ -19,7 +19,7 @@ const char *home = "WT_TEST";
 /* Case insensitive comparator. */
 static int
 __compare_nocase(WT_SESSION *session, WT_COLLATOR *collator, 
-    const WT_ITEM *v1, const WT_ITEM *v2, int *cmp)
+    const WT_ITEM *v1, const WT_ITEM *v2, int *cmp, uint32_t *minprefix)
 {
 	const char *s1 = v1->data;
 	const char *s2 = v2->data;
@@ -28,6 +28,7 @@ __compare_nocase(WT_SESSION *session, WT_COLLATOR *collator,
 	collator = NULL; /* unused */
 
 	*cmp = strcasecmp(s1, s2);
+	*minprefix = (v1->size > v2->size ? v1->size : v2->size);
 	return (0);
 }
 
@@ -39,12 +40,12 @@ static WT_COLLATOR nocasecoll = { __compare_nocase };
  */
 typedef struct {
 	WT_COLLATOR iface;
-	size_t maxlen;
+	uint32_t maxlen;
 } PREFIX_COLLATOR;
 
 static int
 __compare_prefixes(WT_SESSION *session, WT_COLLATOR *collator, 
-    const WT_ITEM *v1, const WT_ITEM *v2, int *cmp)
+    const WT_ITEM *v1, const WT_ITEM *v2, int *cmp, uint32_t *minprefix)
 {
 	PREFIX_COLLATOR *pcoll = (PREFIX_COLLATOR *)collator;
 	const char *s1 = v1->data;
@@ -53,6 +54,7 @@ __compare_prefixes(WT_SESSION *session, WT_COLLATOR *collator,
 	session = NULL; /* unused */
 
 	*cmp = strncmp(s1, s2, pcoll->maxlen);
+	*minprefix = pcoll->maxlen;
 	return (0);
 }
 

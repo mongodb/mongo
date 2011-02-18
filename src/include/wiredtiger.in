@@ -71,7 +71,7 @@ typedef uint64_t wiredtiger_recno_t;
 struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
 struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
 struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
-struct __wt_cursor_factory; typedef struct __wt_cursor_factory WT_CURSOR_FACTORY;
+struct __wt_cursor_type;    typedef struct __wt_cursor_type WT_CURSOR_TYPE;
 struct __wt_error_handler;  typedef struct __wt_error_handler WT_ERROR_HANDLER;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
@@ -674,25 +674,25 @@ struct __wt_connection {
 	 *
 	 * @dontinclude ex_all.c
 	 *
-	 * First the application must implement the WT_CURSOR_FACTORY interface
+	 * First the application must implement the WT_CURSOR_TYPE interface
 	 * as follows:
-	 * @skip Implementation of WT_CURSOR_FACTORY
+	 * @skip Implementation of WT_CURSOR_TYPE
 	 * @until End implementation
 	 *
 	 * Then the implementation is registered with WiredTiger as follows:
-	 * @skip WT_CURSOR_FACTORY
-	 * @until add_cursor_factory
+	 * @skip WT_CURSOR_TYPE
+	 * @until add_cursor_type
 	 *
 	 * @param connection the connection handle
 	 * @param prefix the prefix for location strings passed to
 	 * WT_SESSION::open_cursor
-	 * @param factory the application-supplied code to manage cursors of
+	 * @param ctype the application-supplied code to manage cursors of
 	 * this type
 	 * @configempty
 	 * @errors
 	 */
-	int __F(add_cursor_factory)(WT_CONNECTION *connection,
-	    const char *prefix, WT_CURSOR_FACTORY *factory, const char *config);
+	int __F(add_cursor_type)(WT_CONNECTION *connection,
+	    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config);
 
 	/*! Add a custom collation function.
 	 *
@@ -997,26 +997,30 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * calling WT_CONNECTION::add_collator.
  */
 struct __wt_collator {
-	/*! Callback to compare keys or order duplicate values.
+	/*! Callback to compare keys.
 	 *
-	 * @returns -1 if <code>value1 < value2</code>,
-	 * 	     0 if <code>value1 == value2</code>,
-	 * 	     1 if <code>value1 > value2</code>.
+	 * @param[out] cmp set to -1 if <code>key1 < key2</code>,
+	 * 	0 if <code>key1 == key2</code>,
+	 * 	1 if <code>key1 > key2</code>.
+	 * @param[out] minprefix set to the minimum number of bytes
+	 * 	required to distinguish between the two items.
+	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*compare)(WT_SESSION *session, WT_COLLATOR *collator,
-	    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp);
+	    const WT_ITEM *key1, const WT_ITEM *key2,
+	    int *cmp, uint32_t *minprefix);
 };
 
 /*!
  * Applications can extend WiredTiger by providing new implementation of the
- * WT_CURSOR class.  This is done by implementing the WT_CURSOR_FACTORY
- * interface, then calling WT_CONNECTION::add_cursor_factory.
+ * WT_CURSOR class.  This is done by implementing the WT_CURSOR_TYPE
+ * interface, then calling WT_CONNECTION::add_cursor_type.
  *
- * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_FACTORY
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_TYPE
  * interface from multiple threads concurrently.  It is the responsibility of
  * the implementation to protect any shared data.
  */
-struct __wt_cursor_factory {
+struct __wt_cursor_type {
 	/*! Callback to determine how much space to allocate for a cursor.
 	 *
 	 * If the callback is NULL, no additional space is allocated in the
@@ -1024,11 +1028,11 @@ struct __wt_cursor_factory {
 	 *
 	 * @errors
 	 */
-	int (*cursor_size)(WT_CURSOR_FACTORY *factory,
+	int (*cursor_size)(WT_CURSOR_TYPE *ctype,
 	    const char *obj, size_t *sizep);
 
 	/*! Callback to initialize a cursor. */
-	int (*init_cursor)(WT_CURSOR_FACTORY *factory,
+	int (*init_cursor)(WT_CURSOR_TYPE *ctype,
 	    WT_SESSION *session, const char *obj, WT_CURSOR *old_cursor,
 	    const char *config, WT_CURSOR *new_cursor);
 };

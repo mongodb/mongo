@@ -20,7 +20,7 @@
 
 void cursor_ops(WT_CURSOR *cursor);
 void session_ops(WT_SESSION *session);
-void add_factory(WT_CONNECTION *conn);
+void add_cursor_type(WT_CONNECTION *conn);
 void add_collator(WT_CONNECTION *conn);
 void add_extractor(WT_CONNECTION *conn);
 void connection_ops(WT_CONNECTION *conn);
@@ -102,11 +102,11 @@ session_ops(WT_SESSION *session)
 	ret = session->close(session, NULL);
 }
 
-/* Implementation of WT_CURSOR_FACTORY for WT_CONNECTION::add_cursor_factory. */
+/* Implementation of WT_CURSOR_TYPE for WT_CONNECTION::add_cursor_type. */
 static int
-my_cursor_size(WT_CURSOR_FACTORY *factory, const char *obj, size_t *sizep)
+my_cursor_size(WT_CURSOR_TYPE *ctype, const char *obj, size_t *sizep)
 {
-	(void)factory;
+	(void)ctype;
 	(void)obj;
 
 	*sizep = sizeof (WT_CURSOR);
@@ -114,12 +114,12 @@ my_cursor_size(WT_CURSOR_FACTORY *factory, const char *obj, size_t *sizep)
 }
 
 static int
-my_init_cursor(WT_CURSOR_FACTORY *factory, WT_SESSION *session,
+my_init_cursor(WT_CURSOR_TYPE *ctype, WT_SESSION *session,
     const char *obj, WT_CURSOR *old_cursor, const char *config,
     WT_CURSOR *new_cursor)
 {
 	/* Unused parameters */
-	(void)factory;
+	(void)ctype;
 	(void)session;
 	(void)obj;
 	(void)old_cursor;
@@ -131,26 +131,34 @@ my_init_cursor(WT_CURSOR_FACTORY *factory, WT_SESSION *session,
 /* End implementation of WT_CURSOR_FACTORY. */
 
 void
-add_factory(WT_CONNECTION *conn)
+add_cursor_type(WT_CONNECTION *conn)
 {
 	int ret;
 
-	static WT_CURSOR_FACTORY my_factory;
-	my_factory.cursor_size = my_cursor_size;
-	my_factory.init_cursor = my_init_cursor;
-	ret = conn->add_cursor_factory(conn, NULL, &my_factory, NULL);
+	static WT_CURSOR_TYPE my_ctype;
+	my_ctype.cursor_size = my_cursor_size;
+	my_ctype.init_cursor = my_init_cursor;
+	ret = conn->add_cursor_type(conn, NULL, &my_ctype, NULL);
 }
 
 /* Implementation of WT_COLLATOR for WT_CONNECTION::add_collator. */
 static int
 my_compare(WT_SESSION *session, WT_COLLATOR *collator,
-    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp)
+    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp, uint32_t *minprefix)
 {
+	const char *p1, *p2;
+
 	/* Unused parameters */
 	(void)session;
 	(void)collator;
 
-	*cmp = strcmp((const char *)value1->data, (const char *)value2->data);
+	p1 = value1->data;
+	p2 = value2->data;
+	while (*p1 != '\0' && *p1 == *p2)
+		p1++, p2++;
+
+	*cmp = (int)*p2 - (int)*p1;
+	*minprefix = (uint32_t)(p1 - (const char *)value1->data);
 	return (0);
 }
 /* End implementation of WT_COLLATOR. */
@@ -198,7 +206,7 @@ connection_ops(WT_CONNECTION *conn)
 
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
 
-	add_factory(conn);
+	add_cursor_type(conn);
 	add_collator(conn);
 	add_extractor(conn);
 
@@ -210,37 +218,49 @@ connection_ops(WT_CONNECTION *conn)
 		/* First time initialization. */
 	}
 
+	{
 	WT_SESSION *session;
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	session_ops(session);
+	}
 }
 
 int main(void)
 {
 	int ret;
 
+	{
 	WT_CONNECTION *conn;
 	const char *home = "WT_TEST";
 	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 
 	fprintf(stderr, "Error during operation: %s\n", wiredtiger_strerror(ret));
+	}
 
+	{
 	size_t size;
 	size = wiredtiger_struct_size("iSh", 42, "hello", -3);
 	assert(size < 100);
+	}
 
+	{
 	char buf[100];
 	ret = wiredtiger_struct_pack(buf, sizeof (buf), "iSh", 42, "hello", -3);
  
+	{
 	int i;
 	char *s;
 	short h;
 	ret = wiredtiger_struct_unpack(buf, sizeof (buf), "iSh", &i, &s, &h);
+	}
+	}
 
+	{
 	int major, minor, patch;
 	printf("WiredTiger version %s\n",
 	    wiredtiger_version(&major, &minor, &patch));
+	}
 
 	return (0);
 }
