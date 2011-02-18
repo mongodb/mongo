@@ -33,8 +33,10 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	toc->srch_exp = NULL;
 	toc->srch_write_gen = 0;
 
+	cmp = 0;
 	db = toc->db;
 	idb = db->idb;
+	rip = NULL;
 
 	WT_DB_FCHK(db, "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 

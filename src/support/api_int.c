@@ -1586,7 +1586,7 @@ __wt_methods_env_open_transition(ENV *env)
 void
 __wt_methods_wt_toc_lockout(WT_TOC *wt_toc)
 {
-	WT_CC_QUIET(wt_toc, NULL);
+	WT_UNUSED(wt_toc);
 }
 
 void

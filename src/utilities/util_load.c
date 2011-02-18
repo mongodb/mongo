@@ -268,7 +268,7 @@ bulk_callback(DB *db, DBT **keyp, DBT **datap)
 	static DBT key, data;
 	int ret;
 
-	WT_CC_QUIET(db, NULL);
+	WT_UNUSED(db);
 
 	if ((ret = bulk_read(&key, 1)) != 0)
 		return (ret);

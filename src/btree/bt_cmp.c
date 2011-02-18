@@ -21,7 +21,7 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 	 * The DB * argument isn't used by the default routine, but is
 	 * a standard argument for user-specified comparison functions.
 	 */
-	WT_CC_QUIET(db, NULL);
+	WT_UNUSED(db);
 
 	/*
 	 * Return:

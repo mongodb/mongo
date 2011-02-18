@@ -50,7 +50,7 @@ __wt_bt_sync(WT_TOC *toc)
 static int
 __wt_bt_tree_sync(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
-	WT_CC_QUIET(arg, NULL);
+	WT_UNUSED(arg);
 
 	/* Reconcile any dirty pages. */
 	if (WT_PAGE_IS_MODIFIED(page))

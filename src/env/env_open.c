@@ -17,8 +17,8 @@ __wt_env_open(ENV *env, const char *home, mode_t mode)
 	IENV *ienv;
 	int ret;
 
-	WT_CC_QUIET(home, NULL);
-	WT_CC_QUIET(mode, 0);
+	WT_UNUSED(home);
+	WT_UNUSED(mode);
 
 	ienv = env->ienv;
 	ret = 0;

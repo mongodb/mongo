@@ -69,7 +69,7 @@ __wt_bt_close(WT_TOC *toc)
 static int
 __wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
-	WT_CC_QUIET(arg, NULL);
+	WT_UNUSED(arg);
 
 	/*
 	 * Reconcile any dirty pages, then discard the page.

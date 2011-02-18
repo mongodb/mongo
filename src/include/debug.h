@@ -40,10 +40,12 @@ typedef struct __wt_mbuf {
 /*
  * Quiet a compiler warning by writing, and then reading, a variable.
  */
-#define	WT_CC_QUIET(var, value)	do {				        \
-	(var) = (value);					        \
-	(var) = (var);						        \
-} while (0)
+#define	WT_UNUSED(var)	(void)(var)
+
+/*
+ * Some code that is only executed to avoid a (harmless) warning.
+ */
+#define	WT_LINT(e)	do { e; } while (0)
 
 #if defined(__cplusplus)
 }
