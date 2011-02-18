@@ -304,7 +304,15 @@ namespace mongo {
                 if ( a == b )
                     continue;
 
-                throw UpdateNotTheSame( 8017 , "update not consistent" , _connAddresses , _lastErrors );
+                throw UpdateNotTheSame( 8017 , 
+                                        str::stream() 
+                                        << "update not consistent " 
+                                        << " ns: " << ns
+                                        << " query: " << query.toString()
+                                        << " update: " << obj
+                                        << " gle1: " << _lastErrors[0]
+                                        << " gle2: " << _lastErrors[i] ,
+                                        _connAddresses , _lastErrors );
             }
         }
     }
