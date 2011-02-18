@@ -135,7 +135,17 @@ namespace mongo {
                     return false;
                 }
 
-                unsigned long long elapsed = jsTime() - lastPing["ping"].Date(); // in ms
+                unsigned long long now = jsTime();
+                unsigned long long pingTime = lastPing["ping"].Date();
+                
+                if ( now < pingTime ) {
+                    // clock skew
+                    warning() << "dist_lock has detected clock skew of " << ( pingTime - now ) << "ms" << endl;
+                    conn.done();
+                    return false;
+                }
+
+                unsigned long long elapsed = now - pingTime;
                 elapsed = elapsed / ( 1000 * 60 ); // convert to minutes
 
                 if ( elapsed <= _takeoverMinutes ){
