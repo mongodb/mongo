@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
+static void __wt_free_overwrite(uint8_t *, size_t, const char *, int);
 static void __wt_mtrack(
     ENV *env, const void *, const void *, const char *, int);
 #endif
@@ -161,7 +162,7 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 void
 __wt_free_func(ENV *env, void *p_arg
 #ifdef HAVE_DIAGNOSTIC
-    , size_t len
+    , size_t len, const char *file, int line
 #endif
     )
 {
@@ -192,7 +193,7 @@ __wt_free_func(ENV *env, void *p_arg
 	 * recognizable value for debugging.
 	 */
 	if (len != 0)
-		memset(p, WT_DEBUG_BYTE, len);
+		__wt_free_overwrite(p, len, file, line);
 
 	__wt_mtrack(env, p, NULL, NULL, 0);
 #endif
@@ -201,6 +202,39 @@ __wt_free_func(ENV *env, void *p_arg
 }
 
 #ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_free_overwrite --
+ *	Overwrite free'd memory with an easily recognizable value for debugging.
+ */
+static void
+__wt_free_overwrite(uint8_t *m, size_t mlen, const char *file, int line)
+{
+	const char *p;
+	size_t lfile, lline;
+	char lbuf[10];
+
+	/*
+	 * Move a pointer to the file name, we don't need the whole path, and
+	 * the smaller the identifying chunk, the better off we are.
+	 */
+	if ((p = strrchr(file, '/')) == NULL)
+		p = file;
+	lfile = strlen(p);
+	lline = (size_t)snprintf(lbuf, sizeof(lbuf), "/%d", line);
+
+	/* Repeatedly copy the file/line information into the free'd memory. */
+	while (mlen >= lfile + lline) {
+		memcpy(m, p, lfile);
+		m += lfile;
+		mlen -= lfile;
+		memcpy(m, lbuf, lline);
+		m += lline;
+		mlen -= lline;
+	}
+	for (; mlen > 0; --mlen)
+		*m++ = WT_DEBUG_BYTE;
+}
+
 /*
  * __wt_mtrack_alloc --
  *	Allocate memory tracking structures.

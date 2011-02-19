@@ -287,7 +287,7 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 void
 __wt_free_func(ENV *env, void *p_arg
 #ifdef HAVE_DIAGNOSTIC
-    , size_t len
+    , size_t len, const char *file, int line
 #endif
     );
 int
