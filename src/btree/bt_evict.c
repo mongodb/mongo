@@ -547,8 +547,6 @@ __wt_evict_state_check(WT_TOC *toc)
 				goto skip;
 			}
 			break;
-		default:
-			break;
 		}
 
 		continue;
@@ -684,23 +682,27 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 	 * thread isn't where I expect performance problems, (2) I hate to lose
 	 * more bytes on every page, (3) how often will an internal page be
 	 * evicted anyway?
+	 *
+	 * The state check can't be for (state == WT_REF_CACHE) because we may
+	 * be evicting pages from more than a single level of the tree, and in
+	 * that case, the parent's page will have a WT_REF with state equal to
+	 * WT_REF_EVICT, and we still can't touch the parent until the child
+	 * is flushed.
 	 */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_REF_FOREACH(page, ref, i)
-			if (ref->state == WT_REF_CACHE)
+			if (ref->state != WT_REF_DISK)
 				return (1);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		if (WT_PAGE_DUP_TREES(page))
 			WT_DUP_FOREACH(page, dupp, i)
 				if (*dupp != NULL &&
-				    (*dupp)->state == WT_REF_CACHE)
+				    (*dupp)->state != WT_REF_DISK)
 					return (1);
-		break;
-	default:
 		break;
 	}
 
