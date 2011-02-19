@@ -127,17 +127,17 @@ sleep(5000);
 
 for (var i = 0; i < 3; ++i) {
 
-// durable version
-log("restarting 30001");
-conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
-
-verify();
-
-// kill the process hard
-log("hard kill");
-stopMongod(30001, /*signal*/9);
-
-sleep(5000);
+    // durable version
+    log("restarting 30001");
+    conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+    
+    verify();
+    
+    // kill the process hard
+    log("hard kill");
+    stopMongod(30001, /*signal*/9);
+    
+    sleep(5000);
 }
 
 // journal file should be present, and non-empty as we killed hard
@@ -168,20 +168,20 @@ log("check data matches done");
 var nrows = 0;
 for (var i = 0; i < 5; ++i) {
 
-// durable version
-log("restarting 30001");
-conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
-nrows += addRows();
-// wait for group commit.
-printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
-
-verifyRows(nrows);
-
-// kill the process hard
-log("hard kill");
-stopMongod(30001, /*signal*/9);
-
-sleep(5000);
+    // durable version
+    log("restarting 30001");
+    conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+    nrows += addRows();
+    // wait for group commit.
+    printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
+    
+    verifyRows(nrows);
+    
+    // kill the process hard
+    log("hard kill");
+    stopMongod(30001, /*signal*/9);
+    
+    sleep(5000);
 }
 
 print(testname + " SUCCESS");
