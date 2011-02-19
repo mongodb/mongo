@@ -491,7 +491,7 @@ __wt_evict_hazard_check(WT_TOC *toc)
 			 * Return the page to service.
 			 * Discard our reference.
 			 */
-			ref->page->read_gen = ++cache->read_gen;
+			page->read_gen = ++cache->read_gen;
 			ref->state = WT_REF_CACHE;
 			WT_EVICT_CLR(evict);
 		}
