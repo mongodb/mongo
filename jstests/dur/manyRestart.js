@@ -130,6 +130,9 @@ for (var i = 0; i < 3; ++i) {
     // durable version
     log("restarting 30001");
     conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+
+    // wait for group commit.
+    printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
     
     verify();
     
