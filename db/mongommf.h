@@ -128,6 +128,8 @@ namespace mongo {
         mutex& _mutex() { return _m; }
         MongoMMF* find_inlock(void *p, /*out*/ size_t& ofs);
 
+        map<void*,MongoMMF*>::iterator PointerToMMF::finditer_inlock(void *p) { return _views.upper_bound(p); }
+
     private:
         mutex _m;
         map<void*, MongoMMF*> _views;

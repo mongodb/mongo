@@ -28,7 +28,7 @@ namespace mongo {
     ourbitset writable;
 
     /** notification on unmapping so we can clear writable bits */
-    void MemoryMappedFile::unmapped(void *p) {
+    void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
             writable.clear(i);
             assert( !writable.get(i) );
@@ -45,7 +45,7 @@ namespace mongo {
 
     void MemoryMappedFile::close() {
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
-            unmapped(*i);
+            clearWritableBits(*i);
             UnmapViewOfFile(*i);
         }
         views.clear();

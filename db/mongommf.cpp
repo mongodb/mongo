@@ -37,6 +37,48 @@ namespace mongo {
     __declspec(noinline) void makeChunkWritable(size_t chunkno) { 
         scoped_lock lk(mapViewMutex);
 
+        if( writable.get(chunkno) ) // double check lock
+            return;
+
+        // remap all maps in this chunk.  common case is a single map, but could have more than one with smallfiles or .ns files
+        size_t chunkStart = chunkno * MemoryMappedFile::ChunkSize;
+        size_t chunkNext = chunkStart + MemoryMappedFile::ChunkSize;
+
+        scoped_lock lk2(privateViews._mutex());
+        map<void*,MongoMMF*>::iterator i = privateViews.finditer_inlock((void*) (chunkNext-1));
+        while( 1 ) {
+            const pair<void*,MongoMMF*> x = *(--i);
+            MongoMMF *mmf = x.second;
+            if( mmf == 0 )
+                break;
+
+            size_t viewStart = (size_t) x.first;
+            size_t viewEnd = viewStart + mmf->length();
+            if( viewEnd <= chunkStart )
+                break;
+
+            size_t protectStart = max(viewStart, chunkStart);
+            dassert(protectStart<chunkNext);
+
+            size_t protectEnd = min(viewEnd, chunkNext);
+            size_t protectSize = protectEnd - protectStart;
+            dassert(protectSize>0&&protectSize<=MemoryMappedFile::ChunkSize);
+
+            DWORD old;
+            bool ok = VirtualProtect((void*)protectStart, protectSize, PAGE_WRITECOPY, &old);
+            if( !ok ) {
+                DWORD e = GetLastError();
+                log() << "VirtualProtect failed " << chunkno << hex << protectStart << ' ' << protectSize << ' ' << errnoWithDescription(e) << endl;
+                assert(false);
+            }
+        }
+
+        writable.set(chunkno);
+    }
+
+    __declspec(noinline) void makeChunkWritableOld(size_t chunkno) { 
+        scoped_lock lk(mapViewMutex);
+
         if( writable.get(chunkno) )
             return;
 
@@ -118,12 +160,14 @@ namespace mongo {
     void* MemoryMappedFile::createPrivateMap() {
         assert( maphandle );
         scoped_lock lk(mapViewMutex);
-        void *p = mapaligned(maphandle, len);
+        //void *p = mapaligned(maphandle, len);
+        void *p = MapViewOfFile(maphandle, FILE_MAP_READ, 0, 0, 0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
             log() << "createPrivateMap failed " << filename() << " " << errnoWithDescription(e) << endl;
         }
         else {
+            clearWritableBits(p);
             views.push_back(p);
         }
         return p;
@@ -135,7 +179,7 @@ namespace mongo {
 
         scoped_lock lk(mapViewMutex);
 
-        unmapped(oldPrivateAddr);
+        clearWritableBits(oldPrivateAddr);
 
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD e = GetLastError();

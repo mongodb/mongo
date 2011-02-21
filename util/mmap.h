@@ -190,12 +190,12 @@ namespace mongo {
 
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
-        void unmapped(void *privateView);
+        void clearWritableBits(void *privateView);
     public:
         static const unsigned ChunkSize = 64 * 1024 * 1024;
         static const unsigned NChunks = 1024 * 1024;
 #else
-        void unmapped(void *privateView) { }
+        void clearWritableBits(void *privateView) { }
 #endif
 
     protected:
