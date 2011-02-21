@@ -1,0 +1,16 @@
+#! /bin/sh
+
+# Check for long lines
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+l=`(sed -e '/^[a-z]/! d' -e 's,^,../,' filelist ;
+    ls ../src/include/*.h ../src/include/*.in) |
+    egrep -v 'src/api/(api|pack)\.c$' |
+    egrep -v '.*/api_int\.[ch]$|support/stat\.c$'`
+
+for f in $l ; do
+	# awk's length function appears to include the newline, hence "> 81"
+	expand -t8 < $f | awk -- \
+		"{if(length(\$0) > 81) printf(\"%s:%d\\n\", \"$f\", NR)}"
+done

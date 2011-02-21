@@ -23,7 +23,7 @@ wiredtiger_strerror(int error)
 	case WT_PAGE_DELETED:
 		return ("WT_PAGE_DELETED: requested page was deleted");
 	case WT_READONLY:
-		return ("WT_READONLY: modification attempted of a read-only value");
+		return ("WT_READONLY: attempt to modify a read-only value");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
 	case WT_TOOSMALL:

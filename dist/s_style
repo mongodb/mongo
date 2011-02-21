@@ -17,6 +17,10 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	if grep "(unsigned)" $f > /dev/null; then
 		echo "$f: (unsigned) cast is wrong"
 	fi
+
+	# Bad code we can't easily fix
+	grep -Hn 'bzero|exit[ ]*\(1\)|^[	 ]+[|&=+-]' $f
+
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |
 	unexpand |
 	sed -e 's/){/) {/' \
@@ -25,14 +29,18 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	    -e 's/\([	 ]\)if(/\1if (/' \
 	    -e 's/\([	 ]\)index(/\1strchr(/' \
 	    -e 's/\([	 ]\)return(/\1return (/' \
+	    -e 's/^\([	 ]+\)return \([^()]*\);/\1return (\2);/' \
 	    -e 's/\([	 ]\)rindex(/\1strrchr(/' \
 	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
 	    -e 's/\([	 ]\)switch(/\1switch (/' \
 	    -e 's/\([	 ]\)while(/\1while (/' \
+	    -e 's/\([	 ,]\)uint\([	 ,]\)/\1u_int\2/g' \
 	    -e 's/\([	 ,]\)u_int8_t\([	 ,]\)/\1uint8_t\2/g' \
 	    -e 's/\([	 ,]\)u_int16_t\([	 ,]\)/\1uint16_t\2/g' \
 	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
+	    -e 's/%\([dux]\)l/%l\1/' \
+	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
 	    -e 's/(void) /(void)/' \
 	    -e 's/(unsigned)/(unsigned int)/' \
 	    -e 's/^#define /#define	/' >$t

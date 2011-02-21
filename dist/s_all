@@ -47,6 +47,7 @@ run "sh ./s_tags" "Building tags files"
 
 run "sh ./s_copyright" "Checking copyright notices"
 run "sh ./s_define" "Checking unused #defines"
+run "sh ./s_longlines" "Checking for long lines"
 run "sh ./s_style" "Checking style"
 run "sh ./s_types" "Checking incorrect types"
 run "sh ./s_whitespace" "Checking whitespace"

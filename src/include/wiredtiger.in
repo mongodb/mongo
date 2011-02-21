@@ -352,12 +352,16 @@ struct WT_SESSION {
 	 *
 	 * These are some of the common builtin cursor types:
 	 *   <table>
-	 *   <tr><th>URI</th><th>Function</th></tr>
-	 *   <tr><td><tt>table:[\<tablename\>]</tt></td><td>ordinary table cursor</td></tr>
-	 *   <tr><td><tt>column:[\<tablename\>.\<columnname\>]</tt></td><td>column cursor</td></tr>
-	 *   <tr><td><tt>config:[table:\<tablename\>]</tt></td><td>database or table configuration</td></tr>
-	 *   <tr><td><tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt></td><td>Join the contents of multiple cursors together.</td></tr>
-	 *   <tr><td><tt>statistics:[table:\<tablename\>]</tt></td><td>database or table statistics (key=(string)keyname, data=(int64_t)value)</td></tr>
+	 *   \hrow{URI, Function}
+	 *   \row{<tt>table:[\<tablename\>]</tt>, ordinary table cursor}
+	 *   \row{<tt>column:[\<tablename\>.\<columnname\>]</tt>, column cursor}
+	 *   \row{<tt>config:[table:\<tablename\>]</tt>,
+	 *   		database or table configuration}
+	 *   \row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
+	 *   		Join the contents of multiple cursors together.}
+	 *   \row{<tt>statistics:[table:\<tablename\>]</tt>,
+	 *   		database or table statistics
+	 *   		(key=(string)keyname\, data=(int64_t)value)}
 	 *   </table>
 	 *
 	 * See @ref cursor_types for more information.
@@ -797,12 +801,12 @@ struct WT_ERROR_HANDLER {
  * table:
  *
  * <table>
- * <tr><th>Character</th><th>Byte order</th><th>Size</th><th>Alignment</th></tr>
- * <tr><td><tt>\@</tt></td><td>native</td><td>native</td><td>native</td></tr>
- * <tr><td><tt>=</tt></td><td>native</td><td>standard</td><td>none</td></tr>
- * <tr><td><tt>&lt;</tt></td><td>little-endian</td><td>standard</td><td>none</td></tr>
- * <tr><td><tt>&gt;</tt></td><td>big-endian</td><td>standard</td><td>none</td></tr>
- * <tr><td><tt>!</tt></td><td>network (= big-endian)</td><td>standard</td><td>none</td></tr>
+ * \hrow{Character, Byte order, Size, Alignment}
+ * \row{<tt>\@</tt>, native, native, native}
+ * \row{<tt>=</tt>, native, standard, none}
+ * \row{<tt>&lt;</tt>, little-endian, standard, none}
+ * \row{<tt>&gt;</tt>, big-endian, standard, none}
+ * \row{<tt>!</tt>, network (= big-endian), standard, none}
  * </table>
  *
  * If the first character is not one of these, '>' (big-endian) is assumed, in
@@ -810,26 +814,26 @@ struct WT_ERROR_HANDLER {
  *
  * Format characters:
  * <table>
-<tr><th>Format</th><th>C Type</th><th>Java type</th><th>Python type</th><th>Standard size</th></tr>
-<tr><td>x</td><td>pad byte</td><td>N/A</td><td>N/A</td><td>1</td></tr>
-<tr><td>c</td><td>char</td><td>char</td><td>string of length 1</td><td>1</td></tr>
-<tr><td>b</td><td>signed char</td><td>byte</td><td>integer</td><td>1</td></tr>
-<tr><td>B</td><td>unsigned char</td><td>byte</td><td>integer</td><td>1</td></tr>
-<tr><td>?</td><td>_Bool</td><td>boolean</td><td>bool</td><td>1</td></tr>
-<tr><td>h</td><td>short</td><td>short</td><td>integer</td><td>2</td></tr>
-<tr><td>H</td><td>unsigned short</td><td>short</td><td>integer</td><td>2</td></tr>
-<tr><td>i</td><td>int</td><td>int</td><td>integer</td><td>4</td></tr>
-<tr><td>I</td><td>unsigned int</td><td>int</td><td>integer</td><td>4</td></tr>
-<tr><td>l</td><td>long</td><td>int</td><td>integer</td><td>4</td></tr>
-<tr><td>L</td><td>unsigned long</td><td>int</td><td>integer</td><td>4</td></tr>
-<tr><td>q</td><td>long long</td><td>long</td><td>integer</td><td>8</td></tr>
-<tr><td>Q</td><td>unsigned long long</td><td>long</td><td>integer</td><td>8</td></tr>
-<tr><td>f</td><td>float</td><td>float</td><td>float</td><td>4</td></tr>
-<tr><td>d</td><td>double</td><td>double</td><td>float</td><td>8</td></tr>
-<tr><td>r</td><td>::wiredtiger_recno_t</td><td>long</td><td>integer</td><td>8</td></tr>
-<tr><td>s</td><td>char[]</td><td>String</td><td>string</td><td>fixed length</td></tr>
-<tr><td>S</td><td>char[]</td><td>String</td><td>string</td><td>variable</td></tr>
-<tr><td>u</td><td>WT_DATAITEM</td><td>byte[]</td><td>string</td><td>variable</td></tr>
+ * \hrow{Format, C Type, Java type, Java type, Standard size}
+ * \row{x, pad byte, N/A, N/A, 1}
+ * \row{c, char, char, string of length 1, 1}
+ * \row{b, signed char, byte, integer, 1}
+ * \row{B, unsigned char, byte, integer, 1}
+ * \row{?, _Bool, boolean, bool, 1}
+ * \row{h, short, short, integer, 2}
+ * \row{H, unsigned short, short, integer, 2}
+ * \row{i, int, int, integer, 4}
+ * \row{I, unsigned int, int, integer, 4}
+ * \row{l, long, int, integer, 4}
+ * \row{L, unsigned long, int, integer, 4}
+ * \row{q, long long, long, integer, 8}
+ * \row{Q, unsigned long long, long, integer, 8}
+ * \row{f, float, float, float, 4}
+ * \row{d, double, double, float, 8}
+ * \row{r, ::wiredtiger_recno_t, long, integer, 8}
+ * \row{s, char[], String, string, fixed length}
+ * \row{S, char[], String, string, variable}
+ * \row{u, WT_DATAITEM, byte[], string, variable}
  * </table>
  *
  * The <code>'S'</code> type is encoded as a C language string terminated by a
@@ -958,7 +962,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 #define	WT_NOTFOUND	-31801
 /*! requested page was deleted. */
 #define	WT_PAGE_DELETED	-31802
-/*! modification attempted of a read-only value. */
+/*! attempt to modify a read-only value. */
 #define	WT_READONLY	-31803
 /*! restart the operation (internal). */
 #define	WT_RESTART	-31804

@@ -475,7 +475,7 @@ struct __wt_page_disk {
 };
 
 /*
- * WT_PAGE_DISK_SIZE is the expected structure size --  we verify the build to
+ * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  * The size must also be a multiple of 8 bytes, because compilers will pad it
  * to align the 64-bit fields to an 8 byte boundary.  Also, the header is
@@ -550,7 +550,7 @@ struct __wt_col {
 	void	 *data;			/* on-page data */
 };
 /*
- * WT_COL_SIZE is the expected structure size --  we verify the build to ensure
+ * WT_COL_SIZE is the expected structure size -- we verify the build to ensure
  * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
@@ -701,7 +701,7 @@ struct __wt_item {
 	uint32_t __item_chunk;
 };
 /*
- * WT_ITEM_SIZE is the expected structure size --  we verify the build to make
+ * WT_ITEM_SIZE is the expected structure size -- we verify the build to make
  * sure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_ITEM_SIZE	4
@@ -900,7 +900,7 @@ struct __wt_ovfl {
 	uint32_t size;			/* Overflow length */
 };
 /*
- * WT_OVFL_SIZE is the expected structure size --  we verify the build to
+ * WT_OVFL_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_OVFL_SIZE	8

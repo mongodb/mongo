@@ -202,12 +202,24 @@ TAB_SIZE               = 8
 # will result in a user-defined paragraph with heading "Side Effects:". 
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                = configend=</table> \
-                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
+ALIASES                = \
                          "errors=\returns zero on success and a non-zero error code on failure" \
                          "ex_ref{1}=\ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
+                         "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Effect [Default]</th></tr>" \
                          "config{3}=<tr><td>\1</td><td>\3 \2</td></tr>" \
-                         "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Effect [Default]</th></tr>"
+                         "configend=</table>" \
+                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
+			 "hrow{1}=<tr><th>\1</th></tr>" \
+			 "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
+			 "hrow{3}=<tr><th>\1</th><th>\2</th><th>\3</th></tr>" \
+			 "hrow{4}=<tr><th>\1</th><th>\2</th><th>\3</th><th>\4</th></tr>" \
+			 "hrow{5}=<tr><th>\1</th><th>\2</th><th>\3</th><th>\4</th><th>\5</th></tr>" \
+			 "row{1}=<tr><td>\1</td></tr>" \
+			 "row{2}=<tr><td>\1</td><td>\2</td></tr>" \
+			 "row{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr>" \
+			 "row{4}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>" \
+			 "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>"
+			 
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 
