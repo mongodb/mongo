@@ -105,8 +105,8 @@ __wt_bulk_fix(WT_TOC *toc,
 	db = toc->db;
 	idb = db->idb;
 	insert_cnt = 0;
-	WT_LINT(last_data = NULL);
-	WT_LINT(last_repeat = NULL);
+	last_data = NULL;	/* Avoid "uninitialized" warning. */
+	last_repeat = NULL;	/* Avoid "uninitialized" warning. */
 	WT_CLEAR(stack);
 	tmp = NULL;
 
@@ -265,7 +265,7 @@ __wt_bulk_var(WT_TOC *toc, uint32_t flags,
 
 	WT_CLEAR(stack);
 	dup_space = dup_count = 0;
-	WT_LINT(dup_key = dup_data = NULL);
+	dup_key = dup_data = NULL;	/* Avoid "uninitialized" warning. */
 	insert_cnt = 0;
 	is_column = F_ISSET(idb, WT_COLUMN) ? 1 : 0;
 

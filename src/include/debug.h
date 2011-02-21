@@ -38,14 +38,9 @@ typedef struct __wt_mbuf {
 } WT_MBUF;
 
 /*
- * Quiet a compiler warning by writing, and then reading, a variable.
+ * Quiet compiler warnings about unused parameters.
  */
 #define	WT_UNUSED(var)	(void)(var)
-
-/*
- * Some code that is only executed to avoid a (harmless) warning.
- */
-#define	WT_LINT(e)	do { e; } while (0)
 
 #if defined(__cplusplus)
 }
