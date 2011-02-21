@@ -5,23 +5,22 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 # List of files to search.
-l=`sed -e 's,#.*,,' -e 's,^,\.\./,' filelist`
+l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
 l="$l ../src/include/verify_build.h `echo ../src/utilities/*.c`"
 
 (
 # Copy out the list of #defines we don't use, but it's OK.
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
-for i in \
-    `cat ../src/include/*.h ../src/include/*.in |
-     egrep '^#define' |
-     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
-     sort -u`; do
-	if `egrep -w "$i" $l > /dev/null`; then
-		continue
-	fi
-	echo $i
-done
+# Get the list of macros
+search=`cat ../src/include/*.h ../src/include/*.in | egrep '^#define' |
+    sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
+    sort -u`
+
+# Print the list of macros, followed by the occurrences: we're looking for
+# macros that only appear once
+echo "$search"
+fgrep -who "$search" $l
 
 # The stat #defines are harder for two reasons: first, we don't care about uses
 # of the #define in support/stat.c because it's initialization code, using all
@@ -29,25 +28,22 @@ done
 # Second, we don't use the "WT_STAT_" prefix when we call a stat macro, the stat
 # macro handles that for us, so we have to remove that prefix before searching.
 #
-# The 4 special cases listed below are because the INCR, INCRV, and SET #defines
+# The special cases listed below are because the INCR, INCRV, and SET #defines
 # are in stat.h, but shouldn't have the leading WT_STAT prefix stripped.  They
 # are heavily used, so just delete them from the search.
 
-l=`echo $l | sed -e 's/\.\.\/support\/stat.c//'`
-for i in \
-    `cat ../src/include/stat.h |
-     egrep '^#define' |
-     sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
-	 -e '/^WT_STAT_INCR$/d' \
-	 -e '/^WT_STAT_INCRV$/d' \
-	 -e '/^WT_STAT_SET$/d' \
-         -e 's/WT_STAT_//' |
-     sort -u`; do
-	if `egrep -w "$i" $l > /dev/null`; then
-		continue
-	fi
-	echo "WT_STAT_$i"
-done
+l=`echo $l | sed -e 's,\.\./support/stat.c,,'`
+
+search=`cat ../src/include/stat.h | egrep '^#define' |
+    sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
+        -e '/^WT_STAT_INCR$/d' \
+        -e '/^WT_STAT_INCRV$/d' \
+        -e '/^WT_STAT_SET$/d' \
+        -e 's/WT_STAT_//' |
+    sort -u`
+
+echo "$search" | sed 's/^/WT_STAT_/'
+fgrep -who "$search" $l | sed 's/^/WT_STAT_/'
 
 ) | sort | uniq -u > $t
 
