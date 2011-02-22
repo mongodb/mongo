@@ -23,14 +23,14 @@ config_init(WT_CONFIG *conf, const char *str, int len)
 	if (conf->top == -1)						\
 		conf->top = conf->depth;				\
 	if (conf->depth == conf->top) {					\
-		out->type = t;						\
-		out->str = (conf->cur + i);				\
+		out->type = (t);					\
+		out->str = (conf->cur + (i));				\
 	}								\
 } while (0)
 
 #define	CAP(i) do {							\
 	if (conf->depth == conf->top)					\
-		out->len = (size_t)((conf->cur + i + 1) - out->str);	\
+		out->len = (size_t)((conf->cur + (i) + 1) - out->str);	\
 } while (0)
 
 typedef enum {
