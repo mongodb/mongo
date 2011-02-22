@@ -113,8 +113,9 @@ namespace PerfTests {
         virtual int howLongMillis() { return 5000; }
     public:
         void say(unsigned long long n, int ms, string s) {
-            cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
-            cout << dur::stats.curr->_asObj().toString() << endl;
+            //cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
+            cout << "stats\t" << s << '\t' << n*1000/ms << "\t" << ms << "ms\t"
+                 << dur::stats.curr->_asCSV() << endl;
         }
         void run() {
             _ns = string("perftest.") + name();
@@ -246,7 +247,7 @@ namespace PerfTests {
         static int rand() {
             return std::rand() & 0x7fff;
         }
-        string name() { return "random upserts"; }
+        virtual string name() { return "random upserts"; }
         void prep() {
             client().insert( ns(), BSONObj() );
             client().ensureIndex(ns(), BSON("x"<<1));
@@ -267,7 +268,8 @@ namespace PerfTests {
             BSONObj q = BSON("x" << x);
             client().update(ns(), q, I);
 
-            return "inc";
+            static string s = name()+" inc";
+            return s.c_str();
         }
 
         void post() {
@@ -324,6 +326,9 @@ namespace PerfTests {
 
         void setupTests() {
             add< TaskQueueTest >();
+            cout << "stats\t" 
+                << "test\trps\ttime\t"
+                << dur::stats.curr->_CSVHeader() << endl;
             add< InsertDup >();
             add< Insert1 >();
             add< InsertRandom >();

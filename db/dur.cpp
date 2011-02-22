@@ -84,6 +84,26 @@ namespace mongo {
         Stats::S * Stats::other() {
             return curr == &_a ? &_b : &_a;
         }
+                        string _CSVHeader();
+
+        string Stats::S::_CSVHeader() { 
+            return "commits\tjournaledMB\twriteToDataFilesMB\tcommitsInWriteLock\tearlyCommits\tprepLogBuffer\twriteToJournal\twriteToDataFiles\tremapPrivateView";
+        }
+
+        string Stats::S::_asCSV() { 
+            stringstream ss;
+            ss << 
+                _commits << '\t' << 
+                _journaledBytes / 1000000.0 << '\t' << 
+                _writeToDataFilesBytes / 1000000.0 << '\t' << 
+                _commitsInWriteLock << '\t' << 
+                _earlyCommits <<  '\t' << 
+                (unsigned) (_prepLogBufferMicros/1000) << '\t' << 
+                (unsigned) (_writeToJournalMicros/1000) << '\t' << 
+                (unsigned) (_writeToDataFilesMicros/1000) << '\t' << 
+                (unsigned) (_remapPrivateViewMicros/1000);
+            return ss.str();
+        }
 
         BSONObj Stats::S::_asObj() {
             return BSON(
