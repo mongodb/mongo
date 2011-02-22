@@ -69,22 +69,27 @@ extern "C" {
 		return (__wt_file_method_type(db, name, 0));
 
 /*
- * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a
- * field named "flags" in the structure referenced by its argument),
- * LF_XXX (handles a local variable named "flags"), and FLD_XXX (handles
- * any variable, anywhere.
+ * Flag set, clear and test.
+ *
+ * They come in 3 flavors: F_XXX (handles a field named "flags" in the structure
+ * referenced by its argument), LF_XXX (handles a local variable named "flags"),
+ * and FLD_XXX (handles any variable, anywhere.
+ *
+ * Flags are unsigned 32-bit values -- we cast to keep the compiler quiet (the
+ * hex constant might be a negative integer), and to ensure the hex constant is
+ * the correct size before applying the bitwise not operator.
  */
-#define	F_CLR(p, mask)		((p)->flags &= ~(mask))
-#define	F_ISSET(p, mask)	((p)->flags & (mask))
-#define	F_SET(p, mask)		((p)->flags |= (mask))
+#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)mask))
+#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)mask))
+#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)mask))
 
-#define	LF_CLR(mask)		((flags) &= ~(mask))
-#define	LF_ISSET(mask)		((flags) & (mask))
-#define	LF_SET(mask)		((flags) |= (mask))
+#define	LF_CLR(mask)		((flags) &= ~((uint32_t)mask))
+#define	LF_ISSET(mask)		((flags) & ((uint32_t)mask))
+#define	LF_SET(mask)		((flags) |= ((uint32_t)mask))
 
-#define	FLD_CLR(field, mask)	((field) &= ~(mask))
-#define	FLD_ISSET(field, mask)	((field) & (mask))
-#define	FLD_SET(field, mask)	((field) |= (mask))
+#define	FLD_CLR(field, mask)	((field) &= ~((uint32_t)mask))
+#define	FLD_ISSET(field, mask)	((field) & ((uint32_t)mask))
+#define	FLD_SET(field, mask)	((field) |= ((uint32_t)mask))
 
 /* Output a verbose message. */
 #ifdef HAVE_VERBOSE
