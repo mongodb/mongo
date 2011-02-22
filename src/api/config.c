@@ -8,10 +8,10 @@
 #include "wt_internal.h"
 
 int
-config_init(WT_CONFIG *conf, const char *confstr, int len)
+config_init(WT_CONFIG *conf, const char *str, int len)
 {
-	conf->orig = conf->cur = confstr;
-	conf->end = confstr + len;
+	conf->orig = conf->cur = str;
+	conf->end = str + len;
 	conf->depth = 0;
 	conf->top = -1;
 	conf->go = NULL;
