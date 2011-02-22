@@ -60,7 +60,7 @@ namespace mongo {
 #endif
 
     void printSysInfo() {
-        log() << "sys info: " << sysInfo() << endl;
+        log() << "build sys info: " << sysInfo() << endl;
     }
 
     //
