@@ -35,7 +35,7 @@ main(int argc, char *argv[])
 	 * We can't handle configuration-line information until we've opened
 	 * the DB handle, so we need a place to store it for now.
 	 */
-	if ((config_list = calloc(argc + 1, sizeof(char *))) == NULL) {
+	if ((config_list = calloc((size_t)argc + 1, sizeof(char *))) == NULL) {
 		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
 		return (EXIT_FAILURE);
 	}
@@ -250,7 +250,7 @@ bulk_read(DBT *dbt, int iskey)
 				return (errno);
 			dbt->mem_size = len + 128;
 		}
-		((u_int8_t *)(dbt->data))[len] = ch;
+		((u_int8_t *)(dbt->data))[len] = (u_int8_t)ch;
 	}
 	dbt->size = len;
 	return (0);
