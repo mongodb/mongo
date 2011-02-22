@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_debug_dsk_col_fix(DB *, WT_PAGE_DISK *, FILE *);

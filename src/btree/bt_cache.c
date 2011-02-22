@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 /*
  * __wt_cache_create --
@@ -38,46 +39,6 @@ __wt_cache_create(ENV *env)
 
 err:	(void)__wt_cache_destroy(env);
 	return (ret);
-}
-
-/*
- * __wt_cache_pages_inuse --
- *	Return the number of pages in use.
- */
-inline uint64_t
-__wt_cache_pages_inuse(WT_CACHE *cache)
-{
-	uint64_t pages_in, pages_out;
-
-	/*
-	 * Reading 64-bit fields, potentially on 32-bit machines, and other
-	 * threads of control may be modifying them.  Check them for sanity
-	 * (although "interesting" corruption is vanishingly unlikely, these
-	 * values just increment over time).
-	 */
-	pages_in = cache->stat_pages_in;
-	pages_out = cache->stat_pages_out;
-	return (pages_in > pages_out ? pages_in - pages_out : 0);
-}
-
-/*
- * __wt_cache_bytes_inuse --
- *	Return the number of bytes in use.
- */
-inline uint64_t
-__wt_cache_bytes_inuse(WT_CACHE *cache)
-{
-	uint64_t bytes_in, bytes_out;
-
-	/*
-	 * Reading 64-bit fields, potentially on 32-bit machines, and other
-	 * threads of control may be modifying them.  Check them for sanity
-	 * (although "interesting" corruption is vanishingly unlikely, these
-	 * values just increment over time).
-	 */
-	bytes_in = cache->stat_bytes_in;
-	bytes_out = cache->stat_bytes_out;
-	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }
 
 /*

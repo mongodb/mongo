@@ -44,16 +44,6 @@ __wt_page_disk_read(
 }
 
 /*
- * __wt_page_write --
- *	Write a file page.
- */
-inline int
-__wt_page_write(WT_TOC *toc, WT_PAGE *page)
-{
-	return (__wt_page_disk_write(toc, page->dsk, page->addr, page->size));
-}
-
-/*
  * __wt_page_disk_write --
  *	Write a file page.
  */

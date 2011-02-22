@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 /*
  * WT_STACK --

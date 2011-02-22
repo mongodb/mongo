@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 typedef struct {
 	void (*p)				/* Print function */

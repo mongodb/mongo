@@ -5,8 +5,6 @@ void
 __wt_curstd_close(WT_CURSOR_STD *c);
 int
 __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size);
-inline int
-__wt_block_free_ovfl(WT_TOC *toc, WT_OVFL *ovfl);
 int
 __wt_block_free(WT_TOC *toc, uint32_t addr, uint32_t size);
 int
@@ -21,10 +19,6 @@ __wt_item_build_data(
     WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags);
 int
 __wt_cache_create(ENV *env);
-inline uint64_t
-__wt_cache_pages_inuse(WT_CACHE *cache);
-inline uint64_t
-__wt_cache_bytes_inuse(WT_CACHE *cache);
 void
 __wt_cache_stats(ENV *env);
 int
@@ -72,13 +66,6 @@ int
 __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp);
 int
 __wt_evict_tree_count(WT_TOC *toc, IDB *idb, uint64_t *nodesp);
-inline void
-__wt_set_ff_and_sa_from_offset(WT_PAGE *page,
-    void *p, uint8_t **first_freep, uint32_t *space_availp);
-inline int
-__wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen);
-inline WT_ITEM *
-__wt_key_item_next(WT_PAGE *page, WT_ROW *rip, WT_ITEM *key_item);
 const char *
 __wt_page_type_string(WT_PAGE_DISK *dsk);
 const char *
@@ -96,12 +83,6 @@ int
 __wt_page_inmem(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret);
-inline void
-__wt_key_set(WT_ROW *rip, void *key, uint32_t size);
-inline void
-__wt_key_set_process(WT_ROW *rip, void *key);
-inline int
-__wt_key_process(WT_ROW *rip);
 void
 __wt_workq_read_server(ENV *env, int force);
 int
@@ -118,8 +99,6 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
 __wt_page_disk_read(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
-inline int
-__wt_page_write(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_page_disk_write(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
@@ -149,9 +128,9 @@ int
 __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp);
 int
 __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data);
-inline int
+int
 __wt_db_col_del(WT_TOC *toc, uint64_t recno);
-inline int
+int
 __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data);
 int
 __wt_rle_expand_serial_func(WT_TOC *toc);
@@ -161,9 +140,9 @@ int
 __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags);
 int
 __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
-inline int
+int
 __wt_db_row_del(WT_TOC *toc, DBT *key);
-inline int
+int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_item_update_serial_func(WT_TOC *toc);

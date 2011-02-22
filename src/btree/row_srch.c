@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 static int __wt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
 

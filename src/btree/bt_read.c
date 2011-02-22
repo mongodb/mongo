@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 static int __wt_cache_read(WT_READ_REQ *);
 

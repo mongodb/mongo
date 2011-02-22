@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 static void __wt_page_inmem_col_fix(DB *, WT_PAGE *);
 static void __wt_page_inmem_col_int(WT_PAGE *);
@@ -15,6 +16,17 @@ static int  __wt_page_inmem_dup_leaf(DB *, WT_PAGE *);
 static int  __wt_page_inmem_int_ref(WT_TOC *, uint32_t, WT_PAGE *);
 static int  __wt_page_inmem_row_int(DB *, WT_PAGE *);
 static int  __wt_page_inmem_row_leaf(DB *, WT_PAGE *);
+
+/*
+ * __wt_key_set_process --
+ *	Set a key/size pair, where the key requires further processing.
+ */
+static inline void
+__wt_key_set_process(WT_ROW *rip, void *key)
+{
+	rip->key = key;
+	rip->size = 0;
+}
 
 /*
  * __wt_page_in --
@@ -627,36 +639,4 @@ __wt_page_inmem_int_ref(WT_TOC *toc, uint32_t nindx, WT_PAGE *page)
 	for (i = 0, cp = page->u3.ref; i < nindx; ++i, ++cp)
 		cp->state = WT_REF_DISK;
 	return (0);
-}
-
-/*
- * __wt_key_set --
- *	Set a key/size pair, where the key does not require further processing.
- */
-inline void
-__wt_key_set(WT_ROW *rip, void *key, uint32_t size)
-{
-	rip->key = key;
-	rip->size = size;
-}
-
-/*
- * __wt_key_set_process --
- *	Set a key/size pair, where the key requires further processing.
- */
-inline void
-__wt_key_set_process(WT_ROW *rip, void *key)
-{
-	rip->key = key;
-	rip->size = 0;
-}
-
-/*
- * __wt_key_process --
- *	Return if a key requires processing.
- */
-inline int
-__wt_key_process(WT_ROW *rip)
-{
-	return (rip->size == 0 ? 1 : 0);
 }

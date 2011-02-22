@@ -6,7 +6,9 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
+static inline int __wt_block_free_ovfl(WT_TOC *, WT_OVFL *);
 static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -14,10 +16,25 @@ static int __wt_rec_col_var(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_page_delete(WT_TOC *, WT_PAGE *);
 static int __wt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, uint32_t, uint32_t);
-static int __wt_rec_row_leaf(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static int __wt_rle_expand_compare(const void *, const void *);
+static int __wt_rec_row_leaf(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static inline void __wt_rec_set_page_size(WT_TOC *, WT_PAGE *, uint8_t *);
+static int __wt_rle_expand_compare(const void *, const void *);
+
+/*
+ * __wt_block_free_ovfl --
+ *	Free an chunk of space, referenced by an overflow structure, to the
+ *	underlying file.
+ */
+static inline int
+__wt_block_free_ovfl(WT_TOC *toc, WT_OVFL *ovfl)
+{
+	DB *db;
+
+	db = toc->db;
+	return (__wt_block_free(
+	    toc, ovfl->addr, WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
+}
 
 /*
  * __wt_rec_set_page_size --

@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 static int  __wt_evict(WT_TOC *);
 static int  __wt_evict_compare_lru(const void *a, const void *b);

@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 static int __wt_row_update(WT_TOC *, DBT *, DBT *, int);
 
@@ -13,7 +14,7 @@ static int __wt_row_update(WT_TOC *, DBT *, DBT *, int);
  * __wt_db_row_del --
  *	Db.row_del method.
  */
-inline int
+int
 __wt_db_row_del(WT_TOC *toc, DBT *key)
 {
 	return (__wt_row_update(toc, key, NULL, 0));
@@ -23,7 +24,7 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
  * __wt_db_row_put --
  *	Db.row_put method.
  */
-inline int
+int
 __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data)
 {
 	return (__wt_row_update(toc, key, data, 1));
