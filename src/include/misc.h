@@ -23,15 +23,14 @@ extern "C" {
 #define	WT_SIZEOF32(e)	((uint32_t)sizeof(e))
 
 /*
- * Align a number to a specified power-of-2.
- *
- * The calculation is done using the largest unsigned integer type, usually
- * a 64-bit type, and that results in conversion complaints; cast the result
- * to a uint32_t because that's the size of a piece of data in the WiredTiger
- * engine.
+ * Align an unsigned value of any type to a specified power-of-2, including the
+ * offset result of a pointer subtraction.  Do the calculation using the largest
+ * unsigned integer type available, which results in conversion complaints; cast
+ * the result to a uint32_t because that's the size of a piece of data in the
+ * WiredTiger engine.
  */
 #define	WT_ALIGN(n, v)							\
-	((uint32_t)(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1)))
+	((uint32_t)((((uintmax_t)(n)) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1)))
 
 /* Min, max. */
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
