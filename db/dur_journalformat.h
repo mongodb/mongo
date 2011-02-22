@@ -131,6 +131,7 @@ namespace mongo {
 
             bool checkHash(const void* begin, int len) const {
                 // skip section header since size modified after hashing
+                // todo: skipping the header must be fixed, as we won't catch corruption of it then...
                 (const char*&)begin += sizeof(JSectHeader);
                 len                 -= sizeof(JSectHeader);
                 md5digest current;
