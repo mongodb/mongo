@@ -582,7 +582,7 @@ __wt_rle_expand_sort(ENV *env,
 			__wt_free(
 			    env, *expsortp, *np * sizeof(WT_RLE_EXPAND *));
 		WT_RET(__wt_calloc(
-		    env, n + 10, sizeof(WT_RLE_EXPAND *), expsortp));
+		    env, (size_t)n + 10, sizeof(WT_RLE_EXPAND *), expsortp));
 		*np = n + 10;
 	}
 
