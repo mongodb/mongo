@@ -78,17 +78,17 @@ extern "C" {
  * hex constant might be a negative integer), and to ensure the hex constant is
  * the correct size before applying the bitwise not operator.
  */
-#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)mask))
-#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)mask))
-#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)mask))
+#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
+#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
+#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
 
-#define	LF_CLR(mask)		((flags) &= ~((uint32_t)mask))
-#define	LF_ISSET(mask)		((flags) & ((uint32_t)mask))
-#define	LF_SET(mask)		((flags) |= ((uint32_t)mask))
+#define	LF_CLR(mask)		((flags) &= ~((uint32_t)(mask)))
+#define	LF_ISSET(mask)		((flags) & ((uint32_t)(mask)))
+#define	LF_SET(mask)		((flags) |= ((uint32_t)(mask)))
 
-#define	FLD_CLR(field, mask)	((field) &= ~((uint32_t)mask))
-#define	FLD_ISSET(field, mask)	((field) & ((uint32_t)mask))
-#define	FLD_SET(field, mask)	((field) |= ((uint32_t)mask))
+#define	FLD_CLR(field, mask)	((field) &= ~((uint32_t)(mask)))
+#define	FLD_ISSET(field, mask)	((field) & ((uint32_t)(mask)))
+#define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
 
 /* Output a verbose message. */
 #ifdef HAVE_VERBOSE
