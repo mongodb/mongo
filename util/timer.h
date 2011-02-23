@@ -64,8 +64,18 @@ namespace mongo {
         unsigned long long old;
     };
 
-#if defined(_WIN32)
-    /** helper for testing and such */
+#if 1
+    class DevTimer {
+    public:
+        class scoped { 
+        public:
+            scoped(DevTimer& dt) { }
+            ~scoped() { }
+        };
+        DevTimer(string) { }
+        ~DevTimer() { }
+    };
+#else if defined(_WIN32)
     class DevTimer {
         const string _name;
     public:
