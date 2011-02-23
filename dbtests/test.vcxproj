@@ -256,6 +256,7 @@
     <ClInclude Include="..\util\md5.hpp" />
     <ClInclude Include="..\util\miniwebserver.h" />
     <ClInclude Include="..\util\mmap.h" />
+    <ClInclude Include="..\util\mongoutils\hash.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\unittest.h" />
   </ItemGroup>
