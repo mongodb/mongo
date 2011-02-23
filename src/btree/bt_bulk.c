@@ -236,7 +236,6 @@ __wt_bulk_var(WT_TOC *toc,
 	DB *db;
 	DBT *key, *data, key_copy, data_copy;
 	DBT *tmp;
-	ENV *env;
 	IDB *idb;
 	WT_ITEM key_item, data_item;
 	WT_OVFL key_ovfl, data_ovfl;
@@ -249,7 +248,6 @@ __wt_bulk_var(WT_TOC *toc,
 
 	db = toc->db;
 	tmp = NULL;
-	env = toc->env;
 	idb = db->idb;
 	ret = 0;
 

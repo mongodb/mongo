@@ -22,7 +22,6 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	ENV *env;
 	WT_ROW *rip;
 	uint32_t i, type;
-	void *last_key;
 
 	env = toc->env;
 	type = page->dsk->type;
@@ -45,7 +44,6 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		 * if it points somewhere other than the original page), and
 		 * if so, free the memory.
 		 */
-		last_key = NULL;
 		WT_INDX_FOREACH(page, rip, i)
 			if (!__wt_row_key_on_page(page, rip))
 				__wt_free(env, rip->key, rip->size);

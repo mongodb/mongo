@@ -705,7 +705,6 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	enum { KEY_ON_PAGE, KEY_NONE } key_loc;
-	DB *db;
 	DBT *key, key_dbt, *data, data_dbt;
 	WT_ITEM data_item, *key_item;
 	WT_OVFL data_ovfl;
@@ -715,7 +714,6 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
-	db = toc->db;
 	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
@@ -911,7 +909,6 @@ err:	(void)__wt_block_free(toc, new->addr, new->size);
 static int
 __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 {
-	DB *db;
 	WT_COL *cip;
 	WT_PAGE *parent;
 	WT_PAGE_DISK *dsk;
@@ -1003,7 +1000,6 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	 * page, stopping at the root or the first page with valid entries and
 	 * deleting as we go.
 	 */
-	db = toc->db;
 	if ((parent = page->parent) == NULL)
 		return (0);
 	dsk = parent->dsk;
@@ -1027,7 +1023,6 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 			if (WT_ROW_OFF(rip)->addr != WT_ADDR_DELETED)
 				return (0);
 		break;
-	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*

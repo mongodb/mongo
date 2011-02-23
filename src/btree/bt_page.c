@@ -347,14 +347,12 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 static int
 __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 {
-	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i;
 
-	env = db->env;
 	idb = db->idb;
 	dsk = page->dsk;
 
@@ -447,6 +445,7 @@ offpage:	/*
 		p = tmp->data;
 		size = tmp->size;
 		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*

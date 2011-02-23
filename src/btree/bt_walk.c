@@ -166,7 +166,6 @@ __wt_walk_end(ENV *env, WT_WALK *walk)
 int
 __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 {
-	DB *db;
 	ENV *env;
 	WT_PAGE *page, *child;
 	WT_REF *ref;
@@ -174,7 +173,6 @@ __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 	u_int elem;
 
 	env = toc->env;
-	db = toc->db;
 
 	e = &walk->tree[walk->tree_slot];
 	page = e->ref->page;

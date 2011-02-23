@@ -465,13 +465,11 @@ __wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 		DBT	*scratch;		/* scratch buffer */
 	} *current, *last, _a, _b;
 	DB *db;
-	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i;
 	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	db = toc->db;
-	dsk = page->dsk;
 	func = db->btree_compare;
 	ret = 0;
 
