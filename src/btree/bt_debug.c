@@ -56,7 +56,7 @@ __wt_debug_set_fp(const char *ofile, FILE **fpp, int *close_varp)
  *	Dump a file in debugging mode.
  */
 int
-__wt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
+__wt_debug_dump(WT_TOC *toc, const char *ofile, FILE *fp)
 {
 	int do_close, ret;
 
@@ -80,7 +80,7 @@ __wt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
  *	Dump a disk page in debugging mode.
  */
 int
-__wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
+__wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
 {
 	DB *db;
 	int do_close, ret;
@@ -148,7 +148,7 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
  *	Dump the in-memory information for a page.
  */
 int
-__wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
+__wt_debug_page(WT_TOC *toc, WT_PAGE *page, const char *ofile, FILE *fp)
 {
 	DB *db;
 	WT_PAGE_DISK *dsk;
