@@ -168,16 +168,7 @@ wts_bulk_load()
 
 	db = g.wts_db;
 
-	switch (g.c_file_type) {
-	case FIX:
-	case VAR:
-		ret = db->bulk_load(db, 0, track, cb_bulk);
-		break;
-	case ROW:
-		ret = db->bulk_load(db, WT_DUPLICATES, track, cb_bulk);
-		break;
-	}
-	if (ret != 0) {
+	if ((ret = db->bulk_load(db, track, cb_bulk)) != 0) {
 		db->err(db, ret, "Db.bulk_load");
 		return (1);
 	}
@@ -301,17 +292,7 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 		return (1);
 	}
 
-	/*
-	 * Generate a set of duplicates for each key if duplicates have
-	 * been configured.  The duplicate_pct configuration is a
-	 * percentage, which defines the number of keys that get
-	 * duplicate data items, and the number of duplicate data items
-	 * for each such key is a random value in-between 2 and the
-	 * value of duplicate_cnt.
-	 */
-	if (g.key_cnt == 1 || g.c_duplicates_pct == 0 ||
-	    (u_int32_t)wts_rand() % 100 > g.c_duplicates_pct)
-		key_gen(&key, g.key_cnt);
+	key_gen(&key, g.key_cnt);
 	data_gen(&data, 1);
 
 	switch (g.c_file_type) {

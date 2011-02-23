@@ -27,8 +27,6 @@ bdb_startup()
 	    (g.c_delete_pct == 100 && g.c_write_pct == 100 ? 0 : DB_INIT_LOCK) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
-	if (g.c_duplicates_pct)
-		assert(db->set_flags(db, DB_DUP) == 0);
 
 	p = fname("bdb");
 	assert(db->open(db, NULL, p, NULL, DB_BTREE, DB_CREATE, 0) == 0);

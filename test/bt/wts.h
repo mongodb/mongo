@@ -63,7 +63,6 @@ typedef struct {
 	u_int32_t c_data_min;
 	u_int32_t c_file_type;
 	u_int32_t c_delete_pct;
-	u_int32_t c_duplicates_pct;
 	u_int32_t c_huffman_data;
 	u_int32_t c_huffman_key;
 	u_int32_t c_intl_node_max;

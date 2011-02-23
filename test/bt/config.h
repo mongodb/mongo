@@ -29,7 +29,6 @@ static CONFIG c[] = {
 	{ "data_min",		0,		0,		10,	32,		&g.c_data_min },
 	{ "file_type",	0,		C_IGNORE,	1,	3,		&g.c_file_type },
 	{ "delete_pct",		0,		0,		0,	45,		&g.c_delete_pct },
-	{ "duplicates_pct",	C_ROW,		C_IGNORE,	0,	80,		&g.c_duplicates_pct },
 	{ "huffman_data",	C_ROW|C_VAR,	C_BOOL,		0,	10,		&g.c_huffman_data },
 	{ "huffman_key",	C_ROW,		C_BOOL,		0,	10,		&g.c_huffman_key },
 	{ "intl_node_max",	0,		0,		9,	17,		&g.c_intl_node_max },

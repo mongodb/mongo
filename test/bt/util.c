@@ -91,11 +91,8 @@ data_gen(DBT *data, int grow_ok)
 	}
 
 	/*
-	 * The data always starts with a 10-digit number.
-	 *
-	 * Change the leading number to ensure every data item sorts greater
-	 * than all previous data items -- when bulk-loading duplicate data
-	 * items, they must be loaded in sort order.
+	 * The data always starts with a 10-digit number.  Change the leading
+	 * number to ensure every data item is unique.
 	 */
 	sprintf(buf, "%010u", ++r);
 	buf[10] = '/';
