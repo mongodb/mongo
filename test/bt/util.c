@@ -114,8 +114,15 @@ data_gen(DBT *data, int grow_ok)
 	case VAR:
 	case ROW:
 		p = buf;
-		len = grow_ok ?
-		    MMRAND(g.c_data_min, g.c_data_max) : g.c_data_max;
+		/*
+		 * WiredTiger doesn't store zero-length records, and I want to
+		 * test that: records divisible by 63 are always zero-length.
+		 */
+		if (r % 63 == 0)
+			len = 0;
+		else
+			len = grow_ok ?
+			    MMRAND(g.c_data_min, g.c_data_max) : g.c_data_max;
 		break;
 	}
 
