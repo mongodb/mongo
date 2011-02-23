@@ -117,18 +117,15 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 		item = cip->data;
 		goto item_set;
 	case WT_PAGE_ROW_LEAF:
-	case WT_PAGE_DUP_LEAF:
 		item = rip->data;
 item_set:	switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_DUP:
 			if (idb->huffman_data == NULL) {
 				data_ret = WT_ITEM_BYTE(item);
 				size_ret = WT_ITEM_LEN(item);
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DATA_DUP_OVFL:
 			WT_RET(__wt_item_process(toc, item, &toc->data));
 			data_ret = toc->data.data;
 			size_ret = toc->data.size;

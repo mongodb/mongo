@@ -21,8 +21,6 @@ typedef struct {
 	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
 
-	uint64_t duptree;			/* Dup tree record count */
-
 	WT_PAGE *leaf;				/* Last leaf-page */
 } WT_VSTUFF;
 
@@ -135,15 +133,13 @@ __wt_verify_tree(
 {
 	DB *db;
 	WT_COL *cip;
-	WT_ITEM *item;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_ROW *rip;
 	uint64_t records;
-	uint32_t i, item_num;
+	uint32_t i;
 	int is_root, ret;
 
 	db = toc->db;
@@ -239,17 +235,6 @@ __wt_verify_tree(
 			goto err;
 		}
 		break;
-	case WT_PAGE_DUP_LEAF:
-		/*
-		 * The only row-store record count we maintain is a total count
-		 * of the data items held in each off-page duplicate tree.
-		 * Keep track of how many records on each duplicate tree leaf
-		 * page and check it against the parent row-store leaf page
-		 * stored count when the traversal is complete.
-		 */
-		vs->duptree += dsk->u.entries;
-		/* FALLTHROUGH */
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		if (page->records != 0) {
@@ -259,8 +244,6 @@ __wt_verify_tree(
 			    (u_long)page->addr, page->records);
 			goto err;
 		}
-		break;
-	default:
 		break;
 	}
 
@@ -283,25 +266,17 @@ __wt_verify_tree(
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_verify_overflow_col(toc, page, vs));
 		break;
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_verify_overflow_row(toc, page, vs));
-		break;
-	default:
 		break;
 	}
 
 	/* Check on-page key ordering. */
 	switch (dsk->type) {
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_verify_key_order(toc, page));
-		break;
-	default:
 		break;
 	}
 
@@ -333,7 +308,6 @@ __wt_verify_tree(
 			start_recno += records;
 		}
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		/*
 		 * There are two row-store, logical connection checks:
@@ -369,8 +343,7 @@ __wt_verify_tree(
 			 * in a comparison.
 			 */
 			if (vs->leaf != NULL) {
-				WT_ERR(
-				    __wt_verify_pc(toc, rip, vs->leaf, 0));
+				WT_ERR(__wt_verify_pc(toc, rip, vs->leaf, 0));
 				__wt_hazard_clear(toc, vs->leaf);
 				vs->leaf = NULL;
 			}
@@ -402,66 +375,6 @@ __wt_verify_tree(
 				goto err;
 		}
 		break;
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * For each entry in a row-store leaf page, verify any off-page
-		 * duplicates tree.
-		 */
-		item_num = 0;
-		WT_INDX_FOREACH(page, rip, i) {
-			++item_num;
-
-			/* Ignore anything except off-page duplicate trees. */
-			if ((repl = WT_ROW_REPL(
-			    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
-				continue;
-			item = rip->data;
-			if (WT_ITEM_TYPE(item) != WT_ITEM_OFF_RECORD)
-				continue;
-
-			/* Verify the off-page duplicate tree. */
-			vs->duptree = 0;
-
-			ref = WT_ROW_DUP(page, rip);
-			off_record = WT_ROW_OFF_RECORD(rip);
-			switch (ret =
-			    __wt_page_in(toc, page, ref, off_record, 1)) {
-			case 0:				/* Valid page */
-				ret = __wt_verify_tree(
-				    toc, NULL, (uint64_t)0,
-				    (uint64_t)0, WT_NOLEVEL, ref, vs);
-				__wt_hazard_clear(toc, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
-			if (ret != 0)
-				goto err;
-
-			if (vs->duptree != WT_RECORDS(off_record)) {
-				__wt_api_db_errx(db,
-				    "off-page duplicate tree referenced from "
-				    "item %lu of page %lu has a record count "
-				    "of %llu when a record count of %llu was "
-				    "expected",
-				    (u_long)item_num, (u_long)page->addr,
-				    (unsigned long long)vs->duptree,
-				    (unsigned long long)WT_RECORDS(off_record));
-				goto err;
-			}
-		}
-		/* FALLTHROUGH */
-	case WT_PAGE_DUP_LEAF:
-		/*
-		 * Retain a reference to all row-store leaf pages, we need them
-		 * to check their last entry against the next internal key in
-		 * the tree.
-		 */
-		vs->leaf = page;
-		return (0);
-	default:
-		break;
 	}
 
 	/*
@@ -491,20 +404,8 @@ __wt_verify_pc(WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 
 	db = toc->db;
 	scratch1 = scratch2 = NULL;
+	func = db->btree_compare;
 	ret = 0;
-
-	/* Set the comparison function. */
-	switch (child->dsk->type) {
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
-		func = db->btree_compare_dup;
-		break;
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		func = db->btree_compare;
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
 
 	/*
 	 * The two keys we're going to compare may be overflow keys -- don't
@@ -571,6 +472,7 @@ __wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 
 	db = toc->db;
 	dsk = page->dsk;
+	func = db->btree_compare;
 	ret = 0;
 
 	WT_CLEAR(_a);
@@ -580,25 +482,8 @@ __wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
 	last = &_b;
 	WT_ERR(__wt_scr_alloc(toc, 0, &last->scratch));
 
-	/* Set the comparison function. */
-	switch (dsk->type) {
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
-		func = db->btree_compare_dup;
-		break;
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		func = db->btree_compare;
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
-
 	/* Walk the page, comparing keys. */
 	WT_INDX_FOREACH(page, rip, i) {
-		/* Skip duplicates */
-		if (WT_ROW_INDX_IS_DUPLICATE(page, rip))
-			continue;
-
 		/*
 		 * The two keys we're going to compare may be overflow keys --
 		 * don't bother instantiating the keys in the tree, there's no
@@ -669,12 +554,10 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	int check_data;
 
 	/*
-	 * Walk the in-memory page, verifying overflow items.   We service 4
-	 * page types here: DUP_INT, DUP_LEAF, ROW_INT and ROW_LEAF.  In the
-	 * case of DUP_INT, DUP_LEAF and ROW_INT, we only check the key, as
-	 * there is either no data item, or the data item is known to not be
-	 * an overflow page.   In the case of ROW_LEAF, we have to check both
-	 * the key and the data item.
+	 * Walk the in-memory page, verifying overflow items.   We service two
+	 * page types here: ROW_INT and ROW_LEAF.  In the case of ROW_INT, only
+	 * check the key, as there is no data item; in the case of ROW_LEAF, we
+	 * have to check both the key and the data item.
 	 */
 	check_data = page->dsk->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
@@ -685,41 +568,19 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
 	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
-		if (!WT_ROW_INDX_IS_DUPLICATE(page, rip)) {
-			/*
-			 * WT_ITEM_DATA_XXX types are listed because the data
-			 * items for off-page duplicate trees are sorted, and
-			 * the WT_ROW "key" item actually references data items.
-			 */
-			switch (WT_ITEM_TYPE(key_item)) {
-			case WT_ITEM_DATA_DUP_OVFL:
-			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_KEY_DUP_OVFL:
-			case WT_ITEM_KEY_OVFL:
-				WT_RET(__wt_verify_overflow_common(
-				    toc, WT_ITEM_BYTE_OVFL(key_item),
-				    WT_ROW_SLOT(page, rip) + 1, page->addr,
-				    vs));
-				break;
-			default:
-				break;
-			}
-		}
+		if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+			WT_RET(__wt_verify_overflow_common(
+			    toc, WT_ITEM_BYTE_OVFL(key_item),
+			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
 
-		if (check_data) {
-			data_item = rip->data;
-			switch (WT_ITEM_TYPE(data_item)) {
-			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_DATA_DUP_OVFL:
-				WT_RET(__wt_verify_overflow_common(
-				    toc, WT_ITEM_BYTE_OVFL(data_item),
-				    WT_ROW_SLOT(page, rip) + 1, page->addr,
-				    vs));
-				break;
-			default:
-				break;
-			}
-		}
+		if (!check_data)
+			continue;
+
+		data_item = rip->data;
+		if (WT_ITEM_TYPE(data_item) == WT_ITEM_DATA_OVFL)
+			WT_RET(__wt_verify_overflow_common(
+			    toc, WT_ITEM_BYTE_OVFL(data_item),
+			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
 	}
 	return (0);
 }

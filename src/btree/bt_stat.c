@@ -11,7 +11,6 @@
 static int __wt_stat_page_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_stat_page_col_rle(WT_TOC *, WT_PAGE *);
 static int __wt_stat_page_col_var(WT_TOC *, WT_PAGE *);
-static int __wt_stat_page_dup_leaf(WT_TOC *, WT_PAGE *);
 static int __wt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
 
 /*
@@ -50,13 +49,6 @@ __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_COL_VAR:
 		WT_STAT_INCR(stats, PAGE_COL_VARIABLE);
 		WT_RET(__wt_stat_page_col_var(toc, page));
-		break;
-	case WT_PAGE_DUP_INT:
-		WT_STAT_INCR(stats, PAGE_DUP_INTERNAL);
-		break;
-	case WT_PAGE_DUP_LEAF:
-		WT_STAT_INCR(stats, PAGE_DUP_LEAF);
-		WT_RET(__wt_stat_page_dup_leaf(toc, page));
 		break;
 	case WT_PAGE_OVFL:
 		WT_STAT_INCR(stats, PAGE_OVERFLOW);
@@ -197,52 +189,6 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_stat_page_dup_leaf --
- *	Stat a WT_PAGE_DUP_LEAF page.
- */
-static int
-__wt_stat_page_dup_leaf(WT_TOC *toc, WT_PAGE *page)
-{
-	DB *db;
-	WT_REPL *repl;
-	WT_ROW *rip;
-	WT_STATS *stats;
-	uint32_t i;
-
-	db = toc->db;
-	stats = db->idb->dstats;
-
-	/*
-	 * Walk the page, counting regular and overflow data items, and checking
-	 * to be sure any replacements weren't deletions.  If the item has been
-	 * replaced, assume it was replaced by an item of the same size (it's
-	 * to expensive to figure out if it will require the same space or not,
-	 * especially if there's Huffman encoding).
-	 */
-	WT_INDX_FOREACH(page, rip, i) {
-		switch (WT_ITEM_TYPE(rip->data)) {
-		case WT_ITEM_DATA_DUP:
-			repl = WT_ROW_REPL(page, rip);
-			if (repl == NULL || !WT_REPL_DELETED_ISSET(repl)) {
-				WT_STAT_INCR(stats, ITEM_DUP_DATA);
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			}
-			break;
-		case WT_ITEM_DATA_DUP_OVFL:
-			repl = WT_ROW_REPL(page, rip);
-			if (repl == NULL || !WT_REPL_DELETED_ISSET(repl)) {
-				WT_STAT_INCR(stats, ITEM_DUP_DATA);
-				WT_STAT_INCR(stats, ITEM_DATA_OVFL);
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			}
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
-	}
-	return (0);
-}
-
-/*
  * __wt_stat_page_row_leaf --
  *	Stat a WT_PAGE_ROW_LEAF page.
  */
@@ -250,14 +196,12 @@ static int
 __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
-	WT_OFF_RECORD *off_record;
-	WT_REF *ref;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	WT_STATS *stats;
 	uint32_t i;
-	int ret;
 
+	arg = NULL;				/* Shut the compiler up. */
 	db = toc->db;
 	stats = db->idb->dstats;
 
@@ -282,47 +226,6 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 				continue;
 			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			break;
-		case WT_ITEM_DATA_DUP:
-			repl = WT_ROW_REPL(page, rip);
-			if (repl != NULL && WT_REPL_DELETED_ISSET(repl))
-				continue;
-			WT_STAT_INCR(stats, ITEM_DUP_DATA);
-			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			break;
-		case WT_ITEM_DATA_DUP_OVFL:
-			repl = WT_ROW_REPL(page, rip);
-			if (repl != NULL && WT_REPL_DELETED_ISSET(repl))
-				continue;
-			WT_STAT_INCR(stats, ITEM_DUP_DATA);
-			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
-			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			break;
-		case WT_ITEM_OFF_RECORD:
-			/*
-			 * Recursively call the tree-walk code for any off-page
-			 * duplicate trees.  (Check for any off-page duplicate
-			 * trees locally because we already have to walk the
-			 * page, so it's faster than walking the page both here
-			 * and in the tree-walk function.)
-			 */
-			ref = WT_ROW_DUP(page, rip);
-			off_record = WT_ROW_OFF_RECORD(rip);
-			switch (ret =
-			    __wt_page_in(toc, page, ref, off_record, 0)) {
-			case 0:				/* Valid page */
-				ret = __wt_tree_walk(
-				    toc, ref, 0, __wt_page_stat, arg);
-				__wt_hazard_clear(toc, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
-			if (ret != 0)
-				return (ret);
-
-			WT_STAT_INCR(stats, DUP_TREE);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}

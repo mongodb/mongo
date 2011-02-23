@@ -44,8 +44,8 @@ __wt_bt_close(WT_TOC *toc)
 	 * to evict pages we're flushing.
 	 */
 	__wt_lock(env, cache->mtx_reconcile);
-	WT_TRET(__wt_tree_walk(toc, NULL,
-	    WT_WALK_CACHE | WT_WALK_OFFDUP, __wt_bt_close_page, NULL));
+	WT_TRET(__wt_tree_walk(
+	    toc, NULL, WT_WALK_CACHE, __wt_bt_close_page, NULL));
 	__wt_evict_db_clear(toc);
 	__wt_unlock(env, cache->mtx_reconcile);
 

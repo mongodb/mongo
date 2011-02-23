@@ -2,40 +2,6 @@
 
 #include "wt_internal.h"
 
-static int __wt_api_db_btree_compare_dup_get(
-	DB *db,
-	int (**btree_compare_dup)(DB *, const DBT *, const DBT *));
-static int __wt_api_db_btree_compare_dup_get(
-	DB *db,
-	int (**btree_compare_dup)(DB *, const DBT *, const DBT *))
-{
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-
-	__wt_lock(env, ienv->mtx);
-	WT_STAT_INCR(ienv->method_stats, DB_BTREE_COMPARE_DUP_GET);
-	*btree_compare_dup = db->btree_compare_dup;
-	__wt_unlock(env, ienv->mtx);
-	return (0);
-}
-
-static int __wt_api_db_btree_compare_dup_set(
-	DB *db,
-	int (*btree_compare_dup)(DB *, const DBT *, const DBT *));
-static int __wt_api_db_btree_compare_dup_set(
-	DB *db,
-	int (*btree_compare_dup)(DB *, const DBT *, const DBT *))
-{
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-
-	__wt_lock(env, ienv->mtx);
-	WT_STAT_INCR(ienv->method_stats, DB_BTREE_COMPARE_DUP_SET);
-	db->btree_compare_dup = btree_compare_dup;
-	__wt_unlock(env, ienv->mtx);
-	return (0);
-}
-
 static int __wt_api_db_btree_compare_get(
 	DB *db,
 	int (**btree_compare)(DB *, const DBT *, const DBT *));
@@ -102,42 +68,6 @@ static int __wt_api_db_btree_compare_set(
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_BTREE_COMPARE_SET);
 	db->btree_compare = btree_compare;
-	__wt_unlock(env, ienv->mtx);
-	return (0);
-}
-
-static int __wt_api_db_btree_dup_offpage_get(
-	DB *db,
-	uint32_t *btree_dup_offpage);
-static int __wt_api_db_btree_dup_offpage_get(
-	DB *db,
-	uint32_t *btree_dup_offpage)
-{
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-
-	__wt_lock(env, ienv->mtx);
-	WT_STAT_INCR(ienv->method_stats, DB_BTREE_DUP_OFFPAGE_GET);
-	*btree_dup_offpage = db->btree_dup_offpage;
-	__wt_unlock(env, ienv->mtx);
-	return (0);
-}
-
-static int __wt_api_db_btree_dup_offpage_set(
-	DB *db,
-	uint32_t btree_dup_offpage);
-static int __wt_api_db_btree_dup_offpage_set(
-	DB *db,
-	uint32_t btree_dup_offpage)
-{
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-
-	WT_RET((__wt_db_btree_dup_offpage_set_verify(
-	    db, btree_dup_offpage)));
-	__wt_lock(env, ienv->mtx);
-	WT_STAT_INCR(ienv->method_stats, DB_BTREE_DUP_OFFPAGE_SET);
-	db->btree_dup_offpage = btree_dup_offpage;
 	__wt_unlock(env, ienv->mtx);
 	return (0);
 }
@@ -242,12 +172,10 @@ static int __wt_api_db_btree_pagesize_set(
 
 static int __wt_api_db_bulk_load(
 	DB *db,
-	uint32_t flags,
 	void (*progress)(const char *, uint64_t),
 	int (*cb)(DB *, DBT **, DBT **));
 static int __wt_api_db_bulk_load(
 	DB *db,
-	uint32_t flags,
 	void (*progress)(const char *, uint64_t),
 	int (*cb)(DB *, DBT **, DBT **))
 {
@@ -258,10 +186,9 @@ static int __wt_api_db_bulk_load(
 	int ret;
 
 	WT_DB_RDONLY(db, method_name);
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_BULK_LOAD);
-	ret = __wt_db_bulk_load(toc, flags, progress, cb);
+	ret = __wt_db_bulk_load(toc, progress, cb);
 	WT_TRET(__wt_toc_api_clr(toc, method_name, 1));
 	return (ret);
 }
@@ -1241,19 +1168,12 @@ static int __wt_api_wt_toc_close(
 void
 __wt_methods_db_config_default(DB *db)
 {
-	db->btree_compare_dup = __wt_bt_lex_compare;
 	db->btree_compare = __wt_bt_lex_compare;
 }
 
 void
 __wt_methods_db_lockout(DB *db)
 {
-	db->btree_compare_dup_get = (int (*)
-	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
-	db->btree_compare_dup_set = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
 	db->btree_compare_get = (int (*)
 	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
 	    __wt_db_lockout;
@@ -1265,12 +1185,6 @@ __wt_methods_db_lockout(DB *db)
 	    __wt_db_lockout;
 	db->btree_compare_set = (int (*)
 	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
-	db->btree_dup_offpage_get = (int (*)
-	    (DB *, uint32_t *))
-	    __wt_db_lockout;
-	db->btree_dup_offpage_set = (int (*)
-	    (DB *, uint32_t ))
 	    __wt_db_lockout;
 	db->btree_itemsize_get = (int (*)
 	    (DB *, uint32_t *, uint32_t *))
@@ -1285,7 +1199,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = (int (*)
-	    (DB *, uint32_t , void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **)))
+	    (DB *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **)))
 	    __wt_db_lockout;
 	db->col_del = (int (*)
 	    (DB *, WT_TOC *, uint64_t , uint32_t ))
@@ -1358,14 +1272,10 @@ __wt_methods_db_lockout(DB *db)
 void
 __wt_methods_db_init_transition(DB *db)
 {
-	db->btree_compare_dup_get = __wt_api_db_btree_compare_dup_get;
-	db->btree_compare_dup_set = __wt_api_db_btree_compare_dup_set;
 	db->btree_compare_get = __wt_api_db_btree_compare_get;
 	db->btree_compare_int_get = __wt_api_db_btree_compare_int_get;
 	db->btree_compare_int_set = __wt_api_db_btree_compare_int_set;
 	db->btree_compare_set = __wt_api_db_btree_compare_set;
-	db->btree_dup_offpage_get = __wt_api_db_btree_dup_offpage_get;
-	db->btree_dup_offpage_set = __wt_api_db_btree_dup_offpage_set;
 	db->btree_itemsize_get = __wt_api_db_btree_itemsize_get;
 	db->btree_itemsize_set = __wt_api_db_btree_itemsize_set;
 	db->btree_pagesize_get = __wt_api_db_btree_pagesize_get;
@@ -1387,17 +1297,11 @@ __wt_methods_db_init_transition(DB *db)
 void
 __wt_methods_db_open_transition(DB *db)
 {
-	db->btree_compare_dup_set = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
 	db->btree_compare_int_set = (int (*)
 	    (DB *, int ))
 	    __wt_db_lockout;
 	db->btree_compare_set = (int (*)
 	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
-	db->btree_dup_offpage_set = (int (*)
-	    (DB *, uint32_t ))
 	    __wt_db_lockout;
 	db->btree_itemsize_set = (int (*)
 	    (DB *, uint32_t , uint32_t ))

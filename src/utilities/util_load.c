@@ -102,7 +102,7 @@ main(int argc, char *argv[])
 			goto err;
 		}
 
-		if ((ret = db->bulk_load(db, WT_DUPLICATES,
+		if ((ret = db->bulk_load(db,
 		    verbose ? __wt_progress : NULL, bulk_callback)) != 0) {
 			db->err(db, ret, "Db.bulk_load");
 			goto err;

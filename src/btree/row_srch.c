@@ -8,7 +8,29 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_key_build(WT_TOC *, WT_PAGE *, WT_ROW *);
+static inline int __wt_key_build(WT_TOC *, WT_ROW *);
+
+/*
+ * __wt_key_build --
+ *	Instantiate an overflow or compressed key into a WT_ROW structure.
+ */
+static inline int
+__wt_key_build(WT_TOC *toc, WT_ROW *rip_arg)
+{
+	DBT *dbt, _dbt;
+	WT_ITEM *item;
+
+	WT_CLEAR(_dbt);
+	dbt = &_dbt;
+
+	item = rip_arg->key;
+	WT_RET(__wt_item_process(toc, item, dbt));
+
+	/* Update the WT_ROW reference with the processed key. */
+	__wt_key_set(rip_arg, dbt->data, dbt->size);
+
+	return (0);
+}
 
 /*
  * __wt_row_search --
@@ -50,9 +72,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		write_gen = page->write_gen;
 
 		dsk = page->dsk;
-		isleaf =
-		    dsk->type == WT_PAGE_DUP_LEAF ||
-		    dsk->type == WT_PAGE_ROW_LEAF;
+		isleaf = dsk->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -63,7 +83,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			 */
 			rip = page->u.irow + indx;
 			if (__wt_key_process(rip))
-				WT_ERR(__wt_key_build(toc, page, rip));
+				WT_ERR(__wt_key_build(toc, rip));
 
 			/*
 			 * If we're about to compare an application key with the
@@ -168,7 +188,6 @@ deleted_retry:	/* rip references the subtree containing the record. */
 	 * item was modified/deleted.
 	 */
 	switch (dsk->type) {
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		if (LF_ISSET(WT_INSERT))
 			break;
@@ -181,7 +200,6 @@ deleted_retry:	/* rip references the subtree containing the record. */
 			toc->srch_repl = repl;
 		}
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		/*
 		 * When returning internal pages, set the item's WT_REPL slot
@@ -202,37 +220,4 @@ notfound:
 
 err:	WT_PAGE_OUT(toc, page);
 	return (ret);
-}
-
-/*
- * __wt_key_build --
- *	Instantiate an overflow or compressed key into a WT_ROW structure.
- */
-static int
-__wt_key_build(WT_TOC *toc, WT_PAGE *page, WT_ROW *rip_arg)
-{
-	DBT *dbt, _dbt;
-	WT_ROW *rip;
-	WT_ITEM *item;
-	uint32_t i;
-
-	WT_CLEAR(_dbt);
-	dbt = &_dbt;
-
-	item = rip_arg->key;
-	WT_RET(__wt_item_process(toc, item, dbt));
-
-	/*
-	 * Update the WT_ROW reference with the processed key.  If there are
-	 * any duplicates of this item, update them as well.
-	 */
-	__wt_key_set(rip_arg, dbt->data, dbt->size);
-	if (WT_ITEM_TYPE(rip_arg->data) == WT_ITEM_DATA_DUP ||
-	    WT_ITEM_TYPE(rip_arg->data) == WT_ITEM_DATA_DUP_OVFL) {
-		WT_INDX_FOREACH(page, rip, i)
-			if (rip->key == item)
-				__wt_key_set(rip, dbt->data, dbt->size);
-	}
-
-	return (0);
 }

@@ -15,15 +15,12 @@ typedef struct {
 
 	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
-
-	DBT *dupkey;				/* Offpage duplicate tree key */
 } WT_DSTUFF;
 
 static int  __wt_dump_page(WT_TOC *, WT_PAGE *, void *);
 static void __wt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_rle(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_dup_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_print_byte_string_hex(uint8_t *, uint32_t, FILE *);
 static void __wt_print_byte_string_nl(uint8_t *, uint32_t, FILE *);
@@ -53,7 +50,6 @@ __wt_db_dump(WT_TOC *toc,
 	dstuff.stream = stream;
 	dstuff.f = f;
 	dstuff.fcnt = 0;
-	dstuff.dupkey = NULL;
 
 	/*
 	 * Note we do not have a hazard reference for the root page, and that's
@@ -87,7 +83,6 @@ __wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		break;
 	case WT_PAGE_COL_FIX:
@@ -98,9 +93,6 @@ __wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_dump_page_col_var(toc, page, dp));
-		break;
-	case WT_PAGE_DUP_LEAF:
-		WT_RET(__wt_dump_page_dup_leaf(toc, page, dp));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_dump_page_row_leaf(toc, page, dp));
@@ -256,65 +248,6 @@ err:	__wt_scr_release(&tmp);
 }
 
 /*
- * __wt_dump_page_dup_leaf --
- *	Dump a WT_PAGE_DUP_LEAF page.
- */
-static int
-__wt_dump_page_dup_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
-{
-	DB *db;
-	DBT *dupkey, *tmp;
-	WT_ITEM *item;
-	WT_REPL *repl;
-	WT_ROW *rip;
-	uint32_t i;
-	int ret;
-	void *huffman;
-
-	db = toc->db;
-	dupkey = dp->dupkey;
-	huffman = db->idb->huffman_data;
-	ret = 0;
-
-	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
-	WT_INDX_FOREACH(page, rip, i) {
-		/* Check for deletion. */
-		if ((repl = WT_ROW_REPL(
-		    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
-			continue;
-
-		/* Output the key, we're going to need it. */
-		dp->p(dupkey->data, dupkey->size, dp->stream);
-
-		/* Output the replacement item. */
-		if (repl != NULL) {
-			dp->p(WT_REPL_DATA(repl), repl->size, dp->stream);
-			continue;
-		}
-
-		/* Process the original data. */
-		item = rip->data;
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_DATA_DUP:
-			if (huffman == NULL) {
-				dp->p(WT_ITEM_BYTE(item),
-				    WT_ITEM_LEN(item), dp->stream);
-				break;
-			}
-			/* FALLTHROUGH */
-		case WT_ITEM_DATA_DUP_OVFL:
-			WT_ERR(__wt_item_process(toc, item, tmp));
-			dp->p(tmp->data, tmp->size, dp->stream);
-			break;
-		WT_ILLEGAL_FORMAT_ERR(db, ret);
-		}
-	}
-
-err:	__wt_scr_release(&tmp);
-	return (ret);
-}
-
-/*
  * __wt_dump_page_row_leaf --
  *	Dump a WT_PAGE_ROW_LEAF page.
  */
@@ -324,8 +257,6 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
 	WT_ITEM *item;
-	WT_OFF_RECORD *off_record;
-	WT_REF *ref;
 	WT_REPL *repl;
 	WT_ROW *rip;
 	uint32_t i;
@@ -359,13 +290,8 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			key = (DBT *)rip;
 
 		/*
-		 * If the item was ever replaced, we're done: it can't be an
-		 * off-page tree, and we don't care what kind of item it was
-		 * originally.  Dump the data from the replacement entry.
-		 *
-		 * XXX
-		 * This is wrong -- if an off-page dup tree is reconciled,
-		 * the off-page reference will change underfoot.
+		 * If the item was ever replaced, dump the data from the
+		 * replacement entry.
 		 */
 		if (repl != NULL) {
 			dp->p(key->data, key->size, dp->stream);
@@ -377,7 +303,6 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		item = rip->data;
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_DUP:
 			if (huffman == NULL) {
 				data_local.data = WT_ITEM_BYTE(item);
 				data_local.size = WT_ITEM_LEN(item);
@@ -385,45 +310,10 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 				break;
 			}
 			/* FALLTHROUGH */
-		case WT_ITEM_DATA_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
 			WT_ERR(__wt_item_process(toc, item, data_tmp));
 			data = data_tmp;
 			break;
-		case WT_ITEM_OFF_RECORD:
-			/*
-			 * Set the key and recursively call the tree-walk code
-			 * for any off-page duplicate trees.
-			 *
-			 * Check for off-page duplicate trees locally because
-			 * we already have to walk the page, so it's faster
-			 * than walking the page both here and in the tree-walk
-			 * function, plus we have to pass the duplicate key to
-			 * the underlying worker function.
-			 */
-			dp->dupkey = key;
-
-			ref = WT_ROW_DUP(page, rip);
-			off_record = WT_ROW_OFF_RECORD(rip);
-			switch (ret =
-			    __wt_page_in(toc, page, ref, off_record, 0)) {
-			case 0:				/* Valid page */
-				ret = __wt_tree_walk(
-				    toc, ref, 0, __wt_dump_page, dp);
-				__wt_hazard_clear(toc, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
-			if (ret != 0)
-				goto err;
-
-			/*
-			 * This item is not separately dumped -- continue with
-			 * the main page-walking loop.
-			 */
-			continue;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}
 

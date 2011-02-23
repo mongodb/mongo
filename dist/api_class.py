@@ -299,19 +299,6 @@ methods['db.btree_compare_set'] = Api(
 	[],
 	['init'], ['open'])
 
-methods['db.btree_compare_dup_get'] = Api(
-	'db.btree_compare_dup_get',
-	'method, getter',
-	['btree_compare_dup/int (**@S)(DB *, const DBT *, const DBT *)'],
-	[],
-	['init'], [])
-methods['db.btree_compare_dup_set'] = Api(
-	'db.btree_compare_dup_set',
-	'method, setter',
-	['btree_compare_dup/int (*@S)(DB *, const DBT *, const DBT *)/__wt_bt_lex_compare'],
-	[],
-	['init'], ['open'])
-
 methods['db.btree_compare_int_get'] = Api(
 	'db.btree_compare_int_get',
 	'method, getter',
@@ -322,19 +309,6 @@ methods['db.btree_compare_int_set'] = Api(
 	'db.btree_compare_int_set',
 	'method, setter, verify',
 	['btree_compare_int/int @S'],
-	[],
-	['init'], ['open'])
-
-methods['db.btree_dup_offpage_get'] = Api(
-	'db.btree_dup_offpage_get',
-	'method, getter',
-	['btree_dup_offpage/uint32_t *@S'],
-	[],
-	['init'], [])
-methods['db.btree_dup_offpage_set'] = Api(
-	'db.btree_dup_offpage_set',
-	'method, setter, verify',
-	['btree_dup_offpage/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
@@ -377,10 +351,9 @@ methods['db.btree_pagesize_set'] = Api(
 methods['db.bulk_load'] = Api(
 	'db.bulk_load',
 	'method, rdonly, toc',
-	['flags/uint32_t @S',
-	 'progress/void (*@S)(const char *, uint64_t)',
+	['progress/void (*@S)(const char *, uint64_t)',
 	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
-	[ 'DUPLICATES' ],
+	[],
 	['open'], [])
 
 methods['db.close'] = Api(
@@ -581,15 +554,12 @@ flags['wiredtiger_env_init'] = [
 ###################################################
 # Internal routine flag declarations
 ###################################################
-flags['bt_build_data_item'] = [
-	'IS_DUP']
 flags['bt_search_col'] = [
 	'DATA_OVERWRITE' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
 flags['bt_tree_walk'] = [
-	'WALK_CACHE',
-	'WALK_OFFDUP' ]
+	'WALK_CACHE' ]
 
 ###################################################
 # Structure flag declarations

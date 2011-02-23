@@ -275,7 +275,7 @@ def func_method(a, f):
 		    handle.upper() + '.' + method + '";\n')
 
 	# We need an ENV/IENV handle pair, find them.
-	if (flagchk or locking) and handle != 'env':
+	if handle != 'env':
 		f.write('\tENV *env = ' + handle + '->env;\n')
 	f.write('\tIENV *ienv = env->ienv;\n')
 

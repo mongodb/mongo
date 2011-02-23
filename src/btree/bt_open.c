@@ -214,13 +214,6 @@ __wt_open_verify_page_sizes(DB *db)
 		db->leafitemsize = WT_ITEM_MAX_LEN;
 
 	/*
-	 * By default, any duplicate set that reaches 25% of a leaf page is
-	 * moved into its own separate tree.
-	 */
-	if (db->btree_dup_offpage == 0)
-		db->btree_dup_offpage = 4;
-
-	/*
 	 * A leaf page must hold at least 2 key/data pairs, otherwise the
 	 * whole btree thing breaks down because we can't split.  We have
 	 * to include WT_DESC_SIZE in leaf page calculations, it's not

@@ -60,19 +60,7 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 	 */
 	page = ref == NULL ? idb->root_page.page : ref->page;
 
-	/*
-	 * Walk any internal pages, descending through any off-page references.
-	 *
-	 * Descending into row-store off-page duplicate trees is optional for
-	 * two reasons. (1) it may be faster to call this function recursively
-	 * from the worker function, which is already walking the page, and (2)
-	 * information for off-page dup trees is split (the key is on the
-	 * row-leaf page, and the data is obviously in the off-page dup tree):
-	 * we need the key when we dump the data, and that would be a hard
-	 * special case in this code.  Functions where it's both possible and
-	 * no slower to walk off-page dupliate trees in this code can request
-	 * it be done here.
-	 */
+	/* Walk internal pages, descending through any off-page references. */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(page, cip, i) {
@@ -98,7 +86,6 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 				return (ret);
 		}
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_INDX_FOREACH(page, rip, i) {
 			/* rip references the subtree containing the record */
@@ -121,49 +108,6 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 			if (ret != 0)
 				return (ret);
 		}
-		break;
-	case WT_PAGE_ROW_LEAF:
-		if (!WT_PAGE_DUP_TREES(page) || !LF_ISSET(WT_WALK_OFFDUP))
-			break;
-		WT_INDX_FOREACH(page, rip, i) {
-			/*
-			 * If only walking pages in the cache, skip any off-page
-			 * duplicate pages not already in the cache.
-			 *
-			 * The test for ref == NULL is necessary because some
-			 * elements of the array won't be initialized, as they
-			 * don't reference off-page duplicate trees.  There is
-			 * an alternative, test WT_ITEM_TYPE(rip->data) for an
-			 * item of teyp WT_ITEM_OFF_RECORD, because then we'd
-			 * know this u3.dup array slot must have been filled in.
-			 */
-			ref = WT_ROW_DUP(page, rip);
-			if (ref == NULL ||
-			    (LF_ISSET(WT_WALK_CACHE) &&
-			    ref->state != WT_REF_CACHE))
-				continue;
-
-			/*
-			 * Recursively call the tree-walk function for the
-			 * off-page duplicate tree.
-			 */
-			off_record = WT_ROW_OFF_RECORD(rip);
-			switch (ret =
-			    __wt_page_in(toc, page, ref, off_record, 0)) {
-			case 0:				/* Valid page */
-				ret =
-				    __wt_tree_walk(toc, ref, flags, work, arg);
-				__wt_hazard_clear(toc, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
-			if (ret != 0)
-				return (ret);
-		}
-		break;
-	default:
 		break;
 	}
 
@@ -236,9 +180,8 @@ __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 	page = e->ref->page;
 
 	/*
-	 * Coming into this function we have either a tree internal page (and
-	 * we're walking the array of children), or a row-leaf page (and we're
-	 * walking the array of off-page duplicate trees).
+	 * Coming into this function we have a tree internal page and we're
+	 * walking the array of children.
 	 *
 	 * If we've reached the end of this page, and haven't yet returned it,
 	 * do that now.  If the page has been returned, traversal is finished:
@@ -262,26 +205,10 @@ eop:			e->visited = 1;
 
 	/* Find the next WT_REF/WT_PAGE pair present in the cache. */
 	for (;;) {
-		switch (page->dsk->type) {
-		case WT_PAGE_ROW_LEAF:
-			ref = page->u3.dup[e->indx];
-			break;
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_DUP_INT:
-		case WT_PAGE_ROW_INT:
-			ref = &page->u3.ref[e->indx];
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
+		ref = &page->u2.ref[e->indx];
 
-		/*
-		 * The row-leaf page off-page duplicates tree array has empty
-		 * slots (unlike col/row internal pages), so check for a NULL
-		 * ref.
-		 *
-		 * We only care about pages in the cache.
-		 */
-		if (ref != NULL && ref->state == WT_REF_CACHE)
+		/* We only care about pages in the cache. */
+		if (ref->state == WT_REF_CACHE)
 			break;
 
 		/*
@@ -298,17 +225,7 @@ eop:			e->visited = 1;
 	 */
 	child = ref->page;
 	switch (child->dsk->type) {
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * Check for off-page duplicates -- if there are any, push them
-		 * onto the stack and recursively call ourselves to descend the
-		 * tree.
-		 */
-		if (!WT_PAGE_DUP_TREES(child))
-			break;
-		/* FALLTHROUGH */
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		/*
 		 * The page has children.
@@ -329,8 +246,6 @@ eop:			e->visited = 1;
 		e->indx = 0;
 		e->visited = 0;
 		return (__wt_walk_next(toc, walk, refp));
-	default:
-		break;
 	}
 
 	/* Return the child page, it's not interesting for further traversal. */

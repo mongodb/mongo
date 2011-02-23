@@ -538,9 +538,7 @@ __wt_evict_state_check(WT_TOC *toc)
 		/* Ignore pages with in-memory subtrees. */
 		switch (page->dsk->type) {
 		case WT_PAGE_COL_INT:
-		case WT_PAGE_DUP_INT:
 		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
 			if (__wt_evict_page_subtrees(page)) {
 				WT_VERBOSE(env, WT_VERB_EVICT, (env,
 				    "eviction skipped page addr %lu (subtrees)",
@@ -674,7 +672,7 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 static int
 __wt_evict_page_subtrees(WT_PAGE *page)
 {
-	WT_REF *ref, **dupp;
+	WT_REF *ref;
 	uint32_t i;
 
 	/*
@@ -692,18 +690,10 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 	 */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_REF_FOREACH(page, ref, i)
 			if (ref->state != WT_REF_DISK)
 				return (1);
-		break;
-	case WT_PAGE_ROW_LEAF:
-		if (WT_PAGE_DUP_TREES(page))
-			WT_DUP_FOREACH(page, dupp, i)
-				if (*dupp != NULL &&
-				    (*dupp)->state != WT_REF_DISK)
-					return (1);
 		break;
 	}
 

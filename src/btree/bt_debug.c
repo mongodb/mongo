@@ -103,8 +103,6 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
 		    (u_long)dsk->level, (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		fprintf(fp,
@@ -123,8 +121,6 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		ret = __wt_debug_dsk_item(toc, dsk, fp);
@@ -195,11 +191,9 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_debug_page_col_var(toc, page, fp));
 		break;
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_debug_page_row_leaf(toc, page, fp));
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		__wt_debug_page_row_int(page, fp);
 		break;
@@ -325,7 +319,7 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 
 /*
  * __wt_debug_page_row_leaf --
- *	Dump an in-memory WT_PAGE_DUP_LEAF or WT_PAGE_ROW_LEAF page.
+ *	Dump an in-memory WT_PAGE_ROW_LEAF page.
  */
 static int
 __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
@@ -356,7 +350,7 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 
 /*
  * __wt_debug_page_row_int --
- *	Dump an in-memory WT_PAGE_DUP_INT or WT_PAGE_ROW_INT page.
+ *	Dump an in-memory WT_PAGE_ROW_INT page.
  */
 static void
 __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
@@ -459,14 +453,10 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_DATA:
-	case WT_ITEM_DATA_DUP:
 	case WT_ITEM_DEL:
 	case WT_ITEM_KEY:
-	case WT_ITEM_KEY_DUP:
 		break;
-	case WT_ITEM_DATA_DUP_OVFL:
 	case WT_ITEM_DATA_OVFL:
-	case WT_ITEM_KEY_DUP_OVFL:
 	case WT_ITEM_KEY_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
 		fprintf(fp, ", addr %lu, size %lu",
@@ -586,18 +576,14 @@ __wt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		if (idb->huffman_key != NULL)
 			goto process;
 		goto onpage;
-	case WT_ITEM_KEY_DUP:
 	case WT_ITEM_DATA:
-	case WT_ITEM_DATA_DUP:
 		if (idb->huffman_data != NULL)
 			goto process;
 onpage:		p = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_KEY_OVFL:
-	case WT_ITEM_KEY_DUP_OVFL:
 	case WT_ITEM_DATA_OVFL:
-	case WT_ITEM_DATA_DUP_OVFL:
 process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 		WT_ERR(__wt_item_process(toc, item, tmp));
 		p = tmp->data;

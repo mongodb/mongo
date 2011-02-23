@@ -105,7 +105,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		/*
 		 * Other leaf page types can grow, allocate the maximum leaf
@@ -114,7 +113,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 		max = db->leafmax;
 		break;
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		/*
 		 * All internal page types can grow, allocate the maximum
@@ -158,12 +156,10 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 		WT_ERR(__wt_rec_col_int(toc, page, new));
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_ERR(__wt_rec_row_int(toc, page, new));
 		break;
 	case WT_PAGE_ROW_LEAF:
-	case WT_PAGE_DUP_LEAF:
 		WT_ERR(__wt_rec_row_leaf(toc, page, new));
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
@@ -244,7 +240,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 /*
  * __wt_rec_row_int --
- *	Reconcile a row-store, or off-page duplicate tree, internal page.
+ *	Reconcile a row-store internal page.
  */
 static int
 __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
@@ -654,7 +650,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				data->data = WT_REPL_DATA(repl);
 				data->size = repl->size;
 				WT_RET(__wt_item_build_data(
-				    toc, data, &data_item, &data_ovfl, 0));
+				    toc, data, &data_item, &data_ovfl));
 				len = WT_ITEM_SPACE_REQ(data->size);
 			}
 			data_loc = DATA_OFF_PAGE;
@@ -716,7 +712,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_REPL *repl;
-	uint32_t i, len, space_avail, type;
+	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
 	db = toc->db;
@@ -732,8 +728,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	data = &data_dbt;
 
 	/*
-	 * Walk the page, accumulating key/data groups (groups, because a key
-	 * can reference a duplicate data set).
+	 * Walk the page, accumulating key/data pairs.
 	 *
 	 * We have to walk both the WT_ROW structures and the original page --
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
@@ -750,7 +745,6 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 */
 			switch (WT_ITEM_TYPE(rip->data)) {
 			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_DATA_DUP_OVFL:
 				WT_RET(__wt_block_free_ovfl(
 				    toc, WT_ITEM_BYTE_OVFL(rip->data)));
 				break;
@@ -775,7 +769,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			data->data = WT_REPL_DATA(repl);
 			data->size = repl->size;
 			WT_RET(__wt_item_build_data(
-			    toc, data, &data_item, &data_ovfl, 0));
+			    toc, data, &data_item, &data_ovfl));
 			data_loc = DATA_OFF_PAGE;
 
 		} else {
@@ -785,37 +779,10 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			data_loc = DATA_ON_PAGE;
 		}
 
-		/*
-		 * Check if the key is a duplicate (the key preceding it on the
-		 * page references the same information).  We don't store the
-		 * key for the second and subsequent data items in duplicated
-		 * groups.
-		 */
-		if (WT_ROW_INDX_IS_DUPLICATE(page, rip)) {
-			type = data_loc == DATA_ON_PAGE ?
-			    WT_ITEM_TYPE(rip->data) : WT_ITEM_TYPE(&data_item);
-			switch (type) {
-				case WT_ITEM_DATA:
-				case WT_ITEM_DATA_DUP:
-					type = WT_ITEM_DATA_DUP;
-					break;
-				case WT_ITEM_DATA_OVFL:
-				case WT_ITEM_DATA_DUP_OVFL:
-					type = WT_ITEM_DATA_DUP_OVFL;
-					break;
-				WT_ILLEGAL_FORMAT(db);
-				}
-			if (data_loc == DATA_ON_PAGE)
-				WT_ITEM_SET_TYPE(rip->data, type);
-			else
-				WT_ITEM_SET_TYPE(&data_item, type);
-			key_loc = KEY_NONE;
-		} else {
-			/* Take the key's WT_ITEM from the original page. */
-			key->data = key_item;
-			key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
-			key_loc = KEY_ON_PAGE;
-		}
+		/* Take the key's WT_ITEM from the original page. */
+		key->data = key_item;
+		key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
+		key_loc = KEY_ON_PAGE;
 
 		len = 0;
 		switch (key_loc) {
@@ -1055,7 +1022,6 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 			if (WT_COL_OFF(cip)->addr != WT_ADDR_DELETED)
 				return (0);
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_INDX_FOREACH(parent, rip, i)
 			if (WT_ROW_OFF(rip)->addr != WT_ADDR_DELETED)
@@ -1106,22 +1072,11 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 	parent = page->parent;
 	switch (parent->dsk->type) {
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * Two page types have WT_OFF_RECORD structures: column-store
-		 * internal pages, and row-store leaf pages (their references
-		 * to off-page duplicate trees).
-		 */
 		off_record = page->parent_off;
 		off_record->addr = addr;
 		off_record->size = size;
 		break;
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		/*
-		 * Two page types have WT_OFF structures: row-store internal
-		 * pages and off-page duplicate tree internal pages.
-		 */
 		off = page->parent_off;
 		off->addr = addr;
 		off->size = size;

@@ -12,11 +12,10 @@ __wt_block_read(WT_TOC *toc);
 int
 __wt_block_write(WT_TOC *toc);
 int
-__wt_db_bulk_load(WT_TOC *toc, uint32_t flags,
+__wt_db_bulk_load(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_item_build_data(
-    WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl, u_int flags);
+__wt_item_build_data(WT_TOC *toc, DBT *dbt, WT_ITEM *item, WT_OVFL *ovfl);
 int
 __wt_cache_create(ENV *env);
 void
@@ -158,8 +157,6 @@ void
 __wt_api_db_errx(DB *db, const char *fmt, ...);
 int
 __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int);
-int
-__wt_db_btree_dup_offpage_set_verify(DB *db, uint32_t dup_offpage);
 int
 __wt_db_column_set_verify(
     DB *db, uint32_t fixed_len, const char *dictionary, uint32_t flags);

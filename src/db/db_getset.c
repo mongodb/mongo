@@ -23,31 +23,6 @@ __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int)
 }
 
 /*
- * __wt_db_btree_dup_offpage_set_verify --
- *	Verify arguments to the Db.btree_dup_offpage_set method.
- */
-int
-__wt_db_btree_dup_offpage_set_verify(DB *db, uint32_t dup_offpage)
-{
-	/*
-	 * Limiting this value to something between 10 and 50 is a sanity test,
-	 * not a hard constraint (although a value of 100 might fail hard).
-	 *
-	 * If the value is too large, pages can end up being empty because it
-	 * isn't possible for duplicate sets to span pages.  So, if you set
-	 * the value to 50%, and you have two sequential, large duplicate sets,
-	 * you end up with two, half-empty pages.
-	 */
-	if (dup_offpage > 10 && dup_offpage <= 50)
-		return (0);
-
-	__wt_api_db_errx(db,
-	    "The percent of the page taken up by duplicate entries before "
-	    "being moved off-page must must be between 10 and 50");
-	return (WT_ERROR);
-}
-
-/*
  * __wt_db_column_set_verify --
  *	Verify arguments to the Db.column_set method.
  */

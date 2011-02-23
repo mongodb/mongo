@@ -7,7 +7,6 @@
 
 #include "wt_internal.h"
 
-static void __wt_page_discard_dup(ENV *, WT_PAGE *);
 static void __wt_page_discard_rleexp(ENV *, WT_PAGE *);
 static void __wt_page_discard_repl(ENV *, WT_PAGE *);
 static void __wt_page_discard_repl_list(ENV *, WT_REPL *);
@@ -33,56 +32,34 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 
 	/* Free the in-memory index array. */
 	switch (type) {
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * For each entry, see if the key was an allocation (that is,
-		 * if it points somewhere other than the original page), and
-		 * if so, free the memory.  This test is a superset of the
-		 * __wt_key_process test, that is, any key requiring processing
-		 * but not yet processed, must reference on-page information.
-		 */
-		last_key = NULL;
-		WT_INDX_FOREACH(page, rip, i) {
-			if (__wt_row_key_on_page(page, rip))
-				continue;
-
-			/*
-			 * Only test the first entry for duplicate key/data
-			 * pairs, the others reference the same memory.  (This
-			 * test only makes sense for WT_PAGE_ROW_LEAF pages,
-			 * but there is no cost in doing the test for duplicate
-			 * leaf pages as well.)
-			 */
-			if (rip->key == last_key)
-				continue;
-			last_key = rip->key;
-			__wt_free(env, rip->key, rip->size);
-		}
-		__wt_free(env, page->u.irow, page->indx_count * sizeof(WT_ROW));
-		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		__wt_free(env, page->u.icol, page->indx_count * sizeof(WT_COL));
 		break;
-	default:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * For each entry, see if the key was an allocation (that is,
+		 * if it points somewhere other than the original page), and
+		 * if so, free the memory.
+		 */
+		last_key = NULL;
+		WT_INDX_FOREACH(page, rip, i)
+			if (!__wt_row_key_on_page(page, rip))
+				__wt_free(env, rip->key, rip->size);
+		__wt_free(env, page->u.irow, page->indx_count * sizeof(WT_ROW));
 		break;
 	}
 
 	/* Free the modified/deletion replacements array. */
 	switch (type) {
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
 		if (page->u2.repl != NULL)
 			__wt_page_discard_repl(env, page);
-		break;
-	default:
 		break;
 	}
 
@@ -92,24 +69,15 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		if (page->u2.rleexp != NULL)
 			__wt_page_discard_rleexp(env, page);
 		break;
-	default:
-		break;
 	}
 
 	/* Free the subtree-reference array. */
 	switch (type) {
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		if (page->u3.ref != NULL)
-			__wt_free(env, page->u3.ref,
+		if (page->u2.ref != NULL)
+			__wt_free(env, page->u2.ref,
 			    page->indx_count * sizeof(WT_REF));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		if (WT_PAGE_DUP_TREES(page))
-			__wt_page_discard_dup(env, page);
-		break;
-	default:
 		break;
 	}
 
@@ -193,28 +161,6 @@ __wt_page_discard_repl_list(ENV *env, WT_REPL *repl)
 		if (++update->out == update->in)
 			__wt_free(env, update, update->len);
 	} while ((repl = a) != NULL);
-}
-
-/*
- * __wt_page_discard_dup --
- *	Walk the off-page duplicates tree array.
- */
-static void
-__wt_page_discard_dup(ENV *env, WT_PAGE *page)
-{
-	WT_REF **dupp;
-	u_int i;
-
-	/*
-	 * For each non-NULL slot in the page's array of off-page duplicate
-	 * references, free the reference.
-	 */
-	WT_DUP_FOREACH(page, dupp, i)
-		if (*dupp != NULL)
-			__wt_free(env, *dupp, sizeof(WT_REF));
-
-	/* Free the page's array of off-page duplicate references. */
-	__wt_free(env, page->u3.dup, page->indx_count * sizeof(WT_REF *));
 }
 
 /*

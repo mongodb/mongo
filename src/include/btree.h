@@ -218,13 +218,7 @@ struct __wt_page {
 	 * page is read from the file.  It's sorted by the key, fixed in size,
 	 * and references data on the page.
 	 *
-	 * Complications:
-	 *
-	 * In WT_PAGE_ROW_LEAF pages there may be duplicate data items; in those
-	 * cases, there is a single indx entry per key/data pair, but multiple
-	 * indx entries reference the same memory location.
-	 *
-	 * In column-store fixed-length run-length encoded pages (that is,
+	 * Note: in column-store fixed-length run-length encoded pages (that is,
 	 * WT_PAGE_COL_RLE type pages), a single indx entry may reference a
 	 * large number of records, because there's a single on-page entry that
 	 * represents many identical records.   (We can't expand those entries
@@ -241,6 +235,13 @@ struct __wt_page {
 	} u;
 
 	/*
+	 * Subtree references are stored in the ref array.   When a page that
+	 * references a subtree (where a subtree may be a single page), is read
+	 * into memory, the ref array is populated with entries that can be
+	 * used to bring the subtree page into memory.  That happens for both
+	 * internal page types: WT_PAGE_COL_INT, WT_PAGE_ROW_INT.
+	 * Entries on leaf pages can be modified.
+	 *
 	 * Data modifications or deletions are stored in the replacement array.
 	 * When the first element on a page is modified, the array is allocated,
 	 * with one slot for every existing element in the page.  A slot points
@@ -259,30 +260,11 @@ struct __wt_page {
 	 * useful enough to re-implement, IMNSHO.)
 	 */
 	union {
-		WT_REPL	      **repl;	/* Modification/deletion index */
-		WT_RLE_EXPAND **rleexp;	/* RLE expansion index */
+		WT_REF	       *ref;	/* Internal: subtree references */
+		WT_REPL	      **repl;	/* Leaf: Modification/deletion index */
+		WT_RLE_EXPAND **rleexp;	/* Leaf: RLE expansion index */
 	} u2;
-
-	/*
-	 * Subtree references are stored in the ref array.   When a page that
-	 * references a subtree (where a subtree may be a single page), is read
-	 * into memory, the ref array is populated with entries that can be
-	 * used to bring the subtree page into memory.  That happens both for
-	 * internal page types:
-	 *	WT_PAGE_COL_INT
-	 *	WT_PAGE_DUP_INT
-	 *	WT_PAGE_ROW_INT
-	 * and row-store leaf pages:
-	 *	WT_PAGE_ROW_LEAF
-	 * because row-store leaf pages reference off-page duplicate trees.
-	 */
-	union {
-		WT_REF	 *ref;		/* Internal page references */
-#define	WT_PAGE_DUP_TREES(p)		((p)->u3.dup != NULL)
-		WT_REF	**dup;		/* Row-store off-page duplicate trees */
-	} u3;
 };
-
 /*
  * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure
  * the compiler hasn't inserted padding.  The WT_PAGE structure is in-memory, so
@@ -293,11 +275,11 @@ struct __wt_page {
  * that into account.
  */
 #define	WT_PAGE_SIZE							\
-    WT_ALIGN((6 * sizeof(void *) + 9 * sizeof(uint32_t)), sizeof(void *))
+    WT_ALIGN((6 * sizeof(void *) + 8 * sizeof(uint32_t)), sizeof(void *))
 
 /*
- * There are 4 different arrays which map one-to-one to the original on-disk
- * index: repl, rleexp, ref and dup.
+ * There are 3 different arrays which map one-to-one to the original on-disk
+ * index: ref, repl and rleexp.
  *
  * The WT_{COL,ROW}_SLOT macros return the appropriate array slot based on a
  * WT_{COL,ROW} reference.
@@ -312,8 +294,8 @@ struct __wt_page {
  * individually allocated structures.  The WT_{COL,ROW}_REF macros return
  * the appropriate entry based on a WT_{COL,ROW} reference.
  */
-#define	WT_COL_REF(page, ip)	(&((page)->u3.ref[WT_COL_SLOT(page, ip)]))
-#define	WT_ROW_REF(page, ip)	(&((page)->u3.ref[WT_ROW_SLOT(page, ip)]))
+#define	WT_COL_REF(page, ip)	(&((page)->u2.ref[WT_COL_SLOT(page, ip)]))
+#define	WT_ROW_REF(page, ip)	(&((page)->u2.ref[WT_ROW_SLOT(page, ip)]))
 
 /*
  * The other arrays may not exist, and are arrays of pointers to individually
@@ -327,7 +309,6 @@ struct __wt_page {
 #define	__WT_ROW_ARRAY(page, ip, field)					\
 	((page)->field == NULL ? NULL : (page)->field[WT_ROW_SLOT(page, ip)])
 #define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u2.repl)
-#define	WT_ROW_DUP(page, ip)	__WT_ROW_ARRAY(page, ip, u3.dup)
 
 /*
  * WT_REF --
@@ -360,13 +341,12 @@ struct __wt_page {
  */
 struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
-
-/*
- * !!!
- * WT_REF_DISK has a value of 0: if we forget to initialize a WT_REF structure
- * in the code somewhere, we'll be in the correct default state (as long as the
- * memory was cleared during allocation).
- */
+	/*
+	 * !!!
+	 * WT_REF_DISK has a value of 0: if we forget to initialize a WT_REF
+	 * structure in the code somewhere, we'll be in the correct default
+	 * state (as long as the memory was cleared during allocation).
+	 */
 #define	WT_REF_CACHE	1		/* Page is in cache */
 #define	WT_REF_DISK	0		/* Page is on disk */
 #define	WT_REF_EVICT	2		/* Cache page selected for eviction */
@@ -405,8 +385,6 @@ struct __wt_repl {
  * layout.  (The page type appears early in the header to make this simpler.)
  * In other words, the page type declares the contents of the page and how to
  * read it.
- *
- * For more information on page layouts and types, see the file btree_layout.
  */
 struct __wt_page_disk {
 	/*
@@ -430,17 +408,15 @@ struct __wt_page_disk {
 		uint32_t datalen;	/* 20-23: overflow data length */
 	} u;
 
-#define	WT_PAGE_INVALID		 0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		 1	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		 2	/* Col store internal page */
-#define	WT_PAGE_COL_RLE		 3	/* Col store run-length encoded leaf */
-#define	WT_PAGE_COL_VAR		 4	/* Col store var-length leaf page */
-#define	WT_PAGE_DUP_INT		 5	/* Duplicate tree internal page */
-#define	WT_PAGE_DUP_LEAF	 6	/* Duplicate tree leaf page */
-#define	WT_PAGE_OVFL		 7	/* Page of untyped data */
-#define	WT_PAGE_ROW_INT		 8	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	 9	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	10	/* Free-list page */
+#define	WT_PAGE_INVALID		0	/* Invalid page */
+#define	WT_PAGE_COL_FIX		1	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		2	/* Col store internal page */
+#define	WT_PAGE_COL_RLE		3	/* Col store run-length encoded leaf */
+#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Page of untyped data */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
+#define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* 24: page type */
 
 	/*
@@ -608,15 +584,7 @@ struct __wt_rle_expand {
 	    (i) > 0;							\
 	    ++(rip),							\
 	    key_item = --(i) == 0 ?					\
-	    NULL : __wt_key_item_next(page, rip, key_item))
-
-/*
- * WT_ROW_INDX_IS_DUPLICATE --
- *	Compare the WT_ROW entry against the previous entry and return 1 if
- *	it's a duplicate key.
- */
-#define	WT_ROW_INDX_IS_DUPLICATE(page, ip)				\
-	(((ip) > (page)->u.irow && (ip)->key == ((ip) - 1)->key) ? 1 : 0)
+	    NULL : WT_ITEM_NEXT(WT_ITEM_NEXT(key_item)))
 
 /*
  * WT_REPL_FOREACH --
@@ -641,30 +609,18 @@ struct __wt_rle_expand {
  */
 #define	WT_REF_FOREACH(page, ref, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (ref) = (page)->u3.ref; (i) > 0; ++(ref), --(i))
-
-/*
- * WT_DUP_FOREACH --
- * Macro to walk the off-page duplicate array of an in-memory row-store page.
- */
-#define	WT_DUP_FOREACH(page, dupp, i)					\
-	for ((i) = (page)->indx_count,					\
-	    (dupp) = (page)->u3.dup; (i) > 0; ++(dupp), --(i))
+	    (ref) = (page)->u2.ref; (i) > 0; ++(ref), --(i))
 
 /*
  * On row-store internal pages, the on-page data referenced by the WT_ROW field
  * is a WT_OFF structure, which contains a page addr/size pair.
- */
-#define	WT_ROW_OFF(ip)							\
-	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
-#define	WT_ROW_OFF_RECORD(ip)						\
-	((WT_OFF_RECORD *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
-
-/*
+ *
  * On column-store internal pages, the on-page data referenced by the WT_COL
  * field is a WT_OFF_RECORD structure which contains a page addr/size pair
  * and a total record count.
  */
+#define	WT_ROW_OFF(ip)							\
+	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 #define	WT_COL_OFF(ip)							\
 	((WT_OFF_RECORD *)(((WT_COL *)ip)->data))
 #define	WT_COL_OFF_RECORDS(ip)						\
@@ -707,90 +663,53 @@ struct __wt_item {
 #define	WT_ITEM_SIZE	4
 
 /*
- * There are 4 basic types: keys, duplicate keys, data items and duplicate data
- * items, each of which has an overflow form.  Items are followed by additional
- * data, which varies by type: a key, duplicate key, data or duplicate item is
- * followed by a set of bytes; a WT_OVFL structure follows an overflow form.
- * There are 2 additional types: (1) a deleted type (a place-holder for deleted
+ * There are 2 basic types: key and data items, each of which has an overflow
+ * form.  Items are followed by additional data, which varies by type: a key
+ * or data item is followed by a set of bytes; a WT_OVFL structure follows an
+ * overflow form.
+ *
+ * There are 3 additional types: (1) a deleted type (a place-holder for deleted
  * items where the item cannot be removed, for example, an column-store item
- * that must remain to preserve the record count); (2a) a subtree reference for
+ * that must remain to preserve the record count); (2) a subtree reference for
  * keys that reference subtrees without an associated record count (a row-store
- * internal page has a key/reference pairs for the tree containing all key/data
- * pairs greater than the key); (2b) a subtree reference for keys that reference
+ * internal page has a key/reference pair for the tree containing all key/data
+ * pairs greater than the key); (3) a subtree reference for keys that reference
  * subtrees with an associated record count (a column-store internal page has
  * a reference for the tree containing all records greater than the specified
- * record, or leaf Btree pages where a key references a set of duplicate data
- * items for the key when the duplicate data items no longer fit onto the leaf
- * page itself -- offpage duplicate data sets are counted, which is why Btree
- * leaf pages fall under 2b, and not 2a).
+ * record).
  *
  * Here's the usage by page type:
  *
  * WT_PAGE_ROW_INT (row-store internal pages):
- * -- Variable-length key and offpage-reference pairs (a WT_ITEM_KEY or
- *    WT_ITEM_KEY_OVFL item, followed by a WT_ITEM_OFF item).
- *
- * WT_PAGE_ROW_LEAF (row-store leaf pages):
- * -- Variable-length key and variable-length/data pairs (a WT_ITEM_KEY or
- *    WT_ITEM_KEY_OVFL item followed by a WT_ITEM_DATA or WT_ITEM_DATA_OVFL
- *    item);
- * -- Variable-length key and set of duplicates moved into a separate tree
- *    (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL item followed by a WT_ITEM_OFF_RECORD
- *    item);
- * -- Variable-length key and set of duplicates not yet moved into a separate
- *    tree (a WT_ITEM_KEY/KEY_OVFL item followed by two or more WT_ITEM_DATA_DUP
- *    or WT_ITEM_DATA_DUP_OVFL items).
- *
- * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
- * -- Variable-length duplicate key and offpage-reference pairs (a
- *    WT_ITEM_KEY_DUP or WT_ITEM_KEY_DUP_OVFL item followed by a
- *    WT_ITEM_OFF item).
- *
- * WT_PAGE_DUP_LEAF (row-store offpage duplicates leaf pages):
- * -- Variable-length data items (WT_ITEM_DATA_DUP/DUP_OVFL_ITEM).
- *
- * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length items):
- * -- Variable-length data items (WT_ITEM_DATA/DATA_OVFL/DEL).
+ *	Variable-length keys with offpage-reference pairs (a WT_ITEM_KEY or
+ *	WT_ITEM_KEY_OVFL item, followed by a WT_ITEM_OFF item).
  *
  * WT_PAGE_COL_INT (Column-store internal page):
+ *	Fixed-length WT_OFF_RECORDS structures.
+ *
+ * WT_PAGE_ROW_LEAF (row-store leaf pages):
+ *	Variable-length key and data pairs (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL
+ *	item, followed by a WT_ITEM_DATA or WT_ITEM_DATA_OVFL item).
+ *
  * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length items):
  * WT_PAGE_COL_RLE (Column-store leaf page storing fixed-length items):
+ *	Fixed-sized data items.
+ *
  * WT_PAGE_OVFL (Overflow page):
- *	These pages contain fixed-sized structures (WT_PAGE_COL_{INT,FIX,RLE}),
- *	or a string of bytes (WT_PAGE_OVFL), not WT_ITEM structures.
+ *	A string of bytes.
  *
- * There are currently 11 item types, using 4 bits, with 5 values unused.  If
- * we run out of bits, we could compress the item types in a couple of ways:
+ * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length items):
+ *	Variable-length data items (WT_ITEM_DATA/DATA_OVFL/DEL).
  *
- * We could merge the WT_ITEM_KEY and WT_ITEM_KEY_DUP types, but that requires
- * we know the page's type in order to know how an item might be encoded (that
- * is, if it's an off-page duplicate key, it's encoded using the Huffman data
- * coder, or if it's a Btree row-store key, it's encoded using the Huffman key
- * encoder).
- *
- * We could use a single bit to mean overflow, merging all overflow types into
- * that bit plus the "primary" item type, but that requires more bit shuffling
- * than the current scheme.
- *
- * We could combine WT_ITEM_OFF and WT_ITEM_OFF_RECORD types, again, by using
- * the underlying page type to know what kind of off-page reference it is (if
- * it's a row-store leaf or column-store internal, it's a WT_ITEM_OFF_RECORD,
- * if it's a row-store internal, it's a WT_ITEM_OFF).
- *
- * All of these changes require some amount of compatibility work because they
- * involved on-page format information.
+ * There are currently 7 item types, using 3 bits, with 5 spares.
  */
 #define	WT_ITEM_KEY		0x00000000 /* Key */
 #define	WT_ITEM_KEY_OVFL	0x01000000 /* Key: overflow */
-#define	WT_ITEM_KEY_DUP		0x02000000 /* Key: dup internal tree */
-#define	WT_ITEM_KEY_DUP_OVFL	0x03000000 /* Key: dup internal tree overflow */
-#define	WT_ITEM_DATA		0x04000000 /* Data */
-#define	WT_ITEM_DATA_OVFL	0x05000000 /* Data: overflow */
-#define	WT_ITEM_DATA_DUP	0x06000000 /* Data: duplicate */
-#define	WT_ITEM_DATA_DUP_OVFL	0x07000000 /* Data: duplicate overflow */
-#define	WT_ITEM_DEL		0x08000000 /* Deleted */
-#define	WT_ITEM_OFF		0x09000000 /* Off-page reference */
-#define	WT_ITEM_OFF_RECORD	0x0a000000 /* Off-page reference with records */
+#define	WT_ITEM_DATA		0x02000000 /* Data */
+#define	WT_ITEM_DATA_OVFL	0x03000000 /* Data: overflow */
+#define	WT_ITEM_DEL		0x04000000 /* Deleted */
+#define	WT_ITEM_OFF		0x05000000 /* Off-page reference */
+#define	WT_ITEM_OFF_RECORD	0x06000000 /* Off-page reference with records */
 
 #define	WT_ITEM_TYPE(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x0f000000)
@@ -834,7 +753,7 @@ struct __wt_item {
 /* WT_ITEM_FOREACH is a loop that walks the items on a page */
 #define	WT_ITEM_FOREACH(dsk, item, i)					\
 	for ((item) = (WT_ITEM *)WT_PAGE_DISK_BYTE(dsk),		\
-	    (i) = dsk->u.entries;					\
+	    (i) = (dsk)->u.entries;					\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
 
 /*
@@ -842,9 +761,8 @@ struct __wt_item {
  *	Row-store internal pages reference subtrees with no record count.
  *
  * WT_OFF_RECORD --
- *	Column-store internal pages, and row-store leaf pages with offpage
- * duplicate references, reference subtrees, including total record counts
- * for the subtree.
+ *      Column-store internal pages reference subtrees including total record
+ *	counts for the subtree.
  *
  * !!!
  * Note the initial two fields of the WT_OFF and WT_OFF_RECORD fields are the
@@ -916,7 +834,7 @@ struct __wt_ovfl {
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
 #define	WT_FIX_FOREACH(db, dsk, p, i)					\
 	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = dsk->u.entries; (i) > 0; --(i),			\
+	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len)
 
 /*
@@ -925,7 +843,7 @@ struct __wt_ovfl {
  */
 #define	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)				\
 	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = dsk->u.entries; (i) > 0; --(i),			\
+	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
 	    (p) = (uint8_t *)(p) + (db)->fixed_len + sizeof(uint16_t))
 
 /*

@@ -33,8 +33,6 @@ __wt_verify_dsk_page(
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
@@ -65,13 +63,11 @@ __wt_verify_dsk_page(
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		if (dsk->level != WT_LLEAF)
 			goto err_level;
 		break;
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		if (dsk->level <= WT_LLEAF) {
 err_level:		__wt_api_db_errx(db,
@@ -95,8 +91,6 @@ err_level:		__wt_api_db_errx(db,
 	/* Verify the items on the page. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_verify_dsk_item(toc, dsk, addr, size));
@@ -128,7 +122,7 @@ static int
 __wt_verify_dsk_item(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	enum { IS_FIRST, WAS_KEY, WAS_DATA, WAS_DUP_DATA } last_item_type;
+	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
 	DB *db;
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
@@ -163,20 +157,9 @@ __wt_verify_dsk_item(
 			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_KEY_DUP:
-		case WT_ITEM_KEY_DUP_OVFL:
-			if (dsk->type != WT_PAGE_DUP_INT)
-				goto item_vs_page;
-			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 			if (dsk->type != WT_PAGE_COL_VAR &&
-			    dsk->type != WT_PAGE_ROW_LEAF)
-				goto item_vs_page;
-			break;
-		case WT_ITEM_DATA_DUP:
-		case WT_ITEM_DATA_DUP_OVFL:
-			if (dsk->type != WT_PAGE_DUP_LEAF &&
 			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
@@ -186,8 +169,7 @@ __wt_verify_dsk_item(
 				goto item_vs_page;
 			break;
 		case WT_ITEM_OFF:
-			if (dsk->type != WT_PAGE_DUP_INT &&
-			    dsk->type != WT_PAGE_ROW_INT &&
+			if (dsk->type != WT_PAGE_ROW_INT &&
 			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
@@ -222,14 +204,11 @@ item_vs_page:			__wt_api_db_errx(db,
 		/*
 		 * For row-store leaf pages, check for:
 		 *	two keys in a row,
-		 *	two non-dup data items in a row,
-		 *	inter-mixed dup and non-dup data items,
+		 *	two data items in a row,
 		 *	a data item as the first item on a page.
 		 */
 		switch (item_type) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_KEY_DUP:
-		case WT_ITEM_KEY_DUP_OVFL:
 		case WT_ITEM_KEY_OVFL:
 			if (last_item_type == WAS_KEY) {
 				__wt_api_db_errx(db,
@@ -243,10 +222,13 @@ item_vs_page:			__wt_api_db_errx(db,
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DEL:
-		case WT_ITEM_OFF_RECORD:
 			switch (last_item_type) {
 			case IS_FIRST:
-				goto first_data;
+				__wt_api_db_errx(db,
+				    "page at addr %lu begins with a "
+				    "data item",
+				    (u_long)addr);
+				return (WT_ERROR);
 			case WAS_DATA:
 				__wt_api_db_errx(db,
 				    "item %lu on page at addr %lu is "
@@ -254,32 +236,8 @@ item_vs_page:			__wt_api_db_errx(db,
 				    "items",
 				    (u_long)item_num - 1, (u_long)addr);
 				return (WT_ERROR);
-			case WAS_DUP_DATA:
-				goto mixed_order;
 			case WAS_KEY:
 				last_item_type = WAS_DATA;
-				break;
-			}
-			break;
-		case WT_ITEM_DATA_DUP:
-		case WT_ITEM_DATA_DUP_OVFL:
-			switch (last_item_type) {
-			case IS_FIRST:
-first_data:				__wt_api_db_errx(db,
-				    "page at addr %lu begins with a "
-				    "data item",
-				    (u_long)addr);
-				return (WT_ERROR);
-			case WAS_DATA:
-mixed_order:				__wt_api_db_errx(db,
-				    "item %lu on page at addr %lu is "
-				    "the first of mixed duplicate and "
-				    "non-duplicate data items",
-				    (u_long)item_num - 1, (u_long)addr);
-				return (WT_ERROR);
-			case WAS_DUP_DATA:
-			case WAS_KEY:
-				last_item_type = WAS_DUP_DATA;
 				break;
 			}
 			break;
@@ -289,15 +247,11 @@ skip_order_check:
 		/* Check the item's length. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
-		case WT_ITEM_KEY_DUP:
 		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_DUP:
 			/* The length is variable, we can't check it. */
 			break;
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_KEY_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DATA_DUP_OVFL:
 			if (item_len != sizeof(WT_OVFL))
 				goto item_len;
 			break;
@@ -329,9 +283,7 @@ item_len:			__wt_api_db_errx(db,
 		/* Check if the referenced item is entirely in the file. */
 		switch (item_type) {
 		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_KEY_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DATA_DUP_OVFL:
 			ovfl = WT_ITEM_BYTE_OVFL(item);
 			if (WT_ADDR_TO_OFF(db, ovfl->addr) +
 			    WT_HDR_BYTES_TO_ALLOC(db, ovfl->size) > file_size)

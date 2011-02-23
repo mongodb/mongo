@@ -48,13 +48,9 @@ struct __db {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * DB getter/setter variables: BEGIN
 	 */
-	int (*btree_compare_dup)(DB *, const DBT *, const DBT *);
-
 	int btree_compare_int;
 
 	int (*btree_compare)(DB *, const DBT *, const DBT *);
-
-	uint32_t btree_dup_offpage;
 
 	uint32_t intlitemsize;
 	uint32_t leafitemsize;
@@ -82,12 +78,6 @@ struct __db {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * DB methods: BEGIN
 	 */
-	int (*btree_compare_dup_get)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
-
-	int (*btree_compare_dup_set)(
-	    DB *, int (*)(DB *, const DBT *, const DBT *));
-
 	int (*btree_compare_get)(
 	    DB *, int (**)(DB *, const DBT *, const DBT *));
 
@@ -99,12 +89,6 @@ struct __db {
 
 	int (*btree_compare_set)(
 	    DB *, int (*)(DB *, const DBT *, const DBT *));
-
-	int (*btree_dup_offpage_get)(
-	    DB *, uint32_t *);
-
-	int (*btree_dup_offpage_set)(
-	    DB *, uint32_t );
 
 	int (*btree_itemsize_get)(
 	    DB *, uint32_t *, uint32_t *);
@@ -119,7 +103,7 @@ struct __db {
 	    DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t );
 
 	int (*bulk_load)(
-	    DB *, uint32_t , void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+	    DB *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
 
 	int (*close)(
 	    DB *, uint32_t );
@@ -431,11 +415,9 @@ struct __wt_toc {
 #define	WT_CREATE					0x00000001
 #define	WT_DATA_OVERWRITE				0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_DUPLICATES					0x00000001
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INSERT					0x00000001
-#define	WT_IS_DUP					0x00000001
 #define	WT_MEMORY_CHECK					0x00000001
 #define	WT_NOWRITE					0x00000002
 #define	WT_OSWRITE					0x00000001
@@ -453,15 +435,12 @@ struct __wt_toc {
 #define	WT_VERB_HAZARD					0x00000004
 #define	WT_VERB_MUTEX					0x00000002
 #define	WT_VERB_READ					0x00000001
-#define	WT_WALK_CACHE					0x00000002
-#define	WT_WALK_OFFDUP					0x00000001
+#define	WT_WALK_CACHE					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 
-#define	WT_APIMASK_BT_BUILD_DATA_ITEM			0x00000001
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
-#define	WT_APIMASK_BT_TREE_WALK				0x00000003
-#define	WT_APIMASK_DB_BULK_LOAD				0x00000001
+#define	WT_APIMASK_BT_TREE_WALK				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000003
 #define	WT_APIMASK_DB_COL_DEL				0x00000000
 #define	WT_APIMASK_DB_COL_GET				0x00000000

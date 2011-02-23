@@ -47,10 +47,9 @@ __wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 28, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 24, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
-	stats[WT_STAT_DUP_TREE].desc = "duplicate data off-page trees";
 	stats[WT_STAT_FIXED_LEN].desc = "fixed-record size";
 	stats[WT_STAT_FREELIST_ENTRIES].desc =
 	    "number of entries in the freelist";
@@ -59,7 +58,6 @@ __wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ITEM_COL_DELETED].desc =
 	    "column-store deleted data items";
 	stats[WT_STAT_ITEM_DATA_OVFL].desc = "total overflow data items";
-	stats[WT_STAT_ITEM_DUP_DATA].desc = "total duplicate data items";
 	stats[WT_STAT_ITEM_KEY_OVFL].desc = "total overflow keys";
 	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total data items";
 	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total keys";
@@ -75,8 +73,6 @@ __wt_stat_alloc_file_stats(ENV *env, WT_STATS **statsp)
 	    "column-store repeat-count compressed fixed-size leaf pages";
 	stats[WT_STAT_PAGE_COL_VARIABLE].desc =
 	    "column-store variable-size leaf pages";
-	stats[WT_STAT_PAGE_DUP_INTERNAL].desc = "duplicate internal pages";
-	stats[WT_STAT_PAGE_DUP_LEAF].desc = "duplicate leaf pages";
 	stats[WT_STAT_PAGE_OVERFLOW].desc = "overflow pages";
 	stats[WT_STAT_PAGE_ROW_INTERNAL].desc = "row-store internal pages";
 	stats[WT_STAT_PAGE_ROW_LEAF].desc = "row-store leaf pages";
@@ -90,14 +86,12 @@ void
 __wt_stat_clear_file_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
-	stats[WT_STAT_DUP_TREE].v = 0;
 	stats[WT_STAT_FIXED_LEN].v = 0;
 	stats[WT_STAT_FREELIST_ENTRIES].v = 0;
 	stats[WT_STAT_INTLMAX].v = 0;
 	stats[WT_STAT_INTLMIN].v = 0;
 	stats[WT_STAT_ITEM_COL_DELETED].v = 0;
 	stats[WT_STAT_ITEM_DATA_OVFL].v = 0;
-	stats[WT_STAT_ITEM_DUP_DATA].v = 0;
 	stats[WT_STAT_ITEM_KEY_OVFL].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_DATA].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
@@ -110,8 +104,6 @@ __wt_stat_clear_file_stats(WT_STATS *stats)
 	stats[WT_STAT_PAGE_COL_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_COL_RLE].v = 0;
 	stats[WT_STAT_PAGE_COL_VARIABLE].v = 0;
-	stats[WT_STAT_PAGE_DUP_INTERNAL].v = 0;
-	stats[WT_STAT_PAGE_DUP_LEAF].v = 0;
 	stats[WT_STAT_PAGE_OVERFLOW].v = 0;
 	stats[WT_STAT_PAGE_ROW_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_ROW_LEAF].v = 0;
@@ -123,11 +115,9 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 12, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_FILE_ALLOC].desc = "file: block allocations";
-	stats[WT_STAT_FILE_DUPLICATE_ITEMS_INSERTED].desc =
-	    "file: duplicate key/data pairs inserted";
 	stats[WT_STAT_FILE_EXTEND].desc =
 	    "file: block allocations require file extension";
 	stats[WT_STAT_FILE_FREE].desc = "file: block frees";
@@ -154,7 +144,6 @@ void
 __wt_stat_clear_db_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_FILE_ALLOC].v = 0;
-	stats[WT_STAT_FILE_DUPLICATE_ITEMS_INSERTED].v = 0;
 	stats[WT_STAT_FILE_EXTEND].v = 0;
 	stats[WT_STAT_FILE_FREE].v = 0;
 	stats[WT_STAT_FILE_HUFFMAN_DATA].v = 0;
@@ -228,22 +217,14 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 69, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 65, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
-	    "db.btree_compare_dup_get";
-	stats[WT_STAT_DB_BTREE_COMPARE_DUP_SET].desc =
-	    "db.btree_compare_dup_set";
 	stats[WT_STAT_DB_BTREE_COMPARE_GET].desc = "db.btree_compare_get";
 	stats[WT_STAT_DB_BTREE_COMPARE_INT_GET].desc =
 	    "db.btree_compare_int_get";
 	stats[WT_STAT_DB_BTREE_COMPARE_INT_SET].desc =
 	    "db.btree_compare_int_set";
 	stats[WT_STAT_DB_BTREE_COMPARE_SET].desc = "db.btree_compare_set";
-	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_GET].desc =
-	    "db.btree_dup_offpage_get";
-	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_SET].desc =
-	    "db.btree_dup_offpage_set";
 	stats[WT_STAT_DB_BTREE_ITEMSIZE_GET].desc = "db.btree_itemsize_get";
 	stats[WT_STAT_DB_BTREE_ITEMSIZE_SET].desc = "db.btree_itemsize_set";
 	stats[WT_STAT_DB_BTREE_PAGESIZE_GET].desc = "db.btree_pagesize_get";
@@ -316,14 +297,10 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 void
 __wt_stat_clear_method_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].v = 0;
-	stats[WT_STAT_DB_BTREE_COMPARE_DUP_SET].v = 0;
 	stats[WT_STAT_DB_BTREE_COMPARE_GET].v = 0;
 	stats[WT_STAT_DB_BTREE_COMPARE_INT_GET].v = 0;
 	stats[WT_STAT_DB_BTREE_COMPARE_INT_SET].v = 0;
 	stats[WT_STAT_DB_BTREE_COMPARE_SET].v = 0;
-	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_GET].v = 0;
-	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_SET].v = 0;
 	stats[WT_STAT_DB_BTREE_ITEMSIZE_GET].v = 0;
 	stats[WT_STAT_DB_BTREE_ITEMSIZE_SET].v = 0;
 	stats[WT_STAT_DB_BTREE_PAGESIZE_GET].v = 0;
