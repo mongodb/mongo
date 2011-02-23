@@ -75,6 +75,29 @@ namespace mongo {
             assert(false);
         }
 
+        JSectFooter::JSectFooter(const void* begin, int len) { // needs buffer to compute hash
+            sentinel = JEntry::OpCode_Footer;
+            reserved = 0;
+            magic[0] = magic[1] = magic[2] = magic[3] = '\n';
+
+            // skip section header since size modified after hashing
+            (const char*&)begin += sizeof(JSectHeader);
+            len                 -= sizeof(JSectHeader);
+
+            md5(begin, len, hash);
+        }
+
+        bool JSectFooter::checkHash(const void* begin, int len) const {
+            // skip section header since size modified after hashing
+            // todo: skipping the header must be fixed, as we won't catch corruption of it then...
+            (const char*&)begin += sizeof(JSectHeader);
+            len                 -= sizeof(JSectHeader);
+            md5digest current;
+            md5(begin, len, current);
+            DEV log() << "checkHash len:" << len << " hash:" << toHex(hash, 16) << " current:" << toHex(current, 16) << endl;
+            return (memcmp(hash, current, sizeof(hash)) == 0);
+        }
+
         JHeader::JHeader(string fname) {
             magic[0] = 'j'; magic[1] = '\n';
             _version = CurrentVersion;
