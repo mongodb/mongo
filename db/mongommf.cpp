@@ -174,9 +174,9 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        // the mutex is to assure we get the same address on the remap
-        dbMutex.assertWriteLocked();
+        dbMutex.assertWriteLocked(); // short window where we are unmapped so must be exclusive
 
+        // the mapViewMutex is to assure we get the same address on the remap
         scoped_lock lk(mapViewMutex);
 
         clearWritableBits(oldPrivateAddr);

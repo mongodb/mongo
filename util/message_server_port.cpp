@@ -32,10 +32,11 @@ namespace mongo {
         MessageHandler * handler;
 
         void threadRun( MessagingPort * inPort) {
+            TicketHolderReleaser connTicketReleaser( &connTicketHolder );
+            
             assert( inPort );
 
             setThreadName( "conn" );
-            TicketHolderReleaser connTicketReleaser( &connTicketHolder );
 
             auto_ptr<MessagingPort> p( inPort );
 
@@ -101,6 +102,7 @@ namespace mongo {
                 boost::thread thr( boost::bind( &pms::threadRun , p ) );
             }
             catch ( boost::thread_resource_error& ) {
+                connTicketHolder.release();
                 log() << "can't create new thread, closing connection" << endl;
 
                 p->shutdown();
