@@ -574,18 +574,30 @@ __wt_evict_write(WT_TOC *toc)
 	WT_PAGE *page;
 	WT_REF *ref;
 	u_int i;
+	int update_gen;
 
 	env = toc->env;
 	cache = env->ienv->cache;
+	update_gen = 0;
 
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
 		page = ref->page;
 
-		/* Ignore dirty pages. */
+		/* Ignore clean pages. */
 		if (!WT_PAGE_IS_MODIFIED(page))
 			continue;
+
+		/*
+		 * We are going to write a page, which means any running
+		 * verification may be incorrect -- see the comment in
+		 * the WT_CACHE structure declaration for a explanation.
+		 */
+		if (!update_gen) {
+			update_gen = 1;
+			++cache->evict_rec_gen;
+		}
 
 		/*
 		 * We're using our WT_TOC handle, it needs to reference the

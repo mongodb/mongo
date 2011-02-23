@@ -13,8 +13,19 @@
  * together to make the code prettier.
  */
 typedef struct {
-	uint32_t frags;				/* Total frags */
+	uint32_t  frags;			/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
+
+	/*
+	 * When tree verification starts, copy the eviction generation number,
+	 * updated by the eviction thread before it writes pages.  The problem
+	 * is we have to turn off our checks that every fragment in a file is
+	 * verified once (and only once) if the eviction thread writes pages,
+	 * because we can race with the eviction thread.
+	 */
+#define	WT_EVICT_CURRENT(toc, vs)					\
+	((vs)->evict_rec_gen == (toc)->env->ienv->cache->evict_rec_gen)
+	uint64_t  evict_rec_gen;		/* Eviction generation */
 
 	FILE	*stream;			/* Dump file stream */
 
@@ -25,7 +36,7 @@ typedef struct {
 } WT_VSTUFF;
 
 static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_checkfrag(DB *, WT_VSTUFF *);
+static int __wt_verify_checkfrag(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_key_order(WT_TOC *, WT_PAGE *);
 static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
@@ -65,10 +76,7 @@ __wt_verify(
 	idb = db->idb;
 	ret = 0;
 
-	memset(&vstuff, 0, sizeof(vstuff));
-	vstuff.stream = stream;
-	vstuff.f = f;
-
+	WT_CLEAR(vstuff);
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
 	 * size piece of the file.   This is how we track the parts of the file
@@ -90,6 +98,9 @@ __wt_verify(
 		goto err;
 	}
 	WT_ERR(bit_alloc(env, vstuff.frags, &vstuff.fragbits));
+	vstuff.evict_rec_gen = toc->env->ienv->cache->evict_rec_gen;
+	vstuff.stream = stream;
+	vstuff.f = f;
 
 	/*
 	 * The first sector of the file is the description record -- ignore
@@ -103,7 +114,7 @@ __wt_verify(
 
 	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
-	WT_ERR(__wt_verify_checkfrag(db, &vstuff));
+	WT_ERR(__wt_verify_checkfrag(toc, &vstuff));
 
 err:	/* Wrap up reporting and free allocated memory. */
 	if (vstuff.f != NULL)
@@ -610,14 +621,34 @@ err:	__wt_scr_release(&scratch1);
 static int
 __wt_verify_freelist(WT_TOC *toc, WT_VSTUFF *vs)
 {
+	ENV *env;
 	IDB *idb;
+	WT_CACHE *cache;
 	WT_FREE_ENTRY *fe;
+	int ret;
 
+	env = toc->env;
 	idb = toc->db->idb;
+	cache = env->ienv->cache;
+	ret = 0;
 
+	/*
+	 * If the eviction thread ran during verification, these checks aren't
+	 * possible.
+	 */
+	if (!WT_EVICT_CURRENT(toc, vs))
+		return (0);
+
+	/*
+	 * Lock out the eviction thread -- we're going to read through the
+	 * freelist, and that's owned and operated by the eviction thread.
+	 */
+	__wt_lock(env, cache->mtx_reconcile);
 	TAILQ_FOREACH(fe, &idb->freeqa, qa)
-		WT_RET(__wt_verify_addfrag(toc, fe->addr, fe->size, vs));
-	return (0);
+		WT_TRET(__wt_verify_addfrag(toc, fe->addr, fe->size, vs));
+	__wt_unlock(env, cache->mtx_reconcile);
+
+	return (ret);
 }
 
 /*
@@ -633,13 +664,20 @@ __wt_verify_addfrag(WT_TOC *toc, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 
 	db = toc->db;
 
+	/*
+	 * If the eviction thread ran during verification, these checks aren't
+	 * possible.
+	 */
+	if (!WT_EVICT_CURRENT(toc, vs))
+		return (0);
+
 	frags = WT_OFF_TO_ADDR(db, size);
 	for (i = 0; i < frags; ++i)
 		if (bit_test(vs->fragbits, addr + i)) {
 			__wt_api_db_errx(db,
 			    "page fragment at addr %lu already verified",
 			    (u_long)addr);
-			return (0);
+			return (WT_ERROR);
 		}
 	bit_nset(vs->fragbits, addr, addr + (frags - 1));
 	return (0);
@@ -650,12 +688,21 @@ __wt_verify_addfrag(WT_TOC *toc, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_verify_checkfrag(DB *db, WT_VSTUFF *vs)
+__wt_verify_checkfrag(WT_TOC *toc, WT_VSTUFF *vs)
 {
+	DB *db;
 	int ffc, ffc_start, ffc_end, frags, ret;
 
+	db = toc->db;
 	frags = (int)vs->frags;		/* XXX: bitstring.h wants "ints" */
 	ret = 0;
+
+	/*
+	 * If the eviction thread ran during verification, these checks aren't
+	 * possible.
+	 */
+	if (!WT_EVICT_CURRENT(toc, vs))
+		return (0);
 
 	/* Check for page fragments we haven't verified. */
 	for (ffc_start = ffc_end = -1;;) {

@@ -73,6 +73,19 @@ struct __wt_cache {
 	u_int volatile evict_sleeping;	/* Sleeping */
 
 	/*
+	 * Eviction reconciliation generation: maintained for the verification
+	 * code.  The verification code wants to ensure every fragment in the
+	 * file is verified exactly once.  The problem is that if eviction runs
+	 * during verification, it's possible for a fragment to be free'd and
+	 * verified twice (once while in the tree, and once while on the
+	 * free-list), or to be free'd and never verified (if the check of the
+	 * free-list races with the eviction), and so on and so forth.  For that
+	 * reason, we turn off the check for verification of the entire file if
+	 * any blocks were re-written during verification.
+	 */
+	uint64_t volatile evict_rec_gen;
+
+	/*
 	 * The I/O thread sets/clears the read_sleeping flag when blocked on the
 	 * mtx_read mutex.  The cache thread uses the read_sleeping flag to wake
 	 * the I/O thread as necessary.
