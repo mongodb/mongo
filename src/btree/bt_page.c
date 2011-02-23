@@ -364,15 +364,11 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * overflow (WT_ITEM_KEY_OVFL) items, data are either a single on-page
 	 * (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item.
 	 */
-	rip = NULL;
+	rip = page->u.irow;
 	WT_ITEM_FOREACH(dsk, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
-			if (rip == NULL)
-				rip = page->u.irow;
-			else
-				++rip;
 			if (idb->huffman_key != NULL ||
 			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
 				__wt_key_set_process(rip, item);
@@ -383,6 +379,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 			rip->data = item;
+			++rip;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
