@@ -11,6 +11,8 @@ int
 __wt_block_read(WT_TOC *toc);
 int
 __wt_block_write(WT_TOC *toc);
+void
+__wt_debug_block(WT_TOC *toc);
 int
 __wt_db_bulk_load(WT_TOC *toc,
     void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
