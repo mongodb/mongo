@@ -699,7 +699,6 @@ static int
 __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
-	enum { KEY_ON_PAGE, KEY_NONE } key_loc;
 	DBT *key, key_dbt, *data, data_dbt;
 	WT_ITEM data_item, *key_item;
 	WT_OVFL data_ovfl;
@@ -774,17 +773,8 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 		/* Take the key's WT_ITEM from the original page. */
 		key->data = key_item;
-		key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
-		key_loc = KEY_ON_PAGE;
+		len = key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
 
-		len = 0;
-		switch (key_loc) {
-		case KEY_ON_PAGE:
-			len = key->size;
-			break;
-		case KEY_NONE:
-			break;
-		}
 		switch (data_loc) {
 		case DATA_OFF_PAGE:
 			len += WT_ITEM_SPACE_REQ(data->size);
@@ -806,16 +796,12 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			__wt_abort(toc->env);
 		}
 
-		switch (key_loc) {
-		case KEY_ON_PAGE:
-			memcpy(first_free, key->data, key->size);
-			first_free += key->size;
-			space_avail -= key->size;
-			++dsk->u.entries;
-			break;
-		case KEY_NONE:
-			break;
-		}
+		/* Copy the key onto the page. */
+		memcpy(first_free, key->data, key->size);
+		first_free += key->size;
+		space_avail -= key->size;
+		++dsk->u.entries;
+
 		switch (data_loc) {
 		case DATA_ON_PAGE:
 			memcpy(first_free, data->data, data->size);
