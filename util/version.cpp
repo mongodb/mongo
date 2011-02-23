@@ -26,7 +26,7 @@
 
 namespace mongo {
 
-    const char versionString[] = "1.8.0-rc0";
+    const char versionString[] = "1.8.0-rc1-pre-";
 
     string mongodVersion() {
         stringstream ss;
