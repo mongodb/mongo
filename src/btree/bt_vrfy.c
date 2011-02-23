@@ -675,7 +675,7 @@ __wt_verify_addfrag(WT_TOC *toc, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 	for (i = 0; i < frags; ++i)
 		if (bit_test(vs->fragbits, addr + i)) {
 			__wt_api_db_errx(db,
-			    "page fragment at addr %lu already verified",
+			    "file fragment at addr %lu already verified",
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
@@ -704,7 +704,7 @@ __wt_verify_checkfrag(WT_TOC *toc, WT_VSTUFF *vs)
 	if (!WT_EVICT_CURRENT(toc, vs))
 		return (0);
 
-	/* Check for page fragments we haven't verified. */
+	/* Check for file fragments we haven't verified. */
 	for (ffc_start = ffc_end = -1;;) {
 		bit_ffc(vs->fragbits, frags, &ffc);
 		if (ffc != -1) {
@@ -721,11 +721,11 @@ __wt_verify_checkfrag(WT_TOC *toc, WT_VSTUFF *vs)
 		if (ffc_start != -1) {
 			if (ffc_start == ffc_end)
 				__wt_api_db_errx(db,
-				    "fragment %d was never verified",
+				    "file fragment %d was never verified",
 				    ffc_start);
 			else
 				__wt_api_db_errx(db,
-				    "fragments %d to %d were never verified",
+				    "file fragments %d-%d were never verified",
 				    ffc_start, ffc_end);
 			ret = WT_ERROR;
 		}
