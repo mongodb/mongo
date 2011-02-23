@@ -56,7 +56,6 @@ __wt_desc_read(WT_TOC *toc)
 	db->leafmin = desc.leafmin;
 	db->idb->root_off.addr = desc.root_addr;
 	db->idb->root_off.size = desc.root_size;
-	WT_RECORDS(&db->idb->root_off) = desc.records;
 	db->idb->free_off.addr = desc.free_addr;
 	db->idb->free_off.size = desc.free_size;
 	db->fixed_len = desc.fixed_len;
@@ -98,7 +97,6 @@ __wt_desc_write(WT_TOC *toc)
 	desc.recno_offset = 0;
 	desc.root_addr = idb->root_off.addr;
 	desc.root_size = idb->root_off.size;
-	desc.records = WT_RECORDS(&idb->root_off);
 	desc.free_addr = idb->free_off.addr;
 	desc.free_size = idb->free_off.size;
 	desc.fixed_len = (uint8_t)db->fixed_len;

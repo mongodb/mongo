@@ -156,7 +156,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	expsort = NULL;
 	n_expsort = 0;
 
-	recno = page->dsk->start_recno;
+	recno = page->dsk->recno;
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for

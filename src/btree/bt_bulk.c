@@ -30,7 +30,7 @@ static int __wt_bulk_fix(WT_TOC *, void (*)(const char *,
 		uint64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
-static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, uint64_t, WT_STACK *, u_int);
+static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
 		WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
 static int __wt_bulk_stack_put(WT_TOC *, WT_STACK *);
@@ -114,7 +114,7 @@ __wt_bulk_fix(WT_TOC *toc,
 	WT_ERR(__wt_bulk_scratch_page(toc, db->leafmin,
 	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	dsk = page->dsk;
-	dsk->start_recno = 1;
+	dsk->recno = 1;
 	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 
@@ -156,7 +156,6 @@ __wt_bulk_fix(WT_TOC *toc,
 			if (*last_repeat < UINT16_MAX &&
 			    memcmp(last_data, data->data, data->size) == 0) {
 				++*last_repeat;
-				++page->records;
 				continue;
 			}
 
@@ -171,20 +170,15 @@ __wt_bulk_fix(WT_TOC *toc,
 			 * to its parent and discard it, then switch to the new
 			 * page.
 			 */
-			WT_ERR(__wt_bulk_promote(
-			    toc, page, page->records, &stack, 0));
+			WT_ERR(__wt_bulk_promote(toc, page, &stack, 0));
 			WT_ERR(__wt_page_write(toc, page));
 			dsk->u.entries = 0;
-			page->records = 0;
-			dsk->start_recno = insert_cnt;
-			WT_ERR(
-			    __wt_block_alloc(toc, &page->addr, db->leafmin));
+			dsk->recno = insert_cnt;
+			WT_ERR(__wt_block_alloc(toc, &page->addr, db->leafmin));
 			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 		}
-
 		++dsk->u.entries;
-		++page->records;
 
 		/*
 		 * Copy the data item onto the page -- if doing run-length
@@ -209,7 +203,7 @@ __wt_bulk_fix(WT_TOC *toc,
 
 	/* Promote a key from any partially-filled page and write it. */
 	if (dsk->u.entries != 0) {
-		ret = __wt_bulk_promote(toc, page, page->records, &stack, 0);
+		ret = __wt_bulk_promote(toc, page, &stack, 0);
 		WT_ERR(__wt_page_write(toc, page));
 	}
 
@@ -266,7 +260,7 @@ __wt_bulk_var(WT_TOC *toc,
 	__wt_set_ff_and_sa_from_offset(
 	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
 	if (is_column)
-		page->dsk->start_recno = 1;
+		page->dsk->recno = 1;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (F_ISSET(idb, WT_COLUMN) ) {
@@ -331,8 +325,7 @@ __wt_bulk_var(WT_TOC *toc,
 			 * to its parent and discard it, then switch to the new
 			 * page.
 			 */
-			WT_ERR(__wt_bulk_promote(
-			    toc, page, page->records, &stack, 0));
+			WT_ERR(__wt_bulk_promote(toc, page, &stack, 0));
 			WT_ERR(__wt_page_write(toc, page));
 			__wt_scr_release(&tmp);
 
@@ -350,10 +343,8 @@ __wt_bulk_var(WT_TOC *toc,
 			__wt_set_ff_and_sa_from_offset(page,
 			    WT_PAGE_BYTE(page), &first_free, &space_avail);
 			if (is_column)
-				page->dsk->start_recno = insert_cnt;
+				page->dsk->recno = insert_cnt;
 		}
-
-		++page->records;
 
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
@@ -381,7 +372,7 @@ __wt_bulk_var(WT_TOC *toc,
 
 	/* Promote a key from any partially-filled page and write it. */
 	if (page->dsk->u.entries != 0) {
-		WT_ERR(__wt_bulk_promote(toc, page, page->records, &stack, 0));
+		WT_ERR(__wt_bulk_promote(toc, page, &stack, 0));
 		WT_ERR(__wt_page_write(toc, page));
 	}
 
@@ -401,8 +392,7 @@ err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
  *	Promote the first entry on a page to its parent.
  */
 static int
-__wt_bulk_promote(
-    WT_TOC *toc, WT_PAGE *page, uint64_t incr, WT_STACK *stack, u_int level)
+__wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, WT_STACK *stack, u_int level)
 {
 	DB *db;
 	DBT *key, key_build, *next_tmp;
@@ -578,7 +568,7 @@ split:		switch (dsk->type) {
 		 * the type of the file, it's simpler to just promote 0 up the
 		 * tree in in row-store files.
 		 */
-		next->dsk->start_recno = page->dsk->start_recno;
+		next->dsk->recno = page->dsk->recno;
 
 		/*
 		 * If we don't have a parent page, it's case #1 -- allocate the
@@ -600,7 +590,7 @@ split:		switch (dsk->type) {
 			 */
 			if (stack->elem[level + 1].page == NULL)
 				WT_ERR(__wt_bulk_promote(
-				    toc, parent, incr, stack, level + 1));
+				    toc, parent, stack, level + 1));
 			need_promotion = 1;
 
 			/* Write the last parent page, we have a new one. */
@@ -633,11 +623,14 @@ split:		switch (dsk->type) {
 		if (elem->space_avail < sizeof(WT_OFF_RECORD))
 			goto split;
 
-		/* Create the WT_OFF_RECORD reference. */
-		WT_RECORDS(&off_record) = page->records;
+		/*
+		 * Create the WT_OFF_RECORD reference, taking the starting recno
+		 * from the child page.
+		 */
 		off_record.addr = page->addr;
 		off_record.size =
 		    dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		WT_RECNO(&off_record) = page->dsk->recno;
 
 		/* Store the data item. */
 		++parent->dsk->u.entries;
@@ -680,28 +673,12 @@ split:		switch (dsk->type) {
 		break;
 	}
 
-	parent->records += page->records;
-
 	/*
 	 * The promotion for case #2 and the second part of case #3 -- promote
 	 * the key from the newly allocated internal page to its parent.
 	 */
 	if (need_promotion)
-		WT_RET(__wt_bulk_promote(toc, parent, incr, stack, level + 1));
-	else {
-		/*
-		 * We've finished promoting the new page's key into the tree.
-		 * What remains is to push the new record counts all the way
-		 * to the root.  We've already corrected our current "parent"
-		 * page, so proceed from there to the root.
-		 */
-		for (elem =
-		    &stack->elem[level + 1]; elem->page != NULL; ++elem)
-			if (elem->page->dsk->type == WT_PAGE_COL_INT) {
-				elem->page->records += incr;
-				WT_RECORDS((WT_OFF_RECORD *)elem->data) += incr;
-			}
-	}
+		WT_RET(__wt_bulk_promote(toc, parent, stack, level + 1));
 
 err:	if (next_tmp != NULL)
 		__wt_scr_release(&next_tmp);
@@ -983,7 +960,7 @@ __wt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 		if ((elem + 1)->page == NULL) {
 			idb->root_off.addr = elem->page->addr;
 			idb->root_off.size = elem->page->size;
-			WT_RECORDS(&idb->root_off) = elem->page->records;
+			WT_RECNO(&idb->root_off) = elem->page->dsk->recno;
 			WT_TRET(__wt_desc_write(toc));
 		}
 

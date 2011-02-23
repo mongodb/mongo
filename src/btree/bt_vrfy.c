@@ -33,8 +33,8 @@ static int __wt_verify_overflow_common(
 		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_overflow_row(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_pc(WT_TOC *, WT_ROW *, WT_PAGE *, int);
-static int __wt_verify_tree(WT_TOC *,
-		WT_ROW *, uint64_t, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
+static int __wt_verify_tree(
+		WT_TOC *, WT_ROW *, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -98,8 +98,8 @@ __wt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(toc, NULL, WT_RECORDS(&idb->root_off),
-	    (uint64_t)1, WT_NOLEVEL, &idb->root_page, &vstuff));
+	WT_ERR(__wt_verify_tree(toc, NULL,
+	    WT_RECNO(&idb->root_off), WT_NOLEVEL, &idb->root_page, &vstuff));
 
 	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
@@ -125,8 +125,7 @@ static int
 __wt_verify_tree(
     WT_TOC *toc,		/* Thread of control */
     WT_ROW *parent_rip,		/* Internal key referencing this page, if any */
-    uint64_t parent_records,	/* Parent's count of records in this tree */
-    uint64_t start_recno,	/* First record on this page */
+    uint64_t parent_recno,	/* First record in this subtree */
     uint32_t level,		/* Page's tree level */
     WT_REF *ref,		/* Already verified page reference */
     WT_VSTUFF *vs)		/* The verify package */
@@ -138,9 +137,8 @@ __wt_verify_tree(
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
-	uint64_t records;
 	uint32_t i;
-	int is_root, ret;
+	int ret;
 
 	db = toc->db;
 	page = ref->page;
@@ -154,10 +152,10 @@ __wt_verify_tree(
 	/* Update frags list. */
 	WT_ERR(__wt_verify_addfrag(toc, page->addr, page->size, vs));
 
-#ifdef DIAGNOSTIC
+#ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (vs->stream != NULL)
-		return (__wt_debug_page(toc, page, NULL, vs->stream));
+		WT_ERR(__wt_debug_page(toc, page, NULL, vs->stream));
 #endif
 
 	/*
@@ -189,59 +187,29 @@ __wt_verify_tree(
 	 * If it's the root, use this page's level to initialize expected the
 	 * values for the rest of the tree.
 	 */
-	is_root = level == WT_NOLEVEL ? 1 : 0;
-	if (is_root)
+	if (level == WT_NOLEVEL)
 		level = dsk->level;
-
-	/* Check that tree levels and record counts match up. */
-	if (dsk->level != level) {
+	else if (level != dsk->level) {
 		__wt_api_db_errx(db,
-		    "page at addr %lu has a tree level of %lu where the "
+		    "page at addr %lu has a tree level of %lu when the "
 		    "expected level was %lu",
 		    (u_long)page->addr, (u_long)dsk->level, (u_long)level);
 		goto err;
 	}
 
-	/*
-	 * Check the starting record number and record counts.
-	 *
-	 * Confirm the number of records found on this page (by summing the
-	 * WT_OFF_RECORD structure record counts) matches the WT_OFF_RECORD
-	 * structure record count in our parent.  Use the in-memory record
-	 * count for internal pages -- we could sum the record counts as we
-	 * walk the page below, but we did that when building the in-memory
-	 * version of the page, there's no reason to do it again.
-	 */
+	/* Check the starting record number. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		if (dsk->start_recno != start_recno) {
+		if (parent_recno != dsk->recno) {
 			__wt_api_db_errx(db,
 			    "page at addr %lu has a starting record of %llu "
 			    "where the expected starting record was %llu",
 			    (u_long)page->addr,
-			    (unsigned long long)dsk->start_recno,
-			    (unsigned long long)start_recno);
-			goto err;
-		}
-		if (page->records != parent_records) {
-			__wt_api_db_errx(db,
-			    "page at addr %lu has a record count of %llu where "
-			    "the expected record count was %llu",
-			    (u_long)page->addr, page->records,
-			    (unsigned long long)parent_records);
-			goto err;
-		}
-		break;
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		if (page->records != 0) {
-			__wt_api_db_errx(db,
-			    "page at addr %lu has a record count of %llu where "
-			    "no record count was expected",
-			    (u_long)page->addr, page->records);
+			    (unsigned long long)dsk->recno,
+			    (unsigned long long)parent_recno);
 			goto err;
 		}
 		break;
@@ -284,18 +252,16 @@ __wt_verify_tree(
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
-		start_recno = dsk->start_recno;
 		WT_INDX_FOREACH(page, cip, i) {
-			records = WT_COL_OFF_RECORDS(cip);
-
 			/* cip references the subtree containing the record */
 			ref = WT_COL_REF(page, cip);
 			off_record = WT_COL_OFF(cip);
+			parent_recno = WT_COL_OFF_RECNO(cip);
 			switch (ret =
 			    __wt_page_in(toc, page, ref, off_record, 1)) {
 			case 0:				/* Valid page */
-				ret = __wt_verify_tree(toc, NULL,
-				    records, start_recno, level - 1, ref, vs);
+				ret = __wt_verify_tree(toc,
+				    NULL, parent_recno, level - 1, ref, vs);
 				__wt_hazard_clear(toc, ref->page);
 				break;
 			case WT_PAGE_DELETED:
@@ -304,8 +270,6 @@ __wt_verify_tree(
 			}
 			if (ret != 0)
 				goto err;
-
-			start_recno += records;
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -354,8 +318,7 @@ __wt_verify_tree(
 			switch (ret = __wt_page_in(toc, page, ref, off, 1)) {
 			case 0:				/* Valid page */
 				ret = __wt_verify_tree(
-				    toc, rip, (uint64_t)0,
-				    (uint64_t)0, level - 1, ref, vs);
+				    toc, rip, (uint64_t)0, level - 1, ref, vs);
 				/*
 				 * Remaining special handling of the last
 				 * verified leaf page: if we kept a reference

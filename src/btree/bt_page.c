@@ -194,7 +194,6 @@ __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	}
 
 	page->indx_count = dsk->u.entries;
-	page->records = page->indx_count;
 }
 
 /*
@@ -207,25 +206,19 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 	WT_COL *cip;
 	WT_OFF_RECORD *off_record;
 	WT_PAGE_DISK *dsk;
-	uint64_t records;
 	uint32_t i;
 
 	dsk = page->dsk;
 	cip = page->u.icol;
-	records = 0;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains WT_OFF_RECORD structures.
 	 */
-	WT_OFF_FOREACH(dsk, off_record, i) {
-		cip->data = off_record;
-		++cip;
-		records += WT_RECORDS(off_record);
-	}
+	WT_OFF_FOREACH(dsk, off_record, i)
+		(cip++)->data = off_record;
 
 	page->indx_count = dsk->u.entries;
-	page->records = records;
 }
 
 /*
@@ -238,26 +231,20 @@ __wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	uint64_t records;
 	uint32_t i;
 	uint8_t *p;
 
 	dsk = page->dsk;
 	cip = page->u.icol;
-	records = 0;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	WT_RLE_REPEAT_FOREACH(db, dsk, p, i) {
-		cip->data = p;
-		++cip;
-		records += WT_RLE_REPEAT_COUNT(p);
-	}
+	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)
+		(cip++)->data = p;
 
 	page->indx_count = dsk->u.entries;
-	page->records = records;
 }
 
 /*
@@ -282,13 +269,10 @@ __wt_page_inmem_col_var(WT_PAGE *page)
 	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
 	 * (WT_ITEM_DEL) items.
 	 */
-	WT_ITEM_FOREACH(dsk, item, i) {
-		cip->data = item;
-		++cip;
-	}
+	WT_ITEM_FOREACH(dsk, item, i)
+		(cip++)->data = item;
 
 	page->indx_count = dsk->u.entries;
-	page->records = page->indx_count;
 }
 
 /*

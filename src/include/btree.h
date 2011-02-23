@@ -98,17 +98,16 @@ struct __wt_page_desc {
 	uint64_t recno_offset;		/* 24-31: Offset record number */
 	uint32_t root_addr;		/* 32-35: Root page address */
 	uint32_t root_size;		/* 36-39: Root page length */
-	uint64_t records;		/* 40-47: Offset record number */
-	uint32_t free_addr;		/* 48-51: Free list page address */
-	uint32_t free_size;		/* 52-55: Free list page length */
+	uint32_t free_addr;		/* 40-43: Free list page address */
+	uint32_t free_size;		/* 44-47: Free list page length */
 
 #define	WT_PAGE_DESC_RLE	0x01	/* Run-length encoding */
-	uint32_t flags;			/* 56-59: Flags */
+	uint32_t flags;			/* 48-51: Flags */
 
-	uint8_t  fixed_len;		/* 60: Fixed length byte count */
-	uint8_t  unused1[3];		/* 61-63: Unused */
+	uint8_t  fixed_len;		/* 52: Fixed length byte count */
+	uint8_t  unused1[3];		/* 53-55: Unused */
 
-	uint32_t unused2[112];		/* Unused */
+	uint32_t unused2[114];		/* Unused */
 };
 /*
  * WT_PAGE_DESC_SIZE is the expected structure size -- we verify the build to
@@ -128,9 +127,6 @@ struct __wt_page {
 	 */
 	uint32_t addr;			/* Original file allocation address */
 	uint32_t size;			/* Size in bytes */
-
-	/* Record count is only maintained for column-store files. */
-	uint64_t records;		/* Records in this subtree */
 
 	/*
 	 * Two links to the parent's WT_PAGE structure -- the physical parent
@@ -252,12 +248,11 @@ struct __wt_page {
 	 * Modifying (or deleting) run-length encoded column-store records is
 	 * problematical, because the index entry would no longer reference
 	 * a set of identical items.  We handle this by "inserting" a new entry
-	 * into an array that behaves much like the rinsert array.  This is the
-	 * only case where it's possible to "insert" into a column-store -- it's
-	 * normally only possible to append to a column-store as insert requires
-	 * re-numbering all subsequent records.  (Berkeley DB did support the
-	 * re-numbering functionality, but it won't perform well and it isn't
-	 * useful enough to re-implement, IMNSHO.)
+	 * into the rleexp array.  This is the only case where it's possible to
+	 * "insert" into a column-store -- it's normally only possible to append
+	 * to a column-store as insert requires re-numbering subsequent records.
+	 * (Berkeley DB did support the re-numbering functionality, but it won't
+	 * scale and it isn't useful enough to re-implement, IMNSHO.)
 	 */
 	union {
 		WT_REF	       *ref;	/* Internal: subtree references */
@@ -275,7 +270,7 @@ struct __wt_page {
  * that into account.
  */
 #define	WT_PAGE_SIZE							\
-    WT_ALIGN((6 * sizeof(void *) + 8 * sizeof(uint32_t)), sizeof(void *))
+    WT_ALIGN((6 * sizeof(void *) + 6 * sizeof(uint32_t)), sizeof(void *))
 
 /*
  * There are 3 different arrays which map one-to-one to the original on-disk
@@ -388,15 +383,12 @@ struct __wt_repl {
  */
 struct __wt_page_disk {
 	/*
-	 * The record number of the first record on the page is stored for two
-	 * reasons: first, we have to find the page's stack when reconciling
-	 * leaf pages and second, when salvaging a file it's the only way to
-	 * know where a column-store page fits in the keyspace.  (We could work
-	 * around the first reason by storing the base record number in the
-	 * WT_PAGE structure when we read a page into memory, but we can't work
-	 * around the second reason.)
+	 * The record number of the first record of the page is stored on disk
+	 * because, if the internal page referencing a column-store leaf page
+	 * is corrupted, it's the only way to know where the leaf page fits in
+	 * the keyspace during salvage.
 	 */
-	uint64_t start_recno;		/* 00-07: column-store starting recno */
+	uint64_t recno;			/* 00-07: column-store starting recno */
 
 	uint32_t lsn_file;		/* 08-11: LSN file */
 	uint32_t lsn_off;		/* 12-15: LSN file offset */
@@ -623,8 +615,8 @@ struct __wt_rle_expand {
 	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
 #define	WT_COL_OFF(ip)							\
 	((WT_OFF_RECORD *)(((WT_COL *)ip)->data))
-#define	WT_COL_OFF_RECORDS(ip)						\
-	WT_RECORDS(WT_COL_OFF(ip))
+#define	WT_COL_OFF_RECNO(ip)						\
+	WT_RECNO(WT_COL_OFF(ip))
 
 /*
  * WT_ITEM --
@@ -685,7 +677,7 @@ struct __wt_item {
  *	WT_ITEM_KEY_OVFL item, followed by a WT_ITEM_OFF item).
  *
  * WT_PAGE_COL_INT (Column-store internal page):
- *	Fixed-length WT_OFF_RECORDS structures.
+ *	Fixed-length WT_OFF_RECORD structures.
  *
  * WT_PAGE_ROW_LEAF (row-store leaf pages):
  *	Variable-length key and data pairs (a WT_ITEM_KEY or WT_ITEM_KEY_OVFL
@@ -791,7 +783,7 @@ struct __wt_off_record {
 	uint32_t addr;			/* Subtree root page address */
 	uint32_t size;			/* Subtree root page length */
 
-#define	WT_RECORDS(offp)	(*(uint64_t *)(&(offp)->__record_chunk[0]))
+#define	WT_RECNO(offp)		(*(uint64_t *)(&(offp)->__record_chunk[0]))
 	uint32_t __record_chunk[2];	/* Subtree record count */
 };
 /*

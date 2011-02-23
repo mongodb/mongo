@@ -39,13 +39,8 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 	WT_DB_FCHK(db, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
 
-	/* Check for a record past the end of the file. */
-	page = idb->root_page.page;
-	if (page->records < recno)
-		return (WT_NOTFOUND);
-
 	/* Search the tree. */
-	for (;;) {
+	for (page = idb->root_page.page;;) {
 		/*
 		 * Copy the page's write generation value before reading
 		 * anything on the page.
@@ -57,14 +52,14 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			cip = page->u.icol + (recno - dsk->start_recno);
+			cip = page->u.icol + (recno - dsk->recno);
 			goto done;
 		case WT_PAGE_COL_RLE:
 			/*
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
-			record_cnt = recno - dsk->start_recno;
+			record_cnt = recno - dsk->recno;
 			WT_INDX_FOREACH(page, cip, i) {
 				if (record_cnt < WT_RLE_REPEAT_COUNT(cip->data))
 					break;
@@ -74,15 +69,15 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		case WT_PAGE_COL_INT:
 		default:
 			/*
-			 * Walk the page, counting records -- do the record
-			 * count calculation in a funny way to avoid overflow.
+			 * Walk the page, looking for the right starting record.
+			 *
+			 * XXX
+			 * This could be a binary search.
 			 */
-			record_cnt = recno - dsk->start_recno;
-			WT_INDX_FOREACH(page, cip, i) {
-				if (record_cnt < WT_COL_OFF_RECORDS(cip))
+			WT_INDX_FOREACH(page, cip, i)
+				if (recno > WT_COL_OFF_RECNO(cip))
 					break;
-				record_cnt -= WT_COL_OFF_RECORDS(cip);
-			}
+			--cip;
 			break;
 		}
 

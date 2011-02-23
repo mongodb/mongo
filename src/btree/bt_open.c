@@ -267,6 +267,7 @@ __wt_root_pin(WT_TOC *toc)
 	 * Get the root page.  We don't check for deleted pages, the root page
 	 * had better not be deleted!
 	 */
+	WT_RECNO(&idb->root_off) = 1;
 	WT_RET(__wt_page_in(toc, NULL, &idb->root_page, &idb->root_off, 0));
 
 	WT_PAGE_SET_PIN(idb->root_page.page);

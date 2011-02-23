@@ -137,11 +137,11 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	new->addr = page->addr;
 	new->size = max;
 	new->dsk = tmp->data;
-	new->dsk->start_recno = dsk->start_recno;
-	new->dsk->type = dsk->type;
-	new->dsk->level = dsk->level;
+	new->dsk->recno = dsk->recno;
 	new->dsk->lsn_file = dsk->lsn_file;
 	new->dsk->lsn_off = dsk->lsn_off;
+	new->dsk->type = dsk->type;
+	new->dsk->level = dsk->level;
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -232,7 +232,6 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++dsk->u.entries;
 	}
 
-	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
@@ -303,7 +302,6 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		dsk->u.entries += 2;
 	}
 
-	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
@@ -374,7 +372,6 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++dsk->u.entries;
 	}
 
-	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 err:	if (tmp != NULL)
@@ -426,7 +423,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_FIX_DELETE_SET(WT_RLE_REPEAT_DATA(tmp->data));
 
 	/* Set recno to the first record on the page. */
-	recno = page->dsk->start_recno;
+	recno = page->dsk->recno;
 	WT_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for
@@ -523,7 +520,6 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
-	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 	/* Free the sort array. */
@@ -690,7 +686,6 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++dsk->u.entries;
 	}
 
-	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);
@@ -839,7 +834,6 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
-	new->records = page->records;
 	__wt_rec_set_page_size(toc, new, first_free);
 
 	return (0);

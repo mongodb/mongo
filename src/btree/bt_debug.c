@@ -98,8 +98,7 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp)
 		fprintf(fp,
 		    "%s page: starting recno %llu, level %lu, entries %lu, "
 		    "lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk),
-		    (unsigned long long)dsk->start_recno,
+		    __wt_page_type_string(dsk), (unsigned long long)dsk->recno,
 		    (u_long)dsk->level, (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
@@ -170,7 +169,7 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		fprintf(fp,
-		    ", records %llu", (unsigned long long)page->records);
+		    ", starting recno %llu", (unsigned long long)dsk->recno);
 		break;
 	default:
 		break;
@@ -255,9 +254,10 @@ __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 
 	WT_INDX_FOREACH(page, cip, i) {
 		off_record = WT_COL_OFF(cip);
-		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
+		fprintf(fp,
+		    "\toffpage: addr %lu, size %lu, starting recno %llu\n",
 		    (u_long)off_record->addr, (u_long)off_record->size,
-		    (unsigned long long)WT_RECORDS(off_record));
+		    (unsigned long long)WT_RECNO(off_record));
 	  }
 }
 
@@ -469,9 +469,10 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		break;
 	case WT_ITEM_OFF_RECORD:
 		off_record = WT_ITEM_BYTE_OFF_RECORD(item);
-		fprintf(fp, ", offpage: addr %lu, size %lu, records %llu",
+		fprintf(fp,
+		    ", offpage: addr %lu, size %lu, starting recno %llu",
 		    (u_long)off_record->addr, (u_long)off_record->size,
-		    (unsigned long long)WT_RECORDS(off_record));
+		    (unsigned long long)WT_RECNO(off_record));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -496,9 +497,10 @@ __wt_debug_dsk_col_int(WT_PAGE_DISK *dsk, FILE *fp)
 		fp = stderr;
 
 	WT_OFF_FOREACH(dsk, off_record, i)
-		fprintf(fp, "\toffpage: addr %lu, size %lu, records %llu\n",
+		fprintf(fp,
+		    "\toffpage: addr %lu, size %lu, starting recno %llu\n",
 		    (u_long)off_record->addr, (u_long)off_record->size,
-		    (unsigned long long)WT_RECORDS(off_record));
+		    (unsigned long long)WT_RECNO(off_record));
 }
 
 /*
