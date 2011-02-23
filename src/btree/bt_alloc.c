@@ -62,7 +62,7 @@ __wt_block_alloc(WT_TOC *toc, uint32_t *addrp, uint32_t size)
 		TAILQ_FOREACH(fe, &idb->freeqs, qs) {
 			if (new->size > fe->size)
 				continue;
-			if (new->size < fe->size || new->addr > fe->addr)
+			if (new->size < fe->size || new->addr < fe->addr)
 				break;
 		}
 		if (fe == NULL)
