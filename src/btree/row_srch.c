@@ -108,8 +108,6 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			--limit;
 		}
 
-		WT_ASSERT(toc->env, rip != NULL);
-
 		/*
 		 * Reference the slot used for next step down the tree.  We do
 		 * this on leaf pages too, because it's simpler to code, and we

@@ -24,8 +24,8 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	WT_RLE_EXPAND *exp;
 	WT_REF *ref;
 	WT_REPL *repl;
-	uint64_t record_cnt;
-	uint32_t i, write_gen;
+	uint64_t record_cnt, start_recno;
+	uint32_t base, i, indx, limit, write_gen;
 	int ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -66,20 +66,43 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 				record_cnt -= WT_RLE_REPEAT_COUNT(cip->data);
 			}
 			goto done;
-		case WT_PAGE_COL_INT:
-		default:
-			/*
-			 * Walk the page, looking for the right starting record.
-			 *
-			 * XXX
-			 * This could be a binary search.
-			 */
-			WT_INDX_FOREACH(page, cip, i)
-				if (recno > WT_COL_OFF_RECNO(cip))
-					break;
-			--cip;
-			break;
 		}
+
+		/*
+		 * Binary search of the page, looking for the right starting
+		 * record.
+		 */
+		for (base = 0,
+		    limit = page->indx_count; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+
+			/*
+			 * Like a row-store page, the 0th key sorts less than
+			 * any application key.  Don't bother skipping the 0th
+			 * index the way we do in the row-store binary search,
+			 * key comparisons are cheap here.
+			 */
+			cip = page->u.icol + indx;
+			start_recno = WT_COL_OFF_RECNO(cip);
+			if (recno == start_recno)
+				break;
+			if (recno < start_recno)
+				continue;
+			base = indx + 1;
+			--limit;
+		}
+
+		/*
+		 * Reference the slot used for next step down the tree.
+		 *
+		 * Base is the smallest index greater than recno and may be the
+		 * 0th index or the (last + 1) indx.  If base is not the 0th
+		 * index (remember, the 0th index always sorts less than any
+		 * application recno), decrement it to the smallest index less
+		 * than or equal to recno.
+		 */
+		if (recno != start_recno)
+			cip = page->u.icol + (base == 0 ? 0 : base - 1);
 
 		/* If a level was set, see if we found the asked-for page. */
 		if (level == dsk->level)
