@@ -5,12 +5,7 @@ from dist import compare_srcfile
 from dist import source_paths_list
 
 # Read the source files and build a dictionary of handles and stat counters.
-import stat_class
-
-class Stat:
-	def __init__(self, config, str):
-		self.config = config
-		self.str = str
+from stat_class import *
 
 # method_stats --
 #	Read the API class, and create statistics entries for each method.
@@ -21,12 +16,12 @@ for l in sorted(api.items()):
 	if l[1].config.count('noauto'):
 		continue
 	# Stat counter per method.
-	method_stats[l[0].replace('.', '_').upper()] = Stat([], l[0])
+	method_stats[l[0].replace('.', '_').upper()] = Stat(l[0])
 
 	# Stat counter of restarts per method.
 	if l[1].config.count('restart'):
 		method_stats[l[0].replace('.', '_').upper() +
-		    '_RESTART'] = Stat([], l[0] + ' method restarts')
+		    '_RESTART'] = Stat(l[0] + ' method restarts')
 
 # print_def --
 #	Print the #defines for the stat.h file.
@@ -55,11 +50,11 @@ for line in open('../src/include/stat.h', 'r'):
 	elif line.count('Statistics section: BEGIN'):
 		f.write('\n')
 		skip = 1
-		print_def('CACHE handle', stat_class.cache_stats)
-		print_def('DB/IDB file', stat_class.idb_dstats)
-		print_def('DB/IDB handle', stat_class.idb_stats)
-		print_def('ENV/IENV handle', stat_class.ienv_stats)
-		print_def('FH handle', stat_class.fh_stats)
+		print_def('CACHE handle', cache_stats)
+		print_def('DB/IDB file', idb_dstats)
+		print_def('DB/IDB handle', idb_stats)
+		print_def('ENV/IENV handle', ienv_stats)
+		print_def('FH handle', fh_stats)
 		print_def('Methods', method_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
@@ -103,11 +98,11 @@ f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
-print_func('CACHE', stat_class.cache_stats)
-print_func('FILE', stat_class.idb_dstats)
-print_func('DB', stat_class.idb_stats)
-print_func('ENV', stat_class.ienv_stats)
-print_func('FH', stat_class.fh_stats)
+print_func('CACHE', cache_stats)
+print_func('FILE', idb_dstats)
+print_func('DB', idb_stats)
+print_func('ENV', ienv_stats)
+print_func('FH', fh_stats)
 print_func('METHOD', method_stats)
 
 f.close()
