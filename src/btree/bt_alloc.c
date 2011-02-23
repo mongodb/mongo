@@ -382,3 +382,25 @@ __wt_block_truncate(WT_TOC *toc)
 
 	return (0);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+void
+__wt_debug_block(WT_TOC *toc)
+{
+	IDB *idb;
+	WT_FREE_ENTRY *fe;
+
+	idb = toc->db->idb;
+
+	fprintf(stderr, "Freelist by addr:");
+	TAILQ_FOREACH(fe, &idb->freeqa, qa)
+		fprintf(stderr,
+		    " {%lu/%lu}", (u_long)fe->addr, (u_long)fe->size);
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Freelist by size:");
+	TAILQ_FOREACH(fe, &idb->freeqs, qs)
+		fprintf(stderr,
+		    " {%lu/%lu}", (u_long)fe->addr, (u_long)fe->size);
+	fprintf(stderr, "\n");
+}
+#endif
