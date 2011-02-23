@@ -204,7 +204,7 @@ combine:/*
 	TAILQ_FOREACH(fe, &idb->freeqs, qs) {
 		if (new->size > fe->size)
 			continue;
-		if (new->size < fe->size || new->addr > fe->addr)
+		if (new->size < fe->size || new->addr < fe->addr)
 			break;
 	}
 	if (fe == NULL)
