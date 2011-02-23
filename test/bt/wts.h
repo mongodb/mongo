@@ -89,6 +89,8 @@ int	 bdb_put(u_int64_t, void *, u_int32_t, int *);
 int	 bdb_read(u_int64_t, void *, u_int32_t *, int *);
 void	 bdb_startup(void);
 void	 bdb_teardown(void);
+const char *
+	 config_dtype(void);
 void	 config_dump(int);
 void	 config_file(char *);
 void	 config_names(void);

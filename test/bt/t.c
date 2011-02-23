@@ -126,7 +126,7 @@ skip_ops:	if (wts_stats())		/* Statistics */
 		track("shutting down WT", (u_int64_t)0);
 		wts_teardown();
 
-		track("done", (u_int64_t)0);
+		track(config_dtype(), (u_int64_t)0);
 		printf("\n");
 	}
 

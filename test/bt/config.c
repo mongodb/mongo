@@ -10,7 +10,6 @@
 #include "wts.h"
 #include "config.h"
 
-static const char *config_dtype(void);
 static CONFIG	  *config_find(const char *);
 static uint32_t	   config_translate(char *);
 
@@ -233,7 +232,7 @@ config_find(const char *s)
  * config_dtype --
  *	Return the file type as a string.
  */
-static const char *
+const char *
 config_dtype()
 {
 	switch (g.c_file_type) {
