@@ -203,21 +203,13 @@ item_vs_page:			__wt_api_db_errx(db,
 
 		/*
 		 * For row-store leaf pages, check for:
-		 *	two keys in a row,
 		 *	two data items in a row,
 		 *	a data item as the first item on a page.
 		 */
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
-			if (last_item_type == WAS_KEY) {
-				__wt_api_db_errx(db,
-				    "item %lu on page at addr %lu is first of "
-				    "two adjacent keys",
-				    (u_long)item_num - 1, (u_long)addr);
-				return (WT_ERROR);
-			} else
-				last_item_type = WAS_KEY;
+			last_item_type = WAS_KEY;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:

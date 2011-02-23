@@ -149,6 +149,8 @@ struct __idb {
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
 
+	WT_ITEM empty_item;		/* Empty data item */
+
 	WT_STATS *stats;		/* IDB handle statistics */
 	WT_STATS *dstats;		/* File statistics */
 

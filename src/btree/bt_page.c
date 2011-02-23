@@ -119,13 +119,32 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
+		/*
+		 * Column-store page entries map one-to-one to the number of
+		 * physical entries on the page (each physical entry is a
+		 * data item).
+		 */
 		nindx = dsk->u.entries;
 		WT_ERR((
 		    __wt_calloc(env, nindx, sizeof(WT_COL), &page->u.icol)));
 		break;
 	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Internal row-store page entries map one-to-two to the number
+		 * of physical entries on the page (each physical entry is a
+		 * data item/offset pair).
+		 */
 		nindx = dsk->u.entries / 2;
+		WT_ERR((
+		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->u.irow)));
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Leaf row-store page entries map two-to-one to the number of
+		 * physical entries on the page (each physical entry might be
+		 * a key without any subsequent data item).
+		 */
+		nindx = dsk->u.entries * 2;
 		WT_ERR((
 		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->u.irow)));
 		break;
@@ -188,10 +207,8 @@ __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	WT_FIX_FOREACH(db, dsk, p, i) {
-		cip->data = p;
-		++cip;
-	}
+	WT_FIX_FOREACH(db, dsk, p, i)
+		(cip++)->data = p;
 
 	page->indx_count = dsk->u.entries;
 }
@@ -314,8 +331,7 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 			__wt_key_set_process(rip, item);
 			break;
 		case WT_ITEM_OFF:
-			rip->data = item;
-			++rip;
+			(rip++)->data = item;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -353,22 +369,36 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
+			if (rip->key != NULL)
+				++rip;
 			if (idb->huffman_key != NULL ||
 			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
 				__wt_key_set_process(rip, item);
 			else
 				__wt_key_set(rip,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+
+			/*
+			 * Two keys in a row, or a key at the end of the page
+			 * implies a zero-length data item.  Initialize the
+			 * slot as if it's going to happen.
+			 */
+			rip->data = &idb->empty_item;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
 			rip->data = item;
-			++rip;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
 
-	page->indx_count = dsk->u.entries / 2;
+	/*
+	 * Calculate the number of entries we actually found: rip references
+	 * the slot last filled in, so increment it and do the calculation.
+	 */
+	++rip;
+	page->indx_count = WT_ROW_SLOT(page, rip);
+
 	return (0);
 }
 

@@ -576,7 +576,7 @@ struct __wt_rle_expand {
 	    (i) > 0;							\
 	    ++(rip),							\
 	    key_item = --(i) == 0 ?					\
-	    NULL : WT_ITEM_NEXT(WT_ITEM_NEXT(key_item)))
+	    NULL : __wt_key_item_next(key_item))
 
 /*
  * WT_REPL_FOREACH --

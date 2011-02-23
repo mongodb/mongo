@@ -698,15 +698,17 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
+	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
 	DBT *key, key_dbt, *data, data_dbt;
-	WT_ITEM data_item, *key_item;
+	WT_ITEM data_item, *empty_item, *key_item;
 	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_REPL *repl;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
+
+	empty_item = &toc->db->idb->empty_item;
 
 	dsk = new->dsk;
 	__wt_set_ff_and_sa_from_offset(
@@ -726,6 +728,8 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
 	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
+		len = 0;
+
 		/*
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
@@ -755,34 +759,42 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			}
 
 			/*
-			 * Build the data's WT_ITEM chunk from the most recent
+			 * If no data, nothing needs to be copied.  Otherwise,
+			 * build the data's WT_ITEM chunk from the most recent
 			 * replacement value.
 			 */
-			data->data = WT_REPL_DATA(repl);
-			data->size = repl->size;
-			WT_RET(__wt_item_build_data(
-			    toc, data, &data_item, &data_ovfl));
-			data_loc = DATA_OFF_PAGE;
-
+			if (repl->size == 0)
+				data_loc = EMPTY_DATA;
+			else {
+				data->data = WT_REPL_DATA(repl);
+				data->size = repl->size;
+				WT_RET(__wt_item_build_data(
+				    toc, data, &data_item, &data_ovfl));
+				data_loc = DATA_OFF_PAGE;
+				len += WT_ITEM_SPACE_REQ(data->size);
+			}
 		} else {
-			/* Copy the item off the page. */
-			data->data = rip->data;
-			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->data));
-			data_loc = DATA_ON_PAGE;
+			/*
+			 * Copy the item off the page -- however, when the page
+			 * was read into memory, there may not have been a data
+			 * item, that is, it may have been zero length.  Catch
+			 * that case.
+			 */
+			if (rip->data == empty_item)
+				data_loc = EMPTY_DATA;
+			else {
+				data->data = rip->data;
+				data->size =
+				    WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->data));
+				data_loc = DATA_ON_PAGE;
+				len += data->size;
+			}
 		}
 
 		/* Take the key's WT_ITEM from the original page. */
 		key->data = key_item;
-		len = key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
-
-		switch (data_loc) {
-		case DATA_OFF_PAGE:
-			len += WT_ITEM_SPACE_REQ(data->size);
-			break;
-		case DATA_ON_PAGE:
-			len += data->size;
-			break;
-		}
+		key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
+		len += key->size;
 
 		/*
 		 * XXX
@@ -816,6 +828,8 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			first_free += WT_ITEM_SPACE_REQ(data->size);
 			space_avail -= WT_ITEM_SPACE_REQ(data->size);
 			++dsk->u.entries;
+			break;
+		case EMPTY_DATA:
 			break;
 		}
 	}

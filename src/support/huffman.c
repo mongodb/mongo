@@ -449,6 +449,15 @@ __wt_huffman_encode(void *huffman_arg,
 		WT_RET(__wt_realloc(env, to_len, from_len + 1, top));
 	}
 
+	/*
+	 * We don't want to find all of our callers and ensure they don't pass
+	 * 0-length byte strings, but there's no reason to do any work.
+	 */
+	if (from_len == 0) {
+		*out_bytes_used = 0;
+		return (0);
+	}
+
 	to = *(uint8_t **)top;
 	memset(to, 0, from_len + 1);
 
@@ -543,6 +552,15 @@ __wt_huffman_decode(void *huffman_arg,
 		if (to_len == NULL)
 			*(void **)top = NULL;
 		WT_RET(__wt_realloc(env, to_len, 2 * from_len + 1, top));
+	}
+
+	/*
+	 * We don't want to find all of our callers and ensure they don't pass
+	 * 0-length byte strings, but there's no reason to do any work.
+	 */
+	if (from_len == 0) {
+		*out_bytes_used = 0;
+		return (0);
 	}
 
 	to = *(uint8_t **)top;

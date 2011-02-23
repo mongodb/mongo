@@ -99,3 +99,23 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 {
 	return (page->write_gen == write_gen ? 0 : WT_RESTART);
 }
+
+/*
+ * __wt_key_item_next --
+ *	Move to the next key WT_ITEM on the page (helper function for the
+ *	WT_INDX_AND_KEY_FOREACH macro).
+ */
+static inline WT_ITEM *
+__wt_key_item_next(WT_ITEM *key_item)
+{
+	/*
+	 * Row-store leaf pages may have a single data item between each key, or
+	 * keys may be adjacent (when the data item is empty).  Move to the next
+	 * key.
+	 */
+	key_item = WT_ITEM_NEXT(key_item);
+	if (WT_ITEM_TYPE(key_item) != WT_ITEM_KEY &&
+	    WT_ITEM_TYPE(key_item) != WT_ITEM_KEY_OVFL)
+		key_item = WT_ITEM_NEXT(key_item);
+	return (key_item);
+}

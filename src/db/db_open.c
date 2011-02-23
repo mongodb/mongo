@@ -67,8 +67,10 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 	WT_CLEAR(idb->root_page);
 	idb->root_page.state = WT_REF_DISK;
 	WT_CLEAR(idb->root_off);
-	idb->root_off.addr = 0;
-	idb->root_off.size = 0;
+
+	/* Initialize the zero-length WT_ITEM. */
+	WT_ITEM_SET_TYPE(&idb->empty_item, WT_ITEM_DATA);
+	WT_ITEM_SET_LEN(&idb->empty_item, 0);
 
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(idb, WT_RDONLY);

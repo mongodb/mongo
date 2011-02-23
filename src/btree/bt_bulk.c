@@ -236,7 +236,7 @@ __wt_bulk_var(WT_TOC *toc,
 	WT_PAGE *page;
 	WT_STACK stack;
 	uint64_t insert_cnt;
-	uint32_t space_avail;
+	uint32_t space_avail, space_req;
 	uint8_t *first_free, page_type;
 	int is_column, ret;
 
@@ -292,8 +292,10 @@ __wt_bulk_var(WT_TOC *toc,
 
 		/*
 		 * We don't have a key to store on the page if we're building a
-		 * column-store; the check from here on is if "key == NULL" for
-		 * both cases, that is, there's no key to store.
+		 * column-store; the check from here on is if "key == NULL".
+		 *
+		 * We don't store data items if the length of the data item is
+		 * 0; the check from here on is if "data == NULL".
 		 *
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
 		 * copy them carefully, all we want is a pointer and a length.
@@ -303,23 +305,33 @@ __wt_bulk_var(WT_TOC *toc,
 			key_copy.size = key->size;
 			key = &key_copy;
 		}
-		data_copy.data = data->data;
-		data_copy.size = data->size;
-		data = &data_copy;
+		if (data->size == 0)
+			data = NULL;
+		else {
+			data_copy.data = data->data;
+			data_copy.size = data->size;
+			data = &data_copy;
+		}
 
 		/* Build the key/data items we're going to store on the page. */
 		if (key != NULL)
 			WT_ERR(__wt_item_build_key(
 			    toc, key, &key_item, &key_ovfl));
-		WT_ERR(__wt_item_build_data(toc, data, &data_item, &data_ovfl));
+		if (data != NULL)
+			WT_ERR(__wt_item_build_data(
+			    toc, data, &data_item, &data_ovfl));
 
 		/*
 		 * We now have the key/data items to store on the page.  If
 		 * there is insufficient space on the current page, allocate
 		 * a new one.
 		 */
-		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
-		    WT_ITEM_SPACE_REQ(data->size) > space_avail) {
+		space_req = 0;
+		if (key != NULL)
+			space_req += WT_ITEM_SPACE_REQ(key->size);
+		if (data != NULL)
+			space_req += WT_ITEM_SPACE_REQ(data->size);
+		if (space_req > space_avail) {
 			/*
 			 * We've finished with the page: promote its first key
 			 * to its parent and discard it, then switch to the new
@@ -349,7 +361,6 @@ __wt_bulk_var(WT_TOC *toc,
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
 			++page->dsk->u.entries;
-
 			memcpy(first_free, &key_item, sizeof(key_item));
 			memcpy(first_free +
 			    sizeof(key_item), key->data, key->size);
@@ -358,11 +369,14 @@ __wt_bulk_var(WT_TOC *toc,
 		}
 
 		/* Copy the data item onto the page. */
-		++page->dsk->u.entries;
-		memcpy(first_free, &data_item, sizeof(data_item));
-		memcpy(first_free + sizeof(data_item), data->data, data->size);
-		space_avail -= WT_ITEM_SPACE_REQ(data->size);
-		first_free += WT_ITEM_SPACE_REQ(data->size);
+		if (data != NULL) {
+			++page->dsk->u.entries;
+			memcpy(first_free, &data_item, sizeof(data_item));
+			memcpy(first_free +
+			    sizeof(data_item), data->data, data->size);
+			space_avail -= WT_ITEM_SPACE_REQ(data->size);
+			first_free += WT_ITEM_SPACE_REQ(data->size);
+		}
 	}
 
 	/* A ret of 1 just means we've reached the end of the input. */

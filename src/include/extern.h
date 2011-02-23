@@ -31,11 +31,11 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
-__wt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
+__wt_debug_dump(WT_TOC *toc, const char *ofile, FILE *fp);
 int
-__wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, char *ofile, FILE *fp);
+__wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp);
 int
-__wt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
+__wt_debug_page(WT_TOC *toc, WT_PAGE *page, const char *ofile, FILE *fp);
 void
 __wt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp);
 int
