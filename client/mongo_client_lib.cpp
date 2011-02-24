@@ -53,6 +53,10 @@
 #include "gridfs.cpp"
 #include "dbclientcursor.cpp"
 
+#include "../util/text.cpp"
+#include "dbclient_rs.cpp"
+#include "../bson/oid.cpp"
+
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
