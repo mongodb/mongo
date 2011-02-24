@@ -1,6 +1,6 @@
 #! /bin/sh
 
-bdb=../../../db-4.8.26/build_unix
+bdb=db/build_unix
 
 colflag=0
 while :

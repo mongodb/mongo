@@ -1,4 +1,4 @@
-BDB=	../../../db-4.8.26
+BDB=	db
 SRC=	../../src
 WT=	../../build_posix
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
@@ -9,7 +9,7 @@ HDRS=	config.h wts.h
 SRCS=	bdb.c config.c t.c util.c wts.c
 OBJS=	bdb.o config.o t.o util.o wts.o 
 
-all: t tags
+all: t
 
 t: ${OBJS} ${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 	cc -g -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB} -lpthread
@@ -20,10 +20,10 @@ clean:
 distclean realclean: clean
 	rm -f __*
 
-bdb.o:
+bdb.o: bdb.c
 	${CC} ${CFLAGS} -I${BDB} -c $< -o $@
 
-config.o t.o util.o wts.o:
+%.o: %.c
 	${CC} ${CFLAGS} -I${WT} -I${SRC}/include  -c $< -o $@
 
 ${SRCS}: ${HDRS}
