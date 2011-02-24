@@ -1,0 +1,19 @@
+# Configuration keywords:
+# cache
+# data_max
+# data_min
+# file_type
+# delete_pct
+# huffman_data
+# huffman_key
+# intl_node_max
+# intl_node_min
+# key_max
+# key_min
+# leaf_node_max
+# leaf_node_min
+# ops
+# repeat_comp_pct
+# rows
+# runs
+# write_pct
