@@ -57,6 +57,17 @@ __wt_key_set(WT_ROW *rip, void *key, uint32_t size)
 }
 
 /*
+ * __wt_key_set_process --
+ *	Set a key/size pair, where the key requires further processing.
+ */
+static inline void
+__wt_key_set_process(WT_ROW *rip, void *key)
+{
+	rip->key = key;
+	rip->size = 0;
+}
+
+/*
  * __wt_key_process --
  *	Return if a key requires processing.
  */

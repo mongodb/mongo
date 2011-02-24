@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "bt_inline.c"
 
 static int __wt_err_delfmt(DB *, uint32_t, uint32_t);
 static int __wt_err_eof(DB *, uint32_t, uint32_t);
@@ -123,18 +124,36 @@ __wt_verify_dsk_item(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
+	struct {
+		WT_ROW   rip;			/* Reference to on-page data */
+		DBT	*dbt;			/* DBT to compare */
+		DBT	*scratch;		/* scratch buffer */
+	} *current, *last, *tmp, _a, _b;
 	DB *db;
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
+	WT_ROW *rip;
 	off_t file_size;
 	uint8_t *end;
+	void *huffman;
 	uint32_t i, item_num, item_len, item_type;
+	int (*func)(DB *, const DBT *, const DBT *), ret;
 
 	db = toc->db;
-	file_size = db->idb->fh->file_size;
+	func = db->btree_compare;
+	huffman = db->idb->huffman_key;
+	ret = 0;
 
+	WT_CLEAR(_a);
+	WT_CLEAR(_b);
+	current = &_a;
+	WT_ERR(__wt_scr_alloc(toc, 0, &current->scratch));
+	last = &_b;
+	WT_ERR(__wt_scr_alloc(toc, 0, &last->scratch));
+
+	file_size = db->idb->fh->file_size;
 	end = (uint8_t *)dsk + size;
 
 	last_item_type = IS_FIRST;
@@ -196,46 +215,43 @@ item_vs_page:			__wt_api_db_errx(db,
 		/*
 		 * Only row-store leaf pages require item type ordering checks,
 		 * other page types don't have ordering relationships between
-		 * their WT_ITEM entries, so we can skip those tests.
-		 */
-		if (dsk->type != WT_PAGE_ROW_LEAF)
-			goto skip_order_check;
-
-		/*
+		 * their WT_ITEM entries, and validating the correct types above
+		 * is sufficient.
+		 *
 		 * For row-store leaf pages, check for:
 		 *	two data items in a row,
 		 *	a data item as the first item on a page.
 		 */
-		switch (item_type) {
-		case WT_ITEM_KEY:
-		case WT_ITEM_KEY_OVFL:
-			last_item_type = WAS_KEY;
-			break;
-		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_OVFL:
-		case WT_ITEM_DEL:
-			switch (last_item_type) {
-			case IS_FIRST:
-				__wt_api_db_errx(db,
-				    "page at addr %lu begins with a "
-				    "data item",
-				    (u_long)addr);
-				return (WT_ERROR);
-			case WAS_DATA:
-				__wt_api_db_errx(db,
-				    "item %lu on page at addr %lu is "
-				    "the first of two adjacent data "
-				    "items",
-				    (u_long)item_num - 1, (u_long)addr);
-				return (WT_ERROR);
-			case WAS_KEY:
-				last_item_type = WAS_DATA;
+		if (dsk->type == WT_PAGE_ROW_LEAF)
+			switch (item_type) {
+			case WT_ITEM_KEY:
+			case WT_ITEM_KEY_OVFL:
+				last_item_type = WAS_KEY;
+				break;
+			case WT_ITEM_DATA:
+			case WT_ITEM_DATA_OVFL:
+			case WT_ITEM_DEL:
+				switch (last_item_type) {
+				case IS_FIRST:
+					__wt_api_db_errx(db,
+					    "page at addr %lu begins with a "
+					    "data item",
+					    (u_long)addr);
+					return (WT_ERROR);
+				case WAS_DATA:
+					__wt_api_db_errx(db,
+					    "item %lu on page at addr %lu is "
+					    "the first of two adjacent data "
+					    "items",
+					    (u_long)item_num - 1, (u_long)addr);
+					return (WT_ERROR);
+				case WAS_KEY:
+					last_item_type = WAS_DATA;
+					break;
+				}
 				break;
 			}
-			break;
-		}
 
-skip_order_check:
 		/* Check the item's length. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
@@ -293,14 +309,71 @@ item_len:			__wt_api_db_errx(db,
 			    off_record->addr) + off_record->size > file_size)
 				goto eof;
 			break;
-		default:
-			break;
 		}
-	}
-	return (0);
 
-eof:	return (__wt_err_eof(db, item_num, addr));
-eop:	return (__wt_err_eop(db, item_num, addr));
+		/*
+		 * The only remaining task is to check key ordering: row-store
+		 * internal and leaf page keys must be ordered, variable-length
+		 * column store pages have no such requirement.
+		 */
+		if (dsk->type == WT_PAGE_COL_VAR)
+			continue;
+
+		/*
+		 * Skip data items.
+		 * Otherwise build the keys and compare them.
+		 */
+		rip = &current->rip;
+		switch (item_type) {
+		case WT_ITEM_KEY:
+			if (huffman == NULL) {
+				__wt_key_set(rip,
+				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+				break;
+			}
+			/* FALLTHROUGH */
+		case WT_ITEM_KEY_OVFL:
+			__wt_key_set_process(rip, item);
+			break;
+		default:
+			continue;
+		}
+
+		if (__wt_key_process(rip)) {
+			WT_RET(
+			    __wt_item_process(toc, rip->key, current->scratch));
+			current->dbt = current->scratch;
+		} else
+			current->dbt = (DBT *)rip;
+
+		/* Compare the current key against the last key. */
+		if (last->dbt != NULL &&
+		    func(db, last->dbt, current->dbt) >= 0) {
+			__wt_api_db_errx(db,
+			    "the %lu and %lu keys on page at addr %lu are "
+			    "incorrectly sorted",
+			    (u_long)item_num - 2,
+			    (u_long)item_num, (u_long)addr);
+			ret = WT_ERROR;
+			goto err;
+		}
+		tmp = last;
+		last = current;
+		current = tmp;
+	}
+
+	if (0) {
+eof:		ret = __wt_err_eof(db, item_num, addr);
+	}
+	if (0) {
+eop:		ret = __wt_err_eop(db, item_num, addr);
+	}
+
+err:	if (_a.scratch != NULL)
+		__wt_scr_release(&_a.scratch);
+	if (_b.scratch != NULL)
+		__wt_scr_release(&_b.scratch);
+	return (ret);
 }
 
 /*

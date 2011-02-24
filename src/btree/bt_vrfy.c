@@ -38,7 +38,6 @@ typedef struct {
 static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
-static int __wt_verify_key_order(WT_TOC *, WT_PAGE *);
 static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_common(
 		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
@@ -251,14 +250,6 @@ __wt_verify_tree(
 		break;
 	}
 
-	/* Check on-page key ordering. */
-	switch (dsk->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_key_order(toc, page));
-		break;
-	}
-
 	/* Check tree connections and recursively descend the tree. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
@@ -423,70 +414,6 @@ err:	if (scratch1 != NULL)
 		__wt_scr_release(&scratch1);
 	if (scratch2 != NULL)
 		__wt_scr_release(&scratch2);
-
-	return (ret);
-}
-
-/*
- * __wt_verify_key_order --
- *	Check on-page key ordering.
- */
-static int
-__wt_verify_key_order(WT_TOC *toc, WT_PAGE *page)
-{
-	struct {
-		DBT	*dbt;			/* DBT to compare */
-		DBT	*scratch;		/* scratch buffer */
-	} *current, *last, _a, _b;
-	DB *db;
-	WT_ROW *rip;
-	uint32_t i;
-	int (*func)(DB *, const DBT *, const DBT *), ret;
-
-	db = toc->db;
-	func = db->btree_compare;
-	ret = 0;
-
-	WT_CLEAR(_a);
-	WT_CLEAR(_b);
-	current = &_a;
-	WT_ERR(__wt_scr_alloc(toc, 0, &current->scratch));
-	last = &_b;
-	WT_ERR(__wt_scr_alloc(toc, 0, &last->scratch));
-
-	/* Walk the page, comparing keys. */
-	WT_INDX_FOREACH(page, rip, i) {
-		/*
-		 * The two keys we're going to compare may be overflow keys --
-		 * don't bother instantiating the keys in the tree, there's no
-		 * reason to believe we're going to be doing real operations
-		 * in this file.
-		 */
-		if (__wt_key_process(rip)) {
-			WT_RET(__wt_item_process(
-			    toc, rip->key, current->scratch));
-			current->dbt = current->scratch;
-		} else
-			current->dbt = (DBT *)rip;
-
-		/* Compare the current key against the last key. */
-		if (last->dbt != NULL &&
-		    func(db, last->dbt, current->dbt) >= 0) {
-			__wt_api_db_errx(db,
-			    "the %lu and %lu keys on page at addr %lu are "
-			    "incorrectly sorted",
-			    (u_long)WT_ROW_SLOT(page, rip) - 1,
-			    (u_long)WT_ROW_SLOT(page, rip),
-			    (u_long)page->addr);
-			ret = WT_ERROR;
-			goto err;
-		}
-	}
-
-err:	if (_a.scratch != NULL)
-		__wt_scr_release(&_a.scratch);
-	if (_b.scratch != NULL)
-		__wt_scr_release(&_b.scratch);
 
 	return (ret);
 }

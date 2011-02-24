@@ -8,24 +8,12 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static inline void __wt_key_set_process(WT_ROW *, void *);
 static void __wt_page_inmem_col_fix(DB *, WT_PAGE *);
 static void __wt_page_inmem_col_int(WT_PAGE *);
 static void __wt_page_inmem_col_rle(DB *, WT_PAGE *);
 static void __wt_page_inmem_col_var(WT_PAGE *);
 static int  __wt_page_inmem_row_int(DB *, WT_PAGE *);
 static int  __wt_page_inmem_row_leaf(DB *, WT_PAGE *);
-
-/*
- * __wt_key_set_process --
- *	Set a key/size pair, where the key requires further processing.
- */
-static inline void
-__wt_key_set_process(WT_ROW *rip, void *key)
-{
-	rip->key = key;
-	rip->size = 0;
-}
 
 /*
  * __wt_page_in --
