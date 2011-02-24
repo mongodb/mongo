@@ -209,10 +209,10 @@ struct __wt_page {
 	uint32_t write_gen;
 
 	/*
-	 * Each in-memory page has an array of WT_ROW/WT_COL structures this is
-	 * where the on-page index in DB 1.85 and Berkeley DB is created when a
-	 * page is read from the file.  It's sorted by the key, fixed in size,
-	 * and references data on the page.
+	 * Each in-memory page has an array of WT_ROW/WT_COL structures: this is
+	 * where the on-page index in Berkeley DB is created when a page is read
+	 * from the file.  It's sorted by the key, fixed in size, and references
+	 * data on the page.
 	 *
 	 * Note: in column-store fixed-length run-length encoded pages (that is,
 	 * WT_PAGE_COL_RLE type pages), a single indx entry may reference a
