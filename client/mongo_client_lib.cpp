@@ -4,13 +4,23 @@
 
    Normally one includes dbclient.h, and links against libmongoclient.a, when connecting to MongoDB
    from C++.  However, if you have a situation where the pre-built library does not work, you can use
-   this file instead to build all the necessary symbols.  To do so, include client_lib.cpp in your
+   this file instead to build all the necessary symbols.  To do so, include mongo_client_lib.cpp in your
    project.
 
+   GCC
+   ---
    For example, to build and run simple_client_demo.cpp with GCC and run it:
 
     g++ -I .. simple_client_demo.cpp mongo_client_lib.cpp -lboost_thread-mt -lboost_filesystem
     ./a.out
+
+   Visual Studio (2010 tested)
+   ---------------------------
+   First, see client/examples/simple_client_demo.vcxproj.
+   - Be sure to include your boost include directory in your project as an Additional Include Directory.
+   - Define  _CRT_SECURE_NO_WARNINGS to avoid warnings on use of strncpy and such by the MongoDB client code.
+   - Include the boost libraries directory.
+   - Linker.Input.Additional Dependencies - add ws2_32.lib for the Winsock library.
 */
 
 /*    Copyright 2009 10gen Inc.
@@ -27,6 +37,11 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
+#if defined(_WIN32)
+// C4800 forcing value to bool 'true' or 'false' (performance warning)
+#pragma warning( disable : 4800 )
+#endif
 
 #include "../util/md5main.cpp"
 
@@ -52,6 +67,10 @@
 #include "clientOnly.cpp"
 #include "gridfs.cpp"
 #include "dbclientcursor.cpp"
+
+#include "../util/text.cpp"
+#include "dbclient_rs.cpp"
+#include "../bson/oid.cpp"
 
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"

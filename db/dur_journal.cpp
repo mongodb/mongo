@@ -33,6 +33,7 @@
 #include "../util/mongoutils/str.h"
 #include "dur_journalimpl.h"
 #include "../util/file.h"
+#include "../util/checksum.h"
 
 using namespace mongoutils;
 
@@ -41,6 +42,7 @@ namespace mongo {
     class AlignedBuilder;
 
     namespace dur {
+        BOOST_STATIC_ASSERT( sizeof(Checksum) == 16 );
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 20 );
         BOOST_STATIC_ASSERT( sizeof(JSectFooter) == 32 );
@@ -73,6 +75,26 @@ namespace mongo {
             */
             log() << "journaling error " << msg << endl;
             assert(false);
+        }
+
+        JSectFooter::JSectFooter(const void* begin, int len) { // needs buffer to compute hash
+            sentinel = JEntry::OpCode_Footer;
+            reserved = 0;
+            magic[0] = magic[1] = magic[2] = magic[3] = '\n';
+
+            Checksum c;
+            c.gen(begin, (unsigned) len);
+            memcpy(hash, c.bytes, sizeof(hash));
+        }
+
+        bool JSectFooter::checkHash(const void* begin, int len) const {
+            Checksum c;
+            c.gen(begin, len);
+            DEV log() << "checkHash len:" << len << " hash:" << toHex(hash, 16) << " current:" << toHex(c.bytes, 16) << endl;
+            if( memcmp(hash, c.bytes, sizeof(hash)) == 0 ) 
+                return true;
+            log() << "dur checkHash mismatch, got: " << toHex(c.bytes, 16) << " expected: " << toHex(hash,16) << endl;
+            return false;
         }
 
         JHeader::JHeader(string fname) {
