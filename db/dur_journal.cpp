@@ -33,6 +33,7 @@
 #include "../util/mongoutils/str.h"
 #include "dur_journalimpl.h"
 #include "../util/file.h"
+#include "../util/md5.hpp"
 
 using namespace mongoutils;
 

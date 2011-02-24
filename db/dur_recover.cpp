@@ -33,6 +33,7 @@
 #include "cmdline.h"
 #include "curop.h"
 #include "mongommf.h"
+#include "../util/md5.hpp"
 
 #include <sys/stat.h>
 #include <fcntl.h>

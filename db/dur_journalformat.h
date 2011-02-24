@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "../util/md5.hpp"
-
 namespace mongo {
 
     namespace dur {
@@ -115,7 +113,7 @@ namespace mongo {
         struct JSectFooter {
             JSectFooter(const void* begin, int len); // needs buffer to compute hash
             unsigned sentinel;
-            md5digest hash; // unsigned char[16]
+            unsigned char hash[16];
             unsigned long long reserved;
             char magic[4]; // "\n\n\n\n"
 
