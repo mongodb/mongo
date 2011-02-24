@@ -30,10 +30,10 @@
 #include "database.h"
 #include "db.h"
 #include "../util/unittest.h"
+#include "../util/checksum.h"
 #include "cmdline.h"
 #include "curop.h"
 #include "mongommf.h"
-#include "../util/md5.hpp"
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -120,10 +120,7 @@ namespace mongo {
                             const JSectFooter& footer = *(const JSectFooter*)pos;
                             int len = pos - (char*)_sectHead;
                             if (!footer.checkHash(_sectHead, len)) {
-                                massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
-                                        << toHex(footer.hash, sizeof(footer.hash))
-                                        << " actual: " << md5simpledigest(_sectHead, len)
-                                        , false);
+                                massert(13594, "dur journal checksum doesn't match", false);
                             }
                         }
                         return false; // false return value denotes end of section

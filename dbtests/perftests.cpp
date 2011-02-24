@@ -33,6 +33,7 @@
 #include "../util/timer.h"
 #include "dbtests.h"
 #include "../db/dur_stats.h"
+#include "../util/checksum.h"
 
 namespace PerfTests {
     typedef DBDirectClient DBClientType;
@@ -63,6 +64,43 @@ namespace PerfTests {
         static DBClientType _client;
     };
     DBClientType ClientBase::_client;
+
+    class Checksum {
+    public:
+        void run() {
+            {
+                // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
+                unsigned long long x = 0xffffffffffffffffUL;
+                ASSERT( x+2 == 1 );
+            }
+
+            unsigned sz = 1024 * 1024 * 100 + 3;
+            void *p = malloc(sz);
+            mongo::Checksum last;
+            for( int i = 0; i < 4; i++ ) { 
+                Timer t;
+                mongo::Checksum c;
+                c.gen(p, sz);
+                cout << "checksum " << t.millis() << "ms" << endl;
+                ASSERT( i == 0 || c == last );
+                last = c;
+            }
+            {
+                mongo::Checksum c;
+                c.gen(p, sz-1);
+                ASSERT( c != last );
+                ((char *&)p)[0]++; // check same data, different order, doesn't give same checksum
+                ((char *&)p)[1]--;
+                c.gen(p, sz);
+                ASSERT( c != last );
+                ((char *&)p)[1]++; // check same data, different order, doesn't give same checksum (different longwords case)
+                ((char *&)p)[8]--;
+                c.gen(p, sz);
+                ASSERT( c != last );
+            }
+            free(p);
+        }
+    };
 
     // todo: use a couple threads. not a very good test yet.
     class TaskQueueTest {
@@ -110,7 +148,7 @@ namespace PerfTests {
         virtual void post() { }
         virtual string name() = 0;
         virtual unsigned long long expectation() = 0;
-        virtual int howLongMillis() { return 5000; }
+        virtual int howLongMillis() { return 5000; } // how long to run test
     public:
         void say(unsigned long long n, int ms, string s) {
             //cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
@@ -325,6 +363,7 @@ namespace PerfTests {
         }
 
         void setupTests() {
+            add< Checksum >();
             add< TaskQueueTest >();
             cout << "stats\t" 
                 << "test\trps\ttime\t"

@@ -247,6 +247,9 @@
     <ClInclude Include="..\util\mongoutils\hash.h">
       <Filter>util\h</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\checksum.h">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">

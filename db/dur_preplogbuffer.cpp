@@ -161,19 +161,19 @@ namespace mongo {
                 prepBasicWrites(bb);
             }
 
+            // pad to alignment, and set the total section length in the JSectHeader
+            assert( 0xffffe000 == (~(Alignment-1)) );
+            unsigned lenWillBe = bb.len() + sizeof(JSectFooter);
+            unsigned L = (lenWillBe + Alignment-1) & (~(Alignment-1));
+            dassert( L >= lenWillBe );
+            *((unsigned*)bb.atOfs(0)) = L;
+
             {
                 JSectFooter f(bb.buf(), bb.len());
                 bb.appendStruct(f);
             }
 
             {
-                // pad to alignment, and set the total section length in the JSectHeader
-                assert( 0xffffe000 == (~(Alignment-1)) );
-                unsigned L = (bb.len() + Alignment-1) & (~(Alignment-1));
-                dassert( L >= (unsigned) bb.len() );
-
-                *((unsigned*)bb.atOfs(0)) = L;
-
                 unsigned padding = L - bb.len();
                 bb.skip(padding);
                 dassert( bb.len() % Alignment == 0 );

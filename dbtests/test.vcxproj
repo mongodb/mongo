@@ -242,6 +242,7 @@
     <ClInclude Include="..\db\scanandorder.h" />
     <ClInclude Include="..\db\security.h" />
     <ClInclude Include="..\util\builder.h" />
+    <ClInclude Include="..\util\checksum.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
