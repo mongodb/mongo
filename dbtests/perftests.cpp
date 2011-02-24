@@ -70,7 +70,7 @@ namespace PerfTests {
         void run() {
             {
                 // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
-                unsigned long long x = 0xffffffffffffffffUL;
+                unsigned long long x = 0xffffffffffffffffULL;
                 ASSERT( x+2 == 1 );
             }
 
