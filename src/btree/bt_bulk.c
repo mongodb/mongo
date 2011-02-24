@@ -305,7 +305,7 @@ __wt_bulk_var(WT_TOC *toc,
 			key_copy.size = key->size;
 			key = &key_copy;
 		}
-		if (data->size == 0)
+		if (data->size == 0 && !is_column)
 			data = NULL;
 		else {
 			data_copy.data = data->data;
