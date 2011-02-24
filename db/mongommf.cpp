@@ -53,7 +53,7 @@ namespace mongo {
                 break;
 
             size_t viewStart = (size_t) x.first;
-            size_t viewEnd = viewStart + mmf->length();
+            size_t viewEnd = (size_t) (viewStart + mmf->length());
             if( viewEnd <= chunkStart )
                 break;
 
@@ -93,7 +93,7 @@ namespace mongo {
         assert( mmf->getView() <= Loc );
         if( ofs + len > f->length() ) {
             // at the very end of the map
-            len = f->length() - ofs;
+            len = (size_t) (f->length() - ofs);
         }
         else { 
             ;
