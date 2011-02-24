@@ -75,7 +75,7 @@ namespace mongo {
         DevTimer(string) { }
         ~DevTimer() { }
     };
-#else if defined(_WIN32)
+#elif defined(_WIN32)
     class DevTimer {
         const string _name;
     public:
