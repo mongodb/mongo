@@ -25,7 +25,7 @@ main(int argc, char *argv[])
 		++g.progname;
 
 	/* Configure the FreeBSD malloc for debugging. */
-	(void)putenv("MALLOC_OPTIONS=AJZ");
+	(void)setenv("MALLOC_OPTIONS", "AJZ", 1);
 
 	/* Set values from the "CONFIG" file, if it exists. */
 	if (access("CONFIG", R_OK) == 0) {
@@ -141,7 +141,7 @@ err:	config_dump(1);
  *	Clean up from previous runs.
  */
 static void
-restart()
+restart(void)
 {
 	system("rm -f __bdb* __wt*");
 }
@@ -151,7 +151,7 @@ restart()
  *	Display usage statement and exit failure.
  */
 static void
-usage()
+usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s [-1clrv] [-C config] [name=value ...]\n",

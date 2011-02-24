@@ -1,32 +1,33 @@
-CFLAGS=-g -W -Wall -Wpointer-arith -Wmissing-prototypes
-
-WT=	../../build_posix
 BDB=	../../../db-4.8.26
-LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a ${EXTLIB}
+SRC=	../../src
+WT=	../../build_posix
+LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 
-SRCS=	bdb.c config.c t.c util.c wts.c wts.h config.h
+CFLAGS=-g -Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2-Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunreachable-code -Wunsafe-loop-optimizations -Wunused -Wwrite-strings
+
+HDRS=	config.h wts.h
+SRCS=	bdb.c config.c t.c util.c wts.c
 OBJS=	bdb.o config.o t.o util.o wts.o 
 
 all: t tags
 
 t: ${OBJS} ${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
-	cc -g -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB}
+	cc -g -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB} -lpthread
 
 clean:
-	rm -f t ${OBJS}
-	rm -f DUMP LOG flexlint.out memory.out
+	rm -f t tags ${OBJS}
 
 distclean realclean: clean
 	rm -f __* *.core
-
-tags: ${SRCS}
-	ctags -w *.h *.c ../*/*.c ../*/*.h
 
 bdb.o:
 	${CC} ${CFLAGS} -I${BDB} -c $< -o $@
 
 config.o t.o util.o wts.o:
-	${CC} ${CFLAGS} -I../../build_posix -I../include  -c $< -o $@
+	${CC} ${CFLAGS} -I${WT} -I${SRC}/include  -c $< -o $@
 
-${OBJS}: ${SRCS} wts.h
-config.o: config.h
+${SRCS}: ${HDRS}
+${OBJS}: ${SRCS}
+
+tags: ${HDRS} ${SRCS}
+	ctags -w $>

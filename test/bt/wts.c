@@ -9,8 +9,6 @@
 
 #include "wts.h"
 
-extern void __wt_debug_dbt(const char *, void *, FILE *);
-
 static int cb_bulk(DB *, DBT **, DBT **);
 static int wts_del_col(u_int64_t);
 static int wts_del_row(u_int64_t);
@@ -139,7 +137,7 @@ wts_startup(int logfile)
 }
 
 void
-wts_teardown()
+wts_teardown(void)
 {
 	WT_TOC *toc;
 	time_t now;
@@ -161,7 +159,7 @@ wts_teardown()
 }
 
 int
-wts_bulk_load()
+wts_bulk_load(void)
 {
 	DB *db;
 	int ret;
@@ -176,12 +174,12 @@ wts_bulk_load()
 }
 
 int
-wts_dump()
+wts_dump(void)
 {
 	DB *db;
 	FILE *fp;
 	int ret;
-	char *p;
+	const char *p;
 
 	db = g.wts_db;
 
@@ -217,7 +215,7 @@ wts_dump()
 }
 
 static int
-wts_sync()
+wts_sync(void)
 {
 	DB *db;
 	int ret;
@@ -232,7 +230,7 @@ wts_sync()
 }
 
 int
-wts_verify()
+wts_verify(void)
 {
 	DB *db;
 	int ret;
@@ -251,7 +249,7 @@ wts_verify()
  *	Dump the run's statistics.
  */
 int
-wts_stats()
+wts_stats(void)
 {
 	DB *db;
 	FILE *fp;
@@ -323,7 +321,7 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
  *	Perform a number of operations.
  */
 int
-wts_ops()
+wts_ops(void)
 {
 	u_int64_t keyno;
 	u_int cnt;
@@ -388,7 +386,7 @@ wts_ops()
  *	Read and verify elements in a row-store file.
  */
 int
-wts_read_row_scan()
+wts_read_row_scan(void)
 {
 	u_int64_t cnt, last_cnt;
 
@@ -475,7 +473,7 @@ wts_read_row(u_int64_t keyno)
  *	Read and verify elements in a column-store file.
  */
 int
-wts_read_col_scan()
+wts_read_col_scan(void)
 {
 	u_int64_t cnt, last_cnt;
 

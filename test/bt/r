@@ -1,0 +1,56 @@
+#! /bin/sh
+
+# Configure and build the WiredTiger library.
+conf()
+{
+	test -f configure || {
+		echo 'wtconf: not a build directory'
+		exit 1
+	}
+
+	args="--enable-attach --enable-diagnostic"
+
+	env CFLAGS=-g ./configure $args
+
+	warn='-Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunreachable-code -Wunsafe-loop-optimizations -Wunused -Wwrite-strings'
+	if test "$CC" = "gcc45"; then
+		warn="$warn -Wconversion -Wlogical-op -Wuninitialized"
+	fi
+
+	(
+	echo '/^CFLAGS[	 ]*=/' &&
+	echo "s/\$/ $warn/p"
+	echo 'w'
+	echo 'q'
+	) | ed Makefile
+
+	make clean && make > mklog
+}
+
+auto=""				# Rebuild the GNU automake files.
+rebuild()
+{
+	make clean > /dev/null
+	(cd ../../dist && sh s_all $auto)
+	(cd ../../build_posix && conf > /dev/null)
+}
+
+build=0
+while :
+	do case "$1" in
+	-A)
+		auto="-A"
+		build=1
+		shift;;
+	-a)
+		build=1
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+test "$build" -eq 0 || rebuild
+(cd ../../build_posix && make > /dev/null) && make
+
+exit 0

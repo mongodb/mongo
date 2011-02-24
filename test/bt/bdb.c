@@ -11,7 +11,7 @@
 #include "wts.h"
 
 void
-bdb_startup()
+bdb_startup(void)
 {
 	DB *db;
 	DB_ENV *dbenv;

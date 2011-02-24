@@ -92,7 +92,7 @@ void	 bdb_teardown(void);
 const char *
 	 config_dtype(void);
 void	 config_dump(int);
-void	 config_file(char *);
+void	 config_file(const char *);
 void	 config_names(void);
 void	 config_setup(void);
 void	 config_single(char *);

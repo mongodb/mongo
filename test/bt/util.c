@@ -31,7 +31,7 @@ key_gen(DBT *key, u_int64_t keyno)
 }
 
 void
-key_gen_setup()
+key_gen_setup(void)
 {
 	size_t i;
 
@@ -165,7 +165,8 @@ track(const char *s, u_int64_t i)
 int
 wts_rand(void)
 {
-	char *p, buf[64];
+	const char *p;
+	char buf[64];
 	u_int r;
 
 	/*

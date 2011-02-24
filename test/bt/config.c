@@ -133,7 +133,7 @@ config_dump(int error_display)
  *	Read configuration values from a file.
  */
 void
-config_file(char *name)
+config_file(const char *name)
 {
 	FILE *fp;
 	char *p, buf[256];
@@ -233,7 +233,7 @@ config_find(const char *s)
  *	Return the file type as a string.
  */
 const char *
-config_dtype()
+config_dtype(void)
 {
 	switch (g.c_file_type) {
 	case FIX:
