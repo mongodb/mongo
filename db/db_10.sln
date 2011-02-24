@@ -19,8 +19,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", 
 		..\util\processinfo_none.cpp = ..\util\processinfo_none.cpp
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88-3451-433C-B74F-31B31FEB5791}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other", "other", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "db.vcxproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
@@ -33,12 +31,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bsondemo", "..\bson\bsondem
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoutils test program", "..\util\mongoutils\mongoutils.vcxproj", "{7B84584E-92BC-4DB9-971B-A1A8F93E5053}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "jstests", "jstests", "{F5ABFB2C-A34F-48C1-9B5F-01D456AF6C57}"
-	ProjectSection(SolutionItems) = preProject
-		..\jstests\index_many.js = ..\jstests\index_many.js
-		..\jstests\indexapi.js = ..\jstests\indexapi.js
-		..\jstests\objid5.js = ..\jstests\objid5.js
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_client_demo", "..\client\examples\simple_client_demo.vcxproj", "{89C30BC3-2874-4F2C-B4DA-EB04E9782236}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -120,6 +113,18 @@ Global
 		{7B84584E-92BC-4DB9-971B-A1A8F93E5053}.Release|Win32.ActiveCfg = Release|Win32
 		{7B84584E-92BC-4DB9-971B-A1A8F93E5053}.Release|Win32.Build.0 = Release|Win32
 		{7B84584E-92BC-4DB9-971B-A1A8F93E5053}.Release|x64.ActiveCfg = Release|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Debug|Win32.ActiveCfg = Debug|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Debug|Win32.Build.0 = Debug|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Debug|x64.ActiveCfg = Debug|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Any CPU.ActiveCfg = Release|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Win32.ActiveCfg = Release|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|Win32.Build.0 = Release|Win32
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -127,10 +132,9 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{2B262D59-9DC7-4BF1-A431-1BD4966899A5} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
 		{2F760952-C71B-4865-998F-AABAE96D1373} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
-		{407B4B88-3451-433C-B74F-31B31FEB5791} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
 		{4082881B-EB00-486F-906C-843B8EC06E18} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
 		{C9DB5EB7-81AA-4185-BAA1-DA035654402F} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
 		{7B84584E-92BC-4DB9-971B-A1A8F93E5053} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
-		{F5ABFB2C-A34F-48C1-9B5F-01D456AF6C57} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
+		{89C30BC3-2874-4F2C-B4DA-EB04E9782236} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
 	EndGlobalSection
 EndGlobal
