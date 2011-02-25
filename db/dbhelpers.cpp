@@ -177,10 +177,13 @@ namespace mongo {
         Client::Context context(ns);
 
         shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
-        if ( !c->ok() )
+        if ( !c->ok() ) {
+            context.getClient()->curop()->done();
             return false;
+        }
 
         result = c->current();
+        context.getClient()->curop()->done();
         return true;
     }
 
@@ -207,12 +210,14 @@ namespace mongo {
         OpDebug debug;
         Client::Context context(ns);
         updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug );
+        context.getClient()->curop()->done();
     }
 
     void Helpers::putSingletonGod(const char *ns, BSONObj obj, bool logTheOp) {
         OpDebug debug;
         Client::Context context(ns);
         _updateObjects(/*god=*/true, ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , logTheOp , debug );
+        context.getClient()->curop()->done();
     }
 
     BSONObj Helpers::toKeyFormat( const BSONObj& o , BSONObj& key ) {
