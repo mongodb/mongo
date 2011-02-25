@@ -116,6 +116,93 @@ struct __wt_page_desc {
 #define	WT_PAGE_DESC_SIZE		512
 
 /*
+ * WT_PAGE_DISK --
+ *
+ * All on-disk pages have a common header, defined by the WT_PAGE_DISK
+ * structure.  The header has no version number or mode bits, and the page type
+ * and/or flags value will have to be modified when changes are made to the page
+ * layout.  (The page type appears early in the header to make this simpler.)
+ * In other words, the page type declares the contents of the page and how to
+ * read it.
+ */
+struct __wt_page_disk {
+	/*
+	 * The record number of the first record of the page is stored on disk
+	 * because, if the internal page referencing a column-store leaf page
+	 * is corrupted, it's the only way to know where the leaf page fits in
+	 * the keyspace during salvage.
+	 */
+	uint64_t recno;			/* 00-07: column-store starting recno */
+
+	uint32_t lsn_file;		/* 08-11: LSN file */
+	uint32_t lsn_off;		/* 12-15: LSN file offset */
+
+	uint32_t checksum;		/* 16-19: checksum */
+
+	union {
+		uint32_t entries;	/* 20-23: number of items on page */
+		uint32_t datalen;	/* 20-23: overflow data length */
+	} u;
+
+#define	WT_PAGE_INVALID		0	/* Invalid page */
+#define	WT_PAGE_COL_FIX		1	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		2	/* Col store internal page */
+#define	WT_PAGE_COL_RLE		3	/* Col store run-length encoded leaf */
+#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Page of untyped data */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
+#define	WT_PAGE_FREELIST	8	/* Free-list page */
+	uint8_t type;			/* 24: page type */
+
+	/*
+	 * WiredTiger is no-overwrite: each time a page is written, it's written
+	 * to an unused disk location so torn writes don't corrupt the file.
+	 * This means that writing a page requires updating the page's parent to
+	 * reference the new location.  We don't want to repeatedly write the
+	 * parent on an all-file flush, so we sort the pages for writing based
+	 * on their level in the tree and start writing with the lower levels,
+	 * working our way up to the root.
+	 *
+	 * We don't need the tree level on disk and we could move this field to
+	 * the WT_PAGE structure -- that said, it's only a byte, and it's a lot
+	 * harder to figure out the tree level when reading a page into memory
+	 * than to set it once when the page is created.
+	 *
+	 * Leaf pages are level 1, each higher level of the tree increases by 1.
+	 * The maximum tree level is 255, larger than any practical fan-out.
+	 */
+#define	WT_NOLEVEL	0
+#define	WT_LLEAF	1
+	uint8_t level;			/* 25: tree level */
+
+	/*
+	 * It would be possible to decrease the size of the page header by six
+	 * bytes by only writing out the first 26 bytes of the structure to the
+	 * page, but I'm not bothering -- I don't think the space is worth it
+	 * and having a little bit of on-page data to play with in the future
+	 * can be a good thing.
+	 */
+	uint8_t unused[2];		/* 26-31: unused padding */
+};
+/*
+ * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
+ * ensure the compiler hasn't inserted padding (which would break the world).
+ * The size must also be a multiple of 8 bytes, because compilers will pad it
+ * to align the 64-bit fields to an 8 byte boundary.  Also, the header is
+ * followed by WT_ITEM structures, which require 4-byte alignment.
+ */
+#define	WT_PAGE_DISK_SIZE		28
+
+/*
+ * WT_PAGE_BYTE/WT_PAGE_DISK_BYTE: the first usable data byte on the page.
+ */
+#define	WT_PAGE_BYTE(page)						\
+	WT_PAGE_DISK_BYTE((page)->dsk)
+#define	WT_PAGE_DISK_BYTE(dsk)						\
+	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
+
+/*
  * WT_PAGE --
  * The WT_PAGE structure describes the in-memory information about a file page.
  */
@@ -218,7 +305,7 @@ struct __wt_page {
 	 * WT_PAGE_COL_RLE type pages), a single indx entry may reference a
 	 * large number of records, because there's a single on-page entry that
 	 * represents many identical records.   (We can't expand those entries
-	 * when the page comes into memory because that'd require unacceptable
+	 * when the page comes into memory, that would require unacceptable
 	 * resources as pages are moved to/from the cache, including read-only
 	 * files.)  Instead, a single indx entry represents all of the identical
 	 * records originally found on the page.
@@ -271,6 +358,69 @@ struct __wt_page {
  */
 #define	WT_PAGE_SIZE							\
     WT_ALIGN((6 * sizeof(void *) + 6 * sizeof(uint32_t)), sizeof(void *))
+
+/*
+ * WT_ROW --
+ * The WT_ROW structure describes the in-memory information about a single
+ * key/data pair on a row-store file page.
+ */
+struct __wt_row {
+	/*
+	 * WT_ROW structures are used to describe pages where there's a sort
+	 * key (that is, a row-store, not a column-store, which is "sorted"
+	 * by record number).
+	 *
+	 * The first fields of the WT_ROW structure are the same as the first
+	 * fields of a DBT so we can hand it to a comparison function without
+	 * copying (this is important for keys on internal pages).
+	 *
+	 * If a key requires processing (for example, an overflow key or an
+	 * Huffman encoded key), the key field points to the on-page key,
+	 * but the size is set to 0 to indicate the key is not yet processed.
+	 */
+	void	 *key;			/* Key */
+	uint32_t size;			/* Key length */
+
+	void	 *data;			/* Data */
+};
+/*
+ * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure
+ * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
+ * padding it won't break the world, but we don't want to waste space, and there
+ * are a lot of these structures.
+ */
+#define	WT_ROW_SIZE							\
+	WT_ALIGN(2 * sizeof(void *) + sizeof(uint32_t), sizeof(void *))
+
+/*
+ * WT_COL --
+ * The WT_COL structure describes the in-memory information about a single
+ * item on a column-store file page.
+ */
+struct __wt_col {
+	/*
+	 * The on-page data is untyped for column-store pages -- if the page
+	 * has variable-length objects, it's a WT_ITEM layout, like row-store
+	 * pages.  If the page has fixed-length objects, it's untyped bytes.
+	 */
+	void	 *data;			/* on-page data */
+};
+/*
+ * WT_COL_SIZE is the expected structure size -- we verify the build to ensure
+ * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
+ * padding it won't break the world, but we don't want to waste space, and there
+ * are a lot of these structures.
+ */
+#define	WT_COL_SIZE	(sizeof(void *))
+
+/*
+ * WT_INDX_FOREACH --
+ *	Walk the indexes of an in-memory page: works for both WT_ROW and WT_COL,
+ * based on the type of ip.
+ */
+#define	WT_INDX_FOREACH(page, ip, i)					\
+	for ((i) = (page)->indx_count,					\
+	    (ip) = (page)->indx.indx; (i) > 0; ++(ip), --(i))
 
 /*
  * There are 3 different arrays which map one-to-one to the original on-disk
@@ -372,160 +522,6 @@ struct __wt_repl {
 };
 
 /*
- * WT_PAGE_DISK --
- *
- * All on-disk pages have a common header, defined by the WT_PAGE_DISK
- * structure.  The header has no version number or mode bits, and the page type
- * and/or flags value will have to be modified when changes are made to the page
- * layout.  (The page type appears early in the header to make this simpler.)
- * In other words, the page type declares the contents of the page and how to
- * read it.
- */
-struct __wt_page_disk {
-	/*
-	 * The record number of the first record of the page is stored on disk
-	 * because, if the internal page referencing a column-store leaf page
-	 * is corrupted, it's the only way to know where the leaf page fits in
-	 * the keyspace during salvage.
-	 */
-	uint64_t recno;			/* 00-07: column-store starting recno */
-
-	uint32_t lsn_file;		/* 08-11: LSN file */
-	uint32_t lsn_off;		/* 12-15: LSN file offset */
-
-	uint32_t checksum;		/* 16-19: checksum */
-
-	union {
-		uint32_t entries;	/* 20-23: number of items on page */
-		uint32_t datalen;	/* 20-23: overflow data length */
-	} u;
-
-#define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		2	/* Col store internal page */
-#define	WT_PAGE_COL_RLE		3	/* Col store run-length encoded leaf */
-#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
-#define	WT_PAGE_OVFL		5	/* Page of untyped data */
-#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	8	/* Free-list page */
-	uint8_t type;			/* 24: page type */
-
-	/*
-	 * WiredTiger is no-overwrite: each time a page is written, it's written
-	 * to an unused disk location so torn writes don't corrupt the file.
-	 * This means that writing a page requires updating the page's parent to
-	 * reference the new location.  We don't want to repeatedly write the
-	 * parent on an all-file flush, so we sort the pages for writing based
-	 * on their level in the tree and start writing with the lower levels,
-	 * working our way up to the root.
-	 *
-	 * We don't need the tree level on disk and we could move this field to
-	 * the WT_PAGE structure -- that said, it's only a byte, and it's a lot
-	 * harder to figure out the tree level when reading a page into memory
-	 * than to set it once when the page is created.
-	 *
-	 * Leaf pages are level 1, each higher level of the tree increases by 1.
-	 * The maximum tree level is 255, larger than any practical fan-out.
-	 */
-#define	WT_NOLEVEL	0
-#define	WT_LLEAF	1
-	uint8_t level;			/* 25: tree level */
-
-	/*
-	 * It would be possible to decrease the size of the page header by six
-	 * bytes by only writing out the first 26 bytes of the structure to the
-	 * page, but I'm not bothering -- I don't think the space is worth it
-	 * and having a little bit of on-page data to play with in the future
-	 * can be a good thing.
-	 */
-	uint8_t unused[2];		/* 26-31: unused padding */
-};
-
-/*
- * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding (which would break the world).
- * The size must also be a multiple of 8 bytes, because compilers will pad it
- * to align the 64-bit fields to an 8 byte boundary.  Also, the header is
- * followed by WT_ITEM structures, which require 4-byte alignment.
- */
-#define	WT_PAGE_DISK_SIZE		28
-
-/*
- * WT_PAGE_BYTE/WT_PAGE_DISK_BYTE: the first usable data byte on the page.
- */
-#define	WT_PAGE_BYTE(page)						\
-	WT_PAGE_DISK_BYTE((page)->dsk)
-#define	WT_PAGE_DISK_BYTE(dsk)						\
-	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
-
-/*
- * WT_ROW --
- * The WT_ROW structure describes the in-memory information about a single
- * key/data pair on a row-store file page.
- */
-struct __wt_row {
-	/*
-	 * WT_ROW structures are used to describe pages where there's a sort
-	 * key (that is, a row-store, not a column-store, which is "sorted"
-	 * by record number).
-	 *
-	 * The first fields of the WT_ROW structure are the same as the first
-	 * fields of a DBT so we can hand it to a comparison function without
-	 * copying (this is important for keys on internal pages).
-	 *
-	 * If a key requires processing (for example, an overflow key or an
-	 * Huffman encoded key), the key field points to the on-page key,
-	 * but the size is set to 0 to indicate the key is not yet processed.
-	 */
-	void	 *key;			/* Key */
-	uint32_t size;			/* Key length */
-
-	void	 *data;			/* Data */
-};
-/*
- * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure
- * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
- * padding it won't break the world, but we don't want to waste space, and there
- * are a lot of these structures.
- */
-#define	WT_ROW_SIZE							\
-	WT_ALIGN(2 * sizeof(void *) + sizeof(uint32_t), sizeof(void *))
-
-/*
- * WT_ROW_INSERT --
- * The WT_ROW_INSERT structure describes the in-memory information about an
- * inserted key/data pair on a row-store file page.
- */
-struct __wt_row_insert {
-	WT_ROW	entry;			/* key/data pair */
-	WT_REPL *repl;			/* modifications/deletions */
-
-	WT_ROW_INSERT *next;		/* forward-linked list */
-};
-
-/*
- * WT_COL --
- * The WT_COL structure describes the in-memory information about a single
- * item on a column-store file page.
- */
-struct __wt_col {
-	/*
-	 * The on-page data is untyped for column-store pages -- if the page
-	 * has variable-length objects, it's a WT_ITEM layout, like row-store
-	 * pages.  If the page has fixed-length objects, it's untyped bytes.
-	 */
-	void	 *data;			/* on-page data */
-};
-/*
- * WT_COL_SIZE is the expected structure size -- we verify the build to ensure
- * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
- * padding it won't break the world, but we don't want to waste space, and there
- * are a lot of these structures.
- */
-#define	WT_COL_SIZE	(sizeof(void *))
-
-/*
  * WT_RLE_EXPAND --
  * The WT_RLE_EXPAND structure describes the in-memory information about a
  * replaced key/data pair on a run-length encoded, column-store file page.
@@ -537,15 +533,6 @@ struct __wt_rle_expand {
 
 	WT_RLE_EXPAND *next;		/* forward-linked list */
 };
-
-/*
- * WT_INDX_FOREACH --
- *	Walk the indexes of an in-memory page: works for both WT_ROW and WT_COL,
- * based on the type of ip.
- */
-#define	WT_INDX_FOREACH(page, ip, i)					\
-	for ((i) = (page)->indx_count,					\
-	    (ip) = (page)->indx.indx; (i) > 0; ++(ip), --(i))
 
 /*
  * WT_INDX_AND_KEY_FOREACH --

@@ -37,7 +37,6 @@ struct __wt_ref;		typedef struct __wt_ref WT_REF;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_rle_expand;		typedef struct __wt_rle_expand WT_RLE_EXPAND;
 struct __wt_row;		typedef struct __wt_row WT_ROW;
-struct __wt_row_insert;		typedef struct __wt_row_insert WT_ROW_INSERT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 struct __wt_toc_update;		typedef struct __wt_toc_update WT_TOC_UPDATE;
