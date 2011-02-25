@@ -232,9 +232,7 @@ namespace mongo {
         }
 
         void DurableImpl::commitIfNeeded() {
-#if defined(_DEBUG)
-            commitJob._nSinceCommitIfNeededCall = 0;
-#endif
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
             if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
                 stats.curr->_earlyCommits++;
                 groupCommit();
@@ -542,7 +540,9 @@ namespace mongo {
             }
 
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
-            // write lock instead.  otherwise writes could use too much RAM.
+            // write lock instead.  otherwise journaling could be delayed too long (too much data will 
+            // not accumulate though, as commitIfNeeded logic will have executed in the meantime if there 
+            // has been writes)
             writelock lk;
             groupCommit();
         }
@@ -607,18 +607,11 @@ namespace mongo {
         void recover();
 
         void releasingWriteLock() {
-            try {
-#if defined(_DEBUG)
-                commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
-#endif
-                if (commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit) {
-                    stats.curr->_earlyCommits++;
-                    groupCommit();
-                }
-            }
-            catch(std::exception& e) {
-                log() << "exception in dur::releasingWriteLock causing immediate shutdown: " << e.what() << endl;
-                abort(); // based on myTerminate()
+            // implicit commitIfNeeded check on each write unlock
+            DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
+            if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
+                stats.curr->_earlyCommits++;
+                groupCommit();
             }
         }
 
