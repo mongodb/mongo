@@ -81,7 +81,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			 * If the key is compressed or an overflow, it may not
 			 * have been instantiated yet.
 			 */
-			rip = page->u.irow + indx;
+			rip = page->indx.row + indx;
 			if (__wt_key_process(rip))
 				WT_ERR(__wt_key_build(toc, rip));
 
@@ -122,7 +122,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		 * than or equal to key.
 		 */
 		if (cmp != 0)
-			rip = page->u.irow + (base == 0 ? 0 : base - 1);
+			rip = page->indx.row + (base == 0 ? 0 : base - 1);
 
 		/*
 		 * If we've reached the leaf page, or we've reached the level

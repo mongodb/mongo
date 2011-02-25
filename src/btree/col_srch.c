@@ -52,7 +52,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			cip = page->u.icol + (recno - dsk->recno);
+			cip = page->indx.col + (recno - dsk->recno);
 			goto done;
 		case WT_PAGE_COL_RLE:
 			/*
@@ -82,7 +82,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			 * index the way we do in the row-store binary search,
 			 * key comparisons are cheap here.
 			 */
-			cip = page->u.icol + indx;
+			cip = page->indx.col + indx;
 			start_recno = WT_COL_OFF_RECNO(cip);
 			if (recno == start_recno)
 				break;
@@ -102,7 +102,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		 * than or equal to recno.
 		 */
 		if (recno != start_recno)
-			cip = page->u.icol + (base == 0 ? 0 : base - 1);
+			cip = page->indx.col + (base == 0 ? 0 : base - 1);
 
 		/* If a level was set, see if we found the asked-for page. */
 		if (level == dsk->level)

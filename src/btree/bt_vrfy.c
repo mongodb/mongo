@@ -378,7 +378,7 @@ __wt_verify_pc(WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 	 * believe we're going to be doing real operations in this file.
 	 */
 	child_rip = first_entry ?
-	    child->u.irow : child->u.irow + (child->indx_count - 1);
+	    child->indx.row : child->indx.row + (child->indx_count - 1);
 	if (__wt_key_process(child_rip)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
 		WT_ERR(__wt_item_process(toc, child_rip->key, scratch1));

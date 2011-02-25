@@ -96,7 +96,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	ret = 0;
 
 	WT_ASSERT(env, dsk->u.entries > 0);
-	WT_ASSERT(env, page->u.indx == NULL);
+	WT_ASSERT(env, page->indx.indx == NULL);
 
 	/*
 	 * Determine the maximum number of indexes we'll need for this page
@@ -114,7 +114,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		 */
 		nindx = dsk->u.entries;
 		WT_ERR((
-		    __wt_calloc(env, nindx, sizeof(WT_COL), &page->u.icol)));
+		    __wt_calloc(env, nindx, sizeof(WT_COL), &page->indx.col)));
 		break;
 	case WT_PAGE_ROW_INT:
 		/*
@@ -124,7 +124,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		 */
 		nindx = dsk->u.entries / 2;
 		WT_ERR((
-		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->u.irow)));
+		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->indx.row)));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -134,7 +134,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 		 */
 		nindx = dsk->u.entries * 2;
 		WT_ERR((
-		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->u.irow)));
+		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->indx.row)));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -189,7 +189,7 @@ __wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	uint8_t *p;
 
 	dsk = page->dsk;
-	cip = page->u.icol;
+	cip = page->indx.col;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -214,7 +214,7 @@ __wt_page_inmem_col_int(WT_PAGE *page)
 	uint32_t i;
 
 	dsk = page->dsk;
-	cip = page->u.icol;
+	cip = page->indx.col;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -240,7 +240,7 @@ __wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
 	uint8_t *p;
 
 	dsk = page->dsk;
-	cip = page->u.icol;
+	cip = page->indx.col;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -266,7 +266,7 @@ __wt_page_inmem_col_var(WT_PAGE *page)
 	uint32_t i;
 
 	dsk = page->dsk;
-	cip = page->u.icol;
+	cip = page->indx.col;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -296,7 +296,7 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
 
 	idb = db->idb;
 	dsk = page->dsk;
-	rip = page->u.irow;
+	rip = page->indx.row;
 	huffman = idb->huffman_key;
 
 	/*
@@ -352,7 +352,7 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * overflow (WT_ITEM_KEY_OVFL) items, data are either a single on-page
 	 * (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item.
 	 */
-	rip = page->u.irow;
+	rip = page->indx.row;
 	WT_ITEM_FOREACH(dsk, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:

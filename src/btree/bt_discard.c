@@ -35,7 +35,8 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		__wt_free(env, page->u.icol, page->indx_count * sizeof(WT_COL));
+		__wt_free(
+		    env, page->indx.col, page->indx_count * sizeof(WT_COL));
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -47,7 +48,8 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 		WT_INDX_FOREACH(page, rip, i)
 			if (!__wt_row_key_on_page(page, rip))
 				__wt_free(env, rip->key, rip->size);
-		__wt_free(env, page->u.irow, page->indx_count * sizeof(WT_ROW));
+		__wt_free(
+		    env, page->indx.row, page->indx_count * sizeof(WT_ROW));
 		break;
 	}
 

@@ -225,10 +225,10 @@ struct __wt_page {
 	 */
 	uint32_t indx_count;		/* On-disk entry count */
 	union {				/* On-disk entry index */
-		WT_COL	*icol;		/* On-disk column-store entries */
-		WT_ROW	*irow;		/* On-disk row-store entries */
+		WT_COL	*col;		/* On-disk column-store entries */
+		WT_ROW	*row;		/* On-disk row-store entries */
 		void	*indx;		/* Generic index reference */
-	} u;
+	} indx;
 
 	/*
 	 * Subtree references are stored in the ref array.   When a page that
@@ -279,8 +279,8 @@ struct __wt_page {
  * The WT_{COL,ROW}_SLOT macros return the appropriate array slot based on a
  * WT_{COL,ROW} reference.
  */
-#define	WT_COL_SLOT(page, ip)	((uint32_t)((WT_COL *)(ip) - (page)->u.icol))
-#define	WT_ROW_SLOT(page, ip)	((uint32_t)((WT_ROW *)(ip) - (page)->u.irow))
+#define	WT_COL_SLOT(page, ip)	((uint32_t)((WT_COL *)(ip) - (page)->indx.col))
+#define	WT_ROW_SLOT(page, ip)	((uint32_t)((WT_ROW *)(ip) - (page)->indx.row))
 
 /*
  * The ref array is different from the other three in two ways: first, it
@@ -545,7 +545,7 @@ struct __wt_rle_expand {
  */
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
+	    (ip) = (page)->indx.indx; (i) > 0; ++(ip), --(i))
 
 /*
  * WT_INDX_AND_KEY_FOREACH --
@@ -572,7 +572,7 @@ struct __wt_rle_expand {
  */
 #define	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i)			\
 	for ((key_item) = WT_PAGE_BYTE(page),				\
-	    (rip) = (page)->u.irow, (i) = (page)->indx_count;		\
+	    (rip) = (page)->indx.row, (i) = (page)->indx_count;		\
 	    (i) > 0;							\
 	    ++(rip),							\
 	    key_item = --(i) == 0 ?					\
