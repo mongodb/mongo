@@ -69,13 +69,13 @@ public:
         Writer writer(out, m);
 
         // use low-latency "exhaust" mode if going over the network
-        if (typeid(connBase) == typeid(DBClientConnection&)) {
+        if (!_usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
             DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
             boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
             conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
         }
         else {
-            //This branch should only be taken with DBDirectClient which doesn't support exhaust mode
+            //This branch should only be taken with DBDirectClient or mongos which doesn't support exhaust mode
             scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , queryOptions ));
             while ( cursor->more() ) {
                 writer(cursor->next());
@@ -303,8 +303,6 @@ public:
             opLogStart = op["ts"]._numberLong();
         }
 
-
-
         // check if we're outputting to stdout
         string out = getParam("out");
         if ( out == "-" ) {
@@ -316,6 +314,13 @@ public:
                 cout << "You must specify database and collection to print to stdout" << endl;
                 return -1;
             }
+        }
+
+        {
+            // TODO: when mongos supports QueryOption_Exaust add a version check (SERVER-2628)
+            BSONObj isdbgrid;
+            conn("true").simpleCommand("admin", &isdbgrid, "isdbgrid");
+            _usingMongos = isdbgrid["isdbgrid"].trueValue();
         }
 
         path root( out );
@@ -358,6 +363,7 @@ public:
         return 0;
     }
 
+    bool _usingMongos;
     BSONObj _query;
 };
 
