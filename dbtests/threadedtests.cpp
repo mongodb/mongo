@@ -33,8 +33,8 @@ namespace ThreadedTests {
     class ThreadedTest {
     public:
         virtual void setup() {} //optional
-        virtual void subthread() = 0;
-        virtual void validate() = 0;
+        virtual void subthread(int remaining) = 0; // each thread whatever test work you want done
+        virtual void validate() = 0; // after work is done
 
         static const int nthreads = nthreads_param;
 
@@ -48,12 +48,11 @@ namespace ThreadedTests {
 
     private:
         void launch_subthreads(int remaining) {
-            if (!remaining) return;
+            if (!remaining) 
+                return;
 
-            boost::thread athread(boost::bind(&ThreadedTest::subthread, this));
-
+            boost::thread athread(boost::bind(&ThreadedTest::subthread, this, remaining));
             launch_subthreads(remaining - 1);
-
             athread.join();
         }
     };
@@ -76,7 +75,7 @@ namespace ThreadedTests {
         virtual void setup() {
             mm = new MongoMutex("MongoMutexTest");
         }
-        virtual void subthread() {
+        virtual void subthread(int) {
             Client::initThread("mongomutextest");
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
@@ -139,7 +138,7 @@ namespace ThreadedTests {
         static const int iterations = 1000000;
         AtomicUInt target;
 
-        void subthread() {
+        void subthread(int) {
             for(int i=0; i < iterations; i++) {
                 //target.x++; // verified to fail with this version
                 target++;
@@ -170,7 +169,7 @@ namespace ThreadedTests {
 
     public:
         MVarTest() : target(0) {}
-        void subthread() {
+        void subthread(int) {
             for(int i=0; i < iterations; i++) {
                 int val = target.take();
 #if BOOST_VERSION >= 103500
