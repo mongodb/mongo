@@ -89,7 +89,7 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate a page replacement array if necessary. */
-		if (page->u2.repl == NULL)
+		if (page->u.repl == NULL)
 			WT_ERR(__wt_calloc(env,
 			    page->indx_count, sizeof(WT_REPL *), &new_repl));
 
@@ -112,7 +112,7 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 		}
 							/* #3 */
 		/* Allocate a page expansion array as necessary. */
-		if (page->u2.rleexp == NULL)
+		if (page->u.rleexp == NULL)
 			WT_ERR(__wt_calloc(env, page->indx_count,
 			    sizeof(WT_RLE_EXPAND *), &new_rleexp));
 
@@ -139,12 +139,12 @@ err:		if (exp != NULL)
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
-	if (new_rleexp != NULL && new_rleexp != page->u2.rleexp)
+	if (new_rleexp != NULL && new_rleexp != page->u.rleexp)
 		__wt_free(env,
 		    new_rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
 
 	/* Free any page replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->u2.repl)
+	if (new_repl != NULL && new_repl != page->u.repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
 	WT_PAGE_OUT(toc, page);
@@ -177,17 +177,17 @@ __wt_rle_expand_serial_func(WT_TOC *toc)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->u2.rleexp == NULL)
-		page->u2.rleexp = new_rleexp;
+	if (page->u.rleexp == NULL)
+		page->u.rleexp = new_rleexp;
 
 	/*
 	 * Insert the new WT_RLE_EXPAND as the first item in the forward-linked
 	 * list of expansion structures.  Flush memory to ensure the list is
 	 * never broken.
 	 */
-	exp->next = page->u2.rleexp[slot];
+	exp->next = page->u.rleexp[slot];
 	WT_MEMORY_FLUSH;
-	page->u2.rleexp[slot] = exp;
+	page->u.rleexp[slot] = exp;
 
 err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);

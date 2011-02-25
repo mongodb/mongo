@@ -58,7 +58,7 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_LEAF:
-		if (page->u2.repl != NULL)
+		if (page->u.repl != NULL)
 			__wt_page_discard_repl(env, page);
 		break;
 	}
@@ -66,7 +66,7 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	/* Free the run-length encoded column-store expansion array. */
 	switch (type) {
 	case WT_PAGE_COL_RLE:
-		if (page->u2.rleexp != NULL)
+		if (page->u.rleexp != NULL)
 			__wt_page_discard_rleexp(env, page);
 		break;
 	}
@@ -75,8 +75,8 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	switch (type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		if (page->u2.ref != NULL)
-			__wt_free(env, page->u2.ref,
+		if (page->u.ref != NULL)
+			__wt_free(env, page->u.ref,
 			    page->indx_count * sizeof(WT_REF));
 		break;
 	}
@@ -105,7 +105,7 @@ __wt_page_discard_repl(ENV *env, WT_PAGE *page)
 			__wt_page_discard_repl_list(env, *replp);
 
 	/* Free the page's array of replacements. */
-	__wt_free(env, page->u2.repl, page->indx_count * sizeof(WT_REPL *));
+	__wt_free(env, page->u.repl, page->indx_count * sizeof(WT_REPL *));
 }
 
 /*
@@ -139,7 +139,7 @@ __wt_page_discard_rleexp(ENV *env, WT_PAGE *page)
 
 	/* Free the page's expansion array. */
 	__wt_free(
-	    env, page->u2.rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
+	    env, page->u.rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
 }
 
 /*

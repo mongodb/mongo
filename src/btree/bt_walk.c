@@ -203,7 +203,7 @@ eop:			e->visited = 1;
 
 	/* Find the next WT_REF/WT_PAGE pair present in the cache. */
 	for (;;) {
-		ref = &page->u2.ref[e->indx];
+		ref = &page->u.ref[e->indx];
 
 		/* We only care about pages in the cache. */
 		if (ref->state == WT_REF_CACHE)

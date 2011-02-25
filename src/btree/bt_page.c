@@ -143,8 +143,8 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_calloc(env, nindx, sizeof(WT_REF), &page->u2.ref));
-		for (i = 0, cp = page->u2.ref; i < nindx; ++i, ++cp)
+		WT_RET(__wt_calloc(env, nindx, sizeof(WT_REF), &page->u.ref));
+		for (i = 0, cp = page->u.ref; i < nindx; ++i, ++cp)
 			cp->state = WT_REF_DISK;
 		break;
 	}

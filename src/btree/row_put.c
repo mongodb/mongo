@@ -51,7 +51,7 @@ __wt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 	page = toc->srch_page;
 
 	/* Allocate a page replacement array as necessary. */
-	if (page->u2.repl == NULL)
+	if (page->u.repl == NULL)
 		WT_ERR(__wt_calloc(
 		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
 
@@ -68,7 +68,7 @@ err:		if (repl != NULL)
 	}
 
 	/* Free any replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->u2.repl)
+	if (new_repl != NULL && new_repl != page->u.repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
 	WT_PAGE_OUT(toc, page);
@@ -100,17 +100,17 @@ __wt_item_update_serial_func(WT_TOC *toc)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->u2.repl == NULL)
-		page->u2.repl = new_repl;
+	if (page->u.repl == NULL)
+		page->u.repl = new_repl;
 
 	/*
 	 * Insert the new WT_REPL as the first item in the forward-linked list
 	 * of replacement structures.  Flush memory to ensure the list is never
 	 * broken.
 	 */
-	repl->next = page->u2.repl[slot];
+	repl->next = page->u.repl[slot];
 	WT_MEMORY_FLUSH;
-	page->u2.repl[slot] = repl;
+	page->u.repl[slot] = repl;
 
 err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);

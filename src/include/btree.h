@@ -345,7 +345,7 @@ struct __wt_page {
 		WT_REF	       *ref;	/* Internal: subtree references */
 		WT_REPL	      **repl;	/* Leaf: Modification/deletion index */
 		WT_RLE_EXPAND **rleexp;	/* Leaf: RLE expansion index */
-	} u2;
+	} u;
 };
 /*
  * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure
@@ -439,8 +439,8 @@ struct __wt_col {
  * individually allocated structures.  The WT_{COL,ROW}_REF macros return
  * the appropriate entry based on a WT_{COL,ROW} reference.
  */
-#define	WT_COL_REF(page, ip)	(&((page)->u2.ref[WT_COL_SLOT(page, ip)]))
-#define	WT_ROW_REF(page, ip)	(&((page)->u2.ref[WT_ROW_SLOT(page, ip)]))
+#define	WT_COL_REF(page, ip)	(&((page)->u.ref[WT_COL_SLOT(page, ip)]))
+#define	WT_ROW_REF(page, ip)	(&((page)->u.ref[WT_ROW_SLOT(page, ip)]))
 
 /*
  * The other arrays may not exist, and are arrays of pointers to individually
@@ -449,11 +449,11 @@ struct __wt_col {
  */
 #define	__WT_COL_ARRAY(page, ip, field)					\
 	((page)->field == NULL ? NULL : (page)->field[WT_COL_SLOT(page, ip)])
-#define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u2.repl)
-#define	WT_COL_RLEEXP(page, ip)	__WT_COL_ARRAY(page, ip, u2.rleexp)
+#define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u.repl)
+#define	WT_COL_RLEEXP(page, ip)	__WT_COL_ARRAY(page, ip, u.rleexp)
 #define	__WT_ROW_ARRAY(page, ip, field)					\
 	((page)->field == NULL ? NULL : (page)->field[WT_ROW_SLOT(page, ip)])
-#define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u2.repl)
+#define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u.repl)
 
 /*
  * WT_REF --
@@ -571,7 +571,7 @@ struct __wt_rle_expand {
  */
 #define	WT_REPL_FOREACH(page, replp, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (replp) = (page)->u2.repl; (i) > 0; ++(replp), --(i))
+	    (replp) = (page)->u.repl; (i) > 0; ++(replp), --(i))
 
 /*
  * WT_RLE_EXPAND_FOREACH --
@@ -580,7 +580,7 @@ struct __wt_rle_expand {
  */
 #define	WT_RLE_EXPAND_FOREACH(page, exp, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->u2.rleexp; (i) > 0; ++(exp), --(i))
+	    (exp) = (page)->u.rleexp; (i) > 0; ++(exp), --(i))
 
 /*
  * WT_REF_FOREACH --
@@ -588,7 +588,7 @@ struct __wt_rle_expand {
  */
 #define	WT_REF_FOREACH(page, ref, i)					\
 	for ((i) = (page)->indx_count,					\
-	    (ref) = (page)->u2.ref; (i) > 0; ++(ref), --(i))
+	    (ref) = (page)->u.ref; (i) > 0; ++(ref), --(i))
 
 /*
  * On row-store internal pages, the on-page data referenced by the WT_ROW field
