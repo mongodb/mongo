@@ -386,7 +386,13 @@ namespace mongo {
                     sleepmicros( micros );
             }
             else {
-                warning() << "ClientCursor::yield can't unlock b/c of recursive lock ns: " << ns << endl;
+                CurOp * c = cc().curop();
+                while ( c->parent() )
+                    c = c->parent();
+                warning() << "ClientCursor::yield can't unlock b/c of recursive lock"
+                          << " ns: " << ns 
+                          << " top: " << c->info()
+                          << endl;
             }
         }
     }
