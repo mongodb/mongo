@@ -1,12 +1,15 @@
 
 all:
+	scons util/ipv6_parser.h
 	scons -j `cat /proc/cpuinfo | grep processor | wc -l` all
 
 debug:
 	scons --d -j `cat /proc/cpuinfo | grep processor | wc -l` all
 
 install: # as root
-	scons --prefix=/opt/mongo install
+	scons --full --sharedclient --prefix=/usr/local install
+	echo "/usr/local/lib64" > /etc/ld.so.conf.d/mongodb.conf
+	/sbin/ldconfig
 
 build_deps:
 	yum -y install git tcsh scons gcc-c++ glibc-devel
@@ -28,10 +31,10 @@ test_js_ip_addr: # as root
 	python buildscripts/smoke.py jstests/ipaddr.js
 
 run_server: # as root
-	/opt/mongo/bin/mongod --fork --dbpath=$(MONGO_DB_PATH) --logpath=$(MONGOD_LOGFILE)
+	/usr/local/bin/mongod --fork --dbpath=$(MONGO_DB_PATH) --logpath=$(MONGOD_LOGFILE)
 
 run_shell:
-	/opt/mongo/bin/mongo
+	/usr/local/bin/mongo
 
 js-1.7.0.tar.gz:
 	curl -O ftp://ftp.mozilla.org/pub/mozilla.org/js/js-1.7.0.tar.gz
@@ -45,6 +48,6 @@ js.lib: js-1.7.0.tar.gz
 
 clean:
 	scons --clean
-	rm -rf js-1.7.0.tar.gz js
+	rm -rf js-1.7.0.tar.gz js *.so *.a
 
 
