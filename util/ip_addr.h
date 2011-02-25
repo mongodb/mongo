@@ -39,6 +39,12 @@ class IP_Addr
 
     IP_Addr() {}
 
+    /*** Create an IPv4 or IPv6 address
+     *   @param p_data A pointer to a char[5] or char[17], where the first byte
+     *          is the number of bits in the netmask, and the remaining bytes
+     *          represent the IP address in network order.
+     *   @param p_length Set to 5 for IPv4 or 17 for IPv6
+     **/
     IP_Addr(const char* p_data, uint16_t p_length)
     {
         if (p_length == 5)
@@ -61,13 +67,52 @@ class IP_Addr
         }
     }
 
+    /*** Create an IPv4 or IPv6 address
+     *   @param p_data A pointer to a char[4] or char[16], where the bytes
+     *          represent the IP address in network order.
+     *   @param p_netmask The number of bits in the network mask
+     *   @param p_length Set to 4 for IPv4 or 16 for IPv6
+     **/
+    IP_Addr(const char* p_data, uint8_t p_netmask, uint16_t p_length)
+    {
+        if (p_length == 4)
+        {
+            m_ip_version = 4;
+            m_mask = p_netmask;
+            *(uint32_t*)m_addr = *(uint32_t*)&p_data[0];
+        }
+        else
+        if (p_length == 16)
+        {
+            m_ip_version = 6;
+            m_mask = p_netmask;
+            *(uint64_t*)&m_addr[0] = *(uint64_t*)&p_data[0];
+            *(uint64_t*)&m_addr[8] = *(uint64_t*)&p_data[8];
+        }
+        else
+        {
+            assert(false);
+        }
+    }
+
+    /*** Create an IPv4 address
+     *   @param p_ipv4_network IPv4 Address in network order
+     *   @param p_netmask Number of bits in the netmask
+     **/
+    IP_Addr(uint32_t p_ipv4_network, uint8_t p_netmask)
+    {
+        m_ip_version = 4;
+        m_mask = p_netmask;
+        *(uint32_t*)m_addr = *(uint32_t*)&p_ipv4_network;
+    }
+
     ~IP_Addr() {}
 
     // Get Accessors
     uint8_t getVersion(void) const { return m_ip_version; }
     uint8_t getNetmask(void) const { return m_mask; }
-    const char* getBinDataPtr(void) { return (const char*)&m_mask; }
-    uint8_t getBinDataLength(void)
+    const char* getBinDataPtr(void) const { return (const char*)&m_mask; }
+    uint8_t getBinDataLength(void) const
     {
         if (m_ip_version == 4)
             return 5;
@@ -118,25 +163,14 @@ class IP_Addr
 
     bool containsIPv4(void) const
     {
-        if (m_ip_version == 6)
-        {
-#ifdef BIG_ENDIAN
-            return (IP_LONG(0) == 0) && (IP_WORD(2) == 0x0000FFFF);
-#else
-            return (IP_LONG(0) == 0) && (IP_WORD(2) == 0xFFFF0000);
-#endif
-        }
-
-        return false;
+        return (m_ip_version == 6) &&
+               (IP_LONG(0) == 0) && (IP_SHORT(4) == 0) && (IP_SHORT(5) == 0xFFFF);
     }
 
 
     bool isUnspecified(void) const
     {
-        if (m_ip_version == 6)
-            return (IP_LONG(0) == 0) && (IP_LONG(1) == 0);
-
-        return false;
+        return (m_ip_version == 6) && (IP_LONG(0) == 0) && (IP_LONG(1) == 0);
     }
 
 
@@ -520,20 +554,6 @@ class IP_Addr
 
 
 }; // end class IP_Addr
-
-
-
-#include "ipv6_parser.h"
-
-inline bool IP_Addr::parseIPv6(std::string& p_ipstring)
-{
-    IPv6_Parser ipp;
-    if (!ipp.parse(p_ipstring))
-        return false;
-
-    *this = ipp.getIPv6();
-    return true;
-}
 
 
 
