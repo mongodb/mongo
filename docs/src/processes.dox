@@ -16,7 +16,6 @@ When ::wiredtiger_open is called for a database, one of the following occurs:
 # no process has the database open, but it was not closed cleanly.  In this case, the process becomes the primary and recovery is run before the database is opened.  See @ref transaction_recovery for details.
 # another process has the database open and is running the RPC server, in which case the opening process becomes a client.
 # another process has the database open but is not running the RPC server, in which case the open fails.
-e
 
 @section processes_example Code Samples
 
