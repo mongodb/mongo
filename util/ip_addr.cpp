@@ -17,6 +17,7 @@
  */
 
 #include "ip_addr.h"
+#include "ipv6_parser.h"
 
 
 bool IP_Addr::parseIPv4(std::string& p_ipstring)
@@ -384,4 +385,14 @@ bool IP_Addr::parseIPv4(std::string& p_ipstring)
     return false;
 }
 
+
+bool IP_Addr::parseIPv6(std::string& p_ipstring)
+{
+    IPv6_Parser ipp;
+    if (!ipp.parse(p_ipstring))
+        return false;
+
+    *this = ipp.getIPv6();
+    return true;
+}
 
