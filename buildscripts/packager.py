@@ -620,16 +620,41 @@ def make_rpm(dir, distro, arch, pkgbase, suffix, version):
     topdir=ensure_dir(os.getcwd()+'/rpmbuild/')
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
         ensure_dir("%s/%s/" % (topdir, subdir))
-    # Gah.  RPM is so mindbogglingly stupid.
-    rcfile=os.getcwd()+"/rpmrc"
-    macrofile=os.getcwd()+"/macros"
-    write_rpmrc_file(rcfile, macrofile)
-    write_rpm_macros_file(macrofile, topdir)
+    distro_arch="i686" if arch.endswith("86") else "x86_64"
+    # RPM tools take these macro files that define variables in
+    # RPMland.  Unfortunately, there's no way to tell RPM tools to use
+    # a given file *in addition* to the files that it would already
+    # load, so we have to figure out what it would normally load,
+    # augment that list, and tell RPM to use the augmented list.  To
+    # figure out what macrofiles ordinarily get loaded, older RPM
+    # versions had a parameter called "macrofiles" that could be
+    # extracted from "rpm --showrc".  But newer RPM versions don't
+    # have this.  To tell RPM what macros to use, older versions of
+    # RPM have a --macros option that doesn't work; on these versions,
+    # you can put a "macrofiles" parameter into an rpmrc file.  But
+    # that "macrofiles" setting doesn't do anything for newer RPM
+    # versions, where you have to use the --macros flag instead.  And
+    # all of this is to let us do our work with some guarantee that
+    # we're not clobbering anything that doesn't belong to us.  Why is
+    # RPM so braindamaged?
+    macrofiles=[l for l in backtick(["rpm", "--showrc"]).split("\n") if l.startswith("macrofiles")]
+    flags=[]
+    macropath=os.getcwd()+"/macros"
+    write_rpm_macros_file(macropath, topdir)
+    if len(macrofiles)>0:
+        macrofiles=macrofiles[0]+":"+macropath
+        rcfile=os.getcwd()+"/rpmrc"
+        write_rpmrc_file(rcfile, macrofiles)
+        flags=["--rpmrc", rcfile]
+    else:
+        # This hard-coded hooey came from some box running RPM
+        # 4.4.2.3.  It may not work over time, but RPM isn't sanely
+        # configurable.
+        flags=["--macros", "/usr/lib/rpm/macros:/usr/lib/rpm/%s-linux/macros:/etc/rpm/macros.*:/etc/rpm/macros:/etc/rpm/%s-linux/macros:~/.rpmmacros:%s" % (distro_arch, distro_arch, macropath)]
     # Put the specfile and the tar'd up binaries and stuff in
     # place. FIXME: see if shutil.copyfile can do this without too
     # much hassle.
     sysassert(["cp", "-v", specfile, topdir+"SPECS/"])
-    distro_arch="i686" if arch.endswith("86") else "x86_64"
     oldcwd=os.getcwd()
     os.chdir(dir+"/../")
     try:
@@ -637,7 +662,7 @@ def make_rpm(dir, distro, arch, pkgbase, suffix, version):
     finally:
         os.chdir(oldcwd)
     # Do the build.
-    sysassert(["rpmbuild", "-ba", "--target", distro_arch, "--rcfile", rcfile, "%s/SPECS/mongo%s.spec" % (topdir, suffix)])
+    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongo%s.spec" % (topdir, suffix)])
     r=repodir(distro, distro_arch)
     ensure_dir(r)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob
@@ -654,11 +679,10 @@ def make_rpm_repo(repo):
         os.chdir(oldpwd)
 
 
-def write_rpmrc_file(path, macropath):
-    macrofiles=[l for l in backtick(["rpm", "--showrc"]).split("\n") if l.startswith("macrofiles")][0]
+def write_rpmrc_file(path, string):
     f=open(path, 'w')
     try:
-        f.write(macrofiles+":"+macropath)
+        f.write(string)
     finally:
         f.close()
 
