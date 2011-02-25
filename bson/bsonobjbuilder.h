@@ -24,6 +24,8 @@
 
 #include <limits>
 #include <cmath>
+#include "../util/ip_addr.h"
+#include "../util/mac_addr.h"
 using namespace std;
 
 namespace mongo {
@@ -463,6 +465,39 @@ namespace mongo {
         }
         BSONObjBuilder& appendBinData( const StringData& fieldName, int len, BinDataType type, const unsigned char *data ) {
             return appendBinData(fieldName, len, type, (const char *) data);
+        }
+
+        /** Append a UUID binary data element
+            @param fieldName name of the field
+            @param data the 16 element byte array
+        */
+        BSONObjBuilder& appendUUID( const StringData& fieldName, const char *data ) {
+            return appendBinData( fieldName, 16, bdtUUID, data );
+        }
+
+        /** Append an IPv4 or IPv6 address element
+            @param fieldName name of the field
+            @param ipAddr an IPv4 or IPv6 address
+        */
+        BSONObjBuilder& appendIP( const StringData& fieldName, const IP_Addr& ipAddr) {
+            return appendBinData( fieldName, ipAddr.getBinDataLength(), bdtIpAddr,
+                                  ipAddr.getBinDataPtr() );
+        }
+
+        /** Append a MAC address element
+            @param fieldName name of the field
+            @param data the 6 element byte array
+        */
+        BSONObjBuilder& appendMAC( const StringData& fieldName, const MAC_Addr& macAddr ) {
+            return appendBinData( fieldName, 6, bdtIpAddr, (const char*)&macAddr );
+        }
+
+        /** Append a MAC address element
+            @param fieldName name of the field
+            @param data the 6 element byte array
+        */
+        BSONObjBuilder& appendMAC( const StringData& fieldName, const char *data ) {
+            return appendBinData( fieldName, 6, bdtIpAddr, data );
         }
 
         /**
