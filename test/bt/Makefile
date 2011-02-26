@@ -15,10 +15,10 @@ t: ${OBJS} ${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 	cc -g -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB} -lpthread
 
 clean:
-	rm -f t tags ${OBJS}
+	rm -f t tags ${OBJS} *.core vgcore*
 
 distclean realclean: clean
-	rm -f __* *.core
+	rm -f __*
 
 bdb.o:
 	${CC} ${CFLAGS} -I${BDB} -c $< -o $@
