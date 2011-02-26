@@ -38,11 +38,9 @@ typedef struct {
 static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
-static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_overflow(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_common(
 		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_overflow_row_int(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_overflow_row_leaf(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_pc(WT_TOC *, WT_ROW_REF *, WT_PAGE *, int);
 static int __wt_verify_tree(WT_TOC *,
 		WT_ROW_REF *, WT_PAGE *, uint64_t, uint32_t, WT_VSTUFF *);
@@ -240,13 +238,9 @@ __wt_verify_tree(
 	 */
 	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_verify_overflow_col(toc, page, vs));
-		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_verify_overflow_row_int(toc, page, vs));
-		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow_row_leaf(toc, page, vs));
+		WT_RET(__wt_verify_overflow(toc, page, vs));
 		break;
 	}
 
@@ -432,90 +426,35 @@ err:	if (scratch1 != NULL)
 }
 
 /*
- * __wt_verify_overflow_col --
- *	Check on-page column-store overflow references.
+ * __wt_verify_overflow --
+ *	Verify overflow items.
  */
 static int
-__wt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
-	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
 
 	dsk = page->dsk;
 
-	/* Walk the in-memory page, verifying overflow items. */
+	/*
+	 * Overflow items aren't "in-memory", they're on-disk.  Ignore the fact
+	 * they might have been deleted or replaced, that doesn't mean anything
+	 * until reconciliation writes them to disk.
+	 *
+	 * Walk the disk page, verifying overflow items.
+	 */
 	entry_num = 0;
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_ITEM_FOREACH(dsk, item, i) {
 		++entry_num;
-		item = WT_COL_PTR(dsk, cip);
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
+		switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DATA_OVFL:
 			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(item),
 			    entry_num, page->addr, vs));
-	}
-	return (0);
-}
-
-/*
- * __wt_verify_overflow_row_int --
- *	Check on-page row-store internal page overflow references.
- */
-static int
-__wt_verify_overflow_row_int(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
-{
-	WT_ITEM *key_item;
-	WT_ROW_REF *rref;
-	uint32_t entry_num, i;
-
-	/*
-	 * Walk the in-memory page, verifying overflow items.
-	 *
-	 * We have to walk the original disk page as well as the current page:
-	 * see the comment at WT_ROW_REF_INDX_AND_KEY_FOREACH for details.
-	 */
-	entry_num = 0;
-	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_item, i) {
-		++entry_num;
-		if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
-			WT_RET(__wt_verify_overflow_common(
-			    toc, WT_ITEM_BYTE_OVFL(key_item),
-			    entry_num, page->addr, vs));
-	}
-	return (0);
-}
-
-/*
- * __wt_verify_overflow_row_leaf --
- *	Check on-page row-store leaf overflow references.
- */
-static int
-__wt_verify_overflow_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
-{
-	WT_ITEM *data_item, *key_item;
-	WT_ROW *rip;
-	uint32_t entry_num, i;
-
-	/*
-	 * Walk the in-memory page, verifying overflow items.
-	 *
-	 * We have to walk the original disk page as well as the current page:
-	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
-	 */
-	entry_num = 0;
-	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
-		++entry_num;
-		if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
-			WT_RET(__wt_verify_overflow_common(
-			    toc, WT_ITEM_BYTE_OVFL(key_item),
-			    entry_num, page->addr, vs));
-
-		data_item = rip->data;
-		if (WT_ITEM_TYPE(data_item) == WT_ITEM_DATA_OVFL)
-			WT_RET(__wt_verify_overflow_common(
-			    toc, WT_ITEM_BYTE_OVFL(data_item),
-			    entry_num, page->addr, vs));
+		}
 	}
 	return (0);
 }
