@@ -130,6 +130,9 @@ skip_ops:	if (wts_stats())		/* Statistics */
 		printf("\n");
 	}
 
+	if (g.rand_log != NULL)
+		(void)fclose(g.rand_log);
+
 	return (EXIT_SUCCESS);
 
 err:	config_dump(1);
