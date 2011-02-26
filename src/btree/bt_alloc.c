@@ -238,7 +238,7 @@ __wt_block_read(WT_TOC *toc)
 	WT_RET(__wt_scr_alloc(toc, idb->free_off.size, &tmp));
 
 	/* Read in the free-list. */
-	WT_ERR(__wt_page_disk_read(
+	WT_ERR(__wt_disk_read(
 	    toc, tmp->data, idb->free_off.addr, idb->free_off.size));
 
 	/* Insert the free-list items into the linked list. */
@@ -332,7 +332,7 @@ __wt_block_write(WT_TOC *toc)
 	WT_ERR(__wt_desc_write(toc));
 
 	/* Write the free list. */
-	ret = __wt_page_disk_write(toc, dsk, addr, size);
+	ret = __wt_disk_write(toc, dsk, addr, size);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);

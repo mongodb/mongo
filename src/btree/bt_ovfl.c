@@ -57,7 +57,7 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 		WT_RET(__wt_realloc(env, &store->mem_size, size, &store->data));
 
 	/* Read the page. */
-	WT_RET(__wt_page_disk_read(toc, store->data, ovfl->addr, size));
+	WT_RET(__wt_disk_read(toc, store->data, ovfl->addr, size));
 
 	/* Copy the actual data in the DBT down to the start of the data. */
 	(void)memmove(store->data,

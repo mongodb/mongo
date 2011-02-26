@@ -8,12 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_page_disk_read --
+ * __wt_disk_read --
  *	Read a file page.
  */
 int
-__wt_page_disk_read(
-    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_disk_read(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	DB *db;
 	ENV *env;
@@ -44,12 +43,11 @@ __wt_page_disk_read(
 }
 
 /*
- * __wt_page_disk_write --
+ * __wt_disk_write --
  *	Write a file page.
  */
 int
-__wt_page_disk_write(
-    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_disk_write(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	DB *db;
 	ENV *env;

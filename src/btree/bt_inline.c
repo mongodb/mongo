@@ -96,7 +96,7 @@ __wt_key_process(void *ref)
 static inline int
 __wt_page_write(WT_TOC *toc, WT_PAGE *page)
 {
-	return (__wt_page_disk_write(toc, page->dsk, page->addr, page->size));
+	return (__wt_disk_write(toc, page->dsk, page->addr, page->size));
 }
 
 /*

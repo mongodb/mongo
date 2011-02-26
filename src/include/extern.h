@@ -98,11 +98,9 @@ __wt_rle_expand_sort(ENV *env,
 int
 __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
 int
-__wt_page_disk_read(
-    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+__wt_disk_read(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
-__wt_page_disk_write(
-    WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+__wt_disk_write(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
 __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg);
 int

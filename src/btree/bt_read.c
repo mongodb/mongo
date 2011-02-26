@@ -234,7 +234,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_VERBOSE(env, WT_VERB_READ,
 	    (env, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
 
-	WT_ERR(__wt_page_disk_read(toc, dsk, addr, size));
+	WT_ERR(__wt_disk_read(toc, dsk, addr, size));
 	WT_CACHE_PAGE_IN(cache, size);
 
 	/* If the page needs to be verified, that's next. */

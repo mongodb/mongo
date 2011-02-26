@@ -848,8 +848,8 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	 * Read the overflow page into our scratch buffer and write it out to
 	 * the new location, without change.
 	 */
-	if ((ret = __wt_page_disk_read(toc, tmp->data, from->addr, size)) == 0)
-		ret = __wt_page_disk_write(toc, tmp->data, to->addr, size);
+	if ((ret = __wt_disk_read(toc, tmp->data, from->addr, size)) == 0)
+		ret = __wt_disk_write(toc, tmp->data, to->addr, size);
 
 err:	__wt_scr_release(&tmp);
 

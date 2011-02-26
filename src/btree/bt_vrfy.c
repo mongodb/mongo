@@ -543,7 +543,7 @@ __wt_verify_overflow_common(WT_TOC *toc,
 
 	/* Read the page. */
 	dsk = scratch1->data;
-	WT_ERR(__wt_page_disk_read(toc, dsk, addr, size));
+	WT_ERR(__wt_disk_read(toc, dsk, addr, size));
 
 	/*
 	 * Verify the disk image -- this function would normally be called
