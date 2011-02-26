@@ -805,8 +805,6 @@ namespace mongo {
         dropNS(name);
     }
 
-    int nUnindexes = 0;
-
     /* unindex all keys in index for this record. */
     static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
         BSONObjSetDefaultOrder keys;
@@ -817,7 +815,7 @@ namespace mongo {
                 out() << "_unindexRecord() " << obj.toString();
                 out() << "\n  unindex:" << j.toString() << endl;
             }
-            nUnindexes++;
+
             bool ok = false;
             try {
                 ok = id.head.btree()->unindex(id.head, id, j, dl);
