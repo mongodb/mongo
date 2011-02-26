@@ -558,7 +558,7 @@ struct __wt_col {
 	 * Column-store leaf page references are page offsets, not pointers (we
 	 * boldly re-invent short pointers).  The trade-off is 4B per data item
 	 * on a 64-bit machine vs. a single cycle to do an addition to the base
-	 * pointer.   
+	 * pointer.
 	 *
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_ITEM layout, like row-store
