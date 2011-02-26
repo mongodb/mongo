@@ -62,12 +62,12 @@ namespace mongo {
         virtual void printExtraHelpAfter( ostream & out ) {
             out << "\n";
             out << " Fields\n";
-            out << "   inserts  \t- # of inserts per second\n";
+            out << "   inserts  \t- # of inserts per second (* means replicated op)\n";
             out << "   query    \t- # of queries per second\n";
             out << "   update   \t- # of updates per second\n";
             out << "   delete   \t- # of deletes per second\n";
             out << "   getmore  \t- # of get mores (cursor batch) per second\n";
-            out << "   command  \t- # of commands per second\n";
+            out << "   command  \t- # of commands per second, on a slave its local|replicated\n";
             out << "   flushes  \t- # of fsync flushes per second\n";
             out << "   mapped   \t- amount of data mmaped (total data size) megabytes\n";
             out << "   vsize    \t- virtual size of process in megabytes\n";
@@ -80,6 +80,13 @@ namespace mongo {
             out << "   netIn    \t- network traffic in - bits\n";
             out << "   netOut   \t- network traffic out - bits\n";
             out << "   conn     \t- number of open connections\n";
+            out << "   set      \t- replica set name\n";
+            out << "   repl     \t- replication type \n";
+            out << "            \t    M   - master\n";
+            out << "            \t    SEC - secondary\n";
+            out << "            \t    REC - recovering\n";
+            out << "            \t    UNK - unknown\n";
+            out << "            \t    SLV - slave\n";
         }
 
 
