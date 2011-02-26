@@ -15,7 +15,7 @@ t: ${OBJS} ${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 	cc -g -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB} -lpthread
 
 clean:
-	rm -f t tags ${OBJS} *.core vgcore*
+	rm -f t tags ${OBJS} *.core vgout.* vgcore*
 
 distclean realclean: clean
 	rm -f __*

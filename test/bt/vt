@@ -1,0 +1,7 @@
+#! /bin/sh
+
+valgrind \
+--leak-check=yes \
+--log-file=vgout.%p \
+--track-fds=yes \
+./t -1
