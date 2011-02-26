@@ -100,17 +100,17 @@ __wt_page_write(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_set_ff_and_sa_from_offset --
- *	Set first-free and space-available values from an address positioned
- *	one past the last used byte on the page.
+ * __wt_init_ff_and_sa --
+ *	Initialize first-free and space-available values for a page.
  */
 static inline void
-__wt_set_ff_and_sa_from_offset(WT_PAGE *page,
-    void *p, uint8_t **first_freep, uint32_t *space_availp)
+__wt_init_ff_and_sa(
+    WT_PAGE *page, uint8_t **first_freep, uint32_t *space_availp)
 {
-	*first_freep = (uint8_t *)p;
-	*space_availp =
-	    page->size - (uint32_t)((uint8_t *)p - (uint8_t *)page->dsk);
+	uint8_t *p;
+
+	*first_freep = p = WT_PAGE_BYTE(page);
+	*space_availp = page->size - (uint32_t)(p - (uint8_t *)page->dsk);
 }
 
 /*

@@ -115,8 +115,7 @@ __wt_bulk_fix(WT_TOC *toc,
 	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
 	dsk = page->dsk;
 	dsk->recno = 1;
-	__wt_set_ff_and_sa_from_offset(
-	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
+	__wt_init_ff_and_sa(page, &first_free, &space_avail);
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
@@ -175,8 +174,7 @@ __wt_bulk_fix(WT_TOC *toc,
 			dsk->u.entries = 0;
 			dsk->recno = insert_cnt;
 			WT_ERR(__wt_block_alloc(toc, &page->addr, db->leafmin));
-			__wt_set_ff_and_sa_from_offset(page,
-			    WT_PAGE_BYTE(page), &first_free, &space_avail);
+			__wt_init_ff_and_sa(page, &first_free, &space_avail);
 		}
 		++dsk->u.entries;
 
@@ -257,8 +255,7 @@ __wt_bulk_var(WT_TOC *toc,
 	page_type = is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
 	WT_ERR(__wt_bulk_scratch_page(
 	    toc, db->leafmin, page_type, WT_LLEAF, &page, &tmp));
-	__wt_set_ff_and_sa_from_offset(
-	    page, WT_PAGE_BYTE(page), &first_free, &space_avail);
+	__wt_init_ff_and_sa(page, &first_free, &space_avail);
 	if (is_column)
 		page->dsk->recno = 1;
 
@@ -352,8 +349,7 @@ __wt_bulk_var(WT_TOC *toc,
 			 */
 			WT_ERR(__wt_bulk_scratch_page(toc,
 			    db->leafmin, page_type, WT_LLEAF, &page, &tmp));
-			__wt_set_ff_and_sa_from_offset(page,
-			    WT_PAGE_BYTE(page), &first_free, &space_avail);
+			__wt_init_ff_and_sa(page, &first_free, &space_avail);
 			if (is_column)
 				page->dsk->recno = insert_cnt;
 		}
@@ -572,8 +568,7 @@ split:		switch (dsk->type) {
 
 		WT_ERR(__wt_bulk_scratch_page(toc, db->intlmin,
 		    type, (uint32_t)dsk->level + 1, &next, &next_tmp));
-		__wt_set_ff_and_sa_from_offset(next,
-		    WT_PAGE_BYTE(next), &next_first_free, &next_space_avail);
+		__wt_init_ff_and_sa(next, &next_first_free, &next_space_avail);
 
 		/*
 		 * Column-store pages set the starting record number to the

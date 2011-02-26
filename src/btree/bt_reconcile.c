@@ -207,8 +207,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint8_t *first_free;
 
 	dsk = new->dsk;
-	__wt_set_ff_and_sa_from_offset(
-	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		from = cip->data;
@@ -251,8 +250,7 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint8_t *first_free;
 
 	dsk = new->dsk;
-	__wt_set_ff_and_sa_from_offset(
-	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	/*
 	 * We have to walk both the WT_ROW structures and the original page --
@@ -331,8 +329,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	dsk = new->dsk;
 	ret = 0;
 
-	__wt_set_ff_and_sa_from_offset(
-	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
@@ -408,8 +405,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	last_data = NULL;
 	ret = 0;
 
-	__wt_set_ff_and_sa_from_offset(
-	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
@@ -611,8 +607,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint8_t *first_free;
 
 	dsk = new->dsk;
-	__wt_set_ff_and_sa_from_offset(
-	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	WT_CLEAR(data_dbt);
 	WT_CLEAR(data_item);
@@ -710,8 +705,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	empty_item = &toc->db->idb->empty_item;
 
 	dsk = new->dsk;
-	__wt_set_ff_and_sa_from_offset(
-	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	WT_CLEAR(data_dbt);
 	WT_CLEAR(key_dbt);
