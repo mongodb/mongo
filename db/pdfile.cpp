@@ -832,7 +832,7 @@ namespace mongo {
             }
 
             if ( !ok && logMissing ) {
-                out() << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
+                log() << "unindex failed (key too big?) " << id.indexNamespace() << " key: " << j << endl;
             }
         }
     }
