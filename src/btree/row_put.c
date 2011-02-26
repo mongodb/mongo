@@ -51,16 +51,15 @@ __wt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 	page = toc->srch_page;
 
 	/* Allocate a page replacement array as necessary. */
-	if (page->u.repl == NULL)
-		WT_ERR(__wt_calloc(
-		    env, page->indx_count, sizeof(WT_REPL *), &new_repl));
+	if (page->u.row_leaf.repl == NULL)
+		WT_ERR(__wt_calloc_def(env, page->indx_count, &new_repl));
 
 	/* Allocate room for the new data item from per-thread memory. */
 	WT_ERR(__wt_repl_alloc(toc, &repl, data));
 
 	/* Schedule the workQ to insert the WT_REPL structure. */
 	__wt_item_update_serial(toc, page, toc->srch_write_gen,
-	    WT_ROW_SLOT(page, toc->srch_ip), new_repl, repl, ret);
+	    WT_ROW_INDX_SLOT(page, toc->srch_ip), new_repl, repl, ret);
 
 	if (ret != 0) {
 err:		if (repl != NULL)
@@ -68,7 +67,7 @@ err:		if (repl != NULL)
 	}
 
 	/* Free any replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->u.repl)
+	if (new_repl != NULL && new_repl != page->u.row_leaf.repl)
 		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
 
 	WT_PAGE_OUT(toc, page);
@@ -100,17 +99,17 @@ __wt_item_update_serial_func(WT_TOC *toc)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->u.repl == NULL)
-		page->u.repl = new_repl;
+	if (page->u.row_leaf.repl == NULL)
+		page->u.row_leaf.repl = new_repl;
 
 	/*
 	 * Insert the new WT_REPL as the first item in the forward-linked list
 	 * of replacement structures.  Flush memory to ensure the list is never
 	 * broken.
 	 */
-	repl->next = page->u.repl[slot];
+	repl->next = page->u.row_leaf.repl[slot];
 	WT_MEMORY_FLUSH;
-	page->u.repl[slot] = repl;
+	page->u.row_leaf.repl[slot] = repl;
 
 err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);

@@ -22,7 +22,7 @@ __wt_cache_create(ENV *env)
 	ienv = env->ienv;
 	ret = 0;
 
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_CACHE), &ienv->cache));
+	WT_RET(__wt_calloc_def(env, 1, &ienv->cache));
 	cache = ienv->cache;
 
 	WT_ERR(

@@ -8,12 +8,12 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static void __wt_page_inmem_col_fix(DB *, WT_PAGE *);
-static void __wt_page_inmem_col_int(WT_PAGE *);
-static void __wt_page_inmem_col_rle(DB *, WT_PAGE *);
-static void __wt_page_inmem_col_var(WT_PAGE *);
-static int  __wt_page_inmem_row_int(DB *, WT_PAGE *);
-static int  __wt_page_inmem_row_leaf(DB *, WT_PAGE *);
+static int __wt_page_inmem_col_fix(WT_TOC *, WT_PAGE *);
+static int __wt_page_inmem_col_int(WT_TOC *, WT_PAGE *);
+static int __wt_page_inmem_col_rle(WT_TOC *, WT_PAGE *);
+static int __wt_page_inmem_col_var(WT_TOC *, WT_PAGE *);
+static int __wt_page_inmem_row_int(WT_TOC *, WT_PAGE *);
+static int __wt_page_inmem_row_leaf(WT_TOC *, WT_PAGE *);
 
 /*
  * __wt_page_in --
@@ -22,14 +22,21 @@ static int  __wt_page_inmem_row_leaf(DB *, WT_PAGE *);
  */
 int
 __wt_page_in(
-    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off, int dsk_verify)
+    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off_arg, int dsk_verify)
 {
 	ENV *env;
 	WT_CACHE *cache;
+	WT_OFF *off;
 	int ret;
 
 	env = toc->env;
 	cache = env->ienv->cache;
+
+	/*
+	 * Passed both WT_OFF and WT_OFF_RECORD references; the first two fields
+	 * of the structures are a uint32_t size/addr pair.
+	 */
+	off = off_arg;
 
 	for (;;)
 		switch (ref->state) {
@@ -62,7 +69,7 @@ __wt_page_in(
 			 * was set to WT_ADDR_DELETED before the WT_REF entry
 			 * was reset to WT_REF_DISK.
 			 */
-			if (((WT_OFF *)off)->addr == WT_ADDR_DELETED)
+			if (off->addr == WT_ADDR_DELETED)
 				return (WT_PAGE_DELETED);
 			__wt_cache_read_serial(
 			    toc, parent, ref, off, dsk_verify, ret);
@@ -84,95 +91,40 @@ int
 __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
-	ENV *env;
 	WT_PAGE_DISK *dsk;
-	WT_REF *cp;
-	uint32_t i, nindx;
 	int ret;
 
 	db = toc->db;
-	env = toc->env;
 	dsk = page->dsk;
 	ret = 0;
 
-	WT_ASSERT(env, dsk->u.entries > 0);
-	WT_ASSERT(env, page->indx.indx == NULL);
+	WT_ASSERT(toc->env, dsk->u.entries > 0);
+	WT_ASSERT(toc->env, page->indx_count == 0);
 
-	/*
-	 * Determine the maximum number of indexes we'll need for this page
-	 * and allocate an array of WT_{ROW,COL}_INDX structures.
-	 */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
+		WT_ERR(__wt_page_inmem_col_fix(toc, page));
+		break;
 	case WT_PAGE_COL_INT:
+		WT_ERR(__wt_page_inmem_col_int(toc, page));
+		break;
 	case WT_PAGE_COL_RLE:
+		WT_ERR(__wt_page_inmem_col_rle(toc, page));
+		break;
 	case WT_PAGE_COL_VAR:
-		/*
-		 * Column-store page entries map one-to-one to the number of
-		 * physical entries on the page (each physical entry is a
-		 * data item).
-		 */
-		nindx = dsk->u.entries;
-		WT_ERR((
-		    __wt_calloc(env, nindx, sizeof(WT_COL), &page->indx.col)));
+		WT_ERR(__wt_page_inmem_col_var(toc, page));
 		break;
 	case WT_PAGE_ROW_INT:
-		/*
-		 * Internal row-store page entries map one-to-two to the number
-		 * of physical entries on the page (each physical entry is a
-		 * data item/offset pair).
-		 */
-		nindx = dsk->u.entries / 2;
-		WT_ERR((
-		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->indx.row)));
+		WT_ERR(__wt_page_inmem_row_int(toc, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		/*
-		 * Leaf row-store page entries map two-to-one to the number of
-		 * physical entries on the page (each physical entry might be
-		 * a key without any subsequent data item).
-		 */
-		nindx = dsk->u.entries * 2;
-		WT_ERR((
-		    __wt_calloc(env, nindx, sizeof(WT_ROW), &page->indx.row)));
+		WT_ERR(__wt_page_inmem_row_leaf(toc, page));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
-
-	/* Allocate an array of WT_REF structures for internal pages. */
-	switch (dsk->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_calloc(env, nindx, sizeof(WT_REF), &page->u.ref));
-		for (i = 0, cp = page->u.ref; i < nindx; ++i, ++cp)
-			cp->state = WT_REF_DISK;
-		break;
-	}
-
-	/* Fill in the structures. */
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
-		__wt_page_inmem_col_fix(db, page);
-		break;
-	case WT_PAGE_COL_INT:
-		__wt_page_inmem_col_int(page);
-		break;
-	case WT_PAGE_COL_RLE:
-		__wt_page_inmem_col_rle(db, page);
-		break;
-	case WT_PAGE_COL_VAR:
-		__wt_page_inmem_col_var(page);
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_page_inmem_row_int(db, page));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_page_inmem_row_leaf(db, page));
-		break;
-	}
 	return (0);
 
-err:	__wt_page_discard(toc, page);
+err:	(void)__wt_page_discard(toc, page);
 	return (ret);
 }
 
@@ -180,50 +132,72 @@ err:	__wt_page_discard(toc, page);
  * __wt_page_inmem_col_fix --
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
-static void
-__wt_page_inmem_col_fix(DB *db, WT_PAGE *page)
+static int
+__wt_page_inmem_col_fix(WT_TOC *toc, WT_PAGE *page)
 {
+	DB *db;
+	ENV *env;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 	uint8_t *p;
 
+	db = toc->db;
+	env = toc->env;
 	dsk = page->dsk;
-	cip = page->indx.col;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains fixed-length objects.
+	 * Column-store page entries map one-to-one to the number of physical
+	 * entries on the page (each physical entry is a data item).
 	 */
+	WT_RET((
+	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+
+	/*
+	 * Walk the page, building references: the page contains fixed-length
+	 * objects.
+	 */
+	cip = page->u.col_leaf.d;
 	WT_FIX_FOREACH(db, dsk, p, i)
 		(cip++)->data = p;
 
 	page->indx_count = dsk->u.entries;
+	return (0);
 }
 
 /*
  * __wt_page_inmem_col_int --
  *	Build in-memory index for column-store internal pages.
  */
-static void
-__wt_page_inmem_col_int(WT_PAGE *page)
+static int
+__wt_page_inmem_col_int(WT_TOC *toc, WT_PAGE *page)
 {
-	WT_COL *cip;
+	ENV *env;
+	WT_COL_REF *cref;
 	WT_OFF_RECORD *off_record;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
+	env = toc->env;
 	dsk = page->dsk;
-	cip = page->indx.col;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains WT_OFF_RECORD structures.
+	 * Column-store page entries map one-to-one to the number of physical
+	 * entries on the page (each physical entry is a offset object).
 	 */
+	WT_RET((
+	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_int.t)));
+
+	/*
+	 * Walk the page, building references: the page contains WT_OFF_RECORD
+	 * structures.
+	 */
+	cref = page->u.col_int.t;
 	WT_OFF_FOREACH(dsk, off_record, i)
-		(cip++)->data = off_record;
+		(cref++)->off_record = off_record;
 
 	page->indx_count = dsk->u.entries;
+	return (0);
 }
 
 /*
@@ -231,25 +205,37 @@ __wt_page_inmem_col_int(WT_PAGE *page)
  *	Build in-memory index for fixed-length, run-length encoded, column-store
  *	leaf pages.
  */
-static void
-__wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
+static int
+__wt_page_inmem_col_rle(WT_TOC *toc, WT_PAGE *page)
 {
+	DB *db;
+	ENV *env;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 	uint8_t *p;
 
+	db = toc->db;
+	env = toc->env;
 	dsk = page->dsk;
-	cip = page->indx.col;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains fixed-length objects.
+	 * Column-store page entries map one-to-one to the number of physical
+	 * entries on the page (each physical entry is a data item).
 	 */
+	WT_RET((
+	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+
+	/*
+	 * Walk the page, building references: the page contains fixed-length
+	 * objects.
+	 */
+	cip = page->u.col_leaf.d;
 	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)
 		(cip++)->data = p;
 
 	page->indx_count = dsk->u.entries;
+	return (0);
 }
 
 /*
@@ -257,27 +243,36 @@ __wt_page_inmem_col_rle(DB *db, WT_PAGE *page)
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	column-store trees.
  */
-static void
-__wt_page_inmem_col_var(WT_PAGE *page)
+static int
+__wt_page_inmem_col_var(WT_TOC *toc, WT_PAGE *page)
 {
+	ENV *env;
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
+	env = toc->env;
 	dsk = page->dsk;
-	cip = page->indx.col;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains unsorted data items.  The data items are on-page
-	 * data (WT_ITEM_DATA), overflow (WT_ITEM_DATA_OVFL) or deleted
-	 * (WT_ITEM_DEL) items.
+	 * Column-store page entries map one-to-one to the number of physical
+	 * entries on the page (each physical entry is a data item).
 	 */
+	WT_RET((
+	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+
+	/*
+	 * Walk the page, building references: the page contains unsorted data
+	 * items.  The data items are on-page data (WT_ITEM_DATA), overflow
+	 * (WT_ITEM_DATA_OVFL) or deleted (WT_ITEM_DEL) items.
+	 */
+	cip = page->u.col_leaf.d;
 	WT_ITEM_FOREACH(dsk, item, i)
 		(cip++)->data = item;
 
 	page->indx_count = dsk->u.entries;
+	return (0);
 }
 
 /*
@@ -285,46 +280,54 @@ __wt_page_inmem_col_var(WT_PAGE *page)
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__wt_page_inmem_row_int(DB *db, WT_PAGE *page)
+__wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 {
+	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
-	WT_ROW *rip;
-	uint32_t i;
+	WT_ROW_REF *rref;
+	uint32_t i, nindx;
 	void *huffman;
 
-	idb = db->idb;
+	env = toc->env;
+	idb = toc->db->idb;
 	dsk = page->dsk;
-	rip = page->indx.row;
 	huffman = idb->huffman_key;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 *
-	 * The page contains sorted key/offpage-reference pairs.  Keys are row
-	 * store internal pages with on-page/overflow (WT_ITEM_KEY/KEY_OVFL)
-	 * items, and offpage references are WT_ITEM_OFF items.
+	 * Internal row-store page entries map one-to-two to the number of
+	 * physical entries on the page (each physical entry is a data item
+	 * and offset object).
 	 */
+	nindx = dsk->u.entries / 2;
+	WT_RET((__wt_calloc_def(env, (size_t)nindx, &page->u.row_int.t)));
+
+	/*
+	 * Walk the page, building references: the page contains sorted key and
+	 * offpage-reference pairs.  Keys are row store internal pages with
+	 * on-page/overflow (WT_ITEM_KEY/KEY_OVFL) items, and offpage references
+	 * are WT_ITEM_OFF items.
+	 */
+	rref = page->u.row_int.t;
 	WT_ITEM_FOREACH(dsk, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 			if (huffman == NULL) {
-				__wt_key_set(rip,
+				__wt_key_set(rref,
 				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			__wt_key_set_process(rip, item);
+			__wt_key_set_process(rref, item);
 			break;
 		case WT_ITEM_OFF:
-			(rip++)->data = item;
+			(rref++)->off = WT_ITEM_BYTE_OFF(item);
 			break;
-		WT_ILLEGAL_FORMAT(db);
 		}
 
-	page->indx_count = dsk->u.entries / 2;
+	page->indx_count = nindx;
 	return (0);
 }
 
@@ -333,16 +336,26 @@ __wt_page_inmem_row_int(DB *db, WT_PAGE *page)
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
+__wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
 {
+	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
-	uint32_t i;
+	uint32_t i, nindx;
 
-	idb = db->idb;
+	env = toc->env;
+	idb = toc->db->idb;
 	dsk = page->dsk;
+
+	/*
+	 * Leaf row-store page entries map to a maximum of two-to-one to the
+	 * number of physical entries on the page (each physical entry might
+	 * be a key without any subsequent data item).
+	 */
+	WT_RET((__wt_calloc_def(
+	    env, (size_t)dsk->u.entries * 2, &page->u.row_leaf.d)));
 
 	/*
 	 * Walk a row-store page of WT_ITEMs, building indices and finding the
@@ -352,11 +365,13 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * overflow (WT_ITEM_KEY_OVFL) items, data are either a single on-page
 	 * (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item.
 	 */
-	rip = page->indx.row;
+	nindx = 0;
+	rip = page->u.row_leaf.d;
 	WT_ITEM_FOREACH(dsk, item, i)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
+			++nindx;
 			if (rip->key != NULL)
 				++rip;
 			if (idb->huffman_key != NULL ||
@@ -377,16 +392,9 @@ __wt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DATA_OVFL:
 			rip->data = item;
 			break;
-		WT_ILLEGAL_FORMAT(db);
 		}
 
-	/*
-	 * Calculate the number of entries we actually found: rip references
-	 * the slot last filled in, so increment it and do the calculation.
-	 */
-	++rip;
-	page->indx_count = WT_ROW_SLOT(page, rip);
-
+	page->indx_count = nindx;
 	return (0);
 }
 

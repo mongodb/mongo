@@ -225,7 +225,7 @@ __wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		fprintf(fp, "\tdata {");
 		if (WT_FIX_DELETE_ISSET(cip->data))
 			fprintf(fp, "deleted");
@@ -245,20 +245,18 @@ __wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 static void
 __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 {
-	WT_COL *cip;
-	WT_OFF_RECORD *off_record;
+	WT_COL_REF *cref;
 	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, cip, i) {
-		off_record = WT_COL_OFF(cip);
+	WT_COL_REF_FOREACH(page, cref, i)
 		fprintf(fp,
 		    "\toffpage: addr %lu, size %lu, starting recno %llu\n",
-		    (u_long)off_record->addr, (u_long)off_record->size,
-		    (unsigned long long)WT_RECNO(off_record));
-	  }
+		    (u_long)WT_COL_REF_ADDR(cref),
+		    (u_long)WT_COL_REF_SIZE(cref),
+		    (unsigned long long)WT_COL_REF_RECNO(cref));
 }
 
 /*
@@ -277,7 +275,7 @@ __wt_debug_page_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		fprintf(fp,
 		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cip->data));
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
@@ -306,7 +304,7 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		fprintf(fp, "\tdata {");
 		WT_RET(__wt_debug_item_data(toc, cip->data, fp));
 		fprintf(fp, "}\n");
@@ -331,7 +329,7 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, rip, i) {
+	WT_ROW_INDX_FOREACH(page, rip, i) {
 		if (__wt_key_process(rip))
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
@@ -355,21 +353,20 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 static void
 __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 {
-	WT_OFF *off;
-	WT_ROW *rip;
+	WT_ROW_REF *rref;
 	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_INDX_FOREACH(page, rip, i) {
-		if (__wt_key_process(rip))
+	WT_ROW_REF_FOREACH(page, rref, i) {
+		if (__wt_key_process(rref))
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
-			__wt_debug_dbt("\tkey", rip, fp);
-		off = WT_ROW_OFF(rip);
+			__wt_debug_dbt("\tkey", rref, fp);
 		fprintf(fp, "\toffpage: addr %lu, size %lu\n",
-		    (u_long)off->addr, (u_long)off->size);
+		    (u_long)WT_ROW_REF_ADDR(rref),
+		    (u_long)WT_ROW_REF_SIZE(rref));
 	}
 }
 

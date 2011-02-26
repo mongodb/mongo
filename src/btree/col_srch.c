@@ -18,12 +18,11 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	DB *db;
 	IDB *idb;
 	WT_COL *cip;
-	WT_OFF_RECORD *off_record;
+	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_RLE_EXPAND *exp;
-	WT_REF *ref;
 	WT_REPL *repl;
+	WT_RLE_EXPAND *exp;
 	uint64_t record_cnt, start_recno;
 	uint32_t base, i, indx, limit, write_gen;
 	int ret;
@@ -52,7 +51,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			cip = page->indx.col + (recno - dsk->recno);
+			cip = page->u.col_leaf.d + (recno - dsk->recno);
 			goto done;
 		case WT_PAGE_COL_RLE:
 			/*
@@ -60,7 +59,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			 * count calculation in a funny way to avoid overflow.
 			 */
 			record_cnt = recno - dsk->recno;
-			WT_INDX_FOREACH(page, cip, i) {
+			WT_COL_INDX_FOREACH(page, cip, i) {
 				if (record_cnt < WT_RLE_REPEAT_COUNT(cip->data))
 					break;
 				record_cnt -= WT_RLE_REPEAT_COUNT(cip->data);
@@ -75,6 +74,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
+			cref = page->u.col_int.t + indx;
 
 			/*
 			 * Like a row-store page, the 0th key sorts less than
@@ -82,8 +82,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			 * index the way we do in the row-store binary search,
 			 * key comparisons are cheap here.
 			 */
-			cip = page->indx.col + indx;
-			start_recno = WT_COL_OFF_RECNO(cip);
+			start_recno = WT_COL_REF_RECNO(cref);
 			if (recno == start_recno)
 				break;
 			if (recno < start_recno)
@@ -102,16 +101,15 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		 * than or equal to recno.
 		 */
 		if (recno != start_recno)
-			cip = page->indx.col + (base == 0 ? 0 : base - 1);
+			cref = page->u.col_int.t + (base == 0 ? 0 : base - 1);
 
 		/* If a level was set, see if we found the asked-for page. */
 		if (level == dsk->level)
 			goto done;
 
 		/* cip references the subtree containing the record. */
-		ref = WT_COL_REF(page, cip);
-		off_record = WT_COL_OFF(cip);
-		switch (ret = __wt_page_in(toc, page, ref, off_record, 0)) {
+		switch (ret =
+		    __wt_page_in(toc, page, &cref->ref, cref->off_record, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
 			if (page != idb->root_page.page)
@@ -129,7 +127,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		default:
 			goto err;
 		}
-		page = ref->page;
+		page = WT_COL_REF_PAGE(cref);
 	}
 
 done:	/*

@@ -13,7 +13,7 @@ static int  __wt_evict_compare_lru(const void *a, const void *b);
 static int  __wt_evict_compare_page(const void *a, const void *b);
 static void __wt_evict_hazard_check(WT_TOC *);
 static int  __wt_evict_hazard_compare(const void *a, const void *b);
-static void __wt_evict_page(WT_TOC *, int);
+static int  __wt_evict_page(WT_TOC *, int);
 static int  __wt_evict_page_subtrees(WT_PAGE *);
 static void __wt_evict_set(WT_TOC *);
 static void __wt_evict_state_check(WT_TOC *);
@@ -131,8 +131,7 @@ __wt_cache_evict_server(void *arg)
 	 * size so doesn't need run-time adjustments.
 	 */
 	cache->hazard_elem = env->toc_size * env->hazard_size;
-	WT_ERR(__wt_calloc(
-	    env, cache->hazard_elem, sizeof(WT_PAGE *), &cache->hazard));
+	WT_ERR(__wt_calloc_def(env, cache->hazard_elem, &cache->hazard));
 	cache->hazard_len = cache->hazard_elem * WT_SIZEOF32(WT_PAGE *);
 
 	for (;;) {
@@ -267,9 +266,9 @@ done_duplicates:
 	__wt_evict_set(toc);
 	__wt_evict_hazard_check(toc);
 	__wt_evict_state_check(toc);
-	__wt_evict_page(toc, 0);
+	WT_RET(__wt_evict_page(toc, 0));
 	__wt_evict_write(toc);
-	__wt_evict_page(toc, 1);
+	WT_RET(__wt_evict_page(toc, 1));
 
 	return (0);
 }
@@ -617,7 +616,7 @@ __wt_evict_write(WT_TOC *toc)
  * __wt_evict_page --
  *	Evict cache pages.
  */
-static void
+static int
 __wt_evict_page(WT_TOC *toc, int was_dirty)
 {
 	ENV *env;
@@ -673,8 +672,9 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
 		/* The page can no longer be found, free the memory. */
-		__wt_page_discard(toc, page);
+		WT_RET(__wt_page_discard(toc, page));
 	}
+	return (0);
 }
 
 /*
@@ -684,7 +684,8 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 static int
 __wt_evict_page_subtrees(WT_PAGE *page)
 {
-	WT_REF *ref;
+	WT_ROW_REF *rref;
+	WT_COL_REF *cref;
 	uint32_t i;
 
 	/*
@@ -702,9 +703,13 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 	 */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
+		WT_COL_REF_FOREACH(page, cref, i)
+			if (WT_COL_REF_STATE(cref) != WT_REF_DISK)
+				return (1);
+		break;
 	case WT_PAGE_ROW_INT:
-		WT_REF_FOREACH(page, ref, i)
-			if (ref->state != WT_REF_DISK)
+		WT_ROW_REF_FOREACH(page, rref, i)
+			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK)
 				return (1);
 		break;
 	}
@@ -899,7 +904,7 @@ __wt_evict_tree_dump(WT_TOC *toc, IDB *idb)
 
 /*
  * __wt_evict_cache_count
- *	Retrun the count of nodes in the cache.
+ *	Return the count of nodes in the cache.
  */
 int
 __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp)

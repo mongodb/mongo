@@ -8,14 +8,14 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static inline int __wt_key_build(WT_TOC *, WT_ROW *);
+static inline int __wt_key_build(WT_TOC *, void *);
 
 /*
  * __wt_key_build --
  *	Instantiate an overflow or compressed key into a WT_ROW structure.
  */
 static inline int
-__wt_key_build(WT_TOC *toc, WT_ROW *rip_arg)
+__wt_key_build(WT_TOC *toc, void *ref)
 {
 	DBT *dbt, _dbt;
 	WT_ITEM *item;
@@ -23,11 +23,15 @@ __wt_key_build(WT_TOC *toc, WT_ROW *rip_arg)
 	WT_CLEAR(_dbt);
 	dbt = &_dbt;
 
-	item = rip_arg->key;
+	/*
+	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
+	 * of the structures are a void *data/uint32_t size pair.
+	 */
+	item = ((WT_ROW *)ref)->key;
 	WT_RET(__wt_item_process(toc, item, dbt));
 
 	/* Update the WT_ROW reference with the processed key. */
-	__wt_key_set(rip_arg, dbt->data, dbt->size);
+	__wt_key_set(ref, dbt->data, dbt->size);
 
 	return (0);
 }
@@ -41,12 +45,11 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
-	WT_OFF *off;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_REF *ref;
-	WT_ROW *rip, *t;
 	WT_REPL *repl;
+	WT_ROW *rip;
+	WT_ROW_REF *rref, *t;
 	uint32_t base, indx, limit, write_gen;
 	int cmp, isleaf, ret;
 
@@ -72,57 +75,85 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		write_gen = page->write_gen;
 
 		dsk = page->dsk;
-		isleaf = dsk->type == WT_PAGE_ROW_LEAF ? 1 : 0;
-		for (base = 0,
-		    limit = page->indx_count; limit != 0; limit >>= 1) {
-			indx = base + (limit >> 1);
+		switch (dsk->type) {
+		case WT_PAGE_ROW_INT:
+			isleaf = 0;
+			for (base = 0,
+			    limit = page->indx_count; limit != 0; limit >>= 1) {
+				indx = base + (limit >> 1);
+				rref = page->u.row_int.t + indx;
+
+				/*
+				 * If the key is compressed or an overflow, it
+				 * may not have been instantiated yet.
+				 */
+				if (__wt_key_process(rref))
+					WT_ERR(__wt_key_build(toc, rref));
+
+				/*
+				 * If we're about to compare an application key
+				 * with the 0th index on an internal page,
+				 * pretend the 0th index sorts less than any
+				 * application key.  This test is so we don't
+				 * have to update internal pages if the
+				 * application stores a new, "smallest" key in
+				 * the tree.
+				 *
+				 * For the record, we still maintain the key at
+				 * the 0th location because it means tree
+				 * verification and other code that processes a
+				 * level of the tree doesn't need to know about
+				 * this hack.
+				 */
+				if (indx != 0) {
+					cmp = db->
+					    btree_compare(db, key, (DBT *)rref);
+					if (cmp == 0)
+						break;
+					if (cmp < 0)
+						continue;
+				}
+				base = indx + 1;
+				--limit;
+			}
 
 			/*
-			 * If the key is compressed or an overflow, it may not
-			 * have been instantiated yet.
+			 * Reference the slot used for next step down the tree.
+			 * Base is the smallest index greater than key and may
+			 * be the 0th index or the (last + 1) indx.  If base is
+			 * not the 0th index (remember, the 0th index always
+			 * sorts less than any application key), decrement it
+			 * to the smallest index less than or equal to key.
 			 */
-			rip = page->indx.row + indx;
-			if (__wt_key_process(rip))
-				WT_ERR(__wt_key_build(toc, rip));
+			if (cmp != 0)
+				rref = page->u.row_int.t +
+				    (base == 0 ? 0 : base - 1);
+			break;
+		case WT_PAGE_ROW_LEAF:
+			isleaf = 1;
+			for (base = 0,
+			    limit = page->indx_count; limit != 0; limit >>= 1) {
+				indx = base + (limit >> 1);
+				rip = page->u.row_leaf.d + indx;
 
-			/*
-			 * If we're about to compare an application key with the
-			 * 0th index on an internal page, pretend the 0th index
-			 * sorts less than any application key.  This test is so
-			 * we don't have to update internal pages if the
-			 * application stores a new, "smallest" key in the tree.
-			 *
-			 * For the record, we still maintain the key at the 0th
-			 * location because it means tree verification and other
-			 * code that processes a level of the tree doesn't need
-			 * to know about this hack.
-			 */
-			if (indx != 0 || isleaf) {
+				/*
+				 * If the key is compressed or an overflow, it
+				 * may not have been instantiated yet.
+				 */
+				if (__wt_key_process(rip))
+					WT_ERR(__wt_key_build(toc, rip));
+
 				cmp = db->btree_compare(db, key, (DBT *)rip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
 					continue;
-			}
-			base = indx + 1;
-			--limit;
-		}
 
-		/*
-		 * Reference the slot used for next step down the tree.  We do
-		 * this on leaf pages too, because it's simpler to code, and we
-		 * only care if there's an exact match on leaf pages; setting
-		 * rip doesn't matter for leaf pages because we always return
-		 * WT_NOTFOUND if there's no match.
-		 *
-		 * Base is the smallest index greater than key and may be the
-		 * 0th index or the (last + 1) indx.  If base is not the 0th
-		 * index (remember, the 0th index always sorts less than any
-		 * application key), decrement it to the smallest index less
-		 * than or equal to key.
-		 */
-		if (cmp != 0)
-			rip = page->indx.row + (base == 0 ? 0 : base - 1);
+				base = indx + 1;
+				--limit;
+			}
+			break;
+		}
 
 		/*
 		 * If we've reached the leaf page, or we've reached the level
@@ -131,10 +162,9 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 		if (isleaf || level == dsk->level)
 			break;
 
-deleted_retry:	/* rip references the subtree containing the record. */
-		ref = WT_ROW_REF(page, rip);
-		off = WT_ROW_OFF(rip);
-		switch (ret = __wt_page_in(toc, page, ref, off, 0)) {
+deleted_retry:	/* rref references the subtree containing the record. */
+		switch (ret =
+		    __wt_page_in(toc, page, &rref->ref, rref->off, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
 			if (page != idb->root_page.page)
@@ -156,18 +186,18 @@ deleted_retry:	/* rip references the subtree containing the record. */
 			 * move to a larger valid page entry; (3) if that isn't
 			 * possible, restart the operation.
 			 */
-			for (t = rip,
-			    indx = WT_ROW_SLOT(page, rip);
+			for (t = rref,
+			    indx = WT_ROW_REF_SLOT(page, rref);
 			    indx > 0; --indx, --t)
-				if (WT_ROW_OFF(t)->addr != WT_ADDR_DELETED) {
-					rip = t;
+				if (WT_ROW_REF_ADDR(t) != WT_ADDR_DELETED) {
+					rref = t;
 					goto deleted_retry;
 				}
-			for (t = rip,
-			    indx = WT_ROW_SLOT(page, rip);
+			for (t = rref,
+			    indx = WT_ROW_REF_SLOT(page, rref);
 			    indx < page->indx_count; ++indx, ++t)
-				if (WT_ROW_OFF(t)->addr != WT_ADDR_DELETED) {
-					rip = t;
+				if (WT_ROW_REF_ADDR(t) != WT_ADDR_DELETED) {
+					rref = t;
 					goto deleted_retry;
 				}
 			ret = WT_RESTART;
@@ -175,7 +205,7 @@ deleted_retry:	/* rip references the subtree containing the record. */
 		default:
 			goto err;
 		}
-		page = ref->page;
+		page = WT_ROW_REF_PAGE(rref);
 	}
 
 	/*

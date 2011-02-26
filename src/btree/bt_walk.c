@@ -37,15 +37,12 @@
  *	each page.
  */
 int
-__wt_tree_walk(WT_TOC *toc, WT_REF *ref,
+__wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
     uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
 {
 	IDB *idb;
-	WT_COL *cip;
-	WT_OFF *off;
-	WT_OFF_RECORD *off_record;
-	WT_PAGE *page;
-	WT_ROW *rip;
+	WT_COL_REF *cref;
+	WT_ROW_REF *rref;
 	uint32_t i;
 	int ret;
 
@@ -54,29 +51,25 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 
 	idb = toc->db->idb;
 
-	/*
-	 * A NULL WT_REF means to start at the top of the tree -- it's just
-	 * a convenience.
-	 */
-	page = ref == NULL ? idb->root_page.page : ref->page;
+	/* A NULL page starts at the top of the tree -- it's a convenience. */
+	if (page == NULL)
+		page = idb->root_page.page;
 
 	/* Walk internal pages, descending through any off-page references. */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(page, cip, i) {
-			/* cip references the subtree containing the record */
-			ref = WT_COL_REF(page, cip);
+		WT_COL_REF_FOREACH(page, cref, i) {
+			/* cref references the subtree containing the record */
 			if (LF_ISSET(WT_WALK_CACHE) &&
-			    ref->state != WT_REF_CACHE)
+			    WT_COL_REF_STATE(cref) != WT_REF_CACHE)
 				continue;
 
-			off_record = WT_COL_OFF(cip);
-			switch (ret =
-			    __wt_page_in(toc, page, ref, off_record, 0)) {
+			switch (ret = __wt_page_in(
+			    toc, page, &cref->ref, cref->off_record, 0)) {
 			case 0:				/* Valid page */
-				ret =
-				    __wt_tree_walk(toc, ref, flags, work, arg);
-				__wt_hazard_clear(toc, ref->page);
+				ret = __wt_tree_walk(toc,
+				    WT_COL_REF_PAGE(cref), flags, work, arg);
+				__wt_hazard_clear(toc, WT_COL_REF_PAGE(cref));
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -87,19 +80,18 @@ __wt_tree_walk(WT_TOC *toc, WT_REF *ref,
 		}
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(page, rip, i) {
-			/* rip references the subtree containing the record */
-			ref = WT_ROW_REF(page, rip);
+		WT_ROW_REF_FOREACH(page, rref, i) {
+			/* rref references the subtree containing the record */
 			if (LF_ISSET(WT_WALK_CACHE) &&
-			    ref->state != WT_REF_CACHE)
+			    WT_ROW_REF_STATE(rref) != WT_REF_CACHE)
 				continue;
 
-			off = WT_ROW_OFF(rip);
-			switch (ret = __wt_page_in(toc, page, ref, off, 0)) {
+			switch (ret =
+			    __wt_page_in(toc, page, &rref->ref, rref->off, 0)) {
 			case 0:				/* Valid page */
-				ret =
-				    __wt_tree_walk(toc, ref, flags, work, arg);
-				__wt_hazard_clear(toc, ref->page);
+				ret = __wt_tree_walk(toc,
+				    WT_ROW_REF_PAGE(rref), flags, work, arg);
+				__wt_hazard_clear(toc, WT_ROW_REF_PAGE(rref));
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -167,7 +159,7 @@ int
 __wt_walk_next(WT_TOC *toc, WT_WALK *walk, WT_REF **refp)
 {
 	ENV *env;
-	WT_PAGE *page, *child;
+	WT_PAGE *page;
 	WT_REF *ref;
 	WT_WALK_ENTRY *e;
 	u_int elem;
@@ -201,39 +193,57 @@ eop:			e->visited = 1;
 			return (0);
 		}
 
-	/* Find the next WT_REF/WT_PAGE pair present in the cache. */
-	for (;;) {
-		ref = &page->u.ref[e->indx];
-
-		/* We only care about pages in the cache. */
-		if (ref->state == WT_REF_CACHE)
-			break;
-
-		/*
-		 * If we don't find another WT_REF/WT_OFF pair, do the
-		 * post-order visit.
-		 */
-		if (++e->indx == page->indx_count)
-			goto eop;
-	}
-
 	/*
 	 * Check to see if the page has sub-trees associated with it, in which
 	 * case we traverse those pages.
 	 */
-	child = ref->page;
-	switch (child->dsk->type) {
+	switch (page->dsk->type) {
+	case WT_PAGE_COL_INT:
+		/* Find the next subtree present in the cache. */
+		for (;;) {
+			ref = &page->u.col_int.t[e->indx].ref;
+
+			/* We only care about pages in the cache. */
+			if (ref->state == WT_REF_CACHE)
+				break;
+
+			/*
+			 * If we don't find another WT_REF entry, do the
+			 * post-order visit.
+			 */
+			if (++e->indx == page->indx_count)
+				goto eop;
+		}
+		break;
+	case WT_PAGE_ROW_INT:
+		/* Find the next subtree present in the cache. */
+		for (;;) {
+			ref = &page->u.row_int.t[e->indx].ref;
+
+			/* We only care about pages in the cache. */
+			if (ref->state == WT_REF_CACHE)
+				break;
+
+			/*
+			 * If we don't find another WT_REF entry, do the
+			 * post-order visit.
+			 */
+			if (++e->indx == page->indx_count)
+				goto eop;
+		}
+		break;
+	}
+
+	switch (ref->page->dsk->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		/*
-		 * The page has children.
-		 *
-		 * First, move past this child, then push the child onto our
-		 * stack, and recursively descend the tree.
-		 */
+		/* The page has children; first, move past this child. */
 		++e->indx;
 
-		/* Check to see if we grew past the end of our stack. */
+		/*
+		 * Check to see if we grew past the end of our stack, then push
+		 * the child onto the stack and recursively descend the tree.
+		 */
 		elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
 		if (walk->tree_slot >= elem)
 			WT_RET(__wt_realloc(env, &walk->tree_len,

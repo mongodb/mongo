@@ -195,12 +195,155 @@ struct __wt_page_disk {
 #define	WT_PAGE_DISK_SIZE		28
 
 /*
- * WT_PAGE_BYTE/WT_PAGE_DISK_BYTE: the first usable data byte on the page.
+ * WT_PAGE_BYTE: the first byte on the page.
+ * WT_PAGE_DISK_BYTE: the first usable data byte on the page, past the header.
  */
 #define	WT_PAGE_BYTE(page)						\
 	WT_PAGE_DISK_BYTE((page)->dsk)
 #define	WT_PAGE_DISK_BYTE(dsk)						\
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
+
+/*
+ * WT_REF --
+ * A single in-memory page, and the structure used to determine if it's OK to
+ * dereference the pointer to the page.
+ *
+ * Synchronization is based on the WT_REF->state field:
+ * WT_REF_CACHE:
+ *	The page is in the cache and the page reference is valid.  Readers check
+ *	the state field and if it's WT_REF_CACHE, they set a hazard reference
+ *	to the page, flush memory and re-confirm the state of the page.  If the
+ *	page state is still WT_REF_CACHE, the reader has a valid reference and
+ *	can proceed.
+ * WT_REF_DISK:
+ *      The page is on disk, but needs to be read into the cache before use.
+ * WT_REF_EVICT:
+ *	The eviction server chose this page and is checking hazard references.
+ *	When the eviction server wants to discard a page from the tree, it sets
+ *	state to WT_EVICT, flushes memory, then checks hazard references.  If
+ *	the eviction server finds a hazard reference, it resets the state to
+ *	WT_CACHE, restoring the page to the readers.  If the eviction server
+ *	does not find a hazard reference, the page is then evicted.  Regardless,
+ *	the page will revert to one of the WT_REF_{CACHE,DISK} states.
+ */
+struct __wt_ref {
+	/*
+	 * WT_REF_DISK has a value of 0, we're in the correct default state
+	 * after allocating zero'd memory.
+	 */
+#define	WT_REF_DISK	0		/* Page is on disk */
+#define	WT_REF_CACHE	1		/* Page is in cache */
+#define	WT_REF_EVICT	2		/* Cache page selected for eviction */
+	uint32_t volatile state;
+
+	/* !!!
+	 * The layout is deliberate.  On a 64-bit machine, when you tuck this
+	 * structure inside of a row-store internal page reference, no padding
+	 * is needed because the 32-bit values line up.
+	 */
+	WT_PAGE *page;			/* In-memory page */
+};
+
+/*
+ * WT_ROW_REF --
+ * Row-store internal page subtree entries.
+ */
+struct __wt_row_ref {
+	/*
+	 * These two fields are the same as the first fields of a DBT so we can
+	 * pass them to a comparison function without copying.
+	 *
+	 * If a key requires processing (for example, an overflow key or Huffman
+	 * encoded key), the key field points to the on-page key, and the size
+	 * is set to 0 to indicate the key is not yet processed.
+	 */
+	void	 *key;			/* Key */
+	uint32_t  size;			/* Key length */
+
+	/* !!!
+	 * The layout is deliberate.  On a 64-bit machine no padding is needed
+	 * because the 32-bit values line up.
+	 */
+	WT_REF	  ref;			/* Subtree page */
+#define	WT_ROW_REF_PAGE(rref)	((rref)->ref.page)
+#define	WT_ROW_REF_STATE(rref)	((rref)->ref.state)
+
+	/*
+	 * XXX
+	 * The WT_OFF structure is an offset into the original page and could be
+	 * a uint32_t instead of a pointer.   However, (1) an array of these
+	 * structures would be padded out on a 64-bit machine anyway, so there's
+	 * no obvious gain, and (2) I'm betting MVCC is going to require this
+	 * information move into a per-transaction area.
+	 */
+	WT_OFF   *off;			/* Subtree addr/size pair */
+#define	WT_ROW_REF_ADDR(rref)	((rref)->off->addr)
+#define	WT_ROW_REF_SIZE(rref)	((rref)->off->size)
+};
+
+/*
+ * WT_ROW_REF_SLOT --
+ *	Return the array offset based on a WT_ROW_REF reference.
+ */
+#define	WT_ROW_REF_SLOT(page, rref)					\
+	((uint32_t)((rref) - (page)->u.row_int.t))
+
+/*
+ * WT_ROW_REF_FOREACH --
+ * Macro to walk the off-page subtree array of an in-memory internal page.
+ */
+#define	WT_ROW_REF_FOREACH(page, rref, i)				\
+	for ((i) = (page)->indx_count,					\
+	    (rref) = (page)->u.row_int.t; (i) > 0; ++(rref), --(i))
+
+/*
+ * WT_ROW_SPLIT --
+ * An entry in a linked list of row-store internal page split items.
+ */
+struct __wt_row_split {
+	WT_REF ref;			/* Subtree page */
+	WT_ROW_SPLIT *next;		/* Next entry in the list */
+};
+
+/*
+ * WT_COL_REF --
+ * Column-store internal page subtree entries.
+ */
+struct __wt_col_ref {
+	WT_REF ref;			/* Subtree page */
+#define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
+#define	WT_COL_REF_STATE(cref)	((cref)->ref.state)
+
+	/*
+	 * XXX
+	 * The WT_OFF_RECORD structure is an offset into the original page and
+	 * could be a uint32_t instead of a pointer.   However, (1) an array of
+	 * these structures would be padded out on a 64-bit machine anyway, so
+	 * there's no obvious gain, and (2) I'm betting MVCC is going to require
+	 * this information move into a per-transaction area.
+	 */
+	WT_OFF_RECORD *off_record;	/* Subtree addr/size/records triplet */
+#define	WT_COL_REF_ADDR(cref)	((cref)->off_record->addr)
+#define	WT_COL_REF_RECNO(cref)	WT_RECNO((cref)->off_record)
+#define	WT_COL_REF_SIZE(cref)	((cref)->off_record->size)
+};
+
+/*
+ * WT_COL_REF_FOREACH --
+ * Macro to walk the off-page subtree array of an in-memory internal page.
+ */
+#define	WT_COL_REF_FOREACH(page, cref, i)				\
+	for ((i) = (page)->indx_count,					\
+	    (cref) = (page)->u.col_int.t; (i) > 0; ++(cref), --(i))
+
+/*
+ * WT_COL_SPLIT --
+ * An entry in a linked list of column-store internal page split items.
+ */
+struct __wt_col_split {
+	WT_COL_REF ref;			/* Subtree page */
+	WT_COL_SPLIT *next;		/* Next entry in the list */
+};
 
 /*
  * WT_PAGE --
@@ -296,55 +439,37 @@ struct __wt_page {
 	uint32_t write_gen;
 
 	/*
-	 * Each in-memory page has an array of WT_ROW/WT_COL structures: this is
-	 * where the on-page index in Berkeley DB is created when a page is read
-	 * from the file.  It's sorted by the key, fixed in size, and references
-	 * data on the page.
-	 *
-	 * Note: in column-store fixed-length run-length encoded pages (that is,
-	 * WT_PAGE_COL_RLE type pages), a single indx entry may reference a
-	 * large number of records, because there's a single on-page entry that
-	 * represents many identical records.   (We can't expand those entries
-	 * when the page comes into memory, that would require unacceptable
-	 * resources as pages are moved to/from the cache, including read-only
-	 * files.)  Instead, a single indx entry represents all of the identical
-	 * records originally found on the page.
+	 * Every in-memory page references a number of entries, originally
+	 * based on the number of on-disk entries found.
 	 */
-	uint32_t indx_count;		/* On-disk entry count */
-	union {				/* On-disk entry index */
-		WT_COL	*col;		/* On-disk column-store entries */
-		WT_ROW	*row;		/* On-disk row-store entries */
-		void	*indx;		/* Generic index reference */
-	} indx;
+	uint32_t indx_count;
 
-	/*
-	 * Subtree references are stored in the ref array.   When a page that
-	 * references a subtree (where a subtree may be a single page), is read
-	 * into memory, the ref array is populated with entries that can be
-	 * used to bring the subtree page into memory.  That happens for both
-	 * internal page types: WT_PAGE_COL_INT, WT_PAGE_ROW_INT.
-	 * Entries on leaf pages can be modified.
-	 *
-	 * Data modifications or deletions are stored in the replacement array.
-	 * When the first element on a page is modified, the array is allocated,
-	 * with one slot for every existing element in the page.  A slot points
-	 * to a WT_REPL structure; if more than one modification is done to a
-	 * single entry, the WT_REPL structures are formed into a forward-linked
-	 * list.
-	 *
-	 * Modifying (or deleting) run-length encoded column-store records is
-	 * problematical, because the index entry would no longer reference
-	 * a set of identical items.  We handle this by "inserting" a new entry
-	 * into the rleexp array.  This is the only case where it's possible to
-	 * "insert" into a column-store -- it's normally only possible to append
-	 * to a column-store as insert requires re-numbering subsequent records.
-	 * (Berkeley DB did support the re-numbering functionality, but it won't
-	 * scale and it isn't useful enough to re-implement, IMNSHO.)
-	 */
+	/* But the entires are wildly different, based on the page type. */
 	union {
-		WT_REF	       *ref;	/* Internal: subtree references */
-		WT_REPL	      **repl;	/* Leaf: Modification/deletion index */
-		WT_RLE_EXPAND **rleexp;	/* Leaf: RLE expansion index */
+		/* Row-store internal information. */
+		struct {
+			WT_ROW_REF    *t;	/* Subtrees */
+			WT_ROW_SPLIT **split;	/* Split list */
+		} row_int;
+
+		struct {
+			WT_ROW   *d;		/* K/V pairs */
+			WT_REPL **repl;		/* Modifications/deletes */
+		} row_leaf;
+
+		/* Column-store internal information. */
+		struct {
+			WT_COL_REF    *t;	/* Subtrees */
+			WT_COL_SPLIT **split;	/* Split list */
+		} col_int;
+
+		/* Column-store leaf information. */
+		struct {
+			WT_COL *d;		/* V objects */
+			WT_REPL **repl;		/* Modifications/deletes */
+
+			WT_RLE_EXPAND **rleexp;	/* RLE expansion array */
+		} col_leaf;
 	} u;
 };
 /*
@@ -357,22 +482,20 @@ struct __wt_page {
  * that into account.
  */
 #define	WT_PAGE_SIZE							\
-    WT_ALIGN((6 * sizeof(void *) + 6 * sizeof(uint32_t)), sizeof(void *))
+    WT_ALIGN((7 * sizeof(void *) + 6 * sizeof(uint32_t)), sizeof(void *))
 
 /*
  * WT_ROW --
- * The WT_ROW structure describes the in-memory information about a single
- * key/data pair on a row-store file page.
+ * Each in-memory page row-store leaf page has an array of WT_ROW structures:
+ * this is where the on-page index in Berkeley DB is created when a page is read
+ * from the file.  It's sorted by key, fixed in size, and references data on the
+ * page.
  */
 struct __wt_row {
 	/*
-	 * WT_ROW structures are used to describe pages where there's a sort
-	 * key (that is, a row-store, not a column-store, which is "sorted"
-	 * by record number).
-	 *
 	 * The first fields of the WT_ROW structure are the same as the first
 	 * fields of a DBT so we can hand it to a comparison function without
-	 * copying (this is important for keys on internal pages).
+	 * copying.
 	 *
 	 * If a key requires processing (for example, an overflow key or an
 	 * Huffman encoded key), the key field points to the on-page key,
@@ -393,9 +516,33 @@ struct __wt_row {
 	WT_ALIGN(2 * sizeof(void *) + sizeof(uint32_t), sizeof(void *))
 
 /*
+ * WT_ROW_INDX_FOREACH --
+ *	Walk the entries of an in-memory row-store leaf page.
+ */
+#define	WT_ROW_INDX_FOREACH(page, rip, i)				\
+	for ((i) = (page)->indx_count,					\
+	    (rip) = (page)->u.row_leaf.d; (i) > 0; ++(rip), --(i))
+
+/*
+ * WT_ROW_INDX_SLOT --
+ *	Return the array offset based on a WT_ROW reference.
+ */
+#define	WT_ROW_INDX_SLOT(page, rip)					\
+	((uint32_t)(((WT_ROW *)rip) - (page)->u.row_leaf.d))
+
+/*
  * WT_COL --
- * The WT_COL structure describes the in-memory information about a single
- * item on a column-store file page.
+ * Each in-memory page column-store leaf page has an array of WT_COL structures:
+ * this is where the on-page index in Berkeley DB is created when a page is read
+ * from the file.  It's fixed in size, and references data on the page.
+ *
+ * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
+ * pages), a single indx entry may reference a large number of records, because
+ * there's a single on-page entry that represents many identical records.   (We
+ * can't expand those entries when the page comes into memory, as that would
+ * require resources as pages are moved to/from the cache, including read-only
+ * files.)  Instead, a single indx entry represents all of the identical records
+ * originally found on the page.
  */
 struct __wt_col {
 	/*
@@ -414,93 +561,29 @@ struct __wt_col {
 #define	WT_COL_SIZE	(sizeof(void *))
 
 /*
- * WT_INDX_FOREACH --
- *	Walk the indexes of an in-memory page: works for both WT_ROW and WT_COL,
- * based on the type of ip.
+ * WT_COL_INDX_FOREACH --
+ *	Walk the entries of an in-memory column-store leaf page.
  */
-#define	WT_INDX_FOREACH(page, ip, i)					\
+#define	WT_COL_INDX_FOREACH(page, cip, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (ip) = (page)->indx.indx; (i) > 0; ++(ip), --(i))
+	    (cip) = (page)->u.col_leaf.d; (i) > 0; ++(cip), --(i))
 
 /*
- * There are 3 different arrays which map one-to-one to the original on-disk
- * index: ref, repl and rleexp.
- *
- * The WT_{COL,ROW}_SLOT macros return the appropriate array slot based on a
- * WT_{COL,ROW} reference.
+ * WT_COL_INDX_SLOT --
+ *	Return the array offset based on a WT_COL reference.
  */
-#define	WT_COL_SLOT(page, ip)	((uint32_t)((WT_COL *)(ip) - (page)->indx.col))
-#define	WT_ROW_SLOT(page, ip)	((uint32_t)((WT_ROW *)(ip) - (page)->indx.row))
-
-/*
- * The ref array is different from the other three in two ways: first, it
- * always exists on internal pages, and we don't need to test to see if it's
- * there.  Second, it's an array of structures, not an array of pointers to
- * individually allocated structures.  The WT_{COL,ROW}_REF macros return
- * the appropriate entry based on a WT_{COL,ROW} reference.
- */
-#define	WT_COL_REF(page, ip)	(&((page)->u.ref[WT_COL_SLOT(page, ip)]))
-#define	WT_ROW_REF(page, ip)	(&((page)->u.ref[WT_ROW_SLOT(page, ip)]))
-
-/*
- * The other arrays may not exist, and are arrays of pointers to individually
- * allocated structures.   The following macros return an array entry if the
- * array of pointers and the specific structure exist, otherwise NULL.
- */
-#define	__WT_COL_ARRAY(page, ip, field)					\
-	((page)->field == NULL ? NULL : (page)->field[WT_COL_SLOT(page, ip)])
-#define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u.repl)
-#define	WT_COL_RLEEXP(page, ip)	__WT_COL_ARRAY(page, ip, u.rleexp)
-#define	__WT_ROW_ARRAY(page, ip, field)					\
-	((page)->field == NULL ? NULL : (page)->field[WT_ROW_SLOT(page, ip)])
-#define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u.repl)
-
-/*
- * WT_REF --
- *	Page references: each references a single page, and it's the structure
- *	used to determine if it's OK to dereference the pointer to the page.
- *
- * There may be many threads traversing these entries; they fall into three
- * classes: (1) application threads walking through the tree searching file
- * pages or calling a method like Db.sync; (2) a server thread reading a new
- * page into the tree from disk; (3) a server thread evicting a page from the
- * tree to disk.
- *
- * Synchronization is based on the WT_REF->state field:
- * WT_REF_CACHE:
- *	The page is in the cache and the page reference is valid.  Readers check
- *	the state field and if it's WT_REF_CACHE, they set a hazard reference
- *	to the page, flush memory and re-confirm the state of the page.  If the
- *	page state is still WT_REF_CACHE, the reader has a valid reference and
- *	can proceed.
- * WT_REF_DISK:
- *      The page is on disk, but needs to be read into the cache before use.
- * WT_REF_EVICT:
- *	The eviction server chose this page and is checking hazard references.
- *	When the eviction server wants to discard a page from the tree, it sets
- *	state to WT_EVICT, flushes memory, then checks hazard references.  If
- *	the eviction server finds a hazard reference, it resets the state to
- *	WT_CACHE, restoring the page to the readers.  If the eviction server
- *	does not find a hazard reference, the page is then evicted.  Regardless,
- *	the page will revert to one of the WT_REF_{CACHE,DISK} states.
- */
-struct __wt_ref {
-	WT_PAGE *page;			/* In-memory page */
-	/*
-	 * !!!
-	 * WT_REF_DISK has a value of 0: if we forget to initialize a WT_REF
-	 * structure in the code somewhere, we'll be in the correct default
-	 * state (as long as the memory was cleared during allocation).
-	 */
-#define	WT_REF_CACHE	1		/* Page is in cache */
-#define	WT_REF_DISK	0		/* Page is on disk */
-#define	WT_REF_EVICT	2		/* Cache page selected for eviction */
-	uint32_t volatile state;
-};
+#define	WT_COL_INDX_SLOT(page, cip)					\
+	((uint32_t)(((WT_COL *)cip) - (page)->u.col_leaf.d))
 
 /*
  * WT_REPL --
- *	Updates/deletes for a WT_{COL,ROW} entry.
+ * Entries on leaf pages can be modified or deleted.
+ *
+ * Modifications or deletions are stored in the replacement array of the page.
+ * When the first element on a page is modified, the array is allocated, with
+ * one slot for every existing element in the page.  A slot points to a WT_REPL
+ * structure; if more than one modification is done to a single entry, the
+ * WT_REPL structures are formed into a forward-linked list.
  */
 struct __wt_repl {
 	WT_TOC_UPDATE *update;		/* update buffer holding this WT_REPL */
@@ -523,8 +606,16 @@ struct __wt_repl {
 
 /*
  * WT_RLE_EXPAND --
- * The WT_RLE_EXPAND structure describes the in-memory information about a
- * replaced key/data pair on a run-length encoded, column-store file page.
+ * In-memory information about a replaced key/data pair on a run-length encoded,
+ * column-store file page.
+ *
+ * Modifying (or deleting) run-length encoded column-store records is tricky
+ * because the page's entry no longer references a set of identical items.  We
+ * handle this by "inserting" a new entry into the rleexp array.  This is the
+ * only case where it's possible to "insert" into a column-store, it's normally
+ * only possible to append to a column-store as insert requires re-numbering
+ * subsequent records.  (Berkeley DB did support the re-numbering functionality,
+ * but it won't scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_rle_expand {
 	uint64_t recno;			/* recno */
@@ -535,75 +626,69 @@ struct __wt_rle_expand {
 };
 
 /*
- * WT_INDX_AND_KEY_FOREACH --
- *	Walk the indexes of a row-store in-memory page at the same time walking
- * the underlying page's key WT_ITEMs.
- *
- * This macro is necessary for when we have to walk both the WT_ROW structures
- * as well as the original page: the problem is keys that require processing.
- * When a page is read into memory from a file, the WT_ROW key/size pair is set
- * is set to reference an on-page group of bytes in the key's WT_ITEM structure.
- * For uncompressed, small, simple keys, those bytes are usually what we want to
- * access, and the WT_ROW structure points to them.
- *
- * Keys that require processing are harder (for example, a Huffman encoded or
- * overflow key).  When we actually use a key requiring processing, we process
- * the key and set the WT_ROW key/size pair to reference the allocated memory
- * that holds the key.  At that point we've lost any reference to the original
- * WT_ITEM structure.  If we need the original key (for example, if reconciling
- * the page, or verifying or freeing overflow references, the WT_ROW structure
- * no longer gets us there).  As these are relatively rare operations performed
- * on (hopefully!) relatively rare key types, we don't want to grow the WT_ROW
- * structure by sizeof(void *).  Instead, walk the original page at the same
- * time we walk the WT_PAGE array so we can find the original key WT_ITEM.
- */
-#define	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i)			\
-	for ((key_item) = WT_PAGE_BYTE(page),				\
-	    (rip) = (page)->indx.row, (i) = (page)->indx_count;		\
-	    (i) > 0;							\
-	    ++(rip),							\
-	    key_item = --(i) == 0 ?					\
-	    NULL : __wt_key_item_next(key_item))
-
-/*
- * WT_REPL_FOREACH --
- * Macro to walk the replacement array of an in-memory page.
- */
-#define	WT_REPL_FOREACH(page, replp, i)					\
-	for ((i) = (page)->indx_count,					\
-	    (replp) = (page)->u.repl; (i) > 0; ++(replp), --(i))
-
-/*
  * WT_RLE_EXPAND_FOREACH --
  * Macro to walk the run-length encoded column-store expansion  array of an
  * in-memory page.
  */
 #define	WT_RLE_EXPAND_FOREACH(page, exp, i)				\
 	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->u.rleexp; (i) > 0; ++(exp), --(i))
+	    (exp) = (page)->u.col_leaf.rleexp; (i) > 0; ++(exp), --(i))
 
 /*
- * WT_REF_FOREACH --
- * Macro to walk the off-page subtree array of an in-memory internal page.
+ * The repl and rleexp  arrays may not exist, and are arrays of pointers to
+ * individually allocated structures.   The following macros return an array
+ * entry if the array of pointers and the specific structure exist, otherwise
+ * NULL.
  */
-#define	WT_REF_FOREACH(page, ref, i)					\
-	for ((i) = (page)->indx_count,					\
-	    (ref) = (page)->u.ref; (i) > 0; ++(ref), --(i))
+#define	__WT_COL_ARRAY(page, ip, field)					\
+	((page)->field == NULL ?					\
+	    NULL : (page)->field[WT_COL_INDX_SLOT(page, ip)])
+#define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u.col_leaf.repl)
+#define	WT_COL_RLEEXP(page, ip)	__WT_COL_ARRAY(page, ip, u.col_leaf.rleexp)
+
+#define	__WT_ROW_ARRAY(page, ip, field)					\
+	((page)->field == NULL ?					\
+	    NULL : (page)->field[WT_ROW_INDX_SLOT(page, ip)])
+#define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u.row_leaf.repl)
 
 /*
- * On row-store internal pages, the on-page data referenced by the WT_ROW field
- * is a WT_OFF structure, which contains a page addr/size pair.
+ * WT_ROW_{REF,INDX}_AND_KEY_FOREACH --
+ *	Walk the indexes of a row-store in-memory page at the same time walking
+ * the underlying page's key WT_ITEMs.
  *
- * On column-store internal pages, the on-page data referenced by the WT_COL
- * field is a WT_OFF_RECORD structure which contains a page addr/size pair
- * and a total record count.
+ * This macro is necessary for when we're walking both the in-memory structures
+ * as well as the original page: the problem is keys that require processing.
+ * When a page is read into memory from a file, the in-memory key/size pair is
+ * set to reference an on-page group of bytes in the key's WT_ITEM structure.
+ * For uncompressed, small, simple keys, those bytes are usually what we want to
+ * access, and the in-memory WT_ROW and WT_ROW_REF structures point to them.
+ *
+ * Keys that require processing are harder (for example, a Huffman encoded or
+ * overflow key).  When we actually use a key requiring processing, we process
+ * the key and set the in-memory key/size pair to reference the allocated memory
+ * that holds the key -- which means we've lost any reference to the original
+ * WT_ITEM structure.  If we need the original key (for example, if reconciling
+ * the page, or verifying or freeing overflow references, in-memory information
+ * no longer gets us there).  As these are relatively rare operations performed
+ * on (hopefully!) relatively rare key types, we don't want to increase the size
+ * of the in-memory structurees to always reference the page.  Instead, walk the
+ * original page at the same time we walk the in-memory structures so we can
+ * find the original key WT_ITEM.
  */
-#define	WT_ROW_OFF(ip)							\
-	((WT_OFF *)WT_ITEM_BYTE(((WT_ROW *)ip)->data))
-#define	WT_COL_OFF(ip)							\
-	((WT_OFF_RECORD *)(((WT_COL *)ip)->data))
-#define	WT_COL_OFF_RECNO(ip)						\
-	WT_RECNO(WT_COL_OFF(ip))
+#define	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_item, i)		\
+	for ((key_item) = WT_PAGE_BYTE(page),				\
+	    (rref) = (page)->u.row_int.t, (i) = (page)->indx_count;	\
+	    (i) > 0;							\
+	    ++(rref),							\
+	    key_item = --(i) == 0 ?					\
+	    NULL : WT_ITEM_NEXT(WT_ITEM_NEXT(key_item)))
+#define	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_item, i)		\
+	for ((key_item) = WT_PAGE_BYTE(page),				\
+	    (rip) = (page)->u.row_leaf.d, (i) = (page)->indx_count;	\
+	    (i) > 0;							\
+	    ++(rip),							\
+	    key_item = --(i) == 0 ?					\
+	    NULL : __wt_key_item_next(key_item))
 
 /*
  * WT_ITEM --

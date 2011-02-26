@@ -50,10 +50,14 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
  *	Set a key/size pair, where the key does not require further processing.
  */
 static inline void
-__wt_key_set(WT_ROW *rip, void *key, uint32_t size)
+__wt_key_set(void *ref, void *key, uint32_t size)
 {
-	rip->key = key;
-	rip->size = size;
+	/*
+	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
+	 * of the structures are a void *data/uint32_t size pair.
+	 */
+	((WT_ROW *)ref)->key = key;
+	((WT_ROW *)ref)->size = size;
 }
 
 /*
@@ -61,10 +65,14 @@ __wt_key_set(WT_ROW *rip, void *key, uint32_t size)
  *	Set a key/size pair, where the key requires further processing.
  */
 static inline void
-__wt_key_set_process(WT_ROW *rip, void *key)
+__wt_key_set_process(void *ref, void *key)
 {
-	rip->key = key;
-	rip->size = 0;
+	/*
+	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
+	 * of the structures are a void *data/uint32_t size pair.
+	 */
+	((WT_ROW *)ref)->key = key;
+	((WT_ROW *)ref)->size = 0;
 }
 
 /*
@@ -72,9 +80,13 @@ __wt_key_set_process(WT_ROW *rip, void *key)
  *	Return if a key requires processing.
  */
 static inline int
-__wt_key_process(WT_ROW *rip)
+__wt_key_process(void *ref)
 {
-	return (rip->size == 0 ? 1 : 0);
+	/*
+	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
+	 * of the structures are a void *data/uint32_t size pair.
+	 */
+	return (((WT_ROW *)ref)->size == 0 ? 1 : 0);
 }
 
 /*
@@ -114,7 +126,7 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 /*
  * __wt_key_item_next --
  *	Move to the next key WT_ITEM on the page (helper function for the
- *	WT_INDX_AND_KEY_FOREACH macro).
+ *	WT_ROW_AND_KEY_FOREACH macro).
  */
 static inline WT_ITEM *
 __wt_key_item_next(WT_ITEM *key_item)

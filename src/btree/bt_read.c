@@ -68,10 +68,10 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 {
 	ENV *env;
 	WT_CACHE *cache;
+	WT_OFF *off;
 	WT_PAGE *parent;
 	WT_READ_REQ *rr, *rr_end;
 	WT_REF *ref;
-	void *off;
 	int dsk_verify;
 
 	__wt_cache_read_unpack(toc, parent, ref, off, dsk_verify);
@@ -203,8 +203,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * We're passed a reference to a WT_OFF or a WT_OFF_RECORD structure;
 	 * the initial addr/size pair fields are the same, get what we came for.
 	 */
-	addr = ((WT_OFF *)rr->off)->addr;
-	size = ((WT_OFF *)rr->off)->size;
+	addr = rr->off->addr;
+	size = rr->off->size;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -227,7 +227,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * itself. They're two separate allocation calls so we (hopefully) get
 	 * better alignment from the underlying heap memory allocator.
 	 */
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
+	WT_RET(__wt_calloc_def(env, 1, &page));
 	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &dsk));
 
 	/* Read the page. */
@@ -252,8 +252,12 @@ __wt_cache_read(WT_READ_REQ *rr)
 	page->parent_off = rr->off;
 	page->dsk = dsk;
 
-	/* Build the in-memory version of the page. */
-	WT_ERR(__wt_page_inmem(toc, page));
+	/*
+	 * Build the in-memory version of the page -- just return on error,
+	 * the called function cleaned up everything, including the physical
+	 * page.
+	 */
+	WT_RET(__wt_page_inmem(toc, page));
 
 	/*
 	 * The page is now available -- set the LRU so the page is not selected

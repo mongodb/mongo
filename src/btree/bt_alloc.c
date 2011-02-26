@@ -125,7 +125,7 @@ __wt_block_free(WT_TOC *toc, uint32_t addr, uint32_t size)
 	++idb->freelist_entries;
 
 	/* Allocate memory for the new entry. */
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_FREE_ENTRY), &new));
+	WT_RET(__wt_calloc_def(env, 1, &new));
 	new->addr = addr;
 	new->size = size;
 

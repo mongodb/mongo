@@ -41,10 +41,11 @@ static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_overflow_col(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow_common(
 		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_overflow_row(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_pc(WT_TOC *, WT_ROW *, WT_PAGE *, int);
-static int __wt_verify_tree(
-		WT_TOC *, WT_ROW *, uint64_t, uint32_t, WT_REF *, WT_VSTUFF *);
+static int __wt_verify_overflow_row_int(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_overflow_row_leaf(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_pc(WT_TOC *, WT_ROW_REF *, WT_PAGE *, int);
+static int __wt_verify_tree(WT_TOC *,
+		WT_ROW_REF *, WT_PAGE *, uint64_t, uint32_t, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -108,8 +109,8 @@ __wt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(toc, NULL,
-	    WT_RECNO(&idb->root_off), WT_NOLEVEL, &idb->root_page, &vstuff));
+	WT_ERR(__wt_verify_tree(toc, NULL, idb->root_page.page,
+	    WT_RECNO(&idb->root_off), WT_NOLEVEL, &vstuff));
 
 	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
@@ -133,25 +134,22 @@ err:	/* Wrap up reporting and free allocated memory. */
  */
 static int
 __wt_verify_tree(
-    WT_TOC *toc,		/* Thread of control */
-    WT_ROW *parent_rip,		/* Internal key referencing this page, if any */
-    uint64_t parent_recno,	/* First record in this subtree */
-    uint32_t level,		/* Page's tree level */
-    WT_REF *ref,		/* Already verified page reference */
-    WT_VSTUFF *vs)		/* The verify package */
+	WT_TOC *toc,		/* Thread of control */
+	WT_ROW_REF *parent_rref,/* Internal key referencing this page, if any */
+	WT_PAGE *page,		/* Page to verify */
+	uint64_t parent_recno,	/* First record in this subtree */
+	uint32_t level,		/* Page's tree level */
+	WT_VSTUFF *vs)		/* The verify package */
 {
 	DB *db;
-	WT_COL *cip;
-	WT_OFF *off;
-	WT_OFF_RECORD *off_record;
-	WT_PAGE *page;
+	WT_COL_REF *cref;
 	WT_PAGE_DISK *dsk;
-	WT_ROW *rip;
+	WT_REF *ref;
+	WT_ROW_REF *rref;
 	uint32_t i;
 	int ret;
 
 	db = toc->db;
-	page = ref->page;
 	dsk = page->dsk;
 	ret = 0;
 
@@ -245,8 +243,10 @@ __wt_verify_tree(
 		WT_RET(__wt_verify_overflow_col(toc, page, vs));
 		break;
 	case WT_PAGE_ROW_INT:
+		WT_RET(__wt_verify_overflow_row_int(toc, page, vs));
+		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow_row(toc, page, vs));
+		WT_RET(__wt_verify_overflow_row_leaf(toc, page, vs));
 		break;
 	}
 
@@ -254,16 +254,14 @@ __wt_verify_tree(
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
-		WT_INDX_FOREACH(page, cip, i) {
-			/* cip references the subtree containing the record */
-			ref = WT_COL_REF(page, cip);
-			off_record = WT_COL_OFF(cip);
-			parent_recno = WT_COL_OFF_RECNO(cip);
-			switch (ret =
-			    __wt_page_in(toc, page, ref, off_record, 1)) {
+		WT_COL_REF_FOREACH(page, cref, i) {
+			/* cref references the subtree containing the record */
+			ref = &cref->ref;
+			switch (ret = __wt_page_in(
+			    toc, page, ref, cref->off_record, 1)) {
 			case 0:				/* Valid page */
-				ret = __wt_verify_tree(toc,
-				    NULL, parent_recno, level - 1, ref, vs);
+				ret = __wt_verify_tree(toc, NULL, ref->page,
+				    WT_COL_REF_RECNO(cref), level - 1, vs);
 				__wt_hazard_clear(toc, ref->page);
 				break;
 			case WT_PAGE_DELETED:
@@ -292,11 +290,11 @@ __wt_verify_tree(
 		 * entry's key.  In that comparison, the leaf page's key must
 		 * be less than the internal node entry's key.
 		 */
-		if (parent_rip != NULL)
-			WT_ERR(__wt_verify_pc(toc, parent_rip, page, 1));
+		if (parent_rref != NULL)
+			WT_ERR(__wt_verify_pc(toc, parent_rref, page, 1));
 
 		/* For each entry in an internal page, verify the subtree. */
-		WT_INDX_FOREACH(page, rip, i) {
+		WT_ROW_REF_FOREACH(page, rref, i) {
 			/*
 			 * At each off-page entry, we compare the current entry
 			 * against the largest key in the subtree rooted to the
@@ -309,18 +307,18 @@ __wt_verify_tree(
 			 * in a comparison.
 			 */
 			if (vs->leaf != NULL) {
-				WT_ERR(__wt_verify_pc(toc, rip, vs->leaf, 0));
+				WT_ERR(__wt_verify_pc(toc, rref, vs->leaf, 0));
 				__wt_hazard_clear(toc, vs->leaf);
 				vs->leaf = NULL;
 			}
 
-			/* rip references the subtree containing the record */
-			ref = WT_ROW_REF(page, rip);
-			off = WT_ROW_OFF(rip);
-			switch (ret = __wt_page_in(toc, page, ref, off, 1)) {
+			/* rref references the subtree containing the record */
+			ref = &rref->ref;
+			switch (
+			    ret = __wt_page_in(toc, page, ref, rref->off, 1)) {
 			case 0:				/* Valid page */
-				ret = __wt_verify_tree(
-				    toc, rip, (uint64_t)0, level - 1, ref, vs);
+				ret = __wt_verify_tree(toc, rref,
+				    ref->page, (uint64_t)0, level - 1, vs);
 				/*
 				 * Remaining special handling of the last
 				 * verified leaf page: if we kept a reference
@@ -360,11 +358,12 @@ err:	if (vs->leaf != NULL) {
  *	Compare a key on a parent page to a designated entry on a child page.
  */
 static int
-__wt_verify_pc(WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
+__wt_verify_pc(WT_TOC *toc,
+    WT_ROW_REF *parent_rref, WT_PAGE *child, int first_entry)
 {
 	DB *db;
 	DBT *cd_ref, *pd_ref, *scratch1, *scratch2;
-	WT_ROW *child_rip;
+	WT_ROW *child_key;
 	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
@@ -373,24 +372,38 @@ __wt_verify_pc(WT_TOC *toc, WT_ROW *parent_rip, WT_PAGE *child, int first_entry)
 	ret = 0;
 
 	/*
+	 * We're passed both row-store internal and leaf pages -- find the
+	 * right WT_ROW_REF or WT_ROW structure; the first two fields of the
+	 * structures are a void *data/uint32_t size pair.
+	 */
+	switch (child->dsk->type) {
+	case WT_PAGE_ROW_INT:
+		child_key = (WT_ROW *)(first_entry ? child->u.row_int.t :
+		    child->u.row_int.t + (child->indx_count - 1));
+		break;
+	case WT_PAGE_ROW_LEAF:
+		child_key = first_entry ? child->u.row_leaf.d :
+		    child->u.row_leaf.d + (child->indx_count - 1);
+		break;
+	}
+
+	/*
 	 * The two keys we're going to compare may be overflow keys -- don't
 	 * bother instantiating the keys in the tree, there's no reason to
 	 * believe we're going to be doing real operations in this file.
 	 */
-	child_rip = first_entry ?
-	    child->indx.row : child->indx.row + (child->indx_count - 1);
-	if (__wt_key_process(child_rip)) {
+	if (__wt_key_process(child_key)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
-		WT_ERR(__wt_item_process(toc, child_rip->key, scratch1));
+		WT_ERR(__wt_item_process(toc, child_key->key, scratch1));
 		cd_ref = scratch1;
 	} else
-		cd_ref = (DBT *)child_rip;
-	if (__wt_key_process(parent_rip)) {
+		cd_ref = (DBT *)child_key;
+	if (__wt_key_process(parent_rref)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch2));
-		WT_RET(__wt_item_process(toc, parent_rip->key, scratch2));
+		WT_RET(__wt_item_process(toc, parent_rref->key, scratch2));
 		pd_ref = scratch2;
 	} else
-		pd_ref = (DBT *)parent_rip;
+		pd_ref = (DBT *)parent_rref;
 
 	/* Compare the parent's key against the child's key. */
 	cmp = func(db, cd_ref, pd_ref);
@@ -427,38 +440,59 @@ __wt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_COL *cip;
 	WT_ITEM *item;
-	uint32_t i;
+	uint32_t entry_num, i;
 
 	/* Walk the in-memory page, verifying overflow items. */
-	WT_INDX_FOREACH(page, cip, i) {
+	entry_num = 0;
+	WT_COL_INDX_FOREACH(page, cip, i) {
+		++entry_num;
 		item = cip->data;
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
 			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(item),
-			    WT_COL_SLOT(page, cip) + 1, page->addr, vs));
+			    entry_num, page->addr, vs));
 	}
 	return (0);
 }
 
 /*
- * __wt_verify_overflow_row --
- *	Check on-page row-store overflow references.
+ * __wt_verify_overflow_row_int --
+ *	Check on-page row-store internal page overflow references.
  */
 static int
-__wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow_row_int(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+{
+	WT_ITEM *key_item;
+	WT_ROW_REF *rref;
+	uint32_t entry_num, i;
+
+	/*
+	 * Walk the in-memory page, verifying overflow items.
+	 *
+	 * We have to walk the original disk page as well as the current page:
+	 * see the comment at WT_ROW_REF_INDX_AND_KEY_FOREACH for details.
+	 */
+	entry_num = 0;
+	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_item, i) {
+		++entry_num;
+		if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+			WT_RET(__wt_verify_overflow_common(
+			    toc, WT_ITEM_BYTE_OVFL(key_item),
+			    entry_num, page->addr, vs));
+	}
+	return (0);
+}
+
+/*
+ * __wt_verify_overflow_row_leaf --
+ *	Check on-page row-store leaf overflow references.
+ */
+static int
+__wt_verify_overflow_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_ITEM *data_item, *key_item;
 	WT_ROW *rip;
-	uint32_t i;
-	int check_data;
-
-	/*
-	 * Walk the in-memory page, verifying overflow items.   We service two
-	 * page types here: ROW_INT and ROW_LEAF.  In the case of ROW_INT, only
-	 * check the key, as there is no data item; in the case of ROW_LEAF, we
-	 * have to check both the key and the data item.
-	 */
-	check_data = page->dsk->type == WT_PAGE_ROW_LEAF ? 1 : 0;
+	uint32_t entry_num, i;
 
 	/*
 	 * Walk the in-memory page, verifying overflow items.
@@ -466,20 +500,19 @@ __wt_verify_overflow_row(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 	 * We have to walk the original disk page as well as the current page:
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
-	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
+	entry_num = 0;
+	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
+		++entry_num;
 		if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
 			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(key_item),
-			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
-
-		if (!check_data)
-			continue;
+			    entry_num, page->addr, vs));
 
 		data_item = rip->data;
 		if (WT_ITEM_TYPE(data_item) == WT_ITEM_DATA_OVFL)
 			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(data_item),
-			    WT_ROW_SLOT(page, rip) + 1, page->addr, vs));
+			    entry_num, page->addr, vs));
 	}
 	return (0);
 }

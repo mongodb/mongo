@@ -44,7 +44,7 @@ int
 __wt_desc_read(WT_TOC *toc);
 int
 __wt_desc_write(WT_TOC *toc);
-void
+int
 __wt_page_discard(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_db_dump(WT_TOC *toc,
@@ -79,7 +79,7 @@ int
 __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store);
 int
 __wt_page_in(
-    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off, int dsk_verify);
+    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off_arg, int dsk_verify);
 int
 __wt_page_inmem(WT_TOC *toc, WT_PAGE *page);
 int
@@ -119,7 +119,7 @@ int
 __wt_verify_dsk_chunk(
     WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
-__wt_tree_walk(WT_TOC *toc, WT_REF *ref,
+__wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
     uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg);
 int
 __wt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk);

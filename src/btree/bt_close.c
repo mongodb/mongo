@@ -82,7 +82,5 @@ __wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	if (WT_PAGE_IS_MODIFIED(page))
 		WT_RET(__wt_page_reconcile(toc, page));
 
-	__wt_page_discard(toc, page);
-
-	return (0);
+	return (__wt_page_discard(toc, page));
 }

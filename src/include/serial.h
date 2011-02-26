@@ -3,7 +3,7 @@
 typedef struct {
 	WT_PAGE * parent;
 	WT_REF * ref;
-	void * off;
+	WT_OFF * off;
 	int dsk_verify;
 } __wt_cache_read_args;
 #define	__wt_cache_read_serial(\

@@ -122,7 +122,7 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	db = toc->db;
 
 	/* Walk the page, dumping data items. */
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		if ((repl = WT_COL_REPL(page, cip)) == NULL) {
 			if (!WT_FIX_DELETE_ISSET(cip->data))
 				dp->p(cip->data, db->fixed_len, dp->stream);
@@ -157,7 +157,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	n_expsort = 0;
 
 	recno = page->dsk->recno;
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
@@ -214,7 +214,7 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(toc, 0, &tmp));
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		/* Check for replace or deletion. */
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
 			if (!WT_REPL_DELETED_ISSET(repl))
@@ -273,7 +273,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_CLEAR(key_local);
 	WT_CLEAR(data_local);
 
-	WT_INDX_FOREACH(page, rip, i) {
+	WT_ROW_INDX_FOREACH(page, rip, i) {
 		/* Check for deletion. */
 		if ((repl = WT_ROW_REPL(
 		    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))

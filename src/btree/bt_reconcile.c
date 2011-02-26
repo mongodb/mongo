@@ -210,7 +210,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	__wt_set_ff_and_sa_from_offset(
 	    new, WT_PAGE_BYTE(new), &first_free, &space_avail);
 
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		from = cip->data;
 
 		/*
@@ -246,7 +246,7 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_ITEM *key_item, *data_item, *next;
 	WT_PAGE_DISK *dsk;
-	WT_ROW *rip;
+	WT_ROW_REF *rref;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
@@ -258,12 +258,12 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * We have to walk both the WT_ROW structures and the original page --
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
-	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
+	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_item, i) {
 		/*
 		 * Skip deleted pages; if we delete an overflow key, free the
 		 * underlying file space.
 		 */
-		if (WT_ROW_OFF(rip)->addr == WT_ADDR_DELETED) {
+		if (WT_ROW_REF_ADDR(rref) == WT_ADDR_DELETED) {
 			if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
 				WT_RET(__wt_block_free_ovfl(
 				    toc, WT_ITEM_BYTE_OVFL(key_item)));
@@ -344,7 +344,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	memset(tmp->data, 0, len);
 	WT_FIX_DELETE_SET(tmp->data);
 
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
@@ -424,7 +424,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	/* Set recno to the first record on the page. */
 	recno = page->dsk->recno;
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
@@ -573,8 +573,7 @@ __wt_rle_expand_sort(ENV *env,
 		if (*expsortp != NULL)
 			__wt_free(
 			    env, *expsortp, *np * sizeof(WT_RLE_EXPAND *));
-		WT_RET(__wt_calloc(
-		    env, (size_t)n + 10, sizeof(WT_RLE_EXPAND *), expsortp));
+		WT_RET(__wt_calloc_def(env, (size_t)n + 10, expsortp));
 		*np = n + 10;
 	}
 
@@ -619,7 +618,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_CLEAR(data_item);
 	data = &data_dbt;
 
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a reference to the data: it's either a replacement value
 		 * or the original on-page item.
@@ -727,7 +726,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	 * We have to walk both the WT_ROW structures and the original page --
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
-	WT_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
+	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_item, i) {
 		len = 0;
 
 		/*
@@ -903,10 +902,10 @@ err:	(void)__wt_block_free(toc, new->addr, new->size);
 static int
 __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 {
-	WT_COL *cip;
+	WT_COL_REF *cref;
 	WT_PAGE *parent;
 	WT_PAGE_DISK *dsk;
-	WT_ROW *rip;
+	WT_ROW_REF *rref;
 	uint32_t i;
 
 	/*
@@ -1008,13 +1007,13 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	 */
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(parent, cip, i)
-			if (WT_COL_OFF(cip)->addr != WT_ADDR_DELETED)
+		WT_COL_REF_FOREACH(parent, cref, i)
+			if (WT_COL_REF_ADDR(cref) != WT_ADDR_DELETED)
 				return (0);
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(parent, rip, i)
-			if (WT_ROW_OFF(rip)->addr != WT_ADDR_DELETED)
+		WT_ROW_REF_FOREACH(parent, rref, i)
+			if (WT_ROW_REF_ADDR(rref) != WT_ADDR_DELETED)
 				return (0);
 		break;
 	}

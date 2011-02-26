@@ -80,7 +80,7 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 	stats = toc->db->idb->dstats;
 
 	/* Walk the page, counting data items. */
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		if ((repl = WT_COL_REPL(page, cip)) == NULL)
 			if (WT_FIX_DELETE_ISSET(cip->data))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
@@ -111,7 +111,7 @@ __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 	stats = toc->db->idb->dstats;
 
 	/* Walk the page, counting data items. */
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
 			WT_STAT_INCRV(stats,
 			    ITEM_COL_DELETED, WT_RLE_REPEAT_COUNT(cip->data));
@@ -165,7 +165,7 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 	 * to expensive to figure out if it will require the same space or not,
 	 * especially if there's Huffman encoding).
 	 */
-	WT_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i) {
 		switch (WT_ITEM_TYPE(cip->data)) {
 		case WT_ITEM_DATA:
 			repl = WT_COL_REPL(page, cip);
@@ -212,7 +212,7 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 	 * to expensive to figure out if it will require the same space or not,
 	 * especially if there's Huffman encoding).
 	 */
-	WT_INDX_FOREACH(page, rip, i) {
+	WT_ROW_INDX_FOREACH(page, rip, i) {
 		switch (WT_ITEM_TYPE(rip->data)) {
 		case WT_ITEM_DATA:
 			repl = WT_ROW_REPL(page, rip);
