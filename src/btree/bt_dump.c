@@ -116,16 +116,20 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i;
+	void *cipdata;
 
 	db = toc->db;
+	dsk = page->dsk;
 
 	/* Walk the page, dumping data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(dsk, cip);
 		if ((repl = WT_COL_REPL(page, cip)) == NULL) {
-			if (!WT_FIX_DELETE_ISSET(cip->data))
-				dp->p(cip->data, db->fixed_len, dp->stream);
+			if (!WT_FIX_DELETE_ISSET(cipdata))
+				dp->p(cipdata, db->fixed_len, dp->stream);
 		} else
 			if (!WT_REPL_DELETED_ISSET(repl))
 				dp->p(WT_REPL_DATA(repl),
@@ -144,20 +148,24 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	ENV *env;
 	FILE *fp;
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
 	uint64_t recno;
 	uint32_t i, n_expsort;
 	uint16_t n_repeat;
+	void *cipdata;
 
 	db = toc->db;
 	env = toc->env;
+	dsk = page->dsk;
 	fp = dp->stream;
 	expsort = NULL;
 	n_expsort = 0;
 
 	recno = page->dsk->recno;
 	WT_COL_INDX_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(dsk, cip);
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
@@ -172,7 +180,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * in the WT_RLE_EXPAND array, and original data otherwise.
 		 */
 		for (expp = expsort,
-		    n_repeat = WT_RLE_REPEAT_COUNT(cip->data);
+		    n_repeat = WT_RLE_REPEAT_COUNT(cipdata);
 		    n_repeat > 0; --n_repeat, ++recno)
 			if ((exp = *expp) != NULL && exp->recno == recno) {
 				++expp;
@@ -182,9 +190,9 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 					    WT_REPL_DATA(repl), repl->size, fp);
 			} else
 				if (!WT_FIX_DELETE_ISSET(
-				    WT_RLE_REPEAT_DATA(cip->data)))
+				    WT_RLE_REPEAT_DATA(cipdata)))
 					dp->p(WT_RLE_REPEAT_DATA(
-					    cip->data), db->fixed_len, fp);
+					    cipdata), db->fixed_len, fp);
 	}
 	/* Free the sort array. */
 	if (expsort != NULL)
@@ -204,12 +212,14 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DBT *tmp;
 	WT_COL *cip;
 	WT_ITEM *item;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
-	uint32_t i;
 	int ret;
+	uint32_t i;
 	void *huffman;
 
 	db = toc->db;
+	dsk = page->dsk;
 	huffman = db->idb->huffman_data;
 	ret = 0;
 
@@ -224,7 +234,7 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Process the original data. */
-		item = cip->data;
+		item = WT_COL_PTR(dsk, cip);
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
 			if (huffman == NULL) {

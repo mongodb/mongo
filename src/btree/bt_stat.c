@@ -73,16 +73,18 @@ static int
 __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	WT_STATS *stats;
 	uint32_t i;
 
+	dsk = page->dsk;
 	stats = toc->db->idb->dstats;
 
 	/* Walk the page, counting data items. */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i)
 		if ((repl = WT_COL_REPL(page, cip)) == NULL)
-			if (WT_FIX_DELETE_ISSET(cip->data))
+			if (WT_FIX_DELETE_ISSET(WT_COL_PTR(dsk, cip)))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			else
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
@@ -91,7 +93,6 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			else
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-	}
 	return (0);
 }
 
@@ -103,21 +104,25 @@ static int
 __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_RLE_EXPAND *exp;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
+	WT_RLE_EXPAND *exp;
 	WT_STATS *stats;
 	uint32_t i;
+	void *cipdata;
 
+	dsk = page->dsk;
 	stats = toc->db->idb->dstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
+		cipdata = WT_COL_PTR(dsk, cip);
+		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 			WT_STAT_INCRV(stats,
-			    ITEM_COL_DELETED, WT_RLE_REPEAT_COUNT(cip->data));
+			    ITEM_COL_DELETED, WT_RLE_REPEAT_COUNT(cipdata));
 		else
 			WT_STAT_INCRV(stats,
-			    ITEM_TOTAL_DATA, WT_RLE_REPEAT_COUNT(cip->data));
+			    ITEM_TOTAL_DATA, WT_RLE_REPEAT_COUNT(cipdata));
 
 		/*
 		 * Check for corrections.
@@ -151,11 +156,13 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	WT_STATS *stats;
 	uint32_t i;
 
 	db = toc->db;
+	dsk = page->dsk;
 	stats = db->idb->dstats;
 
 	/*
@@ -166,7 +173,7 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 	 * especially if there's Huffman encoding).
 	 */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		switch (WT_ITEM_TYPE(cip->data)) {
+		switch (WT_ITEM_TYPE(WT_COL_PTR(dsk, cip))) {
 		case WT_ITEM_DATA:
 			repl = WT_COL_REPL(page, cip);
 			if (repl == NULL || !WT_REPL_DELETED_ISSET(repl))

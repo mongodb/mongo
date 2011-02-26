@@ -217,20 +217,24 @@ static void
 __wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t fixed_len, i;
+	void *cipdata;
 
+	dsk = page->dsk;
 	fixed_len = toc->db->fixed_len;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(dsk, cip);
 		fprintf(fp, "\tdata {");
-		if (WT_FIX_DELETE_ISSET(cip->data))
+		if (WT_FIX_DELETE_ISSET(cipdata))
 			fprintf(fp, "deleted");
 		else
-			__wt_print_byte_string(cip->data, fixed_len, fp);
+			__wt_print_byte_string(cipdata, fixed_len, fp);
 		fprintf(fp, "}\n");
 
 		if ((repl = WT_COL_REPL(page, cip)) != NULL)
@@ -267,22 +271,26 @@ static void
 __wt_debug_page_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp;
 	uint32_t fixed_len, i;
+	void *cipdata;
 
+	dsk = page->dsk;
 	fixed_len = toc->db->fixed_len;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(dsk, cip);
 		fprintf(fp,
-		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cip->data));
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
+		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cipdata));
+		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 			fprintf(fp, "deleted");
 		else
 			__wt_print_byte_string(
-			    WT_RLE_REPEAT_DATA(cip->data), fixed_len, fp);
+			    WT_RLE_REPEAT_DATA(cipdata), fixed_len, fp);
 		fprintf(fp, "}\n");
 
 		if ((exp = WT_COL_RLEEXP(page, cip)) != NULL)
@@ -298,15 +306,20 @@ static int
 __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
+	WT_PAGE_DISK *dsk;
 	WT_REPL *repl;
 	uint32_t i;
+	void *cipdata;
+
+	dsk = page->dsk;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(dsk, cip);
 		fprintf(fp, "\tdata {");
-		WT_RET(__wt_debug_item_data(toc, cip->data, fp));
+		WT_RET(__wt_debug_item_data(toc, cipdata, fp));
 		fprintf(fp, "}\n");
 
 		if ((repl = WT_COL_REPL(page, cip)) != NULL)

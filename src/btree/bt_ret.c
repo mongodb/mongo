@@ -106,15 +106,15 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	/* Otherwise, take the item from the original page. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		data_ret = cip->data;
+		data_ret = WT_COL_PTR(dsk, cip);
 		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_RLE:
-		data_ret = WT_RLE_REPEAT_DATA(cip->data);
+		data_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(dsk, cip));
 		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
-		item = cip->data;
+		item = WT_COL_PTR(dsk, cip);
 		goto item_set;
 	case WT_PAGE_ROW_LEAF:
 		item = rip->data;

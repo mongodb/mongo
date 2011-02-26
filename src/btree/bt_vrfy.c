@@ -440,13 +440,16 @@ __wt_verify_overflow_col(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_COL *cip;
 	WT_ITEM *item;
+	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
+
+	dsk = page->dsk;
 
 	/* Walk the in-memory page, verifying overflow items. */
 	entry_num = 0;
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		++entry_num;
-		item = cip->data;
+		item = WT_COL_PTR(dsk, cip);
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
 			WT_RET(__wt_verify_overflow_common(
 			    toc, WT_ITEM_BYTE_OVFL(item),

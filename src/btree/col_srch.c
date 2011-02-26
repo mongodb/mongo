@@ -26,6 +26,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	uint64_t record_cnt, start_recno;
 	uint32_t base, i, indx, limit, write_gen;
 	int ret;
+	void *cipdata;
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
@@ -52,6 +53,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 			cip = page->u.col_leaf.d + (recno - dsk->recno);
+			cipdata = WT_COL_PTR(dsk, cip);
 			goto done;
 		case WT_PAGE_COL_RLE:
 			/*
@@ -60,9 +62,10 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			 */
 			record_cnt = recno - dsk->recno;
 			WT_COL_INDX_FOREACH(page, cip, i) {
-				if (record_cnt < WT_RLE_REPEAT_COUNT(cip->data))
+				cipdata = WT_COL_PTR(dsk, cip);
+				if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata))
 					break;
-				record_cnt -= WT_RLE_REPEAT_COUNT(cip->data);
+				record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
 			}
 			goto done;
 		}
@@ -158,7 +161,7 @@ done:	/*
 				goto notfound;
 			toc->srch_repl = repl;
 		} else
-			if (WT_FIX_DELETE_ISSET(cip->data))
+			if (WT_FIX_DELETE_ISSET(cipdata))
 				goto notfound;
 		break;
 	case WT_PAGE_COL_RLE:
@@ -190,7 +193,7 @@ done:	/*
 			toc->srch_exp = exp;
 			toc->srch_repl = exp->repl;
 		} else
-			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cip->data)))
+			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 				goto notfound;
 		break;
 	case WT_PAGE_COL_VAR:
@@ -216,7 +219,7 @@ done:	/*
 			toc->srch_repl = repl;
 			break;
 		} else
-			if (WT_ITEM_TYPE(cip->data) == WT_ITEM_DEL)
+			if (WT_ITEM_TYPE(cipdata) == WT_ITEM_DEL)
 				goto notfound;
 		break;
 	case WT_PAGE_COL_INT:

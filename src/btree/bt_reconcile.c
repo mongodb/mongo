@@ -200,7 +200,7 @@ err:	if (tmp != NULL)
 static int
 __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	WT_COL *cip;
+	WT_COL_REF *cref;
 	WT_OFF_RECORD *from;
 	WT_PAGE_DISK *dsk;
 	uint32_t i, space_avail;
@@ -209,8 +209,8 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	dsk = new->dsk;
 	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
-	WT_COL_INDX_FOREACH(page, cip, i) {
-		from = cip->data;
+	WT_COL_REF_FOREACH(page, cref, i) {
+		from = cref->off_record;
 
 		/*
 		 * XXX
@@ -322,6 +322,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint32_t i, len, space_avail;
 	uint8_t *data, *first_free;
 	int ret;
+	void *cipdata;
 
 	db = toc->db;
 	tmp = NULL;
@@ -342,6 +343,8 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_FIX_DELETE_SET(tmp->data);
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
+		cipdata = WT_COL_PTR(dsk, cip);
+
 		/*
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
@@ -351,10 +354,10 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				data = tmp->data;	/* Replaced deleted */
 			else				/* Replaced data */
 				data = WT_REPL_DATA(repl);
-		} else if (WT_FIX_DELETE_ISSET(cip->data))
+		} else if (WT_FIX_DELETE_ISSET(cipdata))
 			data = tmp->data;		/* On-disk deleted */
-		else
-			data = cip->data;		/* On-disk data */
+		else					/* On-disk data */
+			data = WT_COL_PTR(dsk, cip);
 
 		/*
 		 * When reconciling a fixed-width page that doesn't support
@@ -395,6 +398,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *first_free, *last_data;
 	int from_repl, ret;
+	void *cipdata;
 
 	db = toc->db;
 	tmp = NULL;
@@ -436,7 +440,8 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * records, checking for WT_RLE_EXPAND entries that match the
 		 * current record number.
 		 */
-		nrepeat = WT_RLE_REPEAT_COUNT(cip->data);
+		cipdata = WT_COL_PTR(dsk, cip);
+		nrepeat = WT_RLE_REPEAT_COUNT(cipdata);
 		for (expp = expsort, n = 1;
 		    n <= nrepeat; n += repeat_count, recno += repeat_count) {
 			from_repl = 0;
@@ -453,10 +458,10 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				}
 				repeat_count = 1;
 			} else {
-				if (WT_FIX_DELETE_ISSET(cip->data))
+				if (WT_FIX_DELETE_ISSET(cipdata))
 					data = tmp->data;
 				else
-					data = cip->data;
+					data = cipdata;
 				/*
 				 * The repeat count is the number of records
 				 * up to the next WT_RLE_EXPAND record, or
@@ -618,7 +623,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data: it's either a replacement value
 		 * or the original on-page item.
 		 */
-		item = cip->data;
+		item = WT_COL_PTR(dsk, cip);
 		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
 			/*
 			 * If we replace or delete an overflow data item, free

@@ -195,13 +195,22 @@ struct __wt_page_disk {
 #define	WT_PAGE_DISK_SIZE		28
 
 /*
- * WT_PAGE_BYTE: the first byte on the page.
- * WT_PAGE_DISK_BYTE: the first usable data byte on the page, past the header.
+ * WT_PAGE_DISK_BYTE, WT_PAGE_BYTE --
+ * The first usable data byte on the page (past the header).
  */
-#define	WT_PAGE_BYTE(page)						\
-	WT_PAGE_DISK_BYTE((page)->dsk)
 #define	WT_PAGE_DISK_BYTE(dsk)						\
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
+#define	WT_PAGE_BYTE(page)						\
+	WT_PAGE_DISK_BYTE((page)->dsk)
+
+/*
+ * WT_PAGE_DISK_OFFSET --
+ *	Offset of a pointer in a page.
+ */
+#define	WT_PAGE_DISK_OFFSET(dsk, p)					\
+	((uint32_t)((uint8_t *)(p) - (uint8_t *)(dsk)))
+#define	WT_PAGE_DISK_REF(dsk, o)					\
+	((void *)((uint8_t *)(dsk) + (o)))
 
 /*
  * WT_REF --
@@ -532,9 +541,9 @@ struct __wt_row {
 
 /*
  * WT_COL --
- * Each in-memory page column-store leaf page has an array of WT_COL structures:
- * this is where the on-page index in Berkeley DB is created when a page is read
- * from the file.  It's fixed in size, and references data on the page.
+ * Each in-memory column-store leaf page has an array of WT_COL structures: this
+ * is where the on-page index in Berkeley DB is created when a page is read from
+ * the file.  It's fixed in size, and references data on the page.
  *
  * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
  * pages), a single indx entry may reference a large number of records, because
@@ -546,11 +555,16 @@ struct __wt_row {
  */
 struct __wt_col {
 	/*
+	 * Column-store leaf page references are page offsets, not pointers (we
+	 * boldly re-invent short pointers).  The trade-off is 4B per data item
+	 * on a 64-bit machine vs. a single cycle to do an addition to the base
+	 * pointer.   
+	 *
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_ITEM layout, like row-store
 	 * pages.  If the page has fixed-length objects, it's untyped bytes.
 	 */
-	void	 *data;			/* on-page data */
+	uint32_t data;
 };
 /*
  * WT_COL_SIZE is the expected structure size -- we verify the build to ensure
@@ -558,7 +572,14 @@ struct __wt_col {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_COL_SIZE	(sizeof(void *))
+#define	WT_COL_SIZE	(sizeof(uint32_t))
+
+/*
+ * WT_COL_PTR --
+ *	Return a pointer corresponding to the data offset.
+ */
+#define	WT_COL_PTR(dsk, cip)						\
+	WT_PAGE_DISK_REF(dsk, (cip)->data)
 
 /*
  * WT_COL_INDX_FOREACH --
