@@ -38,8 +38,8 @@ typedef struct {
 static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(WT_TOC *, WT_VSTUFF *);
 static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
-static int __wt_verify_overflow(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_overflow_common(
+static int __wt_verify_overflow_page(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_overflow(
 		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_pc(WT_TOC *, WT_ROW_REF *, WT_PAGE *, int);
 static int __wt_verify_tree(WT_TOC *,
@@ -240,7 +240,7 @@ __wt_verify_tree(
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow(toc, page, vs));
+		WT_RET(__wt_verify_overflow_page(toc, page, vs));
 		break;
 	}
 
@@ -426,11 +426,11 @@ err:	if (scratch1 != NULL)
 }
 
 /*
- * __wt_verify_overflow --
+ * __wt_verify_overflow_page --
  *	Verify overflow items.
  */
 static int
-__wt_verify_overflow(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow_page(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
@@ -451,8 +451,8 @@ __wt_verify_overflow(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
-			WT_RET(__wt_verify_overflow_common(
-			    toc, WT_ITEM_BYTE_OVFL(item),
+			WT_RET(__wt_verify_overflow(toc,
+			    WT_ITEM_BYTE_OVFL(item),
 			    entry_num, page->addr, vs));
 		}
 	}
@@ -460,11 +460,11 @@ __wt_verify_overflow(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 }
 
 /*
- * __wt_verify_overflow_common --
- *	Common code that reads in an overflow page and checks it.
+ * __wt_verify_overflow --
+ *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow_common(WT_TOC *toc,
+__wt_verify_overflow(WT_TOC *toc,
     WT_OVFL *ovfl, uint32_t entry_num, uint32_t page_ref_addr, WT_VSTUFF *vs)
 {
 	DB *db;
