@@ -830,7 +830,7 @@ namespace mongo {
             }
 
             if ( !ok && logMissing ) {
-                log() << "unindex failed (key too big?) " << id.indexNamespace() << " key: " << j << " obj _id: " << obj["_id"] << endl;
+                log() << "unindex failed (key too big?) " << id.indexNamespace() << " key: " << j << " " << obj["_id"] << endl;
             }
         }
     }
