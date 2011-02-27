@@ -134,7 +134,7 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data);
 int
 __wt_rle_expand_serial_func(WT_TOC *toc);
 int
-__wt_rle_expand_repl_serial_func(WT_TOC *toc);
+__wt_rle_expand_update_serial_func(WT_TOC *toc);
 int
 __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags);
 int
@@ -146,9 +146,9 @@ __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_item_update_serial_func(WT_TOC *toc);
 int
-__wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data);
+__wt_update_alloc(WT_TOC *toc, WT_UPDATE **updp, DBT *data);
 void
-__wt_repl_free(WT_TOC *toc, WT_REPL *repl);
+__wt_update_free(WT_TOC *toc, WT_UPDATE *upd);
 int
 __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags);
 void

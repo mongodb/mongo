@@ -36,7 +36,6 @@ struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_disk;		typedef struct __wt_page_disk WT_PAGE_DISK;
 struct __wt_ref;		typedef struct __wt_ref WT_REF;
-struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 struct __wt_rle_expand;		typedef struct __wt_rle_expand WT_RLE_EXPAND;
 struct __wt_row;		typedef struct __wt_row WT_ROW;
 struct __wt_row_ref;		typedef struct __wt_row_ref WT_ROW_REF;
@@ -44,6 +43,7 @@ struct __wt_row_split;		typedef struct __wt_row_split WT_ROW_SPLIT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 struct __wt_toc_buffer;		typedef struct __wt_toc_buffer WT_TOC_BUFFER;
+struct __wt_update;		typedef struct __wt_update WT_UPDATE;
 
 #include "api_int.h"
 

@@ -318,7 +318,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	ENV *env;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t i, len, space_avail;
 	uint8_t *data, *first_free;
 	int ret;
@@ -349,11 +349,11 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
 		 */
-		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl))
-				data = tmp->data;	/* Replaced deleted */
-			else				/* Replaced data */
-				data = WT_REPL_DATA(repl);
+		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				data = tmp->data;	/* Deleted */
+			else				/* Updated */
+				data = WT_UPDATE_DATA(upd);
 		} else if (WT_FIX_DELETE_ISSET(cipdata))
 			data = tmp->data;		/* On-disk deleted */
 		else					/* On-disk data */
@@ -392,12 +392,12 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t i, len, n_expsort, space_avail;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *first_free, *last_data;
-	int from_repl, ret;
+	int from_upd, ret;
 	void *cipdata;
 
 	db = toc->db;
@@ -444,17 +444,17 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		nrepeat = WT_RLE_REPEAT_COUNT(cipdata);
 		for (expp = expsort, n = 1;
 		    n <= nrepeat; n += repeat_count, recno += repeat_count) {
-			from_repl = 0;
+			from_upd = 0;
 			if ((exp = *expp) != NULL && recno == exp->recno) {
 				++expp;
 
-				/* Use the WT_RLE_EXPAND's WT_REPL field. */
-				repl = exp->repl;
-				if (WT_REPL_DELETED_ISSET(repl))
+				/* Use the WT_RLE_EXPAND's WT_UPDATE field. */
+				upd = exp->upd;
+				if (WT_UPDATE_DELETED_ISSET(upd))
 					data = tmp->data;
 				else {
-					from_repl = 1;
-					data = WT_REPL_DATA(repl);
+					from_upd = 1;
+					data = WT_UPDATE_DATA(upd);
 				}
 				repeat_count = 1;
 			} else {
@@ -504,12 +504,12 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			/*
 			 * Most of the formats already include a repeat count:
 			 * specifically the deleted buffer, or any entry we're
-			 * copying from the original page.   However, entries
-			 * that were deleted or replaced are read from a WT_REPL
-			 * structure, which has no repeat count.
+			 * copying from the original page.   However, updated
+			 * entries are read from a WT_UPDATE structure, which
+			 * has no repeat count.
 			 */
 			last_data = first_free;
-			if (from_repl) {
+			if (from_upd) {
 				WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
 				memcpy(WT_RLE_REPEAT_DATA(
 				    last_data), data, db->fixed_len);
@@ -607,7 +607,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_ITEM data_item, *item;
 	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
@@ -620,14 +620,14 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		/*
-		 * Get a reference to the data: it's either a replacement value
-		 * or the original on-page item.
+		 * Get a reference to the data: it's either an update value or
+		 * the original on-page item.
 		 */
 		item = WT_COL_PTR(dsk, cip);
-		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
+		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			/*
-			 * If we replace or delete an overflow data item, free
-			 * free the underlying file space.
+			 * If we update overflow data item, free the underlying
+			 * file space.
 			 */
 			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
 				WT_RET(__wt_block_free_ovfl(
@@ -635,15 +635,15 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 
 			/*
 			 * Check for deletion, else build the data's WT_ITEM
-			 * chunk from the most recent replacement value.
+			 * chunk from the most recent update value.
 			 */
-			if (WT_REPL_DELETED_ISSET(repl)) {
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				WT_CLEAR(data_item);
 				WT_ITEM_SET(&data_item, WT_ITEM_DEL, 0);
 				len = WT_ITEM_SPACE_REQ(0);
 			} else {
-				data->data = WT_REPL_DATA(repl);
-				data->size = repl->size;
+				data->data = WT_UPDATE_DATA(upd);
+				data->size = upd->size;
 				WT_RET(__wt_item_build_data(
 				    toc, data, &data_item, &data_ovfl));
 				len = WT_ITEM_SPACE_REQ(data->size);
@@ -703,7 +703,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
@@ -732,10 +732,10 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Get a reference to the data.  We get the data first because
 		 * it may have been deleted, in which case we ignore the pair.
 		 */
-		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
+		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL) {
 			/*
-			 * If we replaced or deleted an overflow data item, free
-			 * the underlying file space.
+			 * If we update overflow data item, free the underlying
+			 * file space.
 			 */
 			switch (WT_ITEM_TYPE(rip->data)) {
 			case WT_ITEM_DATA_OVFL:
@@ -749,7 +749,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			 * the key was an overflow item, free the underlying
 			 * file space.
 			 */
-			if (WT_REPL_DELETED_ISSET(repl)) {
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
 					WT_RET(__wt_block_free_ovfl(
 					    toc, WT_ITEM_BYTE_OVFL(key_item)));
@@ -759,13 +759,13 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			/*
 			 * If no data, nothing needs to be copied.  Otherwise,
 			 * build the data's WT_ITEM chunk from the most recent
-			 * replacement value.
+			 * update value.
 			 */
-			if (repl->size == 0)
+			if (upd->size == 0)
 				data_loc = EMPTY_DATA;
 			else {
-				data->data = WT_REPL_DATA(repl);
-				data->size = repl->size;
+				data->data = WT_UPDATE_DATA(upd);
+				data->size = upd->size;
 				WT_RET(__wt_item_build_data(
 				    toc, data, &data_item, &data_ovfl));
 				data_loc = DATA_OFF_PAGE;

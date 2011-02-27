@@ -20,13 +20,13 @@ serial['rle_expand'] = Serial(
 	 'WT_RLE_EXPAND **/new_rleexp',
 	 'WT_RLE_EXPAND */exp'])
 
-serial['rle_expand_repl'] = Serial(
-	'rle_expand_repl',
+serial['rle_expand_update'] = Serial(
+	'rle_expand_update',
 	'WT_WORKQ_FUNC', '1',
 	['WT_PAGE */page',
 	 'uint32_t/write_gen',
 	 'WT_RLE_EXPAND */exp',
-	 'WT_REPL */repl'])
+	 'WT_UPDATE */upd'])
 
 serial['item_update'] = Serial(
 	'item_update',
@@ -34,8 +34,8 @@ serial['item_update'] = Serial(
 	['WT_PAGE */page',
 	 'uint32_t/write_gen',
 	 'uint32_t/slot',
-	 'WT_REPL **/new_repl',
-	 'WT_REPL */repl'])
+	 'WT_UPDATE **/new_upd',
+	 'WT_UPDATE */upd'])
 
 serial['cache_read'] = Serial(
 	'cache_read',

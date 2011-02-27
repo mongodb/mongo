@@ -24,7 +24,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	void *data_ret;
 	uint32_t size_ret;
 	int (*callback)(DB *, DBT *, DBT *), ret;
@@ -39,7 +39,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	dsk = page->dsk;
 	cip = toc->srch_ip;
 	rip = toc->srch_ip;
-	repl = toc->srch_repl;
+	upd = toc->srch_upd;
 
 	/*
 	 * Handle the key item -- the key may be unchanged, in which case we
@@ -92,14 +92,14 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	/*
 	 * Handle the data item.
 	 *
-	 * If the item was ever replaced, it's easy, take the last replacement
-	 * data item, it's just a byte string.
+	 * If the item was ever updated, it's easy, take the last update item,
+	 * it's just a byte string.
 	 */
-	if (repl != NULL) {
-		if (WT_REPL_DELETED_ISSET(repl))
+	if (upd != NULL) {
+		if (WT_UPDATE_DELETED_ISSET(upd))
 			return (WT_NOTFOUND);
-		data->data = WT_REPL_DATA(repl);
-		data->size = repl->size;
+		data->data = WT_UPDATE_DATA(upd);
+		data->size = upd->size;
 		return (callback == NULL ? 0 : callback(db, key, data));
 	}
 

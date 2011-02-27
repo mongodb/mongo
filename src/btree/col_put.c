@@ -48,7 +48,7 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	ENV *env;
 	WT_PAGE *page;
 	WT_RLE_EXPAND *exp, **new_rleexp;
-	WT_REPL **new_repl, *repl;
+	WT_UPDATE **new_upd, *upd;
 	int ret;
 
 	env = toc->env;
@@ -57,8 +57,8 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	page = NULL;
 	exp = NULL;
 	new_rleexp = NULL;
-	new_repl = NULL;
-	repl = NULL;
+	new_upd = NULL;
+	upd = NULL;
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_col_search(
@@ -70,44 +70,44 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	 * each original on-disk index for an RLE can represent large numbers
 	 * of records, and we're only deleting a single one of those records,
 	 * which means working in the WT_RLE_EXPAND array.  All other column
-	 * store deletes are simple changes where a new WT_REPL entry is added
-	 * to the page's modification array.  There are three code paths:
+	 * store deletes are simple changes where a new WT_UPDATE entry is
+	 * added to the page's modification array.  There are three code paths:
 	 *
 	 * 1: column-store deletes other than RLE column stores: delete an entry
-	 * from the on-disk page by creating a new WT_REPL entry, and linking it
-	 * into the WT_REPL array.
+	 * from the on-disk page by creating a new WT_UPDTAE entry, and linking
+	 * it into the WT_UPDATE array.
 	 *
 	 * 2: an RLE column-store delete of an already modified record: create
-	 * a new WT_REPL entry, and link it to the WT_RLE_EXPAND entry's WT_REPL
-	 * list.
+	 * a new WT_UPDATE entry, and link it to the WT_RLE_EXPAND entry's
+	 * WT_UPDATE list.
 	 *
 	 * 3: an RLE column-store delete of a record not yet modified: create
-	 * a new WT_RLE_EXPAND/WT_REPL pair, and link it into the WT_RLE_EXPAND
+	 * a new WT_RLE_EXPAND/WT_UPDATE pair, link it into the WT_RLE_EXPAND
 	 * array.
 	 */
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
-		/* Allocate a page replacement array if necessary. */
+		/* Allocate an update array if necessary. */
 		if (page->u.col_leaf.d == NULL)
 			WT_ERR(
-			    __wt_calloc_def(env, page->indx_count, &new_repl));
+			    __wt_calloc_def(env, page->indx_count, &new_upd));
 
-		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_repl_alloc(toc, &repl, data));
+		/* Allocate a WT_UPDATE structure and fill it in. */
+		WT_ERR(__wt_update_alloc(toc, &upd, data));
 
-		/* workQ: schedule insert of the WT_REPL structure. */
+		/* workQ: schedule insert of the WT_UPDATE structure. */
 		__wt_item_update_serial(toc, page, toc->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, toc->srch_ip), new_repl, repl, ret);
+		    WT_COL_INDX_SLOT(page, toc->srch_ip), new_upd, upd, ret);
 		 break;
 	case WT_PAGE_COL_RLE:
-		if (toc->srch_repl != NULL) {		/* #2 */
-			/* Allocate a WT_REPL structure and fill it in. */
-			WT_ERR(__wt_repl_alloc(toc, &repl, data));
+		if (toc->srch_upd != NULL) {		/* #2 */
+			/* Allocate a WT_UPDATE structure and fill it in. */
+			WT_ERR(__wt_update_alloc(toc, &upd, data));
 
-			/* workQ: schedule insert of the WT_REPL structure. */
-			__wt_rle_expand_repl_serial(toc, page,
-			    toc->srch_write_gen, toc->srch_exp, repl, ret);
+			/* workQ: schedule insert of the WT_UPDATE structure. */
+			__wt_rle_expand_update_serial(toc, page,
+			    toc->srch_write_gen, toc->srch_exp, upd, ret);
 			break;
 		}
 							/* #3 */
@@ -116,13 +116,13 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 			WT_ERR(__wt_calloc_def(
 			    env, page->indx_count, &new_rleexp));
 
-		/* Allocate a WT_REPL structure and fill it in. */
-		WT_ERR(__wt_repl_alloc(toc, &repl, data));
+		/* Allocate a WT_UPDATE structure and fill it in. */
+		WT_ERR(__wt_update_alloc(toc, &upd, data));
 
 		/* Allocate a WT_RLE_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc_def(env, 1, &exp));
 		exp->recno = recno;
-		exp->repl = repl;
+		exp->upd = upd;
 
 		/* Schedule the workQ to link in the WT_RLE_EXPAND structure. */
 		__wt_rle_expand_serial(toc, page, toc->srch_write_gen,
@@ -134,8 +134,8 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	if (ret != 0) {
 err:		if (exp != NULL)
 			__wt_free(env, exp, sizeof(WT_RLE_EXPAND));
-		if (repl != NULL)
-			__wt_repl_free(toc, repl);
+		if (upd != NULL)
+			__wt_update_free(toc, upd);
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
@@ -143,9 +143,9 @@ err:		if (exp != NULL)
 		__wt_free(env,
 		    new_rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
 
-	/* Free any page replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->u.col_leaf.repl)
-		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
+	/* Free any update array unless the workQ used it. */
+	if (new_upd != NULL && new_upd != page->u.col_leaf.upd)
+		__wt_free(env, new_upd, page->indx_count * sizeof(WT_UPDATE *));
 
 	WT_PAGE_OUT(toc, page);
 
@@ -194,34 +194,34 @@ err:	__wt_toc_serialize_wrapup(toc, page, ret);
 }
 
 /*
- * __wt_rle_expand_repl_serial_func --
- *	Server function to update a WT_REPL entry in an already expanded
+ * __wt_rle_expand_update_serial_func --
+ *	Server function to update a WT_UPDATE entry in an already expanded
  *	run-length encoded column-store during a delete.
  */
 int
-__wt_rle_expand_repl_serial_func(WT_TOC *toc)
+__wt_rle_expand_update_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 	WT_RLE_EXPAND *exp;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t write_gen;
 	int ret;
 
 	ret = 0;
 
-	__wt_rle_expand_repl_unpack(toc, page, write_gen, exp, repl);
+	__wt_rle_expand_update_unpack(toc, page, write_gen, exp, upd);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
-	 * Insert the new WT_REPL as the first item in the forward-linked list
-	 * of replacement structures from the WT_RLE_EXPAND structure.  Flush
-	 * memory to ensure the list is never broken.
+	 * Insert the new WT_UPDATE as the first item in the forward-linked list
+	 * of update structures from the WT_RLE_EXPAND structure.  Flush memory
+	 * to ensure the list is never broken.
 	 */
-	repl->next = exp->repl;
+	upd->next = exp->upd;
 	WT_MEMORY_FLUSH;
-	exp->repl = repl;
+	exp->upd = upd;
 
 err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);

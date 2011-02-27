@@ -117,7 +117,7 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
 
@@ -127,12 +127,12 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	/* Walk the page, dumping data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(dsk, cip);
-		if ((repl = WT_COL_REPL(page, cip)) == NULL) {
+		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
 			if (!WT_FIX_DELETE_ISSET(cipdata))
 				dp->p(cipdata, db->fixed_len, dp->stream);
 		} else
-			if (!WT_REPL_DELETED_ISSET(repl))
-				dp->p(WT_REPL_DATA(repl),
+			if (!WT_UPDATE_DELETED_ISSET(upd))
+				dp->p(WT_UPDATE_DATA(upd),
 				    db->fixed_len, dp->stream);
 	}
 }
@@ -149,8 +149,8 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	FILE *fp;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
+	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t i, n_expsort;
 	uint16_t n_repeat;
@@ -176,7 +176,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		    env, page, cip, &expsort, &n_expsort));
 
 		/*
-		 * Dump the records.   We use the WT_REPL entry for records in
+		 * Dump the records.   We use the WT_UPDATE entry for records in
 		 * in the WT_RLE_EXPAND array, and original data otherwise.
 		 */
 		for (expp = expsort,
@@ -184,10 +184,10 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		    n_repeat > 0; --n_repeat, ++recno)
 			if ((exp = *expp) != NULL && exp->recno == recno) {
 				++expp;
-				repl = exp->repl;
-				if (!WT_REPL_DELETED_ISSET(repl))
+				upd = exp->upd;
+				if (!WT_UPDATE_DELETED_ISSET(upd))
 					dp->p(
-					    WT_REPL_DATA(repl), repl->size, fp);
+					    WT_UPDATE_DATA(upd), upd->size, fp);
 			} else
 				if (!WT_FIX_DELETE_ISSET(
 				    WT_RLE_REPEAT_DATA(cipdata)))
@@ -213,7 +213,7 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	int ret;
 	uint32_t i;
 	void *huffman;
@@ -225,11 +225,11 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	WT_RET(__wt_scr_alloc(toc, 0, &tmp));
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		/* Check for replace or deletion. */
-		if ((repl = WT_COL_REPL(page, cip)) != NULL) {
-			if (!WT_REPL_DELETED_ISSET(repl))
+		/* Check for update. */
+		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
+			if (!WT_UPDATE_DELETED_ISSET(upd))
 				dp->p(
-				    WT_REPL_DATA(repl), repl->size, dp->stream);
+				    WT_UPDATE_DATA(upd), upd->size, dp->stream);
 			continue;
 		}
 
@@ -267,8 +267,8 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	DB *db;
 	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
 	WT_ITEM *item;
-	WT_REPL *repl;
 	WT_ROW *rip;
+	WT_UPDATE *upd;
 	uint32_t i;
 	int ret;
 	void *huffman;
@@ -285,8 +285,8 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 
 	WT_ROW_INDX_FOREACH(page, rip, i) {
 		/* Check for deletion. */
-		if ((repl = WT_ROW_REPL(
-		    page, rip)) != NULL && WT_REPL_DELETED_ISSET(repl))
+		upd = WT_ROW_UPDATE(page, rip);
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
 		/*
@@ -300,12 +300,12 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			key = (DBT *)rip;
 
 		/*
-		 * If the item was ever replaced, dump the data from the
-		 * replacement entry.
+		 * If the item was ever updated, dump the data from the
+		 * update entry.
 		 */
-		if (repl != NULL) {
+		if (upd != NULL) {
 			dp->p(key->data, key->size, dp->stream);
-			dp->p(WT_REPL_DATA(repl), repl->size, dp->stream);
+			dp->p(WT_UPDATE_DATA(upd), upd->size, dp->stream);
 			continue;
 		}
 

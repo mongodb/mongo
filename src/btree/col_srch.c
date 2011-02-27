@@ -21,8 +21,8 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_RLE_EXPAND *exp;
+	WT_UPDATE *upd;
 	uint64_t record_cnt, start_recno;
 	uint32_t base, i, indx, limit, write_gen;
 	int ret;
@@ -30,7 +30,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
-	toc->srch_repl = NULL;
+	toc->srch_upd = NULL;
 	toc->srch_exp = NULL;
 	toc->srch_write_gen = 0;
 
@@ -140,26 +140,26 @@ done:	/*
 	 */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		/* Find the item's WT_REPL slot if it exists. */
-		repl = WT_COL_REPL(page, cip);
+		/* Find the item's WT_UPDATE slot if it exists. */
+		upd = WT_COL_UPDATE(page, cip);
 
 		/*
 		 * If overwriting an existing data item, we don't care if the
 		 * item was previously deleted, return the gathered information.
 		 */
 		if (LF_ISSET(WT_DATA_OVERWRITE)) {
-			toc->srch_repl = repl;
+			toc->srch_upd = upd;
 			break;
 		}
 
 		/*
-		 * Otherwise, check for deletion, in either the WT_REPL slot
+		 * Otherwise, check for deletion, in either the WT_UPDATE slot
 		 * or in the original data.
 		 */
-		if (repl != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl))
+		if (upd != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			toc->srch_repl = repl;
+			toc->srch_upd = upd;
 		} else
 			if (WT_FIX_DELETE_ISSET(cipdata))
 				goto notfound;
@@ -178,45 +178,45 @@ done:	/*
 		if (LF_ISSET(WT_DATA_OVERWRITE)) {
 			if (exp != NULL) {
 				toc->srch_exp = exp;
-				toc->srch_repl = exp->repl;
+				toc->srch_upd = exp->upd;
 			}
 			break;
 		}
 
 		/*
-		 * Otherwise, check for deletion, in either the WT_REPL slot
+		 * Otherwise, check for deletion, in either the WT_UPDATE slot
 		 * (referenced by the WT_COL_EXP slot), or in the original data.
 		 */
 		if (exp != NULL) {
-			if (WT_REPL_DELETED_ISSET(exp->repl))
+			if (WT_UPDATE_DELETED_ISSET(exp->upd))
 				goto notfound;
 			toc->srch_exp = exp;
-			toc->srch_repl = exp->repl;
+			toc->srch_upd = exp->upd;
 		} else
 			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 				goto notfound;
 		break;
 	case WT_PAGE_COL_VAR:
-		/* Find the item's WT_REPL slot if it exists. */
-		repl = WT_COL_REPL(page, cip);
+		/* Find the item's WT_UPDATE slot if it exists. */
+		upd = WT_COL_UPDATE(page, cip);
 
 		/*
 		 * If overwriting an existing data item, we don't care if the
 		 * item was previously deleted, return the gathered information.
 		 */
 		if (LF_ISSET(WT_DATA_OVERWRITE)) {
-			toc->srch_repl = repl;
+			toc->srch_upd = upd;
 			break;
 		}
 
 		/*
-		 * Otherwise, check for deletion, in either the WT_REPL slot
+		 * Otherwise, check for deletion, in either the WT_UPDATE slot
 		 * or in the original data.
 		 */
-		if (repl != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl))
+		if (upd != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			toc->srch_repl = repl;
+			toc->srch_upd = upd;
 			break;
 		} else
 			if (WT_ITEM_TYPE(cipdata) == WT_ITEM_DEL)
@@ -224,10 +224,10 @@ done:	/*
 		break;
 	case WT_PAGE_COL_INT:
 		/*
-		 * When returning internal pages, set the item's WT_REPL slot
+		 * When returning internal pages, set the item's WT_UPDATE slot
 		 * if it exists, otherwise we're done.
 		 */
-		toc->srch_repl = WT_COL_REPL(page, cip);
+		toc->srch_upd = WT_COL_UPDATE(page, cip);
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}

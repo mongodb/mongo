@@ -39,36 +39,36 @@ __wt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 {
 	ENV *env;
 	WT_PAGE *page;
-	WT_REPL **new_repl, *repl;
+	WT_UPDATE **new_upd, *upd;
 	int ret;
 
 	env = toc->env;
-	new_repl = NULL;
-	repl = NULL;
+	new_upd = NULL;
+	upd = NULL;
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_row_search(toc, key, WT_NOLEVEL, insert ? WT_INSERT : 0));
 	page = toc->srch_page;
 
-	/* Allocate a page replacement array as necessary. */
-	if (page->u.row_leaf.repl == NULL)
-		WT_ERR(__wt_calloc_def(env, page->indx_count, &new_repl));
+	/* Allocate an update array as necessary. */
+	if (page->u.row_leaf.upd == NULL)
+		WT_ERR(__wt_calloc_def(env, page->indx_count, &new_upd));
 
 	/* Allocate room for the new data item from per-thread memory. */
-	WT_ERR(__wt_repl_alloc(toc, &repl, data));
+	WT_ERR(__wt_update_alloc(toc, &upd, data));
 
-	/* Schedule the workQ to insert the WT_REPL structure. */
+	/* Schedule the workQ to insert the WT_UPDATE structure. */
 	__wt_item_update_serial(toc, page, toc->srch_write_gen,
-	    WT_ROW_INDX_SLOT(page, toc->srch_ip), new_repl, repl, ret);
+	    WT_ROW_INDX_SLOT(page, toc->srch_ip), new_upd, upd, ret);
 
 	if (ret != 0) {
-err:		if (repl != NULL)
-			__wt_repl_free(toc, repl);
+err:		if (upd != NULL)
+			__wt_update_free(toc, upd);
 	}
 
-	/* Free any replacement array unless the workQ used it. */
-	if (new_repl != NULL && new_repl != page->u.row_leaf.repl)
-		__wt_free(env, new_repl, page->indx_count * sizeof(WT_REPL *));
+	/* Free any update array unless the workQ used it. */
+	if (new_upd != NULL && new_upd != page->u.row_leaf.upd)
+		__wt_free(env, new_upd, page->indx_count * sizeof(WT_UPDATE *));
 
 	WT_PAGE_OUT(toc, page);
 
@@ -77,17 +77,17 @@ err:		if (repl != NULL)
 
 /*
  * __wt_item_update_serial_func --
- *	Server function to update a WT_REPL entry in the modification array.
+ *	Server function to update a WT_UPDATE entry in the modification array.
  */
 int
 __wt_item_update_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
-	WT_REPL **new_repl, *repl;
+	WT_UPDATE **new_upd, *upd;
 	uint32_t slot, write_gen;
 	int ret;
 
-	__wt_item_update_unpack(toc, page, write_gen, slot, new_repl, repl);
+	__wt_item_update_unpack(toc, page, write_gen, slot, new_upd, upd);
 
 	ret = 0;
 
@@ -95,38 +95,37 @@ __wt_item_update_serial_func(WT_TOC *toc)
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
-	 * If the page does not yet have a replacement array, our caller passed
+	 * If the page does not yet have an update array, our caller passed
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->u.row_leaf.repl == NULL)
-		page->u.row_leaf.repl = new_repl;
+	if (page->u.row_leaf.upd == NULL)
+		page->u.row_leaf.upd = new_upd;
 
 	/*
-	 * Insert the new WT_REPL as the first item in the forward-linked list
-	 * of replacement structures.  Flush memory to ensure the list is never
-	 * broken.
+	 * Insert the new WT_UPDATE as the first item in the forward-linked list
+	 * of updates, flush memory to ensure the list is never broken.
 	 */
-	repl->next = page->u.row_leaf.repl[slot];
+	upd->next = page->u.row_leaf.upd[slot];
 	WT_MEMORY_FLUSH;
-	page->u.row_leaf.repl[slot] = repl;
+	page->u.row_leaf.upd[slot] = upd;
 
 err:	__wt_toc_serialize_wrapup(toc, page, ret);
 	return (0);
 }
 
 /*
- * __wt_repl_alloc --
- *	Allocate a WT_REPL structure and associated data from the TOC's buffer
+ * __wt_update_alloc --
+ *	Allocate a WT_UPDATE structure and associated data from the TOC's buffer
  *	and fill it in.
  */
 int
-__wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
+__wt_update_alloc(WT_TOC *toc, WT_UPDATE **updp, DBT *data)
 {
 	DB *db;
 	ENV *env;
-	WT_REPL *repl;
 	WT_TOC_BUFFER *tb;
+	WT_UPDATE *upd;
 	uint32_t align_size, alloc_size, size;
 	int single_use;
 
@@ -138,7 +137,7 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * WT_TOC structure for allocation of chunks of memory to hold changed
 	 * or inserted data items.
 	 *
-	 * We align each allocation because we directly access WT_REPL structure
+	 * We align allocations because we directly access WT_UPDATE structure
 	 * fields in the memory (the x86 handles unaligned accesses, but I don't
 	 * want to have to find and fix this code for a port to a system that
 	 * doesn't handle unaligned accesses).  It wastes space, but this memory
@@ -148,32 +147,32 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 *
 	 * The first thing in each chunk of memory is a WT_TOC_BUFFER structure
 	 * (which we check is a multiple of 4B during initialization); then one
-	 * or more WT_REPL structure plus data chunk pairs.
+	 * or more WT_UPDATE structure plus data chunk pairs.
 	 *
 	 * XXX
 	 * Figure out how much space we need: this code limits the maximum size
 	 * of a data item stored in the file.  In summary, for a big item we
-	 * have to store a WT_TOC_BUFFER structure, the WT_REPL structure and
+	 * have to store a WT_TOC_BUFFER structure, the WT_UPDATE structure and
 	 * the data, all in an allocated buffer.   We only pass a 32-bit value
 	 * to our allocation routine, so we can't store an item bigger than the
 	 * maximum 32-bit value minus the sizes of those two structures, where
-	 * the WT_REPL structure and data item are aligned to a 32-bit boundary.
-	 * We could fix this, but it's unclear it's worth the effort -- document
-	 * you can store a (4GB - 20B) item max, and you're done, because it's
-	 * insane to store a 4GB item in the file anyway.
+	 * the WT_UPDATE structure and data item are aligned to a 32-bit
+	 * boundary.  We could fix this, but it's unclear it's worth the effort
+	 * -- document you can store a (4GB - 20B) item max, and you're done,
+	 * because it's insane to store a 4GB item in the file anyway.
 	 *
 	 * Check first we won't overflow when calculating an aligned size, then
 	 * check the total required space for this item.
 	 */
 	size = data == NULL ? 0 : data->size;
-	if (size > UINT32_MAX - (sizeof(WT_REPL) + sizeof(uint32_t)))
+	if (size > UINT32_MAX - (sizeof(WT_UPDATE) + sizeof(uint32_t)))
 		return (__wt_file_item_too_big(db));
-	align_size = WT_ALIGN(size + sizeof(WT_REPL), sizeof(uint32_t));
+	align_size = WT_ALIGN(size + sizeof(WT_UPDATE), sizeof(uint32_t));
 	if (align_size > UINT32_MAX - sizeof(WT_TOC_BUFFER))
 		return (__wt_file_item_too_big(db));
 
 	/*
-	 * If we already have a buffer and the data fits, just copy the WT_REPL
+	 * If we already have a buffer and the data fits, copy the WT_UPDATE
 	 * structure and data into place, we're done.
 	 */
 	tb = toc->tb;
@@ -237,49 +236,49 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	}
 
 no_allocation:
-	/* Copy the WT_REPL structure into place. */
-	repl = (WT_REPL *)tb->first_free;
-	repl->tb = tb;
+	/* Copy the WT_UPDATE structure into place. */
+	upd = (WT_UPDATE *)tb->first_free;
+	upd->tb = tb;
 	if (data == NULL)
-		WT_REPL_DELETED_SET(repl);
+		WT_UPDATE_DELETED_SET(upd);
 	else {
-		repl->size = data->size;
-		memcpy(WT_REPL_DATA(repl), data->data, data->size);
+		upd->size = data->size;
+		memcpy(WT_UPDATE_DATA(upd), data->data, data->size);
 	}
 
 	tb->first_free += align_size;
 	tb->space_avail -= align_size;
 	++tb->in;
 
-	*replp = repl;
+	*updp = upd;
 	return (0);
 }
 
 /*
- * __wt_repl_free --
- *	Free a WT_REPL structure and associated data from the WT_TOC_BUFFER.
+ * __wt_update_free --
+ *	Free a WT_UPDATE structure and associated data from the WT_TOC_BUFFER.
  */
 void
-__wt_repl_free(WT_TOC *toc, WT_REPL *repl)
+__wt_update_free(WT_TOC *toc, WT_UPDATE *upd)
 {
 	ENV *env;
 
 	env = toc->env;
 
 	/*
-	 * It's possible we allocated a WT_REPL structure and associated item
+	 * It's possible we allocated a WT_UPDATE structure and associated item
 	 * memory from the WT_TOC buffer, but then an error occurred.  Don't
 	 * try and clean up the WT_TOC buffer, it's simpler to decrement the
 	 * use count and let the page discard code deal with it during the
 	 * page reconciliation process.  (Note we're still in the allocation
 	 * path, so we decrement the "in" field, not the "out" field.)
 	 */
-	--repl->tb->in;
+	--upd->tb->in;
 
 	/*
 	 * One other thing: if the WT_TOC buffer was a one-off, we have to free
 	 * it here, it's not linked to any WT_PAGE in the system.
 	 */
-	if (repl->tb->in == 0)
-		__wt_free(env, repl->tb, repl->tb->len);
+	if (upd->tb->in == 0)
+		__wt_free(env, upd->tb, upd->tb->len);
 }

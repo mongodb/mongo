@@ -28,27 +28,27 @@ typedef struct {
 	WT_PAGE * page;
 	uint32_t write_gen;
 	uint32_t slot;
-	WT_REPL ** new_repl;
-	WT_REPL * repl;
+	WT_UPDATE ** new_upd;
+	WT_UPDATE * upd;
 } __wt_item_update_args;
 #define	__wt_item_update_serial(\
-    toc, _page, _write_gen, _slot, _new_repl, _repl, ret) do {\
+    toc, _page, _write_gen, _slot, _new_upd, _upd, ret) do {\
 	__wt_item_update_args _args;\
 	_args.page = _page;\
 	_args.write_gen = _write_gen;\
 	_args.slot = _slot;\
-	_args.new_repl = _new_repl;\
-	_args.repl = _repl;\
+	_args.new_upd = _new_upd;\
+	_args.upd = _upd;\
 	(ret) = __wt_toc_serialize_func(toc,\
 	    WT_WORKQ_FUNC, 1, __wt_item_update_serial_func, &_args);\
 } while (0)
 #define	__wt_item_update_unpack(\
-    toc, _page, _write_gen, _slot, _new_repl, _repl) do {\
+    toc, _page, _write_gen, _slot, _new_upd, _upd) do {\
 	_page = ((__wt_item_update_args *)(toc)->wq_args)->page;\
 	_write_gen = ((__wt_item_update_args *)(toc)->wq_args)->write_gen;\
 	_slot = ((__wt_item_update_args *)(toc)->wq_args)->slot;\
-	_new_repl = ((__wt_item_update_args *)(toc)->wq_args)->new_repl;\
-	_repl = ((__wt_item_update_args *)(toc)->wq_args)->repl;\
+	_new_upd = ((__wt_item_update_args *)(toc)->wq_args)->new_upd;\
+	_upd = ((__wt_item_update_args *)(toc)->wq_args)->upd;\
 } while (0)
 
 typedef struct {
@@ -82,22 +82,22 @@ typedef struct {
 	WT_PAGE * page;
 	uint32_t write_gen;
 	WT_RLE_EXPAND * exp;
-	WT_REPL * repl;
-} __wt_rle_expand_repl_args;
-#define	__wt_rle_expand_repl_serial(\
-    toc, _page, _write_gen, _exp, _repl, ret) do {\
-	__wt_rle_expand_repl_args _args;\
+	WT_UPDATE * upd;
+} __wt_rle_expand_update_args;
+#define	__wt_rle_expand_update_serial(\
+    toc, _page, _write_gen, _exp, _upd, ret) do {\
+	__wt_rle_expand_update_args _args;\
 	_args.page = _page;\
 	_args.write_gen = _write_gen;\
 	_args.exp = _exp;\
-	_args.repl = _repl;\
+	_args.upd = _upd;\
 	(ret) = __wt_toc_serialize_func(toc,\
-	    WT_WORKQ_FUNC, 1, __wt_rle_expand_repl_serial_func, &_args);\
+	    WT_WORKQ_FUNC, 1, __wt_rle_expand_update_serial_func, &_args);\
 } while (0)
-#define	__wt_rle_expand_repl_unpack(\
-    toc, _page, _write_gen, _exp, _repl) do {\
-	_page = ((__wt_rle_expand_repl_args *)(toc)->wq_args)->page;\
-	_write_gen = ((__wt_rle_expand_repl_args *)(toc)->wq_args)->write_gen;\
-	_exp = ((__wt_rle_expand_repl_args *)(toc)->wq_args)->exp;\
-	_repl = ((__wt_rle_expand_repl_args *)(toc)->wq_args)->repl;\
+#define	__wt_rle_expand_update_unpack(\
+    toc, _page, _write_gen, _exp, _upd) do {\
+	_page = ((__wt_rle_expand_update_args *)(toc)->wq_args)->page;\
+	_write_gen = ((__wt_rle_expand_update_args *)(toc)->wq_args)->write_gen;\
+	_exp = ((__wt_rle_expand_update_args *)(toc)->wq_args)->exp;\
+	_upd = ((__wt_rle_expand_update_args *)(toc)->wq_args)->upd;\
 } while (0)

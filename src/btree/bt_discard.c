@@ -14,8 +14,8 @@ static void __wt_discard_page_col_var(ENV *, WT_PAGE *);
 static void __wt_discard_page_row_int(ENV *, WT_PAGE *);
 static void __wt_discard_page_row_leaf(ENV *, WT_PAGE *);
 static void __wt_discard_relexp(ENV *, WT_PAGE *);
-static void __wt_discard_repl(ENV *, WT_REPL **, uint32_t);
-static void __wt_discard_repl_list(ENV *, WT_REPL *);
+static void __wt_discard_update(ENV *, WT_UPDATE **, uint32_t);
+static void __wt_discard_update_list(ENV *, WT_UPDATE *);
 static inline int __wt_row_key_on_page(WT_PAGE *, void *);
 
 /*
@@ -93,9 +93,10 @@ __wt_discard_page_col_fix(ENV *env, WT_PAGE *page)
 		__wt_free(
 		    env, page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
 
-	/* Free the modified/deletion replacements array. */
-	if (page->u.col_leaf.repl != NULL)
-		__wt_discard_repl(env, page->u.col_leaf.repl, page->indx_count);
+	/* Free the update array. */
+	if (page->u.col_leaf.upd != NULL)
+		__wt_discard_update(
+		    env, page->u.col_leaf.upd, page->indx_count);
 }
 
 /*
@@ -140,9 +141,10 @@ __wt_discard_page_col_var(ENV *env, WT_PAGE *page)
 		__wt_free(
 		    env, page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
 
-	/* Free the modified/deletion replacements array. */
-	if (page->u.col_leaf.repl != NULL)
-		__wt_discard_repl(env, page->u.col_leaf.repl, page->indx_count);
+	/* Free the update array. */
+	if (page->u.col_leaf.upd != NULL)
+		__wt_discard_update(
+		    env, page->u.col_leaf.upd, page->indx_count);
 }
 
 /*
@@ -191,29 +193,30 @@ __wt_discard_page_row_leaf(ENV *env, WT_PAGE *page)
 			__wt_free(env, rip->key, rip->size);
 	__wt_free(env, page->u.row_leaf.d, page->indx_count * sizeof(WT_ROW));
 
-	if (page->u.row_leaf.repl != NULL)
-		__wt_discard_repl(env, page->u.row_leaf.repl, page->indx_count);
+	if (page->u.row_leaf.upd != NULL)
+		__wt_discard_update(
+		    env, page->u.row_leaf.upd, page->indx_count);
 }
 
 /*
- * __wt_discard_repl --
- *	Discard the replacement array.
+ * __wt_discard_update --
+ *	Discard the update array.
  */
 static void
-__wt_discard_repl(ENV *env, WT_REPL **replp_head, uint32_t indx_count)
+__wt_discard_update(ENV *env, WT_UPDATE **update_head, uint32_t indx_count)
 {
-	WT_REPL **replp;
+	WT_UPDATE **updp;
 
 	/*
-	 * For each non-NULL slot in the page's array of replacements, free the
+	 * For each non-NULL slot in the page's array of updates, free the
 	 * linked list anchored in that slot.
 	 */
-	for (replp = replp_head; indx_count > 0; --indx_count, ++replp)
-		if (*replp != NULL)
-			__wt_discard_repl_list(env, *replp);
+	for (updp = update_head; indx_count > 0; --indx_count, ++updp)
+		if (*updp != NULL)
+			__wt_discard_update_list(env, *updp);
 
-	/* Free the page's array of replacements. */
-	__wt_free(env, replp_head, indx_count * sizeof(WT_REPL *));
+	/* Free the page's array of updates. */
+	__wt_free(env, update_head, indx_count * sizeof(WT_UPDATE *));
 }
 
 /*
@@ -235,10 +238,10 @@ __wt_discard_relexp(ENV *env, WT_PAGE *page)
 		if ((exp = *expp) == NULL)
 			continue;
 		/*
-		 * Free the linked list of WT_REPL structures anchored in the
+		 * Free the linked list of WT_UPDATE structures anchored in the
 		 * WT_RLE_EXPAND entry.
 		 */
-		__wt_discard_repl_list(env, exp->repl);
+		__wt_discard_update_list(env, exp->upd);
 		do {
 			a = exp->next;
 			__wt_free(env, exp, sizeof(WT_RLE_EXPAND));
@@ -251,22 +254,22 @@ __wt_discard_relexp(ENV *env, WT_PAGE *page)
 }
 
 /*
- * __wt_discard_repl_list --
- *	Walk a WT_REPL forward-linked list and free the per-thread combination
- *	of a WT_REPL structure and its associated data.
+ * __wt_discard_update_list --
+ *	Walk a WT_UPDATE forward-linked list and free the per-thread combination
+ *	of a WT_UPDATE structure and its associated data.
  */
 static void
-__wt_discard_repl_list(ENV *env, WT_REPL *repl)
+__wt_discard_update_list(ENV *env, WT_UPDATE *upd)
 {
-	WT_REPL *a;
+	WT_UPDATE *a;
 	WT_TOC_BUFFER *tb;
 
 	do {
-		a = repl->next;
+		a = upd->next;
 
-		tb = repl->tb;
+		tb = upd->tb;
 		WT_ASSERT(env, tb->out < tb->in);
 		if (++tb->out == tb->in)
 			__wt_free(env, tb, tb->len);
-	} while ((repl = a) != NULL);
+	} while ((upd = a) != NULL);
 }

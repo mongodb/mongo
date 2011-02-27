@@ -440,8 +440,8 @@ __wt_verify_overflow_page(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 
 	/*
 	 * Overflow items aren't "in-memory", they're on-disk.  Ignore the fact
-	 * they might have been deleted or replaced, that doesn't mean anything
-	 * until reconciliation writes them to disk.
+	 * they might have been updated, that doesn't mean anything until page
+	 * reconciliation writes them to disk.
 	 *
 	 * Walk the disk page, verifying overflow items.
 	 */

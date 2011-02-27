@@ -22,7 +22,7 @@ static int  __wt_debug_page_col_var(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_debug_pair(const char *, void *, uint32_t, FILE *);
-static void __wt_debug_repl(WT_REPL *, FILE *);
+static void __wt_debug_update(WT_UPDATE *, FILE *);
 static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
 static int  __wt_debug_set_fp(const char *, FILE **, int *);
 
@@ -218,7 +218,7 @@ __wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t fixed_len, i;
 	void *cipdata;
 
@@ -237,8 +237,8 @@ __wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 			__wt_print_byte_string(cipdata, fixed_len, fp);
 		fprintf(fp, "}\n");
 
-		if ((repl = WT_COL_REPL(page, cip)) != NULL)
-			__wt_debug_repl(repl, fp);
+		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
+			__wt_debug_update(upd, fp);
 	}
 }
 
@@ -307,7 +307,7 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
 
@@ -322,8 +322,8 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 		WT_RET(__wt_debug_item_data(toc, cipdata, fp));
 		fprintf(fp, "}\n");
 
-		if ((repl = WT_COL_REPL(page, cip)) != NULL)
-			__wt_debug_repl(repl, fp);
+		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
+			__wt_debug_update(upd, fp);
 	}
 	return (0);
 }
@@ -335,7 +335,7 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 static int
 __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 	WT_ROW *rip;
 	uint32_t i;
 
@@ -352,8 +352,8 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 		WT_RET(__wt_debug_item_data(toc, rip->data, fp));
 		fprintf(fp, "}\n");
 
-		if ((repl = WT_ROW_REPL(page, rip)) != NULL)
-			__wt_debug_repl(repl, fp);
+		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
+			__wt_debug_update(upd, fp);
 	}
 
 	return (0);
@@ -384,21 +384,21 @@ __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_debug_repl --
- *	Dump a replacement array.
+ * __wt_debug_update --
+ *	Dump an update array.
  */
 static void
-__wt_debug_repl(WT_REPL *repl, FILE *fp)
+__wt_debug_update(WT_UPDATE *upd, FILE *fp)
 {
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	for (; repl != NULL; repl = repl->next)
-		if (WT_REPL_DELETED_ISSET(repl))
-			fprintf(fp, "\trepl: {deleted}\n");
+	for (; upd != NULL; upd = upd->next)
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			fprintf(fp, "\tupdate: {deleted}\n");
 		else
 			__wt_debug_pair(
-			    "\trepl", WT_REPL_DATA(repl), repl->size, fp);
+			    "\tupdate", WT_UPDATE_DATA(upd), upd->size, fp);
 }
 
 /*
@@ -408,18 +408,18 @@ __wt_debug_repl(WT_REPL *repl, FILE *fp)
 static void
 __wt_debug_rleexp(WT_RLE_EXPAND *exp, FILE *fp)
 {
-	WT_REPL *repl;
+	WT_UPDATE *upd;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	for (; exp != NULL; exp = exp->next) {
-		repl = exp->repl;
-		if (WT_REPL_DELETED_ISSET(repl))
-			fprintf(fp, "\trepl: {deleted}\n");
+		upd = exp->upd;
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			fprintf(fp, "\tupdate: {deleted}\n");
 		else
 			__wt_debug_pair(
-			    "\trepl", WT_REPL_DATA(repl), repl->size, fp);
+			    "\tupdate", WT_UPDATE_DATA(upd), upd->size, fp);
 	}
 }
 

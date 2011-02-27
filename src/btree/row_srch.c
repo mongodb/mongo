@@ -47,15 +47,15 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_ROW *rip;
 	WT_ROW_REF *rref, *t;
+	WT_UPDATE *upd;
 	uint32_t base, indx, limit, write_gen;
 	int cmp, isleaf, ret;
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
-	toc->srch_repl = NULL;
+	toc->srch_upd = NULL;
 	toc->srch_exp = NULL;
 	toc->srch_write_gen = 0;
 
@@ -222,18 +222,18 @@ deleted_retry:	/* rref references the subtree containing the record. */
 		if (cmp != 0)				/* No match */
 			goto notfound;
 							/* Deleted match. */
-		if ((repl = WT_ROW_REPL(page, rip)) != NULL) {
-			if (WT_REPL_DELETED_ISSET(repl))
+		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			toc->srch_repl = repl;
+			toc->srch_upd = upd;
 		}
 		break;
 	case WT_PAGE_ROW_INT:
 		/*
-		 * When returning internal pages, set the item's WT_REPL slot
+		 * When returning internal pages, set the item's WT_UPDATE slot
 		 * if it exists, otherwise we're done.
 		 */
-		toc->srch_repl = WT_ROW_REPL(page, rip);
+		toc->srch_upd = WT_ROW_UPDATE(page, rip);
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}

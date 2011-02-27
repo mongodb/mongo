@@ -306,15 +306,6 @@ struct __wt_row_ref {
 	    (rref) = (page)->u.row_int.t; (i) > 0; ++(rref), --(i))
 
 /*
- * WT_ROW_SPLIT --
- * An entry in a linked list of row-store internal page split items.
- */
-struct __wt_row_split {
-	WT_REF ref;			/* Subtree page */
-	WT_ROW_SPLIT *next;		/* Next entry in the list */
-};
-
-/*
  * WT_COL_REF --
  * Column-store internal page subtree entries.
  */
@@ -344,15 +335,6 @@ struct __wt_col_ref {
 #define	WT_COL_REF_FOREACH(page, cref, i)				\
 	for ((i) = (page)->indx_count,					\
 	    (cref) = (page)->u.col_int.t; (i) > 0; ++(cref), --(i))
-
-/*
- * WT_COL_SPLIT --
- * An entry in a linked list of column-store internal page split items.
- */
-struct __wt_col_split {
-	WT_COL_REF ref;			/* Subtree page */
-	WT_COL_SPLIT *next;		/* Next entry in the list */
-};
 
 /*
  * WT_PAGE --
@@ -457,25 +439,25 @@ struct __wt_page {
 	union {
 		/* Row-store internal information. */
 		struct {
-			WT_ROW_REF    *t;	/* Subtrees */
-			WT_ROW_SPLIT **split;	/* Split list */
+			WT_ROW_REF *t;		/* Subtrees */
+			WT_UPDATE **upd;	/* Updates */
 		} row_int;
 
 		struct {
-			WT_ROW   *d;		/* K/V pairs */
-			WT_REPL **repl;		/* Modifications/deletes */
+			WT_ROW	   *d;		/* K/V pairs */
+			WT_UPDATE **upd;	/* Updates */
 		} row_leaf;
 
 		/* Column-store internal information. */
 		struct {
-			WT_COL_REF    *t;	/* Subtrees */
-			WT_COL_SPLIT **split;	/* Split list */
+			WT_COL_REF *t;		/* Subtrees */
+			WT_UPDATE **upd;	/* Updates */
 		} col_int;
 
 		/* Column-store leaf information. */
 		struct {
-			WT_COL *d;		/* V objects */
-			WT_REPL **repl;		/* Modifications/deletes */
+			WT_COL	   *d;		/* V objects */
+			WT_UPDATE **upd;	/* Updates */
 
 			WT_RLE_EXPAND **rleexp;	/* RLE expansion array */
 		} col_leaf;
@@ -597,32 +579,34 @@ struct __wt_col {
 	((uint32_t)(((WT_COL *)cip) - (page)->u.col_leaf.d))
 
 /*
- * WT_REPL --
- * Entries on leaf pages can be modified or deleted.
+ * WT_UPDATE --
+ *	Updates: entries on leaf pages can be modified or deleted, and new
+ * entries can be inserted in row-store leaf pages, and both row-store and
+ * column store internal pages.
  *
- * Modifications or deletions are stored in the replacement array of the page.
+ * Modifications or deletions are stored in the update array of the page.
  * When the first element on a page is modified, the array is allocated, with
- * one slot for every existing element in the page.  A slot points to a WT_REPL
- * structure; if more than one modification is done to a single entry, the
- * WT_REPL structures are formed into a forward-linked list.
+ * one slot for every existing element in the page.  A slot points to a
+ * WT_UPDATE; if more than one update is done for a single entry, the WT_UPDATE
+ * structures are formed into a forward-linked list.
  */
-struct __wt_repl {
-	WT_TOC_BUFFER *tb;		/* WT_TOC buffer holding this WT_REPL */
-	WT_REPL *next;			/* forward-linked list */
+struct __wt_update {
+	WT_TOC_BUFFER *tb;		/* WT_TOC buffer holding this update */
+	WT_UPDATE *next;		/* forward-linked list */
 
 	/*
 	 * We can't store 4GB items:  we're short by a few bytes because each
-	 * change/insert item requires a leading WT_REPL structure.  For that
+	 * change/insert item requires a leading WT_UPDATE structure.  For that
 	 * reason, we can use the maximum size as an is-deleted flag and don't
 	 * have to increase the size of this structure for a flag bit.
 	 */
-#define	WT_REPL_DELETED_ISSET(repl)	((repl)->size == UINT32_MAX)
-#define	WT_REPL_DELETED_SET(repl)	((repl)->size = UINT32_MAX)
+#define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
+#define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
 	uint32_t size;			/* data length */
 
-	/* The data immediately follows the repl structure. */
-#define	WT_REPL_DATA(repl)						\
-	((void *)((uint8_t *)repl + sizeof(WT_REPL)))
+	/* The untyped data immediately follows the upd structure. */
+#define	WT_UPDATE_DATA(upd)						\
+	((void *)((uint8_t *)upd + sizeof(WT_UPDATE)))
 };
 
 /*
@@ -641,7 +625,7 @@ struct __wt_repl {
 struct __wt_rle_expand {
 	uint64_t recno;			/* recno */
 
-	WT_REPL *repl;                  /* modifications/deletions */
+	WT_UPDATE *upd;			/* updates */
 
 	WT_RLE_EXPAND *next;		/* forward-linked list */
 };
@@ -656,7 +640,7 @@ struct __wt_rle_expand {
 	    (exp) = (page)->u.col_leaf.rleexp; (i) > 0; ++(exp), --(i))
 
 /*
- * The repl and rleexp  arrays may not exist, and are arrays of pointers to
+ * The upd and rleexp  arrays may not exist, and are arrays of pointers to
  * individually allocated structures.   The following macros return an array
  * entry if the array of pointers and the specific structure exist, otherwise
  * NULL.
@@ -664,13 +648,16 @@ struct __wt_rle_expand {
 #define	__WT_COL_ARRAY(page, ip, field)					\
 	((page)->field == NULL ?					\
 	    NULL : (page)->field[WT_COL_INDX_SLOT(page, ip)])
-#define	WT_COL_REPL(page, ip)	__WT_COL_ARRAY(page, ip, u.col_leaf.repl)
-#define	WT_COL_RLEEXP(page, ip)	__WT_COL_ARRAY(page, ip, u.col_leaf.rleexp)
+#define	WT_COL_UPDATE(page, ip)						\
+	__WT_COL_ARRAY(page, ip, u.col_leaf.upd)
+#define	WT_COL_RLEEXP(page, ip)						\
+	__WT_COL_ARRAY(page, ip, u.col_leaf.rleexp)
 
 #define	__WT_ROW_ARRAY(page, ip, field)					\
 	((page)->field == NULL ?					\
 	    NULL : (page)->field[WT_ROW_INDX_SLOT(page, ip)])
-#define	WT_ROW_REPL(page, ip)	__WT_ROW_ARRAY(page, ip, u.row_leaf.repl)
+#define	WT_ROW_UPDATE(page, ip)						\
+	__WT_ROW_ARRAY(page, ip, u.row_leaf.upd)
 
 /*
  * WT_ROW_{REF,INDX}_AND_KEY_FOREACH --

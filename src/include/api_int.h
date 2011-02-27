@@ -382,10 +382,10 @@ struct __wt_toc {
 	WT_TOC_BUFFER *tb;		/* Per-thread update buffer */
 
 					/* Search return values: */
-	WT_PAGE  *srch_page;		/*    page */
-	uint32_t srch_write_gen;	/*    page's write-generation */
-	void	 *srch_ip;		/*    WT_{COL,ROW} index */
-	WT_REPL	 *srch_repl;		/*    WT_REPL array index */
+	WT_PAGE   *srch_page;		/*    page */
+	uint32_t   srch_write_gen;	/*    page's write-generation */
+	void	  *srch_ip;		/*    WT_{COL,ROW} index */
+	WT_UPDATE *srch_upd;		/*    WT_UPD array index */
 					/* RLE column-store only: */
 	WT_RLE_EXPAND *srch_exp;	/*    WT_RLE_EXPAND array index */
 

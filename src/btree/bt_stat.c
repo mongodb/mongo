@@ -74,8 +74,8 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_STATS *stats;
+	WT_UPDATE *upd;
 	uint32_t i;
 
 	dsk = page->dsk;
@@ -83,13 +83,13 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i)
-		if ((repl = WT_COL_REPL(page, cip)) == NULL)
+		if ((upd = WT_COL_UPDATE(page, cip)) == NULL)
 			if (WT_FIX_DELETE_ISSET(WT_COL_PTR(dsk, cip)))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			else
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 		else
-			if (WT_REPL_DELETED_ISSET(repl))
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			else
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
@@ -105,9 +105,9 @@ __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_RLE_EXPAND *exp;
 	WT_STATS *stats;
+	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
 
@@ -137,8 +137,8 @@ __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 		 */
 		for (exp =
 		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next) {
-			repl = exp->repl;
-			if (WT_REPL_DELETED_ISSET(repl))
+			upd = exp->upd;
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			else
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
@@ -157,8 +157,8 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 	DB *db;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
-	WT_REPL *repl;
 	WT_STATS *stats;
+	WT_UPDATE *upd;
 	uint32_t i;
 
 	db = toc->db;
@@ -167,21 +167,21 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
-	 * to be sure any replacements weren't deletions.  If the item has been
-	 * replaced, assume it was replaced by an item of the same size (it's
-	 * to expensive to figure out if it will require the same space or not,
-	 * especially if there's Huffman encoding).
+	 * to be sure any updates weren't deletions.  If the item was updated,
+	 * assume it was updated by an item of the same size (it's expensive to
+	 * figure out if it will require the same space or not, especially if
+	 * there's Huffman encoding).
 	 */
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		switch (WT_ITEM_TYPE(WT_COL_PTR(dsk, cip))) {
 		case WT_ITEM_DATA:
-			repl = WT_COL_REPL(page, cip);
-			if (repl == NULL || !WT_REPL_DELETED_ISSET(repl))
+			upd = WT_COL_UPDATE(page, cip);
+			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
 		case WT_ITEM_DATA_OVFL:
-			repl = WT_COL_REPL(page, cip);
-			if (repl == NULL || !WT_REPL_DELETED_ISSET(repl)) {
+			upd = WT_COL_UPDATE(page, cip);
+			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd)) {
 				WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			}
@@ -203,9 +203,9 @@ static int
 __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 {
 	DB *db;
-	WT_REPL *repl;
 	WT_ROW *rip;
 	WT_STATS *stats;
+	WT_UPDATE *upd;
 	uint32_t i;
 
 	arg = NULL;				/* Shut the compiler up. */
@@ -214,22 +214,22 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
-	 * to be sure any replacements weren't deletions.  If the item has been
-	 * replaced, assume it was replaced by an item of the same size (it's
-	 * to expensive to figure out if it will require the same space or not,
-	 * especially if there's Huffman encoding).
+	 * to be sure any updates weren't deletions.  If the item was updated,
+	 * assume it was updated by an item of the same size (it's expensive to
+	 * figure out if it will require the same space or not, especially if
+	 * there's Huffman encoding).
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
 		switch (WT_ITEM_TYPE(rip->data)) {
 		case WT_ITEM_DATA:
-			repl = WT_ROW_REPL(page, rip);
-			if (repl != NULL && WT_REPL_DELETED_ISSET(repl))
+			upd = WT_ROW_UPDATE(page, rip);
+			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
 		case WT_ITEM_DATA_OVFL:
-			repl = WT_ROW_REPL(page, rip);
-			if (repl != NULL && WT_REPL_DELETED_ISSET(repl))
+			upd = WT_ROW_UPDATE(page, rip);
+			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
