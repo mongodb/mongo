@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L) : _mutex("SynClusterConnection") {
+    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L) : _mutex("SyncClusterConnection") {
         {
             stringstream s;
             int n=0;
