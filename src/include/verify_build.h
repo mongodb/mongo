@@ -62,7 +62,7 @@ __wt_verify_build(void)
 	ALIGN_CHECK(sizeof(WT_OFF), sizeof(uint32_t));
 	ALIGN_CHECK(sizeof(WT_OVFL), sizeof(uint32_t));
 	ALIGN_CHECK(sizeof(WT_PAGE_DISK), sizeof(uint32_t));
-	ALIGN_CHECK(sizeof(WT_TOC_UPDATE), sizeof(uint32_t));
+	ALIGN_CHECK(sizeof(WT_TOC_BUFFER), sizeof(uint32_t));
 
 	/*
 	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because

@@ -607,7 +607,7 @@ struct __wt_col {
  * WT_REPL structures are formed into a forward-linked list.
  */
 struct __wt_repl {
-	WT_TOC_UPDATE *update;		/* update buffer holding this WT_REPL */
+	WT_TOC_BUFFER *tb;		/* WT_TOC buffer holding this WT_REPL */
 	WT_REPL *next;			/* forward-linked list */
 
 	/*

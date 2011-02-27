@@ -65,7 +65,7 @@ __wt_wt_toc_close(WT_TOC *toc)
 	ENV *env;
 	IENV *ienv;
 	WT_TOC **tp;
-	WT_TOC_UPDATE *update;
+	WT_TOC_BUFFER *tb;
 	int ret;
 
 	env = toc->env;
@@ -77,7 +77,7 @@ __wt_wt_toc_close(WT_TOC *toc)
 
 	/*
 	 * The "in" reference count is artificially incremented by 1 as
-	 * long as an update buffer is referenced by the WT_TOC thread;
+	 * long as an WT_TOC buffer is referenced by the WT_TOC thread;
 	 * we don't want them freed because a page was evicted and their
 	 * count went to 0.  Decrement the reference count on the buffer
 	 * as part of releasing it.  There's a similar reference count
@@ -92,9 +92,9 @@ __wt_wt_toc_close(WT_TOC *toc)
 	 * it never happens.  I'm living with this now: it's unlikely
 	 * and it's a memory leak if it ever happens.
 	 */
-	update = toc->update;
-	if (update != NULL && --update->in == update->out)
-		__wt_free(env, update, update->len);
+	tb = toc->tb;
+	if (tb != NULL && --tb->in == tb->out)
+		__wt_free(env, tb, tb->len);
 
 	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.mem_size);

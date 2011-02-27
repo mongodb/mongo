@@ -43,7 +43,7 @@ struct __wt_row_ref;		typedef struct __wt_row_ref WT_ROW_REF;
 struct __wt_row_split;		typedef struct __wt_row_split WT_ROW_SPLIT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
-struct __wt_toc_update;		typedef struct __wt_toc_update WT_TOC_UPDATE;
+struct __wt_toc_buffer;		typedef struct __wt_toc_buffer WT_TOC_BUFFER;
 
 #include "api_int.h"
 
@@ -88,10 +88,10 @@ struct __wt_toc_update;		typedef struct __wt_toc_update WT_TOC_UPDATE;
  * WT_TOC support.
  *******************************************/
 /*
- * WT_TOC_UPDATE --
+ * WT_TOC_BUFFER --
  *	A structure to accumulate file changes on a per-thread basis.
  */
-struct __wt_toc_update {
+struct __wt_toc_buffer {
 	uint32_t len;				/* Buffer original size */
 	uint32_t space_avail;			/* Buffer's available memory */
 	uint8_t *first_free;			/* Buffer's first free byte */

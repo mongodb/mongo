@@ -259,14 +259,14 @@ static void
 __wt_discard_repl_list(ENV *env, WT_REPL *repl)
 {
 	WT_REPL *a;
-	WT_TOC_UPDATE *update;
+	WT_TOC_BUFFER *tb;
 
 	do {
 		a = repl->next;
 
-		update = repl->update;
-		WT_ASSERT(env, update->out < update->in);
-		if (++update->out == update->in)
-			__wt_free(env, update, update->len);
+		tb = repl->tb;
+		WT_ASSERT(env, tb->out < tb->in);
+		if (++tb->out == tb->in)
+			__wt_free(env, tb, tb->len);
 	} while ((repl = a) != NULL);
 }

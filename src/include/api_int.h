@@ -379,7 +379,7 @@ struct __wt_toc {
 
 	WT_FLIST *flist;		/* Memory free list */
 
-	WT_TOC_UPDATE *update;		/* Modified/inserted data items */
+	WT_TOC_BUFFER *tb;		/* Per-thread update buffer */
 
 					/* Search return values: */
 	WT_PAGE  *srch_page;		/*    page */

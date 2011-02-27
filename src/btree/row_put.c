@@ -117,8 +117,8 @@ err:	__wt_toc_serialize_wrapup(toc, page, ret);
 
 /*
  * __wt_repl_alloc --
- *	Allocate a WT_REPL structure and associated data from the TOC's update
- *	memory, and fill it in.
+ *	Allocate a WT_REPL structure and associated data from the TOC's buffer
+ *	and fill it in.
  */
 int
 __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
@@ -126,7 +126,7 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	DB *db;
 	ENV *env;
 	WT_REPL *repl;
-	WT_TOC_UPDATE *update;
+	WT_TOC_BUFFER *tb;
 	uint32_t align_size, alloc_size, size;
 	int single_use;
 
@@ -146,14 +146,14 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * than with on-disk structures.  Any other code allocating memory from
 	 * this buffer needs to align its allocations as well.
 	 *
-	 * The first thing in each chunk of memory is WT_TOC_UPDATE structure
-	 * (which we check is a multiple of 4B during initialization); then
-	 * there are one or more WT_REPL structure plus data chunk pairs.
+	 * The first thing in each chunk of memory is a WT_TOC_BUFFER structure
+	 * (which we check is a multiple of 4B during initialization); then one
+	 * or more WT_REPL structure plus data chunk pairs.
 	 *
 	 * XXX
 	 * Figure out how much space we need: this code limits the maximum size
 	 * of a data item stored in the file.  In summary, for a big item we
-	 * have to store a WT_TOC_UPDATE structure, the WT_REPL structure and
+	 * have to store a WT_TOC_BUFFER structure, the WT_REPL structure and
 	 * the data, all in an allocated buffer.   We only pass a 32-bit value
 	 * to our allocation routine, so we can't store an item bigger than the
 	 * maximum 32-bit value minus the sizes of those two structures, where
@@ -169,15 +169,15 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	if (size > UINT32_MAX - (sizeof(WT_REPL) + sizeof(uint32_t)))
 		return (__wt_file_item_too_big(db));
 	align_size = WT_ALIGN(size + sizeof(WT_REPL), sizeof(uint32_t));
-	if (align_size > UINT32_MAX - sizeof(WT_TOC_UPDATE))
+	if (align_size > UINT32_MAX - sizeof(WT_TOC_BUFFER))
 		return (__wt_file_item_too_big(db));
 
 	/*
 	 * If we already have a buffer and the data fits, just copy the WT_REPL
 	 * structure and data into place, we're done.
 	 */
-	update = toc->update;
-	if (update != NULL && align_size <= update->space_avail)
+	tb = toc->tb;
+	if (tb != NULL && align_size <= tb->space_avail)
 		goto no_allocation;
 
 	/*
@@ -194,27 +194,27 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 	 * allocate as it's necessary.
 	 */
 	if (align_size > env->data_update_max) {
-		alloc_size = WT_SIZEOF32(WT_TOC_UPDATE) + align_size;
+		alloc_size = WT_SIZEOF32(WT_TOC_BUFFER) + align_size;
 		single_use = 1;
 	} else {
 		alloc_size = __wt_nlpo2(
 		    WT_MAX(align_size * 4, env->data_update_initial));
 		single_use = 0;
 	}
-	WT_RET(__wt_calloc(env, 1, alloc_size, &update));
+	WT_RET(__wt_calloc(env, 1, alloc_size, &tb));
 
-	update->len = alloc_size;
-	update->space_avail = alloc_size - WT_SIZEOF32(WT_TOC_UPDATE);
-	update->first_free = (uint8_t *)update + sizeof(WT_TOC_UPDATE);
+	tb->len = alloc_size;
+	tb->space_avail = alloc_size - WT_SIZEOF32(WT_TOC_BUFFER);
+	tb->first_free = (uint8_t *)tb + sizeof(WT_TOC_BUFFER);
 
 	/*
-	 * If it's a single use allocation, ignore any current update buffer.
-	 * Else, release the old update buffer and replace it with the new one.
+	 * If it's a single use allocation, ignore any current WT_TOC buffer.
+	 * Else, release the old WT_TOC buffer and replace it with the new one.
 	 */
 	if (!single_use) {
 		/*
 		 * The "in" reference count is artificially incremented by 1 as
-		 * long as an update buffer is referenced by the WT_TOC thread;
+		 * long as an WT_TOC buffer is referenced by the WT_TOC thread;
 		 * we don't want them freed because a page was evicted and the
 		 * count went to 0.  Decrement the reference count on the buffer
 		 * as part of releasing it.  There's a similar reference count
@@ -229,17 +229,17 @@ __wt_repl_alloc(WT_TOC *toc, WT_REPL **replp, DBT *data)
 		 * it never happens.  I'm living with this now: it's unlikely
 		 * and it's a memory leak if it ever happens.
 		 */
-		if (toc->update != NULL)
-			--toc->update->in;
-		toc->update = update;
+		if (toc->tb != NULL)
+			--toc->tb->in;
+		toc->tb = tb;
 
-		update->in = 1;
+		tb->in = 1;
 	}
 
 no_allocation:
 	/* Copy the WT_REPL structure into place. */
-	repl = (WT_REPL *)update->first_free;
-	repl->update = update;
+	repl = (WT_REPL *)tb->first_free;
+	repl->tb = tb;
 	if (data == NULL)
 		WT_REPL_DELETED_SET(repl);
 	else {
@@ -247,9 +247,9 @@ no_allocation:
 		memcpy(WT_REPL_DATA(repl), data->data, data->size);
 	}
 
-	update->first_free += align_size;
-	update->space_avail -= align_size;
-	++update->in;
+	tb->first_free += align_size;
+	tb->space_avail -= align_size;
+	++tb->in;
 
 	*replp = repl;
 	return (0);
@@ -257,8 +257,7 @@ no_allocation:
 
 /*
  * __wt_repl_free --
- *	Free a WT_REPL structure and associated data from the TOC's update
- *	memory.
+ *	Free a WT_REPL structure and associated data from the WT_TOC_BUFFER.
  */
 void
 __wt_repl_free(WT_TOC *toc, WT_REPL *repl)
@@ -269,18 +268,18 @@ __wt_repl_free(WT_TOC *toc, WT_REPL *repl)
 
 	/*
 	 * It's possible we allocated a WT_REPL structure and associated item
-	 * memory from the WT_TOC update buffer, but then an error occurred.
-	 * Don't try and clean up the update buffer, it's simpler to decrement
-	 * the use count and let the page discard code deal with it during the
+	 * memory from the WT_TOC buffer, but then an error occurred.  Don't
+	 * try and clean up the WT_TOC buffer, it's simpler to decrement the
+	 * use count and let the page discard code deal with it during the
 	 * page reconciliation process.  (Note we're still in the allocation
 	 * path, so we decrement the "in" field, not the "out" field.)
 	 */
-	--repl->update->in;
+	--repl->tb->in;
 
 	/*
-	 * One other thing: if the update buffer was a one-off, we have to free
+	 * One other thing: if the WT_TOC buffer was a one-off, we have to free
 	 * it here, it's not linked to any WT_PAGE in the system.
 	 */
-	if (repl->update->in == 0)
-		__wt_free(env, repl->update, repl->update->len);
+	if (repl->tb->in == 0)
+		__wt_free(env, repl->tb, repl->tb->len);
 }
