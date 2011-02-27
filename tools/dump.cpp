@@ -150,7 +150,7 @@ public:
         return _repair( dbname  );
     }
     
-    DiskLoc _repairExtent( Database* db , string ns, bool forward , DiskLoc eLoc ){
+    DiskLoc _repairExtent( Database* db , string ns, bool forward , DiskLoc eLoc , Writer& w ){
         LogIndentLevel lil;
         
         if ( eLoc.getOfs() <= 0 ){
@@ -176,16 +176,17 @@ public:
                 error() << "offset is 0 for record which should be impossible" << endl;
                 break;
             }
-            log() << loc << endl;
+            log(1) << loc << endl;
             Record* rec = loc.rec();
-            log() << loc.obj() << endl;
+            log(1) << loc.obj() << endl;
+            w( loc.obj() );
             loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
         }
         return forward ? e->xnext : e->xprev;
         
     }
 
-    void _repair( Database* db , string ns ){
+    void _repair( Database* db , string ns , path outfile ){
         NamespaceDetails * nsd = nsdetails( ns.c_str() );
         log() << "nrecords: " << nsd->stats.nrecords 
               << " datasize: " << nsd->stats.datasize 
@@ -201,36 +202,49 @@ public:
             log() << " ERROR fisrtExtent is not valid" << endl;
             return;
         }
+
+        outfile /= ( ns.substr( ns.find( "." ) + 1 ) + ".bson" );
+        log() << "writing to: " << outfile.string() << endl;
         
+        ofstream out;
+        out.open( outfile.string().c_str() , ios_base::out | ios_base::binary  );
+
+        ProgressMeter m( nsd->stats.nrecords * 2 );
+        
+        Writer w( out , &m );
+
         try {
             log() << "forward extent pass" << endl;
             LogIndentLevel lil;
             DiskLoc eLoc = nsd->firstExtent;
             while ( ! eLoc.isNull() ){
                 log() << "extent loc: " << eLoc << endl;
-                eLoc = _repairExtent( db , ns , true , eLoc );
+                eLoc = _repairExtent( db , ns , true , eLoc , w );
             }
         }
         catch ( DBException& e ){
             error() << "forward extent pass failed:" << e.toString() << endl;
         }
-
+        
         try {
             log() << "backwards extent pass" << endl;
             LogIndentLevel lil;
             DiskLoc eLoc = nsd->lastExtent;
             while ( ! eLoc.isNull() ){
                 log() << "extent loc: " << eLoc << endl;
-                eLoc = _repairExtent( db , ns , false , eLoc );
+                eLoc = _repairExtent( db , ns , false , eLoc , w );
             }
         }
         catch ( DBException& e ){
             error() << "ERROR: backwards extent pass failed:" << e.toString() << endl;
         }
 
+        out.close();
+
+        log() << "\t\t " << m.done() << " objects" << endl;
     }
     
-    int _repair( string dbname ){
+    int _repair( string dbname ) {
         dblock lk;
         Client::Context cx( dbname );
         Database * db = cx.db();
@@ -238,16 +252,22 @@ public:
         list<string> namespaces;
         db->namespaceIndex.getNamespaces( namespaces );
         
+        path root = getParam( "out" );
+        root /= dbname;
+        create_directories( root );
+
         for ( list<string>::iterator i=namespaces.begin(); i!=namespaces.end(); ++i ){
             LogIndentLevel lil;
             string ns = *i;
             if ( str::endsWith( ns , ".system.namespaces" ) )
                 continue;
+            if ( str::contains( ns , ".tmp.mr." ) )
+                continue;
             log() << "trying to recover: " << ns << endl;
             
             LogIndentLevel lil2;
             try {
-                _repair( db , ns );
+                _repair( db , ns , root );
             }
             catch ( DBException& e ){
                 log() << "ERROR recovering: " << ns << " " << e.toString() << endl;
