@@ -275,6 +275,15 @@ namespace mongo {
         while ( ! inShutdown() ) {
 
             try {
+                
+                // first make sure we should even be running
+                if ( ! grid.shouldBalance() ) {
+                    log(1) << "skipping balancing round because balancing is disabled" << endl;
+                    sleepsecs( 30 );
+                    continue;
+                }
+                
+
                 ScopedDbConnection conn( config );
 
                 _ping( conn.conn() );
@@ -291,14 +300,6 @@ namespace mongo {
                     conn.done();
 
                     sleepsecs( 30 ); // no need to wake up soon
-                    continue;
-                }
-
-                if ( ! grid.shouldBalance() ) {
-                    log(1) << "skipping balancing round because balancing is disabled" << endl;;
-                    conn.done();
-
-                    sleepsecs( 30 );
                     continue;
                 }
 
