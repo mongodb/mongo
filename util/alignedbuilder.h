@@ -29,12 +29,7 @@ namespace mongo {
         ~AlignedBuilder() { kill(); }
 
         /** reset for a re-use. shrinks if > 128MB */
-        void reset() {
-            _len = 0;
-            const unsigned sizeCap = 128*1024*1024;
-            if (_p._size > sizeCap)
-                _realloc(sizeCap, _len);
-        }
+        void reset();
 
         /** note this may be deallocated (realloced) if you keep writing or reset(). */
         const char* buf() const { return _p._data; }

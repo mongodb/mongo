@@ -29,6 +29,14 @@ namespace mongo {
 
     BOOST_STATIC_ASSERT(sizeof(void*) == sizeof(size_t));
 
+    /** reset for a re-use. shrinks if > 128MB */
+    void AlignedBuilder::reset() {
+        _len = 0;
+        const unsigned sizeCap = 128*1024*1024;
+        if (_p._size > sizeCap)
+            _realloc(sizeCap, _len);
+    }
+
     void AlignedBuilder::mallocSelfAligned(unsigned sz) {
         assert( sz == _p._size );
         void *p = malloc(sz + Alignment - 1);
