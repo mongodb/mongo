@@ -85,16 +85,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	    (env, "reconcile addr %lu (page %p, type %s)",
 	    (u_long)page->addr, page, __wt_page_type_string(dsk)));
 
-	/*
-	 * Update the disk generation before reading the page.  The workQ will
-	 * update the write generation after it makes a change, and if we have
-	 * different disk and write generation numbers, the page may be dirty.
-	 * We technically requires a flush (the eviction server might run on a
-	 * different core before a flush naturally occurred).
-	 */
-	WT_PAGE_DISK_WRITE(page);
-	WT_MEMORY_FLUSH;
-
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		/*
@@ -120,9 +110,18 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 		 */
 		max = db->intlmax;
 		break;
-	case WT_PAGE_OVFL:
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	WT_ILLEGAL_FORMAT(db);
 	}
+
+	/*
+	 * Update the disk generation before reading the page.  The workQ will
+	 * update the write generation after it makes a change, and if we have
+	 * different disk and write generation numbers, the page may be dirty.
+	 * We technically requires a flush (the eviction server might run on a
+	 * different core before a flush naturally occurred).
+	 */
+	WT_PAGE_DISK_WRITE(page);
+	WT_MEMORY_FLUSH;
 
 	/*
 	 * Initialize a WT_PAGE page on the stack and allocate a scratch buffer
