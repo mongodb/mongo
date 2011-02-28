@@ -1839,18 +1839,20 @@ namespace mongo {
     }
 
     BtreeBuilder::~BtreeBuilder() {
-        if( !committed ) {
-            log(2) << "Rolling back partially built index space" << endl;
-            DiskLoc x = first;
-            while( !x.isNull() ) {
-                DiskLoc next = x.btree()->tempNext();
-                string ns = idx.indexNamespace();
-                theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
-                x = next;
+        DESTRUCTOR_GUARD(
+            if( !committed ) {
+                log(2) << "Rolling back partially built index space" << endl;
+                DiskLoc x = first;
+                while( !x.isNull() ) {
+                    DiskLoc next = x.btree()->tempNext();
+                    string ns = idx.indexNamespace();
+                    theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
+                    x = next;
+                }
+                assert( idx.head.isNull() );
+                log(2) << "done rollback" << endl;
             }
-            assert( idx.head.isNull() );
-            log(2) << "done rollback" << endl;
-        }
+        )
     }
 
 }
