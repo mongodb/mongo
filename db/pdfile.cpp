@@ -1002,7 +1002,7 @@ namespace mongo {
                     }
                     catch (AssertionException& e) {
                         ss << " exception update index ";
-                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << endl;
+                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << " " << objNew["_id"] << endl;
                     }
                 }
             }
