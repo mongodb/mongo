@@ -406,6 +406,8 @@ namespace mongo {
                     t.appendBool( "supported" , false );
                 }
 
+                timeBuilder.appendNumber( "middle of mem" , Listener::getElapsedTimeMillis() - start );
+
                 t.appendNumber( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
 
                 t.done();
