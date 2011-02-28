@@ -1063,7 +1063,7 @@ namespace mongo {
                     // dup key exception, presumably.
                     throw;
                 }
-                problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
+                problem() << " caught assertion _indexRecord " << idx.indexNamespace() << " " << obj["_id"] << endl;
             }
         }
     }
