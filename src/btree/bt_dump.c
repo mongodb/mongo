@@ -351,7 +351,7 @@ static const char hex[] = "0123456789abcdef";
 static void
 __wt_print_byte_string_nl(uint8_t *data, uint32_t size, FILE *stream)
 {
-	if (data[size - 1] == '\n')
+	if (size > 0 && data[size - 1] == '\n')
 		--size;
 	__wt_print_byte_string(data, size, stream);
 	fprintf(stream, "\n");

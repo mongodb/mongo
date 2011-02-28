@@ -58,7 +58,7 @@ extern "C" {
  * header), rounded to an allocation unit.
  */
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
-	(WT_ALIGN((size) + sizeof(WT_PAGE_DISK), (db)->allocsize))
+	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (db)->allocsize))
 
 /*
  * The invalid and deleted addresses are special addresses and limit the
@@ -183,14 +183,18 @@ struct __wt_page_disk {
 	 * and having a little bit of on-page data to play with in the future
 	 * can be a good thing.
 	 */
-	uint8_t unused[2];		/* 26-31: unused padding */
+	uint8_t unused[2];		/* 26-27: unused padding */
 };
 /*
  * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
- * The size must also be a multiple of 8 bytes, because compilers will pad it
- * to align the 64-bit fields to an 8 byte boundary.  Also, the header is
- * followed by WT_ITEM structures, which require 4-byte alignment.
+ * The header is followed by WT_ITEM structures, which require 4-byte
+ * alignment.
+ *
+ * 64-bit compilers will pad the end of this structure to a multiple of 8
+ * bytes. We take that into account when checking the size, and always use
+ * WT_PAGE_DISK_SIZE rather than sizeof to avoid writing 4 bytes of padding to
+ * every page.
  */
 #define	WT_PAGE_DISK_SIZE		28
 
@@ -429,12 +433,6 @@ struct __wt_page {
 	uint32_t disk_gen;
 	uint32_t write_gen;
 
-	/*
-	 * Every in-memory page references a number of entries, originally
-	 * based on the number of on-disk entries found.
-	 */
-	uint32_t indx_count;
-
 	/* But the entires are wildly different, based on the page type. */
 	union {
 		/* Row-store internal information. */
@@ -462,6 +460,13 @@ struct __wt_page {
 			WT_RLE_EXPAND **rleexp;	/* RLE expansion array */
 		} col_leaf;
 	} u;
+
+	/*
+	 * Every in-memory page references a number of entries, originally
+	 * based on the number of on-disk entries found.  We put this at the
+	 * end of the struct to avoid internal padding.
+	 */
+	uint32_t indx_count;
 };
 /*
  * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure
@@ -472,8 +477,9 @@ struct __wt_page {
  * The compiler will pad this to be a multiple of the pointer size, so take
  * that into account.
  */
-#define	WT_PAGE_SIZE							\
-    WT_ALIGN((7 * sizeof(void *) + 6 * sizeof(uint32_t)), sizeof(void *))
+#define	WT_PAGE_SIZE	WT_ALIGN(					\
+	6 * sizeof(void *) + 5 * sizeof(uint32_t) + sizeof(uint64_t),	\
+	sizeof(void *))
 
 /*
  * WT_ROW --

@@ -43,7 +43,8 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
 	    -e 's/(void) /(void)/' \
 	    -e 's/(unsigned)/(unsigned int)/' \
-	    -e 's/^#define /#define	/' >$t
+	    -e 's/^#define /#define	/' \
+	    -e 's/sizeof(WT_PAGE_DISK)/WT_PAGE_DISK_SIZE/g' >$t
 
 	cmp $t $f > /dev/null 2>&1 || (echo "$f" && cp $t $f)
 done)

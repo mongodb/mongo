@@ -32,6 +32,14 @@
  */
 #define	STATIC_ASSERT(cond)	(void)sizeof(char[1 - 2 * !(cond)])
 
+#define	SIZE_CHECK(type, e)	do {					\
+	char __check_##type[1 - 2 * !(sizeof(type) == (e))];		\
+	(void)__check_##type;						\
+} while (0)
+
+#define	ALIGN_CHECK(type, a)						\
+	STATIC_ASSERT(WT_ALIGN(sizeof(type), (a)) == sizeof(type))
+
 static inline void
 __wt_verify_build(void)
 {
@@ -39,14 +47,14 @@ __wt_verify_build(void)
 	 * The compiler had better not have padded our structures -- make sure
 	 * the page header structure is exactly what we expect.
 	 */
-	STATIC_ASSERT(sizeof(WT_COL) == WT_COL_SIZE);
-	STATIC_ASSERT(sizeof(WT_ITEM) == WT_ITEM_SIZE);
-	STATIC_ASSERT(sizeof(WT_OFF) == WT_OFF_SIZE);
-	STATIC_ASSERT(sizeof(WT_OFF_RECORD) == WT_OFF_RECORD_SIZE);
-	STATIC_ASSERT(sizeof(WT_OVFL) == WT_OVFL_SIZE);
-	STATIC_ASSERT(sizeof(WT_PAGE) == WT_PAGE_SIZE);
-	STATIC_ASSERT(sizeof(WT_PAGE_DESC) == WT_PAGE_DESC_SIZE);
-	STATIC_ASSERT(sizeof(WT_ROW) == WT_ROW_SIZE);
+	SIZE_CHECK(WT_COL, WT_COL_SIZE);
+	SIZE_CHECK(WT_ITEM, WT_ITEM_SIZE);
+	SIZE_CHECK(WT_OFF, WT_OFF_SIZE);
+	SIZE_CHECK(WT_OFF_RECORD, WT_OFF_RECORD_SIZE);
+	SIZE_CHECK(WT_OVFL, WT_OVFL_SIZE);
+	SIZE_CHECK(WT_PAGE, WT_PAGE_SIZE);
+	SIZE_CHECK(WT_PAGE_DESC, WT_PAGE_DESC_SIZE);
+	SIZE_CHECK(WT_ROW, WT_ROW_SIZE);
 
 	/*
 	 * The page header is special: the compiler will pad it to a multiple
@@ -54,15 +62,13 @@ __wt_verify_build(void)
 	 * use WT_PAGE_DISK_SIZE everywhere instead of sizeof(WT_PAGE_DISK)
 	 * to avoid writing 4 extra bytes to the file.
 	 */
-	STATIC_ASSERT(sizeof(WT_PAGE_DISK) ==
-	    WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof(void *)));
+	SIZE_CHECK(WT_PAGE_DISK, WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof(void *)));
 
 	/* There are also structures that must be aligned correctly. */
-#define	ALIGN_CHECK(s, a)	STATIC_ASSERT(WT_ALIGN((s), (a)) == (s))
-	ALIGN_CHECK(sizeof(WT_OFF), sizeof(uint32_t));
-	ALIGN_CHECK(sizeof(WT_OVFL), sizeof(uint32_t));
-	ALIGN_CHECK(sizeof(WT_PAGE_DISK), sizeof(uint32_t));
-	ALIGN_CHECK(sizeof(WT_TOC_BUFFER), sizeof(uint32_t));
+	ALIGN_CHECK(WT_OFF, sizeof(uint32_t));
+	ALIGN_CHECK(WT_OVFL, sizeof(uint32_t));
+	ALIGN_CHECK(WT_PAGE_DISK, sizeof(uint32_t));
+	ALIGN_CHECK(WT_TOC_BUFFER, sizeof(uint32_t));
 
 	/*
 	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because
