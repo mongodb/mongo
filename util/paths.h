@@ -82,7 +82,7 @@ namespace mongo {
         struct stat stats;
 
         if (stat(path.c_str(), &stats) != 0){
-            uasserted(13645, str::stream() << "stat() failed for file: " << path << " " << errnoWithDescription());
+            uasserted(13646, str::stream() << "stat() failed for file: " << path << " " << errnoWithDescription());
         }
 
         return stats.st_dev;
