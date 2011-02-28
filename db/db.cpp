@@ -1099,6 +1099,11 @@ namespace mongo {
         oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
+
+        if( cmdLine.dur ) { 
+            ::exit(EXIT_ABRUPT);
+        }
+
         dbexit( EXIT_ABRUPT );
     }
 
