@@ -76,7 +76,10 @@ namespace PerfTests {
 
             unsigned sz = 1024 * 1024 * 100 + 3;
             void *p = malloc(sz);
-            mongo::Checksum last;
+            for (unsigned i = 0; i<sz; i++)
+                ((char*)p)[i] = rand();
+
+            mongo::Checksum last = {};
             for( int i = 0; i < 4; i++ ) { 
                 Timer t;
                 mongo::Checksum c;
