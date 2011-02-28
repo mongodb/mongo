@@ -190,12 +190,20 @@ namespace mongo {
         }
 
         map<HostAndPort,const ReplSetConfig::MemberCfg*> old;
+        bool isLocalHost = false;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = o.members.begin(); i != o.members.end(); i++ ) {
+            if (i->h.isLocalHost()) {
+                isLocalHost = true;
+            }
             old[i->h] = &(*i);
         }
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = n.members.begin(); i != n.members.end(); i++ ) {
             const ReplSetConfig::MemberCfg& m = *i;
+            if ( isLocalHost && !m.h.isLocalHost() ) {
+                log() << "reconfig error: " << m.h.toString() << " cannot be used from localhost replset" << rsLog;
+                uasserted(13645, "hosts cannot change from localhost to hostname");
+            }
             if( old.count(m.h) ) {
                 const ReplSetConfig::MemberCfg& oldCfg = *old[m.h];
                 if( oldCfg._id != m._id ) {
