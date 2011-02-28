@@ -1790,6 +1790,12 @@ namespace mongo {
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
+                RARELY {
+                    getDur().commitIfNeeded();
+                    b = cur.btreemod();
+                    up = upLoc.btreemod();
+                }
+
                 BtreeBucket *x = xloc.btreemod();
                 BSONObj k;
                 DiskLoc r;
