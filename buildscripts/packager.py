@@ -266,7 +266,7 @@ def make_package(srcdir, arch, distro, version, suffixes):
     # eventually.
     os.unlink(setupdir+("%s/usr/bin/mongosniff"%BINARYDIR))
     if re.search("^(debian|ubuntu)", distro):
-        return make_deb(setupdir, distro, arch, pkgbase, suffix, pversion)
+        return make_deb(setupdir, distro, arch, pkgbase, suffix, version, pversion, srcdir)
     elif re.search("^(centos|redhat|fedora)", distro):
         return make_rpm(setupdir, distro, arch, pkgbase, suffix, pversion)
     else:
@@ -280,16 +280,23 @@ def make_repo(repodir):
     else:
         raise Exception("BUG: unsupported platform?")
 
-def make_deb(dir, distro, arch, pkgbase, suffix, version):
-    # remove the upstart file from the
-    # sysvinit-flavored debianoids
+def make_deb(dir, distro, arch, pkgbase, suffix, version, pversion, srcdir):
+    # I can't remember the details anymore, but the initscript/upstart
+    # job files' names must match the package name in some way; and
+    # see also the --name flag to dh_installinit in the generated
+    # debian/rules file.
     if re.search("sysvinit", distro):
+        os.link(dir+"debian/init.d", dir+"debian/%s%s.mongodb.init" % (pkgbase, suffix))
         os.unlink(dir+"debian/mongodb.upstart")
+    elif re.search("upstart", distro):
+        os.link(dir+"debian/mongodb.upstart", dir+"debian/%s%s.upstart" % (pkgbase, suffix))
+        os.unlink(dir+"debian/init.d")
+    else:
+        raise Exception("unknown debianoid flavor: not sysvinit or upstart?")
     # Rewrite the control and rules files
     write_debian_control_file(dir+"debian/control", suffix)
     write_debian_rules_file(dir+"debian/rules", suffix)
-    # FIXME: use real changelogs.
-    write_bogus_debian_changelog(dir+"debian/changelog", suffix, version)
+    write_debian_changelog(dir+"debian/changelog", suffix, version, pversion, srcdir)
     distro_arch="i386" if arch.endswith("86") else "amd64"
     # Do the packaging.
     oldcwd=os.getcwd()
@@ -302,7 +309,7 @@ def make_deb(dir, distro, arch, pkgbase, suffix, version):
     ensure_dir(r)
     # FIXME: see if shutil.copyfile or something can do this without
     # much pain.
-    sysassert(["cp", "-v", dir+"../%s%s_%s_%s.deb"%(pkgbase, suffix, version, distro_arch), r])
+    sysassert(["cp", "-v", dir+"../%s%s_%s_%s.deb"%(pkgbase, suffix, pversion, distro_arch), r])
     return r
 
 def make_deb_repo(repo):
@@ -432,16 +439,19 @@ def move_repos_into_place(src, dst):
         os.rename(oldnam, dst+".old")
 
 
-def write_bogus_debian_changelog(path, suffix, version):
-    s="""mongodb%s (%s) unstable; urgency=low
-
-  * sharding lots of changes
-  * replica_sets lots of changes
-
- -- Richard Kreuter <richard@10gen.com>  Mon, 20 Dec 2010 16:56:28 -0500
-
-""" % (suffix, version)
+def write_debian_changelog(path, suffix, version, pversion, srcdir):
+    oldcwd=os.getcwd()
+    os.chdir(srcdir)
+    try:
+        s=backtick(["sh", "-c", "git archive r%s debian/changelog | tar xOf -" % version])
+    finally:
+        os.chdir(oldcwd)
     f=open(path, 'w')
+    print ">>>"+s+"<<<"
+    lines=s.split("\n")
+    lines=[re.sub("^mongodb \\(.*\\)", "mongodb%s (%s)" % (suffix, pversion), l) for l in lines]
+    lines=[re.sub("^  --", " --", l) for l in lines]
+    s="\n".join(lines)
     try:
         f.write(s)
     finally:
@@ -532,7 +542,7 @@ clean:
 \t# FIXME: scons freaks out at the presence of target files
 \t# under debian/mongodb.
 \t#scons -c
-\trm -rf $(CURDIR)/debian/@@PACKAGE_BASENAME@@
+\trm -rf $(CURDIR)/debian/@@PACKAGE_NAME@@
 \trm -f config.log
 \trm -f mongo
 \trm -f mongod
@@ -560,13 +570,13 @@ install: build
 
 # THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
 \t# scons --prefix=$(CURDIR)/debian/mongodb/usr install
-\tcp -v $(CURDIR)/@@BINARYDIR@@/usr/bin/* $(CURDIR)/debian/@@PACKAGE_BASENAME@@/usr/bin
-\tmkdir -p $(CURDIR)/debian/@@PACKAGE_BASENAME@@/etc
-\tcp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/@@PACKAGE_BASENAME@@/etc/mongodb.conf 
+\tcp -v $(CURDIR)/@@BINARYDIR@@/usr/bin/* $(CURDIR)/debian/@@PACKAGE_NAME@@/usr/bin
+\tmkdir -p $(CURDIR)/debian/@@PACKAGE_NAME@@/etc
+\tcp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/@@PACKAGE_NAME@@/etc/mongodb.conf 
 
-\tmkdir -p $(CURDIR)/debian/@@PACKAGE_BASENAME@@/usr/share/lintian/overrides/
+\tmkdir -p $(CURDIR)/debian/@@PACKAGE_NAME@@/usr/share/lintian/overrides/
 \tinstall -m 644 $(CURDIR)/debian/lintian-overrides \
-\t\t$(CURDIR)/debian/@@PACKAGE_BASENAME@@/usr/share/lintian/overrides/@@PACKAGE_BASENAME@@
+\t\t$(CURDIR)/debian/@@PACKAGE_NAME@@/usr/share/lintian/overrides/@@PACKAGE_NAME@@
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -586,7 +596,7 @@ binary-arch: build install
 #\tdh_installemacsen
 #\tdh_installpam
 #\tdh_installmime
-\tdh_installinit
+\tdh_installinit --name=@@PACKAGE_BASENAME@@
 #\tdh_installinfo
 \tdh_installman
 \tdh_link
@@ -602,7 +612,8 @@ binary-arch: build install
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install configure
 """
-    s=re.sub("@@PACKAGE_BASENAME@@", "mongodb%s" % suffix, s)
+    s=re.sub("@@PACKAGE_NAME@@", "mongodb%s" % suffix, s)
+    s=re.sub("@@PACKAGE_BASENAME@@", "mongodb", s)
     s=re.sub("@@BINARYDIR@@", BINARYDIR, s)
     f=open(path, 'w')
     try:
