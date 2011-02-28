@@ -184,7 +184,7 @@ wts_dump(void)
 	db = g.wts_db;
 
 	/* Dump the WiredTiger file. */
-	track("dump", (u_int64_t)0);
+	track("dump", 0);
 	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
@@ -196,7 +196,7 @@ wts_dump(void)
 	}
 	(void)fclose(fp);
 
-	track("dump comparison", (u_int64_t)0);
+	track("dump comparison", 0);
 	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
@@ -258,7 +258,7 @@ wts_stats(void)
 
 	db = g.wts_db;
 
-	track("stat", (u_int64_t)0);
+	track("stat", 0);
 	p = fname("stats");
 	if ((fp = fopen(p, "w")) == NULL) {
 		db->err(db, errno, "fopen: %s", p);
@@ -376,7 +376,7 @@ wts_ops(void)
 		}
 
 		if (cnt % 10 == 0)
-			track("read/write ops", (u_int64_t)cnt);
+			track("read/write ops", cnt);
 	}
 	return (0);
 }

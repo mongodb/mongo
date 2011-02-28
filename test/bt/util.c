@@ -134,11 +134,19 @@ void
 track(const char *s, u_int64_t i)
 {
 	static int lastlen = 0;
+	static const char *lasts;
 	int len;
 	char *p, msg[128];
 
-	if (!isatty(STDOUT_FILENO))
+	if (!isatty(STDOUT_FILENO)) {
+		if (*s != '\n')
+			lasts = s;
+		else {
+			(void)printf("%4d: %s\n", g.run_cnt, lasts);
+			(void)fflush(stdout);
+		}
 		return;
+	}
 
 	if (s == NULL)
 		len = 0;

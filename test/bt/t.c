@@ -117,17 +117,17 @@ main(int argc, char *argv[])
 skip_ops:	if (wts_stats())		/* Statistics */
 			goto err;
 						/* Close the file */
-		track("shutting down BDB", (u_int64_t)0);
+		track("shutting down BDB", 0);
 		bdb_teardown();	
 
 		if (wts_dump())
 			goto err;
 
-		track("shutting down WT", (u_int64_t)0);
+		track("shutting down WT", 0);
 		wts_teardown();
 
-		track(config_dtype(), (u_int64_t)0);
-		printf("\n");
+		track(config_dtype(), 0);
+		track("\n", 0);
 	}
 
 	if (g.rand_log != NULL)
