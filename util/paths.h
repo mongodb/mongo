@@ -19,6 +19,8 @@
 #pragma once
 
 #include "mongoutils/str.h"
+#include <sys/types.h>
+#include <sys/stat.h>
 
 using namespace mongoutils;
 
@@ -75,5 +77,22 @@ namespace mongo {
         }
 
     };
+
+    inline dev_t getPartition(const string& path){
+        struct stat stats;
+
+        if (stat(path.c_str(), &stats) != 0){
+            uasserted(13645, str::stream() << "stat() failed for file: " << path << " " << errnoWithDescription());
+        }
+
+        return stats.st_dev;
+    }
+    
+    inline bool onSamePartition(const string& path1, const string& path2){
+        dev_t dev1 = getPartition(path1);
+        dev_t dev2 = getPartition(path2);
+
+        return dev1 == dev2;
+    }
 
 }
