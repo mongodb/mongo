@@ -982,7 +982,11 @@ namespace mongo {
                 IndexDetails& idx = d->idx(x);
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
-                        idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
+                        bool found = idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
+                        if ( ! found ) {
+                            RARELY warning() << "ns: " << ns << " couldn't unindex key: " << *changes[x].removed[i] 
+                                             << " for doc: " << objOld["_id"] << endl;
+                        }
                     }
                     catch (AssertionException&) {
                         ss << " exception update unindex ";
