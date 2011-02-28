@@ -1848,6 +1848,7 @@ namespace mongo {
                     string ns = idx.indexNamespace();
                     theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
                     x = next;
+                    RARELY getDur().commitIfNeeded();
                 }
                 assert( idx.head.isNull() );
                 log(2) << "done rollback" << endl;
