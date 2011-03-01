@@ -1275,7 +1275,7 @@ namespace mongo {
             result.appendNumber( "indexSize" , indexSize );
             result.appendNumber( "fileSize" , d->fileSize() );
             if( d )
-                result.appendNumber( "nsSizeMB", d->namespaceIndex.fileLength() / 1024 / 1024 );
+                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
 
             return true;
         }

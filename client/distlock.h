@@ -151,7 +151,7 @@ namespace mongo {
         // Process id, in case we need to customize this
         string _processId;
         // May or may not exist, depending on startup
-        boost::thread::id _threadId;
+        string _threadId;
 
     };
 

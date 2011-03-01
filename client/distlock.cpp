@@ -69,7 +69,7 @@ namespace mongo {
             log( LLL ) << "Creating a distributed lock ping thread for " << addr << " and process " << process << " (sleeping for " << sleepTime << "ms)" << endl;
 
             static int loops = 0;
-            while( ! inShutdown() && ! shouldKill() ) {
+            while( ! inShutdown() && ! shouldKill( addr, process ) ) {
 
                 log(4) << "dist_lock about to ping for: " << process << endl;
 
@@ -137,7 +137,7 @@ namespace mongo {
             warning() << "Removing distributed lock ping thread for " << addr << " and process " << process << endl;
 
 
-            if( shouldKill() )
+            if( shouldKill( addr, process ) )
                 finishKill( addr, process );
 
         }
@@ -155,18 +155,21 @@ namespace mongo {
             }
         }
 
+        string pingThreadId( const ConnectionString& conn, const string& processId ){
+            return conn.toString() + "/" + processId;
+        }
 
-        boost::thread::id got( DistributedLock& lock, unsigned long long sleepTime ) {
+        string got( DistributedLock& lock, unsigned long long sleepTime ) {
 
         	// Make sure we don't start multiple threads for a process id
             scoped_lock lk( _mutex );
 
             const ConnectionString& conn = lock.getRemoteConnection();
             const string& processId = lock.getProcessId();
-            string s = conn.toString() + "/" + processId;
+            string s = pingThreadId( conn, processId );
 
             // Ignore if we already have a pinging thread for this process.
-            if ( _seen.count( s ) > 0 ) return boost::thread::id();
+            if ( _seen.count( s ) > 0 ) return "";
 
             // Check our clock skew
             try {
@@ -182,32 +185,36 @@ namespace mongo {
 
             _seen.insert( s );
 
-            return t.get_id();
+            return s;
         }
 
-        void kill( boost::thread::id threadId, ConnectionString& conn, string& processId ){
+        void kill( ConnectionString& conn, string& processId ){
             // Make sure we're in a consistent state before other threads can see us
             scoped_lock lk( _mutex );
 
-            assert( _seen.count( conn.toString() + "/" + processId ) > 0 );
-            _kill.insert( threadId );
+            string pingId = pingThreadId( conn, processId );
+
+            assert( _seen.count( pingId ) > 0 );
+            _kill.insert( pingId );
 
         }
 
-        bool shouldKill( ){
-            return _kill.count( boost::this_thread::get_id() ) > 0;
+        bool shouldKill( ConnectionString& conn, string& processId ){
+            return _kill.count( pingThreadId( conn, processId ) ) > 0;
         }
 
         void finishKill( ConnectionString& conn, string& processId ){
             // Make sure we're in a consistent state before other threads can see us
             scoped_lock lk( _mutex );
 
-            _kill.erase(  boost::this_thread::get_id() );
-            _seen.erase( conn.toString() + "/" + processId );
+            string pingId = pingThreadId( conn, processId );
+
+            _kill.erase( pingId );
+            _seen.erase( pingId );
 
         }
 
-        set<boost::thread::id> _kill;
+        set<string> _kill;
         set<string> _seen;
         mongo::mutex _mutex;
 
@@ -377,10 +384,11 @@ namespace mongo {
         return true;
     }
 
+    // For use in testing, ping thread should run indefinitely in practice.
     bool DistributedLock::killPinger( DistributedLock& lock ){
-	if( lock._threadId == boost::thread::id() ) return false;
+	if( lock._threadId == "") return false;
 
-	distLockPinger.kill( lock._threadId, lock._conn, lock._processId );
+	distLockPinger.kill( lock._conn, lock._processId );
 	return true;
     }
 
@@ -388,7 +396,7 @@ namespace mongo {
 
     	// TODO:  Start pinging only when we actually get the lock?
 	// If we don't have a thread pinger, make sure we shouldn't have one
-       	if( _threadId == boost::thread::id() )
+       	if( _threadId == "" )
        	    _threadId = distLockPinger.got( *this, _lockPing );
 
     	// This should always be true, if not, we are using the lock incorrectly.
