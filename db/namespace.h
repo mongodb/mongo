@@ -563,6 +563,8 @@ namespace mongo {
 
         boost::filesystem::path path() const;
 
+        unsigned long long fileLength() const { return f.length(); }
+
     private:
         void maybeMkdir() const;
 

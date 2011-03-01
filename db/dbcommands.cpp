@@ -1224,7 +1224,9 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << " example: { dbStats:1 } ";
+            help << 
+                "Get stats on a database. Not instantaneous. Slower for databases with large .ns files.\n" << 
+                "Example: { dbStats:1 }";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             list<string> collections;
@@ -1272,6 +1274,8 @@ namespace mongo {
             result.appendNumber( "indexes" , indexes );
             result.appendNumber( "indexSize" , indexSize );
             result.appendNumber( "fileSize" , d->fileSize() );
+            if( d )
+                result.appendNumber( "nsSizeMB", d->namespaceIndex.fileLength() / 1024 / 1024 );
 
             return true;
         }
