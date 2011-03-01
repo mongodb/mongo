@@ -326,11 +326,12 @@ namespace mongo {
 
         bool uninitialized() const { return version == 0; }
 
-        void init(int fileno, int filelength) {
+        void init(int fileno, int filelength, const char* filename) {
             if ( uninitialized() ) {
                 if( !(filelength > 32768 ) ) { 
                     massert(13640, str::stream() << "DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:" << fileno, false);
                 }
+                getDur().createdFile(filename, filelength);
                 assert( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;

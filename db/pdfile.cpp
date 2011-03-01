@@ -407,7 +407,7 @@ namespace mongo {
             uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
         else
             uassert( 10085 , "can't map file memory", _mb != 0);
-        header()->init(fileNo, size);
+        header()->init(fileNo, size, filename);
     }
 
     void MongoDataFile::flush( bool sync ) {
