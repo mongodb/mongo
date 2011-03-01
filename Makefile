@@ -15,6 +15,7 @@ build_deps: FORCE
 	yum -y install git tcsh scons gcc-c++ glibc-devel
 	yum -y install boost-devel pcre-devel js-devel readline-devel
 	yum -y install boost-devel-static readline-static ncurses-static
+	yum -y install js js-devel
 
 MONGO_DB_PATH=/data/db
 MONGOD_LOGFILE=/var/log/mongod
@@ -36,8 +37,6 @@ run_server: FORCE # as root
 run_shell: FORCE
 	/usr/local/bin/mongo
 
-build_deps: FORCE
-	yum -y install js js-devel
 
 #js-1.7.0.tar.gz:
 #	curl -O ftp://ftp.mozilla.org/pub/mozilla.org/js/js-1.7.0.tar.gz
