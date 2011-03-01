@@ -489,7 +489,7 @@ namespace mongo {
             @param data the 6 element byte array
         */
         BSONObjBuilder& appendMAC( const StringData& fieldName, const MAC_Addr& macAddr ) {
-            return appendBinData( fieldName, 6, bdtIpAddr, (const char*)&macAddr );
+            return appendBinData( fieldName, 6, bdtMacAddr, (const char*)&macAddr );
         }
 
         /** Append a MAC address element
@@ -497,7 +497,7 @@ namespace mongo {
             @param data the 6 element byte array
         */
         BSONObjBuilder& appendMAC( const StringData& fieldName, const char *data ) {
-            return appendBinData( fieldName, 6, bdtIpAddr, data );
+            return appendBinData( fieldName, 6, bdtMacAddr, data );
         }
 
         /**
