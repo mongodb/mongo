@@ -18,6 +18,7 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
+#include <boost/function.hpp>
 #include "mutex.h"
 
 namespace mongo {
@@ -64,6 +65,8 @@ namespace mongo {
         /** may be called multiple times. notifies all waiters */
         void notifyAll();
 
+        /** may be called multiple times. notifies all waiters if test returns true */
+        void notifyAllIf(boost::function<bool()> test);
     private:
         mongo::mutex _mutex;
         unsigned long long _counter;
