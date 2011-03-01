@@ -248,13 +248,38 @@ namespace mongo {
     /* scoped lock for RWLock */
     class rwlock {
     public:
-        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false )
+        /**
+         * @param lowPriority if > 0, will try to get the lock not gredily for that many # of ms
+         */
+        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false , int lowPriorityWaitMS = 0 )
             : _lock( (RWLock&)lock ) , _write( write ) {
+            
             if ( ! alreadyHaveLock ) {
-                if ( _write )
-                    _lock.lock();
-                else
+            
+                if ( _write ) {
+                    
+                    if ( lowPriorityWaitMS ) { 
+                        bool got = false;
+                        for ( int i=0; i<lowPriorityWaitMS/2; i++ ) {  // we divide by 2 since we sleep a bit
+                            if ( _lock.lock_try(1) ) {
+                                got = true;
+                                break;
+                            }
+                            sleepmillis(1);
+                        }
+                        if ( ! got ) {
+                            log() << "couldn't get lazy rwlock" << endl;
+                            _lock.lock();
+                        }
+                    }
+                    else { 
+                        _lock.lock();
+                    }
+
+                }
+                else { 
                     _lock.lock_shared();
+                }
             }
         }
         ~rwlock() {

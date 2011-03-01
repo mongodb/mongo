@@ -223,6 +223,16 @@ namespace ThreadedTests {
         }
     };
 
+    class RWLockTest1 { 
+    public:
+        void run() { 
+            RWLock lk( "eliot" );
+            {
+                rwlock r( lk , true , false , 1000 );
+            }
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ) {
@@ -233,6 +243,7 @@ namespace ThreadedTests {
             add< MVarTest >();
             add< ThreadPoolTest >();
             add< LockTest >();
+            add< RWLockTest1 >();
             add< MongoMutexTest >();
         }
     } myall;
