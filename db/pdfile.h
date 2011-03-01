@@ -272,6 +272,7 @@ namespace mongo {
         Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
 
         static int maxSize();
+        static int minSize() { return 0x100; }
         /**
          * @param len lengt of record we need
          * @param lastRecord size of last extent which is a factor in next extent size
