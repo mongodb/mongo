@@ -23,7 +23,7 @@
 #include "redef_macros.h"
 #include "syncclusterconnection.h"
 
-#define LOCK_LOG_LEVEL 0
+#define LOCK_LOG_LEVEL 1
 #define LLL LOCK_LOG_LEVEL
 
 #define LOCK_TIMEOUT (15 * 60 * 1000)
