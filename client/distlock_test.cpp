@@ -163,7 +163,7 @@ namespace mongo {
             int takeoverMins = (int) number_field(cmdObj, "takeoverMins", 0);
 
             // How long until the lock is forced in ms, only compared locally
-            unsigned long long takeoverMS = number_field(cmdObj, "takeoverMS", 0);
+            unsigned long long takeoverMS = (unsinged long long) number_field(cmdObj, "takeoverMS", 0);
 
             // Whether or not we should hang some threads
             int hangThreads = (int) number_field(cmdObj, "hangThreads", 0);
