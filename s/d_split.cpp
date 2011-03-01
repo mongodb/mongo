@@ -353,7 +353,7 @@ namespace mongo {
                 // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and
                 // split on the following key.
                 set<BSONObj> tooFrequentKeys;
-                splitKeys.push_back( c->currKey() );
+                splitKeys.push_back( c->currKey().getOwned() );
                 while ( cc->ok() ) {
                     currCount++;
                     BSONObj currKey = c->currKey();
