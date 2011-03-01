@@ -87,6 +87,7 @@ __wt_desc_write(WT_TOC *toc)
 	idb = db->idb;
 	ret = 0;
 
+	WT_CLEAR(desc);
 	desc.magic = WT_BTREE_MAGIC;
 	desc.majorv = WT_BTREE_MAJOR_VERSION;
 	desc.minorv = WT_BTREE_MINOR_VERSION;
