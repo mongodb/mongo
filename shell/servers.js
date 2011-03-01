@@ -478,7 +478,7 @@ printShardingStatus = function( configDB , verbose ){
                                 output( "\t\t\t\t" + z.shard + "\t" + z.nChunks );
                             } )
                             
-                            if ( totalChunks < 1000 || verbose ){
+                            if ( totalChunks < 20 || verbose ){
                                 configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                                     function(chunk){
                                         output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
