@@ -74,16 +74,17 @@ namespace mongo {
                     if( m.count(u) ) {
                         uasserted(13531, str::stream() << "unexpected files in journal directory " << dir.string() << " : " << fileName);
                     }
-                    if( !m.empty() && !m.count(u-1) ) {
-                        uasserted(13532,
-                                  str::stream() << "unexpected file in journal directory " << dir.string()
-                                  << " : " << fileName << " : can't find its preceeding file");
-                    }
                     m.insert( pair<unsigned,path>(u,filepath) );
                 }
             }
-            for( map<unsigned,path>::iterator i = m.begin(); i != m.end(); ++i )
+            for( map<unsigned,path>::iterator i = m.begin(); i != m.end(); ++i ) {
+                if( i != m.begin() && m.count(i->first - 1) == 0 ) {
+                    uasserted(13532,
+                    str::stream() << "unexpected file in journal directory " << dir.string()
+                      << " : " << filesystem::path(i->second).leaf() << " : can't find its preceeding file");
+                }
                 files.push_back(i->second);
+            }
         }
 
         /** read through the memory mapped data of a journal file (journal/j._<n> file)
