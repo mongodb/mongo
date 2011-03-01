@@ -178,18 +178,37 @@ namespace mongo {
             }
 
             // for now, the only check is that all shard keys are filled
+            // null is ok, 
             // TODO if $exist for nulls were picking the index, it could be used instead efficiently
             while ( cc->ok() ) {
                 BSONObj currKey = c->currKey();
-                BSONForEach(key, currKey) {
-                    if ( key.type() == jstNULL ) {
-                        ostringstream os;
-                        os << "found null value in key " << bc->prettyKey( currKey );
-                        log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
+                
+                BSONObjIterator i( currKey );
+                int n = 0;
+                while ( i.more() ) {
+                    BSONElement key = i.next();
+                    n++;
 
-                        errmsg = os.str();
-                        return false;
-                    }
+                    if ( key.type() && key.type() != jstNULL )
+                        continue;
+                    
+                    BSONObj obj = c->current();
+                    BSONObjIterator j( keyPattern );
+                    BSONElement real;
+                    for ( int x=0; x<n; x++ )
+                        real = j.next();
+                    
+                    real = obj.getFieldDotted( real.fieldName() );
+
+                    if ( real.type() )
+                        continue;
+                    
+                    ostringstream os;
+                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: " << real["_id"];
+                    log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
+                    
+                    errmsg = os.str();
+                    return false;
                 }
                 cc->advance();
             }
