@@ -136,7 +136,7 @@ namespace mongo {
         }
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << " errno:" << errno << endl;
+            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << ' ' << errnoWithDescription() << endl;
             uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
         }
 
