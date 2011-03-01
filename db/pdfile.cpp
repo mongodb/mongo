@@ -252,6 +252,10 @@ namespace mongo {
             while ( size > 0 ) {
                 int max = MongoDataFile::maxSize() - DataFileHeader::HeaderSize;
                 int desiredExtentSize = (int) (size > max ? max : size);
+                if ( desiredExtentSize < Extent::minSize() ) {
+                    desiredExtentSize = Extent::minSize();
+                }
+                desiredExtentSize &= 0xffffff00;
                 Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
@@ -435,11 +439,11 @@ namespace mongo {
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         massert( 10357 ,  "shutdown in progress", ! inShutdown() );
-        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= Extent::maxSize() );
+        massert( 10358 ,  "bad new extent size", approxSize >= Extent::minSize() && approxSize <= Extent::maxSize() );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
         int ExtentSize = approxSize <= header()->unusedLength ? approxSize : header()->unusedLength;
         DiskLoc loc;
-        if ( ExtentSize <= 0 ) {
+        if ( ExtentSize < Extent::minSize() ) {
             /* not there could be a lot of looping here is db just started and
                no files are open yet.  we might want to do something about that. */
             if ( loops > 8 ) {
