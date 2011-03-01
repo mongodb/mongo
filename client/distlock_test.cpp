@@ -22,6 +22,12 @@
 #include "../db/commands.h"
 #include "../util/bson_util.h"
 
+// Cross-platform RNG
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int.hpp>
+#include <boost/random/variate_generator.hpp>
+
+
 // TODO:  Make a method in BSONObj if useful, don't modify for now
 #define string_field(obj, name, def) ( obj.hasField(name) ? obj[name].String() : def )
 #define number_field(obj, name, def) ( obj.hasField(name) ? obj[name].Number() : def )
@@ -168,6 +174,14 @@ namespace mongo {
             // Whether or not we should hang some threads
             int hangThreads = (int) number_field(cmdObj, "hangThreads", 0);
 
+
+            boost::mt19937 gen(seed);
+
+            boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomSkew(gen, boost::uniform_int<>(0, skewRange));
+            boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomWait(gen, boost::uniform_int<>(1, threadWait));
+            boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomSleep(gen, boost::uniform_int<>(1, threadSleep));
+
+
             int skew = 0;
             bool legacy = (takeoverMins > 0);
             if (!lock.get()) {
@@ -177,7 +191,7 @@ namespace mongo {
                     skew = -skewRange / 2;
                 else if(threadId == 1)
                     skew = skewRange / 2;
-                else skew = (rand_r(&seed) % skewRange) - (skewRange / 2);
+                else skew = randomSkew() - (skewRange / 2);
 
                 // Skew this thread
                 jsTimeVirtualThreadSkew( skew );
@@ -204,7 +218,7 @@ namespace mongo {
 
 			count++;
 			int before = count;
-			int sleep = (rand_r(&seed) % threadWait);
+			int sleep = randomWait();
 			sleepmillis(sleep);
 			int after = count;
 
@@ -233,7 +247,7 @@ namespace mongo {
                     break;
                 }
 
-                sleepmillis(rand_r(&seed) % threadSleep);
+                sleepmillis(randomSleep());
             }
 
             result << "errors" << errors
