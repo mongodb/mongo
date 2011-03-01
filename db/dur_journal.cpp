@@ -237,7 +237,11 @@ namespace mongo {
             return faster;
         }
         bool preallocateIsFaster() {
-            return _preallocateIsFaster() && _preallocateIsFaster() && _preallocateIsFaster(); 
+            Timer t;
+            bool res = _preallocateIsFaster() && _preallocateIsFaster() && _preallocateIsFaster(); 
+            if( t.millis() > 3000 ) 
+                log() << "preallocateIsFaster check took " << t.millis()/1000.0 << " secs" << endl;
+            return res;
         }
 
         // throws
@@ -273,9 +277,9 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            if( preallocateIsFaster() ||
-                exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
-                exists(getJournalDir()/"prealloc.1") ) {
+            if( exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
+                exists(getJournalDir()/"prealloc.1") || 
+                preallocateIsFaster() ) {
                     usingPreallocate = true;
                     try {
                         _preallocateFiles();
