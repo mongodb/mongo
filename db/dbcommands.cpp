@@ -396,9 +396,11 @@ namespace mongo {
                 t.append("bits",  ( sizeof(int*) == 4 ? 32 : 64 ) );
 
                 ProcessInfo p;
+                int v = 0;
                 if ( p.supported() ) {
                     t.appendNumber( "resident" , p.getResidentSize() );
-                    t.appendNumber( "virtual" , p.getVirtualMemorySize() );
+                    v = p.getVirtualMemorySize();
+                    t.appendNumber( "virtual" , v );
                     t.appendBool( "supported" , true );
                 }
                 else {
@@ -408,7 +410,13 @@ namespace mongo {
 
                 timeBuilder.appendNumber( "middle of mem" , Listener::getElapsedTimeMillis() - start );
 
-                t.appendNumber( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+                int m = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
+                t.appendNumber( "mapped" , m );
+
+                if( v - m > 5000 ) { 
+                    t.append("note", "virtual minus mapped is large. could indicate a memory leak");
+                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large. could indicate a memory leak" << endl;
+                }
 
                 t.done();
 
