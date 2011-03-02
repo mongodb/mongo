@@ -22,8 +22,23 @@
 #include "../db/commands.h"
 #include "../util/bson_util.h"
 
-// Cross-platform RNG
+// Modify some config options for the RNG, since they cause MSVC to fail
+#include <boost/config.hpp>
+
+#if defined(BOOST_MSVC) && defined(BOOST_NO_MEMBER_TEMPLATE_FRIENDS)
+#undef BOOST_NO_MEMBER_TEMPLATE_FRIENDS
+#define BOOST_RNG_HACK
+#endif
+
+// Well, sort-of cross-platform RNG
 #include <boost/random/mersenne_twister.hpp>
+
+#ifdef BOOST_RNG_HACK
+#define BOOST_NO_MEMBER_TEMPLATE_FRIENDS
+#undef BOOST_RNG_HACK
+#endif
+
+
 #include <boost/random/uniform_int.hpp>
 #include <boost/random/variate_generator.hpp>
 
@@ -175,7 +190,7 @@ namespace mongo {
             int hangThreads = (int) number_field(cmdObj, "hangThreads", 0);
 
 
-            boost::mt19937 gen(seed);
+            boost::mt19937 gen((boost::mt19937::result_type) seed);
 
             boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomSkew(gen, boost::uniform_int<>(0, skewRange));
             boost::variate_generator<boost::mt19937&, boost::uniform_int<> > randomWait(gen, boost::uniform_int<>(1, threadWait));
