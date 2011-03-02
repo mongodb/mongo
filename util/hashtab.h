@@ -54,7 +54,7 @@ namespace mongo {
             }
         };
         void* _buf;
-        int n;
+        int n; // number of hashtable buckets
         int maxChain;
 
         Node& nodes(int i) {
