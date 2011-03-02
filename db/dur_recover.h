@@ -39,7 +39,7 @@ namespace mongo {
 
             bool _recovering; // are we in recovery or WRITETODATAFILES
 
-            static RecoveryJob _instance;
+            static RecoveryJob &_instance;
         };
     }
 }

@@ -185,8 +185,10 @@ namespace mongo {
         }
 
         RecoveryJob::~RecoveryJob() {
-            if( !_mmfs.empty() )
-                close();
+            DESTRUCTOR_GUARD(
+                if( !_mmfs.empty() )
+                    close();
+            )
         }
 
         void RecoveryJob::close() {
@@ -444,8 +446,8 @@ namespace mongo {
             }
         } brunittest;
 
-
-        RecoveryJob RecoveryJob::_instance;
+        // can't free at termination because order of destruction of global vars is arbitrary
+        RecoveryJob &RecoveryJob::_instance = *(new RecoveryJob());
 
     } // namespace dur
 
