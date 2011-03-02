@@ -578,7 +578,8 @@ MapReduceResult.prototype.drop = function(){
 */
 MapReduceResult.prototype.convertToSingleObject = function(){
     var z = {};
-    this._coll.find().forEach( function(a){ z[a._id] = a.value; } );
+    var it = this.results != null ? this.results : this._coll;
+    it.forEach( function(a){ z[a._id] = a.value; } );
     return z;
 }
 
