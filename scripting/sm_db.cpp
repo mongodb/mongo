@@ -262,7 +262,7 @@ namespace mongo {
     }
 
     JSBool mongo_update(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        smuassert( cx ,  "mongo_find needs at elast 3 args" , argc >= 3 );
+        smuassert( cx ,  "mongo_update needs at least 3 args" , argc >= 3 );
         smuassert( cx ,  "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
         smuassert( cx ,  "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
 
