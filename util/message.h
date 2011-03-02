@@ -48,7 +48,7 @@ namespace mongo {
         const int _port;
 
         /**
-         * @return a rough estimate of elepased time since the server started
+         * @return a rough estimate of elapsed time since the server started
          */
         long long getMyElapsedTimeMillis() const { return _elapsedTime; }
 
