@@ -34,13 +34,12 @@ var ok = true;
 function check() {
     assert(t.validate().valid);
 
-    var c = t.find({ k: /a/ }).count();
+    var c = t.find({ k: /^a/ }).count();
 
     print("keycount:" + c);
 
     if (expect) {
-        print("count of keys doesn't match expected count of : " + expect);
-        ok = false;
+        assert.eq( expect , c , "count of keys doesn't match expected count of" )
     }
     else {
         expect = c;
@@ -73,4 +72,4 @@ for (var pass = 1; pass <= 2; pass++) {
     dir = -1;
 }
 
-assert(ok);
+assert(ok,"not ok");
