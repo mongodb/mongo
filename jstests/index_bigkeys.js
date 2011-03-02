@@ -39,7 +39,10 @@ function check() {
     print("keycount:" + c);
 
     if (expect) {
-        assert.eq( expect , c , "count of keys doesn't match expected count of" )
+        if (expect != c) {
+            print("count of keys doesn't match expected count of : " + expect + " got: " + c);
+            ok = false;
+        }
     }
     else {
         expect = c;
