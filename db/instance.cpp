@@ -763,8 +763,7 @@ namespace mongo {
         rawOut( ss3.str() );
 
         if( cmdLine.dur ) {
-            log() << "shutdown: journalCleanup..." << endl;
-            dur::journalCleanup();
+            dur::journalCleanup(true);
         }
 
 #if !defined(__sunos__)

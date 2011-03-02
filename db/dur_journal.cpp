@@ -190,10 +190,12 @@ namespace mongo {
 
         /** at clean shutdown */
         bool okToCleanUp = false; // successful recovery would set this to true
-        void Journal::cleanup() {
+        void Journal::cleanup(bool _log) {
             if( !okToCleanUp )
                 return;
 
+            if( _log )
+                log() << "journalCleanup..." << endl;
             try {
                 scoped_lock lk(_curLogFileMutex);
                 closeCurrentJournalFile();
@@ -204,7 +206,7 @@ namespace mongo {
                 throw;
             }
         }
-        void journalCleanup() { j.cleanup(); }
+        void journalCleanup(bool log) { j.cleanup(log); }
 
         bool _preallocateIsFaster() {
             bool faster = false;
