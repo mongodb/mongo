@@ -190,7 +190,7 @@ namespace mongo {
             void reset();
 
             /** the commit code calls this when data reaches the journal (on disk) */
-            void notifyCommitted() { _notify.notifyAllIf(!boost::bind(&CommitJob::_hasWritten, this)); }
+            void notifyCommitted() { _notify.notifyAll(); }
 
             /** Wait until the next group commit occurs. That is, wait until someone calls notifyCommitted. */
             void awaitNextCommit() {

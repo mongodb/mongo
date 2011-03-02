@@ -53,12 +53,4 @@ namespace mongo {
         _condition.notify_all();
     }
 
-    void NotifyAll::notifyAllIf(boost::function<bool()> test) {
-        scoped_lock lock( _mutex );
-        if (test()){
-            ++_counter;
-            _condition.notify_all();
-        }
-    }
-
 } // namespace mongo
