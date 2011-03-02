@@ -177,7 +177,21 @@ namespace mongo {
             ShardConnection conn( theShard , "" );
             
             BSONObj res;
-            bool ok = conn->runCommand( "admin" , options , res );
+            bool ok = false;
+            try{
+            	ok = conn->runCommand( "admin" , options , res );
+            }
+            catch( std::exception &e ){
+
+        	warning() << "Could not get last error." << m_error_message( e.what() ) << endl;
+
+        	// Catch everything that happens here, since we need to ensure we return our connection when we're
+            	// finished.
+            	conn.done();
+
+            	return false;
+            }
+
             res = res.getOwned();
             conn.done();
             
@@ -228,7 +242,21 @@ namespace mongo {
             bbb.append( theShard );
             ShardConnection conn( theShard , "" );
             BSONObj res;
-            bool ok = conn->runCommand( "admin" , options , res );
+            bool ok = false;
+            try{
+        	ok = conn->runCommand( "admin" , options , res );
+            }
+            catch( std::exception &e ){
+
+        	    // Safe to return here, since we haven't started any extra processing yet, just collecting
+        	    // responses.
+
+        	    warning() << "Could not get last error." << m_error_message( e.what() ) << endl;
+		    conn.done();
+
+		    return false;
+	    }
+
             _addWriteBack( writebacks, res );
             
             string temp = DBClientWithCommands::getLastErrorString( res );
