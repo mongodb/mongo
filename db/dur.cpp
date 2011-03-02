@@ -526,11 +526,6 @@ namespace mongo {
         }
 
         static void go() {
-            if( !commitJob.hasWritten() ){
-                commitJob.notifyCommitted();
-                return;
-            }
-
             {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
