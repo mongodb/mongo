@@ -240,7 +240,7 @@ namespace mongo {
 
         // If this is a legacy lock, set our takeover minutes for local time comparisons
         if(legacy) {
-            _takeoverMinutes = _lockTimeout;
+            _takeoverMinutes = (unsigned) _lockTimeout;
             if(_takeoverMinutes == 0) _takeoverMinutes = 15;
             _lockTimeout = 0;
 
