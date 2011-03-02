@@ -3365,7 +3365,7 @@ const StringData _jscode_raw_collection =
 "*/\n" 
 "MapReduceResult.prototype.convertToSingleObject = function(){\n" 
 "var z = {};\n" 
-"var it = this.results != null ? this.results : this._coll;\n" 
+"var it = this.results != null ? this.results : this._coll.find();\n" 
 "it.forEach( function(a){ z[a._id] = a.value; } );\n" 
 "return z;\n" 
 "}\n" 
