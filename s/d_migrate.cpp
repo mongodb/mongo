@@ -1171,7 +1171,7 @@ namespace mongo {
                 string system_indexes = cc().database()->name + ".system.indexes";
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
-                    theDataFileMgr.insert( system_indexes.c_str() , idx.objdata() , idx.objsize() );
+                    theDataFileMgr.insertAndLog( system_indexes.c_str() , idx );
                 }
 
                 timing.done(1);
