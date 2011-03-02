@@ -68,6 +68,8 @@ class Spec(object):
         # Catch-all for any other parameters to the packaging.
         i = 2 if self.suf else 1
         self.params = dict([s.split("=") for s in tup[i:]])
+        for key in self.params.keys():
+            assert(key in ["suffix", "revision"])
 
     def version(self):
         return self.ver
@@ -377,7 +379,7 @@ def make_deb(distro, arch, spec, srcdir):
     ensure_dir(r)
     # FIXME: see if shutil.copyfile or something can do this without
     # much pain.
-    sysassert(["cp", "-v", sdir+"../%s%s_%s_%s.deb"%(distro.pkgbase(), suffix, spec.pversion(distro), distro_arch), r])
+    sysassert(["cp", "-v", sdir+"../%s%s_%s%s_%s.deb"%(distro.pkgbase(), suffix, spec.pversion(distro), "-"+spec.param("revision") if spec.param("revision") else"", distro_arch), r])
     return r
 
 def make_deb_repo(repo):
@@ -510,13 +512,26 @@ def move_repos_into_place(src, dst):
 def write_debian_changelog(path, spec, srcdir):
     oldcwd=os.getcwd()
     os.chdir(srcdir)
+    preamble=""
+    if spec.param("revision"):
+        preamble="""mongodb%s (%s-%s) unstable; urgency=low
+
+  * Bump revision number
+
+ -- Richard Kreuter <richard@10gen.com>  %s
+
+""" % (spec.suffix(), spec.pversion(Distro("debian")), spec.param("revision"), time.strftime("%a, %d %b %Y %H:%m:%S %z"))
     try:
-        s=backtick(["sh", "-c", "git archive r%s debian/changelog | tar xOf -" % spec.version()])
+        s=preamble+backtick(["sh", "-c", "git archive r%s debian/changelog | tar xOf -" % spec.version()])
     finally:
         os.chdir(oldcwd)
     f=open(path, 'w')
     lines=s.split("\n")
-    lines=[re.sub("^mongodb \\(.*\\)", "mongodb%s (%s)" % (spec.suffix(), spec.pversion(Distro("debian"))), l) for l in lines]
+    # If the first line starts with "mongodb", it's not a revision
+    # preamble, and so frob the version number.
+    lines[0]=re.sub("^mongodb \\(.*\\)", "mongodb (%s)" % (spec.pversion(Distro("debian"))), lines[0])
+    # Rewrite every changelog entry starting in mongodb<space>
+    lines=[re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), l) for l in lines]
     lines=[re.sub("^  --", " --", l) for l in lines]
     s="\n".join(lines)
     try:
@@ -778,7 +793,7 @@ def write_rpm_spec_file(path, spec):
 Conflicts: @@PACKAGE_CONFLICTS@@
 Obsoletes: @@PACKAGE_OBSOLETES@@
 Version: @@PACKAGE_VERSION@@
-Release: mongodb_1%{?dist}
+Release: mongodb_@@PACKAGE_REVISION@@%{?dist}
 Summary: mongo client shell and tools
 License: AGPL 3.0
 URL: http://www.mongodb.org
@@ -830,13 +845,15 @@ mkdir -p $RPM_BUILD_ROOT/usr
 cp -rv @@BINARYDIR@@/usr/bin $RPM_BUILD_ROOT/usr
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
+# FIXME: remove this rm when mongosniff is back in the package
+rm -v $RPM_BUILD_ROOT/usr/share/man/man1/mongosniff.1*
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
-cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
-cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
+cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
-cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
+cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log/mongo
 touch $RPM_BUILD_ROOT/var/log/mongo/mongod.log
@@ -884,14 +901,16 @@ fi
 %{_bindir}/mongorestore
 %{_bindir}/mongostat
 %{_bindir}/bsondump
+# FIXME: uncomment when mongosniff is back in the package
+#%{_bindir}/mongosniff
 
 %{_mandir}/man1/mongo.1*
-%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
-%{_mandir}/man1/mongosniff.1*
+# FIXME: uncomment when mongosniff is back in the package
+#%{_mandir}/man1/mongosniff.1*
 %{_mandir}/man1/mongostat.1*
 %{_mandir}/man1/mongorestore.1*
 
@@ -900,7 +919,7 @@ fi
 %config(noreplace) /etc/mongod.conf
 %{_bindir}/mongod
 %{_bindir}/mongos
-#%{_mandir}/man1/mongod.1*
+%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
 /etc/rc.d/init.d/mongod
 /etc/sysconfig/mongod
@@ -919,6 +938,10 @@ fi
     suffix=spec.suffix()
     s=re.sub("@@PACKAGE_BASENAME@@", "mongo%s" % suffix, s)
     s=re.sub("@@PACKAGE_VERSION@@", spec.pversion(Distro("redhat")), s)
+    # FIXME, maybe: the RPM guide says that Release numbers ought to
+    # be integers starting at 1, but we use "mongodb_1{%dist}",
+    # whatever the hell that means.
+    s=re.sub("@@PACKAGE_REVISION@@", str(int(spec.param("revision"))+1) if spec.param("revision") else "1", s)
     s=re.sub("@@BINARYDIR@@", BINARYDIR, s)
     conflict_suffixes=["", "-10gen", "-10gen-unstable"]
     conflict_suffixes.remove(suffix)
