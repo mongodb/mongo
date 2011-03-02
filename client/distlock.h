@@ -161,11 +161,31 @@ namespace mongo {
 
     	dist_lock_try() : _lock(NULL), _got(false) {}
 
-    	// Needed so we can handle lock exceptions in context of lock try.
-    	dist_lock_try( const dist_lock_try& that) : _lock(that._lock), _got(that._got), _other(that._other) {
+    	dist_lock_try( const dist_lock_try& that ) : _lock(that._lock), _got(that._got), _other(that._other) {
+    		_other.getOwned();
+
     		// Make sure the lock ownership passes to this object,
     		// so we only unlock once.
     		((dist_lock_try&) that)._got = false;
+    		((dist_lock_try&) that)._lock = NULL;
+    	}
+
+    	// Needed so we can handle lock exceptions in context of lock try.
+    	dist_lock_try& operator=( const dist_lock_try& that ){
+
+    	    if( this == &that ) return *this;
+
+    	    _lock = that._lock;
+    	    _got = that._got;
+    	    _other = that._other;
+    	    _other.getOwned();
+
+    	    // Make sure the lock ownership passes to this object,
+    	    // so we only unlock once.
+    	    ((dist_lock_try&) that)._got = false;
+    	    ((dist_lock_try&) that)._lock = NULL;
+
+    	    return *this;
     	}
 
         dist_lock_try( DistributedLock * lock , string why )
