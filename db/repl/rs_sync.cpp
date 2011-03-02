@@ -143,6 +143,8 @@ namespace mongo {
                     // simple progress metering
                     log() << "replSet initialSyncOplogApplication " << n << rsLog;
                 }
+                
+                RARELY getDur().commitIfNeeded();
             }
             catch (DBException& e) {
                 if( e.getCode() == 11000 || e.getCode() == 11001 ) {

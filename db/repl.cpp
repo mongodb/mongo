@@ -1426,6 +1426,8 @@ namespace mongo {
                         break;
                     }
                     op = oplogReader.next();
+
+                    RARELY getDur().commitIfNeeded();
                 }
             }
         }
