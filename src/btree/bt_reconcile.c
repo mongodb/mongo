@@ -236,75 +236,6 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 }
 
 /*
- * __wt_rec_row_int --
- *	Reconcile a row-store internal page.
- */
-static int
-__wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
-{
-	WT_ITEM *key_item, *data_item, *next;
-	WT_PAGE_DISK *dsk;
-	WT_ROW_REF *rref;
-	uint32_t i, len, space_avail;
-	uint8_t *first_free;
-
-	dsk = new->dsk;
-	__wt_init_ff_and_sa(new, &first_free, &space_avail);
-
-	/*
-	 * We have to walk both the WT_ROW structures and the original page --
-	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
-	 */
-	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_item, i) {
-		/*
-		 * Skip deleted pages; if we delete an overflow key, free the
-		 * underlying file space.
-		 */
-		if (WT_ROW_REF_ADDR(rref) == WT_ADDR_DELETED) {
-			if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
-				WT_RET(__wt_block_free_ovfl(
-				    toc, WT_ITEM_BYTE_OVFL(key_item)));
-			continue;
-		}
-
-		/*
-		 * Copy the paired items off the old page into the new page.
-		 *
-		 * XXX
-		 * Internal pages can't grow, yet, so we could more easily just
-		 * update the old page.   We do the copy because eventually we
-		 * will have to split the internal pages, and they'll be able to
-		 * grow.
-		 */
-		data_item = WT_ITEM_NEXT(key_item);
-		next = WT_ITEM_NEXT(data_item);
-		len = (uint32_t)((uint8_t *)next - (uint8_t *)key_item);
-
-		/*
-		 * XXX
-		 * We don't yet handle splits: we allocated the maximum page
-		 * size, but it still wasn't enough.  We must allocate another
-		 * page and split the parent.
-		 */
-		if (len > space_avail) {
-			fprintf(stderr,
-			    "__wt_rec_row_int: page %lu split\n",
-			    (u_long)page->addr);
-			__wt_abort(toc->env);
-		}
-
-		memcpy(first_free, key_item, len);
-		first_free += len;
-		space_avail -= len;
-		dsk->u.entries += 2;
-	}
-
-	__wt_rec_set_page_size(toc, new, first_free);
-
-	return (0);
-}
-
-/*
  * __wt_rec_col_fix --
  *	Reconcile a fixed-width, column-store leaf page (does not handle
  *	run-length encoding).
@@ -682,6 +613,75 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			space_avail -= len;
 		}
 		++dsk->u.entries;
+	}
+
+	__wt_rec_set_page_size(toc, new, first_free);
+
+	return (0);
+}
+
+/*
+ * __wt_rec_row_int --
+ *	Reconcile a row-store internal page.
+ */
+static int
+__wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+{
+	WT_ITEM *key_item, *data_item, *next;
+	WT_PAGE_DISK *dsk;
+	WT_ROW_REF *rref;
+	uint32_t i, len, space_avail;
+	uint8_t *first_free;
+
+	dsk = new->dsk;
+	__wt_init_ff_and_sa(new, &first_free, &space_avail);
+
+	/*
+	 * We have to walk both the WT_ROW structures and the original page --
+	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
+	 */
+	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_item, i) {
+		/*
+		 * Skip deleted pages; if we delete an overflow key, free the
+		 * underlying file space.
+		 */
+		if (WT_ROW_REF_ADDR(rref) == WT_ADDR_DELETED) {
+			if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+				WT_RET(__wt_block_free_ovfl(
+				    toc, WT_ITEM_BYTE_OVFL(key_item)));
+			continue;
+		}
+
+		/*
+		 * Copy the paired items off the old page into the new page.
+		 *
+		 * XXX
+		 * Internal pages can't grow, yet, so we could more easily just
+		 * update the old page.   We do the copy because eventually we
+		 * will have to split the internal pages, and they'll be able to
+		 * grow.
+		 */
+		data_item = WT_ITEM_NEXT(key_item);
+		next = WT_ITEM_NEXT(data_item);
+		len = (uint32_t)((uint8_t *)next - (uint8_t *)key_item);
+
+		/*
+		 * XXX
+		 * We don't yet handle splits: we allocated the maximum page
+		 * size, but it still wasn't enough.  We must allocate another
+		 * page and split the parent.
+		 */
+		if (len > space_avail) {
+			fprintf(stderr,
+			    "__wt_rec_row_int: page %lu split\n",
+			    (u_long)page->addr);
+			__wt_abort(toc->env);
+		}
+
+		memcpy(first_free, key_item, len);
+		first_free += len;
+		space_avail -= len;
+		dsk->u.entries += 2;
 	}
 
 	__wt_rec_set_page_size(toc, new, first_free);
