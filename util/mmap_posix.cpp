@@ -64,6 +64,7 @@ namespace mongo {
         fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
             log() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
+            fd = 0; // our sentinel for not opened
             return 0;
         }
 
