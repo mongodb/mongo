@@ -29,7 +29,16 @@ GeoNearRandomTest.prototype.insertPts = function(nPts) {
 
 GeoNearRandomTest.prototype.assertIsPrefix = function(short, long) {
     for (var i=0; i < short.length; i++){
-        assert.eq(short[i], long[i]);
+    	
+    	var xS = short[i].obj ? short[i].obj.loc[0] : short[i].loc[0]
+    	var yS = short[i].obj ? short[i].obj.loc[1] : short[i].loc[1]
+    	var dS = short[i].obj ? short[i].dis : 1
+    	
+		var xL = long[i].obj ? long[i].obj.loc[0] : long[i].loc[0]
+    	var yL = long[i].obj ? long[i].obj.loc[1] : long[i].loc[1]
+    	var dL = long[i].obj ? long[i].dis : 1
+    	
+        assert.eq([xS, yS, dS], [xL, yL, dL]);
     }
 } 
 
