@@ -1747,6 +1747,12 @@ namespace mongo {
     }
 
     void BtreeBuilder::addKey(BSONObj& key, DiskLoc loc) {
+        if ( key.objsize() > KeyMax ) {
+            problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
+                      << ' ' << key.objsize() << ' ' << key.toString() << endl;
+            return;
+        }
+
         if( !dupsAllowed ) {
             if( n > 0 ) {
                 int cmp = keyLast.woCompare(key, order);
@@ -1760,15 +1766,9 @@ namespace mongo {
         }
 
         if ( ! b->_pushBack(loc, key, ordering, DiskLoc()) ) {
-            // no room
-            if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.objsize() << ' ' << key.toString() << endl;
-            }
-            else {
-                // bucket was full
-                newBucket();
-                b->pushBack(loc, key, ordering, DiskLoc());
-            }
+            // bucket was full
+            newBucket();
+            b->pushBack(loc, key, ordering, DiskLoc());
         }
         n++;
         mayCommitProgressDurably();
