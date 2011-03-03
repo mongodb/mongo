@@ -23,8 +23,8 @@ typedef struct {
 	 * verified once (and only once) if the eviction thread writes pages,
 	 * because we can race with the eviction thread.
 	 */
-#define	WT_EVICT_CURRENT(toc, vs)					\
-	((vs)->evict_rec_gen == (toc)->env->ienv->cache->evict_rec_gen)
+#define	WT_EVICT_CURRENT(session, vs)					\
+	((vs)->evict_rec_gen == S2C(session)->cache->evict_rec_gen)
 	uint64_t  evict_rec_gen;		/* Eviction generation */
 
 	FILE	*stream;			/* Dump file stream */
@@ -35,24 +35,24 @@ typedef struct {
 	WT_PAGE *leaf;				/* Last leaf-page */
 } WT_VSTUFF;
 
-static int __wt_verify_addfrag(WT_TOC *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_checkfrag(WT_TOC *, WT_VSTUFF *);
-static int __wt_verify_freelist(WT_TOC *, WT_VSTUFF *);
-static int __wt_verify_overflow_page(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_addfrag(SESSION *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_checkfrag(SESSION *, WT_VSTUFF *);
+static int __wt_verify_freelist(SESSION *, WT_VSTUFF *);
+static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow(
-		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_pc(WT_TOC *, WT_ROW_REF *, WT_PAGE *, int);
+		SESSION *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_pc(SESSION *, WT_ROW_REF *, WT_PAGE *, int);
 static int __wt_verify_tree(
-		WT_TOC *, WT_ROW_REF *, WT_PAGE *, uint64_t, WT_VSTUFF *);
+		SESSION *, WT_ROW_REF *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 
 /*
- * __wt_db_verify --
+ * __wt_btree_verify --
  *	Verify a Btree.
  */
 int
-__wt_db_verify(WT_TOC *toc, void (*f)(const char *, uint64_t))
+__wt_btree_verify(SESSION *session, void (*f)(const char *, uint64_t))
 {
-	return (__wt_verify(toc, f, NULL));
+	return (__wt_verify(session, f, NULL));
 }
 
 /*
@@ -61,17 +61,13 @@ __wt_db_verify(WT_TOC *toc, void (*f)(const char *, uint64_t))
  */
 int
 __wt_verify(
-    WT_TOC *toc, void (*f)(const char *, uint64_t), FILE *stream)
+    SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 {
-	DB *db;
-	ENV *env;
 	BTREE *btree;
 	WT_VSTUFF vstuff;
 	int ret;
 
-	env = toc->env;
-	db = toc->db;
-	btree = db->btree;
+	btree = session->btree;
 	ret = 0;
 
 	WT_CLEAR(vstuff);
@@ -90,13 +86,13 @@ __wt_verify(
 	 * don't overflow.   I don't ever expect to see this error message, but
 	 * better safe than sorry.
 	 */
-	vstuff.frags = WT_OFF_TO_ADDR(db, btree->fh->file_size);
+	vstuff.frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
 	if (vstuff.frags > INT_MAX) {
-		__wt_api_db_errx(db, "file is too large to verify");
+		__wt_errx(session, "file is too large to verify");
 		goto err;
 	}
-	WT_ERR(bit_alloc(env, vstuff.frags, &vstuff.fragbits));
-	vstuff.evict_rec_gen = toc->env->ienv->cache->evict_rec_gen;
+	WT_ERR(bit_alloc(session, vstuff.frags, &vstuff.fragbits));
+	vstuff.evict_rec_gen = S2C(session)->cache->evict_rec_gen;
 	vstuff.stream = stream;
 	vstuff.f = f;
 
@@ -107,18 +103,18 @@ __wt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(toc, NULL,
-	    btree->root_page.page, (uint64_t)1,&vstuff));
+	WT_ERR(__wt_verify_tree(session, NULL,
+	    btree->root_page.page, (uint64_t)1, &vstuff));
 
-	WT_ERR(__wt_verify_freelist(toc, &vstuff));
+	WT_ERR(__wt_verify_freelist(session, &vstuff));
 
-	WT_ERR(__wt_verify_checkfrag(toc, &vstuff));
+	WT_ERR(__wt_verify_checkfrag(session, &vstuff));
 
 err:	/* Wrap up reporting and free allocated memory. */
 	if (vstuff.f != NULL)
-		vstuff.f(toc->name, vstuff.fcnt);
+		vstuff.f(session->name, vstuff.fcnt);
 	if (vstuff.fragbits != NULL)
-		__wt_free(env, vstuff.fragbits, 0);
+		__wt_free(session, vstuff.fragbits, 0);
 
 	return (ret);
 }
@@ -132,13 +128,13 @@ err:	/* Wrap up reporting and free allocated memory. */
  */
 static int
 __wt_verify_tree(
-	WT_TOC *toc,		/* Thread of control */
+	SESSION *session,		/* Thread of control */
 	WT_ROW_REF *parent_rref,/* Internal key referencing this page, if any */
 	WT_PAGE *page,		/* Page to verify */
 	uint64_t parent_recno,	/* First record in this subtree */
 	WT_VSTUFF *vs)		/* The verify package */
 {
-	DB *db;
+	BTREE *btree;
 	WT_COL_REF *cref;
 	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
@@ -146,7 +142,7 @@ __wt_verify_tree(
 	uint32_t i;
 	int ret;
 
-	db = toc->db;
+	btree = session->btree;
 	dsk = page->dsk;
 	ret = 0;
 
@@ -174,15 +170,15 @@ __wt_verify_tree(
 
 	/* Report progress every 10 pages. */
 	if (vs->f != NULL && ++vs->fcnt % 10 == 0)
-		vs->f(toc->name, vs->fcnt);
+		vs->f(session->name, vs->fcnt);
 
 	/* Update frags list. */
-	WT_ERR(__wt_verify_addfrag(toc, page->addr, page->size, vs));
+	WT_ERR(__wt_verify_addfrag(session, page->addr, page->size, vs));
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (vs->stream != NULL)
-		WT_ERR(__wt_debug_page(toc, page, NULL, vs->stream));
+		WT_ERR(__wt_debug_page(session, page, NULL, vs->stream));
 #endif
 
 	/* Check the starting record number. */
@@ -192,7 +188,7 @@ __wt_verify_tree(
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		if (parent_recno != dsk->recno) {
-			__wt_api_db_errx(db,
+			__wt_errx(session,
 			    "page at addr %lu has a starting record of %llu "
 			    "where the expected starting record was %llu",
 			    (u_long)page->addr,
@@ -222,7 +218,7 @@ __wt_verify_tree(
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_overflow_page(toc, page, vs));
+		WT_RET(__wt_verify_overflow_page(session, page, vs));
 		break;
 	}
 
@@ -233,11 +229,11 @@ __wt_verify_tree(
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
-			switch (ret = __wt_page_in(toc, page, ref, 1)) {
+			switch (ret = __wt_page_in(session, page, ref, 1)) {
 			case 0:				/* Valid page */
 				ret = __wt_verify_tree(
-				    toc, NULL, ref->page, cref->recno, vs);
-				__wt_hazard_clear(toc, ref->page);
+				    session, NULL, ref->page, cref->recno, vs);
+				__wt_hazard_clear(session, ref->page);
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -266,7 +262,7 @@ __wt_verify_tree(
 		 * be less than the internal node entry's key.
 		 */
 		if (parent_rref != NULL)
-			WT_ERR(__wt_verify_pc(toc, parent_rref, page, 1));
+			WT_ERR(__wt_verify_pc(session, parent_rref, page, 1));
 
 		/* For each entry in an internal page, verify the subtree. */
 		WT_ROW_REF_FOREACH(page, rref, i) {
@@ -282,17 +278,17 @@ __wt_verify_tree(
 			 * in a comparison.
 			 */
 			if (vs->leaf != NULL) {
-				WT_ERR(__wt_verify_pc(toc, rref, vs->leaf, 0));
-				__wt_hazard_clear(toc, vs->leaf);
+				WT_ERR(__wt_verify_pc(session, rref, vs->leaf, 0));
+				__wt_hazard_clear(session, vs->leaf);
 				vs->leaf = NULL;
 			}
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
-			switch (ret = __wt_page_in(toc, page, ref, 1)) {
+			switch (ret = __wt_page_in(session, page, ref, 1)) {
 			case 0:				/* Valid page */
 				ret = __wt_verify_tree(
-				    toc, rref, ref->page, (uint64_t)0, vs);
+				    session, rref, ref->page, (uint64_t)0, vs);
 				/*
 				 * Remaining special handling of the last
 				 * verified leaf page: if we kept a reference
@@ -302,7 +298,7 @@ __wt_verify_tree(
 				 * tree.
 				 */
 				if (vs->leaf != ref->page)
-					__wt_hazard_clear(toc, ref->page);
+					__wt_hazard_clear(session, ref->page);
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -320,7 +316,7 @@ __wt_verify_tree(
 	 * vs->leaf needing to be released.
 	 */
 err:	if (vs->leaf != NULL) {
-		__wt_hazard_clear(toc, vs->leaf);
+		__wt_hazard_clear(session, vs->leaf);
 		vs->leaf = NULL;
 	}
 
@@ -332,18 +328,18 @@ err:	if (vs->leaf != NULL) {
  *	Compare a key on a parent page to a designated entry on a child page.
  */
 static int
-__wt_verify_pc(WT_TOC *toc,
+__wt_verify_pc(SESSION *session,
     WT_ROW_REF *parent_rref, WT_PAGE *child, int first_entry)
 {
-	DB *db;
+	BTREE *btree;
 	WT_DATAITEM *cd_ref, *pd_ref;
 	WT_ROW *child_key;
 	WT_SCRATCH *scratch1, *scratch2;
-	int cmp, ret, (*func)(DB *, const WT_DATAITEM *, const WT_DATAITEM *);
+	int cmp, ret, (*func)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *);
 
-	db = toc->db;
+	btree = session->btree;
 	scratch1 = scratch2 = NULL;
-	func = db->btree_compare;
+	func = btree->btree_compare;
 	ret = 0;
 
 	/*
@@ -368,30 +364,30 @@ __wt_verify_pc(WT_TOC *toc,
 	 * believe we're going to be doing real operations in this file.
 	 */
 	if (__wt_key_process(child_key)) {
-		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
-		WT_ERR(__wt_item_process(toc, child_key->key, scratch1));
+		WT_ERR(__wt_scr_alloc(session, 0, &scratch1));
+		WT_ERR(__wt_item_process(session, child_key->key, scratch1));
 		cd_ref = &scratch1->item;
 	} else
 		cd_ref = (WT_DATAITEM *)child_key;
 	if (__wt_key_process(parent_rref)) {
-		WT_ERR(__wt_scr_alloc(toc, 0, &scratch2));
-		WT_RET(__wt_item_process(toc, parent_rref->key, scratch2));
+		WT_ERR(__wt_scr_alloc(session, 0, &scratch2));
+		WT_RET(__wt_item_process(session, parent_rref->key, scratch2));
 		pd_ref = &scratch2->item;
 	} else
 		pd_ref = (WT_DATAITEM *)parent_rref;
 
 	/* Compare the parent's key against the child's key. */
-	cmp = func(db, cd_ref, pd_ref);
+	cmp = func(btree, cd_ref, pd_ref);
 
 	if (first_entry && cmp < 0) {
-		__wt_api_db_errx(db,
+		__wt_errx(session,
 		    "the first key on page at addr %lu sorts before its "
 		    "reference key on its parent's page",
 		    (u_long)child->addr);
 		ret = WT_ERROR;
 	}
 	if (!first_entry && cmp >= 0) {
-		__wt_api_db_errx(db,
+		__wt_errx(session,
 		    "the last key on the page at addr %lu sorts after a parent "
 		    "page's key for the subsequent page",
 		    (u_long)child->addr);
@@ -411,7 +407,7 @@ err:	if (scratch1 != NULL)
  *	Verify overflow items.
  */
 static int
-__wt_verify_overflow_page(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
@@ -432,7 +428,7 @@ __wt_verify_overflow_page(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
-			WT_RET(__wt_verify_overflow(toc,
+			WT_RET(__wt_verify_overflow(session,
 			    WT_ITEM_BYTE_OVFL(item),
 			    entry_num, page->addr, vs));
 		}
@@ -445,28 +441,28 @@ __wt_verify_overflow_page(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
  *	Read in an overflow page and check it.
  */
 static int
-__wt_verify_overflow(WT_TOC *toc,
+__wt_verify_overflow(SESSION *session,
     WT_OVFL *ovfl, uint32_t entry_num, uint32_t page_ref_addr, WT_VSTUFF *vs)
 {
-	DB *db;
+	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	WT_SCRATCH *scratch1;
 	uint32_t addr, size;
 	int ret;
 
-	db = toc->db;
+	btree = session->btree;
 	scratch1 = NULL;
 	ret = 0;
 
 	addr = ovfl->addr;
-	size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
+	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
 
 	/* Allocate enough memory to hold the overflow pages. */
-	WT_RET(__wt_scr_alloc(toc, size, &scratch1));
+	WT_RET(__wt_scr_alloc(session, size, &scratch1));
 
 	/* Read the page. */
 	dsk = (void *)scratch1->item.data;
-	WT_ERR(__wt_disk_read(toc, dsk, addr, size));
+	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/*
 	 * Verify the disk image -- this function would normally be called
@@ -475,17 +471,17 @@ __wt_verify_overflow(WT_TOC *toc,
 	 * into two parts, on-disk format checking and internal checking,
 	 * just so it looks like all of the other page type checking.
 	 */
-	WT_ERR(__wt_verify_dsk_chunk(toc, dsk, addr, size));
+	WT_ERR(__wt_verify_dsk_chunk(session, dsk, addr, size));
 
 	/* Add the fragments. */
-	WT_ERR(__wt_verify_addfrag(toc, addr, size, vs));
+	WT_ERR(__wt_verify_addfrag(session, addr, size, vs));
 
 	/*
 	 * The only other thing to check is that the size we have in the page
 	 * matches the size on the underlying overflow page.
 	 */
 	if (ovfl->size != dsk->u.datalen) {
-		__wt_api_db_errx(db,
+		__wt_errx(session,
 		    "overflow page reference in item %lu on page at addr %lu "
 		    "does not match the data size on the overflow page",
 		    (u_long)entry_num, (u_long)page_ref_addr);
@@ -502,34 +498,32 @@ err:	__wt_scr_release(&scratch1);
  *	Add the freelist fragments to the list of verified fragments.
  */
 static int
-__wt_verify_freelist(WT_TOC *toc, WT_VSTUFF *vs)
+__wt_verify_freelist(SESSION *session, WT_VSTUFF *vs)
 {
 	BTREE *btree;
-	ENV *env;
 	WT_CACHE *cache;
 	WT_FREE_ENTRY *fe;
 	int ret;
 
-	env = toc->env;
-	btree = toc->db->btree;
-	cache = env->ienv->cache;
+	btree = session->btree;
+	cache = S2C(session)->cache;
 	ret = 0;
 
 	/*
 	 * If the eviction thread ran during verification, these checks aren't
 	 * possible.
 	 */
-	if (!WT_EVICT_CURRENT(toc, vs))
+	if (!WT_EVICT_CURRENT(session, vs))
 		return (0);
 
 	/*
 	 * Lock out the eviction thread -- we're going to read through the
 	 * freelist, and that's owned and operated by the eviction thread.
 	 */
-	__wt_lock(env, cache->mtx_reconcile);
+	__wt_lock(session, cache->mtx_reconcile);
 	TAILQ_FOREACH(fe, &btree->freeqa, qa)
-		WT_TRET(__wt_verify_addfrag(toc, fe->addr, fe->size, vs));
-	__wt_unlock(env, cache->mtx_reconcile);
+		WT_TRET(__wt_verify_addfrag(session, fe->addr, fe->size, vs));
+	__wt_unlock(session, cache->mtx_reconcile);
 
 	return (ret);
 }
@@ -540,24 +534,24 @@ __wt_verify_freelist(WT_TOC *toc, WT_VSTUFF *vs)
  *	verified this chunk of the file.
  */
 static int
-__wt_verify_addfrag(WT_TOC *toc, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
+__wt_verify_addfrag(SESSION *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
-	DB *db;
+	BTREE *btree;
 	uint32_t frags, i;
 
-	db = toc->db;
+	btree = session->btree;
 
 	/*
 	 * If the eviction thread ran during verification, these checks aren't
 	 * possible.
 	 */
-	if (!WT_EVICT_CURRENT(toc, vs))
+	if (!WT_EVICT_CURRENT(session, vs))
 		return (0);
 
-	frags = WT_OFF_TO_ADDR(db, size);
+	frags = WT_OFF_TO_ADDR(btree, size);
 	for (i = 0; i < frags; ++i)
 		if (bit_test(vs->fragbits, addr + i)) {
-			__wt_api_db_errx(db,
+			__wt_errx(session,
 			    "file fragment at addr %lu already verified",
 			    (u_long)addr);
 			return (WT_ERROR);
@@ -571,12 +565,12 @@ __wt_verify_addfrag(WT_TOC *toc, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_verify_checkfrag(WT_TOC *toc, WT_VSTUFF *vs)
+__wt_verify_checkfrag(SESSION *session, WT_VSTUFF *vs)
 {
-	DB *db;
+	BTREE *btree;
 	int ffc, ffc_start, ffc_end, frags, ret;
 
-	db = toc->db;
+	btree = session->btree;
 	frags = (int)vs->frags;		/* XXX: bitstring.h wants "ints" */
 	ret = 0;
 
@@ -584,7 +578,7 @@ __wt_verify_checkfrag(WT_TOC *toc, WT_VSTUFF *vs)
 	 * If the eviction thread ran during verification, these checks aren't
 	 * possible.
 	 */
-	if (!WT_EVICT_CURRENT(toc, vs))
+	if (!WT_EVICT_CURRENT(session, vs))
 		return (0);
 
 	/* Check for file fragments we haven't verified. */
@@ -603,11 +597,11 @@ __wt_verify_checkfrag(WT_TOC *toc, WT_VSTUFF *vs)
 		}
 		if (ffc_start != -1) {
 			if (ffc_start == ffc_end)
-				__wt_api_db_errx(db,
+				__wt_errx(session,
 				    "file fragment %d was never verified",
 				    ffc_start);
 			else
-				__wt_api_db_errx(db,
+				__wt_errx(session,
 				    "file fragments %d-%d were never verified",
 				    ffc_start, ffc_end);
 			ret = WT_ERROR;

@@ -15,7 +15,7 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	DB *db;
+	BTREE *btree;
 	int ch, ret, tret;
 
 	WT_UTILITY_INTRO(progname, argv);
@@ -36,13 +36,15 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
-		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
-			db->err(db, ret, "Db.open: %s", *argv);
+	if ((ret = wiredtiger_simple_setup(progname, NULL, &btree)) == 0) {
+		if ((ret = btree->open(btree, *argv, 0, 0)) != 0) {
+			fprintf(stderr, "%s: db.open(%s): %s\n",
+			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
-		if ((ret = db->stat_print(db, stdout, 0)) != 0) {
-			db->err(db, ret, "Db.stat: %s", *argv);
+		if ((ret = btree->stat_print(btree, stdout, 0)) != 0) {
+			fprintf(stderr, "%s: db.stat(%s): %s\n",
+			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
 	}
@@ -50,7 +52,7 @@ main(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
+	if ((tret = wiredtiger_simple_teardown(progname, btree)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

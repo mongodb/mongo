@@ -15,7 +15,7 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	DB *db;
+	BTREE *btree;
 	int ch, ret, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
@@ -40,14 +40,16 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = wiredtiger_simple_setup(progname, &db, 0, 0)) == 0) {
-		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
-			db->err(db, ret, "Db.open: %s", *argv);
+	if ((ret = wiredtiger_simple_setup(progname, NULL, &btree)) == 0) {
+		if ((ret = btree->open(btree, *argv, 0, 0)) != 0) {
+			fprintf(stderr, "%s: btree.open(%s): %s\n",
+			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
-		if ((ret =
-		    db->verify(db, verbose ? __wt_progress : NULL, 0)) != 0) {
-			db->err(db, ret, "Db.verify: %s", *argv);
+		if ((ret = btree->verify(btree,
+		    verbose ? __wt_progress : NULL, 0)) != 0) {
+			fprintf(stderr, "%s: btree.verify(%s): %s\n",
+			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
 		if (verbose)
@@ -57,7 +59,7 @@ main(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
+	if ((tret = wiredtiger_simple_teardown(progname, btree)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

@@ -12,17 +12,17 @@
  *	Allocate and initialize a pthread mutex.
  */
 int
-__wt_mtx_alloc(ENV *env, const char *name, int is_locked, WT_MTX **mtxp)
+__wt_mtx_alloc(SESSION *session, const char *name, int is_locked, WT_MTX **mtxp)
 {
 	WT_MTX *mtx;
 	pthread_condattr_t condattr;
 	pthread_mutexattr_t mutexattr;
 
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_MTX), &mtx));
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_MTX), &mtx));
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL ENV structure reference.
+	 * This function MUST handle a NULL SESSION structure reference.
 	 *
 	 * Initialize the mutex.
 	 * Mutexes are shared between processes.
@@ -54,12 +54,12 @@ __wt_mtx_alloc(ENV *env, const char *name, int is_locked, WT_MTX **mtxp)
 
 	/* If the normal state of the mutex is locked, lock it immediately. */
 	if (is_locked)
-		__wt_lock(env, mtx);
+		__wt_lock(session, mtx);
 
 	*mtxp = mtx;
 	return (0);
 
-err:	__wt_free(env, mtx, sizeof(WT_MTX));
+err:	__wt_free(session, mtx, sizeof(WT_MTX));
 	return (WT_ERROR);
 }
 
@@ -68,12 +68,12 @@ err:	__wt_free(env, mtx, sizeof(WT_MTX));
  *	Lock a mutex.
  */
 void
-__wt_lock(ENV *env, WT_MTX *mtx)
+__wt_lock(SESSION *session, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(env,
-	    WT_VERB_MUTEX, (env, "lock %s mutex (%p)",  mtx->name, mtx));
+	WT_VERBOSE(S2C(session),
+	    WT_VERB_MUTEX, (session, "lock %s mutex (%p)",  mtx->name, mtx));
 
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
 
@@ -95,13 +95,13 @@ __wt_lock(ENV *env, WT_MTX *mtx)
 	}
 
 	mtx->locked = 1;
-	WT_STAT_INCR(env->ienv->stats, MTX_LOCK);
+	WT_STAT_INCR(S2C(session)->stats, MTX_LOCK);
 
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;
 
-err:	__wt_api_env_err(env, ret, "mutex lock failed");
-	__wt_abort(env);
+err:	__wt_err(session, ret, "mutex lock failed");
+	__wt_abort(session);
 }
 
 /*
@@ -109,12 +109,12 @@ err:	__wt_api_env_err(env, ret, "mutex lock failed");
  *	Release a mutex.
  */
 void
-__wt_unlock(ENV *env, WT_MTX *mtx)
+__wt_unlock(SESSION *session, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(env,
-	    WT_VERB_MUTEX, (env, "unlock %s mutex (%p)",  mtx->name, mtx));
+	WT_VERBOSE(S2C(session),
+	    WT_VERB_MUTEX, (session, "unlock %s mutex (%p)",  mtx->name, mtx));
 
 	ret = 0;
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
@@ -124,8 +124,8 @@ __wt_unlock(ENV *env, WT_MTX *mtx)
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;
 
-err:	__wt_api_env_err(env, ret, "mutex unlock failed");
-	__wt_abort(NULL);
+err:	__wt_err(session, ret, "mutex unlock failed");
+	__wt_abort(session);
 }
 
 /*
@@ -133,14 +133,14 @@ err:	__wt_api_env_err(env, ret, "mutex unlock failed");
  *	Destroy a mutex.
  */
 int
-__wt_mtx_destroy(ENV *env, WT_MTX *mtx)
+__wt_mtx_destroy(SESSION *session, WT_MTX *mtx)
 {
 	int ret;
 
 	ret = pthread_cond_destroy(&mtx->cond);
 	WT_TRET(pthread_mutex_destroy(&mtx->mtx));
 
-	__wt_free(env, mtx, sizeof(WT_MTX));
+	__wt_free(session, mtx, sizeof(WT_MTX));
 
 	return (ret == 0 ? 0 : WT_ERROR);
 }

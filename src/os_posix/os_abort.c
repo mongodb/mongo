@@ -12,11 +12,11 @@
  *	Abort the process, dropping core.
  */
 void
-__wt_abort(ENV *env)
+__wt_abort(SESSION *session)
 {
-	__wt_msg(env, "aborting WiredTiger library");
+	__wt_msg(session, "aborting WiredTiger library");
 
-	__wt_attach(env);
+	__wt_attach(session);
 
 	abort();
 	/* NOTREACHED */

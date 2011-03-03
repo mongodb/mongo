@@ -8,21 +8,19 @@
 #include "wt_internal.h"
 
 /*
- * __wt_env_sync --
+ * __wt_connection_sync --
  *	Flush the environment's cache.
  */
 int
-__wt_env_sync(ENV *env, void (*f)(const char *, uint64_t))
+__wt_connection_sync(CONNECTION *conn, void (*f)(const char *, uint64_t))
 {
 	BTREE *btree;
-	IENV *ienv;
 	int ret;
 
-	ienv = env->ienv;
 	ret = 0;
 
-	TAILQ_FOREACH(btree, &ienv->dbqh, q)
-		WT_TRET(btree->db->sync(btree->db, f, 0));
+	TAILQ_FOREACH(btree, &conn->dbqh, q)
+		WT_TRET(btree->sync(btree, f, 0));
 
 	return (ret);
 }

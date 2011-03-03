@@ -8,33 +8,33 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_col_update(WT_TOC *, uint64_t, WT_DATAITEM *, int);
+static int __wt_col_update(SESSION *, uint64_t, WT_DATAITEM *, int);
 
 /*
- * __wt_db_col_del --
+ * __wt_btree_col_del --
  *	Db.col_del method.
  */
 int
-__wt_db_col_del(WT_TOC *toc, uint64_t recno)
+__wt_btree_col_del(SESSION *session, uint64_t recno)
 {
-	return (__wt_col_update(toc, recno, NULL, 0));
+	return (__wt_col_update(session, recno, NULL, 0));
 }
 
 /*
- * __wt_db_col_put --
+ * __wt_btree_col_put --
  *	Db.put method.
  */
 int
-__wt_db_col_put(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data)
+__wt_btree_col_put(SESSION *session, uint64_t recno, WT_DATAITEM *data)
 {
-	DB *db;
+	BTREE *btree;
 
-	db = toc->db;
+	btree = session->btree;
 
-	if (db->fixed_len != 0 && data->size != db->fixed_len)
-		WT_RET(__wt_file_wrong_fixed_size(toc, data->size));
+	if (btree->fixed_len != 0 && data->size != btree->fixed_len)
+		WT_RET(__wt_file_wrong_fixed_size(session, data->size));
 
-	return (__wt_col_update(toc, recno, data, 1));
+	return (__wt_col_update(session, recno, data, 1));
 }
 
 /*
@@ -42,17 +42,15 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data)
  *	Column-store delete and update.
  */
 static int
-__wt_col_update(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data, int data_overwrite)
+__wt_col_update(SESSION *session, uint64_t recno, WT_DATAITEM *data, int data_overwrite)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 	WT_PAGE *page;
 	WT_RLE_EXPAND *exp, **new_rleexp;
 	WT_UPDATE **new_upd, *upd;
 	int ret;
 
-	env = toc->env;
-	db = toc->db;
+	btree = session->btree;
 
 	page = NULL;
 	exp = NULL;
@@ -62,8 +60,8 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data, int data_overwri
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_col_search(
-	    toc, recno, data_overwrite ? WT_DATA_OVERWRITE : 0));
-	page = toc->srch_page;
+	    session, recno, data_overwrite ? WT_DATA_OVERWRITE : 0));
+	page = session->srch_page;
 
 	/*
 	 * Run-length encoded (RLE) column-store operations are hard because
@@ -91,63 +89,63 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data, int data_overwri
 		/* Allocate an update array if necessary. */
 		if (page->u.col_leaf.upd == NULL)
 			WT_ERR(
-			    __wt_calloc_def(env, page->indx_count, &new_upd));
+			    __wt_calloc_def(session, page->indx_count, &new_upd));
 
 		/* Allocate a WT_UPDATE structure and fill it in. */
-		WT_ERR(__wt_update_alloc(toc, &upd, data));
+		WT_ERR(__wt_update_alloc(session, &upd, data));
 
 		/* workQ: schedule insert of the WT_UPDATE structure. */
-		__wt_item_update_serial(toc, page, toc->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, toc->srch_ip), new_upd, upd, ret);
+		__wt_item_update_serial(session, page, session->srch_write_gen,
+		    WT_COL_INDX_SLOT(page, session->srch_ip), new_upd, upd, ret);
 		 break;
 	case WT_PAGE_COL_RLE:
-		if (toc->srch_upd != NULL) {		/* #2 */
+		if (session->srch_upd != NULL) {		/* #2 */
 			/* Allocate a WT_UPDATE structure and fill it in. */
-			WT_ERR(__wt_update_alloc(toc, &upd, data));
+			WT_ERR(__wt_update_alloc(session, &upd, data));
 
 			/* workQ: schedule insert of the WT_UPDATE structure. */
-			__wt_rle_expand_update_serial(toc, page,
-			    toc->srch_write_gen, toc->srch_exp, upd, ret);
+			__wt_rle_expand_update_serial(session, page,
+			    session->srch_write_gen, session->srch_exp, upd, ret);
 			break;
 		}
 							/* #3 */
 		/* Allocate a page expansion array as necessary. */
 		if (page->u.col_leaf.rleexp == NULL)
 			WT_ERR(__wt_calloc_def(
-			    env, page->indx_count, &new_rleexp));
+			    session, page->indx_count, &new_rleexp));
 
 		/* Allocate a WT_UPDATE structure and fill it in. */
-		WT_ERR(__wt_update_alloc(toc, &upd, data));
+		WT_ERR(__wt_update_alloc(session, &upd, data));
 
 		/* Allocate a WT_RLE_EXPAND structure and fill it in. */
-		WT_ERR(__wt_calloc_def(env, 1, &exp));
+		WT_ERR(__wt_calloc_def(session, 1, &exp));
 		exp->recno = recno;
 		exp->upd = upd;
 
 		/* Schedule the workQ to link in the WT_RLE_EXPAND structure. */
-		__wt_rle_expand_serial(toc, page, toc->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, toc->srch_ip), new_rleexp, exp, ret);
+		__wt_rle_expand_serial(session, page, session->srch_write_gen,
+		    WT_COL_INDX_SLOT(page, session->srch_ip), new_rleexp, exp, ret);
 		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	WT_ILLEGAL_FORMAT_ERR(btree, ret);
 	}
 
 	if (ret != 0) {
 err:		if (exp != NULL)
-			__wt_free(env, exp, sizeof(WT_RLE_EXPAND));
+			__wt_free(session, exp, sizeof(WT_RLE_EXPAND));
 		if (upd != NULL)
-			__wt_update_free(toc, upd);
+			__wt_update_free(session, upd);
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
 	if (new_rleexp != NULL && new_rleexp != page->u.col_leaf.rleexp)
-		__wt_free(env,
+		__wt_free(session,
 		    new_rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.col_leaf.upd)
-		__wt_free(env, new_upd, page->indx_count * sizeof(WT_UPDATE *));
+		__wt_free(session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
 
-	WT_PAGE_OUT(toc, page);
+	WT_PAGE_OUT(session, page);
 
 	return (0);
 }
@@ -158,7 +156,7 @@ err:		if (exp != NULL)
  *	delete.
  */
 int
-__wt_rle_expand_serial_func(WT_TOC *toc)
+__wt_rle_expand_serial_func(SESSION *session)
 {
 	WT_PAGE *page;
 	WT_RLE_EXPAND **new_rleexp, *exp;
@@ -167,7 +165,7 @@ __wt_rle_expand_serial_func(WT_TOC *toc)
 
 	ret = 0;
 
-	__wt_rle_expand_unpack(toc, page, write_gen, slot, new_rleexp, exp);
+	__wt_rle_expand_unpack(session, page, write_gen, slot, new_rleexp, exp);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
@@ -189,7 +187,7 @@ __wt_rle_expand_serial_func(WT_TOC *toc)
 	WT_MEMORY_FLUSH;
 	page->u.col_leaf.rleexp[slot] = exp;
 
-err:	__wt_toc_serialize_wrapup(toc, page, ret);
+err:	__wt_session_serialize_wrapup(session, page, ret);
 	return (0);
 }
 
@@ -199,7 +197,7 @@ err:	__wt_toc_serialize_wrapup(toc, page, ret);
  *	run-length encoded column-store during a delete.
  */
 int
-__wt_rle_expand_update_serial_func(WT_TOC *toc)
+__wt_rle_expand_update_serial_func(SESSION *session)
 {
 	WT_PAGE *page;
 	WT_RLE_EXPAND *exp;
@@ -209,7 +207,7 @@ __wt_rle_expand_update_serial_func(WT_TOC *toc)
 
 	ret = 0;
 
-	__wt_rle_expand_update_unpack(toc, page, write_gen, exp, upd);
+	__wt_rle_expand_update_unpack(session, page, write_gen, exp, upd);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
@@ -223,6 +221,6 @@ __wt_rle_expand_update_serial_func(WT_TOC *toc)
 	WT_MEMORY_FLUSH;
 	exp->upd = upd;
 
-err:	__wt_toc_serialize_wrapup(toc, page, ret);
+err:	__wt_session_serialize_wrapup(session, page, ret);
 	return (0);
 }

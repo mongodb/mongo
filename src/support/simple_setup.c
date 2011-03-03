@@ -9,53 +9,40 @@
 
 #include "wt_internal.h"
 
-static ENV *__env;
+static WT_CONNECTION *wt_conn;
 
 /*
  * wiredtiger_simple_setup --
  *	Standard setup for simple applications.
  */
 int
-wiredtiger_simple_setup(
-    const char *progname, DB **dbp, u_int32_t cache_size, u_int32_t flags)
+wiredtiger_simple_setup(const char *progname, const char *config, BTREE **dbp)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int ret;
 
-	db = *dbp = NULL;
+	btree = *dbp = NULL;
 
-	if ((ret = wiredtiger_env_init(&env, flags)) != 0) {
-		fprintf(stderr,
-		    "%s: wiredtiger_env_init: %s\n",
+	if ((ret = wiredtiger_open(NULL, NULL, config, &wt_conn)) != 0) {
+		fprintf(stderr, "%s: wiredtiger_open: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		return (ret);
 	}
-	__env = env;
+	conn = (CONNECTION *)wt_conn;
+	session = &conn->default_session;
 
-	if (cache_size != 0 &&
-	    (ret = env->cache_size_set(env, cache_size)) != 0) {
-		env->err(env, ret, "Env.cache_size_set");
-		goto err;
-	}
-
-	if ((ret = env->open(env, NULL, 0, 0)) != 0) {
-		env->err(env, ret, "%s: Env.open", progname);
-		goto err;
-	}
-	if ((ret = env->db(env, 0, &db)) != 0) {
-		env->err(env, ret, "%s: Env.db", progname);
-		goto err;
-	}
-	if ((ret = db->errpfx_set(db, progname)) != 0) {
-		db->err(db, ret, "%s: Db.errpfx_set", progname);
+	if ((ret = conn->btree(conn, 0, &btree)) != 0) {
+		fprintf(stderr, "%s: env.btree: %s\n",
+		    progname, wiredtiger_strerror(ret));
 		goto err;
 	}
 
-	*dbp = db;
+	*dbp = btree;
 	return (EXIT_SUCCESS);
 
-err:	wiredtiger_simple_teardown(progname, db);
+err:	wiredtiger_simple_teardown(progname, btree);
 	return (ret);
 }
 
@@ -64,26 +51,26 @@ err:	wiredtiger_simple_teardown(progname, db);
  *	Standard teardown for simple applications.
  */
 int
-wiredtiger_simple_teardown(const char *progname, DB *db)
+wiredtiger_simple_teardown(const char *progname, BTREE *btree)
 {
 	int ret, tret;
 
 	ret = 0;
-	if (db != NULL && (tret = db->close(db, 0)) != 0) {
-		fprintf(stderr,
-		    "%s: Db.close: %s\n", progname, wiredtiger_strerror(ret));
+	if (btree != NULL && (tret = btree->close(btree, 0)) != 0) {
+		fprintf(stderr, "%s: Db.close: %s\n",
+		    progname, wiredtiger_strerror(ret));
 		if (ret == 0)
 			ret = tret;
 	}
 
-	if (__env != NULL) {
-		if ((tret = __env->close(__env, 0)) != 0) {
-			fprintf(stderr, "%s: Env.close: %s\n",
+	if (wt_conn != NULL) {
+		if ((tret = wt_conn->close(wt_conn, NULL)) != 0) {
+			fprintf(stderr, "%s: conn.close: %s\n",
 			    progname, wiredtiger_strerror(ret));
 			if (ret == 0)
 				ret = tret;
 		}
-		__env = NULL;
+		wt_conn = NULL;
 	}
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);

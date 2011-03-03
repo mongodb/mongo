@@ -12,20 +12,18 @@
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc(WT_TOC *toc, uint32_t size, WT_SCRATCH **scratchp)
+__wt_scr_alloc(SESSION *session, uint32_t size, WT_SCRATCH **scratchp)
 {
 	WT_SCRATCH *available, *scratch;
-	ENV *env;
 	uint32_t allocated;
 	u_int i;
 	int ret;
 
-	env = toc->env;
-
-	*scratchp = NULL;	/* Don't risk the caller not catching the error. */
+	/* Don't risk the caller not catching the error. */
+	*scratchp = NULL;
 
 	/*
-	 * There's an array of scratch buffers in each WT_TOC that can be used
+	 * There's an array of scratch buffers in each SESSION that can be used
 	 * by any function.  We use DBTs for scratch buffers because we already
 	 * have to have functions that do variable-length allocation on DBTs.
 	 * Scratch buffers are allocated only by a single thread of control, so
@@ -34,7 +32,7 @@ __wt_scr_alloc(WT_TOC *toc, uint32_t size, WT_SCRATCH **scratchp)
 	 * Walk the list, looking for a buffer we can use.
 	 */
 	for (i = 0, available = NULL,
-	    scratch = toc->scratch; i < toc->scratch_alloc; ++i, ++scratch)
+	    scratch = session->scratch; i < session->scratch_alloc; ++i, ++scratch)
 		if (!F_ISSET(scratch, WT_SCRATCH_INUSE)) {
 			if (size == 0 || scratch->mem_size >= size) {
 				*scratchp = scratch;
@@ -51,11 +49,11 @@ __wt_scr_alloc(WT_TOC *toc, uint32_t size, WT_SCRATCH **scratchp)
 	if (available != NULL) {
 		scratch = available;
 		if (scratch->buf != NULL) {
-			__wt_free(env, scratch->buf, scratch->mem_size);
+			__wt_free(session, scratch->buf, scratch->mem_size);
 			scratch->mem_size = 0;
 		}
 		WT_RET(
-		    __wt_calloc(env, size, sizeof(uint8_t), &scratch->buf));
+		    __wt_calloc(session, size, sizeof(uint8_t), &scratch->buf));
 		scratch->mem_size = size;
 		*scratchp = scratch;
 		F_SET(scratch, WT_SCRATCH_INUSE);
@@ -63,14 +61,14 @@ __wt_scr_alloc(WT_TOC *toc, uint32_t size, WT_SCRATCH **scratchp)
 	}
 
 	/* Resize the array, we need more scratch buffers. */
-	allocated = toc->scratch_alloc * WT_SIZEOF32(WT_SCRATCH);
-	WT_ERR(__wt_realloc(env, &allocated,
-	    (toc->scratch_alloc + 10) * sizeof(WT_SCRATCH), &toc->scratch));
-	toc->scratch_alloc += 10;
-	return (__wt_scr_alloc(toc, size, scratchp));
+	allocated = session->scratch_alloc * WT_SIZEOF32(WT_SCRATCH);
+	WT_ERR(__wt_realloc(session, &allocated,
+	    (session->scratch_alloc + 10) * sizeof(WT_SCRATCH), &session->scratch));
+	session->scratch_alloc += 10;
+	return (__wt_scr_alloc(session, size, scratchp));
 
-err:	__wt_api_env_errx(env,
-	    "WT_TOC unable to allocate more scratch buffers");
+err:	__wt_errx(session,
+	    "SESSION unable to allocate more scratch buffers");
 	return (ret);
 }
 
@@ -94,18 +92,15 @@ __wt_scr_release(WT_SCRATCH **dbt)
  *	Free all memory associated with the scratch buffers.
  */
 void
-__wt_scr_free(WT_TOC *toc)
+__wt_scr_free(SESSION *session)
 {
 	WT_SCRATCH *scratch;
-	ENV *env;
 	u_int i;
 
-	env = toc->env;
-
 	for (i = 0,
-	    scratch = toc->scratch; i < toc->scratch_alloc; ++i, ++scratch)
+	    scratch = session->scratch; i < session->scratch_alloc; ++i, ++scratch)
 		if (scratch->item.data != NULL)
-			__wt_free(env, scratch->item.data, scratch->mem_size);
+			__wt_free(session, scratch->item.data, scratch->mem_size);
 
-	__wt_free(env, toc->scratch, toc->scratch_alloc * sizeof(WT_SCRATCH));
+	__wt_free(session, session->scratch, session->scratch_alloc * sizeof(WT_SCRATCH));
 }

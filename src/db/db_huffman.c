@@ -152,19 +152,17 @@ static uint8_t const __wt_huffman_ascii_english[256] = {
 };
 
 /*
- * __wt_db_huffman_set --
- *	DB huffman configuration setter.
+ * __wt_btree_huffman_set --
+ *	BTREE huffman configuration setter.
  */
 int
-__wt_db_huffman_set(DB *db,
+__wt_btree_huffman_set(BTREE *btree,
     uint8_t const *huffman_table, u_int huffman_table_size, uint32_t flags)
 {
-	ENV *env;
-	BTREE *btree;
+	SESSION *session;
 	uint8_t phone[256];
 
-	env = db->env;
-	btree = db->btree;
+	session = &btree->conn->default_session;
 
 	switch (LF_ISSET(WT_ASCII_ENGLISH | WT_TELEPHONE)) {
 	case WT_ASCII_ENGLISH:
@@ -195,7 +193,7 @@ __wt_db_huffman_set(DB *db,
 		huffman_table_size = sizeof(phone);
 		break;
 	default:
-err:		return (__wt_api_args(env, "Db.huffman_set"));
+err:		return (__wt_api_args(session, "Db.huffman_set"));
 	}
 
 	/*
@@ -207,15 +205,15 @@ err:		return (__wt_api_args(env, "Db.huffman_set"));
 		/* Key and data may use the same table, only close it once. */
 		if (btree->huffman_data == btree->huffman_key)
 			btree->huffman_data = NULL;
-		__wt_huffman_close(env, btree->huffman_key);
+		__wt_huffman_close(session, btree->huffman_key);
 		btree->huffman_key = NULL;
 	}
 	if (LF_ISSET(WT_HUFFMAN_DATA) && btree->huffman_data != NULL) {
-		__wt_huffman_close(env, btree->huffman_data);
+		__wt_huffman_close(session, btree->huffman_data);
 		btree->huffman_data = NULL;
 	}
 	if (LF_ISSET(WT_HUFFMAN_KEY)) {
-		WT_RET(__wt_huffman_open(env,
+		WT_RET(__wt_huffman_open(session,
 		     huffman_table, huffman_table_size, &btree->huffman_key));
 		/* Key and data may use the same table. */
 		if (LF_ISSET(WT_HUFFMAN_DATA)) {
@@ -224,7 +222,7 @@ err:		return (__wt_api_args(env, "Db.huffman_set"));
 		}
 	}
 	if (LF_ISSET(WT_HUFFMAN_DATA))
-		WT_RET(__wt_huffman_open(env,
+		WT_RET(__wt_huffman_open(session,
 		    huffman_table, huffman_table_size, &btree->huffman_data));
 
 	return (0);

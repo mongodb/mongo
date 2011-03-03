@@ -12,16 +12,17 @@
  *	Flush a file handle.
  */
 int
-__wt_fsync(ENV *env, WT_FH *fh)
+__wt_fsync(SESSION *session, WT_FH *fh)
 {
 
 	WT_STAT_INCR(fh->stats, FSYNC);
 
-	WT_VERBOSE(env, WT_VERB_FILEOPS, (env, "fileops: %s: fsync", fh->name));
+	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
+	    (session, "fileops: %s: fsync", fh->name));
 
 	if (fsync(fh->fd) == 0)
 		return (0);
 
-	__wt_api_env_err(env, errno, "%s fsync error", fh->name);
+	__wt_err(session, errno, "%s fsync error", fh->name);
 	return (WT_ERROR);
 }

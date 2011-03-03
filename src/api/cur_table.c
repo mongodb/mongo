@@ -15,13 +15,13 @@ __curtable_first(WT_CURSOR *cursor)
 {
 	BTREE *btree;
 	ICURSOR_TABLE *ctable;
-	ISESSION *isession;
+	SESSION *session;
 
 	ctable = (ICURSOR_TABLE *)cursor;
-	btree = ctable->db->btree;
-	isession = (ISESSION *)cursor->session;
+	btree = ctable->btree;
+	session = (SESSION *)cursor->session;
 
-	WT_RET(__wt_walk_begin(isession->toc, &btree->root_page, &ctable->walk));
+	WT_RET(__wt_walk_begin(session, &btree->root_page, &ctable->walk));
 	F_SET((WT_CURSOR_STD *)cursor, WT_CURSTD_POSITIONED);
 
 	return (__curtable_next(cursor));
@@ -41,7 +41,7 @@ __curtable_next(WT_CURSOR *cursor)
 	BTREE *btree;
 	WT_DATAITEM *key;
 	ICURSOR_TABLE *ctable;
-	ISESSION *isession;
+	SESSION *session;
 	WT_CURSOR_STD *cstd;
 	WT_ITEM *item;
 	WT_UPDATE *upd;
@@ -50,24 +50,24 @@ __curtable_next(WT_CURSOR *cursor)
 
 	ctable = (ICURSOR_TABLE *)cursor;
 	cstd = &ctable->cstd;
-	btree = ctable->db->btree;
+	btree = ctable->btree;
 	huffman = btree->huffman_data;
-	isession = (ISESSION *)cursor->session;
+	session = (SESSION *)cursor->session;
 	ret = 0;
 
 	/*
 	 * TODO: fix this, currently done by the internal API layer, lower
 	 * levels should be passed the handles they need, rather than putting
-	 * everything in WT_TOC / ISESSION.
+	 * everything in SESSION / SESSION.
 	 */
-	isession->toc->db = ctable->db;
+	session->btree = ctable->btree;
 
 	if (ctable->walk.tree == NULL)
 		return (__curtable_first(cursor));
 
 	do {
 		while (ctable->nitems == 0) {
-			WT_RET(__wt_walk_next(isession->toc, &ctable->walk,
+			WT_RET(__wt_walk_next(session, &ctable->walk,
 			    0, &ctable->ref));
 			if (ctable->ref == NULL) {
 				F_CLR(cstd, WT_CURSTD_POSITIONED);
@@ -91,7 +91,7 @@ __curtable_next(WT_CURSOR *cursor)
 			 * print.  Set the key.
 			 */
 			if (__wt_key_process(ctable->rip)) {
-				WT_RET(__wt_item_process(isession->toc,
+				WT_RET(__wt_item_process(session,
 				    ctable->rip->key, ctable->key_tmp));
 				key = &ctable->key_tmp->item;
 			} else
@@ -121,7 +121,7 @@ __curtable_next(WT_CURSOR *cursor)
 					break;
 				}
 			} else if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL) {
-				WT_RET(__wt_item_process(isession->toc,
+				WT_RET(__wt_item_process(session,
 				    item, ctable->value_tmp));
 				cstd->value.item = ctable->value_tmp->item;
 				break;
@@ -193,29 +193,29 @@ __curtable_del(WT_CURSOR *cursor)
 static int
 __curtable_close(WT_CURSOR *cursor, const char *config)
 {
-	ENV *env;
 	ICURSOR_TABLE *ctable;
+	SESSION *session;
 	int ret;
 
 	ctable = (ICURSOR_TABLE *)cursor;
-	env = ((ICONNECTION *)cursor->session->connection)->env;
+	session = (SESSION *)cursor->session;
 	ret = 0;
 
-	__wt_walk_end(env, &ctable->walk);
+	__wt_walk_end(session, &ctable->walk);
 	WT_TRET(__wt_curstd_close(cursor, config));
 
 	return (ret);
 }
 
 static int
-__get_btree(ISESSION *isession, const char *name, size_t namelen, DB **dbp)
+__get_btree(SESSION *session, const char *name, size_t namelen, BTREE **btreep)
 {
-	DB *db;
+	BTREE *btree;
 
-	TAILQ_FOREACH(db, &isession->btrees, q) {
-		if (strncmp(name, db->btree->name, namelen) == 0 &&
-		    db->btree->name[namelen] == '\0') {
-			*dbp = db;
+	TAILQ_FOREACH(btree, &session->btrees, q) {
+		if (strncmp(name, btree->name, namelen) == 0 &&
+		    btree->name[namelen] == '\0') {
+			*btreep = btree;
 			return (0);
 		}
 	}
@@ -224,7 +224,7 @@ __get_btree(ISESSION *isession, const char *name, size_t namelen, DB **dbp)
 }
 
 int
-__wt_curtable_open(WT_SESSION *session,
+__wt_curtable_open(SESSION *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
@@ -247,62 +247,60 @@ __wt_curtable_open(WT_SESSION *session,
 		__curtable_close,
 	};
 	const char *tablename;
-	DB *db;
-	ENV *env;
-	ISESSION *isession;
+	BTREE *btree;
+	CONNECTION *conn;
 	ICURSOR_TABLE *ctable;
 	WT_CONFIG_ITEM cvalue;
 	WT_CURSOR *cursor;
 	int bulk, dump, ret;
 	size_t csize;
 
-	isession = (ISESSION *)session;
-	env = ((ICONNECTION *)session->connection)->env;
+	conn = S2C(session);
 
 	/* TODO: handle projections. */
 	tablename = uri + 6;
 
-	ret = __get_btree(isession, tablename, strlen(tablename), &db);
+	ret = __get_btree(session, tablename, strlen(tablename), &btree);
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
-		WT_RET(env->db(env, 0, &db));
-		WT_RET(db->open(db, tablename, 0, 0));
+		WT_RET(conn->btree(conn, 0, &btree));
+		WT_RET(btree->open(btree, tablename, 0, 0));
 
-		TAILQ_INSERT_HEAD(&isession->btrees, db, q);
+		TAILQ_INSERT_HEAD(&session->btrees, btree, q);
 	} else
 		WT_RET(ret);
 
 	bulk = dump = 0;
-	CONFIG_LOOP(isession, config, cvalue)
+	CONFIG_LOOP(session, config, cvalue)
 		CONFIG_ITEM("dump")
 			dump = (cvalue.val != 0);
 		CONFIG_ITEM("bulk")
 			bulk = (cvalue.val != 0);
-	CONFIG_END(isession)
+	CONFIG_END(session)
 
 	csize = bulk ? sizeof(ICURSOR_BULK) : sizeof(ICURSOR_TABLE);
-	WT_RET(__wt_calloc(env, 1, csize, &ctable));
+	WT_RET(__wt_calloc(session, 1, csize, &ctable));
 
 	cursor = &ctable->cstd.iface;
 	*cursor = iface;
-	cursor->session = session;
+	cursor->session = &session->iface;
 	cursor->key_format = cursor->value_format = "u";
-	ctable->db = db;
+	ctable->btree = btree;
 	__wt_curstd_init(&ctable->cstd);
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((ICURSOR_BULK *)ctable));
 	if (dump)
 		__wt_curdump_init(&ctable->cstd);
 
-	WT_ERR(__wt_scr_alloc(isession->toc, 0, &ctable->key_tmp));
-	WT_ERR(__wt_scr_alloc(isession->toc, 0, &ctable->value_tmp));
+	WT_ERR(__wt_scr_alloc(session, 0, &ctable->key_tmp));
+	WT_ERR(__wt_scr_alloc(session, 0, &ctable->value_tmp));
 
 	STATIC_ASSERT(offsetof(ICURSOR_TABLE, cstd) == 0);
-	TAILQ_INSERT_HEAD(&isession->cursors, &ctable->cstd, q);
+	TAILQ_INSERT_HEAD(&session->cursors, &ctable->cstd, q);
 	*cursorp = cursor;
 
 	if (0) {
-err:		__wt_free(env, ctable, csize);
+err:		__wt_free(session, ctable, csize);
 	}
 
 	return (ret);

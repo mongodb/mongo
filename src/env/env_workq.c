@@ -9,32 +9,30 @@
 
 /*
  * __wt_workq_srvr --
- *      Routine to process the WT_TOC work queue.
+ *      Routine to process the SESSION work queue.
  */
 void *
 __wt_workq_srvr(void *arg)
 {
-	ENV *env;
-	IENV *ienv;
-	WT_TOC **tp, *toc;
+	CONNECTION *conn;
+	SESSION **tp, *session;
 	int chk_read, read_force, request;
 
-	env = (ENV *)arg;
-	ienv = env->ienv;
+	conn = (CONNECTION *)arg;
 
-	/* Walk the WT_TOC list and execute requests. */
-	while (F_ISSET(ienv, WT_WORKQ_RUN)) {
-		++ienv->api_gen;
-		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
+	/* Walk the SESSION list and execute requests. */
+	while (F_ISSET(conn, WT_WORKQ_RUN)) {
+		++conn->api_gen;
+		WT_STAT_INCR(conn->stats, WORKQ_PASSES);
 
 		chk_read = read_force = request = 0;
-		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
-			switch (toc->wq_state) {
+		for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
+			switch (session->wq_state) {
 			case WT_WORKQ_NONE:
 				break;
 			case WT_WORKQ_FUNC:
 				request = 1;
-				(void)toc->wq_func(toc);
+				(void)session->wq_func(session);
 				break;
 			case WT_WORKQ_READ:
 				request = 1;
@@ -57,19 +55,19 @@ __wt_workq_srvr(void *arg)
 				 * function that will contact the server, so we
 				 * can't race on that update.
 				 */
-				toc->wq_state = WT_WORKQ_READ_SCHED;
+				session->wq_state = WT_WORKQ_READ_SCHED;
 
 				/*
 				 * Call the function (which contacts the read
 				 * server).  If that call fails, we're done.
 				 */
-				if (toc->wq_func(toc) != 0)
+				if (session->wq_func(session) != 0)
 					break;
 
 				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
 				chk_read = 1;
-				if (F_ISSET(toc, WT_READ_PRIORITY))
+				if (F_ISSET(session, WT_READ_PRIORITY))
 					read_force = 1;
 				break;
 			}
@@ -77,14 +75,14 @@ __wt_workq_srvr(void *arg)
 
 		/* If a read is scheduled, check on the read server. */
 		if (chk_read)
-			__wt_workq_read_server(env, read_force);
+			__wt_workq_read_server(conn, read_force);
 
 		/* Check on the cache eviction server. */
-		__wt_workq_evict_server(env, 0);
+		__wt_workq_evict_server(conn, 0);
 
 		/* If we didn't find work, yield the processor. */
 		if (!request) {
-			WT_STAT_INCR(ienv->stats, WORKQ_YIELD);
+			WT_STAT_INCR(conn->stats, WORKQ_YIELD);
 			__wt_yield();
 		}
 	}

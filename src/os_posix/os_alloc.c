@@ -10,7 +10,7 @@
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_free_overwrite(uint8_t *, size_t, const char *, int);
 static void __wt_mtrack(
-    ENV *env, const void *, const void *, const char *, int);
+    SESSION *session, const void *, const void *, const char *, int);
 #endif
 
 /*
@@ -27,7 +27,7 @@ static void __wt_mtrack(
  *	ANSI calloc function.
  */
 int
-__wt_calloc_func(ENV *env, size_t number, size_t size, void *retp
+__wt_calloc_func(SESSION *session, size_t number, size_t size, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -37,21 +37,21 @@ __wt_calloc_func(ENV *env, size_t number, size_t size, void *retp
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL ENV structure reference.
+	 * This function MUST handle a NULL SESSION handle.
 	 */
-	WT_ASSERT(env, number != 0 && size != 0);
+	WT_ASSERT(session, number != 0 && size != 0);
 
-	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMALLOC);
+	if (session != NULL && S2C(session)->stats != NULL)
+		WT_STAT_INCR(S2C(session)->stats, MEMALLOC);
 
 	if ((p = calloc(number, (size_t)size)) == NULL) {
-		__wt_api_env_err(env, errno, "memory allocation");
+		__wt_err(session, errno, "memory allocation");
 		return (WT_ERROR);
 	}
 	*(void **)retp = p;
 
 #ifdef	HAVE_DIAGNOSTIC
-	__wt_mtrack(env, NULL, p, file, line);
+	__wt_mtrack(session, NULL, p, file, line);
 #endif
 	return (0);
 }
@@ -61,7 +61,7 @@ __wt_calloc_func(ENV *env, size_t number, size_t size, void *retp
  *	ANSI realloc function.
  */
 int
-__wt_realloc_func(ENV *env,
+__wt_realloc_func(SESSION *session,
     uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
@@ -73,20 +73,25 @@ __wt_realloc_func(ENV *env,
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL ENV structure reference.
+	 * This function MUST handle a NULL SESSION handle.
 	 */
-	WT_ASSERT(env, bytes_to_allocate != 0);
+	WT_ASSERT(session, bytes_to_allocate != 0);
 
-	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMALLOC);
+	if (session != NULL && S2C(session)->stats != NULL)
+		WT_STAT_INCR(S2C(session)->stats, MEMALLOC);
 
 	p = *(void **)retp;
 
-	bytes_allocated = *bytes_allocated_ret;
-	WT_ASSERT(env, bytes_allocated < bytes_to_allocate);
+	/*
+	 * Sometimes we're allocating memory and we don't care about the
+	 * final length -- bytes_allocated_ret may be NULL.
+	 */
+	bytes_allocated =
+	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
+	WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL) {
-		__wt_api_env_err(env, errno, "memory allocation");
+		__wt_err(session, errno, "memory allocation");
 		return (WT_ERROR);
 	}
 
@@ -103,13 +108,13 @@ __wt_realloc_func(ENV *env,
 
 	/* Update caller's bytes allocated value. */
 	if (bytes_allocated_ret != NULL) {
-		WT_ASSERT(env,
+		WT_ASSERT(session,
 		    bytes_to_allocate == (uint32_t)bytes_to_allocate);
 		*bytes_allocated_ret = (uint32_t)bytes_to_allocate;
 	}
 
 #ifdef	HAVE_DIAGNOSTIC
-	__wt_mtrack(env, *(void **)retp, p, file, line);
+	__wt_mtrack(session, *(void **)retp, p, file, line);
 #endif
 
 	*(void **)retp = p;
@@ -121,7 +126,7 @@ __wt_realloc_func(ENV *env,
  *	ANSI strdup function.
  */
 int
-__wt_strdup_func(ENV *env, const char *str, void *retp
+__wt_strdup_func(SESSION *session, const char *str, void *retp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -137,16 +142,16 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL ENV structure reference.
+	 * This function MUST handle a NULL SESSION handle.
 	 */
-	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMALLOC);
+	if (session != NULL && S2C(session)->stats != NULL)
+		WT_STAT_INCR(S2C(session)->stats, MEMALLOC);
 
 	len = strlen(str) + 1;
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_calloc_func(env, len, 1, &p, file, line));
+	WT_RET(__wt_calloc_func(session, len, 1, &p, file, line));
 #else
-	WT_RET(__wt_calloc_func(env, len, 1, &p));
+	WT_RET(__wt_calloc_func(session, len, 1, &p));
 #endif
 
 	memcpy(p, str, len);
@@ -160,7 +165,7 @@ __wt_strdup_func(ENV *env, const char *str, void *retp
  *	ANSI free function.
  */
 void
-__wt_free_func(ENV *env, void *p_arg
+__wt_free_func(SESSION *session, void *p_arg
 #ifdef HAVE_DIAGNOSTIC
     , size_t len, const char *file, int line
 #endif
@@ -170,10 +175,10 @@ __wt_free_func(ENV *env, void *p_arg
 
 	/*
 	 * !!!
-	 * This function MUST handle a NULL ENV structure reference.
+	 * This function MUST handle a NULL SESSION handle.
 	 */
-	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMFREE);
+	if (session != NULL && S2C(session)->stats != NULL)
+		WT_STAT_INCR(S2C(session)->stats, MEMFREE);
 
 	/*
 	 * If there's a serialization bug we might race with another thread.
@@ -195,7 +200,7 @@ __wt_free_func(ENV *env, void *p_arg
 	if (len != 0)
 		__wt_free_overwrite(p, len, file, line);
 
-	__wt_mtrack(env, p, NULL, NULL, 0);
+	__wt_mtrack(session, p, NULL, NULL, 0);
 #endif
 
 	free(p);
@@ -238,23 +243,23 @@ __wt_free_overwrite(uint8_t *m, size_t mlen, const char *file, int line)
  *	Allocate memory tracking structures.
  */
 int
-__wt_mtrack_alloc(ENV *env)
+__wt_mtrack_alloc(CONNECTION *conn)
 {
-	IENV *ienv;
+	SESSION *session;
 	WT_MTRACK *p;
 
-	ienv = env->ienv;
+	session = &conn->default_session;
 
 	/*
-	 * Use a temporary variable -- assigning memory to ienv->mtrack turns
+	 * Use a temporary variable -- assigning memory to conn->mtrack turns
 	 * on memory object tracking, and we need to set up the rest of the
 	 * structure first.
 	 */
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_MTRACK), &p));
-	WT_RET(__wt_calloc(env, 1000, sizeof(WT_MEM), &p->list));
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_MTRACK), &p));
+	WT_RET(__wt_calloc(session, 1000, sizeof(WT_MEM), &p->list));
 	p->next = p->list;
 	p->slots = 1000;
-	ienv->mtrack = p;
+	conn->mtrack = p;
 	return (0);
 }
 
@@ -263,38 +268,34 @@ __wt_mtrack_alloc(ENV *env)
  *	Free memory tracking structures.
  */
 void
-__wt_mtrack_free(ENV *env)
+__wt_mtrack_free(CONNECTION *conn)
 {
-	IENV *ienv;
 	WT_MTRACK *p;
 
-	ienv = env->ienv;
-
 	/*
-	 * Clear ienv->mtrack (to turn off memory object tracking) before the
+	 * Clear conn->mtrack (to turn off memory object tracking) before the
 	 * free.
 	 */
-	if ((p = ienv->mtrack) == NULL)
+	if ((p = conn->mtrack) == NULL)
 		return;
-	ienv->mtrack = NULL;
+	conn->mtrack = NULL;
 
-	__wt_free(env, p->list, 0);
-	__wt_free(env, p, 0);
+	__wt_free(&conn->default_session, p->list, 0);
+	__wt_free(&conn->default_session, p, 0);
 }
 
 /*
- * __wt_mtrack_free --
+ * __wt_mtrack --
  *	Track memory allocations and frees.
  */
 static void
-__wt_mtrack(ENV *env, const void *f, const void *a, const char *file, int line)
+__wt_mtrack(SESSION *session, const void *f, const void *a, const char *file, int line)
 {
 	WT_MEM *mp, *t, *mp_end;
 	WT_MTRACK *mtrack;
 	int slot_check;
 
-	if (env == NULL ||
-	    env->ienv == NULL || (mtrack = env->ienv->mtrack) == NULL)
+	if (session == NULL || (mtrack = S2C(session)->mtrack) == NULL)
 		return;
 
 	/*
@@ -308,8 +309,8 @@ __wt_mtrack(ENV *env, const void *f, const void *a, const char *file, int line)
 					goto enter;
 			} while (mp > mtrack->list);
 
-		__wt_api_env_errx(env, "mtrack: %p: not found", f);
-		__wt_attach(env);
+		__wt_err(session, 0, "mtrack: %p: not found", f);
+		__wt_attach(session);
 	}
 
 	if (a == NULL)
@@ -375,17 +376,17 @@ enter:	mp->addr = a;
  *	Complain about any memory allocated but never freed.
  */
 void
-__wt_mtrack_dump(ENV *env)
+__wt_mtrack_dump(CONNECTION *conn)
 {
 	WT_MTRACK *mtrack;
 	WT_MEM *mp;
 
-	if ((mtrack = env->ienv->mtrack) == NULL)
+	if ((mtrack = conn->mtrack) == NULL)
 		return;
 
 	for (mp = mtrack->list; mp < mtrack->next; ++mp)
 		if (mp->addr != NULL)
-			__wt_api_env_errx(env,
+			__wt_errx(&conn->default_session,
 			    "mtrack: %p {%s/%d}: never freed",
 				mp->addr, mp->file, mp->line);
 }

@@ -7,126 +7,82 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_config(DB *);
-static int __wt_idb_config(DB *);
-static int __wt_idb_destroy(DB *);
+static int __wt_btree_config(BTREE *);
 
 /*
- * __wt_env_db --
- *	DB constructor.
+ * __wt_connection_btree --
+ *	BTREE constructor.
  */
 int
-__wt_env_db(ENV *env, DB **dbp)
+__wt_connection_btree(CONNECTION *conn, BTREE **btreep)
 {
-	DB *db;
 	BTREE *btree;
 	int ret;
 
-	db = NULL;
 	btree = NULL;
 
-	/* Create the DB and BTREE structures. */
-	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
-	WT_ERR(__wt_calloc(env, 1, sizeof(BTREE), &btree));
+	/* Create the BTREE structure. */
+	WT_ERR(__wt_calloc(&conn->default_session, 1, sizeof(BTREE), &btree));
 
 	/* Connect everything together. */
-	db->btree = btree;
-	btree->db = db;
-	db->env = env;
+	btree->conn = conn;
 
-	/* Configure the DB and the BTREE. */
-	WT_ERR(__wt_db_config(db));
-	WT_ERR(__wt_idb_config(db));
+	/* Configure the BTREE and the BTREE. */
+	WT_ERR(__wt_btree_config(btree));
 
-	*dbp = db;
+	*btreep = btree;
 	return (0);
 
-err:	(void)__wt_db_destroy(db);
+err:	(void)__wt_btree_destroy(btree);
 	return (ret);
 }
 
 /*
- * __wt_db_config --
- *	Set configuration for a just-created DB handle.
- */
-static int
-__wt_db_config(DB *db)
-{
-	__wt_methods_db_config_default(db);
-	__wt_methods_db_lockout(db);
-	__wt_methods_db_init_transition(db);
-
-	return (0);
-}
-
-/*
- * __wt_idb_config --
+ * __wt_btree_config --
  *	Set configuration for a just-created BTREE handle.
  */
 static int
-__wt_idb_config(DB *db)
+__wt_btree_config(BTREE *btree)
 {
-	ENV *env;
-	BTREE *btree;
-	IENV *ienv;
+	CONNECTION *conn;
+	SESSION *session;
 
-	env = db->env;
-	btree = db->btree;
-	ienv = env->ienv;
+	conn = btree->conn;
+	session = &conn->default_session;
 
-	btree->db = db;
 	btree->root_page.addr = btree->free_addr = WT_ADDR_INVALID;
 
 	TAILQ_INIT(&btree->freeqa);		/* Free queues */
 	TAILQ_INIT(&btree->freeqs);
 
-	__wt_lock(env, ienv->mtx);		/* Add to the ENV's list */
-	TAILQ_INSERT_TAIL(&ienv->dbqh, btree, q);
-	++ienv->dbqcnt;
-	__wt_unlock(env, ienv->mtx);
+	__wt_lock(session, conn->mtx);		/* Add to the CONNECTION's list */
+	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
+	++conn->dbqcnt;
+	__wt_unlock(session, conn->mtx);
 
-	WT_RET(__wt_stat_alloc_btree_handle_stats(env, &btree->stats));
-	WT_RET(__wt_stat_alloc_btree_file_stats(env, &btree->fstats));
+	WT_RET(__wt_stat_alloc_btree_handle_stats(session, &btree->stats));
+	WT_RET(__wt_stat_alloc_btree_file_stats(session, &btree->fstats));
+
+	__wt_methods_btree_config_default(btree);
+	__wt_methods_btree_lockout(btree);
+	__wt_methods_btree_init_transition(btree);
 
 	return (0);
 }
 
 /*
- * __wt_db_destroy --
- *	DB handle destructor.
- */
-int
-__wt_db_destroy(DB *db)
-{
-	ENV *env;
-	int ret;
-
-	env = db->env;
-
-	/* Discard the underlying BTREE object. */
-	ret = __wt_idb_destroy(db);
-
-	/* Discard the DB object. */
-	__wt_free(env, db, sizeof(DB));
-
-	return (ret);
-}
-
-/*
- * __wt_idb_destroy --
+ * __wt_btree_destroy --
  *	BTREE handle destructor.
  */
-static int
-__wt_idb_destroy(DB *db)
+int
+__wt_btree_destroy(BTREE *btree)
 {
-	ENV *env;
-	BTREE *btree;
-	IENV *ienv;
+	CONNECTION *conn;
+	SESSION *session;
 	int ret;
 
-	env = db->env;
-	btree = db->btree;
-	ienv = env->ienv;
+	conn = btree->conn;
+	session = &conn->default_session;
 	ret = 0;
 
 	/* Check that there's something to close. */
@@ -134,52 +90,53 @@ __wt_idb_destroy(DB *db)
 		return (0);
 
 	/* Diagnostic check: check flags against approved list. */
-	WT_ENV_FCHK_RET(env, "Db.close", btree->flags, WT_APIMASK_IDB, ret);
+	WT_CONN_FCHK_RET(conn, "Db.close", btree->flags, WT_APIMASK_BTREE, ret);
 
-	__wt_free(env, btree->name, 0);
+	__wt_free(session, btree->name, 0);
 
 	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
 		if (btree->huffman_data == btree->huffman_key)
 			btree->huffman_data = NULL;
-		__wt_huffman_close(env, btree->huffman_key);
+		__wt_huffman_close(session, btree->huffman_key);
 		btree->huffman_key = NULL;
 	}
 	if (btree->huffman_data != NULL) {
-		__wt_huffman_close(env, btree->huffman_data);
+		__wt_huffman_close(session, btree->huffman_data);
 		btree->huffman_data = NULL;
 	}
 
-	__wt_walk_end(env, &btree->evict_walk);
+	__wt_walk_end(session, &btree->evict_walk);
 
-	__wt_free(env, btree->stats, 0);
-	__wt_free(env, btree->fstats, 0);
+	__wt_free(session, btree->stats, 0);
+	__wt_free(session, btree->fstats, 0);
 
-	__wt_lock(env, ienv->mtx);		/* Delete from the ENV's list */
-	TAILQ_REMOVE(&ienv->dbqh, btree, q);
-	--ienv->dbqcnt;
-	__wt_unlock(env, ienv->mtx);
+	__wt_lock(session, conn->mtx);		/* Delete from the CONNECTION's list */
+	TAILQ_REMOVE(&conn->dbqh, btree, q);
+	--conn->dbqcnt;
+	__wt_unlock(session, conn->mtx);
 
-	__wt_free(env, btree, sizeof(BTREE));
-	db->btree = NULL;
+	/* Discard the BTREE object. */
+	__wt_free(session, btree, sizeof(BTREE));
+
 	return (ret);
 }
 
 int
-__wt_db_lockout_err(DB *db)
+__wt_btree_lockout_err(BTREE *btree)
 {
-	__wt_api_db_errx(db,
-	    "This Db handle has failed for some reason, and can no longer "
+	__wt_errx(&btree->conn->default_session,
+	    "This btree handle has failed for some reason, and can no longer "
 	    "be used; the only method permitted on it is Db.close which "
 	    "discards the handle permanently");
 	return (WT_ERROR);
 }
 
 int
-__wt_db_lockout_open(DB *db)
+__wt_btree_lockout_open(BTREE *btree)
 {
-	__wt_api_db_errx(db,
-	    "This method may not be called until after the Db.open method has "
-	    "been called");
+	__wt_errx(&btree->conn->default_session,
+	    "This method may not be called until after the Btree.open method "
+	    "has been called");
 	return (WT_ERROR);
 }

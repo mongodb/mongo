@@ -17,20 +17,20 @@ typedef struct {
 	uint64_t fcnt;				/* Progress counter */
 } WT_DSTUFF;
 
-static int  __wt_dump_page(WT_TOC *, WT_PAGE *, void *);
-static void __wt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_col_rle(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static int  __wt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page(SESSION *, WT_PAGE *, void *);
+static void __wt_dump_page_col_fix(SESSION *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_rle(SESSION *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_col_var(SESSION *, WT_PAGE *, WT_DSTUFF *);
+static int  __wt_dump_page_row_leaf(SESSION *, WT_PAGE *, WT_DSTUFF *);
 static void __wt_print_byte_string_hex(const uint8_t *, uint32_t, FILE *);
 static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
 
 /*
- * __wt_db_dump --
+ * __wt_btree_dump --
  *	Db.dump method.
  */
 int
-__wt_db_dump(WT_TOC *toc,
+__wt_btree_dump(SESSION *session,
     FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags)
 {
 	WT_DSTUFF dstuff;
@@ -42,7 +42,7 @@ __wt_db_dump(WT_TOC *toc,
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before blindly reading it.
 		 */
-		return (__wt_verify(toc, f, stream));
+		return (__wt_verify(session, f, stream));
 	}
 
 	dstuff.p = flags == WT_PRINTABLES ?
@@ -58,12 +58,12 @@ __wt_db_dump(WT_TOC *toc,
 	 */
 	fprintf(stream, "VERSION=1\n");
 	fprintf(stream, "HEADER=END\n");
-	ret = __wt_tree_walk(toc, NULL, 0, __wt_dump_page, &dstuff);
+	ret = __wt_tree_walk(session, NULL, 0, __wt_dump_page, &dstuff);
 	fprintf(stream, "DATA=END\n");
 
 	/* Wrap up reporting. */
 	if (f != NULL)
-		f(toc->name, dstuff.fcnt);
+		f(session->name, dstuff.fcnt);
 
 	return (ret);
 }
@@ -73,12 +73,12 @@ __wt_db_dump(WT_TOC *toc,
  *	Depth-first recursive walk of a btree.
  */
 static int
-__wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
 {
-	DB *db;
+	BTREE *btree;
 	WT_DSTUFF *dp;
 
-	db = toc->db;
+	btree = session->btree;
 	dp = arg;
 
 	switch (page->dsk->type) {
@@ -86,23 +86,23 @@ __wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	case WT_PAGE_ROW_INT:
 		break;
 	case WT_PAGE_COL_FIX:
-		__wt_dump_page_col_fix(toc, page, dp);
+		__wt_dump_page_col_fix(session, page, dp);
 		break;
 	case WT_PAGE_COL_RLE:
-		WT_RET(__wt_dump_page_col_rle(toc, page, dp));
+		WT_RET(__wt_dump_page_col_rle(session, page, dp));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_dump_page_col_var(toc, page, dp));
+		WT_RET(__wt_dump_page_col_var(session, page, dp));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_dump_page_row_leaf(toc, page, dp));
+		WT_RET(__wt_dump_page_row_leaf(session, page, dp));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
 	/* Report progress every 10 pages. */
 	if (dp->f != NULL && ++dp->fcnt % 10 == 0)
-		dp->f(toc->name, dp->fcnt);
+		dp->f(session->name, dp->fcnt);
 
 	return (0);
 }
@@ -112,16 +112,16 @@ __wt_dump_page(WT_TOC *toc, WT_PAGE *page, void *arg)
  *	Dump a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_fix(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	DB *db;
+	BTREE *btree;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
 
-	db = toc->db;
+	btree = session->btree;
 	dsk = page->dsk;
 
 	/* Walk the page, dumping data items. */
@@ -129,11 +129,11 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		cipdata = WT_COL_PTR(dsk, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
 			if (!WT_FIX_DELETE_ISSET(cipdata))
-				dp->p(cipdata, db->fixed_len, dp->stream);
+				dp->p(cipdata, btree->fixed_len, dp->stream);
 		} else
 			if (!WT_UPDATE_DELETED_ISSET(upd))
 				dp->p(WT_UPDATE_DATA(upd),
-				    db->fixed_len, dp->stream);
+				    btree->fixed_len, dp->stream);
 	}
 }
 
@@ -142,10 +142,9 @@ __wt_dump_page_col_fix(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
  *	Dump a WT_PAGE_COL_RLE page.
  */
 static int
-__wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 	FILE *fp;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -156,8 +155,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	uint16_t n_repeat;
 	void *cipdata;
 
-	db = toc->db;
-	env = toc->env;
+	btree = session->btree;
 	dsk = page->dsk;
 	fp = dp->stream;
 	expsort = NULL;
@@ -173,7 +171,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * sorted by record number.
 		 */
 		WT_RET(__wt_rle_expand_sort(
-		    toc, page, cip, &expsort, &n_expsort));
+		    session, page, cip, &expsort, &n_expsort));
 
 		/*
 		 * Dump the records.   We use the WT_UPDATE entry for records in
@@ -192,11 +190,11 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 				if (!WT_FIX_DELETE_ISSET(
 				    WT_RLE_REPEAT_DATA(cipdata)))
 					dp->p(WT_RLE_REPEAT_DATA(
-					    cipdata), db->fixed_len, fp);
+					    cipdata), btree->fixed_len, fp);
 	}
 	/* Free the sort array. */
 	if (expsort != NULL)
-		__wt_free(env, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
+		__wt_free(session, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
 
 	return (0);
 }
@@ -206,9 +204,9 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
  *	Dump a WT_PAGE_COL_VAR page.
  */
 static int
-__wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	DB *db;
+	BTREE *btree;
 	WT_SCRATCH *tmp;
 	WT_COL *cip;
 	WT_ITEM *item;
@@ -218,12 +216,12 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	uint32_t i;
 	void *huffman;
 
-	db = toc->db;
+	btree = session->btree;
 	dsk = page->dsk;
-	huffman = db->btree->huffman_data;
+	huffman = btree->huffman_data;
 	ret = 0;
 
-	WT_RET(__wt_scr_alloc(toc, 0, &tmp));
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		/* Check for update. */
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
@@ -244,12 +242,12 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_ERR(__wt_item_process(toc, item, tmp));
+			WT_ERR(__wt_item_process(session, item, tmp));
 			dp->p(tmp->item.data, tmp->item.size, dp->stream);
 			break;
 		case WT_ITEM_DEL:
 			break;
-		WT_ILLEGAL_FORMAT_ERR(db, ret);
+		WT_ILLEGAL_FORMAT_ERR(btree, ret);
 		}
 	}
 
@@ -262,9 +260,9 @@ err:	__wt_scr_release(&tmp);
  *	Dump a WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
+__wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
-	DB *db;
+	BTREE *btree;
 	WT_DATAITEM *key, *value, key_local, value_local;
 	WT_SCRATCH *key_tmp, *value_tmp;
 	WT_ITEM *item;
@@ -274,14 +272,14 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	int ret;
 	void *huffman;
 
-	db = toc->db;
+	btree = session->btree;
 	key = value = NULL;
 	key_tmp = value_tmp = NULL;
-	huffman = db->btree->huffman_data;
+	huffman = btree->huffman_data;
 	ret = 0;
 
-	WT_ERR(__wt_scr_alloc(toc, 0, &key_tmp));
-	WT_ERR(__wt_scr_alloc(toc, 0, &value_tmp));
+	WT_ERR(__wt_scr_alloc(session, 0, &key_tmp));
+	WT_ERR(__wt_scr_alloc(session, 0, &value_tmp));
 	WT_CLEAR(key_local);
 	WT_CLEAR(value_local);
 
@@ -296,7 +294,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * Set the key.
 		 */
 		if (__wt_key_process(rip)) {
-			WT_ERR(__wt_item_process(toc, rip->key, key_tmp));
+			WT_ERR(__wt_item_process(session, rip->key, key_tmp));
 			key = &key_tmp->item;
 		} else
 			key = (WT_DATAITEM *)rip;
@@ -323,10 +321,10 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_ERR(__wt_item_process(toc, item, value_tmp));
+			WT_ERR(__wt_item_process(session, item, value_tmp));
 			value = &value_tmp->item;
 			break;
-		WT_ILLEGAL_FORMAT_ERR(db, ret);
+		WT_ILLEGAL_FORMAT_ERR(btree, ret);
 		}
 
 		dp->p(key->data, key->size, dp->stream);

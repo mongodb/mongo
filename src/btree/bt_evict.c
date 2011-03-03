@@ -8,21 +8,21 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int  __wt_evict(WT_TOC *);
-static void __wt_evict_clean(WT_TOC *);
+static int  __wt_evict(SESSION *);
+static void __wt_evict_clean(SESSION *);
 static int  __wt_evict_compare_lru(const void *a, const void *b);
 static int  __wt_evict_compare_page(const void *a, const void *b);
-static int  __wt_evict_dirty(WT_TOC *);
-static void __wt_evict_hazard_check(WT_TOC *);
+static int  __wt_evict_dirty(SESSION *);
+static void __wt_evict_hazard_check(SESSION *);
 static int  __wt_evict_hazard_compare(const void *a, const void *b);
-static void __wt_evict_set(WT_TOC *);
-static void __wt_evict_state_check(WT_TOC *);
+static void __wt_evict_set(SESSION *);
+static void __wt_evict_state_check(SESSION *);
 static int  __wt_evict_subtrees(WT_PAGE *);
-static int  __wt_evict_walk(WT_TOC *);
-static int  __wt_evict_walk_single(WT_TOC *, BTREE *, u_int);
+static int  __wt_evict_walk(SESSION *);
+static int  __wt_evict_walk_single(SESSION *, BTREE *, u_int);
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_evict_hazard_validate(ENV *, WT_PAGE *);
+static void __wt_evict_hazard_validate(CONNECTION *, WT_PAGE *);
 #endif
 
 /*
@@ -56,12 +56,14 @@ static void __wt_evict_hazard_validate(ENV *, WT_PAGE *);
  *	See if the eviction server thread needs to be awakened.
  */
 void
-__wt_workq_evict_server(ENV *env, int force)
+__wt_workq_evict_server(CONNECTION *conn, int force)
 {
+	SESSION *session;
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
 
-	cache = env->ienv->cache;
+	session = &conn->default_session;
+	cache = conn->cache;
 
 	/* If the eviction server is running, there's nothing to do. */
 	if (!cache->evict_sleeping)
@@ -76,7 +78,7 @@ __wt_workq_evict_server(ENV *env, int force)
 	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
 		return;
 
-	WT_VERBOSE(env, WT_VERB_EVICT, (env,
+	WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 	    "waking eviction server: force %sset, read lockout %sset, "
 	    "bytes inuse %s max (%lluMB %s %lluMB), ",
 	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
@@ -86,7 +88,7 @@ __wt_workq_evict_server(ENV *env, int force)
 	    (unsigned long long)(bytes_max / WT_MEGABYTE)));
 
 	cache->evict_sleeping = 0;
-	__wt_unlock(env, cache->mtx_evict);
+	__wt_unlock(session, cache->mtx_evict);
 }
 
 /*
@@ -96,21 +98,19 @@ __wt_workq_evict_server(ENV *env, int force)
 void *
 __wt_cache_evict_server(void *arg)
 {
-	ENV *env;
-	IENV *ienv;
+	CONNECTION *conn;
 	WT_CACHE *cache;
-	WT_TOC *toc;
+	SESSION *session;
 	uint64_t bytes_inuse, bytes_max;
 	int ret;
 
-	env = arg;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	conn = arg;
+	cache = conn->cache;
 	ret = 0;
 
 	/* We need a thread of control because we're reading/writing pages. */
-	toc = NULL;
-	WT_ERR(__wt_toc_api_set(env, "CacheReconciliation", NULL, &toc));
+	session = NULL;
+	WT_ERR(__wt_session_api_set(conn, "CacheReconciliation", NULL, &session));
 
 	/*
 	 * Multiple pages are marked for eviction by the eviction server, which
@@ -124,37 +124,37 @@ __wt_cache_evict_server(void *arg)
 	 * Reconciliation is probably running because the cache is full, which
 	 * means reads are locked out -- reconciliation can read, regardless.
 	 */
-	F_SET(toc, WT_READ_EVICT | WT_READ_PRIORITY);
+	F_SET(session, WT_READ_EVICT | WT_READ_PRIORITY);
 
 	/*
 	 * Allocate memory for a copy of the hazard references -- it's a fixed
 	 * size so doesn't need run-time adjustments.
 	 */
-	cache->hazard_elem = env->toc_size * env->hazard_size;
-	WT_ERR(__wt_calloc_def(env, cache->hazard_elem, &cache->hazard));
+	cache->hazard_elem = conn->session_size * conn->hazard_size;
+	WT_ERR(__wt_calloc_def(session, cache->hazard_elem, &cache->hazard));
 	cache->hazard_len = cache->hazard_elem * WT_SIZEOF32(WT_PAGE *);
 
 	for (;;) {
-		WT_VERBOSE(env,
-		    WT_VERB_EVICT, (env, "eviction server sleeping"));
+		WT_VERBOSE(conn,
+		    WT_VERB_EVICT, (session, "eviction server sleeping"));
 		cache->evict_sleeping = 1;
-		__wt_lock(env, cache->mtx_evict);
-		WT_VERBOSE(env,
-		    WT_VERB_EVICT, (env, "eviction server waking"));
+		__wt_lock(session, cache->mtx_evict);
+		WT_VERBOSE(conn,
+		    WT_VERB_EVICT, (session, "eviction server waking"));
 
 		/*
 		 * Check for environment exit; do it here, instead of the top of
 		 * the loop because doing it here keeps us from doing a bunch of
 		 * worked when simply awakened to quit.
 		 */
-		if (!F_ISSET(ienv, WT_SERVER_RUN))
+		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 
 		for (;;) {
 			/* Single-thread reconciliation. */
-			__wt_lock(env, cache->mtx_reconcile);
-			ret = __wt_evict(toc);
-			__wt_unlock(env, cache->mtx_reconcile);
+			__wt_lock(session, cache->mtx_reconcile);
+			ret = __wt_evict(session);
+			__wt_unlock(session, cache->mtx_reconcile);
 			if (ret != 0)
 				goto err;
 
@@ -175,17 +175,17 @@ __wt_cache_evict_server(void *arg)
 	}
 
 err:	if (cache->evict != NULL)
-		__wt_free(env, cache->evict, cache->evict_len);
+		__wt_free(session, cache->evict, cache->evict_len);
 	if (cache->hazard != NULL)
-		__wt_free(env, cache->hazard, cache->hazard_len);
-	if (toc != NULL)
-		WT_TRET(toc->close(toc, 0));
+		__wt_free(session, cache->hazard, cache->hazard_len);
+	if (session != NULL)
+		WT_TRET(session->close(session, 0));
 
 	if (ret != 0)
-		__wt_api_env_err(env, ret, "cache eviction server error");
+		__wt_err(session, ret, "cache eviction server error");
 
 	WT_VERBOSE(
-	    env, WT_VERB_EVICT, (env, "cache eviction server exiting"));
+	    conn, WT_VERB_EVICT, (session, "cache eviction server exiting"));
 
 	return (NULL);
 }
@@ -195,18 +195,16 @@ err:	if (cache->evict != NULL)
  *	Evict pages from the cache.
  */
 static int
-__wt_evict(WT_TOC *toc)
+__wt_evict(SESSION *session)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	u_int elem, i, j;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
-	WT_RET(__wt_evict_walk(toc));
+	WT_RET(__wt_evict_walk(session));
 
 	/*
 	 * We have an array of page eviction references that may contain NULLs,
@@ -263,11 +261,13 @@ done_duplicates:
 	 * change and benefits any thread waiting to read a clean page picked
 	 * for discarding, unlikely though that may be.)
 	 */
-	__wt_evict_set(toc);
-	__wt_evict_hazard_check(toc);
-	__wt_evict_state_check(toc);
-	__wt_evict_clean(toc);
-	return (__wt_evict_dirty(toc));
+	__wt_evict_set(session);
+	__wt_evict_hazard_check(session);
+	__wt_evict_state_check(session);
+	__wt_evict_clean(session);
+	WT_RET(__wt_evict_dirty(session));
+
+	return (0);
 }
 
 /*
@@ -275,18 +275,16 @@ done_duplicates:
  *	Fill in the array by walk the next set of pages.
  */
 static int
-__wt_evict_walk(WT_TOC *toc)
+__wt_evict_walk(SESSION *session)
 {
-	ENV *env;
 	BTREE *btree;
-	IENV *ienv;
+	CONNECTION *conn;
 	WT_CACHE *cache;
 	u_int elem, i;
 	int ret;
 
-	env = toc->env;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 
 	/*
 	 * Resize the array in which we're tracking pages, as necessary, then
@@ -296,21 +294,21 @@ __wt_evict_walk(WT_TOC *toc)
 	 * it's not that slow.
 	 */
 	ret = 0;
-	__wt_lock(env, ienv->mtx);
-	elem = WT_EVICT_WALK_BASE + (ienv->dbqcnt * WT_EVICT_WALK_PER_TABLE);
-	if (elem <= cache->evict_elem || (ret = __wt_realloc(env,
+	__wt_lock(session, conn->mtx);
+	elem = WT_EVICT_WALK_BASE + (conn->dbqcnt * WT_EVICT_WALK_PER_TABLE);
+	if (elem <= cache->evict_elem || (ret = __wt_realloc(session,
 	    &cache->evict_len,
 	    elem * sizeof(WT_EVICT_LIST), &cache->evict)) == 0) {
 		cache->evict_elem = elem;
 
 		i = WT_EVICT_WALK_BASE;
-		TAILQ_FOREACH(btree, &ienv->dbqh, q) {
-			if ((ret = __wt_evict_walk_single(toc, btree, i)) != 0)
+		TAILQ_FOREACH(btree, &conn->dbqh, q) {
+			if ((ret = __wt_evict_walk_single(session, btree, i)) != 0)
 				break;
 			i += WT_EVICT_WALK_PER_TABLE;
 		}
 	}
-	__wt_unlock(env, ienv->mtx);
+	__wt_unlock(session, conn->mtx);
 	return (ret);
 }
 
@@ -319,13 +317,13 @@ __wt_evict_walk(WT_TOC *toc)
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__wt_evict_walk_single(WT_TOC *toc, BTREE *btree, u_int slot)
+__wt_evict_walk_single(SESSION *session, BTREE *btree, u_int slot)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	int i, restarted_once;
 
-	cache = toc->env->ienv->cache;
+	cache = S2C(session)->cache;
 
 	/*
 	 * Tricky little loop that restarts the walk as necessary, without
@@ -335,13 +333,13 @@ __wt_evict_walk_single(WT_TOC *toc, BTREE *btree, u_int slot)
 
 	/* If we haven't yet opened a tree-walk structure, do so. */
 	if (btree->evict_walk.tree == NULL)
-restart:	WT_RET(__wt_walk_begin(toc,
+restart:	WT_RET(__wt_walk_begin(session,
 		    &btree->root_page, &btree->evict_walk));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	do {
 		evict = &cache->evict[slot];
-		WT_RET(__wt_walk_next(toc,
+		WT_RET(__wt_walk_next(session,
 		    &btree->evict_walk, WT_WALK_CACHE, &evict->ref));
 
 		/*
@@ -367,19 +365,15 @@ restart:	WT_RET(__wt_walk_begin(toc,
  *	Remove any entries for a file from the eviction list.
  */
 void
-__wt_evict_db_clear(WT_TOC *toc)
+__wt_evict_db_clear(SESSION *session)
 {
-	ENV *env;
 	BTREE *btree;
-	IENV *ienv;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	u_int i;
 
-	env = toc->env;
-	btree = toc->db->btree;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	btree = session->btree;
+	cache = S2C(session)->cache;
 
 	/*
 	 * Discard any entries in the eviction list to a file we're closing
@@ -397,16 +391,14 @@ __wt_evict_db_clear(WT_TOC *toc)
  *	Set the WT_REF_EVICT flag on a set of pages.
  */
 static void
-__wt_evict_set(WT_TOC *toc)
+__wt_evict_set(SESSION *session)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_REF *ref;
 	u_int i;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 
 	/*
 	 * Set the entry state so readers don't try and use the pages.   Once
@@ -429,10 +421,9 @@ __wt_evict_set(WT_TOC *toc)
  *	discarded.
  */
 static void
-__wt_evict_hazard_check(WT_TOC *toc)
+__wt_evict_hazard_check(SESSION *session)
 {
-	ENV *env;
-	IENV *ienv;
+	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_PAGE **hazard, **end_hazard, *page;
@@ -440,9 +431,8 @@ __wt_evict_hazard_check(WT_TOC *toc)
 	WT_STATS *stats;
 	u_int i;
 
-	env = toc->env;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 	stats = cache->stats;
 
 	/* Sort the eviction candidates by WT_PAGE address. */
@@ -452,7 +442,7 @@ __wt_evict_hazard_check(WT_TOC *toc)
 	/* Copy the hazard reference array and sort it by WT_PAGE address. */
 	hazard = cache->hazard;
 	end_hazard = hazard + cache->hazard_elem;
-	memcpy(hazard, ienv->hazard, cache->hazard_elem * sizeof(WT_PAGE *));
+	memcpy(hazard, conn->hazard, cache->hazard_elem * sizeof(WT_PAGE *));
 	qsort(hazard, (size_t)cache->hazard_elem,
 	    sizeof(WT_PAGE *), __wt_evict_hazard_compare);
 
@@ -478,7 +468,7 @@ __wt_evict_hazard_check(WT_TOC *toc)
 		 * No memory flush needed, the state field is declared volatile.
 		 */
 		if (*hazard == page) {
-			WT_VERBOSE(env, WT_VERB_EVICT, (env,
+			WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 			    "eviction skipped page addr %lu (hazard reference)",
 			    page->addr));
 			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
@@ -502,17 +492,17 @@ __wt_evict_hazard_check(WT_TOC *toc)
  *	Confirm these are pages we want to evict.
  */
 static void
-__wt_evict_state_check(WT_TOC *toc)
+__wt_evict_state_check(SESSION *session)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
 	WT_REF *ref;
 	u_int i;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 
 	/*
 	 * We "own" the pages (we've flagged them for eviction, and there were
@@ -527,7 +517,7 @@ __wt_evict_state_check(WT_TOC *toc)
 
 		/* Ignore pinned pages. */
 		if (WT_PAGE_IS_PINNED(page)) {
-			WT_VERBOSE(env, WT_VERB_EVICT, (env,
+			WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 			    "eviction skipped page addr %lu (pinned)",
 			    page->addr));
 			goto skip;
@@ -538,7 +528,7 @@ __wt_evict_state_check(WT_TOC *toc)
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
 			if (__wt_evict_subtrees(page)) {
-				WT_VERBOSE(env, WT_VERB_EVICT, (env,
+				WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 				    "eviction skipped page addr %lu (subtrees)",
 				    page->addr));
 				goto skip;
@@ -564,9 +554,8 @@ skip:		/*
  *	Discard clean cache pages.
  */
 static void
-__wt_evict_clean(WT_TOC *toc)
+__wt_evict_clean(SESSION *session)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
@@ -574,8 +563,7 @@ __wt_evict_clean(WT_TOC *toc)
 	WT_STATS *stats;
 	u_int i;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 	stats = cache->stats;
 
 	WT_EVICT_FOREACH(cache, evict, i) {
@@ -586,10 +574,10 @@ __wt_evict_clean(WT_TOC *toc)
 			continue;
 
 #ifdef HAVE_DIAGNOSTIC
-		__wt_evict_hazard_validate(env, page);
+		__wt_evict_hazard_validate(S2C(session), page);
 #endif
 		WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
-		WT_VERBOSE(env, WT_VERB_EVICT, (env,
+		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "cache evicting clean page addr %lu", page->addr));
 
 		/*
@@ -606,7 +594,7 @@ __wt_evict_clean(WT_TOC *toc)
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
 		/* The page can no longer be found, free the memory. */
-		__wt_page_discard(toc, page);
+		__wt_page_discard(session, page);
 	}
 }
 
@@ -615,9 +603,9 @@ __wt_evict_clean(WT_TOC *toc)
  *	Discard dirty cache pages.
  */
 static int
-__wt_evict_dirty(WT_TOC *toc)
+__wt_evict_dirty(SESSION *session)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
@@ -626,8 +614,8 @@ __wt_evict_dirty(WT_TOC *toc)
 	u_int i;
 	int ret, update_gen;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 	stats = cache->stats;
 	update_gen = 0;
 
@@ -647,23 +635,23 @@ __wt_evict_dirty(WT_TOC *toc)
 		}
 
 #ifdef HAVE_DIAGNOSTIC
-		__wt_evict_hazard_validate(env, page);
+		__wt_evict_hazard_validate(conn, page);
 #endif
 		WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
-		WT_VERBOSE(env, WT_VERB_EVICT, (env,
+		WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 		    "cache evicting dirty page addr %lu", page->addr));
 
 		/*
-		 * We're using our WT_TOC handle, it needs to reference the
-		 * correct DB handle.
+		 * We're using our session handle, it needs to reference the
+		 * correct btree handle.
 		 *
 		 * XXX
 		 * This is pretty sleazy, but I'm hesitant to try and drive
-		 * a separate DB/IDB handle down through the reconciliation
+		 * a separate btree handle down through the reconciliation
 		 * code.
 		 */
-		toc->db = evict->btree->db;
-		WT_ERR(__wt_page_reconcile(toc, page));
+		session->btree = evict->btree;
+		WT_ERR(__wt_page_reconcile(session, page));
 
 		/*
 		 * One special case -- of the page was deleted, the state has
@@ -682,7 +670,7 @@ __wt_evict_dirty(WT_TOC *toc)
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
 		/* The page can no longer be found, free the memory. */
-		__wt_page_discard(toc, page);
+		__wt_page_discard(session, page);
 	}
 	return (0);
 
@@ -817,23 +805,20 @@ __wt_evict_hazard_compare(const void *a, const void *b)
  *	Return if a page is or isn't on the hazard list.
  */
 static void
-__wt_evict_hazard_validate(ENV *env, WT_PAGE *page)
+__wt_evict_hazard_validate(CONNECTION *conn, WT_PAGE *page)
 {
-	IENV *ienv;
 	WT_PAGE **hp;
-	WT_TOC **tp, *toc;
+	SESSION **tp, *session;
 
-	ienv = env->ienv;
-
-	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp)
-		for (hp = toc->hazard;
-		    hp < toc->hazard + toc->env->hazard_size; ++hp)
+	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
+		for (hp = session->hazard;
+		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
 			if (*hp == page) {
-				__wt_api_env_errx(env,
+				__wt_err(session, 0,
 				    "hazard eviction check for page %lu "
 				    "failed",
 				    (u_long)page->addr);
-				__wt_abort(env);
+				__wt_abort(session);
 			}
 }
 
@@ -842,19 +827,17 @@ __wt_evict_hazard_validate(ENV *env, WT_PAGE *page)
  *	Display the eviction list.
  */
 void
-__wt_evict_dump(WT_TOC *toc)
+__wt_evict_dump(SESSION *session)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_MBUF mb;
 	u_int n;
 	int sep;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 
-	__wt_mb_init(env, &mb);
+	__wt_mb_init(session, &mb);
 	__wt_mb_add(&mb, "eviction list");
 
 	for (sep = ':', n = 0; n < cache->evict_elem; ++n) {
@@ -872,15 +855,15 @@ __wt_evict_dump(WT_TOC *toc)
  *	Dump the in-memory cache.
  */
 int
-__wt_evict_cache_dump(WT_TOC *toc)
+__wt_evict_cache_dump(SESSION *session)
 {
 	BTREE *btree;
-	IENV *ienv;
+	CONNECTION *conn;
 
-	ienv = toc->env->ienv;
+	conn = S2C(session);
 
-	TAILQ_FOREACH(btree, &ienv->dbqh, q)
-		WT_RET(__wt_evict_tree_dump(toc, btree));
+	TAILQ_FOREACH(btree, &conn->dbqh, q)
+		WT_RET(__wt_evict_tree_dump(session, btree));
 	return (0);
 }
 
@@ -889,38 +872,38 @@ __wt_evict_cache_dump(WT_TOC *toc)
  *	Dump an in-memory tree.
  */
 int
-__wt_evict_tree_dump(WT_TOC *toc, BTREE *btree)
+__wt_evict_tree_dump(SESSION *session, BTREE *btree)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_REF *ref;
 	WT_WALK walk;
 	WT_MBUF mb;
 	int sep;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 
-	WT_VERBOSE(env, WT_VERB_EVICT, (env,
+	WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 	    "%s: pages inuse %llu, bytes inuse (%llu), max (%llu)",
 	    btree->name,
 	    __wt_cache_pages_inuse(cache),
 	    __wt_cache_bytes_inuse(cache),
 	    WT_STAT(cache->stats, CACHE_BYTES_MAX)));
 
-	__wt_mb_init(env, &mb);
+	__wt_mb_init(session, &mb);
 	__wt_mb_add(&mb, "in-memory page list");
 
 	WT_CLEAR(walk);
-	WT_RET(__wt_walk_begin(toc, &btree->root_page, &walk));
+	WT_RET(__wt_walk_begin(session, &btree->root_page, &walk));
 	for (sep = ':';;) {
-		WT_RET(__wt_walk_next(toc, &walk, WT_WALK_CACHE, &ref));
+		WT_RET(__wt_walk_next(session, &walk, WT_WALK_CACHE, &ref));
 		if (ref == NULL)
 			break;
 		__wt_mb_add(&mb, "%c %lu", sep, (u_long)ref->page->addr);
 		sep = ',';
 	}
-	__wt_walk_end(env, &walk);
+	__wt_walk_end(session, &walk);
 	__wt_mb_discard(&mb);
 
 	return (0);
@@ -931,17 +914,17 @@ __wt_evict_tree_dump(WT_TOC *toc, BTREE *btree)
  *	Return the count of nodes in the cache.
  */
 int
-__wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp)
+__wt_evict_cache_count(SESSION *session, uint64_t *nodesp)
 {
 	BTREE *btree;
-	IENV *ienv;
+	CONNECTION *conn;
 	uint64_t nodes;
 
-	ienv = toc->env->ienv;
+	conn = S2C(session);
 
 	*nodesp = 0;
-	TAILQ_FOREACH(btree, &ienv->dbqh, q) {
-		WT_RET(__wt_evict_tree_count(toc, btree, &nodes));
+	TAILQ_FOREACH(btree, &conn->dbqh, q) {
+		WT_RET(__wt_evict_tree_count(session, btree, &nodes));
 		*nodesp += nodes;
 	}
 	return (0);
@@ -952,25 +935,22 @@ __wt_evict_cache_count(WT_TOC *toc, uint64_t *nodesp)
  *	Return a count of nodes in the tree.
  */
 int
-__wt_evict_tree_count(WT_TOC *toc, BTREE *btree, uint64_t *nodesp)
+__wt_evict_tree_count(SESSION *session, BTREE *btree, uint64_t *nodesp)
 {
-	ENV *env;
 	WT_REF *ref;
 	WT_WALK walk;
 	uint64_t nodes;
 
-	env = toc->env;
-
 	WT_CLEAR(walk);
-	WT_RET(__wt_walk_begin(toc, &btree->root_page, &walk));
+	WT_RET(__wt_walk_begin(session, &btree->root_page, &walk));
 	for (nodes = 0;;) {
-		WT_RET(__wt_walk_next(toc, &walk, WT_WALK_CACHE, &ref));
+		WT_RET(__wt_walk_next(session, &walk, WT_WALK_CACHE, &ref));
 		if (ref == NULL)
 			break;
 		++nodes;
 	}
 	*nodesp = nodes;
-	__wt_walk_end(env, &walk);
+	__wt_walk_end(session, &walk);
 
 	return (0);
 }

@@ -53,7 +53,7 @@ for line in open('../src/include/stat.h', 'r'):
 		print_def('BTREE handle', btree_stats)
 		print_def('BTREE file', btree_fstats)
 		print_def('CACHE handle', cache_stats)
-		print_def('IENV handle', ienv_stats)
+		print_def('CONNECTION handle', conn_stats)
 		print_def('FH handle', fh_stats)
 		print_def('Methods', method_stats)
 f.close()
@@ -65,10 +65,10 @@ def print_func(handle, list):
 	f.write('\n')
 	f.write('int\n')
 	f.write('__wt_stat_alloc_' +
-	    handle.lower() + '_stats(ENV *env, WT_STATS **statsp)\n')
+	    handle.lower() + '_stats(SESSION *session, WT_STATS **statsp)\n')
 	f.write('{\n')
 	f.write('\tWT_STATS *stats;\n\n')
-	f.write('\tWT_RET(__wt_calloc(env, ' +
+	f.write('\tWT_RET(__wt_calloc(session, ' +
 	    str(len(list) + 1) + ', sizeof(WT_STATS), &stats));\n\n')
 
 	for l in sorted(list.items()):
@@ -101,7 +101,7 @@ f.write('#include "wt_internal.h"\n')
 print_func('BTREE_HANDLE', btree_stats)
 print_func('BTREE_FILE', btree_fstats)
 print_func('CACHE', cache_stats)
-print_func('ENV', ienv_stats)
+print_func('CONNECTION', conn_stats)
 print_func('FH', fh_stats)
 print_func('METHOD', method_stats)
 

@@ -1,4 +1,4 @@
-# Read the api file and output C for the WT_TOC/DB structures, getter/setter
+# Read the api file and output C for the SESSION/BTREE structures, getter/setter
 # functions, and other API initialization.
 
 import os, string, sys
@@ -173,15 +173,19 @@ def func_method_getset(a, f):
 	extfunc = config.count('extfunc')
 
 	# Declarations:
-	# If we don't have an environment handle, acquire one.
+	# If we don't have a connection handle, acquire one.
+	if handle != 'connection':
+		if handle == 'session':
+			f.write('\tCONNECTION *connection = S2C(' + handle + ');\n')
+		else:
+			f.write('\tCONNECTION *connection = ' + handle + '->conn;\n')
+	if handle != 'session':
+		f.write('\tSESSION *session = &connection->default_session;\n')
 	# If we are hand-coding the routine, we'll need a place to save the
 	# return value.
-	if handle != 'env':
-		f.write('\tENV *env = ' + handle + '->env;\n')
-	f.write('\tIENV *ienv = env->ienv;\n')
 	if extfunc:
 		f.write('\tint ret;\n')
-	if handle != 'env' or extfunc:
+	if handle != 'connection' or extfunc:
 		f.write('\n')
 
 	# If we have a "flags" argument to a setter function, check it
@@ -189,7 +193,7 @@ def func_method_getset(a, f):
 	if config.count('setter'):
 		for l in args:
 			if l.count('flags/'):
-				f.write('\tWT_ENV_FCHK(env, "' +
+				f.write('\tWT_CONN_FCHK(connection, "' +
 				    handle.upper() + '.' + method +
 				    '",\n\t    ' + l.split('/')[0]  +
 				    ', WT_APIMASK_' + handle.upper() +
@@ -208,12 +212,12 @@ def func_method_getset(a, f):
 		s += ')'
 		f.write(s + '));\n')
 
-	# getter/setter implies ienvlock: lock the data structure.
-	f.write('\t__wt_lock(env, ienv->mtx);\n')
+	# getter/setter implies connlock: lock the data structure.
+	f.write('\t__wt_lock(session, connection->mtx);\n')
 
 	# Count the call.
 	s = a.handle + '_' + a.method
-	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
+	f.write('\tWT_STAT_INCR(connection->method_stats, ' + s.upper() + ');\n')
 
 	# If the function is hand-coded, just call it.
 	if extfunc:
@@ -230,13 +234,15 @@ def func_method_getset(a, f):
 			    handle + '->' + l.split('/')[0] + ';\n')
 	else:
 		for l in args:
-			if l.count('flags/') and flags[a.key][0] == '__NONE__':
+			if l.count('flags/'):
+				if flags[a.key][0] != '__NONE__':
+					f.write('\tF_SET(' + handle + ', flags);\n')
 				continue
 			f.write('\t' + handle + '->' +
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 
-	# getter/setter implies ienvlock: unlock the data structure.
-	f.write('\t__wt_unlock(env, ienv->mtx);\n')
+	# getter/setter implies connlock: unlock the data structure.
+	f.write('\t__wt_unlock(session, connection->mtx);\n')
 	f.write('\treturn (')
 	if extfunc:
 		f.write('ret')
@@ -256,63 +262,67 @@ def func_method(a, f):
 	args = a.args
 
 	colonly = config.count('colonly')	# Check row-only databases
-	locking = config.count('ienvlock')	# Lock
+	locking = config.count('connlock')	# Lock
 	rdonly = config.count('rdonly')		# Check read-only databases
 	restart = config.count('restart')	# Handle WT_RESTART
 	rowonly = config.count('rowonly')	# Check row-only databases
-
-	toc = config.count('toc')		# Handle a WT_TOC
-	toc_alloc = toc and not args[0].count('toc/')
 
 	flagchk = 0				# We're checking flags
 	for l in args:
 		if l.count('flags/'):
 			flagchk = 1
 
+	session = config.count('session')	# Handle a SESSION
+	have_session = handle == 'session' or args[0].count('session/')
+
 	# We may need a method name.
-	if colonly or flagchk or rdonly or rowonly or toc:
+	if colonly or flagchk or rdonly or rowonly or session:
 		f.write('\tconst char *method_name = "' +
 		    handle.upper() + '.' + method + '";\n')
 
-	# We need an ENV/IENV handle pair, find them.
-	if handle != 'env':
-		f.write('\tENV *env = ' + handle + '->env;\n')
-	f.write('\tIENV *ienv = env->ienv;\n')
+	# We need a CONNECTION handle, find it.
+	if handle != 'connection':
+		if handle == 'session':
+			f.write('\tCONNECTION *connection = S2C(' + handle + ');\n')
+		else:
+			f.write('\tCONNECTION *connection = ' + handle + '->conn;\n')
 
-	# If we're allocating a WT_TOC, we'll need a pointer on the stack.
-	if toc_alloc:
-		f.write('\tWT_TOC *toc = NULL;\n')
+	# If we're allocating a SESSION, we'll need a pointer on the stack.
+	if session and not have_session:
+		f.write('\tSESSION *session = NULL;\n')
+	elif locking and not have_session:
+		f.write('\tSESSION *session = &connection->default_session;\n')
 	f.write('\tint ret;\n\n')
 
 	# Check if the method is illegal for the database type.
 	if colonly:
-		f.write('\tWT_DB_COL_ONLY(db, method_name);\n')
+		f.write('\tWT_DB_COL_ONLY(btree, method_name);\n')
 	if rowonly:
-		f.write('\tWT_DB_ROW_ONLY(db, method_name);\n')
+		f.write('\tWT_DB_ROW_ONLY(btree, method_name);\n')
 
 	# Check if the method is illegal for read-only databases.
 	if rdonly:
-		f.write('\tWT_DB_RDONLY(db, method_name);\n')
+		f.write('\tWT_DB_RDONLY(btree, method_name);\n')
+
+	# If entering the API with a SESSION handle, allocate/initialize it.
+	if session:
+		f.write('\tWT_RET(' +
+		    '__wt_session_api_set(connection, method_name, btree, &session));\n')
 
 	# Check flags.
 	if flagchk:
-		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
+		f.write('\tWT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_' +
 		    handle.upper() + '_' + method.upper() + ');\n')
-
-	# If entering the API with a WT_TOC handle, allocate/initialize it.
-	if toc:
-		f.write('\tWT_RET(' +
-		    '__wt_toc_api_set(env, method_name, db, &toc));\n')
 
 	# Acquire the lock.
 	if locking:
-		f.write('\t__wt_lock(env, ienv->mtx);\n')
+		f.write('\t__wt_lock(session, connection->mtx);\n')
 
 	# Method call statistics -- we put the update inside the lock just to
 	# make the stat value a little more precise.
 	stat = a.handle + '_' + a.method
 	stat = stat.upper()
-	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + stat + ');\n')
+	f.write('\tWT_STAT_INCR(connection->method_stats, ' + stat + ');\n')
 
 	# Call the underlying method function, handling restart as necessary.
 	f.write('\t')
@@ -320,30 +330,33 @@ def func_method(a, f):
 		f.write('while ((')
 	f.write('ret = __wt_' + handle + '_' + method + '(')
 
-	# Some functions take DB handles but pass WT_TOC handles; some functions	# take DB and WT_TOC handles, and pass WT_TOC handles.
-	if toc:
-		handle = 'toc'
+	# Some functions take BTREE handles but pass SESSION handles; some functions
+    # take BTREE and SESSION handles, and pass SESSION handles.
+	if session:
+		handle = 'session'
 	f.write(handle)
 	for l in args:
 		if l.count('flags/') and flags[a.key][0] == '__NONE__':
 			continue
-		if not toc or not l.count('toc/'):
+		if not session or not l.count('session/'):
 			f.write(', ' + l.split('/')[0])
 	if restart:
 		f.write(')) == WT_RESTART)\n')
-		f.write('\t\tWT_STAT_INCR(ienv->method_stats, ' +
+		f.write('\t\tWT_STAT_INCR(connection->method_stats, ' +
 		    stat + '_RESTART);\n')
 	else:
 		f.write(');\n')
 
 	# Unlock.
 	if locking:
-		f.write('\t__wt_unlock(env, ienv->mtx);\n')
+		if handle == 'session' and method == 'close':
+			f.write('\tsession = &connection->default_session;\n')
+		f.write('\t__wt_unlock(session, connection->mtx);\n')
 
-	# If entering the API with a WT_TOC handle, free/clear it.
-	if toc:
-		f.write('\tWT_TRET(__wt_toc_api_clr(toc, method_name, ')
-		if toc_alloc:
+	# If entering the API with a SESSION handle, free/clear it.
+	if session:
+		f.write('\tWT_TRET(__wt_session_api_clr(session, method_name, ')
+		if not have_session:
 			f.write('1')
 		else:
 			f.write('0')
@@ -376,59 +389,64 @@ for i in sorted(api.items()):
 		func_method(i[1], tfile)
 
 # Write the method default initialization, lockout and transition functions.
-func_method_init('db', 'DB *db', tfile)
-func_method_lockout('db', 'DB *db', tfile)
-func_method_transition('db', 'DB *db', tfile)
+func_method_init('btree', 'BTREE *btree', tfile)
+func_method_lockout('btree', 'BTREE *btree', tfile)
+func_method_transition('btree', 'BTREE *btree', tfile)
 
-func_method_init('env', 'ENV *env', tfile)
-func_method_lockout('env', 'ENV *env', tfile)
-func_method_transition('env', 'ENV *env', tfile)
+func_method_init('connection', 'CONNECTION *connection', tfile)
+func_method_lockout('connection', 'CONNECTION *connection', tfile)
+func_method_transition('connection', 'CONNECTION *connection', tfile)
 
-func_method_lockout('wt_toc', 'WT_TOC *wt_toc', tfile)
-func_method_transition('wt_toc', 'WT_TOC *wt_toc', tfile)
+func_method_lockout('session', 'SESSION *session', tfile)
+func_method_transition('session', 'SESSION *session', tfile)
 
 tfile.close()
-compare_srcfile(tmp_file, '../src/support/api_int.c')
+compare_srcfile(tmp_file, '../src/api/api_int.c')
 
 #####################################################################
-# Update wiredtiger.in file with WT_TOC/DB methods and DB/ENV getter/setter
-# variables.
+# Update api.h file with SESSION/BTREE methods and BTREE/CONNECTION
+# getter/setter variables.
 #####################################################################
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/wiredtiger.in', 'r'):
+for line in open('../src/include/api.h', 'r'):
 	if skip:
-		if line.count('DB methods: END') or\
-		    line.count('ENV methods: END') or\
-		    line.count('WT_TOC methods: END') or\
-		    line.count('DB getter/setter variables: END') or\
-		    line.count('ENV getter/setter variables: END'):
+		if line.count('BTREE methods: END') or\
+		    line.count('CONNECTION methods: END') or\
+		    line.count('SESSION methods: END') or\
+		    line.count('SESSION getter/setter variables: END') or\
+		    line.count('BTREE getter/setter variables: END') or\
+		    line.count('CONNECTION getter/setter variables: END'):
 			tfile.write('\t/*\n' + line)
 			skip = 0
 	else:
 		tfile.write(line)
-	if line.count('DB methods: BEGIN'):
+	if line.count('BTREE methods: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		func_struct_all('db', tfile)
-	elif line.count('ENV methods: BEGIN'):
+		func_struct_all('btree', tfile)
+	elif line.count('CONNECTION methods: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		func_struct_all('env', tfile)
-	elif line.count('WT_TOC methods: BEGIN'):
+		func_struct_all('connection', tfile)
+	elif line.count('SESSION methods: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		func_struct_all('wt_toc', tfile)
-	elif line.count('DB getter/setter variables: BEGIN'):
+		func_struct_all('session', tfile)
+	elif line.count('BTREE getter/setter variables: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		func_struct_variable_all('db', tfile)
-	elif line.count('ENV getter/setter variables: BEGIN'):
+		func_struct_variable_all('btree', tfile)
+	elif line.count('CONNECTION getter/setter variables: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		func_struct_variable_all('env', tfile)
+		func_struct_variable_all('connection', tfile)
+	elif line.count('SESSION getter/setter variables: BEGIN'):
+		skip = 1
+		tfile.write('\t */')
+		func_struct_variable_all('session', tfile)
 
 tfile.close()
-compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
+compare_srcfile(tmp_file, '../src/include/api.h')
 
 os.remove(tmp_file)

@@ -12,17 +12,13 @@
  *	Truncate a file.
  */
 int
-__wt_ftruncate(WT_TOC *toc, WT_FH *fh, off_t len)
+__wt_ftruncate(SESSION *session, WT_FH *fh, off_t len)
 {
-	ENV *env;
-
-	env = toc->env;
-
 	if (ftruncate(fh->fd, len) == 0) {
 		fh->file_size = len;
 		return (0);
 	}
 
-	__wt_api_env_err(env, errno, "%s ftruncate error", fh->name);
+	__wt_err(session, errno, "%s ftruncate error", fh->name);
 	return (WT_ERROR);
 }

@@ -804,11 +804,13 @@ struct WT_ERROR_HANDLER {
 	    int error, const char *errmsg);
 
 	/*! Optional callback to retrieve buffered messages. */
-	int (*get_messages)(WT_ERROR_HANDLER *handler, const char **errmsgp);
+	int (*get_messages)(WT_ERROR_HANDLER *handler,
+	    const char **errmsgp);
 
 	/*! Optional callback to clear buffered messages. */
 	int (*clear_messages)(WT_ERROR_HANDLER *handler);
 };
+
 /*! Pack a structure into a buffer.
  *
  * See @ref packing for a description of the permitted format strings.

@@ -12,28 +12,26 @@
  *	Read a file page.
  */
 int
-__wt_disk_read(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_disk_read(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 	WT_FH *fh;
 	off_t offset;
 	uint32_t checksum;
 
-	db = toc->db;
-	env = toc->env;
-	fh = db->btree->fh;
+	btree = session->btree;
+	fh = btree->fh;
 
-	WT_STAT_INCR(db->btree->stats, FILE_PAGE_READ);
-	WT_STAT_INCR(env->ienv->cache->stats, CACHE_PAGE_READ);
+	WT_STAT_INCR(btree->stats, FILE_PAGE_READ);
+	WT_STAT_INCR(S2C(session)->cache->stats, CACHE_PAGE_READ);
 
-	offset = WT_ADDR_TO_OFF(db, addr);
-	WT_RET(__wt_read(env, fh, offset, size, dsk));
+	offset = WT_ADDR_TO_OFF(btree, addr);
+	WT_RET(__wt_read(session, fh, offset, size, dsk));
 
 	checksum = dsk->checksum;
 	dsk->checksum = 0;
 	if (checksum != __wt_cksum(dsk, size)) {
-		__wt_api_env_errx(env,
+		__wt_err(session, 0,
 		    "read checksum error: addr/size %lu/%lu at offset %llu",
 		    (u_long)addr, (u_long)size, (unsigned long long)offset);
 		return (WT_ERROR);
@@ -47,15 +45,13 @@ __wt_disk_read(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
  *	Write a file page.
  */
 int
-__wt_disk_write(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_disk_write(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 	WT_FH *fh;
 
-	db = toc->db;
-	env = toc->env;
-	fh = db->btree->fh;
+	btree = session->btree;
+	fh = btree->fh;
 
 	/*
 	 * We increment the page LSN in non-transactional stores so it's easy
@@ -74,13 +70,13 @@ __wt_disk_write(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 	} else
 		++dsk->lsn_off;
 
-	WT_ASSERT(env, __wt_verify_dsk_page(toc, dsk, addr, size) == 0);
+	WT_ASSERT(session, __wt_verify_dsk_page(session, dsk, addr, size) == 0);
 
-	WT_STAT_INCR(db->btree->stats, FILE_PAGE_WRITE);
-	WT_STAT_INCR(env->ienv->cache->stats, CACHE_PAGE_WRITE);
+	WT_STAT_INCR(btree->stats, FILE_PAGE_WRITE);
+	WT_STAT_INCR(S2C(session)->cache->stats, CACHE_PAGE_WRITE);
 
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, size);
 
-	return (__wt_write(env, fh, WT_ADDR_TO_OFF(db, addr), size, dsk));
+	return (__wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
 }

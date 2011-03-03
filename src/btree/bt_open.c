@@ -7,47 +7,43 @@
 
 #include "wt_internal.h"
 
-static int __wt_open_verify(DB *);
-static int __wt_open_verify_page_sizes(DB *);
+static int __wt_open_verify(SESSION *, BTREE *);
+static int __wt_open_verify_page_sizes(SESSION *, BTREE *);
 
 /*
  * __wt_bt_open --
  *	Open a Btree.
  */
 int
-__wt_bt_open(WT_TOC *toc, int ok_create)
+__wt_bt_open(SESSION *session, int ok_create)
 {
-	DB *db;
-	ENV *env;
 	BTREE *btree;
 
-	db = toc->db;
-	env = toc->env;
-	btree = db->btree;
+	btree = session->btree;
 
 	/* Check page size configuration. */
-	WT_RET(__wt_open_verify(db));
+	WT_RET(__wt_open_verify(session, btree));
 
 	/* Open the fle. */
-	WT_RET(__wt_open(env, btree->name, btree->mode, ok_create, &btree->fh));
+	WT_RET(__wt_open(session, btree->name, btree->mode, ok_create, &btree->fh));
 
 	/*
 	 * If the file size is 0, write a description page; if the file size
-	 * is non-zero, update the DB handle based on the on-disk description
+	 * is non-zero, update the BTREE handle based on the on-disk description
 	 * page.  (If the file isn't empty, there must be a description page.)
 	 */
 	if (btree->fh->file_size == 0)
-		WT_RET(__wt_desc_write(toc));
+		WT_RET(__wt_desc_write(session));
 	else {
-		WT_RET(__wt_desc_read(toc));
+		WT_RET(__wt_desc_read(session));
 
 		/* If there's a root page, pin it. */
 		if (btree->root_page.addr != WT_ADDR_INVALID)
-			WT_RET(__wt_root_pin(toc));
+			WT_RET(__wt_root_pin(session));
 	}
 
 	/* Read the free-list into memory. */
-	WT_RET(__wt_block_read(toc));
+	WT_RET(__wt_block_read(session));
 
 	return (0);
 }
@@ -58,18 +54,14 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
  *	set defaults as necessary.
  */
 static int
-__wt_open_verify(DB *db)
+__wt_open_verify(SESSION *session, BTREE *btree)
 {
-	BTREE *btree;
-
-	btree = db->btree;
-
 	/* Verify the page sizes. */
-	WT_RET(__wt_open_verify_page_sizes(db));
+	WT_RET(__wt_open_verify_page_sizes(session, btree));
 
 	/* Verify other configuration combinations. */
-	if (db->fixed_len != 0 && (btree->huffman_key || btree->huffman_data)) {
-		__wt_api_db_errx(db,
+	if (btree->fixed_len != 0 && (btree->huffman_key || btree->huffman_data)) {
+		__wt_err(session, 0,
 		    "Fixed-size column-store files may not be Huffman encoded");
 		return (WT_ERROR);
 	}
@@ -82,12 +74,8 @@ __wt_open_verify(DB *db)
  *	Verify the page sizes.
  */
 static int
-__wt_open_verify_page_sizes(DB *db)
+__wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 {
-	BTREE *btree;
-
-	btree = db->btree;
-
 	/*
 	 * The application can set lots of page sizes.  It's complicated, so
 	 * instead of verifying the relationships when they're set, verify
@@ -101,12 +89,12 @@ __wt_open_verify_page_sizes(DB *db)
 	 * Default to a small fragment size, so overflow items don't consume
 	 * a lot of space.
 	 */
-	if (db->allocsize == 0)
-		db->allocsize = WT_BTREE_ALLOCATION_SIZE;
+	if (btree->allocsize == 0)
+		btree->allocsize = WT_BTREE_ALLOCATION_SIZE;
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
-	if (!__wt_ispo2(db->allocsize)) {
-		__wt_api_db_errx(db,
+	if (!__wt_ispo2(btree->allocsize)) {
+		__wt_err(session, 0,
 		   "the allocation size must be a power of two");
 		return (WT_ERROR);
 	}
@@ -118,8 +106,8 @@ __wt_open_verify_page_sizes(DB *db)
 	 * an application specifying larger allocation or page sizes is almost
 	 * certainly making a mistake.
 	 */
-	if (db->allocsize > WT_BTREE_ALLOCATION_SIZE_MAX) {
-		__wt_api_db_errx(db,
+	if (btree->allocsize > WT_BTREE_ALLOCATION_SIZE_MAX) {
+		__wt_err(session, 0,
 		   "the allocation size must less than or equal to %luMB",
 		    (u_long)(WT_BTREE_PAGE_SIZE_MAX / WT_MEGABYTE));
 		return (WT_ERROR);
@@ -139,15 +127,15 @@ __wt_open_verify_page_sizes(DB *db)
 	 *	8K		204 bytes
 	 * and so on, roughly doubling for each power-of-two.
 	 */
-	if (db->intlmin == 0)
-		db->intlmin = WT_BTREE_INTLMIN_DEFAULT;
-	if (db->intlmax == 0)
-		db->intlmax = WT_MAX(db->intlmin, WT_BTREE_INTLMAX_DEFAULT);
-	if (db->intlitemsize == 0) {
-		if (db->intlmin <= 1024)
-			db->intlitemsize = 50;
+	if (btree->intlmin == 0)
+		btree->intlmin = WT_BTREE_INTLMIN_DEFAULT;
+	if (btree->intlmax == 0)
+		btree->intlmax = WT_MAX(btree->intlmin, WT_BTREE_INTLMAX_DEFAULT);
+	if (btree->intlitemsize == 0) {
+		if (btree->intlmin <= 1024)
+			btree->intlitemsize = 50;
 		else
-			db->intlitemsize = db->intlmin / 40;
+			btree->intlitemsize = btree->intlmin / 40;
 	}
 
 	/*
@@ -165,40 +153,40 @@ __wt_open_verify_page_sizes(DB *db)
 	 *	16K		409 bytes
 	 * and so on, roughly doubling for each power-of-two.
 	 */
-	if (db->leafmin == 0)
-		db->leafmin = WT_BTREE_LEAFMIN_DEFAULT;
-	if (db->leafmax == 0)
-		db->leafmax = WT_MAX(db->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
-	if (db->leafitemsize == 0) {
-		if (db->leafmin <= 4096)
-			db->leafitemsize = 80;
+	if (btree->leafmin == 0)
+		btree->leafmin = WT_BTREE_LEAFMIN_DEFAULT;
+	if (btree->leafmax == 0)
+		btree->leafmax = WT_MAX(btree->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
+	if (btree->leafitemsize == 0) {
+		if (btree->leafmin <= 4096)
+			btree->leafitemsize = 80;
 		else
-			db->leafitemsize = db->leafmin / 40;
+			btree->leafitemsize = btree->leafmin / 40;
 	}
 
 	/* Final checks for safety. */
-	if (db->intlmin % db->allocsize != 0 ||
-	    db->intlmax % db->allocsize != 0 ||
-	    db->leafmin % db->allocsize != 0 ||
-	    db->leafmax % db->allocsize != 0) {
-		__wt_api_db_errx(db,
+	if (btree->intlmin % btree->allocsize != 0 ||
+	    btree->intlmax % btree->allocsize != 0 ||
+	    btree->leafmin % btree->allocsize != 0 ||
+	    btree->leafmax % btree->allocsize != 0) {
+		__wt_err(session, 0,
 		    "all page sizes must be a multiple of %lu bytes",
-		    (u_long)db->allocsize);
+		    (u_long)btree->allocsize);
 		return (WT_ERROR);
 	}
 
-	if (db->intlmin > db->intlmax || db->leafmin > db->leafmax) {
-		__wt_api_db_errx(db,
+	if (btree->intlmin > btree->intlmax || btree->leafmin > btree->leafmax) {
+		__wt_err(session, 0,
 		    "minimum page sizes must be less than or equal to maximum "
 		    "page sizes");
 		return (WT_ERROR);
 	}
 
-	if (db->intlmin > WT_BTREE_PAGE_SIZE_MAX ||
-	    db->intlmax > WT_BTREE_PAGE_SIZE_MAX ||
-	    db->leafmin > WT_BTREE_PAGE_SIZE_MAX ||
-	    db->leafmax > WT_BTREE_PAGE_SIZE_MAX) {
-		__wt_api_db_errx(db,
+	if (btree->intlmin > WT_BTREE_PAGE_SIZE_MAX ||
+	    btree->intlmax > WT_BTREE_PAGE_SIZE_MAX ||
+	    btree->leafmin > WT_BTREE_PAGE_SIZE_MAX ||
+	    btree->leafmax > WT_BTREE_PAGE_SIZE_MAX) {
+		__wt_err(session, 0,
 		    "all page sizes must less than or equal to %luMB",
 		    (u_long)WT_BTREE_PAGE_SIZE_MAX / WT_MEGABYTE);
 		return (WT_ERROR);
@@ -208,30 +196,30 @@ __wt_open_verify_page_sizes(DB *db)
 	 * We only have 3 bytes of length for on-page items, so the maximum
 	 * on-page item size is limited to 16MB.
 	 */
-	if (db->intlitemsize > WT_ITEM_MAX_LEN)
-		db->intlitemsize = WT_ITEM_MAX_LEN;
-	if (db->leafitemsize > WT_ITEM_MAX_LEN)
-		db->leafitemsize = WT_ITEM_MAX_LEN;
+	if (btree->intlitemsize > WT_ITEM_MAX_LEN)
+		btree->intlitemsize = WT_ITEM_MAX_LEN;
+	if (btree->leafitemsize > WT_ITEM_MAX_LEN)
+		btree->leafitemsize = WT_ITEM_MAX_LEN;
 
 	/*
 	 * A leaf page must hold at least 2 key/data pairs, otherwise the
 	 * whole btree thing breaks down because we can't split.  We have
 	 * to include WT_DESC_SIZE in leaf page calculations, it's not
 	 * strictly necessary in internal pages because page 0 is always
-	 * a leaf page.  The additional 10 bytes is for slop -- Berkeley DB
+	 * a leaf page.  The additional 10 bytes is for slop -- Berkeley BTREE
 	 * took roughly a decade to get the calculation correct, and that
 	 * way I can skip the suspense.
 	 */
-#define	WT_MINIMUM_DATA_SPACE(db, s)					\
+#define	WT_MINIMUM_DATA_SPACE(btree, s)					\
 	    (((s) - (WT_PAGE_DISK_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
-	if (db->intlitemsize > WT_MINIMUM_DATA_SPACE(db, db->intlmin)) {
-		__wt_api_db_errx(db,
+	if (btree->intlitemsize > WT_MINIMUM_DATA_SPACE(btree, btree->intlmin)) {
+		__wt_err(session, 0,
 		    "The internal page size is too small for its maximum item "
 		    "size");
 		return (WT_ERROR);
 	}
-	if (db->leafitemsize > WT_MINIMUM_DATA_SPACE(db, db->leafmin)) {
-		__wt_api_db_errx(db,
+	if (btree->leafitemsize > WT_MINIMUM_DATA_SPACE(btree, btree->leafmin)) {
+		__wt_err(session, 0,
 		    "The leaf page size is too small for its maximum item "
 		    "size");
 		return (WT_ERROR);
@@ -242,8 +230,8 @@ __wt_open_verify_page_sizes(DB *db)
 	 * objects on a page, otherwise it just doesn't make sense.
 	 */
 	if (F_ISSET(btree, WT_COLUMN) &&
-	    db->fixed_len != 0 && db->leafmin / db->fixed_len < 20) {
-		__wt_api_db_errx(db,
+	    btree->fixed_len != 0 && btree->leafmin / btree->fixed_len < 20) {
+		__wt_err(session, 0,
 		    "The leaf page size cannot store at least 20 fixed-length "
 		    "objects");
 		return (WT_ERROR);
@@ -257,17 +245,17 @@ __wt_open_verify_page_sizes(DB *db)
  *	Read in the root page and pin it into memory.
  */
 int
-__wt_root_pin(WT_TOC *toc)
+__wt_root_pin(SESSION *session)
 {
 	BTREE *btree;
 
-	btree = toc->db->btree;
+	btree = session->btree;
 
 	/* Get the root page, which had better be there. */
-	WT_RET(__wt_page_in(toc, NULL, &btree->root_page, 0));
+	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
 
 	WT_PAGE_SET_PIN(btree->root_page.page);
-	__wt_hazard_clear(toc, btree->root_page.page);
+	__wt_hazard_clear(session, btree->root_page.page);
 
 	return (0);
 }

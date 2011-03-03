@@ -57,7 +57,7 @@ def func_serial(f):
 		f.write('} __wt_' + entry[0] + '_args;\n')
 
 		# pack function
-		f.write('#define\t__wt_' + entry[0] + '_serial(\\\n    toc')
+		f.write('#define\t__wt_' + entry[0] + '_serial(\\\n    session')
 		for l in entry[1].args:
 			f.write(', _' + l.split('/')[1])
 		f.write(', ret) do {\\\n')
@@ -65,20 +65,20 @@ def func_serial(f):
 		for l in entry[1].args:
 			f.write('\t_args.' + l.split('/')[1] +
 			    ' = _' + l.split('/')[1] + ';\\\n')
-		f.write('\t(ret) = __wt_toc_serialize_func(toc,\\\n')
+		f.write('\t(ret) = __wt_session_serialize_func(session,\\\n')
 		f.write('\t    ' + entry[1].op + ', ' + entry[1].spin +
 		    ', __wt_' + entry[1].key + '_serial_func, &_args);\\\n')
 		f.write('} while (0)\n')
 
 		# unpack function
-		f.write('#define\t__wt_' + entry[0] + '_unpack(\\\n    toc')
+		f.write('#define\t__wt_' + entry[0] + '_unpack(\\\n    session')
 		for l in entry[1].args:
 			f.write(', _' + l.split('/')[1])
 		f.write(') do {\\\n')
 		for l in entry[1].args:
 			f.write('\t_' + l.split('/')[1] +
 			    ' = ((__wt_' + entry[0] +
-			    '_args *)(toc)->wq_args)->' +
+			    '_args *)(session)->wq_args)->' +
 			    l.split('/')[1] + ';\\\n')
 		f.write('} while (0)\n')
 

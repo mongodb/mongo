@@ -7,21 +7,21 @@
 
 #include "wt_internal.h"
 
-static int __wt_desc_io(WT_TOC *, void *, int);
+static int __wt_desc_io(SESSION *, void *, int);
 
 /*
  * __wt_desc_stat --
  *	Fill in the statistics from the file's description.
  */
 int
-__wt_desc_stat(WT_TOC *toc)
+__wt_desc_stat(SESSION *session)
 {
 	WT_PAGE_DESC desc;
 	WT_STATS *stats;
 
-	stats = toc->db->btree->fstats;
+	stats = session->btree->fstats;
 
-	WT_RET(__wt_desc_io(toc, &desc, 1));
+	WT_RET(__wt_desc_io(session, &desc, 1));
 
 	WT_STAT_SET(stats, MAGIC, desc.magic);
 	WT_STAT_SET(stats, MAJOR, desc.majorv);
@@ -41,32 +41,32 @@ __wt_desc_stat(WT_TOC *toc)
  *	Read the descriptor structure from page 0.
  */
 int
-__wt_desc_read(WT_TOC *toc)
+__wt_desc_read(SESSION *session)
 {
-	DB *db;
+	BTREE *btree;
 	WT_PAGE_DESC desc;
 
-	db = toc->db;
+	btree = session->btree;
 
-	WT_RET(__wt_desc_io(toc, &desc, 1));
+	WT_RET(__wt_desc_io(session, &desc, 1));
 
-	db->intlmax = desc.intlmax;		/* Update DB handle */
-	db->intlmin = desc.intlmin;
-	db->leafmax = desc.leafmax;
-	db->leafmin = desc.leafmin;
-	db->btree->root_page.addr = desc.root_addr;
-	db->btree->root_page.size = desc.root_size;
-	db->btree->free_addr = desc.free_addr;
-	db->btree->free_size = desc.free_size;
-	db->fixed_len = desc.fixed_len;
+	btree->intlmax = desc.intlmax;		/* Update DB handle */
+	btree->intlmin = desc.intlmin;
+	btree->leafmax = desc.leafmax;
+	btree->leafmin = desc.leafmin;
+	btree->root_page.addr = desc.root_addr;
+	btree->root_page.size = desc.root_size;
+	btree->free_addr = desc.free_addr;
+	btree->free_size = desc.free_size;
+	btree->fixed_len = desc.fixed_len;
 
 	/*
 	 * XXX
 	 * This is the wrong place to do this -- need to think about how
 	 * to update open/configuration information in a reasonable way.
 	 */
-	if (db->fixed_len != 0)
-		F_SET(db->btree, WT_COLUMN);
+	if (btree->fixed_len != 0)
+		F_SET(btree, WT_COLUMN);
 
 	return (0);
 }
@@ -76,36 +76,34 @@ __wt_desc_read(WT_TOC *toc)
  *	Update the description page.
  */
 int
-__wt_desc_write(WT_TOC *toc)
+__wt_desc_write(SESSION *session)
 {
-	DB *db;
 	BTREE *btree;
 	WT_PAGE_DESC desc;
 	int ret;
 
-	db = toc->db;
-	btree = db->btree;
+	btree = session->btree;
 	ret = 0;
 
 	WT_CLEAR(desc);
 	desc.magic = WT_BTREE_MAGIC;
 	desc.majorv = WT_BTREE_MAJOR_VERSION;
 	desc.minorv = WT_BTREE_MINOR_VERSION;
-	desc.intlmax = db->intlmax;
-	desc.intlmin = db->intlmin;
-	desc.leafmax = db->leafmax;
-	desc.leafmin = db->leafmin;
+	desc.intlmax = btree->intlmax;
+	desc.intlmin = btree->intlmin;
+	desc.leafmax = btree->leafmax;
+	desc.leafmin = btree->leafmin;
 	desc.recno_offset = 0;
 	desc.root_addr = btree->root_page.addr;
 	desc.root_size = btree->root_page.size;
 	desc.free_addr = btree->free_addr;
 	desc.free_size = btree->free_size;
-	desc.fixed_len = (uint8_t)db->fixed_len;
+	desc.fixed_len = (uint8_t)btree->fixed_len;
 	desc.flags = 0;
 	if (F_ISSET(btree, WT_RLE))
 		F_SET(&desc, WT_PAGE_DESC_RLE);
 
-	WT_RET(__wt_desc_io(toc, &desc, 0));
+	WT_RET(__wt_desc_io(session, &desc, 0));
 
 	return (ret);
 }
@@ -115,15 +113,13 @@ __wt_desc_write(WT_TOC *toc)
  *	Read/write the WT_DESC sector.
  */
 static int
-__wt_desc_io(WT_TOC *toc, void *p, int is_read)
+__wt_desc_io(SESSION *session, void *p, int is_read)
 {
 	WT_FH *fh;
-	ENV *env;
 
-	fh = toc->db->btree->fh;
-	env = toc->env;
+	fh = session->btree->fh;
 
 	return (is_read ?
-	    __wt_read(env, fh, (off_t)0, 512, p) :
-	    __wt_write(env, fh, (off_t)0, 512, p));
+	    __wt_read(session, fh, (off_t)0, 512, p) :
+	    __wt_write(session, fh, (off_t)0, 512, p));
 }

@@ -9,13 +9,13 @@
 
 extern FILE *__wt_err_stream;
 
-#define	WT_MSG(env, fmt) {						\
+#define	WT_MSG(session, fmt) {						\
 	va_list __ap;							\
 	/*								\
-	 * Support messages even when we don't yet have an ENV handle,	\
+	 * Support messages even when we don't yet have a SESSION handle,	\
 	 * using the error stream.
 	 */								\
-	if ((env) == NULL) {						\
+	if ((session) == NULL) {					\
 		va_start(__ap, fmt);					\
 		__wt_msg_stream(					\
 		    __wt_err_stream, NULL, NULL, 0, fmt, __ap);		\
@@ -24,10 +24,10 @@ extern FILE *__wt_err_stream;
 	}								\
 									\
 	/* Application-specified callback function. */			\
-	if ((env)->msgcall != NULL) {					\
+	if ((session)->msgcall != NULL) {				\
 		va_start(__ap, fmt);					\
-		__wt_msg_call((void *)((env)->msgcall),			\
-		    (void *)env, NULL, NULL, 0, fmt, __ap);		\
+		__wt_msg_call((void *)((session)->msgcall),		\
+		    (void *)session, NULL, NULL, 0, fmt, __ap);		\
 		va_end(__ap);						\
 	}								\
 									\
@@ -35,11 +35,11 @@ extern FILE *__wt_err_stream;
 	 * If the application set an message callback function but not a\
 	 * message stream, we're done.  Otherwise, write the stream.	\
 	 */								\
-	if ((env)->msgcall != NULL && (env)->msgfile == NULL)		\
+	if ((session)->msgcall != NULL && (session)->msgfile == NULL)	\
 			return;						\
 									\
 	va_start(__ap, fmt);						\
-	__wt_msg_stream((env)->msgfile, NULL, NULL, 0, fmt, __ap);	\
+	__wt_msg_stream((session)->msgfile, NULL, NULL, 0, fmt, __ap);	\
 	va_end(__ap);							\
 }
 
@@ -48,9 +48,9 @@ extern FILE *__wt_err_stream;
  *	Write a message.
  */
 void
-__wt_msg(ENV *env, const char *fmt, ...)
+__wt_msg(SESSION *session, const char *fmt, ...)
 {
-	WT_MSG(env, fmt);
+	WT_MSG(session, fmt);
 }
 
 /*
@@ -58,9 +58,9 @@ __wt_msg(ENV *env, const char *fmt, ...)
  *	Initialize a WT_MBUF structure for message aggregation.
  */
 void
-__wt_mb_init(ENV *env, WT_MBUF *mbp)
+__wt_mb_init(SESSION *session, WT_MBUF *mbp)
 {
-	mbp->env = env;
+	mbp->session = session;
 	mbp->first = mbp->next = NULL;
 	mbp->len = 0;
 }
@@ -79,7 +79,7 @@ __wt_mb_discard(WT_MBUF *mbp)
 	if (mbp->next != mbp->first)
 		__wt_mb_write(mbp);
 
-	__wt_free(mbp->env, mbp->first, mbp->len);
+	__wt_free(mbp->session, mbp->first, mbp->len);
 }
 
 /*
@@ -103,7 +103,7 @@ __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...)
 		 * more memory.
 		 */
 		if (remain <= len) {
-			if (__wt_realloc(mbp->env,
+			if (__wt_realloc(mbp->session,
 			    &mbp->len, mbp->len + len * 2, &mbp->first))
 				goto err;
 			mbp->next = mbp->first + current;
@@ -133,7 +133,7 @@ __wt_mb_write(WT_MBUF *mbp)
 	if (mbp->first == NULL || mbp->next == mbp->first)
 		return;
 
-	__wt_msg(mbp->env, "%s", mbp->first);
+	__wt_msg(mbp->session, "%s", mbp->first);
 
 	mbp->next = mbp->first;
 }

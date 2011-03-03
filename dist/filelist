@@ -3,6 +3,7 @@
 
 
 src/api/api.c
+src/api/api_int.c
 src/api/config.c
 src/api/cur_bulk.c
 src/api/cur_dump.c
@@ -41,23 +42,20 @@ src/btree/col_srch.c
 src/btree/row_get.c
 src/btree/row_put.c
 src/btree/row_srch.c
-src/db/db_err.c
 src/db/db_getset.c
 src/db/db_handle.c
 src/db/db_huffman.c
 src/db/db_open.c
 src/db/db_stat.c
 src/db/db_sync.c
-src/env/env_err.c
 src/env/env_getset.c
 src/env/env_global.c
 src/env/env_handle.c
-src/env/env_init.c
 src/env/env_msg.c
 src/env/env_open.c
+src/env/env_session.c
 src/env/env_stat.c
 src/env/env_sync.c
-src/env/env_toc.c
 src/env/env_workq.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
@@ -70,7 +68,6 @@ src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
 src/os_posix/os_yield.c
-src/support/api_int.c
 src/support/cksum.c
 src/support/err.c
 src/support/hazard.c

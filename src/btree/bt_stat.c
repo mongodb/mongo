@@ -8,25 +8,23 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_stat_page_col_fix(WT_TOC *, WT_PAGE *);
-static int __wt_stat_page_col_rle(WT_TOC *, WT_PAGE *);
-static int __wt_stat_page_col_var(WT_TOC *, WT_PAGE *);
-static int __wt_stat_page_row_leaf(WT_TOC *, WT_PAGE *, void *);
+static int __wt_stat_page_col_fix(SESSION *, WT_PAGE *);
+static int __wt_stat_page_col_rle(SESSION *, WT_PAGE *);
+static int __wt_stat_page_col_var(SESSION *, WT_PAGE *);
+static int __wt_stat_page_row_leaf(SESSION *, WT_PAGE *, void *);
 
 /*
  * __wt_page_stat --
  *	Stat any Btree page.
  */
 int
-__wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_page_stat(SESSION *session, WT_PAGE *page, void *arg)
 {
-	DB *db;
 	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 
-	db = toc->db;
-	btree = db->btree;
+	btree = session->btree;
 	dsk = page->dsk;
 	stats = btree->fstats;
 
@@ -37,18 +35,18 @@ __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		WT_STAT_INCR(stats, PAGE_COL_FIX);
-		WT_RET(__wt_stat_page_col_fix(toc, page));
+		WT_RET(__wt_stat_page_col_fix(session, page));
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, PAGE_COL_INTERNAL);
 		break;
 	case WT_PAGE_COL_RLE:
 		WT_STAT_INCR(stats, PAGE_COL_RLE);
-		WT_RET(__wt_stat_page_col_rle(toc, page));
+		WT_RET(__wt_stat_page_col_rle(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_STAT_INCR(stats, PAGE_COL_VARIABLE);
-		WT_RET(__wt_stat_page_col_var(toc, page));
+		WT_RET(__wt_stat_page_col_var(session, page));
 		break;
 	case WT_PAGE_OVFL:
 		WT_STAT_INCR(stats, PAGE_OVERFLOW);
@@ -58,9 +56,9 @@ __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_STAT_INCR(stats, PAGE_ROW_LEAF);
-		WT_RET(__wt_stat_page_row_leaf(toc, page, arg));
+		WT_RET(__wt_stat_page_row_leaf(session, page, arg));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 	return (0);
 }
@@ -70,7 +68,7 @@ __wt_page_stat(WT_TOC *toc, WT_PAGE *page, void *arg)
  *	Stat a WT_PAGE_COL_FIX page.
  */
 static int
-__wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_fix(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -79,7 +77,7 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 	uint32_t i;
 
 	dsk = page->dsk;
-	stats = toc->db->btree->fstats;
+	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i)
@@ -101,7 +99,7 @@ __wt_stat_page_col_fix(WT_TOC *toc, WT_PAGE *page)
  *	Stat a WT_PAGE_COL_RLE page.
  */
 static int
-__wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -112,7 +110,7 @@ __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
 	void *cipdata;
 
 	dsk = page->dsk;
-	stats = toc->db->btree->fstats;
+	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
@@ -152,18 +150,18 @@ __wt_stat_page_col_rle(WT_TOC *toc, WT_PAGE *page)
  *	Stat a WT_PAGE_COL_VAR page.
  */
 static int
-__wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
+__wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 {
-	DB *db;
+	BTREE *btree;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
 	uint32_t i;
 
-	db = toc->db;
+	btree = session->btree;
 	dsk = page->dsk;
-	stats = db->btree->fstats;
+	stats = btree->fstats;
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
@@ -189,7 +187,7 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
 		case WT_ITEM_DEL:
 			WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			break;
-		WT_ILLEGAL_FORMAT(db);
+		WT_ILLEGAL_FORMAT(btree);
 		}
 	}
 	return (0);
@@ -200,17 +198,17 @@ __wt_stat_page_col_var(WT_TOC *toc, WT_PAGE *page)
  *	Stat a WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 {
-	DB *db;
+	BTREE *btree;
 	WT_ROW *rip;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
 	uint32_t i;
 
 	arg = NULL;				/* Shut the compiler up. */
-	db = toc->db;
-	stats = db->btree->fstats;
+	btree = session->btree;
+	stats = btree->fstats;
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
@@ -234,7 +232,7 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
-		WT_ILLEGAL_FORMAT(db);
+		WT_ILLEGAL_FORMAT(btree);
 		}
 
 		/*
@@ -256,7 +254,7 @@ __wt_stat_page_row_leaf(WT_TOC *toc, WT_PAGE *page, void *arg)
 			case WT_ITEM_KEY:
 				WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
 				break;
-			WT_ILLEGAL_FORMAT(db);
+			WT_ILLEGAL_FORMAT(btree);
 			}
 		else
 			WT_STAT_INCR(stats, ITEM_TOTAL_KEY);

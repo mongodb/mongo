@@ -49,27 +49,27 @@ extern "C" {
  * about implicit conversions of integers.  Using the largest unsigned type,
  * there's no defined bit mask type or maximum value.
  */
-#define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
+#define	WT_CONN_FCHK_RET(conn, name, f, mask, ret)			\
 	if ((f) & ~((uintmax_t)(mask)))					\
-		ret = __wt_api_args(env, name);
-#define	WT_ENV_FCHK(env, name, f, mask)					\
+		ret = __wt_api_args(&(conn)->default_session, (name));
+#define	WT_CONN_FCHK(conn, name, f, mask)					\
 	if ((f) & ~((uintmax_t)(mask)))					\
-		return (__wt_api_args(env, name));
-#define	WT_DB_FCHK(db, name, f, mask)					\
-	WT_ENV_FCHK((db)->env, name, f, mask)
+		return (__wt_api_args(&(conn)->default_session, (name)));
+#define	WT_DB_FCHK(btree, name, f, mask)				\
+	WT_CONN_FCHK((btree)->conn, (name), (f), (mask))
 
 /* Read-only file check. */
-#define	WT_DB_RDONLY(db, name)						\
-	if (F_ISSET((db)->btree, WT_RDONLY))				\
-		return (__wt_file_readonly(db, name));
+#define	WT_DB_RDONLY(btree, name)						\
+	if (F_ISSET((btree), WT_RDONLY))				\
+		return (__wt_file_readonly((btree), (name)));
 
 /* Column- and row-only file check. */
-#define	WT_DB_ROW_ONLY(db, name)					\
-	if (F_ISSET((db)->btree, WT_COLUMN))				\
-		return (__wt_file_method_type(db, name, 1));
-#define	WT_DB_COL_ONLY(db, name)					\
-	if (!F_ISSET((db)->btree, WT_COLUMN))				\
-		return (__wt_file_method_type(db, name, 0));
+#define	WT_DB_ROW_ONLY(btree, name)					\
+	if (F_ISSET((btree), WT_COLUMN))				\
+		return (__wt_file_method_type((btree), (name), 1));
+#define	WT_DB_COL_ONLY(btree, name)					\
+	if (!F_ISSET((btree), WT_COLUMN))				\
+		return (__wt_file_method_type((btree), (name), 0));
 
 /*
  * Flag set, clear and test.
@@ -96,24 +96,24 @@ extern "C" {
 
 /* Output a verbose message. */
 #ifdef HAVE_VERBOSE
-#define	WT_VERBOSE(env, f, msg) do {					\
-	if (FLD_ISSET((env)->verbose, WT_VERB_ALL | (f)))		\
+#define	WT_VERBOSE(conn, f, msg) do {					\
+	if (FLD_ISSET((conn)->verbose, WT_VERB_ALL | (f)))		\
 		__wt_msg msg;						\
 } while (0)
 #else
-#define	WT_VERBOSE(env, f, msg)
+#define	WT_VERBOSE(conn, f, msg)
 #endif
 
 /* Clear a structure. */
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-#define	WT_ILLEGAL_FORMAT(db)						\
+#define	WT_ILLEGAL_FORMAT(btree)						\
 	default:							\
-		return (__wt_file_format(db))
-#define	WT_ILLEGAL_FORMAT_ERR(db, ret)					\
+		return (__wt_file_format((btree)))
+#define	WT_ILLEGAL_FORMAT_ERR(btree, ret)					\
 	default:							\
-		ret = __wt_file_format(db);				\
+		ret = __wt_file_format((btree));				\
 		goto err
 
 /*
@@ -140,9 +140,9 @@ extern "C" {
  * the root page, which remains pinned for the life of the table handle.  It's
  * common enough to need a macro.
  */
-#define	WT_PAGE_OUT(toc, p)						\
-	if ((p) != NULL && (p) != (toc)->db->btree->root_page.page)	\
-		__wt_hazard_clear(toc, p);
+#define	WT_PAGE_OUT(session, p)						\
+	if ((p) != NULL && (p) != (session)->btree->root_page.page)	\
+		__wt_hazard_clear((session), (p));
 
 #if defined(__cplusplus)
 }

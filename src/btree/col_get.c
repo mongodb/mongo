@@ -8,30 +8,28 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_col_get --
+ * __wt_btree_col_get --
  *	Db.col_get method.
  */
 int
-__wt_db_col_get(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data)
+__wt_btree_col_get(SESSION *session, uint64_t recno, WT_DATAITEM *data)
 {
-	DB *db;
 	BTREE *btree;
 	int ret;
 
-	db = toc->db;
-	btree = db->btree;
+	btree = session->btree;
 
 	/* Search the column-store for the key. */
 	if (!F_ISSET(btree, WT_COLUMN)) {
-		__wt_api_db_errx(db,
+		__wt_errx(session,
 		    "row-store records cannot be retrieved by record number");
 		return (WT_ERROR);
 	}
 
-	WT_ERR(__wt_col_search(toc, recno, 0));
-	ret = __wt_data_return(toc, NULL, data, 0);
+	WT_ERR(__wt_col_search(session, recno, 0));
+	ret = __wt_data_return(session, NULL, data, 0);
 
-err:	if (toc->srch_page != btree->root_page.page)
-		__wt_hazard_clear(toc, toc->srch_page);
+err:	if (session->srch_page != btree->root_page.page)
+		__wt_hazard_clear(session, session->srch_page);
 	return (ret);
 }

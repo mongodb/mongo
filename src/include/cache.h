@@ -106,23 +106,23 @@ typedef struct {
  *	Encapsulation of a read request.
  */
 struct __wt_read_req {
-	WT_TOC	*toc;				/* Requesting thread */
-	WT_PAGE	*parent;			/* Parent page */
-	WT_REF	*ref;				/* Access control WT_REF */
-	int	 dsk_verify;			/* Verify the disk image */
+	SESSION *session;				/* Requesting thread */
+	WT_PAGE *parent;			/* Parent */
+	WT_REF *ref;				/* Address */
+	int	dsk_verify;			/* Verify the disk image */
 };
 #define	WT_READ_REQ_ISEMPTY(r)						\
-	((r)->toc == NULL)
-#define	WT_READ_REQ_SET(r, _toc, _parent, _ref, _dsk_verify) do {	\
+	((r)->session == NULL)
+#define	WT_READ_REQ_SET(r, _session, _parent, _ref, _dsk_verify) do {	\
 	(r)->parent = _parent;						\
 	(r)->ref = _ref;						\
 	(r)->dsk_verify = _dsk_verify;					\
 	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
-	(r)->toc = _toc;						\
+	(r)->session = _session;						\
 	WT_MEMORY_FLUSH;	/* Turn entry on */			\
 } while (0)
 #define	WT_READ_REQ_CLR(r) do {						\
-	(r)->toc = NULL;						\
+	(r)->session = NULL;						\
 	WT_MEMORY_FLUSH;	/* Turn entry off */			\
 } while (0)
 
@@ -173,7 +173,7 @@ struct __wt_cache {
 	u_int volatile read_lockout;	/* No reading until memory drains */
 
 	WT_READ_REQ read_request[40];	/* Read requests:
-					   slot available if toc is NULL */
+					   slot available if session is NULL */
 
 	uint32_t   read_gen;		/* Page read generation (LRU) */
 

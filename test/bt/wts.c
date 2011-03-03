@@ -9,10 +9,10 @@
 
 #include "wts.h"
 
-static int cb_bulk(DB *, WT_DATAITEM **, WT_DATAITEM **);
+static int cb_bulk(BTREE *, WT_DATAITEM **, WT_DATAITEM **);
 static int wts_del_col(u_int64_t);
 static int wts_del_row(u_int64_t);
-static int wts_notfound_chk(ENV *, const char *, int, int, u_int64_t);
+static int wts_notfound_chk(const char *, int, int, u_int64_t);
 static int wts_put_col(u_int64_t);
 static int wts_put_row(u_int64_t);
 static int wts_read_col(u_int64_t);
@@ -23,9 +23,9 @@ int
 wts_startup(int logfile)
 {
 	time_t now;
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	u_int32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
 	int ret;
 	char *p;
@@ -53,36 +53,34 @@ wts_startup(int logfile)
 		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
 	}
 
-	if ((ret = wiredtiger_simple_setup(
-	    g.progname, &db, g.c_cache, WT_MEMORY_CHECK)) != 0) {
+	/* XXX add cachesize to config */
+	if ((ret = wiredtiger_simple_setup(g.progname, "memcheck", &btree)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_simple_setup: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	env = db->env;
-
-	(void)env->errpfx_set(env, g.progname);
-	(void)env->errfile_set(env, stderr);
+	conn = btree->conn;
 
 	/* Open the log file. */
 	if (logfile) {
-		(void)env->verbose_set(env,
+		(void)conn->verbose_set(conn,
 		    // WT_VERB_FILEOPS |
 		    // WT_VERB_HAZARD |
 		    // WT_VERB_MUTEX |
 		    // WT_VERB_READ |
 		    // WT_VERB_EVICT |
 		    0);
-		(void)env->msgfile_set(env, g.wts_log);
+		(void)conn->msgfile_set(conn, g.wts_log);
 	}
 
 	intl_node_max = (u_int)1 << g.c_intl_node_max;
 	intl_node_min = (u_int)1 << g.c_intl_node_min;
 	leaf_node_max = (u_int)1 << g.c_leaf_node_max;
 	leaf_node_min = (u_int)1 << g.c_leaf_node_min;
-	if ((ret = db->btree_pagesize_set(db, 0,
+	if ((ret = btree->btree_pagesize_set(btree, 0,
 	    intl_node_min, intl_node_max, leaf_node_min, leaf_node_max)) != 0) {
-		db->err(db, ret, "Db.btree_pagesize_set");
+		fprintf(stderr, "%s: btree_pagesize_set: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
@@ -94,55 +92,61 @@ wts_startup(int logfile)
 		 */
 		if (20 * g.c_data_min > leaf_node_min)
 			g.c_data_min = leaf_node_min / 20;
-		if ((ret = db->column_set(db, g.c_data_min,
+		if ((ret = btree->column_set(btree, g.c_data_min,
 		    NULL, g.c_repeat_comp_pct != 0 ? WT_RLE : 0)) != 0) {
-			db->err(db, ret, "Db.column_set");
+			fprintf(stderr, "%s: column_set: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
 			return (1);
 		}
 		break;
 	case VAR:
-		if ((ret = db->column_set(db, 0, NULL, 0)) != 0) {
-			db->err(db, ret, "Db.column_set");
+		if ((ret = btree->column_set(btree, 0, NULL, 0)) != 0) {
+			fprintf(stderr, "%s: column_set: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
 			return (1);
 		}
 		/* FALLTHROUGH */
 	case ROW:
-		if (g.c_huffman_key && (ret = db->huffman_set(
-		    db, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_KEY)) != 0) {
-			db->err(db, ret, "Db.huffman_set: data");
+		if (g.c_huffman_key && (ret = btree->huffman_set(
+		    btree, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_KEY)) != 0) {
+			fprintf(stderr, "%s: huffman_set: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
 			return (1);
 		}
-		if (g.c_huffman_data && (ret = db->huffman_set(
-		    db, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_DATA)) != 0) {
-			db->err(db, ret, "Db.huffman_set: data");
+		if (g.c_huffman_data && (ret = btree->huffman_set(
+		    btree, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_DATA)) != 0) {
+			fprintf(stderr, "%s: huffman_set: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
 			return (1);
 		}
 		break;
 	}
 
 	p = fname("wt");
-	if ((ret = db->open(db, p, 0660, WT_CREATE)) != 0) {
-		db->err(db, ret, "Db.open: %s", p);
+	if ((ret = btree->open(btree, p, 0660, WT_CREATE)) != 0) {
+		fprintf(stderr, "%s: btree.open: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	if ((ret = db->env->toc(db->env, 0, &toc)) != 0) {
-		db->err(db, ret, "Env.toc");
+	if ((ret = btree->conn->session(btree->conn, 0, &session)) != 0) {
+		fprintf(stderr, "%s: conn.session: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	g.wts_db = db;
-	g.wts_toc = toc;
+	g.wts_btree = btree;
+	g.wts_session = session;
 	return (0);
 }
 
 void
 wts_teardown(void)
 {
-	WT_TOC *toc;
+	SESSION *session;
 	time_t now;
 
-	toc = g.wts_toc;
+	session = g.wts_session;
 
 	if (g.wts_log != NULL) {
 		fprintf(
@@ -154,20 +158,21 @@ wts_teardown(void)
 	}
 
 	assert(wts_sync() == 0);
-	assert(toc->close(toc, 0) == 0);
-	assert(wiredtiger_simple_teardown(g.progname, g.wts_db) == 0);
+	assert(session->close(session, 0) == 0);
+	assert(wiredtiger_simple_teardown(g.progname, g.wts_btree) == 0);
 }
 
 int
 wts_bulk_load(void)
 {
-	DB *db;
+	BTREE *btree;
 	int ret;
 
-	db = g.wts_db;
+	btree = g.wts_btree;
 
-	if ((ret = db->bulk_load(db, track, cb_bulk)) != 0) {
-		db->err(db, ret, "Db.bulk_load");
+	if ((ret = btree->bulk_load(btree, track, cb_bulk)) != 0) {
+		fprintf(stderr, "%s: bulk_load: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -176,22 +181,24 @@ wts_bulk_load(void)
 int
 wts_dump(void)
 {
-	DB *db;
+	BTREE *btree;
 	FILE *fp;
 	int ret;
 	const char *p;
 
-	db = g.wts_db;
+	btree = g.wts_btree;
 
 	/* Dump the WiredTiger file. */
 	track("dump", 0);
 	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
-		db->err(db, errno, "fopen: %s", p);
+		fprintf(stderr, "%s: fopen: %s\n",
+		    g.progname, wiredtiger_strerror(errno));
 		return (1);
 	}
-	if ((ret = db->dump(db, fp, track, WT_PRINTABLES)) != 0) {
-		db->err(db, ret, "Db.dump");
+	if ((ret = btree->dump(btree, fp, track, WT_PRINTABLES)) != 0) {
+		fprintf(stderr, "%s: btree.dump: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 	(void)fclose(fp);
@@ -207,7 +214,7 @@ wts_dump(void)
 		break;
 	}
 	if (system(p) != 0) {
-		db->errx(db, "dump comparison failed");
+		fprintf(stderr, "%s: dump comparison failed\n", g.progname);
 		return (1);
 	}
 
@@ -217,13 +224,14 @@ wts_dump(void)
 static int
 wts_sync(void)
 {
-	DB *db;
+	BTREE *btree;
 	int ret;
 
-	db = g.wts_db;
+	btree = g.wts_btree;
 
-	if ((ret = db->sync(db, track, WT_OSWRITE)) != 0) {
-		db->err(db, ret, "Db.sync");
+	if ((ret = btree->sync(btree, track, WT_OSWRITE)) != 0) {
+		fprintf(stderr, "%s: btree.sync: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -232,13 +240,14 @@ wts_sync(void)
 int
 wts_verify(void)
 {
-	DB *db;
+	BTREE *btree;
 	int ret;
 
-	db = g.wts_db;
+	btree = g.wts_btree;
 
-	if ((ret = db->verify(db, track, 0)) != 0) {
-		db->err(db, ret, "Db.verify");
+	if ((ret = btree->verify(btree, track, 0)) != 0) {
+		fprintf(stderr, "%s: btree.verify: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -251,21 +260,23 @@ wts_verify(void)
 int
 wts_stats(void)
 {
-	DB *db;
+	BTREE *btree;
 	FILE *fp;
 	char *p;
 	int ret;
 
-	db = g.wts_db;
+	btree = g.wts_btree;
 
 	track("stat", 0);
 	p = fname("stats");
 	if ((fp = fopen(p, "w")) == NULL) {
-		db->err(db, errno, "fopen: %s", p);
+		fprintf(stderr, "%s: fopen: %s\n",
+		    g.progname, wiredtiger_strerror(errno));
 		return (1);
 	}
-	if ((ret = db->env->stat_print(db->env, fp, 0)) != 0) {
-		db->err(db, ret, "Env.stat_print");
+	if ((ret = btree->conn->stat_print(btree->conn, fp, 0)) != 0) {
+		fprintf(stderr, "%s: conn.stat_print: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 	(void)fclose(fp);
@@ -278,11 +289,11 @@ wts_stats(void)
  *	WiredTiger bulk load callback routine. 
  */
 static int
-cb_bulk(DB *db, WT_DATAITEM **keyp, WT_DATAITEM **datap)
+cb_bulk(BTREE *btree, WT_DATAITEM **keyp, WT_DATAITEM **datap)
 {
 	static WT_DATAITEM key, data;
 
-	db = NULL;					/* Lint */
+	btree = NULL;					/* Lint */
 	++g.key_cnt;
 
 	if (g.key_cnt > g.c_rows) {
@@ -425,14 +436,14 @@ static int
 wts_read_row(u_int64_t keyno)
 {
 	static WT_DATAITEM key, data, bdb_data;
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int notfound, ret;
 
-	db = g.wts_db;
-	toc = g.wts_toc;
-	env = db->env;
+	btree = g.wts_btree;
+	session = g.wts_session;
+	conn = btree->conn;
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
@@ -444,16 +455,16 @@ wts_read_row(u_int64_t keyno)
 
 	/* Retrieve the key/data pair by key. */
 	key_gen(&key.data, &key.size, keyno);
-	if ((ret = db->row_get(db, toc, &key, &data, 0)) != 0 &&
+	if ((ret = btree->row_get(btree, session, &key, &data, 0)) != 0 &&
 	    ret != WT_NOTFOUND) {
-		env->err(env, ret,
-		    "wts_read_key: read row %llu by key",
-		    (unsigned long long)keyno);
+		fprintf(stderr, "%s: wts_read_key: read row %llu by key: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
 		return (1);
 	}
 
 	/* Check for not-found status. */
-	NTF_CHK(wts_notfound_chk(env, "wts_read_row", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_read_row", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (data.size != bdb_data.size ||
@@ -501,14 +512,14 @@ static int
 wts_read_col(u_int64_t keyno)
 {
 	static WT_DATAITEM data, bdb_data;
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int notfound, ret;
 
-	db = g.wts_db;
-	toc = g.wts_toc;
-	env = db->env;
+	btree = g.wts_btree;
+	session = g.wts_session;
+	conn = btree->conn;
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
@@ -519,16 +530,17 @@ wts_read_col(u_int64_t keyno)
 		return (1);
 
 	/* Retrieve the key/data pair by record number. */
-	if ((ret = db->col_get(
-	    db, toc, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret,
-		    "wts_read_recno: read column %llu by recno",
-		    (unsigned long long)keyno);
+	if ((ret = btree->col_get(
+	    btree, session, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
+		fprintf(stderr,
+		    "%s: wts_read_recno: read column %llu by recno: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
 		return (1);
 	}
 
 	/* Check for not-found status. */
-	NTF_CHK(wts_notfound_chk(env, "wts_read_col", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_read_col", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (data.size != bdb_data.size ||
@@ -552,14 +564,14 @@ static int
 wts_put_row(u_int64_t keyno)
 {
 	static WT_DATAITEM key, data;
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int notfound, ret;
 
-	db = g.wts_db;
-	toc = g.wts_toc;
-	env = db->env;
+	btree = g.wts_btree;
+	session = g.wts_session;
+	conn = btree->conn;
 
 	key_gen(&key.data, &key.size, keyno);
 	data_gen(&data.data, &key.size, 0);
@@ -573,10 +585,11 @@ wts_put_row(u_int64_t keyno)
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
 
-	if ((ret = db->row_put(
-	    db, toc, &key, &data, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret, "wts_put_row: put row %llu by key",
-		    (unsigned long long)keyno);
+	if ((ret = btree->row_put(
+	    btree, session, &key, &data, 0)) != 0 && ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: wts_put_row: put row %llu by key: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -590,14 +603,14 @@ static int
 wts_put_col(u_int64_t keyno)
 {
 	static WT_DATAITEM data;
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int notfound, ret;
 
-	db = g.wts_db;
-	toc = g.wts_toc;
-	env = db->env;
+	btree = g.wts_btree;
+	session = g.wts_session;
+	conn = btree->conn;
 
 	data_gen(&data.data, &data.size, 0);
 
@@ -610,10 +623,11 @@ wts_put_col(u_int64_t keyno)
 	if (bdb_put(keyno, data.data, data.size, &notfound))
 		return (1);
 	
-	if ((ret = db->col_put(
-	    db, toc, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret, "wts_put_col: put row %llu by key",
-		    (unsigned long long)keyno);
+	if ((ret = btree->col_put(
+	    btree, session, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: wts_put_col: put col %llu by key: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
 		return (1);
 	}
 	return (0);
@@ -627,14 +641,14 @@ static int
 wts_del_row(u_int64_t keyno)
 {
 	static WT_DATAITEM key;
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int notfound, ret;
 
-	db = g.wts_db;
-	toc = g.wts_toc;
-	env = db->env;
+	btree = g.wts_btree;
+	session = g.wts_session;
+	conn = btree->conn;
 
 	key_gen(&key.data, &key.size, keyno);
 
@@ -646,13 +660,13 @@ wts_del_row(u_int64_t keyno)
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
-	if ((ret = db->row_del(db, toc, &key, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(
-		    env, ret, "wts_del_row: delete row %llu by key",
-		        (unsigned long long)keyno);
+	if ((ret = btree->row_del(btree, session, &key, 0)) != 0 && ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: wts_del_row: delete row %llu by key: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
 		return (1);
 	}
-	NTF_CHK(wts_notfound_chk(env, "wts_del_row", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_del_row", ret, notfound, keyno));
 	return (0);
 }
 
@@ -663,14 +677,14 @@ wts_del_row(u_int64_t keyno)
 static int
 wts_del_col(u_int64_t keyno)
 {
-	DB *db;
-	ENV *env;
-	WT_TOC *toc;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	int notfound, ret;
 
-	db = g.wts_db;
-	toc = g.wts_toc;
-	env = db->env;
+	btree = g.wts_btree;
+	session = g.wts_session;
+	conn = btree->conn;
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
@@ -680,13 +694,14 @@ wts_del_col(u_int64_t keyno)
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
-	if ((ret = db->col_del(db, toc, keyno, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret, "wts_del_col: delete row %llu by key",
-		        (unsigned long long)keyno);
+	if ((ret = btree->col_del(btree, session, keyno, 0)) != 0 && ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: wts_del_col: delete col %llu by key: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	NTF_CHK(wts_notfound_chk(env, "wts_del_col", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_del_col", ret, notfound, keyno));
 	return (0);
 }
 
@@ -695,23 +710,22 @@ wts_del_col(u_int64_t keyno)
  *	Compare notfound returns for consistency.
  */
 static int
-wts_notfound_chk(
-    ENV *env, const char *f, int wt_ret, int bdb_notfound, u_int64_t keyno)
+wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, u_int64_t keyno)
 {
 	/* Check for not found status. */
 	if (bdb_notfound) {
 		if (wt_ret == WT_NOTFOUND)
 			return (2);
 
-		env->errx(env,
-		    "%s: row %llu: deleted in Berkeley DB, found in WiredTiger",
-		    f, (unsigned long long)keyno);
+		fprintf(stderr, "%s: %s: row %llu: "
+		    "deleted in Berkeley DB, found in WiredTiger\n",
+		    g.progname, f, (unsigned long long)keyno);
 		return (1);
 	}
 	if (wt_ret == WT_NOTFOUND) {
-		env->errx(env,
-		    "%s: row %llu: found in Berkeley DB, deleted in WiredTiger",
-		    f, (unsigned long long)keyno);
+		fprintf(stderr, "%s: %s: row %llu: "
+		    "found in Berkeley DB, deleted in WiredTiger\n",
+		    g.progname, f, (unsigned long long)keyno);
 		return (1);
 	}
 	return (0);

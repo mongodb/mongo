@@ -40,7 +40,6 @@ extern "C" {
 /*******************************************
  * Forward structure declarations for internal structures.
  *******************************************/
-struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_col;		typedef struct __wt_col WT_COL;
 struct __wt_col_ref;		typedef struct __wt_col_ref WT_COL_REF;
@@ -63,39 +62,39 @@ struct __wt_row;		typedef struct __wt_row WT_ROW;
 struct __wt_row_ref;		typedef struct __wt_row_ref WT_ROW_REF;
 struct __wt_row_split;		typedef struct __wt_row_split WT_ROW_SPLIT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
-struct __wt_toc;		typedef struct __wt_toc WT_TOC;
-struct __wt_toc_buffer;		typedef struct __wt_toc_buffer WT_TOC_BUFFER;
+struct __session_buffer;	typedef struct __session_buffer SESSION_BUFFER;
 struct __wt_update;		typedef struct __wt_update WT_UPDATE;
-
-#include "scratch.h"
-#include "api_int.h"
-#include "cur_std.h"
-
-#include "walk.h"
-#include "api_impl.h"
 
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "scratch.h"
+#include "cur_std.h"
+
+#include "walk.h"
+#include "btree.h"
+#include "mem.h"
+#include "api.h"
+
 #include "mutex.h"
 
-#include "btree.h"
 #include "cache.h"
 #include "config.h"
 #include "debug.h"
 #include "fh.h"
-#include "mem.h"
 #include "misc.h"
 #include "stat.h"
 
 /*******************************************
- * WT_TOC support.
+ * SESSION support.
  *******************************************/
+#define	S2C(session) ((CONNECTION *)(session)->iface.connection)
+
 /*
- * WT_TOC_BUFFER --
+ * SESSION_BUFFER --
  *	A structure to accumulate file changes on a per-thread basis.
  */
-struct __wt_toc_buffer {
+struct __session_buffer {
 	uint32_t len;				/* Buffer original size */
 	uint32_t space_avail;			/* Buffer's available memory */
 	uint8_t *first_free;			/* Buffer's first free byte */
@@ -117,106 +116,6 @@ struct __wt_free_entry {
 
 	uint32_t addr;				/* Disk offset */
 	uint32_t size;				/* Size */
-};
-
-struct __btree {
-	DB *db;				/* Public object */
-	TAILQ_ENTRY(__btree) q;		/* Linked list of databases */
-
-	char	 *name;			/* File name */
-	mode_t	  mode;			/* File create mode */
-
-	uint32_t file_id;		/* In-memory file ID */
-	WT_FH	 *fh;			/* Backing file handle */
-
-	/*
-	 * When a file is opened and/or created a hazard reference is taken on
-	 * its root page, and the root page brought into memory.  If no root
-	 * page has been acquired, there's usually not much work to do.
-	 */
-#define	WT_UNOPENED_FILE(btree)		((btree)->root_page.state != WT_REF_CACHE)
-	WT_REF		root_page;	/* Root page reference */
-
-	uint32_t free_addr;		/* Free page */
-	uint32_t free_size;
-					/* Free list */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	uint32_t freelist_entries;	/* Free list entry count */
-
-	WT_WALK evict_walk;		/* Eviction thread's walk state */
-
-	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_data;		/* Data huffman encoding */
-
-	WT_ITEM empty_item;		/* Empty data item */
-
-	WT_STATS *stats;		/* Btree handle statistics */
-	WT_STATS *fstats;		/* File statistics */
-
-	uint32_t flags;
-};
-
-/*******************************************
- * Environment handle information that doesn't persist.
- *******************************************/
-struct __ienv {
-	WT_MTX *mtx;			/* Global mutex */
-
-	pthread_t workq_tid;		/* workQ thread ID */
-	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
-	pthread_t cache_read_tid;	/* Cache read server thread ID */
-
-	TAILQ_HEAD(__wt_db_qh, __btree) dbqh;	/* Locked: database list */
-	u_int dbqcnt;			/* Locked: database list count */
-
-	TAILQ_HEAD(
-	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
-	u_int next_file_id;		/* Locked: file ID counter */
-
-	uint32_t volatile api_gen;	/* API generation number */
-
-	/*
-	 * WiredTiger allocates space for 50 simultaneous threads of control by
-	 * default.   The Env.toc_max_set method tunes this if the application
-	 * needs more.   Growing the number of threads dynamically is possible,
-	 * but tricky since the workQ is walking the array without locking it.
-	 *
-	 * There's an array of WT_TOC pointers that reference the allocated
-	 * array; we do it that way because we want an easy way for the workQ
-	 * code to avoid walking the entire array when only a few threads are
-	 * running.
-	 */
-	WT_TOC	**toc;			/* TOC reference */
-	uint32_t toc_cnt;		/* TOC count */
-	void	 *toc_array;		/* TOC array */
-
-	/*
-	 * WiredTiger allocates space for 15 hazard references in each thread of
-	 * control, by default.  The Env.hazard_max_set method tunes this if an
-	 * application needs more, but that shouldn't happen, there's no code
-	 * path that requires more than 15 pages at a time (and if we find one,
-	 * the right change is to increase the default).  The method is there
-	 * just in case an application starts failing in the field.
-	 *
-	 * The hazard array is separate from the WT_TOC array because we must be
-	 * able to easily copy and search it when evicting pages from the cache.
-	 */
-	WT_PAGE **hazard;		/* Hazard references array */
-
-	WT_CACHE  *cache;		/* Page cache */
-
-	WT_STATS *stats;		/* Environment handle statistics */
-	WT_STATS *method_stats;		/* Environment method statistics */
-
-#ifdef HAVE_DIAGNOSTIC
-	WT_MTRACK *mtrack;		/* Memory tracking information */
-#endif
-
-	const char *sep;		/* Display separator line */
-	char err_buf[32];		/* Last-ditch error buffer */
-
-	uint32_t flags;
 };
 
 #include "serial.h"

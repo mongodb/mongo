@@ -13,12 +13,10 @@
  *	Return a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_return)
+__wt_data_return(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *value, int key_return)
 {
-	DB *db;
-	WT_DATAITEM local_key, local_value;
-	ENV *env;
 	BTREE *btree;
+	WT_DATAITEM local_key, local_value;
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE *page;
@@ -27,19 +25,17 @@ __wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_retu
 	WT_UPDATE *upd;
 	const void *value_ret;
 	uint32_t size_ret;
-	int (*callback)(DB *, WT_DATAITEM *, WT_DATAITEM *), ret;
+	int (*callback)(BTREE *, WT_DATAITEM *, WT_DATAITEM *), ret;
 
-	db = toc->db;
-	env = toc->env;
-	btree = db->btree;
+	btree = session->btree;
 	callback = NULL; /* TODO: was value->callback */
 	ret = 0;
 
-	page = toc->srch_page;
+	page = session->srch_page;
 	dsk = page->dsk;
-	cip = toc->srch_ip;
-	rip = toc->srch_ip;
-	upd = toc->srch_upd;
+	cip = session->srch_ip;
+	rip = session->srch_ip;
+	upd = session->srch_upd;
 
 	/*
 	 * Handle the key item -- the key may be unchanged, in which case we
@@ -59,7 +55,7 @@ __wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_retu
 	 * memory for keys, but if we are looking at a key only to return it,
 	 * it's not that likely to be accessed again (think of a cursor moving
 	 * through the tree).  Use memory in the application's WT_DATAITEM instead, it
-	 * is discarded when the WT_TOC is discarded.
+	 * is discarded when the SESSION is discarded.
 	 *
 	 * Key return implies a reference to a WT_ROW index (we don't return
 	 * record number keys yet, that will probably change when I add cursor
@@ -67,18 +63,18 @@ __wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_retu
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_item_process(toc, rip->key, &toc->key));
+			WT_RET(__wt_item_process(session, rip->key, &session->key));
 
-			*key = toc->key.item;
+			*key = session->key.item;
 		} else if (callback == NULL) {
-			if (toc->key.mem_size < rip->size)
-				WT_RET(__wt_realloc(env,
-				    &toc->key.mem_size,
-				    rip->size, &toc->key.item.data));
-			memcpy((void *)toc->key.item.data, rip->key, rip->size);
-			toc->key.item.size = rip->size;
+			if (session->key.mem_size < rip->size)
+				WT_RET(__wt_realloc(session,
+				    &session->key.mem_size,
+				    rip->size, &session->key.item.data));
+			memcpy((void *)session->key.item.data, rip->key, rip->size);
+			session->key.item.size = rip->size;
 
-			*key = toc->key.item;
+			*key = session->key.item;
 		} else {
 			WT_CLEAR(local_key);
 			key = &local_key;
@@ -98,18 +94,18 @@ __wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_retu
 			return (WT_NOTFOUND);
 		value->data = WT_UPDATE_DATA(upd);
 		value->size = upd->size;
-		return (callback == NULL ? 0 : callback(db, key, value));
+		return (callback == NULL ? 0 : callback(btree, key, value));
 	}
 
 	/* Otherwise, take the item from the original page. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		value_ret = WT_COL_PTR(dsk, cip);
-		size_ret = db->fixed_len;
+		size_ret = btree->fixed_len;
 		break;
 	case WT_PAGE_COL_RLE:
 		value_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(dsk, cip));
-		size_ret = db->fixed_len;
+		size_ret = btree->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
 		item = WT_COL_PTR(dsk, cip);
@@ -124,14 +120,14 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_RET(__wt_item_process(toc, item, &toc->value));
-			value_ret = toc->value.item.data;
-			size_ret = toc->value.item.size;
+			WT_RET(__wt_item_process(session, item, &session->value));
+			value_ret = session->value.item.data;
+			size_ret = session->value.item.size;
 			break;
-		WT_ILLEGAL_FORMAT(db);
+		WT_ILLEGAL_FORMAT(btree);
 		}
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
 	/*
@@ -146,16 +142,16 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 		 * haven't yet copied the value_ret/size_ret pair into the return
 		 * WT_DATAITEM (potentially done by __wt_item_process), do so now.
 		 */
-		if (value_ret != toc->value.item.data) {
-			if (toc->value.mem_size < size_ret)
-				WT_RET(__wt_realloc(env,
-				    &toc->value.mem_size,
-				    size_ret, &toc->value.item.data));
-			memcpy((void *)toc->value.item.data, value_ret, size_ret);
-			toc->value.item.size = size_ret;
+		if (value_ret != session->value.item.data) {
+			if (session->value.mem_size < size_ret)
+				WT_RET(__wt_realloc(session,
+				    &session->value.mem_size,
+				    size_ret, &session->value.item.data));
+			memcpy((void *)session->value.item.data, value_ret, size_ret);
+			session->value.item.size = size_ret;
 		}
 
-		*value = toc->value.item;
+		*value = session->value.item;
 	} else {
 		/*
 		 * If we're given a callback function, use the data_ret/size_ret
@@ -165,7 +161,7 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 		value = &local_value;
 		value->data = value_ret;
 		value->size = size_ret;
-		ret = callback(db, key, value);
+		ret = callback(btree, key, value);
 	}
 
 	return (ret);

@@ -15,12 +15,12 @@ static int __wt_cache_read(WT_READ_REQ *);
  *	See if the read server thread needs to be awakened.
  */
 void
-__wt_workq_read_server(ENV *env, int force)
+__wt_workq_read_server(CONNECTION *conn, int force)
 {
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
 
-	cache = env->ienv->cache;
+	cache = conn->cache;
 
 	/*
 	 * If we're 10% over the maximum cache, shut out reads (which include
@@ -35,7 +35,8 @@ __wt_workq_read_server(ENV *env, int force)
 		if (bytes_inuse <= bytes_max - (bytes_max / 20))
 			cache->read_lockout = 0;
 	} else if (bytes_inuse > bytes_max + (bytes_max / 10)) {
-		WT_VERBOSE(env, WT_VERB_READ, (env,
+		WT_VERBOSE(conn, WT_VERB_READ,
+		    (&conn->default_session,
 		    "workQ locks out reads: bytes-inuse %llu of bytes-max %llu",
 		    (unsigned long long)bytes_inuse,
 		    (unsigned long long)bytes_max));
@@ -55,7 +56,7 @@ __wt_workq_read_server(ENV *env, int force)
 		return;
 
 	cache->read_sleeping = 0;
-	__wt_unlock(env, cache->mtx_read);
+	__wt_unlock(&conn->default_session, cache->mtx_read);
 }
 
 /*
@@ -64,29 +65,27 @@ __wt_workq_read_server(ENV *env, int force)
  *	allocation or a read.
  */
 int
-__wt_cache_read_serial_func(WT_TOC *toc)
+__wt_cache_read_serial_func(SESSION *session)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	WT_PAGE *parent;
 	WT_READ_REQ *rr, *rr_end;
 	WT_REF *ref;
 	int dsk_verify;
 
-	__wt_cache_read_unpack(toc, parent, ref, dsk_verify);
+	__wt_cache_read_unpack(session, parent, ref, dsk_verify);
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 
 	/* Find an empty slot and enter the read request. */
 	rr = cache->read_request;
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 	for (; rr < rr_end; ++rr)
 		if (WT_READ_REQ_ISEMPTY(rr)) {
-			WT_READ_REQ_SET(rr, toc, parent, ref, dsk_verify);
+			WT_READ_REQ_SET(rr, session, parent, ref, dsk_verify);
 			return (0);
 		}
-	__wt_api_env_errx(env, "read server request table full");
+	__wt_err(session, 0, "read server request table full");
 	return (WT_RESTART);
 }
 
@@ -97,40 +96,38 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 void *
 __wt_cache_read_server(void *arg)
 {
-	ENV *env;
-	IENV *ienv;
+	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_READ_REQ *rr, *rr_end;
-	WT_TOC *toc;
+	SESSION *session;
 	int didwork, ret;
 
-	env = arg;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	conn = arg;
+	cache = conn->cache;
 	ret = 0;
 
 	rr = cache->read_request;
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 
 	for (;;) {
-		WT_VERBOSE(env,
-		    WT_VERB_READ, (env, "cache read server sleeping"));
+		WT_VERBOSE(conn, WT_VERB_READ,
+		    (&conn->default_session, "cache read server sleeping"));
 		cache->read_sleeping = 1;
-		__wt_lock(env, cache->mtx_read);
-		WT_VERBOSE(
-		    env, WT_VERB_READ, (env, "cache read server waking"));
+		__wt_lock(&conn->default_session, cache->mtx_read);
+		WT_VERBOSE(conn, WT_VERB_READ,
+		    (&conn->default_session, "cache read server waking"));
 
 		/*
 		 * Check for environment exit; do it here, instead of the top of
 		 * the loop because doing it here keeps us from doing a bunch of
 		 * worked when simply awakened to quit.
 		 */
-		if (!F_ISSET(ienv, WT_SERVER_RUN))
+		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
-		 * a valid WT_TOC handle).  If we find a read request, perform
+		 * a valid SESSION handle).  If we find a read request, perform
 		 * it, flush the result and clear the request slot, then wake
 		 * up the requesting thread.  The request slot clear doesn't
 		 * need to be flushed, but we have to flush the read result,
@@ -140,10 +137,10 @@ __wt_cache_read_server(void *arg)
 		do {
 			didwork = 0;
 			for (rr = cache->read_request; rr < rr_end; ++rr) {
-				if ((toc = rr->toc) == NULL)
+				if ((session = rr->session) == NULL)
 					continue;
 				if (cache->read_lockout &&
-				    !F_ISSET(toc, WT_READ_PRIORITY))
+				    !F_ISSET(session, WT_READ_PRIORITY))
 					continue;
 
 				/*
@@ -155,7 +152,7 @@ __wt_cache_read_server(void *arg)
 				ret = __wt_cache_read(rr);
 
 				WT_READ_REQ_CLR(rr);
-				__wt_toc_serialize_wrapup(toc, NULL, ret);
+				__wt_session_serialize_wrapup(session, NULL, ret);
 
 				didwork = 1;
 
@@ -173,9 +170,11 @@ __wt_cache_read_server(void *arg)
 	}
 
 	if (ret != 0)
-err:		__wt_api_env_err(env, ret, "cache read server error");
+err:		__wt_err(&conn->default_session,
+		    ret, "cache read server error");
 
-	WT_VERBOSE(env, WT_VERB_READ, (env, "cache read server exiting"));
+	WT_VERBOSE(conn, WT_VERB_READ,
+	    (&conn->default_session, "cache read server exiting"));
 	return (NULL);
 }
 
@@ -186,22 +185,20 @@ err:		__wt_api_env_err(env, ret, "cache read server error");
 static int
 __wt_cache_read(WT_READ_REQ *rr)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
-	WT_TOC *toc;
+	SESSION *session;
 	uint32_t addr, size;
 	int ret;
 
-	toc = rr->toc;
+	session = rr->session;
 	ref = rr->ref;
 	addr = ref->addr;
 	size = ref->size;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 	ret = 0;
 
 	/* If the state is anything other than on-disk, not our problem. */
@@ -217,19 +214,19 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * itself. They're two separate allocation calls so we (hopefully) get
 	 * better alignment from the underlying heap memory allocator.
 	 */
-	WT_RET(__wt_calloc_def(env, 1, &page));
-	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(uint8_t), &dsk));
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 
 	/* Read the page. */
-	WT_VERBOSE(env, WT_VERB_READ,
-	    (env, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
+	WT_VERBOSE(S2C(session), WT_VERB_READ,
+	    (session, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
 
-	WT_ERR(__wt_disk_read(toc, dsk, addr, size));
+	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 	WT_CACHE_PAGE_IN(cache, size);
 
 	/* If the page needs to be verified, that's next. */
 	if (rr->dsk_verify)
-		WT_ERR(__wt_verify_dsk_page(toc, dsk, addr, size));
+		WT_ERR(__wt_verify_dsk_page(session, dsk, addr, size));
 
 	/*
 	 * Fill in the WT_PAGE addr, size.
@@ -247,7 +244,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * the called function cleaned up everything, including the physical
 	 * page.
 	 */
-	WT_RET(__wt_page_inmem(toc, page));
+	WT_RET(__wt_page_inmem(session, page));
 
 	/*
 	 * The page is now available -- set the LRU so the page is not selected
@@ -261,8 +258,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 err:	if (page != NULL) {
 		if (page->dsk != NULL)
-			__wt_free(env, page->dsk, size);
-		__wt_free(env, page, sizeof(WT_PAGE));
+			__wt_free(session, page->dsk, size);
+		__wt_free(session, page, sizeof(WT_PAGE));
 	}
 	return (ret);
 }

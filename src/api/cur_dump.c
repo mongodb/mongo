@@ -12,9 +12,9 @@
  * convert it to a dumpable string.
  */
 static int
-__convert_to_dump(ENV *env, WT_SCRATCH *scratch)
+__convert_to_dump(CONNECTION *conn, WT_SCRATCH *scratch)
 {
-	WT_UNUSED(env);
+	WT_UNUSED(conn);
 	WT_UNUSED(scratch);
 
 	return (0);
@@ -25,9 +25,9 @@ __convert_to_dump(ENV *env, WT_SCRATCH *scratch)
  * convert it to a raw value.
  */
 static int
-__convert_from_dump(ENV *env, WT_SCRATCH *scratch)
+__convert_from_dump(CONNECTION *conn, WT_SCRATCH *scratch)
 {
-	WT_UNUSED(env);
+	WT_UNUSED(conn);
 	WT_UNUSED(scratch);
 
 	return (0);
@@ -36,14 +36,14 @@ __convert_from_dump(ENV *env, WT_SCRATCH *scratch)
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
 	va_list ap;
 
-	env = ((ICONNECTION *)cursor->session->connection)->env;
+	conn = (CONNECTION *)cursor->session->connection;
 
 	if (!F_ISSET(stdc, WT_CURSTD_DUMPKEY)) {
-		WT_RET(__convert_to_dump(env, &stdc->key));
+		WT_RET(__convert_to_dump(conn, &stdc->key));
 		F_SET(stdc, WT_CURSTD_DUMPKEY);
 	}
 	va_start(ap, cursor);
@@ -56,14 +56,14 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
 	va_list ap;
 
-	env = ((ICONNECTION *)cursor->session->connection)->env;
+	conn = (CONNECTION *)cursor->session->connection;
 
 	if (!F_ISSET(stdc, WT_CURSTD_DUMPVALUE)) {
-		WT_RET(__convert_to_dump(env, &stdc->value));
+		WT_RET(__convert_to_dump(conn, &stdc->value));
 		F_SET(stdc, WT_CURSTD_DUMPVALUE);
 	}
 	va_start(ap, cursor);
@@ -76,16 +76,16 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 static void
 __curdump_set_key(WT_CURSOR *cursor, ...)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
 	va_list ap;
 
-	env = ((ICONNECTION *)cursor->session->connection)->env;
+	conn = (CONNECTION *)cursor->session->connection;
 
 	va_start(ap, cursor);
 	stdc->key.item = *va_arg(ap, WT_DATAITEM *);
 
-	if (__convert_from_dump(env, &stdc->key) == 0)
+	if (__convert_from_dump(conn, &stdc->key) == 0)
 		F_CLR(stdc, WT_CURSTD_BADKEY);
 	else
 		F_SET(stdc, WT_CURSTD_BADKEY);
@@ -96,16 +96,16 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 static void
 __curdump_set_value(WT_CURSOR *cursor, ...)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_CURSOR_STD *stdc = (WT_CURSOR_STD *)cursor;
 	va_list ap;
 
-	env = ((ICONNECTION *)cursor->session->connection)->env;
+	conn = (CONNECTION *)cursor->session->connection;
 
 	va_start(ap, cursor);
 	stdc->value.item = *va_arg(ap, WT_DATAITEM *);
 
-	if (__convert_from_dump(env, &stdc->value) == 0)
+	if (__convert_from_dump(conn, &stdc->value) == 0)
 		F_CLR(stdc, WT_CURSTD_BADKEY);
 	else
 		F_SET(stdc, WT_CURSTD_BADKEY);

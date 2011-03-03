@@ -12,12 +12,12 @@
  *	Set a hazard reference.
  */
 int
-__wt_hazard_set(WT_TOC *toc, WT_REF *ref)
+__wt_hazard_set(SESSION *session, WT_REF *ref)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_PAGE **hp;
 
-	env = toc->env;
+	conn = S2C(session);
 
 	/*
 	 * Do the dance:
@@ -26,14 +26,14 @@ __wt_hazard_set(WT_TOC *toc, WT_REF *ref)
 	 * can be reset from WT_REF_OK to WT_REF_EVICT at any time by the page
 	 * eviction server.
 	 *
-	 * Add the WT_REF reference to the WT_TOC's hazard list and flush the
+	 * Add the WT_REF reference to the SESSION's hazard list and flush the
 	 * write, then see if the state field is still WT_REF_OK.  If it's still
 	 * WT_REF_OK, we can use the page because the page eviction server will
 	 * see our hazard reference before it discards the buffer (the eviction
 	 * server sets the WT_REF state to WT_REF_EVICT, flushes memory, and
 	 * then checks the hazard references).
 	 */
-	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp) {
+	for (hp = session->hazard; hp < session->hazard + conn->hazard_size; ++hp) {
 		if (*hp != NULL)
 			continue;
 
@@ -51,9 +51,9 @@ __wt_hazard_set(WT_TOC *toc, WT_REF *ref)
 		 */
 		if (ref->state == WT_REF_CACHE ||
 		    (ref->state == WT_REF_EVICT &&
-		    F_ISSET(toc, WT_READ_EVICT))) {
-			WT_VERBOSE(env, WT_VERB_HAZARD,
-			    (env, "toc %p hazard %p: set", toc, ref->page));
+		    F_ISSET(session, WT_READ_EVICT))) {
+			WT_VERBOSE(conn, WT_VERB_HAZARD,
+			    (session, "session %p hazard %p: set", session, ref->page));
 			return (1);
 		}
 
@@ -62,8 +62,8 @@ __wt_hazard_set(WT_TOC *toc, WT_REF *ref)
 		return (0);
 	}
 
-	__wt_api_env_errx(env, "WT_TOC has no more hazard reference slots");
-	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
+	__wt_errx(session, "SESSION has no more hazard reference slots");
+	WT_ASSERT(session, hp < session->hazard + conn->hazard_size);
 	return (0);
 }
 
@@ -72,18 +72,18 @@ __wt_hazard_set(WT_TOC *toc, WT_REF *ref)
  *	Clear a hazard reference.
  */
 void
-__wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
+__wt_hazard_clear(SESSION *session, WT_PAGE *page)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_PAGE **hp;
 
-	env = toc->env;
+	conn = S2C(session);
 
-	WT_VERBOSE(env,
-	    WT_VERB_HAZARD, (env, "toc %p hazard %p: clr", toc, page));
+	WT_VERBOSE(conn,
+	    WT_VERB_HAZARD, (session, "session %p hazard %p: clr", session, page));
 
 	/* Clear the caller's hazard pointer. */
-	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
+	for (hp = session->hazard; hp < session->hazard + conn->hazard_size; ++hp)
 		if (*hp == page) {
 			*hp = NULL;
 			/*
@@ -95,8 +95,8 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
 			 */
 			return;
 		}
-	__wt_api_env_errx(env, "WT_TOC hazard reference not found");
-	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
+	__wt_errx(session, "SESSION hazard reference not found");
+	WT_ASSERT(session, hp < session->hazard + conn->hazard_size);
 }
 
 /*
@@ -104,26 +104,26 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
  *	Verify that no hazard references are set.
  */
 void
-__wt_hazard_empty(WT_TOC *toc, const char *name)
+__wt_hazard_empty(SESSION *session, const char *name)
 {
-	ENV *env;
+	CONNECTION *conn;
 	WT_PAGE **hp;
 
-	env = toc->env;
+	conn = S2C(session);
 
 	/*
 	 * Check for a set hazard reference and complain if we find one.  Clear
 	 * any we find because it's not a correctness problem (any hazard ref
-	 * we find can't be real because the WT_TOC is being closed when we're
+	 * we find can't be real because the SESSION is being closed when we're
 	 * called).   We do this work because it's not expensive, and we don't
 	 * want to let a hazard reference lie around, keeping a page from being
 	 * flushed.  The flush isn't necessary for correctness, but gives the
 	 * cache eviction thread immediate access to any page our reference
 	 * blocks.
 	 */
-	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
+	for (hp = session->hazard; hp < session->hazard + conn->hazard_size; ++hp)
 		if (*hp != NULL) {
-			__wt_api_env_errx(env,
+			__wt_errx(session,
 			    "%s: returned with a hazard reference set (%p)",
 			    name, *hp);
 			*hp = NULL;

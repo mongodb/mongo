@@ -110,7 +110,7 @@ extern "C" {
  * We #undef all of the macros because there are incompatible versions of this
  * file and these macros on various systems.  What makes the problem worse is
  * they are included and/or defined by system include files which we may have
- * already loaded into Berkeley DB before getting here.  For example, FreeBSD's
+ * already loaded into Berkeley BTREE before getting here.  For example, FreeBSD's
  * <rpc/rpc.h> includes its system <sys/queue.h>, and VxWorks UnixLib.h defines
  * several of the LIST_XXX macros.  Visual C.NET 7.0 also defines some of these
  * same macros in Vc7\PlatformSDK\Include\WinNT.h.  Make sure we use ours.

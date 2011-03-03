@@ -11,9 +11,9 @@ class Stat:
 		self.str = str
 
 ##########################################
-# IENV handle statistics
+# CONNECTION handle statistics
 ##########################################
-ienv_stats = {
+conn_stats = {
 	'FILE_OPEN' : Stat('file open'),
 	'MEMALLOC' : Stat('memory allocations'),
 	'MEMFREE' : Stat('memory frees'),

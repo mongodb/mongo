@@ -40,7 +40,7 @@ typedef struct __wt_static_huffman_node {
 } WT_STATIC_HUFFMAN_NODE;
 
 typedef struct __wt_huffman_obj {
-	ENV *env;		/* Enclosing environment */
+	SESSION *session;		/* Enclosing session */
 	/*
 	 * Data structure here defines specific instance of the encoder/decoder.
 	 * This contains the frequency table (tree) used to produce optimal
@@ -78,10 +78,10 @@ typedef struct node_queue {
 #define	node_queue_is_empty(queue)					\
 	(((queue) == NULL || (queue)->first == NULL) ? 1 : 0)
 
-static void node_queue_close(ENV *, NODE_QUEUE *);
-static void node_queue_dequeue(ENV *, NODE_QUEUE *, WT_FREQTREE_NODE **);
-static int  node_queue_enqueue(ENV *, NODE_QUEUE *, WT_FREQTREE_NODE *);
-static void recursive_free_node(ENV *env, WT_FREQTREE_NODE *node);
+static void node_queue_close(SESSION *, NODE_QUEUE *);
+static void node_queue_dequeue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE **);
+static int  node_queue_enqueue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE *);
+static void recursive_free_node(SESSION *, WT_FREQTREE_NODE *);
 
 /*
  * The following macros are used by the encoder to write the buffer with bit
@@ -181,12 +181,12 @@ fill_static_representation(
  *	Recursively free the huffman frequency tree's nodes.
  */
 static void
-recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
+recursive_free_node(SESSION *session, WT_FREQTREE_NODE *node)
 {
 	if (node != NULL) {
-		recursive_free_node(env, node->left);
-		recursive_free_node(env, node->right);
-		__wt_free(env, node, sizeof(WT_FREQTREE_NODE));
+		recursive_free_node(session, node->left);
+		recursive_free_node(session, node->right);
+		__wt_free(session, node, sizeof(WT_FREQTREE_NODE));
 	}
 }
 
@@ -203,7 +203,7 @@ recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
  *  The table should be 2 bytes x 65536 values.
  */
 int
-__wt_huffman_open(ENV *env,
+__wt_huffman_open(SESSION *session,
     uint8_t const *byte_frequency_array, u_int nbytes, void *retp)
 {
 	INDEXED_BYTE *indexed_freqs;
@@ -219,9 +219,9 @@ __wt_huffman_open(ENV *env,
 	node = node2 = tempnode = NULL;
 	ret = 0;
 
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_HUFFMAN_OBJ), &huffman));
-	WT_ERR(__wt_calloc(env, nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
-	huffman->env = env;
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_HUFFMAN_OBJ), &huffman));
+	WT_ERR(__wt_calloc(session, nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
+	huffman->session = session;
 
 	/*
 	 * The frequency array must be sorted to be able to use linear time
@@ -236,8 +236,8 @@ __wt_huffman_open(ENV *env,
 	    nbytes, sizeof(INDEXED_BYTE), indexed_byte_comparator);
 
 	/* We need two node queues to build the tree. */
-	WT_ERR(__wt_calloc(env, 1, sizeof(NODE_QUEUE), &leaves));
-	WT_ERR(__wt_calloc(env, 1, sizeof(NODE_QUEUE), &combined_nodes));
+	WT_ERR(__wt_calloc(session, 1, sizeof(NODE_QUEUE), &leaves));
+	WT_ERR(__wt_calloc(session, 1, sizeof(NODE_QUEUE), &combined_nodes));
 
 	/* Adding the leaves to the queue */
 	for (i = 0; i < nbytes; ++i) {
@@ -253,10 +253,10 @@ __wt_huffman_open(ENV *env,
 		 */
 		if (indexed_freqs[i].frequency > 0) {
 			WT_ERR(__wt_calloc(
-			    env, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
+			    session, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
 			tempnode->symbol = indexed_freqs[i].symbol;
 			tempnode->weight = indexed_freqs[i].frequency;
-			WT_ERR(node_queue_enqueue(env, leaves, tempnode));
+			WT_ERR(node_queue_enqueue(session, leaves, tempnode));
 			tempnode = NULL;
 		}
 	}
@@ -284,16 +284,16 @@ __wt_huffman_open(ENV *env,
 		 * element and place it to the alternating target node pointer:
 		 */
 		if (w1 < w2)
-			node_queue_dequeue(env, leaves, refnode);
+			node_queue_dequeue(session, leaves, refnode);
 		else
-			node_queue_dequeue(env, combined_nodes, refnode);
+			node_queue_dequeue(session, combined_nodes, refnode);
 
 		/*
 		 * In every second run, we have both node and node2 initialized.
 		 */
 		if (node != NULL && node2 != NULL) {
 			WT_ERR(__wt_calloc(
-			    env, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
+			    session, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
 
 			/* The new weight is the sum of the two weights. */
 			tempnode->weight = node->weight + node2->weight;
@@ -302,7 +302,7 @@ __wt_huffman_open(ENV *env,
 
 			/* Enqueue it to the combined nodes queue */
 			WT_ERR(
-			    node_queue_enqueue(env, combined_nodes, tempnode));
+			    node_queue_enqueue(session, combined_nodes, tempnode));
 			tempnode = NULL;
 
 			/* Reset the state pointers */
@@ -321,28 +321,28 @@ __wt_huffman_open(ENV *env,
 	traverse_tree(node, 0, &huffman->max_depth);
 
 	/* Converting the tree to a static array representation. */
-	WT_ERR(__wt_calloc(env, 1 << huffman->max_depth,
+	WT_ERR(__wt_calloc(session, 1 << huffman->max_depth,
 	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
 	fill_static_representation(huffman->nodes, node, 0);
 
 	*(void **)retp = huffman;
 
 err:	if (leaves != NULL)
-		node_queue_close(env, leaves);
+		node_queue_close(session, leaves);
 	if (combined_nodes != NULL)
-		node_queue_close(env, combined_nodes);
+		node_queue_close(session, combined_nodes);
 	if (indexed_freqs != NULL)
-		__wt_free(env, indexed_freqs, 0);
+		__wt_free(session, indexed_freqs, 0);
 	if (node != NULL)
-		recursive_free_node(env, node);
+		recursive_free_node(session, node);
 	if (node2 != NULL)
-		recursive_free_node(env, node2);
+		recursive_free_node(session, node2);
 	if (tempnode != NULL)
-		__wt_free(env, tempnode, sizeof(WT_FREQTREE_NODE));
+		__wt_free(session, tempnode, sizeof(WT_FREQTREE_NODE));
 	if (ret != 0) {
 		if (huffman->nodes != NULL)
-			__wt_free(env, huffman->nodes, 0);
-		__wt_free(env, huffman, sizeof(WT_HUFFMAN_OBJ));
+			__wt_free(session, huffman->nodes, 0);
+		__wt_free(session, huffman, sizeof(WT_HUFFMAN_OBJ));
 	}
 	return (ret);
 }
@@ -352,14 +352,14 @@ err:	if (leaves != NULL)
  *	Discard a Huffman descriptor object.
  */
 void
-__wt_huffman_close(ENV *env, void *huffman_arg)
+__wt_huffman_close(SESSION *session, void *huffman_arg)
 {
 	WT_HUFFMAN_OBJ *huffman;
 
 	huffman = huffman_arg;
 
-	__wt_free(env, huffman->nodes, 0);
-	__wt_free(env, huffman, sizeof(WT_HUFFMAN_OBJ));
+	__wt_free(session, huffman->nodes, 0);
+	__wt_free(session, huffman, sizeof(WT_HUFFMAN_OBJ));
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -368,7 +368,7 @@ __wt_huffman_close(ENV *env, void *huffman_arg)
  *	Prints a symbol's huffman code. Can be used for debugging purposes.
  */
 int
-__wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol)
+__wt_print_huffman_code(SESSION *session, void *huffman_arg, uint16_t symbol)
 {
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE *node;
@@ -380,7 +380,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol)
 
 	/* Check if the symbol is in valid range */
 	if (symbol < huffman->numSymbols) {
-		WT_RET(__wt_calloc(env, huffman->max_depth, 1, &buffer));
+		WT_RET(__wt_calloc(session, huffman->max_depth, 1, &buffer));
 
 		node = NULL;
 		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
@@ -407,7 +407,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, uint16_t symbol)
 			return (WT_ERROR);
 		}
 
-		__wt_free(env, buffer, 0);
+		__wt_free(session, buffer, 0);
 	} else
 		(void)printf("Symbol out of range: %lu >= %lu\n",
 		    (u_long)symbol, (u_long)huffman->numSymbols);
@@ -424,7 +424,7 @@ __wt_huffman_encode(void *huffman_arg,
     const uint8_t *from, uint32_t from_len,
     void *top, uint32_t *to_len, uint32_t *out_bytes_used)
 {
-	ENV *env;
+	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE *node;
 	uint32_t bitpos, i, n, j;
@@ -433,7 +433,7 @@ __wt_huffman_encode(void *huffman_arg,
 	int p;
 
 	huffman = huffman_arg;
-	env = huffman->env;
+	session = huffman->session;
 
 	/*
 	 * We need N+1 bytes to encode N bytes, re-allocate as necessary.
@@ -446,7 +446,7 @@ __wt_huffman_encode(void *huffman_arg,
 	if (to_len == NULL || *to_len < from_len + 1) {
 		if (to_len == NULL)
 			*(void **)top = NULL;
-		WT_RET(__wt_realloc(env, to_len, from_len + 1, top));
+		WT_RET(__wt_realloc(session, to_len, from_len + 1, top));
 	}
 
 	/*
@@ -497,7 +497,7 @@ __wt_huffman_encode(void *huffman_arg,
 
 			bitpos += node->codeword_length;
 		} else {
-			__wt_api_env_errx(NULL,
+			__wt_errx(NULL,
 			    "Huffman compression: there was a symbol in the "
 			    "source originally declared with zero frequency; "
 			    "undefined source symbol: %lu", (u_long)symbol);
@@ -531,14 +531,14 @@ __wt_huffman_decode(void *huffman_arg,
     const uint8_t *from, uint32_t from_len,
     void *top, uint32_t *to_len, uint32_t *out_bytes_used)
 {
-	ENV *env;
+	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE* node;
 	uint32_t bytes, i, from_len_bits, node_idx;
 	uint8_t bitpos, mask, bit, padding_info, *to;
 
 	huffman = huffman_arg;
-	env = huffman->env;
+	session = huffman->session;
 
 	/*
 	 * We need 2N+1 bytes to decode N bytes, re-allocate as necessary.
@@ -551,7 +551,7 @@ __wt_huffman_decode(void *huffman_arg,
 	if (to_len == NULL || *to_len < 2 * from_len + 1) {
 		if (to_len == NULL)
 			*(void **)top = NULL;
-		WT_RET(__wt_realloc(env, to_len, 2 * from_len + 1, top));
+		WT_RET(__wt_realloc(session, to_len, 2 * from_len + 1, top));
 	}
 
 	/*
@@ -633,18 +633,18 @@ __wt_huffman_decode(void *huffman_arg,
  * It does not delete the pointed huffman tree nodes!
  */
 static void
-node_queue_close(ENV *env, NODE_QUEUE *queue)
+node_queue_close(SESSION *session, NODE_QUEUE *queue)
 {
 	NODE_QUEUE_ELEM *elem, *next_elem;
 
 	/* Freeing each element of the queue's linked list. */
 	for (elem = queue->first; elem != NULL; elem = next_elem) {
 		next_elem = elem->next;
-		__wt_free(env, elem, sizeof(NODE_QUEUE_ELEM));
+		__wt_free(session, elem, sizeof(NODE_QUEUE_ELEM));
 	}
 
 	/* Freeing the queue record itself. */
-	__wt_free(env, queue, sizeof(NODE_QUEUE));
+	__wt_free(session, queue, sizeof(NODE_QUEUE));
 }
 
 /*
@@ -652,12 +652,12 @@ node_queue_close(ENV *env, NODE_QUEUE *queue)
  *	Push a tree node to the end of the queue.
  */
 static int
-node_queue_enqueue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
+node_queue_enqueue(SESSION *session, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
 {
 	NODE_QUEUE_ELEM *elem;
 
 	/* Allocating a new linked list element */
-	WT_RET(__wt_calloc(env, 1, sizeof(NODE_QUEUE_ELEM), &elem));
+	WT_RET(__wt_calloc(session, 1, sizeof(NODE_QUEUE_ELEM), &elem));
 
 	/* It holds the tree node, and has no next element yet */
 	elem->node = node;
@@ -686,7 +686,7 @@ node_queue_enqueue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
  *	pointer to the location referred by the retp parameter.
  */
 static void
-node_queue_dequeue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
+node_queue_dequeue(SESSION *session, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
 {
 	NODE_QUEUE_ELEM *first_elem;
 
@@ -706,5 +706,5 @@ node_queue_dequeue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
 		queue->last = NULL;
 
 	/* Freeing the linked list element that has been dequeued */
-	__wt_free(env, first_elem, sizeof(NODE_QUEUE_ELEM));
+	__wt_free(session, first_elem, sizeof(NODE_QUEUE_ELEM));
 }

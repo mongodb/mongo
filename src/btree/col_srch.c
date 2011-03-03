@@ -13,9 +13,8 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
+__wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 {
-	DB *db;
 	BTREE *btree;
 	WT_COL *cip;
 	WT_COL_REF *cref;
@@ -28,16 +27,15 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
 	int ret;
 	void *cipdata;
 
-	toc->srch_page = NULL;			/* Return values. */
-	toc->srch_ip = NULL;
-	toc->srch_upd = NULL;
-	toc->srch_exp = NULL;
-	toc->srch_write_gen = 0;
+	session->srch_page = NULL;			/* Return values. */
+	session->srch_ip = NULL;
+	session->srch_upd = NULL;
+	session->srch_exp = NULL;
+	session->srch_write_gen = 0;
 
-	db = toc->db;
-	btree = db->btree;
+	btree = session->btree;
 
-	WT_DB_FCHK(db, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
+	WT_DB_FCHK(btree, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
 
 	/* Search the tree. */
 	for (page = btree->root_page.page;;) {
@@ -107,11 +105,11 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
 			cref = page->u.col_int.t + (base == 0 ? 0 : base - 1);
 
 		/* cip references the subtree containing the record. */
-		switch (ret = __wt_page_in(toc, page, &cref->ref, 0)) {
+		switch (ret = __wt_page_in(session, page, &cref->ref, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
 			if (page != btree->root_page.page)
-				__wt_hazard_clear(toc, page);
+				__wt_hazard_clear(session, page);
 			break;
 		case WT_PAGE_DELETED:
 			/*
@@ -143,7 +141,7 @@ done:	/*
 		 * item was previously deleted, return the gathered information.
 		 */
 		if (LF_ISSET(WT_DATA_OVERWRITE)) {
-			toc->srch_upd = upd;
+			session->srch_upd = upd;
 			break;
 		}
 
@@ -154,7 +152,7 @@ done:	/*
 		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			toc->srch_upd = upd;
+			session->srch_upd = upd;
 		} else
 			if (WT_FIX_DELETE_ISSET(cipdata))
 				goto notfound;
@@ -172,8 +170,8 @@ done:	/*
 		 */
 		if (LF_ISSET(WT_DATA_OVERWRITE)) {
 			if (exp != NULL) {
-				toc->srch_exp = exp;
-				toc->srch_upd = exp->upd;
+				session->srch_exp = exp;
+				session->srch_upd = exp->upd;
 			}
 			break;
 		}
@@ -185,8 +183,8 @@ done:	/*
 		if (exp != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(exp->upd))
 				goto notfound;
-			toc->srch_exp = exp;
-			toc->srch_upd = exp->upd;
+			session->srch_exp = exp;
+			session->srch_upd = exp->upd;
 		} else
 			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 				goto notfound;
@@ -200,7 +198,7 @@ done:	/*
 		 * item was previously deleted, return the gathered information.
 		 */
 		if (LF_ISSET(WT_DATA_OVERWRITE)) {
-			toc->srch_upd = upd;
+			session->srch_upd = upd;
 			break;
 		}
 
@@ -211,7 +209,7 @@ done:	/*
 		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			toc->srch_upd = upd;
+			session->srch_upd = upd;
 			break;
 		} else
 			if (WT_ITEM_TYPE(cipdata) == WT_ITEM_DEL)
@@ -222,19 +220,19 @@ done:	/*
 		 * When returning internal pages, set the item's WT_UPDATE slot
 		 * if it exists, otherwise we're done.
 		 */
-		toc->srch_upd = WT_COL_UPDATE(page, cip);
+		session->srch_upd = WT_COL_UPDATE(page, cip);
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
-	toc->srch_page = page;
-	toc->srch_ip = cip;
-	toc->srch_write_gen = write_gen;
+	session->srch_page = page;
+	session->srch_ip = cip;
+	session->srch_write_gen = write_gen;
 	return (0);
 
 notfound:
 	ret = WT_NOTFOUND;
 
-err:	WT_PAGE_OUT(toc, page);
+err:	WT_PAGE_OUT(session, page);
 	return (ret);
 }

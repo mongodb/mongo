@@ -13,31 +13,31 @@
  *	Create the underlying cache.
  */
 int
-__wt_cache_create(ENV *env)
+__wt_cache_create(CONNECTION *conn)
 {
-	IENV *ienv;
 	WT_CACHE *cache;
+	SESSION *session;
 	int ret;
 
-	ienv = env->ienv;
+	session = &conn->default_session;
 	ret = 0;
 
-	WT_RET(__wt_calloc_def(env, 1, &ienv->cache));
-	cache = ienv->cache;
+	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+	cache = conn->cache;
 
 	WT_ERR(
-	    __wt_mtx_alloc(env, "cache eviction server", 1, &cache->mtx_evict));
-	WT_ERR(__wt_mtx_alloc(env, "cache read server", 1, &cache->mtx_read));
-	WT_ERR(__wt_mtx_alloc(env, "reconciliation", 0, &cache->mtx_reconcile));
+	    __wt_mtx_alloc(session, "cache eviction server", 1, &cache->mtx_evict));
+	WT_ERR(__wt_mtx_alloc(session, "cache read server", 1, &cache->mtx_read));
+	WT_ERR(__wt_mtx_alloc(session, "reconciliation", 0, &cache->mtx_reconcile));
 
-	WT_ERR(__wt_stat_alloc_cache_stats(env, &cache->stats));
+	WT_ERR(__wt_stat_alloc_cache_stats(session, &cache->stats));
 
 	WT_STAT_SET(
-	    cache->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
+	    cache->stats, CACHE_BYTES_MAX, conn->cache_size * WT_MEGABYTE);
 
 	return (0);
 
-err:	(void)__wt_cache_destroy(env);
+err:	(void)__wt_cache_destroy(conn);
 	return (ret);
 }
 
@@ -46,12 +46,12 @@ err:	(void)__wt_cache_destroy(env);
  *	Update the cache statistics for return to the application.
  */
 void
-__wt_cache_stats(ENV *env)
+__wt_cache_stats(CONNECTION *conn)
 {
 	WT_CACHE *cache;
 	WT_STATS *stats;
 
-	cache = env->ienv->cache;
+	cache = conn->cache;
 	stats = cache->stats;
 
 	WT_STAT_SET(stats, CACHE_BYTES_INUSE, __wt_cache_bytes_inuse(cache));
@@ -63,35 +63,35 @@ __wt_cache_stats(ENV *env)
  *	Discard the underlying cache.
  */
 int
-__wt_cache_destroy(ENV *env)
+__wt_cache_destroy(CONNECTION *conn)
 {
-	IENV *ienv;
+	SESSION *session;
 	WT_CACHE *cache;
 	WT_REC_LIST *reclist;
 	int ret;
 
-	ienv = env->ienv;
-	cache = ienv->cache;
+	session = &conn->default_session;
+	cache = conn->cache;
 	ret = 0;
 
 	if (cache == NULL)
 		return (0);
 
 	if (cache->mtx_reconcile != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_reconcile);
+		(void)__wt_mtx_destroy(session, cache->mtx_reconcile);
 	if (cache->mtx_evict != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_evict);
+		(void)__wt_mtx_destroy(session, cache->mtx_evict);
 	if (cache->mtx_read != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_read);
+		(void)__wt_mtx_destroy(session, cache->mtx_read);
 
 	reclist = &cache->reclist;
 	if (reclist->list != NULL)
-		__wt_free(env, reclist->list, reclist->l_allocated);
+		__wt_free(session, reclist->list, reclist->l_allocated);
 	if (reclist->save != NULL)
-		__wt_free(env,
+		__wt_free(session,
 		    reclist->save, reclist->s_entries * sizeof(*reclist->save));
-	__wt_free(env, cache->stats, 0);
-	__wt_free(env, ienv->cache, sizeof(WT_CACHE));
+	__wt_free(session, cache->stats, 0);
+	__wt_free(session, conn->cache, sizeof(WT_CACHE));
 
 	return (ret);
 }

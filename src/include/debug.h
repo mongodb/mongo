@@ -14,13 +14,13 @@ extern "C" {
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 
 #ifdef HAVE_DIAGNOSTIC
-#define	WT_ABORT(env, e)						\
-	__wt_assert(env, e, __FILE__, __LINE__)
-#define	WT_ASSERT(env, e)						\
-	((e) ? (void)0 : __wt_assert(env, #e, __FILE__, __LINE__))
+#define	WT_ABORT(session, e)						\
+	__wt_assert(session, e, __FILE__, __LINE__)
+#define	WT_ASSERT(session, e)						\
+	((e) ? (void)0 : __wt_assert(session, #e, __FILE__, __LINE__))
 #else
-#define	WT_ABORT(env, e)
-#define	WT_ASSERT(env, e)
+#define	WT_ABORT(session, e)
+#define	WT_ASSERT(session, e)
 #endif
 
 /*
@@ -30,7 +30,7 @@ extern "C" {
  * dump them to the application's logging file/function.
  */
 typedef struct __wt_mbuf {
-	ENV	 *env;			/* Enclosing environment */
+	SESSION	 *session;		/* Enclosing environment */
 
 	char  *first;			/* Allocated message buffer */
 	char  *next;			/* Next available byte of the buffer */

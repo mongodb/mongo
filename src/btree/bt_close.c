@@ -7,23 +7,21 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_close_page(WT_TOC *, WT_PAGE *, void *);
+static int __wt_bt_close_page(SESSION *, WT_PAGE *, void *);
 
 /*
  * __wt_bt_close --
  *	Close the tree.
  */
 int
-__wt_bt_close(WT_TOC *toc)
+__wt_bt_close(SESSION *session)
 {
-	ENV *env;
 	BTREE *btree;
 	WT_CACHE *cache;
 	int ret;
 
-	env = toc->env;
-	btree = toc->db->btree;
-	cache = env->ienv->cache;
+	btree = session->btree;
+	cache = S2C(session)->cache;
 	ret = 0;
 
 	/*
@@ -43,20 +41,20 @@ __wt_bt_close(WT_TOC *toc)
 	 * Lock out the cache evictions thread, though, we don't want it trying
 	 * to evict pages we're flushing.
 	 */
-	__wt_lock(env, cache->mtx_reconcile);
+	__wt_lock(session, cache->mtx_reconcile);
 	WT_TRET(__wt_tree_walk(
-	    toc, NULL, WT_WALK_CACHE, __wt_bt_close_page, NULL));
-	__wt_evict_db_clear(toc);
-	__wt_unlock(env, cache->mtx_reconcile);
+	    session, NULL, WT_WALK_CACHE, __wt_bt_close_page, NULL));
+	__wt_evict_db_clear(session);
+	__wt_unlock(session, cache->mtx_reconcile);
 
 	/* There's no root page any more, kill the pointer to catch mistakes. */
 	btree->root_page.page = NULL;
 
 	/* Write out the free list. */
-	WT_TRET(__wt_block_write(toc));
+	WT_TRET(__wt_block_write(session));
 
 	/* Close the underlying file handle. */
-	WT_TRET(__wt_close(env, btree->fh));
+	WT_TRET(__wt_close(session, btree->fh));
 	btree->fh = NULL;
 
 	return (ret);
@@ -67,7 +65,7 @@ __wt_bt_close(WT_TOC *toc)
  *	Close a page.
  */
 static int
-__wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_bt_close_page(SESSION *session, WT_PAGE *page, void *arg)
 {
 	WT_UNUSED(arg);
 
@@ -80,8 +78,8 @@ __wt_bt_close_page(WT_TOC *toc, WT_PAGE *page, void *arg)
 	 * child page, or reading a page after we discard it,
 	 */
 	if (WT_PAGE_IS_MODIFIED(page))
-		WT_RET(__wt_page_reconcile(toc, page));
+		WT_RET(__wt_page_reconcile(session, page));
 
-	__wt_page_discard(toc, page);
+	__wt_page_discard(session, page);
 	return (0);
 }

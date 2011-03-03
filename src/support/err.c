@@ -77,12 +77,12 @@ __wt_msg_stream(FILE *fp,
  *	Internal version of assert function.
  */
 void
-__wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
+__wt_assert(SESSION *session, const char *check, const char *file_name, int line_number)
 {
-	__wt_api_env_errx(env,
+	__wt_errx(session,
 	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
 
-	__wt_abort(env);
+	__wt_abort(session);
 	/* NOTREACHED */
 }
 #endif
@@ -93,9 +93,9 @@ __wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
  *	arguments.
  */
 int
-__wt_api_args(ENV *env, const char *name)
+__wt_api_args(SESSION *session, const char *name)
 {
-	__wt_api_env_errx(env,
+	__wt_errx(session,
 	    "%s: illegal API arguments or flag values specified", name);
 	return (WT_ERROR);
 }
@@ -106,13 +106,13 @@ __wt_api_args(ENV *env, const char *name)
  *	too-small argument.
  */
 int
-__wt_api_arg_min(ENV *env,
+__wt_api_arg_min(SESSION *session,
     const char *name, const char *arg_name, uint32_t v, uint32_t min)
 {
 	if (v >= min)
 		return (0);
 
-	__wt_api_env_errx(env,
+	__wt_errx(session,
 	    "%s: %s argument less than minimum value of %lu",
 	    name, arg_name, (u_long)min);
 	return (WT_ERROR);
@@ -124,13 +124,13 @@ __wt_api_arg_min(ENV *env,
  *	too-large argument.
  */
 int
-__wt_api_arg_max(ENV *env,
+__wt_api_arg_max(SESSION *session,
     const char *name, const char *arg_name, uint32_t v, uint32_t max)
 {
 	if (v <= max)
 		return (0);
 
-	__wt_api_env_errx(env,
+	__wt_errx(session,
 	    "%s: %s argument larger than maximum value of %lu",
 	    name, arg_name, (u_long)max);
 	return (WT_ERROR);
@@ -142,9 +142,13 @@ __wt_api_arg_max(ENV *env,
  *	for a file type.
  */
 int
-__wt_file_method_type(DB *db, const char *name, int column_err)
+__wt_file_method_type(BTREE *btree, const char *name, int column_err)
 {
-	__wt_api_db_errx(db,
+	SESSION *session;
+
+	session = &btree->conn->default_session;
+
+	__wt_errx(session,
 	    "%s: this method is not supported for a %s file",
 	    name, column_err ? "column-store" : "row-store");
 	return (WT_ERROR);
@@ -156,16 +160,16 @@ __wt_file_method_type(DB *db, const char *name, int column_err)
  *	into a fixed-size file.
  */
 int
-__wt_file_wrong_fixed_size(WT_TOC *toc, uint32_t len)
+__wt_file_wrong_fixed_size(SESSION *session, uint32_t len)
 {
-	DB *db;
+	BTREE *btree;
 
-	db = toc->db;
+	btree = session->btree;
 
-	__wt_api_db_errx(db,
+	__wt_errx(session,
 	    "%s: length of %lu does not match fixed-length file configuration "
 	    "of %lu",
-	     toc->name, (u_long)len, (u_long)db->fixed_len);
+	     session->name, (u_long)len, (u_long)btree->fixed_len);
 	return (WT_ERROR);
 }
 
@@ -174,9 +178,13 @@ __wt_file_wrong_fixed_size(WT_TOC *toc, uint32_t len)
  *	Print a standard error message on attempts to modify a read-only file.
  */
 int
-__wt_file_readonly(DB *db, const char *name)
+__wt_file_readonly(BTREE *btree, const char *name)
 {
-	__wt_api_db_errx(db,
+	SESSION *session;
+
+	session = &btree->conn->default_session;
+
+	__wt_errx(session,
 	    "%s: the file was opened read-only and may not be modified", name);
 	return (WT_READONLY);
 }
@@ -187,9 +195,13 @@ __wt_file_readonly(DB *db, const char *name)
  *	discovered.
  */
 int
-__wt_file_format(DB *db)
+__wt_file_format(BTREE *btree)
 {
-	__wt_api_db_errx(db, "the file is corrupted; use the Db.salvage"
+	SESSION *session;
+
+	session = &btree->conn->default_session;
+
+	__wt_errx(session, "the file is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the file");
 	return (WT_ERROR);
 }
@@ -199,40 +211,24 @@ __wt_file_format(DB *db)
  *	Print a standard error message when an element is too large to store.
  */
 int
-__wt_file_item_too_big(DB *db)
+__wt_file_item_too_big(BTREE *btree)
 {
-	__wt_api_db_errx(db, "the item is too large for the file to store");
+	SESSION *session;
+
+	session = &btree->conn->default_session;
+
+	__wt_errx(session, "the item is too large for the file to store");
 	return (WT_ERROR);
 }
 
 /*
- * __wt_wt_toc_lockout --
- *	Standard WT_TOC handle lockout error message.
+ * __wt_session_lockout --
+ *	Standard SESSION handle lockout error message.
  */
 int
-__wt_wt_toc_lockout(WT_TOC *toc)
+__wt_session_lockout(SESSION *session)
 {
-	return (__wt_env_lockout(toc->env));
-}
-
-/*
- * __wt_db_lockout --
- *	Standard DB handle lockout error message.
- */
-int
-__wt_db_lockout(DB *db)
-{
-	return (__wt_env_lockout(db->env));
-}
-
-/*
- * __wt_env_lockout --
- *	Standard ENV handle lockout error message.
- */
-int
-__wt_env_lockout(ENV *env)
-{
-	__wt_api_env_errx(env,
+	__wt_errx(session,
 	    "An unavailable handle method was called; the handle method is "
 	    "not available for some reason, for example, handle methods are "
 	    "restricted after an error, or configuration methods may be "
@@ -242,8 +238,28 @@ __wt_env_lockout(ENV *env)
 	return (WT_ERROR);
 }
 
+/*
+ * __wt_btree_lockout --
+ *	Standard BTREE handle lockout error message.
+ */
 int
-__wt_errv(ENV *env, ISESSION *isession, int error, const char *fmt, va_list ap)
+__wt_btree_lockout(BTREE *btree)
+{
+	return (__wt_connection_lockout(btree->conn));
+}
+
+/*
+ * __wt_connection_lockout --
+ *	Standard CONNECTION handle lockout error message.
+ */
+int
+__wt_connection_lockout(CONNECTION *conn)
+{
+	return (__wt_session_lockout(&conn->default_session));
+}
+
+int
+__wt_errv(SESSION *session, int error, const char *prefix, const char *fmt, va_list ap)
 {
 	WT_ERROR_HANDLER *handler;
 	char *end, *p;
@@ -259,30 +275,40 @@ __wt_errv(ENV *env, ISESSION *isession, int error, const char *fmt, va_list ap)
 	p = s;
 	end = s + sizeof(s);
 
-	/* TODO: prefix? */
+	if (prefix != NULL && p < end)
+		p += snprintf(p, end - p, "%s: ", prefix);
 	if (p < end)
 		p += vsnprintf(p, end - p, fmt, ap);
 	if (error != 0 && p < end)
 		p += snprintf(p, end - p, ": %s", wiredtiger_strerror(error));
 
-	if (isession != NULL && isession->error_handler != NULL)
-		handler = isession->error_handler;
-	else {
-		WT_ASSERT(env, env != NULL && env->error_handler != NULL);
-		handler = env->error_handler;
-	}
-
+	handler = session->error_handler;
 	return (handler->handle_error(handler, error, s));
 }
 
 int
-__wt_err(ENV *env, ISESSION *isession, int error, const char *fmt, ...)
+__wt_err(SESSION *session, int error, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
 
 	va_start(ap, fmt);
-	ret = __wt_errv(env, isession, error, fmt, ap);
+	ret = __wt_errv(session, error,
+	    (session->btree != NULL) ? session->btree->name : NULL, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}
+
+int
+__wt_errx(SESSION *session, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = __wt_errv(session, 0,
+	    (session->btree != NULL) ? session->btree->name : NULL, fmt, ap);
 	va_end(ap);
 
 	return (ret);

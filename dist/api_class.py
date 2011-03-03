@@ -15,15 +15,15 @@
 #		colonly	 -- column databases only
 #		extfunc  -- call an external function to do the work
 #		getter	 -- getter method
-#		ienvlock -- locks the IENV mutex (implied by getter/setter)
+#		connlock -- locks the connection mutex (implied by getter/setter)
 #		method	 -- method returns an int
 #		methodV  -- method returns void
 #		noauto	 -- don't auto-generate a stub at all
 #		rdonly	 -- not allowed if the database is read-only
 #		restart	 -- handle WT_RESTART in the API call
 #		rowonly	 -- row databases only
+#		session	 -- function takes a SESSION/BTREE argument pair
 #		setter	 -- setter method
-#		toc	 -- function takes a WT_TOC/DB argument pair
 #		verify	 -- setter methods call validation function
 #     3: a slash-separated list of argument names, declaration and optional
 #         default value triplets, that is, first the name of the argument,
@@ -53,167 +53,113 @@ class Api:
 		self.off = off
 
 ###################################################
-# WT_TOC method declarations
+# SESSION method declarations
 ###################################################
-methods['wt_toc.close'] = Api(
-	'wt_toc.close',
-	'method, ienvlock',
+methods['session.close'] = Api(
+	'session.close',
+	'method, connlock',
 	['flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
 ###################################################
-# ENV method declarations
+# CONNECTION method declarations
 ###################################################
-methods['env.cache_size_get'] = Api(
-	'env.cache_size_get',
+methods['connection.cache_size_get'] = Api(
+	'connection.cache_size_get',
 	'method, getter',
 	['cache_size/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['env.cache_size_set'] = Api(
-	'env.cache_size_set',
+methods['connection.cache_size_set'] = Api(
+	'connection.cache_size_set',
 	'method, setter, verify',
 	['cache_size/uint32_t @S/20'],
 	[],
 	['init'], ['open'])
 
-methods['env.close'] = Api(
-	'env.close',
+methods['connection.close'] = Api(
+	'connection.close',
 	'method',
 	['flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
-methods['env.data_update_initial_get'] = Api(
-	'env.data_update_initial_get',
+methods['connection.data_update_initial_get'] = Api(
+	'connection.data_update_initial_get',
 	'method, getter',
 	['data_update_initial/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['env.data_update_initial_set'] = Api(
-	'env.data_update_initial_set',
+methods['connection.data_update_initial_set'] = Api(
+	'connection.data_update_initial_set',
 	'method, setter',
 	['data_update_initial/uint32_t @S/8 * 1024'],
 	[],
 	['init'], [])
 
-methods['env.data_update_max_get'] = Api(
-	'env.data_update_max_get',
+methods['connection.data_update_max_get'] = Api(
+	'connection.data_update_max_get',
 	'method, getter',
 	['data_update_max/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['env.data_update_max_set'] = Api(
-	'env.data_update_max_set',
+methods['connection.data_update_max_set'] = Api(
+	'connection.data_update_max_set',
 	'method, setter',
 	['data_update_max/uint32_t @S/32 * 1024'],
 	[],
 	['init'], [])
 
-methods['env.db'] = Api(
-	'env.db',
+methods['connection.btree'] = Api(
+	'connection.btree',
 	'method',
 	['flags/uint32_t @S',
-	 'dbp/DB **@S'],
+	 'btreep/BTREE **@S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['env.err'] = Api(
-	'env.err',
-	'methodV, noauto',
-	['err/int @S',
-	 'fmt/const char *@S, ...'],
-	[],
-	['init'], [])
-
-methods['env.errcall_get'] = Api(
-	'env.errcall_get',
-	'method, getter',
-	['errcall/void (**@S)(const ENV *, const char *)'],
-	[],
-	['init'], [])
-methods['env.errcall_set'] = Api(
-	'env.errcall_set',
-	'method, setter',
-	['errcall/void (*@S)(const ENV *, const char *)'],
-	[],
-	['init'], [])
-
-methods['env.errfile_get'] = Api(
-	'env.errfile_get',
-	'method, getter',
-	['errfile/FILE **@S'],
-	[],
-	['init'], [])
-methods['env.errfile_set'] = Api(
-	'env.errfile_set',
-	'method, setter',
-	['errfile/FILE *@S'],
-	[],
-	['init'], [])
-
-methods['env.errpfx_get'] = Api(
-	'env.errpfx_get',
-	'method, getter',
-	['errpfx/const char **@S'],
-	[],
-	['init'], [])
-methods['env.errpfx_set'] = Api(
-	'env.errpfx_set',
-	'method, setter',
-	['errpfx/const char *@S'],
-	[],
-	['init'], [])
-
-methods['env.errx'] = Api(
-	'env.errx',
-	'methodV, noauto',
-	['fmt/const char *@S, ...'],
-	[],
-	['init'], [])
-
-methods['env.hazard_size_get'] = Api(
-	'env.hazard_size_get',
+methods['connection.hazard_size_get'] = Api(
+	'connection.hazard_size_get',
 	'method, getter',
 	['hazard_size/uint32_t *@S/15'],
 	[],
 	['init'], [])
-methods['env.hazard_size_set'] = Api(
-	'env.hazard_size_set',
+methods['connection.hazard_size_set'] = Api(
+	'connection.hazard_size_set',
 	'method, setter, verify',
 	['hazard_size/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
-methods['env.msgcall_get'] = Api(
-	'env.msgcall_get',
+methods['connection.msgcall_get'] = Api(
+	'connection.msgcall_get',
 	'method, getter',
-	['msgcall/void (**@S)(const ENV *, const char *)'],
+	['msgcall/void (**@S)(const CONNECTION *, const char *)'],
 	[],
 	['init'], [])
-methods['env.msgcall_set'] = Api(
-	'env.msgcall_set',
+methods['connection.msgcall_set'] = Api(
+	'connection.msgcall_set',
 	'method, setter',
-	['msgcall/void (*@S)(const ENV *, const char *)'],
+	['msgcall/void (*@S)(const CONNECTION *, const char *)'],
 	[],
 	['init'], [])
 
-methods['env.msgfile_get'] = Api(
-	'env.msgfile_get',
+methods['connection.msgfile_get'] = Api(
+	'connection.msgfile_get',
 	'method, getter',
 	['msgfile/FILE **@S'],
 	[],
 	['init'], [])
-methods['env.msgfile_set'] = Api(
-	'env.msgfile_set',
+methods['connection.msgfile_set'] = Api(
+	'connection.msgfile_set',
 	'method, setter',
 	['msgfile/FILE *@S'],
 	[],
 	['init'], [])
 
-methods['env.open'] = Api(
-	'env.open',
+methods['connection.open'] = Api(
+	'connection.open',
 	'method',
 	['home/const char *@S',
 	 'mode/mode_t @S',
@@ -221,58 +167,58 @@ methods['env.open'] = Api(
 	['__NONE__'],
 	['init'], ['open'])
 
-methods['env.stat_clear'] = Api(
-	'env.stat_clear',
+methods['connection.stat_clear'] = Api(
+	'connection.stat_clear',
 	'method',
 	['flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
-methods['env.stat_print'] = Api(
-	'env.stat_print',
+methods['connection.stat_print'] = Api(
+	'connection.stat_print',
 	'method',
 	['stream/FILE *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
-methods['env.sync'] = Api(
-	'env.sync',
+methods['connection.sync'] = Api(
+	'connection.sync',
 	'method',
 	['progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['env.toc'] = Api(
-	'env.toc',
-	'method, ienvlock',
+methods['connection.session'] = Api(
+	'connection.session',
+	'method, connlock',
 	['flags/uint32_t @S',
-	 'tocp/WT_TOC **@S'],
+	 'sessionp/SESSION **@S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['env.toc_size_get'] = Api(
-	'env.toc_size_get',
+methods['connection.session_size_get'] = Api(
+	'connection.session_size_get',
 	'method, getter',
-	['toc_size/uint32_t *@S'],
+	['session_size/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['env.toc_size_set'] = Api(
-	'env.toc_size_set',
+methods['connection.session_size_set'] = Api(
+	'connection.session_size_set',
 	'method, setter, verify',
-	['toc_size/uint32_t @S/50'],
+	['session_size/uint32_t @S/50'],
 	[],
 	['init'], ['open'])
 
-methods['env.verbose_get'] = Api(
-	'env.verbose_get',
+methods['connection.verbose_get'] = Api(
+	'connection.verbose_get',
 	'method, getter',
 	['verbose/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['env.verbose_set'] = Api(
-	'env.verbose_set',
+methods['connection.verbose_set'] = Api(
+	'connection.verbose_set',
 	'method, setter, verify',
 	['verbose/uint32_t @S'],
 	['VERB_ALL',
@@ -286,49 +232,49 @@ methods['env.verbose_set'] = Api(
 ###################################################
 # Db standalone method declarations
 ###################################################
-methods['db.btree_compare_get'] = Api(
-	'db.btree_compare_get',
+methods['btree.btree_compare_get'] = Api(
+	'btree.btree_compare_get',
 	'method, getter',
-	['btree_compare/int (**@S)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)'],
+	['btree_compare/int (**@S)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)'],
 	[],
 	['init'], [])
-methods['db.btree_compare_set'] = Api(
-	'db.btree_compare_set',
+methods['btree.btree_compare_set'] = Api(
+	'btree.btree_compare_set',
 	'method, setter',
-	['btree_compare/int (*@S)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)/__wt_bt_lex_compare'],
+	['btree_compare/int (*@S)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)/__wt_bt_lex_compare'],
 	[],
 	['init'], ['open'])
 
-methods['db.btree_compare_int_get'] = Api(
-	'db.btree_compare_int_get',
+methods['btree.btree_compare_int_get'] = Api(
+	'btree.btree_compare_int_get',
 	'method, getter',
 	['btree_compare_int/int *@S'],
 	[],
 	['init'], [])
-methods['db.btree_compare_int_set'] = Api(
-	'db.btree_compare_int_set',
+methods['btree.btree_compare_int_set'] = Api(
+	'btree.btree_compare_int_set',
 	'method, setter, verify',
 	['btree_compare_int/int @S'],
 	[],
 	['init'], ['open'])
 
-methods['db.btree_itemsize_get'] = Api(
-	'db.btree_itemsize_get',
+methods['btree.btree_itemsize_get'] = Api(
+	'btree.btree_itemsize_get',
 	'method, getter',
 	['intlitemsize/uint32_t *@S',
 	 'leafitemsize/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['db.btree_itemsize_set'] = Api(
-	'db.btree_itemsize_set',
+methods['btree.btree_itemsize_set'] = Api(
+	'btree.btree_itemsize_set',
 	'method, setter',
 	['intlitemsize/uint32_t @S',
 	 'leafitemsize/uint32_t @S'],
 	[],
 	['init'], ['open'])
 
-methods['db.btree_pagesize_get'] = Api(
-	'db.btree_pagesize_get',
+methods['btree.btree_pagesize_get'] = Api(
+	'btree.btree_pagesize_get',
 	'method, getter',
 	['allocsize/uint32_t *@S',
 	 'intlmin/uint32_t *@S',
@@ -337,8 +283,8 @@ methods['db.btree_pagesize_get'] = Api(
 	 'leafmax/uint32_t *@S'],
 	[],
 	['init'], [])
-methods['db.btree_pagesize_set'] = Api(
-	'db.btree_pagesize_set',
+methods['btree.btree_pagesize_set'] = Api(
+	'btree.btree_pagesize_set',
 	'method, setter',
 	['allocsize/uint32_t @S',
 	 'intlmin/uint32_t @S',
@@ -348,63 +294,63 @@ methods['db.btree_pagesize_set'] = Api(
 	[],
 	['init'], ['open'])
 
-methods['db.bulk_load'] = Api(
-	'db.bulk_load',
-	'method, rdonly, toc',
+methods['btree.bulk_load'] = Api(
+	'btree.bulk_load',
+	'method, rdonly, session',
 	['progress/void (*@S)(const char *, uint64_t)',
-	 'cb/int (*@S)(DB *, WT_DATAITEM **, WT_DATAITEM **)'],
+	 'cb/int (*@S)(BTREE *, WT_DATAITEM **, WT_DATAITEM **)'],
 	[],
 	['open'], [])
 
-methods['db.close'] = Api(
-	'db.close',
-	'method, toc',
+methods['btree.close'] = Api(
+	'btree.close',
+	'method, session',
 	['flags/uint32_t @S'],
 	['NOWRITE',
 	 'OSWRITE'],
 	['init'], [])
 
-methods['db.col_del'] = Api(
-	'db.col_del',
-	'method, colonly, rdonly, restart, toc',
-	['toc/WT_TOC *@S',
+methods['btree.col_del'] = Api(
+	'btree.col_del',
+	'method, colonly, rdonly, restart, session',
+	['session/SESSION *@S',
 	 'recno/uint64_t @S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['db.col_get'] = Api(
-	'db.col_get',
-	'method, colonly, toc',
-	['toc/WT_TOC *@S',
-	 'recno/uint64_t @S',
-	 'value/WT_DATAITEM *@S',
-	 'flags/uint32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
-methods['db.col_put'] = Api(
-	'db.col_put',
-	'method, colonly, rdonly, restart, toc',
-	['toc/WT_TOC *@S',
+methods['btree.col_get'] = Api(
+	'btree.col_get',
+	'method, colonly, session',
+	['session/SESSION *@S',
 	 'recno/uint64_t @S',
 	 'value/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['db.column_set'] = Api(
-	'db.column_set',
+methods['btree.col_put'] = Api(
+	'btree.col_put',
+	'method, colonly, rdonly, restart, session',
+	['session/SESSION *@S',
+	 'recno/uint64_t @S',
+	 'value/WT_DATAITEM *@S',
+	 'flags/uint32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
+methods['btree.column_set'] = Api(
+	'btree.column_set',
 	'method, setter, verify',
 	['fixed_len/uint32_t @S',
 	 'dictionary/const char *@S',
 	 'flags/uint32_t @S'],
-	[ 'RLE' ],
+	['RLE'],
 	['init'], ['open'])
 
-methods['db.dump'] = Api(
-	'db.dump',
-	'method, toc',
+methods['btree.dump'] = Api(
+	'btree.dump',
+	'method, session',
 	['stream/FILE *@S',
 	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
@@ -412,62 +358,8 @@ methods['db.dump'] = Api(
 	 'PRINTABLES' ],
 	['open'], [])
 
-methods['db.err'] = Api(
-	'db.err',
-	'methodV, noauto',
-	['err/int @S',
-	 'fmt/const char *@S, ...'],
-	[],
-	['init'], [])
-
-methods['db.errcall_get'] = Api(
-	'db.errcall_get',
-	'method, getter',
-	['errcall/void (**@S)(const DB *, const char *)'],
-	[],
-	['init'], [])
-methods['db.errcall_set'] = Api(
-	'db.errcall_set',
-	'method, setter',
-	['errcall/void (*@S)(const DB *, const char *)'],
-	[],
-	['init'], [])
-
-methods['db.errfile_get'] = Api(
-	'db.errfile_get',
-	'method, getter',
-	['errfile/FILE **@S'],
-	[],
-	['init'], [])
-methods['db.errfile_set'] = Api(
-	'db.errfile_set',
-	'method, setter',
-	['errfile/FILE *@S'],
-	[],
-	['init'], [])
-
-methods['db.errpfx_get'] = Api(
-	'db.errpfx_get',
-	'method, getter',
-	['errpfx/const char **@S'],
-	[],
-	['init'], [])
-methods['db.errpfx_set'] = Api(
-	'db.errpfx_set',
-	'method, setter',
-	['errpfx/const char *@S'],
-	[],
-	['init'], [])
-
-methods['db.errx'] = Api(
-	'db.errx',
-	'methodV, noauto',
-	['fmt/const char *@S, ...'],
-	[],
-	['init'], [])
-
-methods['db.huffman_set'] = Api(
-	'db.huffman_set',
+methods['btree.huffman_set'] = Api(
+	'btree.huffman_set',
 	'method, extfunc, setter',
 	['huffman_table/uint8_t const *@S',
 	 'huffman_table_size/u_int @S',
@@ -475,9 +367,9 @@ methods['db.huffman_set'] = Api(
 	[ 'ASCII_ENGLISH', 'HUFFMAN_DATA', 'HUFFMAN_KEY', 'TELEPHONE' ],
 	['init'], ['open'])
 
-methods['db.open'] = Api(
-	'db.open',
-	'method, toc',
+methods['btree.open'] = Api(
+	'btree.open',
+	'method, session',
 	['name/const char *@S',
 	 'mode/mode_t @S',
 	 'flags/uint32_t @S'],
@@ -485,61 +377,61 @@ methods['db.open'] = Api(
 	  'RDONLY' ],
 	['init'], [])
 
-methods['db.row_del'] = Api(
-	'db.row_del',
-	'method, rdonly, restart, rowonly, toc',
-	['toc/WT_TOC *@S',
+methods['btree.row_del'] = Api(
+	'btree.row_del',
+	'method, rdonly, restart, rowonly, session',
+	['session/SESSION *@S',
 	 'key/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['db.row_get'] = Api(
-	'db.row_get',
-	'method, rowonly, toc',
-	['toc/WT_TOC *@S',
-	 'key/WT_DATAITEM *@S',
-	 'value/WT_DATAITEM *@S',
-	 'flags/uint32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
-methods['db.row_put'] = Api(
-	'db.row_put',
-	'method, rdonly, restart, rowonly, toc',
-	['toc/WT_TOC *@S',
+methods['btree.row_get'] = Api(
+	'btree.row_get',
+	'method, rowonly, session',
+	['session/SESSION *@S',
 	 'key/WT_DATAITEM *@S',
 	 'value/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['db.stat_clear'] = Api(
-	'db.stat_clear',
+methods['btree.row_put'] = Api(
+	'btree.row_put',
+	'method, rdonly, restart, rowonly, session',
+	['session/SESSION *@S',
+	 'key/WT_DATAITEM *@S',
+	 'value/WT_DATAITEM *@S',
+	 'flags/uint32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
+methods['btree.stat_clear'] = Api(
+	'btree.stat_clear',
 	'method',
 	['flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['db.stat_print'] = Api(
-	'db.stat_print',
-	'method, toc',
+methods['btree.stat_print'] = Api(
+	'btree.stat_print',
+	'method, session',
 	['stream/FILE *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
-methods['db.sync'] = Api(
-	'db.sync',
-	'method, rdonly, toc',
+methods['btree.sync'] = Api(
+	'btree.sync',
+	'method, rdonly, session',
 	['progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['OSWRITE'],
 	['open'], [])
 
-methods['db.verify'] = Api(
-	'db.verify',
-	'method, toc',
+methods['btree.verify'] = Api(
+	'btree.verify',
+	'method, session',
 	['progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
@@ -548,7 +440,7 @@ methods['db.verify'] = Api(
 ###################################################
 # External routine flag declarations
 ###################################################
-flags['wiredtiger_env_init'] = [
+flags['wiredtiger_conn_init'] = [
 	'MEMORY_CHECK' ]
 
 ###################################################
@@ -564,17 +456,16 @@ flags['bt_tree_walk'] = [
 ###################################################
 # Structure flag declarations
 ###################################################
-flags['env'] = [
-	'MEMORY_CHECK' ]
-flags['idb'] = [
+flags['conn'] = [
+	'MEMORY_CHECK',
+	'SERVER_RUN',
+	'WORKQ_RUN' ]
+flags['btree'] = [
 	'COLUMN',
 	'RDONLY',
 	'RLE' ]
-flags['ienv'] = [
-	'SERVER_RUN',
-	'WORKQ_RUN' ]
 flags['scratch'] = [
 	'SCRATCH_INUSE' ]
-flags['wt_toc'] = [
+flags['session'] = [
 	'READ_EVICT',
 	'READ_PRIORITY' ]

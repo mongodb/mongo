@@ -7,56 +7,52 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_btree_open(DB *, const char *, mode_t, uint32_t);
+static int __wt_btree_btree_open(BTREE *, const char *, mode_t, uint32_t);
 
 /*
- * __wt_db_open --
- *	Open a DB handle.
+ * __wt_btree_open --
+ *	Open a BTREE handle.
  */
 int
-__wt_db_open(WT_TOC *toc, const char *name, mode_t mode, uint32_t flags)
+__wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 
-	env = toc->env;
-	db = toc->db;
+	btree = session->btree;
 
-	WT_STAT_INCR(env->ienv->stats, FILE_OPEN);
+	WT_STAT_INCR(btree->conn->stats, FILE_OPEN);
 
 	/* Initialize the BTREE structure. */
-	WT_RET(__wt_db_btree_open(db, name, mode, flags));
+	WT_RET(__wt_btree_btree_open(btree, name, mode, flags));
 
 	/* Open the underlying Btree. */
-	WT_RET(__wt_bt_open(toc, LF_ISSET(WT_CREATE) ? 1 : 0));
+	WT_RET(__wt_bt_open(session, LF_ISSET(WT_CREATE) ? 1 : 0));
 
 	/* Turn on the methods that require open. */
-	__wt_methods_db_open_transition(db);
+	__wt_methods_btree_open_transition(btree);
 
 	return (0);
 }
 
 /*
- * __wt_db_btree_open --
- *	Routine to intialize any BTREE values based on a DB value during open.
+ * __wt_btree_btree_open --
+ *	Routine to intialize any BTREE values based on a BTREE value during open.
  */
 static int
-__wt_db_btree_open(DB *db, const char *name, mode_t mode, uint32_t flags)
+__wt_btree_btree_open(BTREE *btree, const char *name, mode_t mode, uint32_t flags)
 {
-	ENV *env;
-	IENV *ienv;
-	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 
-	env = db->env;
-	ienv = env->ienv;
-	btree = db->btree;
+	conn = btree->conn;
+	session = &conn->default_session;
 
-	WT_RET(__wt_strdup(env, name, &btree->name));
+	WT_RET(__wt_strdup(session, name, &btree->name));
 	btree->mode = mode;
 
-	__wt_lock(env, ienv->mtx);
-	btree->file_id = ++ienv->next_file_id;
-	__wt_unlock(env, ienv->mtx);
+	__wt_lock(session, conn->mtx);
+	btree->file_id = ++conn->next_file_id;
+	__wt_unlock(session, conn->mtx);
 
 	/*
 	 * XXX
@@ -77,26 +73,26 @@ __wt_db_btree_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 }
 
 /*
- * __wt_db_close --
- *	Db.close method (DB close & handle destructor).
+ * __wt_btree_close --
+ *	Db.close method (BTREE close & handle destructor).
  */
 int
-__wt_db_close(WT_TOC *toc, uint32_t flags)
+__wt_btree_close(SESSION *session, uint32_t flags)
 {
-	DB *db;
+	BTREE *btree;
 	int ret;
 
-	db = toc->db;
+	btree = session->btree;
 	ret = 0;
 
 	/* Flush the underlying Btree. */
 	if (!LF_ISSET(WT_NOWRITE))
-		WT_TRET(__wt_bt_sync(toc));
+		WT_TRET(__wt_bt_sync(session));
 
 	/* Close the underlying Btree. */
-	ret = __wt_bt_close(toc);
+	ret = __wt_bt_close(session);
 
-	WT_TRET(__wt_db_destroy(db));
+	WT_TRET(__wt_btree_destroy(btree));
 
 	return (ret);
 }

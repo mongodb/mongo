@@ -8,78 +8,77 @@
 #include "wt_internal.h"
 
 static int
-__session_close(WT_SESSION *session, const char *config)
+__session_close(WT_SESSION *wt_session, const char *config)
 {
-	DB *db;
-	ICONNECTION *iconn;
-	ISESSION *isession;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 	WT_CURSOR_STD *cstd;
 	int ret;
 
 	printf("WT_SESSION->close\n");
-	iconn = (ICONNECTION *)session->connection;
-	isession = (ISESSION *)session;
+	conn = (CONNECTION *)wt_session->connection;
+	session = (SESSION *)wt_session;
 	ret = 0;
 
-	while ((cstd = TAILQ_FIRST(&isession->cursors)) != NULL)
+	while ((cstd = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cstd->iface.close(&cstd->iface, config));
 
-	while ((db = TAILQ_FIRST(&isession->btrees)) != NULL) {
-		TAILQ_REMOVE(&isession->btrees, db, q);
-		WT_TRET(db->close(db, 0));
+	while ((btree = TAILQ_FIRST(&session->btrees)) != NULL) {
+		TAILQ_REMOVE(&session->btrees, btree, q);
+		WT_TRET(btree->close(btree, 0));
 	}
 
-	if (isession->toc != NULL)
-		WT_TRET(__wt_wt_toc_close(isession->toc));
+	WT_TRET(__wt_session_close(session));
 
-	TAILQ_REMOVE(&iconn->sessions, isession, q);
-	__wt_free(NULL, session, sizeof(ISESSION));
+	TAILQ_REMOVE(&conn->sessions_head, session, q);
+	__wt_free(NULL, session, sizeof(SESSION));
 	return (0);
 }
 
 static int
-__session_open_cursor(WT_SESSION *session,
+__session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
-	ISESSION *isession;
+	SESSION *session;
 
 	WT_UNUSED(to_dup);
 
-	isession = (ISESSION *)session;
+	session = (SESSION *)wt_session;
 
 	if (strncmp(uri, "table:", 6) == 0)
 		return (__wt_curtable_open(session, uri, config, cursorp));
 
-	__wt_err(NULL, isession, 0, "Unknown cursor type '%s'\n", uri);
+	__wt_err(session, 0, "Unknown cursor type '%s'\n", uri);
 	return (EINVAL);
 }
 
 static int
-__session_create_table(WT_SESSION *session,
+__session_create_table(WT_SESSION *wt_session,
     const char *name, const char *config)
 {
-	DB *db;
-	ENV *env;
-	ISESSION *isession;
+	BTREE *btree;
+	CONNECTION *conn;
+	SESSION *session;
 
 	WT_UNUSED(config);
 
-	isession = (ISESSION *)session;
-	env = ((ICONNECTION *)session->connection)->env;
+	session = (SESSION *)wt_session;
+	conn = (CONNECTION *)wt_session->connection;
 
-	WT_RET(env->db(env, 0, &db));
-	WT_RET(db->open(db, name, 0, WT_CREATE));
+	WT_RET(conn->btree(conn, 0, &btree));
+	WT_RET(btree->open(btree, name, 0, WT_CREATE));
 
-	TAILQ_INSERT_HEAD(&isession->btrees, db, q);
+	TAILQ_INSERT_HEAD(&session->btrees, btree, q);
 
 	return (0);
 }
 
 static int
-__session_rename_table(WT_SESSION *session,
+__session_rename_table(WT_SESSION *wt_session,
     const char *oldname, const char *newname, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(oldname);
 	WT_UNUSED(newname);
 	WT_UNUSED(config);
@@ -88,25 +87,25 @@ __session_rename_table(WT_SESSION *session,
 }
 
 static int
-__session_drop_table(WT_SESSION *session, const char *name, const char *config)
+__session_drop_table(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	ISESSION *isession;
+	SESSION *session;
 	WT_CONFIG_ITEM cvalue;
 	int force, ret;
 
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(name);
 	WT_UNUSED(config);
 
-	isession = (ISESSION *)session;
+	session = (SESSION *)wt_session;
 	force = 0;
 
-	CONFIG_LOOP(isession, config, cvalue)
+	CONFIG_LOOP(session, config, cvalue)
 		CONFIG_ITEM("force")
 			force = (cvalue.val != 0);
-	CONFIG_END(isession)
+	CONFIG_END(session)
 
-	/* TODO: Combine the table name with the env home to make a filename. */
+	/* TODO: Combine the table name with the conn home to make a filename. */
 
 	ret = remove(name);
 
@@ -114,10 +113,10 @@ __session_drop_table(WT_SESSION *session, const char *name, const char *config)
 }
 
 static int
-__session_truncate_table(WT_SESSION *session,
+__session_truncate_table(WT_SESSION *wt_session,
     const char *name, WT_CURSOR *start, WT_CURSOR *end, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(name);
 	WT_UNUSED(start);
 	WT_UNUSED(end);
@@ -127,9 +126,9 @@ __session_truncate_table(WT_SESSION *session,
 }
 
 static int
-__session_verify_table(WT_SESSION *session, const char *name, const char *config)
+__session_verify_table(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(name);
 	WT_UNUSED(config);
 
@@ -137,45 +136,45 @@ __session_verify_table(WT_SESSION *session, const char *name, const char *config
 }
 
 static int
-__session_begin_transaction(WT_SESSION *session, const char *config)
+__session_begin_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(config);
 
 	return (ENOTSUP);
 }
 
 static int
-__session_commit_transaction(WT_SESSION *session, const char *config)
+__session_commit_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(config);
 
 	return (ENOTSUP);
 }
 
 static int
-__session_rollback_transaction(WT_SESSION *session, const char *config)
+__session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(config);
 
 	return (ENOTSUP);
 }
 
 static int
-__session_checkpoint(WT_SESSION *session, const char *config)
+__session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(wt_session);
 	WT_UNUSED(config);
 
 	return (ENOTSUP);
 }
 
 static int
-__conn_load_extension(WT_CONNECTION *conn, const char *path, const char *config)
+__conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *config)
 {
-	WT_UNUSED(conn);
+	WT_UNUSED(wt_conn);
 	WT_UNUSED(path);
 	WT_UNUSED(config);
 
@@ -183,10 +182,10 @@ __conn_load_extension(WT_CONNECTION *conn, const char *path, const char *config)
 }
 
 static int
-__conn_add_cursor_factory(WT_CONNECTION *conn,
+__conn_add_cursor_factory(WT_CONNECTION *wt_conn,
     const char *prefix, WT_CURSOR_FACTORY *factory, const char *config)
 {
-	WT_UNUSED(conn);
+	WT_UNUSED(wt_conn);
 	WT_UNUSED(prefix);
 	WT_UNUSED(factory);
 	WT_UNUSED(config);
@@ -195,10 +194,10 @@ __conn_add_cursor_factory(WT_CONNECTION *conn,
 }
 
 static int
-__conn_add_collator(WT_CONNECTION *conn,
+__conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
 {
-	WT_UNUSED(conn);
+	WT_UNUSED(wt_conn);
 	WT_UNUSED(name);
 	WT_UNUSED(collator);
 	WT_UNUSED(config);
@@ -207,10 +206,10 @@ __conn_add_collator(WT_CONNECTION *conn,
 }
 
 static int
-__conn_add_extractor(WT_CONNECTION *conn,
+__conn_add_extractor(WT_CONNECTION *wt_conn,
     const char *name, WT_EXTRACTOR *extractor, const char *config)
 {
-	WT_UNUSED(conn);
+	WT_UNUSED(wt_conn);
 	WT_UNUSED(name);
 	WT_UNUSED(extractor);
 	WT_UNUSED(config);
@@ -219,44 +218,43 @@ __conn_add_extractor(WT_CONNECTION *conn,
 }
 
 static const char *
-__conn_get_home(WT_CONNECTION *conn)
+__conn_get_home(WT_CONNECTION *wt_conn)
 {
-	return (((ICONNECTION *)conn)->home);
+	return (((CONNECTION *)wt_conn)->home);
 }
 
 static int
-__conn_is_new(WT_CONNECTION *conn)
+__conn_is_new(WT_CONNECTION *wt_conn)
 {
-	WT_UNUSED(conn);
+	WT_UNUSED(wt_conn);
 
 	return (0);
 }
 
 static int
-__conn_close(WT_CONNECTION *conn, const char *config)
+__conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
 	int ret;
-	ICONNECTION *iconn;
-	ISESSION *isession;
-	WT_SESSION *session;
+	CONNECTION *conn;
+	SESSION *session;
+	WT_SESSION *wt_session;
 
 	ret = 0;
-	iconn = (ICONNECTION *)conn;
+	conn = (CONNECTION *)wt_conn;
 
-	while ((isession = TAILQ_FIRST(&iconn->sessions)) != NULL) {
-		session = (WT_SESSION *)isession;
-		WT_TRET(session->close(session, config));
+	while ((session = TAILQ_FIRST(&conn->sessions_head)) != NULL) {
+		wt_session = &session->iface;
+		WT_TRET(wt_session->close(wt_session, config));
 	}
 
-	__wt_free(iconn->env, iconn->home, 0);
-	WT_TRET(iconn->env->close(iconn->env, 0));
-	__wt_free(NULL, iconn, sizeof(ICONNECTION));
+	__wt_free(&conn->default_session, conn->home, 0);
+	WT_TRET(conn->close(conn, 0));
 	return (ret);
 }
 
 static int
-__conn_open_session(WT_CONNECTION *conn,
-    WT_ERROR_HANDLER *error_handler, const char *config, WT_SESSION **sessionp)
+__conn_open_session(WT_CONNECTION *wt_conn,
+    WT_ERROR_HANDLER *error_handler, const char *config, WT_SESSION **wt_sessionp)
 {
 	static WT_SESSION stds = {
 		NULL,
@@ -272,36 +270,36 @@ __conn_open_session(WT_CONNECTION *conn,
 		__session_rollback_transaction,
 		__session_checkpoint,
 	};
-	ICONNECTION *iconn;
-	ISESSION *isession;
+	CONNECTION *conn;
+	SESSION *session;
 	int ret;
 
 	WT_UNUSED(error_handler);
 	WT_UNUSED(config);
 
-	iconn = (ICONNECTION *)conn;
+	conn = (CONNECTION *)wt_conn;
 
-	WT_RET(__wt_calloc(iconn->env, 1, sizeof(ISESSION), &isession));
-	TAILQ_INIT(&isession->cursors);
-	TAILQ_INIT(&isession->btrees);
+	WT_RET(__wt_calloc(&conn->default_session, 1, sizeof(SESSION), &session));
+	TAILQ_INIT(&session->cursors);
+	TAILQ_INIT(&session->btrees);
 
-	isession->iface = stds;
-	isession->iface.connection = conn;
+	session->iface = stds;
+	session->iface.connection = wt_conn;
 
-	isession->error_handler = (error_handler != NULL) ?
-	    error_handler : iconn->env->error_handler;
+	session->error_handler = (error_handler != NULL) ?
+	    error_handler : conn->default_session.error_handler;
 
-	WT_ERR(__wt_env_toc(iconn->env, &isession->toc));
+	WT_ERR(__wt_connection_session(conn, &session));
 
-	TAILQ_INSERT_HEAD(&iconn->sessions, isession, q);
+	TAILQ_INSERT_HEAD(&conn->sessions_head, session, q);
 
-	STATIC_ASSERT(offsetof(ICONNECTION, iface) == 0);
-	*sessionp = &isession->iface;
+	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
+	*wt_sessionp = &session->iface;
 
 	if (0) {
-err:		if (isession->toc != NULL)
-			(void)__wt_wt_toc_close(isession->toc);
-		__wt_free(iconn->env, isession, sizeof(ISESSION));
+err:		if (session != NULL)
+			(void)__wt_session_close(session);
+		__wt_free(&conn->default_session, session, sizeof(SESSION));
 	}
 
 	return (0);
@@ -309,8 +307,9 @@ err:		if (isession->toc != NULL)
 
 int
 wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
-    const char *config, WT_CONNECTION **connectionp)
+    const char *config, WT_CONNECTION **wt_connp)
 {
+	static int library_init = 0;
 	static WT_CONNECTION stdc = {
 		__conn_load_extension,
 		__conn_add_cursor_factory,
@@ -321,36 +320,53 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 		__conn_is_new,
 		__conn_open_session
 	};
-	ICONNECTION *iconn;
+	CONNECTION *conn;
 	int ret;
 
-	WT_UNUSED(home);
 	WT_UNUSED(config);
 
-	WT_RET(__wt_calloc(NULL, 1, sizeof(ICONNECTION), &iconn));
-	WT_ERR(__wt_strdup(NULL, home, &iconn->home));
-	TAILQ_INIT(&iconn->sessions);
+	*wt_connp = NULL;
 
-	/* XXX env flags? */
-	WT_ERR(wiredtiger_env_init(&iconn->env, 0));
+	if (error_handler == NULL)
+		error_handler = __wt_error_handler_default;
 
-	iconn->env->error_handler = (error_handler != NULL) ?
-	    error_handler : __wt_error_handler_default;
+	/*
+	 * We end up here before we do any real work.   Check the build itself,
+	 * and do some global stuff.
+	 */
+	if (library_init == 0) {
+		WT_RET(__wt_library_init());
+		library_init = 1;
+	}
+
+	/*
+	 * !!!
+	 * We don't have a session handle to pass to the memory allocation
+	 * functions.
+	 */
+	WT_RET(__wt_calloc(NULL, 1, sizeof(CONNECTION), &conn));
+	WT_ERR(__wt_strdup(NULL, home, &conn->home));
+	TAILQ_INIT(&conn->sessions_head);
+
+	conn->default_session.iface.connection = &conn->iface;
+	conn->default_session.error_handler = error_handler;
+
+	/* XXX conn flags, including WT_MEMORY_CHECK */
+	WT_ERR(__wt_connection_config(conn));
 
 	/* XXX configure cache size */
 
-	WT_ERR(iconn->env->open(iconn->env, home, 0, 0));
+	WT_ERR(conn->open(conn, home, 0644, 0));
 
-	STATIC_ASSERT(offsetof(ICONNECTION, iface) == 0);
-	iconn->iface = stdc;
-	*connectionp = &iconn->iface;
+	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
+	conn->iface = stdc;
+	*wt_connp = &conn->iface;
 
 	if (0) {
-err:		if (iconn->home != NULL)
-			__wt_free(NULL, iconn, 0);
-		if (iconn->env != NULL)
-			iconn->env->close(iconn->env, 0);
-		__wt_free(NULL, iconn, sizeof(ICONNECTION));
+err:		if (conn->home != NULL)
+			__wt_free(NULL, conn, 0);
+		conn->close(conn, 0);
+		__wt_free(NULL, conn, sizeof(CONNECTION));
 	}
 
 	return (ret);

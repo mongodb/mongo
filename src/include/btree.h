@@ -50,17 +50,17 @@ extern "C" {
  * than 4GB), so we use a standard type known to hold the size of a file, off_t.
  */
 /* Convert a data address to/from a byte offset. */
-#define	WT_ADDR_TO_OFF(db, addr)					\
-	((off_t)(addr) * (db)->allocsize)
-#define	WT_OFF_TO_ADDR(db, off)						\
-	((uint32_t)((off) / (db)->allocsize))
+#define	WT_ADDR_TO_OFF(btree, addr)					\
+	((off_t)(addr) * (btree)->allocsize)
+#define	WT_OFF_TO_ADDR(btree, off)						\
+	((uint32_t)((off) / (btree)->allocsize))
 
 /*
  * Return file allocation units needed for length (optionally including a page
  * header), rounded to an allocation unit.
  */
-#define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
-	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (db)->allocsize))
+#define	WT_HDR_BYTES_TO_ALLOC(btree, size)					\
+	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (btree)->allocsize))
 
 /*
  * The file needs a description, here's the structure.  At the moment, this
@@ -441,7 +441,7 @@ struct __wt_page {
 /*
  * WT_ROW --
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
- * this is where the on-page index in Berkeley DB is created when a page is read
+ * this is where the on-page index in Berkeley BTREE is created when a page is read
  * from the file.  It's sorted by key, fixed in size, and references data on the
  * page.
  */
@@ -487,7 +487,7 @@ struct __wt_row {
 /*
  * WT_COL --
  * Each in-memory column-store leaf page has an array of WT_COL structures: this
- * is where the on-page index in Berkeley DB is created when a page is read from
+ * is where the on-page index in Berkeley BTREE is created when a page is read from
  * the file.  It's fixed in size, and references data on the page.
  *
  * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
@@ -554,7 +554,7 @@ struct __wt_col {
  * structures are formed into a forward-linked list.
  */
 struct __wt_update {
-	WT_TOC_BUFFER *tb;		/* WT_TOC buffer holding this update */
+	SESSION_BUFFER *sb;		/* session buffer holding this update */
 	WT_UPDATE *next;		/* forward-linked list */
 
 	/*
@@ -582,7 +582,7 @@ struct __wt_update {
  * handle this by "inserting" a new entry into the rleexp array.  This is the
  * only case where it's possible to "insert" into a column-store, it's normally
  * only possible to append to a column-store as insert requires re-numbering
- * subsequent records.  (Berkeley DB did support the re-numbering functionality,
+ * subsequent records.  (Berkeley BTREE did support the re-numbering functionality,
  * but it won't scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_rle_expand {
@@ -867,19 +867,19 @@ struct __wt_ovfl {
 #define	WT_FIX_DELETE_SET(b)	(((uint8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
 
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
-#define	WT_FIX_FOREACH(db, dsk, p, i)					\
+#define	WT_FIX_FOREACH(btree, dsk, p, i)					\
 	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
-	    (p) = (uint8_t *)(p) + (db)->fixed_len)
+	    (p) = (uint8_t *)(p) + (btree)->fixed_len)
 
 /*
  * WT_RLE_REPEAT_FOREACH is a loop that walks fixed-length, run-length encoded
  * entries on a page.
  */
-#define	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)				\
+#define	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)				\
 	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
-	    (p) = (uint8_t *)(p) + (db)->fixed_len + sizeof(uint16_t))
+	    (p) = (uint8_t *)(p) + (btree)->fixed_len + sizeof(uint16_t))
 
 /*
  * WT_RLE_REPEAT_COUNT and WT_RLE_REPEAT_DATA reference the data and count
@@ -892,8 +892,8 @@ struct __wt_ovfl {
  * WT_RLE_REPEAT_ITERATE is a loop that walks fixed-length, run-length encoded
  * references on a page, visiting each entry the appropriate number of times.
  */
-#define	WT_RLE_REPEAT_ITERATE(db, dsk, p, i, j)				\
-	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)				\
+#define	WT_RLE_REPEAT_ITERATE(btree, dsk, p, i, j)				\
+	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)				\
 		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 
 #if defined(__cplusplus)

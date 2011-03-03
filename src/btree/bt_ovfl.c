@@ -12,14 +12,14 @@
  *	Read an overflow item from the disk.
  */
 int
-__wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_SCRATCH *store)
+__wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_SCRATCH *store)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
+	CONNECTION *conn;
 	uint32_t size;
 
-	env = toc->env;
-	db = toc->db;
+	conn = S2C(session);
+	btree = session->btree;
 
 	/*
 	 * Read an overflow page, using an overflow structure from a page for
@@ -29,11 +29,11 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_SCRATCH *store)
 	 * WiredTiger supports large page sizes, and overflow items should be
 	 * rare.
 	 */
-	WT_VERBOSE(env, WT_VERB_READ, (env,
+	WT_VERBOSE(conn, WT_VERB_READ, (session,
 	    "overflow read addr/size %lu/%lu",
 	    (u_long)ovfl->addr, (u_long)ovfl->size));
-	WT_STAT_INCR(db->btree->stats, FILE_OVERFLOW_READ);
-	WT_STAT_INCR(env->ienv->cache->stats, CACHE_OVERFLOW_READ);
+	WT_STAT_INCR(btree->stats, FILE_OVERFLOW_READ);
+	WT_STAT_INCR(conn->cache->stats, CACHE_OVERFLOW_READ);
 
 	/*
 	 * The only caller that wants a copy of the overflow pages (as opposed
@@ -52,12 +52,12 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_SCRATCH *store)
 	 *
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
-	size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
+	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
 	if (store->mem_size < size)
-		WT_RET(__wt_realloc(env, &store->mem_size, size, &store->item.data));
+		WT_RET(__wt_realloc(session, &store->mem_size, size, &store->item.data));
 
 	/* Read the page. */
-	WT_RET(__wt_disk_read(toc, (void *)store->item.data, ovfl->addr, size));
+	WT_RET(__wt_disk_read(session, (void *)store->item.data, ovfl->addr, size));
 
 	/* Copy the actual data in the WT_DATAITEM down to the start of the data. */
 	(void)memmove((void *)store->item.data,

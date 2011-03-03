@@ -12,19 +12,19 @@
  *	Read a chunk.
  */
 int
-__wt_read(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
+__wt_read(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh->stats, READ_IO);
-	WT_STAT_INCR(env->ienv->stats, TOTAL_READ_IO);
+	WT_STAT_INCR(S2C(session)->stats, TOTAL_READ_IO);
 
-	WT_VERBOSE(env, WT_VERB_FILEOPS,
-	    (env, "fileops: %s: read %lu bytes at offset %lu",
+	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
+	    (session, "fileops: %s: read %lu bytes at offset %lu",
 	    fh->name, (u_long)bytes, (u_long)offset));
 
 	if (pread(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
-	__wt_api_env_err(env, errno,
+	__wt_err(session, errno,
 	    "%s read error: attempt to read %lu bytes at offset %lu",
 	    fh->name, (u_long)bytes, (u_long)offset);
 	return (WT_ERROR);
@@ -35,19 +35,19 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
  *	Write a chunk.
  */
 int
-__wt_write(ENV *env, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
+__wt_write(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
 	WT_STAT_INCR(fh->stats, WRITE_IO);
-	WT_STAT_INCR(env->ienv->stats, TOTAL_WRITE_IO);
+	WT_STAT_INCR(S2C(session)->stats, TOTAL_WRITE_IO);
 
-	WT_VERBOSE(env, WT_VERB_FILEOPS,
-	    (env, "fileops: %s: write %lu bytes at offset %lu",
+	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
+	    (session, "fileops: %s: write %lu bytes at offset %lu",
 	    fh->name, (u_long)bytes, (u_long)offset));
 
 	if (pwrite(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
-	__wt_api_env_err(env, errno,
+	__wt_err(session, errno,
 	    "%s write error: attempt to write %lu bytes at offset %lu",
 	    fh->name, (u_long)bytes, (u_long)offset);
 	return (WT_ERROR);

@@ -88,7 +88,7 @@ main(int argc, char *argv[])
 
 	/*
 	 * Right now, we only support text input -- require the T option to
-	 * match Berkeley DB's API.
+	 * match Berkeley BTREE's API.
 	 */
 	if (text_input == 0) {
 		fprintf(stderr,

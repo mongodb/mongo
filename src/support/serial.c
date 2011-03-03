@@ -28,20 +28,20 @@
  */
 
 /*
- * __wt_toc_serialize_func --
+ * __wt_session_serialize_func --
  *	Schedule a serialization request, and block or spin until it completes.
  */
 int
-__wt_toc_serialize_func(
-    WT_TOC *toc, wq_state_t op, int spin, int (*func)(WT_TOC *), void *args)
+__wt_session_serialize_func(
+    SESSION *session, wq_state_t op, int spin, int (*func)(SESSION *), void *args)
 {
 	int done;
 
 	/*
 	 * Threads serializing access to data using a function:
-	 *	set a function/argument pair in the WT_TOC handle,
+	 *	set a function/argument pair in the SESSION handle,
 	 *	flush memory,
-	 *	update the WT_TOC workq state, and
+	 *	update the SESSION workq state, and
 	 *	spins or blocks.
 	 *
 	 * The workQ thread notices the state change and calls the serialization
@@ -52,14 +52,14 @@ __wt_toc_serialize_func(
 	 * thread).  No second memory flush is required, the wq_state field is
 	 * declared volatile.
 	 */
-	toc->wq_args = args;
-	toc->wq_func = func;
-	toc->wq_sleeping = spin ? 0 : 1;
+	session->wq_args = args;
+	session->wq_func = func;
+	session->wq_sleeping = spin ? 0 : 1;
 	WT_MEMORY_FLUSH;
-	toc->wq_state = op;
+	session->wq_state = op;
 
 	/*
-	 * Callers can spin on the WT_TOC state (implying the call is quickly
+	 * Callers can spin on the SESSION state (implying the call is quickly
 	 * satisfied), or block until its mutex is unlocked by another thread
 	 * when the operation has completed.
 	 */
@@ -70,7 +70,7 @@ __wt_toc_serialize_func(
 		 * it makes some compilers/lint tools angry.
 		 */
 		for (done = 0; !done;) {
-			switch (toc->wq_state) {
+			switch (session->wq_state) {
 			case WT_WORKQ_NONE:
 				done = 1;
 				break;
@@ -82,22 +82,18 @@ __wt_toc_serialize_func(
 			}
 		}
 	} else
-		__wt_lock(toc->env, toc->mtx);
+		__wt_lock(session, session->mtx);
 
-	return (toc->wq_ret);
+	return (session->wq_ret);
 }
 
 /*
- * __wt_toc_serialize_wrapup --
+ * __wt_session_serialize_wrapup --
  *	Server function cleanup.
  */
 void
-__wt_toc_serialize_wrapup(WT_TOC *toc, WT_PAGE *page, int ret)
+__wt_session_serialize_wrapup(SESSION *session, WT_PAGE *page, int ret)
 {
-	ENV *env;
-
-	env = toc->env;
-
 	/*
 	 * If passed a page and the return value is good, we modified the page;
 	 * no need for a memory flush, we'll use the one below.
@@ -111,11 +107,11 @@ __wt_toc_serialize_wrapup(WT_TOC *toc, WT_PAGE *page, int ret)
 	 *
 	 * The return value isn't volatile, so requires an explicit flush.
 	 */
-	toc->wq_ret = ret;
-	toc->wq_state = WT_WORKQ_NONE;
+	session->wq_ret = ret;
+	session->wq_state = WT_WORKQ_NONE;
 	WT_MEMORY_FLUSH;
 
 	/* If the calling thread is sleeping, wake it up. */
-	if (toc->wq_sleeping)
-		__wt_unlock(env, toc->mtx);
+	if (session->wq_sleeping)
+		__wt_unlock(session, session->mtx);
 }

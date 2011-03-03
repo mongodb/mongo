@@ -94,9 +94,9 @@ __wt_key_process(void *ref)
  *	Write a file page.
  */
 static inline int
-__wt_page_write(WT_TOC *toc, WT_PAGE *page)
+__wt_page_write(SESSION *session, WT_PAGE *page)
 {
-	return (__wt_disk_write(toc, page->dsk, page->addr, page->size));
+	return (__wt_disk_write(session, page->dsk, page->addr, page->size));
 }
 
 /*

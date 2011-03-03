@@ -8,12 +8,12 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_page_inmem_col_fix(WT_TOC *, WT_PAGE *);
-static int __wt_page_inmem_col_int(WT_TOC *, WT_PAGE *);
-static int __wt_page_inmem_col_rle(WT_TOC *, WT_PAGE *);
-static int __wt_page_inmem_col_var(WT_TOC *, WT_PAGE *);
-static int __wt_page_inmem_row_int(WT_TOC *, WT_PAGE *);
-static int __wt_page_inmem_row_leaf(WT_TOC *, WT_PAGE *);
+static int __wt_page_inmem_col_fix(SESSION *, WT_PAGE *);
+static int __wt_page_inmem_col_int(SESSION *, WT_PAGE *);
+static int __wt_page_inmem_col_rle(SESSION *, WT_PAGE *);
+static int __wt_page_inmem_col_var(SESSION *, WT_PAGE *);
+static int __wt_page_inmem_row_int(SESSION *, WT_PAGE *);
+static int __wt_page_inmem_row_leaf(SESSION *, WT_PAGE *);
 
 /*
  * __wt_page_in --
@@ -21,14 +21,12 @@ static int __wt_page_inmem_row_leaf(WT_TOC *, WT_PAGE *);
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_page_in(WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
+__wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
-	ENV *env;
 	WT_CACHE *cache;
 	int ret;
 
-	env = toc->env;
-	cache = env->ienv->cache;
+	cache = S2C(session)->cache;
 
 	for (;;)
 		switch (ref->state) {
@@ -39,7 +37,7 @@ __wt_page_in(WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 			 * can't get a hazard reference is because the page is
 			 * being evicted; yield and try again.
 			 */
-			if (__wt_hazard_set(toc, ref)) {
+			if (__wt_hazard_set(session, ref)) {
 				ref->page->read_gen = ++cache->read_gen;
 				return (0);
 			}
@@ -61,12 +59,12 @@ __wt_page_in(WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 		case WT_REF_DISK:
 			/* The page isn't in memory, request it be read. */
 			__wt_cache_read_serial(
-			    toc, parent, ref, dsk_verify, ret);
+			    session, parent, ref, dsk_verify, ret);
 			if (ret != 0)
 				return (ret);
 			break;
 		default:
-			WT_ABORT(env, "WT_REF->state invalid");
+			WT_ABORT(session, "WT_REF->state invalid");
 			break;
 		}
 	/* NOTREACHED */
@@ -77,43 +75,43 @@ __wt_page_in(WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem(SESSION *session, WT_PAGE *page)
 {
-	DB *db;
+	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	int ret;
 
-	db = toc->db;
+	btree = session->btree;
 	dsk = page->dsk;
 	ret = 0;
 
-	WT_ASSERT(toc->env, dsk->u.entries > 0);
-	WT_ASSERT(toc->env, page->indx_count == 0);
+	WT_ASSERT(session, dsk->u.entries > 0);
+	WT_ASSERT(session, page->indx_count == 0);
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_page_inmem_col_fix(toc, page));
+		WT_ERR(__wt_page_inmem_col_fix(session, page));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_ERR(__wt_page_inmem_col_int(toc, page));
+		WT_ERR(__wt_page_inmem_col_int(session, page));
 		break;
 	case WT_PAGE_COL_RLE:
-		WT_ERR(__wt_page_inmem_col_rle(toc, page));
+		WT_ERR(__wt_page_inmem_col_rle(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__wt_page_inmem_col_var(toc, page));
+		WT_ERR(__wt_page_inmem_col_var(session, page));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_page_inmem_row_int(toc, page));
+		WT_ERR(__wt_page_inmem_row_int(session, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_page_inmem_row_leaf(toc, page));
+		WT_ERR(__wt_page_inmem_row_leaf(session, page));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 	return (0);
 
-err:	__wt_page_discard(toc, page);
+err:	__wt_page_discard(session, page);
 	return (ret);
 }
 
@@ -122,17 +120,15 @@ err:	__wt_page_discard(toc, page);
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__wt_page_inmem_col_fix(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 	uint8_t *p;
 
-	db = toc->db;
-	env = toc->env;
+	btree = session->btree;
 	dsk = page->dsk;
 
 	/*
@@ -140,14 +136,14 @@ __wt_page_inmem_col_fix(WT_TOC *toc, WT_PAGE *page)
 	 * entries on the page (each physical entry is a data item).
 	 */
 	WT_RET((
-	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
 
 	/*
 	 * Walk the page, building references: the page contains fixed-length
 	 * objects.
 	 */
 	cip = page->u.col_leaf.d;
-	WT_FIX_FOREACH(db, dsk, p, i)
+	WT_FIX_FOREACH(btree, dsk, p, i)
 		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, p);
 
 	page->indx_count = dsk->u.entries;
@@ -159,15 +155,13 @@ __wt_page_inmem_col_fix(WT_TOC *toc, WT_PAGE *page)
  *	Build in-memory index for column-store internal pages.
  */
 static int
-__wt_page_inmem_col_int(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
 {
-	ENV *env;
 	WT_COL_REF *cref;
 	WT_OFF_RECORD *off_record;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	env = toc->env;
 	dsk = page->dsk;
 
 	/*
@@ -175,7 +169,7 @@ __wt_page_inmem_col_int(WT_TOC *toc, WT_PAGE *page)
 	 * entries on the page (each physical entry is a offset object).
 	 */
 	WT_RET((
-	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_int.t)));
+	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_int.t)));
 
 	/*
 	 * Walk the page, building references: the page contains WT_OFF_RECORD
@@ -199,17 +193,15 @@ __wt_page_inmem_col_int(WT_TOC *toc, WT_PAGE *page)
  *	leaf pages.
  */
 static int
-__wt_page_inmem_col_rle(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
 {
-	DB *db;
-	ENV *env;
+	BTREE *btree;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 	uint8_t *p;
 
-	db = toc->db;
-	env = toc->env;
+	btree = session->btree;
 	dsk = page->dsk;
 
 	/*
@@ -217,14 +209,14 @@ __wt_page_inmem_col_rle(WT_TOC *toc, WT_PAGE *page)
 	 * entries on the page (each physical entry is a data item).
 	 */
 	WT_RET((
-	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
 
 	/*
 	 * Walk the page, building references: the page contains fixed-length
 	 * objects.
 	 */
 	cip = page->u.col_leaf.d;
-	WT_RLE_REPEAT_FOREACH(db, dsk, p, i)
+	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
 		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, p);
 
 	page->indx_count = dsk->u.entries;
@@ -237,15 +229,13 @@ __wt_page_inmem_col_rle(WT_TOC *toc, WT_PAGE *page)
  *	column-store trees.
  */
 static int
-__wt_page_inmem_col_var(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 {
-	ENV *env;
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	env = toc->env;
 	dsk = page->dsk;
 
 	/*
@@ -253,7 +243,7 @@ __wt_page_inmem_col_var(WT_TOC *toc, WT_PAGE *page)
 	 * entries on the page (each physical entry is a data item).
 	 */
 	WT_RET((
-	    __wt_calloc_def(env, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
 
 	/*
 	 * Walk the page, building references: the page contains unsorted data
@@ -273,9 +263,8 @@ __wt_page_inmem_col_var(WT_TOC *toc, WT_PAGE *page)
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 {
-	ENV *env;
 	BTREE *btree;
 	WT_ITEM *item;
 	WT_OFF *off;
@@ -284,10 +273,8 @@ __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 	uint32_t i, nindx;
 	void *huffman;
 
-	env = toc->env;
-	btree = toc->db->btree;
+	btree = session->btree;
 	dsk = page->dsk;
-	env = toc->env;
 	huffman = btree->huffman_key;
 
 	/*
@@ -296,7 +283,7 @@ __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 	 * and offset object).
 	 */
 	nindx = dsk->u.entries / 2;
-	WT_RET((__wt_calloc_def(env, (size_t)nindx, &page->u.row_int.t)));
+	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row_int.t)));
 
 	/*
 	 * Walk the page, building references: the page contains sorted key and
@@ -334,17 +321,15 @@ __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
+__wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 {
-	ENV *env;
 	BTREE *btree;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
 
-	env = toc->env;
-	btree = toc->db->btree;
+	btree = session->btree;
 	dsk = page->dsk;
 
 	/*
@@ -353,7 +338,7 @@ __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
 	 * be a key without any subsequent data item).
 	 */
 	WT_RET((__wt_calloc_def(
-	    env, (size_t)dsk->u.entries * 2, &page->u.row_leaf.d)));
+	    session, (size_t)dsk->u.entries * 2, &page->u.row_leaf.d)));
 
 	/*
 	 * Walk a row-store page of WT_ITEMs, building indices and finding the
@@ -402,10 +387,8 @@ __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_item_process(WT_TOC *toc, WT_ITEM *item, WT_SCRATCH *scratch)
+__wt_item_process(SESSION *session, WT_ITEM *item, WT_SCRATCH *scratch)
 {
-	DB *db;
-	ENV *env;
 	BTREE *btree;
 	WT_SCRATCH *tmp;
 	uint32_t size;
@@ -413,10 +396,8 @@ __wt_item_process(WT_TOC *toc, WT_ITEM *item, WT_SCRATCH *scratch)
 	void *huffman;
 	const void *p;
 
-	db = toc->db;
+	btree = session->btree;
 	tmp = NULL;
-	env = toc->env;
-	btree = db->btree;
 	ret = 0;
 
 	/*
@@ -446,12 +427,12 @@ offpage:	/*
 		if (huffman == NULL)
 			tmp = scratch;
 		else
-			WT_RET(__wt_scr_alloc(toc, 0, &tmp));
-		WT_RET(__wt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), tmp));
+			WT_RET(__wt_scr_alloc(session, 0, &tmp));
+		WT_RET(__wt_ovfl_in(session, WT_ITEM_BYTE_OVFL(item), tmp));
 		p = tmp->item.data;
 		size = tmp->item.size;
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
 	/*
@@ -465,7 +446,7 @@ offpage:	/*
 	if (huffman == NULL) {
 		if (tmp != scratch) {
 			 if (size > scratch->mem_size)
-				 WT_ERR(__wt_realloc(env,
+				 WT_ERR(__wt_realloc(session,
 				     &scratch->mem_size, size, &scratch->item.data));
 			memcpy((void *)scratch->item.data, p, size);
 			scratch->item.size = size;

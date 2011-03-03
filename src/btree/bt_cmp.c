@@ -12,16 +12,16 @@
  *	Lexicographic comparison routine.
  */
 int
-__wt_bt_lex_compare(DB *db, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt)
+__wt_bt_lex_compare(BTREE *btree, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt)
 {
 	uint32_t len;
 	const uint8_t *userp, *treep;
 
 	/*
-	 * The DB * argument isn't used by the default routine, but is
+	 * The BTREE * argument isn't used by the default routine, but is
 	 * a standard argument for user-specified comparison functions.
 	 */
-	WT_UNUSED(db);
+	WT_UNUSED(btree);
 
 	/*
 	 * Return:
@@ -49,7 +49,7 @@ __wt_bt_lex_compare(DB *db, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree
  *	Integer comparison routine.
  */
 int
-__wt_bt_int_compare(DB *db, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt)
+__wt_bt_int_compare(BTREE *btree, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt)
 {
 	uint64_t user_int, tree_int;
 
@@ -65,8 +65,8 @@ __wt_bt_int_compare(DB *db, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree
 	 * application is looking at when we call its comparison func.
 	 */
 	user_int = tree_int = 0;
-	memcpy(&user_int, user_dbt->data, (size_t)db->btree_compare_int);
-	memcpy(&tree_int, tree_dbt->data, (size_t)db->btree_compare_int);
+	memcpy(&user_int, user_dbt->data, (size_t)btree->btree_compare_int);
+	memcpy(&tree_int, tree_dbt->data, (size_t)btree->btree_compare_int);
 
 	return (user_int == tree_int ? 0 : (user_int < tree_int ? -1 : 1));
 }

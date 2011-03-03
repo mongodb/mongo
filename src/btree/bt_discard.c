@@ -7,15 +7,15 @@
 
 #include "wt_internal.h"
 
-static void __wt_discard_page_col_fix(ENV *, WT_PAGE *);
-static void __wt_discard_page_col_int(ENV *, WT_PAGE *);
-static void __wt_discard_page_col_rle(ENV *, WT_PAGE *);
-static void __wt_discard_page_col_var(ENV *, WT_PAGE *);
-static void __wt_discard_page_row_int(ENV *, WT_PAGE *);
-static void __wt_discard_page_row_leaf(ENV *, WT_PAGE *);
-static void __wt_discard_relexp(ENV *, WT_PAGE *);
-static void __wt_discard_update(ENV *, WT_UPDATE **, uint32_t);
-static void __wt_discard_update_list(ENV *, WT_UPDATE *);
+static void __wt_discard_page_col_fix(SESSION *, WT_PAGE *);
+static void __wt_discard_page_col_int(SESSION *, WT_PAGE *);
+static void __wt_discard_page_col_rle(SESSION *, WT_PAGE *);
+static void __wt_discard_page_col_var(SESSION *, WT_PAGE *);
+static void __wt_discard_page_row_int(SESSION *, WT_PAGE *);
+static void __wt_discard_page_row_leaf(SESSION *, WT_PAGE *);
+static void __wt_discard_relexp(SESSION *, WT_PAGE *);
+static void __wt_discard_update(SESSION *, WT_UPDATE **, uint32_t);
+static void __wt_discard_update_list(SESSION *, WT_UPDATE *);
 static inline int __wt_row_key_on_page(WT_PAGE *, void *);
 
 /*
@@ -41,39 +41,35 @@ __wt_row_key_on_page(WT_PAGE *page, void *key)
  *	Free all memory associated with a page.
  */
 void
-__wt_page_discard(WT_TOC *toc, WT_PAGE *page)
+__wt_page_discard(SESSION *session, WT_PAGE *page)
 {
-	ENV *env;
-
-	env = toc->env;
-
 	/* Never discard a dirty page. */
-	WT_ASSERT(env, !WT_PAGE_IS_MODIFIED(page));
+	WT_ASSERT(session, !WT_PAGE_IS_MODIFIED(page));
 
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_FIX:
-		__wt_discard_page_col_fix(env, page);
+		__wt_discard_page_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
-		__wt_discard_page_col_int(env, page);
+		__wt_discard_page_col_int(session, page);
 		break;
 	case WT_PAGE_COL_RLE:
-		__wt_discard_page_col_rle(env, page);
+		__wt_discard_page_col_rle(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		__wt_discard_page_col_var(env, page);
+		__wt_discard_page_col_var(session, page);
 		break;
 	case WT_PAGE_ROW_INT:
-		__wt_discard_page_row_int(env, page);
+		__wt_discard_page_row_int(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		__wt_discard_page_row_leaf(env, page);
+		__wt_discard_page_row_leaf(session, page);
 		break;
 	}
 
 	if (page->dsk != NULL)
-		__wt_free(env, page->dsk, page->size);
-	__wt_free(env, page, sizeof(WT_PAGE));
+		__wt_free(session, page->dsk, page->size);
+	__wt_free(session, page, sizeof(WT_PAGE));
 }
 
 /*
@@ -81,17 +77,17 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_discard_page_col_fix(ENV *env, WT_PAGE *page)
+__wt_discard_page_col_fix(SESSION *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
-		__wt_free(
-		    env, page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
+		__wt_free(session,
+		    page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
 
 	/* Free the update array. */
 	if (page->u.col_leaf.upd != NULL)
-		__wt_discard_update(
-		    env, page->u.col_leaf.upd, page->indx_count);
+		__wt_discard_update(session,
+		    page->u.col_leaf.upd, page->indx_count);
 }
 
 /*
@@ -99,11 +95,11 @@ __wt_discard_page_col_fix(ENV *env, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_INT page.
  */
 static void
-__wt_discard_page_col_int(ENV *env, WT_PAGE *page)
+__wt_discard_page_col_int(SESSION *session, WT_PAGE *page)
 {
 	/* Free the subtree-reference array. */
 	if (page->u.col_int.t != NULL)
-		__wt_free(env,
+		__wt_free(session,
 		    page->u.col_int.t, page->indx_count * sizeof(WT_COL_REF));
 }
 
@@ -112,16 +108,16 @@ __wt_discard_page_col_int(ENV *env, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_RLE page.
  */
 static void
-__wt_discard_page_col_rle(ENV *env, WT_PAGE *page)
+__wt_discard_page_col_rle(SESSION *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
-		__wt_free(
-		    env, page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
+		__wt_free(session,
+		    page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
 
 	/* Free the run-length encoded column-store expansion array. */
 	if (page->u.col_leaf.rleexp != NULL)
-		__wt_discard_relexp(env, page);
+		__wt_discard_relexp(session, page);
 }
 
 /*
@@ -129,17 +125,17 @@ __wt_discard_page_col_rle(ENV *env, WT_PAGE *page)
  *	Discard a WT_PAGE_COL_VAR page.
  */
 static void
-__wt_discard_page_col_var(ENV *env, WT_PAGE *page)
+__wt_discard_page_col_var(SESSION *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
-		__wt_free(
-		    env, page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
+		__wt_free(session,
+		    page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
 
 	/* Free the update array. */
 	if (page->u.col_leaf.upd != NULL)
-		__wt_discard_update(
-		    env, page->u.col_leaf.upd, page->indx_count);
+		__wt_discard_update(session,
+		    page->u.col_leaf.upd, page->indx_count);
 }
 
 /*
@@ -147,7 +143,7 @@ __wt_discard_page_col_var(ENV *env, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_INT page.
  */
 static void
-__wt_discard_page_row_int(ENV *env, WT_PAGE *page)
+__wt_discard_page_row_int(SESSION *session, WT_PAGE *page)
 {
 	WT_ROW_REF *rref;
 	uint32_t i;
@@ -158,11 +154,11 @@ __wt_discard_page_row_int(ENV *env, WT_PAGE *page)
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
 		if (!__wt_row_key_on_page(page, rref))
-			__wt_free(env, rref->key, rref->size);
+			__wt_free(session, rref->key, rref->size);
 
 	/* Free the subtree-reference array. */
 	if (page->u.row_int.t != NULL)
-		__wt_free(env,
+		__wt_free(session,
 		    page->u.row_int.t, page->indx_count * sizeof(WT_ROW_REF));
 }
 
@@ -171,7 +167,7 @@ __wt_discard_page_row_int(ENV *env, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_LEAF page.
  */
 static void
-__wt_discard_page_row_leaf(ENV *env, WT_PAGE *page)
+__wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 {
 	WT_ROW *rip;
 	uint32_t i;
@@ -185,12 +181,12 @@ __wt_discard_page_row_leaf(ENV *env, WT_PAGE *page)
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i)
 		if (!__wt_row_key_on_page(page, rip))
-			__wt_free(env, rip->key, rip->size);
-	__wt_free(env, page->u.row_leaf.d, page->indx_count * sizeof(WT_ROW));
+			__wt_free(session, rip->key, rip->size);
+	__wt_free(session,
+	    page->u.row_leaf.d, page->indx_count * sizeof(WT_ROW));
 
 	if (page->u.row_leaf.upd != NULL)
-		__wt_discard_update(
-		    env, page->u.row_leaf.upd, page->indx_count);
+		__wt_discard_update(session, page->u.row_leaf.upd, page->indx_count);
 }
 
 /*
@@ -198,7 +194,7 @@ __wt_discard_page_row_leaf(ENV *env, WT_PAGE *page)
  *	Discard the update array.
  */
 static void
-__wt_discard_update(ENV *env, WT_UPDATE **update_head, uint32_t indx_count)
+__wt_discard_update(SESSION *session, WT_UPDATE **update_head, uint32_t indx_count)
 {
 	WT_UPDATE **updp;
 
@@ -208,10 +204,10 @@ __wt_discard_update(ENV *env, WT_UPDATE **update_head, uint32_t indx_count)
 	 */
 	for (updp = update_head; indx_count > 0; --indx_count, ++updp)
 		if (*updp != NULL)
-			__wt_discard_update_list(env, *updp);
+			__wt_discard_update_list(session, *updp);
 
 	/* Free the page's array of updates. */
-	__wt_free(env, update_head, indx_count * sizeof(WT_UPDATE *));
+	__wt_free(session, update_head, indx_count * sizeof(WT_UPDATE *));
 }
 
 /*
@@ -219,7 +215,7 @@ __wt_discard_update(ENV *env, WT_UPDATE **update_head, uint32_t indx_count)
  *	Discard the run-length encoded column-store expansion array.
  */
 static void
-__wt_discard_relexp(ENV *env, WT_PAGE *page)
+__wt_discard_relexp(SESSION *session, WT_PAGE *page)
 {
 	WT_RLE_EXPAND **expp, *exp, *a;
 	u_int i;
@@ -236,15 +232,15 @@ __wt_discard_relexp(ENV *env, WT_PAGE *page)
 		 * Free the linked list of WT_UPDATE structures anchored in the
 		 * WT_RLE_EXPAND entry.
 		 */
-		__wt_discard_update_list(env, exp->upd);
+		__wt_discard_update_list(session, exp->upd);
 		do {
 			a = exp->next;
-			__wt_free(env, exp, sizeof(WT_RLE_EXPAND));
+			__wt_free(session, exp, sizeof(WT_RLE_EXPAND));
 		} while ((exp = a) != NULL);
 	}
 
 	/* Free the page's expansion array. */
-	__wt_free(env, page->u.col_leaf.rleexp,
+	__wt_free(session, page->u.col_leaf.rleexp,
 	    page->indx_count * sizeof(WT_RLE_EXPAND *));
 }
 
@@ -254,17 +250,17 @@ __wt_discard_relexp(ENV *env, WT_PAGE *page)
  *	of a WT_UPDATE structure and its associated data.
  */
 static void
-__wt_discard_update_list(ENV *env, WT_UPDATE *upd)
+__wt_discard_update_list(SESSION *session, WT_UPDATE *upd)
 {
 	WT_UPDATE *a;
-	WT_TOC_BUFFER *tb;
+	SESSION_BUFFER *sb;
 
 	do {
 		a = upd->next;
 
-		tb = upd->tb;
-		WT_ASSERT(env, tb->out < tb->in);
-		if (++tb->out == tb->in)
-			__wt_free(env, tb, tb->len);
+		sb = upd->sb;
+		WT_ASSERT(session, sb->out < sb->in);
+		if (++sb->out == sb->in)
+			__wt_free(session, sb, sb->len);
 	} while ((upd = a) != NULL);
 }

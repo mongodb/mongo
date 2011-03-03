@@ -8,14 +8,14 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static inline int __wt_key_build(WT_TOC *, void *);
+static inline int __wt_key_build(SESSION *, void *);
 
 /*
  * __wt_key_build --
  *	Instantiate an overflow or compressed key into a WT_ROW structure.
  */
 static inline int
-__wt_key_build(WT_TOC *toc, void *ref)
+__wt_key_build(SESSION *session, void *ref)
 {
 	WT_SCRATCH *scratch, _scratch;
 	WT_ITEM *item;
@@ -28,7 +28,7 @@ __wt_key_build(WT_TOC *toc, void *ref)
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
 	item = ((WT_ROW *)ref)->key;
-	WT_RET(__wt_item_process(toc, item, scratch));
+	WT_RET(__wt_item_process(session, item, scratch));
 
 	/* Update the WT_ROW reference with the processed key. */
 	__wt_key_set(ref, (void *)scratch->item.data, scratch->item.size);
@@ -41,9 +41,8 @@ __wt_key_build(WT_TOC *toc, void *ref)
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
+__wt_row_search(SESSION *session, WT_DATAITEM *key, uint32_t flags)
 {
-	DB *db;
 	BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
@@ -53,18 +52,17 @@ __wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
 	uint32_t base, indx, limit, write_gen;
 	int cmp, isleaf, ret;
 
-	toc->srch_page = NULL;			/* Return values. */
-	toc->srch_ip = NULL;
-	toc->srch_upd = NULL;
-	toc->srch_exp = NULL;
-	toc->srch_write_gen = 0;
+	session->srch_page = NULL;			/* Return values. */
+	session->srch_ip = NULL;
+	session->srch_upd = NULL;
+	session->srch_exp = NULL;
+	session->srch_write_gen = 0;
 
 	cmp = 0;
-	db = toc->db;
-	btree = db->btree;
+	btree = session->btree;
 	rip = NULL;
 
-	WT_DB_FCHK(db, "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
+	WT_DB_FCHK(btree, "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
 	/* Search the tree. */
 	for (page = btree->root_page.page;;) {
@@ -88,7 +86,7 @@ __wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
 				 * may not have been instantiated yet.
 				 */
 				if (__wt_key_process(rref))
-					WT_ERR(__wt_key_build(toc, rref));
+					WT_ERR(__wt_key_build(session, rref));
 
 				/*
 				 * If we're about to compare an application key
@@ -106,8 +104,8 @@ __wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
 				 * this hack.
 				 */
 				if (indx != 0) {
-					cmp = db->
-					    btree_compare(db, key, (WT_DATAITEM *)rref);
+					cmp = btree->
+					    btree_compare(btree, key, (WT_DATAITEM *)rref);
 					if (cmp == 0)
 						break;
 					if (cmp < 0)
@@ -141,9 +139,9 @@ __wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
 				 * may not have been instantiated yet.
 				 */
 				if (__wt_key_process(rip))
-					WT_ERR(__wt_key_build(toc, rip));
+					WT_ERR(__wt_key_build(session, rip));
 
-				cmp = db->btree_compare(db, key, (WT_DATAITEM *)rip);
+				cmp = btree->btree_compare(btree, key, (WT_DATAITEM *)rip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -160,11 +158,11 @@ __wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
 			break;
 
 deleted_retry:	/* rref references the subtree containing the record. */
-		switch (ret = __wt_page_in(toc, page, &rref->ref, 0)) {
+		switch (ret = __wt_page_in(session, page, &rref->ref, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
 			if (page != btree->root_page.page)
-				__wt_hazard_clear(toc, page);
+				__wt_hazard_clear(session, page);
 			break;
 		case WT_PAGE_DELETED:
 			/*
@@ -221,7 +219,7 @@ deleted_retry:	/* rref references the subtree containing the record. */
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			toc->srch_upd = upd;
+			session->srch_upd = upd;
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -229,19 +227,19 @@ deleted_retry:	/* rref references the subtree containing the record. */
 		 * When returning internal pages, set the item's WT_UPDATE slot
 		 * if it exists, otherwise we're done.
 		 */
-		toc->srch_upd = WT_ROW_UPDATE(page, rip);
+		session->srch_upd = WT_ROW_UPDATE(page, rip);
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
-	toc->srch_page = page;
-	toc->srch_ip = rip;
-	toc->srch_write_gen = write_gen;
+	session->srch_page = page;
+	session->srch_ip = rip;
+	session->srch_write_gen = write_gen;
 	return (0);
 
 notfound:
 	ret = WT_NOTFOUND;
 
-err:	WT_PAGE_OUT(toc, page);
+err:	WT_PAGE_OUT(session, page);
 	return (ret);
 }

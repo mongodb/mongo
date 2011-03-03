@@ -7,23 +7,21 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_tree_sync(WT_TOC *, WT_PAGE *, void *);
+static int __wt_bt_tree_sync(SESSION *, WT_PAGE *, void *);
 
 /*
  * __wt_bt_sync --
  *	Sync the tree.
  */
 int
-__wt_bt_sync(WT_TOC *toc)
+__wt_bt_sync(SESSION *session)
 {
-	ENV *env;
 	BTREE *btree;
 	WT_CACHE *cache;
 	int ret;
 
-	env = toc->env;
-	btree = toc->db->btree;
-	cache = env->ienv->cache;
+	btree = session->btree;
+	cache = S2C(session)->cache;
 
 	if (WT_UNOPENED_FILE(btree))
 		return (0);
@@ -36,9 +34,9 @@ __wt_bt_sync(WT_TOC *toc)
 	 * Lock out the cache eviction thread, though, we don't want it trying
 	 * to reconcile pages we're flushing.
 	 */
-	__wt_lock(env, cache->mtx_reconcile);
-	ret = __wt_tree_walk(toc, NULL, WT_WALK_CACHE, __wt_bt_tree_sync, NULL);
-	__wt_unlock(env, cache->mtx_reconcile);
+	__wt_lock(session, cache->mtx_reconcile);
+	ret = __wt_tree_walk(session, NULL, WT_WALK_CACHE, __wt_bt_tree_sync, NULL);
+	__wt_unlock(session, cache->mtx_reconcile);
 	return (ret);
 }
 
@@ -47,12 +45,12 @@ __wt_bt_sync(WT_TOC *toc)
  *	Sync a page.
  */
 static int
-__wt_bt_tree_sync(WT_TOC *toc, WT_PAGE *page, void *arg)
+__wt_bt_tree_sync(SESSION *session, WT_PAGE *page, void *arg)
 {
 	WT_UNUSED(arg);
 
 	/* Reconcile any dirty pages. */
 	if (WT_PAGE_IS_MODIFIED(page))
-		WT_RET(__wt_page_reconcile(toc, page));
+		WT_RET(__wt_page_reconcile(session, page));
 	return (0);
 }

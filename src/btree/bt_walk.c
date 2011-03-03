@@ -23,7 +23,7 @@
  *	to restart the traversal at any point,
  *    + to only visit pages that currently appear in the cache,
  *    + to return the WT_REF structure (not the WT_PAGE structure),
- *    + to walk files not associated with the current WT_TOC's DB handle,
+ *    + to walk files not associated with the current SESSION's BTREE handle,
  *    + and finally, it doesn't require a hazard reference.
  *
  * My guess is we'll generalize a more complicated walk at some point, which
@@ -37,8 +37,8 @@
  *	each page.
  */
 int
-__wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
-    uint32_t flags, int (*work)(WT_TOC *, WT_PAGE *, void *), void *arg)
+__wt_tree_walk(SESSION *session, WT_PAGE *page,
+    uint32_t flags, int (*work)(SESSION *, WT_PAGE *, void *), void *arg)
 {
 	BTREE *btree;
 	WT_COL_REF *cref;
@@ -47,10 +47,10 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 	uint32_t i;
 	int ret;
 
-	 WT_ENV_FCHK(
-	     toc->env, "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
+	 WT_CONN_FCHK(
+	     S2C(session), "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
 
-	btree = toc->db->btree;
+	btree = session->btree;
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (page == NULL)
@@ -73,11 +73,11 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 				break;
 			}
 			ref = &cref->ref;
-			switch (ret = __wt_page_in(toc, page, ref, 0)) {
+			switch (ret = __wt_page_in(session, page, ref, 0)) {
 			case 0:				/* Valid page */
 				ret = __wt_tree_walk(
-				    toc, ref->page, flags, work, arg);
-				__wt_hazard_clear(toc, ref->page);
+				    session, ref->page, flags, work, arg);
+				__wt_hazard_clear(session, ref->page);
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -102,11 +102,11 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 				break;
 			}
 			ref = &rref->ref;
-			switch (ret = __wt_page_in(toc, page, ref, 0)) {
+			switch (ret = __wt_page_in(session, page, ref, 0)) {
 			case 0:				/* Valid page */
 				ret = __wt_tree_walk(
-				    toc, ref->page, flags, work, arg);
-				__wt_hazard_clear(toc, ref->page);
+				    session, ref->page, flags, work, arg);
+				__wt_hazard_clear(session, ref->page);
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -124,7 +124,7 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 	 * the close/sync methods, where reconciling a modified child page will
 	 * modify its parent.
 	 */
-	WT_RET(work(toc, page, arg));
+	WT_RET(work(session, page, arg));
 
 	return (0);
 }
@@ -134,18 +134,14 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
  *	Start a tree walk.
  */
 int
-__wt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk)
+__wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
 {
-	ENV *env;
-
-	env = toc->env;
-
 	/*
 	 * The caller may be restarting a walk, so the structure may already
 	 * be allocated.  Allocate 20 slots: it's always going to be enough.
 	 */
 	if (walk->tree_len == 0)
-		WT_RET(__wt_realloc(env, &walk->tree_len,
+		WT_RET(__wt_realloc(session, &walk->tree_len,
 		    20 * sizeof(WT_WALK_ENTRY), &walk->tree));
 	walk->tree_slot = 0;
 
@@ -161,9 +157,9 @@ __wt_walk_begin(WT_TOC *toc, WT_REF *ref, WT_WALK *walk)
  *	End a tree walk.
  */
 void
-__wt_walk_end(ENV *env, WT_WALK *walk)
+__wt_walk_end(SESSION *session, WT_WALK *walk)
 {
-	__wt_free(env, walk->tree, walk->tree_len);
+	__wt_free(session, walk->tree, walk->tree_len);
 }
 
 /*
@@ -171,9 +167,8 @@ __wt_walk_end(ENV *env, WT_WALK *walk)
  *	Return the next WT_REF/WT_PAGE in the tree, in a non-recursive way.
  */
 int
-__wt_walk_next(WT_TOC *toc, WT_WALK *walk, uint32_t flags, WT_REF **refp)
+__wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 {
-	ENV *env;
 	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_REF *ref;
@@ -181,8 +176,6 @@ __wt_walk_next(WT_TOC *toc, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 	WT_WALK_ENTRY *e;
 	u_int elem;
 	int ret;
-
-	env = toc->env;
 
 	e = &walk->tree[walk->tree_slot];
 	page = e->ref->page;
@@ -202,7 +195,7 @@ __wt_walk_next(WT_TOC *toc, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 			return (0);
 		} else {
 			--walk->tree_slot;
-			return (__wt_walk_next(toc, walk, flags, refp));
+			return (__wt_walk_next(session, walk, flags, refp));
 		}
 	} else
 		if (e->indx == page->indx_count) {
@@ -227,7 +220,7 @@ eop:			e->visited = 1;
 				break;
 			else if (ref->state != WT_REF_DELETED &&
 			    !LF_ISSET(WT_WALK_CACHE)) {
-				if ((ret = __wt_page_in(toc, page, ref, 0)) == 0)
+				if ((ret = __wt_page_in(session, page, ref, 0)) == 0)
 					break;			/* Valid page */
 				else if (ret == WT_PAGE_DELETED)
 					ret = 0;
@@ -254,7 +247,7 @@ eop:			e->visited = 1;
 				break;
 			else if (ref->state != WT_REF_DELETED &&
 			    !LF_ISSET(WT_WALK_CACHE)) {
-				if ((ret = __wt_page_in(toc, page, ref, 0)) == 0)
+				if ((ret = __wt_page_in(session, page, ref, 0)) == 0)
 					break;			/* Valid page */
 				else if (ret == WT_PAGE_DELETED)
 					ret = 0;
@@ -284,14 +277,14 @@ eop:			e->visited = 1;
 		 */
 		elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
 		if (walk->tree_slot >= elem)
-			WT_RET(__wt_realloc(env, &walk->tree_len,
+			WT_RET(__wt_realloc(session, &walk->tree_len,
 			    (elem + 20) * sizeof(WT_WALK_ENTRY), &walk->tree));
 
 		e = &walk->tree[++walk->tree_slot];
 		e->ref = ref;
 		e->indx = 0;
 		e->visited = 0;
-		return (__wt_walk_next(toc, walk, flags, refp));
+		return (__wt_walk_next(session, walk, flags, refp));
 	}
 
 	/* Return the child page, it's not interesting for further traversal. */

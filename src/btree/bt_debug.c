@@ -9,18 +9,18 @@
 #include "bt_inline.c"
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_debug_dsk_col_fix(DB *, WT_PAGE_DISK *, FILE *);
+static void __wt_debug_dsk_col_fix(BTREE *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
-static void __wt_debug_dsk_col_rle(DB *, WT_PAGE_DISK *, FILE *);
-static int  __wt_debug_dsk_item(WT_TOC *, WT_PAGE_DISK *, FILE *);
-static int  __wt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
-static int  __wt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
-static void __wt_debug_page_col_fix(WT_TOC *, WT_PAGE *, FILE *);
+static void __wt_debug_dsk_col_rle(BTREE *, WT_PAGE_DISK *, FILE *);
+static int  __wt_debug_dsk_item(SESSION *, WT_PAGE_DISK *, FILE *);
+static int  __wt_debug_item(SESSION *, WT_ITEM *, FILE *);
+static int  __wt_debug_item_data(SESSION *, WT_ITEM *, FILE *fp);
+static void __wt_debug_page_col_fix(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_page_col_int(WT_PAGE *, FILE *);
-static void __wt_debug_page_col_rle(WT_TOC *, WT_PAGE *, FILE *);
-static int  __wt_debug_page_col_var(WT_TOC *, WT_PAGE *, FILE *);
+static void __wt_debug_page_col_rle(SESSION *, WT_PAGE *, FILE *);
+static int  __wt_debug_page_col_var(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
-static int  __wt_debug_page_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
+static int  __wt_debug_page_row_leaf(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
 static void __wt_debug_update(WT_UPDATE *, FILE *);
 static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
@@ -56,7 +56,7 @@ __wt_debug_set_fp(const char *ofile, FILE **fpp, int *close_varp)
  *	Dump a file in debugging mode.
  */
 int
-__wt_debug_dump(WT_TOC *toc, const char *ofile, FILE *fp)
+__wt_debug_dump(SESSION *session, const char *ofile, FILE *fp)
 {
 	int do_close, ret;
 
@@ -67,7 +67,7 @@ __wt_debug_dump(WT_TOC *toc, const char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_verify(toc, NULL, fp);
+	ret = __wt_verify(session, NULL, fp);
 
 	if (do_close)
 		(void)fclose(fp);
@@ -80,12 +80,12 @@ __wt_debug_dump(WT_TOC *toc, const char *ofile, FILE *fp)
  *	Dump a disk page in debugging mode.
  */
 int
-__wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
+__wt_debug_disk(SESSION *session, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
 {
-	DB *db;
+	BTREE *btree;
 	int do_close, ret;
 
-	db = toc->db;
+	btree = session->btree;
 	ret = 0;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
@@ -113,20 +113,20 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
 		    __wt_page_type_string(dsk), (u_long)dsk->u.datalen,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		ret = __wt_debug_dsk_item(toc, dsk, fp);
+		ret = __wt_debug_dsk_item(session, dsk, fp);
 		break;
 	case WT_PAGE_COL_FIX:
-		__wt_debug_dsk_col_fix(db, dsk, fp);
+		__wt_debug_dsk_col_fix(btree, dsk, fp);
 		break;
 	case WT_PAGE_COL_RLE:
-		__wt_debug_dsk_col_rle(db, dsk, fp);
+		__wt_debug_dsk_col_rle(btree, dsk, fp);
 		break;
 	case WT_PAGE_COL_INT:
 		__wt_debug_dsk_col_int(dsk, fp);
@@ -146,20 +146,20 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
  *	Dump the in-memory information for a page.
  */
 int
-__wt_debug_page(WT_TOC *toc, WT_PAGE *page, const char *ofile, FILE *fp)
+__wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 {
-	DB *db;
+	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	int do_close;
 
-	db = toc->db;
+	btree = session->btree;
 	dsk = page->dsk;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
 	fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu",
 	    (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1),
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(btree, page->size) - 1),
 	    __wt_page_type_string(dsk), (u_long)page->size);
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -177,26 +177,26 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, const char *ofile, FILE *fp)
 	/* Dump the WT_{ROW,COL}_INDX array. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		__wt_debug_page_col_fix(toc, page, fp);
+		__wt_debug_page_col_fix(session, page, fp);
 		break;
 	case WT_PAGE_COL_INT:
 		__wt_debug_page_col_int(page, fp);
 		break;
 	case WT_PAGE_COL_RLE:
-		__wt_debug_page_col_rle(toc, page, fp);
+		__wt_debug_page_col_rle(session, page, fp);
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_debug_page_col_var(toc, page, fp));
+		WT_RET(__wt_debug_page_col_var(session, page, fp));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_debug_page_row_leaf(toc, page, fp));
+		WT_RET(__wt_debug_page_row_leaf(session, page, fp));
 		break;
 	case WT_PAGE_ROW_INT:
 		__wt_debug_page_row_int(page, fp);
 		break;
 	case WT_PAGE_OVFL:
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
 	fprintf(fp, "}\n");
@@ -212,7 +212,7 @@ __wt_debug_page(WT_TOC *toc, WT_PAGE *page, const char *ofile, FILE *fp)
  *	Dump an in-memory WT_PAGE_COL_FIX page.
  */
 static void
-__wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_fix(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -221,7 +221,7 @@ __wt_debug_page_col_fix(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	void *cipdata;
 
 	dsk = page->dsk;
-	fixed_len = toc->db->fixed_len;
+	fixed_len = session->btree->fixed_len;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -266,7 +266,7 @@ __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
  *	Dump an in-memory WT_PAGE_COL_RLE page.
  */
 static void
-__wt_debug_page_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -275,7 +275,7 @@ __wt_debug_page_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	void *cipdata;
 
 	dsk = page->dsk;
-	fixed_len = toc->db->fixed_len;
+	fixed_len = session->btree->fixed_len;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
@@ -301,7 +301,7 @@ __wt_debug_page_col_rle(WT_TOC *toc, WT_PAGE *page, FILE *fp)
  *	Dump an in-memory WT_PAGE_COL_VAR page.
  */
 static int
-__wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
@@ -317,7 +317,7 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(dsk, cip);
 		fprintf(fp, "\tdata {");
-		WT_RET(__wt_debug_item_data(toc, cipdata, fp));
+		WT_RET(__wt_debug_item_data(session, cipdata, fp));
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
@@ -331,7 +331,7 @@ __wt_debug_page_col_var(WT_TOC *toc, WT_PAGE *page, FILE *fp)
  *	Dump an in-memory WT_PAGE_ROW_LEAF page.
  */
 static int
-__wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
+__wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_UPDATE *upd;
 	WT_ROW *rip;
@@ -347,7 +347,7 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 			__wt_debug_dbt("\tkey", rip, fp);
 
 		fprintf(fp, "\tdata: {");
-		WT_RET(__wt_debug_item_data(toc, rip->value, fp));
+		WT_RET(__wt_debug_item_data(session, rip->value, fp));
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
@@ -426,7 +426,7 @@ __wt_debug_rleexp(WT_RLE_EXPAND *exp, FILE *fp)
  *	Dump a page of WT_ITEM's.
  */
 static int
-__wt_debug_dsk_item(WT_TOC *toc, WT_PAGE_DISK *dsk, FILE *fp)
+__wt_debug_dsk_item(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
 {
 	WT_ITEM *item;
 	uint32_t i;
@@ -435,7 +435,7 @@ __wt_debug_dsk_item(WT_TOC *toc, WT_PAGE_DISK *dsk, FILE *fp)
 		fp = stderr;
 
 	WT_ITEM_FOREACH(dsk, item, i)
-		WT_RET(__wt_debug_item(toc, item, fp));
+		WT_RET(__wt_debug_item(session, item, fp));
 	return (0);
 }
 
@@ -444,9 +444,9 @@ __wt_debug_dsk_item(WT_TOC *toc, WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a single WT_ITEM.
  */
 static int
-__wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
+__wt_debug_item(SESSION *session, WT_ITEM *item, FILE *fp)
 {
-	DB *db;
+	BTREE *btree;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
 	WT_OVFL *ovfl;
@@ -454,7 +454,7 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	db = toc->db;
+	btree = session->btree;
 
 	fprintf(fp, "\t%s: len %lu",
 	    __wt_item_type_string(item), (u_long)WT_ITEM_LEN(item));
@@ -482,11 +482,11 @@ __wt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		    (u_long)off_record->addr, (u_long)off_record->size,
 		    (unsigned long long)WT_RECNO(off_record));
 		break;
-	WT_ILLEGAL_FORMAT(db);
+	WT_ILLEGAL_FORMAT(btree);
 	}
 
 	fprintf(fp, "\n\t{");
-	WT_RET(__wt_debug_item_data(toc, item, fp));
+	WT_RET(__wt_debug_item_data(session, item, fp));
 	fprintf(fp, "}\n");
 	return (0);
 }
@@ -516,7 +516,7 @@ __wt_debug_dsk_col_int(WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a WT_PAGE_COL_FIX page.
  */
 static void
-__wt_debug_dsk_col_fix(DB *db, WT_PAGE_DISK *dsk, FILE *fp)
+__wt_debug_dsk_col_fix(BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
 {
 	uint32_t i;
 	uint8_t *p;
@@ -524,12 +524,12 @@ __wt_debug_dsk_col_fix(DB *db, WT_PAGE_DISK *dsk, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_FIX_FOREACH(db, dsk, p, i) {
+	WT_FIX_FOREACH(btree, dsk, p, i) {
 		fprintf(fp, "\t{");
 		if (WT_FIX_DELETE_ISSET(p))
 			fprintf(fp, "deleted");
 		else
-			__wt_print_byte_string(p, db->fixed_len, fp);
+			__wt_print_byte_string(p, btree->fixed_len, fp);
 		fprintf(fp, "}\n");
 	}
 }
@@ -539,7 +539,7 @@ __wt_debug_dsk_col_fix(DB *db, WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a WT_PAGE_COL_RLE page.
  */
 static void
-__wt_debug_dsk_col_rle(DB *db, WT_PAGE_DISK *dsk, FILE *fp)
+__wt_debug_dsk_col_rle(BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
 {
 	uint32_t i;
 	uint8_t *p;
@@ -547,14 +547,14 @@ __wt_debug_dsk_col_rle(DB *db, WT_PAGE_DISK *dsk, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_RLE_REPEAT_FOREACH(db, dsk, p, i) {
+	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i) {
 		fprintf(fp, "\trepeat %lu {",
 		    (u_long)WT_RLE_REPEAT_COUNT(p));
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(p)))
 			fprintf(fp, "deleted");
 		else
 			__wt_print_byte_string(
-			    WT_RLE_REPEAT_DATA(p), db->fixed_len, fp);
+			    WT_RLE_REPEAT_DATA(p), btree->fixed_len, fp);
 		fprintf(fp, "}\n");
 	}
 }
@@ -564,11 +564,10 @@ __wt_debug_dsk_col_rle(DB *db, WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a single item's data in debugging mode.
  */
 static int
-__wt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
+__wt_debug_item_data(SESSION *session, WT_ITEM *item, FILE *fp)
 {
-	DB *db;
-	WT_SCRATCH *tmp;
 	BTREE *btree;
+	WT_SCRATCH *tmp;
 	uint32_t size;
 	const uint8_t *p;
 	int ret;
@@ -576,9 +575,8 @@ __wt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	db = toc->db;
+	btree = session->btree;
 	tmp = NULL;
-	btree = db->btree;
 	ret = 0;
 
 	switch (WT_ITEM_TYPE(item)) {
@@ -594,8 +592,8 @@ onpage:		p = WT_ITEM_BYTE(item);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
-process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
-		WT_ERR(__wt_item_process(toc, item, tmp));
+process:	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+		WT_ERR(__wt_item_process(session, item, tmp));
 		p = tmp->item.data;
 		size = tmp->item.size;
 		break;
@@ -611,7 +609,7 @@ process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 		p = (uint8_t *)"offpage_record";
 		size = sizeof("offpage_record") - 1;
 		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	WT_ILLEGAL_FORMAT_ERR(btree, ret);
 	}
 
 	__wt_print_byte_string(p, size, fp);

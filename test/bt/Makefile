@@ -3,7 +3,7 @@ SRC=	../../src
 WT=	../../build_posix
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 
-CFLAGS=-g -Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2-Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunreachable-code -Wunsafe-loop-optimizations -Wunused -Wwrite-strings -I${BDB} -I${WT} -I${SRC}/include
+CFLAGS=-g -Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2-Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunreachable-code -Wunsafe-loop-optimizations -Wunused -Wwrite-strings -O -Wuninitialized -I${BDB} -I${WT} -I${SRC}/include
 
 HDRS=	config.h wts.h
 SRCS=	bdb.c config.c t.c util.c wts.c

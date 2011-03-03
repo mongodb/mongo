@@ -8,26 +8,26 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_row_get --
+ * __wt_btree_row_get --
  *	Db.row_get method.
  */
 int
-__wt_db_row_get(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *data)
+__wt_btree_row_get(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *data)
 {
 	BTREE *btree;
 	WT_PAGE *page;
 	int ret;
 
-	btree = toc->db->btree;
+	btree = session->btree;
 	page = NULL;
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_row_search(toc, key, 0));
-	page = toc->srch_page;
+	WT_ERR(__wt_row_search(session, key, 0));
+	page = session->srch_page;
 
-	ret = __wt_data_return(toc, key, data, 0);
+	ret = __wt_data_return(session, key, data, 0);
 
 err:	if (page != btree->root_page.page)
-		__wt_hazard_clear(toc, page);
+		__wt_hazard_clear(session, page);
 	return (ret);
 }

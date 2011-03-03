@@ -7,129 +7,77 @@
 
 #include "wt_internal.h"
 
-static int __wt_env_config(ENV *);
-static int __wt_ienv_config(ENV *);
-
 /*
- * __wt_env_create --
- *	ENV constructor.
+ * __wt_connection_config --
+ *	Set configuration for a just-created CONNECTION handle.
  */
 int
-__wt_env_create(uint32_t flags, ENV **envp)
+__wt_connection_config(CONNECTION *conn)
 {
-	ENV *env;
-	IENV *ienv;
-	int ret;
+	SESSION *session;
 
-	/*
-	 * !!!
-	 * We don't yet have valid ENV/IENV structures to use to call other
-	 * functions.  The only functions that can handle NULL ENV handles
-	 * are the memory allocation and free functions, no other functions
-	 * may be called.
-	 */
-	WT_RET(__wt_calloc(NULL, 1, sizeof(ENV), &env));
-	WT_ERR(__wt_calloc(NULL, 1, sizeof(IENV), &ienv));
+	session = &conn->default_session;
 
-	/* Connect everything together. */
-	env->ienv = ienv;
-
-	/* Set flags. */
-	if (LF_ISSET(WT_MEMORY_CHECK))
-		F_SET(env, WT_MEMORY_CHECK);
-
-	/* Configure the ENV and the IENV. */
-	WT_ERR(__wt_env_config(env));
-	WT_ERR(__wt_ienv_config(env));
-
-	*envp = env;
-	return (0);
-
-err:	(void)__wt_env_close(env);
-	return (ret);
-}
-
-/*
- * __wt_env_config --
- *	Set configuration for a just-created ENV handle.
- */
-static int
-__wt_env_config(ENV *env)
-{
-	__wt_methods_env_config_default(env);
-	__wt_methods_env_lockout(env);
-	__wt_methods_env_init_transition(env);
-	return (0);
-}
-
-/*
- * __wt_ienv_config --
- *	Set configuration for a just-created IENV handle.
- */
-static int
-__wt_ienv_config(ENV *env)
-{
-	IENV *ienv;
-
-	ienv = env->ienv;
+	__wt_methods_connection_config_default(conn);
+	__wt_methods_connection_lockout(conn);
+	__wt_methods_connection_init_transition(conn);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* If we're tracking memory, initialize those structures first. */
-	if (F_ISSET(env, WT_MEMORY_CHECK))
-		WT_RET(__wt_mtrack_alloc(env));
+	if (F_ISSET(conn, WT_MEMORY_CHECK))
+		WT_RET(__wt_mtrack_alloc(conn));
 #endif
 						/* Global mutex */
-	WT_RET(__wt_mtx_alloc(env, "IENV", 0, &ienv->mtx));
+	WT_RET(__wt_mtx_alloc(session, "CONNECTION", 0, &conn->mtx));
 
-	TAILQ_INIT(&ienv->dbqh);		/* DB list */
-	TAILQ_INIT(&ienv->fhqh);		/* File list */
+	TAILQ_INIT(&conn->dbqh);		/* BTREE list */
+	TAILQ_INIT(&conn->fhqh);		/* File list */
 
 	/* Statistics. */
-	WT_RET(__wt_stat_alloc_env_stats(env, &ienv->stats));
-	WT_RET(__wt_stat_alloc_method_stats(env, &ienv->method_stats));
+	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
+	WT_RET(__wt_stat_alloc_method_stats(session, &conn->method_stats));
 
 	/* Diagnostic output separator. */
-	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
+	conn->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
 
 	return (0);
 }
 
 /*
- * __wt_ienv_destroy --
- *	Destroy the ENV's underlying IENV structure.
+ * __wt_connection_destroy --
+ *	Destroy the CONNECTION's underlying CONNECTION structure.
  */
 int
-__wt_ienv_destroy(ENV *env)
+__wt_connection_destroy(CONNECTION *conn)
 {
-	IENV *ienv;
+	SESSION *session;
 	int ret;
 
-	ienv = env->ienv;
+	session = &conn->default_session;
 	ret = 0;
 
 	/* Check there's something to destroy. */
-	if (ienv == NULL)
+	if (conn == NULL)
 		return (0);
 
 	/* Diagnostic check: check flags against approved list. */
-	WT_ENV_FCHK_RET(env, "Env.close", ienv->flags, WT_APIMASK_IENV, ret);
+	WT_CONN_FCHK_RET(conn, "Env.close", conn->flags, WT_APIMASK_CONN, ret);
 
-	(void)__wt_mtx_destroy(env, ienv->mtx);
+	(void)__wt_mtx_destroy(session, conn->mtx);
 
 	/* Free allocated memory. */
-	__wt_free(env, ienv->toc, 0);
-	__wt_free(env, ienv->toc_array, 0);
-	__wt_free(env, ienv->hazard, 0);
-	__wt_free(env, ienv->stats, 0);
-	__wt_free(env, ienv->method_stats, 0);
+	__wt_free(session, conn->sessions, 0);
+	__wt_free(session, conn->toc_array, 0);
+	__wt_free(session, conn->hazard, 0);
+	__wt_free(session, conn->stats, 0);
+	__wt_free(session, conn->method_stats, 0);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* If we're tracking memory, check to see if everything was free'd. */
-	__wt_mtrack_dump(env);
-	__wt_mtrack_free(env);
+	__wt_mtrack_dump(conn);
+	__wt_mtrack_free(conn);
 #endif
 
-	__wt_free(NULL, ienv, sizeof(IENV));
-	env->ienv = NULL;
+	__wt_free(NULL, conn, sizeof(CONNECTION));
 	return (ret);
 }
