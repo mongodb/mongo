@@ -260,7 +260,7 @@ __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 		    "\toffpage: addr %lu, size %lu, starting recno %llu\n",
 		    (u_long)WT_COL_REF_ADDR(cref),
 		    (u_long)WT_COL_REF_SIZE(cref),
-		    (unsigned long long)WT_COL_REF_RECNO(cref));
+		    (unsigned long long)cref->recno);
 }
 
 /*

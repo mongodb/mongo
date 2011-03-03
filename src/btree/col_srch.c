@@ -85,7 +85,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			 * index the way we do in the row-store binary search,
 			 * key comparisons are cheap here.
 			 */
-			start_recno = WT_COL_REF_RECNO(cref);
+			start_recno = cref->recno;
 			if (recno == start_recno)
 				break;
 			if (recno < start_recno)
@@ -111,8 +111,7 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 			goto done;
 
 		/* cip references the subtree containing the record. */
-		switch (ret =
-		    __wt_page_in(toc, page, &cref->ref, cref->off_record, 0)) {
+		switch (ret = __wt_page_in(toc, page, &cref->ref, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
 			if (page != idb->root_page.page)

@@ -21,29 +21,23 @@ static int __wt_page_inmem_row_leaf(WT_TOC *, WT_PAGE *);
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_page_in(
-    WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, void *off_arg, int dsk_verify)
+__wt_page_in(WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	ENV *env;
 	WT_CACHE *cache;
-	WT_OFF *off;
 	int ret;
 
 	env = toc->env;
 	cache = env->ienv->cache;
-
-	/*
-	 * Passed both WT_OFF and WT_OFF_RECORD references; the first two fields
-	 * of the structures are a uint32_t size/addr pair.
-	 */
-	off = off_arg;
 
 	for (;;)
 		switch (ref->state) {
 		case WT_REF_CACHE:
 			/*
 			 * The page is in memory: get a hazard reference, update
-			 * the page's LRU and return.
+			 * the page's LRU and return.  The expected reason we
+			 * can't get a hazard reference is because the page is
+			 * being evicted; yield and try again.
 			 */
 			if (__wt_hazard_set(toc, ref)) {
 				ref->page->read_gen = ++cache->read_gen;
@@ -57,22 +51,17 @@ __wt_page_in(
 			 */
 			__wt_yield();
 			break;
-		case WT_REF_DISK:
+		case WT_REF_DELETED:
 			/*
-			 * The page isn't in memory, request it be read.  There
-			 * is one additional special case: if the page were to
-			 * be emptied and reconciled, it may have been deleted,
-			 * in which case we return that fact.
-			 *
-			 * Note, the underlying read server does not check for
-			 * this case: it's not necessary, because the address
-			 * was set to WT_ADDR_DELETED before the WT_REF entry
-			 * was reset to WT_REF_DISK.
+			 * if the page were to be emptied and reconciled, it may
+			 * have been deleted.  Any thread walking the tree needs
+			 * to be notified.
 			 */
-			if (off->addr == WT_ADDR_DELETED)
-				return (WT_PAGE_DELETED);
+			return (WT_PAGE_DELETED);
+		case WT_REF_DISK:
+			/* The page isn't in memory, request it be read. */
 			__wt_cache_read_serial(
-			    toc, parent, ref, off, dsk_verify, ret);
+			    toc, parent, ref, dsk_verify, ret);
 			if (ret != 0)
 				return (ret);
 			break;
@@ -193,8 +182,12 @@ __wt_page_inmem_col_int(WT_TOC *toc, WT_PAGE *page)
 	 * structures.
 	 */
 	cref = page->u.col_int.t;
-	WT_OFF_FOREACH(dsk, off_record, i)
-		(cref++)->off_record = off_record;
+	WT_OFF_FOREACH(dsk, off_record, i) {
+		WT_COL_REF_ADDR(cref) = off_record->addr;
+		WT_COL_REF_SIZE(cref) = off_record->size;
+		cref->recno = WT_RECNO(off_record);
+		++cref;
+	}
 
 	page->indx_count = dsk->u.entries;
 	return (0);
@@ -285,6 +278,7 @@ __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
+	WT_OFF *off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
 	uint32_t i, nindx;
@@ -323,7 +317,10 @@ __wt_page_inmem_row_int(WT_TOC *toc, WT_PAGE *page)
 			__wt_key_set_process(rref, item);
 			break;
 		case WT_ITEM_OFF:
-			(rref++)->off = WT_ITEM_BYTE_OFF(item);
+			off = WT_ITEM_BYTE_OFF(item);
+			WT_COL_REF_ADDR(rref) = off->addr;
+			WT_COL_REF_SIZE(rref) = off->size;
+			++rref;
 			break;
 		}
 

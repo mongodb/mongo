@@ -42,7 +42,7 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 		WT_RET(__wt_desc_read(toc));
 
 		/* If there's a root page, pin it. */
-		if (idb->root_off.addr != WT_ADDR_INVALID)
+		if (idb->root_page.addr != WT_ADDR_INVALID)
 			WT_RET(__wt_root_pin(toc));
 	}
 
@@ -263,12 +263,8 @@ __wt_root_pin(WT_TOC *toc)
 
 	idb = toc->db->idb;
 
-	/*
-	 * Get the root page.  We don't check for deleted pages, the root page
-	 * had better not be deleted!
-	 */
-	WT_RECNO(&idb->root_off) = 1;
-	WT_RET(__wt_page_in(toc, NULL, &idb->root_page, &idb->root_off, 0));
+	/* Get the root page, which had better be there. */
+	WT_RET(__wt_page_in(toc, NULL, &idb->root_page, 0));
 
 	WT_PAGE_SET_PIN(idb->root_page.page);
 	__wt_hazard_clear(toc, idb->root_page.page);

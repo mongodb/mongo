@@ -2,25 +2,22 @@
 
 typedef struct {
 	WT_PAGE * parent;
-	WT_REF * ref;
-	WT_OFF * off;
+	void * parent_ref;
 	int dsk_verify;
 } __wt_cache_read_args;
 #define	__wt_cache_read_serial(\
-    toc, _parent, _ref, _off, _dsk_verify, ret) do {\
+    toc, _parent, _parent_ref, _dsk_verify, ret) do {\
 	__wt_cache_read_args _args;\
 	_args.parent = _parent;\
-	_args.ref = _ref;\
-	_args.off = _off;\
+	_args.parent_ref = _parent_ref;\
 	_args.dsk_verify = _dsk_verify;\
 	(ret) = __wt_toc_serialize_func(toc,\
 	    WT_WORKQ_READ, 0, __wt_cache_read_serial_func, &_args);\
 } while (0)
 #define	__wt_cache_read_unpack(\
-    toc, _parent, _ref, _off, _dsk_verify) do {\
+    toc, _parent, _parent_ref, _dsk_verify) do {\
 	_parent = ((__wt_cache_read_args *)(toc)->wq_args)->parent;\
-	_ref = ((__wt_cache_read_args *)(toc)->wq_args)->ref;\
-	_off = ((__wt_cache_read_args *)(toc)->wq_args)->off;\
+	_parent_ref = ((__wt_cache_read_args *)(toc)->wq_args)->parent_ref;\
 	_dsk_verify = ((__wt_cache_read_args *)(toc)->wq_args)->dsk_verify;\
 } while (0)
 

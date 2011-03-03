@@ -231,15 +231,14 @@ __wt_block_read(WT_TOC *toc)
 	ret = 0;
 
 	/* Make sure there's a free-list to read. */
-	if (idb->free_off.addr == WT_ADDR_INVALID)
+	if (idb->free_addr == WT_ADDR_INVALID)
 		return (0);
 
 	/* Get a scratch buffer and make it look like our work page. */
-	WT_RET(__wt_scr_alloc(toc, idb->free_off.size, &tmp));
+	WT_RET(__wt_scr_alloc(toc, idb->free_size, &tmp));
 
 	/* Read in the free-list. */
-	WT_ERR(__wt_disk_read(
-	    toc, tmp->data, idb->free_off.addr, idb->free_off.size));
+	WT_ERR(__wt_disk_read(toc, tmp->data, idb->free_addr, idb->free_size));
 
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)((uint8_t *)
@@ -287,8 +286,8 @@ __wt_block_write(WT_TOC *toc)
 
 	/* Allocate room at the end of the file. */
 	__wt_block_extend(toc, &addr, size);
-	idb->free_off.addr = addr;
-	idb->free_off.size = size;
+	idb->free_addr = addr;
+	idb->free_size = size;
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_RET(__wt_scr_alloc(toc, size, &tmp));

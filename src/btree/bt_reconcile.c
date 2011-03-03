@@ -200,17 +200,16 @@ static int
 __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
 	WT_COL_REF *cref;
-	WT_OFF_RECORD *from;
+	WT_OFF_RECORD *from, _from;
 	WT_PAGE_DISK *dsk;
 	uint32_t i, space_avail;
 	uint8_t *first_free;
 
+	from = &_from;
 	dsk = new->dsk;
 	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	WT_COL_REF_FOREACH(page, cref, i) {
-		from = cref->off_record;
-
 		/*
 		 * XXX
 		 * We don't yet handle splits:  we allocated the maximum page
@@ -223,6 +222,10 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 			   (u_long)page->addr);
 			__wt_abort(toc->env);
 		}
+
+		from->addr = WT_COL_REF_ADDR(cref);
+		from->size = WT_COL_REF_SIZE(cref);
+		WT_RECNO(from) = cref->recno;
 
 		memcpy(first_free, from, sizeof(WT_OFF_RECORD));
 		first_free += sizeof(WT_OFF_RECORD);
@@ -627,12 +630,14 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 static int
 __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 {
-	WT_ITEM *key_item, *data_item, *next;
+	WT_ITEM *key_item, *next;
+	WT_OFF *from, _from;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
 	uint32_t i, len, space_avail;
 	uint8_t *first_free;
 
+	from = &_from;
 	dsk = new->dsk;
 	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
@@ -645,25 +650,26 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * Skip deleted pages; if we delete an overflow key, free the
 		 * underlying file space.
 		 */
-		if (WT_ROW_REF_ADDR(rref) == WT_ADDR_DELETED) {
+		if (WT_ROW_REF_STATE(rref) == WT_REF_DELETED) {
 			if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
 				WT_RET(__wt_block_free_ovfl(
 				    toc, WT_ITEM_BYTE_OVFL(key_item)));
 			continue;
 		}
 
+		next = WT_ITEM_NEXT(key_item);
+		len = (uint32_t)((uint8_t *)next - (uint8_t *)key_item);
+
 		/*
 		 * Copy the paired items off the old page into the new page.
 		 *
 		 * XXX
-		 * Internal pages can't grow, yet, so we could more easily just
-		 * update the old page.   We do the copy because eventually we
-		 * will have to split the internal pages, and they'll be able to
-		 * grow.
+		 * For now, we just punch the new page locations into the old
+		 * on-page information, that will eventually change.
 		 */
-		data_item = WT_ITEM_NEXT(key_item);
-		next = WT_ITEM_NEXT(data_item);
-		len = (uint32_t)((uint8_t *)next - (uint8_t *)key_item);
+		from = WT_ITEM_BYTE_OFF(WT_ITEM_NEXT(key_item));
+		from->addr = WT_ROW_REF_ADDR(rref);
+		from->size = WT_ROW_REF_SIZE(rref);
 
 		/*
 		 * XXX
@@ -909,13 +915,12 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	/*
 	 * An evicted page has no entries, therefore we want to delete it.
 	 *
-	 * First, set the parent page's address for the page to a special,
-	 * non-existent address; at some point, when the WT_REF->state on the
-	 * parent page is reset to WT_REF_DISK, the non-existent address will
-	 * cause any future request for the page to return WT_PAGE_DELETED as
-	 * an error.
+	 * Set the parent page's address for the page (this has no effect other
+	 * than marking the parent page as dirty, we've done the work by setting
+	 * the WT_REF state field).
 	 */
-	 WT_RET(__wt_rec_parent_update(toc, page, WT_ADDR_DELETED, 0));
+
+	 WT_RET(__wt_rec_parent_update(toc, page, WT_ADDR_INVALID, 0));
 
 	/*
 	 * Now, the tricky part.  Any future reader/writer of the page has to
@@ -1006,12 +1011,12 @@ __wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(parent, cref, i)
-			if (WT_COL_REF_ADDR(cref) != WT_ADDR_DELETED)
+			if (WT_COL_REF_STATE(cref) != WT_REF_DELETED)
 				return (0);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(parent, rref, i)
-			if (WT_ROW_REF_ADDR(rref) != WT_ADDR_DELETED)
+			if (WT_ROW_REF_STATE(rref) != WT_REF_DELETED)
 				return (0);
 		break;
 	}
@@ -1032,9 +1037,6 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	DB *db;
 	IDB *idb;
-	WT_PAGE *parent;
-	WT_OFF *off;
-	WT_OFF_RECORD *off_record;
 
 	db = toc->db;
 	idb = db->idb;
@@ -1043,32 +1045,20 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 	 * If we're writing the root of the tree, then we have to update the
 	 * descriptor record, there's no parent to update.
 	 */
-	if (page->addr == idb->root_off.addr) {
-		  idb->root_off.addr = addr;
-		  idb->root_off.size = size;
+	if (page->addr == idb->root_page.addr) {
+		  idb->root_page.addr = addr;
+		  idb->root_page.size = size;
 		  return (__wt_desc_write(toc));
 	 }
 
 	/*
-	 * Update the relevant WT_OFF/WT_OFF_RECORD structure.  There are two
-	 * memory locations that change (address and size), and we could race,
-	 * but that's not a problem.   Only a single thread reconciles pages,
-	 * and pages cannot leave memory if they have children.
+	 * Update the relevant WT_REF structure.  There are two memory locations
+	 * that change (address and size), and we could race, but that's not a
+	 * problem.   Only a single thread reconciles pages, and pages cannot
+	 * leave memory if they have children.
 	 */
-	parent = page->parent;
-	switch (parent->dsk->type) {
-	case WT_PAGE_COL_INT:
-		off_record = page->parent_off;
-		off_record->addr = addr;
-		off_record->size = size;
-		break;
-	case WT_PAGE_ROW_INT:
-		off = page->parent_off;
-		off->addr = addr;
-		off->size = size;
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
+	page->parent_ref->addr = addr;
+	page->parent_ref->size = size;
 
 	/*
 	 * Mark the parent page as dirty.
@@ -1082,7 +1072,7 @@ __wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
 	 * with us, the page will still be marked dirty and that's all we care
 	 * about.
 	 */
-	WT_PAGE_SET_MODIFIED(parent);
+	WT_PAGE_SET_MODIFIED(page->parent);
 
 	return (0);
 }

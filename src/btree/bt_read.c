@@ -68,13 +68,12 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 {
 	ENV *env;
 	WT_CACHE *cache;
-	WT_OFF *off;
 	WT_PAGE *parent;
 	WT_READ_REQ *rr, *rr_end;
 	WT_REF *ref;
 	int dsk_verify;
 
-	__wt_cache_read_unpack(toc, parent, ref, off, dsk_verify);
+	__wt_cache_read_unpack(toc, parent, ref, dsk_verify);
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -84,7 +83,7 @@ __wt_cache_read_serial_func(WT_TOC *toc)
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 	for (; rr < rr_end; ++rr)
 		if (WT_READ_REQ_ISEMPTY(rr)) {
-			WT_READ_REQ_SET(rr, toc, parent, ref, off, dsk_verify);
+			WT_READ_REQ_SET(rr, toc, parent, ref, dsk_verify);
 			return (0);
 		}
 	__wt_api_env_errx(env, "read server request table full");
@@ -198,23 +197,14 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 	toc = rr->toc;
 	ref = rr->ref;
-
-	/*
-	 * We're passed a reference to a WT_OFF or a WT_OFF_RECORD structure;
-	 * the initial addr/size pair fields are the same, get what we came for.
-	 */
-	addr = rr->off->addr;
-	size = rr->off->size;
+	addr = ref->addr;
+	size = ref->size;
 
 	env = toc->env;
 	cache = env->ienv->cache;
 	ret = 0;
 
-	/*
-	 * Check to see if some other thread brought the page into the cache
-	 * while our request was in the queue.   If the state is anything
-	 * other than on-disk, it's not our problem.
-	 */
+	/* If the state is anything other than on-disk, not our problem. */
 	if (ref->state != WT_REF_DISK)
 		return (0);
 
@@ -243,13 +233,13 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 	/*
 	 * Fill in the WT_PAGE addr, size.
-	 * Reference the parent's WT_PAGE and WT_OFF/WT_OFF_RECORD structures.
+	 * Reference the parent's WT_PAGE and WT_{COL,ROW}_REF structures.
 	 * Reference the underlying disk page.
 	 */
 	page->addr = addr;
 	page->size = size;
 	page->parent = rr->parent;
-	page->parent_off = rr->off;
+	page->parent_ref = ref;
 	page->dsk = dsk;
 
 	/*

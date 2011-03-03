@@ -60,13 +60,11 @@ __wt_db_idb_open(DB *db, const char *name, mode_t mode, uint32_t flags)
 
 	/*
 	 * XXX
-	 * Initialize the root WT_REF/WT_OFF pair to point to the start of
-	 * the file.  This is all wrong, and we'll get the information from
-	 * somewhere else, eventually.
+	 * Initialize the root location to point to the start of the file.
+	 * This is all wrong, and we'll get the information from somewhere
+	 * else, eventually.
 	 */
 	WT_CLEAR(idb->root_page);
-	idb->root_page.state = WT_REF_DISK;
-	WT_CLEAR(idb->root_off);
 
 	/* Initialize the zero-length WT_ITEM. */
 	WT_ITEM_SET_TYPE(&idb->empty_item, WT_ITEM_DATA);

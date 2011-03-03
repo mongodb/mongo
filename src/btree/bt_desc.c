@@ -54,10 +54,10 @@ __wt_desc_read(WT_TOC *toc)
 	db->intlmin = desc.intlmin;
 	db->leafmax = desc.leafmax;
 	db->leafmin = desc.leafmin;
-	db->idb->root_off.addr = desc.root_addr;
-	db->idb->root_off.size = desc.root_size;
-	db->idb->free_off.addr = desc.free_addr;
-	db->idb->free_off.size = desc.free_size;
+	db->idb->root_page.addr = desc.root_addr;
+	db->idb->root_page.size = desc.root_size;
+	db->idb->free_addr = desc.free_addr;
+	db->idb->free_size = desc.free_size;
 	db->fixed_len = desc.fixed_len;
 
 	/*
@@ -95,10 +95,10 @@ __wt_desc_write(WT_TOC *toc)
 	desc.leafmax = db->leafmax;
 	desc.leafmin = db->leafmin;
 	desc.recno_offset = 0;
-	desc.root_addr = idb->root_off.addr;
-	desc.root_size = idb->root_off.size;
-	desc.free_addr = idb->free_off.addr;
-	desc.free_size = idb->free_off.size;
+	desc.root_addr = idb->root_page.addr;
+	desc.root_size = idb->root_page.size;
+	desc.free_addr = idb->free_addr;
+	desc.free_size = idb->free_size;
 	desc.fixed_len = (uint8_t)db->fixed_len;
 	desc.flags = 0;
 	if (F_ISSET(idb, WT_RLE))

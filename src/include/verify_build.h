@@ -59,7 +59,7 @@ __wt_verify_build(void)
 	/*
 	 * The page header is special: the compiler will pad it to a multiple
 	 * of 8 bytes because it has 64-bit fields that need alignment.  We
-	 * use WT_PAGE_DISK_SIZE everywhere instead of sizeof(WT_PAGE_DISK)
+	 * use WT_PAGE_DISK_SIZE everywhere instead of WT_PAGE_DISK_SIZE
 	 * to avoid writing 4 extra bytes to the file.
 	 */
 	SIZE_CHECK(WT_PAGE_DISK, WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof(void *)));

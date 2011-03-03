@@ -163,8 +163,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			break;
 
 deleted_retry:	/* rref references the subtree containing the record. */
-		switch (ret =
-		    __wt_page_in(toc, page, &rref->ref, rref->off, 0)) {
+		switch (ret = __wt_page_in(toc, page, &rref->ref, 0)) {
 		case 0:				/* Valid page */
 			/* Swap the parent page for the child page. */
 			if (page != idb->root_page.page)
@@ -189,14 +188,14 @@ deleted_retry:	/* rref references the subtree containing the record. */
 			for (t = rref,
 			    indx = WT_ROW_REF_SLOT(page, rref);
 			    indx > 0; --indx, --t)
-				if (WT_ROW_REF_ADDR(t) != WT_ADDR_DELETED) {
+				if (WT_ROW_REF_STATE(t) != WT_REF_DELETED) {
 					rref = t;
 					goto deleted_retry;
 				}
 			for (t = rref,
 			    indx = WT_ROW_REF_SLOT(page, rref);
 			    indx < page->indx_count; ++indx, ++t)
-				if (WT_ROW_REF_ADDR(t) != WT_ADDR_DELETED) {
+				if (WT_ROW_REF_STATE(t) != WT_REF_DELETED) {
 					rref = t;
 					goto deleted_retry;
 				}

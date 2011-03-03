@@ -26,18 +26,16 @@ struct __wt_evict_list {
  *	Encapsulation of a read request.
  */
 struct __wt_read_req {
-	WT_TOC *toc;				/* Requesting thread */
-	WT_PAGE *parent;			/* Parent */
-	WT_REF *ref;				/* Address */
-	WT_OFF *off;				/* Bytes */
-	int	dsk_verify;			/* Verify the disk image */
+	WT_TOC	*toc;				/* Requesting thread */
+	WT_PAGE	*parent;			/* Parent page */
+	WT_REF	*ref;				/* Access control WT_REF */
+	int	 dsk_verify;			/* Verify the disk image */
 };
 #define	WT_READ_REQ_ISEMPTY(r)						\
 	((r)->toc == NULL)
-#define	WT_READ_REQ_SET(r, _toc, _parent, _ref, _off, _dsk_verify) do {	\
-	(r)->ref = _ref;						\
+#define	WT_READ_REQ_SET(r, _toc, _parent, _ref, _dsk_verify) do {	\
 	(r)->parent = _parent;						\
-	(r)->off = _off;						\
+	(r)->ref = _ref;						\
 	(r)->dsk_verify = _dsk_verify;					\
 	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
 	(r)->toc = _toc;						\

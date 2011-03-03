@@ -107,8 +107,8 @@ __wt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(toc, NULL, idb->root_page.page,
-	    WT_RECNO(&idb->root_off), WT_NOLEVEL, &vstuff));
+	WT_ERR(__wt_verify_tree(toc, NULL,
+	    idb->root_page.page, (uint64_t)1, WT_NOLEVEL, &vstuff));
 
 	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
@@ -251,11 +251,10 @@ __wt_verify_tree(
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
-			switch (ret = __wt_page_in(
-			    toc, page, ref, cref->off_record, 1)) {
+			switch (ret = __wt_page_in(toc, page, ref, 1)) {
 			case 0:				/* Valid page */
-				ret = __wt_verify_tree(toc, NULL, ref->page,
-				    WT_COL_REF_RECNO(cref), level - 1, vs);
+				ret = __wt_verify_tree(toc, NULL,
+				    ref->page, cref->recno, level - 1, vs);
 				__wt_hazard_clear(toc, ref->page);
 				break;
 			case WT_PAGE_DELETED:
@@ -308,8 +307,7 @@ __wt_verify_tree(
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
-			switch (
-			    ret = __wt_page_in(toc, page, ref, rref->off, 1)) {
+			switch (ret = __wt_page_in(toc, page, ref, 1)) {
 			case 0:				/* Valid page */
 				ret = __wt_verify_tree(toc, rref,
 				    ref->page, (uint64_t)0, level - 1, vs);

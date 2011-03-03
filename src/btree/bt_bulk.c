@@ -967,9 +967,8 @@ __wt_bulk_stack_put(WT_TOC *toc, WT_STACK *stack)
 		 * and the descriptor record.
 		 */
 		if ((elem + 1)->page == NULL) {
-			idb->root_off.addr = elem->page->addr;
-			idb->root_off.size = elem->page->size;
-			WT_RECNO(&idb->root_off) = elem->page->dsk->recno;
+			idb->root_page.addr = elem->page->addr;
+			idb->root_page.size = elem->page->size;
 			WT_TRET(__wt_desc_write(toc));
 		}
 

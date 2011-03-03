@@ -43,6 +43,7 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 	IDB *idb;
 	WT_COL_REF *cref;
 	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i;
 	int ret;
 
@@ -60,16 +61,23 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/* cref references the subtree containing the record */
-			if (LF_ISSET(WT_WALK_CACHE) &&
-			    WT_COL_REF_STATE(cref) != WT_REF_CACHE)
+			switch (WT_COL_REF_STATE(cref)) {
+			case WT_REF_CACHE:
+				break;
+			case WT_REF_DELETED:
 				continue;
-
-			switch (ret = __wt_page_in(
-			    toc, page, &cref->ref, cref->off_record, 0)) {
+			case WT_REF_DISK:
+			case WT_REF_EVICT:
+				if (LF_ISSET(WT_WALK_CACHE))
+					continue;
+				break;
+			}
+			ref = &cref->ref;
+			switch (ret = __wt_page_in(toc, page, ref, 0)) {
 			case 0:				/* Valid page */
-				ret = __wt_tree_walk(toc,
-				    WT_COL_REF_PAGE(cref), flags, work, arg);
-				__wt_hazard_clear(toc, WT_COL_REF_PAGE(cref));
+				ret = __wt_tree_walk(
+				    toc, ref->page, flags, work, arg);
+				__wt_hazard_clear(toc, ref->page);
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */
@@ -82,16 +90,23 @@ __wt_tree_walk(WT_TOC *toc, WT_PAGE *page,
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i) {
 			/* rref references the subtree containing the record */
-			if (LF_ISSET(WT_WALK_CACHE) &&
-			    WT_ROW_REF_STATE(rref) != WT_REF_CACHE)
+			switch (WT_ROW_REF_STATE(rref)) {
+			case WT_REF_CACHE:
+				break;
+			case WT_REF_DELETED:
 				continue;
-
-			switch (ret =
-			    __wt_page_in(toc, page, &rref->ref, rref->off, 0)) {
+			case WT_REF_DISK:
+			case WT_REF_EVICT:
+				if (LF_ISSET(WT_WALK_CACHE))
+					continue;
+				break;
+			}
+			ref = &rref->ref;
+			switch (ret = __wt_page_in(toc, page, ref, 0)) {
 			case 0:				/* Valid page */
-				ret = __wt_tree_walk(toc,
-				    WT_ROW_REF_PAGE(rref), flags, work, arg);
-				__wt_hazard_clear(toc, WT_ROW_REF_PAGE(rref));
+				ret = __wt_tree_walk(
+				    toc, ref->page, flags, work, arg);
+				__wt_hazard_clear(toc, ref->page);
 				break;
 			case WT_PAGE_DELETED:
 				ret = 0;		/* Skip deleted pages */

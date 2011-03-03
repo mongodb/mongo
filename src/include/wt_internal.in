@@ -132,25 +132,25 @@ struct __idb {
 	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
-	WT_REF		root_page;	/* Root page reference */
-	WT_OFF_RECORD	root_off;	/* Root page location */
-
-	WT_WALK evict_walk;		/* Eviction thread's walk state */
-
 	/*
 	 * When a file is opened and/or created a hazard reference is taken on
 	 * its root page, and the root page brought into memory.  If no root
 	 * page has been acquired, there's usually not much work to do.
 	 */
-#define	WT_UNOPENED_FILE(idb)		((idb)->root_page.page == NULL ? 1 : 0)
+#define	WT_UNOPENED_FILE(idb)		((idb)->root_page.state != WT_REF_CACHE)
+	WT_REF		root_page;	/* Root page reference */
+
+	uint32_t free_addr;		/* Free page */
+	uint32_t free_size;
+					/* Free list */
+	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
+	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
+	uint32_t freelist_entries;	/* Free list entry count */
+
+	WT_WALK evict_walk;		/* Eviction thread's walk state */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */
-
-	WT_OFF free_off;		/* Free page location */
-	uint32_t freelist_entries;	/* Free list entry count */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
 
 	WT_ITEM empty_item;		/* Empty data item */
 

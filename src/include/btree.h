@@ -42,6 +42,8 @@ extern "C" {
 #define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(256 * WT_MEGABYTE)
 
+#define	WT_ADDR_INVALID	UINT32_MAX	/* Invalid file address */
+
 /*
  * Underneath the Btree code is the OS layer, where sizes are stored as numbers
  * of bytes.   In the OS layer, 32-bits is too small (a file might be larger
@@ -59,13 +61,6 @@ extern "C" {
  */
 #define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
 	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (db)->allocsize))
-
-/*
- * The invalid and deleted addresses are special addresses and limit the
- * maximum size of a file.
- */
-#define	WT_ADDR_DELETED		(UINT32_MAX - 1)
-#define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
  * The file needs a description, here's the structure.  At the moment, this
@@ -228,6 +223,8 @@ struct __wt_page_disk {
  *	to the page, flush memory and re-confirm the state of the page.  If the
  *	page state is still WT_REF_CACHE, the reader has a valid reference and
  *	can proceed.
+ * WT_REF_DELETED:
+ *      The page has been deleted.
  * WT_REF_DISK:
  *      The page is on disk, but needs to be read into the cache before use.
  * WT_REF_EVICT:
@@ -246,8 +243,12 @@ struct __wt_ref {
 	 */
 #define	WT_REF_DISK	0		/* Page is on disk */
 #define	WT_REF_CACHE	1		/* Page is in cache */
-#define	WT_REF_EVICT	2		/* Cache page selected for eviction */
+#define	WT_REF_DELETED	2		/* Page was deleted */
+#define	WT_REF_EVICT	3		/* Cache page selected for eviction */
 	uint32_t volatile state;
+
+	uint32_t addr;			/* Address */
+	uint32_t size;			/* Size */
 
 	/* !!!
 	 * The layout is deliberate.  On a 64-bit machine, when you tuck this
@@ -273,25 +274,11 @@ struct __wt_row_ref {
 	void	 *key;			/* Key */
 	uint32_t  size;			/* Key length */
 
-	/* !!!
-	 * The layout is deliberate.  On a 64-bit machine no padding is needed
-	 * because the 32-bit values line up.
-	 */
 	WT_REF	  ref;			/* Subtree page */
+#define	WT_ROW_REF_ADDR(rref)	((rref)->ref.addr)
 #define	WT_ROW_REF_PAGE(rref)	((rref)->ref.page)
+#define	WT_ROW_REF_SIZE(rref)	((rref)->ref.size)
 #define	WT_ROW_REF_STATE(rref)	((rref)->ref.state)
-
-	/*
-	 * XXX
-	 * The WT_OFF structure is an offset into the original page and could be
-	 * a uint32_t instead of a pointer.   However, (1) an array of these
-	 * structures would be padded out on a 64-bit machine anyway, so there's
-	 * no obvious gain, and (2) I'm betting MVCC is going to require this
-	 * information move into a per-transaction area.
-	 */
-	WT_OFF   *off;			/* Subtree addr/size pair */
-#define	WT_ROW_REF_ADDR(rref)	((rref)->off->addr)
-#define	WT_ROW_REF_SIZE(rref)	((rref)->off->size)
 };
 
 /*
@@ -314,22 +301,13 @@ struct __wt_row_ref {
  * Column-store internal page subtree entries.
  */
 struct __wt_col_ref {
-	WT_REF ref;			/* Subtree page */
-#define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
-#define	WT_COL_REF_STATE(cref)	((cref)->ref.state)
+	uint64_t recno;			/* Starting record number */
 
-	/*
-	 * XXX
-	 * The WT_OFF_RECORD structure is an offset into the original page and
-	 * could be a uint32_t instead of a pointer.   However, (1) an array of
-	 * these structures would be padded out on a 64-bit machine anyway, so
-	 * there's no obvious gain, and (2) I'm betting MVCC is going to require
-	 * this information move into a per-transaction area.
-	 */
-	WT_OFF_RECORD *off_record;	/* Subtree addr/size/records triplet */
-#define	WT_COL_REF_ADDR(cref)	((cref)->off_record->addr)
-#define	WT_COL_REF_RECNO(cref)	WT_RECNO((cref)->off_record)
-#define	WT_COL_REF_SIZE(cref)	((cref)->off_record->size)
+	WT_REF ref;			/* Subtree page */
+#define	WT_COL_REF_ADDR(cref)	((cref)->ref.addr)
+#define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
+#define	WT_COL_REF_SIZE(cref)	((cref)->ref.size)
+#define	WT_COL_REF_STATE(cref)	((cref)->ref.state)
 };
 
 /*
@@ -359,7 +337,7 @@ struct __wt_page {
 	 * page.
 	 */
 	WT_PAGE	*parent;		/* Page's parent */
-	void	*parent_off;		/* Page's parent reference */
+	WT_REF	*parent_ref;		/* Page's parent reference */
 
 	WT_PAGE_DISK *dsk;		/* Page's on-disk representation */
 

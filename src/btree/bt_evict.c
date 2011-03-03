@@ -657,13 +657,14 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 		    "cache evicting page addr %lu", page->addr));
 
 		/*
-		 * Copy a page reference, then make the cache entry available
-		 * for re-use.
+		 * Clear the cache entry; if the reconciliation code deleted the
+		 * page, we're done, otherwise, the page is somewhere on disk.
 		 *
 		 * No memory flush needed, the state field is declared volatile.
 		 */
 		ref->page = NULL;
-		ref->state = WT_REF_DISK;
+		if (ref->state != WT_REF_DELETED)
+			ref->state = WT_REF_DISK;
 
 		/* Remove the entry from the eviction list. */
 		WT_EVICT_CLR(evict);
@@ -704,12 +705,14 @@ __wt_evict_page_subtrees(WT_PAGE *page)
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_COL_REF_STATE(cref) != WT_REF_DISK)
+			if (WT_COL_REF_STATE(cref) != WT_REF_DISK &&
+			    WT_COL_REF_STATE(cref) != WT_REF_DELETED)
 				return (1);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK)
+			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK &&
+			    WT_ROW_REF_STATE(rref) != WT_REF_DELETED)
 				return (1);
 		break;
 	}
