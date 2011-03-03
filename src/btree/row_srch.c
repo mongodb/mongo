@@ -18,7 +18,7 @@ static inline int
 __wt_key_build(SESSION *session, void *ref)
 {
 	WT_SCRATCH *scratch, _scratch;
-	WT_ITEM *item;
+	WT_CELL *item;
 
 	WT_CLEAR(_scratch);
 	scratch = &_scratch;
@@ -41,7 +41,7 @@ __wt_key_build(SESSION *session, void *ref)
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(SESSION *session, WT_DATAITEM *key, uint32_t flags)
+__wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 {
 	BTREE *btree;
 	WT_PAGE *page;
@@ -105,7 +105,7 @@ __wt_row_search(SESSION *session, WT_DATAITEM *key, uint32_t flags)
 				 */
 				if (indx != 0) {
 					cmp = btree->
-					    btree_compare(btree, key, (WT_DATAITEM *)rref);
+					    btree_compare(btree, key, (WT_ITEM *)rref);
 					if (cmp == 0)
 						break;
 					if (cmp < 0)
@@ -141,7 +141,7 @@ __wt_row_search(SESSION *session, WT_DATAITEM *key, uint32_t flags)
 				if (__wt_key_process(rip))
 					WT_ERR(__wt_key_build(session, rip));
 
-				cmp = btree->btree_compare(btree, key, (WT_DATAITEM *)rip);
+				cmp = btree->btree_compare(btree, key, (WT_ITEM *)rip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)

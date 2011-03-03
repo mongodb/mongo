@@ -144,7 +144,7 @@ add_factory(WT_CONNECTION *conn)
 /* Implementation of WT_COLLATOR for WT_CONNECTION::add_collator. */
 static int
 my_compare(WT_SESSION *session, WT_COLLATOR *collator,
-    const WT_DATAITEM *value1, const WT_DATAITEM *value2, int *cmp)
+    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp)
 {
 	/* Unused parameters */
 	(void)session;
@@ -168,8 +168,8 @@ add_collator(WT_CONNECTION *conn)
 /* Implementation of WT_EXTRACTOR for WT_CONNECTION::add_extractor. */
 static int
 my_extract(WT_SESSION *session, WT_EXTRACTOR *extractor,
-    const WT_DATAITEM *key, const WT_DATAITEM *value,
-    WT_DATAITEM *result)
+    const WT_ITEM *key, const WT_ITEM *value,
+    WT_ITEM *result)
 {
 	/* Unused parameters */
 	(void)session;

@@ -74,7 +74,7 @@ struct WT_CURSOR;	  typedef struct WT_CURSOR WT_CURSOR;
 struct WT_CURSOR_FACTORY; typedef struct WT_CURSOR_FACTORY WT_CURSOR_FACTORY;
 struct WT_ERROR_HANDLER;  typedef struct WT_ERROR_HANDLER WT_ERROR_HANDLER;
 struct WT_EXTRACTOR;	  typedef struct WT_EXTRACTOR WT_EXTRACTOR;
-struct WT_DATAITEM;	  typedef struct WT_DATAITEM WT_DATAITEM;
+struct WT_ITEM;	  typedef struct WT_ITEM WT_ITEM;
 struct WT_SESSION;	  typedef struct WT_SESSION WT_SESSION;
 
 /*!
@@ -82,7 +82,7 @@ struct WT_SESSION;	  typedef struct WT_SESSION WT_SESSION;
  * a length (limited to 4GB for items stored in tables).  Records consist of a
  * pair of items: a key and an associated value.
  */
-struct WT_DATAITEM {
+struct WT_ITEM {
 	/*!
 	 * The memory reference of the data item.
 	 *
@@ -104,7 +104,7 @@ struct WT_DATAITEM {
  * Cursors allow data to be searched, stepped through and updated: the
  * so-called CRUD operations (create, read, update and delete).
  *
- * Raw data is represented by key/value pairs of WT_DATAITEM structures, but
+ * Raw data is represented by key/value pairs of WT_ITEM structures, but
  * cursors can also provide access to fields within the key and value if the
  * formats are described in the WT_SESSION::create_table method.
  *
@@ -125,14 +125,14 @@ struct WT_CURSOR {
 	/*!
 	 * The format of the data packed into key items.  See @ref packing for
 	 * details.  If not set, a default value of "u" is assumed, and
-	 * applications use WT_DATAITEM to manipulate raw byte arrays.
+	 * applications use WT_ITEM to manipulate raw byte arrays.
 	 */
 	const char *key_format;
 
 	/*!
 	 * The format of the data packed into value items.  See @ref packing
 	 * for details.  If not set, a default value of "u" is assumed, and
-	 * applications use WT_DATAITEM to manipulate raw byte arrays.
+	 * applications use WT_ITEM to manipulate raw byte arrays.
 	 */
 	const char *value_format;
 
@@ -441,11 +441,11 @@ struct WT_SESSION {
 	 * @config{key_format,,The format of the data packed into key items.
 	 * 	See @ref packing for details.  If not set\, a
 	 * 	default value of \c "u" is assumed\, and applications use the
-	 * 	WT_DATAITEM struct to manipulate raw byte arrays.}
+	 * 	WT_ITEM struct to manipulate raw byte arrays.}
 	 * @config{value_format,,The format of the data packed into value
 	 * 	items.  See @ref packing for details.  If not set\,
 	 * 	a default value of \c "u" is assumed\, and applications use the
-	 * 	WT_DATAITEM struct to manipulate raw byte arrays.}
+	 * 	WT_ITEM struct to manipulate raw byte arrays.}
 	 * @configend
 	 * @errors
 	 */
@@ -967,7 +967,7 @@ struct WT_COLLATOR {
 	 * 	     1 if <code>value1 > value2</code>.
 	 */
 	int (*compare)(WT_SESSION *session, WT_COLLATOR *collator,
-	    const WT_DATAITEM *value1, const WT_DATAITEM *value2, int *cmp);
+	    const WT_ITEM *value1, const WT_ITEM *value2, int *cmp);
 };
 
 /*!
@@ -1007,8 +1007,8 @@ struct WT_EXTRACTOR {
 	 * @errors
 	 */
 	int (*extract)(WT_SESSION *session, WT_EXTRACTOR *extractor,
-	    const WT_DATAITEM *key, const WT_DATAITEM *value,
-	    WT_DATAITEM *result);
+	    const WT_ITEM *key, const WT_ITEM *value,
+	    WT_ITEM *result);
 };
 
 /*! Entry point to an extension, implemented by loadable modules.

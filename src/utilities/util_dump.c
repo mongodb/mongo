@@ -20,7 +20,7 @@ main(int argc, char *argv[])
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	WT_DATAITEM key, value;
+	WT_ITEM key, value;
 	const char *tablename, *home;
 	char cursor_config[100], datasrc[100];
 	int ch, debug, printable, ret, tret;

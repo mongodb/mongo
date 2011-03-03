@@ -232,7 +232,7 @@ static int
 __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
@@ -247,11 +247,11 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 
 	/*
 	 * Walk the page, building references: the page contains unsorted data
-	 * items.  The data items are on-page data (WT_ITEM_DATA), overflow
-	 * (WT_ITEM_DATA_OVFL) or deleted (WT_ITEM_DEL) items.
+	 * items.  The data items are on-page data (WT_CELL_DATA), overflow
+	 * (WT_CELL_DATA_OVFL) or deleted (WT_CELL_DEL) items.
 	 */
 	cip = page->u.col_leaf.d;
-	WT_ITEM_FOREACH(dsk, item, i)
+	WT_CELL_FOREACH(dsk, item, i)
 		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, item);
 
 	page->indx_count = dsk->u.entries;
@@ -266,7 +266,7 @@ static int
 __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_OFF *off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
@@ -288,24 +288,24 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 	/*
 	 * Walk the page, building references: the page contains sorted key and
 	 * offpage-reference pairs.  Keys are row store internal pages with
-	 * on-page/overflow (WT_ITEM_KEY/KEY_OVFL) items, and offpage references
-	 * are WT_ITEM_OFF items.
+	 * on-page/overflow (WT_CELL_KEY/KEY_OVFL) items, and offpage references
+	 * are WT_CELL_OFF items.
 	 */
 	rref = page->u.row_int.t;
-	WT_ITEM_FOREACH(dsk, item, i)
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_KEY:
+	WT_CELL_FOREACH(dsk, item, i)
+		switch (WT_CELL_TYPE(item)) {
+		case WT_CELL_KEY:
 			if (huffman == NULL) {
 				__wt_key_set(rref,
-				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+				    WT_CELL_BYTE(item), WT_CELL_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
-		case WT_ITEM_KEY_OVFL:
+		case WT_CELL_KEY_OVFL:
 			__wt_key_set_process(rref, item);
 			break;
-		case WT_ITEM_OFF:
-			off = WT_ITEM_BYTE_OFF(item);
+		case WT_CELL_OFF:
+			off = WT_CELL_BYTE_OFF(item);
 			WT_COL_REF_ADDR(rref) = off->addr;
 			WT_COL_REF_SIZE(rref) = off->size;
 			++rref;
@@ -324,7 +324,7 @@ static int
 __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
@@ -341,28 +341,28 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 	    session, (size_t)dsk->u.entries * 2, &page->u.row_leaf.d)));
 
 	/*
-	 * Walk a row-store page of WT_ITEMs, building indices and finding the
+	 * Walk a row-store page of WT_CELLs, building indices and finding the
 	 * end of the page.
 	 *
-	 * The page contains key/data pairs.  Keys are on-page (WT_ITEM_KEY) or
-	 * overflow (WT_ITEM_KEY_OVFL) items, data are either a single on-page
-	 * (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item.
+	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
+	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
+	 * (WT_CELL_DATA) or overflow (WT_CELL_DATA_OVFL) item.
 	 */
 	nindx = 0;
 	rip = page->u.row_leaf.d;
-	WT_ITEM_FOREACH(dsk, item, i)
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_KEY:
-		case WT_ITEM_KEY_OVFL:
+	WT_CELL_FOREACH(dsk, item, i)
+		switch (WT_CELL_TYPE(item)) {
+		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			++nindx;
 			if (rip->key != NULL)
 				++rip;
 			if (btree->huffman_key != NULL ||
-			    WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL)
+			    WT_CELL_TYPE(item) == WT_CELL_KEY_OVFL)
 				__wt_key_set_process(rip, item);
 			else
 				__wt_key_set(rip,
-				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+				    WT_CELL_BYTE(item), WT_CELL_LEN(item));
 
 			/*
 			 * Two keys in a row, or a key at the end of the page
@@ -371,8 +371,8 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 			 */
 			rip->value = &btree->empty_item;
 			break;
-		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_OVFL:
+		case WT_CELL_DATA:
+		case WT_CELL_DATA_OVFL:
 			rip->value = item;
 			break;
 		}
@@ -387,7 +387,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_item_process(SESSION *session, WT_ITEM *item, WT_SCRATCH *scratch)
+__wt_item_process(SESSION *session, WT_CELL *item, WT_SCRATCH *scratch)
 {
 	BTREE *btree;
 	WT_SCRATCH *tmp;
@@ -404,31 +404,31 @@ __wt_item_process(SESSION *session, WT_ITEM *item, WT_SCRATCH *scratch)
 	 * 3 cases: compressed on-page item or, compressed or uncompressed
 	 * overflow item.
 	 */
-	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_KEY:
+	switch (WT_CELL_TYPE(item)) {
+	case WT_CELL_KEY:
 		huffman = btree->huffman_key;
 		goto onpage;
-	case WT_ITEM_KEY_OVFL:
+	case WT_CELL_KEY_OVFL:
 		huffman = btree->huffman_key;
 		goto offpage;
-	case WT_ITEM_DATA:
+	case WT_CELL_DATA:
 		huffman = btree->huffman_data;
-onpage:		p = WT_ITEM_BYTE(item);
-		size = WT_ITEM_LEN(item);
+onpage:		p = WT_CELL_BYTE(item);
+		size = WT_CELL_LEN(item);
 		break;
-	case WT_ITEM_DATA_OVFL:
+	case WT_CELL_DATA_OVFL:
 		huffman = btree->huffman_data;
 offpage:	/*
 		 * It's an overflow item -- if it's not encoded, we can read
-		 * it directly into the user's return WT_DATAITEM, otherwise we have to
+		 * it directly into the user's return WT_ITEM, otherwise we have to
 		 * have our own buffer as temporary space, and the decode call
-		 * will put a decoded version into the user's return WT_DATAITEM.
+		 * will put a decoded version into the user's return WT_ITEM.
 		 */
 		if (huffman == NULL)
 			tmp = scratch;
 		else
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
-		WT_RET(__wt_ovfl_in(session, WT_ITEM_BYTE_OVFL(item), tmp));
+		WT_RET(__wt_ovfl_in(session, WT_CELL_BYTE_OVFL(item), tmp));
 		p = tmp->item.data;
 		size = tmp->item.size;
 		break;
@@ -437,11 +437,11 @@ offpage:	/*
 
 	/*
 	 * If the item is not compressed, and it's not an overflow item, copy
-	 * it into the caller's WT_DATAITEM.  If the item is not compressed, and it's
-	 * an overflow item, it was already copied into the caller's WT_DATAITEM.
+	 * it into the caller's WT_ITEM.  If the item is not compressed, and it's
+	 * an overflow item, it was already copied into the caller's WT_ITEM.
 	 *
 	 * If the item is compressed, pass it to the decode routines, they'll
-	 * copy a decoded version into the caller's WT_DATAITEM.
+	 * copy a decoded version into the caller's WT_ITEM.
 	 */
 	if (huffman == NULL) {
 		if (tmp != scratch) {

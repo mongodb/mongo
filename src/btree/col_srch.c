@@ -212,7 +212,7 @@ done:	/*
 			session->srch_upd = upd;
 			break;
 		} else
-			if (WT_ITEM_TYPE(cipdata) == WT_ITEM_DEL)
+			if (WT_CELL_TYPE(cipdata) == WT_CELL_DEL)
 				goto notfound;
 		break;
 	case WT_PAGE_COL_INT:

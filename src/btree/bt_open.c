@@ -196,10 +196,10 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 	 * We only have 3 bytes of length for on-page items, so the maximum
 	 * on-page item size is limited to 16MB.
 	 */
-	if (btree->intlitemsize > WT_ITEM_MAX_LEN)
-		btree->intlitemsize = WT_ITEM_MAX_LEN;
-	if (btree->leafitemsize > WT_ITEM_MAX_LEN)
-		btree->leafitemsize = WT_ITEM_MAX_LEN;
+	if (btree->intlitemsize > WT_CELL_MAX_LEN)
+		btree->intlitemsize = WT_CELL_MAX_LEN;
+	if (btree->leafitemsize > WT_CELL_MAX_LEN)
+		btree->leafitemsize = WT_CELL_MAX_LEN;
 
 	/*
 	 * A leaf page must hold at least 2 key/data pairs, otherwise the

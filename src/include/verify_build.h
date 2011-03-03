@@ -48,7 +48,7 @@ __wt_verify_build(void)
 	 * the page header structure is exactly what we expect.
 	 */
 	SIZE_CHECK(WT_COL, WT_COL_SIZE);
-	SIZE_CHECK(WT_ITEM, WT_ITEM_SIZE);
+	SIZE_CHECK(WT_CELL, WT_CELL_SIZE);
 	SIZE_CHECK(WT_OFF, WT_OFF_SIZE);
 	SIZE_CHECK(WT_OFF_RECORD, WT_OFF_RECORD_SIZE);
 	SIZE_CHECK(WT_OVFL, WT_OVFL_SIZE);

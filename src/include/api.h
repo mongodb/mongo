@@ -86,7 +86,7 @@ struct __btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */
 
-	WT_ITEM empty_item;		/* Empty data item */
+	WT_CELL empty_item;		/* Empty data item */
 
 	WT_STATS *stats;		/* Btree handle statistics */
 	WT_STATS *fstats;		/* File statistics */
@@ -97,7 +97,7 @@ struct __btree {
 	 */
 	int btree_compare_int;
 
-	int (*btree_compare)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *);
+	int (*btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	uint32_t intlitemsize;
 	uint32_t leafitemsize;
@@ -120,7 +120,7 @@ struct __btree {
 	 * BTREE methods: BEGIN
 	 */
 	int (*btree_compare_get)(
-	    BTREE *, int (**)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *));
+	    BTREE *, int (**)(BTREE *, const WT_ITEM *, const WT_ITEM *));
 
 	int (*btree_compare_int_get)(
 	    BTREE *, int *);
@@ -129,7 +129,7 @@ struct __btree {
 	    BTREE *, int );
 
 	int (*btree_compare_set)(
-	    BTREE *, int (*)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *));
+	    BTREE *, int (*)(BTREE *, const WT_ITEM *, const WT_ITEM *));
 
 	int (*btree_itemsize_get)(
 	    BTREE *, uint32_t *, uint32_t *);
@@ -144,7 +144,7 @@ struct __btree {
 	    BTREE *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t );
 
 	int (*bulk_load)(
-	    BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_DATAITEM **, WT_DATAITEM **));
+	    BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
 
 	int (*close)(
 	    BTREE *, uint32_t );
@@ -153,10 +153,10 @@ struct __btree {
 	    BTREE *, SESSION *, uint64_t , uint32_t );
 
 	int (*col_get)(
-	    BTREE *, SESSION *, uint64_t , WT_DATAITEM *, uint32_t );
+	    BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t );
 
 	int (*col_put)(
-	    BTREE *, SESSION *, uint64_t , WT_DATAITEM *, uint32_t );
+	    BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t );
 
 	int (*column_set)(
 	    BTREE *, uint32_t , const char *, uint32_t );
@@ -171,13 +171,13 @@ struct __btree {
 	    BTREE *, const char *, mode_t , uint32_t );
 
 	int (*row_del)(
-	    BTREE *, SESSION *, WT_DATAITEM *, uint32_t );
+	    BTREE *, SESSION *, WT_ITEM *, uint32_t );
 
 	int (*row_get)(
-	    BTREE *, SESSION *, WT_DATAITEM *, WT_DATAITEM *, uint32_t );
+	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
 
 	int (*row_put)(
-	    BTREE *, SESSION *, WT_DATAITEM *, WT_DATAITEM *, uint32_t );
+	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
 
 	int (*stat_clear)(
 	    BTREE *, uint32_t );

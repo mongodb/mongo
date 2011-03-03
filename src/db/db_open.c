@@ -62,9 +62,9 @@ __wt_btree_btree_open(BTREE *btree, const char *name, mode_t mode, uint32_t flag
 	 */
 	WT_CLEAR(btree->root_page);
 
-	/* Initialize the zero-length WT_ITEM. */
-	WT_ITEM_SET_TYPE(&btree->empty_item, WT_ITEM_DATA);
-	WT_ITEM_SET_LEN(&btree->empty_item, 0);
+	/* Initialize the zero-length WT_CELL. */
+	WT_CELL_SET_TYPE(&btree->empty_item, WT_CELL_DATA);
+	WT_CELL_SET_LEN(&btree->empty_item, 0);
 
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(btree, WT_RDONLY);

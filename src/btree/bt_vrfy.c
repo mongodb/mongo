@@ -332,10 +332,10 @@ __wt_verify_pc(SESSION *session,
     WT_ROW_REF *parent_rref, WT_PAGE *child, int first_entry)
 {
 	BTREE *btree;
-	WT_DATAITEM *cd_ref, *pd_ref;
+	WT_ITEM *cd_ref, *pd_ref;
 	WT_ROW *child_key;
 	WT_SCRATCH *scratch1, *scratch2;
-	int cmp, ret, (*func)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *);
+	int cmp, ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
 	scratch1 = scratch2 = NULL;
@@ -368,13 +368,13 @@ __wt_verify_pc(SESSION *session,
 		WT_ERR(__wt_item_process(session, child_key->key, scratch1));
 		cd_ref = &scratch1->item;
 	} else
-		cd_ref = (WT_DATAITEM *)child_key;
+		cd_ref = (WT_ITEM *)child_key;
 	if (__wt_key_process(parent_rref)) {
 		WT_ERR(__wt_scr_alloc(session, 0, &scratch2));
 		WT_RET(__wt_item_process(session, parent_rref->key, scratch2));
 		pd_ref = &scratch2->item;
 	} else
-		pd_ref = (WT_DATAITEM *)parent_rref;
+		pd_ref = (WT_ITEM *)parent_rref;
 
 	/* Compare the parent's key against the child's key. */
 	cmp = func(btree, cd_ref, pd_ref);
@@ -409,7 +409,7 @@ err:	if (scratch1 != NULL)
 static int
 __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
 
@@ -423,13 +423,13 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 * Walk the disk page, verifying overflow items.
 	 */
 	entry_num = 0;
-	WT_ITEM_FOREACH(dsk, item, i) {
+	WT_CELL_FOREACH(dsk, item, i) {
 		++entry_num;
-		switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DATA_OVFL:
+		switch (WT_CELL_TYPE(item)) {
+		case WT_CELL_KEY_OVFL:
+		case WT_CELL_DATA_OVFL:
 			WT_RET(__wt_verify_overflow(session,
-			    WT_ITEM_BYTE_OVFL(item),
+			    WT_CELL_BYTE_OVFL(item),
 			    entry_num, page->addr, vs));
 		}
 	}

@@ -13,8 +13,8 @@ static void __wt_debug_dsk_col_fix(BTREE *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(BTREE *, WT_PAGE_DISK *, FILE *);
 static int  __wt_debug_dsk_item(SESSION *, WT_PAGE_DISK *, FILE *);
-static int  __wt_debug_item(SESSION *, WT_ITEM *, FILE *);
-static int  __wt_debug_item_data(SESSION *, WT_ITEM *, FILE *fp);
+static int  __wt_debug_item(SESSION *, WT_CELL *, FILE *);
+static int  __wt_debug_item_data(SESSION *, WT_CELL *, FILE *fp);
 static void __wt_debug_page_col_fix(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_page_col_int(WT_PAGE *, FILE *);
 static void __wt_debug_page_col_rle(SESSION *, WT_PAGE *, FILE *);
@@ -423,28 +423,28 @@ __wt_debug_rleexp(WT_RLE_EXPAND *exp, FILE *fp)
 
 /*
  * __wt_debug_dsk_item --
- *	Dump a page of WT_ITEM's.
+ *	Dump a page of WT_CELL's.
  */
 static int
 __wt_debug_dsk_item(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
 {
-	WT_ITEM *item;
+	WT_CELL *item;
 	uint32_t i;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_ITEM_FOREACH(dsk, item, i)
+	WT_CELL_FOREACH(dsk, item, i)
 		WT_RET(__wt_debug_item(session, item, fp));
 	return (0);
 }
 
 /*
  * __wt_debug_item --
- *	Dump a single WT_ITEM.
+ *	Dump a single WT_CELL.
  */
 static int
-__wt_debug_item(SESSION *session, WT_ITEM *item, FILE *fp)
+__wt_debug_item(SESSION *session, WT_CELL *item, FILE *fp)
 {
 	BTREE *btree;
 	WT_OFF *off;
@@ -457,26 +457,26 @@ __wt_debug_item(SESSION *session, WT_ITEM *item, FILE *fp)
 	btree = session->btree;
 
 	fprintf(fp, "\t%s: len %lu",
-	    __wt_item_type_string(item), (u_long)WT_ITEM_LEN(item));
+	    __wt_item_type_string(item), (u_long)WT_CELL_LEN(item));
 
-	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_DATA:
-	case WT_ITEM_DEL:
-	case WT_ITEM_KEY:
+	switch (WT_CELL_TYPE(item)) {
+	case WT_CELL_DATA:
+	case WT_CELL_DEL:
+	case WT_CELL_KEY:
 		break;
-	case WT_ITEM_DATA_OVFL:
-	case WT_ITEM_KEY_OVFL:
-		ovfl = WT_ITEM_BYTE_OVFL(item);
+	case WT_CELL_DATA_OVFL:
+	case WT_CELL_KEY_OVFL:
+		ovfl = WT_CELL_BYTE_OVFL(item);
 		fprintf(fp, ", addr %lu, size %lu",
 		    (u_long)ovfl->addr, (u_long)ovfl->size);
 		break;
-	case WT_ITEM_OFF:
-		off = WT_ITEM_BYTE_OFF(item);
+	case WT_CELL_OFF:
+		off = WT_CELL_BYTE_OFF(item);
 		fprintf(fp, ", offpage: addr %lu, size %lu",
 		    (u_long)off->addr, (u_long)off->size);
 		break;
-	case WT_ITEM_OFF_RECORD:
-		off_record = WT_ITEM_BYTE_OFF_RECORD(item);
+	case WT_CELL_OFF_RECORD:
+		off_record = WT_CELL_BYTE_OFF_RECORD(item);
 		fprintf(fp,
 		    ", offpage: addr %lu, size %lu, starting recno %llu",
 		    (u_long)off_record->addr, (u_long)off_record->size,
@@ -564,7 +564,7 @@ __wt_debug_dsk_col_rle(BTREE *btree, WT_PAGE_DISK *dsk, FILE *fp)
  *	Dump a single item's data in debugging mode.
  */
 static int
-__wt_debug_item_data(SESSION *session, WT_ITEM *item, FILE *fp)
+__wt_debug_item_data(SESSION *session, WT_CELL *item, FILE *fp)
 {
 	BTREE *btree;
 	WT_SCRATCH *tmp;
@@ -579,33 +579,33 @@ __wt_debug_item_data(SESSION *session, WT_ITEM *item, FILE *fp)
 	tmp = NULL;
 	ret = 0;
 
-	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_KEY:
+	switch (WT_CELL_TYPE(item)) {
+	case WT_CELL_KEY:
 		if (btree->huffman_key != NULL)
 			goto process;
 		goto onpage;
-	case WT_ITEM_DATA:
+	case WT_CELL_DATA:
 		if (btree->huffman_data != NULL)
 			goto process;
-onpage:		p = WT_ITEM_BYTE(item);
-		size = WT_ITEM_LEN(item);
+onpage:		p = WT_CELL_BYTE(item);
+		size = WT_CELL_LEN(item);
 		break;
-	case WT_ITEM_KEY_OVFL:
-	case WT_ITEM_DATA_OVFL:
+	case WT_CELL_KEY_OVFL:
+	case WT_CELL_DATA_OVFL:
 process:	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_item_process(session, item, tmp));
 		p = tmp->item.data;
 		size = tmp->item.size;
 		break;
-	case WT_ITEM_DEL:
+	case WT_CELL_DEL:
 		p = (uint8_t *)"deleted";
 		size = 7;
 		break;
-	case WT_ITEM_OFF:
+	case WT_CELL_OFF:
 		p = (uint8_t *)"offpage";
 		size = sizeof("offpage") - 1;
 		break;
-	case WT_ITEM_OFF_RECORD:
+	case WT_CELL_OFF_RECORD:
 		p = (uint8_t *)"offpage_record";
 		size = sizeof("offpage_record") - 1;
 		break;
@@ -621,18 +621,18 @@ err:	if (tmp != NULL)
 
 /*
  * __wt_debug_dbt --
- *	Dump a single WT_DATAITEM in debugging mode, with an optional tag.
+ *	Dump a single WT_ITEM in debugging mode, with an optional tag.
  */
 void
 __wt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 {
-	WT_DATAITEM *dbt;
+	WT_ITEM *dbt;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	/*
-	 * The argument isn't necessarily a WT_DATAITEM structure, but the first two
+	 * The argument isn't necessarily a WT_ITEM structure, but the first two
 	 * fields of the argument are always a void *data/uint32_t size pair.
 	 */
 	dbt = arg_dbt;

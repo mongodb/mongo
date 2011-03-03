@@ -47,7 +47,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 		F_SET(stdc, WT_CURSTD_DUMPKEY);
 	}
 	va_start(ap, cursor);
-	*va_arg(ap, WT_DATAITEM *) = stdc->key.item;
+	*va_arg(ap, WT_ITEM *) = stdc->key.item;
 	va_end(ap);
 
 	return (0);
@@ -67,7 +67,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		F_SET(stdc, WT_CURSTD_DUMPVALUE);
 	}
 	va_start(ap, cursor);
-	*va_arg(ap, WT_DATAITEM *) = stdc->value.item;
+	*va_arg(ap, WT_ITEM *) = stdc->value.item;
 	va_end(ap);
 
 	return (0);
@@ -83,7 +83,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	conn = (CONNECTION *)cursor->session->connection;
 
 	va_start(ap, cursor);
-	stdc->key.item = *va_arg(ap, WT_DATAITEM *);
+	stdc->key.item = *va_arg(ap, WT_ITEM *);
 
 	if (__convert_from_dump(conn, &stdc->key) == 0)
 		F_CLR(stdc, WT_CURSTD_BADKEY);
@@ -103,7 +103,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	conn = (CONNECTION *)cursor->session->connection;
 
 	va_start(ap, cursor);
-	stdc->value.item = *va_arg(ap, WT_DATAITEM *);
+	stdc->value.item = *va_arg(ap, WT_ITEM *);
 
 	if (__convert_from_dump(conn, &stdc->value) == 0)
 		F_CLR(stdc, WT_CURSTD_BADKEY);

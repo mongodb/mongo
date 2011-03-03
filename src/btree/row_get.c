@@ -12,7 +12,7 @@
  *	Db.row_get method.
  */
 int
-__wt_btree_row_get(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *data)
+__wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *data)
 {
 	BTREE *btree;
 	WT_PAGE *page;

@@ -8,7 +8,7 @@
 struct WT_SCRATCH;	typedef struct WT_SCRATCH WT_SCRATCH;
 
 struct WT_SCRATCH {
-	WT_DATAITEM item;
+	WT_ITEM item;
 	void *buf;
 	uint32_t mem_size;
 

@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_col_update(SESSION *, uint64_t, WT_DATAITEM *, int);
+static int __wt_col_update(SESSION *, uint64_t, WT_ITEM *, int);
 
 /*
  * __wt_btree_col_del --
@@ -25,7 +25,7 @@ __wt_btree_col_del(SESSION *session, uint64_t recno)
  *	Db.put method.
  */
 int
-__wt_btree_col_put(SESSION *session, uint64_t recno, WT_DATAITEM *data)
+__wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *data)
 {
 	BTREE *btree;
 
@@ -42,7 +42,7 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_DATAITEM *data)
  *	Column-store delete and update.
  */
 static int
-__wt_col_update(SESSION *session, uint64_t recno, WT_DATAITEM *data, int data_overwrite)
+__wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwrite)
 {
 	BTREE *btree;
 	WT_PAGE *page;

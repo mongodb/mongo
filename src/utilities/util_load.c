@@ -11,10 +11,10 @@
 const char *progname;
 
 struct record_t {
-	WT_DATAITEM key;
+	WT_ITEM key;
 	size_t   key_memsize;
 
-	WT_DATAITEM value;
+	WT_ITEM value;
 	size_t   value_memsize;
 };
 
@@ -159,10 +159,10 @@ err:		ret = 1;
 
 /*
  * bulk_read_line --
- *	Read a line from stdin into a WT_DATAITEM.
+ *	Read a line from stdin into a WT_ITEM.
  */
 static int
-bulk_read_line(WT_DATAITEM *item, size_t *memsize, int iskey)
+bulk_read_line(WT_ITEM *item, size_t *memsize, int iskey)
 {
 	static unsigned long long line = 0;
 	uint8_t *buf;

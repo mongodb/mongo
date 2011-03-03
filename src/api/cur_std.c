@@ -40,7 +40,7 @@ static int
 __curstd_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
-	WT_DATAITEM *item;
+	WT_ITEM *item;
 	const char *fmt;
 	va_list ap;
 	int ret;
@@ -58,7 +58,7 @@ static int
 __curstd_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
-	WT_DATAITEM *item;
+	WT_ITEM *item;
 	const char *fmt;
 	va_list ap;
 	int ret;
@@ -77,7 +77,7 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 {
 	SESSION *session;
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
-	WT_DATAITEM *item;
+	WT_ITEM *item;
 	const char *fmt, *str;
 	size_t sz;
 	va_list ap;
@@ -91,7 +91,7 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 		sz = strlen(str) + 1;
 		cstd->key.item.data = str;
 	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
-		item = va_arg(ap, WT_DATAITEM *);
+		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cstd->key.item.data = item->data;
 	} else {
@@ -115,7 +115,7 @@ __curstd_set_value(WT_CURSOR *cursor, ...)
 {
 	SESSION *session;
 	WT_CURSOR_STD *cstd = (WT_CURSOR_STD *)cursor;
-	WT_DATAITEM *item;
+	WT_ITEM *item;
 	const char *fmt, *str;
 	size_t sz;
 	va_list ap;
@@ -129,7 +129,7 @@ __curstd_set_value(WT_CURSOR *cursor, ...)
 		sz = strlen(str) + 1;
 		cstd->value.item.data = str;
 	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
-		item = va_arg(ap, WT_DATAITEM *);
+		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cstd->value.item.data = item->data;
 	} else {

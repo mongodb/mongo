@@ -89,7 +89,7 @@ __wt_verify_dsk_page(
 
 /*
  * __wt_verify_dsk_item --
- *	Walk a disk page of WT_ITEMs, and verify them.
+ *	Walk a disk page of WT_CELLs, and verify them.
  */
 static int
 __wt_verify_dsk_item(
@@ -98,11 +98,11 @@ __wt_verify_dsk_item(
 	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
 	struct {
 		WT_ROW   rip;			/* Reference to on-page data */
-		WT_DATAITEM	*dbt;			/* WT_DATAITEM to compare */
+		WT_ITEM	*dbt;			/* WT_ITEM to compare */
 		WT_SCRATCH	*scratch;		/* scratch buffer */
 	} *current, *last, *tmp, _a, _b;
 	BTREE *btree;
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_OVFL *ovfl;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
@@ -111,7 +111,7 @@ __wt_verify_dsk_item(
 	uint8_t *end;
 	void *huffman;
 	uint32_t i, item_num, item_len, item_type;
-	int (*func)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *), ret;
+	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
 
 	btree = session->btree;
 	func = btree->btree_compare;
@@ -130,41 +130,41 @@ __wt_verify_dsk_item(
 
 	last_item_type = IS_FIRST;
 	item_num = 0;
-	WT_ITEM_FOREACH(dsk, item, i) {
+	WT_CELL_FOREACH(dsk, item, i) {
 		++item_num;
 
 		/* Check if this item is entirely on the page. */
-		if ((uint8_t *)item + sizeof(WT_ITEM) > end)
+		if ((uint8_t *)item + sizeof(WT_CELL) > end)
 			goto eop;
 
-		item_type = WT_ITEM_TYPE(item);
-		item_len = WT_ITEM_LEN(item);
+		item_type = WT_CELL_TYPE(item);
+		item_len = WT_CELL_LEN(item);
 
 		/* Check the item's type. */
 		switch (item_type) {
-		case WT_ITEM_KEY:
-		case WT_ITEM_KEY_OVFL:
+		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			if (dsk->type != WT_PAGE_ROW_INT &&
 			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_DATA:
-		case WT_ITEM_DATA_OVFL:
+		case WT_CELL_DATA:
+		case WT_CELL_DATA_OVFL:
 			if (dsk->type != WT_PAGE_COL_VAR &&
 			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_DEL:
+		case WT_CELL_DEL:
 			/* Deleted items only appear on column-store pages. */
 			if (dsk->type != WT_PAGE_COL_VAR)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_OFF:
+		case WT_CELL_OFF:
 			if (dsk->type != WT_PAGE_ROW_INT &&
 			    dsk->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_OFF_RECORD:
+		case WT_CELL_OFF_RECORD:
 			if (dsk->type != WT_PAGE_ROW_LEAF) {
 item_vs_page:			__wt_errx(session,
 				    "illegal item and page type combination "
@@ -187,7 +187,7 @@ item_vs_page:			__wt_errx(session,
 		/*
 		 * Only row-store leaf pages require item type ordering checks,
 		 * other page types don't have ordering relationships between
-		 * their WT_ITEM entries, and validating the correct types above
+		 * their WT_CELL entries, and validating the correct types above
 		 * is sufficient.
 		 *
 		 * For row-store leaf pages, check for:
@@ -196,13 +196,13 @@ item_vs_page:			__wt_errx(session,
 		 */
 		if (dsk->type == WT_PAGE_ROW_LEAF)
 			switch (item_type) {
-			case WT_ITEM_KEY:
-			case WT_ITEM_KEY_OVFL:
+			case WT_CELL_KEY:
+			case WT_CELL_KEY_OVFL:
 				last_item_type = WAS_KEY;
 				break;
-			case WT_ITEM_DATA:
-			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_DEL:
+			case WT_CELL_DATA:
+			case WT_CELL_DATA_OVFL:
+			case WT_CELL_DEL:
 				switch (last_item_type) {
 				case IS_FIRST:
 					__wt_errx(session,
@@ -226,24 +226,24 @@ item_vs_page:			__wt_errx(session,
 
 		/* Check the item's length. */
 		switch (item_type) {
-		case WT_ITEM_KEY:
-		case WT_ITEM_DATA:
+		case WT_CELL_KEY:
+		case WT_CELL_DATA:
 			/* The length is variable, we can't check it. */
 			break;
-		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DATA_OVFL:
+		case WT_CELL_KEY_OVFL:
+		case WT_CELL_DATA_OVFL:
 			if (item_len != sizeof(WT_OVFL))
 				goto item_len;
 			break;
-		case WT_ITEM_DEL:
+		case WT_CELL_DEL:
 			if (item_len != 0)
 				goto item_len;
 			break;
-		case WT_ITEM_OFF:
+		case WT_CELL_OFF:
 			if (item_len != sizeof(WT_OFF))
 				goto item_len;
 			break;
-		case WT_ITEM_OFF_RECORD:
+		case WT_CELL_OFF_RECORD:
 			if (item_len != sizeof(WT_OFF_RECORD)) {
 item_len:			__wt_errx(session,
 				    "item %lu on page at addr %lu has an "
@@ -257,26 +257,26 @@ item_len:			__wt_errx(session,
 		}
 
 		/* Check if the item is entirely on the page. */
-		if ((uint8_t *)WT_ITEM_NEXT(item) > end)
+		if ((uint8_t *)WT_CELL_NEXT(item) > end)
 			goto eop;
 
 		/* Check if the referenced item is entirely in the file. */
 		switch (item_type) {
-		case WT_ITEM_KEY_OVFL:
-		case WT_ITEM_DATA_OVFL:
-			ovfl = WT_ITEM_BYTE_OVFL(item);
+		case WT_CELL_KEY_OVFL:
+		case WT_CELL_DATA_OVFL:
+			ovfl = WT_CELL_BYTE_OVFL(item);
 			if (WT_ADDR_TO_OFF(btree, ovfl->addr) +
 			    WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size) > file_size)
 				goto eof;
 			break;
-		case WT_ITEM_OFF:
-			off = WT_ITEM_BYTE_OFF(item);
+		case WT_CELL_OFF:
+			off = WT_CELL_BYTE_OFF(item);
 			if (WT_ADDR_TO_OFF(btree,
 			    off->addr) + off->size > file_size)
 				goto eof;
 			break;
-		case WT_ITEM_OFF_RECORD:
-			off_record = WT_ITEM_BYTE_OFF_RECORD(item);
+		case WT_CELL_OFF_RECORD:
+			off_record = WT_CELL_BYTE_OFF_RECORD(item);
 			if (WT_ADDR_TO_OFF(btree,
 			    off_record->addr) + off_record->size > file_size)
 				goto eof;
@@ -297,14 +297,14 @@ item_len:			__wt_errx(session,
 		 */
 		rip = &current->rip;
 		switch (item_type) {
-		case WT_ITEM_KEY:
+		case WT_CELL_KEY:
 			if (huffman == NULL) {
 				__wt_key_set(rip,
-				    WT_ITEM_BYTE(item), WT_ITEM_LEN(item));
+				    WT_CELL_BYTE(item), WT_CELL_LEN(item));
 				break;
 			}
 			/* FALLTHROUGH */
-		case WT_ITEM_KEY_OVFL:
+		case WT_CELL_KEY_OVFL:
 			__wt_key_set_process(rip, item);
 			break;
 		default:
@@ -316,7 +316,7 @@ item_len:			__wt_errx(session,
 			    __wt_item_process(session, rip->key, current->scratch));
 			current->dbt = &current->scratch->item;
 		} else
-			current->dbt = (WT_DATAITEM *)rip;
+			current->dbt = (WT_ITEM *)rip;
 
 		/* Compare the current key against the last key. */
 		if (last->dbt != NULL &&

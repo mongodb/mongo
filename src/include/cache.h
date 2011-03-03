@@ -46,7 +46,7 @@ typedef struct {
 		 * the page's key, saved in the WT_OFF_RECORD structure, is the
 		 * column-store key.
 		 */
-		WT_DATAITEM key;		/* Row key */
+		WT_ITEM key;			/* Row key */
 
 		int	 deleted;		/* Page deleted */
 	} *list;

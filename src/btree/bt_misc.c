@@ -44,22 +44,22 @@ __wt_page_type_string(WT_PAGE_DISK *dsk)
  *	Return a string representing the item type.
  */
 const char *
-__wt_item_type_string(WT_ITEM *item)
+__wt_item_type_string(WT_CELL *item)
 {
-	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_DATA:
+	switch (WT_CELL_TYPE(item)) {
+	case WT_CELL_DATA:
 		return ("data");
-	case WT_ITEM_DATA_OVFL:
+	case WT_CELL_DATA_OVFL:
 		return ("data-overflow");
-	case WT_ITEM_DEL:
+	case WT_CELL_DEL:
 		return ("deleted");
-	case WT_ITEM_KEY:
+	case WT_CELL_KEY:
 		return ("key");
-	case WT_ITEM_KEY_OVFL:
+	case WT_CELL_KEY_OVFL:
 		return ("key-overflow");
-	case WT_ITEM_OFF:
+	case WT_CELL_OFF:
 		return ("off-page");
-	case WT_ITEM_OFF_RECORD:
+	case WT_CELL_OFF_RECORD:
 		return ("off-page-records");
 	default:
 		break;

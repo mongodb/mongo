@@ -171,20 +171,20 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 	 * there's Huffman encoding).
 	 */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		switch (WT_ITEM_TYPE(WT_COL_PTR(dsk, cip))) {
-		case WT_ITEM_DATA:
+		switch (WT_CELL_TYPE(WT_COL_PTR(dsk, cip))) {
+		case WT_CELL_DATA:
 			upd = WT_COL_UPDATE(page, cip);
 			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
-		case WT_ITEM_DATA_OVFL:
+		case WT_CELL_DATA_OVFL:
 			upd = WT_COL_UPDATE(page, cip);
 			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd)) {
 				WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			}
 			break;
-		case WT_ITEM_DEL:
+		case WT_CELL_DEL:
 			WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			break;
 		WT_ILLEGAL_FORMAT(btree);
@@ -218,14 +218,14 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 	 * there's Huffman encoding).
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
-		switch (WT_ITEM_TYPE(rip->value)) {
-		case WT_ITEM_DATA:
+		switch (WT_CELL_TYPE(rip->value)) {
+		case WT_CELL_DATA:
 			upd = WT_ROW_UPDATE(page, rip);
 			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
-		case WT_ITEM_DATA_OVFL:
+		case WT_CELL_DATA_OVFL:
 			upd = WT_ROW_UPDATE(page, rip);
 			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 				continue;
@@ -247,11 +247,11 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 		 * in the WT_ROW structure.
 		 */
 		if (__wt_key_process(rip))
-			switch (WT_ITEM_TYPE(rip->key)) {
-			case WT_ITEM_KEY_OVFL:
+			switch (WT_CELL_TYPE(rip->key)) {
+			case WT_CELL_KEY_OVFL:
 				WT_STAT_INCR(stats, ITEM_KEY_OVFL);
 				/* FALLTHROUGH */
-			case WT_ITEM_KEY:
+			case WT_CELL_KEY:
 				WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
 				break;
 			WT_ILLEGAL_FORMAT(btree);

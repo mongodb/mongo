@@ -39,11 +39,11 @@ static int
 __curtable_next(WT_CURSOR *cursor)
 {
 	BTREE *btree;
-	WT_DATAITEM *key;
+	WT_ITEM *key;
 	ICURSOR_TABLE *ctable;
 	SESSION *session;
 	WT_CURSOR_STD *cstd;
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_UPDATE *upd;
 	void *huffman;
 	int ret;
@@ -95,7 +95,7 @@ __curtable_next(WT_CURSOR *cursor)
 				    ctable->rip->key, ctable->key_tmp));
 				key = &ctable->key_tmp->item;
 			} else
-				key = (WT_DATAITEM *)ctable->rip;
+				key = (WT_ITEM *)ctable->rip;
 
 			cstd->key.item.data = key->data;
 			cstd->key.item.size = key->size;
@@ -112,15 +112,15 @@ __curtable_next(WT_CURSOR *cursor)
 
 			/* Set data to reference the data we'll dump. */
 			item = ctable->rip->value;
-			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
+			if (WT_CELL_TYPE(item) == WT_CELL_DATA) {
 				if (huffman == NULL) {
 					cstd->value.item.data =
-					    WT_ITEM_BYTE(item);
+					    WT_CELL_BYTE(item);
 					cstd->value.item.size =
-					    WT_ITEM_LEN(item);
+					    WT_CELL_LEN(item);
 					break;
 				}
-			} else if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL) {
+			} else if (WT_CELL_TYPE(item) == WT_CELL_DATA_OVFL) {
 				WT_RET(__wt_item_process(session,
 				    item, ctable->value_tmp));
 				cstd->value.item = ctable->value_tmp->item;

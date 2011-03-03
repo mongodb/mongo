@@ -9,7 +9,7 @@
 
 #include "wts.h"
 
-static int cb_bulk(BTREE *, WT_DATAITEM **, WT_DATAITEM **);
+static int cb_bulk(BTREE *, WT_ITEM **, WT_ITEM **);
 static int wts_del_col(u_int64_t);
 static int wts_del_row(u_int64_t);
 static int wts_notfound_chk(const char *, int, int, u_int64_t);
@@ -289,9 +289,9 @@ wts_stats(void)
  *	WiredTiger bulk load callback routine. 
  */
 static int
-cb_bulk(BTREE *btree, WT_DATAITEM **keyp, WT_DATAITEM **datap)
+cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **datap)
 {
-	static WT_DATAITEM key, data;
+	static WT_ITEM key, data;
 
 	btree = NULL;					/* Lint */
 	++g.key_cnt;
@@ -435,7 +435,7 @@ wts_read_row_scan(void)
 static int
 wts_read_row(u_int64_t keyno)
 {
-	static WT_DATAITEM key, data, bdb_data;
+	static WT_ITEM key, data, bdb_data;
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
@@ -511,7 +511,7 @@ wts_read_col_scan(void)
 static int
 wts_read_col(u_int64_t keyno)
 {
-	static WT_DATAITEM data, bdb_data;
+	static WT_ITEM data, bdb_data;
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
@@ -563,7 +563,7 @@ wts_read_col(u_int64_t keyno)
 static int
 wts_put_row(u_int64_t keyno)
 {
-	static WT_DATAITEM key, data;
+	static WT_ITEM key, data;
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
@@ -602,7 +602,7 @@ wts_put_row(u_int64_t keyno)
 static int
 wts_put_col(u_int64_t keyno)
 {
-	static WT_DATAITEM data;
+	static WT_ITEM data;
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
@@ -640,7 +640,7 @@ wts_put_col(u_int64_t keyno)
 static int
 wts_del_row(u_int64_t keyno)
 {
-	static WT_DATAITEM key;
+	static WT_ITEM key;
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;

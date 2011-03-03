@@ -4,10 +4,10 @@
 
 static int __wt_api_btree_btree_compare_get(
 	BTREE *btree,
-	int (**btree_compare)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *));
+	int (**btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *));
 static int __wt_api_btree_btree_compare_get(
 	BTREE *btree,
-	int (**btree_compare)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *))
+	int (**btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *))
 {
 	CONNECTION *connection = btree->conn;
 	SESSION *session = &connection->default_session;
@@ -57,10 +57,10 @@ static int __wt_api_btree_btree_compare_int_set(
 
 static int __wt_api_btree_btree_compare_set(
 	BTREE *btree,
-	int (*btree_compare)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *));
+	int (*btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *));
 static int __wt_api_btree_btree_compare_set(
 	BTREE *btree,
-	int (*btree_compare)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *))
+	int (*btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *))
 {
 	CONNECTION *connection = btree->conn;
 	SESSION *session = &connection->default_session;
@@ -173,11 +173,11 @@ static int __wt_api_btree_btree_pagesize_set(
 static int __wt_api_btree_bulk_load(
 	BTREE *btree,
 	void (*progress)(const char *, uint64_t),
-	int (*cb)(BTREE *, WT_DATAITEM **, WT_DATAITEM **));
+	int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **));
 static int __wt_api_btree_bulk_load(
 	BTREE *btree,
 	void (*progress)(const char *, uint64_t),
-	int (*cb)(BTREE *, WT_DATAITEM **, WT_DATAITEM **))
+	int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	const char *method_name = "BTREE.bulk_load";
 	CONNECTION *connection = btree->conn;
@@ -242,13 +242,13 @@ static int __wt_api_btree_col_get(
 	BTREE *btree,
 	SESSION *session,
 	uint64_t recno,
-	WT_DATAITEM *value,
+	WT_ITEM *value,
 	uint32_t flags);
 static int __wt_api_btree_col_get(
 	BTREE *btree,
 	SESSION *session,
 	uint64_t recno,
-	WT_DATAITEM *value,
+	WT_ITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.col_get";
@@ -268,13 +268,13 @@ static int __wt_api_btree_col_put(
 	BTREE *btree,
 	SESSION *session,
 	uint64_t recno,
-	WT_DATAITEM *value,
+	WT_ITEM *value,
 	uint32_t flags);
 static int __wt_api_btree_col_put(
 	BTREE *btree,
 	SESSION *session,
 	uint64_t recno,
-	WT_DATAITEM *value,
+	WT_ITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.col_put";
@@ -397,12 +397,12 @@ static int __wt_api_btree_open(
 static int __wt_api_btree_row_del(
 	BTREE *btree,
 	SESSION *session,
-	WT_DATAITEM *key,
+	WT_ITEM *key,
 	uint32_t flags);
 static int __wt_api_btree_row_del(
 	BTREE *btree,
 	SESSION *session,
-	WT_DATAITEM *key,
+	WT_ITEM *key,
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.row_del";
@@ -423,14 +423,14 @@ static int __wt_api_btree_row_del(
 static int __wt_api_btree_row_get(
 	BTREE *btree,
 	SESSION *session,
-	WT_DATAITEM *key,
-	WT_DATAITEM *value,
+	WT_ITEM *key,
+	WT_ITEM *value,
 	uint32_t flags);
 static int __wt_api_btree_row_get(
 	BTREE *btree,
 	SESSION *session,
-	WT_DATAITEM *key,
-	WT_DATAITEM *value,
+	WT_ITEM *key,
+	WT_ITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.row_get";
@@ -449,14 +449,14 @@ static int __wt_api_btree_row_get(
 static int __wt_api_btree_row_put(
 	BTREE *btree,
 	SESSION *session,
-	WT_DATAITEM *key,
-	WT_DATAITEM *value,
+	WT_ITEM *key,
+	WT_ITEM *value,
 	uint32_t flags);
 static int __wt_api_btree_row_put(
 	BTREE *btree,
 	SESSION *session,
-	WT_DATAITEM *key,
-	WT_DATAITEM *value,
+	WT_ITEM *key,
+	WT_ITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.row_put";
@@ -963,7 +963,7 @@ void
 __wt_methods_btree_lockout(BTREE *btree)
 {
 	btree->btree_compare_get = (int (*)
-	    (BTREE *, int (**)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)))
+	    (BTREE *, int (**)(BTREE *, const WT_ITEM *, const WT_ITEM *)))
 	    __wt_btree_lockout;
 	btree->btree_compare_int_get = (int (*)
 	    (BTREE *, int *))
@@ -972,7 +972,7 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, int ))
 	    __wt_btree_lockout;
 	btree->btree_compare_set = (int (*)
-	    (BTREE *, int (*)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)))
+	    (BTREE *, int (*)(BTREE *, const WT_ITEM *, const WT_ITEM *)))
 	    __wt_btree_lockout;
 	btree->btree_itemsize_get = (int (*)
 	    (BTREE *, uint32_t *, uint32_t *))
@@ -987,16 +987,16 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t ))
 	    __wt_btree_lockout;
 	btree->bulk_load = (int (*)
-	    (BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_DATAITEM **, WT_DATAITEM **)))
+	    (BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **)))
 	    __wt_btree_lockout;
 	btree->col_del = (int (*)
 	    (BTREE *, SESSION *, uint64_t , uint32_t ))
 	    __wt_btree_lockout;
 	btree->col_get = (int (*)
-	    (BTREE *, SESSION *, uint64_t , WT_DATAITEM *, uint32_t ))
+	    (BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->col_put = (int (*)
-	    (BTREE *, SESSION *, uint64_t , WT_DATAITEM *, uint32_t ))
+	    (BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->column_set = (int (*)
 	    (BTREE *, uint32_t , const char *, uint32_t ))
@@ -1011,13 +1011,13 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, const char *, mode_t , uint32_t ))
 	    __wt_btree_lockout;
 	btree->row_del = (int (*)
-	    (BTREE *, SESSION *, WT_DATAITEM *, uint32_t ))
+	    (BTREE *, SESSION *, WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->row_get = (int (*)
-	    (BTREE *, SESSION *, WT_DATAITEM *, WT_DATAITEM *, uint32_t ))
+	    (BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->row_put = (int (*)
-	    (BTREE *, SESSION *, WT_DATAITEM *, WT_DATAITEM *, uint32_t ))
+	    (BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->stat_clear = (int (*)
 	    (BTREE *, uint32_t ))
@@ -1057,7 +1057,7 @@ __wt_methods_btree_open_transition(BTREE *btree)
 	    (BTREE *, int ))
 	    __wt_btree_lockout;
 	btree->btree_compare_set = (int (*)
-	    (BTREE *, int (*)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)))
+	    (BTREE *, int (*)(BTREE *, const WT_ITEM *, const WT_ITEM *)))
 	    __wt_btree_lockout;
 	btree->btree_itemsize_set = (int (*)
 	    (BTREE *, uint32_t , uint32_t ))

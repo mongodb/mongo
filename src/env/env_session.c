@@ -92,7 +92,7 @@ __wt_session_close(SESSION *session)
 	if (sb != NULL && --sb->in == sb->out)
 		__wt_free(session, sb, sb->len);
 
-	/* Discard WT_DATAITEM memory. */
+	/* Discard WT_ITEM memory. */
 	__wt_free(session, session->key.item.data, session->key.mem_size);
 	__wt_free(session, session->value.item.data, session->value.mem_size);
 	__wt_scr_free(session);

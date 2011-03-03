@@ -12,7 +12,7 @@
  *	Lexicographic comparison routine.
  */
 int
-__wt_bt_lex_compare(BTREE *btree, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt)
+__wt_bt_lex_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_dbt)
 {
 	uint32_t len;
 	const uint8_t *userp, *treep;
@@ -49,12 +49,12 @@ __wt_bt_lex_compare(BTREE *btree, const WT_DATAITEM *user_dbt, const WT_DATAITEM
  *	Integer comparison routine.
  */
 int
-__wt_bt_int_compare(BTREE *btree, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt)
+__wt_bt_int_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_dbt)
 {
 	uint64_t user_int, tree_int;
 
 	/*
-	 * The WT_DATAITEM must hold the low-order bits in machine integer order.
+	 * The WT_ITEM must hold the low-order bits in machine integer order.
 	 *
 	 * Return:
 	 *	< 0 if user_dbt is < tree_dbt

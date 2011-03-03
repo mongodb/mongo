@@ -13,19 +13,19 @@
  *	Return a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_data_return(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *value, int key_return)
+__wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 {
 	BTREE *btree;
-	WT_DATAITEM local_key, local_value;
+	WT_ITEM local_key, local_value;
 	WT_COL *cip;
-	WT_ITEM *item;
+	WT_CELL *item;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	const void *value_ret;
 	uint32_t size_ret;
-	int (*callback)(BTREE *, WT_DATAITEM *, WT_DATAITEM *), ret;
+	int (*callback)(BTREE *, WT_ITEM *, WT_ITEM *), ret;
 
 	btree = session->btree;
 	callback = NULL; /* TODO: was value->callback */
@@ -44,8 +44,8 @@ __wt_data_return(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *value, int key
 	 * If the key/value items are being passed to a callback routine and
 	 * there's nothing special about them (they aren't uninstantiated
 	 * overflow or compressed items), then give the callback a pointer to
-	 * the on-page data.  (We use a local WT_DATAITEM in this case, so we don't
-	 * touch potentially allocated application WT_DATAITEM memory.)  Else, copy
+	 * the on-page data.  (We use a local WT_ITEM in this case, so we don't
+	 * touch potentially allocated application WT_ITEM memory.)  Else, copy
 	 * the items into the application's WT_DATAITEMs.
 	 *
 	 * If the key/value item are uninstantiated overflow and/or compressed
@@ -54,7 +54,7 @@ __wt_data_return(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *value, int key
 	 * allocate WT_INDX memory for data items.   We do allocate WT_INDX
 	 * memory for keys, but if we are looking at a key only to return it,
 	 * it's not that likely to be accessed again (think of a cursor moving
-	 * through the tree).  Use memory in the application's WT_DATAITEM instead, it
+	 * through the tree).  Use memory in the application's WT_ITEM instead, it
 	 * is discarded when the SESSION is discarded.
 	 *
 	 * Key return implies a reference to a WT_ROW index (we don't return
@@ -112,14 +112,14 @@ __wt_data_return(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *value, int key
 		goto item_set;
 	case WT_PAGE_ROW_LEAF:
 		item = rip->value;
-item_set:	switch (WT_ITEM_TYPE(item)) {
-		case WT_ITEM_DATA:
+item_set:	switch (WT_CELL_TYPE(item)) {
+		case WT_CELL_DATA:
 			if (btree->huffman_data == NULL) {
-				value_ret = WT_ITEM_BYTE(item);
-				size_ret = WT_ITEM_LEN(item);
+				value_ret = WT_CELL_BYTE(item);
+				size_ret = WT_CELL_LEN(item);
 			}
 			/* FALLTHROUGH */
-		case WT_ITEM_DATA_OVFL:
+		case WT_CELL_DATA_OVFL:
 			WT_RET(__wt_item_process(session, item, &session->value));
 			value_ret = session->value.item.data;
 			size_ret = session->value.item.size;
@@ -140,7 +140,7 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 		/*
 		 * We're copying the key/value pair out to the caller.  If we
 		 * haven't yet copied the value_ret/size_ret pair into the return
-		 * WT_DATAITEM (potentially done by __wt_item_process), do so now.
+		 * WT_ITEM (potentially done by __wt_item_process), do so now.
 		 */
 		if (value_ret != session->value.item.data) {
 			if (session->value.mem_size < size_ret)

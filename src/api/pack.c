@@ -20,7 +20,7 @@ wiredtiger_struct_sizev(const char *fmt, va_list ap)
 		break;
 
 	case 'u':
-		size += va_arg(ap, WT_DATAITEM *)->size;
+		size += va_arg(ap, WT_ITEM *)->size;
 		break;
 	}
 
@@ -30,7 +30,7 @@ wiredtiger_struct_sizev(const char *fmt, va_list ap)
 int
 wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 {
-	WT_DATAITEM *item;
+	WT_ITEM *item;
 	uint8_t *p;
 	const void *src;
 	const char *str;
@@ -45,7 +45,7 @@ wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 		break;
 
 	case 'u':
-		item = va_arg(ap, WT_DATAITEM *);
+		item = va_arg(ap, WT_ITEM *);
 		src = item->data;
 		sz = item->size;
 		break;
@@ -70,7 +70,7 @@ int
 wiredtiger_struct_unpackv(
     const void *buffer, size_t size, const char *fmt, va_list ap)
 {
-	WT_DATAITEM *item;
+	WT_ITEM *item;
 	const uint8_t *p;
 	const char **strp;
 
@@ -81,7 +81,7 @@ wiredtiger_struct_unpackv(
 		*strp = (const char *)p;
 		break;
 	case 'u':
-		item = va_arg(ap, WT_DATAITEM *);
+		item = va_arg(ap, WT_ITEM *);
 		item->data = p;
 		item->size = (uint32_t)size;
 		break;

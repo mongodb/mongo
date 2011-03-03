@@ -838,8 +838,8 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	WT_COL *cip;
-	WT_DATAITEM *data, data_dbt;
-	WT_ITEM data_item, *item;
+	WT_ITEM *data, data_dbt;
+	WT_CELL data_item, *item;
 	WT_OVFL data_ovfl;
 	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
@@ -870,29 +870,29 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 			 * If we update overflow data item, free the underlying
 			 * file space.
 			 */
-			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
+			if (WT_CELL_TYPE(item) == WT_CELL_DATA_OVFL)
 				WT_RET(__wt_block_free_ovfl(
-				    session, WT_ITEM_BYTE_OVFL(item)));
+				    session, WT_CELL_BYTE_OVFL(item)));
 
 			/*
-			 * Check for deletion, else build the data's WT_ITEM
+			 * Check for deletion, else build the data's WT_CELL
 			 * chunk from the most recent update value.
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				WT_CLEAR(data_item);
-				WT_ITEM_SET(&data_item, WT_ITEM_DEL, 0);
-				len = WT_ITEM_SPACE_REQ(0);
+				WT_CELL_SET(&data_item, WT_CELL_DEL, 0);
+				len = WT_CELL_SPACE_REQ(0);
 			} else {
 				data->data = WT_UPDATE_DATA(upd);
 				data->size = upd->size;
 				WT_RET(__wt_item_build_value(
 				    session, data, &data_item, &data_ovfl));
-				len = WT_ITEM_SPACE_REQ(data->size);
+				len = WT_CELL_SPACE_REQ(data->size);
 			}
 			data_loc = DATA_OFF_PAGE;
 		} else {
 			data->data = item;
-			data->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
+			data->size = WT_CELL_SPACE_REQ(WT_CELL_LEN(item));
 			len = data->size;
 			data_loc = DATA_ON_PAGE;
 		}
@@ -932,7 +932,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 static int
 __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 {
-	WT_ITEM *key_item, *data_item;
+	WT_CELL *key_item, *data_item;
 	WT_OFF *from;
 	WT_ROW_REF *rref;
 	uint64_t unused;
@@ -956,14 +956,14 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 		 * underlying file space.
 		 */
 		if (WT_ROW_REF_STATE(rref) == WT_REF_DELETED) {
-			if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+			if (WT_CELL_TYPE(key_item) == WT_CELL_KEY_OVFL)
 				WT_RET(__wt_block_free_ovfl(
-				    session, WT_ITEM_BYTE_OVFL(key_item)));
+				    session, WT_CELL_BYTE_OVFL(key_item)));
 			continue;
 		}
 
-		data_item = WT_ITEM_NEXT(key_item);
-		len = WT_PTRDIFF32(WT_ITEM_NEXT(data_item), key_item);
+		data_item = WT_CELL_NEXT(key_item);
+		len = WT_PTRDIFF32(WT_CELL_NEXT(data_item), key_item);
 
 		/* Boundary: allocate, split or write the page. */
 		if (len + sizeof(WT_OFF) > space_avail)
@@ -975,7 +975,7 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 		 * For now, we just punch the new page locations into the old
 		 * on-page information, that will eventually change.
 		 */
-		from = WT_ITEM_BYTE_OFF(data_item);
+		from = WT_CELL_BYTE_OFF(data_item);
 		from->addr = WT_ROW_REF_ADDR(rref);
 		from->size = WT_ROW_REF_SIZE(rref);
 
@@ -999,8 +999,8 @@ static int
 __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
-	WT_DATAITEM *key, key_dbt, *data, data_dbt;
-	WT_ITEM data_item, *empty_item, *key_item;
+	WT_ITEM *key, key_dbt, *data, data_dbt;
+	WT_CELL data_item, *empty_item, *key_item;
 	WT_OVFL data_ovfl;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -1038,9 +1038,9 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 			 * If we update overflow data item, free the underlying
 			 * file space.
 			 */
-			if (WT_ITEM_TYPE(rip->value) == WT_ITEM_DATA_OVFL)
+			if (WT_CELL_TYPE(rip->value) == WT_CELL_DATA_OVFL)
 				WT_RET(__wt_block_free_ovfl(
-				    session, WT_ITEM_BYTE_OVFL(rip->value)));
+				    session, WT_CELL_BYTE_OVFL(rip->value)));
 
 			/*
 			 * If this key/data pair was deleted, we're done.  If
@@ -1048,15 +1048,15 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 			 * file space.
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				if (WT_ITEM_TYPE(key_item) == WT_ITEM_KEY_OVFL)
+				if (WT_CELL_TYPE(key_item) == WT_CELL_KEY_OVFL)
 					WT_RET(__wt_block_free_ovfl(
-					    session, WT_ITEM_BYTE_OVFL(key_item)));
+					    session, WT_CELL_BYTE_OVFL(key_item)));
 				continue;
 			}
 
 			/*
 			 * If no data, nothing needs to be copied.  Otherwise,
-			 * build the data's WT_ITEM chunk from the most recent
+			 * build the data's WT_CELL chunk from the most recent
 			 * update value.
 			 */
 			if (upd->size == 0)
@@ -1067,7 +1067,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 				WT_RET(__wt_item_build_value(
 				    session, data, &data_item, &data_ovfl));
 				data_loc = DATA_OFF_PAGE;
-				len += WT_ITEM_SPACE_REQ(data->size);
+				len += WT_CELL_SPACE_REQ(data->size);
 			}
 		} else {
 			/*
@@ -1081,15 +1081,15 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 			else {
 				data->data = rip->value;
 				data->size =
-				    WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->value));
+				    WT_CELL_SPACE_REQ(WT_CELL_LEN(rip->value));
 				data_loc = DATA_ON_PAGE;
 				len += data->size;
 			}
 		}
 
-		/* Take the key's WT_ITEM from the original page. */
+		/* Take the key's WT_CELL from the original page. */
 		key->data = key_item;
-		key->size = WT_ITEM_SPACE_REQ(WT_ITEM_LEN(key_item));
+		key->size = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_item));
 		len += key->size;
 
 		/* Boundary: allocate, split or write the page. */
@@ -1114,9 +1114,9 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 		case DATA_OFF_PAGE:
 			memcpy(first_free, &data_item, sizeof(data_item));
 			memcpy(first_free +
-			    sizeof(WT_ITEM), data->data, data->size);
-			first_free += WT_ITEM_SPACE_REQ(data->size);
-			space_avail -= WT_ITEM_SPACE_REQ(data->size);
+			    sizeof(WT_CELL), data->data, data->size);
+			first_free += WT_CELL_SPACE_REQ(data->size);
+			space_avail -= WT_CELL_SPACE_REQ(data->size);
 			++entries;
 			break;
 		case EMPTY_DATA:

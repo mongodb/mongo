@@ -8,14 +8,14 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_row_update(SESSION *, WT_DATAITEM *, WT_DATAITEM *, int);
+static int __wt_row_update(SESSION *, WT_ITEM *, WT_ITEM *, int);
 
 /*
  * __wt_btree_row_del --
  *	Db.row_del method.
  */
 int
-__wt_btree_row_del(SESSION *session, WT_DATAITEM *key)
+__wt_btree_row_del(SESSION *session, WT_ITEM *key)
 {
 	return (__wt_row_update(session, key, NULL, 0));
 }
@@ -25,7 +25,7 @@ __wt_btree_row_del(SESSION *session, WT_DATAITEM *key)
  *	Db.row_put method.
  */
 int
-__wt_btree_row_put(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *data)
+__wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *data)
 {
 	return (__wt_row_update(session, key, data, 1));
 }
@@ -35,7 +35,7 @@ __wt_btree_row_put(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *data)
  *	Row-store delete and update.
  */
 static int
-__wt_row_update(SESSION *session, WT_DATAITEM *key, WT_DATAITEM *data, int insert)
+__wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *data, int insert)
 {
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd;
@@ -118,7 +118,7 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  *	and fill it in.
  */
 int
-__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_DATAITEM *data)
+__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data)
 {
 	BTREE *btree;
 	SESSION_BUFFER *sb;
