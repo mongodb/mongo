@@ -183,18 +183,16 @@ namespace mongo {
 
 
     HostAndPort ReplicaSetMonitor::getMaster() {
-        bool good = false;
         {
             scoped_lock lk( _lock );
-            good = _master >= 0 && _nodes[_master].ok;
+            if ( _master >= 0 && _nodes[_master].ok )
+                return _nodes[_master].addr;
         }
-
-        if ( ! good )
-            _check();
-
-        uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
-
+        
+        _check();
+        
         scoped_lock lk( _lock );
+        uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
         return _nodes[_master].addr;
     }
     
