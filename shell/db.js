@@ -663,7 +663,12 @@ DB.prototype.getReplicationInfo = function() {
 
 DB.prototype.printReplicationInfo = function() {
     var result = this.getReplicationInfo();
-    if( result.errmsg ) { 
+    if( result.errmsg ) {
+        if (!this.isMaster().ismaster) {
+            print("this is a slave, printing slave replication info.");
+            this.printSlaveReplicationInfo();
+            return;
+        }
 	print(tojson(result));
 	return;
     }
