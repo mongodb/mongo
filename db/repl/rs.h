@@ -270,7 +270,6 @@ namespace mongo {
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
         const Member* getMemberToSyncTo();
-        void _changeArbiterState();
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
