@@ -98,8 +98,8 @@ __wt_verify_dsk_item(
 	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
 	struct {
 		WT_ROW   rip;			/* Reference to on-page data */
-		DBT	*dbt;			/* DBT to compare */
-		DBT	*scratch;		/* scratch buffer */
+		WT_DATAITEM	*dbt;			/* WT_DATAITEM to compare */
+		WT_SCRATCH	*scratch;		/* scratch buffer */
 	} *current, *last, *tmp, _a, _b;
 	DB *db;
 	WT_ITEM *item;
@@ -111,7 +111,7 @@ __wt_verify_dsk_item(
 	uint8_t *end;
 	void *huffman;
 	uint32_t i, item_num, item_len, item_type;
-	int (*func)(DB *, const DBT *, const DBT *), ret;
+	int (*func)(DB *, const WT_DATAITEM *, const WT_DATAITEM *), ret;
 
 	db = toc->db;
 	func = db->btree_compare;
@@ -314,9 +314,9 @@ item_len:			__wt_api_db_errx(db,
 		if (__wt_key_process(rip)) {
 			WT_RET(
 			    __wt_item_process(toc, rip->key, current->scratch));
-			current->dbt = current->scratch;
+			current->dbt = &current->scratch->item;
 		} else
-			current->dbt = (DBT *)rip;
+			current->dbt = (WT_DATAITEM *)rip;
 
 		/* Compare the current key against the last key. */
 		if (last->dbt != NULL &&

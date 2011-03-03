@@ -9,7 +9,7 @@
 
 #include "wts.h"
 
-static int cb_bulk(DB *, DBT **, DBT **);
+static int cb_bulk(DB *, WT_DATAITEM **, WT_DATAITEM **);
 static int wts_del_col(u_int64_t);
 static int wts_del_row(u_int64_t);
 static int wts_notfound_chk(ENV *, const char *, int, int, u_int64_t);
@@ -278,9 +278,9 @@ wts_stats(void)
  *	WiredTiger bulk load callback routine. 
  */
 static int
-cb_bulk(DB *db, DBT **keyp, DBT **datap)
+cb_bulk(DB *db, WT_DATAITEM **keyp, WT_DATAITEM **datap)
 {
-	static DBT key, data;
+	static WT_DATAITEM key, data;
 
 	db = NULL;					/* Lint */
 	++g.key_cnt;
@@ -290,8 +290,8 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 		return (1);
 	}
 
-	key_gen(&key, g.key_cnt);
-	data_gen(&data, 1);
+	key_gen(&key.data, &key.size, g.key_cnt);
+	data_gen(&data.data, &data.size, 1);
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -424,7 +424,7 @@ wts_read_row_scan(void)
 static int
 wts_read_row(u_int64_t keyno)
 {
-	static DBT key, data, bdb_data;
+	static WT_DATAITEM key, data, bdb_data;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
@@ -443,9 +443,9 @@ wts_read_row(u_int64_t keyno)
 		return (1);
 
 	/* Retrieve the key/data pair by key. */
-	key_gen(&key, keyno);
-	if ((ret = db->row_get(
-	    db, toc, &key, &data, 0)) != 0 && ret != WT_NOTFOUND) {
+	key_gen(&key.data, &key.size, keyno);
+	if ((ret = db->row_get(db, toc, &key, &data, 0)) != 0 &&
+	    ret != WT_NOTFOUND) {
 		env->err(env, ret,
 		    "wts_read_key: read row %llu by key",
 		    (unsigned long long)keyno);
@@ -500,7 +500,7 @@ wts_read_col_scan(void)
 static int
 wts_read_col(u_int64_t keyno)
 {
-	static DBT data, bdb_data;
+	static WT_DATAITEM data, bdb_data;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
@@ -551,7 +551,7 @@ wts_read_col(u_int64_t keyno)
 static int
 wts_put_row(u_int64_t keyno)
 {
-	static DBT key, data;
+	static WT_DATAITEM key, data;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
@@ -561,8 +561,8 @@ wts_put_row(u_int64_t keyno)
 	toc = g.wts_toc;
 	env = db->env;
 
-	key_gen(&key, keyno);
-	data_gen(&data, 0);
+	key_gen(&key.data, &key.size, keyno);
+	data_gen(&data.data, &key.size, 0);
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
@@ -589,7 +589,7 @@ wts_put_row(u_int64_t keyno)
 static int
 wts_put_col(u_int64_t keyno)
 {
-	static DBT data;
+	static WT_DATAITEM data;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
@@ -599,7 +599,7 @@ wts_put_col(u_int64_t keyno)
 	toc = g.wts_toc;
 	env = db->env;
 
-	data_gen(&data, 0);
+	data_gen(&data.data, &data.size, 0);
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
@@ -626,7 +626,7 @@ wts_put_col(u_int64_t keyno)
 static int
 wts_del_row(u_int64_t keyno)
 {
-	static DBT key;
+	static WT_DATAITEM key;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
@@ -636,7 +636,7 @@ wts_del_row(u_int64_t keyno)
 	toc = g.wts_toc;
 	env = db->env;
 
-	key_gen(&key, keyno);
+	key_gen(&key.data, &key.size, keyno);
 
 	/* Log the operation */
 	if (g.wts_log != NULL)

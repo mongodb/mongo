@@ -289,13 +289,13 @@ methods['env.verbose_set'] = Api(
 methods['db.btree_compare_get'] = Api(
 	'db.btree_compare_get',
 	'method, getter',
-	['btree_compare/int (**@S)(DB *, const DBT *, const DBT *)'],
+	['btree_compare/int (**@S)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)'],
 	[],
 	['init'], [])
 methods['db.btree_compare_set'] = Api(
 	'db.btree_compare_set',
 	'method, setter',
-	['btree_compare/int (*@S)(DB *, const DBT *, const DBT *)/__wt_bt_lex_compare'],
+	['btree_compare/int (*@S)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)/__wt_bt_lex_compare'],
 	[],
 	['init'], ['open'])
 
@@ -352,7 +352,7 @@ methods['db.bulk_load'] = Api(
 	'db.bulk_load',
 	'method, rdonly, toc',
 	['progress/void (*@S)(const char *, uint64_t)',
-	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
+	 'cb/int (*@S)(DB *, WT_DATAITEM **, WT_DATAITEM **)'],
 	[],
 	['open'], [])
 
@@ -378,7 +378,7 @@ methods['db.col_get'] = Api(
 	'method, colonly, toc',
 	['toc/WT_TOC *@S',
 	 'recno/uint64_t @S',
-	 'value/DBT *@S',
+	 'value/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -388,7 +388,7 @@ methods['db.col_put'] = Api(
 	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
 	 'recno/uint64_t @S',
-	 'value/DBT *@S',
+	 'value/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -489,7 +489,7 @@ methods['db.row_del'] = Api(
 	'db.row_del',
 	'method, rdonly, restart, rowonly, toc',
 	['toc/WT_TOC *@S',
-	 'key/DBT *@S',
+	 'key/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -498,8 +498,8 @@ methods['db.row_get'] = Api(
 	'db.row_get',
 	'method, rowonly, toc',
 	['toc/WT_TOC *@S',
-	 'key/DBT *@S',
-	 'value/DBT *@S',
+	 'key/WT_DATAITEM *@S',
+	 'value/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -508,8 +508,8 @@ methods['db.row_put'] = Api(
 	'db.row_put',
 	'method, rdonly, restart, rowonly, toc',
 	['toc/WT_TOC *@S',
-	 'key/DBT *@S',
-	 'value/DBT *@S',
+	 'key/WT_DATAITEM *@S',
+	 'value/WT_DATAITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -564,8 +564,6 @@ flags['bt_tree_walk'] = [
 ###################################################
 # Structure flag declarations
 ###################################################
-flags['dbt'] = [
-	'SCRATCH_INUSE' ]
 flags['env'] = [
 	'MEMORY_CHECK' ]
 flags['idb'] = [
@@ -575,6 +573,8 @@ flags['idb'] = [
 flags['ienv'] = [
 	'SERVER_RUN',
 	'WORKQ_RUN' ]
+flags['scratch'] = [
+	'SCRATCH_INUSE' ]
 flags['wt_toc'] = [
 	'READ_EVICT',
 	'READ_PRIORITY' ]

@@ -17,21 +17,21 @@ static inline int __wt_key_build(WT_TOC *, void *);
 static inline int
 __wt_key_build(WT_TOC *toc, void *ref)
 {
-	DBT *dbt, _dbt;
+	WT_SCRATCH *scratch, _scratch;
 	WT_ITEM *item;
 
-	WT_CLEAR(_dbt);
-	dbt = &_dbt;
+	WT_CLEAR(_scratch);
+	scratch = &_scratch;
 
 	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
 	item = ((WT_ROW *)ref)->key;
-	WT_RET(__wt_item_process(toc, item, dbt));
+	WT_RET(__wt_item_process(toc, item, scratch));
 
 	/* Update the WT_ROW reference with the processed key. */
-	__wt_key_set(ref, dbt->data, dbt->size);
+	__wt_key_set(ref, (void *)scratch->item.data, scratch->item.size);
 
 	return (0);
 }
@@ -41,7 +41,7 @@ __wt_key_build(WT_TOC *toc, void *ref)
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags)
+__wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags)
 {
 	DB *db;
 	BTREE *btree;
@@ -107,7 +107,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags)
 				 */
 				if (indx != 0) {
 					cmp = db->
-					    btree_compare(db, key, (DBT *)rref);
+					    btree_compare(db, key, (WT_DATAITEM *)rref);
 					if (cmp == 0)
 						break;
 					if (cmp < 0)
@@ -143,7 +143,7 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags)
 				if (__wt_key_process(rip))
 					WT_ERR(__wt_key_build(toc, rip));
 
-				cmp = db->btree_compare(db, key, (DBT *)rip);
+				cmp = db->btree_compare(db, key, (WT_DATAITEM *)rip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)

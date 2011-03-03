@@ -11,14 +11,14 @@ void
 __wt_scratch_init(WT_SCRATCH *scratch)
 {
 	scratch->item.data = scratch->buf = NULL;
-	scratch->bufsz = scratch->item.size = 0;
+	scratch->mem_size = scratch->item.size = 0;
 }
 
 int
 __wt_scratch_grow(ENV *env, WT_SCRATCH *scratch, size_t sz)
 {
-	if (sz > scratch->bufsz)
-		WT_RET(__wt_realloc(env, &scratch->bufsz, sz, &scratch->buf));
+	if (sz > scratch->mem_size)
+		WT_RET(__wt_realloc(env, &scratch->mem_size, sz, &scratch->buf));
 
 	scratch->item.data = scratch->buf;
 	WT_ASSERT(env, sz < UINT32_MAX);
@@ -31,10 +31,10 @@ __wt_scratch_free(ENV *env, WT_SCRATCH *scratch)
 {
 
 	if (scratch->buf != NULL)
-		__wt_free(env, scratch->buf, scratch->bufsz);
+		__wt_free(env, scratch->buf, scratch->mem_size);
 
 	scratch->item.data = NULL;
-	scratch->bufsz = scratch->item.size = 0;
+	scratch->mem_size = scratch->item.size = 0;
 }
 
 static int
@@ -184,7 +184,7 @@ __wt_curstd_init(WT_CURSOR_STD *cstd)
 	c->set_value = __curstd_set_value;
 
 	cstd->value.item.data = cstd->value.buf = NULL;
-	cstd->value.bufsz = 0;
+	cstd->value.mem_size = 0;
 
 	cstd->flags = WT_CURSTD_BADKEY | WT_CURSTD_BADVALUE;
 }

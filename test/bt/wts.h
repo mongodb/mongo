@@ -84,8 +84,8 @@ typedef struct {
 extern GLOBAL g;
 
 int	 bdb_del(u_int64_t, int *);
-void	 bdb_insert(void *, u_int32_t, void *, u_int32_t);
-int	 bdb_put(u_int64_t, void *, u_int32_t, int *);
+void	 bdb_insert(const void *, u_int32_t, const void *, u_int32_t);
+int	 bdb_put(u_int64_t, const void *, u_int32_t, int *);
 int	 bdb_read(u_int64_t, void *, u_int32_t *, int *);
 void	 bdb_startup(void);
 void	 bdb_teardown(void);
@@ -96,9 +96,9 @@ void	 config_file(const char *);
 void	 config_names(void);
 void	 config_setup(void);
 void	 config_single(char *, int);
-void	 data_gen(DBT *, int);
+void	 data_gen(void *, uint32_t *, int);
 char	*fname(const char *);
-void	 key_gen(DBT *, u_int64_t);
+void	 key_gen(void *, uint32_t *, u_int64_t);
 void	 key_gen_setup(void);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);

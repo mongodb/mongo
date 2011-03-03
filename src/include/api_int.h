@@ -17,21 +17,6 @@ struct __env;			typedef struct __env ENV;
 struct __ienv;			typedef struct __ienv IENV;
 
 /*******************************************
- * Key/value structure -- a Data-Base Thang
- *******************************************/
-struct __dbt {
-	void    *data;			/* returned/specified data */
-	uint32_t size;			/* returned/specified data length */
-
-	uint32_t mem_size;		/* associated allocated memory size */
-
-					/* callback return */
-	int (*callback)(DB *, DBT *, DBT *);
-
-	uint32_t flags;
-};
-
-/*******************************************
  * File handle
  *******************************************/
 struct __db {
@@ -50,7 +35,7 @@ struct __db {
 	 */
 	int btree_compare_int;
 
-	int (*btree_compare)(DB *, const DBT *, const DBT *);
+	int (*btree_compare)(DB *, const WT_DATAITEM *, const WT_DATAITEM *);
 
 	uint32_t intlitemsize;
 	uint32_t leafitemsize;
@@ -79,7 +64,7 @@ struct __db {
 	 * DB methods: BEGIN
 	 */
 	int (*btree_compare_get)(
-	    DB *, int (**)(DB *, const DBT *, const DBT *));
+	    DB *, int (**)(DB *, const WT_DATAITEM *, const WT_DATAITEM *));
 
 	int (*btree_compare_int_get)(
 	    DB *, int *);
@@ -88,7 +73,7 @@ struct __db {
 	    DB *, int );
 
 	int (*btree_compare_set)(
-	    DB *, int (*)(DB *, const DBT *, const DBT *));
+	    DB *, int (*)(DB *, const WT_DATAITEM *, const WT_DATAITEM *));
 
 	int (*btree_itemsize_get)(
 	    DB *, uint32_t *, uint32_t *);
@@ -103,7 +88,7 @@ struct __db {
 	    DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t );
 
 	int (*bulk_load)(
-	    DB *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **));
+	    DB *, void (*)(const char *, uint64_t), int (*)(DB *, WT_DATAITEM **, WT_DATAITEM **));
 
 	int (*close)(
 	    DB *, uint32_t );
@@ -112,10 +97,10 @@ struct __db {
 	    DB *, WT_TOC *, uint64_t , uint32_t );
 
 	int (*col_get)(
-	    DB *, WT_TOC *, uint64_t , DBT *, uint32_t );
+	    DB *, WT_TOC *, uint64_t , WT_DATAITEM *, uint32_t );
 
 	int (*col_put)(
-	    DB *, WT_TOC *, uint64_t , DBT *, uint32_t );
+	    DB *, WT_TOC *, uint64_t , WT_DATAITEM *, uint32_t );
 
 	int (*column_set)(
 	    DB *, uint32_t , const char *, uint32_t );
@@ -154,13 +139,13 @@ struct __db {
 	    DB *, const char *, mode_t , uint32_t );
 
 	int (*row_del)(
-	    DB *, WT_TOC *, DBT *, uint32_t );
+	    DB *, WT_TOC *, WT_DATAITEM *, uint32_t );
 
 	int (*row_get)(
-	    DB *, WT_TOC *, DBT *, DBT *, uint32_t );
+	    DB *, WT_TOC *, WT_DATAITEM *, WT_DATAITEM *, uint32_t );
 
 	int (*row_put)(
-	    DB *, WT_TOC *, DBT *, DBT *, uint32_t );
+	    DB *, WT_TOC *, WT_DATAITEM *, WT_DATAITEM *, uint32_t );
 
 	int (*stat_clear)(
 	    DB *, uint32_t );
@@ -356,9 +341,9 @@ struct __wt_toc {
 	void	*app_private;		/* Application-private information */
 
 	DB	*db;			/* Current file */
-	DBT	 key, value;		/* Returned key/value pairs */
+	WT_SCRATCH	 key, value;	/* Returned key/value pairs */
 
-	DBT	*scratch;		/* Temporary memory for any function */
+	WT_SCRATCH	*scratch;	/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
 
 					/* WT_TOC workQ request */

@@ -336,9 +336,10 @@ __wt_verify_pc(WT_TOC *toc,
     WT_ROW_REF *parent_rref, WT_PAGE *child, int first_entry)
 {
 	DB *db;
-	DBT *cd_ref, *pd_ref, *scratch1, *scratch2;
+	WT_DATAITEM *cd_ref, *pd_ref;
 	WT_ROW *child_key;
-	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
+	WT_SCRATCH *scratch1, *scratch2;
+	int cmp, ret, (*func)(DB *, const WT_DATAITEM *, const WT_DATAITEM *);
 
 	db = toc->db;
 	scratch1 = scratch2 = NULL;
@@ -369,15 +370,15 @@ __wt_verify_pc(WT_TOC *toc,
 	if (__wt_key_process(child_key)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch1));
 		WT_ERR(__wt_item_process(toc, child_key->key, scratch1));
-		cd_ref = scratch1;
+		cd_ref = &scratch1->item;
 	} else
-		cd_ref = (DBT *)child_key;
+		cd_ref = (WT_DATAITEM *)child_key;
 	if (__wt_key_process(parent_rref)) {
 		WT_ERR(__wt_scr_alloc(toc, 0, &scratch2));
 		WT_RET(__wt_item_process(toc, parent_rref->key, scratch2));
-		pd_ref = scratch2;
+		pd_ref = &scratch2->item;
 	} else
-		pd_ref = (DBT *)parent_rref;
+		pd_ref = (WT_DATAITEM *)parent_rref;
 
 	/* Compare the parent's key against the child's key. */
 	cmp = func(db, cd_ref, pd_ref);
@@ -448,8 +449,8 @@ __wt_verify_overflow(WT_TOC *toc,
     WT_OVFL *ovfl, uint32_t entry_num, uint32_t page_ref_addr, WT_VSTUFF *vs)
 {
 	DB *db;
-	DBT *scratch1;
 	WT_PAGE_DISK *dsk;
+	WT_SCRATCH *scratch1;
 	uint32_t addr, size;
 	int ret;
 
@@ -464,7 +465,7 @@ __wt_verify_overflow(WT_TOC *toc,
 	WT_RET(__wt_scr_alloc(toc, size, &scratch1));
 
 	/* Read the page. */
-	dsk = scratch1->data;
+	dsk = (void *)scratch1->item.data;
 	WT_ERR(__wt_disk_read(toc, dsk, addr, size));
 
 	/*

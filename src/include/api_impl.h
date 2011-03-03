@@ -11,11 +11,11 @@ typedef struct ICURSOR_TABLE {
 	WT_CURSOR_STD cstd;
 
 	DB *db;
-	DBT *key_tmp, *value_tmp;
 	WT_WALK walk;
 	WT_REF *ref;
 	WT_COL *cip;
 	WT_ROW *rip;
+	WT_SCRATCH *key_tmp, *value_tmp;
 	uint32_t nitems;
 } ICURSOR_TABLE;
 
@@ -29,8 +29,8 @@ typedef struct {
 	uint8_t	*first_free;			/* page's first free byte */
 	uint32_t space_avail;			/* page's space available */
 
-	DBT	*tmp;				/* page-in-a-buffer */
-	void	*data;				/* last on-page WT_COL/WT_ROW */
+	WT_SCRATCH *tmp;			/* page-in-a-buffer */
+	void *data;				/* last on-page WT_COL/WT_ROW */
 } WT_STACK_ELEM;
 
 typedef struct {
@@ -41,7 +41,7 @@ typedef struct {
 typedef struct ICURSOR_BULK {
 	ICURSOR_TABLE ctable;
 
-	DBT *tmp;
+	WT_SCRATCH *tmp;
 	WT_PAGE *page;
 	WT_STACK stack;
 	uint64_t insert_cnt;

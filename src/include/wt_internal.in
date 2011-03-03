@@ -67,6 +67,7 @@ struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 struct __wt_toc_buffer;		typedef struct __wt_toc_buffer WT_TOC_BUFFER;
 struct __wt_update;		typedef struct __wt_update WT_UPDATE;
 
+#include "scratch.h"
 #include "api_int.h"
 #include "cur_std.h"
 

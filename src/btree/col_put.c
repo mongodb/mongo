@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_col_update(WT_TOC *, uint64_t, DBT *, int);
+static int __wt_col_update(WT_TOC *, uint64_t, WT_DATAITEM *, int);
 
 /*
  * __wt_db_col_del --
@@ -25,7 +25,7 @@ __wt_db_col_del(WT_TOC *toc, uint64_t recno)
  *	Db.put method.
  */
 int
-__wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
+__wt_db_col_put(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data)
 {
 	DB *db;
 
@@ -42,7 +42,7 @@ __wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data)
  *	Column-store delete and update.
  */
 static int
-__wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
+__wt_col_update(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data, int data_overwrite)
 {
 	DB *db;
 	ENV *env;

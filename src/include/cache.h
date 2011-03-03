@@ -26,7 +26,7 @@ struct __wt_evict_list {
  *	Information tracking a single page reconciliation.
  */
 typedef struct {
-	DBT *dsk_tmp;				/* Disk-image buffer */
+	WT_SCRATCH *dsk_tmp;			/* Disk-image buffer */
 
 	/*
 	 * Each reconciliation function writes out some number of pages,
@@ -46,7 +46,7 @@ typedef struct {
 		 * the page's key, saved in the WT_OFF_RECORD structure, is the
 		 * column-store key.
 		 */
-		DBT	 key;			/* Row key */
+		WT_DATAITEM key;		/* Row key */
 
 		int	 deleted;		/* Page deleted */
 	} *list;

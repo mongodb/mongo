@@ -48,15 +48,14 @@ bdb_teardown(void)
 }
 
 void
-bdb_insert(
-    void *key_data, u_int32_t key_size, void *data_data, u_int32_t data_size)
+bdb_insert(const void *key_data, u_int32_t key_size, const void *data_data, u_int32_t data_size)
 {
 	static DBT key, data;
 	DB *db;
 
-	key.data = key_data;
+	key.data = (void *)key_data;
 	key.size = key_size;
-	data.data = data_data;
+	data.data = (void *)data_data;
 	data.size = data_size;
 
 	db = g.bdb_db;
@@ -74,7 +73,7 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 	db = g.bdb_db;
 	*notfoundp = 0;
 
-	key_gen(&key, keyno);
+	key_gen(&key.data, &key.size, keyno);
 
 	if ((ret = db->get(db, NULL, &key, &data, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
@@ -91,7 +90,7 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 }
 
 int
-bdb_put(u_int64_t keyno, void *arg_data, u_int32_t arg_size, int *notfoundp)
+bdb_put(u_int64_t keyno, const void *arg_data, u_int32_t arg_size, int *notfoundp)
 {
 	static DBT key, data;
 	DB *db;
@@ -100,8 +99,8 @@ bdb_put(u_int64_t keyno, void *arg_data, u_int32_t arg_size, int *notfoundp)
 	db = g.bdb_db;
 	*notfoundp = 0;
 
-	key_gen(&key, keyno);
-	data.data = arg_data;
+	key_gen(&key.data, &key.size, keyno);
+	data.data = (void *)arg_data;
 	data.size = arg_size;
 
 	if ((ret = db->put(db, NULL, &key, &data, 0)) != 0) {
@@ -127,7 +126,7 @@ bdb_del(u_int64_t keyno, int *notfoundp)
 	db = g.bdb_db;
 	*notfoundp = 0;
 
-	key_gen(&key, keyno);
+	key_gen(&key.data, &key.size, keyno);
 
 	if ((ret = db->del(db, NULL, &key, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {

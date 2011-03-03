@@ -9,14 +9,14 @@
 #include "bt_inline.c"
 
 /*
- * __wt_dbt_return --
- *	Retrun a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
+ * __wt_data_return --
+ *	Return a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return)
+__wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_return)
 {
 	DB *db;
-	DBT local_key, local_value;
+	WT_DATAITEM local_key, local_value;
 	ENV *env;
 	BTREE *btree;
 	WT_COL *cip;
@@ -25,14 +25,14 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return)
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
-	void *value_ret;
+	const void *value_ret;
 	uint32_t size_ret;
-	int (*callback)(DB *, DBT *, DBT *), ret;
+	int (*callback)(DB *, WT_DATAITEM *, WT_DATAITEM *), ret;
 
 	db = toc->db;
 	env = toc->env;
 	btree = db->btree;
-	callback = value->callback;
+	callback = NULL; /* TODO: was value->callback */
 	ret = 0;
 
 	page = toc->srch_page;
@@ -48,17 +48,17 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return)
 	 * If the key/value items are being passed to a callback routine and
 	 * there's nothing special about them (they aren't uninstantiated
 	 * overflow or compressed items), then give the callback a pointer to
-	 * the on-page data.  (We use a local DBT in this case, so we don't
-	 * touch potentially allocated application DBT memory.)  Else, copy
-	 * the items into the application's DBTs.
+	 * the on-page data.  (We use a local WT_DATAITEM in this case, so we don't
+	 * touch potentially allocated application WT_DATAITEM memory.)  Else, copy
+	 * the items into the application's WT_DATAITEMs.
 	 *
 	 * If the key/value item are uninstantiated overflow and/or compressed
-	 * items, they require processing before being copied into the DBTs.
+	 * items, they require processing before being copied into the WT_DATAITEMs.
 	 * Don't allocate WT_INDX memory for key/value items here.  (We never
 	 * allocate WT_INDX memory for data items.   We do allocate WT_INDX
 	 * memory for keys, but if we are looking at a key only to return it,
 	 * it's not that likely to be accessed again (think of a cursor moving
-	 * through the tree).  Use memory in the application's DBT instead, it
+	 * through the tree).  Use memory in the application's WT_DATAITEM instead, it
 	 * is discarded when the WT_TOC is discarded.
 	 *
 	 * Key return implies a reference to a WT_ROW index (we don't return
@@ -69,18 +69,16 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return)
 		if (__wt_key_process(rip)) {
 			WT_RET(__wt_item_process(toc, rip->key, &toc->key));
 
-			key->data = toc->key.data;
-			key->size = toc->key.size;
+			*key = toc->key.item;
 		} else if (callback == NULL) {
 			if (toc->key.mem_size < rip->size)
 				WT_RET(__wt_realloc(env,
 				    &toc->key.mem_size,
-				    rip->size, &toc->key.data));
-			memcpy(toc->key.data, rip->key, rip->size);
-			toc->key.size = rip->size;
+				    rip->size, &toc->key.item.data));
+			memcpy((void *)toc->key.item.data, rip->key, rip->size);
+			toc->key.item.size = rip->size;
 
-			key->data = toc->key.data;
-			key->size = toc->key.size;
+			*key = toc->key.item;
 		} else {
 			WT_CLEAR(local_key);
 			key = &local_key;
@@ -127,8 +125,8 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
 			WT_RET(__wt_item_process(toc, item, &toc->value));
-			value_ret = toc->value.data;
-			size_ret = toc->value.size;
+			value_ret = toc->value.item.data;
+			size_ret = toc->value.item.size;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -146,19 +144,18 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 		/*
 		 * We're copying the key/value pair out to the caller.  If we
 		 * haven't yet copied the value_ret/size_ret pair into the return
-		 * DBT (potentially done by __wt_item_process), do so now.
+		 * WT_DATAITEM (potentially done by __wt_item_process), do so now.
 		 */
-		if (value_ret != toc->value.data) {
+		if (value_ret != toc->value.item.data) {
 			if (toc->value.mem_size < size_ret)
 				WT_RET(__wt_realloc(env,
 				    &toc->value.mem_size,
-				    size_ret, &toc->value.data));
-			memcpy(toc->value.data, value_ret, size_ret);
-			toc->value.size = size_ret;
+				    size_ret, &toc->value.item.data));
+			memcpy((void *)toc->value.item.data, value_ret, size_ret);
+			toc->value.item.size = size_ret;
 		}
 
-		value->data = toc->value.data;
-		value->size = toc->value.size;
+		*value = toc->value.item;
 	} else {
 		/*
 		 * If we're given a callback function, use the data_ret/size_ret

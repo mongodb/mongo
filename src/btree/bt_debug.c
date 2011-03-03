@@ -21,7 +21,7 @@ static void __wt_debug_page_col_rle(WT_TOC *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_var(WT_TOC *, WT_PAGE *, FILE *);
 static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_leaf(WT_TOC *, WT_PAGE *, FILE *);
-static void __wt_debug_pair(const char *, void *, uint32_t, FILE *);
+static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
 static void __wt_debug_update(WT_UPDATE *, FILE *);
 static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
 static int  __wt_debug_set_fp(const char *, FILE **, int *);
@@ -567,10 +567,10 @@ static int
 __wt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
 	DB *db;
-	DBT *tmp;
+	WT_SCRATCH *tmp;
 	BTREE *btree;
 	uint32_t size;
-	uint8_t *p;
+	const uint8_t *p;
 	int ret;
 
 	if (fp == NULL)				/* Default to stderr */
@@ -596,8 +596,8 @@ onpage:		p = WT_ITEM_BYTE(item);
 	case WT_ITEM_DATA_OVFL:
 process:	WT_ERR(__wt_scr_alloc(toc, 0, &tmp));
 		WT_ERR(__wt_item_process(toc, item, tmp));
-		p = tmp->data;
-		size = tmp->size;
+		p = tmp->item.data;
+		size = tmp->item.size;
 		break;
 	case WT_ITEM_DEL:
 		p = (uint8_t *)"deleted";
@@ -623,18 +623,18 @@ err:	if (tmp != NULL)
 
 /*
  * __wt_debug_dbt --
- *	Dump a single DBT in debugging mode, with an optional tag.
+ *	Dump a single WT_DATAITEM in debugging mode, with an optional tag.
  */
 void
 __wt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 {
-	DBT *dbt;
+	WT_DATAITEM *dbt;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	/*
-	 * The argument isn't necessarily a DBT structure, but the first two
+	 * The argument isn't necessarily a WT_DATAITEM structure, but the first two
 	 * fields of the argument are always a void *data/uint32_t size pair.
 	 */
 	dbt = arg_dbt;
@@ -646,7 +646,7 @@ __wt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
  *	Dump a single data/size pair, with an optional tag.
  */
 static void
-__wt_debug_pair(const char *tag, void *data, uint32_t size, FILE *fp)
+__wt_debug_pair(const char *tag, const void *data, uint32_t size, FILE *fp)
 {
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;

@@ -4,10 +4,10 @@
 
 static int __wt_api_db_btree_compare_get(
 	DB *db,
-	int (**btree_compare)(DB *, const DBT *, const DBT *));
+	int (**btree_compare)(DB *, const WT_DATAITEM *, const WT_DATAITEM *));
 static int __wt_api_db_btree_compare_get(
 	DB *db,
-	int (**btree_compare)(DB *, const DBT *, const DBT *))
+	int (**btree_compare)(DB *, const WT_DATAITEM *, const WT_DATAITEM *))
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -57,10 +57,10 @@ static int __wt_api_db_btree_compare_int_set(
 
 static int __wt_api_db_btree_compare_set(
 	DB *db,
-	int (*btree_compare)(DB *, const DBT *, const DBT *));
+	int (*btree_compare)(DB *, const WT_DATAITEM *, const WT_DATAITEM *));
 static int __wt_api_db_btree_compare_set(
 	DB *db,
-	int (*btree_compare)(DB *, const DBT *, const DBT *))
+	int (*btree_compare)(DB *, const WT_DATAITEM *, const WT_DATAITEM *))
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -173,11 +173,11 @@ static int __wt_api_db_btree_pagesize_set(
 static int __wt_api_db_bulk_load(
 	DB *db,
 	void (*progress)(const char *, uint64_t),
-	int (*cb)(DB *, DBT **, DBT **));
+	int (*cb)(DB *, WT_DATAITEM **, WT_DATAITEM **));
 static int __wt_api_db_bulk_load(
 	DB *db,
 	void (*progress)(const char *, uint64_t),
-	int (*cb)(DB *, DBT **, DBT **))
+	int (*cb)(DB *, WT_DATAITEM **, WT_DATAITEM **))
 {
 	const char *method_name = "DB.bulk_load";
 	ENV *env = db->env;
@@ -245,13 +245,13 @@ static int __wt_api_db_col_get(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *value,
+	WT_DATAITEM *value,
 	uint32_t flags);
 static int __wt_api_db_col_get(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *value,
+	WT_DATAITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.col_get";
@@ -272,13 +272,13 @@ static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *value,
+	WT_DATAITEM *value,
 	uint32_t flags);
 static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *value,
+	WT_DATAITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.col_put";
@@ -506,12 +506,12 @@ static int __wt_api_db_open(
 static int __wt_api_db_row_del(
 	DB *db,
 	WT_TOC *toc,
-	DBT *key,
+	WT_DATAITEM *key,
 	uint32_t flags);
 static int __wt_api_db_row_del(
 	DB *db,
 	WT_TOC *toc,
-	DBT *key,
+	WT_DATAITEM *key,
 	uint32_t flags)
 {
 	const char *method_name = "DB.row_del";
@@ -533,14 +533,14 @@ static int __wt_api_db_row_del(
 static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
-	DBT *key,
-	DBT *value,
+	WT_DATAITEM *key,
+	WT_DATAITEM *value,
 	uint32_t flags);
 static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
-	DBT *key,
-	DBT *value,
+	WT_DATAITEM *key,
+	WT_DATAITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.row_get";
@@ -560,14 +560,14 @@ static int __wt_api_db_row_get(
 static int __wt_api_db_row_put(
 	DB *db,
 	WT_TOC *toc,
-	DBT *key,
-	DBT *value,
+	WT_DATAITEM *key,
+	WT_DATAITEM *value,
 	uint32_t flags);
 static int __wt_api_db_row_put(
 	DB *db,
 	WT_TOC *toc,
-	DBT *key,
-	DBT *value,
+	WT_DATAITEM *key,
+	WT_DATAITEM *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.row_put";
@@ -1175,7 +1175,7 @@ void
 __wt_methods_db_lockout(DB *db)
 {
 	db->btree_compare_get = (int (*)
-	    (DB *, int (**)(DB *, const DBT *, const DBT *)))
+	    (DB *, int (**)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)))
 	    __wt_db_lockout;
 	db->btree_compare_int_get = (int (*)
 	    (DB *, int *))
@@ -1184,7 +1184,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, int ))
 	    __wt_db_lockout;
 	db->btree_compare_set = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    (DB *, int (*)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)))
 	    __wt_db_lockout;
 	db->btree_itemsize_get = (int (*)
 	    (DB *, uint32_t *, uint32_t *))
@@ -1199,16 +1199,16 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = (int (*)
-	    (DB *, void (*)(const char *, uint64_t), int (*)(DB *, DBT **, DBT **)))
+	    (DB *, void (*)(const char *, uint64_t), int (*)(DB *, WT_DATAITEM **, WT_DATAITEM **)))
 	    __wt_db_lockout;
 	db->col_del = (int (*)
 	    (DB *, WT_TOC *, uint64_t , uint32_t ))
 	    __wt_db_lockout;
 	db->col_get = (int (*)
-	    (DB *, WT_TOC *, uint64_t , DBT *, uint32_t ))
+	    (DB *, WT_TOC *, uint64_t , WT_DATAITEM *, uint32_t ))
 	    __wt_db_lockout;
 	db->col_put = (int (*)
-	    (DB *, WT_TOC *, uint64_t , DBT *, uint32_t ))
+	    (DB *, WT_TOC *, uint64_t , WT_DATAITEM *, uint32_t ))
 	    __wt_db_lockout;
 	db->column_set = (int (*)
 	    (DB *, uint32_t , const char *, uint32_t ))
@@ -1247,13 +1247,13 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, const char *, mode_t , uint32_t ))
 	    __wt_db_lockout;
 	db->row_del = (int (*)
-	    (DB *, WT_TOC *, DBT *, uint32_t ))
+	    (DB *, WT_TOC *, WT_DATAITEM *, uint32_t ))
 	    __wt_db_lockout;
 	db->row_get = (int (*)
-	    (DB *, WT_TOC *, DBT *, DBT *, uint32_t ))
+	    (DB *, WT_TOC *, WT_DATAITEM *, WT_DATAITEM *, uint32_t ))
 	    __wt_db_lockout;
 	db->row_put = (int (*)
-	    (DB *, WT_TOC *, DBT *, DBT *, uint32_t ))
+	    (DB *, WT_TOC *, WT_DATAITEM *, WT_DATAITEM *, uint32_t ))
 	    __wt_db_lockout;
 	db->stat_clear = (int (*)
 	    (DB *, uint32_t ))
@@ -1301,7 +1301,7 @@ __wt_methods_db_open_transition(DB *db)
 	    (DB *, int ))
 	    __wt_db_lockout;
 	db->btree_compare_set = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    (DB *, int (*)(DB *, const WT_DATAITEM *, const WT_DATAITEM *)))
 	    __wt_db_lockout;
 	db->btree_itemsize_set = (int (*)
 	    (DB *, uint32_t , uint32_t ))

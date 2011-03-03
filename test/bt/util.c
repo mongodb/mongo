@@ -19,14 +19,14 @@ fname(const char *name)
 }
 
 void
-key_gen(DBT *key, u_int64_t keyno)
+key_gen(void *datap, uint32_t *sizep, u_int64_t keyno)
 {
 	/* The key always starts with a 10-digit string (the specified cnt). */
 	sprintf(g.key_gen_buf, "%010llu", keyno);
 	g.key_gen_buf[10] = '/';
 
-	key->data = g.key_gen_buf;
-	key->size = g.key_rand_len[keyno %
+	*(void **)datap = g.key_gen_buf;
+	*sizep = g.key_rand_len[keyno %
 	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 }
 
@@ -60,7 +60,7 @@ key_gen_setup(void)
 }
 
 void
-data_gen(DBT *data, int grow_ok)
+data_gen(void *datap, uint32_t *sizep, int grow_ok)
 {
 	static size_t blen;
 	static u_int r;
@@ -126,8 +126,8 @@ data_gen(DBT *data, int grow_ok)
 		break;
 	}
 
-	data->data = p;
-	data->size = len;
+	*(void **)datap = p;
+	*sizep = len;
 }
 
 void

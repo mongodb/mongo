@@ -6,13 +6,6 @@
  */
 
 struct WT_CURSOR_STD;	typedef struct WT_CURSOR_STD WT_CURSOR_STD;
-struct WT_SCRATCH;	typedef struct WT_SCRATCH WT_SCRATCH;
-
-struct WT_SCRATCH {
-	WT_DATAITEM item;
-	void *buf;
-	uint32_t bufsz;
-};
 
 struct WT_CURSOR_STD {
 	WT_CURSOR iface;

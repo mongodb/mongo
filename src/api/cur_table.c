@@ -39,7 +39,7 @@ static int
 __curtable_next(WT_CURSOR *cursor)
 {
 	BTREE *btree;
-	DBT *key;
+	WT_DATAITEM *key;
 	ICURSOR_TABLE *ctable;
 	ISESSION *isession;
 	WT_CURSOR_STD *cstd;
@@ -93,9 +93,9 @@ __curtable_next(WT_CURSOR *cursor)
 			if (__wt_key_process(ctable->rip)) {
 				WT_RET(__wt_item_process(isession->toc,
 				    ctable->rip->key, ctable->key_tmp));
-				key = ctable->key_tmp;
+				key = &ctable->key_tmp->item;
 			} else
-				key = (DBT *)ctable->rip;
+				key = (WT_DATAITEM *)ctable->rip;
 
 			cstd->key.item.data = key->data;
 			cstd->key.item.size = key->size;
@@ -123,8 +123,7 @@ __curtable_next(WT_CURSOR *cursor)
 			} else if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL) {
 				WT_RET(__wt_item_process(isession->toc,
 				    item, ctable->value_tmp));
-				cstd->value.item.data = ctable->value_tmp->data;
-				cstd->value.item.size = ctable->value_tmp->size;
+				cstd->value.item = ctable->value_tmp->item;
 				break;
 			} else
 				continue;

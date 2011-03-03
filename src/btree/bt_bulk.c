@@ -9,15 +9,15 @@
 #include "bt_inline.c"
 
 static int __wt_bulk_fix(WT_TOC *, void (*)(const char *,
-		uint64_t), int (*)(DB *, DBT **, DBT **));
+		uint64_t), int (*)(DB *, WT_DATAITEM **, WT_DATAITEM **));
 static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(WT_TOC *, WT_DATAITEM *, WT_OVFL *);
 static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
-		WT_TOC *, uint32_t, uint32_t, WT_PAGE **, DBT **);
+		WT_TOC *, uint32_t, uint32_t, WT_PAGE **, WT_SCRATCH **);
 static int __wt_bulk_stack_put(WT_TOC *, WT_STACK *);
 static int __wt_bulk_var(WT_TOC *, void (*)(const char *,
-		uint64_t), int (*)(DB *, DBT **, DBT **));
+		uint64_t), int (*)(DB *, WT_DATAITEM **, WT_DATAITEM **));
 static int __wt_item_build_key(WT_TOC *, WT_DATAITEM *, WT_ITEM *, WT_OVFL *);
 
 /*
@@ -26,7 +26,7 @@ static int __wt_item_build_key(WT_TOC *, WT_DATAITEM *, WT_ITEM *, WT_OVFL *);
  */
 int
 __wt_db_bulk_load(WT_TOC *toc,
-    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, WT_DATAITEM **, WT_DATAITEM **))
 {
 	DB *db;
 	BTREE *btree;
@@ -63,13 +63,14 @@ __wt_db_bulk_load(WT_TOC *toc,
  */
 static int
 __wt_bulk_fix(WT_TOC *toc,
-    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, WT_DATAITEM **, WT_DATAITEM **))
 {
 	DB *db;
-	DBT *key, *data, *tmp;
+	WT_DATAITEM *key, *data;
 	BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
+	WT_SCRATCH *tmp;
 	WT_STACK stack;
 	uint64_t insert_cnt;
 	uint32_t len, space_avail;
@@ -205,15 +206,15 @@ err:	WT_TRET(__wt_bulk_stack_put(toc, &stack));
  */
 static int
 __wt_bulk_var(WT_TOC *toc,
-    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **))
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, WT_DATAITEM **, WT_DATAITEM **))
 {
 	BTREE *btree;
 	DB *db;
-	DBT *key, *value, key_copy, value_copy;
-	DBT *tmp;
+	WT_DATAITEM *key, *value, key_copy, value_copy;
 	WT_ITEM key_item, value_item;
 	WT_OVFL key_ovfl, value_ovfl;
 	WT_PAGE *page;
+	WT_SCRATCH *tmp;
 	WT_STACK stack;
 	uint64_t insert_cnt;
 	uint32_t space_avail, space_req;
@@ -607,7 +608,7 @@ static int
 __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, WT_STACK *stack, u_int level)
 {
 	DB *db;
-	DBT *key, key_build, *next_tmp;
+	WT_DATAITEM *key, key_build;
 	ENV *env;
 	WT_ITEM *key_item, item;
 	WT_OFF off;
@@ -615,6 +616,7 @@ __wt_bulk_promote(WT_TOC *toc, WT_PAGE *page, WT_STACK *stack, u_int level)
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	WT_PAGE_DISK *dsk;
+	WT_SCRATCH *next_tmp;
 	WT_STACK_ELEM *elem;
 	uint32_t next_space_avail;
 	uint8_t *next_first_free;
@@ -914,9 +916,9 @@ __wt_item_build_key(WT_TOC *toc, WT_DATAITEM *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	stats = btree->stats;
 
 	/*
-	 * We're called with a DBT that references a data/size pair.  We can
-	 * re-point that DBT's data and size fields to other memory, but we
-	 * cannot allocate memory in that DBT -- all we can do is re-point it.
+	 * We're called with a WT_DATAITEM that references a data/size pair.  We can
+	 * re-point that WT_DATAITEM's data and size fields to other memory, but we
+	 * cannot allocate memory in that WT_DATAITEM -- all we can do is re-point it.
 	 *
 	 * For Huffman-encoded key/data items, we need a chunk of new space;
 	 * use the WT_TOC key/data return memory: this routine is called during
@@ -927,12 +929,11 @@ __wt_item_build_key(WT_TOC *toc, WT_DATAITEM *dbt, WT_ITEM *item, WT_OVFL *ovfl)
 	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(
 		    btree->huffman_key, dbt->data, dbt->size,
-		    &toc->key.data, &toc->key.mem_size, &toc->key.size));
-		if (toc->key.size > dbt->size)
+		    &toc->key.item.data, &toc->key.mem_size, &toc->key.item.size));
+		if (toc->key.item.size > dbt->size)
 			WT_STAT_INCRV(stats,
-			    FILE_HUFFMAN_KEY, toc->key.size - dbt->size);
-		dbt->data = toc->key.data;
-		dbt->size = toc->key.size;
+			    FILE_HUFFMAN_KEY, toc->key.item.size - dbt->size);
+		*dbt = toc->key.item;
 	}
 
 	/* Create an overflow object if the data won't fit. */
@@ -966,9 +967,9 @@ __wt_item_build_value(WT_TOC *toc,
 	stats = btree->stats;
 
 	/*
-	 * We're called with a DBT that references a data/size pair.  We can
-	 * re-point that DBT's data and size fields to other memory, but we
-	 * cannot allocate memory in that DBT -- all we can do is re-point it.
+	 * We're called with a WT_DATAITEM that references a data/size pair.  We can
+	 * re-point that WT_DATAITEM's data and size fields to other memory, but we
+	 * cannot allocate memory in that WT_DATAITEM -- all we can do is re-point it.
 	 *
 	 * For Huffman-encoded key/data items, we need a chunk of new space;
 	 * use the WT_TOC key/data return memory: this routine is called during
@@ -990,12 +991,11 @@ __wt_item_build_value(WT_TOC *toc,
 	if (btree->huffman_data != NULL) {
 		WT_RET(__wt_huffman_encode(
 		    btree->huffman_data, dbt->data, dbt->size,
-		    &toc->value.data, &toc->value.mem_size, &toc->value.size));
-		if (toc->value.size > dbt->size)
+		    &toc->value.item.data, &toc->value.mem_size, &toc->value.item.size));
+		if (toc->value.item.size > dbt->size)
 			WT_STAT_INCRV(stats,
-			    FILE_HUFFMAN_DATA, toc->value.size - dbt->size);
-		dbt->data = toc->value.data;
-		dbt->size = toc->value.size;
+			    FILE_HUFFMAN_DATA, toc->value.item.size - dbt->size);
+		*dbt = toc->value.item;
 	}
 
 	/* Create an overflow object if the data won't fit. */
@@ -1021,7 +1021,7 @@ static int
 __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 {
 	DB *db;
-	DBT *tmp;
+	WT_SCRATCH *tmp;
 	uint32_t size;
 	int ret;
 
@@ -1046,8 +1046,8 @@ __wt_bulk_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *to)
 	 * Read the overflow page into our scratch buffer and write it out to
 	 * the new location, without change.
 	 */
-	if ((ret = __wt_disk_read(toc, tmp->data, from->addr, size)) == 0)
-		ret = __wt_disk_write(toc, tmp->data, to->addr, size);
+	if ((ret = __wt_disk_read(toc, (void *)tmp->item.data, from->addr, size)) == 0)
+		ret = __wt_disk_write(toc, (void *)tmp->item.data, to->addr, size);
 
 err:	__wt_scr_release(&tmp);
 
@@ -1062,7 +1062,7 @@ static int
 __wt_bulk_ovfl_write(WT_TOC *toc, WT_DATAITEM *dbt, WT_OVFL *to)
 {
 	DB *db;
-	DBT *tmp;
+	WT_SCRATCH *tmp;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	uint32_t size;
@@ -1098,9 +1098,9 @@ err:	if (tmp != NULL)
  */
 static int
 __wt_bulk_scratch_page(WT_TOC *toc,
-    uint32_t page_size, uint32_t page_type, WT_PAGE **page_ret, DBT **tmp_ret)
+    uint32_t page_size, uint32_t page_type, WT_PAGE **page_ret, WT_SCRATCH **tmp_ret)
 {
-	DBT *tmp;
+	WT_SCRATCH *tmp;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	uint32_t size;
@@ -1115,7 +1115,7 @@ __wt_bulk_scratch_page(WT_TOC *toc,
 	 */
 	size = page_size + WT_SIZEOF32(WT_PAGE);
 	WT_ERR(__wt_scr_alloc(toc, size, &tmp));
-	memset(tmp->data, 0, size);
+	memset((void *)tmp->item.data, 0, size);
 
 	/*
 	 * Set up the page and allocate a file address.
@@ -1124,9 +1124,9 @@ __wt_bulk_scratch_page(WT_TOC *toc,
 	 * a lot of messages we don't want to bother with.  We're the only user
 	 * of the file, which means we can grab file space whenever we want.
 	 */
-	page = tmp->data;
+	page = (void *)tmp->item.data;
 	page->dsk = dsk =
-	    (WT_PAGE_DISK *)((uint8_t *)tmp->data + sizeof(WT_PAGE));
+	    (WT_PAGE_DISK *)((uint8_t *)tmp->item.data + sizeof(WT_PAGE));
 	WT_ERR(__wt_block_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
 	dsk->type = (uint8_t)page_type;

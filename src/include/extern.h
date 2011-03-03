@@ -32,7 +32,7 @@ void
 __wt_debug_block(WT_TOC *toc);
 int
 __wt_db_bulk_load(WT_TOC *toc,
-    void (*f)(const char *, uint64_t), int (*cb)(DB *, DBT **, DBT **));
+    void (*f)(const char *, uint64_t), int (*cb)(DB *, WT_DATAITEM **, WT_DATAITEM **));
 int
 __wt_bulk_init(ICURSOR_BULK *cbulk);
 int
@@ -51,9 +51,9 @@ __wt_cache_destroy(ENV *env);
 int
 __wt_bt_close(WT_TOC *toc);
 int
-__wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
+__wt_bt_lex_compare(DB *db, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt);
 int
-__wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
+__wt_bt_int_compare(DB *db, const WT_DATAITEM *user_dbt, const WT_DATAITEM *tree_dbt);
 int
 __wt_debug_dump(WT_TOC *toc, const char *ofile, FILE *fp);
 int
@@ -74,7 +74,7 @@ int
 __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags);
 void
-__wt_print_byte_string(uint8_t *data, uint32_t size, FILE *stream);
+__wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream);
 void
 __wt_workq_evict_server(ENV *env, int force);
 void *
@@ -100,13 +100,13 @@ __wt_bt_open(WT_TOC *toc, int ok_create);
 int
 __wt_root_pin(WT_TOC *toc);
 int
-__wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store);
+__wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_SCRATCH *store);
 int
 __wt_page_in(WT_TOC *toc, WT_PAGE *parent, WT_REF *ref, int dsk_verify);
 int
 __wt_page_inmem(WT_TOC *toc, WT_PAGE *page);
 int
-__wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret);
+__wt_item_process(WT_TOC *toc, WT_ITEM *item, WT_SCRATCH *scratch);
 void
 __wt_workq_read_server(ENV *env, int force);
 int
@@ -119,7 +119,7 @@ int
 __wt_rle_expand_sort(WT_TOC *toc,
     WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np);
 int
-__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return);
+__wt_data_return(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *value, int key_return);
 int
 __wt_disk_read(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
@@ -149,11 +149,11 @@ __wt_walk_end(ENV *env, WT_WALK *walk);
 int
 __wt_walk_next(WT_TOC *toc, WT_WALK *walk, uint32_t flags, WT_REF **refp);
 int
-__wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data);
+__wt_db_col_get(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data);
 int
 __wt_db_col_del(WT_TOC *toc, uint64_t recno);
 int
-__wt_db_col_put(WT_TOC *toc, uint64_t recno, DBT *data);
+__wt_db_col_put(WT_TOC *toc, uint64_t recno, WT_DATAITEM *data);
 int
 __wt_rle_expand_serial_func(WT_TOC *toc);
 int
@@ -161,19 +161,19 @@ __wt_rle_expand_update_serial_func(WT_TOC *toc);
 int
 __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags);
 int
-__wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data);
+__wt_db_row_get(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *data);
 int
-__wt_db_row_del(WT_TOC *toc, DBT *key);
+__wt_db_row_del(WT_TOC *toc, WT_DATAITEM *key);
 int
-__wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data);
+__wt_db_row_put(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *data);
 int
 __wt_item_update_serial_func(WT_TOC *toc);
 int
-__wt_update_alloc(WT_TOC *toc, WT_UPDATE **updp, DBT *data);
+__wt_update_alloc(WT_TOC *toc, WT_UPDATE **updp, WT_DATAITEM *data);
 void
 __wt_update_free(WT_TOC *toc, WT_UPDATE *upd);
 int
-__wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags);
+__wt_row_search(WT_TOC *toc, WT_DATAITEM *key, uint32_t flags);
 void
 __wt_api_db_err(DB *db, int error, const char *fmt, ...);
 void
@@ -403,7 +403,7 @@ __wt_huffman_encode(void *huffman_arg,
     void *top, uint32_t *to_len, uint32_t *out_bytes_used);
 int
 __wt_huffman_decode(void *huffman_arg,
-    uint8_t *from, uint32_t from_len,
+    const uint8_t *from, uint32_t from_len,
     void *top, uint32_t *to_len, uint32_t *out_bytes_used);
 uint32_t
 __wt_nlpo2(uint32_t v);
@@ -414,9 +414,9 @@ __wt_prime(uint32_t n);
 void
 __wt_progress(const char *s, uint64_t v);
 int
-__wt_scr_alloc(WT_TOC *toc, uint32_t size, DBT **dbtp);
+__wt_scr_alloc(WT_TOC *toc, uint32_t size, WT_SCRATCH **scratchp);
 void
-__wt_scr_release(DBT **dbt);
+__wt_scr_release(WT_SCRATCH **dbt);
 void
 __wt_scr_free(WT_TOC *toc);
 int

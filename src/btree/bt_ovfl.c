@@ -12,7 +12,7 @@
  *	Read an overflow item from the disk.
  */
 int
-__wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
+__wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, WT_SCRATCH *store)
 {
 	DB *db;
 	ENV *env;
@@ -46,7 +46,7 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 	 * buffer and so should be fast, but it's still not a good thing.  If
 	 * it ever becomes a problem, then we either have to pass the fact that
 	 * it's a "page" back to our caller and let them deal with the offset,
-	 * or add a new field to the DBT that flags the start of the allocated
+	 * or add a new field to the WT_DATAITEM that flags the start of the allocated
 	 * buffer, instead of using the "data" field to indicate both the start
 	 * of the data and the start of the allocated memory.
 	 *
@@ -54,15 +54,15 @@ __wt_ovfl_in(WT_TOC *toc, WT_OVFL *ovfl, DBT *store)
 	 */
 	size = WT_HDR_BYTES_TO_ALLOC(db, ovfl->size);
 	if (store->mem_size < size)
-		WT_RET(__wt_realloc(env, &store->mem_size, size, &store->data));
+		WT_RET(__wt_realloc(env, &store->mem_size, size, &store->item.data));
 
 	/* Read the page. */
-	WT_RET(__wt_disk_read(toc, store->data, ovfl->addr, size));
+	WT_RET(__wt_disk_read(toc, (void *)store->item.data, ovfl->addr, size));
 
-	/* Copy the actual data in the DBT down to the start of the data. */
-	(void)memmove(store->data,
-	    (uint8_t *)store->data + WT_PAGE_DISK_SIZE, ovfl->size);
-	store->size = ovfl->size;
+	/* Copy the actual data in the WT_DATAITEM down to the start of the data. */
+	(void)memmove((void *)store->item.data,
+	    (uint8_t *)store->item.data + WT_PAGE_DISK_SIZE, ovfl->size);
+	store->item.size = ovfl->size;
 
 	return (0);
 }

@@ -10,7 +10,7 @@
 
 typedef struct {
 	void (*p)				/* Print function */
-	    (uint8_t *, uint32_t, FILE *);
+	    (const uint8_t *, uint32_t, FILE *);
 	FILE *stream;				/* Dump stream */
 
 	void (*f)(const char *, uint64_t);	/* Progress callback */
@@ -22,8 +22,8 @@ static void __wt_dump_page_col_fix(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_rle(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_col_var(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
 static int  __wt_dump_page_row_leaf(WT_TOC *, WT_PAGE *, WT_DSTUFF *);
-static void __wt_print_byte_string_hex(uint8_t *, uint32_t, FILE *);
-static void __wt_print_byte_string_nl(uint8_t *, uint32_t, FILE *);
+static void __wt_print_byte_string_hex(const uint8_t *, uint32_t, FILE *);
+static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
 
 /*
  * __wt_db_dump --
@@ -209,7 +209,7 @@ static int
 __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	DBT *tmp;
+	WT_SCRATCH *tmp;
 	WT_COL *cip;
 	WT_ITEM *item;
 	WT_PAGE_DISK *dsk;
@@ -245,7 +245,7 @@ __wt_dump_page_col_var(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
 			WT_ERR(__wt_item_process(toc, item, tmp));
-			dp->p(tmp->data, tmp->size, dp->stream);
+			dp->p(tmp->item.data, tmp->item.size, dp->stream);
 			break;
 		case WT_ITEM_DEL:
 			break;
@@ -265,7 +265,8 @@ static int
 __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	DBT *key, *value, *key_tmp, *value_tmp, key_local, value_local;
+	WT_DATAITEM *key, *value, key_local, value_local;
+	WT_SCRATCH *key_tmp, *value_tmp;
 	WT_ITEM *item;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -274,7 +275,8 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	void *huffman;
 
 	db = toc->db;
-	key = value = key_tmp = value_tmp = NULL;
+	key = value = NULL;
+	key_tmp = value_tmp = NULL;
 	huffman = db->btree->huffman_data;
 	ret = 0;
 
@@ -290,14 +292,14 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 
 		/*
-		 * The key and value variables reference the DBT's we'll print.
+		 * The key and value variables reference the WT_DATAITEMs we'll print.
 		 * Set the key.
 		 */
 		if (__wt_key_process(rip)) {
 			WT_ERR(__wt_item_process(toc, rip->key, key_tmp));
-			key = key_tmp;
+			key = &key_tmp->item;
 		} else
-			key = (DBT *)rip;
+			key = (WT_DATAITEM *)rip;
 
 		/*
 		 * If the item was ever updated, dump the data from the
@@ -322,7 +324,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
 			WT_ERR(__wt_item_process(toc, item, value_tmp));
-			value = value_tmp;
+			value = &value_tmp->item;
 			break;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}
@@ -349,7 +351,7 @@ static const char hex[] = "0123456789abcdef";
  *	is itself terminated with a <newline> character.
  */
 static void
-__wt_print_byte_string_nl(uint8_t *data, uint32_t size, FILE *stream)
+__wt_print_byte_string_nl(const uint8_t *data, uint32_t size, FILE *stream)
 {
 	if (size > 0 && data[size - 1] == '\n')
 		--size;
@@ -362,7 +364,7 @@ __wt_print_byte_string_nl(uint8_t *data, uint32_t size, FILE *stream)
  *	Output a single byte string in printable characters, where possible.
  */
 void
-__wt_print_byte_string(uint8_t *data, uint32_t size, FILE *stream)
+__wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream)
 {
 	int ch;
 
@@ -381,7 +383,7 @@ __wt_print_byte_string(uint8_t *data, uint32_t size, FILE *stream)
  *	Output a single byte string in hexadecimal characters.
  */
 static void
-__wt_print_byte_string_hex(uint8_t *data, uint32_t size, FILE *stream)
+__wt_print_byte_string_hex(const uint8_t *data, uint32_t size, FILE *stream)
 {
 	for (; size > 0; --size, ++data)
 		fprintf(stream, "%x%x",

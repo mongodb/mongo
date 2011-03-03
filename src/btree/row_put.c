@@ -8,14 +8,14 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_row_update(WT_TOC *, DBT *, DBT *, int);
+static int __wt_row_update(WT_TOC *, WT_DATAITEM *, WT_DATAITEM *, int);
 
 /*
  * __wt_db_row_del --
  *	Db.row_del method.
  */
 int
-__wt_db_row_del(WT_TOC *toc, DBT *key)
+__wt_db_row_del(WT_TOC *toc, WT_DATAITEM *key)
 {
 	return (__wt_row_update(toc, key, NULL, 0));
 }
@@ -25,7 +25,7 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
  *	Db.row_put method.
  */
 int
-__wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data)
+__wt_db_row_put(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *data)
 {
 	return (__wt_row_update(toc, key, data, 1));
 }
@@ -35,7 +35,7 @@ __wt_db_row_put(WT_TOC *toc, DBT *key, DBT *data)
  *	Row-store delete and update.
  */
 static int
-__wt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
+__wt_row_update(WT_TOC *toc, WT_DATAITEM *key, WT_DATAITEM *data, int insert)
 {
 	ENV *env;
 	WT_PAGE *page;
@@ -120,7 +120,7 @@ err:	__wt_toc_serialize_wrapup(toc, page, ret);
  *	and fill it in.
  */
 int
-__wt_update_alloc(WT_TOC *toc, WT_UPDATE **updp, DBT *data)
+__wt_update_alloc(WT_TOC *toc, WT_UPDATE **updp, WT_DATAITEM *data)
 {
 	DB *db;
 	ENV *env;

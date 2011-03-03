@@ -402,15 +402,16 @@ __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_item_process(WT_TOC *toc, WT_ITEM *item, DBT *dbt_ret)
+__wt_item_process(WT_TOC *toc, WT_ITEM *item, WT_SCRATCH *scratch)
 {
 	DB *db;
-	DBT *tmp;
 	ENV *env;
 	BTREE *btree;
+	WT_SCRATCH *tmp;
 	uint32_t size;
 	int ret;
-	void *huffman, *p;
+	void *huffman;
+	const void *p;
 
 	db = toc->db;
 	tmp = NULL;
@@ -438,42 +439,42 @@ onpage:		p = WT_ITEM_BYTE(item);
 		huffman = btree->huffman_data;
 offpage:	/*
 		 * It's an overflow item -- if it's not encoded, we can read
-		 * it directly into the user's return DBT, otherwise we have to
+		 * it directly into the user's return WT_DATAITEM, otherwise we have to
 		 * have our own buffer as temporary space, and the decode call
-		 * will put a decoded version into the user's return DBT.
+		 * will put a decoded version into the user's return WT_DATAITEM.
 		 */
 		if (huffman == NULL)
-			tmp = dbt_ret;
+			tmp = scratch;
 		else
 			WT_RET(__wt_scr_alloc(toc, 0, &tmp));
 		WT_RET(__wt_ovfl_in(toc, WT_ITEM_BYTE_OVFL(item), tmp));
-		p = tmp->data;
-		size = tmp->size;
+		p = tmp->item.data;
+		size = tmp->item.size;
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
 	 * If the item is not compressed, and it's not an overflow item, copy
-	 * it into the caller's DBT.  If the item is not compressed, and it's
-	 * an overflow item, it was already copied into the caller's DBT.
+	 * it into the caller's WT_DATAITEM.  If the item is not compressed, and it's
+	 * an overflow item, it was already copied into the caller's WT_DATAITEM.
 	 *
 	 * If the item is compressed, pass it to the decode routines, they'll
-	 * copy a decoded version into the caller's DBT.
+	 * copy a decoded version into the caller's WT_DATAITEM.
 	 */
 	if (huffman == NULL) {
-		if (tmp != dbt_ret) {
-			 if (size > dbt_ret->mem_size)
+		if (tmp != scratch) {
+			 if (size > scratch->mem_size)
 				 WT_ERR(__wt_realloc(env,
-				     &dbt_ret->mem_size, size, &dbt_ret->data));
-			memcpy(dbt_ret->data, p, size);
-			dbt_ret->size = size;
+				     &scratch->mem_size, size, &scratch->item.data));
+			memcpy((void *)scratch->item.data, p, size);
+			scratch->item.size = size;
 		}
 	} else
 		WT_ERR(__wt_huffman_decode(huffman, p, size,
-		    &dbt_ret->data, &dbt_ret->mem_size, &dbt_ret->size));
+		    &scratch->item.data, &scratch->mem_size, &scratch->item.size));
 
-err:	if (tmp != NULL && tmp != dbt_ret)
+err:	if (tmp != NULL && tmp != scratch)
 		__wt_scr_release(&tmp);
 
 	return (ret);
