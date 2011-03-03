@@ -345,6 +345,9 @@ namespace mongo {
         }
 
         list<const ReplSetConfig::MemberCfg*> newOnes;
+        // additive short-cuts the new config setup. If we are just adding a
+        // node/nodes and nothing else is changing, this is additive. If it's
+        // not a reconfig, we're not adding anything
         bool additive = reconf;
         {
             unsigned nfound = 0;
@@ -366,7 +369,7 @@ namespace mongo {
                     if( old ) {
                         nfound++;
                         assert( (int) old->id() == m._id );
-                        if( old->config() == m ) {
+                        if( old->config() != m ) {
                             additive = false;
                         }
                     }
@@ -387,6 +390,7 @@ namespace mongo {
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 
+            // if we found different members that the original config, reload everything
             if( reconf && config().members.size() != nfound )
                 additive = false;
         }
@@ -397,6 +401,7 @@ namespace mongo {
         _name = _cfg->_id;
         assert( !_name.empty() );
 
+        // this is a shortcut for simple changes
         if( additive ) {
             log() << "replSet info : additive change to configuration" << rsLog;
             for( list<const ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
