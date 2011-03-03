@@ -11,15 +11,15 @@
 static int  __wt_evict(WT_TOC *);
 static int  __wt_evict_compare_lru(const void *a, const void *b);
 static int  __wt_evict_compare_page(const void *a, const void *b);
+static int  __wt_evict_discard(WT_TOC *, int);
 static void __wt_evict_hazard_check(WT_TOC *);
 static int  __wt_evict_hazard_compare(const void *a, const void *b);
-static int  __wt_evict_page(WT_TOC *, int);
-static int  __wt_evict_page_subtrees(WT_PAGE *);
+static void __wt_evict_reconcile(WT_TOC *);
 static void __wt_evict_set(WT_TOC *);
 static void __wt_evict_state_check(WT_TOC *);
+static int  __wt_evict_subtrees(WT_PAGE *);
 static int  __wt_evict_walk(WT_TOC *);
 static int  __wt_evict_walk_single(WT_TOC *, IDB *, u_int);
-static void __wt_evict_write(WT_TOC *);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_evict_hazard_validate(ENV *, WT_PAGE *);
@@ -266,9 +266,9 @@ done_duplicates:
 	__wt_evict_set(toc);
 	__wt_evict_hazard_check(toc);
 	__wt_evict_state_check(toc);
-	WT_RET(__wt_evict_page(toc, 0));
-	__wt_evict_write(toc);
-	WT_RET(__wt_evict_page(toc, 1));
+	WT_RET(__wt_evict_discard(toc, 0));
+	__wt_evict_reconcile(toc);
+	WT_RET(__wt_evict_discard(toc, 1));
 
 	return (0);
 }
@@ -538,7 +538,7 @@ __wt_evict_state_check(WT_TOC *toc)
 		switch (page->dsk->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			if (__wt_evict_page_subtrees(page)) {
+			if (__wt_evict_subtrees(page)) {
 				WT_VERBOSE(env, WT_VERB_EVICT, (env,
 				    "eviction skipped page addr %lu (subtrees)",
 				    page->addr));
@@ -561,11 +561,11 @@ skip:		/*
 }
 
 /*
- * __wt_evict_write --
- *	Write any modified pages.
+ * __wt_evict_reconcile --
+ *	Reconcile any modified pages.
  */
 static void
-__wt_evict_write(WT_TOC *toc)
+__wt_evict_reconcile(WT_TOC *toc)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -613,11 +613,11 @@ __wt_evict_write(WT_TOC *toc)
 }
 
 /*
- * __wt_evict_page --
- *	Evict cache pages.
+ * __wt_evict_discard --
+ *	Discard cache pages.
  */
 static int
-__wt_evict_page(WT_TOC *toc, int was_dirty)
+__wt_evict_discard(WT_TOC *toc, int was_dirty)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -679,11 +679,11 @@ __wt_evict_page(WT_TOC *toc, int was_dirty)
 }
 
 /*
- * __wt_evict_page_subtrees --
+ * __wt_evict_subtrees --
  *	Return if a page has an in-memory subtree.
  */
 static int
-__wt_evict_page_subtrees(WT_PAGE *page)
+__wt_evict_subtrees(WT_PAGE *page)
 {
 	WT_ROW_REF *rref;
 	WT_COL_REF *cref;
