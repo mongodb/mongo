@@ -380,6 +380,9 @@ namespace mongo {
                     }
                 }
                 c->advance();
+
+                if ( ! cc->yieldSometimes() )
+                    break;
             }
 
             if ( cc ) {
