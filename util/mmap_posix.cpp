@@ -155,7 +155,7 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         if ( views.empty() || fd == 0 )
             return;
-        if ( msync(views[0], len, sync ? MS_SYNC : MS_ASYNC) )
+        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) )
             problem() << "msync " << errnoWithDescription() << endl;
     }
 
@@ -178,7 +178,7 @@ namespace mongo {
     };
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new PosixFlushable( views.empty() ? 0 : views[0] , fd , len );
+        return new PosixFlushable( viewForFlushing() , fd , len );
     }
 
     void MemoryMappedFile::_lock() {

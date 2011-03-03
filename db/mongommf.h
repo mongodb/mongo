@@ -27,6 +27,9 @@ namespace mongo {
         not this.
     */
     class MongoMMF : private MemoryMappedFile {
+    protected:
+        virtual void* viewForFlushing() { return _view_write; }
+
     public:
         MongoMMF();
         virtual ~MongoMMF();

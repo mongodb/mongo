@@ -135,6 +135,13 @@ namespace mongo {
     };
 
     class MemoryMappedFile : public MongoFile {
+    protected:
+        virtual void* viewForFlushing() { 
+            if( views.size() == 0 )
+                return 0;
+            assert( views.size() == 1 );
+            return views[0];
+        }
     public:
         MemoryMappedFile();
 
@@ -187,7 +194,7 @@ namespace mongo {
         HANDLE maphandle;
         vector<void *> views;
         unsigned long long len;
-
+        
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
         void clearWritableBits(void *privateView);

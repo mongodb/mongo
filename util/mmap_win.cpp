@@ -183,13 +183,13 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f( views[0] , fd , filename() , _flushMutex);
+            WindowsFlushable f( viewForFlushing() , fd , filename() , _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable( views.empty() ? 0 : views[0] , fd , filename() , _flushMutex );
+        return new WindowsFlushable( viewForFlushing() , fd , filename() , _flushMutex );
     }
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}
