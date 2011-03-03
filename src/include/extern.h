@@ -119,7 +119,7 @@ int
 __wt_rle_expand_sort(WT_TOC *toc,
     WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np);
 int
-__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);
+__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return);
 int
 __wt_disk_read(WT_TOC *toc, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int

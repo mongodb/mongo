@@ -13,10 +13,10 @@
  *	Retrun a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
+__wt_dbt_return(WT_TOC *toc, DBT *key, DBT *value, int key_return)
 {
 	DB *db;
-	DBT local_key, local_data;
+	DBT local_key, local_value;
 	ENV *env;
 	BTREE *btree;
 	WT_COL *cip;
@@ -25,14 +25,14 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
-	void *data_ret;
+	void *value_ret;
 	uint32_t size_ret;
 	int (*callback)(DB *, DBT *, DBT *), ret;
 
 	db = toc->db;
 	env = toc->env;
 	btree = db->btree;
-	callback = data->callback;
+	callback = value->callback;
 	ret = 0;
 
 	page = toc->srch_page;
@@ -45,16 +45,16 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	 * Handle the key item -- the key may be unchanged, in which case we
 	 * don't touch it, it's already correct.
 	 *
-	 * If the key/data items are being passed to a callback routine and
+	 * If the key/value items are being passed to a callback routine and
 	 * there's nothing special about them (they aren't uninstantiated
 	 * overflow or compressed items), then give the callback a pointer to
 	 * the on-page data.  (We use a local DBT in this case, so we don't
 	 * touch potentially allocated application DBT memory.)  Else, copy
 	 * the items into the application's DBTs.
 	 *
-	 * If the key/data item are uninstantiated overflow and/or compressed
+	 * If the key/value item are uninstantiated overflow and/or compressed
 	 * items, they require processing before being copied into the DBTs.
-	 * Don't allocate WT_INDX memory for key/data items here.  (We never
+	 * Don't allocate WT_INDX memory for key/value items here.  (We never
 	 * allocate WT_INDX memory for data items.   We do allocate WT_INDX
 	 * memory for keys, but if we are looking at a key only to return it,
 	 * it's not that likely to be accessed again (think of a cursor moving
@@ -90,7 +90,7 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	}
 
 	/*
-	 * Handle the data item.
+	 * Handle the value.
 	 *
 	 * If the item was ever updated, it's easy, take the last update item,
 	 * it's just a byte string.
@@ -98,37 +98,37 @@ __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return)
 	if (upd != NULL) {
 		if (WT_UPDATE_DELETED_ISSET(upd))
 			return (WT_NOTFOUND);
-		data->data = WT_UPDATE_DATA(upd);
-		data->size = upd->size;
-		return (callback == NULL ? 0 : callback(db, key, data));
+		value->data = WT_UPDATE_DATA(upd);
+		value->size = upd->size;
+		return (callback == NULL ? 0 : callback(db, key, value));
 	}
 
 	/* Otherwise, take the item from the original page. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		data_ret = WT_COL_PTR(dsk, cip);
+		value_ret = WT_COL_PTR(dsk, cip);
 		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_RLE:
-		data_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(dsk, cip));
+		value_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(dsk, cip));
 		size_ret = db->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
 		item = WT_COL_PTR(dsk, cip);
 		goto item_set;
 	case WT_PAGE_ROW_LEAF:
-		item = rip->data;
+		item = rip->value;
 item_set:	switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
 			if (btree->huffman_data == NULL) {
-				data_ret = WT_ITEM_BYTE(item);
+				value_ret = WT_ITEM_BYTE(item);
 				size_ret = WT_ITEM_LEN(item);
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_RET(__wt_item_process(toc, item, &toc->data));
-			data_ret = toc->data.data;
-			size_ret = toc->data.size;
+			WT_RET(__wt_item_process(toc, item, &toc->value));
+			value_ret = toc->value.data;
+			size_ret = toc->value.size;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -137,38 +137,38 @@ item_set:	switch (WT_ITEM_TYPE(item)) {
 	}
 
 	/*
-	 * When we get here, data_ret and size_ret are set to the byte string
+	 * When we get here, value_ret and size_ret are set to the byte string
 	 * and the length we're going to return.   That byte string has been
 	 * decoded, we called __wt_item_process above in all cases where the
 	 * item could be encoded.
 	 */
 	if (callback == NULL) {
 		/*
-		 * We're copying the key/data pair out to the caller.  If we
-		 * haven't yet copied the data_ret/size_ret pair into the return
+		 * We're copying the key/value pair out to the caller.  If we
+		 * haven't yet copied the value_ret/size_ret pair into the return
 		 * DBT (potentially done by __wt_item_process), do so now.
 		 */
-		if (data_ret != toc->data.data) {
-			if (toc->data.mem_size < size_ret)
+		if (value_ret != toc->value.data) {
+			if (toc->value.mem_size < size_ret)
 				WT_RET(__wt_realloc(env,
-				    &toc->data.mem_size,
-				    size_ret, &toc->data.data));
-			memcpy(toc->data.data, data_ret, size_ret);
-			toc->data.size = size_ret;
+				    &toc->value.mem_size,
+				    size_ret, &toc->value.data));
+			memcpy(toc->value.data, value_ret, size_ret);
+			toc->value.size = size_ret;
 		}
 
-		data->data = toc->data.data;
-		data->size = toc->data.size;
+		value->data = toc->value.data;
+		value->size = toc->value.size;
 	} else {
 		/*
 		 * If we're given a callback function, use the data_ret/size_ret
 		 * fields as set.
 		 */
-		WT_CLEAR(local_data);
-		data = &local_data;
-		data->data = data_ret;
-		data->size = size_ret;
-		ret = callback(db, key, data);
+		WT_CLEAR(local_value);
+		value = &local_value;
+		value->data = value_ret;
+		value->size = size_ret;
+		ret = callback(db, key, value);
 	}
 
 	return (ret);

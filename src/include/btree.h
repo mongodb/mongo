@@ -458,7 +458,7 @@ struct __wt_row {
 	void	 *key;			/* Key */
 	uint32_t size;			/* Key length */
 
-	void	 *data;			/* Data */
+	void	 *value;		/* Data */
 };
 /*
  * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure

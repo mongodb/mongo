@@ -1049,9 +1049,9 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 			 * If we update overflow data item, free the underlying
 			 * file space.
 			 */
-			if (WT_ITEM_TYPE(rip->data) == WT_ITEM_DATA_OVFL)
+			if (WT_ITEM_TYPE(rip->value) == WT_ITEM_DATA_OVFL)
 				WT_RET(__wt_block_free_ovfl(
-				    toc, WT_ITEM_BYTE_OVFL(rip->data)));
+				    toc, WT_ITEM_BYTE_OVFL(rip->value)));
 
 			/*
 			 * If this key/data pair was deleted, we're done.  If
@@ -1087,12 +1087,12 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 			 * item, that is, it may have been zero length.  Catch
 			 * that case.
 			 */
-			if (rip->data == empty_item)
+			if (rip->value == empty_item)
 				data_loc = EMPTY_DATA;
 			else {
-				data->data = rip->data;
+				data->data = rip->value;
 				data->size =
-				    WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->data));
+				    WT_ITEM_SPACE_REQ(WT_ITEM_LEN(rip->value));
 				data_loc = DATA_ON_PAGE;
 				len += data->size;
 			}

@@ -111,7 +111,7 @@ __curtable_next(WT_CURSOR *cursor)
 			}
 
 			/* Set data to reference the data we'll dump. */
-			item = ctable->rip->data;
+			item = ctable->rip->value;
 			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
 				if (huffman == NULL) {
 					cstd->value.item.data =

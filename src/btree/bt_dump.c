@@ -265,7 +265,7 @@ static int
 __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	DB *db;
-	DBT *key, *data, *key_tmp, *data_tmp, key_local, data_local;
+	DBT *key, *value, *key_tmp, *value_tmp, key_local, value_local;
 	WT_ITEM *item;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -274,14 +274,14 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 	void *huffman;
 
 	db = toc->db;
-	key = data = key_tmp = data_tmp = NULL;
+	key = value = key_tmp = value_tmp = NULL;
 	huffman = db->btree->huffman_data;
 	ret = 0;
 
 	WT_ERR(__wt_scr_alloc(toc, 0, &key_tmp));
-	WT_ERR(__wt_scr_alloc(toc, 0, &data_tmp));
+	WT_ERR(__wt_scr_alloc(toc, 0, &value_tmp));
 	WT_CLEAR(key_local);
-	WT_CLEAR(data_local);
+	WT_CLEAR(value_local);
 
 	WT_ROW_INDX_FOREACH(page, rip, i) {
 		/* Check for deletion. */
@@ -290,7 +290,7 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 
 		/*
-		 * The key and data variables reference the DBT's we'll print.
+		 * The key and value variables reference the DBT's we'll print.
 		 * Set the key.
 		 */
 		if (__wt_key_process(rip)) {
@@ -309,33 +309,33 @@ __wt_dump_page_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 		}
 
-		/* Set data to reference the data we'll dump. */
-		item = rip->data;
+		/* Set value to reference the value we'll dump. */
+		item = rip->value;
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_DATA:
 			if (huffman == NULL) {
-				data_local.data = WT_ITEM_BYTE(item);
-				data_local.size = WT_ITEM_LEN(item);
-				data = &data_local;
+				value_local.data = WT_ITEM_BYTE(item);
+				value_local.size = WT_ITEM_LEN(item);
+				value = &value_local;
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
-			WT_ERR(__wt_item_process(toc, item, data_tmp));
-			data = data_tmp;
+			WT_ERR(__wt_item_process(toc, item, value_tmp));
+			value = value_tmp;
 			break;
 		WT_ILLEGAL_FORMAT_ERR(db, ret);
 		}
 
 		dp->p(key->data, key->size, dp->stream);
-		dp->p(data->data, data->size, dp->stream);
+		dp->p(value->data, value->size, dp->stream);
 	}
 
-err:	/* Discard any space allocated to hold off-page key/data items. */
+err:	/* Discard any space allocated to hold off-page key/value items. */
 	if (key_tmp != NULL)
 		__wt_scr_release(&key_tmp);
-	if (data_tmp != NULL)
-		__wt_scr_release(&data_tmp);
+	if (value_tmp != NULL)
+		__wt_scr_release(&value_tmp);
 
 	return (ret);
 }

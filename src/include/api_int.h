@@ -17,7 +17,7 @@ struct __env;			typedef struct __env ENV;
 struct __ienv;			typedef struct __ienv IENV;
 
 /*******************************************
- * Key/data structure -- a Data-Base Thang
+ * Key/value structure -- a Data-Base Thang
  *******************************************/
 struct __dbt {
 	void    *data;			/* returned/specified data */
@@ -356,7 +356,7 @@ struct __wt_toc {
 	void	*app_private;		/* Application-private information */
 
 	DB	*db;			/* Current file */
-	DBT	 key, data;		/* Returned key/data pairs */
+	DBT	 key, value;		/* Returned key/value pairs */
 
 	DBT	*scratch;		/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */

@@ -378,7 +378,7 @@ methods['db.col_get'] = Api(
 	'method, colonly, toc',
 	['toc/WT_TOC *@S',
 	 'recno/uint64_t @S',
-	 'data/DBT *@S',
+	 'value/DBT *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -388,7 +388,7 @@ methods['db.col_put'] = Api(
 	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
 	 'recno/uint64_t @S',
-	 'data/DBT *@S',
+	 'value/DBT *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -499,7 +499,7 @@ methods['db.row_get'] = Api(
 	'method, rowonly, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
-	 'data/DBT *@S',
+	 'value/DBT *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -509,7 +509,7 @@ methods['db.row_put'] = Api(
 	'method, rdonly, restart, rowonly, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
-	 'data/DBT *@S',
+	 'value/DBT *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])

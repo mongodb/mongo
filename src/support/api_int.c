@@ -245,13 +245,13 @@ static int __wt_api_db_col_get(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *data,
+	DBT *value,
 	uint32_t flags);
 static int __wt_api_db_col_get(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *data,
+	DBT *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.col_get";
@@ -263,7 +263,7 @@ static int __wt_api_db_col_get(
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_GET);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_COL_GET);
-	ret = __wt_db_col_get(toc, recno, data);
+	ret = __wt_db_col_get(toc, recno, value);
 	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
@@ -272,13 +272,13 @@ static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *data,
+	DBT *value,
 	uint32_t flags);
 static int __wt_api_db_col_put(
 	DB *db,
 	WT_TOC *toc,
 	uint64_t recno,
-	DBT *data,
+	DBT *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.col_put";
@@ -291,7 +291,7 @@ static int __wt_api_db_col_put(
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_PUT);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_COL_PUT);
-	while ((ret = __wt_db_col_put(toc, recno, data)) == WT_RESTART)
+	while ((ret = __wt_db_col_put(toc, recno, value)) == WT_RESTART)
 		WT_STAT_INCR(ienv->method_stats, DB_COL_PUT_RESTART);
 	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
@@ -534,13 +534,13 @@ static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
-	DBT *data,
+	DBT *value,
 	uint32_t flags);
 static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
-	DBT *data,
+	DBT *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.row_get";
@@ -552,7 +552,7 @@ static int __wt_api_db_row_get(
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_GET);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_GET);
-	ret = __wt_db_row_get(toc, key, data);
+	ret = __wt_db_row_get(toc, key, value);
 	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);
 }
@@ -561,13 +561,13 @@ static int __wt_api_db_row_put(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
-	DBT *data,
+	DBT *value,
 	uint32_t flags);
 static int __wt_api_db_row_put(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
-	DBT *data,
+	DBT *value,
 	uint32_t flags)
 {
 	const char *method_name = "DB.row_put";
@@ -580,7 +580,7 @@ static int __wt_api_db_row_put(
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_PUT);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_PUT);
-	while ((ret = __wt_db_row_put(toc, key, data)) == WT_RESTART)
+	while ((ret = __wt_db_row_put(toc, key, value)) == WT_RESTART)
 		WT_STAT_INCR(ienv->method_stats, DB_ROW_PUT_RESTART);
 	WT_TRET(__wt_toc_api_clr(toc, method_name, 0));
 	return (ret);

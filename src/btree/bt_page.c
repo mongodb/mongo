@@ -384,11 +384,11 @@ __wt_page_inmem_row_leaf(WT_TOC *toc, WT_PAGE *page)
 			 * implies a zero-length data item.  Initialize the
 			 * slot as if it's going to happen.
 			 */
-			rip->data = &btree->empty_item;
+			rip->value = &btree->empty_item;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
-			rip->data = item;
+			rip->value = item;
 			break;
 		}
 

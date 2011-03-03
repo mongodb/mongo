@@ -990,12 +990,12 @@ __wt_item_build_value(WT_TOC *toc,
 	if (btree->huffman_data != NULL) {
 		WT_RET(__wt_huffman_encode(
 		    btree->huffman_data, dbt->data, dbt->size,
-		    &toc->data.data, &toc->data.mem_size, &toc->data.size));
-		if (toc->data.size > dbt->size)
+		    &toc->value.data, &toc->value.mem_size, &toc->value.size));
+		if (toc->value.size > dbt->size)
 			WT_STAT_INCRV(stats,
-			    FILE_HUFFMAN_DATA, toc->data.size - dbt->size);
-		dbt->data = toc->data.data;
-		dbt->size = toc->data.size;
+			    FILE_HUFFMAN_DATA, toc->value.size - dbt->size);
+		dbt->data = toc->value.data;
+		dbt->size = toc->value.size;
 	}
 
 	/* Create an overflow object if the data won't fit. */

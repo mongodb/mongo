@@ -347,7 +347,7 @@ __wt_debug_page_row_leaf(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 			__wt_debug_dbt("\tkey", rip, fp);
 
 		fprintf(fp, "\tdata: {");
-		WT_RET(__wt_debug_item_data(toc, rip->data, fp));
+		WT_RET(__wt_debug_item_data(toc, rip->value, fp));
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
