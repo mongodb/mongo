@@ -207,7 +207,7 @@ static int
 __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_CELL *item;
 	WT_PAGE_DISK *dsk;
@@ -264,7 +264,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	BTREE *btree;
 	WT_ITEM *key, *value, key_local, value_local;
-	WT_SCRATCH *key_tmp, *value_tmp;
+	WT_BUF *key_tmp, *value_tmp;
 	WT_CELL *item;
 	WT_ROW *rip;
 	WT_UPDATE *upd;

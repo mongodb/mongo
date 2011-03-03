@@ -99,7 +99,7 @@ __wt_verify_dsk_item(
 	struct {
 		WT_ROW   rip;			/* Reference to on-page data */
 		WT_ITEM	*dbt;			/* WT_ITEM to compare */
-		WT_SCRATCH	*scratch;		/* scratch buffer */
+		WT_BUF	*scratch;		/* scratch buffer */
 	} *current, *last, *tmp, _a, _b;
 	BTREE *btree;
 	WT_CELL *item;

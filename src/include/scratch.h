@@ -5,12 +5,10 @@
  *	All rights reserved.
  */
 
-struct WT_SCRATCH;	typedef struct WT_SCRATCH WT_SCRATCH;
-
-struct WT_SCRATCH {
+typedef struct {
 	WT_ITEM item;
-	void *buf;
+	void *mem;
 	uint32_t mem_size;
 
 	uint32_t flags;
-};
+} WT_BUF;

@@ -387,10 +387,10 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_item_process(SESSION *session, WT_CELL *item, WT_SCRATCH *scratch)
+__wt_item_process(SESSION *session, WT_CELL *item, WT_BUF *scratch)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	uint32_t size;
 	int ret;
 	void *huffman;
@@ -445,15 +445,11 @@ offpage:	/*
 	 */
 	if (huffman == NULL) {
 		if (tmp != scratch) {
-			 if (size > scratch->mem_size)
-				 WT_ERR(__wt_realloc(session,
-				     &scratch->mem_size, size, &scratch->item.data));
-			memcpy((void *)scratch->item.data, p, size);
-			scratch->item.size = size;
+			WT_ERR(__wt_buf_grow(session, scratch, size));
+			memcpy(scratch->mem, p, size);
 		}
 	} else
-		WT_ERR(__wt_huffman_decode(huffman, p, size,
-		    &scratch->item.data, &scratch->mem_size, &scratch->item.size));
+		WT_ERR(__wt_huffman_decode(huffman, p, size, scratch));
 
 err:	if (tmp != NULL && tmp != scratch)
 		__wt_scr_release(&tmp);

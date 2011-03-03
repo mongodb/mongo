@@ -17,7 +17,7 @@ static inline int __wt_key_build(SESSION *, void *);
 static inline int
 __wt_key_build(SESSION *session, void *ref)
 {
-	WT_SCRATCH *scratch, _scratch;
+	WT_BUF *scratch, _scratch;
 	WT_CELL *item;
 
 	WT_CLEAR(_scratch);
@@ -31,7 +31,7 @@ __wt_key_build(SESSION *session, void *ref)
 	WT_RET(__wt_item_process(session, item, scratch));
 
 	/* Update the WT_ROW reference with the processed key. */
-	__wt_key_set(ref, (void *)scratch->item.data, scratch->item.size);
+	__wt_key_set(ref, scratch->mem, scratch->item.size);
 
 	return (0);
 }

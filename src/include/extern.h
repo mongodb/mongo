@@ -27,12 +27,6 @@ int
 __wt_curbulk_init(ICURSOR_BULK *cbulk);
 void
 __wt_curdump_init(WT_CURSOR_STD *stdc);
-void
-__wt_scratch_init(WT_SCRATCH *scratch);
-int
-__wt_scratch_grow(SESSION *session, WT_SCRATCH *scratch, size_t sz);
-void
-__wt_scratch_free(SESSION *session, WT_SCRATCH *scratch);
 int
 __wt_curstd_close(WT_CURSOR *cursor, const char *config);
 void
@@ -120,13 +114,13 @@ __wt_bt_open(SESSION *session, int ok_create);
 int
 __wt_root_pin(SESSION *session);
 int
-__wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_SCRATCH *store);
+__wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store);
 int
 __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify);
 int
 __wt_page_inmem(SESSION *session, WT_PAGE *page);
 int
-__wt_item_process(SESSION *session, WT_CELL *item, WT_SCRATCH *scratch);
+__wt_item_process(SESSION *session, WT_CELL *item, WT_BUF *scratch);
 void
 __wt_workq_read_server(CONNECTION *conn, int force);
 int
@@ -393,12 +387,10 @@ int
 __wt_print_huffman_code(SESSION *session, void *huffman_arg, uint16_t symbol);
 int
 __wt_huffman_encode(void *huffman_arg,
-    const uint8_t *from, uint32_t from_len,
-    void *top, uint32_t *to_len, uint32_t *out_bytes_used);
+    const uint8_t *from, uint32_t from_len, WT_BUF *to_buf);
 int
 __wt_huffman_decode(void *huffman_arg,
-    const uint8_t *from, uint32_t from_len,
-    void *top, uint32_t *to_len, uint32_t *out_bytes_used);
+    const uint8_t *from, uint32_t from_len, WT_BUF *to_buf);
 uint32_t
 __wt_nlpo2(uint32_t v);
 int
@@ -407,10 +399,16 @@ uint32_t
 __wt_prime(uint32_t n);
 void
 __wt_progress(const char *s, uint64_t v);
-int
-__wt_scr_alloc(SESSION *session, uint32_t size, WT_SCRATCH **scratchp);
 void
-__wt_scr_release(WT_SCRATCH **dbt);
+__wt_buf_init(WT_BUF *buf);
+int
+__wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz);
+void
+__wt_buf_free(SESSION *session, WT_BUF *buf);
+int
+__wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp);
+void
+__wt_scr_release(WT_BUF **bufp);
 void
 __wt_scr_free(SESSION *session);
 int

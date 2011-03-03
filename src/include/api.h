@@ -20,7 +20,7 @@ typedef struct {
 	WT_REF *ref;
 	WT_COL *cip;
 	WT_ROW *rip;
-	WT_SCRATCH *key_tmp, *value_tmp;
+	WT_BUF *key_tmp, *value_tmp;
 	uint32_t nitems;
 } ICURSOR_TABLE;
 
@@ -34,7 +34,7 @@ typedef struct {
 	uint8_t	*first_free;			/* page's first free byte */
 	uint32_t space_avail;			/* page's space available */
 
-	WT_SCRATCH *tmp;			/* page-in-a-buffer */
+	WT_BUF *tmp;			/* page-in-a-buffer */
 	void *data;				/* last on-page WT_COL/WT_ROW */
 } WT_STACK_ELEM;
 
@@ -46,7 +46,7 @@ typedef struct {
 typedef struct {
 	ICURSOR_TABLE ctable;
 
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_PAGE *page;
 	WT_STACK stack;
 	uint64_t insert_cnt;
@@ -225,9 +225,9 @@ struct __session {
 	const char *name;		/* Name */
 
 	BTREE	*btree;			/* Current file */
-	WT_SCRATCH	 key, value;	/* Returned key/value pairs */
+	WT_BUF	 key, value;	/* Returned key/value pairs */
 
-	WT_SCRATCH	*scratch;	/* Temporary memory for any function */
+	WT_BUF	*scratch;	/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
 
 					/* SESSION workQ request */
@@ -462,6 +462,7 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
  * API flags section: BEGIN
  */
 #define	WT_ASCII_ENGLISH				0x00000008
+#define	WT_BUF_INUSE					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DATA_OVERWRITE				0x00000001
@@ -477,7 +478,6 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_READ_EVICT					0x00000002
 #define	WT_READ_PRIORITY				0x00000001
 #define	WT_RLE						0x00000001
-#define	WT_SCRATCH_INUSE				0x00000001
 #define	WT_SERVER_RUN					0x00000004
 #define	WT_TELEPHONE					0x00000001
 #define	WT_VERB_ALL					0x00000020
@@ -508,6 +508,7 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_APIMASK_BTREE_STAT_PRINT			0x00000000
 #define	WT_APIMASK_BTREE_SYNC				0x00000001
 #define	WT_APIMASK_BTREE_VERIFY				0x00000000
+#define	WT_APIMASK_BUF					0x00000001
 #define	WT_APIMASK_CONN					0x00000007
 #define	WT_APIMASK_CONNECTION_BTREE			0x00000000
 #define	WT_APIMASK_CONNECTION_CLOSE			0x00000000
@@ -517,7 +518,6 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_APIMASK_CONNECTION_STAT_PRINT		0x00000000
 #define	WT_APIMASK_CONNECTION_SYNC			0x00000000
 #define	WT_APIMASK_CONNECTION_VERBOSE_SET		0x0000003f
-#define	WT_APIMASK_SCRATCH				0x00000001
 #define	WT_APIMASK_SESSION				0x00000003
 #define	WT_APIMASK_SESSION_CLOSE			0x00000000
 #define	WT_APIMASK_WIREDTIGER_CONN_INIT			0x00000001

@@ -235,13 +235,13 @@ methods['connection.verbose_set'] = Api(
 methods['btree.btree_compare_get'] = Api(
 	'btree.btree_compare_get',
 	'method, getter',
-	['btree_compare/int (**@S)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)'],
+	['btree_compare/int (**@S)(BTREE *, const WT_ITEM *, const WT_ITEM *)'],
 	[],
 	['init'], [])
 methods['btree.btree_compare_set'] = Api(
 	'btree.btree_compare_set',
 	'method, setter',
-	['btree_compare/int (*@S)(BTREE *, const WT_DATAITEM *, const WT_DATAITEM *)/__wt_bt_lex_compare'],
+	['btree_compare/int (*@S)(BTREE *, const WT_ITEM *, const WT_ITEM *)/__wt_bt_lex_compare'],
 	[],
 	['init'], ['open'])
 
@@ -298,7 +298,7 @@ methods['btree.bulk_load'] = Api(
 	'btree.bulk_load',
 	'method, rdonly, session',
 	['progress/void (*@S)(const char *, uint64_t)',
-	 'cb/int (*@S)(BTREE *, WT_DATAITEM **, WT_DATAITEM **)'],
+	 'cb/int (*@S)(BTREE *, WT_ITEM **, WT_ITEM **)'],
 	[],
 	['open'], [])
 
@@ -324,7 +324,7 @@ methods['btree.col_get'] = Api(
 	'method, colonly, session',
 	['session/SESSION *@S',
 	 'recno/uint64_t @S',
-	 'value/WT_DATAITEM *@S',
+	 'value/WT_ITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -334,7 +334,7 @@ methods['btree.col_put'] = Api(
 	'method, colonly, rdonly, restart, session',
 	['session/SESSION *@S',
 	 'recno/uint64_t @S',
-	 'value/WT_DATAITEM *@S',
+	 'value/WT_ITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -381,7 +381,7 @@ methods['btree.row_del'] = Api(
 	'btree.row_del',
 	'method, rdonly, restart, rowonly, session',
 	['session/SESSION *@S',
-	 'key/WT_DATAITEM *@S',
+	 'key/WT_ITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -390,8 +390,8 @@ methods['btree.row_get'] = Api(
 	'btree.row_get',
 	'method, rowonly, session',
 	['session/SESSION *@S',
-	 'key/WT_DATAITEM *@S',
-	 'value/WT_DATAITEM *@S',
+	 'key/WT_ITEM *@S',
+	 'value/WT_ITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -400,8 +400,8 @@ methods['btree.row_put'] = Api(
 	'btree.row_put',
 	'method, rdonly, restart, rowonly, session',
 	['session/SESSION *@S',
-	 'key/WT_DATAITEM *@S',
-	 'value/WT_DATAITEM *@S',
+	 'key/WT_ITEM *@S',
+	 'value/WT_ITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -464,8 +464,8 @@ flags['btree'] = [
 	'COLUMN',
 	'RDONLY',
 	'RLE' ]
-flags['scratch'] = [
-	'SCRATCH_INUSE' ]
+flags['buf'] = [
+	'BUF_INUSE' ]
 flags['session'] = [
 	'READ_EVICT',
 	'READ_PRIORITY' ]

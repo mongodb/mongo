@@ -7,35 +7,6 @@
 
 #include "wt_internal.h"
 
-void
-__wt_scratch_init(WT_SCRATCH *scratch)
-{
-	scratch->item.data = scratch->buf = NULL;
-	scratch->mem_size = scratch->item.size = 0;
-}
-
-int
-__wt_scratch_grow(SESSION *session, WT_SCRATCH *scratch, size_t sz)
-{
-	if (sz > scratch->mem_size)
-		WT_RET(__wt_realloc(session, &scratch->mem_size, sz, &scratch->buf));
-
-	scratch->item.data = scratch->buf;
-	WT_ASSERT(session, sz < UINT32_MAX);
-	scratch->item.size = (uint32_t)sz;
-	return (0);
-}
-
-void
-__wt_scratch_free(SESSION *session, WT_SCRATCH *scratch)
-{
-	if (scratch->buf != NULL)
-		__wt_free(session, scratch->buf, scratch->mem_size);
-
-	scratch->item.data = NULL;
-	scratch->mem_size = scratch->item.size = 0;
-}
-
 static int
 __curstd_get_key(WT_CURSOR *cursor, ...)
 {
@@ -96,14 +67,14 @@ __curstd_set_key(WT_CURSOR *cursor, ...)
 		cstd->key.item.data = item->data;
 	} else {
 		sz = wiredtiger_struct_sizev(fmt, ap);
-		if (__wt_scratch_grow(session, &cstd->key, sz) == 0 &&
-		    wiredtiger_struct_packv(cstd->key.buf, sz, fmt, ap) == 0)
+		if (__wt_buf_grow(session, &cstd->key, sz) == 0 &&
+		    wiredtiger_struct_packv(cstd->key.mem, sz, fmt, ap) == 0)
 			F_CLR(cstd, WT_CURSTD_BADKEY);
 		else {
 			F_SET(cstd, WT_CURSTD_BADKEY);
 			return;
 		}
-		cstd->key.item.data = cstd->key.buf;
+		cstd->key.item.data = cstd->key.mem;
 	}
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
 	cstd->key.item.size = (uint32_t)sz;
@@ -134,14 +105,14 @@ __curstd_set_value(WT_CURSOR *cursor, ...)
 		cstd->value.item.data = item->data;
 	} else {
 		sz = wiredtiger_struct_sizev(fmt, ap);
-		if (__wt_scratch_grow(session, &cstd->value, sz) == 0 &&
-		    wiredtiger_struct_packv(cstd->value.buf, sz, fmt, ap) == 0)
+		if (__wt_buf_grow(session, &cstd->value, sz) == 0 &&
+		    wiredtiger_struct_packv(cstd->value.mem, sz, fmt, ap) == 0)
 			F_CLR(cstd, WT_CURSTD_BADVALUE);
 		else {
 			F_SET(cstd, WT_CURSTD_BADVALUE);
 			return;
 		}
-		cstd->value.item.data = cstd->value.buf;
+		cstd->value.item.data = cstd->value.mem;
 	}
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
 	cstd->value.item.size = (uint32_t)sz;
@@ -161,8 +132,8 @@ __wt_curstd_close(WT_CURSOR *cursor, const char *config)
 	session = (SESSION *)cursor->session;
 	ret = 0;
 
-	__wt_scratch_free(session, &cstd->key);
-	__wt_scratch_free(session, &cstd->value);
+	__wt_buf_free(session, &cstd->key);
+	__wt_buf_free(session, &cstd->value);
 
 	TAILQ_REMOVE(&session->cursors, cstd, q);
 	__wt_free(session, cursor, sizeof(ICURSOR_TABLE));
@@ -180,7 +151,7 @@ __wt_curstd_init(WT_CURSOR_STD *cstd)
 	c->set_key = __curstd_set_key;
 	c->set_value = __curstd_set_value;
 
-	cstd->value.item.data = cstd->value.buf = NULL;
+	cstd->value.item.data = cstd->value.mem = NULL;
 	cstd->value.mem_size = 0;
 
 	cstd->flags = WT_CURSTD_BADKEY | WT_CURSTD_BADVALUE;

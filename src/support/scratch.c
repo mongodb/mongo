@@ -7,14 +7,43 @@
 
 #include "wt_internal.h"
 
+void
+__wt_buf_init(WT_BUF *buf)
+{
+	buf->item.data = buf->mem = NULL;
+	buf->mem_size = buf->item.size = 0;
+}
+
+int
+__wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz)
+{
+	if (sz > buf->mem_size)
+		WT_RET(__wt_realloc(session, &buf->mem_size, sz, &buf->mem));
+
+	buf->item.data = buf->mem;
+	WT_ASSERT(session, sz < UINT32_MAX);
+	buf->item.size = (uint32_t)sz;
+	return (0);
+}
+
+void
+__wt_buf_free(SESSION *session, WT_BUF *buf)
+{
+	if (buf->mem != NULL)
+		__wt_free(session, buf->mem, buf->mem_size);
+
+	buf->item.data = NULL;
+	buf->mem_size = buf->item.size = 0;
+}
+
 /*
  * __wt_scr_alloc --
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc(SESSION *session, uint32_t size, WT_SCRATCH **scratchp)
+__wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 {
-	WT_SCRATCH *available, *scratch;
+	WT_BUF *available, *buf;
 	uint32_t allocated;
 	u_int i;
 	int ret;
@@ -32,38 +61,29 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_SCRATCH **scratchp)
 	 * Walk the list, looking for a buffer we can use.
 	 */
 	for (i = 0, available = NULL,
-	    scratch = session->scratch; i < session->scratch_alloc; ++i, ++scratch)
-		if (!F_ISSET(scratch, WT_SCRATCH_INUSE)) {
-			if (size == 0 || scratch->mem_size >= size) {
-				*scratchp = scratch;
-				F_SET(scratch, WT_SCRATCH_INUSE);
+	    buf = session->scratch; i < session->scratch_alloc; ++i, ++buf)
+		if (!F_ISSET(buf, WT_BUF_INUSE)) {
+			if (size == 0 || buf->mem_size >= size) {
+				F_SET(buf, WT_BUF_INUSE);
+				buf->item.data = buf->mem;
+				*scratchp = buf;
 				return (0);
 			}
-			available = scratch;
+			available = buf;
 		}
 
-	/*
-	 * If available set, we found a slot but it wasn't large enough.
-	 * Free any existing memory, and allocate something large enough.
-	 */
+	/* If available set, we found a slot but it wasn't large enough. */
 	if (available != NULL) {
-		scratch = available;
-		if (scratch->buf != NULL) {
-			__wt_free(session, scratch->buf, scratch->mem_size);
-			scratch->mem_size = 0;
-		}
-		WT_RET(
-		    __wt_calloc(session, size, sizeof(uint8_t), &scratch->buf));
-		scratch->mem_size = size;
-		*scratchp = scratch;
-		F_SET(scratch, WT_SCRATCH_INUSE);
+		F_SET(available, WT_BUF_INUSE);
+		WT_RET(__wt_buf_grow(session, available, size));
+		*scratchp = available;
 		return (0);
 	}
 
 	/* Resize the array, we need more scratch buffers. */
-	allocated = session->scratch_alloc * WT_SIZEOF32(WT_SCRATCH);
+	allocated = session->scratch_alloc * WT_SIZEOF32(WT_BUF);
 	WT_ERR(__wt_realloc(session, &allocated,
-	    (session->scratch_alloc + 10) * sizeof(WT_SCRATCH), &session->scratch));
+	    (session->scratch_alloc + 10) * sizeof(WT_BUF), &session->scratch));
 	session->scratch_alloc += 10;
 	return (__wt_scr_alloc(session, size, scratchp));
 
@@ -77,14 +97,14 @@ err:	__wt_errx(session,
  *	Release a scratch buffer.
  */
 void
-__wt_scr_release(WT_SCRATCH **dbt)
+__wt_scr_release(WT_BUF **bufp)
 {
-	WT_SCRATCH *scratch;
+	WT_BUF *buf;
 
-	scratch = *dbt;
-	*dbt = NULL;
+	buf = *bufp;
+	*bufp = NULL;
 
-	F_CLR(scratch, WT_SCRATCH_INUSE);
+	F_CLR(buf, WT_BUF_INUSE);
 }
 
 /*
@@ -94,13 +114,13 @@ __wt_scr_release(WT_SCRATCH **dbt)
 void
 __wt_scr_free(SESSION *session)
 {
-	WT_SCRATCH *scratch;
+	WT_BUF *buf;
 	u_int i;
 
-	for (i = 0,
-	    scratch = session->scratch; i < session->scratch_alloc; ++i, ++scratch)
-		if (scratch->item.data != NULL)
-			__wt_free(session, scratch->item.data, scratch->mem_size);
+	for (i = 0, buf = session->scratch;
+	    i < session->scratch_alloc;
+	    ++i, ++buf)
+		__wt_buf_free(session, buf);
 
-	__wt_free(session, session->scratch, session->scratch_alloc * sizeof(WT_SCRATCH));
+	__wt_free(session, session->scratch, session->scratch_alloc * sizeof(WT_BUF));
 }

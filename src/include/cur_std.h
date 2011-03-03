@@ -12,7 +12,7 @@ struct WT_CURSOR_STD {
 
 	TAILQ_ENTRY(WT_CURSOR_STD) q;		/* List of open cursors. */
 
-	WT_SCRATCH key, value;
+	WT_BUF key, value;
 
 #define	WT_CURSTD_BADKEY	0x01
 #define	WT_CURSTD_BADVALUE	0x02

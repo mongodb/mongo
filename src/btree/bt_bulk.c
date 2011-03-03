@@ -14,7 +14,7 @@ static int __wt_bulk_ovfl_copy(SESSION *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(SESSION *, WT_ITEM *, WT_OVFL *);
 static int __wt_bulk_promote(SESSION *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
-		SESSION *, uint32_t, uint32_t, WT_PAGE **, WT_SCRATCH **);
+		SESSION *, uint32_t, uint32_t, WT_PAGE **, WT_BUF **);
 static int __wt_bulk_stack_put(SESSION *, WT_STACK *);
 static int __wt_bulk_var(SESSION *, void (*)(const char *,
 		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
@@ -67,7 +67,7 @@ __wt_bulk_fix(SESSION *session,
 	WT_ITEM *key, *data;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_STACK stack;
 	uint64_t insert_cnt;
 	uint32_t len, space_avail;
@@ -209,7 +209,7 @@ __wt_bulk_var(SESSION *session,
 	WT_CELL key_item, value_item;
 	WT_OVFL key_ovfl, value_ovfl;
 	WT_PAGE *page;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_STACK stack;
 	uint64_t insert_cnt;
 	uint32_t space_avail, space_req;
@@ -597,7 +597,7 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	WT_PAGE_DISK *dsk;
-	WT_SCRATCH *next_tmp;
+	WT_BUF *next_tmp;
 	WT_STACK_ELEM *elem;
 	uint32_t next_space_avail;
 	uint8_t *next_first_free;
@@ -906,8 +906,7 @@ __wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(
-		    btree->huffman_key, dbt->data, dbt->size,
-		    &session->key.item.data, &session->key.mem_size, &session->key.item.size));
+		    btree->huffman_key, dbt->data, dbt->size, &session->key));
 		if (session->key.item.size > dbt->size)
 			WT_STAT_INCRV(stats,
 			    FILE_HUFFMAN_KEY, session->key.item.size - dbt->size);
@@ -966,8 +965,7 @@ __wt_item_build_value(SESSION *session,
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_data != NULL) {
 		WT_RET(__wt_huffman_encode(
-		    btree->huffman_data, dbt->data, dbt->size,
-		    &session->value.item.data, &session->value.mem_size, &session->value.item.size));
+		    btree->huffman_data, dbt->data, dbt->size, &session->value));
 		if (session->value.item.size > dbt->size)
 			WT_STAT_INCRV(stats,
 			    FILE_HUFFMAN_DATA, session->value.item.size - dbt->size);
@@ -997,7 +995,7 @@ static int
 __wt_bulk_ovfl_copy(SESSION *session, WT_OVFL *from, WT_OVFL *to)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	uint32_t size;
 	int ret;
 
@@ -1022,8 +1020,8 @@ __wt_bulk_ovfl_copy(SESSION *session, WT_OVFL *from, WT_OVFL *to)
 	 * Read the overflow page into our scratch buffer and write it out to
 	 * the new location, without change.
 	 */
-	if ((ret = __wt_disk_read(session, (void *)tmp->item.data, from->addr, size)) == 0)
-		ret = __wt_disk_write(session, (void *)tmp->item.data, to->addr, size);
+	if ((ret = __wt_disk_read(session, tmp->mem, from->addr, size)) == 0)
+		ret = __wt_disk_write(session, tmp->mem, to->addr, size);
 
 err:	__wt_scr_release(&tmp);
 
@@ -1038,7 +1036,7 @@ static int
 __wt_bulk_ovfl_write(SESSION *session, WT_ITEM *dbt, WT_OVFL *to)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	uint32_t size;
@@ -1074,9 +1072,9 @@ err:	if (tmp != NULL)
  */
 static int
 __wt_bulk_scratch_page(SESSION *session,
-    uint32_t page_size, uint32_t page_type, WT_PAGE **page_ret, WT_SCRATCH **tmp_ret)
+    uint32_t page_size, uint32_t page_type, WT_PAGE **page_ret, WT_BUF **tmp_ret)
 {
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	uint32_t size;
@@ -1091,7 +1089,7 @@ __wt_bulk_scratch_page(SESSION *session,
 	 */
 	size = page_size + WT_SIZEOF32(WT_PAGE);
 	WT_ERR(__wt_scr_alloc(session, size, &tmp));
-	memset((void *)tmp->item.data, 0, size);
+	memset(tmp->mem, 0, size);
 
 	/*
 	 * Set up the page and allocate a file address.
@@ -1100,7 +1098,7 @@ __wt_bulk_scratch_page(SESSION *session,
 	 * a lot of messages we don't want to bother with.  We're the only user
 	 * of the file, which means we can grab file space whenever we want.
 	 */
-	page = (void *)tmp->item.data;
+	page = tmp->mem;
 	page->dsk = dsk =
 	    (WT_PAGE_DISK *)((uint8_t *)tmp->item.data + sizeof(WT_PAGE));
 	WT_ERR(__wt_block_alloc(session, &page->addr, page_size));

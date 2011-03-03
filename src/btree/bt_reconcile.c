@@ -148,7 +148,7 @@ __wt_rec_helper_init(SESSION *session, WT_PAGE *page, uint32_t max,
 	 * Some fields of the disk image are fixed based on the original page,
 	 * set them.
 	 */
-	dsk = r->dsk_tmp->buf;
+	dsk = r->dsk_tmp->mem;
 	WT_CLEAR(*dsk);
 	dsk->lsn_file = page->dsk->lsn_file;
 	dsk->lsn_off = page->dsk->lsn_off;
@@ -264,7 +264,7 @@ __wt_rec_helper(SESSION *session, uint64_t *recnop,
 	 * times.
 	 */
 	r = &S2C(session)->cache->reclist;
-	dsk = r->dsk_tmp->buf;
+	dsk = r->dsk_tmp->mem;
 
 	/*
 	 * There are 4 cases we have to handle.
@@ -383,7 +383,7 @@ static int
 __wt_rec_helper_fixup(SESSION *session, uint64_t *recnop,
     uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
 {
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
 	struct rec_save *r_save;
@@ -408,8 +408,8 @@ __wt_rec_helper_fixup(SESSION *session, uint64_t *recnop,
 	 * Copy the leading WT_PAGE_DISK header onto the scratch buffer.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->split_page_size, &tmp));
-	dsk = tmp->buf;
-	memcpy(dsk, r->dsk_tmp->buf, WT_PAGE_DISK_SIZE);
+	dsk = tmp->mem;
+	memcpy(dsk, r->dsk_tmp->mem, WT_PAGE_DISK_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
@@ -436,7 +436,7 @@ __wt_rec_helper_fixup(SESSION *session, uint64_t *recnop,
 	 * There is probably a remnant that didn't get written, copy it down to
 	 * the beginning of the working buffer.
 	 */
-	dsk_start = WT_PAGE_DISK_BYTE(r->dsk_tmp->buf);
+	dsk_start = WT_PAGE_DISK_BYTE(r->dsk_tmp->mem);
 	len = WT_PTRDIFF32(*first_freep, r_save->start);
 	memcpy(dsk_start, r_save->start, len);
 
@@ -548,7 +548,7 @@ static int
 __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
@@ -569,7 +569,7 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	 */
 	len = btree->fixed_len;
 	WT_ERR(__wt_scr_alloc(session, len, &tmp));
-	memset((void *)tmp->item.data, 0, len);
+	memset(tmp->mem, 0, len);
 	WT_FIX_DELETE_SET(tmp->item.data);
 
 	/*
@@ -592,11 +592,11 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 		 */
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
-				data = (void *)tmp->item.data;	/* Deleted */
+				data = tmp->mem;	/* Deleted */
 			else				/* Updated */
 				data = WT_UPDATE_DATA(upd);
 		} else if (WT_FIX_DELETE_ISSET(cipdata))
-			data = (void *)tmp->item.data;		/* On-disk deleted */
+			data = tmp->mem;		/* On-disk deleted */
 		else					/* On-disk data */
 			data = WT_COL_PTR(dsk, cip);
 
@@ -628,7 +628,7 @@ static int
 __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
@@ -655,7 +655,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	 */
 	len = btree->fixed_len + WT_SIZEOF32(uint16_t);
 	WT_ERR(__wt_scr_alloc(session, len, &tmp));
-	memset((void *)tmp->item.data, 0, len);
+	memset(tmp->mem, 0, len);
 	WT_RLE_REPEAT_COUNT(tmp->item.data) = 1;
 	WT_FIX_DELETE_SET(WT_RLE_REPEAT_DATA(tmp->item.data));
 
@@ -692,7 +692,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 				/* Use the WT_RLE_EXPAND's WT_UPDATE field. */
 				upd = exp->upd;
 				if (WT_UPDATE_DELETED_ISSET(upd))
-					data = (void *)tmp->item.data;
+					data = tmp->mem;
 				else {
 					from_upd = 1;
 					data = WT_UPDATE_DATA(upd);
@@ -700,7 +700,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 				repeat_count = 1;
 			} else {
 				if (WT_FIX_DELETE_ISSET(cipdata))
-					data = (void *)tmp->item.data;
+					data = tmp->mem;
 				else
 					data = cipdata;
 				/*
@@ -1252,7 +1252,7 @@ static int
 __wt_rec_col_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_OFF_RECORD *off;
 	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
@@ -1274,7 +1274,7 @@ __wt_rec_col_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 
 	r_list = r->list;
 
-	dsk = tmp->buf;
+	dsk = tmp->mem;
 	WT_CLEAR(*dsk);
 	dsk->recno = WT_RECNO(&r_list->off);
 	dsk->lsn_file = dsk->lsn_off = 0;

@@ -212,7 +212,7 @@ combine:/*
 int
 __wt_block_read(SESSION *session)
 {
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	BTREE *btree;
 	uint32_t *p;
 	int ret;
@@ -229,7 +229,7 @@ __wt_block_read(SESSION *session)
 
 	/* Read in the free-list. */
 	WT_ERR(__wt_disk_read(
-	    session, (void *)tmp->item.data, btree->free_addr, btree->free_size));
+	    session, tmp->mem, btree->free_addr, btree->free_size));
 
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)((uint8_t *)
@@ -250,7 +250,7 @@ int
 __wt_block_write(SESSION *session)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	WT_FREE_ENTRY *fe;
 	WT_PAGE_DISK *dsk;
 	uint32_t addr, size, *p, total_entries;
@@ -284,10 +284,10 @@ __wt_block_write(SESSION *session)
 	 * header), but this only happens when the file shuts down cleanly,
 	 * it doesn't seem like a big deal.
 	 */
-	memset((void *)tmp->item.data, 0, size);
+	memset(tmp->mem, 0, size);
 
 	/* Initialize the page's header. */
-	dsk = (void *)tmp->item.data;
+	dsk = tmp->mem;
 	dsk->u.datalen = total_entries * WT_SIZEOF32(WT_FREE_ENTRY);
 	dsk->type = WT_PAGE_FREELIST;
 

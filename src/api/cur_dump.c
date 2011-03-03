@@ -12,7 +12,7 @@
  * convert it to a dumpable string.
  */
 static int
-__convert_to_dump(CONNECTION *conn, WT_SCRATCH *scratch)
+__convert_to_dump(CONNECTION *conn, WT_BUF *scratch)
 {
 	WT_UNUSED(conn);
 	WT_UNUSED(scratch);
@@ -25,7 +25,7 @@ __convert_to_dump(CONNECTION *conn, WT_SCRATCH *scratch)
  * convert it to a raw value.
  */
 static int
-__convert_from_dump(CONNECTION *conn, WT_SCRATCH *scratch)
+__convert_from_dump(CONNECTION *conn, WT_BUF *scratch)
 {
 	WT_UNUSED(conn);
 	WT_UNUSED(scratch);

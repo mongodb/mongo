@@ -334,7 +334,7 @@ __wt_verify_pc(SESSION *session,
 	BTREE *btree;
 	WT_ITEM *cd_ref, *pd_ref;
 	WT_ROW *child_key;
-	WT_SCRATCH *scratch1, *scratch2;
+	WT_BUF *scratch1, *scratch2;
 	int cmp, ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
@@ -446,7 +446,7 @@ __wt_verify_overflow(SESSION *session,
 {
 	BTREE *btree;
 	WT_PAGE_DISK *dsk;
-	WT_SCRATCH *scratch1;
+	WT_BUF *scratch1;
 	uint32_t addr, size;
 	int ret;
 
@@ -461,7 +461,7 @@ __wt_verify_overflow(SESSION *session,
 	WT_RET(__wt_scr_alloc(session, size, &scratch1));
 
 	/* Read the page. */
-	dsk = (void *)scratch1->item.data;
+	dsk = scratch1->mem;
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/*

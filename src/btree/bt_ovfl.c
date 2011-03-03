@@ -12,7 +12,7 @@
  *	Read an overflow item from the disk.
  */
 int
-__wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_SCRATCH *store)
+__wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 {
 	BTREE *btree;
 	CONNECTION *conn;
@@ -53,15 +53,14 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_SCRATCH *store)
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
 	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
-	if (store->mem_size < size)
-		WT_RET(__wt_realloc(session, &store->mem_size, size, &store->item.data));
+	WT_RET(__wt_buf_grow(session, store, size));
 
 	/* Read the page. */
-	WT_RET(__wt_disk_read(session, (void *)store->item.data, ovfl->addr, size));
+	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, size));
 
 	/* Copy the actual data in the WT_ITEM down to the start of the data. */
-	(void)memmove((void *)store->item.data,
-	    (uint8_t *)store->item.data + WT_PAGE_DISK_SIZE, ovfl->size);
+	(void)memmove(store->mem,
+	    (uint8_t *)store->mem + WT_PAGE_DISK_SIZE, ovfl->size);
 	store->item.size = ovfl->size;
 
 	return (0);

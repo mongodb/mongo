@@ -567,7 +567,7 @@ static int
 __wt_debug_item_data(SESSION *session, WT_CELL *item, FILE *fp)
 {
 	BTREE *btree;
-	WT_SCRATCH *tmp;
+	WT_BUF *tmp;
 	uint32_t size;
 	const uint8_t *p;
 	int ret;

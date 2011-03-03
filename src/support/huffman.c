@@ -421,8 +421,7 @@ __wt_print_huffman_code(SESSION *session, void *huffman_arg, uint16_t symbol)
  */
 int
 __wt_huffman_encode(void *huffman_arg,
-    const uint8_t *from, uint32_t from_len,
-    void *top, uint32_t *to_len, uint32_t *out_bytes_used)
+    const uint8_t *from, uint32_t from_len, WT_BUF *to_buf)
 {
 	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
@@ -436,6 +435,15 @@ __wt_huffman_encode(void *huffman_arg,
 	session = huffman->session;
 
 	/*
+	 * We don't want to find all of our callers and ensure they don't pass
+	 * 0-length byte strings, but there's no reason to do any work.
+	 */
+	if (from_len == 0) {
+		to_buf->item.size = 0;
+		return (0);
+	}
+
+	/*
 	 * We need N+1 bytes to encode N bytes, re-allocate as necessary.
 	 *
 	 * If the initial target pointer, or the initial target buffer length,
@@ -443,22 +451,8 @@ __wt_huffman_encode(void *huffman_arg,
 	 * our caller may have only set the initial target buffer length, not
 	 * the initial pointer value.
 	 */
-	if (to_len == NULL || *to_len < from_len + 1) {
-		if (to_len == NULL)
-			*(void **)top = NULL;
-		WT_RET(__wt_realloc(session, to_len, from_len + 1, top));
-	}
-
-	/*
-	 * We don't want to find all of our callers and ensure they don't pass
-	 * 0-length byte strings, but there's no reason to do any work.
-	 */
-	if (from_len == 0) {
-		*out_bytes_used = 0;
-		return (0);
-	}
-
-	to = *(uint8_t **)top;
+	WT_RET(__wt_buf_grow(session, to_buf, from_len + 1));
+	to = to_buf->mem;
 	memset(to, 0, from_len + 1);
 
 	/*
@@ -517,8 +511,7 @@ __wt_huffman_encode(void *huffman_arg,
 	padding_info = (bitpos % 8) << 5;
 	*to |= padding_info;
 
-	*out_bytes_used = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
-
+	to_buf->item.size = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
 	return (0);
 }
 
@@ -528,8 +521,7 @@ __wt_huffman_encode(void *huffman_arg,
  */
 int
 __wt_huffman_decode(void *huffman_arg,
-    const uint8_t *from, uint32_t from_len,
-    void *top, uint32_t *to_len, uint32_t *out_bytes_used)
+    const uint8_t *from, uint32_t from_len, WT_BUF *to_buf)
 {
 	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
@@ -541,6 +533,15 @@ __wt_huffman_decode(void *huffman_arg,
 	session = huffman->session;
 
 	/*
+	 * We don't want to find all of our callers and ensure they don't pass
+	 * 0-length byte strings, but there's no reason to do any work.
+	 */
+	if (from_len == 0) {
+		to_buf->item.size = 0;
+		return (0);
+	}
+
+	/*
 	 * We need 2N+1 bytes to decode N bytes, re-allocate as necessary.
 	 *
 	 * If the initial target pointer, or the initial target buffer length,
@@ -548,22 +549,8 @@ __wt_huffman_decode(void *huffman_arg,
 	 * our caller may have only set the initial target buffer length, not
 	 * the initial pointer value.
 	 */
-	if (to_len == NULL || *to_len < 2 * from_len + 1) {
-		if (to_len == NULL)
-			*(void **)top = NULL;
-		WT_RET(__wt_realloc(session, to_len, 2 * from_len + 1, top));
-	}
-
-	/*
-	 * We don't want to find all of our callers and ensure they don't pass
-	 * 0-length byte strings, but there's no reason to do any work.
-	 */
-	if (from_len == 0) {
-		*out_bytes_used = 0;
-		return (0);
-	}
-
-	to = *(uint8_t **)top;
+	WT_RET(__wt_buf_grow(session, to_buf, 2 * from_len + 1));
+	to = to_buf->mem;
 
 	bitpos = 4;			/* Skipping the first 3 bits. */
 	bytes = 0;
@@ -621,7 +608,7 @@ __wt_huffman_decode(void *huffman_arg,
 	}
 
 	/* Return the number of bytes used. */
-	*out_bytes_used = bytes;
+	to_buf->item.size = bytes;
 
 	return (0);
 }

@@ -67,12 +67,8 @@ __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 
 			*key = session->key.item;
 		} else if (callback == NULL) {
-			if (session->key.mem_size < rip->size)
-				WT_RET(__wt_realloc(session,
-				    &session->key.mem_size,
-				    rip->size, &session->key.item.data));
-			memcpy((void *)session->key.item.data, rip->key, rip->size);
-			session->key.item.size = rip->size;
+			WT_RET(__wt_buf_grow(session, &session->key, rip->size));
+			memcpy(session->key.mem, rip->key, rip->size);
 
 			*key = session->key.item;
 		} else {
@@ -143,12 +139,8 @@ item_set:	switch (WT_CELL_TYPE(item)) {
 		 * WT_ITEM (potentially done by __wt_item_process), do so now.
 		 */
 		if (value_ret != session->value.item.data) {
-			if (session->value.mem_size < size_ret)
-				WT_RET(__wt_realloc(session,
-				    &session->value.mem_size,
-				    size_ret, &session->value.item.data));
-			memcpy((void *)session->value.item.data, value_ret, size_ret);
-			session->value.item.size = size_ret;
+			WT_RET(__wt_buf_grow(session, &session->value, size_ret));
+			memcpy(session->value.mem, value_ret, size_ret);
 		}
 
 		*value = session->value.item;
