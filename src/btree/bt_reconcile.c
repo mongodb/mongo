@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static inline int __wt_block_free_ovfl(WT_TOC *, WT_OVFL *);
 static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *, WT_PAGE *);
@@ -18,8 +17,30 @@ static int __wt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, uint32_t, uint32_t);
 static int __wt_rec_row_int(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_row_leaf(WT_TOC *, WT_PAGE *, WT_PAGE *);
-static inline void __wt_rec_set_page_size(WT_TOC *, WT_PAGE *, uint8_t *);
 static int __wt_rle_expand_compare(const void *, const void *);
+
+static inline int	__wt_block_free_ovfl(WT_TOC *, WT_OVFL *);
+static inline uint32_t	__wt_set_disk_size(WT_TOC *, void *, uint8_t *);
+
+/*
+ * __wt_set_disk_size --
+ *	Return the size to the minimum number of allocation units needed
+ * (the page size can either grow or shrink), and zero out unused bytes.
+ */
+static inline uint32_t
+__wt_set_disk_size(WT_TOC *toc, void *begin, uint8_t *end)
+{
+	DB *db;
+	uint32_t len, alloc_len;
+
+	db = toc->db;
+
+	len = WT_PTRDIFF32(end, begin);
+	alloc_len = WT_ALIGN(len, db->allocsize);
+	if (alloc_len > len)
+		memset(end, 0, alloc_len - len);
+	return (alloc_len);
+}
 
 /*
  * __wt_block_free_ovfl --
@@ -34,28 +55,6 @@ __wt_block_free_ovfl(WT_TOC *toc, WT_OVFL *ovfl)
 	db = toc->db;
 	return (__wt_block_free(
 	    toc, ovfl->addr, WT_HDR_BYTES_TO_ALLOC(db, ovfl->size)));
-}
-
-/*
- * __wt_rec_set_page_size --
- *	Set the page's size to the minimum number of allocation units.
- */
-static inline void
-__wt_rec_set_page_size(WT_TOC *toc, WT_PAGE *page, uint8_t *first_free)
-{
-	DB *db;
-
-	db = toc->db;
-
-	/*
-	 * Set the page's size to the minimum number of allocation units needed
-	 * (the page size can either grow or shrink).
-	 *
-	 * Set the page size before verifying the page, the verification code
-	 * checks for entries that extend past the end of the page, and expects
-	 * the WT_PAGE->size field to be valid.
-	 */
-	page->size = WT_ALIGN(first_free - (uint8_t *)page->dsk, db->allocsize);
 }
 
 /*
@@ -132,7 +131,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_CLEAR(_new);
 	new = &_new;
 	WT_ERR(__wt_scr_alloc(toc, max, &tmp));
-	memset(tmp->data, 0, max);
 	new->addr = page->addr;
 	new->size = max;
 	new->dsk = tmp->data;
@@ -233,7 +231,7 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++dsk->u.entries;
 	}
 
-	__wt_rec_set_page_size(toc, new, first_free);
+	new->size = __wt_set_disk_size(toc, dsk, first_free);
 
 	return (0);
 }
@@ -305,7 +303,7 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++dsk->u.entries;
 	}
 
-	__wt_rec_set_page_size(toc, new, first_free);
+	new->size = __wt_set_disk_size(toc, dsk, first_free);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -454,7 +452,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
-	__wt_rec_set_page_size(toc, new, first_free);
+	new->size = __wt_set_disk_size(toc, dsk, first_free);
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
@@ -618,7 +616,7 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		++dsk->u.entries;
 	}
 
-	__wt_rec_set_page_size(toc, new, first_free);
+	new->size = __wt_set_disk_size(toc, dsk, first_free);
 
 	return (0);
 }
@@ -690,7 +688,7 @@ __wt_rec_row_int(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		dsk->u.entries += 2;
 	}
 
-	__wt_rec_set_page_size(toc, new, first_free);
+	new->size = __wt_set_disk_size(toc, dsk, first_free);
 
 	return (0);
 }
@@ -837,7 +835,7 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		}
 	}
 
-	__wt_rec_set_page_size(toc, new, first_free);
+	new->size = __wt_set_disk_size(toc, dsk, first_free);
 
 	return (0);
 }

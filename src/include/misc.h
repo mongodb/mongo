@@ -15,12 +15,16 @@ extern "C" {
 #define	WT_MILLION	(1000000)
 
 /*
- * 32-bit version of sizeof.  Many sizes that cannot be larger than 2**32 are
- * stored in uint32_t variables to save bytes.  To avoid warnings with
- * conversion from size_t to uint32_t, we use this macro for sizeof
- * calculations in 32-bit space.
+ * 32-bit version of sizeof: many sizes that cannot be larger than 2**32 are
+ * stored in uint32_t variables to save bytes.  To avoid size_t to uint32_t
+ * conversion warnings, we use this macro for sizeof calculations in 32-bit
+ * space.
+ *
+ * And, a similar solution for pointer arithmetic.
  */
 #define	WT_SIZEOF32(e)	((uint32_t)sizeof(e))
+#define	WT_PTRDIFF32(end, begin)					\
+	((uint32_t)((uint8_t *)(end) - ((uint8_t *)begin)))
 
 /*
  * Align an unsigned value of any type to a specified power-of-2, including the
