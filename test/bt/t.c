@@ -84,8 +84,6 @@ main(int argc, char *argv[])
 		if (wts_verify())		/* Verify the file */
 			goto err;
 
-		if (g.c_ops == 0)
-			goto skip_ops;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
 			switch (g.c_file_type) {
@@ -99,6 +97,13 @@ main(int argc, char *argv[])
 					goto err;
 				break;
 			}
+
+			/*
+			 * If no operations scheduled, quit after a single
+			 * read pass.
+			 */
+			if (g.c_ops == 0)
+				break;
 
 			if (wts_ops())		/* Random operations */
 				goto err;
@@ -114,7 +119,7 @@ main(int argc, char *argv[])
 				goto err;
 		}
 
-skip_ops:	if (wts_stats())		/* Statistics */
+		if (wts_stats())		/* Statistics */
 			goto err;
 						/* Close the file */
 		track("shutting down BDB", 0);
