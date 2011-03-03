@@ -13,7 +13,7 @@ l="$l ../src/include/verify_build.h `echo ../src/utilities/*.c`"
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
 # Get the list of macros
-search=`cat ../src/include/*.h ../src/include/*.in | egrep '^#define' |
+search=`cat ../src/include/*.[hi] ../src/include/*.in | egrep '^#define' |
     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
     sort -u`
 

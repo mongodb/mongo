@@ -5,7 +5,7 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l=`(sed -e '/^[a-z]/! d' -e 's,^,../,' filelist ;
-    ls ../src/include/*.h ../src/include/*.in) |
+    ls ../src/include/*.[hi] ../src/include/*.in) |
     egrep -v 'src/api/(api|pack)\.c$' |
     egrep -v 'include/api\.h|.*/api_int\.c$|support/stat\.c$'`
 

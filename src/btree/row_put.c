@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 static int __wt_row_update(SESSION *, WT_ITEM *, WT_ITEM *, int);
 

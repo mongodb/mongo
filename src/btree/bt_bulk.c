@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 static int __wt_bulk_fix(SESSION *, void (*)(const char *,
 		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));

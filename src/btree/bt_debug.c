@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 #ifdef HAVE_DIAGNOSTIC
 static int  __wt_debug_cell(SESSION *, WT_CELL *, FILE *fp);

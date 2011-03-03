@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 /*
  * There's a bunch of stuff we pass around during verification, group it

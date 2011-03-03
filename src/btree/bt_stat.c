@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 static int __wt_stat_page_col_fix(SESSION *, WT_PAGE *);
 static int __wt_stat_page_col_rle(SESSION *, WT_PAGE *);

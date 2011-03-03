@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 int
 __wt_btcur_first(CURSOR_BTREE *cbt)

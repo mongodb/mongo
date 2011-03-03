@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 static int  __wt_evict(SESSION *);
 static void __wt_evict_clean(SESSION *);

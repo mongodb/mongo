@@ -24,14 +24,14 @@ done
 # Generate a tags file for the build directory
 (cd ../build_posix
 rm -f tags
-ctags $flags ../src/include/*.in ../src/include/*.h ../src/*/*.[ch] 2>/dev/null
+ctags $flags ../src/include/*.in ../src/include/*.[hi] ../src/*/*.[ch] 2>/dev/null
 chmod 444 tags)
 
 # Put the shared tags file in the include directory, it's at the same level in
 # the tree as the other source files.
 (cd ../src/include
 rm -f tags
-ctags $flags ../include/*.in ../include/*.h ../*/*.[ch] 2>/dev/null
+ctags $flags ../include/*.in ../include/*.[hi] ../*/*.[ch] 2>/dev/null
 chmod 444 tags)
 
 # Link to the tags file from standard build and source directories.

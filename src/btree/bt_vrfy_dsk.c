@@ -6,7 +6,7 @@
  */
 
 #include "wt_internal.h"
-#include "bt_inline.c"
+#include "btree.i"
 
 static int __wt_err_delfmt(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eof(SESSION *, uint32_t, uint32_t);
