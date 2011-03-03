@@ -723,7 +723,11 @@ int main(int argc, char* argv[]) {
     dbExecCommand = argv[0];
 
     srand(curTimeMicros());
+#if( BOOST_VERSION >= 104500 )
+    boost::filesystem::path::default_name_check( boost::filesystem2::no_check );
+#else
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
+#endif
 
     {
         unsigned x = 0x12345678;
