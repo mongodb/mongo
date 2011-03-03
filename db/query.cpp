@@ -381,8 +381,10 @@ namespace mongo {
                 }
                 c->advance();
 
-                if ( ! cc->yieldSometimes() )
+                if ( ! cc->yieldSometimes() ) {
+                    cc = 0;
                     break;
+                }
             }
 
             if ( cc ) {
