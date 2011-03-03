@@ -73,10 +73,10 @@ function verify() {
     var d = conn.getDB("test");
     var count = d.foo.count();
     if (count != 1) {
-	print("going to fail, count mismatch in verify()");
+	    print("going to fail, test.foo.count() != 1 in verify()"); 
         sleep(10000); // easier to read the output this way
         print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count);
-	print(d.foo.count() + "\n\n\n");
+	    print(d.foo.count() + "\n\n\n");
         assert(false);
     }
     assert(d.foo.findOne()._id == 100, "100");
@@ -85,9 +85,16 @@ function verify() {
     printjson(conn.getDB("teste").foo.findOne());
 
     var teste = conn.getDB("teste");
-    print("dropdb count " + teste.foo.count());
+    var testecount = teste.foo.count();
+    if (testecount != 1) {
+        print("going to fail, teste.foo.count() != 1 in verify()");
+        sleep(10000); // easier to read the output this way
+        print("\n\n\ndropdb.js FAIL teste.foo.count() should be 1 but is : " + testecount);
+        print("\n\n\n");
+        assert(false);
+    } 
+    print("teste.foo.count() = " + teste.foo.count());
     assert(teste.foo.findOne()._id == 99, "teste");
-
 }
 
 if (debugging) {
