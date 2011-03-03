@@ -170,8 +170,16 @@ public:
         
         LogIndentLevel lil2;
         
+        set<DiskLoc> seen;
+
         DiskLoc loc = forward ? e->firstRecord : e->lastRecord;
         while ( ! loc.isNull() ){
+            
+            if ( ! seen.insert( loc ).second ) {
+                error() << "infinite loop in extend, seen: " << loc << " before" << endl;
+                break;
+            }
+
             if ( loc.getOfs() <= 0 ){
                 error() << "offset is 0 for record which should be impossible" << endl;
                 break;
