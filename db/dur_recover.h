@@ -15,7 +15,7 @@ namespace mongo {
          */
         class RecoveryJob : boost::noncopyable {
         public:
-            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") { _lastSeqMentionedInConsoleLog = 1; }
+            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
             void go(vector<path>& files);
             ~RecoveryJob();
             void processSection(const void *, unsigned len);
