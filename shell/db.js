@@ -774,8 +774,8 @@ DB.prototype.listCommands = function(){
     }
 }
 
-DB.prototype.printShardingStatus = function(){
-    printShardingStatus( this.getSiblingDB( "config" ) );
+DB.prototype.printShardingStatus = function( verbose ){
+    printShardingStatus( this.getSiblingDB( "config" ) , verbose );
 }
 
 DB.autocomplete = function(obj){
