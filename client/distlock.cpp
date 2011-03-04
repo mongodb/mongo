@@ -21,6 +21,8 @@
 
 namespace mongo {
 
+    const LabeledLevel DistributedLock::logLvl( 1 );
+
     ThreadLocalValue<string> distLockIds("");
 
     /* ==================
@@ -59,19 +61,25 @@ namespace mongo {
 
     class DistributedLockPinger {
     public:
+
         DistributedLockPinger()
             : _mutex( "DistributedLockPinger" ) {
         }
 
         void _distLockPingThread( ConnectionString addr, string process, unsigned long long sleepTime ) {
+
             setThreadName( "LockPinger" );
 
-            log( LLL ) << "Creating a distributed lock ping thread for " << addr << " and process " << process << " (sleeping for " << sleepTime << "ms)" << endl;
+            string pingId = pingThreadId( addr, process );
+
+            log( DistributedLock::logLvl - 1 ) << "creating distributed lock ping thread for " << addr
+                                               << " and process " << process
+                                               << " (sleeping for " << sleepTime << "ms)" << endl;
 
             static int loops = 0;
             while( ! inShutdown() && ! shouldKill( addr, process ) ) {
 
-                log(4) << "dist_lock about to ping for: " << process << endl;
+                log( DistributedLock::logLvl + 2 ) << "distributed lock pinger '" << pingId << "' about to ping." << endl;
 
                 Date_t pingTime;
 
@@ -85,12 +93,15 @@ namespace mongo {
                                   BSON( "_id" << process ) ,
                                   BSON( "$set" << BSON( "ping" << pingTime ) ) ,
                                   true );
+
                     string err = conn->getLastError();
                     if ( ! err.empty() ) {
-                        warning() << "dist_lock process: " << process << " pinging: " << addr << " failed: "
-                                  << err << endl;
+                        warning() << "pinging failed for distributed lock pinger '" << pingId << "'."
+                                  << m_error_message(err) << endl;
                         conn.done();
-                        sleepsecs(30);
+
+                        // Sleep for normal ping time
+                        sleepmillis(sleepTime);
                         continue;
                     }
 
@@ -111,10 +122,12 @@ namespace mongo {
                     conn->remove( DistributedLock::lockPingNS , BSON( "_id" << BSON( "$nin" << pids ) << "ping" << LT << fourDays ) );
                     err = conn->getLastError();
                     if ( ! err.empty() ) {
-                        warning() << "dist_lock cleanup request from process: " << process << " to: " << addr
-                                  << " failed: " << err << endl;
+                        warning() << "ping cleanup for distributed lock pinger '" << pingId << " failed."
+                                  << m_error_message(err) << endl;
                         conn.done();
-                        sleepsecs(30);
+
+                        // Sleep for normal ping time
+                        sleepmillis(sleepTime);
                         continue;
                     }
 
@@ -124,17 +137,20 @@ namespace mongo {
                     }
 
                     conn.done();
+
+                    log( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime
+                            << " by distributed lock pinger '" << pingId
+                            << "', sleeping for " << sleepTime << "ms" << endl;
                 }
                 catch ( std::exception& e ) {
-                    warning() << "Exception while pinging cluster " << addr << " : " << e.what() << endl;
+                    warning() << "distributed lock pinger '" << pingId << "' detected an exception while pinging."
+                              << m_error_message(e.what()) << endl;
                 }
-
-                log( loops % 10 == 0 ? 0 : 1) << "Cluster " << addr << " pinged successfully at " << pingTime << " for process " << process << ", sleeping for " << sleepTime << "ms" << endl;
 
                 sleepmillis(sleepTime);
             }
 
-            warning() << "Removing distributed lock ping thread for " << addr << " and process " << process << endl;
+            warning() << "removing distributed lock ping thread '" << pingId << "'" << endl;
 
 
             if( shouldKill( addr, process ) )
@@ -148,20 +164,20 @@ namespace mongo {
                 _distLockPingThread( addr, processId, sleepTime );
             }
             catch ( std::exception& e ) {
-            	error() << "Unexpected error while pinging for distributed lock at " << addr << ", process " << processId << m_error_message(e.what()) << endl;
+                error() << "unexpected error while running distributed lock pinger for " << addr << ", process " << processId << m_error_message(e.what()) << endl;
             }
             catch ( ... ) {
-                error() << "Unknown error while pinging for distributed lock at " << addr << ", process " << processId << endl;
+                error() << "unknown error while running distributed lock pinger for " << addr << ", process " << processId << endl;
             }
         }
 
-        string pingThreadId( const ConnectionString& conn, const string& processId ){
+        string pingThreadId( const ConnectionString& conn, const string& processId ) {
             return conn.toString() + "/" + processId;
         }
 
         string got( DistributedLock& lock, unsigned long long sleepTime ) {
 
-        	// Make sure we don't start multiple threads for a process id
+            // Make sure we don't start multiple threads for a process id
             scoped_lock lk( _mutex );
 
             const ConnectionString& conn = lock.getRemoteConnection();
@@ -174,11 +190,11 @@ namespace mongo {
             // Check our clock skew
             try {
                 if( lock.isRemoteTimeSkewed() ) {
-                    m_throw_exception(70002, LockException, "Clock skew of the cluster " << conn.toString() << " is too far out of bounds to allow distributed locking.");
+                    m_throw_exception(13650, LockException, "clock skew of the cluster " << conn.toString() << " is too far out of bounds to allow distributed locking.");
                 }
             }
             catch( LockException& e) {
-                m_chain_exception(70002, e, LockException, "Error checking clock skew of cluster " << conn.toString());
+                m_chain_exception(13651, e, LockException, "error checking clock skew of cluster " << conn.toString());
             }
 
             boost::thread t( boost::bind( &DistributedLockPinger::distLockPingThread, this, conn, getJSTimeVirtualThreadSkew(), processId, sleepTime) );
@@ -188,7 +204,7 @@ namespace mongo {
             return s;
         }
 
-        void kill( ConnectionString& conn, string& processId ){
+        void kill( ConnectionString& conn, string& processId ) {
             // Make sure we're in a consistent state before other threads can see us
             scoped_lock lk( _mutex );
 
@@ -199,11 +215,11 @@ namespace mongo {
 
         }
 
-        bool shouldKill( ConnectionString& conn, string& processId ){
+        bool shouldKill( ConnectionString& conn, string& processId ) {
             return _kill.count( pingThreadId( conn, processId ) ) > 0;
         }
 
-        void finishKill( ConnectionString& conn, string& processId ){
+        void finishKill( ConnectionString& conn, string& processId ) {
             // Make sure we're in a consistent state before other threads can see us
             scoped_lock lk( _mutex );
 
@@ -257,23 +273,26 @@ namespace mongo {
         if(asProcess) _processId = getDistLockId();
         else _processId = getDistLockProcess();
 
-        log( LLL ) << "Created new distributed lock for " << name << " on " << conn << " ( lock timeout : " << _lockTimeout << ", legacy timeout : " << _takeoverMinutes << ", ping interval : " << _lockPing << ", process : " << asProcess << ", legacy : " << legacy << " )" << endl;
+        log( logLvl - 1 ) << "created new distributed lock for " << name << " on " << conn
+                          << " ( lock timeout : " << _lockTimeout << ", legacy timeout : " << _takeoverMinutes
+                          << ", ping interval : " << _lockPing << ", process : " << asProcess
+                          << ", legacy : " << legacy << " )" << endl;
     }
 
-    Date_t DistributedLock::getRemoteTime(){
-    	return DistributedLock::remoteTime( _conn, _maxNetSkew );
+    Date_t DistributedLock::getRemoteTime() {
+        return DistributedLock::remoteTime( _conn, _maxNetSkew );
     }
 
-    bool DistributedLock::isRemoteTimeSkewed(){
-    	return !DistributedLock::checkSkew( _conn, NUM_LOCK_SKEW_CHECKS, _maxClockSkew, _maxNetSkew );
+    bool DistributedLock::isRemoteTimeSkewed() {
+        return !DistributedLock::checkSkew( _conn, NUM_LOCK_SKEW_CHECKS, _maxClockSkew, _maxNetSkew );
     }
 
-    const ConnectionString& DistributedLock::getRemoteConnection(){
-    	return _conn;
+    const ConnectionString& DistributedLock::getRemoteConnection() {
+        return _conn;
     }
 
-    const string& DistributedLock::getProcessId(){
-    	return _processId;
+    const string& DistributedLock::getProcessId() {
+        return _processId;
     }
 
     /**
@@ -295,12 +314,12 @@ namespace mongo {
 
             // TODO : Pick exception number
             if( !success )
-                m_throw_exception(70004, TimeNotFoundException, "Could not get status from server " << server.toString() << " in cluster " << cluster.toString() << " to check time");
+                m_throw_exception( 13647, TimeNotFoundException, "could not get status from server " << server.toString() << " in cluster " << cluster.toString() << " to check time");
 
             // Make sure that our delay is not more than 2x our maximum network skew, since this is the max our remote
             // time value can be off by if we assume a response in the middle of the delay.
             if( delay > (long long) (maxNetSkew * 2) )
-                m_throw_exception(70005, TimeNotFoundException, "Server " << server.toString() << " in cluster " << cluster.toString() << " did not respond within max network delay of " << maxNetSkew << "ms");
+                m_throw_exception( 13648, TimeNotFoundException, "server " << server.toString() << " in cluster " << cluster.toString() << " did not respond within max network delay of " << maxNetSkew << "ms");
         }
         catch(...) {
             conn.done();
@@ -344,7 +363,7 @@ namespace mongo {
                 // Skew is how much time we'd have to add to local to get to remote
                 avgSkews[s] += (long long) (remote - local);
 
-                log( LLL + 1 ) << "Skew from remote server " << server << " found: " << (long long) (remote - local) << endl;
+                log( logLvl + 1 ) << "skew from remote server " << server << " found: " << (long long) (remote - local) << endl;
 
             }
         }
@@ -375,34 +394,34 @@ namespace mongo {
         long long totalSkew = serverMaxSkew - serverMinSkew;
 
         // Make sure our max skew is not more than our pre-set limit
-        if(totalSkew > (long long) maxClockSkew){
-        	log( LLL + 1 ) << "Total clock skew of " << totalSkew << "ms for servers " << cluster << " is out of " << maxClockSkew << "ms bounds." << endl;
-        	return false;
+        if(totalSkew > (long long) maxClockSkew) {
+            log( logLvl + 1 ) << "total clock skew of " << totalSkew << "ms for servers " << cluster << " is out of " << maxClockSkew << "ms bounds." << endl;
+            return false;
         }
 
-        log( LLL + 1 ) << "Total clock skew of " << totalSkew << "ms for servers " << cluster << " is in " << maxClockSkew << "ms bounds." << endl;
+        log( logLvl + 1 ) << "total clock skew of " << totalSkew << "ms for servers " << cluster << " is in " << maxClockSkew << "ms bounds." << endl;
         return true;
     }
 
     // For use in testing, ping thread should run indefinitely in practice.
-    bool DistributedLock::killPinger( DistributedLock& lock ){
-	if( lock._threadId == "") return false;
+    bool DistributedLock::killPinger( DistributedLock& lock ) {
+        if( lock._threadId == "") return false;
 
-	distLockPinger.kill( lock._conn, lock._processId );
-	return true;
+        distLockPinger.kill( lock._conn, lock._processId );
+        return true;
     }
 
     bool DistributedLock::lock_try( string why , BSONObj * other ) {
 
-    	// TODO:  Start pinging only when we actually get the lock?
-	// If we don't have a thread pinger, make sure we shouldn't have one
-       	if( _threadId == "" )
-       	    _threadId = distLockPinger.got( *this, _lockPing );
+        // TODO:  Start pinging only when we actually get the lock?
+        // If we don't have a thread pinger, make sure we shouldn't have one
+        if( _threadId == "" )
+            _threadId = distLockPinger.got( *this, _lockPing );
 
-    	// This should always be true, if not, we are using the lock incorrectly.
-    	assert( _name != "" );
+        // This should always be true, if not, we are using the lock incorrectly.
+        assert( _name != "" );
 
-    	// write to dummy if 'other' is null
+        // write to dummy if 'other' is null
         BSONObj dummyOther;
         if ( other == NULL )
             other = &dummyOther;
@@ -416,16 +435,19 @@ namespace mongo {
         {
             // make sure its there so we can use simple update logic below
             BSONObj o = conn->findOne( _ns , _id ).getOwned();
+
+            // Case 1: No locks
             if ( o.isEmpty() ) {
                 try {
-                    log( LLL ) << "dist_lock inserting initial doc in " << _ns << " for lock " << _name << endl;
+                    log( logLvl ) << "inserting initial doc in " << _ns << " for lock " << _name << endl;
                     conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
                 }
                 catch ( UserException& e ) {
-                    log( LLL ) << "dist_lock could not insert initial doc: " << e << endl;
+                    warning() << "could not insert initial doc for distributed lock " << _name << m_caused_by(e) << endl;
                 }
             }
-            
+
+            // Case 2: A set lock that we might be able to force
             else if ( o["state"].numberInt() > 0 ) {
 
                 string lockName = o["_id"].String() + string("/") + o["process"].String();
@@ -433,11 +455,13 @@ namespace mongo {
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ) {
                     if(_lockTimeout > 0) {
-                        log( LLL ) << "Empty ping found for process in lock '" << lockName << "'" << endl;
+                        log( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
                         // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
                         lastPing = BSON( "_id" << o["process"].String() << "ping" << (Date_t) 0 );
                     }
                     else {
+                        // LEGACY
+
                         // if a lock is taken but there's no ping for it, we're in an inconsistent situation
                         // if the lock holder (mongos or d)  does not exist anymore, the lock could safely be removed
                         // but we'd require analysis of the situation before a manual intervention
@@ -454,7 +478,7 @@ namespace mongo {
                 unsigned long long takeover = ( _lockTimeout > 0 ? _lockTimeout : _takeoverMinutes);
                 if(_lockTimeout > 0) {
 
-                    log( LLL ) << "Checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.get<0>() << " and ping " << _lastPingCheck.get<1>() << endl;
+                    log( logLvl ) << "checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.get<0>() << " and ping " << _lastPingCheck.get<1>() << endl;
 
                     try {
 
@@ -471,9 +495,9 @@ namespace mongo {
                             // is less than the remote time.  We *have* to check this here, otherwise
                             // we overflow and our lock breaks.
                             if(_lastPingCheck.get<2>() >= remote)
-                        	elapsed = 0;
+                                elapsed = 0;
                             else
-                        	elapsed = remote - _lastPingCheck.get<2>();
+                                elapsed = remote - _lastPingCheck.get<2>();
                         }
 
                     }
@@ -486,6 +510,8 @@ namespace mongo {
 
                 }
                 else {
+                    // LEGACY
+
                     // GOTCHA!  If jsTime() (current time) is less than the remote time,
                     // we should definitely not break the lock.  However, if we don't check
                     // this here, we get an invalid unsigned elapsed, which is ginormous and
@@ -500,44 +526,50 @@ namespace mongo {
 
 
                 if ( elapsed <= takeover) {
-                    log( LLL ) << "Could not force lock '" << lockName << "' because elapsed time " << elapsed << " <= " << " takeover time " << takeover << endl;
+                    log( logLvl ) << "could not force lock '" << lockName << "' because elapsed time " << elapsed << " <= " << " takeover time " << takeover << endl;
                     *other = o;
                     conn.done();
                     return false;
                 }
 
-                log( LLL ) << "Forcing lock '" << lockName << "' because elapsed time " << elapsed << " > " << " takeover time " << takeover << endl;
+                log( logLvl - 1 ) << "forcing lock '" << lockName << "' because elapsed time " << elapsed << " > " << " takeover time " << takeover << endl;
                 try {
 
                     // Check the clock skew again.  If we check this before we get a lock
                     // and after the lock times out, we can be pretty sure the time is
                     // increasing at the same rate on all servers and therefore our
                     // timeout is accurate
-                    uassert_msg( 70004, "Remote time in cluster " << _conn.toString() << " is now skewed, cannot force lock.", !isRemoteTimeSkewed() );
+                    uassert_msg( 13652, "remote time in cluster " << _conn.toString() << " is now skewed, cannot force lock.", !isRemoteTimeSkewed() );
 
                     // Make sure we break the lock with the correct "ts" (OID) value, otherwise
                     // we can overwrite a new lock inserted in the meantime.
                     conn->update( _ns , BSON( "_id" << _id["_id"].String() << "state" << o["state"].numberInt() << "ts" << o["ts"] ), BSON( "$set" << BSON( "state" << 0 ) ) );
 
-                    string err = conn->getLastError();
+                    BSONObj err = conn->getLastErrorDetailed();
+                    string errMsg = DBClientWithCommands::getLastErrorString(err);
 
                     // TODO: Clean up all the extra code to exit this method, probably with a refactor
-                    if ( ! err.empty() ) {
-                        log() << "Could not force lock '" << lockName << "' (another force probably won) " << m_error_message(err) << endl;
+                    if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
+                        ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "Could not force lock '" << lockName << "' "
+                                << ( !errMsg.empty() ?  m_error_message(errMsg) : string("(another force won)") ) << endl;
                         *other = o;
                         other->getOwned();
                         conn.done();
                         return false;
                     }
 
-                    log( LLL ) << "Forcing succeeded for '" << lockName << "' @ " << _conn << " using query " << BSON( "_id" << _id["_id"].String() << "state" << o["state"].numberInt() << "ts" << o["ts"] ) << " : " << BSON( "$set" << BSON( "state" << 0 ) ) << endl;
                 }
-                catch( DBException& e) {
-                    // In general, could be a UpdateNotTheSame or LockException
-
-                    //log() << "Exception forcing lock " << e. << "\n" << BSON( "_id" << _id["_id"].String() << "state" << o["state"].numberInt() ) << endl;
-                    //throw e;
-                    warning() << "Lock forcing '" << lockName << "' failed." << m_caused_by(e) << endl;
+                catch( LockException& e ) {
+                    warning() << "lock forcing '" << lockName << "' failed." << m_caused_by(e) << endl;
+                    *other = o;
+                    other->getOwned();
+                    conn.done();
+                    return false;
+                }
+                catch( UpdateNotTheSame& e) {
+                    // Abort since we aren't yet sure if we have multiple lock entries to timeout on the
+                    // diff config servers, or this was just interference from other forcing.
+                    warning() << "lock forcing '" << lockName << "' inconsistent, aborting." << endl;
                     *other = o;
                     other->getOwned();
                     conn.done();
@@ -548,16 +580,18 @@ namespace mongo {
                 if(_lockTimeout > 0)
                     _lastPingCheck = make_tuple(string(""), 0, 0);
 
-                log( LLL ) << "Lock '" << lockName << "' successfully forced" << endl;
+                log( logLvl - 1 ) << "lock '" << lockName << "' successfully forced" << endl;
 
+                // We don't need the ts value in the query, since we will only ever replace locks with state=0.
             }
+            // Case 3: We have an expired lock
             else if ( o["ts"].type() ) {
                 queryBuilder.append( o["ts"] );
             }
         }
 
         bool gotLock = false;
-        BSONObj now;
+        BSONObj currLock;
 
         BSONObj lockDetails = BSON( "state" << 1 << "who" << getDistLockId() << "process" << _processId <<
                                     "when" << jsTime() << "why" << why << "ts" << OID::gen() );
@@ -565,18 +599,26 @@ namespace mongo {
 
         BSONObj query = queryBuilder.obj();
 
+        string lockName = _name + string("/") + _processId;
+
         try {
 
-            log( LLL ) << "dist_lock about to aquire lock: " <<  lockDetails << "\n" << query << endl;
+            log( logLvl ) << "about to acquire distributed lock '" << lockName << ":\n"
+                          <<  lockDetails.jsonString(Strict, true) << "\n"
+                          << query.jsonString(Strict, true) << endl;
+
             conn->update( _ns , query , whatIWant );
 
-            BSONObj o = conn->getLastErrorDetailed();
-            now = conn->findOne( _ns , _id );
+            BSONObj err = conn->getLastErrorDetailed();
+            string errMsg = DBClientWithCommands::getLastErrorString(err);
 
-            if ( o["n"].numberInt() == 0 ) {
-                *other = now;
+            currLock = conn->findOne( _ns , _id );
+
+            if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
+                ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "could not acquire lock '" << lockName << "' "
+                        << ( !errMsg.empty() ?  m_error_message(errMsg) : string("(another update won)") ) << endl;
+                *other = currLock;
                 other->getOwned();
-                log( LLL ) << "dist_lock error trying to aquire lock: " << lockDetails << " error: " << o << endl;
                 gotLock = false;
             }
             else {
@@ -586,75 +628,79 @@ namespace mongo {
         }
         catch ( UpdateNotTheSame& up ) {
             // this means our update got through on some, but not others
-            log( LLL ) << "dist_lock lock did not propagate properly" << endl;
+            warning() << "distributed lock '" << lockName << " did not propagate properly." /* << m_caused_by(up) */ << endl;
 
+            // Find the highest OID value on the diff. servers, that will be the value that
+            // "wins"
             for ( unsigned i=0; i<up.size(); i++ ) {
-                ScopedDbConnection temp( up[i].first );
-                BSONObj temp2 = temp->findOne( _ns , _id );
 
-                if ( now.isEmpty() || now["ts"] < temp2["ts"] ) {
-                    now = temp2.getOwned();
+                ScopedDbConnection indDB( up[i].first );
+
+                BSONObj indUpdate = indDB->findOne( _ns , _id );
+                if ( currLock.isEmpty() || currLock["ts"] < indUpdate["ts"] ) {
+                    currLock = indUpdate.getOwned();
                 }
 
-                temp.done();
+                indDB.done();
+
             }
 
-            if ( now["ts"].OID() == lockDetails["ts"].OID() ) {
-                log( LLL ) << "dist_lock completed lock propagation" << endl;
+            if ( currLock["ts"].OID() == lockDetails["ts"].OID() ) {
+                log( logLvl - 1 ) << "lock update won, completing lock propagation for '" << lockName << "'" << endl;
                 gotLock = true;
+
+                // TODO: This may not be safe, if we've previously borked here and are recovering via a
+                // force.
                 conn->update( _ns , _id , whatIWant );
             }
             else {
-                log( LLL ) << "dist_lock error trying to complete propagation" << endl;
+                log( logLvl - 1 ) << "lock update lost, lock '" << lockName << "' not propagated." << endl;
                 gotLock = false;
             }
         }
 
-        if(gotLock) {
-            try {
-                log( LLL ) << "Distributed lock '" << _id["_id"].String() << "' acquired : " << conn->findOne( _ns, lockDetails );
-                log( LLL ) << "Num old locks: " << conn->findOne( _ns, query ) << endl;
-            }
-            catch( UserException& e ) {
-                log( LLL ) << "No old locks." << e << endl;
-            }
-        }
+        if(gotLock)
+            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, now : " << currLock << endl;
+        else
+            log( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
 
         conn.done();
-
-        log( LLL ) << "dist_lock lock gotLock: " << gotLock << " now: " << now << endl;
 
         return gotLock;
     }
 
     void DistributedLock::unlock() {
 
-    	assert( _name != "" );
+        assert( _name != "" );
 
-    	const int maxAttempts = 3;
+        string lockName = _name + string("/") + _processId;
+
+        const int maxAttempts = 3;
         int attempted = 0;
         while ( ++attempted <= maxAttempts ) {
 
             try {
                 ScopedDbConnection conn( _conn );
                 conn->update( _ns , _id, BSON( "$set" << BSON( "state" << 0 ) ) );
-                log( LLL ) << "dist_lock unlock: " << conn->findOne( _ns , _id ) << endl;
+
+                log( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked. " << conn->findOne( _ns , _id ) << endl;
+
                 conn.done();
-
                 return;
-
 
             }
             catch ( std::exception& e) {
-                warning() << "dist_lock  " << _name << " failed to contact config server in unlock attempt "
-                          << attempted << ": " << e.what() <<  endl;
+                warning() << "distributed lock '" << lockName << "' failed unlock attempt."
+                          << m_error_message(e.what()) <<  endl;
 
                 sleepsecs(1 << attempted);
             }
         }
 
-        warning() << "dist_lock couldn't consumate unlock request. " << "Lock " << _name
-                  << " will be taken over after " <<  _takeoverMinutes << " minutes timeout" << endl;
+        warning() << "distributed lock '" << lockName << "' couldn't consummate unlock request. "
+                  << "lock will be taken over after "
+                  << (_lockTimeout > 0 ? _lockTimeout / (60 * 1000) : _takeoverMinutes)
+                  << " minutes timeout." << endl;
     }
 
 

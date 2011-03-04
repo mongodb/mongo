@@ -23,9 +23,6 @@
 #include "redef_macros.h"
 #include "syncclusterconnection.h"
 
-#define LOCK_LOG_LEVEL 1
-#define LLL LOCK_LOG_LEVEL
-
 #define LOCK_TIMEOUT (15 * 60 * 1000)
 #define LOCK_SKEW_FACTOR (30)
 #define LOCK_PING (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
@@ -69,6 +66,8 @@ namespace mongo {
      */
     class DistributedLock {
     public:
+
+    	static const LabeledLevel logLvl;
 
         /**
          * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired.
@@ -154,7 +153,6 @@ namespace mongo {
         string _threadId;
 
     };
-
 
     class dist_lock_try {
     public:

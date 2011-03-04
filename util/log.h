@@ -46,6 +46,39 @@ namespace mongo {
         }
     }
 
+    class LabeledLevel {
+    public:
+
+	LabeledLevel( int level ) : _level( level ) {}
+	LabeledLevel( const char* label, int level ) : _label( label ), _level( level ) {}
+	LabeledLevel( const string& label, int level ) : _label( label ), _level( level ) {}
+
+	LabeledLevel operator+( int i ) const {
+	    return LabeledLevel( _label, _level + i );
+	}
+
+	LabeledLevel operator+( const char* label ) const {
+	    if( _label == "" )
+		return LabeledLevel( label, _level );
+	    return LabeledLevel( _label + string("::") + label, _level );
+	}
+
+	LabeledLevel operator+( string& label ) const {
+	    return LabeledLevel( _label + string("::") + label, _level );
+	}
+
+	LabeledLevel operator-( int i ) const {
+	    return LabeledLevel( _label, _level - i );
+	}
+
+	const string& getLabel() const { return _label; }
+	int getLevel() const { return _level; }
+
+    private:
+	string _label;
+	int _level;
+    };
+
     class LazyString {
     public:
         virtual ~LazyString() {}
@@ -312,6 +345,12 @@ namespace mongo {
         return Logstream::get().prolog().setLogLevel( l );
     }
 
+    inline Nullstream& log( const LabeledLevel& ll ) {
+        Nullstream& stream = log( ll.getLevel() );
+        if( ll.getLabel() != "" )
+            stream << "[" << ll.getLabel() << "] ";
+        return stream;
+    }
 
     inline Nullstream& log() {
         return Logstream::get().prolog();
