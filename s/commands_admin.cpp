@@ -534,7 +534,7 @@ namespace mongo {
                     result.append( "cause" , res );
                     return false;
                 }
-
+                config->getChunkManager( ns , true );
                 return true;
             }
         } splitCollectionCmd;
