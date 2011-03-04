@@ -113,10 +113,14 @@ public:
         auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->nextSafe();
-            if ( obj.toString().find( ".$" ) != string::npos )
-                continue;
-
             const string name = obj.getField( "name" ).valuestr();
+
+            // skip namespaces with $ in them only if we don't specify a collection to dump
+            if ( _coll == "*" && name.find( ".$" ) != string::npos ) {
+                log(1) << "\tskipping collection: " << name << endl;
+                continue;
+            }
+
             const string filename = name.substr( db.size() + 1 );
 
             if ( _coll != "*" && db + "." + _coll != name && _coll != name )
