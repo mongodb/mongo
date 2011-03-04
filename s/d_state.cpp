@@ -518,6 +518,7 @@ namespace mongo {
                 return false;
             }
 
+            Timer relockTime;
             {
                 dbtemprelease unlock;
 
@@ -530,7 +531,10 @@ namespace mongo {
                     return false;
                 }
             }
-
+            if ( relockTime.millis() >= ( cmdLine.slowMS - 10 ) ) {
+                log() << "setShardVersion - relocking slow: " << relockTime.millis() << endl;
+            }
+            
             info->setVersion( ns , version );
             result.appendTimestamp( "oldVersion" , oldVersion );
             result.append( "ok" , 1 );
