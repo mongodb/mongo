@@ -19,13 +19,13 @@
 
 #include "jsobj.h"
 #include "../util/timer.h"
+#include "../commands.h"
 
 namespace mongo
 {
     class BSONObj;
     class BSONObjBuilder;
-    class BufBuilder;
-    class Client;
+    class DocumentSource;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
@@ -45,6 +45,8 @@ namespace mongo
 	Aggregate();
 
     private:
+	shared_ptr<DocumentSource> setupProject(
+	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
     };
 
 } // namespace mongo

@@ -25,21 +25,33 @@ namespace mongo
     class FieldIterator;
 
     class Document :
+        public boost::enable_shared_from_this<Document>,
         boost::noncopyable
     {
     public:
 	~Document();
 
-	Document();
-	Document(BSONObj bsonObj);
+	static shared_ptr<Document> createFromBsonObj(BSONObj bsonObj);
+	void toBson(BSONObjBuilder *pBsonObjBuilder);
 
-	FieldIterator *createFieldIterator();
 	/*
 	  Create a new FieldIterator that can be used to examine the
 	  Document's fields.
 	*/
+	FieldIterator *createFieldIterator();
+
+	/*
+	  Get a pointer to the requested field.
+
+	  @param fieldName the name of the field
+	  @return point to the requested field
+	*/
+	shared_ptr<Field> getField(string fieldName);
 
     private:
+	Document();
+	Document(BSONObj bsonObj);
+
 	vector<shared_ptr<Field>> fieldPtr;
     };
 }

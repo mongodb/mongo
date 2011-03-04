@@ -15,9 +15,9 @@
  */
 
 #include "pch.h"
-#include "../commands.h"
 #include "../cursor.h"
 #include "../Document.h"
+#include "../DocumentSource.h"
 #include "../Field.h"
 #include "../FieldIterator.h"
 #include "../DocumentSourceCursor.h"
@@ -30,7 +30,7 @@ namespace mongo {
     static Aggregate aggregateCmd;
 
     Aggregate::Aggregate() :
-	Command("aggregate")
+	Command("pipeline")
     {
     }
 
@@ -60,8 +60,6 @@ namespace mongo {
 	string collectionName;
 	vector<BSONElement> pipeline;
 
-	DEV log() << "Aggregate::run() begins..." << endl;
-
 	/* gather the specification for the aggregation */
 	for(BSONObj::iterator cmdIterator = cmdObj.begin();
 	    cmdIterator.more(); )
@@ -70,7 +68,7 @@ namespace mongo {
 	    const char *pFieldName = cmdElement.fieldName();
 
 	    /* look for the aggregation command */
-	    if (!strcmp(pFieldName, "aggregate"))
+	    if (!strcmp(pFieldName, "pipeline"))
 	    {
 		pipeline = cmdElement.Array();
 		continue;
@@ -92,51 +90,50 @@ namespace mongo {
 	    return false;
 	}
 
+	/*
+	  If we get here, we've harvested the fields we expect
 
-	/* if we get here, we've harvested the fields we expect */
-	const size_t nSteps = pipeline.size();
-
-	/* set up the document source pipeline */
+	  Set up the document source pipeline.
+	*/
+	BSONArrayBuilder resultArray; // where we'll stash the results
 
 	/* connect up a cursor to the specified collection */
 	shared_ptr<Cursor> pCursor(
 	    findTableScan(collectionName.c_str(), BSONObj()));
+	shared_ptr<DocumentSource> pSource(new DocumentSourceCursor(pCursor));
 
-/*
-	for(bool hasNext = pCursor->ok(); hasNext; hasNext = pCursor->advance())
+	const size_t nSteps = pipeline.size();
+	for(size_t iStep = 0; iStep < nSteps; ++iStep)
 	{
-	    BSONObj bsonObj = pCursor->current();
-	    
-	    DEV log() << "Aggregate::run() got a document" << endl;
-	}
-*/
+	    BSONElement bsonElement(pipeline[iStep]);
+	    const char *pFieldName = bsonElement.fieldName();
 
-	shared_ptr<DocumentSource> pSource(
-	    new DocumentSourceCursor(pCursor.get()));
+	    if (strcmp(pFieldName, "$project") == 0)
+		pSource = setupProject(&bsonElement, pSource);
+	}
+
+	/*
+	  Iterate through the resulting documents, and add them to the result.
+	*/
 	for(bool hasDocument = !pSource->eof(); hasDocument;
 	    hasDocument = pSource->advance())
 	{
 	    shared_ptr<Document> pDocument(pSource->getCurrent());
-	    shared_ptr<FieldIterator> pFieldIterator(
-		pDocument->createFieldIterator());
 
-	    DEV log() << "Aggregate::run() document begin..." << endl;
-
-	    for(bool hasField = !pFieldIterator->eof(); hasField;
-		hasField = pFieldIterator->advance())
-	    {
-		shared_ptr<Field> pField(pFieldIterator->getCurrent());
-
-		DEV log() << "Aggregate::run() Field \"" <<
-		    pField->getName() << "\" type \"" <<
-		    (int)pField->getType() << endl;
-	    }
-	    
-	    DEV log() << "Aggregate::run() ...end document" << endl;
+	    /* add the document to the result set */
+	    BSONObjBuilder documentBuilder;
+	    pDocument->toBson(&documentBuilder);
+	    resultArray.append(documentBuilder.done());
 	}
-	
-	DEV log() << "Aggregate::run() ...ends" << endl;
 
+	result.appendArray("result", resultArray.done());
+	
 	return true;
+    }
+
+    shared_ptr<DocumentSource> Aggregate::setupProject(
+	BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource)
+    {
+	return pSource; // TODO
     }
 }

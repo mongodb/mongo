@@ -38,7 +38,7 @@ namespace mongo
 	  Advanced the DocumentSource's position in the Document stream.
 	*/
 
-	virtual Document *getCurrent() = 0;
+	virtual shared_ptr<Document> getCurrent() = 0;
 	/*
 	  Advance the source, and return the next Expression.
 

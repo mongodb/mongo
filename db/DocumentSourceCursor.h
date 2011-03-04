@@ -32,9 +32,9 @@ namespace mongo
 	virtual ~DocumentSourceCursor();
 	virtual bool eof();
 	virtual bool advance();
-	virtual Document *getCurrent();
+	virtual shared_ptr<Document> getCurrent();
 
-	DocumentSourceCursor(Cursor *pTheCursor);
+	DocumentSourceCursor(shared_ptr<Cursor> pTheCursor);
 
     private:
 	boost::shared_ptr<Cursor> pCursor;

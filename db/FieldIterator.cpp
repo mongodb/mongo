@@ -21,7 +21,7 @@
 
 namespace mongo
 {
-    FieldIterator::FieldIterator(Document *pTheDocument,
+    FieldIterator::FieldIterator(shared_ptr<Document> pTheDocument,
 				 vector<shared_ptr<Field>> *pTheVFieldPtr):
 	pDocument(pTheDocument),
 	pVFieldPtr(pTheVFieldPtr),
@@ -40,12 +40,12 @@ namespace mongo
     {
 	assert(!eof());
 	++currentField;
-	return eof();
+	return !eof();
     }
 
-    Field *FieldIterator::getCurrent() const
+    shared_ptr<Field> FieldIterator::getCurrent() const
     {
 	assert(!eof());
-	return (*pVFieldPtr)[currentField].get();
+	return (*pVFieldPtr)[currentField];
     }
 }

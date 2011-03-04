@@ -39,14 +39,14 @@ namespace mongo
 	  @return true if this results in a valid field
 	*/
 
-	Field *getCurrent() const;
+	shared_ptr<Field> getCurrent() const;
 	/*
 	  @return a pointer to the current Field
 	*/
 
     private:
 	friend class Document;
-	FieldIterator(Document *pDocument,
+	FieldIterator(shared_ptr<Document> pDocument,
 		      vector<shared_ptr<Field>> *pVFieldPtr);
 	/*
 	  @param pDocument points to the document whose fields are being

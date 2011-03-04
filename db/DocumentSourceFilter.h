@@ -32,10 +32,10 @@ namespace mongo
 	virtual ~DocumentSourceFilter();
 	virtual bool eof();
 	virtual bool advance();
-	virtual Document *getCurrent();
+	virtual shared_ptr<Document> getCurrent();
 
-	DocumentSourceFilter(DocumentSource *pTheSource,
-			     Expression *pTheFilter);
+	DocumentSourceFilter(shared_ptr<DocumentSource> pTheSource,
+			     shared_ptr<Expression> pTheFilter);
 
     private:
 	boost::shared_ptr<DocumentSource> pSource;

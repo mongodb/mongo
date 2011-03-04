@@ -17,12 +17,13 @@
 #include "pch.h"
 
 #include "Cursor.h"
+#include "Document.h"
 #include "DocumentSourceCursor.h"
 #include "Expression.h"
 
 namespace mongo
 {
-    DocumentSourceCursor::DocumentSourceCursor(Cursor *pTheCursor):
+    DocumentSourceCursor::DocumentSourceCursor(shared_ptr<Cursor> pTheCursor):
 	pCursor(pTheCursor)
     {
     }
@@ -37,11 +38,11 @@ namespace mongo
 	return pCursor->advance();
     }
 
-    Document *DocumentSourceCursor::getCurrent()
+    shared_ptr<Document> DocumentSourceCursor::getCurrent()
     {
-	BSONObj bsonObj(pCursor->current());
-
-	return NULL; // TODO
+	shared_ptr<Document> pDocument(
+	    Document::createFromBsonObj(pCursor->current()));
+	return pDocument;
     }
 
     DocumentSourceCursor::~DocumentSourceCursor()

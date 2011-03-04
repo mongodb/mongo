@@ -23,7 +23,8 @@
 namespace mongo
 {
     DocumentSourceFilter::DocumentSourceFilter(
-	DocumentSource *pTheSource, Expression *pTheFilter):
+	shared_ptr<DocumentSource> pTheSource,
+	shared_ptr<Expression> pTheFilter):
 	pFilter(pTheFilter)
     {
     }
@@ -39,9 +40,10 @@ namespace mongo
 	return pSource->advance();
     }
 
-    Document *DocumentSourceFilter::getCurrent()
+    shared_ptr<Document> DocumentSourceFilter::getCurrent()
     {
-	return NULL; // TODO
+	shared_ptr<Document> pDocument;
+	return pDocument; // TODO
     }
 
     DocumentSourceFilter::~DocumentSourceFilter()
