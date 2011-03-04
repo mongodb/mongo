@@ -1114,16 +1114,16 @@ namespace mongo {
 
     /** remove a key from the index */
     bool BtreeBucket::unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc ) const {
-        if ( key.objsize() > KeyMax ) {
-            OCCASIONALLY problem() << "unindex: key too large to index, skipping " << id.indexNamespace() << /* ' ' << key.toString() << */ endl;
-            return false;
-        }
-
         int pos;
         bool found;
         DiskLoc loc = locate(id, thisLoc, key, Ordering::make(id.keyPattern()), pos, found, recordLoc, 1);
         if ( found ) {
             loc.btreemod()->delKeyAtPos(loc, id, pos, Ordering::make(id.keyPattern()));
+            
+            if ( key.objsize() > KeyMax ) {
+                OCCASIONALLY problem() << "unindex: key too large to index but was found for " << id.indexNamespace() << " reIndex suggested" << endl;
+            }
+            
             return true;
         }
         return false;
