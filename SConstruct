@@ -160,6 +160,17 @@ add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False
 
 # --- environment setup ---
 
+def getCodeVersion():
+    fullSource = open( "util/version.cpp" , "r" ).read()
+    allMatches = re.findall( r"versionString.. = \"([\d].[\d].[\d]).*\"" , fullSource );
+    if len(allMatches) != 1:
+        print( "can't find version # in code" )
+        return None
+    return allMatches[0]
+
+if getCodeVersion() == None:
+    Exit(-1)
+
 def removeIfInList( lst , thing ):
     if thing in lst:
         lst.remove( thing )
@@ -641,7 +652,6 @@ elif "win32" == os.sys.platform:
     winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
 
     if force64:
-        
         winLibString += ""
         #winLibString += " LIBCMT LIBCPMT "
 
@@ -680,9 +690,6 @@ if nix:
     #make scons colorgcc friendly
     env['ENV']['HOME'] = os.environ['HOME']
     env['ENV']['TERM'] = os.environ['TERM']
-
-    if linux and has_option( "sharedclient" ):
-        env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
@@ -1117,8 +1124,33 @@ mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + s
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
-if has_option( "sharedclient" ):
-    sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
+sharedLibName = None
+
+if GetOption( "sharedclient" ) != None:
+    sharedClientEnv = env.Clone()
+    libprefix = sharedClientEnv['LIBPREFIX']
+    libsuffix = sharedClientEnv['SHLIBSUFFIX']
+    if nix:
+        version = getCodeVersion()
+        assert(version)
+        sharedClientEnv['SHLIBSUFFIX'] += '.' + version
+
+    sharedLibName = str( sharedClientEnv.SharedLibrary( "mongoclient" , allClientFiles)[0] )
+
+    # sonames is a must for a c++ shared library... to be able to upgrade later on
+    if nix:
+        sharedClientEnv.Append(LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs -Wl,-soname,%s" % sharedLibName)
+
+        # create a symlink during buildtime
+        # this needs to be done so that further targets can link to the shared lib
+        basename = libprefix + "mongoclient" + libsuffix
+        def string_it(target, source, env):
+            return "symlinking " + str(target[0]) + " to " + str(source[0])
+        def build_it(target, source, env):
+            if not os.path.exists(str(target[0])):
+                os.symlink(str(source[0]), str(target[0]))
+        symlinkTarget = sharedClientEnv.Command(basename, sharedLibName, sharedClientEnv.Action(build_it, string_it))
+
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
@@ -1406,17 +1438,6 @@ def getSystemInstallName():
 
     return n
 
-def getCodeVersion():
-    fullSource = open( "util/version.cpp" , "r" ).read()
-    allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
-    if len(allMatches) != 1:
-        print( "can't find version # in code" )
-        return None
-    return allMatches[0]
-
-if getCodeVersion() == None:
-    Exit(-1)
-
 def getDistName( sofar ):
     global distName
     global dontReplacePackage
@@ -1511,10 +1532,26 @@ if installSetup.clientSrc:
 
 #lib
 if installSetup.libraries:
-    env.Install( installDir + "/" + nixLibPrefix, clientLibName )
-    if has_option( "sharedclient" ): 
-        env.Install( installDir + "/" + nixLibPrefix, sharedClientLibName )
+    clientLibInstallTarget = env.Install( os.path.join(installDir, nixLibPrefix), clientLibName )
 
+    if sharedLibName:
+        sharedLibInstallTarget = env.Install( os.path.join(installDir, nixLibPrefix), sharedLibName )
+
+        # create a symlink to the fully qualified lib name lib.so -> lib.so.#.#.#
+        # this is the desired behavior on linux systems
+        if nix:
+            basename = env['LIBPREFIX'] + "mongoclient" + env['SHLIBSUFFIX']
+
+            # helpers for the symlink action
+            def string_it(target, source, env):
+                return "symlinking " + str(target[0]) + " to " + str(source[0])
+            def build_it(target, source, env):
+                os.symlink(str(source[0]), str(target[0]))
+
+            symlinkTarget = env.Command(os.path.join(installDir, nixLibPrefix, basename), sharedLibName, env.Action(build_it, string_it))
+
+            env.Alias("install", symlinkTarget)
+            env.Depends(symlinkTarget, sharedLibInstallTarget)
 
 #textfiles
 if installSetup.bannerDir:
@@ -1539,7 +1576,9 @@ if installSetup.clientTestsDir:
 env.Alias( "install" , installDir )
 
 # aliases
-env.Alias( "mongoclient" , has_option( "sharedclient" ) and sharedClientLibName or clientLibName )
+env.Alias( "mongoclient" , clientLibName )
+if sharedLibName:
+    env.Alias( "mongoclient" , sharedLibName )
 
 
 #  ---- CONVENIENCE ----
