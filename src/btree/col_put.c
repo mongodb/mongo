@@ -89,7 +89,7 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate an update array if necessary. */
-		if (page->u.col_leaf.d == NULL)
+		if (page->u.col_leaf.upd == NULL)
 			WT_ERR(
 			    __wt_calloc_def(env, page->indx_count, &new_upd));
 
