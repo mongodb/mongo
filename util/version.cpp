@@ -23,10 +23,64 @@
 #include <string>
 #include "unittest.h"
 #include "version.h"
+#include "../db/jsobj.h"
 
 namespace mongo {
 
+    /* Approved formats for versionString:
+     *      1.2.3
+     *      1.2.3-pre-
+     *      1.2.3-rc4 (up to rc9)
+     *      1.2.3-rc4-pre-
+     * If you really need to do something else you'll need to fix versionArray()
+     */
     const char versionString[] = "1.9.0-pre-";
+
+
+    // See unit test for example outputs
+    static BSONArray _versionArray(const char* version){
+        // this is inefficient, but cached so it doesn't matter
+        BSONArrayBuilder b;
+        string curPart;
+        const char* c = version;
+        int finalPart = 0; // 0 = final release, -100 = pre, -10 to -1 = -10 + X for rcX
+        do { //walks versionString including NUL byte
+            if (!(*c == '.' || *c == '-' || *c == '\0')){
+                curPart += *c;
+                continue;
+            }
+
+            try {
+                unsigned num = stringToNum(curPart.c_str());
+                b.append((int) num);
+            }
+            catch (...){ // not a number
+                if (curPart.empty()){
+                    assert(*c == '\0');
+                    break;
+                }
+                else if (startsWith(curPart, "rc")){
+                    finalPart = -10 + stringToNum(curPart.c_str()+2);
+                    break;
+                }
+                else if (curPart == "pre"){
+                    finalPart = -100;
+                    break;
+                }
+            }
+
+            curPart = "";
+        } while (*c++);
+
+        b.append(finalPart);
+        return b.arr();
+    }
+    BSONArray versionArray(){
+        static BSONArray out;
+        if (out.isEmpty())
+            out = _versionArray(versionString);
+        return out;
+    }
 
     string mongodVersion() {
         stringstream ss;
@@ -134,4 +188,28 @@ namespace mongo {
             log(1) << "versionCmpTest passed" << endl;
         }
     } versionCmpTest;
+
+    class VersionArrayTest : public UnitTest {
+    public:
+        void run() {
+            assert( _versionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );
+            assert( _versionArray("1.2.0") == BSON_ARRAY(1 << 2 << 0 << 0) );
+            assert( _versionArray("2.0.0") == BSON_ARRAY(2 << 0 << 0 << 0) );
+
+            assert( _versionArray("1.2.3-pre-") == BSON_ARRAY(1 << 2 << 3 << -100) );
+            assert( _versionArray("1.2.0-pre-") == BSON_ARRAY(1 << 2 << 0 << -100) );
+            assert( _versionArray("2.0.0-pre-") == BSON_ARRAY(2 << 0 << 0 << -100) );
+
+            assert( _versionArray("1.2.3-rc0") == BSON_ARRAY(1 << 2 << 3 << -10) );
+            assert( _versionArray("1.2.0-rc1") == BSON_ARRAY(1 << 2 << 0 << -9) );
+            assert( _versionArray("2.0.0-rc2") == BSON_ARRAY(2 << 0 << 0 << -8) );
+
+            // Note that the pre of an rc is the same as the rc itself
+            assert( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
+            assert( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
+            assert( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
+
+            log(1) << "versionArrayTest passed" << endl;
+        }
+    } versionArrayTest;
 }

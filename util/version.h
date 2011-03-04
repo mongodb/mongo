@@ -4,11 +4,13 @@
 #include <string>
 
 namespace mongo {
+    struct BSONArray;
 
     using std::string;
 
     // mongo version
     extern const char versionString[];
+    BSONArray versionArray();
     string mongodVersion();
     int versionCmp(StringData rhs, StringData lhs); // like strcmp
 
