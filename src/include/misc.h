@@ -24,7 +24,7 @@ extern "C" {
  */
 #define	WT_SIZEOF32(e)	((uint32_t)sizeof(e))
 #define	WT_PTRDIFF32(end, begin)					\
-	((uint32_t)((uint8_t *)(end) - ((uint8_t *)begin)))
+	((uint32_t)((uint8_t *)(end) - ((uint8_t *)(begin))))
 
 /*
  * Align an unsigned value of any type to a specified power-of-2, including the
