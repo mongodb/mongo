@@ -713,11 +713,11 @@ __wt_rec_col_var(WT_TOC *toc, WT_PAGE *page)
 	uint64_t recno;
 	uint32_t entries, i, len, max, space_avail;
 	uint8_t *first_free;
-	int loop_state, ret;
+	int loop_state, need_ovfl_free, ret;
 
 	db = toc->db;
 	dsk = page->dsk;
-	loop_state = ret = 0;
+	loop_state = need_ovfl_free = ret = 0;
 
 	WT_CLEAR(data_dbt);
 	WT_CLEAR(data_item);
@@ -741,13 +741,9 @@ split_restart:	__wt_scr_release(&tmp);
 		 */
 		item = WT_COL_PTR(dsk, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
-			/*
-			 * If we update overflow data item, free the underlying
-			 * file space.
-			 */
+			/* Flag if we need a pass to free overflow items. */
 			if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
-				WT_RET(__wt_block_free_ovfl(
-				    toc, WT_ITEM_BYTE_OVFL(item)));
+				need_ovfl_free = 1;
 
 			/*
 			 * Check for deletion, else build the data's WT_ITEM
@@ -806,6 +802,28 @@ split_restart:	__wt_scr_release(&tmp);
 	 */
 	ret = __wt_rec_dsk_scratch(toc, page,
 	    recno, &tmp, entries, max, &first_free, &space_avail);
+
+	/*
+	 * Now that we've re-written the page, free the underlying file space
+	 * for any overflow items we've updated.
+	 *
+	 * It would be nice to do this as part of a single pass, but we don't
+	 * for two reasons: First, we restart the above loop if we realize we
+	 * have to physically split the page. and it's tricky to figure out
+	 * which overflow items we've already freed after the restart.  Second,
+	 * if the reconciliation fails, freeing the overflow items corrupts the
+	 * database.
+	 *
+	 * For each entry in the in-memory page...
+	 */
+	if (need_ovfl_free)
+		WT_COL_INDX_FOREACH(page, cip, i)
+			if (WT_COL_UPDATE(page, cip) != NULL) {
+				item = WT_COL_PTR(dsk, cip);
+				if (WT_ITEM_TYPE(item) == WT_ITEM_DATA_OVFL)
+					WT_RET(__wt_block_free_ovfl(
+					    toc, WT_ITEM_BYTE_OVFL(item)));
+			}
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
