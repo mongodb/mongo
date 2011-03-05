@@ -113,7 +113,7 @@ __wt_page_inmem(WT_TOC *toc, WT_PAGE *page)
 	}
 	return (0);
 
-err:	(void)__wt_page_discard(toc, page);
+err:	__wt_page_discard(toc, page);
 	return (ret);
 }
 

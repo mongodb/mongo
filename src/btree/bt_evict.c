@@ -9,7 +9,7 @@
 #include "bt_inline.c"
 
 static int  __wt_evict(WT_TOC *);
-static int  __wt_evict_clean(WT_TOC *);
+static void __wt_evict_clean(WT_TOC *);
 static int  __wt_evict_compare_lru(const void *a, const void *b);
 static int  __wt_evict_compare_page(const void *a, const void *b);
 static int  __wt_evict_dirty(WT_TOC *);
@@ -266,10 +266,8 @@ done_duplicates:
 	__wt_evict_set(toc);
 	__wt_evict_hazard_check(toc);
 	__wt_evict_state_check(toc);
-	WT_RET(__wt_evict_clean(toc));
-	WT_RET(__wt_evict_dirty(toc));
-
-	return (0);
+	__wt_evict_clean(toc);
+	return (__wt_evict_dirty(toc));
 }
 
 /*
@@ -563,7 +561,7 @@ skip:		/*
  * __wt_evict_clean --
  *	Discard clean cache pages.
  */
-static int
+static void
 __wt_evict_clean(WT_TOC *toc)
 {
 	ENV *env;
@@ -606,9 +604,8 @@ __wt_evict_clean(WT_TOC *toc)
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
 		/* The page can no longer be found, free the memory. */
-		WT_RET(__wt_page_discard(toc, page));
+		__wt_page_discard(toc, page);
 	}
-	return (0);
 }
 
 /*
@@ -625,7 +622,7 @@ __wt_evict_dirty(WT_TOC *toc)
 	WT_REF *ref;
 	WT_STATS *stats;
 	u_int i;
-	int update_gen;
+	int ret, update_gen;
 
 	env = toc->env;
 	cache = env->ienv->cache;
@@ -664,7 +661,7 @@ __wt_evict_dirty(WT_TOC *toc)
 		 * code.
 		 */
 		toc->db = evict->idb->db;
-		WT_RET(__wt_page_reconcile(toc, page));
+		WT_ERR(__wt_page_reconcile(toc, page));
 
 		/*
 		 * One special case -- of the page was deleted, the state has
@@ -683,9 +680,21 @@ __wt_evict_dirty(WT_TOC *toc)
 		WT_CACHE_PAGE_OUT(cache, page->size);
 
 		/* The page can no longer be found, free the memory. */
-		WT_RET(__wt_page_discard(toc, page));
+		__wt_page_discard(toc, page);
 	}
 	return (0);
+
+err:	/*
+	 * Writes to the file are likely failing -- quit trying to reconcile
+	 * pages, and clear any remaining eviction flags.
+	 */
+	WT_EVICT_FOREACH(cache, evict, i) {
+		if ((ref = evict->ref) == NULL)
+			continue;
+		if (ref->state == WT_REF_EVICT)
+			ref->state = WT_REF_DISK;
+	}
+	return (ret);
 }
 
 /*

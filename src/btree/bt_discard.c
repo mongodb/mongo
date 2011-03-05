@@ -40,13 +40,11 @@ __wt_row_key_on_page(WT_PAGE *page, void *key)
  * __wt_page_discard --
  *	Free all memory associated with a page.
  */
-int
+void
 __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 {
-	DB *db;
 	ENV *env;
 
-	db = toc->db;
 	env = toc->env;
 
 	/* Never discard a dirty page. */
@@ -71,14 +69,11 @@ __wt_page_discard(WT_TOC *toc, WT_PAGE *page)
 	case WT_PAGE_ROW_LEAF:
 		__wt_discard_page_row_leaf(env, page);
 		break;
-	WT_ILLEGAL_FORMAT(db);
 	}
 
 	if (page->dsk != NULL)
 		__wt_free(env, page->dsk, page->size);
 	__wt_free(env, page, sizeof(WT_PAGE));
-
-	return (0);
 }
 
 /*

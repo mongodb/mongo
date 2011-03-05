@@ -44,7 +44,7 @@ int
 __wt_desc_read(WT_TOC *toc);
 int
 __wt_desc_write(WT_TOC *toc);
-int
+void
 __wt_page_discard(WT_TOC *toc, WT_PAGE *page);
 int
 __wt_db_dump(WT_TOC *toc,
