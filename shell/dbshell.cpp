@@ -47,7 +47,6 @@ using namespace mongo;
 
 string historyFile;
 bool gotInterrupted = 0;
-bool inMultiLine = 0;
 static volatile bool atPrompt = false; // can eval before getting to prompt
 bool autoKillOp = false;
 
@@ -204,7 +203,7 @@ void killOps() {
 
 void quitNicely( int sig ) {
     mongo::dbexitCalled = true;
-    if ( sig == SIGINT && inMultiLine ) {
+    if ( sig == SIGINT ) {
         gotInterrupted = 1;
         return;
     }
@@ -223,7 +222,7 @@ void quitNicely( int sig ) {
 }
 #endif
 
-char * shellReadline( const char * prompt , int handlesigint = 0 ) {
+char * shellReadline( const char * prompt , int handlesigint = 1 ) {
 
     atPrompt = true;
 #ifdef USE_READLINE
@@ -415,9 +414,8 @@ public:
 
 string finishCode( string code ) {
     while ( ! isBalanced( code ) ) {
-        inMultiLine = 1;
         code += "\n";
-        char * line = shellReadline("... " , 1 );
+        char * line = shellReadline("... ");
         if ( gotInterrupted )
             return "";
         if ( ! line )
@@ -695,7 +693,6 @@ int _main(int argc, char* argv[]) {
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
         while ( 1 ) {
-            inMultiLine = 0;
             gotInterrupted = 0;
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
@@ -703,6 +700,10 @@ int _main(int argc, char* argv[]) {
             string prompt(sayReplSetMemberState()+"> ");
 
             char * line = shellReadline( prompt.c_str() );
+            if ( gotInterrupted ) {
+                cout << endl;
+                continue;
+            }
 
             if ( line ) {
                 while (startsWith(line, "> "))
