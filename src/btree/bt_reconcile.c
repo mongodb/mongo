@@ -1378,6 +1378,7 @@ __wt_rec_col_split(WT_TOC *toc, uint32_t *addrp, uint32_t *sizep)
 
 	db = toc->db;
 	reclist = &toc->env->ienv->cache->reclist;
+	addr = WT_ADDR_INVALID;
 	ret = 0;
 
 	/* The disk image is a header plus room for the WT_OFF_RECORD pairs. */
@@ -1400,15 +1401,25 @@ __wt_rec_col_split(WT_TOC *toc, uint32_t *addrp, uint32_t *sizep)
 	size = __wt_set_disk_size(toc, dsk, first_free);
 
 	/* Allocate file space. */
-	WT_RET(__wt_block_alloc(toc, &addr, size));
+	WT_ERR(__wt_block_alloc(toc, &addr, size));
 
 	/* Write the disk block. */
-	WT_RET(__wt_disk_write(toc, dsk, addr, size));
+	WT_ERR(__wt_disk_write(toc, dsk, addr, size));
 
 	*addrp = addr;
 	*sizep = size;
 
-err:	if (tmp != NULL)
+	if (0) {
+err:		/* On error, free all of the pages we just wrote. */
+		for (i = 0; i < reclist->next; ++i)
+			(void)__wt_block_free(toc,
+			    reclist->list[i].off.addr,
+			    reclist->list[i].off.size);
+		if (addr != WT_ADDR_INVALID)
+			(void)__wt_block_free(toc, addr, size);
+	}
+
+	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);
