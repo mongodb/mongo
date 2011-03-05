@@ -151,34 +151,13 @@ struct __wt_page_disk {
 	uint8_t type;			/* 24: page type */
 
 	/*
-	 * WiredTiger is no-overwrite: each time a page is written, it's written
-	 * to an unused disk location so torn writes don't corrupt the file.
-	 * This means that writing a page requires updating the page's parent to
-	 * reference the new location.  We don't want to repeatedly write the
-	 * parent on an all-file flush, so we sort the pages for writing based
-	 * on their level in the tree and start writing with the lower levels,
-	 * working our way up to the root.
-	 *
-	 * We don't need the tree level on disk and we could move this field to
-	 * the WT_PAGE structure -- that said, it's only a byte, and it's a lot
-	 * harder to figure out the tree level when reading a page into memory
-	 * than to set it once when the page is created.
-	 *
-	 * Leaf pages are level 1, each higher level of the tree increases by 1.
-	 * The maximum tree level is 255, larger than any practical fan-out.
-	 */
-#define	WT_NOLEVEL	0
-#define	WT_LLEAF	1
-	uint8_t level;			/* 25: tree level */
-
-	/*
-	 * It would be possible to decrease the size of the page header by six
-	 * bytes by only writing out the first 26 bytes of the structure to the
+	 * It would be possible to decrease the size of the page header by 3
+	 * bytes by only writing out the first 25 bytes of the structure to the
 	 * page, but I'm not bothering -- I don't think the space is worth it
 	 * and having a little bit of on-page data to play with in the future
 	 * can be a good thing.
 	 */
-	uint8_t unused[2];		/* 26-27: unused padding */
+	uint8_t unused[3];		/* 25-27: unused padding */
 };
 /*
  * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to

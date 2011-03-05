@@ -28,7 +28,7 @@ __wt_db_col_get(WT_TOC *toc, uint64_t recno, DBT *data)
 		return (WT_ERROR);
 	}
 
-	WT_ERR(__wt_col_search(toc, recno, WT_NOLEVEL, 0));
+	WT_ERR(__wt_col_search(toc, recno, 0));
 	ret = __wt_dbt_return(toc, NULL, data, 0);
 
 err:	if (toc->srch_page != idb->root_page.page)

@@ -41,7 +41,7 @@ __wt_key_build(WT_TOC *toc, void *ref)
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
+__wt_row_search(WT_TOC *toc, DBT *key, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -155,11 +155,8 @@ __wt_row_search(WT_TOC *toc, DBT *key, uint32_t level, uint32_t flags)
 			break;
 		}
 
-		/*
-		 * If we've reached the leaf page, or we've reached the level
-		 * requested by our caller, we're done.
-		 */
-		if (isleaf || level == dsk->level)
+		/* If we've reached the leaf page, we're done. */
+		if (isleaf)
 			break;
 
 deleted_retry:	/* rref references the subtree containing the record. */

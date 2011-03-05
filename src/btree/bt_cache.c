@@ -67,6 +67,7 @@ __wt_cache_destroy(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
+	WT_REC_LIST *reclist;
 	int ret;
 
 	ienv = env->ienv;
@@ -76,15 +77,15 @@ __wt_cache_destroy(ENV *env)
 	if (cache == NULL)
 		return (0);
 
-	/* Discard mutexes. */
+	if (cache->mtx_reconcile != NULL)
+		(void)__wt_mtx_destroy(env, cache->mtx_reconcile);
 	if (cache->mtx_evict != NULL)
 		(void)__wt_mtx_destroy(env, cache->mtx_evict);
 	if (cache->mtx_read != NULL)
 		(void)__wt_mtx_destroy(env, cache->mtx_read);
-	if (cache->mtx_reconcile != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_reconcile);
 
-	/* Discard allocated memory, and clear. */
+	reclist = &cache->reclist;
+	__wt_free(env, reclist->list, reclist->entries * sizeof(reclist->list));
 	__wt_free(env, cache->stats, 0);
 	__wt_free(env, ienv->cache, sizeof(WT_CACHE));
 

@@ -82,7 +82,6 @@ idb_dstats = {
     'PAGE_OVERFLOW' : Stat('overflow pages'),
     'PAGE_ROW_INTERNAL' : Stat('row-store internal pages'),
     'PAGE_ROW_LEAF' : Stat('row-store leaf pages'),
-    'TREE_LEVEL' : Stat('number of levels in the btree'),
 }
 
 ##########################################

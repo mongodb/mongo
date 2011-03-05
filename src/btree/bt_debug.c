@@ -96,18 +96,16 @@ __wt_debug_disk(WT_TOC *toc, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		fprintf(fp,
-		    "%s page: starting recno %llu, level %lu, entries %lu, "
-		    "lsn %lu/%lu\n",
+		    "%s page: starting recno %llu, entries %lu, lsn %lu/%lu\n",
 		    __wt_page_type_string(dsk), (unsigned long long)dsk->recno,
-		    (u_long)dsk->level, (u_long)dsk->u.entries,
+		    (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		fprintf(fp,
-		    "%s page: level %lu, entries %lu, lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk),
-		    (u_long)dsk->level, (u_long)dsk->u.entries,
+		    "%s page: entries %lu, lsn %lu/%lu\n",
+		    __wt_page_type_string(dsk), (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	case WT_PAGE_OVFL:

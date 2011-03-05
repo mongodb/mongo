@@ -47,7 +47,7 @@ __wt_row_update(WT_TOC *toc, DBT *key, DBT *data, int insert)
 	upd = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_row_search(toc, key, WT_NOLEVEL, insert ? WT_INSERT : 0));
+	WT_RET(__wt_row_search(toc, key, insert ? WT_INSERT : 0));
 	page = toc->srch_page;
 
 	/* Allocate an update array as necessary. */

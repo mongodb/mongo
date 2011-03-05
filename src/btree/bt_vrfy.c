@@ -42,8 +42,8 @@ static int __wt_verify_overflow_page(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow(
 		WT_TOC *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_pc(WT_TOC *, WT_ROW_REF *, WT_PAGE *, int);
-static int __wt_verify_tree(WT_TOC *,
-		WT_ROW_REF *, WT_PAGE *, uint64_t, uint32_t, WT_VSTUFF *);
+static int __wt_verify_tree(
+		WT_TOC *, WT_ROW_REF *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -107,8 +107,8 @@ __wt_verify(
 	bit_nset(vstuff.fragbits, 0, 0);
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(toc, NULL,
-	    idb->root_page.page, (uint64_t)1, WT_NOLEVEL, &vstuff));
+	WT_ERR(__wt_verify_tree(
+	    toc, NULL, idb->root_page.page, (uint64_t)1, &vstuff));
 
 	WT_ERR(__wt_verify_freelist(toc, &vstuff));
 
@@ -136,7 +136,6 @@ __wt_verify_tree(
 	WT_ROW_REF *parent_rref,/* Internal key referencing this page, if any */
 	WT_PAGE *page,		/* Page to verify */
 	uint64_t parent_recno,	/* First record in this subtree */
-	uint32_t level,		/* Page's tree level */
 	WT_VSTUFF *vs)		/* The verify package */
 {
 	DB *db;
@@ -150,19 +149,6 @@ __wt_verify_tree(
 	db = toc->db;
 	dsk = page->dsk;
 	ret = 0;
-
-	/* Report progress every 10 pages. */
-	if (vs->f != NULL && ++vs->fcnt % 10 == 0)
-		vs->f(toc->name, vs->fcnt);
-
-	/* Update frags list. */
-	WT_ERR(__wt_verify_addfrag(toc, page->addr, page->size, vs));
-
-#ifdef HAVE_DIAGNOSTIC
-	/* Optionally dump the page in debugging mode. */
-	if (vs->stream != NULL)
-		WT_ERR(__wt_debug_page(toc, page, NULL, vs->stream));
-#endif
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -186,22 +172,18 @@ __wt_verify_tree(
 	 * which happens here.
 	 */
 
-	/*
-	 * If passed a level of WT_NOLEVEL (that is, the only level that can't
-	 * possibly be a valid page level), this is the root page of the tree.
-	 *
-	 * If it's the root, use this page's level to initialize expected the
-	 * values for the rest of the tree.
-	 */
-	if (level == WT_NOLEVEL)
-		level = dsk->level;
-	else if (level != dsk->level) {
-		__wt_api_db_errx(db,
-		    "page at addr %lu has a tree level of %lu when the "
-		    "expected level was %lu",
-		    (u_long)page->addr, (u_long)dsk->level, (u_long)level);
-		goto err;
-	}
+	/* Report progress every 10 pages. */
+	if (vs->f != NULL && ++vs->fcnt % 10 == 0)
+		vs->f(toc->name, vs->fcnt);
+
+	/* Update frags list. */
+	WT_ERR(__wt_verify_addfrag(toc, page->addr, page->size, vs));
+
+#ifdef HAVE_DIAGNOSTIC
+	/* Optionally dump the page in debugging mode. */
+	if (vs->stream != NULL)
+		WT_ERR(__wt_debug_page(toc, page, NULL, vs->stream));
+#endif
 
 	/* Check the starting record number. */
 	switch (dsk->type) {
@@ -253,8 +235,8 @@ __wt_verify_tree(
 			ref = &cref->ref;
 			switch (ret = __wt_page_in(toc, page, ref, 1)) {
 			case 0:				/* Valid page */
-				ret = __wt_verify_tree(toc, NULL,
-				    ref->page, cref->recno, level - 1, vs);
+				ret = __wt_verify_tree(
+				    toc, NULL, ref->page, cref->recno, vs);
 				__wt_hazard_clear(toc, ref->page);
 				break;
 			case WT_PAGE_DELETED:
@@ -309,8 +291,8 @@ __wt_verify_tree(
 			ref = &rref->ref;
 			switch (ret = __wt_page_in(toc, page, ref, 1)) {
 			case 0:				/* Valid page */
-				ret = __wt_verify_tree(toc, rref,
-				    ref->page, (uint64_t)0, level - 1, vs);
+				ret = __wt_verify_tree(
+				    toc, rref, ref->page, (uint64_t)0, vs);
 				/*
 				 * Remaining special handling of the last
 				 * verified leaf page: if we kept a reference

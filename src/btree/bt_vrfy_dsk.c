@@ -54,34 +54,6 @@ __wt_verify_dsk_page(
 
 	/* Ignore the checksum -- it verified when we first read the page. */
 
-	/* Check the page level. */
-	switch (dsk->type) {
-	case WT_PAGE_FREELIST:
-	case WT_PAGE_OVFL:
-		if (dsk->level != WT_NOLEVEL)
-			goto err_level;
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		if (dsk->level != WT_LLEAF)
-			goto err_level;
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		if (dsk->level <= WT_LLEAF) {
-err_level:		__wt_api_db_errx(db,
-			    "%s page at addr %lu has incorrect tree level "
-			    "of %lu",
-			    __wt_page_type_string(dsk),
-			    (u_long)addr, (u_long)dsk->level);
-			return (WT_ERROR);
-		}
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
-
 	if (dsk->unused[0] != '\0' || dsk->unused[1] != '\0') {
 		__wt_api_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",

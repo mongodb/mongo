@@ -32,7 +32,7 @@ static int __wt_bulk_ovfl_copy(WT_TOC *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(WT_TOC *, DBT *, WT_OVFL *);
 static int __wt_bulk_promote(WT_TOC *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
-		WT_TOC *, uint32_t, uint32_t, uint32_t, WT_PAGE **, DBT **);
+		WT_TOC *, uint32_t, uint32_t, WT_PAGE **, DBT **);
 static int __wt_bulk_stack_put(WT_TOC *, WT_STACK *);
 static int __wt_bulk_var(WT_TOC *, void (*)(const char *,
 		uint64_t), int (*)(DB *, DBT **, DBT **));
@@ -112,7 +112,7 @@ __wt_bulk_fix(WT_TOC *toc,
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bulk_scratch_page(toc, db->leafmin,
-	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX, WT_LLEAF, &page, &tmp));
+	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX, &page, &tmp));
 	dsk = page->dsk;
 	dsk->recno = 1;
 	__wt_init_ff_and_sa(page, &first_free, &space_avail);
@@ -254,7 +254,7 @@ __wt_bulk_var(WT_TOC *toc,
 	/* Get a scratch buffer and make it look like our work page. */
 	page_type = is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
 	WT_ERR(__wt_bulk_scratch_page(
-	    toc, db->leafmin, page_type, WT_LLEAF, &page, &tmp));
+	    toc, db->leafmin, page_type, &page, &tmp));
 	__wt_init_ff_and_sa(page, &first_free, &space_avail);
 	if (is_column)
 		page->dsk->recno = 1;
@@ -348,7 +348,7 @@ __wt_bulk_var(WT_TOC *toc,
 			 * won't be reusable until the I/O completes.
 			 */
 			WT_ERR(__wt_bulk_scratch_page(toc,
-			    db->leafmin, page_type, WT_LLEAF, &page, &tmp));
+			    db->leafmin, page_type, &page, &tmp));
 			__wt_init_ff_and_sa(page, &first_free, &space_avail);
 			if (is_column)
 				page->dsk->recno = insert_cnt;
@@ -566,8 +566,8 @@ split:		switch (dsk->type) {
 			break;
 		}
 
-		WT_ERR(__wt_bulk_scratch_page(toc, db->intlmin,
-		    type, (uint32_t)dsk->level + 1, &next, &next_tmp));
+		WT_ERR(__wt_bulk_scratch_page(
+		    toc, db->intlmin, type, &next, &next_tmp));
 		__wt_init_ff_and_sa(next, &next_first_free, &next_space_avail);
 
 		/*
@@ -637,8 +637,7 @@ split:		switch (dsk->type) {
 		 * from the child page.
 		 */
 		off_record.addr = page->addr;
-		off_record.size =
-		    dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		off_record.size = page->size;
 		WT_RECNO(&off_record) = page->dsk->recno;
 
 		/* Store the data item. */
@@ -667,7 +666,7 @@ split:		switch (dsk->type) {
 		/* Create the WT_ITEM(WT_OFF) reference. */
 		WT_ITEM_SET(&item, WT_ITEM_OFF, sizeof(WT_OFF));
 		off.addr = page->addr;
-		off.size = dsk->level == WT_LLEAF ? db->leafmin : db->intlmin;
+		off.size = page->size;
 
 		/* Store the data item. */
 		++parent->dsk->u.entries;
@@ -870,8 +869,7 @@ __wt_bulk_ovfl_write(WT_TOC *toc, DBT *dbt, WT_OVFL *to)
 
 	/* Get a scratch buffer and make it look like our work page. */
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE + dbt->size, db->allocsize);
-	WT_ERR(__wt_bulk_scratch_page(
-	    toc, size, WT_PAGE_OVFL, WT_NOLEVEL, &page, &tmp));
+	WT_ERR(__wt_bulk_scratch_page(toc, size, WT_PAGE_OVFL, &page, &tmp));
 
 	/* Fill in the return information. */
 	to->addr = page->addr;
@@ -895,8 +893,8 @@ err:	if (tmp != NULL)
  *	Allocate a scratch buffer and make it look like a file page.
  */
 static int
-__wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
-    uint32_t page_type, uint32_t page_level, WT_PAGE **page_ret, DBT **tmp_ret)
+__wt_bulk_scratch_page(WT_TOC *toc,
+    uint32_t page_size, uint32_t page_type, WT_PAGE **page_ret, DBT **tmp_ret)
 {
 	DBT *tmp;
 	WT_PAGE *page;
@@ -928,7 +926,6 @@ __wt_bulk_scratch_page(WT_TOC *toc, uint32_t page_size,
 	WT_ERR(__wt_block_alloc(toc, &page->addr, page_size));
 	page->size = page_size;
 	dsk->type = (uint8_t)page_type;
-	dsk->level = (uint8_t)page_level;
 
 	*page_ret = page;
 	*tmp_ret = tmp;

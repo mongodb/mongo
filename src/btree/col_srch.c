@@ -13,7 +13,7 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
+__wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t flags)
 {
 	DB *db;
 	IDB *idb;
@@ -105,10 +105,6 @@ __wt_col_search(WT_TOC *toc, uint64_t recno, uint32_t level, uint32_t flags)
 		 */
 		if (recno != start_recno)
 			cref = page->u.col_int.t + (base == 0 ? 0 : base - 1);
-
-		/* If a level was set, see if we found the asked-for page. */
-		if (level == dsk->level)
-			goto done;
 
 		/* cip references the subtree containing the record. */
 		switch (ret = __wt_page_in(toc, page, &cref->ref, 0)) {

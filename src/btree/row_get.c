@@ -22,7 +22,7 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	page = NULL;
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_row_search(toc, key, WT_NOLEVEL, 0));
+	WT_ERR(__wt_row_search(toc, key, 0));
 	page = toc->srch_page;
 
 	ret = __wt_dbt_return(toc, key, data, 0);

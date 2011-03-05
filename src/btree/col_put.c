@@ -62,7 +62,7 @@ __wt_col_update(WT_TOC *toc, uint64_t recno, DBT *data, int data_overwrite)
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_col_search(
-	    toc, recno, WT_NOLEVEL, data_overwrite ? WT_DATA_OVERWRITE : 0));
+	    toc, recno, data_overwrite ? WT_DATA_OVERWRITE : 0));
 	page = toc->srch_page;
 
 	/*

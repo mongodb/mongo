@@ -9,12 +9,12 @@
 #include "bt_inline.c"
 
 static int  __wt_evict(WT_TOC *);
+static int  __wt_evict_clean(WT_TOC *);
 static int  __wt_evict_compare_lru(const void *a, const void *b);
 static int  __wt_evict_compare_page(const void *a, const void *b);
-static int  __wt_evict_discard(WT_TOC *, int);
+static int  __wt_evict_dirty(WT_TOC *);
 static void __wt_evict_hazard_check(WT_TOC *);
 static int  __wt_evict_hazard_compare(const void *a, const void *b);
-static void __wt_evict_reconcile(WT_TOC *);
 static void __wt_evict_set(WT_TOC *);
 static void __wt_evict_state_check(WT_TOC *);
 static int  __wt_evict_subtrees(WT_PAGE *);
@@ -255,20 +255,19 @@ done_duplicates:
 	 *	Reconcile dirty pages (making them clean)
 	 *	Discard clean pages
 	 *
-	 * The reason we release clean pages, then reconcile dirty pages, then
-	 * release clean pages again is because reconciling a dirty page is a
-	 * slow operation, and this releases space sooner.   (Arguably, we are
-	 * going to discard all of the pages anyway, so what does it matter if
-	 * we make clean pages wait for the dirty page writes?   On the other
-	 * hand, it's a small change and benefits any thread waiting to read a
-	 * clean page we picked for discarding, unlikely though that may be.)
+	 * The reason we release clean pages first, then release dirty pages,
+	 * is because reconciling a dirty page is a slow operation, and it
+	 * releases space sooner.   (Arguably, we are going to discard all of
+	 * the pages anyway, so what does it matter if we make clean pages
+	 * wait for the dirty page writes?   On the other hand, it's a small
+	 * change and benefits any thread waiting to read a clean page picked
+	 * for discarding, unlikely though that may be.)
 	 */
 	__wt_evict_set(toc);
 	__wt_evict_hazard_check(toc);
 	__wt_evict_state_check(toc);
-	WT_RET(__wt_evict_discard(toc, 0));
-	__wt_evict_reconcile(toc);
-	WT_RET(__wt_evict_discard(toc, 1));
+	WT_RET(__wt_evict_clean(toc));
+	WT_RET(__wt_evict_dirty(toc));
 
 	return (0);
 }
@@ -561,63 +560,11 @@ skip:		/*
 }
 
 /*
- * __wt_evict_reconcile --
- *	Reconcile any modified pages.
- */
-static void
-__wt_evict_reconcile(WT_TOC *toc)
-{
-	ENV *env;
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	WT_PAGE *page;
-	WT_REF *ref;
-	u_int i;
-	int update_gen;
-
-	env = toc->env;
-	cache = env->ienv->cache;
-	update_gen = 0;
-
-	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
-			continue;
-		page = ref->page;
-
-		/* Ignore clean pages. */
-		if (!WT_PAGE_IS_MODIFIED(page))
-			continue;
-
-		/*
-		 * We are going to write a page, which means any running
-		 * verification may be incorrect -- see the comment in
-		 * the WT_CACHE structure declaration for a explanation.
-		 */
-		if (!update_gen) {
-			update_gen = 1;
-			++cache->evict_rec_gen;
-		}
-
-		/*
-		 * We're using our WT_TOC handle, it needs to reference the
-		 * correct DB handle.
-		 *
-		 * XXX
-		 * This is pretty sleazy, but I'm hesitant to try and drive
-		 * a separate DB/IDB handle down through the reconciliation
-		 * code.
-		 */
-		toc->db = evict->idb->db;
-		(void)__wt_page_reconcile(toc, page);
-	}
-}
-
-/*
- * __wt_evict_discard --
- *	Discard cache pages.
+ * __wt_evict_clean --
+ *	Discard clean cache pages.
  */
 static int
-__wt_evict_discard(WT_TOC *toc, int was_dirty)
+__wt_evict_clean(WT_TOC *toc)
 {
 	ENV *env;
 	WT_CACHE *cache;
@@ -635,35 +582,98 @@ __wt_evict_discard(WT_TOC *toc, int was_dirty)
 		if ((ref = evict->ref) == NULL)
 			continue;
 		page = ref->page;
-
-		/*
-		 * The first time we're called, we get rid of the clean pages;
-		 * the second time we're called, we get rid of the pages that
-		 * were dirty but have since been cleaned.  Ignore dirty pages
-		 * in all cases, it's simpler.
-		 */
 		if (WT_PAGE_IS_MODIFIED(page))
 			continue;
-
-		if (was_dirty)
-			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
-		else
-			WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
 
 #ifdef HAVE_DIAGNOSTIC
 		__wt_evict_hazard_validate(env, page);
 #endif
+		WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
 		WT_VERBOSE(env, WT_VERB_EVICT, (env,
-		    "cache evicting page addr %lu", page->addr));
+		    "cache evicting clean page addr %lu", page->addr));
 
 		/*
-		 * Clear the cache entry; if the reconciliation code deleted the
-		 * page, we're done, otherwise, the page is somewhere on disk.
-		 *
-		 * No memory flush needed, the state field is declared volatile.
+		 * Clear the cache entry -- no memory flush needed, the state
+		 * field is declared volatile.
 		 */
 		ref->page = NULL;
-		if (ref->state != WT_REF_DELETED)
+		ref->state = WT_REF_DISK;
+
+		/* Remove the entry from the eviction list. */
+		WT_EVICT_CLR(evict);
+
+		/* We've got more space. */
+		WT_CACHE_PAGE_OUT(cache, page->size);
+
+		/* The page can no longer be found, free the memory. */
+		WT_RET(__wt_page_discard(toc, page));
+	}
+	return (0);
+}
+
+/*
+ * __wt_evict_dirty --
+ *	Discard dirty cache pages.
+ */
+static int
+__wt_evict_dirty(WT_TOC *toc)
+{
+	ENV *env;
+	WT_CACHE *cache;
+	WT_EVICT_LIST *evict;
+	WT_PAGE *page;
+	WT_REF *ref;
+	WT_STATS *stats;
+	u_int i;
+	int update_gen;
+
+	env = toc->env;
+	cache = env->ienv->cache;
+	stats = cache->stats;
+	update_gen = 0;
+
+	WT_EVICT_FOREACH(cache, evict, i) {
+		if ((ref = evict->ref) == NULL)
+			continue;
+		page = ref->page;
+
+		/*
+		 * We are going to write a page, which means any running
+		 * verification may be incorrect -- see the comment in
+		 * the WT_CACHE structure declaration for a explanation.
+		 */
+		if (!update_gen) {
+			update_gen = 1;
+			++cache->evict_rec_gen;
+		}
+
+#ifdef HAVE_DIAGNOSTIC
+		__wt_evict_hazard_validate(env, page);
+#endif
+		WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
+		WT_VERBOSE(env, WT_VERB_EVICT, (env,
+		    "cache evicting dirty page addr %lu", page->addr));
+
+		/*
+		 * We're using our WT_TOC handle, it needs to reference the
+		 * correct DB handle.
+		 *
+		 * XXX
+		 * This is pretty sleazy, but I'm hesitant to try and drive
+		 * a separate DB/IDB handle down through the reconciliation
+		 * code.
+		 */
+		toc->db = evict->idb->db;
+		WT_RET(__wt_page_reconcile(toc, page));
+
+		/*
+		 * One special case -- of the page was deleted, the state has
+		 * been reset to WT_REF_DELETED.  If still in "evict" mode,
+		 * clear the cache entry -- no memory flush needed, the state
+		 * field is declared volatile.
+		 */
+		ref->page = NULL;
+		if (ref->state == WT_REF_EVICT)
 			ref->state = WT_REF_DISK;
 
 		/* Remove the entry from the eviction list. */

@@ -27,7 +27,6 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 
 	/* Clear the file stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_file_stats(idb->dstats);
-	WT_STAT_SET(idb->dstats, TREE_LEVEL, idb->root_page.page->dsk->level);
 	WT_STAT_SET(idb->dstats, FREELIST_ENTRIES, idb->freelist_entries);
 	WT_RET(__wt_desc_stat(toc));
 

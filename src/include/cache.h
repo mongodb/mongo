@@ -22,6 +22,35 @@ struct __wt_evict_list {
 };
 
 /*
+ * WT_REC_LIST --
+ *	List of pages created from a single page reconciliation.
+ *
+ * Each reconciliation function writes out some number of pages, normally one,
+ * occasionally more than one, and returns to its caller a list of addr/size
+ * pairs for the newly-written pages.  That list is used to update the parent's
+ * references.  There's something hugely wrong if this list is ever longer than
+ * a few pages, that would make no sense at all (well, maybe, in a long-running
+ * system, an internal page might acquire that many entries!?)  Dynamically
+ * allocated just in case.
+ */
+typedef struct {
+	struct {
+		WT_OFF_RECORD off;		/* Address, size, recno */
+
+		/*
+		 * The key for this page; no column-store key is needed because
+		 * the page's key, saved in the WT_OFF_RECORD structure, is the
+		 * column-store key.
+		 */
+		DBT	 key;			/* Row key */
+
+		int	 deleted;		/* Page deleted */
+	} *list;
+	u_int next;				/* Next slot */
+	u_int entries;				/* Total slots */
+} WT_REC_LIST;
+
+/*
  * WT_READ_REQ --
  *	Encapsulation of a read request.
  */
@@ -96,6 +125,9 @@ struct __wt_cache {
 					   slot available if toc is NULL */
 
 	uint32_t   read_gen;		/* Page read generation (LRU) */
+
+	/* List of pages created from a single page reconciliation. */
+	WT_REC_LIST reclist;
 
 	/*
 	 * Different threads read/write pages to/from the cache, so we cannot
