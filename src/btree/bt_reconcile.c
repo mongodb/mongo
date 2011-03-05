@@ -1276,10 +1276,12 @@ __wt_rec_XXX_update(WT_TOC *toc, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_REC_LIST *reclist;
+	WT_STATS *stats;
 	uint32_t addr, size;
 
 	idb = toc->db->idb;
 	reclist = &toc->env->ienv->cache->reclist;
+	stats = idb->stats;
 
 	/*
 	 * Because WiredTiger's pages grow without splitting, we're replacing a
@@ -1301,6 +1303,16 @@ __wt_rec_XXX_update(WT_TOC *toc, WT_PAGE *page)
 		 * A page grew so large we had to divide it into two or more
 		 * physical pages -- create a new internal page.
 		 */
+		switch (page->dsk->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_COL_INT:
+			WT_STAT_INCR(stats, PAGE_SPLIT_INTL);
+			break;
+		case WT_PAGE_ROW_LEAF:
+		case WT_PAGE_COL_VAR:
+			WT_STAT_INCR(stats, PAGE_SPLIT_LEAF);
+			break;
+		}
 		switch (page->dsk->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:

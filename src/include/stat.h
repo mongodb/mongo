@@ -75,6 +75,8 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_OVERFLOW			   19
 #define	WT_STAT_PAGE_ROW_INTERNAL		   20
 #define	WT_STAT_PAGE_ROW_LEAF			   21
+#define	WT_STAT_PAGE_SPLIT_INTL			   22
+#define	WT_STAT_PAGE_SPLIT_LEAF			   23
 
 /*
  * Statistics entries for DB/IDB handle.

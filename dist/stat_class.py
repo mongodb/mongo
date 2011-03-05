@@ -82,6 +82,8 @@ idb_dstats = {
     'PAGE_OVERFLOW' : Stat('overflow pages'),
     'PAGE_ROW_INTERNAL' : Stat('row-store internal pages'),
     'PAGE_ROW_LEAF' : Stat('row-store leaf pages'),
+    'PAGE_SPLIT_INTL' : Stat('split internal pages'),
+    'PAGE_SPLIT_LEAF' : Stat('split leaf pages'),
 }
 
 ##########################################
