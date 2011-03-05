@@ -37,7 +37,12 @@ namespace mongo {
     }
 
     void PoolForHost::done( DBClientBase * c ) {
-        _pool.push(c);
+        if ( _pool.size() >= _maxPerHost ) {
+            delete c;
+        }
+        else {
+            _pool.push(c);
+        }
     }
 
     DBClientBase * PoolForHost::get() {
@@ -85,6 +90,8 @@ namespace mongo {
             _type = base->type();
         _created++;
     }
+
+    unsigned PoolForHost::_maxPerHost = 50;
 
     // ------ DBConnectionPool ------
 

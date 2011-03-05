@@ -57,6 +57,9 @@ namespace mongo {
         void done( DBClientBase * c );
 
         void flush();
+
+        static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
+        static unsigned getMaxPerHost() { return _maxPerHost; }
     private:
 
         struct StoredConnection {
@@ -71,6 +74,8 @@ namespace mongo {
         std::stack<StoredConnection> _pool;
         long long _created;
         ConnectionString::ConnectionType _type;
+
+        static unsigned _maxPerHost;
     };
 
     class DBConnectionHook {
