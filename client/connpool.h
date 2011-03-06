@@ -87,8 +87,17 @@ namespace mongo {
                 delete c;
                 return;
             }
-            scoped_lock L(_mutex);
-            _pools[host].pool.push(c);
+
+            {
+                scoped_lock L(_mutex);
+                if ( _pools[host].pool.size() < 50 ) {
+                    _pools[host].pool.push(c);
+                    return;
+                }
+            }
+
+            // if we get here it means we didn't add for some reason
+            delete c;
         }
         void addHook( DBConnectionHook * hook );
         void appendInfo( BSONObjBuilder& b );
