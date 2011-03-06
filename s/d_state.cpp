@@ -60,6 +60,7 @@ namespace mongo {
     }
 
     void ShardingState::gotShardName( const string& name ) {
+        scoped_lock lk(_mutex);
         if ( _shardName.size() == 0 ) {
             // TODO SERVER-2299 verify the name is sound w.r.t IPs
             _shardName = name;
@@ -78,7 +79,7 @@ namespace mongo {
     }
 
     void ShardingState::gotShardHost( string host ) {
-
+        scoped_lock lk(_mutex);
         size_t slash = host.find( '/' );
         if ( slash != string::npos )
             host = host.substr( 0 , slash );
@@ -386,79 +387,128 @@ namespace mongo {
             help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
         }
 
-        virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
+        virtual LockType locktype() const { return NONE; }
+        
+        bool checkConfigOrInit( const string& configdb , bool authoritative , string& errmsg , BSONObjBuilder& result , bool locked=false ) const {
+            if ( configdb.size() == 0 ) {
+                errmsg = "no configdb";
+                return false;
+            }
+            
+            if ( shardingState.enabled() ) {
+                if ( configdb == shardingState.getConfigServer() ) 
+                    return true;
+                
+                result.append( "configdb" , BSON( "stored" << shardingState.getConfigServer() << 
+                                                  "given" << configdb ) );
+                errmsg = "specified a different configdb!";
+                return false;
+            }
+            
+            if ( ! authoritative ) {
+                result.appendBool( "need_authoritative" , true );
+                errmsg = "first setShardVersion";
+                return false;
+            }
+            
+            if ( locked ) {
+                shardingState.enable( configdb );
+                configServer.init( configdb );
+                return true;
+            }
+
+            dblock lk;
+            return checkConfigOrInit( configdb , authoritative , errmsg , result , true );
+        }
+        
+        bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string errmsg ) {
+            if ( id.type() != jstOID ) {
+                // TODO: fix this
+                //errmsg = "need serverID to be an OID";
+                //return 0;
+                return true;
+            }
+            
+            OID clientId = id.__oid();
+            if ( ! info->hasID() ) {
+                info->setID( clientId );
+                return true;
+            }
+            
+            if ( clientId != info->getID() ) {
+                errmsg = "server id has changed!";
+                return false;
+            }
+
+            return true;
+        }
 
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+
+            // Steps
+            // 1. check basic config
+            // 2. extract params from command
+            // 3. fast check
+            // 4. slow check (LOCKS)
+            
+            // step 1
 
             lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
 
             bool authoritative = cmdObj.getBoolField( "authoritative" );
+            
+            // check config server is ok or enable sharding
+            if ( ! checkConfigOrInit( cmdObj["configdb"].valuestrsafe() , authoritative , errmsg , result ) )
+                return false;
 
-            string configdb = cmdObj["configdb"].valuestrsafe();
-            {
-                // configdb checking
-                if ( configdb.size() == 0 ) {
-                    errmsg = "no configdb";
-                    return false;
-                }
-
-                if ( shardingState.enabled() ) {
-                    if ( configdb != shardingState.getConfigServer() ) {
-                        errmsg = "specified a different configdb!";
-                        return false;
-                    }
-                }
-                else {
-                    if ( ! authoritative ) {
-                        result.appendBool( "need_authoritative" , true );
-                        errmsg = "first setShardVersion";
-                        return false;
-                    }
-                    shardingState.enable( configdb );
-                    configServer.init( configdb );
-                }
-            }
-
+            // check shard name/hosts are correct
             if ( cmdObj["shard"].type() == String ) {
                 shardingState.gotShardName( cmdObj["shard"].String() );
                 shardingState.gotShardHost( cmdObj["shardHost"].String() );
             }
-
-            {
-                // setting up ids
-                if ( cmdObj["serverID"].type() != jstOID ) {
-                    // TODO: fix this
-                    //errmsg = "need serverID to be an OID";
-                    //return 0;
-                }
-                else {
-                    OID clientId = cmdObj["serverID"].__oid();
-                    if ( ! info->hasID() ) {
-                        info->setID( clientId );
-                    }
-                    else if ( clientId != info->getID() ) {
-                        errmsg = "server id has changed!";
-                        return 0;
-                    }
-                }
-            }
-
-            unsigned long long version = extractVersion( cmdObj["version"] , errmsg );
-
-            if ( errmsg.size() ) {
+            
+            // make sure we have the mongos id for writebacks
+            if ( ! checkMongosID( info , cmdObj["serverID"] , errmsg ) )
                 return false;
-            }
 
+            // step 2
+            
             string ns = cmdObj["setShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
-                errmsg = "need to speciy fully namespace";
+                errmsg = "need to speciy namespace";
                 return false;
             }
+
+            const ConfigVersion version = extractVersion( cmdObj["version"] , errmsg );
+            if ( errmsg.size() )
+                return false;
+            
+            // step 3
 
             const ConfigVersion oldVersion = info->getVersion(ns);
             const ConfigVersion globalVersion = shardingState.getVersion(ns);
 
+            result.appendTimestamp( "oldVersion" , oldVersion );
+            
+            if ( globalVersion > 0 && version > 0 ) {
+                // this means there is no reset going on an either side
+                // so its safe to make some assuptions
+
+                if ( version == globalVersion ) {
+                    // mongos and mongod agree!
+                    if ( oldVersion != version ) {
+                        assert( oldVersion < globalVersion );
+                        info->setVersion( ns , version );
+                    }
+                    return true;
+                }
+                
+            }
+
+            // step 4
+            dblock setShardVersionLock; // TODO: can we get rid of this??
+            
             if ( oldVersion > 0 && globalVersion == 0 ) {
                 // this had been reset
                 info->setVersion( ns , 0 );
@@ -475,7 +525,6 @@ namespace mongo {
                     result.appendBool( "need_authoritative" , true );
                     result.append( "ns" , ns );
                     result.appendTimestamp( "globalVersion" , globalVersion );
-                    result.appendTimestamp( "oldVersion" , oldVersion );
                     errmsg = "dropping needs to be authoritative";
                     return false;
                 }
@@ -491,7 +540,6 @@ namespace mongo {
             if ( version < oldVersion ) {
                 errmsg = "you already have a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
-                result.appendTimestamp( "oldVersion" , oldVersion );
                 result.appendTimestamp( "newVersion" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
                 return false;
@@ -510,7 +558,7 @@ namespace mongo {
                 return false;
             }
 
-            if ( globalVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ) {
+            if ( globalVersion == 0 && ! authoritative ) {
                 // need authoritative for first look
                 result.append( "ns" , ns );
                 result.appendBool( "need_authoritative" , true );
@@ -536,9 +584,6 @@ namespace mongo {
             }
             
             info->setVersion( ns , version );
-            result.appendTimestamp( "oldVersion" , oldVersion );
-            result.append( "ok" , 1 );
-
             return true;
         }
 
