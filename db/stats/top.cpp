@@ -44,6 +44,9 @@ namespace mongo {
     }
 
     void Top::record( const string& ns , int op , int lockType , long long micros , bool command ) {
+        if ( ns[0] == '?' )
+            return;
+
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         scoped_lock lk(_lock);
 
