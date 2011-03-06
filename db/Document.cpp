@@ -21,20 +21,21 @@
 
 namespace mongo
 {
-    shared_ptr<Document> Document::createFromBsonObj(BSONObj bsonObj)
+    shared_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj)
     {
-	shared_ptr<Document> pDocument(new Document(bsonObj));
+	shared_ptr<Document> pDocument(new Document(pBsonObj));
 	return pDocument;
     }
 
-    Document::Document(BSONObj bsonObj):
+    Document::Document(BSONObj *pBsonObj):
 	fieldPtr()
     {
-	BSONObjIterator bsonIterator(bsonObj.begin());
+	BSONObjIterator bsonIterator(pBsonObj->begin());
 	while(bsonIterator.more())
 	{
 	    BSONElement bsonElement(bsonIterator.next());
-	    shared_ptr<Field> pField(Field::createFromBsonElement(bsonElement));
+	    shared_ptr<Field> pField(
+		Field::createFromBsonElement(&bsonElement));
 	    fieldPtr.push_back(pField);
 	}
     }
@@ -60,6 +61,17 @@ namespace mongo
     Document::Document():
 	fieldPtr()
     {
+    }
+
+    shared_ptr<Document> Document::clone(shared_ptr<Document> pDocument)
+    {
+	shared_ptr<Document> pNew(Document::create());
+
+	const size_t nField = pDocument->fieldPtr.size();
+	for(size_t iField = 0; iField < nField; ++iField)
+	    pNew->fieldPtr.push_back(pDocument->fieldPtr[iField]);
+
+	return pNew;
     }
 
     Document::~Document()
@@ -98,5 +110,10 @@ namespace mongo
     void Document::addField(shared_ptr<Field> pField)
     {
         fieldPtr.push_back(pField);
+    }
+
+    void Document::setField(shared_ptr<Field> pField, size_t index)
+    {
+	fieldPtr[index] = pField;
     }
 }

@@ -32,15 +32,25 @@ namespace mongo
 
 	/*
 	  Construct a Field from a BSONElement.
+
+	  @returns a new Field initialized from the bsonElement
 	*/
-	static shared_ptr<Field> createFromBsonElement(BSONElement bsonElement);
+	static shared_ptr<Field> createFromBsonElement(
+	    BSONElement *pBsonElement);
 
 	/*
 	  Construct a Field from an existing field, but with a new name.  The
 	  new Field will have the same value as the original.
+
+	  @returns a new Field with the same value, but with the new name
 	*/
 	static shared_ptr<Field> createRename(
 	    string newName, shared_ptr<Field> pField);
+
+	/*
+	  Construct a nul-valued Field.
+	*/
+	static shared_ptr<Field> createNul(string fieldName);
 
 	/*
 	  @return a pointer to the name of the field.  The pointer will live
@@ -49,6 +59,10 @@ namespace mongo
 	const char *getName() const;
 
 	/*
+	  Get the BSON type of the field.
+
+	  If the type is jstNULL, no value getter will work.
+
 	  @return the BSON type of the field.
 	*/
 	BSONType getType() const;
@@ -88,7 +102,8 @@ namespace mongo
 	void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
     private:
-	Field(BSONElement bsonElement);
+	Field(string fieldName);
+	Field(BSONElement *pBsonElement);
 	Field(string newName, shared_ptr<Field> pField);
 
 	string fieldName;

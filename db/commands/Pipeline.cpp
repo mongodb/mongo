@@ -179,6 +179,7 @@ namespace mongo
 	    string inFieldName(outFieldName);
 	    BSONType specType = outFieldElement.type();
 	    int fieldInclusion = -1;
+	    bool ravelArray = false;
 
 	    switch(specType)
 	    {
@@ -215,6 +216,41 @@ namespace mongo
  		    // CW TODO handle fields with a dot for subdocument fields
 		break;
 
+	    case Object:
+	    {
+		/*
+		  A computed expression, or a $ravel.
+
+		  We handle $ravel as a special case, because this is done
+		  by the projection source.  For any other expression,
+		  we hand over control to code that parses the expression
+		  and returns an expression.
+		*/
+		BSONObj fieldExprObj(outFieldElement.Obj());
+		BSONObjIterator exprIterator(fieldExprObj);
+		size_t subFieldCount = 0;
+		while(exprIterator.more())
+		{
+		    ++subFieldCount;
+
+		    BSONElement exprElement(exprIterator.next());
+		    const char *pOpName = exprElement.fieldName();
+		    if (strcmp(pOpName, "$ravel") != 0)
+			assert(false); // CW TODO parseExpression(fieldExprObj);
+		    else
+		    {
+			assert(exprElement.type() == String);
+			    // CW TODO $ravel operand must be single field name
+			ravelArray = true;
+			inFieldName = exprElement.String();
+		    }
+		}
+
+		assert(subFieldCount == 1);
+		    // CW TODO no nested object support, for now
+		break;
+	    }
+
 	    default:
 		assert(false); // CW TODO invalid field projection specification
 	    }
@@ -226,7 +262,7 @@ namespace mongo
 		// CW TODO: renames, ravels, expressions
 		shared_ptr<Expression> pExpression(
 		    ExpressionField::create(inFieldName));
-		pProject->includeField(outFieldName, pExpression);
+		pProject->includeField(outFieldName, pExpression, ravelArray);
 	    }
 	}
 

@@ -40,8 +40,9 @@ namespace mongo
 
     shared_ptr<Document> DocumentSourceCursor::getCurrent()
     {
+	BSONObj documentObj(pCursor->current());
 	shared_ptr<Document> pDocument(
-	    Document::createFromBsonObj(pCursor->current()));
+	    Document::createFromBsonObj(&documentObj));
 	return pDocument;
     }
 

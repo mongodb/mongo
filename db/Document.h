@@ -39,7 +39,7 @@ namespace mongo
 
 	  @returns shared pointer to the newly created Document
 	*/
-	static shared_ptr<Document> createFromBsonObj(BSONObj bsonObj);
+	static shared_ptr<Document> createFromBsonObj(BSONObj *pBsonObj);
 
 	/*
 	  Create a new empty Document.
@@ -47,6 +47,13 @@ namespace mongo
 	  @returns shared pointer to the newly created Document
 	*/
 	static shared_ptr<Document> create();
+
+	/*
+	  Clone a document.
+
+	  The new document shares all the fields with the original.
+	*/
+	static shared_ptr<Document> clone(shared_ptr<Document> pDocument);
 
 	/*
 	  Add this document to the BSONObj under construction with the
@@ -79,9 +86,17 @@ namespace mongo
 	*/
 	void addField(shared_ptr<Field> pField);
 
+	/*
+	  Set the given field to be at the specified position in the
+	  Document.  This will replace any field that is currently in that
+	  position.  The index must be within the current range of field
+	  indices.
+	*/
+	void setField(shared_ptr<Field> pField, size_t index);
+
     private:
 	Document();
-	Document(BSONObj bsonObj);
+	Document(BSONObj *pBsonObj);
 
 	vector<shared_ptr<Field>> fieldPtr;
     };

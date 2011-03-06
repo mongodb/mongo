@@ -25,46 +25,46 @@ namespace mongo
     {
     }
 
-    shared_ptr<Field> Field::createFromBsonElement(BSONElement bsonElement)
+    shared_ptr<Field> Field::createFromBsonElement(BSONElement *pBsonElement)
     {
-	shared_ptr<Field> pField(new Field(bsonElement));
+	shared_ptr<Field> pField(new Field(pBsonElement));
 	return pField;
     }
 
-    Field::Field(BSONElement bsonElement):
-	fieldName(bsonElement.fieldName()),
-	type(bsonElement.type()),
+    Field::Field(BSONElement *pBsonElement):
+	fieldName(pBsonElement->fieldName()),
+	type(pBsonElement->type()),
 	pDocumentValue(),
 	vpField()
     {
 	switch(type)
 	{
 	    case NumberDouble:
-		simple.doubleValue = bsonElement.Double();
+		simple.doubleValue = pBsonElement->Double();
 		break;
 
 	    case String:
-		stringValue = bsonElement.String();
+		stringValue = pBsonElement->String();
 		break;
 
 	    case Object:
 	    {
-		BSONObj document(bsonElement.embeddedObject());
-		pDocumentValue = Document::createFromBsonObj(document);
+		BSONObj document(pBsonElement->embeddedObject());
+		pDocumentValue = Document::createFromBsonObj(&document);
 		break;
 	    }
 
 	    case Array:
 	    {
-		vector<BSONElement> vElement(bsonElement.Array());
+		vector<BSONElement> vElement(pBsonElement->Array());
 		const size_t n = vElement.size();
 
-		vpField.reserve(n);
+		vpField.reserve(n); // save on realloc()ing
 
 		for(size_t i = 0; i < n; ++i)
 		{
 		    vpField.push_back(
-			Field::createFromBsonElement(vElement[i]));
+			Field::createFromBsonElement(&vElement[i]));
 		}
 		break;
 	    }
@@ -75,20 +75,20 @@ namespace mongo
 		break;
 
 	    case jstOID:
-		oidValue = bsonElement.OID();
+		oidValue = pBsonElement->OID();
 		break;
 
 	    case Bool:
-		simple.boolValue = bsonElement.Bool();
+		simple.boolValue = pBsonElement->Bool();
 		break;
 
 	    case Date:
-		dateValue = bsonElement.Date();
+		dateValue = pBsonElement->Date();
 		break;
 
 	    case RegEx:
-		stringValue = bsonElement.regex();
-		// TODO bsonElement.regexFlags();
+		stringValue = pBsonElement->regex();
+		// TODO pBsonElement->regexFlags();
 		break;
 
 	    case Symbol:
@@ -100,15 +100,15 @@ namespace mongo
 		break;
 
 	    case NumberInt:
-		simple.intValue = bsonElement.numberInt();
+		simple.intValue = pBsonElement->numberInt();
 		break;
 
 	    case Timestamp:
-		dateValue = bsonElement.timestampTime();
+		dateValue = pBsonElement->timestampTime();
 		break;
 
 	    case NumberLong:
-		simple.longValue = bsonElement.numberLong();
+		simple.longValue = pBsonElement->numberLong();
 		break;
 
 		/* these shouldn't happen in this context */
@@ -129,6 +129,23 @@ namespace mongo
     {
 	shared_ptr<Field> pField(new Field(newName, pSourceField));
 	return pField;
+    }
+
+    shared_ptr<Field> Field::createNul(string fieldName)
+    {
+	shared_ptr<Field> pField(new Field(fieldName));
+	return pField;
+    }
+
+    Field::Field(string theFieldName):
+	fieldName(theFieldName),
+	type(jstNULL),
+	oidValue(),
+	dateValue(),
+	stringValue(),
+	pDocumentValue(),
+	vpField()
+    {
     }
 
     Field::Field(string newName, shared_ptr<Field> pSourceField):
