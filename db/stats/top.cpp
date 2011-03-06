@@ -155,11 +155,12 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return READ; }
-        virtual void help( stringstream& help ) const { help << "usage by collection"; }
+        virtual void help( stringstream& help ) const { help << "usage by collection, in micros "; }
 
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );
+                b.append( "note" , "all times in microseconds" );
                 Top::global.append( b );
                 b.done();
             }
