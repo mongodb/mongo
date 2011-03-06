@@ -1103,7 +1103,7 @@ Default( mongod )
 
 # tools
 allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
-normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" ]
+normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" ]
 env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
     env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )
