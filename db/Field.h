@@ -36,6 +36,13 @@ namespace mongo
 	static shared_ptr<Field> createFromBsonElement(BSONElement bsonElement);
 
 	/*
+	  Construct a Field from an existing field, but with a new name.  The
+	  new Field will have the same value as the original.
+	*/
+	static shared_ptr<Field> createRename(
+	    string newName, shared_ptr<Field> pField);
+
+	/*
 	  @return a pointer to the name of the field.  The pointer will live
 	  as long as this Field does.
 	*/
@@ -82,8 +89,9 @@ namespace mongo
 
     private:
 	Field(BSONElement bsonElement);
+	Field(string newName, shared_ptr<Field> pField);
 
-	const char *pFieldName;
+	string fieldName;
 	BSONType type;
 
 	/* store values here */

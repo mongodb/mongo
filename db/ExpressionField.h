@@ -18,25 +18,28 @@
 
 #include "pch.h"
 
+#include "Expression.h"
+
 namespace mongo
 {
+    class Document;
+    class Field;
+
     class ExpressionField :
         public Expression,
-        boost::enable_shared_from_this<ExpressionField>,
-        boost::noncopyable
+        public boost::enable_shared_from_this<ExpressionField>
     {
     public:
 	// virtuals from Expression
 	virtual ~ExpressionField();
-	virtual void setDocument(shared_ptr<Document>);
-	virtual shared_ptr<Expression> evaluate();
+	virtual shared_ptr<Field> evaluate(
+	    shared_ptr<Document> pDocument) const;
 
-	static shared_ptr<Expression> create(string fieldName);
+	static shared_ptr<ExpressionField> create(string fieldName);
 
     private:
-	ExpressionField(string theFieldName);
+	ExpressionField(string fieldName);
 
 	string fieldName;
-	shared_ptr<Document> pDocument;
     };
 }

@@ -32,7 +32,7 @@ namespace mongo
     }
 
     Field::Field(BSONElement bsonElement):
-	pFieldName(bsonElement.fieldName()),
+	fieldName(bsonElement.fieldName()),
 	type(bsonElement.type()),
 	pDocumentValue(),
 	vpField()
@@ -124,9 +124,88 @@ namespace mongo
 	}
     }
 
+    shared_ptr<Field> Field::createRename(
+	string newName, shared_ptr<Field> pSourceField)
+    {
+	shared_ptr<Field> pField(new Field(newName, pSourceField));
+	return pField;
+    }
+
+    Field::Field(string newName, shared_ptr<Field> pSourceField):
+	fieldName(newName),
+	type(pSourceField->getType()),
+	pDocumentValue(),
+	vpField()
+    {
+	/* assign the simple value, whatever it is */
+	switch(type)
+	{
+	    case NumberDouble:
+		simple.doubleValue = pSourceField->simple.doubleValue;
+		break;
+
+	    case String:
+	    case RegEx:
+		stringValue = pSourceField->stringValue;
+		break;
+
+	    case Object:
+		pDocumentValue = pSourceField->pDocumentValue;
+		break;
+
+	    case Array:
+		vpField = pSourceField->vpField;
+		break;
+
+	    case BinData:
+		assert(false); // unimplemented
+		break;
+
+	    case jstOID:
+		oidValue = pSourceField->oidValue;
+		break;
+
+	    case Bool:
+		simple.boolValue = pSourceField->simple.boolValue;
+		break;
+
+	    case Date:
+	    case Timestamp:
+		dateValue = pSourceField->dateValue;
+		break;
+
+	    case Symbol:
+		assert(false); // unimplemented
+		break;
+
+	    case CodeWScope:
+		assert(false); // unimplemented
+		break;
+
+	    case NumberInt:
+		simple.intValue = pSourceField->simple.intValue;
+		break;
+
+	    case NumberLong:
+		simple.longValue = pSourceField->simple.longValue;
+		break;
+
+		/* these shouldn't happen in this context */
+	    case MinKey:
+	    case EOO:
+	    case Undefined:
+	    case jstNULL:
+	    case DBRef:
+	    case Code:
+	    case MaxKey:
+		assert(false);
+		break;
+	}
+    }
+
     const char *Field::getName() const
     {
-	return pFieldName;
+	return fieldName.c_str();
     }
 
     BSONType Field::getType() const

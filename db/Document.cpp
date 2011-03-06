@@ -21,16 +21,22 @@
 
 namespace mongo
 {
-
-    Document::Document():
-	fieldPtr()
-    {
-    }
-
     shared_ptr<Document> Document::createFromBsonObj(BSONObj bsonObj)
     {
 	shared_ptr<Document> pDocument(new Document(bsonObj));
 	return pDocument;
+    }
+
+    Document::Document(BSONObj bsonObj):
+	fieldPtr()
+    {
+	BSONObjIterator bsonIterator(bsonObj.begin());
+	while(bsonIterator.more())
+	{
+	    BSONElement bsonElement(bsonIterator.next());
+	    shared_ptr<Field> pField(Field::createFromBsonElement(bsonElement));
+	    fieldPtr.push_back(pField);
+	}
     }
 
     void Document::toBson(BSONObjBuilder *pBuilder)
@@ -45,16 +51,15 @@ namespace mongo
 	}
     }
 
-    Document::Document(BSONObj bsonObj):
+    shared_ptr<Document> Document::create()
+    {
+        shared_ptr<Document> pDocument(new Document());
+	return pDocument;
+    }
+
+    Document::Document():
 	fieldPtr()
     {
-	BSONObjIterator bsonIterator(bsonObj.begin());
-	while(bsonIterator.more())
-	{
-	    BSONElement bsonElement = bsonIterator.next();
-	    shared_ptr<Field> pField(Field::createFromBsonElement(bsonElement));
-	    fieldPtr.push_back(pField);
-	}
     }
 
     Document::~Document()
@@ -88,5 +93,10 @@ namespace mongo
 	}
 
 	return(shared_ptr<Field>());
+    }
+
+    void Document::addField(shared_ptr<Field> pField)
+    {
+        fieldPtr.push_back(pField);
     }
 }

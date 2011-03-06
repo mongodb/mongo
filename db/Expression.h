@@ -20,14 +20,21 @@
 
 namespace mongo
 {
+    class Document;
+    class Field;
+
     class Expression :
         boost::noncopyable
     {
     public:
 	virtual ~Expression() {};
 
-	virtual void setDocument(shared_ptr<Document>) = 0;
+	/*
+	  Evaluate the expression using the given document.
 
-	virtual shared_ptr<Expression> evaluate() = 0;
+	  @return a Field value
+	*/
+	virtual shared_ptr<Field> evaluate(
+	    shared_ptr<Document> pDocument) const = 0;
     };
 }

@@ -21,24 +21,43 @@
 
 namespace mongo
 {
-    class Filter;
+    class Document;
     class Expression;
 
-    class DocumentSourceFilter :
-        public DocumentSource
+    class DocumentSourceProject :
+        public DocumentSource,
+	public boost::enable_shared_from_this<DocumentSourceProject>
     {
     public:
 	// virtuals from DocumentSource
-	virtual ~DocumentSourceFilter();
+	virtual ~DocumentSourceProject();
 	virtual bool eof();
 	virtual bool advance();
 	virtual shared_ptr<Document> getCurrent();
 
-	DocumentSourceFilter(shared_ptr<DocumentSource> pTheSource,
-			     shared_ptr<Expression> pTheFilter);
+
+	/*
+	  Create a new DocumentSource that can implement projection.
+	*/
+	static shared_ptr<DocumentSourceProject> create(
+	    shared_ptr<DocumentSource> pSource);
+
+	/*
+	  Add an Expression to the projection.
+
+	  BSON document fields are ordered, so the new field will be 
+	  appended to the existing set.
+
+	  @param fieldName the name of the field as it will appear
+	  @param pExpression the expression used to compute the field
+	*/
+	void includeField(string fieldName, shared_ptr<Expression> pExpression);
 
     private:
-	boost::shared_ptr<DocumentSource> pSource;
-	boost::shared_ptr<Expression> pFilter;
+	DocumentSourceProject(shared_ptr<DocumentSource> pSource);
+
+	shared_ptr<DocumentSource> pSource; // underlying source
+	vector<shared_ptr<Expression>> vpExpression; // inclusions
+	vector<string> vFieldName; // inclusion field names
     };
 }

@@ -31,7 +31,27 @@ namespace mongo
     public:
 	~Document();
 
+	/*
+	  Create a new Document from the given BSONObj.
+
+	  Document field values may be pointed to in the BSONObj, so it
+	  must live at least as long as the resulting Document.
+
+	  @returns shared pointer to the newly created Document
+	*/
 	static shared_ptr<Document> createFromBsonObj(BSONObj bsonObj);
+
+	/*
+	  Create a new empty Document.
+
+	  @returns shared pointer to the newly created Document
+	*/
+	static shared_ptr<Document> create();
+
+	/*
+	  Add this document to the BSONObj under construction with the
+	  given BSONObjBuilder.
+	*/
 	void toBson(BSONObjBuilder *pBsonObjBuilder);
 
 	/*
@@ -47,6 +67,17 @@ namespace mongo
 	  @return point to the requested field
 	*/
 	shared_ptr<Field> getField(string fieldName);
+
+	/*
+	  Add the given field to the Document.
+
+	  BSON documents' fields are ordered; the new Field will be
+	  appened to the current list of fields.
+
+	  It is an error to add a Field that has the same name as another
+	  field.
+	*/
+	void addField(shared_ptr<Field> pField);
 
     private:
 	Document();
