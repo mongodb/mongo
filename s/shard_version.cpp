@@ -121,7 +121,7 @@ namespace mongo {
         BSONObj result;
         if ( setShardVersion( conn , ns , version , authoritative , result ) ) {
             // success!
-            log(1) << "      setShardVersion success!" << endl;
+            LOG(1) << "      setShardVersion success: " << result << endl;
             connectionShardStatus.setSequence( &conn , ns , officialSequenceNumber );
             return true;
         }
