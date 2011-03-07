@@ -26,7 +26,7 @@ struct __wt_evict_list {
  *	Information tracking a single page reconciliation.
  */
 typedef struct {
-	DBT *tmp;				/* Temporary space */
+	DBT *dsk_tmp;				/* Disk-image buffer */
 
 	/*
 	 * Each reconciliation function writes out some number of pages,

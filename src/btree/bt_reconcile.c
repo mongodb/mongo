@@ -147,13 +147,13 @@ __wt_rec_helper_init(WT_TOC *toc, WT_PAGE *page, uint32_t max,
 	r = &toc->env->ienv->cache->reclist;
 
 	/* Allocate a scratch buffer to hold the new disk image. */
-	WT_RET(__wt_scr_alloc(toc, max, &r->tmp));
+	WT_RET(__wt_scr_alloc(toc, max, &r->dsk_tmp));
 
 	/*
 	 * Some fields of the disk image are fixed based on the original page,
 	 * set them.
 	 */
-	dsk = r->tmp->data;
+	dsk = r->dsk_tmp->data;
 	WT_CLEAR(*dsk);
 	dsk->lsn_file = page->dsk->lsn_file;
 	dsk->lsn_off = page->dsk->lsn_off;
@@ -269,7 +269,7 @@ __wt_rec_helper(WT_TOC *toc, uint64_t *recnop,
 	 * times.
 	 */
 	r = &toc->env->ienv->cache->reclist;
-	dsk = r->tmp->data;
+	dsk = r->dsk_tmp->data;
 
 	/*
 	 * There are 4 cases we have to handle.
@@ -414,7 +414,7 @@ __wt_rec_helper_fixup(WT_TOC *toc, uint64_t *recnop,
 	 */
 	WT_RET(__wt_scr_alloc(toc, r->split_page_size, &tmp));
 	dsk = tmp->data;
-	memcpy(dsk, r->tmp->data, WT_PAGE_DISK_SIZE);
+	memcpy(dsk, r->dsk_tmp->data, WT_PAGE_DISK_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
@@ -441,7 +441,7 @@ __wt_rec_helper_fixup(WT_TOC *toc, uint64_t *recnop,
 	 * There is probably a remnant that didn't get written, copy it down to
 	 * the beginning of the working buffer.
 	 */
-	dsk_start = WT_PAGE_DISK_BYTE(r->tmp->data);
+	dsk_start = WT_PAGE_DISK_BYTE(r->dsk_tmp->data);
 	len = WT_PTRDIFF32(*first_freep, r_save->start);
 	memcpy(dsk_start, r_save->start, len);
 
