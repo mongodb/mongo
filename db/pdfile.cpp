@@ -1193,7 +1193,9 @@ namespace mongo {
             op->setMessage( "index: (3/3) btree-middle" );
             log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
-            wassert( btBuilder.getn() == nkeys || dropDups );
+            if ( btBuilder.getn() != nkeys && ! dropDups ) {
+                warning() << "not all entries were added to the index, probably some keys were too large" << endl;
+            }
         }
 
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
