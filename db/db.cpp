@@ -276,21 +276,21 @@ sendmore:
             dbMsgPort->shutdown();
         }
         catch ( SocketException& ) {
-            problem() << "SocketException in connThread, closing client connection" << endl;
+            log() << "SocketException in connThread, closing client connection" << endl;
             dbMsgPort->shutdown();
         }
         catch ( const ClockSkewException & ) {
             exitCleanly( EXIT_CLOCK_SKEW );
         }
         catch ( std::exception &e ) {
-            problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
+            error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
         catch ( ... ) {
-            problem() << "Uncaught exception, terminating" << endl;
+            error() << "Uncaught exception, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
-
+        
         // thread ending...
         {
             Client * c = currentClient.get();
