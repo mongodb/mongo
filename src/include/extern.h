@@ -92,7 +92,7 @@ __wt_cache_read_server(void *arg);
 int
 __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page);
 int
-__wt_rle_expand_sort(ENV *env,
+__wt_rle_expand_sort(WT_TOC *toc,
     WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np);
 int
 __wt_dbt_return(WT_TOC *toc, DBT *key, DBT *data, int key_return);

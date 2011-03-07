@@ -11,7 +11,7 @@
 static int __wt_rec_XXX_update(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *);
-static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_split(WT_TOC *, uint32_t *, uint32_t *);
 static int __wt_rec_col_var(WT_TOC *, WT_PAGE *);
 static int __wt_rec_page_delete(WT_TOC *, WT_PAGE *);
@@ -155,7 +155,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 		WT_ERR(__wt_rec_col_fix(toc, page));
 		break;
 	case WT_PAGE_COL_RLE:
-		WT_ERR(__wt_rec_col_rle(toc, page, new));
+		WT_ERR(__wt_rec_col_rle(toc, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_ERR(__wt_rec_col_var(toc, page));
@@ -174,9 +174,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_RLE:
-		/* Write the new page to disk. */
-		WT_ERR(__wt_rec_page_write(toc, page, new));
-		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
@@ -713,7 +710,7 @@ err:	if (tmp != NULL)
  *	Reconcile a fixed-width, run-length encoded, column-store leaf page.
  */
 static int
-__wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	DBT *tmp;
@@ -723,22 +720,20 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_UPDATE *upd;
 	uint64_t recno;
-	uint32_t i, len, n_expsort, space_avail;
+	uint32_t entries, i, len, n_expsort, space_avail;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *first_free, *last_data;
 	int from_upd, ret;
 	void *cipdata;
 
 	db = toc->db;
-	tmp = NULL;
 	env = toc->env;
+	tmp = NULL;
 	expsort = NULL;
-	dsk = new->dsk;
+	dsk = page->dsk;
 	n_expsort = 0;			/* Necessary for the sort function */
 	last_data = NULL;
 	ret = 0;
-
-	__wt_init_ff_and_sa(new, &first_free, &space_avail);
 
 	/*
 	 * We need a "deleted" data item to store on the page.  Make sure the
@@ -751,8 +746,12 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 	WT_RLE_REPEAT_COUNT(tmp->data) = 1;
 	WT_FIX_DELETE_SET(WT_RLE_REPEAT_DATA(tmp->data));
 
-	/* Set recno to the first record on the page. */
 	recno = page->dsk->recno;
+	entries = 0;
+	WT_RET(__wt_rec_helper_init(
+	    toc, page, toc->db->leafmax, &recno, &first_free, &space_avail));
+
+	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		/*
 		 * Get a sorted list of any expansion entries we've created for
@@ -761,7 +760,7 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * sorted by record number.
 		 */
 		WT_ERR(
-		    __wt_rle_expand_sort(env, page, cip, &expsort, &n_expsort));
+		    __wt_rle_expand_sort(toc, page, cip, &expsort, &n_expsort));
 
 		/*
 		 *
@@ -817,18 +816,10 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				continue;
 			}
 
-			/*
-			 * XXX
-			 * We don't yet handle splits:  we allocated the maximum
-			 * leaf page size, but it still wasn't enough.  We must
-			 * allocate another leaf page and split the parent.
-			 */
-			if (len > space_avail) {
-				fprintf(stderr,
-				    "__wt_rec_col_rle: page %lu split\n",
-				    (u_long)page->addr);
-				__wt_abort(env);
-			}
+			/* Boundary: allocate, split or write the page. */
+			if (len > space_avail)
+				WT_ERR(__wt_rec_helper(toc, &recno,
+				    &entries, &first_free, &space_avail, 0));
 
 			/*
 			 * Most of the formats already include a repeat count:
@@ -846,12 +837,13 @@ __wt_rec_col_rle(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 				memcpy(last_data, data, len);
 			first_free += len;
 			space_avail -= len;
-			++dsk->u.entries;
+			++entries;
 		}
 	}
 
-	/* Set the disk block size and clear trailing bytes. */
-	new->size = __wt_allocation_size(toc, dsk, first_free);
+	/* Write the remnant page. */
+	ret = __wt_rec_helper(
+	    toc, &recno, &entries, &first_free, &space_avail, 1);
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
@@ -885,11 +877,14 @@ __wt_rle_expand_compare(const void *a, const void *b)
  *	sorted by record offset.
  */
 int
-__wt_rle_expand_sort(ENV *env,
+__wt_rle_expand_sort(WT_TOC *toc,
     WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np)
 {
+	ENV *env;
 	WT_RLE_EXPAND *exp;
 	uint16_t n;
+
+	env = toc->env;
 
 	/* Figure out how big the array needs to be. */
 	for (n = 0,

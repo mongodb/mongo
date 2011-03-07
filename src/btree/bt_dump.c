@@ -173,7 +173,7 @@ __wt_dump_page_col_rle(WT_TOC *toc, WT_PAGE *page, WT_DSTUFF *dp)
 		 * sorted by record number.
 		 */
 		WT_RET(__wt_rle_expand_sort(
-		    env, page, cip, &expsort, &n_expsort));
+		    toc, page, cip, &expsort, &n_expsort));
 
 		/*
 		 * Dump the records.   We use the WT_UPDATE entry for records in
