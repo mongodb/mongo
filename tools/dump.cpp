@@ -185,8 +185,26 @@ public:
             }
             log(1) << loc << endl;
             Record* rec = loc.rec();
-            log(1) << loc.obj() << endl;
-            w( loc.obj() );
+            BSONObj obj;
+            try {
+                obj = loc.obj();
+                assert( obj.valid() );
+                LOG(1) << obj << endl;
+                w( obj );
+            }
+            catch ( std::exception& e ) {
+                log() << "found invalid document @ " << loc << " " << e.what() << endl;
+                if ( ! obj.isEmpty() ) {
+                    try {
+                        BSONElement e = obj.firstElement();
+                        stringstream ss;
+                        ss << "first element: " << e;
+                        log() << ss.str();
+                    }
+                    catch ( std::exception& ee ) {
+                    }
+                }
+            }
             loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
         }
         return forward ? e->xnext : e->xprev;
