@@ -389,7 +389,7 @@ namespace mongo {
             // faults after remapping, so doing a little bit at a time will avoid big load spikes on
             // remapping.
             unsigned long long now = curTimeMicros64();
-            double fraction = (now-lastRemap)/20000000.0;
+            double fraction = (now-lastRemap)/2000000.0;
             lastRemap = now;
 
             rwlock lk(MongoFile::mmmutex, false);
