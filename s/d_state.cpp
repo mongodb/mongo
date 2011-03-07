@@ -507,6 +507,7 @@ namespace mongo {
             }
 
             // step 4
+            assert( cc().getContext() == 0 ); // this is because of a weird segfault I saw and I can't see why this should ever be set
             dblock setShardVersionLock; // TODO: can we get rid of this??
             
             if ( oldVersion > 0 && globalVersion == 0 ) {
