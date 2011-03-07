@@ -8,14 +8,13 @@
 #include "wt_internal.h"
 #include "bt_inline.c"
 
-static int __wt_rec_XXX_update(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_split(WT_TOC *, uint32_t *, uint32_t *);
 static int __wt_rec_col_var(WT_TOC *, WT_PAGE *);
 static int __wt_rec_page_delete(WT_TOC *, WT_PAGE *);
-static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, uint32_t, uint32_t);
+static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *);
 static int __wt_rec_row_int(WT_TOC *, WT_PAGE *);
 static int __wt_rec_row_leaf(WT_TOC *, WT_PAGE *);
 static int __wt_rec_row_split(WT_TOC *, uint32_t *, uint32_t *);
@@ -121,7 +120,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	WT_RET(__wt_rec_XXX_update(toc, page));
+	WT_RET(__wt_rec_parent_update(toc, page));
 
 	/* Free the original disk page. */
 	return (__wt_block_free(toc, page->addr, page->size));
@@ -1142,187 +1141,11 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_page_delete --
- *	Delete a page from the tree.
- */
-static int
-__wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
-{
-	WT_COL_REF *cref;
-	WT_PAGE *parent;
-	WT_PAGE_DISK *dsk;
-	WT_ROW_REF *rref;
-	uint32_t i;
-
-	/*
-	 * An evicted page has no entries, therefore we want to delete it.
-	 *
-	 * Set the parent page's address for the page (this has no effect other
-	 * than marking the parent page as dirty, we've done the work by setting
-	 * the WT_REF state field).
-	 */
-
-	 WT_RET(__wt_rec_parent_update(toc, page, WT_ADDR_INVALID, 0));
-
-	/*
-	 * Now, the tricky part.  Any future reader/writer of the page has to
-	 * deal with deleted pages.
-	 *
-	 * Threads sequentially reading pages (for example, any dump/statistics
-	 * threads), skip deleted pages and continue on.  There are no threads
-	 * sequentially writing pages, so this is a pretty simple case.
-	 *
-	 * Threads binarily searching the tree (for example, threads retrieving
-	 * or storing key/data pairs) are a harder problem.  Imagine a thread
-	 * ending up on a deleted page entry, in other words, a thread getting
-	 * the WT_PAGE_DELETED error returned from the page-get function while
-	 * descending the tree.
-	 *
-	 * If that thread is a reader, it's simple and we can return not-found,
-	 * obviously the key doesn't exist in the tree.
-	 *
-	 * If the thread is a writer, we first try to switch from the deleted
-	 * entry to a lower page entry.  This works because deleting a page
-	 * from the tree's key range is equivalent to merging the page's key
-	 * range into the previous page's key range.
-	 *
-	 * For example, imagine a parent page with 3 child pages: the parent has
-	 * 3 keys A, C, and E, and the child pages have the key ranges A-B, C-D
-	 * and E-F.  If the page with C-D is deleted, the parent's reference
-	 * for the key C is marked deleted and the page with the key range A-B
-	 * immediately extends to the range A-D because future searches for keys
-	 * starting with C or D will compare greater than A and less than E, and
-	 * will descend into the page referenced by the key A.  In other words,
-	 * the search key associated with any page is the lowest key associated
-	 * with the page and there's no upper bound.   By switching our writing
-	 * thread to the lower entry, we're mimicing what will happen on future
-	 * searches.
-	 *
-	 * If there's no lower page entry (if, in the example, we deleted the
-	 * key A and the child page with the range A-B), the thread switches to
-	 * the next larger page entry.  This works because the search algorithm
-	 * that landed us on this page ignores any lower boundary for the first
-	 * entry in the page.  In other words, if there's no lower entry on the
-	 * page, then the next larger entry, as the lowest entry on the page,
-	 * holds the lowest keys referenced from this page.  Again, by switching
-	 * our writing thread to the larger entry, we're mimicing what happens
-	 * on future searches.
-	 *
-	 * If there's no entry at all, either smaller or larger (that is, the
-	 * parent no longer references any valid entries at all), it gets hard.
-	 * In that case, we can't fix our writer's position: our writer is in
-	 * the wrong part of the tree, a section of the tree being discarded.
-	 * In this case, we return the WT_RESTART error up the call stack and
-	 * restart the search operation.  Unfortunately, that's not sufficient:
-	 * a restarted search will only come back into the same page without
-	 * any valid entries, encounter the same error, and infinitely loop.
-	 *
-	 * To break the infinite loop, we mark the parent's parent reference as
-	 * deleted, too.  That way, our restarted search will hit a deleted
-	 * entry and be indirected to some other entry, and not back down into
-	 * the same page.  A few additional points:
-	 *
-	 * First, we have to repeat this check all the way up the tree, until
-	 * we reach the root or a page that has non-deleted entries.  In other
-	 * words, deleting our parent in our parent's parent page might just
-	 * result in another page in our search path without any valid entries,
-	 * and its the existence of a page of deleted references that results
-	 * in the infinite loop.
-	 *
-	 * Second, we're discarding a chunk of the tree, because no search can
-	 * ever reach it.  That's OK: those pages will eventually be selected
-	 * for eviction, we're re-discover that they have no entries, and we'll
-	 * discard their contents then.
-	 *
-	 * So, let's get to it: walk the chain of parent pages from the current
-	 * page, stopping at the root or the first page with valid entries and
-	 * deleting as we go.
-	 */
-	if ((parent = page->parent) == NULL)
-		return (0);
-	dsk = parent->dsk;
-
-	/*
-	 * Search the current parent page for a valid child page entry.  We can
-	 * do this because there's a valid child for the page in the tree (so it
-	 * can't be evicted), and we're the eviction thread and no other thread
-	 * deletes pages from the tree, so the address fields can't change from
-	 * underneath us.  If we find a valid page entry, we're done, we've gone
-	 * as far up the tree as we need to go.
-	 */
-	switch (dsk->type) {
-	case WT_PAGE_COL_INT:
-		WT_COL_REF_FOREACH(parent, cref, i)
-			if (WT_COL_REF_STATE(cref) != WT_REF_DELETED)
-				return (0);
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ROW_REF_FOREACH(parent, rref, i)
-			if (WT_ROW_REF_STATE(rref) != WT_REF_DELETED)
-				return (0);
-		break;
-	}
-
-	/*
-	 * The current page has no valid child page entries -- lather, rinse,
-	 * repeat.
-	 */
-	return (__wt_rec_page_delete(toc, parent));
-}
-
-/*
  * __wt_rec_parent_update --
  *	Update a parent page's reference when a page is reconciled.
  */
 static int
-__wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page, uint32_t addr, uint32_t size)
-{
-	IDB *idb;
-
-	idb = toc->db->idb;
-
-	/*
-	 * If we're writing the root of the tree, then we have to update the
-	 * descriptor record, there's no parent to update.
-	 */
-	if (page->addr == idb->root_page.addr) {
-		  idb->root_page.addr = addr;
-		  idb->root_page.size = size;
-		  return (__wt_desc_write(toc));
-	 }
-
-	/*
-	 * Update the relevant WT_REF structure.  There are two memory locations
-	 * that change (address and size), and we could race, but that's not a
-	 * problem.   Only a single thread reconciles pages, and pages cannot
-	 * leave memory if they have children.
-	 */
-	page->parent_ref->addr = addr;
-	page->parent_ref->size = size;
-
-	/*
-	 * Mark the parent page as dirty.
-	 *
-	 * There's no chance we need to flush this write -- the eviction thread
-	 * is the only thread that eventually cares if the page is dirty or not,
-	 * and it's our update that's making it dirty.   (The workQ thread does
-	 * have to flush its set-modified update, of course).
-	 *
-	 * We don't care if we race with the workQ; if the workQ thread races
-	 * with us, the page will still be marked dirty and that's all we care
-	 * about.
-	 */
-	WT_PAGE_SET_MODIFIED(page->parent);
-
-	return (0);
-}
-
-/*
- * __wt_rec_XXX_update --
- *	Update a parent page's reference when a page is reconciled.
- */
-static int
-__wt_rec_XXX_update(WT_TOC *toc, WT_PAGE *page)
+__wt_rec_parent_update(WT_TOC *toc, WT_PAGE *page)
 {
 	ENV *env;
 	IDB *idb;
@@ -1343,11 +1166,7 @@ __wt_rec_XXX_update(WT_TOC *toc, WT_PAGE *page)
 		addr = r->list[0].off.addr;
 		size = r->list[0].off.size;
 
-		/*
-		 * If all of the entries on a page were deleted, the address
-		 * was cleared,
-		 * deleted, then the addr was cleared -- check on that.
-		 */
+		/* If all entries on a page were deleted, delete the page. */
 		if (r->list[0].deleted) {
 			WT_RET(__wt_rec_page_delete(toc, page));
 
@@ -1505,4 +1324,120 @@ err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);
+}
+
+/*
+ * __wt_rec_page_delete --
+ *	Delete a page from the tree.
+ */
+static int
+__wt_rec_page_delete(WT_TOC *toc, WT_PAGE *page)
+{
+	WT_COL_REF *cref;
+	WT_PAGE *parent;
+	WT_ROW_REF *rref;
+	uint32_t i;
+
+	/*
+	 * Any future reader/writer of the page has to deal with deleted pages.
+	 *
+	 * Threads sequentially reading pages (for example, any dump/statistics
+	 * threads), skip deleted pages and continue on.  There are no threads
+	 * sequentially writing pages, so this is a pretty simple case.
+	 *
+	 * Threads binarily searching the tree (for example, threads retrieving
+	 * or storing key/data pairs) are a harder problem.  Imagine a thread
+	 * ending up on a deleted page entry, in other words, a thread getting
+	 * the WT_PAGE_DELETED error returned from the page-get function while
+	 * descending the tree.
+	 *
+	 * If that thread is a reader, it's simple and we can return not-found,
+	 * obviously the key doesn't exist in the tree.
+	 *
+	 * If the thread is a writer, we first try to switch from the deleted
+	 * entry to a lower page entry.  This works because deleting a page
+	 * from the tree's key range is equivalent to merging the page's key
+	 * range into the previous page's key range.
+	 *
+	 * For example, imagine a parent page with 3 child pages: the parent has
+	 * 3 keys A, C, and E, and the child pages have the key ranges A-B, C-D
+	 * and E-F.  If the page with C-D is deleted, the parent's reference
+	 * for the key C is marked deleted and the page with the key range A-B
+	 * immediately extends to the range A-D because future searches for keys
+	 * starting with C or D will compare greater than A and less than E, and
+	 * will descend into the page referenced by the key A.  In other words,
+	 * the search key associated with any page is the lowest key associated
+	 * with the page and there's no upper bound.   By switching our writing
+	 * thread to the lower entry, we're mimicing what will happen on future
+	 * searches.
+	 *
+	 * If there's no lower page entry (if, in the example, we deleted the
+	 * key A and the child page with the range A-B), the thread switches to
+	 * the next larger page entry.  This works because the search algorithm
+	 * that landed us on this page ignores any lower boundary for the first
+	 * entry in the page.  In other words, if there's no lower entry on the
+	 * page, then the next larger entry, as the lowest entry on the page,
+	 * holds the lowest keys referenced from this page.  Again, by switching
+	 * our writing thread to the larger entry, we're mimicing what happens
+	 * on future searches.
+	 *
+	 * If there's no entry at all, either smaller or larger (that is, the
+	 * parent no longer references any valid entries at all), it gets hard.
+	 * In that case, we can't fix our writer's position: our writer is in
+	 * the wrong part of the tree, a section of the tree being discarded.
+	 * In this case, we return the WT_RESTART error up the call stack and
+	 * restart the search operation.  Unfortunately, that's not sufficient:
+	 * a restarted search will only come back into the same page without
+	 * any valid entries, encounter the same error, and infinitely loop.
+	 *
+	 * To break the infinite loop, we mark the parent's parent reference as
+	 * deleted, too.  That way, our restarted search will hit a deleted
+	 * entry and be indirected to some other entry, and not back down into
+	 * the same page.  A few additional points:
+	 *
+	 * First, we have to repeat this check all the way up the tree, until
+	 * we reach the root or a page that has non-deleted entries.  In other
+	 * words, deleting our parent in our parent's parent page might just
+	 * result in another page in our search path without any valid entries,
+	 * and its the existence of a page of deleted references that results
+	 * in the infinite loop.
+	 *
+	 * Second, we're discarding a chunk of the tree, because no search can
+	 * ever reach it.  That's OK: those pages will eventually be selected
+	 * for eviction, we're re-discover that they have no entries, and we'll
+	 * discard their contents then.
+	 *
+	 * So, let's get to it: walk the chain of parent pages from the current
+	 * page, stopping at the root or the first page with valid entries and
+	 * deleting as we go.
+	 */
+	if ((parent = page->parent) == NULL)
+		return (0);
+
+	/*
+	 * Search the current parent page for a valid child page entry.  We can
+	 * do this because there's a valid child for the page in the tree (so it
+	 * can't be evicted), and we're the eviction thread and no other thread
+	 * deletes pages from the tree, so the address fields can't change from
+	 * underneath us.  If we find a valid page entry, we're done, we've gone
+	 * as far up the tree as we need to go.
+	 */
+	switch (parent->dsk->type) {
+	case WT_PAGE_COL_INT:
+		WT_COL_REF_FOREACH(parent, cref, i)
+			if (WT_COL_REF_STATE(cref) != WT_REF_DELETED)
+				return (0);
+		break;
+	case WT_PAGE_ROW_INT:
+		WT_ROW_REF_FOREACH(parent, rref, i)
+			if (WT_ROW_REF_STATE(rref) != WT_REF_DELETED)
+				return (0);
+		break;
+	}
+
+	/*
+	 * The current page has no valid child page entries -- lather, rinse,
+	 * repeat.
+	 */
+	return (__wt_rec_page_delete(toc, parent));
 }
