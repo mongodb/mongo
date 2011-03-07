@@ -143,11 +143,6 @@ public:
             return -1;
         }
 
-        if ( hasParam( "collection" ) ){
-            cout << "repair mode can't work with collection, only on full db" << endl;
-            return -1;
-        }
-
         string dbname = getParam( "db" );
         log() << "going to try and recover data from: " << dbname << endl;
 
@@ -271,10 +266,16 @@ public:
         for ( list<string>::iterator i=namespaces.begin(); i!=namespaces.end(); ++i ){
             LogIndentLevel lil;
             string ns = *i;
+
             if ( str::endsWith( ns , ".system.namespaces" ) )
                 continue;
+            
             if ( str::contains( ns , ".tmp.mr." ) )
                 continue;
+            
+            if ( _coll != "*" && ! str::endsWith( ns , _coll ) )
+                continue;
+
             log() << "trying to recover: " << ns << endl;
             
             LogIndentLevel lil2;
