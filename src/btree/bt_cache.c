@@ -25,10 +25,12 @@ __wt_cache_create(CONNECTION *conn)
 	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 	cache = conn->cache;
 
-	WT_ERR(
-	    __wt_mtx_alloc(session, "cache eviction server", 1, &cache->mtx_evict));
-	WT_ERR(__wt_mtx_alloc(session, "cache read server", 1, &cache->mtx_read));
-	WT_ERR(__wt_mtx_alloc(session, "reconciliation", 0, &cache->mtx_reconcile));
+	WT_ERR(__wt_mtx_alloc(session,
+	    "cache eviction server", 1, &cache->mtx_evict));
+	WT_ERR(__wt_mtx_alloc(session,
+	    "cache read server", 1, &cache->mtx_read));
+	WT_ERR(__wt_mtx_alloc(session,
+	    "reconciliation", 0, &cache->mtx_reconcile));
 
 	WT_ERR(__wt_stat_alloc_cache_stats(session, &cache->stats));
 

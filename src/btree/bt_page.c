@@ -135,8 +135,8 @@ __wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
 	 * Column-store page entries map one-to-one to the number of physical
 	 * entries on the page (each physical entry is a data item).
 	 */
-	WT_RET((
-	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+	WT_RET(__wt_calloc_def(
+	    session, (size_t)dsk->u.entries, &page->u.col_leaf.d));
 
 	/*
 	 * Walk the page, building references: the page contains fixed-length
@@ -168,8 +168,8 @@ __wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
 	 * Column-store page entries map one-to-one to the number of physical
 	 * entries on the page (each physical entry is a offset object).
 	 */
-	WT_RET((
-	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_int.t)));
+	WT_RET(__wt_calloc_def(
+	    session, (size_t)dsk->u.entries, &page->u.col_int.t));
 
 	/*
 	 * Walk the page, building references: the page contains WT_OFF_RECORD
@@ -208,8 +208,8 @@ __wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
 	 * Column-store page entries map one-to-one to the number of physical
 	 * entries on the page (each physical entry is a data item).
 	 */
-	WT_RET((
-	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+	WT_RET(__wt_calloc_def(
+	    session, (size_t)dsk->u.entries, &page->u.col_leaf.d));
 
 	/*
 	 * Walk the page, building references: the page contains fixed-length
@@ -242,8 +242,8 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 	 * Column-store page entries map one-to-one to the number of physical
 	 * entries on the page (each physical entry is a data item).
 	 */
-	WT_RET((
-	    __wt_calloc_def(session, (size_t)dsk->u.entries, &page->u.col_leaf.d)));
+	WT_RET(__wt_calloc_def(
+	    session, (size_t)dsk->u.entries, &page->u.col_leaf.d));
 
 	/*
 	 * Walk the page, building references: the page contains unsorted data
@@ -419,10 +419,11 @@ onpage:		p = WT_CELL_BYTE(item);
 	case WT_CELL_DATA_OVFL:
 		huffman = btree->huffman_data;
 offpage:	/*
-		 * It's an overflow item -- if it's not encoded, we can read
-		 * it directly into the user's return WT_ITEM, otherwise we have to
-		 * have our own buffer as temporary space, and the decode call
-		 * will put a decoded version into the user's return WT_ITEM.
+		 * It's an overflow item -- if it's not encoded, we can read it
+		 * directly into the user's return WT_ITEM, otherwise we have
+		 * to have our own buffer as temporary space, and the decode
+		 * call will put a decoded version into the user's return
+		 * WT_ITEM.
 		 */
 		if (huffman == NULL)
 			tmp = scratch;

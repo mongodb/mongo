@@ -55,7 +55,8 @@ __wt_btree_config(BTREE *btree)
 	TAILQ_INIT(&btree->freeqa);		/* Free queues */
 	TAILQ_INIT(&btree->freeqs);
 
-	__wt_lock(session, conn->mtx);		/* Add to the CONNECTION's list */
+	/* Add to the connection's list. */
+	__wt_lock(session, conn->mtx);
 	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
 	++conn->dbqcnt;
 	__wt_unlock(session, conn->mtx);
@@ -111,7 +112,8 @@ __wt_btree_destroy(BTREE *btree)
 	__wt_free(session, btree->stats, 0);
 	__wt_free(session, btree->fstats, 0);
 
-	__wt_lock(session, conn->mtx);		/* Delete from the CONNECTION's list */
+	/* Remove from the connection's list. */
+	__wt_lock(session, conn->mtx);
 	TAILQ_REMOVE(&conn->dbqh, btree, q);
 	--conn->dbqcnt;
 	__wt_unlock(session, conn->mtx);

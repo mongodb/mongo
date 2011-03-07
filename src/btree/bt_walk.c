@@ -220,7 +220,8 @@ eop:			e->visited = 1;
 				break;
 			else if (ref->state != WT_REF_DELETED &&
 			    !LF_ISSET(WT_WALK_CACHE)) {
-				if ((ret = __wt_page_in(session, page, ref, 0)) == 0)
+				ret = __wt_page_in(session, page, ref, 0);
+				if (ret == 0)
 					break;			/* Valid page */
 				else if (ret == WT_PAGE_DELETED)
 					ret = 0;
@@ -247,7 +248,8 @@ eop:			e->visited = 1;
 				break;
 			else if (ref->state != WT_REF_DELETED &&
 			    !LF_ISSET(WT_WALK_CACHE)) {
-				if ((ret = __wt_page_in(session, page, ref, 0)) == 0)
+				ret = __wt_page_in(session, page, ref, 0);
+				if (ret == 0)
 					break;			/* Valid page */
 				else if (ret == WT_PAGE_DELETED)
 					ret = 0;

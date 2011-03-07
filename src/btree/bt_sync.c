@@ -35,7 +35,8 @@ __wt_bt_sync(SESSION *session)
 	 * to reconcile pages we're flushing.
 	 */
 	__wt_lock(session, cache->mtx_reconcile);
-	ret = __wt_tree_walk(session, NULL, WT_WALK_CACHE, __wt_bt_tree_sync, NULL);
+	ret = __wt_tree_walk(
+	    session, NULL, WT_WALK_CACHE, __wt_bt_tree_sync, NULL);
 	__wt_unlock(session, cache->mtx_reconcile);
 	return (ret);
 }

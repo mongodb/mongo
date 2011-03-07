@@ -31,7 +31,9 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 	 * The SESSION reference list is compact, the SESSION array is not.
 	 * Find the first empty SESSION slot.
 	 */
-	for (slot = 0, session = conn->toc_array; session->iface.connection != NULL; ++session, ++slot)
+	for (slot = 0, session = conn->toc_array;
+	    session->iface.connection != NULL;
+	    ++session, ++slot)
 		;
 
 	/* Clear previous contents of the SESSION entry, they get re-used. */
@@ -40,7 +42,9 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 	session->iface.connection = &conn->iface;
 	session->hazard = conn->hazard + slot * conn->hazard_size;
 
-	WT_RET(__wt_mtx_alloc(&conn->default_session, "session", 1, &session->mtx));
+	/* We can't use the new session: it hasn't been configured yet. */
+	WT_RET(__wt_mtx_alloc(
+	    &conn->default_session, "session", 1, &session->mtx));
 
 	__wt_methods_session_lockout(session);
 	__wt_methods_session_init_transition(session);
@@ -127,7 +131,8 @@ __wt_session_close(SESSION *session)
  *	Pair SESSION and BTREE handle, allocating the SESSION as necessary.
  */
 int
-__wt_session_api_set(CONNECTION *conn, const char *name, BTREE *btree, SESSION **sessionp)
+__wt_session_api_set(
+    CONNECTION *conn, const char *name, BTREE *btree, SESSION **sessionp)
 {
 	SESSION *session;
 
@@ -192,7 +197,8 @@ __wt_session_dump(CONNECTION *conn)
 		else
 			__wt_mb_add(&mb, "%p", session->wq_func);
 
-		__wt_mb_add(&mb, " state: %s", __wt_session_print_state(session));
+		__wt_mb_add(&mb,
+		    " state: %s", __wt_session_print_state(session));
 
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = session->hazard;

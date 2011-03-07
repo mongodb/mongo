@@ -459,7 +459,8 @@ err:	if (tmp != NULL)
  *	Write a disk block out for the helper functions.
  */
 static int
-__wt_rec_helper_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
+__wt_rec_helper_write(
+    SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 {
 	WT_REC_LIST *r;
 	struct rec_list *r_list;
@@ -672,8 +673,8 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 		 * terminated array of references to WT_RLE_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_ERR(
-		    __wt_rle_expand_sort(session, page, cip, &expsort, &n_expsort));
+		WT_ERR(__wt_rle_expand_sort(
+		    session, page, cip, &expsort, &n_expsort));
 
 		/*
 		 *
@@ -1049,8 +1050,8 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (WT_CELL_TYPE(key_item) == WT_CELL_KEY_OVFL)
-					WT_RET(__wt_block_free_ovfl(
-					    session, WT_CELL_BYTE_OVFL(key_item)));
+					WT_RET(__wt_block_free_ovfl(session,
+					    WT_CELL_BYTE_OVFL(key_item)));
 				continue;
 			}
 

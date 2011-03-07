@@ -46,9 +46,9 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	 * buffer and so should be fast, but it's still not a good thing.  If
 	 * it ever becomes a problem, then we either have to pass the fact that
 	 * it's a "page" back to our caller and let them deal with the offset,
-	 * or add a new field to the WT_ITEM that flags the start of the allocated
-	 * buffer, instead of using the "data" field to indicate both the start
-	 * of the data and the start of the allocated memory.
+	 * or add a new field to the WT_ITEM that flags the start of the
+	 * allocated buffer, instead of using the "data" field to indicate both
+	 * the start of the data and the start of the allocated memory.
 	 *
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */

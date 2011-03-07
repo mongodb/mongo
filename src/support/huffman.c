@@ -220,7 +220,8 @@ __wt_huffman_open(SESSION *session,
 	ret = 0;
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_HUFFMAN_OBJ), &huffman));
-	WT_ERR(__wt_calloc(session, nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
+	WT_ERR(__wt_calloc(
+	    session, nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
 	huffman->session = session;
 
 	/*
@@ -301,8 +302,8 @@ __wt_huffman_open(SESSION *session,
 			tempnode->right = node2;
 
 			/* Enqueue it to the combined nodes queue */
-			WT_ERR(
-			    node_queue_enqueue(session, combined_nodes, tempnode));
+			WT_ERR(node_queue_enqueue(
+			    session, combined_nodes, tempnode));
 			tempnode = NULL;
 
 			/* Reset the state pointers */

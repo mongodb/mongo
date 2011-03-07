@@ -26,7 +26,8 @@ static int __wt_item_build_key(SESSION *, WT_ITEM *, WT_CELL *, WT_OVFL *);
  */
 int
 __wt_btree_bulk_load(SESSION *session,
-    void (*f)(const char *, uint64_t), int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
+    void (*f)(const char *, uint64_t),
+    int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
 	uint32_t addr;
@@ -61,7 +62,8 @@ __wt_btree_bulk_load(SESSION *session,
  */
 static int
 __wt_bulk_fix(SESSION *session,
-    void (*f)(const char *, uint64_t), int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
+    void (*f)(const char *, uint64_t),
+    int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
 	WT_ITEM *key, *data;
@@ -152,7 +154,8 @@ __wt_bulk_fix(SESSION *session,
 			WT_ERR(__wt_page_write(session, page));
 			dsk->u.entries = 0;
 			dsk->recno = insert_cnt;
-			WT_ERR(__wt_block_alloc(session, &page->addr, btree->leafmin));
+			WT_ERR(__wt_block_alloc(session,
+			    &page->addr, btree->leafmin));
 			__wt_init_ff_and_sa(page, &first_free, &space_avail);
 		}
 		++dsk->u.entries;
@@ -202,7 +205,8 @@ err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
  */
 static int
 __wt_bulk_var(SESSION *session,
-    void (*f)(const char *, uint64_t), int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
+    void (*f)(const char *, uint64_t),
+    int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
 	WT_ITEM *key, *value, key_copy, value_copy;
@@ -509,7 +513,8 @@ __wt_bulk_var_insert(ICURSOR_BULK *cbulk)
 		 * to its parent and discard it, then switch to the new
 		 * page.
 		 */
-		WT_RET(__wt_bulk_promote(session, cbulk->page, &cbulk->stack, 0));
+		WT_RET(__wt_bulk_promote(session,
+		    cbulk->page, &cbulk->stack, 0));
 		WT_RET(__wt_page_write(session, cbulk->page));
 		__wt_scr_release(&cbulk->tmp);
 
@@ -567,7 +572,8 @@ __wt_bulk_end(ICURSOR_BULK *cbulk)
 
 	/* Promote a key from any partially-filled page and write it. */
 	if (cbulk->page->dsk->u.entries != 0) {
-		WT_ERR(__wt_bulk_promote(session, cbulk->page, &cbulk->stack, 0));
+		WT_ERR(__wt_bulk_promote(session,
+		    cbulk->page, &cbulk->stack, 0));
 		WT_ERR(__wt_page_write(session, cbulk->page));
 	}
 
@@ -615,7 +621,7 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 	/*
 	 * If it's a row-store, get a copy of the first item on the page -- it
 	 * might be an overflow item, in which case we need to make a copy for
-	 * the parent.  Most versions of Berkeley BTREE tried to reference count
+	 * the parent.  Most versions of Berkeley DB tried to reference count
 	 * overflow items if they were promoted to internal pages.  That turned
 	 * out to be hard to get right, so I'm not doing it again.
 	 *
@@ -896,7 +902,8 @@ __wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl
 	/*
 	 * We're called with a WT_ITEM that references a data/size pair.  We can
 	 * re-point that WT_ITEM's data and size fields to other memory, but we
-	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point it.
+	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
+	 * it.
 	 *
 	 * For Huffman-encoded key/data items, we need a chunk of new space;
 	 * use the SESSION key/data return memory: this routine is called during
@@ -905,11 +912,11 @@ __wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl
 
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_key != NULL) {
-		WT_RET(__wt_huffman_encode(
-		    btree->huffman_key, dbt->data, dbt->size, &session->key));
+		WT_RET(__wt_huffman_encode(btree->huffman_key,
+		    dbt->data, dbt->size, &session->key));
 		if (session->key.item.size > dbt->size)
-			WT_STAT_INCRV(stats,
-			    FILE_HUFFMAN_KEY, session->key.item.size - dbt->size);
+			WT_STAT_INCRV(stats, FILE_HUFFMAN_KEY,
+			    session->key.item.size - dbt->size);
 		*dbt = session->key.item;
 	}
 
@@ -944,7 +951,8 @@ __wt_item_build_value(SESSION *session,
 	/*
 	 * We're called with a WT_ITEM that references a data/size pair.  We can
 	 * re-point that WT_ITEM's data and size fields to other memory, but we
-	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point it.
+	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
+	 * it.
 	 *
 	 * For Huffman-encoded key/data items, we need a chunk of new space;
 	 * use the SESSION key/data return memory: this routine is called during
@@ -964,11 +972,11 @@ __wt_item_build_value(SESSION *session,
 
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_data != NULL) {
-		WT_RET(__wt_huffman_encode(
-		    btree->huffman_data, dbt->data, dbt->size, &session->value));
+		WT_RET(__wt_huffman_encode(btree->huffman_data,
+		    dbt->data, dbt->size, &session->value));
 		if (session->value.item.size > dbt->size)
-			WT_STAT_INCRV(stats,
-			    FILE_HUFFMAN_DATA, session->value.item.size - dbt->size);
+			WT_STAT_INCRV(stats, FILE_HUFFMAN_DATA,
+			    session->value.item.size - dbt->size);
 		*dbt = session->value.item;
 	}
 

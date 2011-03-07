@@ -12,7 +12,8 @@
  *	Read a file page.
  */
 int
-__wt_disk_read(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_disk_read(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	BTREE *btree;
 	WT_FH *fh;
@@ -45,7 +46,8 @@ __wt_disk_read(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size
  *	Write a file page.
  */
 int
-__wt_disk_write(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_disk_write(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	BTREE *btree;
 	WT_FH *fh;

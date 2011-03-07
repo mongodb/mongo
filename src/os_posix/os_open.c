@@ -12,7 +12,8 @@
  *	Open a file handle.
  */
 int
-__wt_open(SESSION *session, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
+__wt_open(
+    SESSION *session, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
 	BTREE *btree;
 	CONNECTION *conn;

@@ -12,7 +12,8 @@
  *	Lexicographic comparison routine.
  */
 int
-__wt_bt_lex_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_dbt)
+__wt_bt_lex_compare(
+    BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	uint32_t len;
 	const uint8_t *userp, *treep;
@@ -25,23 +26,23 @@ __wt_bt_lex_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_d
 
 	/*
 	 * Return:
-	 *	< 0 if user_dbt is lexicographically < tree_dbt
-	 *	= 0 if user_dbt is lexicographically = tree_dbt
-	 *	> 0 if user_dbt is lexicographically > tree_dbt
+	 *	< 0 if user_item is lexicographically < tree_item
+	 *	= 0 if user_item is lexicographically = tree_item
+	 *	> 0 if user_item is lexicographically > tree_item
 	 *
 	 * We use the names "user" and "tree" so it's clear which the
 	 * application is looking at when we call its comparison func.
 	 */
-	if ((len = user_dbt->size) > tree_dbt->size)
-		len = tree_dbt->size;
-	for (userp = user_dbt->data,
-	    treep = tree_dbt->data; len > 0; --len, ++userp, ++treep)
+	if ((len = user_item->size) > tree_item->size)
+		len = tree_item->size;
+	for (userp = user_item->data,
+	    treep = tree_item->data; len > 0; --len, ++userp, ++treep)
 		if (*userp != *treep)
 			return (*userp < *treep ? -1 : 1);
 
 	/* Contents are equal up to the smallest length. */
-	return (user_dbt->size == tree_dbt->size ? 0 :
-	    (user_dbt->size < tree_dbt->size ? -1 : 1));
+	return (user_item->size == tree_item->size ? 0 :
+	    (user_item->size < tree_item->size ? -1 : 1));
 }
 
 /*
@@ -49,7 +50,8 @@ __wt_bt_lex_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_d
  *	Integer comparison routine.
  */
 int
-__wt_bt_int_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_dbt)
+__wt_bt_int_compare(
+    BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	uint64_t user_int, tree_int;
 
@@ -57,16 +59,16 @@ __wt_bt_int_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_d
 	 * The WT_ITEM must hold the low-order bits in machine integer order.
 	 *
 	 * Return:
-	 *	< 0 if user_dbt is < tree_dbt
-	 *	= 0 if user_dbt is = tree_dbt
-	 *	> 0 if user_dbt is > tree_dbt
+	 *	< 0 if user_item is < tree_item
+	 *	= 0 if user_item is = tree_item
+	 *	> 0 if user_item is > tree_item
 	 *
 	 * We use the names "user" and "tree" so it's clear which the
 	 * application is looking at when we call its comparison func.
 	 */
 	user_int = tree_int = 0;
-	memcpy(&user_int, user_dbt->data, (size_t)btree->btree_compare_int);
-	memcpy(&tree_int, tree_dbt->data, (size_t)btree->btree_compare_int);
+	memcpy(&user_int, user_item->data, (size_t)btree->btree_compare_int);
+	memcpy(&tree_int, tree_item->data, (size_t)btree->btree_compare_int);
 
 	return (user_int == tree_int ? 0 : (user_int < tree_int ? -1 : 1));
 }

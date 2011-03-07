@@ -441,9 +441,8 @@ struct __wt_page {
 /*
  * WT_ROW --
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
- * this is where the on-page index in Berkeley BTREE is created when a page is read
- * from the file.  It's sorted by key, fixed in size, and references data on the
- * page.
+ * this is created from on-page data when a page is read from the file.
+ * It's sorted by key, fixed in size, and references data on the page.
  */
 struct __wt_row {
 	/*
@@ -486,9 +485,9 @@ struct __wt_row {
 
 /*
  * WT_COL --
- * Each in-memory column-store leaf page has an array of WT_COL structures: this
- * is where the on-page index in Berkeley BTREE is created when a page is read from
- * the file.  It's fixed in size, and references data on the page.
+ * Each in-memory column-store leaf page has an array of WT_COL structures:
+ * this is created from on-page data when a page is read from the file.
+ * It's fixed in size, and references data on the page.
  *
  * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
  * pages), a single indx entry may reference a large number of records, because
@@ -582,8 +581,9 @@ struct __wt_update {
  * handle this by "inserting" a new entry into the rleexp array.  This is the
  * only case where it's possible to "insert" into a column-store, it's normally
  * only possible to append to a column-store as insert requires re-numbering
- * subsequent records.  (Berkeley BTREE did support the re-numbering functionality,
- * but it won't scale and it isn't useful enough to re-implement, IMNSHO.)
+ * subsequent records.  (Berkeley DB did support the re-numbering
+ * functionality, but it won't scale and it isn't useful enough to
+ * re-implement, IMNSHO.)
  */
 struct __wt_rle_expand {
 	uint64_t recno;			/* recno */

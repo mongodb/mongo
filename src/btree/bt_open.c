@@ -25,7 +25,8 @@ __wt_bt_open(SESSION *session, int ok_create)
 	WT_RET(__wt_open_verify(session, btree));
 
 	/* Open the fle. */
-	WT_RET(__wt_open(session, btree->name, btree->mode, ok_create, &btree->fh));
+	WT_RET(__wt_open(session,
+	    btree->name, btree->mode, ok_create, &btree->fh));
 
 	/*
 	 * If the file size is 0, write a description page; if the file size
@@ -60,7 +61,8 @@ __wt_open_verify(SESSION *session, BTREE *btree)
 	WT_RET(__wt_open_verify_page_sizes(session, btree));
 
 	/* Verify other configuration combinations. */
-	if (btree->fixed_len != 0 && (btree->huffman_key || btree->huffman_data)) {
+	if (btree->fixed_len != 0 &&
+	    (btree->huffman_key || btree->huffman_data)) {
 		__wt_err(session, 0,
 		    "Fixed-size column-store files may not be Huffman encoded");
 		return (WT_ERROR);
@@ -130,7 +132,8 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 	if (btree->intlmin == 0)
 		btree->intlmin = WT_BTREE_INTLMIN_DEFAULT;
 	if (btree->intlmax == 0)
-		btree->intlmax = WT_MAX(btree->intlmin, WT_BTREE_INTLMAX_DEFAULT);
+		btree->intlmax =
+		    WT_MAX(btree->intlmin, WT_BTREE_INTLMAX_DEFAULT);
 	if (btree->intlitemsize == 0) {
 		if (btree->intlmin <= 1024)
 			btree->intlitemsize = 50;
@@ -156,7 +159,8 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 	if (btree->leafmin == 0)
 		btree->leafmin = WT_BTREE_LEAFMIN_DEFAULT;
 	if (btree->leafmax == 0)
-		btree->leafmax = WT_MAX(btree->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
+		btree->leafmax =
+		    WT_MAX(btree->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
 	if (btree->leafitemsize == 0) {
 		if (btree->leafmin <= 4096)
 			btree->leafitemsize = 80;
@@ -206,7 +210,7 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 	 * whole btree thing breaks down because we can't split.  We have
 	 * to include WT_DESC_SIZE in leaf page calculations, it's not
 	 * strictly necessary in internal pages because page 0 is always
-	 * a leaf page.  The additional 10 bytes is for slop -- Berkeley BTREE
+	 * a leaf page.  The additional 10 bytes is for slop -- Berkeley DB
 	 * took roughly a decade to get the calculation correct, and that
 	 * way I can skip the suspense.
 	 */

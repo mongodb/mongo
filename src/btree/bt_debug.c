@@ -80,7 +80,8 @@ __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp)
  *	Dump a disk page in debugging mode.
  */
 int
-__wt_debug_disk(SESSION *session, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
+__wt_debug_disk(
+    SESSION *session, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp)
 {
 	BTREE *btree;
 	int do_close, ret;

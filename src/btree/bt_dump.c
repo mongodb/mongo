@@ -290,8 +290,8 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 
 		/*
-		 * The key and value variables reference the WT_DATAITEMs we'll print.
-		 * Set the key.
+		 * The key and value variables reference the items we will
+		 * print.  Set the key.
 		 */
 		if (__wt_key_process(rip)) {
 			WT_ERR(__wt_item_process(session, rip->key, key_tmp));

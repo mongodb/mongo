@@ -32,8 +32,8 @@
  *	Schedule a serialization request, and block or spin until it completes.
  */
 int
-__wt_session_serialize_func(
-    SESSION *session, wq_state_t op, int spin, int (*func)(SESSION *), void *args)
+__wt_session_serialize_func(SESSION *session,
+    wq_state_t op, int spin, int (*func)(SESSION *), void *args)
 {
 	int done;
 

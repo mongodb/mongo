@@ -46,7 +46,8 @@ void
 __wt_debug_block(SESSION *session);
 int
 __wt_btree_bulk_load(SESSION *session,
-    void (*f)(const char *, uint64_t), int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **));
+    void (*f)(const char *, uint64_t),
+    int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **));
 int
 __wt_bulk_init(ICURSOR_BULK *cbulk);
 int
@@ -65,13 +66,16 @@ __wt_cache_destroy(CONNECTION *conn);
 int
 __wt_bt_close(SESSION *session);
 int
-__wt_bt_lex_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_dbt);
+__wt_bt_lex_compare(
+    BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item);
 int
-__wt_bt_int_compare(BTREE *btree, const WT_ITEM *user_dbt, const WT_ITEM *tree_dbt);
+__wt_bt_int_compare(
+    BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item);
 int
 __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp);
 int
-__wt_debug_disk(SESSION *session, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp);
+__wt_debug_disk(
+    SESSION *session, WT_PAGE_DISK *dsk, const char *ofile, FILE *fp);
 int
 __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp);
 void
@@ -135,9 +139,11 @@ __wt_rle_expand_sort(SESSION *session,
 int
 __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);
 int
-__wt_disk_read(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+__wt_disk_read(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
-__wt_disk_write(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+__wt_disk_write(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
 int
 __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg);
 int
@@ -213,7 +219,9 @@ __wt_btree_stat_print(SESSION *session, FILE *stream);
 int
 __wt_btree_stat_clear(BTREE *btree);
 int
-__wt_btree_sync(SESSION *session, void (*f)(const char *, uint64_t), uint32_t flags);
+__wt_btree_sync(SESSION *session,
+    void (*f)(const char *, uint64_t),
+    uint32_t flags);
 int
 __wt_connection_cache_size_set_verify(CONNECTION *conn, uint32_t cache_size);
 int
@@ -253,7 +261,8 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp);
 int
 __wt_session_close(SESSION *session);
 int
-__wt_session_api_set(CONNECTION *conn, const char *name, BTREE *btree, SESSION **sessionp);
+__wt_session_api_set(
+    CONNECTION *conn, const char *name, BTREE *btree, SESSION **sessionp);
 int
 __wt_session_api_clr(SESSION *session, const char *name, int islocal);
 int
@@ -316,7 +325,8 @@ __wt_unlock(SESSION *session, WT_MTX *mtx);
 int
 __wt_mtx_destroy(SESSION *session, WT_MTX *mtx);
 int
-__wt_open(SESSION *session, const char *name, mode_t mode, int ok_create, WT_FH **fhp);
+__wt_open(
+    SESSION *session, const char *name, mode_t mode, int ok_create, WT_FH **fhp);
 int
 __wt_close(SESSION *session, WT_FH *fh);
 int
@@ -341,7 +351,8 @@ void
 __wt_msg_stream(FILE *fp,
     const char *pfx1, const char *pfx2, int error, const char *fmt, va_list ap);
 void
-__wt_assert(SESSION *session, const char *check, const char *file_name, int line_number);
+__wt_assert(
+    SESSION *session, const char *check, const char *file_name, int line_number);
 int
 __wt_api_args(SESSION *session, const char *name);
 int
@@ -367,7 +378,9 @@ __wt_btree_lockout(BTREE *btree);
 int
 __wt_connection_lockout(CONNECTION *conn);
 int
-__wt_errv(SESSION *session, int error, const char *prefix, const char *fmt, va_list ap);
+__wt_errv(
+    SESSION *session, int error,
+    const char *prefix, const char *fmt, va_list ap);
 int
 __wt_err(SESSION *session, int error, const char *fmt, ...);
 int
@@ -412,8 +425,8 @@ __wt_scr_release(WT_BUF **bufp);
 void
 __wt_scr_free(SESSION *session);
 int
-__wt_session_serialize_func(
-    SESSION *session, wq_state_t op, int spin, int (*func)(SESSION *), void *args);
+__wt_session_serialize_func(SESSION *session,
+    wq_state_t op, int spin, int (*func)(SESSION *), void *args);
 void
 __wt_session_serialize_wrapup(SESSION *session, WT_PAGE *page, int ret);
 int

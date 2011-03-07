@@ -110,7 +110,8 @@ __wt_cache_evict_server(void *arg)
 
 	/* We need a thread of control because we're reading/writing pages. */
 	session = NULL;
-	WT_ERR(__wt_session_api_set(conn, "CacheReconciliation", NULL, &session));
+	WT_ERR(__wt_session_api_set(conn,
+	    "CacheReconciliation", NULL, &session));
 
 	/*
 	 * Multiple pages are marked for eviction by the eviction server, which
@@ -303,12 +304,11 @@ __wt_evict_walk(SESSION *session)
 
 		i = WT_EVICT_WALK_BASE;
 		TAILQ_FOREACH(btree, &conn->dbqh, q) {
-			if ((ret = __wt_evict_walk_single(session, btree, i)) != 0)
-				break;
+			WT_ERR(__wt_evict_walk_single(session, btree, i));
 			i += WT_EVICT_WALK_PER_TABLE;
 		}
 	}
-	__wt_unlock(session, conn->mtx);
+err:	__wt_unlock(session, conn->mtx);
 	return (ret);
 }
 

@@ -186,7 +186,8 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 	    page->u.row_leaf.d, page->indx_count * sizeof(WT_ROW));
 
 	if (page->u.row_leaf.upd != NULL)
-		__wt_discard_update(session, page->u.row_leaf.upd, page->indx_count);
+		__wt_discard_update(
+		    session, page->u.row_leaf.upd, page->indx_count);
 }
 
 /*
@@ -194,7 +195,8 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
  *	Discard the update array.
  */
 static void
-__wt_discard_update(SESSION *session, WT_UPDATE **update_head, uint32_t indx_count)
+__wt_discard_update(
+    SESSION *session, WT_UPDATE **update_head, uint32_t indx_count)
 {
 	WT_UPDATE **updp;
 

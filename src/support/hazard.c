@@ -33,7 +33,9 @@ __wt_hazard_set(SESSION *session, WT_REF *ref)
 	 * server sets the WT_REF state to WT_REF_EVICT, flushes memory, and
 	 * then checks the hazard references).
 	 */
-	for (hp = session->hazard; hp < session->hazard + conn->hazard_size; ++hp) {
+	for (hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size;
+	    ++hp) {
 		if (*hp != NULL)
 			continue;
 
@@ -52,8 +54,8 @@ __wt_hazard_set(SESSION *session, WT_REF *ref)
 		if (ref->state == WT_REF_CACHE ||
 		    (ref->state == WT_REF_EVICT &&
 		    F_ISSET(session, WT_READ_EVICT))) {
-			WT_VERBOSE(conn, WT_VERB_HAZARD,
-			    (session, "session %p hazard %p: set", session, ref->page));
+			WT_VERBOSE(conn, WT_VERB_HAZARD, (session,
+			    "session %p hazard %p: set", session, ref->page));
 			return (1);
 		}
 
@@ -79,11 +81,13 @@ __wt_hazard_clear(SESSION *session, WT_PAGE *page)
 
 	conn = S2C(session);
 
-	WT_VERBOSE(conn,
-	    WT_VERB_HAZARD, (session, "session %p hazard %p: clr", session, page));
+	WT_VERBOSE(conn, WT_VERB_HAZARD, (session,
+	    "session %p hazard %p: clr", session, page));
 
 	/* Clear the caller's hazard pointer. */
-	for (hp = session->hazard; hp < session->hazard + conn->hazard_size; ++hp)
+	for (hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size;
+	    ++hp)
 		if (*hp == page) {
 			*hp = NULL;
 			/*
@@ -121,7 +125,9 @@ __wt_hazard_empty(SESSION *session, const char *name)
 	 * cache eviction thread immediate access to any page our reference
 	 * blocks.
 	 */
-	for (hp = session->hazard; hp < session->hazard + conn->hazard_size; ++hp)
+	for (hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size;
+	    ++hp)
 		if (*hp != NULL) {
 			__wt_errx(session,
 			    "%s: returned with a hazard reference set (%p)",

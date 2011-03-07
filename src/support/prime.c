@@ -17,7 +17,7 @@ __wt_prime(uint32_t n)
 	/*
 	 * Ref: the hash functions section of "Algorithms in C", by Sedgewick.
 	 *
-	 * The table is the same as the one in Berkeley BTREE -- check at each
+	 * The table is the same as the one in Berkeley DB -- check at each
 	 * power-of-two up to 2^18, then mid-points between each power-of-two
 	 * to a maximum of 2^30.
 	 */

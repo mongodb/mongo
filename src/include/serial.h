@@ -16,9 +16,11 @@ typedef struct {
 } while (0)
 #define	__wt_cache_read_unpack(\
     session, _parent, _parent_ref, _dsk_verify) do {\
-	_parent = ((__wt_cache_read_args *)(session)->wq_args)->parent;\
-	_parent_ref = ((__wt_cache_read_args *)(session)->wq_args)->parent_ref;\
-	_dsk_verify = ((__wt_cache_read_args *)(session)->wq_args)->dsk_verify;\
+	__wt_cache_read_args *_args =\
+	    (__wt_cache_read_args *)(session)->wq_args;\
+	_parent = _args->parent;\
+	_parent_ref = _args->parent_ref;\
+	_dsk_verify = _args->dsk_verify;\
 } while (0)
 
 typedef struct {
@@ -41,11 +43,13 @@ typedef struct {
 } while (0)
 #define	__wt_item_update_unpack(\
     session, _page, _write_gen, _slot, _new_upd, _upd) do {\
-	_page = ((__wt_item_update_args *)(session)->wq_args)->page;\
-	_write_gen = ((__wt_item_update_args *)(session)->wq_args)->write_gen;\
-	_slot = ((__wt_item_update_args *)(session)->wq_args)->slot;\
-	_new_upd = ((__wt_item_update_args *)(session)->wq_args)->new_upd;\
-	_upd = ((__wt_item_update_args *)(session)->wq_args)->upd;\
+	__wt_item_update_args *_args =\
+	    (__wt_item_update_args *)(session)->wq_args;\
+	_page = _args->page;\
+	_write_gen = _args->write_gen;\
+	_slot = _args->slot;\
+	_new_upd = _args->new_upd;\
+	_upd = _args->upd;\
 } while (0)
 
 typedef struct {
@@ -68,11 +72,13 @@ typedef struct {
 } while (0)
 #define	__wt_rle_expand_unpack(\
     session, _page, _write_gen, _slot, _new_rleexp, _exp) do {\
-	_page = ((__wt_rle_expand_args *)(session)->wq_args)->page;\
-	_write_gen = ((__wt_rle_expand_args *)(session)->wq_args)->write_gen;\
-	_slot = ((__wt_rle_expand_args *)(session)->wq_args)->slot;\
-	_new_rleexp = ((__wt_rle_expand_args *)(session)->wq_args)->new_rleexp;\
-	_exp = ((__wt_rle_expand_args *)(session)->wq_args)->exp;\
+	__wt_rle_expand_args *_args =\
+	    (__wt_rle_expand_args *)(session)->wq_args;\
+	_page = _args->page;\
+	_write_gen = _args->write_gen;\
+	_slot = _args->slot;\
+	_new_rleexp = _args->new_rleexp;\
+	_exp = _args->exp;\
 } while (0)
 
 typedef struct {
@@ -93,8 +99,10 @@ typedef struct {
 } while (0)
 #define	__wt_rle_expand_update_unpack(\
     session, _page, _write_gen, _exp, _upd) do {\
-	_page = ((__wt_rle_expand_update_args *)(session)->wq_args)->page;\
-	_write_gen = ((__wt_rle_expand_update_args *)(session)->wq_args)->write_gen;\
-	_exp = ((__wt_rle_expand_update_args *)(session)->wq_args)->exp;\
-	_upd = ((__wt_rle_expand_update_args *)(session)->wq_args)->upd;\
+	__wt_rle_expand_update_args *_args =\
+	    (__wt_rle_expand_update_args *)(session)->wq_args;\
+	_page = _args->page;\
+	_write_gen = _args->write_gen;\
+	_exp = _args->exp;\
+	_upd = _args->upd;\
 } while (0)

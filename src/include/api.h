@@ -292,7 +292,7 @@ struct __connection {
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
-	TAILQ_HEAD(__wt_btree_qh, __btree) dbqh;	/* Locked: database list */
+	TAILQ_HEAD(__wt_btree_qh, __btree) dbqh; /* Locked: database list */
 	u_int dbqcnt;			/* Locked: database list count */
 
 	TAILQ_HEAD(

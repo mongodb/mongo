@@ -62,7 +62,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	btree = session->btree;
 	rip = NULL;
 
-	WT_DB_FCHK(btree, "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
+	WT_DB_FCHK(btree,
+	    "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
 	/* Search the tree. */
 	for (page = btree->root_page.page;;) {
@@ -104,8 +105,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 				 * this hack.
 				 */
 				if (indx != 0) {
-					cmp = btree->
-					    btree_compare(btree, key, (WT_ITEM *)rref);
+					cmp = btree->btree_compare(
+					    btree, key, (WT_ITEM *)rref);
 					if (cmp == 0)
 						break;
 					if (cmp < 0)
@@ -141,7 +142,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 				if (__wt_key_process(rip))
 					WT_ERR(__wt_key_build(session, rip));
 
-				cmp = btree->btree_compare(btree, key, (WT_ITEM *)rip);
+				cmp = btree->btree_compare(
+				    btree, key, (WT_ITEM *)rip);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)

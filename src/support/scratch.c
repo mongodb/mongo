@@ -122,5 +122,6 @@ __wt_scr_free(SESSION *session)
 	    ++i, ++buf)
 		__wt_buf_free(session, buf);
 
-	__wt_free(session, session->scratch, session->scratch_alloc * sizeof(WT_BUF));
+	__wt_free(
+	    session, session->scratch, session->scratch_alloc * sizeof(WT_BUF));
 }

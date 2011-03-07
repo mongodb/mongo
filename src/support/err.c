@@ -77,7 +77,8 @@ __wt_msg_stream(FILE *fp,
  *	Internal version of assert function.
  */
 void
-__wt_assert(SESSION *session, const char *check, const char *file_name, int line_number)
+__wt_assert(
+    SESSION *session, const char *check, const char *file_name, int line_number)
 {
 	__wt_errx(session,
 	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
@@ -259,7 +260,9 @@ __wt_connection_lockout(CONNECTION *conn)
 }
 
 int
-__wt_errv(SESSION *session, int error, const char *prefix, const char *fmt, va_list ap)
+__wt_errv(
+    SESSION *session, int error,
+    const char *prefix, const char *fmt, va_list ap)
 {
 	WT_ERROR_HANDLER *handler;
 	char *end, *p;

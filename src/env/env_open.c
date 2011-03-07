@@ -27,11 +27,13 @@ __wt_connection_open(CONNECTION *conn, const char *home, mode_t mode)
 	ret = 0;
 
 	/* SESSION and hazard arrays. */
-	WT_RET(__wt_calloc(session, conn->session_size, sizeof(SESSION *), &conn->sessions));
-	WT_RET(
-	    __wt_calloc(session, conn->session_size, sizeof(SESSION), &conn->toc_array));
 	WT_RET(__wt_calloc(session,
-	   conn->session_size * conn->hazard_size, sizeof(WT_PAGE *), &conn->hazard));
+	    conn->session_size, sizeof(SESSION *), &conn->sessions));
+	WT_RET(__wt_calloc(session,
+	    conn->session_size, sizeof(SESSION), &conn->toc_array));
+	WT_RET(__wt_calloc(session,
+	   conn->session_size * conn->hazard_size, sizeof(WT_PAGE *),
+	   &conn->hazard));
 
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(conn));

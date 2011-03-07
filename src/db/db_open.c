@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static int __wt_btree_btree_open(BTREE *, const char *, mode_t, uint32_t);
-
 /*
  * __wt_btree_open --
  *	Open a BTREE handle.
@@ -16,36 +14,13 @@ static int __wt_btree_btree_open(BTREE *, const char *, mode_t, uint32_t);
 int
 __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 {
+	CONNECTION *conn;
 	BTREE *btree;
 
 	btree = session->btree;
+	conn = btree->conn;
 
 	WT_STAT_INCR(btree->conn->stats, FILE_OPEN);
-
-	/* Initialize the BTREE structure. */
-	WT_RET(__wt_btree_btree_open(btree, name, mode, flags));
-
-	/* Open the underlying Btree. */
-	WT_RET(__wt_bt_open(session, LF_ISSET(WT_CREATE) ? 1 : 0));
-
-	/* Turn on the methods that require open. */
-	__wt_methods_btree_open_transition(btree);
-
-	return (0);
-}
-
-/*
- * __wt_btree_btree_open --
- *	Routine to intialize any BTREE values based on a BTREE value during open.
- */
-static int
-__wt_btree_btree_open(BTREE *btree, const char *name, mode_t mode, uint32_t flags)
-{
-	CONNECTION *conn;
-	SESSION *session;
-
-	conn = btree->conn;
-	session = &conn->default_session;
 
 	WT_RET(__wt_strdup(session, name, &btree->name));
 	btree->mode = mode;
@@ -68,6 +43,12 @@ __wt_btree_btree_open(BTREE *btree, const char *name, mode_t mode, uint32_t flag
 
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(btree, WT_RDONLY);
+
+	/* Open the underlying Btree. */
+	WT_RET(__wt_bt_open(session, LF_ISSET(WT_CREATE) ? 1 : 0));
+
+	/* Turn on the methods that require open. */
+	__wt_methods_btree_open_transition(btree);
 
 	return (0);
 }

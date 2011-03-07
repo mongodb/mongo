@@ -75,11 +75,11 @@ def func_serial(f):
 		for l in entry[1].args:
 			f.write(', _' + l.split('/')[1])
 		f.write(') do {\\\n')
+		f.write('\t__wt_' + entry[0] + '_args *_args =\\\n	    ')
+		f.write('(__wt_' + entry[0] + '_args *)(session)->wq_args;\\\n')
 		for l in entry[1].args:
 			f.write('\t_' + l.split('/')[1] +
-			    ' = ((__wt_' + entry[0] +
-			    '_args *)(session)->wq_args)->' +
-			    l.split('/')[1] + ';\\\n')
+			    ' = _args->' + l.split('/')[1] + ';\\\n')
 		f.write('} while (0)\n')
 
 #####################################################################

@@ -278,7 +278,8 @@ __wt_verify_tree(
 			 * in a comparison.
 			 */
 			if (vs->leaf != NULL) {
-				WT_ERR(__wt_verify_pc(session, rref, vs->leaf, 0));
+				WT_ERR(__wt_verify_pc(
+				    session, rref, vs->leaf, 0));
 				__wt_hazard_clear(session, vs->leaf);
 				vs->leaf = NULL;
 			}
@@ -534,7 +535,8 @@ __wt_verify_freelist(SESSION *session, WT_VSTUFF *vs)
  *	verified this chunk of the file.
  */
 static int
-__wt_verify_addfrag(SESSION *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
+__wt_verify_addfrag(
+    SESSION *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
 {
 	BTREE *btree;
 	uint32_t frags, i;

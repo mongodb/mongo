@@ -42,7 +42,8 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *data)
  *	Column-store delete and update.
  */
 static int
-__wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwrite)
+__wt_col_update(
+    SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwrite)
 {
 	BTREE *btree;
 	WT_PAGE *page;
@@ -88,8 +89,8 @@ __wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwr
 	case WT_PAGE_COL_VAR:
 		/* Allocate an update array if necessary. */
 		if (page->u.col_leaf.upd == NULL)
-			WT_ERR(
-			    __wt_calloc_def(session, page->indx_count, &new_upd));
+			WT_ERR(__wt_calloc_def(session,
+			    page->indx_count, &new_upd));
 
 		/* Allocate a WT_UPDATE structure and fill it in. */
 		WT_ERR(__wt_update_alloc(session, &upd, data));
@@ -105,7 +106,8 @@ __wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwr
 
 			/* workQ: schedule insert of the WT_UPDATE structure. */
 			__wt_rle_expand_update_serial(session, page,
-			    session->srch_write_gen, session->srch_exp, upd, ret);
+			    session->srch_write_gen, session->srch_exp,
+			    upd, ret);
 			break;
 		}
 							/* #3 */
@@ -124,7 +126,8 @@ __wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwr
 
 		/* Schedule the workQ to link in the WT_RLE_EXPAND structure. */
 		__wt_rle_expand_serial(session, page, session->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, session->srch_ip), new_rleexp, exp, ret);
+		    WT_COL_INDX_SLOT(page, session->srch_ip),
+		    new_rleexp, exp, ret);
 		break;
 	WT_ILLEGAL_FORMAT_ERR(btree, ret);
 	}
@@ -143,7 +146,8 @@ err:		if (exp != NULL)
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.col_leaf.upd)
-		__wt_free(session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
+		__wt_free(
+		    session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
 
 	WT_PAGE_OUT(session, page);
 

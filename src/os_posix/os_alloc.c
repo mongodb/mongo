@@ -289,7 +289,8 @@ __wt_mtrack_free(CONNECTION *conn)
  *	Track memory allocations and frees.
  */
 static void
-__wt_mtrack(SESSION *session, const void *f, const void *a, const char *file, int line)
+__wt_mtrack(
+    SESSION *session, const void *f, const void *a, const char *file, int line)
 {
 	WT_MEM *mp, *t, *mp_end;
 	WT_MTRACK *mtrack;

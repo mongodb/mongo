@@ -11,10 +11,14 @@
 static int __wt_err_delfmt(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eof(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eop(SESSION *, uint32_t, uint32_t);
-static int __wt_verify_dsk_col_fix(SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
-static int __wt_verify_dsk_col_int(SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
-static int __wt_verify_dsk_col_rle(SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
-static int __wt_verify_dsk_item(SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_fix(
+    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_int(
+    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_col_rle(
+    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
+static int __wt_verify_dsk_item(
+    SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 
 /*
  * __wt_verify_dsk_page --
@@ -312,8 +316,8 @@ item_len:			__wt_errx(session,
 		}
 
 		if (__wt_key_process(rip)) {
-			WT_RET(
-			    __wt_item_process(session, rip->key, current->scratch));
+			WT_RET(__wt_item_process(
+			    session, rip->key, current->scratch));
 			current->dbt = &current->scratch->item;
 		} else
 			current->dbt = (WT_ITEM *)rip;
@@ -353,7 +357,8 @@ err:	if (_a.scratch != NULL)
  *	Walk a WT_PAGE_COL_INT disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_int(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_verify_dsk_col_int(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	BTREE *btree;
 	WT_OFF_RECORD *off_record;
@@ -385,7 +390,8 @@ __wt_verify_dsk_col_int(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint
  *	Walk a WT_PAGE_COL_FIX disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_fix(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_verify_dsk_col_fix(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	BTREE *btree;
 	u_int len;
@@ -425,7 +431,8 @@ delfmt:	return (__wt_err_delfmt(session, entry_num, addr));
  *	Walk a WT_PAGE_COL_RLE disk page and verify it.
  */
 static int
-__wt_verify_dsk_col_rle(SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
+__wt_verify_dsk_col_rle(
+    SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	BTREE *btree;
 	u_int len;

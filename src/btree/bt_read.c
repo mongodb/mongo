@@ -152,7 +152,8 @@ __wt_cache_read_server(void *arg)
 				ret = __wt_cache_read(rr);
 
 				WT_READ_REQ_CLR(rr);
-				__wt_session_serialize_wrapup(session, NULL, ret);
+				__wt_session_serialize_wrapup(
+				    session, NULL, ret);
 
 				didwork = 1;
 
@@ -218,8 +219,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 
 	/* Read the page. */
-	WT_VERBOSE(S2C(session), WT_VERB_READ,
-	    (session, "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
+	WT_VERBOSE(S2C(session), WT_VERB_READ, (session,
+	    "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
 
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 	WT_CACHE_PAGE_IN(cache, size);

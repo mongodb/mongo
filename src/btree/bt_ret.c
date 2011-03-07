@@ -49,13 +49,14 @@ __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	 * the items into the application's WT_DATAITEMs.
 	 *
 	 * If the key/value item are uninstantiated overflow and/or compressed
-	 * items, they require processing before being copied into the WT_DATAITEMs.
-	 * Don't allocate WT_INDX memory for key/value items here.  (We never
-	 * allocate WT_INDX memory for data items.   We do allocate WT_INDX
-	 * memory for keys, but if we are looking at a key only to return it,
-	 * it's not that likely to be accessed again (think of a cursor moving
-	 * through the tree).  Use memory in the application's WT_ITEM instead, it
-	 * is discarded when the SESSION is discarded.
+	 * items, they require processing before being copied into the
+	 * WT_DATAITEMs.  Don't allocate WT_INDX memory for key/value items
+	 * here.  (We never allocate WT_INDX memory for data items.   We do
+	 * allocate WT_INDX memory for keys, but if we are looking at a key
+	 * only to return it, it's not that likely to be accessed again (think
+	 * of a cursor moving through the tree).  Use memory in the
+	 * application's WT_ITEM instead, it is discarded when the SESSION is
+	 * discarded.
 	 *
 	 * Key return implies a reference to a WT_ROW index (we don't return
 	 * record number keys yet, that will probably change when I add cursor
@@ -63,7 +64,8 @@ __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_item_process(session, rip->key, &session->key));
+			WT_RET(__wt_item_process(
+			    session, rip->key, &session->key));
 
 			*key = session->key.item;
 		} else if (callback == NULL) {
@@ -116,7 +118,8 @@ item_set:	switch (WT_CELL_TYPE(item)) {
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_RET(__wt_item_process(session, item, &session->value));
+			WT_RET(__wt_item_process(
+			    session, item, &session->value));
 			value_ret = session->value.item.data;
 			size_ret = session->value.item.size;
 			break;
@@ -139,7 +142,8 @@ item_set:	switch (WT_CELL_TYPE(item)) {
 		 * WT_ITEM (potentially done by __wt_item_process), do so now.
 		 */
 		if (value_ret != session->value.item.data) {
-			WT_RET(__wt_buf_grow(session, &session->value, size_ret));
+			WT_RET(__wt_buf_grow(
+			    session, &session->value, size_ret));
 			memcpy(session->value.mem, value_ret, size_ret);
 		}
 

@@ -66,7 +66,8 @@ err:		if (upd != NULL)
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.row_leaf.upd)
-		__wt_free(session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
+		__wt_free(
+		    session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
 
 	WT_PAGE_OUT(session, page);
 
