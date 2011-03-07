@@ -507,9 +507,7 @@ namespace mongo {
             }
 
             // step 4
-            // TODO: this step needs to be clean up.
             dblock setShardVersionLock; // TODO: can we get rid of this??
-            Client::Context cx( ns );
             
             if ( oldVersion > 0 && globalVersion == 0 ) {
                 // this had been reset
