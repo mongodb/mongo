@@ -214,11 +214,15 @@ __wt_rec_helper_init(WT_TOC *toc, WT_PAGE *page, uint32_t max,
 		 *
 		 * The calculation is actually +1, because we save the start
 		 * point one past the current entry -- make it +5 because I
-		 * don't want to debug any off-by-ones.
+		 * don't want to debug the off-by-ones.
 		 */
 		if (r->s_entries < r->split_count + 5) {
-			WT_RET(__wt_realloc(env, NULL,
-			    (r->split_count + 5) * sizeof(*r->save), &r->save));
+			if (r->save != NULL)
+				__wt_free(env,
+				    r->save, r->s_entries * sizeof(*r->save));
+			r->s_entries = 0;
+			WT_RET(
+			    __wt_calloc_def(env, r->split_count + 5, &r->save));
 			r->s_entries = r->split_count + 5;
 		}
 	}
@@ -486,11 +490,11 @@ __wt_rec_helper_write(WT_TOC *toc, int deleted, WT_PAGE_DISK *dsk, void *end)
 
 	/* Save the addr/size/recno triplet to update the parent. */
 	if (r->l_next == r->l_entries) {
-		WT_RET(__wt_realloc(env, NULL,
+		WT_RET(__wt_realloc(env, &r->l_allocated,
 		    (r->l_entries + 20) * sizeof(*r->list), &r->list));
 		r->l_entries += 20;
 	}
-	r_list = r->list + r->l_next++;
+	r_list = &r->list[r->l_next++];
 	r_list->off.addr = addr;
 	r_list->off.size = size;
 	WT_RECNO(&r_list->off) = dsk->recno;
@@ -1446,6 +1450,7 @@ __wt_rec_col_split(WT_TOC *toc, uint32_t *addrp, uint32_t *sizep)
 	WT_OFF_RECORD *off;
 	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
+	struct rec_list *r_list;
 	uint32_t addr, i, size;
 	uint8_t *first_free;
 	int ret;
@@ -1461,21 +1466,27 @@ __wt_rec_col_split(WT_TOC *toc, uint32_t *addrp, uint32_t *sizep)
 	    WT_PAGE_DISK_SIZE + (r->l_next - 1) * sizeof(WT_OFF_RECORD),
 	    db->allocsize);
 	WT_ERR(__wt_scr_alloc(toc, size, &tmp));
+
+	r_list = r->list;
+
 	dsk = tmp->data;
-
-	for (i = 0, first_free = WT_PAGE_DISK_BYTE(dsk);
-	    i < r->l_next; ++i, first_free += sizeof(WT_OFF_RECORD)) {
-		off = &r->list[i].off;
-		memcpy(first_free, off, sizeof(WT_OFF_RECORD));
-
-		WT_VERBOSE(env, WT_VERB_EVICT, (env,
-		    "split: %lu (%luB)",
-		    (u_long)off->addr, (u_long)off->size));
-	}
-	dsk->recno = WT_RECNO(&r->list[0].off);
+	WT_CLEAR(*dsk);
+	dsk->recno = WT_RECNO(&r_list->off);
 	dsk->lsn_file = dsk->lsn_off = 0;
 	dsk->u.entries = r->l_next;
 	dsk->type = WT_PAGE_COL_INT;
+
+	first_free = WT_PAGE_DISK_BYTE(dsk);
+	for (i = 0; i < r->l_next; ++i, ++r_list) {
+		off = &r_list->off;
+		memcpy(first_free, off, sizeof(WT_OFF_RECORD));
+		first_free += sizeof(WT_OFF_RECORD);
+
+		WT_VERBOSE(env, WT_VERB_EVICT, (env,
+		    "split: %lu (%luB), starting record %llu",
+		    (u_long)off->addr, (u_long)off->size,
+		    (unsigned long long)WT_RECNO(&r_list->off)));
+	}
 
 	/*
 	 * Set the disk block size and clear trailing bytes.

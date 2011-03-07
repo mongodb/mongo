@@ -14,7 +14,7 @@
 int
 __wt_scr_alloc(WT_TOC *toc, uint32_t size, DBT **dbtp)
 {
-	DBT *scratch;
+	DBT *available, *scratch;
 	ENV *env;
 	uint32_t allocated;
 	u_int i;
@@ -30,22 +30,38 @@ __wt_scr_alloc(WT_TOC *toc, uint32_t size, DBT **dbtp)
 	 * have to have functions that do variable-length allocation on DBTs.
 	 * Scratch buffers are allocated only by a single thread of control, so
 	 * no locking is necessary.
+	 *
+	 * Walk the list, looking for a buffer we can use.
 	 */
-	for (i = 0,
+	for (i = 0, available = NULL,
 	    scratch = toc->scratch; i < toc->scratch_alloc; ++i, ++scratch)
 		if (!F_ISSET(scratch, WT_SCRATCH_INUSE)) {
-			*dbtp = scratch;
-			F_SET(scratch, WT_SCRATCH_INUSE);
-
-			/*
-			 * If the caller has a minimum size, grow the scratch
-			 * buffer as necessary.
-			 */
-			if (size != 0 && scratch->mem_size < size)
-				WT_RET(__wt_realloc(env,
-				    &scratch->mem_size, size, &scratch->data));
-			return (0);
+			if (size == 0 || scratch->mem_size >= size) {
+				*dbtp = scratch;
+				F_SET(scratch, WT_SCRATCH_INUSE);
+				return (0);
+			}
+			available = scratch;
 		}
+
+	/*
+	 * If available set, we found a slot but it wasn't large enough.
+	 * Free any existing memory, and allocate something large enough.
+	 */
+	if (available != NULL) {
+		scratch = available;
+		if (scratch->data != NULL) {
+			__wt_free(env, scratch->data, scratch->mem_size);
+			scratch->data = NULL;
+			scratch->mem_size = 0;
+		}
+		WT_RET(
+		    __wt_calloc(env, size, sizeof(uint8_t), &scratch->data));
+		scratch->mem_size = size;
+		*dbtp = scratch;
+		F_SET(scratch, WT_SCRATCH_INUSE);
+		return (0);
+	}
 
 	/* Resize the array, we need more scratch buffers. */
 	allocated = toc->scratch_alloc * WT_SIZEOF32(DBT);

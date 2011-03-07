@@ -82,12 +82,7 @@ __wt_realloc_func(ENV *env,
 
 	p = *(void **)retp;
 
-	/*
-	 * Sometimes we're allocating memory and we don't care about the
-	 * final length -- bytes_allocated_ret may be NULL.
-	 */
-	bytes_allocated =
-	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
+	bytes_allocated = *bytes_allocated_ret;
 	WT_ASSERT(env, bytes_allocated < bytes_to_allocate);
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL) {

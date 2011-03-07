@@ -50,8 +50,9 @@ typedef struct {
 
 		int	 deleted;		/* Page deleted */
 	} *list;
-	u_int l_next;				/* Next list slot */
-	u_int l_entries;			/* Total list slots */
+	u_int	 l_next;			/* Next list slot */
+	u_int	 l_entries;			/* Total list slots */
+	uint32_t l_allocated;			/* Bytes allocated */
 
 	/*
 	 * Reconciliation splits to a smaller-than-maximum page size when a
