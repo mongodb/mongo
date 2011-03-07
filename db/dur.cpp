@@ -231,12 +231,14 @@ namespace mongo {
             return p;
         }
 
-        void DurableImpl::commitIfNeeded() {
+        bool DurableImpl::commitIfNeeded() {
             DEV commitJob._nSinceCommitIfNeededCall = 0;
             if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
                 stats.curr->_earlyCommits++;
                 groupCommit();
+                return true;
             }
+            return false;
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
