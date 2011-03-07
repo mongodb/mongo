@@ -77,8 +77,11 @@ namespace mongo {
     }
     BSONArray versionArray(){
         static BSONArray out;
-        if (out.isEmpty())
-            out = _versionArray(versionString);
+        if (out.isEmpty()) {
+            BSONArray tmp = _versionArray(versionString);
+            out = tmp;
+            return tmp;
+        }
         return out;
     }
 
@@ -208,6 +211,8 @@ namespace mongo {
             assert( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
             assert( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
             assert( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
+
+            versionArray(); // make sure we work on current versionString
 
             log(1) << "versionArrayTest passed" << endl;
         }
