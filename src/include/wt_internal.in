@@ -68,9 +68,6 @@ struct __wt_update;		typedef struct __wt_update WT_UPDATE;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
-#include "scratch.h"
-#include "cur_std.h"
-
 #include "walk.h"
 #include "btree.h"
 #include "mem.h"

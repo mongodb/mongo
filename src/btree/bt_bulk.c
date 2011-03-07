@@ -379,15 +379,15 @@ err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
 }
 
 int
-__wt_bulk_init(ICURSOR_BULK *cbulk)
+__wt_bulk_init(CURSOR_BULK *cbulk)
 {
 	BTREE *btree;
 	SESSION *session;
 	uint32_t addr;
 	int is_column;
 
-	btree = cbulk->ctable.btree;
-	session = (SESSION *)cbulk->ctable.cstd.iface.session;
+	btree = cbulk->cbt.btree;
+	session = (SESSION *)cbulk->cbt.iface.session;
 	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
 
 	session->btree = btree;
@@ -423,20 +423,20 @@ __wt_bulk_init(ICURSOR_BULK *cbulk)
  *	Db.bulk_load method for row or column-store variable-length file pages.
  */
 int
-__wt_bulk_var_insert(ICURSOR_BULK *cbulk)
+__wt_bulk_var_insert(CURSOR_BULK *cbulk)
 {
 	BTREE *btree;
 	SESSION *session;
-	WT_CURSOR_STD *cstd;
+	WT_CURSOR *cursor;
 	WT_ITEM *key, *value, key_copy, value_copy;
 	WT_CELL key_item, value_item;
 	WT_OVFL key_ovfl, value_ovfl;
 	uint32_t space_req;
 	int is_column;
 
-	cstd = &cbulk->ctable.cstd;
-	btree = cbulk->ctable.btree;
-	session = (SESSION *)cstd->iface.session;
+	cursor = &cbulk->cbt.iface;
+	btree = cbulk->cbt.btree;
+	session = (SESSION *)cursor->session;
 	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
 
 	WT_CLEAR(key_copy);
@@ -480,13 +480,13 @@ __wt_bulk_var_insert(ICURSOR_BULK *cbulk)
 	if (is_column)
 		key = NULL;
 	else {
-		key_copy = cstd->key.item;
+		key_copy = cursor->key.item;
 		key = &key_copy;
 	}
-	if (cstd->value.item.size == 0 && !is_column)
+	if (cursor->value.item.size == 0 && !is_column)
 		value = NULL;
 	else {
-		value_copy = cstd->value.item;
+		value_copy = cursor->value.item;
 		value = &value_copy;
 	}
 
@@ -560,14 +560,14 @@ __wt_bulk_var_insert(ICURSOR_BULK *cbulk)
 }
 
 int
-__wt_bulk_end(ICURSOR_BULK *cbulk)
+__wt_bulk_end(CURSOR_BULK *cbulk)
 {
 	BTREE *btree;
 	SESSION *session;
 	int ret;
 
-	btree = cbulk->ctable.btree;
-	session = (SESSION *)cbulk->ctable.cstd.iface.session;
+	btree = cbulk->cbt.btree;
+	session = (SESSION *)cbulk->cbt.iface.session;
 	ret = 0;
 
 	/* Promote a key from any partially-filled page and write it. */

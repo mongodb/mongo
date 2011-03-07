@@ -10,9 +10,9 @@
 static int
 __curbulk_insert(WT_CURSOR *cursor)
 {
-	ICURSOR_BULK *cbulk;
+	CURSOR_BULK *cbulk;
 
-	cbulk = (ICURSOR_BULK *)cursor;
+	cbulk = (CURSOR_BULK *)cursor;
 
 	/* TODO: check the state of the key/value pair. */
 
@@ -25,24 +25,24 @@ __curbulk_insert(WT_CURSOR *cursor)
 static int
 __curbulk_close(WT_CURSOR *cursor, const char *config)
 {
-	ICURSOR_BULK *cbulk;
+	CURSOR_BULK *cbulk;
 	int ret;
 
 	WT_UNUSED(config);
 
-	cbulk = (ICURSOR_BULK *)cursor;
+	cbulk = (CURSOR_BULK *)cursor;
 	ret = 0;
 
 	WT_TRET(__wt_bulk_end(cbulk));
-	WT_TRET(__wt_curstd_close(cursor, config));
+	WT_TRET(__wt_cursor_close(cursor, config));
 
 	return (ret);
 }
 
 int
-__wt_curbulk_init(ICURSOR_BULK *cbulk)
+__wt_curbulk_init(CURSOR_BULK *cbulk)
 {
-	WT_CURSOR *c = &cbulk->ctable.cstd.iface;
+	WT_CURSOR *c = &cbulk->cbt.iface;
 
 	c->insert = __curbulk_insert;
 	c->close = __curbulk_close;

@@ -24,16 +24,16 @@ __wt_config_init(WT_CONFIG *conf, const char *str, size_t len);
 int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 int
-__wt_curbulk_init(ICURSOR_BULK *cbulk);
-void
-__wt_curdump_init(WT_CURSOR_STD *stdc);
-int
-__wt_curstd_close(WT_CURSOR *cursor, const char *config);
-void
-__wt_curstd_init(WT_CURSOR_STD *cstd);
-int
-__wt_curtable_open(SESSION *session,
+__wt_cursor_open(SESSION *session,
     const char *uri, const char *config, WT_CURSOR **cursorp);
+int
+__wt_curbulk_init(CURSOR_BULK *cbulk);
+void
+__wt_curdump_init(WT_CURSOR *cursor);
+int
+__wt_cursor_close(WT_CURSOR *cursor, const char *config);
+void
+__wt_cursor_init(WT_CURSOR *cursor);
 int
 __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size);
 int
@@ -49,11 +49,11 @@ __wt_btree_bulk_load(SESSION *session,
     void (*f)(const char *, uint64_t),
     int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **));
 int
-__wt_bulk_init(ICURSOR_BULK *cbulk);
+__wt_bulk_init(CURSOR_BULK *cbulk);
 int
-__wt_bulk_var_insert(ICURSOR_BULK *cbulk);
+__wt_bulk_var_insert(CURSOR_BULK *cbulk);
 int
-__wt_bulk_end(ICURSOR_BULK *cbulk);
+__wt_bulk_end(CURSOR_BULK *cbulk);
 int
 __wt_item_build_value(SESSION *session,
     WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl);
@@ -71,6 +71,22 @@ __wt_bt_lex_compare(
 int
 __wt_bt_int_compare(
     BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item);
+int
+__wt_btcur_first(CURSOR_BTREE *cbt);
+int
+__wt_btcur_next(CURSOR_BTREE *cbt);
+int
+__wt_btcur_prev(CURSOR_BTREE *cbt);
+int
+__wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact);
+int
+__wt_btcur_insert(CURSOR_BTREE *cbt);
+int
+__wt_btcur_update(CURSOR_BTREE *cbt);
+int
+__wt_btcur_del(CURSOR_BTREE *cbt);
+int
+__wt_btcur_close(CURSOR_BTREE *cbt, const char *config);
 int
 __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp);
 int

@@ -13,7 +13,7 @@ struct __connection;		typedef struct __connection CONNECTION;
 struct __session;		typedef struct __session SESSION;
 
 typedef struct {
-	WT_CURSOR_STD cstd;
+	WT_CURSOR iface;
 
 	BTREE *btree;
 	WT_WALK walk;
@@ -22,7 +22,7 @@ typedef struct {
 	WT_ROW *rip;
 	WT_BUF *key_tmp, *value_tmp;
 	uint32_t nitems;
-} ICURSOR_TABLE;
+} CURSOR_BTREE;
 
 /*
  * WT_STACK --
@@ -44,7 +44,7 @@ typedef struct {
 } WT_STACK;
 
 typedef struct {
-	ICURSOR_TABLE ctable;
+	CURSOR_BTREE cbt;
 
 	WT_BUF *tmp;
 	WT_PAGE *page;
@@ -52,7 +52,7 @@ typedef struct {
 	uint64_t insert_cnt;
 	uint32_t space_avail;
 	uint8_t *first_free;
-} ICURSOR_BULK;
+} CURSOR_BULK;
 
 struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
@@ -214,7 +214,7 @@ struct __session {
 	WT_ERROR_HANDLER *error_handler;
 
 	TAILQ_ENTRY(__session) q;
-	TAILQ_HEAD(__cursors, WT_CURSOR_STD) cursors;
+	TAILQ_HEAD(__cursors, WT_CURSOR) cursors;
 
 	TAILQ_HEAD(__btrees, __btree) btrees;
 

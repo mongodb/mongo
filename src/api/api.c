@@ -13,7 +13,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
-	WT_CURSOR_STD *cstd;
+	WT_CURSOR *cursor;
 	int ret;
 
 	printf("WT_SESSION->close\n");
@@ -21,8 +21,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	session = (SESSION *)wt_session;
 	ret = 0;
 
-	while ((cstd = TAILQ_FIRST(&session->cursors)) != NULL)
-		WT_TRET(cstd->iface.close(&cstd->iface, config));
+	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
+		WT_TRET(cursor->close(cursor, config));
 
 	while ((btree = TAILQ_FIRST(&session->btrees)) != NULL) {
 		TAILQ_REMOVE(&session->btrees, btree, q);
@@ -47,7 +47,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 	session = (SESSION *)wt_session;
 
 	if (strncmp(uri, "table:", 6) == 0)
-		return (__wt_curtable_open(session, uri, config, cursorp));
+		return (__wt_cursor_open(session, uri, config, cursorp));
 
 	__wt_err(session, 0, "Unknown cursor type '%s'\n", uri);
 	return (EINVAL);
