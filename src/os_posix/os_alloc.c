@@ -223,13 +223,11 @@ __wt_free_overwrite(uint8_t *m, size_t mlen, const char *file, int line)
 	lline = (size_t)snprintf(lbuf, sizeof(lbuf), "/%d", line);
 
 	/* Repeatedly copy the file/line information into the free'd memory. */
-	while (mlen >= lfile + lline) {
+	for (; mlen >= lfile + lline; mlen -= (lfile + lline)) {
 		memcpy(m, p, lfile);
 		m += lfile;
-		mlen -= lfile;
 		memcpy(m, lbuf, lline);
 		m += lline;
-		mlen -= lline;
 	}
 	for (; mlen > 0; --mlen)
 		*m++ = WT_DEBUG_BYTE;
