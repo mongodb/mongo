@@ -56,6 +56,10 @@ namespace mongo {
         assert( a );
         while( 1 ) {
             a *= 2;
+            DEV if( a > 256*1024*1024 ) { 
+                log() << "dur AlignedBuilder too big, aborting in _DEBUG build" << endl;
+                abort();
+            }
             wassert( a <= 256*1024*1024 );
             assert( a <= 512*1024*1024 );
             if( _len < a )
