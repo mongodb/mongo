@@ -306,7 +306,7 @@ if has_option( "full" ):
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp  db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/projection.cpp shell/mongo.cpp db/security_key.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" , 
+commonFiles += [ "util/background.cpp" , "util/sock.cpp" ,  "util/util.cpp" , "util/file_allocator.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/log.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
                  "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
@@ -316,18 +316,21 @@ commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_r
 
 #mmap stuff
 
-if has_option( "mm" ):
-    commonFiles += [ "util/mmap_mm.cpp" ]
-elif os.sys.platform == "win32":
-    commonFiles += [ "util/mmap_win.cpp" ]
-else:
-    commonFiles += [ "util/mmap_posix.cpp" ]
-
 coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/message_server_port.cpp" , 
                     "client/parallel.cpp" ,  
                     "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
+
+coreServerFiles += [ "util/mmap.cpp" ]
+
+if has_option( "mm" ):
+    coreServerFiles += [ "util/mmap_mm.cpp" ]
+elif os.sys.platform == "win32":
+    coreServerFiles += [ "util/mmap_win.cpp" ]
+else:
+    coreServerFiles += [ "util/mmap_posix.cpp" ]
+
 
 processInfoFiles = [ "util/processinfo.cpp" ]
 
@@ -1144,12 +1147,17 @@ clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest
 mongosniff_built = False
 if darwin or clientEnv["_HAVEPCAP"]:
     mongosniff_built = True
-    sniffEnv = clientEnv.Clone()
+    sniffEnv = env.Clone()
     sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
+
     if not windows:
         sniffEnv.Append( LIBS=[ "pcap" ] )
     else:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
+
+    sniffEnv.Prepend( LIBPATH=["."] )
+    sniffEnv.Append( LIBS=[ "mongotestfiles" ] )
+
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
 # --- shell ---

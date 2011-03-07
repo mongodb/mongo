@@ -69,6 +69,11 @@ using mongo::DBClientConnection;
 using mongo::QueryResult;
 using mongo::MemoryMappedFile;
 
+mongo::CmdLine mongo::cmdLine;
+namespace mongo {
+    void setupSignals( bool inFork ){}
+}
+
 #define SNAP_LEN 65535
 
 int captureHeaderSize;
