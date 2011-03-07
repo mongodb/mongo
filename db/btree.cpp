@@ -1740,8 +1740,7 @@ namespace mongo {
     }
 
     void BtreeBuilder::mayCommitProgressDurably() {
-        RARELY {
-            getDur().commitIfNeeded();
+        if ( getDur().commitIfNeeded() ) {
             b = cur.btreemod();
         }
     }
@@ -1790,8 +1789,7 @@ namespace mongo {
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
-                RARELY {
-                    getDur().commitIfNeeded();
+                if ( getDur().commitIfNeeded() ) {
                     b = cur.btreemod();
                     up = upLoc.btreemod();
                 }
@@ -1848,7 +1846,7 @@ namespace mongo {
                     string ns = idx.indexNamespace();
                     theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
                     x = next;
-                    RARELY getDur().commitIfNeeded();
+                    getDur().commitIfNeeded();
                 }
                 assert( idx.head.isNull() );
                 log(2) << "done rollback" << endl;
