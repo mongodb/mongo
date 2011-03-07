@@ -20,6 +20,7 @@
 #include "processinfo.h"
 #include "concurrency/rwlock.h"
 #include "../db/namespace.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
 
@@ -173,6 +174,8 @@ namespace mongo {
 
 #if defined(_DEBUG)
     void MongoFile::markAllWritable() {
+      if( cmdLine.dur )
+	return;
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
@@ -181,6 +184,8 @@ namespace mongo {
     }
 
     void MongoFile::unmarkAllWritable() {
+      if( cmdLine.dur )
+	return;
         rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
