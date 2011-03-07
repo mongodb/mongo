@@ -19,13 +19,12 @@
 #include "mmap.h"
 #include "file_allocator.h"
 #include "../db/concurrency.h"
-
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include "../util/processinfo.h"
 #include "mongoutils/str.h"
 using namespace mongoutils;
 
@@ -146,6 +145,7 @@ namespace mongo {
             int err = errno;
             error()  << "13601 Couldn't remap private view: " << errnoWithDescription(err) << endl;
             log() << "aborting" << endl;
+            printMemInfo();
             abort();
         }
         assert( x == oldPrivateAddr );

@@ -44,3 +44,5 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
 else {
     print( "skipping big_object1 b/c not 64-bit" )
 }
+
+print("SUCCESS");
