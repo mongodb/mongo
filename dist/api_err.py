@@ -33,7 +33,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 		# -31,999.
 		v = -31800
 		for name, msg in list:
-			tfile.write('/*! %s. */\n' % msg)
+			tfile.write('/*! %s. */\n' % (msg[0].upper() + msg[1:]))
 			tfile.write('#define\t%s\t%d\n' % (name, v))
 			v -= 1
 		tfile.write('/*\n')

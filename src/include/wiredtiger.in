@@ -406,14 +406,14 @@ struct WT_SESSION {
 	 *
 	 * These are some of the common builtin cursor types:
 	 *   <table>
-	 *   \hrow{URI, Function}
-	 *   \row{<tt>table:[\<tablename\>]</tt>, ordinary table cursor}
-	 *   \row{<tt>column:[\<tablename\>.\<columnname\>]</tt>, column cursor}
-	 *   \row{<tt>config:[table:\<tablename\>]</tt>,
+	 *   @hrow{URI, Function}
+	 *   @row{<tt>table:[\<tablename\>]</tt>, ordinary table cursor}
+	 *   @row{<tt>column:[\<tablename\>.\<columnname\>]</tt>, column cursor}
+	 *   @row{<tt>config:[table:\<tablename\>]</tt>,
 	 *   		database or table configuration}
-	 *   \row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
+	 *   @row{<tt>join:\<cursor1\>&\<cursor2\>[&\<cursor3\>...]</tt>,
 	 *   		Join the contents of multiple cursors together.}
-	 *   \row{<tt>statistics:[table:\<tablename\>]</tt>,
+	 *   @row{<tt>statistics:[table:\<tablename\>]</tt>,
 	 *   		database or table statistics
 	 *   		(key=(string)keyname\, data=(int64_t)value)}
 	 *   </table>
@@ -962,19 +962,19 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * DO NOT EDIT: automatically built by dist/api_err.py.
  * Error return section: BEGIN
  */
-/*! conflict with concurrent operation. */
+/*! Conflict with concurrent operation. */
 #define	WT_DEADLOCK	-31800
-/*! non-specific WiredTiger error. */
+/*! Non-specific WiredTiger error. */
 #define	WT_ERROR	-31801
-/*! item not found. */
+/*! Item not found. */
 #define	WT_NOTFOUND	-31802
-/*! requested page was deleted. */
+/*! Requested page was deleted. */
 #define	WT_PAGE_DELETED	-31803
-/*! attempt to modify a read-only value. */
+/*! Attempt to modify a read-only value. */
 #define	WT_READONLY	-31804
-/*! restart the operation (internal). */
+/*! Restart the operation (internal). */
 #define	WT_RESTART	-31805
-/*! buffer too small. */
+/*! Buffer too small. */
 #define	WT_TOOSMALL	-31806
 /*
  * Error return section: END
