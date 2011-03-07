@@ -8,7 +8,7 @@ test = new SyncCCTest( "sync6", { logpath : "/dev/null" } )
 
 // Startup another process to handle our commands to the cluster, mostly so it's 
 // easier to read.
-var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, { logpath : "/dev/null" } )//{verbose : ""} )
+var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {})//{ logpath : "/dev/null" } )//{verbose : ""} )
 // { logpath : "/data/db/syncCommander/mongod.log" } );
 
 // Have lots of threads, so use larger i
