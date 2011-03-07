@@ -9,7 +9,7 @@
 #include "bt_inline.c"
 
 static int __wt_rec_XXX_update(WT_TOC *, WT_PAGE *);
-static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *, WT_PAGE *);
+static int __wt_rec_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_int(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_col_split(WT_TOC *, uint32_t *, uint32_t *);
@@ -152,7 +152,7 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_rec_col_fix(toc, page, new));
+		WT_ERR(__wt_rec_col_fix(toc, page));
 		break;
 	case WT_PAGE_COL_RLE:
 		WT_ERR(__wt_rec_col_rle(toc, page, new));
@@ -173,11 +173,11 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	}
 
 	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 		/* Write the new page to disk. */
 		WT_ERR(__wt_rec_page_write(toc, page, new));
 		break;
+	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
@@ -633,37 +633,44 @@ __wt_rec_col_int(WT_TOC *toc, WT_PAGE *page)
  *	run-length encoding).
  */
 static int
-__wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
+__wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	DBT *tmp;
-	ENV *env;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
-	uint32_t i, len, space_avail;
+	uint64_t unused;
+	uint32_t entries, i, len, space_avail;
 	uint8_t *data, *first_free;
-	int ret;
 	void *cipdata;
+	int ret;
 
 	db = toc->db;
 	tmp = NULL;
-	env = toc->env;
-	dsk = new->dsk;
+	dsk = page->dsk;
 	ret = 0;
 
-	__wt_init_ff_and_sa(new, &first_free, &space_avail);
-
 	/*
-	 * We need a "deleted" data item to store on the page.  Make sure the
-	 * WT_TOC's scratch buffer is big enough.  Clear the buffer's contents
-	 * and set the delete flag.
+	 * We need a "deleted" data item to store on the page; get a scratch
+	 * buffer, clear the contents and set the delete flag.
 	 */
 	len = db->fixed_len;
 	WT_ERR(__wt_scr_alloc(toc, len, &tmp));
 	memset(tmp->data, 0, len);
 	WT_FIX_DELETE_SET(tmp->data);
 
+	/*
+	 * Fixed-size pages can't split, but we use the underlying helper
+	 * functions because they don't add much overhead, and it's better
+	 * if all the reconciliation functions look the same.
+	 */
+	unused = page->dsk->recno;
+	entries = 0;
+	WT_ERR(__wt_rec_helper_init(
+	    toc, page, toc->db->leafmax, &unused, &first_free, &space_avail));
+
+	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(dsk, cip);
 
@@ -686,16 +693,15 @@ __wt_rec_col_fix(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
 		 * run-length encoding, the on-page information can't change
 		 * size -- there's no reason to ever split such a page.
 		 */
-		WT_ASSERT(env, len <= space_avail);
-
 		memcpy(first_free, data, len);
 		first_free += len;
 		space_avail -= len;
-		++dsk->u.entries;
+		++entries;
 	}
 
-	/* Set the disk block size and clear trailing bytes. */
-	new->size = __wt_allocation_size(toc, dsk, first_free);
+	/* Write the remnant page. */
+	ret = __wt_rec_helper(
+	    toc, &unused, &entries, &first_free, &space_avail, 1);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
