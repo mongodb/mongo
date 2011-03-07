@@ -87,7 +87,10 @@ __wt_cache_destroy(ENV *env)
 	reclist = &cache->reclist;
 	if (reclist->list != NULL)
 		__wt_free(env,
-		    reclist->list, reclist->entries * sizeof(reclist->list));
+		    reclist->list, reclist->l_entries * sizeof(*reclist->list));
+	if (reclist->save != NULL)
+		__wt_free(env,
+		    reclist->save, reclist->s_entries * sizeof(*reclist->save));
 	__wt_free(env, cache->stats, 0);
 	__wt_free(env, ienv->cache, sizeof(WT_CACHE));
 

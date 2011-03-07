@@ -23,18 +23,22 @@ struct __wt_evict_list {
 
 /*
  * WT_REC_LIST --
- *	List of pages created from a single page reconciliation.
- *
- * Each reconciliation function writes out some number of pages, normally one,
- * occasionally more than one, and returns to its caller a list of addr/size
- * pairs for the newly-written pages.  That list is used to update the parent's
- * references.  There's something hugely wrong if this list is ever longer than
- * a few pages, that would make no sense at all (well, maybe, in a long-running
- * system, an internal page might acquire that many entries!?)  Dynamically
- * allocated just in case.
+ *	Information tracking a single page reconciliation.
  */
 typedef struct {
-	struct {
+	DBT *tmp;				/* Temporary space */
+
+	/*
+	 * Each reconciliation function writes out some number of pages,
+	 * normally one, occasionally more than one, and returns to its
+	 * caller a list of addr/size pairs for the newly-written pages.
+	 * That list is used to update the parent's references.  There's
+	 * something hugely wrong if this list is ever longer than a few
+	 * pages, that would make no sense at all (maybe, in a long-running
+	 * system, an internal page might acquire that many entries!?)
+	 * Dynamically allocated just in case.
+	 */
+	struct rec_list {
 		WT_OFF_RECORD off;		/* Address, size, recno */
 
 		/*
@@ -46,8 +50,54 @@ typedef struct {
 
 		int	 deleted;		/* Page deleted */
 	} *list;
-	u_int next;				/* Next slot */
-	u_int entries;				/* Total slots */
+	u_int l_next;				/* Next list slot */
+	u_int l_entries;			/* Total list slots */
+
+	/*
+	 * Reconciliation splits to a smaller-than-maximum page size when a
+	 * split is required so that we don't repeatedly split a packed page.
+	 *
+	 * page_size is the number of bytes in the maximum page size.
+	 * split_page_size is the page size of the split chunk.
+	 */
+	uint32_t page_size;			/* Maximum page size */
+	uint32_t split_page_size;		/* Split page size */
+
+	/*
+	 * Instead of checking sizes all the time, we count down the number of
+	 * times we'll approach a split boundary before we've gone to the end
+	 * of the maximum page size.
+	 *
+	 * split_avail is the number of bytes available for each split chunk.
+	 * split_count: count down to split
+	 */
+	uint32_t split_avail;			/* Split bytes available */
+	uint32_t split_count;			/* Number of boundaries */
+
+	/*
+	 * We track the total number of entries in split chunks so we can
+	 * easily figure out how many entries in the newest split chunk.
+	 */
+	uint32_t total_split_entries;		/* Total entries in splits */
+
+	/*
+	 * To keep from having to start building the page over when we reach
+	 * the maximum page size, track the page information when we approach
+	 * each split boundary.
+	 */
+	struct rec_save {
+		uint64_t recno;			/* Split's starting record */
+		uint32_t entries;		/* Split's entries */
+
+		/*
+		 * Start is the first byte in the split chunk; the difference
+		 * between the next slot's first byte and this slot's first
+		 * byte is the length of the split chunk.
+		 */
+		uint8_t *start;			/* Split's first byte */
+	} *save;
+	u_int s_next;				/* Next save slot */
+	u_int s_entries;			/* Total save slots */
 } WT_REC_LIST;
 
 /*
