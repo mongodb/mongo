@@ -11,8 +11,9 @@ typedef struct {
 	u_int8_t	 type_mask;		/* File type mask */
 
 #define	C_BOOL		0x01			/* Value is a boolean, yes/no if roll 1 between 1 and N. */
-#define	C_FIXED		0x02			/* Value was set from command-line or file, ignore for this run. */
-#define	C_IGNORE	0x04			/* Not a simple randomization, handle outside the main loop. */ 
+#define	C_IGNORE	0x02			/* Not a simple randomization, handle outside the main loop. */ 
+#define	C_PERM		0x04			/* Value was set from command-line or file, ignore for this run. */
+#define	C_TEMP		0x08			/* Value was set from command-line or file, ignore for this run. */
 	u_int8_t	 flags;
 
 	u_int32_t	 min;			/* Minimum value */

@@ -95,7 +95,7 @@ void	 config_dump(int);
 void	 config_file(const char *);
 void	 config_names(void);
 void	 config_setup(void);
-void	 config_single(char *);
+void	 config_single(char *, int);
 void	 data_gen(DBT *, int);
 char	*fname(const char *);
 void	 key_gen(DBT *, u_int64_t);

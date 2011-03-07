@@ -10,6 +10,7 @@
 #include "wts.h"
 #include "config.h"
 
+static void	   config_clear(void);
 static CONFIG	  *config_find(const char *);
 static uint32_t	   config_translate(char *);
 
@@ -21,23 +22,57 @@ void
 config_setup(void)
 {
 	CONFIG *cp;
+	char buf[64];
 
 	/* Seed the random number generator. */
 	if (!g.replay)
 		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
+	/* Clear any temporary values. */
+	config_clear();
+
 	/* Pick a file type next, other items depend on it. */
 	cp = config_find("file_type");
-	if (!(cp->flags & C_FIXED))
-		switch (MMRAND(0, 2)) {
+	if (cp->flags & C_PERM) {
+		/*
+		 * If a file type was specified and it's fixed, but no repeat-
+		 * count was specified, go with RLE 50% of the time.
+		 */
+		if (g.c_file_type == FIX) {
+			cp = config_find("repeat_comp_pct");
+			if (!(cp->flags & C_PERM)) {
+				(void)snprintf(buf, sizeof(buf),
+				    "repeat_comp_pct=%d",
+				    MMRAND(0, 1) == 1 ? 0 : MMRAND(10, 90));
+				config_single(buf, 0);
+			}
+		}
+	} else
+		switch (MMRAND(0, 3)) {
 		case 0:
-			g.c_file_type = FIX;
+			(void)snprintf(buf, sizeof(buf), "file_type=flcs");
+			config_single(buf, 0);
+			(void)snprintf(buf, sizeof(buf), "repeat_comp_pct=0");
+			config_single(buf, 0);
 			break;
 		case 1:
-			g.c_file_type = VAR;
+			/*
+			 * 25% of the time go with RLE, which is fixed-length
+			 * and a repeat count.
+			 */
+			(void)snprintf(buf, sizeof(buf), "file_type=flcs");
+			config_single(buf, 0);
+			(void)snprintf(buf, sizeof(buf),
+			    "repeat_comp_pct=%d", MMRAND(10, 90));
+			config_single(buf, 0);
 			break;
 		case 2:
-			g.c_file_type = ROW;
+			(void)snprintf(buf, sizeof(buf), "file_type=vlcs");
+			config_single(buf, 0);
+			break;
+		case 3:
+			(void)snprintf(buf, sizeof(buf), "file_type=row");
+			config_single(buf, 0);
 			break;
 		}
 
@@ -46,7 +81,7 @@ config_setup(void)
 
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
-		if (cp->flags & (C_FIXED | C_IGNORE))
+		if (cp->flags & (C_IGNORE | C_PERM | C_TEMP))
 			continue;
 
 		*cp->v = CONF_RAND(cp);
@@ -148,17 +183,32 @@ config_file(const char *name)
 		*p = '\0';
 		if (buf[0] == '\0' || buf[0] == '#')
 			continue;
-		config_single(buf);
+		config_single(buf, 1);
 	}
 	(void)fclose(fp);
 }
+
+/*
+ * config_clear --
+ *	Clear per-run values.
+ */
+static void
+config_clear(void)
+{
+	CONFIG *cp;
+
+	/* Display configuration names. */
+	for (cp = c; cp->name != NULL; ++cp)
+		cp->flags &= ~C_TEMP;
+}
+
 
 /*
  * config_single --
  *	Set a single configuration structure value.
  */
 void
-config_single(char *s)
+config_single(char *s, int perm)
 {
 	CONFIG *cp;
 	char *vp;
@@ -171,7 +221,7 @@ config_single(char *s)
 	*vp++ = '\0';
 
 	cp = config_find(s);
-	cp->flags |= C_FIXED;
+	cp->flags |= perm ? C_PERM : C_TEMP;
 
 	*cp->v = config_translate(vp);
 	if (*cp->v < cp->min || *cp->v > cp->max) {

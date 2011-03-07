@@ -63,7 +63,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 	for (; *argv != NULL; ++argv)
-		config_single(*argv);
+		config_single(*argv, 1);
 
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
