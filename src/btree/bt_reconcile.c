@@ -15,7 +15,6 @@ static int __wt_rec_col_rle(WT_TOC *, WT_PAGE *);
 static int __wt_rec_col_split(WT_TOC *, uint32_t *, uint32_t *);
 static int __wt_rec_col_var(WT_TOC *, WT_PAGE *);
 static int __wt_rec_page_delete(WT_TOC *, WT_PAGE *);
-static int __wt_rec_page_write(WT_TOC *, WT_PAGE *, WT_PAGE *);
 static int __wt_rec_parent_update(WT_TOC *, WT_PAGE *, uint32_t, uint32_t);
 static int __wt_rec_row_int(WT_TOC *, WT_PAGE *);
 static int __wt_rec_row_leaf(WT_TOC *, WT_PAGE *);
@@ -76,15 +75,10 @@ int
 __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
-	DBT *tmp;
 	ENV *env;
-	WT_PAGE *new, _new;
 	WT_PAGE_DISK *dsk;
-	uint32_t max;
-	int ret;
 
 	db = toc->db;
-	tmp = NULL;
 	env = toc->env;
 	dsk = page->dsk;
 
@@ -94,34 +88,6 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_VERBOSE(env, WT_VERB_EVICT,
 	    (env, "reconcile addr %lu (page %p, type %s)",
 	    (u_long)page->addr, page, __wt_page_type_string(dsk)));
-
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
-		/*
-		 * Fixed-width pages without run-length encoding cannot change
-		 * size.
-		 */
-		max = page->size;
-		break;
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * Other leaf page types can grow, allocate the maximum leaf
-		 * page size.
-		 */
-		max = db->leafmax;
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		/*
-		 * All internal page types can grow, allocate the maximum
-		 * internal page size.
-		 */
-		max = db->intlmax;
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
 
 	/*
 	 * Update the disk generation before reading the page.  The workQ will
@@ -133,80 +99,32 @@ __wt_page_reconcile(WT_TOC *toc, WT_PAGE *page)
 	WT_PAGE_DISK_WRITE(page);
 	WT_MEMORY_FLUSH;
 
-	/*
-	 * Initialize a WT_PAGE page on the stack and allocate a scratch buffer
-	 * for its contents.  We use two pieces of memory because we want the
-	 * page contents to be aligned for direct I/O.  The WT_PAGE structure
-	 * is relatively small, the stack is fine.
-	 */
-	WT_CLEAR(_new);
-	new = &_new;
-	WT_ERR(__wt_scr_alloc(toc, max, &tmp));
-	new->addr = page->addr;
-	new->size = max;
-	new->dsk = tmp->data;
-	new->dsk->recno = dsk->recno;
-	new->dsk->lsn_file = dsk->lsn_file;
-	new->dsk->lsn_off = dsk->lsn_off;
-	new->dsk->type = dsk->type;
-
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_rec_col_fix(toc, page));
+		WT_RET(__wt_rec_col_fix(toc, page));
 		break;
 	case WT_PAGE_COL_RLE:
-		WT_ERR(__wt_rec_col_rle(toc, page));
+		WT_RET(__wt_rec_col_rle(toc, page));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__wt_rec_col_var(toc, page));
+		WT_RET(__wt_rec_col_var(toc, page));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_ERR(__wt_rec_col_int(toc, page));
+		WT_RET(__wt_rec_col_int(toc, page));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_rec_row_int(toc, page));
+		WT_RET(__wt_rec_row_int(toc, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_rec_row_leaf(toc, page));
+		WT_RET(__wt_rec_row_leaf(toc, page));
 		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	WT_ILLEGAL_FORMAT(db);
 	}
 
-	switch (dsk->type) {
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_rec_XXX_update(toc, page));
-		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
-	}
+	WT_RET(__wt_rec_XXX_update(toc, page));
 
 	/* Free the original disk page. */
-	WT_ERR(__wt_block_free(toc, page->addr, page->size));
-
-	/*
-	 * Update the backing address.
-	 *
-	 * XXX
-	 * This is more for diagnostic information than anything else, that is,
-	 * it changes the page's addr to match the parent page's WT_REF->addr.
-	 *
-	 * The parent's WT_REF->size may be different, that is, page->size is
-	 * the original page size at the original address and the size of the
-	 * page's buffer in memory, NOT the size of the newly written page at
-	 * the new address.   Do NOT update the size here, otherwise we could
-	 * no longer figure out if WT_ROW/WT_COL items reference on-page data
-	 * vs. allocated data.
-	 */
-	page->addr = new->addr;
-
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
-
-	return (ret);
+	return (__wt_block_free(toc, page->addr, page->size));
 }
 
 /*
@@ -1217,63 +1135,6 @@ __wt_rec_row_leaf(WT_TOC *toc, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__wt_rec_helper(
 	    toc, &unused, &entries, &first_free, &space_avail, 1));
-}
-
-/*
- * __wt_rec_page_write --
- *	Write a newly reconciled page.
- */
-static int
-__wt_rec_page_write(WT_TOC *toc, WT_PAGE *page, WT_PAGE *new)
-{
-	ENV *env;
-	int ret;
-
-	env = toc->env;
-
-	if (new->dsk->u.entries == 0) {
-		/*
-		 * We don't need to allocate file space or write the page if
-		 * the page has been emptied.
-		 */
-		WT_VERBOSE(env, WT_VERB_EVICT,
-		    (env, "reconcile delete page %lu, size %lu",
-		    (u_long)page->addr, (u_long)page->size));
-
-		WT_RET(__wt_rec_page_delete(toc, page));
-	} else {
-		WT_VERBOSE(env, WT_VERB_EVICT,
-		    (env, "reconcile move %lu to %lu, resize %lu to %lu",
-		    (u_long)page->addr, (u_long)new->addr,
-		    (u_long)page->size, (u_long)new->size));
-
-		/*
-		 * Allocate file space for the page.
-		 *
-		 * The cache eviction server is the only thread allocating space
-		 * from the file, so there's no need to do any serialization.
-		 */
-		WT_RET(__wt_block_alloc(toc, &new->addr, new->size));
-
-		/*
-		 * Write the page to disk.
-		 *
-		 * !!!
-		 * This is safe for now, but it's a problem when we switch to
-		 * asynchronous I/O: the scenario is (1) schedule the write,
-		 * (2) discard the newly-clean in-memory version, (3) another
-		 * thread tries to read down the tree before the write finishes.
-		 */
-		WT_ERR(__wt_page_write(toc, new));
-
-		/* Update the page's parent. */
-		WT_ERR(__wt_rec_parent_update(toc, page, new->addr, new->size));
-	}
-
-	return (0);
-
-err:	(void)__wt_block_free(toc, new->addr, new->size);
-	return (ret);
 }
 
 /*
