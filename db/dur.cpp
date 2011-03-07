@@ -377,6 +377,9 @@ namespace mongo {
             Call within write lock.
         */
         void _REMAPPRIVATEVIEW() {
+            // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
+            //       to assure very good behavior here.
+
             static unsigned startAt;
             static unsigned long long lastRemap;
 
