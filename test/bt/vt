@@ -2,8 +2,15 @@
 
 rm -f vgout.*
 
-valgrind \
-    --leak-check=yes \
-    --log-file=vgout.%p \
-    --track-fds=yes \
-    ./t -1
+# Command line argument is the number of iterations.
+r=1
+test $# -eq 0 || r=$1
+
+while test $r -gt 0; do
+	r=`expr $r - 1`
+	valgrind \
+	    --leak-check=yes \
+	    --log-file=vgout.%p \
+	    --track-fds=yes \
+	    ./t -1
+done
