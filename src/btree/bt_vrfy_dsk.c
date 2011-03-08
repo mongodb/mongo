@@ -269,7 +269,8 @@ cell_len:			__wt_errx(session,
 		case WT_CELL_DATA_OVFL:
 			ovfl = WT_CELL_BYTE_OVFL(cell);
 			if (WT_ADDR_TO_OFF(btree, ovfl->addr) +
-			    WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size) > file_size)
+			    WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size) >
+			    file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF:

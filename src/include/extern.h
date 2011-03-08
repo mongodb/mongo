@@ -228,7 +228,10 @@ int
 __wt_btree_huffman_set(BTREE *btree,
     uint8_t const *huffman_table, u_int huffman_table_size, uint32_t flags);
 int
-__wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags);
+__wt_btree_open(SESSION *session,
+    const char *name,
+    mode_t mode,
+    uint32_t flags);
 int
 __wt_btree_close(SESSION *session, uint32_t flags);
 int
@@ -242,7 +245,8 @@ __wt_btree_sync(SESSION *session,
 int
 __wt_connection_cache_size_set_verify(CONNECTION *conn, uint32_t cache_size);
 int
-__wt_connection_cache_hash_size_set_verify(CONNECTION *conn, uint32_t hash_size);
+__wt_connection_cache_hash_size_set_verify(CONNECTION *conn,
+    uint32_t hash_size);
 int
 __wt_connection_hazard_size_set_verify(CONNECTION *conn, uint32_t hazard_size);
 int
@@ -334,7 +338,10 @@ __wt_fsync(SESSION *session, WT_FH *fh);
 int
 __wt_ftruncate(SESSION *session, WT_FH *fh, off_t len);
 int
-__wt_mtx_alloc(SESSION *session, const char *name, int is_locked, WT_MTX **mtxp);
+__wt_mtx_alloc(SESSION *session,
+    const char *name,
+    int is_locked,
+    WT_MTX **mtxp);
 void
 __wt_lock(SESSION *session, WT_MTX *mtx);
 void
@@ -343,13 +350,21 @@ int
 __wt_mtx_destroy(SESSION *session, WT_MTX *mtx);
 int
 __wt_open(
-    SESSION *session, const char *name, mode_t mode, int ok_create, WT_FH **fhp);
+    SESSION *session,
+    const char *name,
+    mode_t mode,
+    int ok_create,
+    WT_FH **fhp);
 int
 __wt_close(SESSION *session, WT_FH *fh);
 int
 __wt_read(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf);
 int
-__wt_write(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf);
+__wt_write(SESSION *session,
+    WT_FH *fh,
+    off_t offset,
+    uint32_t bytes,
+    void *buf);
 void
 __wt_sleep(long seconds, long micro_seconds);
 int
@@ -369,7 +384,10 @@ __wt_msg_stream(FILE *fp,
     const char *pfx1, const char *pfx2, int error, const char *fmt, va_list ap);
 void
 __wt_assert(
-    SESSION *session, const char *check, const char *file_name, int line_number);
+    SESSION *session,
+    const char *check,
+    const char *file_name,
+    int line_number);
 int
 __wt_api_args(SESSION *session, const char *name);
 int

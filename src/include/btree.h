@@ -52,14 +52,14 @@ extern "C" {
 /* Convert a data address to/from a byte offset. */
 #define	WT_ADDR_TO_OFF(btree, addr)					\
 	((off_t)(addr) * (btree)->allocsize)
-#define	WT_OFF_TO_ADDR(btree, off)						\
+#define	WT_OFF_TO_ADDR(btree, off)					\
 	((uint32_t)((off) / (btree)->allocsize))
 
 /*
  * Return file allocation units needed for length (optionally including a page
  * header), rounded to an allocation unit.
  */
-#define	WT_HDR_BYTES_TO_ALLOC(btree, size)					\
+#define	WT_HDR_BYTES_TO_ALLOC(btree, size)				\
 	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (btree)->allocsize))
 
 /*
@@ -867,7 +867,7 @@ struct __wt_ovfl {
 #define	WT_FIX_DELETE_SET(b)	(((uint8_t *)(b))[0] = WT_FIX_DELETE_BYTE)
 
 /* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
-#define	WT_FIX_FOREACH(btree, dsk, p, i)					\
+#define	WT_FIX_FOREACH(btree, dsk, p, i)				\
 	for ((p) = WT_PAGE_DISK_BYTE(dsk),				\
 	    (i) = (dsk)->u.entries; (i) > 0; --(i),			\
 	    (p) = (uint8_t *)(p) + (btree)->fixed_len)
@@ -892,7 +892,7 @@ struct __wt_ovfl {
  * WT_RLE_REPEAT_ITERATE is a loop that walks fixed-length, run-length encoded
  * references on a page, visiting each entry the appropriate number of times.
  */
-#define	WT_RLE_REPEAT_ITERATE(btree, dsk, p, i, j)				\
+#define	WT_RLE_REPEAT_ITERATE(btree, dsk, p, i, j)			\
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)				\
 		for ((j) = WT_RLE_REPEAT_COUNT(p); (j) > 0; --(j))
 

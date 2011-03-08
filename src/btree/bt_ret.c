@@ -70,7 +70,8 @@ __wt_value_return(
 
 			*key = session->key.item;
 		} else if (callback == NULL) {
-			WT_RET(__wt_buf_grow(session, &session->key, rip->size));
+			WT_RET(
+			    __wt_buf_grow(session, &session->key, rip->size));
 			memcpy(session->key.mem, rip->key, rip->size);
 
 			*key = session->key.item;
@@ -139,8 +140,9 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 	if (callback == NULL) {
 		/*
 		 * We're copying the key/value pair out to the caller.  If we
-		 * haven't yet copied the value_ret/size_ret pair into the return
-		 * WT_ITEM (potentially done by __wt_cell_process), do so now.
+		 * haven't yet copied the value_ret/size_ret pair into the
+		 * return WT_ITEM (potentially done by __wt_cell_process), do
+		 * so now.
 		 */
 		if (value_ret != session->value.item.data) {
 			WT_RET(__wt_buf_grow(

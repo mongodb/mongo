@@ -179,7 +179,8 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 		return (WT_ERROR);
 	}
 
-	if (btree->intlmin > btree->intlmax || btree->leafmin > btree->leafmax) {
+	if (btree->intlmin > btree->intlmax ||
+	    btree->leafmin > btree->leafmax) {
 		__wt_err(session, 0,
 		    "minimum page sizes must be less than or equal to maximum "
 		    "page sizes");
@@ -216,13 +217,15 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 	 */
 #define	WT_MINIMUM_DATA_SPACE(btree, s)					\
 	    (((s) - (WT_PAGE_DISK_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
-	if (btree->intlitemsize > WT_MINIMUM_DATA_SPACE(btree, btree->intlmin)) {
+	if (btree->intlitemsize >
+	    WT_MINIMUM_DATA_SPACE(btree, btree->intlmin)) {
 		__wt_err(session, 0,
 		    "The internal page size is too small for its maximum item "
 		    "size");
 		return (WT_ERROR);
 	}
-	if (btree->leafitemsize > WT_MINIMUM_DATA_SPACE(btree, btree->leafmin)) {
+	if (btree->leafitemsize >
+	    WT_MINIMUM_DATA_SPACE(btree, btree->leafmin)) {
 		__wt_err(session, 0,
 		    "The leaf page size is too small for its maximum item "
 		    "size");

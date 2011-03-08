@@ -107,7 +107,8 @@ __wt_bulk_fix(SESSION *session,
 			goto err;
 		}
 		if (value->size != btree->fixed_len)
-			WT_ERR(__wt_file_wrong_fixed_size(session, value->size));
+			WT_ERR(
+			    __wt_file_wrong_fixed_size(session, value->size));
 
 		/*
 		 * We use the high bit of the value as a "deleted" value,
@@ -1057,7 +1058,8 @@ __wt_bulk_ovfl_write(SESSION *session, WT_ITEM *item, WT_OVFL *to)
 
 	/* Get a scratch buffer and make it look like our work page. */
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE + item->size, btree->allocsize);
-	WT_ERR(__wt_bulk_scratch_page(session, size, WT_PAGE_OVFL, &page, &tmp));
+	WT_ERR(
+	    __wt_bulk_scratch_page(session, size, WT_PAGE_OVFL, &page, &tmp));
 
 	/* Fill in the return information. */
 	to->addr = page->addr;
@@ -1081,8 +1083,8 @@ err:	if (tmp != NULL)
  *	Allocate a scratch buffer and make it look like a file page.
  */
 static int
-__wt_bulk_scratch_page(SESSION *session,
-    uint32_t page_size, uint32_t page_type, WT_PAGE **page_ret, WT_BUF **tmp_ret)
+__wt_bulk_scratch_page(SESSION *session, uint32_t page_size,
+    uint32_t page_type, WT_PAGE **page_ret, WT_BUF **tmp_ret)
 {
 	WT_BUF *tmp;
 	WT_PAGE *page;

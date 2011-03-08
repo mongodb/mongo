@@ -102,7 +102,8 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	} else {
 		sz = wiredtiger_struct_sizev(fmt, ap);
 		if (__wt_buf_grow(session, &cursor->value, sz) == 0 &&
-		    wiredtiger_struct_packv(cursor->value.mem, sz, fmt, ap) == 0)
+		    wiredtiger_struct_packv(
+		    cursor->value.mem, sz, fmt, ap) == 0)
 			F_CLR(cursor, WT_CURSTD_BADVALUE);
 		else {
 			F_SET(cursor, WT_CURSTD_BADVALUE);

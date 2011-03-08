@@ -10,7 +10,6 @@ l=`(sed -e '/^[a-z]/! d' -e 's,^,../,' filelist ;
     egrep -v 'include/api\.h|.*/api_int\.c$|support/stat\.c$'`
 
 for f in $l ; do
-	# awk's length function appears to include the newline, hence "> 81"
 	expand -t8 < $f | awk -- \
-		"{if(length(\$0) > 81) printf(\"%s:%d\\n\", \"$f\", NR)}"
+		"{if(length(\$0) > 80) printf(\"%s:%d\\n\", \"$f\", NR)}"
 done

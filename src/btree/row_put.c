@@ -115,8 +115,8 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
 
 /*
  * __wt_update_alloc --
- *	Allocate a WT_UPDATE structure and associated value from the TOC's buffer
- *	and fill it in.
+ *	Allocate a WT_UPDATE structure and associated value from the SESSION's
+ *	buffer and fill it in.
  */
 int
 __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
@@ -178,9 +178,9 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 
 	/*
 	 * Decide how much memory to allocate: if it's a one-off (that is, the
-	 * value is bigger than anything we'll aggregate into these buffers, it's
-	 * a one-off.  Otherwise, allocate the next power-of-two larger than 4
-	 * times the requested size, and at least the default buffer size.
+	 * value is bigger than anything we'll aggregate into these buffers,
+	 * it's a one-off.  Otherwise, allocate the next power-of-two larger
+	 * than 4 times the requested size and at least the default buffer size.
 	 *
 	 * XXX
 	 * I have no reason for the 4x the request size, I just hate to allocate
@@ -210,7 +210,7 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 	if (!single_use) {
 		/*
 		 * The "in" reference count is artificially incremented by 1 as
-		 * long as an SESSION buffer is referenced by the SESSION thread;
+		 * long as a SESSION buffer is referenced by the SESSION thread;
 		 * we don't want them freed because a page was evicted and the
 		 * count went to 0.  Decrement the reference count on the buffer
 		 * as part of releasing it.  There's a similar reference count

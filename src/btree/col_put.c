@@ -97,7 +97,8 @@ __wt_col_update(
 
 		/* workQ: schedule insert of the WT_UPDATE structure. */
 		__wt_item_update_serial(session, page, session->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, session->srch_ip), new_upd, upd, ret);
+		    WT_COL_INDX_SLOT(page, session->srch_ip),
+		    new_upd, upd, ret);
 		 break;
 	case WT_PAGE_COL_RLE:
 		if (session->srch_upd != NULL) {		/* #2 */

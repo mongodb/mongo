@@ -137,8 +137,8 @@ __wt_session_api_set(
 	SESSION *session;
 
 	/*
-	 * We pass around WT_TOCs internally in the Btree, (rather than a
-	 * BTREE), because the BTREE's are free-threaded, and the WT_TOCs are
+	 * We pass around SESSIONs internally in the Btree, (rather than a
+	 * BTREE), because the BTREE's are free-threaded, and the SESSIONs are
 	 * per-thread.  Lots of the API calls don't require the application to
 	 * allocate and manage the SESSION, which means we have to do it for
 	 * them.

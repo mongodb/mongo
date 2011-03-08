@@ -194,7 +194,8 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	}
 	/* Free the sort array. */
 	if (expsort != NULL)
-		__wt_free(session, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
+		__wt_free(
+		    session, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
 
 	return (0);
 }

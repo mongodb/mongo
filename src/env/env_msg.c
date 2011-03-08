@@ -12,7 +12,7 @@ extern FILE *__wt_err_stream;
 #define	WT_MSG(session, fmt) {						\
 	va_list __ap;							\
 	/*								\
-	 * Support messages even when we don't yet have a SESSION handle,	\
+	 * Support messages even if we don't yet have a SESSION handle,	\
 	 * using the error stream.
 	 */								\
 	if ((session) == NULL) {					\

@@ -52,14 +52,14 @@ extern "C" {
 #define	WT_CONN_FCHK_RET(conn, name, f, mask, ret)			\
 	if ((f) & ~((uintmax_t)(mask)))					\
 		ret = __wt_api_args(&(conn)->default_session, (name));
-#define	WT_CONN_FCHK(conn, name, f, mask)					\
+#define	WT_CONN_FCHK(conn, name, f, mask)				\
 	if ((f) & ~((uintmax_t)(mask)))					\
 		return (__wt_api_args(&(conn)->default_session, (name)));
 #define	WT_DB_FCHK(btree, name, f, mask)				\
 	WT_CONN_FCHK((btree)->conn, (name), (f), (mask))
 
 /* Read-only file check. */
-#define	WT_DB_RDONLY(btree, name)						\
+#define	WT_DB_RDONLY(btree, name)					\
 	if (F_ISSET((btree), WT_RDONLY))				\
 		return (__wt_file_readonly((btree), (name)));
 
@@ -108,12 +108,12 @@ extern "C" {
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-#define	WT_ILLEGAL_FORMAT(btree)						\
+#define	WT_ILLEGAL_FORMAT(btree)					\
 	default:							\
 		return (__wt_file_format((btree)))
-#define	WT_ILLEGAL_FORMAT_ERR(btree, ret)					\
+#define	WT_ILLEGAL_FORMAT_ERR(btree, ret)				\
 	default:							\
-		ret = __wt_file_format((btree));				\
+		ret = __wt_file_format((btree));			\
 		goto err
 
 /*

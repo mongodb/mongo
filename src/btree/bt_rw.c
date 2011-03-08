@@ -80,5 +80,6 @@ __wt_disk_write(
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, size);
 
-	return (__wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
+	return (
+	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
 }

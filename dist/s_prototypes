@@ -22,7 +22,11 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e x \
 	    -e 's/$/;/p' \
 	    < ../$i
-done) > $t
+done) | awk '{
+	if (length() > 80)
+		gsub(", ", ",\n    ");
+	print $0
+}' > $t
 
 f=../src/include/extern.h
 cmp $t $f > /dev/null 2>&1 ||

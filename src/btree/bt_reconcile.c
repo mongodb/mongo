@@ -761,7 +761,8 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
-		__wt_free(session, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
+		__wt_free(
+		    session, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
 
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -893,7 +894,8 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 			data_loc = DATA_OFF_PAGE;
 		} else {
 			value->data = cell;
-			len = value->size = WT_CELL_SPACE_REQ(WT_CELL_LEN(cell));
+			len =
+			    value->size = WT_CELL_SPACE_REQ(WT_CELL_LEN(cell));
 			data_loc = DATA_ON_PAGE;
 		}
 

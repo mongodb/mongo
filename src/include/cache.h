@@ -118,7 +118,7 @@ struct __wt_read_req {
 	(r)->ref = _ref;						\
 	(r)->dsk_verify = _dsk_verify;					\
 	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
-	(r)->session = _session;						\
+	(r)->session = _session;					\
 	WT_MEMORY_FLUSH;	/* Turn entry on */			\
 } while (0)
 #define	WT_READ_REQ_CLR(r) do {						\

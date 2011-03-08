@@ -468,7 +468,8 @@ struct WT_SESSION {
 	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
 	 * 	Each column group is stored separately\, keyed by the primary
 	 * 	key of the table.  Any column that does not appear in a column
-	 * 	group is stored in a default unnamed column group for the table.}
+	 * 	group is stored in a default, unnamed, column group for the
+	 *	table.}
 	 * @config{exclusive,,Fail if the table exists (if "no"\, the
 	 * 	default\, verifies that the table exists and has the specified
 	 * 	schema.}
@@ -673,7 +674,7 @@ struct WT_CONNECTION {
 	 *
 	 * @dontinclude ex_all.c
 	 *
-	 * First the application has to implement the WT_CURSOR_FACTORY interface
+	 * First the application must implement the WT_CURSOR_FACTORY interface
 	 * as follows:
 	 * @skip Implementation of WT_CURSOR_FACTORY
 	 * @until End implementation
@@ -1034,7 +1035,7 @@ struct WT_CURSOR_FACTORY {
 
 /*!
  * The interface implemented by applications to provide custom extraction of
- * index keys or column group values.  Applications register their implementation
+ * index keys or column group values.  Applications register implementations
  * with WiredTiger by calling WT_CONNECTION::add_extractor.
  */
 struct WT_EXTRACTOR {
