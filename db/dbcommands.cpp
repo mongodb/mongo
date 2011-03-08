@@ -412,7 +412,10 @@ namespace mongo {
 
                 int m = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
                 t.appendNumber( "mapped" , m );
-
+                
+                if ( cmdLine.dur )
+                    m *= 2;
+                
                 if( v - m > 5000 ) { 
                     t.append("note", "virtual minus mapped is large. could indicate a memory leak");
                     log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large. could indicate a memory leak" << endl;
