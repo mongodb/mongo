@@ -66,7 +66,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 				continue;
 
 			/*
-			 * The key and value variables reference the DBTs we'll
+			 * The key and value variables reference the items we'll
 			 * print.  Set the key.
 			 */
 			if (__wt_key_process(cbt->rip)) {

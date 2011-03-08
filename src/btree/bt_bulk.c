@@ -275,8 +275,9 @@ __wt_bulk_var(SESSION *session,
 		 * We don't store values if the length of the value is 0;
 		 * the check from here on is if "value == NULL".
 		 *
-		 * Copy the caller's DBTs, we don't want to modify them.  But,
-		 * copy them carefully, all we want is a pointer and a length.
+		 * Copy the caller's key/value pair, we don't want to modify
+		 * them.  But, copy them carefully, all we want is a pointer
+		 * and a length.
 		 */
 		if (key != NULL) {
 			key_copy.data = key->data;
@@ -291,7 +292,7 @@ __wt_bulk_var(SESSION *session,
 			value = &value_copy;
 		}
 
-		/* Build the key/value items we're going to store on the page. */
+		/* Build the key/value items we'll store on the page. */
 		if (key != NULL)
 			WT_ERR(__wt_item_build_key(session,
 			    (WT_ITEM *)key, &key_item, &key_ovfl));
