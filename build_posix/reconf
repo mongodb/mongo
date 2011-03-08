@@ -67,3 +67,5 @@ automake --add-missing --copy
 
 # Cleanup
 rm -rf autom4te.cache config.hin~
+
+exit 0
