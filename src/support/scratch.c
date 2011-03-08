@@ -7,13 +7,6 @@
 
 #include "wt_internal.h"
 
-void
-__wt_buf_init(WT_BUF *buf)
-{
-	buf->item.data = buf->mem = NULL;
-	buf->mem_size = buf->item.size = 0;
-}
-
 int
 __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz)
 {
@@ -64,24 +57,26 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 	    p = session->scratch; i < session->scratch_alloc; ++i, ++p) {
 		/* If we find an empty slot, remember it. */
 		if ((buf = *p) == NULL) {
-			slot = p;
+			if (slot == NULL)
+				slot = p;
 			continue;
 		}
+
+		if (F_ISSET(buf, WT_BUF_INUSE))
+			continue;
 
 		/*
 		 * If we find a buffer that's not in-use, check its size.  If it
 		 * is large enough, we're done; otherwise, remember it.
 		 */
-		if (F_ISSET(buf, WT_BUF_INUSE))
-			continue;
-
 		if (size == 0 || buf->mem_size >= size) {
 			F_SET(buf, WT_BUF_INUSE);
 			buf->item.data = buf->mem;
 			*scratchp = buf;
 			return (0);
 		}
-		small = buf;
+		if (small == NULL)
+			small = buf;
 	}
 
 	/*
