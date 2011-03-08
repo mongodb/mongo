@@ -22,7 +22,8 @@ for ( var i = 0; i < 10; i++ ) {
 
 	// Amount of total clock skew possible between locking threads (processes)
 	// Must be much less than the takeover minutes
-	command["skewRange"] = ( command["takeoverMins"] / 2 ) * 60 * 1000
+	// TODO:  Put divisor back to 2, if possible
+	command["skewRange"] = ( command["takeoverMins"] / 5 ) * 60 * 1000
 
 	result = commandConn.getDB( "admin" ).runCommand( command )
 	printjson( result )
