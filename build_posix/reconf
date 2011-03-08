@@ -9,7 +9,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 # There's a cleanup function so we can easily clean out the directory.
 clean()
 {
-	test -f Makefile && make distclean
+	test -f Makefile && make distclean > /dev/null
 	rm -rf \
 	    ChangeLog COPYING INSTALL Makefile.am Makefile.in NEWS \
 	    README aclocal.m4 autom4te.cache config.hin config.hin~ \
