@@ -284,8 +284,9 @@ __wt_rec_helper(SESSION *session, uint64_t *recnop,
 	 * write all the split pages.
 	 *
 	 * #4
-	 * Not done, and about to cross the max boundary, but we've already done
-	 * the split thing, in which case we write the page and keep going.
+	 * Not done, and about to cross the split boundary, but we've already
+	 * done the split thing when we approached the max boundary, in which
+	 * case we write the page and keep going.
 	 *
 	 * Cases #2 and #3 are the hard ones: we're called when we're about to
 	 * cross each split boundary, and we save information away so we can
@@ -354,6 +355,7 @@ __wt_rec_helper(SESSION *session, uint64_t *recnop,
 		 */
 		ret = __wt_rec_helper_fixup(
 		    session, recnop, entriesp, first_freep, space_availp);
+		dsk->recno = *recnop;
 		r->s_next = 0;
 		break;
 	case 4:
