@@ -4,15 +4,10 @@
 t=__wt.$$
 trap 'rm -f $t *.pyc __tmp __wt.*; exit 0' 0 1 2 3 13 15
 
-indent()
-{
-	$1 | 2>&1 sed -e 's/^/	/'
-}
-
 run()
 {
 	printf "$2 ..."
-	indent "$1" > $t
+	$1 | 2>&1 sed -e 's/^/	/' > $t
 	test -s $t && (echo && cat $t) || echo ' OK'
 }
 
@@ -31,8 +26,7 @@ done
 
 test "$reconf" -eq 0 || {
 	(cd ../build_posix &&
-	echo "Rebuilding GNU tools library support" &&
-	indent "sh ./reconf")
+	run "sh ./reconf" "Rebuilding GNU tools library support")
 }
 
 run "python api_flags.py" "Building API flags include file"
