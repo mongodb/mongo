@@ -3,7 +3,7 @@
 
 test = new SyncCCTest( "sync5-", { logpath : "/dev/null" } )
 
-var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, { logpath : "/dev/null" } )
+var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {})//{ logpath : "/dev/null" } )
 // { logpath : "/data/db/syncCommander/mongod.log" } );
 
 for ( var i = 0; i < 10; i++ ) {
