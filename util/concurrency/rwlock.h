@@ -57,8 +57,9 @@ namespace mongo {
 
     class RWLock {
     public:
-        RWLock(const char *) { InitializeSRWLock(&_lock); }
+        RWLock(const char *, int lowPriorityWaitMS=0 ) { _lowPriorityWaitMS=lowPriorityWaitMS; InitializeSRWLock(&_lock); }
         ~RWLock() { }
+        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         void lock()          { AcquireSRWLockExclusive(&_lock); }
         void unlock()        { ReleaseSRWLockExclusive(&_lock); }
         void lock_shared()   { AcquireSRWLockShared(&_lock); }
@@ -87,18 +88,23 @@ namespace mongo {
         }
     private:
         SRWLOCK _lock;
+        int _lowPriorityWaitMS();
     };
 
 #elif defined(BOOST_RWLOCK)
     class RWLock {
         shared_mutex _m;
+        int _lowPriorityWaitMS;
     public:
 #if defined(_DEBUG)
         const char *_name;
-        RWLock(const char *name) : _name(name) { }
+        RWLock(const char *name, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) , _name(name) { }
 #else
-        RWLock(const char *) { }
+        RWLock(const char *, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) { }
 #endif
+
+        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
+
         void lock() {
             _m.lock();
 #if defined(_DEBUG)
@@ -121,18 +127,14 @@ namespace mongo {
         }
 
         bool lock_shared_try( int millis ) {
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(millis);
-            if( _m.timed_lock_shared( until ) ) {
+            if( _m.timed_lock_shared( boost::posix_time::milliseconds(millis) ) ) {
                 return true;
             }
             return false;
         }
 
         bool lock_try( int millis = 0 ) {
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(millis);
-            if( _m.timed_lock( until ) ) {
+            if( _m.timed_lock( boost::posix_time::milliseconds(millis) ) ) {
 #if defined(_DEBUG)
                 mutexDebugger.entering(_name);
 #endif
@@ -255,13 +257,16 @@ namespace mongo {
             : _lock( (RWLock&)lock ) , _write( write ) {
             
             if ( ! alreadyHaveLock ) {
-            
+                
                 if ( _write ) {
+                    
+                    if ( ! lowPriorityWaitMS && lock.lowPriorityWaitMS() )
+                        lowPriorityWaitMS = lock.lowPriorityWaitMS();
                     
                     if ( lowPriorityWaitMS ) { 
                         bool got = false;
-                        for ( int i=0; i<lowPriorityWaitMS/2; i++ ) {  // we divide by 2 since we sleep a bit
-                            if ( _lock.lock_try(1) ) {
+                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {  // we divide by 2 since we sleep a bit
+                            if ( _lock.lock_try(0) ) {
                                 got = true;
                                 break;
                             }

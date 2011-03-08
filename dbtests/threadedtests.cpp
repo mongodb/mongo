@@ -233,6 +233,53 @@ namespace ThreadedTests {
         }
     };
 
+    class RWLockTest2 { 
+    public:
+        
+        static void worker( const RWLock * lk , int * x ) {
+            *x = 1;
+            cout << "lock b try" << endl;
+            rwlock b( *lk , true ); 
+            cout << "lock b got" << endl;
+            *x = 2;
+        }
+
+        void run() { 
+            /**
+             * note: this test will deadlock if the code breaks
+             */
+            
+            RWLock lk( "eliot2" , 10000 );
+            
+            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            
+            int x = 0;
+            boost::thread t( boost::bind( worker , &lk , &x ) );
+            while ( ! x );
+            assert( x == 1 );
+            sleepmillis( 500 );
+            assert( x == 1 );
+            
+            cout << "lock c try" << endl;
+            auto_ptr<rwlock> c( new rwlock( lk , false ) );
+            cout << "lock c got" << endl;
+
+            c.reset();
+            a.reset();
+
+            for ( int i=0; i<2000; i++ ) {
+                if ( x == 2 )
+                    break;
+                sleepmillis(1);
+            }
+
+            assert( x == 2 );
+            t.join();
+            
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ) {
@@ -244,6 +291,7 @@ namespace ThreadedTests {
             add< ThreadPoolTest >();
             add< LockTest >();
             add< RWLockTest1 >();
+            add< RWLockTest2 >();
             add< MongoMutexTest >();
         }
     } myall;
