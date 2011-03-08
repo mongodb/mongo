@@ -164,7 +164,7 @@ namespace mongo {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
 #else
-        RWLock(const char *, int lowPriorityWaitMS) : _lowPriorityWaitMS( lowPriorityWaitMS ) {
+        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS ) {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
 #endif
