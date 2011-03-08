@@ -19,9 +19,10 @@ clean()
 while :
 	do case "$1" in
 	-c)
-		clean
+		clean			# Clean and leave empty
 		exit 0;;
 	*)
+		clean			# Clean and then re-create
 		break;;
 	esac
 done
