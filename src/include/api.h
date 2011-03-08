@@ -225,7 +225,7 @@ struct __session {
 	BTREE	*btree;			/* Current file */
 	WT_BUF	 key, value;		/* Returned key/value pairs */
 
-	WT_BUF	*scratch;		/* Temporary memory for any function */
+	WT_BUF	**scratch;		/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
 
 					/* SESSION workQ request */
