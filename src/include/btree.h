@@ -243,8 +243,8 @@ struct __wt_ref {
  */
 struct __wt_row_ref {
 	/*
-	 * These two fields are the same as the first fields of a DBT so we can
-	 * pass them to a comparison function without copying.
+	 * These two fields are the same as the first fields of a WT_ITEM so we
+	 * can pass them to a comparison function without copying.
 	 *
 	 * If a key requires processing (for example, an overflow key or Huffman
 	 * encoded key), the key field points to the on-page key, and the size
@@ -447,8 +447,8 @@ struct __wt_page {
 struct __wt_row {
 	/*
 	 * The first fields of the WT_ROW structure are the same as the first
-	 * fields of a DBT so we can hand it to a comparison function without
-	 * copying.
+	 * fields of a WT_ITEM so we can pass it to a comparison function
+	 * without copying.
 	 *
 	 * If a key requires processing (for example, an overflow key or an
 	 * Huffman encoded key), the key field points to the on-page key,
