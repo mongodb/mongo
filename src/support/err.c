@@ -259,7 +259,7 @@ __wt_connection_lockout(CONNECTION *conn)
 	return (__wt_session_lockout(&conn->default_session));
 }
 
-int
+void
 __wt_errv(
     SESSION *session, int error,
     const char *prefix, const char *fmt, va_list ap)
@@ -286,33 +286,27 @@ __wt_errv(
 		p += snprintf(p, end - p, ": %s", wiredtiger_strerror(error));
 
 	handler = session->error_handler;
-	return (handler->handle_error(handler, error, s));
+	(void)handler->handle_error(handler, error, s);
 }
 
-int
+void
 __wt_err(SESSION *session, int error, const char *fmt, ...)
 {
 	va_list ap;
-	int ret;
 
 	va_start(ap, fmt);
-	ret = __wt_errv(session, error,
+	__wt_errv(session, error,
 	    (session->btree != NULL) ? session->btree->name : NULL, fmt, ap);
 	va_end(ap);
-
-	return (ret);
 }
 
-int
+void
 __wt_errx(SESSION *session, const char *fmt, ...)
 {
 	va_list ap;
-	int ret;
 
 	va_start(ap, fmt);
-	ret = __wt_errv(session, 0,
+	__wt_errv(session, 0,
 	    (session->btree != NULL) ? session->btree->name : NULL, fmt, ap);
 	va_end(ap);
-
-	return (ret);
 }

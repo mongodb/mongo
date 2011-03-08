@@ -412,13 +412,13 @@ int
 __wt_btree_lockout(BTREE *btree);
 int
 __wt_connection_lockout(CONNECTION *conn);
-int
+void
 __wt_errv(
     SESSION *session, int error,
     const char *prefix, const char *fmt, va_list ap);
-int
+void
 __wt_err(SESSION *session, int error, const char *fmt, ...);
-int
+void
 __wt_errx(SESSION *session, const char *fmt, ...);
 int
 __wt_hazard_set(SESSION *session, WT_REF *ref);

@@ -104,7 +104,7 @@ __session_drop_table(
 	CONFIG_LOOP(session, config, cvalue)
 		CONFIG_ITEM("force")
 			force = (cvalue.val != 0);
-	CONFIG_END(session)
+	CONFIG_END(session);
 
 	/* TODO: Combine the table name with the conn home to make a filename. */
 

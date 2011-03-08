@@ -169,7 +169,7 @@ __wt_cursor_open(SESSION *session,
 			dump = (cvalue.val != 0);
 		CONFIG_ITEM("bulk")
 			bulk = (cvalue.val != 0);
-	CONFIG_END(session)
+	CONFIG_END(session);
 
 	csize = bulk ? sizeof(CURSOR_BULK) : sizeof(CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));

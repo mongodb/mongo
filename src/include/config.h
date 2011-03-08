@@ -29,10 +29,10 @@ struct WT_CONFIG_ITEM
 #define	CONFIG_LOOP(session, cstr, cvalue) do {				\
 	WT_CONFIG __conf;						\
 	WT_CONFIG_ITEM __ckey;						\
-	int __ret;							\
+	int __cret;							\
 									\
 	WT_RET(__wt_config_init(&__conf, (cstr), strlen(cstr)));	\
-	while ((__ret = 						\
+	while ((__cret = 						\
 	    __wt_config_next(&__conf, &__ckey, &(cvalue))) == 0) {	\
 		if (__ckey.type != ITEM_STRING &&			\
 		    __ckey.type != ITEM_ID) {				\
@@ -53,6 +53,6 @@ struct WT_CONFIG_ITEM
 		}							\
 	}								\
 									\
-	if (__ret != WT_NOTFOUND)					\
-		return (__ret);						\
-} while (0) /* Keep s_style happy. */ ;
+	if (__cret != WT_NOTFOUND)					\
+		return (__cret);					\
+} while (0)
