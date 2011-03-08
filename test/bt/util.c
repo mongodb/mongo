@@ -97,6 +97,8 @@ data_gen(void *datap, uint32_t *sizep, int grow_ok)
 	sprintf(buf, "%010u", ++r);
 	buf[10] = '/';
 
+	p = buf;
+	len = 0;
 	switch (g.c_file_type) {
 	case FIX:
 		/*
@@ -105,7 +107,6 @@ data_gen(void *datap, uint32_t *sizep, int grow_ok)
 		 * single chunk of repeated data.   To do that, we just jump
 		 * forward in the buffer by a small, random number of bytes.
 		 */
-		p = buf;
 		if (g.c_repeat_comp_pct != 0 &&
 		    (u_int)wts_rand() % 100 > g.c_repeat_comp_pct)
 			p += wts_rand() % 7;
@@ -113,7 +114,6 @@ data_gen(void *datap, uint32_t *sizep, int grow_ok)
 		break;
 	case VAR:
 	case ROW:
-		p = buf;
 		/*
 		 * WiredTiger doesn't store zero-length records, and I want to
 		 * test that: records divisible by 63 are always zero-length.
