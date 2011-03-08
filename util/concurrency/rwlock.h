@@ -176,6 +176,8 @@ namespace mongo {
             }
         }
 
+        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
+
         void lock() {
             check( pthread_rwlock_wrlock( &_lock ) );
 #if defined(_DEBUG)
