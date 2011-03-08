@@ -87,7 +87,8 @@ __session_rename_table(WT_SESSION *wt_session,
 }
 
 static int
-__session_drop_table(WT_SESSION *wt_session, const char *name, const char *config)
+__session_drop_table(
+    WT_SESSION *wt_session, const char *name, const char *config)
 {
 	SESSION *session;
 	WT_CONFIG_ITEM cvalue;
