@@ -15,8 +15,6 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	extern char *optarg;
-	extern int optind;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
