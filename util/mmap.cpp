@@ -62,7 +62,7 @@ namespace mongo {
        this is the administrative stuff
     */
 
-    RWLock MongoFile::mmmutex("rw:mmmutex");
+    RWLock MongoFile::mmmutex("rw:mmmutex",10*60*1000 /* 10 minutes */);
 
     /* subclass must call in destructor (or at close).
         removes this from pathToFile and other maps
