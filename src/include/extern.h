@@ -429,8 +429,6 @@ uint32_t
 __wt_prime(uint32_t n);
 void
 __wt_progress(const char *s, uint64_t v);
-void
-__wt_buf_init(WT_BUF *buf);
 int
 __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz);
 void
