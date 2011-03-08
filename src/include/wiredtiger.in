@@ -68,13 +68,13 @@ typedef uint64_t wiredtiger_recno_t;
 /*******************************************
  * Forward structure declarations
  *******************************************/
-struct WT_CONNECTION;	  typedef struct WT_CONNECTION WT_CONNECTION;
 struct WT_COLLATOR;	  typedef struct WT_COLLATOR WT_COLLATOR;
+struct WT_CONNECTION;	  typedef struct WT_CONNECTION WT_CONNECTION;
 struct WT_CURSOR;	  typedef struct WT_CURSOR WT_CURSOR;
 struct WT_CURSOR_FACTORY; typedef struct WT_CURSOR_FACTORY WT_CURSOR_FACTORY;
 struct WT_ERROR_HANDLER;  typedef struct WT_ERROR_HANDLER WT_ERROR_HANDLER;
 struct WT_EXTRACTOR;	  typedef struct WT_EXTRACTOR WT_EXTRACTOR;
-struct WT_ITEM;	  typedef struct WT_ITEM WT_ITEM;
+struct WT_ITEM;		  typedef struct WT_ITEM WT_ITEM;
 struct WT_SESSION;	  typedef struct WT_SESSION WT_SESSION;
 
 /*!
