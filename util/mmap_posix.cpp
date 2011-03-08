@@ -52,6 +52,10 @@ namespace mongo {
 #define O_NOATIME (0)
 #endif
 
+#ifndef MAP_NORESERVE
+#define MAP_NORESERVE (0)
+#endif
+
     void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
         // length may be updated by callee.
         setFilename(filename);
@@ -118,7 +122,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::createPrivateMap() {
-        void * x = mmap( /*start*/0 , len , PROT_READ|PROT_WRITE , MAP_PRIVATE , fd , 0 );
+        void * x = mmap( /*start*/0 , len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_NORESERVE , fd , 0 );
         if( x == MAP_FAILED ) {
             if ( errno == ENOMEM ) {
                 if( sizeof(void*) == 4 ) {
@@ -140,7 +144,7 @@ namespace mongo {
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
         // don't unmap, just mmap over the old region
-        void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_FIXED , fd , 0 );
+        void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_NORESERVE|MAP_FIXED , fd , 0 );
         if( x == MAP_FAILED ) {
             int err = errno;
             error()  << "13601 Couldn't remap private view: " << errnoWithDescription(err) << endl;
