@@ -5,10 +5,10 @@
  *	All rights reserved.
  */
 
-typedef struct WT_CONFIG WT_CONFIG;
-typedef struct WT_CONFIG_ITEM WT_CONFIG_ITEM;
+struct __wt_config;		typedef struct __wt_config WT_CONFIG;
+struct __wt_config_item;	typedef struct __wt_config_item WT_CONFIG_ITEM;
 
-struct WT_CONFIG
+struct __wt_config
 {
 	const char *orig;
 	const char *end;
@@ -18,7 +18,7 @@ struct WT_CONFIG
 	int8_t *go;
 };
 
-struct WT_CONFIG_ITEM
+struct __wt_config_item
 {
 	const char *str;
 	size_t len;

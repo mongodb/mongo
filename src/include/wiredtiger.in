@@ -68,21 +68,21 @@ typedef uint64_t wiredtiger_recno_t;
 /*******************************************
  * Forward structure declarations
  *******************************************/
-struct WT_COLLATOR;	  typedef struct WT_COLLATOR WT_COLLATOR;
-struct WT_CONNECTION;	  typedef struct WT_CONNECTION WT_CONNECTION;
-struct WT_CURSOR;	  typedef struct WT_CURSOR WT_CURSOR;
-struct WT_CURSOR_FACTORY; typedef struct WT_CURSOR_FACTORY WT_CURSOR_FACTORY;
-struct WT_ERROR_HANDLER;  typedef struct WT_ERROR_HANDLER WT_ERROR_HANDLER;
-struct WT_EXTRACTOR;	  typedef struct WT_EXTRACTOR WT_EXTRACTOR;
-struct WT_ITEM;		  typedef struct WT_ITEM WT_ITEM;
-struct WT_SESSION;	  typedef struct WT_SESSION WT_SESSION;
+struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
+struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
+struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
+struct __wt_cursor_factory; typedef struct __wt_cursor_factory WT_CURSOR_FACTORY;
+struct __wt_error_handler;  typedef struct __wt_error_handler WT_ERROR_HANDLER;
+struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
+struct __wt_item;	    typedef struct __wt_item WT_ITEM;
+struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
  * a length (limited to 4GB for items stored in tables).  Records consist of a
  * pair of items: a key and an associated value.
  */
-struct WT_ITEM {
+struct __wt_item {
 	/*!
 	 * The memory reference of the data item.
 	 *
@@ -131,7 +131,7 @@ typedef struct {
  * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
  * it may only be used within the same thread as the encapsulating WT_SESSION.
  */
-struct WT_CURSOR {
+struct __wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
 
 	/*!
@@ -336,11 +336,11 @@ struct WT_CURSOR {
 	/*
 	 * !!!
 	 * Explicit representations of structures from queue.h.
-	 * TAILQ_ENTRY(WT_CURSOR) q;
+	 * TAILQ_ENTRY(__wt_cursor) q;
 	 */
 	struct {
-		struct WT_CURSOR *tqe_next;
-		struct WT_CURSOR **tqe_prev;
+		WT_CURSOR *tqe_next;
+		WT_CURSOR **tqe_prev;
 	} q;                            /* Linked list of WT_CURSORs. */
 
 	WT_BUF key, value;
@@ -362,7 +362,7 @@ struct WT_CURSOR {
  * it may only be used within a single thread.  Each thread accessing a
  * database should open a separate WT_SESSION handle.
  */
-struct WT_SESSION {
+struct __wt_session {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
 
@@ -651,7 +651,7 @@ struct WT_SESSION {
  * will communicate with the first process over a socket connection to perform
  * their operations.
  */
-struct WT_CONNECTION {
+struct __wt_connection {
 	/*! Load an extension.
 	 *
 	 * @dontinclude ex_all.c
@@ -835,7 +835,7 @@ const char *wiredtiger_strerror(int err);
 /*!
  * The interface implemented by applications in order to handle errors.
  */
-struct WT_ERROR_HANDLER {
+struct __wt_error_handler {
 	/*! Callback to handle errors within the session. */
 	int (*handle_error)(WT_ERROR_HANDLER *handler,
 	    int error, const char *errmsg);
@@ -996,7 +996,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * records.  Applications register their implementation with WiredTiger by
  * calling WT_CONNECTION::add_collator.
  */
-struct WT_COLLATOR {
+struct __wt_collator {
 	/*! Callback to compare keys or order duplicate values.
 	 *
 	 * @returns -1 if <code>value1 < value2</code>,
@@ -1016,7 +1016,7 @@ struct WT_COLLATOR {
  * interface from multiple threads concurrently.  It is the responsibility of
  * the implementation to protect any shared data.
  */
-struct WT_CURSOR_FACTORY {
+struct __wt_cursor_factory {
 	/*! Callback to determine how much space to allocate for a cursor.
 	 *
 	 * If the callback is NULL, no additional space is allocated in the
@@ -1038,7 +1038,7 @@ struct WT_CURSOR_FACTORY {
  * index keys or column group values.  Applications register implementations
  * with WiredTiger by calling WT_CONNECTION::add_extractor.
  */
-struct WT_EXTRACTOR {
+struct __wt_extractor {
 	/*! Callback to extract a value for an index or column group.
 	 *
 	 * @errors

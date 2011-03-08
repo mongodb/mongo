@@ -212,7 +212,7 @@ struct __session {
 	WT_ERROR_HANDLER *error_handler;
 
 	TAILQ_ENTRY(__session) q;
-	TAILQ_HEAD(__cursors, WT_CURSOR) cursors;
+	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
 	TAILQ_HEAD(__btrees, __btree) btrees;
 

@@ -688,7 +688,7 @@ struct __wt_rle_expand {
  * __item_chunk field on the page.
  */
 #define	WT_CELL_MAX_LEN	(16 * 1024 * 1024 - 1)
-struct __wt_item {
+struct __wt_cell {
 	uint32_t __item_chunk;
 };
 /*
