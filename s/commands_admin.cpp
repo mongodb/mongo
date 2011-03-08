@@ -971,6 +971,13 @@ namespace mongo {
             BSONArrayBuilder bb( result.subarrayStart( "databases" ) );
             for ( map<string,long long>::iterator i=sizes.begin(); i!=sizes.end(); ++i ) {
                 string name = i->first;
+
+                if ( name == "local" ) {
+                    // we don't return local
+                    // since all shards have their own independant local
+                    continue;
+                }
+
                 long long size = i->second;
                 totalSize += size;
 
