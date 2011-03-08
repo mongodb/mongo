@@ -148,23 +148,27 @@ namespace mongo {
 #else
     class RWLock {
         pthread_rwlock_t _lock;
-
+        int _lowPriorityWaitMS;
+        
         inline void check( int x ) {
             if( x == 0 )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
             assert( x == 0 );
         }
-
+        
     public:
 #if defined(_DEBUG)
         const char *_name;
-        RWLock(const char *name) : _name(name) {
-#else
-        RWLock(const char *) {
-#endif
+        RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name) {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
+#else
+        RWLock(const char *, int lowPriorityWaitMS) : _lowPriorityWaitMS( lowPriorityWaitMS ) {
+            check( pthread_rwlock_init( &_lock , 0 ) );
+        }
+#endif
+        
 
         ~RWLock() {
             if ( ! StaticObserver::_destroyingStatics ) {
