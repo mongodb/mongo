@@ -51,6 +51,6 @@ while :
 done
 
 test "$build" -eq 0 || rebuild
-(cd ../../build_posix && make > /dev/null) && make
+(cd ../../build_posix && make > /dev/null) && make > /dev/null
 
 exit 0
