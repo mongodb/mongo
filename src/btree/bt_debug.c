@@ -345,7 +345,7 @@ __wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 		if (__wt_key_process(rip))
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
-			__wt_debug_cell("\tkey", rip, fp);
+			__wt_debug_item("\tkey", rip, fp);
 
 		fprintf(fp, "\tdata: {");
 		WT_RET(__wt_debug_cell_data(session, rip->value, fp));
@@ -375,7 +375,7 @@ __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 		if (__wt_key_process(rref))
 			fprintf(fp, "\tkey: {requires processing}\n");
 		else
-			__wt_debug_cell("\tkey", rref, fp);
+			__wt_debug_item("\tkey", rref, fp);
 		fprintf(fp, "\toffpage: addr %lu, size %lu\n",
 		    (u_long)WT_ROW_REF_ADDR(rref),
 		    (u_long)WT_ROW_REF_SIZE(rref));
@@ -441,7 +441,7 @@ __wt_debug_dsk_item(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
 }
 
 /*
- * __wt_debug_cell --
+ * __wt_debug_item --
  *	Dump a single WT_CELL.
  */
 static int
@@ -621,11 +621,11 @@ err:	if (tmp != NULL)
 }
 
 /*
- * __wt_debug_cell --
+ * __wt_debug_item --
  *	Dump a single WT_ITEM in debugging mode, with an optional tag.
  */
 void
-__wt_debug_cell(const char *tag, void *arg_item, FILE *fp)
+__wt_debug_item(const char *tag, void *arg_item, FILE *fp)
 {
 	WT_ITEM *item;
 
