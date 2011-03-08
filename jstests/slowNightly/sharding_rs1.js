@@ -43,6 +43,15 @@ function diff(){
 assert.lt( 20 , diff() , "big differential here" );
 print( diff() )
 
+{
+    // quick test for SERVER-2686
+    var mydbs = db.getMongo().getDBs().databases;
+    for ( var i=0; i<mydbs.length; i++ ) {
+        assert( mydbs[i].name != "local" , "mongos listDatabases can't return local" );
+    }
+}
+
+
 assert.soon( function(){
     var d = diff();
     return d < 5;
