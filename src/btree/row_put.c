@@ -25,9 +25,9 @@ __wt_btree_row_del(SESSION *session, WT_ITEM *key)
  *	Db.row_put method.
  */
 int
-__wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *data)
+__wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value)
 {
-	return (__wt_row_update(session, key, data, 1));
+	return (__wt_row_update(session, key, value, 1));
 }
 
 /*
@@ -35,7 +35,7 @@ __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *data)
  *	Row-store delete and update.
  */
 static int
-__wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *data, int insert)
+__wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int insert)
 {
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd;
@@ -52,8 +52,8 @@ __wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *data, int insert)
 	if (page->u.row_leaf.upd == NULL)
 		WT_ERR(__wt_calloc_def(session, page->indx_count, &new_upd));
 
-	/* Allocate room for the new data item from per-thread memory. */
-	WT_ERR(__wt_update_alloc(session, &upd, data));
+	/* Allocate room for the new value from per-thread memory. */
+	WT_ERR(__wt_update_alloc(session, &upd, value));
 
 	/* Schedule the workQ to insert the WT_UPDATE structure. */
 	__wt_item_update_serial(session, page, session->srch_write_gen,
@@ -115,11 +115,11 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
 
 /*
  * __wt_update_alloc --
- *	Allocate a WT_UPDATE structure and associated data from the TOC's buffer
+ *	Allocate a WT_UPDATE structure and associated value from the TOC's buffer
  *	and fill it in.
  */
 int
-__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data)
+__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 {
 	BTREE *btree;
 	SESSION_BUFFER *sb;
@@ -130,9 +130,9 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data)
 	btree = session->btree;
 
 	/*
-	 * Allocate memory for a data insert or change; there's a buffer in the
+	 * Allocate memory for an insert or change; there's a buffer in the
 	 * SESSION structure for allocation of chunks of memory to hold changed
-	 * or inserted data items.
+	 * or inserted values.
 	 *
 	 * We align allocations because we directly access WT_UPDATE structure
 	 * fields in the memory (the x86 handles unaligned accesses, but I don't
@@ -144,7 +144,7 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data)
 	 *
 	 * The first thing in each chunk of memory is a SESSION_BUFFER structure
 	 * (which we check is a multiple of 4B during initialization); then one
-	 * or more WT_UPDATE structure plus data chunk pairs.
+	 * or more WT_UPDATE structure plus value chunk pairs.
 	 *
 	 * XXX
 	 * Figure out how much space we need: this code limits the maximum size
@@ -161,7 +161,7 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data)
 	 * Check first we won't overflow when calculating an aligned size, then
 	 * check the total required space for this item.
 	 */
-	size = data == NULL ? 0 : data->size;
+	size = value == NULL ? 0 : value->size;
 	if (size > UINT32_MAX - (sizeof(WT_UPDATE) + sizeof(uint32_t)))
 		return (__wt_file_item_too_big(btree));
 	align_size = WT_ALIGN(size + sizeof(WT_UPDATE), sizeof(uint32_t));
@@ -178,7 +178,7 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data)
 
 	/*
 	 * Decide how much memory to allocate: if it's a one-off (that is, the
-	 * data is bigger than anything we'll aggregate into these buffers, it's
+	 * value is bigger than anything we'll aggregate into these buffers, it's
 	 * a one-off.  Otherwise, allocate the next power-of-two larger than 4
 	 * times the requested size, and at least the default buffer size.
 	 *
@@ -236,11 +236,11 @@ no_allocation:
 	/* Copy the WT_UPDATE structure into place. */
 	upd = (WT_UPDATE *)sb->first_free;
 	upd->sb = sb;
-	if (data == NULL)
+	if (value == NULL)
 		WT_UPDATE_DELETED_SET(upd);
 	else {
-		upd->size = data->size;
-		memcpy(WT_UPDATE_DATA(upd), data->data, data->size);
+		upd->size = value->size;
+		memcpy(WT_UPDATE_DATA(upd), value->data, value->size);
 	}
 
 	sb->first_free += align_size;

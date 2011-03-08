@@ -56,7 +56,7 @@ int
 __wt_bulk_end(CURSOR_BULK *cbulk);
 int
 __wt_item_build_value(SESSION *session,
-    WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl);
+    WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl);
 int
 __wt_cache_create(CONNECTION *conn);
 void
@@ -95,7 +95,7 @@ __wt_debug_disk(
 int
 __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp);
 void
-__wt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp);
+__wt_debug_item(const char *tag, void *arg_item, FILE *fp);
 int
 __wt_desc_stat(SESSION *session);
 int
@@ -128,7 +128,7 @@ __wt_evict_tree_count(SESSION *session, BTREE *btree, uint64_t *nodesp);
 const char *
 __wt_page_type_string(WT_PAGE_DISK *dsk);
 const char *
-__wt_item_type_string(WT_CELL *item);
+__wt_cell_type_string(WT_CELL *cell);
 int
 __wt_bt_open(SESSION *session, int ok_create);
 int
@@ -140,7 +140,7 @@ __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify);
 int
 __wt_page_inmem(SESSION *session, WT_PAGE *page);
 int
-__wt_item_process(SESSION *session, WT_CELL *item, WT_BUF *scratch);
+__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *scratch);
 void
 __wt_workq_read_server(CONNECTION *conn, int force);
 int
@@ -153,7 +153,8 @@ int
 __wt_rle_expand_sort(SESSION *session,
     WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np);
 int
-__wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);
+__wt_value_return(
+    SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);
 int
 __wt_disk_read(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
@@ -185,11 +186,11 @@ __wt_walk_end(SESSION *session, WT_WALK *walk);
 int
 __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp);
 int
-__wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *data);
+__wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value);
 int
 __wt_btree_col_del(SESSION *session, uint64_t recno);
 int
-__wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *data);
+__wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value);
 int
 __wt_rle_expand_serial_func(SESSION *session);
 int
@@ -197,15 +198,15 @@ __wt_rle_expand_update_serial_func(SESSION *session);
 int
 __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags);
 int
-__wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *data);
+__wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value);
 int
 __wt_btree_row_del(SESSION *session, WT_ITEM *key);
 int
-__wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *data);
+__wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value);
 int
 __wt_item_update_serial_func(SESSION *session);
 int
-__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *data);
+__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value);
 void
 __wt_update_free(SESSION *session, WT_UPDATE *upd);
 int

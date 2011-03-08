@@ -12,7 +12,7 @@
  *	Db.col_get method.
  */
 int
-__wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *data)
+__wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value)
 {
 	BTREE *btree;
 	int ret;
@@ -27,7 +27,7 @@ __wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *data)
 	}
 
 	WT_ERR(__wt_col_search(session, recno, 0));
-	ret = __wt_data_return(session, NULL, data, 0);
+	ret = __wt_value_return(session, NULL, value, 0);
 
 err:	if (session->srch_page != btree->root_page.page)
 		__wt_hazard_clear(session, session->srch_page);

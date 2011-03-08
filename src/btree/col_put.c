@@ -25,16 +25,16 @@ __wt_btree_col_del(SESSION *session, uint64_t recno)
  *	Db.put method.
  */
 int
-__wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *data)
+__wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
 {
 	BTREE *btree;
 
 	btree = session->btree;
 
-	if (btree->fixed_len != 0 && data->size != btree->fixed_len)
-		WT_RET(__wt_file_wrong_fixed_size(session, data->size));
+	if (btree->fixed_len != 0 && value->size != btree->fixed_len)
+		WT_RET(__wt_file_wrong_fixed_size(session, value->size));
 
-	return (__wt_col_update(session, recno, data, 1));
+	return (__wt_col_update(session, recno, value, 1));
 }
 
 /*
@@ -43,7 +43,7 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *data)
  */
 static int
 __wt_col_update(
-    SESSION *session, uint64_t recno, WT_ITEM *data, int data_overwrite)
+    SESSION *session, uint64_t recno, WT_ITEM *value, int overwrite)
 {
 	BTREE *btree;
 	WT_PAGE *page;
@@ -61,7 +61,7 @@ __wt_col_update(
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_col_search(
-	    session, recno, data_overwrite ? WT_DATA_OVERWRITE : 0));
+	    session, recno, overwrite ? WT_DATA_OVERWRITE : 0));
 	page = session->srch_page;
 
 	/*
@@ -93,7 +93,7 @@ __wt_col_update(
 			    page->indx_count, &new_upd));
 
 		/* Allocate a WT_UPDATE structure and fill it in. */
-		WT_ERR(__wt_update_alloc(session, &upd, data));
+		WT_ERR(__wt_update_alloc(session, &upd, value));
 
 		/* workQ: schedule insert of the WT_UPDATE structure. */
 		__wt_item_update_serial(session, page, session->srch_write_gen,
@@ -102,7 +102,7 @@ __wt_col_update(
 	case WT_PAGE_COL_RLE:
 		if (session->srch_upd != NULL) {		/* #2 */
 			/* Allocate a WT_UPDATE structure and fill it in. */
-			WT_ERR(__wt_update_alloc(session, &upd, data));
+			WT_ERR(__wt_update_alloc(session, &upd, value));
 
 			/* workQ: schedule insert of the WT_UPDATE structure. */
 			__wt_rle_expand_update_serial(session, page,
@@ -117,7 +117,7 @@ __wt_col_update(
 			    session, page->indx_count, &new_rleexp));
 
 		/* Allocate a WT_UPDATE structure and fill it in. */
-		WT_ERR(__wt_update_alloc(session, &upd, data));
+		WT_ERR(__wt_update_alloc(session, &upd, value));
 
 		/* Allocate a WT_RLE_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc_def(session, 1, &exp));

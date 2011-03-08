@@ -40,13 +40,13 @@ __wt_page_type_string(WT_PAGE_DISK *dsk)
 }
 
 /*
- * __wt_item_type_string --
- *	Return a string representing the item type.
+ * __wt_cell_type_string --
+ *	Return a string representing the cell type.
  */
 const char *
-__wt_item_type_string(WT_CELL *item)
+__wt_cell_type_string(WT_CELL *cell)
 {
-	switch (WT_CELL_TYPE(item)) {
+	switch (WT_CELL_TYPE(cell)) {
 	case WT_CELL_DATA:
 		return ("data");
 	case WT_CELL_DATA_OVFL:

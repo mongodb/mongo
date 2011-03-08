@@ -232,7 +232,7 @@ static int
 __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
@@ -251,8 +251,8 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 	 * (WT_CELL_DATA_OVFL) or deleted (WT_CELL_DEL) items.
 	 */
 	cip = page->u.col_leaf.d;
-	WT_CELL_FOREACH(dsk, item, i)
-		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, item);
+	WT_CELL_FOREACH(dsk, cell, i)
+		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, cell);
 
 	page->indx_count = dsk->u.entries;
 	return (0);
@@ -266,7 +266,7 @@ static int
 __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_OFF *off;
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
@@ -292,20 +292,20 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 	 * are WT_CELL_OFF items.
 	 */
 	rref = page->u.row_int.t;
-	WT_CELL_FOREACH(dsk, item, i)
-		switch (WT_CELL_TYPE(item)) {
+	WT_CELL_FOREACH(dsk, cell, i)
+		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
 				__wt_key_set(rref,
-				    WT_CELL_BYTE(item), WT_CELL_LEN(item));
+				    WT_CELL_BYTE(cell), WT_CELL_LEN(cell));
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_KEY_OVFL:
-			__wt_key_set_process(rref, item);
+			__wt_key_set_process(rref, cell);
 			break;
 		case WT_CELL_OFF:
-			off = WT_CELL_BYTE_OFF(item);
+			off = WT_CELL_BYTE_OFF(cell);
 			WT_COL_REF_ADDR(rref) = off->addr;
 			WT_COL_REF_SIZE(rref) = off->size;
 			++rref;
@@ -324,7 +324,7 @@ static int
 __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
@@ -350,30 +350,30 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 	 */
 	nindx = 0;
 	rip = page->u.row_leaf.d;
-	WT_CELL_FOREACH(dsk, item, i)
-		switch (WT_CELL_TYPE(item)) {
+	WT_CELL_FOREACH(dsk, cell, i)
+		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
 			++nindx;
 			if (rip->key != NULL)
 				++rip;
 			if (btree->huffman_key != NULL ||
-			    WT_CELL_TYPE(item) == WT_CELL_KEY_OVFL)
-				__wt_key_set_process(rip, item);
+			    WT_CELL_TYPE(cell) == WT_CELL_KEY_OVFL)
+				__wt_key_set_process(rip, cell);
 			else
 				__wt_key_set(rip,
-				    WT_CELL_BYTE(item), WT_CELL_LEN(item));
+				    WT_CELL_BYTE(cell), WT_CELL_LEN(cell));
 
 			/*
 			 * Two keys in a row, or a key at the end of the page
 			 * implies a zero-length data item.  Initialize the
 			 * slot as if it's going to happen.
 			 */
-			rip->value = &btree->empty_item;
+			rip->value = &btree->empty_cell;
 			break;
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
-			rip->value = item;
+			rip->value = cell;
 			break;
 		}
 
@@ -382,12 +382,12 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 }
 
 /*
- * __wt_item_process --
- *	Overflow and/or compressed on-page items need processing before
+ * __wt_cell_process --
+ *	Overflow and/or compressed on-page cells need processing before
  *	we look at them.
  */
 int
-__wt_item_process(SESSION *session, WT_CELL *item, WT_BUF *scratch)
+__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *scratch)
 {
 	BTREE *btree;
 	WT_BUF *tmp;
@@ -404,7 +404,7 @@ __wt_item_process(SESSION *session, WT_CELL *item, WT_BUF *scratch)
 	 * 3 cases: compressed on-page item or, compressed or uncompressed
 	 * overflow item.
 	 */
-	switch (WT_CELL_TYPE(item)) {
+	switch (WT_CELL_TYPE(cell)) {
 	case WT_CELL_KEY:
 		huffman = btree->huffman_key;
 		goto onpage;
@@ -413,8 +413,8 @@ __wt_item_process(SESSION *session, WT_CELL *item, WT_BUF *scratch)
 		goto offpage;
 	case WT_CELL_DATA:
 		huffman = btree->huffman_data;
-onpage:		p = WT_CELL_BYTE(item);
-		size = WT_CELL_LEN(item);
+onpage:		p = WT_CELL_BYTE(cell);
+		size = WT_CELL_LEN(cell);
 		break;
 	case WT_CELL_DATA_OVFL:
 		huffman = btree->huffman_data;
@@ -429,7 +429,7 @@ offpage:	/*
 			tmp = scratch;
 		else
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
-		WT_RET(__wt_ovfl_in(session, WT_CELL_BYTE_OVFL(item), tmp));
+		WT_RET(__wt_ovfl_in(session, WT_CELL_BYTE_OVFL(cell), tmp));
 		p = tmp->item.data;
 		size = tmp->item.size;
 		break;

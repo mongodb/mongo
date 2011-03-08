@@ -366,13 +366,13 @@ __wt_verify_pc(SESSION *session,
 	 */
 	if (__wt_key_process(child_key)) {
 		WT_ERR(__wt_scr_alloc(session, 0, &scratch1));
-		WT_ERR(__wt_item_process(session, child_key->key, scratch1));
+		WT_ERR(__wt_cell_process(session, child_key->key, scratch1));
 		cd_ref = &scratch1->item;
 	} else
 		cd_ref = (WT_ITEM *)child_key;
 	if (__wt_key_process(parent_rref)) {
 		WT_ERR(__wt_scr_alloc(session, 0, &scratch2));
-		WT_RET(__wt_item_process(session, parent_rref->key, scratch2));
+		WT_RET(__wt_cell_process(session, parent_rref->key, scratch2));
 		pd_ref = &scratch2->item;
 	} else
 		pd_ref = (WT_ITEM *)parent_rref;
@@ -410,7 +410,7 @@ err:	if (scratch1 != NULL)
 static int
 __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
 
@@ -424,13 +424,13 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 * Walk the disk page, verifying overflow items.
 	 */
 	entry_num = 0;
-	WT_CELL_FOREACH(dsk, item, i) {
+	WT_CELL_FOREACH(dsk, cell, i) {
 		++entry_num;
-		switch (WT_CELL_TYPE(item)) {
+		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_DATA_OVFL:
 			WT_RET(__wt_verify_overflow(session,
-			    WT_CELL_BYTE_OVFL(item),
+			    WT_CELL_BYTE_OVFL(cell),
 			    entry_num, page->addr, vs));
 		}
 	}
@@ -483,7 +483,7 @@ __wt_verify_overflow(SESSION *session,
 	 */
 	if (ovfl->size != dsk->u.datalen) {
 		__wt_errx(session,
-		    "overflow page reference in item %lu on page at addr %lu "
+		    "overflow page reference in cell %lu on page at addr %lu "
 		    "does not match the data size on the overflow page",
 		    (u_long)entry_num, (u_long)page_ref_addr);
 		ret = WT_ERROR;

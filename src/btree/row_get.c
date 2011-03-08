@@ -12,7 +12,7 @@
  *	Db.row_get method.
  */
 int
-__wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *data)
+__wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value)
 {
 	BTREE *btree;
 	WT_PAGE *page;
@@ -25,7 +25,7 @@ __wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *data)
 	WT_ERR(__wt_row_search(session, key, 0));
 	page = session->srch_page;
 
-	ret = __wt_data_return(session, key, data, 0);
+	ret = __wt_value_return(session, key, value, 0);
 
 err:	if (page != btree->root_page.page)
 		__wt_hazard_clear(session, page);

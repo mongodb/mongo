@@ -18,7 +18,7 @@ static inline int
 __wt_key_build(SESSION *session, void *ref)
 {
 	WT_BUF *scratch, _scratch;
-	WT_CELL *item;
+	WT_CELL *cell;
 
 	WT_CLEAR(_scratch);
 	scratch = &_scratch;
@@ -27,8 +27,8 @@ __wt_key_build(SESSION *session, void *ref)
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
-	item = ((WT_ROW *)ref)->key;
-	WT_RET(__wt_item_process(session, item, scratch));
+	cell = ((WT_ROW *)ref)->key;
+	WT_RET(__wt_cell_process(session, cell, scratch));
 
 	/* Update the WT_ROW reference with the processed key. */
 	__wt_key_set(ref, scratch->mem, scratch->item.size);

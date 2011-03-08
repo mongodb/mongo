@@ -34,7 +34,7 @@ wiredtiger_simple_setup(const char *progname, const char *config, BTREE **dbp)
 	session = &conn->default_session;
 
 	if ((ret = conn->btree(conn, 0, &btree)) != 0) {
-		fprintf(stderr, "%s: env.btree: %s\n",
+		fprintf(stderr, "%s: conn.btree: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		goto err;
 	}

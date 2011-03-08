@@ -66,7 +66,7 @@ __wt_bulk_fix(SESSION *session,
     int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
-	WT_ITEM *key, *data;
+	WT_ITEM *key, *value;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_BUF *tmp;
@@ -74,12 +74,12 @@ __wt_bulk_fix(SESSION *session,
 	uint64_t insert_cnt;
 	uint32_t len, space_avail;
 	uint16_t *last_repeat;
-	uint8_t *first_free, *last_data;
+	uint8_t *first_free, *last_value;
 	int rle, ret;
 
 	btree = session->btree;
 	insert_cnt = 0;
-	last_data = NULL;	/* Avoid "uninitialized" warning. */
+	last_value = NULL;	/* Avoid "uninitialized" warning. */
 	last_repeat = NULL;	/* Avoid "uninitialized" warning. */
 	WT_CLEAR(stack);
 	tmp = NULL;
@@ -98,7 +98,7 @@ __wt_bulk_fix(SESSION *session,
 	dsk->recno = 1;
 	__wt_init_ff_and_sa(page, &first_free, &space_avail);
 
-	while ((ret = cb(btree, &key, &data)) == 0) {
+	while ((ret = cb(btree, &key, &value)) == 0) {
 		if (key != NULL) {
 			__wt_err(session, 0,
 			    "column-store keys are implied and should not "
@@ -106,14 +106,14 @@ __wt_bulk_fix(SESSION *session,
 			ret = WT_ERROR;
 			goto err;
 		}
-		if (data->size != btree->fixed_len)
-			WT_ERR(__wt_file_wrong_fixed_size(session, data->size));
+		if (value->size != btree->fixed_len)
+			WT_ERR(__wt_file_wrong_fixed_size(session, value->size));
 
 		/*
-		 * We use the high bit of the data field as a "deleted" value,
-		 * make sure the user's data doesn't set it.
+		 * We use the high bit of the value as a "deleted" value,
+		 * make sure the user's value doesn't set it.
 		 */
-		if (WT_FIX_DELETE_ISSET(data->data)) {
+		if (WT_FIX_DELETE_ISSET(value->data)) {
 			__wt_err(session, 0,
 			    "the first bit may not be stored in fixed-length "
 			    "column-store file items");
@@ -128,19 +128,19 @@ __wt_bulk_fix(SESSION *session,
 
 		/*
 		 * If doing run-length encoding, check to see if this record
-		 * matches the last data inserted.   If there's a match try
+		 * matches the last value inserted.   If there's a match try
 		 * and increment that item's repeat count instead of entering
-		 * new data.
+		 * new value.
 		 */
 		if (rle && dsk->u.entries != 0)
 			if (*last_repeat < UINT16_MAX &&
-			    memcmp(last_data, data->data, data->size) == 0) {
+			    memcmp(last_value, value->data, value->size) == 0) {
 				++*last_repeat;
 				continue;
 			}
 
 		/*
-		 * We now have the data item to store on the page.  If there
+		 * We now have the value to store on the page.  If there
 		 * is insufficient space on the current page, allocate a new
 		 * one.
 		 */
@@ -161,7 +161,7 @@ __wt_bulk_fix(SESSION *session,
 		++dsk->u.entries;
 
 		/*
-		 * Copy the data item onto the page -- if doing run-length
+		 * Copy the value onto the page -- if doing run-length
 		 * encoding, track the location of the item for comparison.
 		 */
 		if (rle) {
@@ -169,11 +169,11 @@ __wt_bulk_fix(SESSION *session,
 			*last_repeat = 1;
 			first_free += sizeof(uint16_t);
 			space_avail -= WT_SIZEOF32(uint16_t);
-			last_data = first_free;
+			last_value = first_free;
 		}
-		memcpy(first_free, data->data, data->size);
-		first_free += data->size;
-		space_avail -= data->size;
+		memcpy(first_free, value->data, value->size);
+		first_free += value->size;
+		space_avail -= value->size;
 	}
 
 	/* A ret of 1 just means we've reached the end of the input. */
@@ -891,7 +891,8 @@ err:	if (next_tmp != NULL)
  *	string to be stored on the page.
  */
 static int
-__wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl)
+__wt_item_build_key(
+    SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
 	WT_STATS *stats;
@@ -905,7 +906,7 @@ __wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl
 	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
 	 * it.
 	 *
-	 * For Huffman-encoded key/data items, we need a chunk of new space;
+	 * For Huffman-encoded key/data cells, we need a chunk of new space;
 	 * use the SESSION key/data return memory: this routine is called during
 	 * bulk insert and reconciliation, we aren't returning key/data pairs.
 	 */
@@ -913,23 +914,23 @@ __wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(btree->huffman_key,
-		    dbt->data, dbt->size, &session->key));
-		if (session->key.item.size > dbt->size)
+		    item->data, item->size, &session->key));
+		if (session->key.item.size > item->size)
 			WT_STAT_INCRV(stats, FILE_HUFFMAN_KEY,
-			    session->key.item.size - dbt->size);
-		*dbt = session->key.item;
+			    session->key.item.size - item->size);
+		*item = session->key.item;
 	}
 
 	/* Create an overflow object if the data won't fit. */
-	if (dbt->size > btree->leafitemsize) {
-		WT_RET(__wt_bulk_ovfl_write(session, dbt, ovfl));
+	if (item->size > btree->leafitemsize) {
+		WT_RET(__wt_bulk_ovfl_write(session, item, ovfl));
 
-		dbt->data = ovfl;
-		dbt->size = sizeof(*ovfl);
-		WT_CELL_SET(item, WT_CELL_KEY_OVFL, dbt->size);
+		item->data = ovfl;
+		item->size = sizeof(*ovfl);
+		WT_CELL_SET(cell, WT_CELL_KEY_OVFL, item->size);
 		WT_STAT_INCR(stats, FILE_OVERFLOW_KEY);
 	} else
-		WT_CELL_SET(item, WT_CELL_KEY, dbt->size);
+		WT_CELL_SET(cell, WT_CELL_KEY, item->size);
 	return (0);
 }
 
@@ -940,7 +941,7 @@ __wt_item_build_key(SESSION *session, WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl
  */
 int
 __wt_item_build_value(SESSION *session,
-    WT_ITEM *dbt, WT_CELL *item, WT_OVFL *ovfl)
+    WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
 	WT_STATS *stats;
@@ -954,43 +955,43 @@ __wt_item_build_value(SESSION *session,
 	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
 	 * it.
 	 *
-	 * For Huffman-encoded key/data items, we need a chunk of new space;
+	 * For Huffman-encoded key/data cells, we need a chunk of new space;
 	 * use the SESSION key/data return memory: this routine is called during
 	 * bulk insert and reconciliation, we aren't returning key/data pairs.
 	 */
-	WT_CLEAR(*item);
-	WT_CELL_SET_TYPE(item, WT_CELL_DATA);
+	WT_CLEAR(*cell);
+	WT_CELL_SET_TYPE(cell, WT_CELL_DATA);
 
 	/*
-	 * Handle zero-length items quickly -- this is a common value, it's
-	 * a deleted column-store variable length item.
+	 * Handle zero-length cells quickly -- this is a common value, it's
+	 * a deleted column-store variable length cell.
 	 */
-	if (dbt->size == 0) {
-		WT_CELL_SET_LEN(item, 0);
+	if (item->size == 0) {
+		WT_CELL_SET_LEN(cell, 0);
 		return (0);
 	}
 
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_data != NULL) {
 		WT_RET(__wt_huffman_encode(btree->huffman_data,
-		    dbt->data, dbt->size, &session->value));
-		if (session->value.item.size > dbt->size)
+		    item->data, item->size, &session->value));
+		if (session->value.item.size > item->size)
 			WT_STAT_INCRV(stats, FILE_HUFFMAN_DATA,
-			    session->value.item.size - dbt->size);
-		*dbt = session->value.item;
+			    session->value.item.size - item->size);
+		*item = session->value.item;
 	}
 
 	/* Create an overflow object if the data won't fit. */
-	if (dbt->size > btree->leafitemsize) {
-		WT_RET(__wt_bulk_ovfl_write(session, dbt, ovfl));
+	if (item->size > btree->leafitemsize) {
+		WT_RET(__wt_bulk_ovfl_write(session, item, ovfl));
 
-		dbt->data = ovfl;
-		dbt->size = sizeof(*ovfl);
-		WT_CELL_SET_TYPE(item, WT_CELL_DATA_OVFL);
+		item->data = ovfl;
+		item->size = sizeof(*ovfl);
+		WT_CELL_SET_TYPE(cell, WT_CELL_DATA_OVFL);
 		WT_STAT_INCR(stats, FILE_OVERFLOW_DATA);
 	}
 
-	WT_CELL_SET_LEN(item, dbt->size);
+	WT_CELL_SET_LEN(cell, item->size);
 	return (0);
 }
 
@@ -1041,7 +1042,7 @@ err:	__wt_scr_release(&tmp);
  *	Store bulk-loaded overflow items in the file, returning the page addr.
  */
 static int
-__wt_bulk_ovfl_write(SESSION *session, WT_ITEM *dbt, WT_OVFL *to)
+__wt_bulk_ovfl_write(SESSION *session, WT_ITEM *item, WT_OVFL *to)
 {
 	BTREE *btree;
 	WT_BUF *tmp;
@@ -1054,17 +1055,17 @@ __wt_bulk_ovfl_write(SESSION *session, WT_ITEM *dbt, WT_OVFL *to)
 	tmp = NULL;
 
 	/* Get a scratch buffer and make it look like our work page. */
-	size = WT_ALIGN(WT_PAGE_DISK_SIZE + dbt->size, btree->allocsize);
+	size = WT_ALIGN(WT_PAGE_DISK_SIZE + item->size, btree->allocsize);
 	WT_ERR(__wt_bulk_scratch_page(session, size, WT_PAGE_OVFL, &page, &tmp));
 
 	/* Fill in the return information. */
 	to->addr = page->addr;
-	to->size = dbt->size;
+	to->size = item->size;
 
 	/* Initialize the page header and copy the record into place. */
 	dsk = page->dsk;
-	dsk->u.datalen = dbt->size;
-	memcpy((uint8_t *)dsk + WT_PAGE_DISK_SIZE, dbt->data, dbt->size);
+	dsk->u.datalen = item->size;
+	memcpy((uint8_t *)dsk + WT_PAGE_DISK_SIZE, item->data, item->size);
 
 	ret = __wt_page_write(session, page);
 

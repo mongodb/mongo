@@ -29,7 +29,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 	BTREE *btree;
 	WT_ITEM *key;
 	SESSION *session;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_CURSOR *cursor;
 	WT_UPDATE *upd;
 	void *huffman;
@@ -70,7 +70,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			 * print.  Set the key.
 			 */
 			if (__wt_key_process(cbt->rip)) {
-				WT_RET(__wt_item_process(session,
+				WT_RET(__wt_cell_process(session,
 				    cbt->rip->key, cbt->key_tmp));
 				key = &cbt->key_tmp->item;
 			} else
@@ -89,18 +89,18 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			}
 
 			/* Set data to reference the data we'll dump. */
-			item = cbt->rip->value;
-			if (WT_CELL_TYPE(item) == WT_CELL_DATA) {
+			cell = cbt->rip->value;
+			if (WT_CELL_TYPE(cell) == WT_CELL_DATA) {
 				if (huffman == NULL) {
 					cursor->value.item.data =
-					    WT_CELL_BYTE(item);
+					    WT_CELL_BYTE(cell);
 					cursor->value.item.size =
-					    WT_CELL_LEN(item);
+					    WT_CELL_LEN(cell);
 					break;
 				}
-			} else if (WT_CELL_TYPE(item) == WT_CELL_DATA_OVFL) {
-				WT_RET(__wt_item_process(session,
-				    item, cbt->value_tmp));
+			} else if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL) {
+				WT_RET(__wt_cell_process(session,
+				    cell, cbt->value_tmp));
 				cursor->value.item = cbt->value_tmp->item;
 				break;
 			} else

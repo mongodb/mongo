@@ -9,16 +9,17 @@
 #include "bt_inline.c"
 
 /*
- * __wt_data_return --
+ * __wt_value_return --
  *	Return a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
+__wt_value_return(
+    SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 {
 	BTREE *btree;
 	WT_ITEM local_key, local_value;
 	WT_COL *cip;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
@@ -64,7 +65,7 @@ __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_item_process(
+			WT_RET(__wt_cell_process(
 			    session, rip->key, &session->key));
 
 			*key = session->key.item;
@@ -84,7 +85,7 @@ __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	/*
 	 * Handle the value.
 	 *
-	 * If the item was ever updated, it's easy, take the last update item,
+	 * If the item was ever updated, it's easy, take the last update,
 	 * it's just a byte string.
 	 */
 	if (upd != NULL) {
@@ -106,20 +107,20 @@ __wt_data_return(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 		size_ret = btree->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
-		item = WT_COL_PTR(dsk, cip);
-		goto item_set;
+		cell = WT_COL_PTR(dsk, cip);
+		goto cell_set;
 	case WT_PAGE_ROW_LEAF:
-		item = rip->value;
-item_set:	switch (WT_CELL_TYPE(item)) {
+		cell = rip->value;
+cell_set:	switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (btree->huffman_data == NULL) {
-				value_ret = WT_CELL_BYTE(item);
-				size_ret = WT_CELL_LEN(item);
+				value_ret = WT_CELL_BYTE(cell);
+				size_ret = WT_CELL_LEN(cell);
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_RET(__wt_item_process(
-			    session, item, &session->value));
+			WT_RET(__wt_cell_process(
+			    session, cell, &session->value));
 			value_ret = session->value.item.data;
 			size_ret = session->value.item.size;
 			break;
@@ -132,14 +133,14 @@ item_set:	switch (WT_CELL_TYPE(item)) {
 	/*
 	 * When we get here, value_ret and size_ret are set to the byte string
 	 * and the length we're going to return.   That byte string has been
-	 * decoded, we called __wt_item_process above in all cases where the
+	 * decoded, we called __wt_cell_process above in all cases where the
 	 * item could be encoded.
 	 */
 	if (callback == NULL) {
 		/*
 		 * We're copying the key/value pair out to the caller.  If we
 		 * haven't yet copied the value_ret/size_ret pair into the return
-		 * WT_ITEM (potentially done by __wt_item_process), do so now.
+		 * WT_ITEM (potentially done by __wt_cell_process), do so now.
 		 */
 		if (value_ret != session->value.item.data) {
 			WT_RET(__wt_buf_grow(

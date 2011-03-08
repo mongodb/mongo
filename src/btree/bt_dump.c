@@ -209,7 +209,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	int ret;
@@ -232,17 +232,17 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Process the original data. */
-		item = WT_COL_PTR(dsk, cip);
-		switch (WT_CELL_TYPE(item)) {
+		cell = WT_COL_PTR(dsk, cip);
+		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				dp->p(WT_CELL_BYTE(item),
-				    WT_CELL_LEN(item), dp->stream);
+				dp->p(WT_CELL_BYTE(cell),
+				    WT_CELL_LEN(cell), dp->stream);
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_ERR(__wt_item_process(session, item, tmp));
+			WT_ERR(__wt_cell_process(session, cell, tmp));
 			dp->p(tmp->item.data, tmp->item.size, dp->stream);
 			break;
 		case WT_CELL_DEL:
@@ -265,7 +265,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	BTREE *btree;
 	WT_ITEM *key, *value, key_local, value_local;
 	WT_BUF *key_tmp, *value_tmp;
-	WT_CELL *item;
+	WT_CELL *cell;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -294,7 +294,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * print.  Set the key.
 		 */
 		if (__wt_key_process(rip)) {
-			WT_ERR(__wt_item_process(session, rip->key, key_tmp));
+			WT_ERR(__wt_cell_process(session, rip->key, key_tmp));
 			key = &key_tmp->item;
 		} else
 			key = (WT_ITEM *)rip;
@@ -310,18 +310,18 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Set value to reference the value we'll dump. */
-		item = rip->value;
-		switch (WT_CELL_TYPE(item)) {
+		cell = rip->value;
+		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {
-				value_local.data = WT_CELL_BYTE(item);
-				value_local.size = WT_CELL_LEN(item);
+				value_local.data = WT_CELL_BYTE(cell);
+				value_local.size = WT_CELL_LEN(cell);
 				value = &value_local;
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_ERR(__wt_item_process(session, item, value_tmp));
+			WT_ERR(__wt_cell_process(session, cell, value_tmp));
 			value = &value_tmp->item;
 			break;
 		WT_ILLEGAL_FORMAT_ERR(btree, ret);
