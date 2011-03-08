@@ -141,9 +141,12 @@ __wt_scr_free(SESSION *session)
 	WT_BUF **p;
 	u_int i;
 
-	for (i = 0, p = session->scratch; i < session->scratch_alloc; ++i, ++p)
+	for (i = 0,
+	    p = session->scratch; i < session->scratch_alloc; ++i, ++p) {
 		if (*p != NULL)
 			__wt_buf_free(session, *p);
+		__wt_free(session, *p, sizeof(WT_BUF));
+	}
 
 	__wt_free(session,
 	    session->scratch, session->scratch_alloc * sizeof(WT_BUF *));
