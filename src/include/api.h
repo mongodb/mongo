@@ -28,17 +28,17 @@ typedef struct {
  *	in this structure.
  */
 typedef struct {
-	WT_PAGE	*page;				/* page header */
-	uint8_t	*first_free;			/* page's first free byte */
-	uint32_t space_avail;			/* page's space available */
+	WT_PAGE	*page;			/* page header */
+	uint8_t	*first_free;		/* page's first free byte */
+	uint32_t space_avail;		/* page's space available */
 
 	WT_BUF *tmp;			/* page-in-a-buffer */
-	void *data;				/* last on-page WT_COL/WT_ROW */
+	void *data;			/* last on-page WT_COL/WT_ROW */
 } WT_STACK_ELEM;
 
 typedef struct {
-	WT_STACK_ELEM *elem;			/* stack */
-	u_int size;				/* stack size */
+	WT_STACK_ELEM *elem;		/* stack */
+	u_int size;			/* stack size */
 } WT_STACK;
 
 typedef struct {
@@ -223,9 +223,9 @@ struct __session {
 	const char *name;		/* Name */
 
 	BTREE	*btree;			/* Current file */
-	WT_BUF	 key, value;	/* Returned key/value pairs */
+	WT_BUF	 key, value;		/* Returned key/value pairs */
 
-	WT_BUF	*scratch;	/* Temporary memory for any function */
+	WT_BUF	*scratch;		/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
 
 					/* SESSION workQ request */
