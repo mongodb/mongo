@@ -564,11 +564,9 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 int
 __wt_bulk_end(CURSOR_BULK *cbulk)
 {
-	BTREE *btree;
 	SESSION *session;
 	int ret;
 
-	btree = cbulk->cbt.btree;
 	session = (SESSION *)cbulk->cbt.iface.session;
 	ret = 0;
 
