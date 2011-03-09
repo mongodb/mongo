@@ -322,15 +322,16 @@ coreServerFiles = [ "util/message_server_port.cpp" ,
                     "util/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
                     "db/matcher.cpp" , "db/dbcommands_generic.cpp" ]
 
-coreServerFiles += [ "util/mmap.cpp" ]
+mmapFiles = [ "util/mmap.cpp" ]
 
 if has_option( "mm" ):
-    coreServerFiles += [ "util/mmap_mm.cpp" ]
+    mmapFiles += [ "util/mmap_mm.cpp" ]
 elif os.sys.platform == "win32":
-    coreServerFiles += [ "util/mmap_win.cpp" ]
+    mmapFiles += [ "util/mmap_win.cpp" ]
 else:
-    coreServerFiles += [ "util/mmap_posix.cpp" ]
+    mmapFiles += [ "util/mmap_posix.cpp" ]
 
+coreServerFiles += mmapFiles
 
 processInfoFiles = [ "util/processinfo.cpp" ]
 
@@ -1199,11 +1200,7 @@ elif not onlyServer:
 
     if weird:
         shell32BitFiles = coreShellFiles
-        for f in allClientFiles:
-            shell32BitFiles.append( "32bit/" + str( f ) )
-        for f in scriptingFiles:
-            shell32BitFiles.append( "32bit/" + str( f ) )
-        for f in processInfoFiles:
+        for f in allClientFiles + scriptingFiles + processInfoFiles + mmapFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
         shellEnv.VariantDir( "32bit" , "." , duplicate=1 )
     else:
