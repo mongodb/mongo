@@ -131,7 +131,7 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	__wt_buf_free(session, &cursor->value);
 
 	TAILQ_REMOVE(&session->cursors, cursor, q);
-	__wt_free(session, cursor, sizeof(CURSOR_BTREE));
+	__wt_free(session, cursor);
 
 	return (ret);
 }

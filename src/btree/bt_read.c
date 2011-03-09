@@ -259,8 +259,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 
 err:	if (page != NULL) {
 		if (page->dsk != NULL)
-			__wt_free(session, page->dsk, size);
-		__wt_free(session, page, sizeof(WT_PAGE));
+			__wt_free(session, page->dsk);
+		__wt_free(session, page);
 	}
 	return (ret);
 }

@@ -135,20 +135,18 @@ __wt_col_update(
 
 	if (ret != 0) {
 err:		if (exp != NULL)
-			__wt_free(session, exp, sizeof(WT_RLE_EXPAND));
+			__wt_free(session, exp);
 		if (upd != NULL)
 			__wt_update_free(session, upd);
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */
 	if (new_rleexp != NULL && new_rleexp != page->u.col_leaf.rleexp)
-		__wt_free(session,
-		    new_rleexp, page->indx_count * sizeof(WT_RLE_EXPAND *));
+		__wt_free(session, new_rleexp);
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.col_leaf.upd)
-		__wt_free(
-		    session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
+		__wt_free(session, new_upd);
 
 	WT_PAGE_OUT(session, page);
 

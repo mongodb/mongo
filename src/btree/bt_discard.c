@@ -68,8 +68,8 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	}
 
 	if (page->dsk != NULL)
-		__wt_free(session, page->dsk, page->size);
-	__wt_free(session, page, sizeof(WT_PAGE));
+		__wt_free(session, page->dsk);
+	__wt_free(session, page);
 }
 
 /*
@@ -81,8 +81,7 @@ __wt_discard_page_col_fix(SESSION *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
-		__wt_free(session,
-		    page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
+		__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the update array. */
 	if (page->u.col_leaf.upd != NULL)
@@ -99,8 +98,7 @@ __wt_discard_page_col_int(SESSION *session, WT_PAGE *page)
 {
 	/* Free the subtree-reference array. */
 	if (page->u.col_int.t != NULL)
-		__wt_free(session,
-		    page->u.col_int.t, page->indx_count * sizeof(WT_COL_REF));
+		__wt_free(session, page->u.col_int.t);
 }
 
 /*
@@ -112,8 +110,7 @@ __wt_discard_page_col_rle(SESSION *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
-		__wt_free(session,
-		    page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
+		__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the run-length encoded column-store expansion array. */
 	if (page->u.col_leaf.rleexp != NULL)
@@ -129,8 +126,7 @@ __wt_discard_page_col_var(SESSION *session, WT_PAGE *page)
 {
 	/* Free the in-memory index array. */
 	if (page->u.col_leaf.d != NULL)
-		__wt_free(session,
-		    page->u.col_leaf.d, page->indx_count * sizeof(WT_COL));
+		__wt_free(session, page->u.col_leaf.d);
 
 	/* Free the update array. */
 	if (page->u.col_leaf.upd != NULL)
@@ -154,12 +150,11 @@ __wt_discard_page_row_int(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
 		if (!__wt_row_key_on_page(page, rref))
-			__wt_free(session, rref->key, rref->size);
+			__wt_free(session, rref->key);
 
 	/* Free the subtree-reference array. */
 	if (page->u.row_int.t != NULL)
-		__wt_free(session,
-		    page->u.row_int.t, page->indx_count * sizeof(WT_ROW_REF));
+		__wt_free(session, page->u.row_int.t);
 }
 
 /*
@@ -181,9 +176,8 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i)
 		if (!__wt_row_key_on_page(page, rip))
-			__wt_free(session, rip->key, rip->size);
-	__wt_free(session,
-	    page->u.row_leaf.d, page->indx_count * sizeof(WT_ROW));
+			__wt_free(session, rip->key);
+	__wt_free(session, page->u.row_leaf.d);
 
 	if (page->u.row_leaf.upd != NULL)
 		__wt_discard_update(
@@ -209,7 +203,7 @@ __wt_discard_update(
 			__wt_discard_update_list(session, *updp);
 
 	/* Free the page's array of updates. */
-	__wt_free(session, update_head, indx_count * sizeof(WT_UPDATE *));
+	__wt_free(session, update_head);
 }
 
 /*
@@ -237,13 +231,12 @@ __wt_discard_relexp(SESSION *session, WT_PAGE *page)
 		__wt_discard_update_list(session, exp->upd);
 		do {
 			a = exp->next;
-			__wt_free(session, exp, sizeof(WT_RLE_EXPAND));
+			__wt_free(session, exp);
 		} while ((exp = a) != NULL);
 	}
 
 	/* Free the page's expansion array. */
-	__wt_free(session, page->u.col_leaf.rleexp,
-	    page->indx_count * sizeof(WT_RLE_EXPAND *));
+	__wt_free(session, page->u.col_leaf.rleexp);
 }
 
 /*
@@ -263,6 +256,6 @@ __wt_discard_update_list(SESSION *session, WT_UPDATE *upd)
 		sb = upd->sb;
 		WT_ASSERT(session, sb->out < sb->in);
 		if (++sb->out == sb->in)
-			__wt_free(session, sb, sb->len);
+			__wt_free(session, sb);
 	} while ((upd = a) != NULL);
 }

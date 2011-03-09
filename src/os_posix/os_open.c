@@ -88,8 +88,8 @@ __wt_open(
 
 err:	if (fh != NULL) {
 		if (fh->name != NULL)
-			__wt_free(session, fh->name, 0);
-		__wt_free(session, fh, sizeof(WT_FH));
+			__wt_free(session, fh->name);
+		__wt_free(session, fh);
 	}
 	(void)close(fd);
 	return (ret);
@@ -121,8 +121,8 @@ __wt_close(SESSION *session, WT_FH *fh)
 		ret = WT_ERROR;
 	}
 
-	__wt_free(session, fh->name, 0);
-	__wt_free(session, fh->stats, 0);
-	__wt_free(session, fh, sizeof(WT_FH));
+	__wt_free(session, fh->name);
+	__wt_free(session, fh->stats);
+	__wt_free(session, fh);
 	return (ret);
 }

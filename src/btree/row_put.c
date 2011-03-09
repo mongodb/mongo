@@ -66,8 +66,7 @@ err:		if (upd != NULL)
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.row_leaf.upd)
-		__wt_free(
-		    session, new_upd, page->indx_count * sizeof(WT_UPDATE *));
+		__wt_free(session, new_upd);
 
 	WT_PAGE_OUT(session, page);
 
@@ -273,5 +272,5 @@ __wt_update_free(SESSION *session, WT_UPDATE *upd)
 	 * it here, it's not linked to any WT_PAGE in the system.
 	 */
 	if (upd->sb->in == 0)
-		__wt_free(session, upd->sb, upd->sb->len);
+		__wt_free(session, upd->sb);
 }

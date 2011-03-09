@@ -1159,7 +1159,7 @@ __wt_bulk_stack_put(SESSION *session, WT_STACK *stack)
 
 		__wt_scr_release(&elem->tmp);
 	}
-	__wt_free(session, stack->elem, stack->size * sizeof(WT_STACK_ELEM));
+	__wt_free(session, stack->elem);
 
 	return (0);
 }

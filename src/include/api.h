@@ -335,10 +335,6 @@ struct __connection {
 	WT_STATS *stats;		/* Environment handle statistics */
 	WT_STATS *method_stats;		/* Environment method statistics */
 
-#ifdef HAVE_DIAGNOSTIC
-	WT_MTRACK *mtrack;		/* Memory tracking information */
-#endif
-
 	const char *sep;		/* Display separator line */
 
 	uint32_t flags;

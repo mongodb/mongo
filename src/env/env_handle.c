@@ -22,11 +22,6 @@ __wt_connection_config(CONNECTION *conn)
 	__wt_methods_connection_lockout(conn);
 	__wt_methods_connection_init_transition(conn);
 
-#ifdef HAVE_DIAGNOSTIC
-	/* If we're tracking memory, initialize those structures first. */
-	if (F_ISSET(conn, WT_MEMORY_CHECK))
-		WT_RET(__wt_mtrack_alloc(conn));
-#endif
 						/* Global mutex */
 	WT_RET(__wt_mtx_alloc(session, "CONNECTION", 0, &conn->mtx));
 
@@ -66,18 +61,12 @@ __wt_connection_destroy(CONNECTION *conn)
 	(void)__wt_mtx_destroy(session, conn->mtx);
 
 	/* Free allocated memory. */
-	__wt_free(session, conn->sessions, 0);
-	__wt_free(session, conn->toc_array, 0);
-	__wt_free(session, conn->hazard, 0);
-	__wt_free(session, conn->stats, 0);
-	__wt_free(session, conn->method_stats, 0);
+	__wt_free(session, conn->sessions);
+	__wt_free(session, conn->toc_array);
+	__wt_free(session, conn->hazard);
+	__wt_free(session, conn->stats);
+	__wt_free(session, conn->method_stats);
 
-#ifdef HAVE_DIAGNOSTIC
-	/* If we're tracking memory, check to see if everything was free'd. */
-	__wt_mtrack_dump(conn);
-	__wt_mtrack_free(conn);
-#endif
-
-	__wt_free(NULL, conn, sizeof(CONNECTION));
+	__wt_free(NULL, conn);
 	return (ret);
 }

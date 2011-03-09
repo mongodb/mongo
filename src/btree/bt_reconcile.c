@@ -213,8 +213,7 @@ __wt_rec_helper_init(SESSION *session, WT_PAGE *page, uint32_t max,
 		 */
 		if (r->s_entries < r->split_count + 5) {
 			if (r->save != NULL)
-				__wt_free(session,
-				    r->save, r->s_entries * sizeof(*r->save));
+				__wt_free(session, r->save);
 			r->s_entries = 0;
 			WT_RET(__wt_calloc_def(session,
 			    r->split_count + 5, &r->save));
@@ -763,8 +762,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	/* Free the sort array. */
 err:	if (expsort != NULL)
-		__wt_free(
-		    session, expsort, n_expsort * sizeof(WT_RLE_EXPAND *));
+		__wt_free(session, expsort);
 
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -811,8 +809,7 @@ __wt_rle_expand_sort(SESSION *session,
 	 */
 	if (n >= *np) {
 		if (*expsortp != NULL)
-			__wt_free(
-			    session, *expsortp, *np * sizeof(WT_RLE_EXPAND *));
+			__wt_free(session, *expsortp);
 		WT_RET(__wt_calloc_def(session, (size_t)n + 10, expsortp));
 		*np = n + 10;
 	}

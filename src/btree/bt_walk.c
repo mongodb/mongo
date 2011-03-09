@@ -159,7 +159,7 @@ __wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
 void
 __wt_walk_end(SESSION *session, WT_WALK *walk)
 {
-	__wt_free(session, walk->tree, walk->tree_len);
+	__wt_free(session, walk->tree);
 }
 
 /*

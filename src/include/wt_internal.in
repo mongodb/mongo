@@ -70,7 +70,6 @@ struct __wt_update;		typedef struct __wt_update WT_UPDATE;
  *******************************************/
 #include "walk.h"
 #include "btree.h"
-#include "mem.h"
 #include "api.h"
 
 #include "mutex.h"

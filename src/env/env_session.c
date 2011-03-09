@@ -94,11 +94,11 @@ __wt_session_close(SESSION *session)
 	 */
 	sb = session->sb;
 	if (sb != NULL && --sb->in == sb->out)
-		__wt_free(session, sb, sb->len);
+		__wt_free(session, sb);
 
 	/* Discard WT_ITEM memory. */
-	__wt_free(session, session->key.item.data, session->key.mem_size);
-	__wt_free(session, session->value.item.data, session->value.mem_size);
+	__wt_free(session, session->key.item.data);
+	__wt_free(session, session->value.item.data);
 	__wt_scr_free(session);
 
 	/* Unlock and destroy the thread's mutex. */

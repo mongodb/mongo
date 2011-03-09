@@ -7,12 +7,6 @@
 
 #include "wt_internal.h"
 
-#ifdef HAVE_DIAGNOSTIC
-static void __wt_free_overwrite(uint8_t *, size_t, const char *, int);
-static void __wt_mtrack(
-    SESSION *session, const void *, const void *, const char *, int);
-#endif
-
 /*
  * There's no malloc interface, WiredTiger never calls malloc.  The problem is
  * an application might: allocate memory, write secret stuff into it, free the
@@ -23,15 +17,11 @@ static void __wt_mtrack(
  */
 
 /*
- * __wt_calloc_func --
+ * __wt_calloc --
  *	ANSI calloc function.
  */
 int
-__wt_calloc_func(SESSION *session, size_t number, size_t size, void *retp
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    )
+__wt_calloc(SESSION *session, size_t number, size_t size, void *retp)
 {
 	void *p;
 
@@ -48,25 +38,18 @@ __wt_calloc_func(SESSION *session, size_t number, size_t size, void *retp
 		__wt_err(session, errno, "memory allocation");
 		return (WT_ERROR);
 	}
-	*(void **)retp = p;
 
-#ifdef	HAVE_DIAGNOSTIC
-	__wt_mtrack(session, NULL, p, file, line);
-#endif
+	*(void **)retp = p;
 	return (0);
 }
 
 /*
- * __wt_realloc_func --
+ * __wt_realloc --
  *	ANSI realloc function.
  */
 int
-__wt_realloc_func(SESSION *session,
-    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    )
+__wt_realloc(SESSION *session,
+    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
 	void *p;
 	size_t bytes_allocated;
@@ -113,24 +96,16 @@ __wt_realloc_func(SESSION *session,
 		*bytes_allocated_ret = (uint32_t)bytes_to_allocate;
 	}
 
-#ifdef	HAVE_DIAGNOSTIC
-	__wt_mtrack(session, *(void **)retp, p, file, line);
-#endif
-
 	*(void **)retp = p;
 	return (0);
 }
 
 /*
- * __wt_strdup_func --
+ * __wt_strdup --
  *	ANSI strdup function.
  */
 int
-__wt_strdup_func(SESSION *session, const char *str, void *retp
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    )
+__wt_strdup(SESSION *session, const char *str, void *retp)
 {
 	size_t len;
 	void *p;
@@ -148,12 +123,7 @@ __wt_strdup_func(SESSION *session, const char *str, void *retp
 		WT_STAT_INCR(S2C(session)->stats, MEMALLOC);
 
 	len = strlen(str) + 1;
-#ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_calloc_func(session, len, 1, &p, file, line));
-#else
-	WT_RET(__wt_calloc_func(session, len, 1, &p));
-#endif
-
+	WT_RET(__wt_calloc(session, len, 1, &p));
 	memcpy(p, str, len);
 
 	*(void **)retp = p;
@@ -161,15 +131,11 @@ __wt_strdup_func(SESSION *session, const char *str, void *retp
 }
 
 /*
- * __wt_free_func --
+ * __wt_free_int --
  *	ANSI free function.
  */
 void
-__wt_free_func(SESSION *session, void *p_arg
-#ifdef HAVE_DIAGNOSTIC
-    , size_t len, const char *file, int line
-#endif
-    )
+__wt_free_int(SESSION *session, void *p_arg)
 {
 	void *p;
 
@@ -189,206 +155,6 @@ __wt_free_func(SESSION *session, void *p_arg
 	p = *(void **)p_arg;
 	*(void **)p_arg = NULL;
 
-	if (p == NULL)			/* ANSI C free semantics */
-		return;
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * If we know how long the object is, overwrite it with an easily
-	 * recognizable value for debugging.
-	 */
-	if (len != 0)
-		__wt_free_overwrite(p, len, file, line);
-
-	__wt_mtrack(session, p, NULL, NULL, 0);
-#endif
-
-	free(p);
+	if (p != NULL)			/* ANSI C free semantics */
+		free(p);
 }
-
-#ifdef HAVE_DIAGNOSTIC
-/*
- * __wt_free_overwrite --
- *	Overwrite free'd memory with an easily recognizable value for debugging.
- */
-static void
-__wt_free_overwrite(uint8_t *m, size_t mlen, const char *file, int line)
-{
-	const char *p;
-	size_t lfile, lline;
-	char lbuf[10];
-
-	/*
-	 * Move a pointer to the file name, we don't need the whole path, and
-	 * the smaller the identifying chunk, the better off we are.
-	 */
-	if ((p = strrchr(file, '/')) == NULL)
-		p = file;
-	lfile = strlen(p);
-	lline = (size_t)snprintf(lbuf, sizeof(lbuf), "/%d", line);
-
-	/* Repeatedly copy the file/line information into the free'd memory. */
-	for (; mlen >= lfile + lline; mlen -= (lfile + lline)) {
-		memcpy(m, p, lfile);
-		m += lfile;
-		memcpy(m, lbuf, lline);
-		m += lline;
-	}
-	for (; mlen > 0; --mlen)
-		*m++ = WT_DEBUG_BYTE;
-}
-
-/*
- * __wt_mtrack_alloc --
- *	Allocate memory tracking structures.
- */
-int
-__wt_mtrack_alloc(CONNECTION *conn)
-{
-	SESSION *session;
-	WT_MTRACK *p;
-
-	session = &conn->default_session;
-
-	/*
-	 * Use a temporary variable -- assigning memory to conn->mtrack turns
-	 * on memory object tracking, and we need to set up the rest of the
-	 * structure first.
-	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_MTRACK), &p));
-	WT_RET(__wt_calloc(session, 1000, sizeof(WT_MEM), &p->list));
-	p->next = p->list;
-	p->slots = 1000;
-	conn->mtrack = p;
-	return (0);
-}
-
-/*
- * __wt_mtrack_free --
- *	Free memory tracking structures.
- */
-void
-__wt_mtrack_free(CONNECTION *conn)
-{
-	WT_MTRACK *p;
-
-	/*
-	 * Clear conn->mtrack (to turn off memory object tracking) before the
-	 * free.
-	 */
-	if ((p = conn->mtrack) == NULL)
-		return;
-	conn->mtrack = NULL;
-
-	__wt_free(&conn->default_session, p->list, 0);
-	__wt_free(&conn->default_session, p, 0);
-}
-
-/*
- * __wt_mtrack --
- *	Track memory allocations and frees.
- */
-static void
-__wt_mtrack(
-    SESSION *session, const void *f, const void *a, const char *file, int line)
-{
-	WT_MEM *mp, *t, *mp_end;
-	WT_MTRACK *mtrack;
-	int slot_check;
-
-	if (session == NULL || (mtrack = S2C(session)->mtrack) == NULL)
-		return;
-
-	/*
-	 * Remove freed memory from the list.  If it's a free/alloc pair (that
-	 * is, if __wt_realloc was called), re-use the slot.
-	 */
-	if (f != NULL) {
-		if ((mp = mtrack->next) > mtrack->list)
-			do {
-				if ((--mp)->addr == f)
-					goto enter;
-			} while (mp > mtrack->list);
-
-		__wt_err(session, 0, "mtrack: %p: not found", f);
-		__wt_attach(session);
-	}
-
-	if (a == NULL)
-		return;
-
-	/*
-	 * Add allocated memory to the list.
-	 *
-	 * First, see if there's a slot close by we can re-use (the assumption
-	 * is that when memory is allocated and quickly freed we re-use the
-	 * slots instead of leaving lots of free spots in the array.
-	 */
-	if ((mp = mtrack->next) > mtrack->list)
-		for (slot_check = 0; slot_check < 10; ++slot_check) {
-			if ((--mp)->addr == NULL)
-				goto enter;
-			if (mp == mtrack->list)
-				break;
-		}
-
-	mp_end = mtrack->list + mtrack->slots;
-
-	/* If there's an empty slot, use it. */
-	if (mtrack->next < mp_end)
-		goto next;
-
-	/* Try to compress the array. */
-	for (mp = mtrack->list, t = NULL;; ++mp, ++t) {
-		while (mp < mp_end && mp->addr != NULL)
-			++mp;
-		if (mp == mp_end)
-			break;
-		if (t == NULL)
-			t = mp + 1;
-		while (t < mp_end && t->addr == NULL)
-			++t;
-		if (t == mp_end)
-			break;
-		*mp++ = *t;
-		t->addr = NULL;
-	}
-	mtrack->next = mp;
-
-	/* If there's an empty slot, use it. */
-	if (mtrack->next < mp_end)
-		goto next;
-
-	/* Re-allocate the array and use the next empty slot. */
-	if ((mtrack->list = realloc(mtrack->list,
-	    mtrack->slots * 2 * sizeof(WT_MEM))) == NULL)
-		return;
-	mtrack->next = mtrack->list + mtrack->slots;
-	mtrack->slots *= 2;
-
-next:	mp = mtrack->next++;
-enter:	mp->addr = a;
-	mp->file = file;
-	mp->line = line;
-}
-
-/*
- * __wt_mtrack_dump --
- *	Complain about any memory allocated but never freed.
- */
-void
-__wt_mtrack_dump(CONNECTION *conn)
-{
-	WT_MTRACK *mtrack;
-	WT_MEM *mp;
-
-	if ((mtrack = conn->mtrack) == NULL)
-		return;
-
-	for (mp = mtrack->list; mp < mtrack->next; ++mp)
-		if (mp->addr != NULL)
-			__wt_errx(&conn->default_session,
-			    "mtrack: %p {%s/%d}: never freed",
-				mp->addr, mp->file, mp->line);
-}
-#endif

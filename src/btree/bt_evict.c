@@ -176,9 +176,9 @@ __wt_cache_evict_server(void *arg)
 	}
 
 err:	if (cache->evict != NULL)
-		__wt_free(session, cache->evict, cache->evict_len);
+		__wt_free(session, cache->evict);
 	if (cache->hazard != NULL)
-		__wt_free(session, cache->hazard, cache->hazard_len);
+		__wt_free(session, cache->hazard);
 	if (session != NULL)
 		WT_TRET(session->close(session, 0));
 

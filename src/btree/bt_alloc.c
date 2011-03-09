@@ -41,7 +41,7 @@ __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size)
 			TAILQ_REMOVE(&btree->freeqa, fe, qa);
 			TAILQ_REMOVE(&btree->freeqs, fe, qs);
 			--btree->freelist_entries;
-			__wt_free(session, fe, sizeof(WT_FREE_ENTRY));
+			__wt_free(session, fe);
 			return (0);
 		}
 
@@ -145,7 +145,7 @@ combine:/*
 			TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 			--btree->freelist_entries;
-			__wt_free(session, new, sizeof(WT_FREE_ENTRY));
+			__wt_free(session, new);
 			new = fe;
 			break;
 		}
@@ -162,7 +162,7 @@ combine:/*
 			TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 			--btree->freelist_entries;
-			__wt_free(session, new, sizeof(WT_FREE_ENTRY));
+			__wt_free(session, new);
 
 			new = fe;
 			goto combine;
@@ -311,7 +311,7 @@ __wt_block_write(SESSION *session)
 		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 		--btree->freelist_entries;
-		__wt_free(session, fe, sizeof(WT_FREE_ENTRY));
+		__wt_free(session, fe);
 	}
 
 	WT_ERR(__wt_desc_write(session));
@@ -355,7 +355,7 @@ __wt_block_truncate(SESSION *session)
 		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 		--btree->freelist_entries;
-		__wt_free(session, fe, sizeof(WT_FREE_ENTRY));
+		__wt_free(session, fe);
 	}
 
 	if (need_trunc)

@@ -32,7 +32,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__wt_session_close(session));
 
 	TAILQ_REMOVE(&conn->sessions_head, session, q);
-	__wt_free(NULL, session, sizeof(SESSION));
+	__wt_free(NULL, session);
 	return (0);
 }
 
@@ -248,7 +248,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		WT_TRET(wt_session->close(wt_session, config));
 	}
 
-	__wt_free(&conn->default_session, conn->home, 0);
+	__wt_free(&conn->default_session, conn->home);
 	WT_TRET(conn->close(conn, 0));
 	return (ret);
 }
@@ -300,7 +300,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	if (0) {
 err:		if (session != NULL)
 			(void)__wt_session_close(session);
-		__wt_free(&conn->default_session, session, sizeof(SESSION));
+		__wt_free(&conn->default_session, session);
 	}
 
 	return (0);
@@ -365,9 +365,9 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 
 	if (0) {
 err:		if (conn->home != NULL)
-			__wt_free(NULL, conn, 0);
+			__wt_free(NULL, conn);
 		conn->close(conn, 0);
-		__wt_free(NULL, conn, sizeof(CONNECTION));
+		__wt_free(NULL, conn);
 	}
 
 	return (ret);

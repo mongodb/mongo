@@ -88,12 +88,11 @@ __wt_cache_destroy(CONNECTION *conn)
 
 	reclist = &cache->reclist;
 	if (reclist->list != NULL)
-		__wt_free(session, reclist->list, reclist->l_allocated);
+		__wt_free(session, reclist->list);
 	if (reclist->save != NULL)
-		__wt_free(session,
-		    reclist->save, reclist->s_entries * sizeof(*reclist->save));
-	__wt_free(session, cache->stats, 0);
-	__wt_free(session, conn->cache, sizeof(WT_CACHE));
+		__wt_free(session, reclist->save);
+	__wt_free(session, cache->stats);
+	__wt_free(session, conn->cache);
 
 	return (ret);
 }

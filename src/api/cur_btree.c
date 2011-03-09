@@ -194,7 +194,7 @@ __wt_cursor_open(SESSION *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		__wt_free(session, cbt, csize);
+err:		__wt_free(session, cbt);
 	}
 
 	return (ret);

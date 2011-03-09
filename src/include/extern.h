@@ -301,36 +301,14 @@ __wt_workq_srvr(void *arg);
 void
 __wt_abort(SESSION *session);
 int
-__wt_calloc_func(SESSION *session, size_t number, size_t size, void *retp
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    );
+__wt_calloc(SESSION *session, size_t number, size_t size, void *retp);
 int
-__wt_realloc_func(SESSION *session,
-    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    );
+__wt_realloc(SESSION *session,
+    uint32_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
 int
-__wt_strdup_func(SESSION *session, const char *str, void *retp
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    );
+__wt_strdup(SESSION *session, const char *str, void *retp);
 void
-__wt_free_func(SESSION *session, void *p_arg
-#ifdef HAVE_DIAGNOSTIC
-    , size_t len, const char *file, int line
-#endif
-    );
-int
-__wt_mtrack_alloc(CONNECTION *conn);
-void
-__wt_mtrack_free(CONNECTION *conn);
-void
-__wt_mtrack_dump(CONNECTION *conn);
+__wt_free_int(SESSION *session, void *p_arg);
 int
 __wt_filesize(SESSION *session, WT_FH *fh, off_t *sizep);
 int

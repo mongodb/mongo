@@ -186,7 +186,7 @@ recursive_free_node(SESSION *session, WT_FREQTREE_NODE *node)
 	if (node != NULL) {
 		recursive_free_node(session, node->left);
 		recursive_free_node(session, node->right);
-		__wt_free(session, node, sizeof(WT_FREQTREE_NODE));
+		__wt_free(session, node);
 	}
 }
 
@@ -333,17 +333,17 @@ err:	if (leaves != NULL)
 	if (combined_nodes != NULL)
 		node_queue_close(session, combined_nodes);
 	if (indexed_freqs != NULL)
-		__wt_free(session, indexed_freqs, 0);
+		__wt_free(session, indexed_freqs);
 	if (node != NULL)
 		recursive_free_node(session, node);
 	if (node2 != NULL)
 		recursive_free_node(session, node2);
 	if (tempnode != NULL)
-		__wt_free(session, tempnode, sizeof(WT_FREQTREE_NODE));
+		__wt_free(session, tempnode);
 	if (ret != 0) {
 		if (huffman->nodes != NULL)
-			__wt_free(session, huffman->nodes, 0);
-		__wt_free(session, huffman, sizeof(WT_HUFFMAN_OBJ));
+			__wt_free(session, huffman->nodes);
+		__wt_free(session, huffman);
 	}
 	return (ret);
 }
@@ -359,8 +359,8 @@ __wt_huffman_close(SESSION *session, void *huffman_arg)
 
 	huffman = huffman_arg;
 
-	__wt_free(session, huffman->nodes, 0);
-	__wt_free(session, huffman, sizeof(WT_HUFFMAN_OBJ));
+	__wt_free(session, huffman->nodes);
+	__wt_free(session, huffman);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -408,7 +408,7 @@ __wt_print_huffman_code(SESSION *session, void *huffman_arg, uint16_t symbol)
 			return (WT_ERROR);
 		}
 
-		__wt_free(session, buffer, 0);
+		__wt_free(session, buffer);
 	} else
 		(void)printf("Symbol out of range: %lu >= %lu\n",
 		    (u_long)symbol, (u_long)huffman->numSymbols);
@@ -628,11 +628,11 @@ node_queue_close(SESSION *session, NODE_QUEUE *queue)
 	/* Freeing each element of the queue's linked list. */
 	for (elem = queue->first; elem != NULL; elem = next_elem) {
 		next_elem = elem->next;
-		__wt_free(session, elem, sizeof(NODE_QUEUE_ELEM));
+		__wt_free(session, elem);
 	}
 
 	/* Freeing the queue record itself. */
-	__wt_free(session, queue, sizeof(NODE_QUEUE));
+	__wt_free(session, queue);
 }
 
 /*
@@ -694,5 +694,5 @@ node_queue_dequeue(SESSION *session, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
 		queue->last = NULL;
 
 	/* Freeing the linked list element that has been dequeued */
-	__wt_free(session, first_elem, sizeof(NODE_QUEUE_ELEM));
+	__wt_free(session, first_elem);
 }

@@ -114,7 +114,7 @@ err:	/* Wrap up reporting and free allocated memory. */
 	if (vstuff.f != NULL)
 		vstuff.f(session->name, vstuff.fcnt);
 	if (vstuff.fragbits != NULL)
-		__wt_free(session, vstuff.fragbits, 0);
+		__wt_free(session, vstuff.fragbits);
 
 	return (ret);
 }

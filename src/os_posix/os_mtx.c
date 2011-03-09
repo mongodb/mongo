@@ -59,7 +59,7 @@ __wt_mtx_alloc(SESSION *session, const char *name, int is_locked, WT_MTX **mtxp)
 	*mtxp = mtx;
 	return (0);
 
-err:	__wt_free(session, mtx, sizeof(WT_MTX));
+err:	__wt_free(session, mtx);
 	return (WT_ERROR);
 }
 
@@ -140,7 +140,7 @@ __wt_mtx_destroy(SESSION *session, WT_MTX *mtx)
 	ret = pthread_cond_destroy(&mtx->cond);
 	WT_TRET(pthread_mutex_destroy(&mtx->mtx));
 
-	__wt_free(session, mtx, sizeof(WT_MTX));
+	__wt_free(session, mtx);
 
 	return (ret == 0 ? 0 : WT_ERROR);
 }

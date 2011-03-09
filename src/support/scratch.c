@@ -23,7 +23,7 @@ void
 __wt_buf_free(SESSION *session, WT_BUF *buf)
 {
 	if (buf->mem != NULL)
-		__wt_free(session, buf->mem, buf->mem_size);
+		__wt_free(session, buf->mem);
 
 	buf->item.data = NULL;
 	buf->mem_size = buf->item.size = 0;
@@ -145,9 +145,8 @@ __wt_scr_free(SESSION *session)
 	    p = session->scratch; i < session->scratch_alloc; ++i, ++p) {
 		if (*p != NULL)
 			__wt_buf_free(session, *p);
-		__wt_free(session, *p, sizeof(WT_BUF));
+		__wt_free(session, *p);
 	}
 
-	__wt_free(session,
-	    session->scratch, session->scratch_alloc * sizeof(WT_BUF *));
+	__wt_free(session, session->scratch);
 }

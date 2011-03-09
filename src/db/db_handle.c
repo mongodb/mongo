@@ -93,7 +93,7 @@ __wt_btree_destroy(BTREE *btree)
 	/* Diagnostic check: check flags against approved list. */
 	WT_CONN_FCHK_RET(conn, "Db.close", btree->flags, WT_APIMASK_BTREE, ret);
 
-	__wt_free(session, btree->name, 0);
+	__wt_free(session, btree->name);
 
 	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
@@ -109,8 +109,8 @@ __wt_btree_destroy(BTREE *btree)
 
 	__wt_walk_end(session, &btree->evict_walk);
 
-	__wt_free(session, btree->stats, 0);
-	__wt_free(session, btree->fstats, 0);
+	__wt_free(session, btree->stats);
+	__wt_free(session, btree->fstats);
 
 	/* Remove from the connection's list. */
 	__wt_lock(session, conn->mtx);
@@ -119,7 +119,7 @@ __wt_btree_destroy(BTREE *btree)
 	__wt_unlock(session, conn->mtx);
 
 	/* Discard the BTREE object. */
-	__wt_free(session, btree, sizeof(BTREE));
+	__wt_free(session, btree);
 
 	return (ret);
 }

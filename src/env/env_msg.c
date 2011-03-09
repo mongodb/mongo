@@ -79,7 +79,7 @@ __wt_mb_discard(WT_MBUF *mbp)
 	if (mbp->next != mbp->first)
 		__wt_mb_write(mbp);
 
-	__wt_free(mbp->session, mbp->first, mbp->len);
+	__wt_free(mbp->session, mbp->first);
 }
 
 /*
