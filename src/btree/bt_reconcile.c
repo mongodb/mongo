@@ -209,16 +209,16 @@ __wt_rec_helper_init(SESSION *session,
 		 * sure there's enough room.
 		 *
 		 * The calculation is actually +1, because we save the start
-		 * point one past the current entry -- make it +5 because I
-		 * don't want to debug the off-by-ones.
+		 * point one past the current entry -- make it +10 so we don't
+		 * grow slot-by-slot.
 		 */
-		if (r->s_entries < r->split_count + 5) {
+		if (r->s_entries < r->split_count + 10) {
 			if (r->save != NULL)
 				__wt_free(session, r->save);
 			r->s_entries = 0;
 			WT_RET(__wt_calloc_def(session,
-			    r->split_count + 5, &r->save));
-			r->s_entries = r->split_count + 5;
+			    r->split_count + 10, &r->save));
+			r->s_entries = r->split_count + 10;
 		}
 	}
 
