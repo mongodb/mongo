@@ -549,7 +549,7 @@ namespace mongo {
 
             scoped_lock lk(_curLogFileMutex);
 
-            if ( inShutdown() )
+            if ( inShutdown() || !_curLogFile )
                 return;
 
             j.updateLSNFile();
