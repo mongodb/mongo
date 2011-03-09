@@ -134,7 +134,6 @@ __wt_verify_tree(
 	uint64_t parent_recno,	/* First record in this subtree */
 	WT_VSTUFF *vs)		/* The verify package */
 {
-	BTREE *btree;
 	WT_COL_REF *cref;
 	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
@@ -142,7 +141,6 @@ __wt_verify_tree(
 	uint32_t i;
 	int ret;
 
-	btree = session->btree;
 	dsk = page->dsk;
 	ret = 0;
 

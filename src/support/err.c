@@ -279,11 +279,12 @@ __wt_errv(
 	end = s + sizeof(s);
 
 	if (prefix != NULL && p < end)
-		p += snprintf(p, end - p, "%s: ", prefix);
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix);
 	if (p < end)
-		p += vsnprintf(p, end - p, fmt, ap);
+		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
 	if (error != 0 && p < end)
-		p += snprintf(p, end - p, ": %s", wiredtiger_strerror(error));
+		p += snprintf(p,
+		    (size_t)(end - p), ": %s", wiredtiger_strerror(error));
 
 	handler = session->error_handler;
 	(void)handler->handle_error(handler, error, s);
