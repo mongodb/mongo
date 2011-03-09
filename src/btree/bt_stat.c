@@ -206,7 +206,7 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 	WT_UPDATE *upd;
 	uint32_t i;
 
-	arg = NULL;				/* Shut the compiler up. */
+	WT_UNUSED(arg);
 	btree = session->btree;
 	stats = btree->fstats;
 
