@@ -63,10 +63,10 @@ namespace mongo {
                     _open();
             }
 
-        private:
             /** open a journal file to journal operations to. */
             void open();
 
+        private:
             void _open();
             void closeCurrentJournalFile();
             void removeUnneededJournalFiles();

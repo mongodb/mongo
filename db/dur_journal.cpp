@@ -296,6 +296,7 @@ namespace mongo {
                         log() << "warning caught exception in preallocateFiles, continuing" << endl;
                     }
             }
+            j.open();
         }
 
         void removeOldJournalFile(path p) { 
