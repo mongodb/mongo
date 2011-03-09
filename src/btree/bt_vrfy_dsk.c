@@ -503,11 +503,8 @@ int
 __wt_verify_dsk_chunk(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
 	uint32_t len;
 	uint8_t *p;
-
-	btree = session->btree;
 
 	/*
 	 * Overflow and freelist pages are roughly identical, both are simply
