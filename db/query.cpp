@@ -382,11 +382,14 @@ namespace mongo {
                 c->advance();
 
                 if ( ! cc->yieldSometimes() ) {
+                    ClientCursor::erase(cursorid);
+                    cursorid = 0;
                     cc = 0;
+                    p.deleted();
                     break;
                 }
             }
-
+            
             if ( cc ) {
                 cc->updateLocation();
                 cc->mayUpgradeStorage();
