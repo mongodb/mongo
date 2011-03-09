@@ -11,6 +11,7 @@ while test $r -gt 0; do
 	valgrind \
 	    --leak-check=yes \
 	    --log-file=vgout.%p \
+	    --suppressions=vt.suppress \
 	    --track-fds=yes \
 	    ./t -1
 done
