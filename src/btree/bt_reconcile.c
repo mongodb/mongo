@@ -637,7 +637,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_UPDATE *upd;
 	uint64_t recno;
-	uint32_t entries, i, len, n_expsort, space_avail;
+	uint32_t entries, i, len, space_avail;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *first_free, *last_data;
 	int from_upd, ret;
@@ -645,9 +645,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	btree = session->btree;
 	tmp = NULL;
-	expsort = NULL;
 	dsk = page->dsk;
-	n_expsort = 0;			/* Necessary for the sort function */
 	last_data = NULL;
 	ret = 0;
 
@@ -675,11 +673,10 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 		 * terminated array of references to WT_RLE_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_ERR(__wt_rle_expand_sort(
-		    session, page, cip, &expsort, &n_expsort));
+		WT_ERR(__wt_rle_expand_sort(session, page, cip,
+		    &expsort, &S2C(session)->cache->reclist.expsort));
 
 		/*
-		 *
 		 * Generate entries for the new page: loop through the repeat
 		 * records, checking for WT_RLE_EXPAND entries that match the
 		 * current record number.
@@ -761,11 +758,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	ret = __wt_rec_helper(
 	    session, &recno, &entries, &first_free, &space_avail, 1);
 
-	/* Free the sort array. */
-err:	if (expsort != NULL)
-		__wt_free(session, expsort);
-
-	if (tmp != NULL)
+err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);
@@ -794,9 +787,12 @@ __wt_rle_expand_compare(const void *a, const void *b)
  */
 int
 __wt_rle_expand_sort(SESSION *session,
-    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np)
+    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, WT_BUF **tmpp)
 {
+	WT_BUF *tmp;
+	WT_RLE_EXPAND **expsort;
 	WT_RLE_EXPAND *exp;
+	uint32_t sz;
 	uint16_t n;
 
 	/* Figure out how big the array needs to be. */
@@ -805,29 +801,31 @@ __wt_rle_expand_sort(SESSION *session,
 		;
 
 	/*
-	 * Allocate that big an array -- always allocate at least one slot,
-	 * our caller expects NULL-termination.
+	 * Allocate a temporary buffer, and/or grow it as necessary.  Our caller
+	 * expects a NULL-terminated array, so always add an extra slot.
 	 */
-	if (n >= *np) {
-		if (*expsortp != NULL)
-			__wt_free(session, *expsortp);
-		WT_RET(__wt_calloc_def(session, (size_t)n + 10, expsortp));
-		*np = n + 10;
-	}
-
-	/* Enter the WT_RLE_EXPAND structures into the array. */
-	for (n = 0,
-	    exp = WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next, ++n)
-		(*expsortp)[n] = exp;
-
-	/* Sort the entries. */
-	if (n != 0)
-		qsort(*expsortp, (size_t)n,
-		    sizeof(WT_RLE_EXPAND *), __wt_rle_expand_compare);
+	sz = (n + 1) * sizeof(WT_RLE_EXPAND *);
+	if ((tmp = *tmpp) == NULL) {
+		WT_RET(__wt_scr_alloc(session, sz, tmpp));
+		tmp = *tmpp;
+	} else
+		if (sz > tmp->mem_size)
+			WT_RET(__wt_buf_grow(session, tmp, sz));
+	expsort = tmp->mem;
 
 	/* NULL-terminate the array. */
-	(*expsortp)[n] = NULL;
+	expsort[n] = NULL;
 
+	/* Enter the WT_RLE_EXPAND structures into the array and sort them. */
+	if (n != 0) {
+		for (exp =
+		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next)
+			*expsort++ = exp;
+		qsort(tmp->mem, (size_t)n,
+		    sizeof(WT_RLE_EXPAND *), __wt_rle_expand_compare);
+	}
+
+	*expsortp = tmp->mem;
 	return (0);
 }
 

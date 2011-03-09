@@ -146,20 +146,22 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	BTREE *btree;
 	FILE *fp;
+	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_UPDATE *upd;
 	uint64_t recno;
-	uint32_t i, n_expsort;
+	uint32_t i;
 	uint16_t n_repeat;
 	void *cipdata;
+	int ret;
 
 	btree = session->btree;
-	dsk = page->dsk;
 	fp = dp->stream;
-	expsort = NULL;
-	n_expsort = 0;
+	tmp = NULL;
+	dsk = page->dsk;
+	ret = 0;
 
 	recno = page->dsk->recno;
 	WT_COL_INDX_FOREACH(page, cip, i) {
@@ -170,8 +172,8 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * terminated array of references to WT_RLE_EXPAND structures,
 		 * sorted by record number.
 		 */
-		WT_RET(__wt_rle_expand_sort(
-		    session, page, cip, &expsort, &n_expsort));
+		WT_ERR(
+		    __wt_rle_expand_sort(session, page, cip, &expsort, &tmp));
 
 		/*
 		 * Dump the records.   We use the WT_UPDATE entry for records in
@@ -192,11 +194,12 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 					dp->p(WT_RLE_REPEAT_DATA(
 					    cipdata), btree->fixed_len, fp);
 	}
-	/* Free the sort array. */
-	if (expsort != NULL)
-		__wt_free( session, expsort);
 
-	return (0);
+	/* Free the sort array. */
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
+
+	return (ret);
 }
 
 /*

@@ -26,8 +26,6 @@ struct __wt_evict_list {
  *	Information tracking a single page reconciliation.
  */
 typedef struct {
-	WT_BUF *dsk_tmp;			/* Disk-image buffer */
-
 	/*
 	 * Each reconciliation function writes out some number of pages,
 	 * normally one, occasionally more than one, and returns to its
@@ -99,6 +97,10 @@ typedef struct {
 	} *save;
 	u_int s_next;				/* Next save slot */
 	u_int s_entries;			/* Total save slots */
+
+	WT_BUF *dsk_tmp;			/* Disk-image buffer */
+	WT_BUF *expsort;			/* RLE expansion array buffer */
+
 } WT_REC_LIST;
 
 /*

@@ -151,7 +151,7 @@ int
 __wt_page_reconcile(SESSION *session, WT_PAGE *page);
 int
 __wt_rle_expand_sort(SESSION *session,
-    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, uint32_t *np);
+    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, WT_BUF **tmpp);
 int
 __wt_value_return(
     SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);
