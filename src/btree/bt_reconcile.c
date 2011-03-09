@@ -24,8 +24,8 @@ static int __wt_rec_helper(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *, int);
 static int __wt_rec_helper_fixup(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *);
-static int __wt_rec_helper_init(
-	SESSION *, WT_PAGE *, uint32_t, uint64_t *, uint8_t **, uint32_t *);
+static int __wt_rec_helper_init(SESSION *,
+	WT_PAGE *, uint32_t, uint32_t, uint64_t *, uint8_t **, uint32_t *);
 static int __wt_rec_helper_write(SESSION *, int, WT_PAGE_DISK *, void *);
 
 static inline uint32_t	__wt_allocation_size(SESSION *, void *, uint8_t *);
@@ -129,7 +129,8 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page)
  *	Initialization for the reconciliation helper function.
  */
 static int
-__wt_rec_helper_init(SESSION *session, WT_PAGE *page, uint32_t max,
+__wt_rec_helper_init(SESSION *session,
+    WT_PAGE *page, uint32_t max, uint32_t min,
     uint64_t *recnop, uint8_t **first_freep, uint32_t *space_availp)
 {
 	BTREE *btree;
@@ -185,7 +186,7 @@ __wt_rec_helper_init(SESSION *session, WT_PAGE *page, uint32_t max,
 	 * This won't get tested enough if we don't force the code to create
 	 * lots of splits.
 	 */
-	r->split_page_size = btree->allocsize;
+	r->split_page_size = min;
 #endif
 	/*
 	 * If the maximum page size is the same as the split page size, there
@@ -512,8 +513,8 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page)
 
 	recno = page->dsk->recno;
 	entries = 0;
-	WT_RET(__wt_rec_helper_init(session, page,
-	    session->btree->intlmax, &recno, &first_free, &space_avail));
+	WT_RET(__wt_rec_helper_init(session, page, session->btree->intlmax,
+	    session->btree->intlmin, &recno, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
 	from = &_from;
@@ -581,8 +582,8 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	 */
 	unused = page->dsk->recno;
 	entries = 0;
-	WT_ERR(__wt_rec_helper_init(session, page,
-	    session->btree->leafmax, &unused, &first_free, &space_avail));
+	WT_ERR(__wt_rec_helper_init(session, page, session->btree->leafmax,
+	    session->btree->leafmin, &unused, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
@@ -663,8 +664,8 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	recno = page->dsk->recno;
 	entries = 0;
-	WT_RET(__wt_rec_helper_init(session, page,
-	    session->btree->leafmax, &recno, &first_free, &space_avail));
+	WT_RET(__wt_rec_helper_init(session, page, session->btree->leafmax,
+	    session->btree->leafmin, &recno, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
@@ -856,8 +857,8 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 
 	recno = page->dsk->recno;
 	entries = 0;
-	WT_RET(__wt_rec_helper_init(session, page,
-	    session->btree->leafmax, &recno, &first_free, &space_avail));
+	WT_RET(__wt_rec_helper_init(session, page, session->btree->leafmax,
+	    session->btree->leafmin, &recno, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
@@ -942,8 +943,8 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 
 	unused = 0;
 	entries = 0;
-	WT_RET(__wt_rec_helper_init(session, page,
-	    session->btree->intlmax, &unused, &first_free, &space_avail));
+	WT_RET(__wt_rec_helper_init(session, page, session->btree->intlmax,
+	    session->btree->intlmin, &unused, &first_free, &space_avail));
 
 	/*
 	 * We have to walk both the WT_ROW structures and the original page --
@@ -1019,8 +1020,8 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 
 	unused = 0;
 	entries = 0;
-	WT_RET(__wt_rec_helper_init(session, page,
-	    session->btree->leafmax, &unused, &first_free, &space_avail));
+	WT_RET(__wt_rec_helper_init(session, page, session->btree->leafmax,
+	    session->btree->leafmin, &unused, &first_free, &space_avail));
 
 	/*
 	 * Walk the page, accumulating key/value pairs.
