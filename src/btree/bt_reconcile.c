@@ -804,7 +804,7 @@ __wt_rle_expand_sort(SESSION *session,
 	 * Allocate a temporary buffer, and/or grow it as necessary.  Our caller
 	 * expects a NULL-terminated array, so always add an extra slot.
 	 */
-	sz = (n + 1) * sizeof(WT_RLE_EXPAND *);
+	sz = (n + 1) * WT_SIZEOF32(WT_RLE_EXPAND *);
 	if ((tmp = *tmpp) == NULL) {
 		WT_RET(__wt_scr_alloc(session, sz, tmpp));
 		tmp = *tmpp;
