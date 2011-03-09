@@ -579,29 +579,32 @@ namespace mongo {
             return;
 
         Client::Context ctx(ns);
-        int n = 0;
-        while ( d.moreJSObjs() ) {
-            BSONObj js = d.nextJsObj();
-            uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        if( d.moreJSObjs() ) { 
+            int n = 0;
+            while ( 1 ) {
+                BSONObj js = d.nextJsObj();
+                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
-            {
-                // check no $ modifiers
-                BSONObjIterator i( js );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                {
+                    // check no $ modifiers
+                    BSONObjIterator i( js );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                    }
                 }
-            }
 
-            theDataFileMgr.insertWithObjMod(ns, js, false);
-            logOp("i", ns, js);
+                theDataFileMgr.insertWithObjMod(ns, js, false);
+                logOp("i", ns, js);
+                ++n;
 
-            if( ++n % 4 == 0 ) {
-                // if we are inserting quite a few, we may need to commit along the way
+                if( !d.moreJSObjs() )
+                    break;
+
                 getDur().commitIfNeeded();
             }
+            globalOpCounters.incInsertInWriteLock(n);
         }
-        globalOpCounters.incInsertInWriteLock(n);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
