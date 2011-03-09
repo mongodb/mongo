@@ -569,10 +569,8 @@ __wt_verify_addfrag(
 static int
 __wt_verify_checkfrag(SESSION *session, WT_VSTUFF *vs)
 {
-	BTREE *btree;
 	int ffc, ffc_start, ffc_end, frags, ret;
 
-	btree = session->btree;
 	frags = (int)vs->frags;		/* XXX: bitstring.h wants "ints" */
 	ret = 0;
 
