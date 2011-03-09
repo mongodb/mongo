@@ -236,12 +236,12 @@ namespace ThreadedTests {
     class RWLockTest2 { 
     public:
         
-        static void worker( const RWLock * lk , int * x ) {
-            *x = 1;
+        static void worker( const RWLock * lk , AtomicUInt * x ) {
+            (*x)++; // 1
             cout << "lock b try" << endl;
             rwlock b( *lk , true ); 
             cout << "lock b got" << endl;
-            *x = 2;
+            (*x)++; // 2
         }
 
         void run() { 
@@ -253,7 +253,8 @@ namespace ThreadedTests {
             
             auto_ptr<rwlock> a( new rwlock( lk , false ) );
             
-            int x = 0;
+            AtomicUInt x = 0;
+            cout << "A : " << &x << endl;
             boost::thread t( boost::bind( worker , &lk , &x ) );
             while ( ! x );
             assert( x == 1 );
