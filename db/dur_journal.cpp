@@ -256,14 +256,23 @@ namespace mongo {
         void preallocateFile(filesystem::path p, unsigned long long len) {
             if( exists(p) ) 
                 return;
-
-            const unsigned BLKSZ = 1024 * 1024;
+            
             log() << "preallocating a journal file " << p.string() << endl;
-            LogFile f(p.string());
-            AlignedBuilder b(BLKSZ);
-            for( unsigned long long x = 0; x < len; x += BLKSZ ) { 
-                f.synchronousAppend(b.buf(), BLKSZ);
+
+            const unsigned BLKSZ = 1024 * 64;
+            AlignedBuilder b(BLKSZ);            
+            assert( len % BLKSZ == 0 );
+
+            File f;
+            f.open( p.string().c_str() , false , true );
+            assert( f.is_open() );
+            fileofs loc = 0;
+            while ( loc < len ) {
+                f.write( loc , b.buf() , BLKSZ );
+                loc += BLKSZ;
             }
+            assert( loc == len );
+            f.fsync();
         }
 
         // throws
