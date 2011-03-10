@@ -574,7 +574,7 @@ wts_put_row(u_int64_t keyno)
 	conn = btree->conn;
 
 	key_gen(&key.data, &key.size, keyno);
-	data_gen(&data.data, &key.size, 0);
+	data_gen(&data.data, &data.size, 0);
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
