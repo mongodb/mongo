@@ -257,11 +257,15 @@ namespace mongo {
     class rwlock {
     public:
         /**
-         * @param lowPriority if > 0, will try to get the lock not gredily for that many # of ms
+         * @param write acquire write lock if true sharable if false
+         * @param lowPriority if > 0, will try to get the lock non-greedily for that many ms
          */
         rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false , int lowPriorityWaitMS = 0 )
             : _lock( (RWLock&)lock ) , _write( write ) {
             
+            // alreadyHaveLock should probably go away.  this as a starter in that direction:
+            dassert(!alreadyHaveLock);
+
             if ( ! alreadyHaveLock ) {
                 
                 if ( _write ) {
