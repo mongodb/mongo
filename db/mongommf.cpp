@@ -332,8 +332,6 @@ namespace mongo {
     /*virtual*/ void MongoMMF::close() {
         {
             if( cmdLine.dur && _view_write/*actually was opened*/ ) {
-                if( debug )
-                    log() << "closingFileNotication:" << filename() << endl;
                 dur::closingFileNotification();
             }
             privateViews.remove(_view_private);
