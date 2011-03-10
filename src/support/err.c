@@ -259,9 +259,12 @@ __wt_connection_lockout(CONNECTION *conn)
 	return (__wt_session_lockout(&conn->default_session));
 }
 
+/*
+ * __wt_errv --
+ * 	Report an error (va_list version).
+ */
 void
-__wt_errv(
-    SESSION *session, int error,
+__wt_errv(SESSION *session, int error,
     const char *prefix, const char *fmt, va_list ap)
 {
 	WT_ERROR_HANDLER *handler;
@@ -290,6 +293,10 @@ __wt_errv(
 	(void)handler->handle_error(handler, error, s);
 }
 
+/*
+ * __wt_err --
+ * 	Report an error.
+ */
 void
 __wt_err(SESSION *session, int error, const char *fmt, ...)
 {
@@ -301,6 +308,10 @@ __wt_err(SESSION *session, int error, const char *fmt, ...)
 	va_end(ap);
 }
 
+/*
+ * __wt_errx --
+ * 	Report an error with no error code.
+ */
 void
 __wt_errx(SESSION *session, const char *fmt, ...)
 {

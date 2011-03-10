@@ -26,6 +26,10 @@ static void __wt_debug_update(WT_UPDATE *, FILE *);
 static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
 static int  __wt_debug_set_fp(const char *, FILE **, int *);
 
+/*
+ * __wt_debug_set_fp --
+ *	Set the output stream for debugging messages.
+ */
 static int
 __wt_debug_set_fp(const char *ofile, FILE **fpp, int *close_varp)
 {

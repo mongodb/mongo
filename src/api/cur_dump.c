@@ -8,8 +8,9 @@
 #include "wt_internal.h"
 
 /*
- * We have a scratch buffer where the data item contains a raw value,
- * convert it to a dumpable string.
+ * __convert_to_dump --
+ *	We have a scratch buffer where the data item contains a raw value,
+ *	convert it to a dumpable string.
  */
 static int
 __convert_to_dump(CONNECTION *conn, WT_BUF *scratch)
@@ -21,8 +22,9 @@ __convert_to_dump(CONNECTION *conn, WT_BUF *scratch)
 }
 
 /*
- * We have a scratch buffer where the data item contains a dump string,
- * convert it to a raw value.
+ * convert_from_dump --
+ *	We have a scratch buffer where the data item contains a dump string,
+ *	convert it to a raw value.
  */
 static int
 __convert_from_dump(CONNECTION *conn, WT_BUF *scratch)
@@ -33,6 +35,10 @@ __convert_from_dump(CONNECTION *conn, WT_BUF *scratch)
 	return (0);
 }
 
+/*
+ * __curdump_get_key --
+ *	WT_CURSOR->get_key for dump cursors.
+ */
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
@@ -52,6 +58,10 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	return (0);
 }
 
+/*
+ * __curdump_get_value --
+ *	WT_CURSOR->get_value for dump cursors.
+ */
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
@@ -71,6 +81,10 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	return (0);
 }
 
+/*
+ * __curdump_set_key --
+ *	WT_CURSOR->set_key for dump cursors.
+ */
 static void
 __curdump_set_key(WT_CURSOR *cursor, ...)
 {
@@ -90,6 +104,10 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	va_end(ap);
 }
 
+/*
+ * __curdump_set_value --
+ *	WT_CURSOR->set_value for dump cursors.
+ */
 static void
 __curdump_set_value(WT_CURSOR *cursor, ...)
 {
@@ -109,6 +127,10 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 }
 
+/*
+ * __wt_curdump_init --
+ *	initialize a dump cursor.
+ */
 void
 __wt_curdump_init(WT_CURSOR *cursor)
 {

@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_progress --
+ *	Send a progress message to stdout.
+ */
 void
 __wt_progress(const char *s, uint64_t v)
 {

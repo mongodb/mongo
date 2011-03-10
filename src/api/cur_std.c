@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __cursor_get_key --
+ *	WT_CURSOR->get_key default implementation.
+ */
 static int
 __cursor_get_key(WT_CURSOR *cursor, ...)
 {
@@ -24,6 +28,10 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	return (ret);
 }
 
+/*
+ * __cursor_get_value --
+ *	WT_CURSOR->get_value default implementation.
+ */
 static int
 __cursor_get_value(WT_CURSOR *cursor, ...)
 {
@@ -41,6 +49,10 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	return (ret);
 }
 
+/*
+ * __cursor_set_key --
+ *	WT_CURSOR->set_key default implementation.
+ */
 static void
 __cursor_set_key(WT_CURSOR *cursor, ...)
 {
@@ -78,6 +90,10 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	va_end(ap);
 }
 
+/*
+ * __cursor_set_value --
+ *	WT_CURSOR->set_value default implementation.
+ */
 static void
 __cursor_set_value(WT_CURSOR *cursor, ...)
 {
@@ -116,6 +132,10 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 }
 
+/*
+ * __wt_cursor_close --
+ *	WT_CURSOR->close default implementation.
+ */
 int
 __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 {
@@ -136,6 +156,10 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	return (ret);
 }
 
+/*
+ * __wt_cursor_init --
+ *	Default cursor initialization.
+ */
 void
 __wt_cursor_init(WT_CURSOR *cursor)
 {

@@ -391,8 +391,7 @@ __wt_btree_lockout(BTREE *btree);
 int
 __wt_connection_lockout(CONNECTION *conn);
 void
-__wt_errv(
-    SESSION *session, int error,
+__wt_errv(SESSION *session, int error,
     const char *prefix, const char *fmt, va_list ap);
 void
 __wt_err(SESSION *session, int error, const char *fmt, ...);

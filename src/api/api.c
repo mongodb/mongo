@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __session_close --
+ *	WT_SESSION->close method.
+ */
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
@@ -36,6 +40,10 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	return (0);
 }
 
+/*
+ * __session_open_cursor --
+ *	WT_SESSION->open_cursor method.
+ */
 static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
@@ -53,6 +61,10 @@ __session_open_cursor(WT_SESSION *wt_session,
 	return (EINVAL);
 }
 
+/*
+ * __session_create_table --
+ *	WT_SESSION->create_table method.
+ */
 static int
 __session_create_table(WT_SESSION *wt_session,
     const char *name, const char *config)
@@ -74,6 +86,10 @@ __session_create_table(WT_SESSION *wt_session,
 	return (0);
 }
 
+/*
+ * __session_rename_table --
+ *	WT_SESSION->rename_table method.
+ */
 static int
 __session_rename_table(WT_SESSION *wt_session,
     const char *oldname, const char *newname, const char *config)
@@ -86,6 +102,10 @@ __session_rename_table(WT_SESSION *wt_session,
 	return (ENOTSUP);
 }
 
+/*
+ * __session_drop_table --
+ *	WT_SESSION->drop_table method.
+ */
 static int
 __session_drop_table(
     WT_SESSION *wt_session, const char *name, const char *config)
@@ -113,6 +133,10 @@ __session_drop_table(
 	return (force ? 0 : ret);
 }
 
+/*
+ * __session_truncate_table --
+ *	WT_SESSION->truncate_table method.
+ */
 static int
 __session_truncate_table(WT_SESSION *wt_session,
     const char *name, WT_CURSOR *start, WT_CURSOR *end, const char *config)
@@ -126,6 +150,10 @@ __session_truncate_table(WT_SESSION *wt_session,
 	return (ENOTSUP);
 }
 
+/*
+ * __session_verify_table --
+ *	WT_SESSION->verify_table method.
+ */
 static int
 __session_verify_table(WT_SESSION *wt_session, const char *name, const char *config)
 {
@@ -136,6 +164,10 @@ __session_verify_table(WT_SESSION *wt_session, const char *name, const char *con
 	return (0);
 }
 
+/*
+ * __session_begin_transaction --
+ *	WT_SESSION->begin_transaction method.
+ */
 static int
 __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 {
@@ -145,6 +177,10 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	return (ENOTSUP);
 }
 
+/*
+ * __session_commit_transaction --
+ *	WT_SESSION->commit_transaction method.
+ */
 static int
 __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 {
@@ -154,6 +190,10 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	return (ENOTSUP);
 }
 
+/*
+ * __session_rollback_transaction --
+ *	WT_SESSION->rollback_transaction method.
+ */
 static int
 __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 {
@@ -163,6 +203,10 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	return (ENOTSUP);
 }
 
+/*
+ * __session_checkpoint --
+ *	WT_SESSION->checkpoint method.
+ */
 static int
 __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
@@ -172,6 +216,10 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	return (ENOTSUP);
 }
 
+/*
+ * __conn_load_extension --
+ *	WT_CONNECTION->load_extension method.
+ */
 static int
 __conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *config)
 {
@@ -182,6 +230,10 @@ __conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *conf
 	return (ENOTSUP);
 }
 
+/*
+ * __conn_add_cursor_type --
+ *	WT_CONNECTION->add_cursor_type method.
+ */
 static int
 __conn_add_cursor_type(WT_CONNECTION *wt_conn,
     const char *prefix, WT_CURSOR_TYPE *ctype, const char *config)
@@ -194,6 +246,10 @@ __conn_add_cursor_type(WT_CONNECTION *wt_conn,
 	return (ENOTSUP);
 }
 
+/*
+ * __conn_add_collator --
+ *	WT_CONNECTION->add_collator method.
+ */
 static int
 __conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
@@ -206,6 +262,10 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	return (ENOTSUP);
 }
 
+/*
+ * __conn_add_extractor --
+ *	WT_CONNECTION->add_extractor method.
+ */
 static int
 __conn_add_extractor(WT_CONNECTION *wt_conn,
     const char *name, WT_EXTRACTOR *extractor, const char *config)
@@ -224,6 +284,10 @@ __conn_get_home(WT_CONNECTION *wt_conn)
 	return (((CONNECTION *)wt_conn)->home);
 }
 
+/*
+ * __conn_is_new --
+ *	WT_CONNECTION->is_new method.
+ */
 static int
 __conn_is_new(WT_CONNECTION *wt_conn)
 {
@@ -232,6 +296,10 @@ __conn_is_new(WT_CONNECTION *wt_conn)
 	return (0);
 }
 
+/*
+ * __conn_close --
+ *	WT_CONNECTION->close method.
+ */
 static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
@@ -253,6 +321,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	return (ret);
 }
 
+/*
+ * __conn_open_session --
+ *	WT_CONNECTION->open_session method.
+ */
 static int
 __conn_open_session(WT_CONNECTION *wt_conn,
     WT_ERROR_HANDLER *error_handler, const char *config, WT_SESSION **wt_sessionp)
@@ -306,6 +378,11 @@ err:		if (session != NULL)
 	return (0);
 }
 
+/*
+ * wiredtiger_open --
+ *	Main library entry point: open a new connection to a WiredTiger
+ *	database.
+ */
 int
 wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
     const char *config, WT_CONNECTION **wt_connp)

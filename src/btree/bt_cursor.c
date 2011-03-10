@@ -8,6 +8,10 @@
 #include "wt_internal.h"
 #include "btree.i"
 
+/*
+ * __wt_btcur_first --
+ *	Move to the first record in the tree.
+ */
 int
 __wt_btcur_first(CURSOR_BTREE *cbt)
 {
@@ -23,6 +27,10 @@ __wt_btcur_first(CURSOR_BTREE *cbt)
 	return (__wt_btcur_next(cbt));
 }
 
+/*
+ * __wt_btcur_next --
+ *	Move to the next record in the tree.
+ */
 int
 __wt_btcur_next(CURSOR_BTREE *cbt)
 {
@@ -119,6 +127,10 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 	return (ret);
 }
 
+/*
+ * __wt_btcur_prev --
+ *	Move to the previous record in the tree.
+ */
 int
 __wt_btcur_prev(CURSOR_BTREE *cbt)
 {
@@ -127,6 +139,10 @@ __wt_btcur_prev(CURSOR_BTREE *cbt)
 	return (ENOTSUP);
 }
 
+/*
+ * __wt_btcur_search_near --
+ *	Search for a record in the tree.
+ */
 int
 __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 {
@@ -136,6 +152,10 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 	return (ENOTSUP);
 }
 
+/*
+ * __wt_btcur_insert --
+ *	Insert a record into the tree.
+ */
 int
 __wt_btcur_insert(CURSOR_BTREE *cbt)
 {
@@ -144,6 +164,10 @@ __wt_btcur_insert(CURSOR_BTREE *cbt)
 	return (ENOTSUP);
 }
 
+/*
+ * __wt_btcur_update --
+ *	Update a record in the tree.
+ */
 int
 __wt_btcur_update(CURSOR_BTREE *cbt)
 {
@@ -152,6 +176,10 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
 	return (ENOTSUP);
 }
 
+/*
+ * __wt_btcur_del --
+ *	Delete a record from the tree.
+ */
 int
 __wt_btcur_del(CURSOR_BTREE *cbt)
 {
@@ -160,6 +188,10 @@ __wt_btcur_del(CURSOR_BTREE *cbt)
 	return (ENOTSUP);
 }
 
+/*
+ * __wt_btcur_close --
+ *	Close a btree cursor.
+ */
 int
 __wt_btcur_close(CURSOR_BTREE *cbt, const char *config)
 {

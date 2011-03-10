@@ -179,6 +179,10 @@ __wt_session_api_clr(SESSION *session, const char *name, int islocal)
 #ifdef HAVE_DIAGNOSTIC
 static const char *__wt_session_print_state(SESSION *);
 
+/*
+ * __wt_session_dump --
+ *	Dump information about open sessions.
+ */
 int
 __wt_session_dump(CONNECTION *conn)
 {

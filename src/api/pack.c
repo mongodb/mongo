@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * wiredtiger_struct_sizev --
+ *	Calculate the size of a packed byte string (va_list version).
+ */
 size_t
 wiredtiger_struct_sizev(const char *fmt, va_list ap)
 {
@@ -27,6 +31,10 @@ wiredtiger_struct_sizev(const char *fmt, va_list ap)
 	return (size);
 }
 
+/*
+ * wiredtiger_struct_packv --
+ *	Pack a byte string (va_list version).
+ */
 int
 wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 {
@@ -66,6 +74,10 @@ wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 	return (0);
 }
 
+/*
+ * wiredtiger_struct_unpackv --
+ *	Unpack a byte string (va_list version).
+ */
 int
 wiredtiger_struct_unpackv(
     const void *buffer, size_t size, const char *fmt, va_list ap)
@@ -96,6 +108,10 @@ wiredtiger_struct_unpackv(
 	return (0);
 }
 
+/*
+ * wiredtiger_struct_size --
+ *	Calculate the size of a packed byte string.
+ */
 size_t
 wiredtiger_struct_size(const char *fmt, ...)
 {
@@ -109,6 +125,10 @@ wiredtiger_struct_size(const char *fmt, ...)
 	return (size);
 }
 
+/*
+ * wiredtiger_struct_pack --
+ *	Pack a byte string.
+ */
 int
 wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
 {
@@ -122,6 +142,10 @@ wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
 	return (ret);
 }
 
+/*
+ * wiredtiger_struct_unpack --
+ *	Unpack a byte string.
+ */
 int
 wiredtiger_struct_unpack(const void *buffer, size_t size, const char *fmt, ...)
 {

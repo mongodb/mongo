@@ -9,12 +9,20 @@
 
 static int __curbtree_next(WT_CURSOR *cursor);
 
+/*
+ * __curbtree_first --
+ *	WT_CURSOR->first method for the btree cursor type.
+ */
 static int
 __curbtree_first(WT_CURSOR *cursor)
 {
 	return (__wt_btcur_first((CURSOR_BTREE *)cursor));
 }
 
+/*
+ * __curbtree_last --
+ *	WT_CURSOR->last method for the btree cursor type.
+ */
 static int
 __curbtree_last(WT_CURSOR *cursor)
 {
@@ -23,6 +31,10 @@ __curbtree_last(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/*
+ * __curbtree_next --
+ *	WT_CURSOR->next method for the btree cursor type.
+ */
 static int
 __curbtree_next(WT_CURSOR *cursor)
 {
@@ -36,6 +48,10 @@ __curbtree_next(WT_CURSOR *cursor)
 	return (__wt_btcur_next((CURSOR_BTREE *)cursor));
 }
 
+/*
+ * __curbtree_prev --
+ *	WT_CURSOR->prev method for the btree cursor type.
+ */
 static int
 __curbtree_prev(WT_CURSOR *cursor)
 {
@@ -44,6 +60,10 @@ __curbtree_prev(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/*
+ * __curbtree_search --
+ *	WT_CURSOR->search method for the btree cursor type.
+ */
 static int
 __curbtree_search(WT_CURSOR *cursor)
 {
@@ -52,6 +72,10 @@ __curbtree_search(WT_CURSOR *cursor)
 	    (exact != 0 ? WT_NOTFOUND : 0));
 }
 
+/*
+ * __curbtree_search_near --
+ *	WT_CURSOR->search_near method for the btree cursor type.
+ */
 static int
 __curbtree_search_near(WT_CURSOR *cursor, int *exact)
 {
@@ -61,6 +85,10 @@ __curbtree_search_near(WT_CURSOR *cursor, int *exact)
 	return (ENOTSUP);
 }
 
+/*
+ * __curbtree_insert --
+ *	WT_CURSOR->insert method for the btree cursor type.
+ */
 static int
 __curbtree_insert(WT_CURSOR *cursor)
 {
@@ -69,6 +97,10 @@ __curbtree_insert(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/*
+ * __curbtree_update --
+ *	WT_CURSOR->update method for the btree cursor type.
+ */
 static int
 __curbtree_update(WT_CURSOR *cursor)
 {
@@ -77,6 +109,10 @@ __curbtree_update(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/*
+ * __curbtree_del --
+ *	WT_CURSOR->del method for the btree cursor type.
+ */
 static int
 __curbtree_del(WT_CURSOR *cursor)
 {
@@ -85,6 +121,10 @@ __curbtree_del(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/*
+ * __curbtree_close --
+ *	WT_CURSOR->close method for the btree cursor type.
+ */
 static int
 __curbtree_close(WT_CURSOR *cursor, const char *config)
 {
@@ -96,6 +136,10 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 	return (ret);
 }
 
+/*
+ * __get_btree --
+ *	Get the btree handle for the named table.
+ */
 static int
 __get_btree(SESSION *session, const char *name, size_t namelen, BTREE **btreep)
 {
@@ -112,6 +156,10 @@ __get_btree(SESSION *session, const char *name, size_t namelen, BTREE **btreep)
 	return (WT_NOTFOUND);
 }
 
+/*
+ * __wt_cursor_open --
+ *	WT_SESSION->open_cursor method for the btree cursor type.
+ */
 int
 __wt_cursor_open(SESSION *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)

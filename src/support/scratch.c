@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_buf_grow --
+ *	Ensure that a buffer is at least as big as required.
+ */
 int
 __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz)
 {
@@ -19,6 +23,10 @@ __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz)
 	return (0);
 }
 
+/*
+ * __wt_buf_free --
+ *	Free a buffer.
+ */
 void
 __wt_buf_free(SESSION *session, WT_BUF *buf)
 {

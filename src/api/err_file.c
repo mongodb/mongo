@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __handle_error_default --
+ *	Default WT_ERROR_HANDLER->handle_error implementation.
+ */
 static int
 __handle_error_default(WT_ERROR_HANDLER *handler, int error, const char *errmsg)
 {
@@ -18,6 +22,10 @@ __handle_error_default(WT_ERROR_HANDLER *handler, int error, const char *errmsg)
 	return (0);
 }
 
+/*
+ * __get_messages_default --
+ *	Default WT_ERROR_HANDLER->get_messages implementation.
+ */
 static int
 __get_messages_default(WT_ERROR_HANDLER *handler, const char **errmsgp)
 {
@@ -27,6 +35,10 @@ __get_messages_default(WT_ERROR_HANDLER *handler, const char **errmsgp)
 	return (ENOTSUP);
 }
 
+/*
+ * __clear_messages_default --
+ *	Default WT_ERROR_HANDLER->clear_messages implementation.
+ */
 static int
 __clear_messages_default(WT_ERROR_HANDLER *handler)
 {

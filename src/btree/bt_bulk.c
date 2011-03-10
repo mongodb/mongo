@@ -380,6 +380,10 @@ err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
 	return (ret);
 }
 
+/*
+ * __wt_bulk_init --
+ *	Start a bulk load.
+ */
 int
 __wt_bulk_init(CURSOR_BULK *cbulk)
 {
@@ -561,6 +565,10 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	return (0);
 }
 
+/*
+ * __wt_bulk_end --
+ *	Clean up after a bulk load.
+ */
 int
 __wt_bulk_end(CURSOR_BULK *cbulk)
 {

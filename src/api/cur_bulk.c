@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __curbulk_insert --
+ *	WT_CURSOR->insert for the bulk cursor type.
+ */
 static int
 __curbulk_insert(WT_CURSOR *cursor)
 {
@@ -22,6 +26,10 @@ __curbulk_insert(WT_CURSOR *cursor)
 
 }
 
+/*
+ * __curbulk_close --
+ *	WT_CURSOR->close for the bulk cursor type.
+ */
 static int
 __curbulk_close(WT_CURSOR *cursor, const char *config)
 {
@@ -39,6 +47,10 @@ __curbulk_close(WT_CURSOR *cursor, const char *config)
 	return (ret);
 }
 
+/*
+ * __wt_curbulk_init --
+ *	initialize a bulk cursor.
+ */
 int
 __wt_curbulk_init(CURSOR_BULK *cbulk)
 {

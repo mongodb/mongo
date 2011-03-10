@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_config_init --
+ *	Initialize a config handle, used to iterate through a config string.
+ */
 int
 __wt_config_init(WT_CONFIG *conf, const char *str, size_t len)
 {
@@ -281,6 +285,10 @@ static int8_t goesc[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD
 };
 
+/*
+ * __wt_config_next --
+ *	Get the next config item in the string.
+ */
 int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {

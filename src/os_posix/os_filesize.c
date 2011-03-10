@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_filesize --
+ *	Get the size of a file in bytes.
+ */
 int
 __wt_filesize(SESSION *session, WT_FH *fh, off_t *sizep)
 {
@@ -20,6 +24,6 @@ __wt_filesize(SESSION *session, WT_FH *fh, off_t *sizep)
 		return (WT_ERROR);
 	}
 
-	*sizep = sb.st_size;		/* Return size in bytes. */
+	*sizep = sb.st_size;
 	return (0);
 }
