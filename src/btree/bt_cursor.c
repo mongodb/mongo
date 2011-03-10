@@ -177,11 +177,11 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_btcur_del --
- *	Delete a record from the tree.
+ * __wt_btcur_remove --
+ *	Remove a record from the tree.
  */
 int
-__wt_btcur_del(CURSOR_BTREE *cbt)
+__wt_btcur_remove(CURSOR_BTREE *cbt)
 {
 	WT_UNUSED(cbt);
 

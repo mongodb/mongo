@@ -110,11 +110,11 @@ __curbtree_update(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_del --
- *	WT_CURSOR->del method for the btree cursor type.
+ * __curbtree_remove --
+ *	WT_CURSOR->remove method for the btree cursor type.
  */
 static int
-__curbtree_del(WT_CURSOR *cursor)
+__curbtree_remove(WT_CURSOR *cursor)
 {
 	WT_UNUSED(cursor);
 
@@ -180,7 +180,7 @@ __wt_cursor_open(SESSION *session,
 		__curbtree_search_near,
 		__curbtree_insert,
 		__curbtree_update,
-		__curbtree_del,
+		__curbtree_remove,
 		__curbtree_close,
 		{ NULL, NULL },
 		{ { NULL, 0 }, NULL, 0, 0 },

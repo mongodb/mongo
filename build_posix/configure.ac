@@ -62,6 +62,11 @@ if test "$db_cv_enable_debug" = "yes"; then
 	CFLAGS="$CFLAGS -g"
 fi
 
+# Python API
+if test "$db_cv_enable_python" = "yes"; then
+	AM_PATH_PYTHON([2.5])
+fi
+
 AM_TYPES
 
 AC_PROG_RANLIB

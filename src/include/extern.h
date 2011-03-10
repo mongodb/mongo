@@ -84,7 +84,7 @@ __wt_btcur_insert(CURSOR_BTREE *cbt);
 int
 __wt_btcur_update(CURSOR_BTREE *cbt);
 int
-__wt_btcur_del(CURSOR_BTREE *cbt);
+__wt_btcur_remove(CURSOR_BTREE *cbt);
 int
 __wt_btcur_close(CURSOR_BTREE *cbt, const char *config);
 int

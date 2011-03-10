@@ -212,7 +212,7 @@ struct __session {
 	WT_ERROR_HANDLER *error_handler;
 
 	TAILQ_ENTRY(__session) q;
-	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
+	TAILQ_HEAD(__cursors, wt_cursor) cursors;
 
 	TAILQ_HEAD(__btrees, __btree) btrees;
 
@@ -290,7 +290,7 @@ struct __connection {
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
-	TAILQ_HEAD(__wt_btree_qh, __btree) dbqh; /* Locked: database list */
+	TAILQ_HEAD(wt_btree_qh, __btree) dbqh; /* Locked: database list */
 	u_int dbqcnt;			/* Locked: database list count */
 
 	TAILQ_HEAD(

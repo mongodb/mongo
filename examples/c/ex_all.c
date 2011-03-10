@@ -66,7 +66,7 @@ cursor_ops(WT_CURSOR *cursor)
 	cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
 
-	ret = cursor->del(cursor);
+	ret = cursor->remove(cursor);
 
 	ret = cursor->close(cursor, NULL);
 }

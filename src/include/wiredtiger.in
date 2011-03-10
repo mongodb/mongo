@@ -46,10 +46,16 @@ extern "C" {
 @uintmax_t_decl@
 @uintptr_t_decl@
 
-#ifdef DOXYGEN
+#if defined(DOXYGEN) || defined(SWIG)
 #define	__F(func) func
 #else
 #define	__F(func) (*func)
+#endif
+
+#ifdef SWIG
+%{
+#include <wiredtiger.h>
+%}
 #endif
 
 /*! @defgroup wt WiredTiger API
@@ -68,21 +74,22 @@ typedef uint64_t wiredtiger_recno_t;
 /*******************************************
  * Forward structure declarations
  *******************************************/
-struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
-struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
-struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
-struct __wt_cursor_type;    typedef struct __wt_cursor_type WT_CURSOR_TYPE;
-struct __wt_error_handler;  typedef struct __wt_error_handler WT_ERROR_HANDLER;
-struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
-struct __wt_item;	    typedef struct __wt_item WT_ITEM;
-struct __wt_session;	    typedef struct __wt_session WT_SESSION;
+struct wt_collator;	    typedef struct wt_collator WT_COLLATOR;
+struct wt_connection;	    typedef struct wt_connection WT_CONNECTION;
+struct wt_cursor;	    typedef struct wt_cursor WT_CURSOR;
+struct wt_cursor_type;	    typedef struct wt_cursor_type WT_CURSOR_TYPE;
+struct wt_error_handler;    typedef struct wt_error_handler WT_ERROR_HANDLER;
+struct wt_extractor;	    typedef struct wt_extractor WT_EXTRACTOR;
+struct wt_item;		    typedef struct wt_item WT_ITEM;
+struct wt_session;	    typedef struct wt_session WT_SESSION;
 
+#ifndef SWIG
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
  * a length (limited to 4GB for items stored in tables).  Records consist of a
  * pair of items: a key and an associated value.
  */
-struct __wt_item {
+struct wt_item {
 	/*!
 	 * The memory reference of the data item.
 	 *
@@ -109,6 +116,7 @@ typedef struct {
 
 	uint32_t flags;
 } WT_BUF;
+#endif
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
@@ -131,7 +139,7 @@ typedef struct {
  * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
  * it may only be used within the same thread as the encapsulating WT_SESSION.
  */
-struct __wt_cursor {
+struct wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
 
 	/*!
@@ -303,15 +311,15 @@ struct __wt_cursor {
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
-	/*! Delete the current record.
+	/*! Remove the current record.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->del
+	 * @skipline ->remove
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(del)(WT_CURSOR *cursor);
+	int __F(remove)(WT_CURSOR *cursor);
 	/*! @} */
 
 	/*! Close the cursor.
@@ -333,10 +341,11 @@ struct __wt_cursor {
 	 * Protected fields, only to be used by cursor implementations.
 	 */
 
+#ifndef SWIG
 	/*
 	 * !!!
 	 * Explicit representations of structures from queue.h.
-	 * TAILQ_ENTRY(__wt_cursor) q;
+	 * TAILQ_ENTRY(wt_cursor) q;
 	 */
 	struct {
 		WT_CURSOR *tqe_next;
@@ -352,6 +361,7 @@ struct __wt_cursor {
 #define	WT_CURSTD_POSITIONED	0x10
 #define	WT_CURSTD_RAW		0x20
 	uint32_t flags;
+#endif
 };
 
 /*!
@@ -362,7 +372,7 @@ struct __wt_cursor {
  * it may only be used within a single thread.  Each thread accessing a
  * database should open a separate WT_SESSION handle.
  */
-struct __wt_session {
+struct wt_session {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
 
@@ -651,7 +661,7 @@ struct __wt_session {
  * will communicate with the first process over a socket connection to perform
  * their operations.
  */
-struct __wt_connection {
+struct wt_connection {
 	/*! Load an extension.
 	 *
 	 * @dontinclude ex_all.c
@@ -835,7 +845,7 @@ const char *wiredtiger_strerror(int err);
 /*!
  * The interface implemented by applications in order to handle errors.
  */
-struct __wt_error_handler {
+struct wt_error_handler {
 	/*! Callback to handle errors within the session. */
 	int (*handle_error)(WT_ERROR_HANDLER *handler,
 	    int error, const char *errmsg);
@@ -874,6 +884,7 @@ struct __wt_error_handler {
  */
 int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
 
+#ifndef SWIG
 /*! Pack a structure into a buffer.
  *
  * stdarg version of ::wiredtiger_struct_pack.
@@ -886,6 +897,7 @@ int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
  */
 int wiredtiger_struct_packv(void *buffer, size_t size,
     const char *format, va_list ap);
+#endif
 
 /*! Calculate the size required to pack a structure.
  *
@@ -903,6 +915,7 @@ int wiredtiger_struct_packv(void *buffer, size_t size,
  */
 size_t wiredtiger_struct_size(const char *format, ...);
 
+#ifndef SWIG
 /*! Calculate the size required to pack a structure.
  *
  * stdarg version of ::wiredtiger_struct_size.
@@ -913,6 +926,7 @@ size_t wiredtiger_struct_size(const char *format, ...);
  * ::wiredtiger_struct_pack
  */
 size_t wiredtiger_struct_sizev(const char *format, va_list ap);
+#endif
 
 /*! Unpack a structure from a buffer.
  *
@@ -930,6 +944,7 @@ size_t wiredtiger_struct_sizev(const char *format, va_list ap);
 int wiredtiger_struct_unpack(const void *buffer, size_t size,
     const char *format, ...);
 
+#ifndef SWIG
 /*! Unpack a structure from a buffer.
  *
  * stdarg version of ::wiredtiger_struct_unpack.
@@ -942,6 +957,7 @@ int wiredtiger_struct_unpack(const void *buffer, size_t size,
  */
 int wiredtiger_struct_unpackv(const void *buffer, size_t size,
     const char *format, va_list ap);
+#endif
 
 /*! Get version information.
  *
@@ -991,12 +1007,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * @{
  */
 
+#ifndef SWIG
 /*!
  * The interface implemented by applications to provide custom ordering of
  * records.  Applications register their implementation with WiredTiger by
  * calling WT_CONNECTION::add_collator.
  */
-struct __wt_collator {
+struct wt_collator {
 	/*! Callback to compare keys.
 	 *
 	 * @param[out] cmp set to -1 if <code>key1 < key2</code>,
@@ -1020,7 +1037,7 @@ struct __wt_collator {
  * interface from multiple threads concurrently.  It is the responsibility of
  * the implementation to protect any shared data.
  */
-struct __wt_cursor_type {
+struct wt_cursor_type {
 	/*! Callback to determine how much space to allocate for a cursor.
 	 *
 	 * If the callback is NULL, no additional space is allocated in the
@@ -1042,7 +1059,7 @@ struct __wt_cursor_type {
  * index keys or column group values.  Applications register implementations
  * with WiredTiger by calling WT_CONNECTION::add_extractor.
  */
-struct __wt_extractor {
+struct wt_extractor {
 	/*! Callback to extract a value for an index or column group.
 	 *
 	 * @errors
@@ -1060,6 +1077,7 @@ struct __wt_extractor {
  */
 extern int wiredtiger_extension_init(WT_CONNECTION *connection,
     const char *config);
+#endif
 
 #ifdef __cplusplus
 }

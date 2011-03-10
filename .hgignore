@@ -12,6 +12,6 @@
 ^docs/java
 ^docs/latex
 ^docs/python
-src/server/WiredTiger_server
-src/server/gen-py
+^lang/python/(_wiredtiger.so|wiredtiger.py|wiredtiger_wrap.c)
+^src/server
 /tags$

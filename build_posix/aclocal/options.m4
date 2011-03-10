@@ -38,6 +38,17 @@ no)	db_cv_enable_diagnostic=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_diagnostic)
 
+AC_MSG_CHECKING(if --enable-python option specified)
+AC_ARG_ENABLE(python,
+	[AC_HELP_STRING([--enable-python],
+	    [Configure for python symbols.])], r=$enableval, r=no)
+case "$r" in
+no)	db_cv_enable_python=no;;
+*)	db_cv_enable_python=yes;;
+esac
+AC_MSG_RESULT($db_cv_enable_python)
+AM_CONDITIONAL([PYTHON], [test x$db_cv_enable_python = xyes])
+
 AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
 AC_MSG_CHECKING(if --enable-verbose option specified)
 AC_ARG_ENABLE(verbose,

@@ -22,3 +22,9 @@ Makefile.am: Make.base makemake ../dist/filelist
 
 prototype.chk: $(libwiredtiger_a_SOURCES)
 	@(cd ../dist && sh s_prototypes) && touch $@
+
+if PYTHON
+all-local: ../lang/python/_wiredtiger.so
+endif
+../lang/python/_wiredtiger.so: libwiredtiger.a ../lang/python/wiredtiger.i
+	@(cd ../lang/python ; python setup.py build_ext -f -i)
