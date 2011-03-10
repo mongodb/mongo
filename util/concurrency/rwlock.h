@@ -253,6 +253,14 @@ namespace mongo {
         RWLock& _l;
     };
 
+    class rwlock_shared : boost::noncopyable {
+    public:
+        rwlock_shared(RWLock& rwlock) : _r(rwlock) {_r.lock_shared(); }
+        ~rwlock_shared() { _r.unlock_shared(); }
+    private:
+        RWLock& _r;
+    };
+
     /* scoped lock for RWLock */
     class rwlock {
     public:
