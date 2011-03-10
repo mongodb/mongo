@@ -69,7 +69,7 @@ namespace mongo {
             if( is_open() ) CloseHandle(fd);
             fd = INVALID_HANDLE_VALUE;
         }
-        void open(const char *filename, bool readOnly=false ) {
+        void open(const char *filename, bool readOnly=false , bool direct=false) {
             fd = CreateFile(
                      toNativeString(filename).c_str(),
                      ( readOnly ? 0 : GENERIC_WRITE ) | GENERIC_READ, FILE_SHARE_WRITE|FILE_SHARE_READ,
@@ -142,7 +142,11 @@ namespace mongo {
 
         void open(const char *filename, bool readOnly=false , bool direct=false) {
             fd = ::open(filename,
-                        O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) | ( direct ? O_DIRECT : 0 ) ,
+                        O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) 
+#if defined(O_DIRECT)
+                        | ( direct ? O_DIRECT : 0 ) 
+#endif
+                        ,
                         S_IRUSR | S_IWUSR);
             if ( fd <= 0 ) {
                 out() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
