@@ -269,6 +269,8 @@ def runTest(test):
                     "--port", mongod_port]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
+    sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
+    sys.stderr.flush()
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
     t1 = time.time()
