@@ -140,9 +140,9 @@ namespace mongo {
 #define O_NOATIME 0
 #endif
 
-        void open(const char *filename, bool readOnly=false ) {
+        void open(const char *filename, bool readOnly=false , bool direct=false) {
             fd = ::open(filename,
-                        O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) ,
+                        O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) | ( direct ? O_DIRECT : 0 ) ,
                         S_IRUSR | S_IWUSR);
             if ( fd <= 0 ) {
                 out() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
