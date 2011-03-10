@@ -110,7 +110,7 @@ class mongod(object):
         sock.connect(("localhost", int(port)))
         sock.close()
 
-    def did_mongod_start(self, port=mongod_port, timeout=80):
+    def did_mongod_start(self, port=mongod_port, timeout=90):
         while timeout > 0:
             time.sleep(1)
             try:
