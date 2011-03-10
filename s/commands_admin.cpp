@@ -62,6 +62,15 @@ namespace mongo {
 
             // all grid commands are designed not to lock
             virtual LockType locktype() const { return NONE; }
+
+            bool okForConfigChanges( string& errmsg ) {
+                string e;
+                if ( ! configServer.allUp(e) ) {
+                    errmsg = str::stream() << "not all config servers are up: " << e;
+                    return false;
+                }
+                return true;
+            }
         };
 
         // --------------- misc commands ----------------------
@@ -308,6 +317,9 @@ namespace mongo {
                     return false;
                 }
 
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
+
                 log() << "enabling sharding on: " << dbname << endl;
 
                 config->enableSharding();
@@ -363,6 +375,9 @@ namespace mongo {
                     errmsg = "can't shard system namespaces";
                     return false;
                 }
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
 
                 // Sharding interacts with indexing in at least two ways:
                 //
@@ -492,6 +507,10 @@ namespace mongo {
             }
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
+
                 ShardConnection::sync();
 
                 string ns = cmdObj.firstElement().valuestrsafe();
@@ -558,6 +577,10 @@ namespace mongo {
                 help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
+
                 ShardConnection::sync();
 
                 Timer t;
