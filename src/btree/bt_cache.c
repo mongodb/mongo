@@ -70,6 +70,8 @@ __wt_cache_destroy(CONNECTION *conn)
 	SESSION *session;
 	WT_CACHE *cache;
 	WT_REC_LIST *reclist;
+	struct rec_list *r_list;
+	uint32_t i;
 	int ret;
 
 	session = &conn->default_session;
@@ -87,8 +89,13 @@ __wt_cache_destroy(CONNECTION *conn)
 		(void)__wt_mtx_destroy(session, cache->mtx_read);
 
 	reclist = &cache->reclist;
-	if (reclist->list != NULL)
+	if (reclist->list != NULL) {
+		for (r_list = reclist->list,
+		    i = 0; i < reclist->l_entries; ++r_list, ++i)
+			if (r_list->key.mem != NULL)
+				__wt_free(session, r_list->key.mem);
 		__wt_free(session, reclist->list);
+	}
 	if (reclist->save != NULL)
 		__wt_free(session, reclist->save);
 	__wt_free(session, cache->stats);

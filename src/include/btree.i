@@ -124,21 +124,21 @@ __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 }
 
 /*
- * __wt_key_item_next --
+ * __wt_key_cell_next --
  *	Move to the next key WT_CELL on the page (helper function for the
  *	WT_ROW_AND_KEY_FOREACH macro).
  */
 static inline WT_CELL *
-__wt_key_item_next(WT_CELL *key_item)
+__wt_key_cell_next(WT_CELL *key_cell)
 {
 	/*
-	 * Row-store leaf pages may have a single data item between each key, or
-	 * keys may be adjacent (when the data item is empty).  Move to the next
+	 * Row-store leaf pages may have a single data cell between each key, or
+	 * keys may be adjacent (when the data cell is empty).  Move to the next
 	 * key.
 	 */
-	key_item = WT_CELL_NEXT(key_item);
-	if (WT_CELL_TYPE(key_item) != WT_CELL_KEY &&
-	    WT_CELL_TYPE(key_item) != WT_CELL_KEY_OVFL)
-		key_item = WT_CELL_NEXT(key_item);
-	return (key_item);
+	key_cell = WT_CELL_NEXT(key_cell);
+	if (WT_CELL_TYPE(key_cell) != WT_CELL_KEY &&
+	    WT_CELL_TYPE(key_cell) != WT_CELL_KEY_OVFL)
+		key_cell = WT_CELL_NEXT(key_cell);
+	return (key_cell);
 }

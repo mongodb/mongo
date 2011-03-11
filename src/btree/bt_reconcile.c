@@ -355,10 +355,22 @@ __wt_rec_helper(SESSION *session, uint64_t *recnop,
 		 */
 		ret = __wt_rec_helper_fixup(
 		    session, recnop, entriesp, first_freep, space_availp);
+
+		/* Set the starting record number for the next set of items. */
 		dsk->recno = *recnop;
+
+		/* We're done saving split-points. */
 		r->s_next = 0;
 		break;
 	case 4:
+		/*
+		 * It didn't all fit, but either we've already noticed it and
+		 * are now processing the rest of the page at the split-size
+		 * boundaries, or, the split size was the same as the page size,
+		 * so we never bothered with saving split-point information.
+		 *
+		 * Write the current disk image.
+		 */
 		dsk->u.entries = *entriesp;
 		WT_RET(__wt_rec_helper_write(session, 0, dsk, *first_freep));
 
@@ -406,8 +418,9 @@ __wt_rec_helper_fixup(SESSION *session, uint64_t *recnop,
 	 * The data isn't laid out on page-boundaries, so we have to copy it
 	 * into another buffer before writing it.
 	 *
-	 * Allocate a scratch buffer to hold the new disk image.
-	 * Copy the leading WT_PAGE_DISK header onto the scratch buffer.
+	 * Allocate a scratch buffer to hold the new disk image.  Copy the
+	 * WT_PAGE_DISK header onto the scratch buffer, most of the header
+	 * information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->split_page_size, &tmp));
 	dsk = tmp->mem;
@@ -467,6 +480,7 @@ __wt_rec_helper_write(
 	WT_REC_LIST *r;
 	struct rec_list *r_list;
 	uint32_t addr, size;
+	void *cs;
 
 	r = &S2C(session)->cache->reclist;
 
@@ -484,7 +498,7 @@ __wt_rec_helper_write(
 		WT_RET(__wt_disk_write(session, dsk, addr, size));
 	}
 
-	/* Save the addr/size/recno triplet to update the parent. */
+	/* Save the key and addr/size pairs to update the parent. */
 	if (r->l_next == r->l_entries) {
 		WT_RET(__wt_realloc(session, &r->l_allocated,
 		    (r->l_entries + 20) * sizeof(*r->list), &r->list));
@@ -493,8 +507,36 @@ __wt_rec_helper_write(
 	r_list = &r->list[r->l_next++];
 	r_list->off.addr = addr;
 	r_list->off.size = size;
-	WT_RECNO(&r_list->off) = dsk->recno;
-	r_list->deleted = deleted;
+
+	/* Deletes are easy -- just flag the fact and we're done. */
+	if (deleted) {
+		r_list->deleted = deleted;
+		return (0);
+	}
+
+	/*
+	 * For a column-store, the key is the recno, for a row-store, it's a
+	 * variable-length byte string.
+	 */
+	switch (dsk->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		cs = WT_PAGE_DISK_BYTE(dsk);
+		size = WT_PTRDIFF32(WT_CELL_NEXT(cs), cs);
+		if (size > r_list->key.mem_size)
+			WT_RET(__wt_buf_grow(session, &r_list->key, size));
+		memcpy(r_list->key.mem, cs, size);
+		r_list->key.item.data = r_list->key.mem;
+		r_list->key.item.size = size;
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
+		WT_RECNO(&r_list->off) = dsk->recno;
+		break;
+	}
+
 	return (0);
 }
 
@@ -1035,7 +1077,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 		len = 0;
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL) {
 			/*
-			 * If we update overflow value item, free the underlying
+			 * If we update an overflow value, free the underlying
 			 * file space.
 			 */
 			if (WT_CELL_TYPE(rip->value) == WT_CELL_DATA_OVFL)
@@ -1238,10 +1280,79 @@ __wt_rec_parent_update(SESSION *session, WT_PAGE *page)
 static int
 __wt_rec_row_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(addrp);
-	WT_UNUSED(sizep);
-	return (0);
+	BTREE *btree;
+	WT_BUF *tmp;
+	WT_CELL cell, *cellp;
+	WT_OVFL *from, to;
+	WT_PAGE_DISK *dsk;
+	WT_REC_LIST *r;
+	struct rec_list *r_list;
+	uint32_t addr, i, size;
+	uint8_t *first_free;
+	int ret;
+
+	btree = session->btree;
+	tmp = NULL;
+	r = &S2C(session)->cache->reclist;
+	ret = 0;
+
+	WT_CLEAR(cell);
+
+	/*
+	 * The disk image is a header plus room for the key and WT_OFF pairs;
+	 * walk the list and figure out how much room we need.
+	 */
+	for (size = WT_PAGE_DISK_SIZE,
+	    r_list = r->list, i = 0; i < r->l_next; ++r_list, ++i)
+		size +=
+		    r_list->key.item.size + WT_CELL_SPACE_REQ(sizeof(WT_OFF));
+	WT_ERR(__wt_scr_alloc(session, WT_ALIGN(size, btree->allocsize), &tmp));
+	dsk = tmp->mem;
+	WT_CLEAR(*dsk);
+	dsk->u.entries = r->l_next * 2;
+	dsk->type = WT_PAGE_ROW_INT;
+
+	/* Lay the key/WT_OFF pairs out on the page. */
+	first_free = WT_PAGE_DISK_BYTE(dsk);
+	for (r_list = r->list, i = 0; i < r->l_next; ++r_list, ++i) {
+		/* If the cell references an overflow item, copy it. */
+		cellp = (WT_CELL *)r_list->key.item.data;
+		if (WT_CELL_TYPE(cellp) == WT_CELL_KEY_OVFL) {
+			from = WT_CELL_BYTE_OVFL(cellp);
+			WT_RET(__wt_bulk_ovfl_copy(session, from, &to));
+			fprintf(stderr, "\noverflow: %lu/%lu -> %lu/%lu\n", (u_long)from->addr, (u_long)from->size, (u_long)to.addr, (u_long)to.size);
+			*from = to;
+		}
+		/* Copy the key onto the page. */
+		memcpy(
+		    first_free, r_list->key.item.data, r_list->key.item.size);
+		first_free += r_list->key.item.size;
+
+		/* Copy the WT_OFF onto the page. */
+		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
+		memcpy(first_free, &cell, sizeof(WT_CELL));
+		first_free += sizeof(WT_CELL);
+		memcpy(first_free, &r_list->off, sizeof(WT_OFF));
+		first_free += sizeof(WT_OFF);
+	}
+
+	/*
+	 * Set the disk block size and clear trailing bytes.
+	 * Allocate file space.
+	 * Write the disk block.
+	 */
+	size = __wt_allocation_size(session, dsk, first_free);
+	WT_ERR(__wt_block_alloc(session, &addr, size));
+	WT_ERR(__wt_disk_write(session, dsk, addr, size));
+
+	/* Return the address information to the caller. */
+	*addrp = addr;
+	*sizep = size;
+
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
+
+	return (ret);
 }
 
 /*
@@ -1266,23 +1377,18 @@ __wt_rec_col_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 	r = &S2C(session)->cache->reclist;
 	ret = 0;
 
-	/* The disk image is a header plus room for the WT_OFF_RECORD pairs. */
-	size = WT_ALIGN(
-	    WT_PAGE_DISK_SIZE + (r->l_next - 1) * sizeof(WT_OFF_RECORD),
-	    btree->allocsize);
-	WT_ERR(__wt_scr_alloc(session, size, &tmp));
-
-	r_list = r->list;
-
+	/* The disk image is a header plus room for the WT_OFF_RECORD values. */
+	size = WT_PAGE_DISK_SIZE + (r->l_next - 1) * sizeof(WT_OFF_RECORD);
+	WT_ERR(__wt_scr_alloc(session, WT_ALIGN(size, btree->allocsize), &tmp));
 	dsk = tmp->mem;
 	WT_CLEAR(*dsk);
-	dsk->recno = WT_RECNO(&r_list->off);
-	dsk->lsn_file = dsk->lsn_off = 0;
+	dsk->recno = WT_RECNO(&r->list[0].off);
 	dsk->u.entries = r->l_next;
 	dsk->type = WT_PAGE_COL_INT;
 
+	/* Lay the WT_OFF_RECORD values out on the page. */
 	first_free = WT_PAGE_DISK_BYTE(dsk);
-	for (i = 0; i < r->l_next; ++i, ++r_list) {
+	for (r_list = r->list, i = 0; i < r->l_next; ++r_list, ++i) {
 		off = &r_list->off;
 		memcpy(first_free, off, sizeof(WT_OFF_RECORD));
 		first_free += sizeof(WT_OFF_RECORD);

@@ -10,7 +10,6 @@
 
 static int __wt_bulk_fix(SESSION *, void (*)(const char *,
 		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
-static int __wt_bulk_ovfl_copy(SESSION *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(SESSION *, WT_ITEM *, WT_OVFL *);
 static int __wt_bulk_promote(SESSION *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
@@ -1008,7 +1007,7 @@ __wt_item_build_value(SESSION *session,
  *	Copy bulk-loaded overflow items in the file, returning the WT_OVFL
  *	structure, filled in.
  */
-static int
+int
 __wt_bulk_ovfl_copy(SESSION *session, WT_OVFL *from, WT_OVFL *to)
 {
 	BTREE *btree;
