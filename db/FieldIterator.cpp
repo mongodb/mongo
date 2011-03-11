@@ -22,7 +22,7 @@
 namespace mongo
 {
     FieldIterator::FieldIterator(shared_ptr<Document> pTheDocument,
-				 vector<shared_ptr<Field>> *pTheVFieldPtr):
+			 const vector<shared_ptr<const Field>> *pTheVFieldPtr):
 	pDocument(pTheDocument),
 	pVFieldPtr(pTheVFieldPtr),
 	currentField(0)
@@ -31,21 +31,14 @@ namespace mongo
 	nField = pVFieldPtr->size();
     }
 
-    bool FieldIterator::eof() const
+    bool FieldIterator::more() const
     {
-	return currentField >= nField;
+	return currentField < nField;
     }
 
-    bool FieldIterator::advance()
+    shared_ptr<const Field> FieldIterator::next()
     {
-	assert(!eof());
-	++currentField;
-	return !eof();
-    }
-
-    shared_ptr<Field> FieldIterator::getCurrent() const
-    {
-	assert(!eof());
-	return (*pVFieldPtr)[currentField];
+	assert(more());
+	return (*pVFieldPtr)[currentField++];
     }
 }

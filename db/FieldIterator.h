@@ -27,27 +27,24 @@ namespace mongo
         boost::noncopyable
     {
     public:
-	bool eof() const;
 	/*
-	  @return true if there are no more fields, false otherwise
-	*/
+	  Ask if there are more fields to return.
 
-	bool advance();
+	  @return true if there are more fields, false otherwise
+	*/
+	bool more() const;
+
 	/*
-	  Move the iterator to point to the next field.
+	  Move the iterator to point to the next field and return it.
 
-	  @return true if this results in a valid field
+	  @return a pointer to the next Field
 	*/
-
-	shared_ptr<Field> getCurrent() const;
-	/*
-	  @return a pointer to the current Field
-	*/
+	shared_ptr<const Field> next();
 
     private:
 	friend class Document;
 	FieldIterator(shared_ptr<Document> pDocument,
-		      vector<shared_ptr<Field>> *pVFieldPtr);
+		      const vector<shared_ptr<const Field>> *pVFieldPtr);
 	/*
 	  @param pDocument points to the document whose fields are being
 	      iterated
@@ -62,6 +59,6 @@ namespace mongo
 	  fieldPtr vector alive.
 	*/
 	shared_ptr<Document> pDocument;
-	vector<shared_ptr<Field>> *pVFieldPtr;
+	const vector<shared_ptr<const Field>> *pVFieldPtr;
     };
 }

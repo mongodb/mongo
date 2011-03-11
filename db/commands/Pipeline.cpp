@@ -181,6 +181,9 @@ namespace mongo
 	    int fieldInclusion = -1;
 	    bool ravelArray = false;
 
+	    assert(outFieldName.find('.') == outFieldName.npos);
+	        // CW TODO user error: out field name can't use dot notation
+
 	    switch(specType)
 	    {
 	    case NumberDouble:
@@ -211,9 +214,6 @@ namespace mongo
 		/* include a field, with rename */
 		fieldInclusion = 1;
 		inFieldName = outFieldElement.String();
-
-		assert(inFieldName.find('.') != inFieldName.npos);
- 		    // CW TODO handle fields with a dot for subdocument fields
 		break;
 
 	    case Object:

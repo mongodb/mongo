@@ -32,14 +32,14 @@ namespace mongo
     public:
 	// virtuals from Expression
 	virtual ~ExpressionField();
-	virtual shared_ptr<Field> evaluate(
+	virtual shared_ptr<const Field> evaluate(
 	    shared_ptr<Document> pDocument) const;
 
-	static shared_ptr<ExpressionField> create(string fieldName);
+	static shared_ptr<ExpressionField> create(string fieldPath);
 
     private:
-	ExpressionField(string fieldName);
+	ExpressionField(string fieldPath);
 
-	string fieldName;
+	vector<string> fieldPath;
     };
 }

@@ -21,13 +21,50 @@
 
 namespace mongo
 {
+    const Field Field::fieldNull("Field::fieldNull");
+    const Field Field::fieldTrue("Field::fieldTrue", true);
+    const Field Field::fieldFalse("Field::fieldFalse", false);
+    const Field Field::fieldMinusOne("Field::fieldMinusOne", -1);
+    const Field Field::fieldZero("Field::fieldZero", 0);
+    const Field Field::fieldOne("Field::fieldOne", 1);
+
+    Field::Field(string theFieldName):
+	fieldName(theFieldName),
+	type(jstNULL),
+	oidValue(),
+	dateValue(),
+	stringValue(),
+	pDocumentValue(),
+	vpField()
+    {
+    }
+
+    Field::Field(string theFieldName, bool boolValue):
+	fieldName(theFieldName),
+	type(Bool),
+	pDocumentValue(),
+	vpField()
+    {
+	simple.boolValue = boolValue;
+    }
+
+    Field::Field(string theFieldName, int intValue):
+	fieldName(theFieldName),
+	type(NumberInt),
+	pDocumentValue(),
+	vpField()
+    {
+	simple.intValue = intValue;
+    }
+
     Field::~Field()
     {
     }
 
-    shared_ptr<Field> Field::createFromBsonElement(BSONElement *pBsonElement)
+    shared_ptr<const Field> Field::createFromBsonElement(
+	BSONElement *pBsonElement)
     {
-	shared_ptr<Field> pField(new Field(pBsonElement));
+	shared_ptr<const Field> pField(new Field(pBsonElement));
 	return pField;
     }
 
@@ -124,31 +161,20 @@ namespace mongo
 	}
     }
 
-    shared_ptr<Field> Field::createRename(
-	string newName, shared_ptr<Field> pSourceField)
+    shared_ptr<const Field> Field::createRename(
+	string newName, shared_ptr<const Field> pSourceField)
     {
-	shared_ptr<Field> pField(new Field(newName, pSourceField));
+	shared_ptr<const Field> pField(new Field(newName, pSourceField));
 	return pField;
     }
 
-    shared_ptr<Field> Field::createNul(string fieldName)
+    shared_ptr<const Field> Field::createInt(string fieldName, int value)
     {
-	shared_ptr<Field> pField(new Field(fieldName));
+	shared_ptr<const Field> pField(new Field(fieldName, value));
 	return pField;
     }
 
-    Field::Field(string theFieldName):
-	fieldName(theFieldName),
-	type(jstNULL),
-	oidValue(),
-	dateValue(),
-	stringValue(),
-	pDocumentValue(),
-	vpField()
-    {
-    }
-
-    Field::Field(string newName, shared_ptr<Field> pSourceField):
+    Field::Field(string newName, shared_ptr<const Field> pSourceField):
 	fieldName(newName),
 	type(pSourceField->getType()),
 	pDocumentValue(),
@@ -207,11 +233,14 @@ namespace mongo
 		simple.longValue = pSourceField->simple.longValue;
 		break;
 
+	    case jstNULL:
+		/* nothing to do */
+		break;
+	    
 		/* these shouldn't happen in this context */
 	    case MinKey:
 	    case EOO:
 	    case Undefined:
-	    case jstNULL:
 	    case DBRef:
 	    case Code:
 	    case MaxKey:
@@ -248,7 +277,7 @@ namespace mongo
 	return pDocumentValue;
     }
 
-    const vector<shared_ptr<Field>> *Field::getArray() const
+    const vector<shared_ptr<const Field>> *Field::getArray() const
     {
 	assert(getType() == Array);
 	return &vpField;
@@ -330,7 +359,7 @@ namespace mongo
 	    BSONArrayBuilder arrayBuilder(n);
 	    for(size_t i = 0; i < n; ++i)
 	    {
-		shared_ptr<Field> pField(vpField[i]);
+		shared_ptr<const Field> pField(vpField[i]);
 		pField->addToBsonArray(&arrayBuilder);
 	    }
 	    
@@ -380,11 +409,14 @@ namespace mongo
 	    pBuilder->append(fieldName, getLong());
 	    break;
 
+	case jstNULL:
+	    pBuilder->appendNull(fieldName);
+	    break;
+
 	    /* these shouldn't happen in this context */
 	case MinKey:
 	case EOO:
 	case Undefined:
-	case jstNULL:
 	case DBRef:
 	case Code:
 	case MaxKey:
@@ -421,7 +453,7 @@ namespace mongo
 	    BSONArrayBuilder arrayBuilder(n);
 	    for(size_t i = 0; i < n; ++i)
 	    {
-		shared_ptr<Field> pField(vpField[i]);
+		shared_ptr<const Field> pField(vpField[i]);
 		pField->addToBsonArray(&arrayBuilder);
 	    }
 	    

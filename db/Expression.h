@@ -34,7 +34,7 @@ namespace mongo
 
 	  @return a Field value
 	*/
-	virtual shared_ptr<Field> evaluate(
+	virtual shared_ptr<const Field> evaluate(
 	    shared_ptr<Document> pDocument) const = 0;
     };
 }

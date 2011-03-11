@@ -90,7 +90,8 @@ namespace mongo
 		string outName(vFieldName[i]);
 
 		/* get the value for the field */
-		shared_ptr<Field> pOutField(pExpression->evaluate(pInDocument));
+		shared_ptr<const Field> pOutField(
+		    pExpression->evaluate(pInDocument));
 
 		/*
 		  The name might already be what we want if this is just a
@@ -118,7 +119,8 @@ namespace mongo
 		    if (nRavel == 0)
 		    {
 			pRavelField.reset();
-			pOutField = Field::createNul(pOutField->getName());
+			pOutField = Field::createRename(
+			    pOutField->getName(), Field::getNull());
 		    }
 		}
 
@@ -139,20 +141,21 @@ namespace mongo
 		Document::clone(pNoRavelDocument));
 
 	    /* get access to the array of values */
-	    const vector<shared_ptr<Field>> *pvpField = pRavelField->getArray();
+	    const vector<shared_ptr<const Field>> *pvpField =
+		pRavelField->getArray();
 
 	    /* grab the individual array element */
-	    shared_ptr<Field> pArrayField((*pvpField)[iRavel]);
+	    shared_ptr<const Field> pArrayField((*pvpField)[iRavel]);
 
 	    /* get the output field name */
 	    string fieldName(pRavelField->getName());
 
 	    /* make a new Field that has the correct name */
-	    shared_ptr<Field> pNamedField(
+	    shared_ptr<const Field> pNamedField(
 		Field::createRename(fieldName, pArrayField));
 
 	    /* substitute the named field into the prototype document */
-	    pRavelDocument->setField(pNamedField, (size_t)ravelField);
+	    pRavelDocument->setField((size_t)ravelField, pNamedField);
 
 	    return pRavelDocument;
 	}

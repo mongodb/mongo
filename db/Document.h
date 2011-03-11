@@ -73,7 +73,7 @@ namespace mongo
 	  @param fieldName the name of the field
 	  @return point to the requested field
 	*/
-	shared_ptr<Field> getField(string fieldName);
+	shared_ptr<const Field> getField(string fieldName);
 
 	/*
 	  Add the given field to the Document.
@@ -84,7 +84,7 @@ namespace mongo
 	  It is an error to add a Field that has the same name as another
 	  field.
 	*/
-	void addField(shared_ptr<Field> pField);
+	void addField(shared_ptr<const Field> pField);
 
 	/*
 	  Set the given field to be at the specified position in the
@@ -92,12 +92,12 @@ namespace mongo
 	  position.  The index must be within the current range of field
 	  indices.
 	*/
-	void setField(shared_ptr<Field> pField, size_t index);
+	void setField(size_t index, shared_ptr<const Field> pField);
 
     private:
 	Document();
 	Document(BSONObj *pBsonObj);
 
-	vector<shared_ptr<Field>> fieldPtr;
+	vector<shared_ptr<const Field>> fieldPtr;
     };
 }

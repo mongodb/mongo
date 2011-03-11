@@ -34,7 +34,7 @@ namespace mongo
 	while(bsonIterator.more())
 	{
 	    BSONElement bsonElement(bsonIterator.next());
-	    shared_ptr<Field> pField(
+	    shared_ptr<const Field> pField(
 		Field::createFromBsonElement(&bsonElement));
 	    fieldPtr.push_back(pField);
 	}
@@ -44,10 +44,9 @@ namespace mongo
     {
 	auto_ptr<FieldIterator> pFieldIterator(createFieldIterator());
 
-	for(bool hasField = !pFieldIterator->eof(); hasField;
-	    hasField = pFieldIterator->advance())
+	while(pFieldIterator->more())
 	{
-	    shared_ptr<Field> pField(pFieldIterator->getCurrent());
+	    shared_ptr<const Field> pField(pFieldIterator->next());
 	    pField->addToBsonObj(pBuilder);
 	}
     }
@@ -83,7 +82,7 @@ namespace mongo
 	return new FieldIterator(shared_from_this(), &fieldPtr);
     }
 
-    shared_ptr<Field> Document::getField(string fieldName)
+    shared_ptr<const Field> Document::getField(string fieldName)
     {
 	/*
 	  For now, assume the number of fields is small enough that iteration
@@ -98,21 +97,21 @@ namespace mongo
 	const size_t n = fieldPtr.size();
 	for(size_t i = 0; i < n; ++i)
 	{
-	    shared_ptr<Field> pField(fieldPtr[i]);
+	    shared_ptr<const Field> pField(fieldPtr[i]);
 	    const char *pFieldName = pField->getName();
 	    if (fieldName.compare(pFieldName) == 0)
 		return(pField);
 	}
 
-	return(shared_ptr<Field>());
+	return(shared_ptr<const Field>());
     }
 
-    void Document::addField(shared_ptr<Field> pField)
+    void Document::addField(shared_ptr<const Field> pField)
     {
         fieldPtr.push_back(pField);
     }
 
-    void Document::setField(shared_ptr<Field> pField, size_t index)
+    void Document::setField(size_t index, shared_ptr<const Field> pField)
     {
 	fieldPtr[index] = pField;
     }

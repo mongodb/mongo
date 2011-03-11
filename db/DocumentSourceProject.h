@@ -72,6 +72,6 @@ namespace mongo
 	size_t iRavel; // next index in current ravel
 	size_t nRavel; // size of array to be raveled
 	shared_ptr<Document> pNoRavelDocument; // document to return, pre-ravel
-	shared_ptr<Field> pRavelField; // field being raveled
+	shared_ptr<const Field> pRavelField; // field being raveled
     };
 }
