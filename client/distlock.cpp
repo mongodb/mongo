@@ -33,7 +33,7 @@ namespace mongo {
     static void initModule() {
         // cache process string
         stringstream ss;
-        ss << prettyHostName() << ":" << time(0) << ":" << rand();
+        ss << getHostName() << ":" << cmdLine.port << ":" << time(0) << ":" << rand();
         _cachedProcessString = new string( ss.str() );
     }
 
