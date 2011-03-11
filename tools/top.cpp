@@ -97,7 +97,7 @@ namespace mongo {
                  << "\t write"  
                  << "\t\t" << terseCurrentTime()
                  << endl;
-            for ( unsigned i=data.size()-1; i>=0 && data.size() - i < 10 ; i-- ) {
+            for ( int i=data.size()-1; i>=0 && data.size() - i < 10 ; i-- ) {
                 cout << setw(longest) << data[i].ns 
                      << "\t" << setprecision(3) << ( data[i].timeDiff / ( 1000 * _sleep ) ) << "%" 
                      << "\t" << setprecision(3) << data[i].percentTime( "readLock" , _sleep) << "%" 

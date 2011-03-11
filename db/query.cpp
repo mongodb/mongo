@@ -1108,7 +1108,7 @@ namespace mongo {
                 qr->startingFrom = 0;
                 qr->nReturned = n;
                 result.setData( qr.release(), true );
-                return false;
+                return NULL;
             }
         }
 

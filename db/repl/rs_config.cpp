@@ -135,7 +135,7 @@ namespace mongo {
     void ReplSetConfig::MemberCfg::check() const {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
-        mchk(votes >= 0 && votes <= 100);
+        mchk(votes <= 100); // votes >= 0 because it is unsigned
         uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);

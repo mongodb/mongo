@@ -213,11 +213,11 @@ namespace mongo {
 
                 log() << "Initializing lock with skew of " << skew << " for thread " << threadId << endl;
 
-                lock.reset(new DistributedLock(hostConn, lockName, legacy ? takeoverMins : takeoverMS, true, legacy));
+                lock.reset(new DistributedLock(hostConn, lockName, legacy ? (unsigned long long)takeoverMins : takeoverMS, true, legacy));
 
                 log() << "Skewed time " << jsTime() << "  for thread " << threadId << endl
                       << "  max wait (with lock: " << threadWait << ", after lock: " << threadSleep << ")" << endl
-                      << "  takeover in " << (legacy ? takeoverMins : takeoverMS) << (legacy ? " (mins local)" : "(ms remote)") << endl;
+                      << "  takeover in " << (legacy ? (unsigned long long)takeoverMins : takeoverMS) << (legacy ? " (mins local)" : "(ms remote)") << endl;
 
             }
 
@@ -267,7 +267,7 @@ namespace mongo {
 
             result << "errors" << errors
                    << "skew" << skew
-                   << "takeover" << (long long) (legacy ? takeoverMS : takeoverMins)
+                   << "takeover" << (long long) (legacy ? takeoverMS : (unsigned long long)takeoverMins)
                    << "localTimeout" << (takeoverMS > 0);
 
         }

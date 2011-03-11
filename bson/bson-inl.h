@@ -398,7 +398,7 @@ namespace mongo {
             break;
         case RegEx: {
             const char *p = value();
-            size_t len1 = ( maxLen == -1 ) ? strlen( p ) : mongo::strnlen( p, remain );
+            size_t len1 = ( maxLen == -1 ) ? strlen( p ) : (size_t)mongo::strnlen( p, remain );
             //massert( 10318 ,  "Invalid regex string", len1 != -1 ); // ERH - 4/28/10 - don't think this does anything
             p = p + len1 + 1;
             size_t len2;

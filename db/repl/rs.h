@@ -134,6 +134,7 @@ namespace mongo {
             log() << "replSet ~RSBase called" << rsLog;
         }
 
+    public:
         class lock {
             RSBase& rsbase;
             auto_ptr<scoped_lock> sl;
@@ -157,7 +158,6 @@ namespace mongo {
             }
         };
 
-    public:
         /* for asserts */
         bool locked() const { return _locked != 0; }
 
