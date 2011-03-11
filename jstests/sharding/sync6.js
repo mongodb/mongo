@@ -16,8 +16,8 @@ var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {})//{ log
 // javascript console.
 for ( var i = 8; i < 12; i++ ) {
 
-	// Our force time is 1 second
-	var takeoverMS = 1000;
+	// Our force time is 2 seconds
+	var takeoverMS = 2000;
 
 	// Generate valid sleep and skew for this timeout
 	var threadSleepWithLock = takeoverMS / 2;
@@ -40,7 +40,7 @@ for ( var i = 8; i < 12; i++ ) {
 	
 	// Critical values so we're sure of correct operation
 	command["takeoverMS"] = takeoverMS
-	command["wait"] = 6 * takeoverMS // so we must force the lock
+	command["wait"] = 4 * takeoverMS // so we must force the lock
 	command["skewHosts"] = configServerTimeSkew
 	command["threadWait"] = threadSleepWithLock
 
