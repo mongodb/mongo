@@ -153,6 +153,7 @@ add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
 # to use CPUPROFILE=/tmp/profile
 # to view pprof -gv mongod /tmp/profile
 add_option( "pg", "link against profiler" , 0 , False , "profile" )
+add_option( "tcmalloc" , "link against tcmalloc" , 0 , False )
 add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
@@ -1009,6 +1010,10 @@ def doConfigure( myenv , needPcre=True , shell=False ):
 
     myenv.Append(LINKCOM=" $STATICFILES")
     myenv.Append(STATICFILES=staticlibfiles)
+
+    if has_option( "tcmalloc" ):
+        myCheckLib( "tcmalloc" , True );  # if successful, appedded 'tcmalloc' to myenv[ LIBS ]
+
 
     return conf.Finish()
 
