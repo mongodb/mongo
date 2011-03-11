@@ -58,12 +58,9 @@ namespace ThreadedTests {
     };
 
     class MongoMutexTest : public ThreadedTest<135> {
-#if defined(_DEBUG)
-        enum { N = 5000 };
-#else
         enum { N = 40000 };
-#endif
         MongoMutex *mm;
+
     public:
         void run() {
             Timer t;
