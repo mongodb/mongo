@@ -25,20 +25,20 @@ namespace mongo
     class Document;
     class Field;
 
-    class ExpressionField :
+    class ExpressionFieldPath :
         public Expression,
-        public boost::enable_shared_from_this<ExpressionField>
+        public boost::enable_shared_from_this<ExpressionFieldPath>
     {
     public:
 	// virtuals from Expression
-	virtual ~ExpressionField();
+	virtual ~ExpressionFieldPath();
 	virtual shared_ptr<const Field> evaluate(
 	    shared_ptr<Document> pDocument) const;
 
-	static shared_ptr<ExpressionField> create(string fieldPath);
+	static shared_ptr<ExpressionFieldPath> create(string fieldPath);
 
     private:
-	ExpressionField(string fieldPath);
+	ExpressionFieldPath(string fieldPath);
 
 	vector<string> fieldPath;
     };

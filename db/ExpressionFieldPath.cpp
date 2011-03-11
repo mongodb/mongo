@@ -15,24 +15,26 @@
  */
 
 #include "pch.h"
-#include "ExpressionField.h"
+#include "ExpressionFieldPath.h"
 
 #include "Document.h"
 #include "Field.h"
 
 namespace mongo
 {
-    ExpressionField::~ExpressionField()
+    ExpressionFieldPath::~ExpressionFieldPath()
     {
     }
 
-    shared_ptr<ExpressionField> ExpressionField::create(string fieldPath)
+    shared_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
+	string fieldPath)
     {
-	shared_ptr<ExpressionField> pExpression(new ExpressionField(fieldPath));
+	shared_ptr<ExpressionFieldPath> pExpression(
+	    new ExpressionFieldPath(fieldPath));
 	return pExpression;
     }
 
-    ExpressionField::ExpressionField(string theFieldPath):
+    ExpressionFieldPath::ExpressionFieldPath(string theFieldPath):
 	fieldPath()
     {
 	/*
@@ -63,7 +65,7 @@ namespace mongo
 	}
     }
 
-    shared_ptr<const Field> ExpressionField::evaluate(
+    shared_ptr<const Field> ExpressionFieldPath::evaluate(
 	shared_ptr<Document> pDocument) const
     {
 	shared_ptr<const Field> pField;

@@ -22,7 +22,7 @@
 #include "../DocumentSource.h"
 #include "../DocumentSourceCursor.h"
 #include "../DocumentSourceProject.h"
-#include "../ExpressionField.h"
+#include "../ExpressionFieldPath.h"
 #include "../Field.h"
 #include "../FieldIterator.h"
 #include "../pdfile.h"
@@ -261,7 +261,7 @@ namespace mongo
 	    {
 		// CW TODO: renames, ravels, expressions
 		shared_ptr<Expression> pExpression(
-		    ExpressionField::create(inFieldName));
+		    ExpressionFieldPath::create(inFieldName));
 		pProject->includeField(outFieldName, pExpression, ravelArray);
 	    }
 	}

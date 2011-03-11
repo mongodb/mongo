@@ -58,8 +58,8 @@ namespace mongo
     shared_ptr<const Field> ExpressionCompare::evaluate(
 	shared_ptr<Document> pDocument) const
     {
-	shared_ptr<Expression> pLeft(operand[0]->evaluate(pDocument));
-	shared_ptr<Expression> pRight(operand[1]->evaluate(pDocument));
+	shared_ptr<const Field> pLeft(operand[0]->evaluate(pDocument));
+	shared_ptr<const Field> pRight(operand[1]->evaluate(pDocument));
 
 	BSONType leftType = pLeft->getType();
 	BSONType rightType = pRight->getType();
@@ -69,7 +69,7 @@ namespace mongo
 	int cmp = 0;
 	switch(leftType)
 	{
-	case NumericDouble:
+	case NumberDouble:
 	{
 	    double left = pLeft->getDouble();
 	    double right = pRight->getDouble();
@@ -81,7 +81,7 @@ namespace mongo
 	    break;
 	}
 
-	case NumericInt:
+	case NumberInt:
 	{
 	    int left = pLeft->getInt();
 	    int right = pRight->getInt();
@@ -97,7 +97,7 @@ namespace mongo
 	{
 	    string left(pLeft->getString());
 	    string right(pRight->getString());
-	    const int cmp = left.compare(right);
+	    cmp = left.compare(right);
 
 	    if (cmp < 0)
 		cmp = -1;
