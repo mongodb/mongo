@@ -395,7 +395,7 @@ namespace mongo {
             double fraction = (now-lastRemap)/2000000.0;
             lastRemap = now;
 
-            rwlock lk(MongoFile::mmmutex, false);
+            RWLockRecursive::Shared lk(MongoFile::mmmutex);
             set<MongoFile*>& files = MongoFile::getAllFiles();
             unsigned sz = files.size();
             if( sz == 0 )
@@ -447,7 +447,75 @@ namespace mongo {
 
         mutex groupCommitMutex("groupCommit");
 
-        /** locking: in read lock when called. */
+        bool _groupCommitWithLimitedLocks() {
+            scoped_ptr<readlocktry> lk1( new readlocktry("", 500) );
+            if( !lk1->got() )
+                return false;
+
+            scoped_lock lk2(groupCommitMutex);
+
+            stats.curr->_commits++;
+
+            if( !commitJob.hasWritten() ) {
+                // getlasterror request could have came after the data was already committed
+                commitJob.notifyCommitted();
+                return true;
+            }
+
+            PREPLOGBUFFER();
+
+            RWLockRecursive::Shared lk3(MongoFile::mmmutex);
+
+            unsigned abLen = commitJob._ab.len();
+            commitJob.reset(); // must be reset before allowing anyone to write
+            DEV assert( !commitJob.hasWritten() );
+
+            // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
+            lk1.reset();
+
+            // ****** now other threads can do writes ******
+
+            WRITETOJOURNAL(commitJob._ab);
+            assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
+
+            // data is now in the journal, which is sufficient for acknowledging getLastError.
+            // (ok to crash after that)
+            commitJob.notifyCommitted();
+
+            WRITETODATAFILES();
+            assert( abLen == commitJob._ab.len() ); // WRITETODATAFILES uses _ab also
+            commitJob._ab.reset();
+
+            // can't : dbMutex._remapPrivateViewRequested = true;
+
+            return true;
+        }
+
+       /** @return true if committed; false if lock acquisition timed out (we only try for a read lock herein and only wait for a certain duration). */
+       bool groupCommitWithLimitedLocks() {
+           try {
+               return _groupCommitWithLimitedLocks();
+           }
+           catch(DBException& e ) {
+               log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
+               abort();
+           }
+           catch(std::ios_base::failure& e) {
+               log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
+               abort();
+           }
+           catch(std::bad_alloc& e) {
+               log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
+               abort();
+           }
+           catch(std::exception& e) {
+               log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
+               abort();
+           }
+           return false;
+       }
+
+       /** locking: in read lock when called. */
         static void _groupCommit() {
             stats.curr->_commits++;
 
@@ -473,8 +541,10 @@ namespace mongo {
             commitJob.notifyCommitted();
 
             WRITETODATAFILES();
+            debugValidateAllMapsMatch();
 
             commitJob.reset();
+            commitJob._ab.reset();
 
             // REMAPPRIVATEVIEW
             //
@@ -531,7 +601,16 @@ namespace mongo {
         }
 
         static void go() {
-            {
+            const int N = 10;
+            static int n;
+            if( privateMapBytes < UncommittedBytesLimit && ++n % N ) {
+                // limited locks version doesn't do any remapprivateview at all, so only try this if privateMapBytes
+                // is in an acceptable range.  also every Nth commit, we do everything so we can do some remapping;
+                // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
+                if( groupCommitWithLimitedLocks() )
+                    return;
+            }
+            else {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
                     groupCommit();

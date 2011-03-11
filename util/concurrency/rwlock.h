@@ -315,4 +315,37 @@ namespace mongo {
         RWLock& _lock;
         const bool _write;
     };
+
+    /** recursive on shared locks is ok for this implementation */
+    class RWLockRecursive {
+        ThreadLocalValue<int> _state;
+        RWLock _lk;
+        friend class Exclusive;
+    public:
+        RWLockRecursive(const char *name, int lpwait) : _lk(name, lpwait) { }
+
+        class Exclusive { 
+            rwlock _scopedLock;
+        public:
+            Exclusive(RWLockRecursive& r) : _scopedLock(r._lk, true) { }
+        };
+
+        class Shared { 
+            RWLockRecursive& _r;
+        public:
+            Shared(RWLockRecursive& r) : _r(r) {
+                int s = _r._state.get();
+                if( s == 0 )
+                    _r._lk.lock_shared(); 
+                _r._state.set(++s);
+            }
+            ~Shared() {
+                int s = _r._state.get() - 1;
+                if( s == 0 ) 
+                    _r._lk.unlock_shared();
+                _r._state.set(s);
+                dassert( s >= 0 );
+            }
+        };
+    };
 }

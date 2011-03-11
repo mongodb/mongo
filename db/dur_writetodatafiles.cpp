@@ -76,9 +76,8 @@ namespace mongo {
         }
 #endif
 
+        // concurrency: in mmmutex, not necessarily in dbMutex
         void WRITETODATAFILES() {
-            dbMutex.assertAtLeastReadLocked();
-
             Timer t;
 #if defined(_EXPERIMENTAL)
             WRITETODATAFILES_Impl3();
@@ -88,7 +87,6 @@ namespace mongo {
             stats.curr->_writeToDataFilesMicros += t.micros();
 
 
-            debugValidateAllMapsMatch();
         }
 
     }

@@ -129,7 +129,6 @@ namespace mongo {
         void CommitJob::reset() {
             _hasWritten = false;
             _wi.clear();
-            _ab.reset();
             privateMapBytes += _bytes;
             _bytes = 0;
             _nSinceCommitIfNeededCall = 0;

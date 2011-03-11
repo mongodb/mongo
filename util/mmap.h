@@ -100,7 +100,7 @@ namespace mongo {
         static set<MongoFile*> mmfiles;
     public:
         static map<string,MongoFile*> pathToFile;
-        static RWLock mmmutex;
+        static RWLockRecursive mmmutex;
     };
 
     /** look up a MMF by filename. scoped mutex locking convention.
@@ -111,7 +111,7 @@ namespace mongo {
     */
     class MongoFileFinder : boost::noncopyable {
     public:
-        MongoFileFinder() : _lk(MongoFile::mmmutex,false) { }
+        MongoFileFinder() : _lk(MongoFile::mmmutex) { }
 
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
@@ -122,7 +122,7 @@ namespace mongo {
         }
 
     private:
-        rwlock _lk;
+        RWLockRecursive::Shared _lk;
     };
 
     struct MongoFileAllowWrites {
@@ -219,7 +219,7 @@ namespace mongo {
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
     template < class F >
     inline void MongoFile::forEach( F p ) {
-        rwlock lk( mmmutex , false );
+        RWLockRecursive::Shared lklk(mmmutex);
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
