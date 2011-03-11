@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "dur.h"
+#include "dur_stats.h"
 #include "dur_recover.h"
 #include "dur_journal.h"
 #include "dur_journalformat.h"
@@ -225,6 +226,7 @@ namespace mongo {
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
                 void* dest = (char*)mmf->view_write() + entry.e->ofs;
                 memcpy(dest, entry.e->srcData(), entry.e->len);
+                stats.curr->_writeToDataFilesBytes += entry.e->len;
             }
             else {
                 massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
