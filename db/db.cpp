@@ -636,8 +636,8 @@ int main(int argc, char* argv[]) {
     ("dbpath", po::value<string>() , "directory for datafiles")
     ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
     ("directoryperdb", "each database will be stored in a separate directory")
-    ("dur", "enable journaling")
-    ("durOptions", po::value<int>(), "durability diagnostic options")
+    ("journal", "enable journaling")
+    ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("maxConns",po::value<int>(), "max number of simultaneous connections")
@@ -704,6 +704,8 @@ int main(int argc, char* argv[]) {
     // things we don't want people to use
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
+    ("dur", "enable journaling") // deprecated version
+    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
     ;
 
 
@@ -800,10 +802,13 @@ int main(int argc, char* argv[]) {
         if( params.count("nodur") ) {
             cmdLine.dur = false;
         }
-        if( params.count("dur") ) {
+        if( params.count("dur") || params.count( "journal" ) ) {
             cmdLine.dur = true;
         }
         if (params.count("durOptions")) {
+            cmdLine.durOptions = params["durOptions"].as<int>();
+        }
+        if (params.count("journalOptions")) {
             cmdLine.durOptions = params["durOptions"].as<int>();
         }
         if (params.count("objcheck")) {
