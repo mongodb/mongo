@@ -23,6 +23,7 @@
 #include "../../s/d_logic.h"
 #include "rs.h"
 #include "connections.h"
+#include "../repl.h"
 
 namespace mongo {
 
@@ -383,6 +384,10 @@ namespace mongo {
                 conn.setTimeout(c.ho.heartbeatTimeoutMillis/1000.0);
             }
             if( me == 0 ) {
+                // initial startup with fastsync
+                if (!reconf && replSettings.fastsync) {
+                    return false;
+                }
                 // log() << "replSet config : " << _cfg->toString() << rsLog;
                 log() << "replSet error self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;

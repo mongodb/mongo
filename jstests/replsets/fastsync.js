@@ -73,21 +73,7 @@ print("total in foo: "+foo.bar.count());
 
 print("2");
 admin.runCommand( {fsync:1,lock:1} );
-
 copyDbpath( basePath + "-p", basePath + "-s" );
-
-print("remove local files or slave will get confused");
-var files = listFiles(basePath+"-s");
-
-for (var i in files) {
-  var filename = files[i].name;
-  if (filename.match("/local")) {
-    print("removing "+filename);
-    removeFile(filename);
-  }
-}
-//run("rm", basePath+"-s/local.*");
-    
 admin.$cmd.sys.unlock.findOne();
 
 
