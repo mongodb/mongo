@@ -63,14 +63,7 @@ namespace mongo {
                 return false;
             }
 
-            {
-                BSONObjBuilder q;
-                q.appendDate("$gte", applyGTE.asDate());
-                BSONObjBuilder query;
-                query.append("ts", q.done());
-                BSONObj queryObj = query.done();
-                r.query(rsoplog, queryObj);
-            }
+            r.queryGTE( rsoplog, applyGTE );
             assert( r.haveCursor() );
 
             {
@@ -147,10 +140,21 @@ namespace mongo {
                 getDur().commitIfNeeded();
             }
             catch (DBException& e) {
+                // skip duplicate key exceptions
                 if( e.getCode() == 11000 || e.getCode() == 11001 ) {
-                    // skip duplicate key exceptions
                     continue;
                 }
+                
+                // handle cursor not found (just requery)
+                if( e.getCode() == 13127 ) {
+                    r.resetCursor();
+                    r.queryGTE(rsoplog, ts);
+                    if( r.haveCursor() ) {
+                        continue;
+                    }
+                }
+
+                // TODO: handle server restart
 
                 if( ts <= minValid ) {
                     // didn't make it far enough
