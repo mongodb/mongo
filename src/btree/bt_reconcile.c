@@ -1320,7 +1320,6 @@ __wt_rec_row_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 		if (WT_CELL_TYPE(cellp) == WT_CELL_KEY_OVFL) {
 			from = WT_CELL_BYTE_OVFL(cellp);
 			WT_RET(__wt_bulk_ovfl_copy(session, from, &to));
-			fprintf(stderr, "\noverflow: %lu/%lu -> %lu/%lu\n", (u_long)from->addr, (u_long)from->size, (u_long)to.addr, (u_long)to.size);
 			*from = to;
 		}
 		/* Copy the key onto the page. */
