@@ -147,6 +147,7 @@ add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 
 add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
+add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 
 # debugging/profiling help
 
@@ -212,6 +213,10 @@ env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.'
 if has_option( "cxx" ):
     env["CC"] = get_option( "cxx" )
     env["CXX"] = get_option( "cxx" )
+elif has_option("clang"):
+    env["CC"] = 'clang'
+    env["CXX"] = 'clang++'
+
 env["LIBPATH"] = []
 
 if has_option( "libpath" ):
@@ -677,7 +682,9 @@ if nix:
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
         env.Append( CPPFLAGS=" -Werror " )
-        env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
+        if not has_option('clang'): 
+            env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
+
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
@@ -722,6 +729,11 @@ if nix:
     # pre-compiled headers
     if usePCH and 'Gch' in dir( env ):
         print( "using precompiled headers" )
+        if has_option('clang'):
+            #env['GCHSUFFIX']  = '.pch' # clang++ uses pch.h.pch rather than pch.h.gch
+            #env.Prepend( CXXFLAGS=' -include pch.h ' ) # clang++ only uses pch from command line
+            print( "ERROR: clang pch is broken for now" )
+            Exit(1)
         env['Gch'] = env.Gch( [ "pch.h" ] )[0]
     elif os.path.exists('pch.h.gch'):
         print( "removing precompiled headers" )
