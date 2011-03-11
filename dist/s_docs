@@ -3,7 +3,7 @@
 # We require doxygen which may not be installed.
 type doxygen > /dev/null 2>&1 || {
 	echo 'doxygen not found, skipping document creation'
-	return 1
+	exit 1
 }
 
 filter=
