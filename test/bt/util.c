@@ -17,7 +17,7 @@ fname(const char *name)
 }
 
 void
-key_gen(void *datap, uint32_t *sizep, u_int64_t keyno, int insert)
+key_gen(void *keyp, uint32_t *sizep, u_int64_t keyno, int insert)
 {
 	int len;
 
@@ -31,7 +31,7 @@ key_gen(void *datap, uint32_t *sizep, u_int64_t keyno, int insert)
 	    sprintf(g.key_gen_buf, "%010llu.00", keyno);
 	g.key_gen_buf[len] = '/';
 
-	*(void **)datap = g.key_gen_buf;
+	*(void **)keyp = g.key_gen_buf;
 	*sizep = g.key_rand_len[keyno %
 	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 }
@@ -66,7 +66,7 @@ key_gen_setup(void)
 }
 
 void
-data_gen(void *datap, uint32_t *sizep, int grow_ok)
+value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 {
 	static size_t blen;
 	static u_int r;
@@ -132,7 +132,7 @@ data_gen(void *datap, uint32_t *sizep, int grow_ok)
 		break;
 	}
 
-	*(void **)datap = p;
+	*(void **)valuep = p;
 	*sizep = len;
 }
 

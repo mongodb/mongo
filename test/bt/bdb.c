@@ -47,26 +47,27 @@ bdb_teardown(void)
 }
 
 void
-bdb_insert(const void *key_data,
-    uint32_t key_size, const void *data_data, uint32_t data_size)
+bdb_insert(
+    const void *key_data, u_int32_t key_size,
+    const void *value_data, u_int32_t value_size)
 {
-	static DBT key, data;
+	static DBT key, value;
 	DB *db;
 
 	key.data = (void *)key_data;
 	key.size = key_size;
-	data.data = (void *)data_data;
-	data.size = data_size;
+	value.data = (void *)value_data;
+	value.size = value_size;
 
 	db = g.bdb_db;
 
-	assert(db->put(db, NULL, &key, &data, 0) == 0);
+	assert(db->put(db, NULL, &key, &value, 0) == 0);
 }
 
 int
-bdb_read(uint64_t keyno, void *datap, uint32_t *sizep, int *notfoundp)
+bdb_read(uint64_t keyno, void *valuep, uint32_t *sizep, int *notfoundp)
 {
-	static DBT key, data;
+	static DBT key, value;
 	DB *db;
 	int ret;
 
@@ -75,7 +76,7 @@ bdb_read(uint64_t keyno, void *datap, uint32_t *sizep, int *notfoundp)
 
 	key_gen(&key.data, &key.size, keyno, 0);
 
-	if ((ret = db->get(db, NULL, &key, &data, 0)) != 0) {
+	if ((ret = db->get(db, NULL, &key, &value, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
 			*notfoundp = 1;
 			return (0);
@@ -84,16 +85,16 @@ bdb_read(uint64_t keyno, void *datap, uint32_t *sizep, int *notfoundp)
 		    "bdb_read_key: {%.*s}", (int)key.size, (char *)key.data);
 		return (1);
 	}
-	*(void **)datap = data.data;
-	*sizep = data.size;
+	*(void **)valuep = value.data;
+	*sizep = value.size;
 	return (0);
 }
 
 int
 bdb_put(const void *arg_key, uint32_t arg_key_size,
-    const void *arg_data, uint32_t arg_data_size, int *notfoundp)
+    const void *arg_value, uint32_t arg_value_size, int *notfoundp)
 {
-	static DBT key, data;
+	static DBT key, value;
 	DB *db;
 	int ret;
 
@@ -102,17 +103,17 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 
 	key.data = (void *)arg_key;
 	key.size = arg_key_size;
-	data.data = (void *)arg_data;
-	data.size = arg_data_size;
+	value.data = (void *)arg_value;
+	value.size = arg_value_size;
 
-	if ((ret = db->put(db, NULL, &key, &data, 0)) != 0) {
+	if ((ret = db->put(db, NULL, &key, &value, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
 			*notfoundp = 1;
 			return (0);
 		}
 		db->err(db, ret, "bdb_put: {%.*s}{%.*s}",
 		    (int)key.size, (char *)key.data,
-		    (int)data.size, (char *)data.data);
+		    (int)value.size, (char *)value.data);
 		return (1);
 	}
 	return (0);

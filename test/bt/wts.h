@@ -96,7 +96,7 @@ void	 config_names(void);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(char *, int);
-void	 data_gen(void *, uint32_t *, int);
+void	 value_gen(void *, uint32_t *, int);
 char	*fname(const char *);
 void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);
