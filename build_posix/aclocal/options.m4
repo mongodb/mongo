@@ -47,7 +47,7 @@ no)	db_cv_enable_python=no;;
 *)	db_cv_enable_python=yes;;
 esac
 AC_MSG_RESULT($db_cv_enable_python)
-AM_CONDITIONAL([PYTHON], [test x$db_cv_enable_python = xyes])
+AM_CONDITIONAL(PYTHON, test x$db_cv_enable_python = xyes)
 
 AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
 AC_MSG_CHECKING(if --enable-verbose option specified)
