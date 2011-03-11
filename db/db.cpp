@@ -641,8 +641,6 @@ int main(int argc, char* argv[]) {
     ("jsonp","allow JSONP access via http (has security implications)")
     ("maxConns",po::value<int>(), "max number of simultaneous connections")
     ("noauth", "run without security")
-    ("nocursors", "diagnostic/debugging option")
-    ("nohints", "ignore query hints")
     ("nohttpinterface", "disable http interface")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
@@ -703,6 +701,8 @@ int main(int argc, char* argv[]) {
     ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
     ("nodur", "disable journaling (currently the default)")
     ("appsrvpath", po::value<string>(), "root directory for the babble app server")
+    ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
+    ("nohints", "ignore query hints")
     ;
 
 
