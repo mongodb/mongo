@@ -40,11 +40,11 @@ typedef struct {
 		WT_OFF_RECORD off;		/* Address, size, recno */
 
 		/*
-		 * The key for this page; no column-store key is needed because
-		 * the page's key, saved in the WT_OFF_RECORD structure, is the
-		 * column-store key.
+		 * The key for a row-store page; no column-store key is needed
+		 * because the page's recno, stored in the WT_OFF_RECORD, is
+		 * the column-store key.
 		 */
-		WT_ITEM key;			/* Row key */
+		WT_BUF key;			/* Row key */
 
 		int	 deleted;		/* Page deleted */
 	} *list;

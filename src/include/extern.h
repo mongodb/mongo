@@ -58,6 +58,8 @@ int
 __wt_item_build_value(SESSION *session,
     WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl);
 int
+__wt_bulk_ovfl_copy(SESSION *session, WT_OVFL *from, WT_OVFL *to);
+int
 __wt_cache_create(CONNECTION *conn);
 void
 __wt_cache_stats(CONNECTION *conn);
