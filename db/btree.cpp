@@ -313,6 +313,9 @@ namespace mongo {
         nextChild = kn.prevChildBucket;
 
         n--;
+        // This is risky because the key we are returning points to this unalloc'ed memory,
+        // and we are assuming that the last key points to the last allocated
+        // bson region.
         emptySize += sizeof(_KeyNode);
         _unalloc(keysize);
     }
@@ -628,10 +631,6 @@ namespace mongo {
         return false;
     }
 
-    /**
-     * @param self - don't complain about ourself already being in the index case.
-     * @return true = there is a duplicate.
-     */
     bool BtreeBucket::wouldCreateDup(
         const IndexDetails& idx, const DiskLoc &thisLoc,
         const BSONObj& key, const Ordering& order,
@@ -849,6 +848,9 @@ namespace mongo {
         }
 
         KeyNode kn = advanceLoc.btree()->keyNode( advanceKeyOfs );
+        // Because advanceLoc is a descendant of thisLoc, updating thisLoc will
+        // not not affect packing or keys of advanceLoc and kn will be stable
+        // during the following setInternalKey()
         setInternalKey( thisLoc, keypos, kn.recordLoc, kn.key, order, childForPos( keypos ), childForPos( keypos + 1 ), id );
         advanceLoc.btreemod()->delKeyAtPos( advanceLoc, id, advanceKeyOfs, order );
     }
@@ -943,6 +945,8 @@ namespace mongo {
         l->_packReadyForMod( order, pos );
         r->_packReadyForMod( order, pos ); // pack r in case there are droppable keys
 
+        // We know the additional keys below will fit in l because canMergeChildren()
+        // must be true.
         int oldLNum = l->n;
         {
             KeyNode kn = keyNode( leftIndex );
@@ -1007,6 +1011,10 @@ namespace mongo {
                                             BtreeBucket *r, const DiskLoc rchild,
                                             IndexDetails &id, const Ordering &order ) {
         // TODO maybe do some audits the same way pushBack() does?
+        // As a precondition, rchild + the old separator are less than half a body size,
+        // and lchild is at most completely full.  Based on the value of split,
+        // rchild will get <= half of the total bytes which is at most 75%
+        // of a full body.  So rchild will have room for the following keys:
         int rAdd = l->n - split;
         r->reserveKeysFront( rAdd );
         for( int i = split + 1, j = 0; i < l->n; ++i, ++j ) {
@@ -1021,9 +1029,14 @@ namespace mongo {
         {
             KeyNode kn = l->keyNode( split );
             l->nextChild = kn.prevChildBucket;
+            // Because lchild is a descendant of thisLoc, updating thisLoc will
+            // not not affect packing or keys of lchild and kn will be stable
+            // during the following setInternalKey()            
             setInternalKey( thisLoc, leftIndex, kn.recordLoc, kn.key, order, lchild, rchild, id );
         }
         int zeropos = 0;
+        // lchild and rchild cannot be merged, so there must be >0 (actually more)
+        // keys to the left of split.
         l->truncateTo( split, order, zeropos );
     }
 
@@ -1031,6 +1044,10 @@ namespace mongo {
                                             BtreeBucket *l, const DiskLoc lchild,
                                             BtreeBucket *r, const DiskLoc rchild,
                                             IndexDetails &id, const Ordering &order ) {
+        // As a precondition, lchild + the old separator are less than half a body size,
+        // and rchild is at most completely full.  Based on the value of split,
+        // lchild will get less than half of the total bytes which is at most 75%
+        // of a full body.  So lchild will have room for the following keys:
         int lN = l->n;
         {
             KeyNode kn = keyNode( leftIndex );
@@ -1043,10 +1060,16 @@ namespace mongo {
         {
             KeyNode kn = r->keyNode( split - lN - 1 );
             l->nextChild = kn.prevChildBucket;
+            // Child lN was lchild's old nextChild, and don't need to fix that one.
             l->fixParentPtrs( lchild, lN + 1, l->n );
+            // Because rchild is a descendant of thisLoc, updating thisLoc will
+            // not affect packing or keys of rchild and kn will be stable
+            // during the following setInternalKey()            
             setInternalKey( thisLoc, leftIndex, kn.recordLoc, kn.key, order, lchild, rchild, id );
         }
         int zeropos = 0;
+        // lchild and rchild cannot be merged, so there must be >0 (actually more)
+        // keys to the right of split.
         r->dropFront( split - lN, order, zeropos );
     }
 
@@ -1144,7 +1167,10 @@ namespace mongo {
         }
     }
 
-    /** this sucks.  maybe get rid of parent ptrs. */
+    /**
+     * This can cause a lot of additional page writes when we assign buckets to
+     * different parents.  Maybe get rid of parent ptrs?
+     */
     void BtreeBucket::fixParentPtrs(const DiskLoc thisLoc, int firstIndex, int lastIndex) const {
         VERIFYTHISLOC
         if ( lastIndex == -1 ) {
@@ -1191,6 +1217,7 @@ namespace mongo {
         DiskLoc oldLoc = thisLoc;
 
         if ( !basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
+            // If basicInsert() fails, the bucket will be packed as required by split().
             thisLoc.btreemod()->split(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
             return;
         }
@@ -1266,6 +1293,10 @@ namespace mongo {
                 out() << "    splitkey key:" << splitkey.key.toString() << endl;
             }
 
+            // Because thisLoc is a descendant of parent, updating parent will
+            // not not affect packing or keys of thisLoc and splitkey will be stable
+            // during the following:
+            
             // promote splitkey to a parent node
             if ( parent.isNull() ) {
                 // make a new parent if we were the root
@@ -1290,7 +1321,7 @@ namespace mongo {
 
         int newpos = keypos;
         // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
-        truncateTo(split, order, newpos);  // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
+        truncateTo(split, order, newpos);
 
         // add our new key, there is room now
         {
