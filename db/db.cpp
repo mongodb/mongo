@@ -56,7 +56,6 @@ namespace mongo {
     /* only off if --nohints */
     extern bool useHints;
 
-    extern char *appsrvPath;
     extern int diagLogging;
     extern unsigned lenForNewNsFiles;
     extern int lockFile;
@@ -464,7 +463,7 @@ sendmore:
         return cc().curop()->opNum();
     }
 
-    void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
+    void _initAndListen(int listenPort ) {
 
         Client::initThread("initandlisten");
 
@@ -554,8 +553,10 @@ sendmore:
 
     void testPretouch();
 
-    void initAndListen(int listenPort, const char *appserverLoc = NULL) {
-        try { _initAndListen(listenPort, appserverLoc); }
+    void initAndListen(int listenPort) {
+        try { 
+            _initAndListen(listenPort); 
+        }
         catch ( std::exception &e ) {
             log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
@@ -573,7 +574,7 @@ sendmore:
 #if defined(_WIN32)
     bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
-        initAndListen( cmdLine.port, appsrvPath );
+        initAndListen( cmdLine.port );
         return true;
     }
 #endif
@@ -700,7 +701,6 @@ int main(int argc, char* argv[]) {
     ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
     ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
     ("nodur", "disable journaling (currently the default)")
-    ("appsrvpath", po::value<string>(), "root directory for the babble app server")
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
     ;
@@ -807,10 +807,6 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("objcheck")) {
             objcheck = true;
-        }
-        if (params.count("appsrvpath")) {
-            /* casting away the const-ness here */
-            appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
         }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
@@ -1051,7 +1047,7 @@ int main(int argc, char* argv[]) {
     }
 
     UnitTest::runTests();
-    initAndListen(cmdLine.port, appsrvPath);
+    initAndListen(cmdLine.port);
     dbexit(EXIT_CLEAN);
     return 0;
 }

@@ -56,8 +56,6 @@ namespace mongo {
 
     string dbExecCommand;
 
-    char *appsrvPath = NULL;
-
     DiagLog _diaglog;
 
     bool useCursors = true;
