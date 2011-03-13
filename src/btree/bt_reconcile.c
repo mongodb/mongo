@@ -1429,6 +1429,10 @@ __wt_rec_page_delete(SESSION *session, WT_PAGE *page)
 	WT_ROW_REF *rref;
 	uint32_t i;
 
+	/* If we reach the root of the tree, we're done by definition. */
+	if ((parent = page->parent) == NULL)
+		return (0);
+
 	/*
 	 * Any future reader/writer of the page has to deal with deleted pages.
 	 *
@@ -1501,11 +1505,7 @@ __wt_rec_page_delete(SESSION *session, WT_PAGE *page)
 	 * So, let's get to it: walk the chain of parent pages from the current
 	 * page, stopping at the root or the first page with valid entries and
 	 * deleting as we go.
-	 */
-	if ((parent = page->parent) == NULL)
-		return (0);
-
-	/*
+	 *
 	 * Search the current parent page for a valid child page entry.  We can
 	 * do this because there's a valid child for the page in the tree (so it
 	 * can't be evicted), and we're the eviction thread and no other thread
@@ -1527,8 +1527,11 @@ __wt_rec_page_delete(SESSION *session, WT_PAGE *page)
 	}
 
 	/*
-	 * The current page has no valid child page entries -- lather, rinse,
-	 * repeat.
+	 * The current page has no valid child page entries -- mark the page as
+	 * deleted.
 	 */
+	page->parent_ref->state = WT_REF_DELETED;
+
+	/* Lather, rinse, repeat. */
 	return (__wt_rec_page_delete(session, parent));
 }
