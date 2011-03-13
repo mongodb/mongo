@@ -202,7 +202,7 @@ namespace mongo {
 			  }
                         }
 #endif
-                        uassert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
+                        massert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
                     }
                 }
             }
