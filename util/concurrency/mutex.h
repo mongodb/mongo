@@ -199,19 +199,22 @@ namespace mongo {
 
 
         class scoped_lock : boost::noncopyable {
-#if defined(_DEBUG)
-            mongo::mutex *mut;
-#endif
         public:
-            scoped_lock( mongo::mutex &m ) : _l( m.boost() ) {
 #if defined(_DEBUG)
-                mut = &m;
-                mutexDebugger.entering(mut->_name);
+            mongo::mutex * const _mut;
+#endif
+            scoped_lock( mongo::mutex &m ) : 
+#if defined(_DEBUG)
+            _mut(&m),
+#endif
+            _l( m.boost() ) {
+#if defined(_DEBUG)
+                mutexDebugger.entering(_mut->_name);
 #endif
             }
             ~scoped_lock() {
 #if defined(_DEBUG)
-                mutexDebugger.leaving(mut->_name);
+                mutexDebugger.leaving(_mut->_name);
 #endif
             }
             boost::timed_mutex::scoped_lock &boost() { return _l; }

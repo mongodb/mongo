@@ -98,17 +98,19 @@ namespace mongo {
 
     const time_t LeaseTime = 30;
 
+    mutex Consensus::lyMutex("ly");
+
     unsigned Consensus::yea(unsigned memberId) { /* throws VoteException */
-        Atomic<LastYea>::tran t(ly);
-        LastYea &ly = t.ref();
+        mutex::scoped_lock lk(lyMutex);
+        LastYea &L = this->ly.ref(lk);
         time_t now = time(0);
-        if( ly.when + LeaseTime >= now && ly.who != memberId ) {
+        if( L.when + LeaseTime >= now && L.who != memberId ) {
             log(1) << "replSet not voting yea for " << memberId <<
-                   " voted for " << ly.who << ' ' << now-ly.when << " secs ago" << rsLog;
+                   " voted for " << L.who << ' ' << now-L.when << " secs ago" << rsLog;
             throw VoteException();
         }
-        ly.when = now;
-        ly.who = memberId;
+        L.when = now;
+        L.who = memberId;
         return rs._self->config().votes;
     }
 
@@ -116,8 +118,8 @@ namespace mongo {
        place instead of leaving it for a long time.
        */
     void Consensus::electionFailed(unsigned meid) {
-        Atomic<LastYea>::tran t(ly);
-        LastYea &L = t.ref();
+        mutex::scoped_lock lk(lyMutex);
+        LastYea &L = ly.ref(lk);
         DEV assert( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
         if( L.who == meid )
             L.when = 0;

@@ -92,7 +92,8 @@ namespace mongo {
             time_t when;
             unsigned who;
         };
-        Atomic<LastYea> ly;
+        static mutex lyMutex;
+        Guarded<LastYea,lyMutex> ly;
         unsigned yea(unsigned memberId); // throws VoteException
         void electionFailed(unsigned meid);
         void _electSelf();
