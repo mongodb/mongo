@@ -654,7 +654,7 @@ __wt_evict_dirty(SESSION *session)
 		WT_ERR(__wt_page_reconcile(session, page));
 
 		/*
-		 * One special case -- of the page was deleted, the state has
+		 * One special case -- if the page was deleted, the state has
 		 * been reset to WT_REF_DELETED.  If still in "evict" mode,
 		 * clear the cache entry -- no memory flush needed, the state
 		 * field is declared volatile.
