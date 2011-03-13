@@ -213,7 +213,7 @@ namespace PerfTests {
     public:
         InsertDup() : o( BSON("_id" << 1) ) { } // dup keys
         string name() {
-            return "insert duplicate _ids";
+            return "insert-duplicate-_ids";
         }
         void prep() {
             client().insert( ns(), o );
@@ -231,7 +231,7 @@ namespace PerfTests {
         const BSONObj x;
     public:
         Insert1() : x( BSON("x" << 99) ) { }
-        string name() { return "insert simple"; }
+        string name() { return "insert-simple"; }
         void timed() {
             client().insert( ns(), x );
         }
@@ -265,7 +265,7 @@ namespace PerfTests {
 
     class InsertRandom : public B {
     public:
-        string name() { return "random inserts"; }
+        string name() { return "random-inserts"; }
         void prep() {
             client().insert( ns(), BSONObj() );
             client().ensureIndex(ns(), BSON("x"<<1));
@@ -288,7 +288,7 @@ namespace PerfTests {
         static int rand() {
             return std::rand() & 0x7fff;
         }
-        virtual string name() { return "random upserts"; }
+        virtual string name() { return "random-upserts"; }
         void prep() {
             client().insert( ns(), BSONObj() );
             client().ensureIndex(ns(), BSON("x"<<1));
@@ -321,7 +321,7 @@ namespace PerfTests {
     template <typename T>
     class MoreIndexes : public T {
     public:
-        string name() { return T::name() + " with more indexes"; }
+        string name() { return T::name() + "-with-more-indexes"; }
         void prep() {
             T::prep();
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
