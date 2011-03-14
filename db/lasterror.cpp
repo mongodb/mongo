@@ -97,7 +97,7 @@ namespace mongo {
 
     LastError * LastErrorHolder::disableForCommand() {
         LastError *le = _get();
-        assert( le );
+        uassert(13649, "no operation yet", le);
         le->disabled = true;
         le->nPrev--; // caller is a command that shouldn't count as an operation
         return le;
