@@ -117,8 +117,11 @@ namespace mongo {
 
         int _configval( const IndexSpec* spec , const string& name , int def ) {
             BSONElement e = spec->info[name];
-            if ( e.isNumber() )
-                return e.numberInt();
+            if ( e.isNumber() ){
+            	// Check that our values are not too big or small
+            	uassert_msg(15073, "Value " << e.numberLong() << " exceeds integer bounds.", e.numberLong() == e.numberInt() )
+            	return e.numberInt();
+            }
             return def;
         }
 

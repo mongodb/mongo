@@ -1345,6 +1345,10 @@ namespace mongo {
         assert( d->indexBuildInProgress == 0 );
         assertInWriteLock();
         RecoverableIndexState recoverable( d );
+
+        // Build index spec here in case the collection is empty and the index details are invalid
+        idx.getSpec();
+
         if( inDBRepair || !background ) {
             n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
             assert( !idx.head.isNull() );
