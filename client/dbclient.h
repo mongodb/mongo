@@ -453,6 +453,7 @@ namespace mongo {
             @return error message text, or empty string if no error.
         */
         string getLastError();
+
         /** Get error result from the last operation on this connection.
             @return full error object.
         */
