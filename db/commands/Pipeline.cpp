@@ -21,6 +21,7 @@
 #include "../Document.h"
 #include "../DocumentSource.h"
 #include "../DocumentSourceCursor.h"
+#include "../DocumentSourceFilter.h"
 #include "../DocumentSourceProject.h"
 #include "../ExpressionAnd.h"
 #include "../ExpressionCompare.h"
@@ -128,6 +129,8 @@ namespace mongo
 		/* select the appropriate operation */
 		if (strcmp(pFieldName, "$project") == 0)
 		    pSource = setupProject(&bsonElement, pSource);
+		else if (strcmp(pFieldName, "$filter") == 0)
+		    pSource = setupFilter(&bsonElement, pSource);
 		else
 		{
 		    ostringstream sb;
@@ -350,7 +353,6 @@ namespace mongo
 		    assert(false); // CW TODO unimplemented
 		else
 		{
-		    // CW TODO: renames, ravels, expressions
 		    shared_ptr<Expression> pExpression(
 			ExpressionFieldPath::create(inFieldName));
 		    pProject->includeField(
@@ -372,12 +374,13 @@ namespace mongo
 	    case Object:
 	    {
 		/*
-		  A computed expression, or a $ravel.
+		  A computed expression, or a ravel (unwinding an array
+		  one element at a time).
 
-		  We handle $ravel as a special case, because this is done
-		  by the projection source.  For any other expression,
-		  we hand over control to code that parses the expression
-		  and returns an expression.
+		  We handle $ravel as a special case,
+		  because this is done by the projection source.  For any
+		  other expression, we hand over control to code that parses
+		  the expression and returns an expression.
 
 		  field expressions will look like one of
 		  f0: {f1: ..., f2: ..., f3: ...}
@@ -433,5 +436,38 @@ namespace mongo
 	}
 
 	return pProject;
+    }
+
+    shared_ptr<Expression> Pipeline::parseExpressionObject(
+	BSONElement *pBsonElement)
+    {
+	assert(pBsonElement->type() == Object);
+  	    // CW TODO expression object must be an object
+
+	shared_ptr<Expression> pExpression;
+
+	BSONObj filterObj(pBsonElement->Obj());
+	BSONObjIterator filterIterator(filterObj);
+	for(size_t i = 0; filterIterator.more(); ++i)
+	{
+	    assert(i == 0);
+	        // CW TODO error only one field allowed in an expression object
+
+	    BSONElement filterExpr(filterIterator.next());
+	    const char *pOpName = filterExpr.fieldName();
+	    pExpression = parseExpression(pOpName, &filterExpr);
+	}
+
+	return pExpression;
+    }
+
+    shared_ptr<DocumentSource> Pipeline::setupFilter(
+	BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource)
+    {
+	shared_ptr<Expression> pExpression(parseExpressionObject(pBsonElement));
+	shared_ptr<DocumentSourceFilter> pFilter(
+	    DocumentSourceFilter::create(pExpression, pSource));
+
+	return pFilter;
     }
 }

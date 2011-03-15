@@ -16,37 +16,93 @@
 
 #include "pch.h"
 
-#include "Filter.h"
 #include "DocumentSourceFilter.h"
+
 #include "Expression.h"
+#include "Field.h"
 
 namespace mongo
 {
-    DocumentSourceFilter::DocumentSourceFilter(
-	shared_ptr<DocumentSource> pTheSource,
-	shared_ptr<Expression> pTheFilter):
-	pFilter(pTheFilter)
+    DocumentSourceFilter::~DocumentSourceFilter()
     {
+    }
+
+    void DocumentSourceFilter::findNext()
+    {
+	/* only do this the first time */
+	if (unstarted)
+	{
+	    hasNext = !pSource->eof();
+	    unstarted = false;
+	}
+
+	while(hasNext)
+	{
+	    shared_ptr<Document> pDocument(pSource->getCurrent());
+	    hasNext = pSource->advance();
+
+	    shared_ptr<const Field> pField(pFilter->evaluate(pDocument));
+	    bool pass = Field::coerceToBool(pField);
+	    if (pass)
+	    {
+		pCurrent = pDocument;
+		return;
+	    }
+	}
+
+	pCurrent.reset();
     }
 
     bool DocumentSourceFilter::eof()
     {
-	// TODO need to look ahead and see
-	return pSource->eof();
+	if (unstarted)
+	    findNext();
+
+	return (pCurrent.get() == NULL);
     }
 
     bool DocumentSourceFilter::advance()
     {
-	return pSource->advance();
+	if (unstarted)
+	    findNext();
+
+	/*
+	  This looks weird after the above, but is correct.  Note that calling
+	  getCurrent() when first starting already yields the first document
+	  in the collection.  Calling advance() without using getCurrent()
+	  first will skip over the first item.
+	 */
+	findNext();
+
+	return (pCurrent.get() != NULL);
     }
 
     shared_ptr<Document> DocumentSourceFilter::getCurrent()
     {
-	shared_ptr<Document> pDocument;
-	return pDocument; // TODO
+	if (unstarted)
+	    findNext();
+
+	assert(pCurrent.get() != NULL); // CW TODO error
+	return pCurrent;
     }
 
-    DocumentSourceFilter::~DocumentSourceFilter()
+    shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
+	shared_ptr<Expression> pTheFilter,
+	shared_ptr<DocumentSource> pTheSource)
+    {
+	shared_ptr<DocumentSourceFilter> pSource(
+	    new DocumentSourceFilter(pTheFilter, pTheSource));
+	return pSource;
+    }
+
+    DocumentSourceFilter::DocumentSourceFilter(
+	shared_ptr<Expression> pTheFilter,
+	shared_ptr<DocumentSource> pTheSource):
+	pSource(pTheSource),
+	pFilter(pTheFilter),
+	unstarted(true),
+	hasNext(false),
+	pCurrent()
     {
     }
 }

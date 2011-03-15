@@ -50,9 +50,14 @@ namespace mongo
 	/* these statics could move elsewhere */
 	static shared_ptr<DocumentSource> setupProject(
 	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
+	static shared_ptr<DocumentSource> setupFilter(
+	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
+	static shared_ptr<Expression> parseExpressionObject(
+	    BSONElement *pBsonElement);
+	static shared_ptr<Expression> parseDocument(BSONElement *pBsonElement);
+
 	static shared_ptr<Expression> parseExpression(
 	    const char *pOpName, BSONElement *pBsonElement);
-	static shared_ptr<Expression> parseDocument(BSONElement *pBsonElement);
     };
 
 } // namespace mongo

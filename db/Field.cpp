@@ -516,16 +516,14 @@ namespace mongo
 	}
     }
 
-    shared_ptr<const Field> Field::coerceToBoolean(
-	shared_ptr<const Field> pField)
+    bool Field::coerceToBool(shared_ptr<const Field> pField)
     {
-	bool result = false;
 	BSONType type = pField->getType();
 	switch(type)
 	{
 	case NumberDouble:
 	    if (pField->simple.doubleValue != 0)
-		result = true;
+		return true;
 	    break;
 
 	case String:
@@ -537,11 +535,12 @@ namespace mongo
 	case RegEx:
 	case Symbol:
 	case Timestamp:
-	    result = true;
-	    break;
+	    return true;
 
 	case Bool:
-	    return pField;
+	    if (pField->simple.boolValue)
+		return true;
+	    break;
 
 	case CodeWScope:
 	    assert(false); // CW TODO unimplemented
@@ -549,12 +548,12 @@ namespace mongo
 
 	case NumberInt:
 	    if (pField->simple.intValue != 0)
-		result = true;
+		return true;
 	    break;
 
 	case NumberLong:
 	    if (pField->simple.longValue != 0)
-		result = true;
+		return true;
 	    break;
 
 	case jstNULL:
@@ -572,6 +571,13 @@ namespace mongo
 	    break;
 	}
 
+	return false;
+    }
+
+    shared_ptr<const Field> Field::coerceToBoolean(
+	shared_ptr<const Field> pField)
+    {
+	bool result = coerceToBool(pField);
 	if (result)
 	    return Field::getTrue();
 	return Field::getFalse();

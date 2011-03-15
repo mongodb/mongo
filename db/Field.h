@@ -119,7 +119,18 @@ namespace mongo
 	static shared_ptr<const Field> getOne();
 
 	/*
-	  Coerce a value to a boolean, using JSON rules.
+	  Coerce (cast) a value to a native bool, using JSON rules.
+
+	  @param pField the field value to coerce
+	  @returns the bool value
+	*/
+	static bool coerceToBool(shared_ptr<const Field> pField);
+
+	/*
+	  Coerce (cast) a value to a Boolean Field, using JSON rules.
+
+	  @param pField the field value to coerce
+	  @returns the Boolean Field value
 	*/
 	static shared_ptr<const Field> coerceToBoolean(
 	    shared_ptr<const Field> pField);

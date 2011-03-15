@@ -21,7 +21,6 @@
 
 namespace mongo
 {
-    class Filter;
     class Expression;
 
     class DocumentSourceFilter :
@@ -34,11 +33,21 @@ namespace mongo
 	virtual bool advance();
 	virtual shared_ptr<Document> getCurrent();
 
-	DocumentSourceFilter(shared_ptr<DocumentSource> pTheSource,
-			     shared_ptr<Expression> pTheFilter);
+	static shared_ptr<DocumentSourceFilter> create(
+	    shared_ptr<Expression> pTheFilter,
+	    shared_ptr<DocumentSource> pTheSource);
 
     private:
-	boost::shared_ptr<DocumentSource> pSource;
-	boost::shared_ptr<Expression> pFilter;
+	DocumentSourceFilter(shared_ptr<Expression> pTheFilter,
+			     shared_ptr<DocumentSource> pTheSource);
+
+	shared_ptr<DocumentSource> pSource;
+	shared_ptr<Expression> pFilter;
+
+	void findNext();
+
+	bool unstarted;
+	bool hasNext;
+	shared_ptr<Document> pCurrent;
     };
 }
