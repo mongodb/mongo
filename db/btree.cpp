@@ -284,6 +284,7 @@ namespace mongo {
     }
 
     void BucketBasics::_delKeyAtPos(int keypos, bool mayEmpty) {
+        // TODO This should be keypos < n
         assert( keypos >= 0 && keypos <= n );
         assert( childForPos(keypos).isNull() );
         // TODO audit cases where nextChild is null
@@ -375,6 +376,7 @@ namespace mongo {
         b->emptySize -= sizeof(_KeyNode);
         b->n++;
 
+        // This _KeyNode was marked for writing above.
         _KeyNode& kn = b->k(keypos);
         kn.prevChildBucket.Null();
         kn.recordLoc = recordLoc;
@@ -385,7 +387,10 @@ namespace mongo {
         return true;
     }
 
-    /** with this implementation, refPos == 0 disregards effect of refPos */
+    /**
+     * With this implementation, refPos == 0 disregards effect of refPos.
+     * index > 0 prevents creation of an empty bucket.
+     */
     bool BucketBasics::mayDropKey( int index, int refPos ) const {
         return index > 0 && ( index != refPos ) && k( index ).isUnused() && k( index ).prevChildBucket.isNull();
     }
@@ -492,7 +497,7 @@ namespace mongo {
      * We just have a simple algorithm right now: if a key includes the
      * halfway point (or 10% way point) in terms of bytes, split on that key;
      * otherwise split on the key immediately to the left of the halfway
-     * point.
+     * point (or 10% point).
      *
      * This function is expected to be called on a packed bucket.
      */
@@ -502,6 +507,7 @@ namespace mongo {
         int rightSize = 0;
         // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split.
         // see SERVER-983
+        // TODO I think we only want to do the 90% split on the rhs node of the tree.
         int rightSizeLimit = ( topSize + sizeof( _KeyNode ) * n ) / ( keypos == n ? 10 : 2 );
         for( int i = n - 1; i > -1; --i ) {
             rightSize += keyNode( i ).key.objsize() + sizeof( _KeyNode );
@@ -839,7 +845,10 @@ namespace mongo {
         int advanceDirection = lchild.isNull() ? 1 : -1;
         int advanceKeyOfs = keypos;
         DiskLoc advanceLoc = advance( thisLoc, advanceKeyOfs, advanceDirection, __FUNCTION__ );
-
+        // advanceLoc must be a descentant of thisLoc, because thisLoc has a
+        // child in the proper direction and all descendants of thisLoc must be
+        // nonempty because they are not the root.
+         
         if ( !advanceLoc.btree()->childForPos( advanceKeyOfs ).isNull() ||
                 !advanceLoc.btree()->childForPos( advanceKeyOfs + 1 ).isNull() ) {
             // only expected with legacy btrees, see note above
@@ -849,7 +858,7 @@ namespace mongo {
 
         KeyNode kn = advanceLoc.btree()->keyNode( advanceKeyOfs );
         // Because advanceLoc is a descendant of thisLoc, updating thisLoc will
-        // not not affect packing or keys of advanceLoc and kn will be stable
+        // not affect packing or keys of advanceLoc and kn will be stable
         // during the following setInternalKey()
         setInternalKey( thisLoc, keypos, kn.recordLoc, kn.key, order, childForPos( keypos ), childForPos( keypos + 1 ), id );
         advanceLoc.btreemod()->delKeyAtPos( advanceLoc, id, advanceKeyOfs, order );
@@ -1011,7 +1020,7 @@ namespace mongo {
                                             BtreeBucket *r, const DiskLoc rchild,
                                             IndexDetails &id, const Ordering &order ) {
         // TODO maybe do some audits the same way pushBack() does?
-        // As a precondition, rchild + the old separator are less than half a body size,
+        // As a precondition, rchild + the old separator are <= half a body size,
         // and lchild is at most completely full.  Based on the value of split,
         // rchild will get <= half of the total bytes which is at most 75%
         // of a full body.  So rchild will have room for the following keys:
@@ -1044,7 +1053,7 @@ namespace mongo {
                                             BtreeBucket *l, const DiskLoc lchild,
                                             BtreeBucket *r, const DiskLoc rchild,
                                             IndexDetails &id, const Ordering &order ) {
-        // As a precondition, lchild + the old separator are less than half a body size,
+        // As a precondition, lchild + the old separator are <= half a body size,
         // and rchild is at most completely full.  Based on the value of split,
         // lchild will get less than half of the total bytes which is at most 75%
         // of a full body.  So lchild will have room for the following keys:
@@ -1206,6 +1215,9 @@ namespace mongo {
      * @keypos - where to insert the key in range 0..n.  0=make leftmost, n=make rightmost.
      * NOTE this function may free some data, and as a result the value passed for keypos may
      * be invalid after calling insertHere()
+     *
+     * Some of the write intent signaling below relies on the implementation of
+     * the optimized write intent code in basicInsert().
      */
     void BtreeBucket::insertHere( const DiskLoc thisLoc, int keypos,
                                   const DiskLoc recordLoc, const BSONObj& key, const Ordering& order,
@@ -1623,7 +1635,10 @@ namespace mongo {
         DiskLoc child = childForPos(pos);
         if ( insert_debug )
             out() << "    getChild(" << pos << "): " << child.toString() << endl;
-        if ( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) {
+        // In current usage, rChild isNull() for a new key and false when we are
+        // promoting a split key.  These are the only two cases where _insert()
+        // is called currently.
+        if ( child.isNull() || !rChild.isNull() ) {
             insertHere(thisLoc, pos, recordLoc, key, order, lChild, rChild, idx);
             return 0;
         }
