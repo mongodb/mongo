@@ -32,6 +32,7 @@ using namespace mongoutils;
 #endif
 
 #include "file_allocator.h"
+#include "paths.h"
 
 namespace mongo {
 
@@ -42,6 +43,7 @@ namespace mongo {
             ensureParentDirCreated(parent);
             log() << "creating directory " << parent.string() << endl;
             boost::filesystem::create_directory(parent);
+            flushMyDirectory(parent); // flushes grandparent to ensure parent exists after crash
         }
 
         assert(boost::filesystem::is_directory(parent));
@@ -224,6 +226,8 @@ namespace mongo {
                         ss << "FileAllocator: couldn't open " << name << ' ' << errnoWithDescription();
                         uassert( 10439 ,  ss.str(), fd <= 0 );
                     }
+
+                    flushMyDirectory(name); // done before ensureLength to avoid flushing data on some filesystems
 
 #if defined(POSIX_FADV_DONTNEED)
                     if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) {

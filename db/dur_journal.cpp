@@ -185,6 +185,9 @@ namespace mongo {
                 throw;
             }
             assert(!haveJournalFiles());
+
+            flushMyDirectory(getJournalDir() / "file"); // flushes parent of argument (in this case journal dir)
+
             log(1) << "removeJournalFiles end" << endl;
         }
 

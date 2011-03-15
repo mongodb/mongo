@@ -951,6 +951,7 @@ namespace mongo {
         uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
         writePid( lockFile );
         fsync( lockFile );
+        flushMyDirectory(name);
 #endif
     }
 #else

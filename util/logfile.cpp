@@ -99,6 +99,7 @@ namespace mongo {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "paths.h"
 
 namespace mongo {
 
@@ -118,6 +119,7 @@ namespace mongo {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
 
+        flushMyDirectory(name);
     }
 
     LogFile::~LogFile() {
