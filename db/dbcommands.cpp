@@ -94,9 +94,10 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "return error status of the last operation on this connection\n"
                  << "options:\n"
-                 << "  fsync - fsync before returning, or wait for journal commit if running with --dur\n"
-                 << "  w - await replication to w servers (including self) before returning\n"
-                 << "  wtimeout - timeout for w in milliseconds";
+                 << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
+                 << "  { j:true } - wait for journal commit if running with --journal\n"
+                 << "  { w:n } - await replication to n servers (including self) before returning\n"
+                 << "  { wtimeout:m} - timeout for w in m milliseconds";
         }
         bool run(const string& dbname, BSONObj& _cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
@@ -125,7 +126,17 @@ namespace mongo {
                 }
             }
 
-            if ( cmdObj["fsync"].trueValue() ) {
+            if ( cmdObj["j"].trueValue() ) { 
+                if( !getDur().awaitCommit() ) {
+                    // --journal is off
+                    result.append("jnote", "journaling not enabled on this server");
+                }
+                if( cmdObj["fsync"].trueValue() ) { 
+                    errmsg = "fsync and j options are not used together";
+                    return false;
+                }
+            }
+            else if ( cmdObj["fsync"].trueValue() ) {
                 Timer t;
                 if( !getDur().awaitCommit() ) {
                     // if get here, not running with --dur
