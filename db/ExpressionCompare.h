@@ -18,23 +18,38 @@
 
 #include "pch.h"
 
-#include "Expression.h"
+#include "ExpressionNary.h"
 
 namespace mongo
 {
-    class Document;
-    class Field;
-
     class ExpressionCompare :
-        public Expression,
+        public ExpressionNary,
         public boost::enable_shared_from_this<ExpressionCompare>
     {
     public:
-	// virtuals from Expression
+	// virtuals from ExpressionNary
 	virtual ~ExpressionCompare();
 	virtual shared_ptr<const Field> evaluate(
 	    shared_ptr<Document> pDocument) const;
+	virtual void addOperand(shared_ptr<Expression> pExpression);
 
+	/*
+	  Shorthands for creating various comparisons expressions.
+	  Provide for conformance with the uniform function pointer signature
+	  required for parsing.
+
+	  These create a particular comparision operand, without any
+	  operands.  Those must be added via ExpressionNary::addOperand().
+	*/
+	static shared_ptr<ExpressionNary> createCmp();
+	static shared_ptr<ExpressionNary> createEq();
+	static shared_ptr<ExpressionNary> createNe();
+	static shared_ptr<ExpressionNary> createGt();
+	static shared_ptr<ExpressionNary> createGte();
+	static shared_ptr<ExpressionNary> createLt();
+	static shared_ptr<ExpressionNary> createLte();
+
+    private:
 	/*
 	  Any changes to these values require adjustment of the lookup
 	  table in the implementation.
@@ -50,41 +65,8 @@ namespace mongo
 	    CMP = 6, // return -1, 0, 1 for a < b, a == b, a > b
 	};
 
-	/*
-	  Create an expression that compares two operands.
-
-	  @param operand a vector of two operands to be compared
-	  @param relOp indicates the desired result; see enum RelOp
-	  @returns comparison result
-	 */
-	static shared_ptr<ExpressionCompare> create(
-	    vector<shared_ptr<Expression>> operand, RelOp relOp);
-
-	/*
-	  Shorthands for creating various comparisons expressions.
-	  Provide for conformance with the uniform function pointer signature
-	  required for parsing.
-	*/
-	static shared_ptr<ExpressionCompare> createCmp(
-	    vector<shared_ptr<Expression>> operand);
-	static shared_ptr<ExpressionCompare> createEq(
-	    vector<shared_ptr<Expression>> operand);
-	static shared_ptr<ExpressionCompare> createNe(
-	    vector<shared_ptr<Expression>> operand);
-	static shared_ptr<ExpressionCompare> createGt(
-	    vector<shared_ptr<Expression>> operand);
-	static shared_ptr<ExpressionCompare> createGte(
-	    vector<shared_ptr<Expression>> operand);
-	static shared_ptr<ExpressionCompare> createLt(
-	    vector<shared_ptr<Expression>> operand);
-	static shared_ptr<ExpressionCompare> createLte(
-	    vector<shared_ptr<Expression>> operand);
-
-
-    private:
-	ExpressionCompare(vector<shared_ptr<Expression>> operand, RelOp relop);
+	ExpressionCompare(RelOp relop);
 
 	RelOp relop;
-	vector<shared_ptr<Expression>> operand;
     };
 }

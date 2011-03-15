@@ -118,6 +118,12 @@ namespace mongo
 	static shared_ptr<const Field> getZero();
 	static shared_ptr<const Field> getOne();
 
+	/*
+	  Coerce a value to a boolean, using JSON rules.
+	*/
+	static shared_ptr<const Field> coerceToBoolean(
+	    shared_ptr<const Field> pField);
+
     private:
 	Field(string fieldName); // creates nul value
 	Field(BSONElement *pBsonElement);

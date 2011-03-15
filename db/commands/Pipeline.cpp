@@ -22,7 +22,11 @@
 #include "../DocumentSource.h"
 #include "../DocumentSourceCursor.h"
 #include "../DocumentSourceProject.h"
+#include "../ExpressionAnd.h"
+#include "../ExpressionCompare.h"
+#include "../ExpressionConstant.h"
 #include "../ExpressionFieldPath.h"
+#include "../ExpressionOr.h"
 #include "../Field.h"
 #include "../FieldIterator.h"
 #include "../pdfile.h"
@@ -155,6 +159,142 @@ namespace mongo
 	return true;
     }
 
+
+    struct OpDesc
+    {
+	const char *pName;
+	shared_ptr<ExpressionNary> (*pFactory)(void);
+    };
+
+    static int OpDescCmp(const void *pL, const void *pR)
+    {
+	return strcmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
+    }
+
+    /*
+      Keep these sorted alphabetically so we can bsearch() them using
+      OpDescCmp() above.
+    */
+    static const OpDesc OpTable[] =
+    {
+//	{"$add", ExpressionAdd::create},
+	{"$and", ExpressionAnd::create},
+	{"$cmp", ExpressionCompare::createCmp},
+//	{"$divide", ExpressionDivide::create},
+	{"$eq", ExpressionCompare::createEq},
+	{"$gt", ExpressionCompare::createGt},
+	{"$gte", ExpressionCompare::createGte},
+	{"$lt", ExpressionCompare::createLt},
+	{"$lte", ExpressionCompare::createLte},
+	{"$ne", ExpressionCompare::createNe},
+//	{"$not", ExpressionNot::create},
+	{"$or", ExpressionOr::create},
+    };
+
+    static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
+
+    shared_ptr<Expression> Pipeline::parseExpression(
+	const char *pOpName, BSONElement *pBsonElement)
+    {
+	/* look for the specified operator */
+	OpDesc key;
+	key.pName = pOpName;
+	const OpDesc *pOp = (const OpDesc *)bsearch(
+	    &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
+
+	assert(pOp); // CW TODO invalid operator
+	shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
+
+	/* add the operands */
+	assert(pBsonElement->type() == Array); // CW TODO malformed operands
+	vector<BSONElement> bsonArray(pBsonElement->Array());
+	const size_t n = bsonArray.size();
+	for(size_t i = 0; i < n; ++i)
+	{
+	    BSONElement *pBsonOperand = &bsonArray[i];
+	    BSONType type = pBsonOperand->type();
+
+	    switch(type)
+	    {
+	    case String:
+	    {
+		/*
+		  This could be a field path, or it could be a constant
+		  string.
+
+		  We make a copy of the BSONElement reader so we can read its
+		  value without advancing its state, in case we need to read it
+		  again in the constant code path.
+		*/
+		BSONElement opCopy(*pBsonOperand);
+		string value(opCopy.String());
+
+		/* check for a field path */
+		if (value.compare(0, 10, "$document.") != 0)
+		    goto ExpectConstant;  // assume plain string constant
+
+		/* if we got here, this is a field path expression */
+		string fieldPath(value.substr(10));
+		shared_ptr<Expression> pFieldExpr(
+		    ExpressionFieldPath::create(fieldPath));
+		pExpression->addOperand(pFieldExpr);
+		break;
+	    }
+	    
+	    case Object:
+	    {
+		shared_ptr<Expression> pSubExpression(
+		    parseDocument(pBsonOperand));
+		pExpression->addOperand(pSubExpression);
+		break;
+	    }
+
+	    default:
+	    ExpectConstant:
+	    {
+		shared_ptr<Expression> pOperand(
+		    ExpressionConstant::createFromBsonElement(pBsonOperand));
+		pExpression->addOperand(pOperand);
+		break;
+	    }
+
+	    } // switch(type)
+	}
+
+	return pExpression;
+    }
+
+    shared_ptr<Expression> Pipeline::parseDocument(BSONElement *pBsonElement)
+    {
+	shared_ptr<Expression> pExpression; // the result
+
+	/*
+	  We're looking at an operand or the value of a field.  This could be
+	  a virtual document, or it could be an expression.
+	*/
+	BSONObj opObj(pBsonElement->Obj());
+
+	/* check the first field to see if it is an operator */
+	BSONObjIterator objIterator(opObj);
+	for(size_t fieldCount = 0; objIterator.more(); ++fieldCount)
+	{
+	    BSONElement subField(objIterator.next());
+	    string subFieldName(subField.fieldName());
+
+	    if (subFieldName.at(0) != '$')
+	    {
+		assert(false); // CW TODO virtual ExpressionDocument
+	    }
+	    else
+	    {
+		assert(fieldCount == 0); // CW TODO operator must be only field
+		pExpression = parseExpression(subFieldName.c_str(), &subField);
+	    }
+	}
+
+	return pExpression;
+    }
+
     shared_ptr<DocumentSource> Pipeline::setupProject(
 	BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource)
     {
@@ -195,7 +335,8 @@ namespace mongo
 		{
 		    assert(false); // CW TODO unimplemented constant expression
 		}
-		break;
+
+		goto AddField;
 	    }
 
 	    case NumberInt:
@@ -203,18 +344,30 @@ namespace mongo
 		fieldInclusion = outFieldElement.numberInt();
 		assert((fieldInclusion >= 0) && (fieldInclusion <= 1));
     		    // CW TODO invalid field projection specification
+
+	    AddField:
+		if (fieldInclusion == 0)
+		    assert(false); // CW TODO unimplemented
+		else
+		{
+		    // CW TODO: renames, ravels, expressions
+		    shared_ptr<Expression> pExpression(
+			ExpressionFieldPath::create(inFieldName));
+		    pProject->includeField(
+			outFieldName, pExpression, ravelArray);
+		}
 		break;
 
 	    case Bool:
 		/* just a plain boolean include/exclude specification */
 		fieldInclusion = outFieldElement.Bool() ? 1 : 0;
-		break;
+		goto AddField;
 
 	    case String:
 		/* include a field, with rename */
 		fieldInclusion = 1;
 		inFieldName = outFieldElement.String();
-		break;
+		goto AddField;
 
 	    case Object:
 	    {
@@ -225,6 +378,11 @@ namespace mongo
 		  by the projection source.  For any other expression,
 		  we hand over control to code that parses the expression
 		  and returns an expression.
+
+		  field expressions will look like one of
+		  f0: {f1: ..., f2: ..., f3: ...}
+		  f0: {$operator:[operand1, operand2, ...]}
+		  f0: {$ravel:"f1"}
 		*/
 		BSONObj fieldExprObj(outFieldElement.Obj());
 		BSONObjIterator exprIterator(fieldExprObj);
@@ -235,19 +393,36 @@ namespace mongo
 
 		    BSONElement exprElement(exprIterator.next());
 		    const char *pOpName = exprElement.fieldName();
-		    if (strcmp(pOpName, "$ravel") != 0)
-			assert(false); // CW TODO parseExpression(fieldExprObj);
-		    else
+		    if (pOpName[0] != '$')
 		    {
+			/* create a virtual document */
+			assert(false); // CW TODO unimplemented
+			// CW TODO ExpressionDocument?
+		    }
+		    else if (strcmp(pOpName, "$ravel") == 0)
+		    {
+			assert(subFieldCount == 1);
+			    // CW TODO usage error
 			assert(exprElement.type() == String);
 			    // CW TODO $ravel operand must be single field name
 			ravelArray = true;
 			inFieldName = exprElement.String();
+
+			shared_ptr<Expression> pExpression(
+			    ExpressionFieldPath::create(inFieldName));
+			pProject->includeField(
+			    outFieldName, pExpression, ravelArray);
+		    }
+		    else
+		    {
+			shared_ptr<Expression> pExpression(
+			    parseExpression(pOpName, &exprElement));
+
+			pProject->includeField(
+			    outFieldName, pExpression, false);
 		    }
 		}
 
-		assert(subFieldCount == 1);
-		    // CW TODO no nested object support, for now
 		break;
 	    }
 
@@ -255,15 +430,6 @@ namespace mongo
 		assert(false); // CW TODO invalid field projection specification
 	    }
 
-	    if (fieldInclusion == 0)
-		assert(false); // CW TODO unimplemented
-	    else
-	    {
-		// CW TODO: renames, ravels, expressions
-		shared_ptr<Expression> pExpression(
-		    ExpressionFieldPath::create(inFieldName));
-		pProject->includeField(outFieldName, pExpression, ravelArray);
-	    }
 	}
 
 	return pProject;

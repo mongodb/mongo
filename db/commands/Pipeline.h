@@ -27,6 +27,7 @@ namespace mongo
     class BSONObj;
     class BSONObjBuilder;
     class DocumentSource;
+    class Expression;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
@@ -46,8 +47,12 @@ namespace mongo
 	Pipeline();
 
     private:
-	shared_ptr<DocumentSource> setupProject(
+	/* these statics could move elsewhere */
+	static shared_ptr<DocumentSource> setupProject(
 	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
+	static shared_ptr<Expression> parseExpression(
+	    const char *pOpName, BSONElement *pBsonElement);
+	static shared_ptr<Expression> parseDocument(BSONElement *pBsonElement);
     };
 
 } // namespace mongo

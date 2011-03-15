@@ -108,7 +108,7 @@ namespace mongo
 
 	    case BinData:
 		// pBuilder->appendBinData(fieldName, ...);
-		assert(false); // unimplemented
+		assert(false); // CW TODO unimplemented
 		break;
 
 	    case jstOID:
@@ -129,11 +129,11 @@ namespace mongo
 		break;
 
 	    case Symbol:
-		assert(false); // unimplemented
+		assert(false); // CW TODO unimplemented
 		break;
 
 	    case CodeWScope:
-		assert(false); // unimplemented
+		assert(false); // CW TODO unimplemented
 		break;
 
 	    case NumberInt:
@@ -156,7 +156,7 @@ namespace mongo
 	    case DBRef:
 	    case Code:
 	    case MaxKey:
-		assert(false);
+		assert(false); // CW TODO better message
 		break;
 	}
     }
@@ -201,7 +201,7 @@ namespace mongo
 		break;
 
 	    case BinData:
-		assert(false); // unimplemented
+		assert(false); // CW TODO unimplemented
 		break;
 
 	    case jstOID:
@@ -218,11 +218,11 @@ namespace mongo
 		break;
 
 	    case Symbol:
-		assert(false); // unimplemented
+		assert(false); // CW TODO unimplemented
 		break;
 
 	    case CodeWScope:
-		assert(false); // unimplemented
+		assert(false); // CW TODO unimplemented
 		break;
 
 	    case NumberInt:
@@ -244,7 +244,7 @@ namespace mongo
 	    case DBRef:
 	    case Code:
 	    case MaxKey:
-		assert(false);
+		assert(false); // CW TODO better message
 		break;
 	}
     }
@@ -370,7 +370,7 @@ namespace mongo
 
 	case BinData:
 	    // pBuilder->appendBinData(fieldName, ...);
-	    assert(false); // unimplemented
+	    assert(false); // CW TODO unimplemented
 	    break;
 
 	case jstOID:
@@ -394,7 +394,7 @@ namespace mongo
 	    break;
 
 	case CodeWScope:
-	    assert(false); // unimplemented
+	    assert(false); // CW TODO unimplemented
 	    break;
 
 	case NumberInt:
@@ -420,7 +420,7 @@ namespace mongo
 	case DBRef:
 	case Code:
 	case MaxKey:
-	    assert(false);
+	    assert(false); // CW TODO better message
 	    break;
 	}
     }
@@ -464,7 +464,7 @@ namespace mongo
 
 	case BinData:
 	    // pBuilder->appendBinData(fieldName, ...);
-	    assert(false); // unimplemented
+	    assert(false); // CW TODO unimplemented
 	    break;
 
 	case jstOID:
@@ -488,7 +488,7 @@ namespace mongo
 	    break;
 
 	case CodeWScope:
-	    assert(false); // unimplemented
+	    assert(false); // CW TODO unimplemented
 	    break;
 
 	case NumberInt:
@@ -511,8 +511,69 @@ namespace mongo
 	case DBRef:
 	case Code:
 	case MaxKey:
-	    assert(false);
+	    assert(false); // CW TODO better message
 	    break;
 	}
+    }
+
+    shared_ptr<const Field> Field::coerceToBoolean(
+	shared_ptr<const Field> pField)
+    {
+	bool result = false;
+	BSONType type = pField->getType();
+	switch(type)
+	{
+	case NumberDouble:
+	    if (pField->simple.doubleValue != 0)
+		result = true;
+	    break;
+
+	case String:
+	case Object:
+	case Array:
+	case BinData:
+	case jstOID:
+	case Date:
+	case RegEx:
+	case Symbol:
+	case Timestamp:
+	    result = true;
+	    break;
+
+	case Bool:
+	    return pField;
+
+	case CodeWScope:
+	    assert(false); // CW TODO unimplemented
+	    break;
+
+	case NumberInt:
+	    if (pField->simple.intValue != 0)
+		result = true;
+	    break;
+
+	case NumberLong:
+	    if (pField->simple.longValue != 0)
+		result = true;
+	    break;
+
+	case jstNULL:
+	    /* nothing to do */
+	    break;
+
+	    /* these shouldn't happen in this context */
+	case MinKey:
+	case EOO:
+	case Undefined:
+	case DBRef:
+	case Code:
+	case MaxKey:
+	    assert(false); // CW TODO better message
+	    break;
+	}
+
+	if (result)
+	    return Field::getTrue();
+	return Field::getFalse();
     }
 }

@@ -26,20 +26,65 @@ namespace mongo
     {
     }
 
-    shared_ptr<ExpressionCompare> ExpressionCompare::create(
-	vector<shared_ptr<Expression>> operand, RelOp relop)
+    shared_ptr<ExpressionNary> ExpressionCompare::createEq()
     {
 	shared_ptr<ExpressionCompare> pExpression(
-	    new ExpressionCompare(operand, relop));
+	    new ExpressionCompare(EQ));
 	return pExpression;
     }
 
-    ExpressionCompare::ExpressionCompare(
-	vector<shared_ptr<Expression>> theOperand, RelOp theRelOp):
-	relop(theRelOp),
-	operand(theOperand)
+    shared_ptr<ExpressionNary> ExpressionCompare::createNe()
     {
-	assert(operand.size() == 2); // CW TODO user error otherwise
+	shared_ptr<ExpressionCompare> pExpression(
+	    new ExpressionCompare(NE));
+	return pExpression;
+    }
+
+    shared_ptr<ExpressionNary> ExpressionCompare::createGt()
+    {
+	shared_ptr<ExpressionCompare> pExpression(
+	    new ExpressionCompare(GT));
+	return pExpression;
+    }
+
+    shared_ptr<ExpressionNary> ExpressionCompare::createGte()
+    {
+	shared_ptr<ExpressionCompare> pExpression(
+	    new ExpressionCompare(GTE));
+	return pExpression;
+    }
+
+    shared_ptr<ExpressionNary> ExpressionCompare::createLt()
+    {
+	shared_ptr<ExpressionCompare> pExpression(
+	    new ExpressionCompare(LT));
+	return pExpression;
+    }
+
+    shared_ptr<ExpressionNary> ExpressionCompare::createLte()
+    {
+	shared_ptr<ExpressionCompare> pExpression(
+	    new ExpressionCompare(LTE));
+	return pExpression;
+    }
+
+    shared_ptr<ExpressionNary> ExpressionCompare::createCmp()
+    {
+	shared_ptr<ExpressionCompare> pExpression(
+	    new ExpressionCompare(CMP));
+	return pExpression;
+    }
+
+    ExpressionCompare::ExpressionCompare(RelOp theRelOp):
+	ExpressionNary(),
+	relop(theRelOp)
+    {
+    }
+
+    void ExpressionCompare::addOperand(shared_ptr<Expression> pExpression)
+    {
+	assert(operand.size() < 2); // CW TODO user error
+	ExpressionNary::addOperand(pExpression);
     }
 
     /*
@@ -58,6 +103,7 @@ namespace mongo
     shared_ptr<const Field> ExpressionCompare::evaluate(
 	shared_ptr<Document> pDocument) const
     {
+	assert(operand.size() == 2); // CW TODO user error
 	shared_ptr<const Field> pLeft(operand[0]->evaluate(pDocument));
 	shared_ptr<const Field> pRight(operand[1]->evaluate(pDocument));
 
@@ -103,6 +149,7 @@ namespace mongo
 		cmp = -1;
 	    else if (cmp > 0)
 		cmp = 1;
+	    break;
 	}
 
 	default:
