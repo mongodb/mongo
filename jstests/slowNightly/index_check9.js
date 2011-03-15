@@ -1,3 +1,5 @@
+// Randomized index testing
+
 Random.setRandomSeed();
 
 t = db.test_index_check9;
