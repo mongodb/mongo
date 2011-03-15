@@ -682,7 +682,7 @@ err:	/*
 		if ((ref = evict->ref) == NULL)
 			continue;
 		if (ref->state == WT_REF_EVICT)
-			ref->state = WT_REF_DISK;
+			ref->state = WT_REF_CACHE;
 	}
 	return (ret);
 }
