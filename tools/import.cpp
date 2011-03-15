@@ -109,7 +109,7 @@ class Import : public Tool {
                     }
                     else {
                         data.append(line, end-line);
-                        line = end+2; //skip '"' and ','
+                        line = end+(end[1] == ',' ? 2 : 1); //skip '"', and ',' if present
                         break;
                     }
                 }
