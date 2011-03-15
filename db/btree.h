@@ -306,7 +306,7 @@ namespace mongo {
 
         /**
          * Preconditions:
-         *  - keypos is between 0 and n, inclusive
+         *  - 0 <= keypos < n
          *  - there is no child bucket at keypos
          *  - n > 1
          *  - if mayEmpty == false or nextChild.isNull(), n > 0
@@ -348,7 +348,7 @@ namespace mongo {
          *  - Some unused nodes may be dropped, but not ones at index 0 or refPos
          *  - Some used nodes may be moved
          *  - If refPos is the index of an existing key, it will be updated to that
-         *    key's new index.
+         *    key's new index if the key is moved.
          */
         void _pack(const DiskLoc thisLoc, const Ordering &order, int &refPos) const;
         /** Pack when already writable */
@@ -367,7 +367,8 @@ namespace mongo {
         /**
          * This function can be used to deallocate the lowest byte index bson
          * buffer in the top region, which in some but not all cases is for the
-         * n - 1 index key.
+         * n - 1 index key.  This function only works correctly in certain
+         * special cases, please be careful.
          * Preconditions: 'bytes' <= topSize
          * Postconditions: The top region is decreased
          */
@@ -376,11 +377,13 @@ namespace mongo {
          * Preconditions: 'N' <= n
          * Postconditions:
          *  - All keys after the N index key are dropped.
-         *  - The bucket is packed, without dropping refPos if applicable.
+         *  - Then bucket is packed, without dropping refPos if < refPos N.
          */
         void truncateTo(int N, const Ordering &order, int &refPos);
         /**
-         * Preconditions: 'nDrop' < n
+         * Preconditions:
+         *  - 'nDrop' < n
+         *  - for now, refPos should be zero.
          * Postconditions:
          *  - All keys before the nDrop index key are dropped.
          *  - The bucket is packed.
@@ -427,13 +430,12 @@ namespace mongo {
         /**
          * Preconditions:
          *  - 0 <= i < n
-         *  - The bson 'key' must fit in the bucket without packing.  (This
-         *    function is expected to be called after reserveKeysFront.)
+         *  - The bson 'key' must fit in the bucket without packing.
          *  - If 'key' and 'prevChildBucket' are set at index i, the btree
          *    ordering properties will be maintained.
          * Postconditions:
-         *  - The specified key is set at index i, without shifting any other
-         *    _KeyNode objects.
+         *  - The specified key is set at index i, replacing the existing
+         *    _KeyNode data and without shifting any other _KeyNode objects.
          */
         void setKey( int i, const DiskLoc recordLoc, const BSONObj &key, const DiskLoc prevChildBucket );
     };
@@ -588,8 +590,8 @@ namespace mongo {
     protected:
         /**
          * Preconditions:
-         *  - 0 <= firstIndex < n
-         *  - -1 <= lastIndex < n ( -1 is equivalent to n )
+         *  - 0 <= firstIndex <= n
+         *  - -1 <= lastIndex <= n ( -1 is equivalent to n )
          * Postconditions:
          *  - Any children at indexes firstIndex through lastIndex (inclusive)
          *    will have their parent pointers set to thisLoc.
@@ -604,7 +606,7 @@ namespace mongo {
          *  - All cursors pointing to this bucket will be updated.
          *  - This bucket's parent's child pointer is set to null.
          *  - This bucket is deallocated from pdfile storage.
-         *  - 'this' and thisLoc will are invalidated.
+         *  - 'this' and thisLoc are invalidated.
          */
         void delBucket(const DiskLoc thisLoc, const IndexDetails&);
 
@@ -689,6 +691,7 @@ namespace mongo {
 
         /**
          * Preconditions:
+         *  - 0 <= leftIndex < n
          *  - this->canMergeChildren( thisLoc, leftIndex ) == true
          * Postconditions:
          *  - All of the above mentioned keys will be placed in the left child.
@@ -718,7 +721,7 @@ namespace mongo {
         /**
          * Preconditions:
          *  - leftIndex and leftIndex + 1 children are packed
-         *  - leftIndex or leftIndex + 1 is below lowWaterMark
+         *  - leftIndex or leftIndex + 1 child is below lowWaterMark
          * @return index of the rebalanced separator; the index value is
          *  determined as if we had a bucket with body
          *  <left bucket keys array>.push( <old separator> ).concat( <right bucket keys array> )
@@ -746,7 +749,7 @@ namespace mongo {
          * Preconditions:
          *  - This bucket is packed.
          *  - Cannot add a key of size KeyMax to this bucket.
-         *  - 0 < keypos <= n is the position of a new key that will be inserted
+         *  - 0 <= keypos <= n is the position of a new key that will be inserted
          *  - lchild is equal to the existing child at index keypos.
          * Postconditions:
          *  - The thisLoc bucket is split into two packed buckets, possibly
@@ -772,6 +775,8 @@ namespace mongo {
          *    bucket is split if necessary, which may change the tree head.
          *  - The bucket may be packed or split, invalidating the specified value
          *    of keypos.
+         * This function will always modify thisLoc, but it's marked const because
+         * it commonly relies on the specialized write intent mechanism of basicInsert().
          */
         void insertHere(const DiskLoc thisLoc, int keypos,
                         const DiskLoc recordLoc, const BSONObj& key, const Ordering &order,
@@ -815,7 +820,9 @@ namespace mongo {
          * Postconditions:
          *  - The specified key is deleted by replacing it with another key if
          *    possible.  This replacement may cause a split and change the tree
-         *    head.
+         *    head.  The replacement key will be deleted from its original
+         *    location, potentially causing merges and splits that may invalidate
+         *    'this' and thisLoc and change the tree head.
          *  - If the key cannot be replaced, it will be marked as unused.  This
          *    is only expected in legacy btrees.
          */
