@@ -312,9 +312,21 @@ namespace mongo {
 
         SERVICE_STATUS ssStatus;
 
+        DWORD dwControlsAccepted;
+        switch ( reportState ) {
+        case SERVICE_START_PENDING:
+        case SERVICE_STOP_PENDING:
+        case SERVICE_STOPPED:
+            dwControlsAccepted = 0;
+            break;
+        default:
+            dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+            break;
+        }
+
         ssStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
         ssStatus.dwServiceSpecificExitCode = 0;
-        ssStatus.dwControlsAccepted = reportState == SERVICE_START_PENDING ? 0 : SERVICE_ACCEPT_STOP;
+        ssStatus.dwControlsAccepted = dwControlsAccepted;
         ssStatus.dwCurrentState = reportState;
         ssStatus.dwWin32ExitCode = NO_ERROR;
         ssStatus.dwWaitHint = waitHint;
@@ -340,6 +352,7 @@ namespace mongo {
         switch ( ctrlCode ) {
         case SERVICE_CONTROL_STOP:
         case SERVICE_CONTROL_SHUTDOWN:
+            reportStatus( SERVICE_STOP_PENDING );
             shutdownServer();
             reportStatus( SERVICE_STOPPED );
             return;
