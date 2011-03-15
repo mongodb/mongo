@@ -191,7 +191,7 @@ namespace mongo {
         }
 
         bool DurableImpl::awaitCommit() {
-            commitJob.awaitNextCommit();
+            commitJob._notify.awaitBeyondNow();
             return true;
         }
 
@@ -454,7 +454,7 @@ namespace mongo {
 
             scoped_lock lk2(groupCommitMutex);
 
-            stats.curr->_commits++;
+            commitJob.beginCommit();
 
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
@@ -517,7 +517,7 @@ namespace mongo {
 
        /** locking: in read lock when called. */
         static void _groupCommit() {
-            stats.curr->_commits++;
+            commitJob.beginCommit();
 
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed

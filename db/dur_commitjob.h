@@ -189,14 +189,10 @@ namespace mongo {
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */
             void reset();
 
-            /** the commit code calls this when data reaches the journal (on disk) */
-            void notifyCommitted() { _notify.notifyAll(); }
+            void beginCommit();
 
-            /** Wait until the next group commit occurs. That is, wait until someone calls notifyCommitted. */
-            void awaitNextCommit() {
-                if( hasWritten() )
-                    _notify.wait();
-            }
+            /** the commit code calls this when data reaches the journal (on disk) */
+            void notifyCommitted() { _notify.notifyAll(_commitNumber); }
 
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
             size_t bytes() const { return _bytes; }
@@ -207,11 +203,12 @@ namespace mongo {
 
             Writes& wi() { return _wi; }
         private:
+            NotifyAll::When _commitNumber;
             bool _hasWritten;
             Writes _wi; // todo: fix name
             size_t _bytes;
-            NotifyAll _notify; // for getlasterror fsync:true acknowledgements
         public:
+            NotifyAll _notify; // for getlasterror fsync:true acknowledgements
             unsigned _nSinceCommitIfNeededCall;
         };
 

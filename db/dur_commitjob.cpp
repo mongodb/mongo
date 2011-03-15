@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "dur_commitjob.h"
+#include "dur_stats.h"
 #include "taskqueue.h"
 
 namespace mongo {
@@ -126,6 +127,12 @@ namespace mongo {
 
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
 
+        void CommitJob::beginCommit() { 
+            DEV dbMutex.assertAtLeastReadLocked();
+            _commitNumber = _notify.now();
+            stats.curr->_commits++;
+        }
+
         void CommitJob::reset() {
             _hasWritten = false;
             _wi.clear();
@@ -135,7 +142,9 @@ namespace mongo {
         }
 
         CommitJob::CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), 
-            _bytes(0), _nSinceCommitIfNeededCall(0) { }
+            _bytes(0), _nSinceCommitIfNeededCall(0) { 
+            _commitNumber = 0;
+        }
 
         void CommitJob::note(void* p, int len) {
             // from the point of view of the dur module, it would be fine (i think) to only
