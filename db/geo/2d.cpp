@@ -98,14 +98,18 @@ namespace mongo {
 
             uassert( 13024 , "no geo field specified" , _geo.size() );
 
-            _bits = _configval( spec , "bits" , 26 ); // for lat/long, ~ 1ft
+            double bits =  _configval( spec , "bits" , 26 ); // for lat/long, ~ 1ft
 
-            uassert( 13028 , "can't have more than 32 bits in geo index" , _bits <= 32 );
+            uassert( 13028 , "bits in geo index must be between 1 and 32" , bits > 0 && bits <= 32 );
 
-            _max = _configval( spec , "max" , 180 );
-            _min = _configval( spec , "min" , -180 );
+            _bits = (unsigned) bits;
 
-            _scaling = (1024*1024*1024*4.0)/(_max-_min);
+            _max = _configval( spec , "max" , 180.0 );
+            _min = _configval( spec , "min" , -180.0 );
+
+            double numBuckets = (1024 * 1024 * 1024 * 4.0);
+
+            _scaling = numBuckets / ( _max - _min );
 
             _order = orderBuilder.obj();
 
@@ -115,12 +119,10 @@ namespace mongo {
             _error = distance(a, b);
         }
 
-        int _configval( const IndexSpec* spec , const string& name , int def ) {
+        double _configval( const IndexSpec* spec , const string& name , double def ) {
             BSONElement e = spec->info[name];
             if ( e.isNumber() ){
-            	// Check that our values are not too big or small
-            	uassert_msg(15073, "Value " << e.numberLong() << " exceeds integer bounds.", e.numberLong() == e.numberInt() )
-            	return e.numberInt();
+            	return e.numberDouble();
             }
             return def;
         }
@@ -234,9 +236,9 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert( 13027 , "point not in range" , in <= (_max + _error) && in >= (_min - _error) );
+            uassert_msg( 13027 , "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
             in -= _min;
-            uassert( 14021 , "point not in range" , in > 0 );
+            uassert_msg( 14021 , "point not in range > " << _min , in > 0 );
             return (unsigned)(in * _scaling);
         }
 
@@ -317,8 +319,8 @@ namespace mongo {
         vector<string> _other;
 
         unsigned _bits;
-        int _max;
-        int _min;
+        double _max;
+        double _min;
         double _scaling;
 
         BSONObj _order;

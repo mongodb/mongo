@@ -11,20 +11,32 @@ GeoNearRandomTest = function(name) {
 }
 
 
-GeoNearRandomTest.prototype.mkPt = function mkPt(scale){
-    scale = scale || 1; // scale is good for staying away from edges
-    return [((Random.rand() * 359.8) - 179.9) * scale, ((Random.rand() * 180) - 90) * scale];
+GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds){
+	if(!indexBounds){
+		scale = scale || 1; // scale is good for staying away from edges
+    	return [((Random.rand() * 359.8) - 179.9) * scale, ((Random.rand() * 180) - 90) * scale];
+	}
+	else{
+		var range = indexBounds.max - indexBounds.min;
+		var eps = Math.pow(2, -40);
+		// Go very close to the borders but not quite there.
+		return [( Random.rand() * (range - eps) + eps) + indexBounds.min, ( Random.rand() * (range - eps) + eps ) + indexBounds.min];
+	}
+    
 }
 
-GeoNearRandomTest.prototype.insertPts = function(nPts) {
+GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds) {
     assert.eq(this.nPts, 0, "insertPoints already called");
     this.nPts = nPts;
 
     for (var i=0; i<nPts; i++){
-        this.t.insert({_id: i, loc: this.mkPt()});
+        this.t.insert({_id: i, loc: this.mkPt(undefined, indexBounds)});
     }
-
-    this.t.ensureIndex({loc: '2d'});
+    
+    if(!indexBounds)
+    	this.t.ensureIndex({loc: '2d'});
+    else
+    	this.t.ensureIndex({loc: '2d'}, indexBounds)
 }
 
 GeoNearRandomTest.prototype.assertIsPrefix = function(short, long) {
