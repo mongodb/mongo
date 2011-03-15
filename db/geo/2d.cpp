@@ -236,7 +236,7 @@ namespace mongo {
         unsigned _convert( double in ) const {
             uassert( 13027 , "point not in range" , in <= (_max + _error) && in >= (_min - _error) );
             in -= _min;
-            assert( in > 0 );
+            uassert( 14021 , "point not in range" , in > 0 );
             return (unsigned)(in * _scaling);
         }
 
