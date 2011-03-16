@@ -1377,7 +1377,7 @@ __wt_rec_col_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 	ret = 0;
 
 	/* The disk image is a header plus room for the WT_OFF_RECORD values. */
-	size = WT_PAGE_DISK_SIZE + (r->l_next - 1) * sizeof(WT_OFF_RECORD);
+	size = WT_PAGE_DISK_SIZE + (r->l_next - 1) * WT_SIZEOF32(WT_OFF_RECORD);
 	WT_ERR(__wt_scr_alloc(session, WT_ALIGN(size, btree->allocsize), &tmp));
 	dsk = tmp->mem;
 	WT_CLEAR(*dsk);
