@@ -101,7 +101,7 @@ namespace mongo {
         massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(), file.has_branch_path());
         boost::filesystem::path dir = file.branch_path(); // parent_path in new boosts
 
-        log() << "flushing directory " << dir.string() << endl;
+        log(1) << "flushing directory " << dir.string() << endl;
 
         int fd = ::open(dir.string().c_str(), O_RDONLY); // DO NOT THROW OR ASSERT BEFORE CLOSING
         massert(13650, str::stream() << "Couldn't open directory '" << dir.string() << "' for flushing: " << errnoWithDescription(), fd >= 0);
