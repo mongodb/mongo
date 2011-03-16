@@ -40,17 +40,6 @@ function r() {
     return buf;
 }
 
-// filter out docs with keys too big to be indexed
-function lowPassFilter( a ) {
-    var ret = [];
-    for( var i in a ) {
-        if ( Object.bsonsize( a[ i ] ) <= 819 /* KeyMax */ ) {
-            ret.push( a[ i ] );
-        }
-    }
-    return ret;
-}
-    
 function check() {
     var v = t.validate();
     if ( !t.valid ) {
@@ -86,11 +75,30 @@ function check() {
     }
     s = sort();
     c1 = t.find( spec, { _id:null } ).sort( s ).hint( idx ).toArray();
+    try {
+	    c3 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
+    } catch( e ) {
+        // may assert if too much data for in memory sort
+        print( "retrying check..." );
+        check(); // retry with different bounds
+        return;
+    }
 
-    // Potentially we could have to much data to do an in memory sort and this would fail.
-    c3 = lowPassFilter( t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray() );
-
-    assert.eq( c1, c3 );
+    var j = 0;
+	for( var i = 0; i < c3.length; ++i ) {
+        if( friendlyEqual( c1[ j ], c3[ i ] ) ) {
+            ++j;
+        } else {
+            var o = c3[ i ];
+            var size = Object.bsonsize( o );
+            for( var f in o ) {
+             	size -= f.length;
+            }
+            if ( size <= 819 /* KeyMax */ ) {
+	            assert.eq( c1, c3 );
+            }
+        }
+    }
 }
 
 for( var i = 0; i < 10000; ++i ) {
