@@ -16,8 +16,8 @@
 
 #include "pch.h"
 #include "Document.h"
-#include "Field.h"
 #include "FieldIterator.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -28,27 +28,27 @@ namespace mongo
     }
 
     Document::Document(BSONObj *pBsonObj):
-	fieldPtr()
+	vFieldName(),
+	vpValue()
     {
 	BSONObjIterator bsonIterator(pBsonObj->begin());
 	while(bsonIterator.more())
 	{
 	    BSONElement bsonElement(bsonIterator.next());
-	    shared_ptr<const Field> pField(
-		Field::createFromBsonElement(&bsonElement));
-	    fieldPtr.push_back(pField);
+	    string fieldName(bsonElement.fieldName());
+	    shared_ptr<const Value> pValue(
+		Value::createFromBsonElement(&bsonElement));
+
+	    vFieldName.push_back(fieldName);
+	    vpValue.push_back(pValue);
 	}
     }
 
     void Document::toBson(BSONObjBuilder *pBuilder)
     {
-	auto_ptr<FieldIterator> pFieldIterator(createFieldIterator());
-
-	while(pFieldIterator->more())
-	{
-	    shared_ptr<const Field> pField(pFieldIterator->next());
-	    pField->addToBsonObj(pBuilder);
-	}
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i)
+	    vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);
     }
 
     shared_ptr<Document> Document::create()
@@ -58,17 +58,20 @@ namespace mongo
     }
 
     Document::Document():
-	fieldPtr()
+	vFieldName(),
+	vpValue()
     {
     }
 
-    shared_ptr<Document> Document::clone(shared_ptr<Document> pDocument)
+    shared_ptr<Document> Document::clone()
     {
 	shared_ptr<Document> pNew(Document::create());
 
-	const size_t nField = pDocument->fieldPtr.size();
-	for(size_t iField = 0; iField < nField; ++iField)
-	    pNew->fieldPtr.push_back(pDocument->fieldPtr[iField]);
+	const size_t n = vFieldName.size();
+	pNew->vFieldName.reserve(n);
+	pNew->vpValue.reserve(n);
+	for(size_t i = 0; i < n; ++i)
+	    pNew->addField(vFieldName[i], vpValue[i]);
 
 	return pNew;
     }
@@ -79,10 +82,10 @@ namespace mongo
 
     FieldIterator *Document::createFieldIterator()
     {
-	return new FieldIterator(shared_from_this(), &fieldPtr);
+	return new FieldIterator(shared_from_this());
     }
 
-    shared_ptr<const Field> Document::getField(string fieldName)
+    shared_ptr<const Value> Document::getValue(string fieldName)
     {
 	/*
 	  For now, assume the number of fields is small enough that iteration
@@ -94,25 +97,26 @@ namespace mongo
 	  in a particular place as we would with a statically compilable
 	  reference.
 	*/
-	const size_t n = fieldPtr.size();
+	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i)
 	{
-	    shared_ptr<const Field> pField(fieldPtr[i]);
-	    const char *pFieldName = pField->getName();
-	    if (fieldName.compare(pFieldName) == 0)
-		return(pField);
+	    if (strcmp(vFieldName[i].c_str(), fieldName.c_str()) == 0)
+		return vpValue[i];
 	}
 
-	return(shared_ptr<const Field>());
+	return(shared_ptr<const Value>());
     }
 
-    void Document::addField(shared_ptr<const Field> pField)
+    void Document::addField(string fieldName, shared_ptr<const Value> pValue)
     {
-        fieldPtr.push_back(pField);
+	vFieldName.push_back(fieldName);
+	vpValue.push_back(pValue);
     }
 
-    void Document::setField(size_t index, shared_ptr<const Field> pField)
+    void Document::setField(size_t index,
+			    string fieldName, shared_ptr<const Value> pValue)
     {
-	fieldPtr[index] = pField;
+	vFieldName[index] = fieldName;
+	vpValue[index] = pValue;
     }
 }

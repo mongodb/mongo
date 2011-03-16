@@ -18,7 +18,7 @@
 #include "ExpressionCompare.h"
 
 #include "Document.h"
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -83,7 +83,7 @@ namespace mongo
 
     void ExpressionCompare::addOperand(shared_ptr<Expression> pExpression)
     {
-	assert(operand.size() < 2); // CW TODO user error
+	assert(vpOperand.size() < 2); // CW TODO user error
 	ExpressionNary::addOperand(pExpression);
     }
 
@@ -100,12 +100,12 @@ namespace mongo
 	/* LTE */ { true,  true,  false },
     };
 
-    shared_ptr<const Field> ExpressionCompare::evaluate(
+    shared_ptr<const Value> ExpressionCompare::evaluate(
 	shared_ptr<Document> pDocument) const
     {
-	assert(operand.size() == 2); // CW TODO user error
-	shared_ptr<const Field> pLeft(operand[0]->evaluate(pDocument));
-	shared_ptr<const Field> pRight(operand[1]->evaluate(pDocument));
+	assert(vpOperand.size() == 2); // CW TODO user error
+	shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+	shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
 	BSONType leftType = pLeft->getType();
 	BSONType rightType = pRight->getType();
@@ -162,21 +162,21 @@ namespace mongo
 	    switch(cmp)
 	    {
 	    case -1:
-		return Field::getMinusOne();
+		return Value::getMinusOne();
 	    case 0:
-		return Field::getZero();
+		return Value::getZero();
 	    case 1:
-		return Field::getOne();
+		return Value::getOne();
 
 	    default:
 		assert(false); // CW TODO internal error
-		return Field::getNull();
+		return Value::getNull();
 	    }
 	}
 
 	bool returnValue = lookup[relop][cmp + 1];
 	if (returnValue)
-	    return Field::getTrue();
-	return Field::getFalse();
+	    return Value::getTrue();
+	return Value::getFalse();
     }
 }

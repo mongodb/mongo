@@ -23,7 +23,6 @@
 namespace mongo
 {
     class BSONElement;
-    class Field;
 
     class ExpressionConstant :
         public Expression,
@@ -32,7 +31,7 @@ namespace mongo
     public:
 	// virtuals from Expression
 	virtual ~ExpressionConstant();
-	virtual shared_ptr<const Field> evaluate(
+	virtual shared_ptr<const Value> evaluate(
 	    shared_ptr<Document> pDocument) const;
 
 	static shared_ptr<ExpressionConstant> createFromBsonElement(
@@ -41,6 +40,6 @@ namespace mongo
     private:
 	ExpressionConstant(BSONElement *pBsonElement);
 
-	shared_ptr<const Field> pValue;
+	shared_ptr<const Value> pValue;
     };
 }

@@ -39,6 +39,6 @@ namespace mongo
     protected:
 	ExpressionNary();
 
-	vector<shared_ptr<Expression>> operand;
+	vector<shared_ptr<Expression>> vpOperand;
     };
 }

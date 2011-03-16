@@ -17,7 +17,7 @@
 #include "pch.h"
 #include "ExpressionOr.h"
 
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -36,18 +36,18 @@ namespace mongo
     {
     }
 
-    shared_ptr<const Field> ExpressionOr::evaluate(
+    shared_ptr<const Value> ExpressionOr::evaluate(
 	shared_ptr<Document> pDocument) const
     {
-	const size_t n = operand.size();
+	const size_t n = vpOperand.size();
 	for(size_t i = 0; i < n; ++i)
 	{
-	    shared_ptr<const Field> pResult(operand[i]->evaluate(pDocument));
-	    shared_ptr<const Field> pBool(Field::coerceToBoolean(pResult));
+	    shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+	    shared_ptr<const Value> pBool(Value::coerceToBoolean(pValue));
 	    if (pBool->getBool())
-		return Field::getTrue();
+		return Value::getTrue();
 	}
 
-	return Field::getFalse();
+	return Value::getFalse();
     }
 }

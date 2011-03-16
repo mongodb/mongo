@@ -18,7 +18,7 @@
 #include "ExpressionFieldPath.h"
 
 #include "Document.h"
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -35,7 +35,7 @@ namespace mongo
     }
 
     ExpressionFieldPath::ExpressionFieldPath(string theFieldPath):
-	fieldPath()
+	vFieldPath()
     {
 	/*
 	  The field path could be using dot notation.
@@ -50,14 +50,14 @@ namespace mongo
 	    /* if there are no more dots, use the remainder of the string */
 	    if (dotpos == theFieldPath.npos)
 	    {
-		fieldPath.push_back(theFieldPath.substr(startpos, dotpos));
+		vFieldPath.push_back(theFieldPath.substr(startpos, dotpos));
 		break;
 	    }
 	    
 	    /* use the string up to the dot */
 	    const size_t length = dotpos - startpos;
 	    assert(length); // CW TODO user error: no zero-length field names
-	    fieldPath.push_back(
+	    vFieldPath.push_back(
 		theFieldPath.substr(startpos, length));
 
 	    /* next time, search starting one spot after that */
@@ -65,19 +65,19 @@ namespace mongo
 	}
     }
 
-    shared_ptr<const Field> ExpressionFieldPath::evaluate(
+    shared_ptr<const Value> ExpressionFieldPath::evaluate(
 	shared_ptr<Document> pDocument) const
     {
-	shared_ptr<const Field> pField;
-	const size_t n = fieldPath.size();
+	shared_ptr<const Value> pValue;
+	const size_t n = vFieldPath.size();
 	size_t i = 0;
 	while(true)
 	{
-	    pField = pDocument->getField(fieldPath[i]);
+	    pValue = pDocument->getValue(vFieldPath[i]);
 
 	    /* if the field doesn't exist, quit with a null value */
-	    if (!pField.get())
-		return Field::getNull();
+	    if (!pValue.get())
+		return Value::getNull();
 
 	    /* if we've hit the end of the path, stop */
 	    ++i;
@@ -87,16 +87,16 @@ namespace mongo
 	    /*
 	      We're diving deeper.  If the value was null, return null.
 	    */
-	    BSONType type = pField->getType();
+	    BSONType type = pValue->getType();
 	    if (type == jstNULL)
-		return Field::getNull();
+		return Value::getNull();
 	    if (type != Object)
 		assert(false); // CW TODO user error:  must be a document
 
 	    /* extract from the next level down */
-	    pDocument = pField->getDocument();
+	    pDocument = pValue->getDocument();
 	}
 
-	return pField;
+	return pValue;
     }
 }

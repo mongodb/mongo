@@ -15,64 +15,60 @@
  */
 
 #include "pch.h"
-#include "Field.h"
+#include "Value.h"
 
 #include "Document.h"
 
 namespace mongo
 {
-    const Field Field::fieldNull("Field::fieldNull");
-    const Field Field::fieldTrue("Field::fieldTrue", true);
-    const Field Field::fieldFalse("Field::fieldFalse", false);
-    const Field Field::fieldMinusOne("Field::fieldMinusOne", -1);
-    const Field Field::fieldZero("Field::fieldZero", 0);
-    const Field Field::fieldOne("Field::fieldOne", 1);
+    const Value Value::fieldNull;
+    const Value Value::fieldTrue(true);
+    const Value Value::fieldFalse(false);
+    const Value Value::fieldMinusOne(-1);
+    const Value Value::fieldZero(0);
+    const Value Value::fieldOne(1);
 
-    Field::Field(string theFieldName):
-	fieldName(theFieldName),
+    Value::Value():
 	type(jstNULL),
 	oidValue(),
 	dateValue(),
 	stringValue(),
 	pDocumentValue(),
-	vpField()
+	vpValue()
     {
     }
 
-    Field::Field(string theFieldName, bool boolValue):
-	fieldName(theFieldName),
+    Value::Value(bool boolValue):
 	type(Bool),
 	pDocumentValue(),
-	vpField()
+	vpValue()
     {
 	simple.boolValue = boolValue;
     }
 
-    Field::Field(string theFieldName, int intValue):
-	fieldName(theFieldName),
+    Value::Value(int intValue):
 	type(NumberInt),
 	pDocumentValue(),
-	vpField()
+	vpValue()
     {
 	simple.intValue = intValue;
     }
 
-    Field::~Field()
+    Value::~Value()
     {
     }
 
-    shared_ptr<const Field> Field::createFromBsonElement(
+    shared_ptr<const Value> Value::createFromBsonElement(
 	BSONElement *pBsonElement)
     {
-	shared_ptr<const Field> pField(new Field(pBsonElement));
-	return pField;
+	shared_ptr<const Value> pValue(new Value(pBsonElement));
+	return pValue;
     }
 
-    Field::Field(BSONElement *pBsonElement):
-	fieldName(pBsonElement->fieldName()),
+    Value::Value(BSONElement *pBsonElement):
 	type(pBsonElement->type()),
 	pDocumentValue(),
-	vpField()
+	vpValue()
     {
 	switch(type)
 	{
@@ -96,12 +92,12 @@ namespace mongo
 		vector<BSONElement> vElement(pBsonElement->Array());
 		const size_t n = vElement.size();
 
-		vpField.reserve(n); // save on realloc()ing
+		vpValue.reserve(n); // save on realloc()ing
 
 		for(size_t i = 0; i < n; ++i)
 		{
-		    vpField.push_back(
-			Field::createFromBsonElement(&vElement[i]));
+		    vpValue.push_back(
+			Value::createFromBsonElement(&vElement[i]));
 		}
 		break;
 	    }
@@ -161,179 +157,86 @@ namespace mongo
 	}
     }
 
-    shared_ptr<const Field> Field::createRename(
-	string newName, shared_ptr<const Field> pSourceField)
+    shared_ptr<const Value> Value::createInt(int value)
     {
-	shared_ptr<const Field> pField(new Field(newName, pSourceField));
-	return pField;
+	shared_ptr<const Value> pValue(new Value(value));
+	return pValue;
     }
 
-    shared_ptr<const Field> Field::createInt(string fieldName, int value)
-    {
-	shared_ptr<const Field> pField(new Field(fieldName, value));
-	return pField;
-    }
-
-    Field::Field(string newName, shared_ptr<const Field> pSourceField):
-	fieldName(newName),
-	type(pSourceField->getType()),
-	pDocumentValue(),
-	vpField()
-    {
-	/* assign the simple value, whatever it is */
-	switch(type)
-	{
-	    case NumberDouble:
-		simple.doubleValue = pSourceField->simple.doubleValue;
-		break;
-
-	    case String:
-	    case RegEx:
-		stringValue = pSourceField->stringValue;
-		break;
-
-	    case Object:
-		pDocumentValue = pSourceField->pDocumentValue;
-		break;
-
-	    case Array:
-		vpField = pSourceField->vpField;
-		break;
-
-	    case BinData:
-		assert(false); // CW TODO unimplemented
-		break;
-
-	    case jstOID:
-		oidValue = pSourceField->oidValue;
-		break;
-
-	    case Bool:
-		simple.boolValue = pSourceField->simple.boolValue;
-		break;
-
-	    case Date:
-	    case Timestamp:
-		dateValue = pSourceField->dateValue;
-		break;
-
-	    case Symbol:
-		assert(false); // CW TODO unimplemented
-		break;
-
-	    case CodeWScope:
-		assert(false); // CW TODO unimplemented
-		break;
-
-	    case NumberInt:
-		simple.intValue = pSourceField->simple.intValue;
-		break;
-
-	    case NumberLong:
-		simple.longValue = pSourceField->simple.longValue;
-		break;
-
-	    case jstNULL:
-		/* nothing to do */
-		break;
-	    
-		/* these shouldn't happen in this context */
-	    case MinKey:
-	    case EOO:
-	    case Undefined:
-	    case DBRef:
-	    case Code:
-	    case MaxKey:
-		assert(false); // CW TODO better message
-		break;
-	}
-    }
-
-    const char *Field::getName() const
-    {
-	return fieldName.c_str();
-    }
-
-    BSONType Field::getType() const
-    {
-	return type;
-    }
-
-    double Field::getDouble() const
+    double Value::getDouble() const
     {
 	assert(getType() == NumberDouble);
 	return simple.doubleValue;
     }
 
-    string Field::getString() const
+    string Value::getString() const
     {
 	assert(getType() == String);
 	return stringValue;
     }
 
-    shared_ptr<Document> Field::getDocument() const
+    shared_ptr<Document> Value::getDocument() const
     {
 	assert(getType() == Object);
 	return pDocumentValue;
     }
 
-    const vector<shared_ptr<const Field>> *Field::getArray() const
+    const vector<shared_ptr<const Value>> *Value::getArray() const
     {
 	assert(getType() == Array);
-	return &vpField;
+	return &vpValue;
     }
 
-    OID Field::getOid() const
+    OID Value::getOid() const
     {
 	assert(getType() == jstOID);
 	return oidValue;
     }
 
-    bool Field::getBool() const
+    bool Value::getBool() const
     {
 	assert(getType() == Bool);
 	return simple.boolValue;
     }
 
-    Date_t Field::getDate() const
+    Date_t Value::getDate() const
     {
 	assert(getType() == Date);
 	return dateValue;
     }
 
-    string Field::getRegex() const
+    string Value::getRegex() const
     {
 	assert(getType() == RegEx);
 	return stringValue;
     }
 
-    string Field::getSymbol() const
+    string Value::getSymbol() const
     {
 	assert(getType() == Symbol);
 	return stringValue;
     }
 
-    int Field::getInt() const
+    int Value::getInt() const
     {
 	assert(getType() == NumberInt);
 	return simple.intValue;
     }
 
-    unsigned long long Field::getTimestamp() const
+    unsigned long long Value::getTimestamp() const
     {
 	assert(getType() == Timestamp);
 	return dateValue;
     }
 
-    long long Field::getLong() const
+    long long Value::getLong() const
     {
 	assert(getType() == NumberLong);
 	return simple.longValue;
     }
 
-    void Field::addToBsonObj(BSONObjBuilder *pBuilder) const
+    void Value::addToBsonObj(BSONObjBuilder *pBuilder, string fieldName) const
     {
-	StringData fieldName(getName());
 	switch(getType())
 	{
 	case NumberDouble:
@@ -355,12 +258,12 @@ namespace mongo
 
 	case Array:
 	{
-	    const size_t n = vpField.size();
+	    const size_t n = vpValue.size();
 	    BSONArrayBuilder arrayBuilder(n);
 	    for(size_t i = 0; i < n; ++i)
 	    {
-		shared_ptr<const Field> pField(vpField[i]);
-		pField->addToBsonArray(&arrayBuilder);
+		shared_ptr<const Value> pValue(vpValue[i]);
+		pValue->addToBsonArray(&arrayBuilder);
 	    }
 	    
 	    arrayBuilder.done();
@@ -425,7 +328,7 @@ namespace mongo
 	}
     }
 
-    void Field::addToBsonArray(BSONArrayBuilder *pBuilder) const
+    void Value::addToBsonArray(BSONArrayBuilder *pBuilder) const
     {
 	switch(getType())
 	{
@@ -449,12 +352,12 @@ namespace mongo
 
 	case Array:
 	{
-	    const size_t n = vpField.size();
+	    const size_t n = vpValue.size();
 	    BSONArrayBuilder arrayBuilder(n);
 	    for(size_t i = 0; i < n; ++i)
 	    {
-		shared_ptr<const Field> pField(vpField[i]);
-		pField->addToBsonArray(&arrayBuilder);
+		shared_ptr<const Value> pValue(vpValue[i]);
+		pValue->addToBsonArray(&arrayBuilder);
 	    }
 	    
 	    arrayBuilder.done();
@@ -516,13 +419,13 @@ namespace mongo
 	}
     }
 
-    bool Field::coerceToBool(shared_ptr<const Field> pField)
+    bool Value::coerceToBool(shared_ptr<const Value> pValue)
     {
-	BSONType type = pField->getType();
+	BSONType type = pValue->getType();
 	switch(type)
 	{
 	case NumberDouble:
-	    if (pField->simple.doubleValue != 0)
+	    if (pValue->simple.doubleValue != 0)
 		return true;
 	    break;
 
@@ -538,7 +441,7 @@ namespace mongo
 	    return true;
 
 	case Bool:
-	    if (pField->simple.boolValue)
+	    if (pValue->simple.boolValue)
 		return true;
 	    break;
 
@@ -547,12 +450,12 @@ namespace mongo
 	    break;
 
 	case NumberInt:
-	    if (pField->simple.intValue != 0)
+	    if (pValue->simple.intValue != 0)
 		return true;
 	    break;
 
 	case NumberLong:
-	    if (pField->simple.longValue != 0)
+	    if (pValue->simple.longValue != 0)
 		return true;
 	    break;
 
@@ -574,12 +477,12 @@ namespace mongo
 	return false;
     }
 
-    shared_ptr<const Field> Field::coerceToBoolean(
-	shared_ptr<const Field> pField)
+    shared_ptr<const Value> Value::coerceToBoolean(
+	shared_ptr<const Value> pValue)
     {
-	bool result = coerceToBool(pField);
+	bool result = coerceToBool(pValue);
 	if (result)
-	    return Field::getTrue();
-	return Field::getFalse();
+	    return Value::getTrue();
+	return Value::getFalse();
     }
 }

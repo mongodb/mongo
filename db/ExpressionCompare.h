@@ -29,7 +29,7 @@ namespace mongo
     public:
 	// virtuals from ExpressionNary
 	virtual ~ExpressionCompare();
-	virtual shared_ptr<const Field> evaluate(
+	virtual shared_ptr<const Value> evaluate(
 	    shared_ptr<Document> pDocument) const;
 	virtual void addOperand(shared_ptr<Expression> pExpression);
 

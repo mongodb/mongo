@@ -21,7 +21,7 @@
 namespace mongo
 {
     class Document;
-    class Field;
+    class Value;
 
     class FieldIterator :
         boost::noncopyable
@@ -37,28 +37,26 @@ namespace mongo
 	/*
 	  Move the iterator to point to the next field and return it.
 
-	  @return a pointer to the next Field
+	  @return the next field's <name, Value>
 	*/
-	shared_ptr<const Field> next();
+	pair<string, shared_ptr<const Value>> next();
 
     private:
 	friend class Document;
-	FieldIterator(shared_ptr<Document> pDocument,
-		      const vector<shared_ptr<const Field>> *pVFieldPtr);
+
 	/*
+	  Constructor.
+
 	  @param pDocument points to the document whose fields are being
 	      iterated
-	  @param pFieldPtr points to the field vector within that document
 	*/
-
-	size_t currentField; /* index of current field */
-	size_t nField; /* number of fields */
+	FieldIterator(shared_ptr<Document> pDocument);
 
 	/*
 	  We'll hang on to the original document to ensure we keep the
 	  fieldPtr vector alive.
 	*/
 	shared_ptr<Document> pDocument;
-	const vector<shared_ptr<const Field>> *pVFieldPtr;
+	size_t index; // current field in iteration
     };
 }

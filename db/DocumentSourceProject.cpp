@@ -19,7 +19,7 @@
 
 #include "Document.h"
 #include "Expression.h"
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -35,11 +35,11 @@ namespace mongo
 	shared_ptr<DocumentSource> pTheSource):
 	pSource(pTheSource),
 	vpExpression(),
-	ravelField(-1),
+	ravelWhich(-1),
 	iRavel(0),
 	nRavel(0),
 	pNoRavelDocument(),
-	pRavelField()
+	pRavelValue()
     {
     }
 
@@ -49,7 +49,7 @@ namespace mongo
 	  If we're raveling an array, and there are more elements, then we
 	  can return more documents.
 	*/
-	if ((ravelField >= 0) && (iRavel < nRavel))
+	if ((ravelWhich >= 0) && (iRavel < nRavel))
 	    return false;
 
 	return pSource->eof();
@@ -57,7 +57,7 @@ namespace mongo
 
     bool DocumentSourceProject::advance()
     {
-	if (ravelField >= 0)
+	if (ravelWhich >= 0)
 	{
 	    if (++iRavel < nRavel)
 		return true;
@@ -67,7 +67,7 @@ namespace mongo
 	}
 
 	/* release the last document and advance */
-	pRavelField.reset();
+	pRavelValue.reset();
 	pNoRavelDocument.reset();
 	return pSource->advance();
     }
@@ -83,33 +83,25 @@ namespace mongo
 	      Use the expressions to create a new Document out of the
 	      source Document
 	    */
-	    const size_t n = vpExpression.size();
+	    const size_t n = vFieldName.size();
 	    for(size_t i = 0; i < n; ++i)
 	    {
-		shared_ptr<Expression> pExpression(vpExpression[i]);
 		string outName(vFieldName[i]);
+		shared_ptr<Expression> pExpression(vpExpression[i]);
 
 		/* get the value for the field */
-		shared_ptr<const Field> pOutField(
+		shared_ptr<const Value> pOutValue(
 		    pExpression->evaluate(pInDocument));
-
-		/*
-		  The name might already be what we want if this is just a
-		  pass-through from the underlying source.
-		  If the name isn't as requested, rename it.
-		*/
-		if (outName.compare(pOutField->getName()) != 0)
-		    pOutField = Field::createRename(outName, pOutField);
 
 		/*
 		  If we're raveling this field, and it's an array, then we're
 		  going to pick off elements one by one, and make fields of
 		  them below.
 		*/
-		if (((int)i == ravelField) && (pOutField->getType() == Array))
+		if (((int)i == ravelWhich) && (pOutValue->getType() == Array))
 		{
-		    pRavelField = pOutField;
-		    nRavel = pRavelField->getArray()->size();
+		    pRavelValue = pOutValue;
+		    nRavel = pRavelValue->getArray()->size();
 
 		    /*
 		      The $ravel of an empty array is a nul value.  If we
@@ -118,14 +110,13 @@ namespace mongo
 		    */
 		    if (nRavel == 0)
 		    {
-			pRavelField.reset();
-			pOutField = Field::createRename(
-			    pOutField->getName(), Field::getNull());
+			pRavelValue.reset();
+			pOutValue = Value::getNull();
 		    }
 		}
 
 		/* add the field to the document under construction */
-		pNoRavelDocument->addField(pOutField);
+		pNoRavelDocument->addField(outName, pOutValue);
 	    }
 	}
 
@@ -134,28 +125,21 @@ namespace mongo
 	  alternate (clone), replace the raveled array field with the element
 	  at the appropriate index.
 	 */
-	if (pRavelField.get())
+	if (pRavelValue.get())
 	{
 	    /* clone the document with an array we're raveling */
-	    shared_ptr<Document> pRavelDocument(
-		Document::clone(pNoRavelDocument));
+	    shared_ptr<Document> pRavelDocument(pNoRavelDocument->clone());
 
 	    /* get access to the array of values */
-	    const vector<shared_ptr<const Field>> *pvpField =
-		pRavelField->getArray();
+	    const vector<shared_ptr<const Value>> *pvpValue =
+		pRavelValue->getArray();
 
 	    /* grab the individual array element */
-	    shared_ptr<const Field> pArrayField((*pvpField)[iRavel]);
-
-	    /* get the output field name */
-	    string fieldName(pRavelField->getName());
-
-	    /* make a new Field that has the correct name */
-	    shared_ptr<const Field> pNamedField(
-		Field::createRename(fieldName, pArrayField));
+	    shared_ptr<const Value> pArrayValue((*pvpValue)[iRavel]);
 
 	    /* substitute the named field into the prototype document */
-	    pRavelDocument->setField((size_t)ravelField, pNamedField);
+	    pRavelDocument->setField(
+		(size_t)ravelWhich, vFieldName[ravelWhich], pArrayValue);
 
 	    return pRavelDocument;
 	}
@@ -167,17 +151,17 @@ namespace mongo
     {
     }
 
-    void DocumentSourceProject::includeField(
+    void DocumentSourceProject::addField(
 	string fieldName, shared_ptr<Expression> pExpression, bool ravelArray)
     {
 	assert(fieldName.length()); // CW TODO must be a non-empty string
 	assert(pExpression); // CW TODO must be a non-null expression
-	assert(!ravelArray || (ravelField < 0));
+	assert(!ravelArray || (ravelWhich < 0));
 	    // CW TODO only one ravel allowed
 
 	/* if we're raveling, remember which field */
 	if (ravelArray)
-	    ravelField = vFieldName.size();
+	    ravelWhich = vFieldName.size();
 
 	vFieldName.push_back(fieldName);
 	vpExpression.push_back(pExpression);

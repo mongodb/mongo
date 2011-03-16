@@ -52,6 +52,9 @@ namespace mongo
 	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
 	static shared_ptr<DocumentSource> setupFilter(
 	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
+	static shared_ptr<DocumentSource> setupGroup(
+	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
+
 	static shared_ptr<Expression> parseExpressionObject(
 	    BSONElement *pBsonElement);
 	static shared_ptr<Expression> parseDocument(BSONElement *pBsonElement);

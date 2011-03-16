@@ -17,7 +17,7 @@
 #include "pch.h"
 #include "ExpressionConstant.h"
 
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -34,11 +34,11 @@ namespace mongo
     }
 
     ExpressionConstant::ExpressionConstant(BSONElement *pBsonElement):
-	pValue(Field::createFromBsonElement(pBsonElement))
+	pValue(Value::createFromBsonElement(pBsonElement))
     {
     }
 
-    shared_ptr<const Field> ExpressionConstant::evaluate(
+    shared_ptr<const Value> ExpressionConstant::evaluate(
 	shared_ptr<Document> pDocument) const
     {
 	return pValue;

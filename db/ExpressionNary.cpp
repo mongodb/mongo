@@ -23,13 +23,13 @@
 namespace mongo
 {
     ExpressionNary::ExpressionNary():
-	operand()
+	vpOperand()
     {
     }
 
     void ExpressionNary::addOperand(
 	shared_ptr<Expression> pExpression)
     {
-	operand.push_back(pExpression);
+	vpOperand.push_back(pExpression);
     }
 }

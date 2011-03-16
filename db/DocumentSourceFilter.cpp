@@ -19,7 +19,7 @@
 #include "DocumentSourceFilter.h"
 
 #include "Expression.h"
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {
@@ -41,8 +41,8 @@ namespace mongo
 	    shared_ptr<Document> pDocument(pSource->getCurrent());
 	    hasNext = pSource->advance();
 
-	    shared_ptr<const Field> pField(pFilter->evaluate(pDocument));
-	    bool pass = Field::coerceToBool(pField);
+	    shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
+	    bool pass = Value::coerceToBool(pValue);
 	    if (pass)
 	    {
 		pCurrent = pDocument;

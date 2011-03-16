@@ -21,9 +21,8 @@
 
 namespace mongo
 {
-    class Document;
     class Expression;
-    class Field;
+    class Value;
 
     class DocumentSourceProject :
         public DocumentSource,
@@ -56,7 +55,7 @@ namespace mongo
 	      a sequence of documents is generated, with each one containing one
 	      value from the array.  Note there can only be one raveled field.
 	*/
-	void includeField(string fieldName, shared_ptr<Expression> pExpression,
+	void addField(string fieldName, shared_ptr<Expression> pExpression,
 	    bool ravelArray);
 
     private:
@@ -64,14 +63,14 @@ namespace mongo
 
 	// configuration state
 	shared_ptr<DocumentSource> pSource; // underlying source
-	vector<shared_ptr<Expression>> vpExpression; // inclusions
 	vector<string> vFieldName; // inclusion field names
-	int ravelField; // index of raveled field, if any, otherwise -1
+	vector<shared_ptr<Expression>> vpExpression; // inclusions
+	int ravelWhich; // index of raveled field, if any, otherwise -1
 
 	// iteration state
 	size_t iRavel; // next index in current ravel
 	size_t nRavel; // size of array to be raveled
 	shared_ptr<Document> pNoRavelDocument; // document to return, pre-ravel
-	shared_ptr<const Field> pRavelField; // field being raveled
+	shared_ptr<const Value> pRavelValue; // field being raveled
     };
 }

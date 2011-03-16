@@ -1,5 +1,5 @@
 /**
- * Copyright 2011 10gen Inc.
+ * Copyright 2011 (c) 10gen Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -14,30 +14,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "FieldIterator.h"
+#pragma once
 
-#include "Document.h"
+#include "pch.h"
+#include "DocumentSource.h"
 
 namespace mongo
 {
-    FieldIterator::FieldIterator(shared_ptr<Document> pTheDocument):
-	pDocument(pTheDocument),
-	index(0)
-    {
-    }
+    class Expression;
 
-    bool FieldIterator::more() const
+    class DocumentSourceGroup :
+        public DocumentSource
     {
-	return (index < pDocument->vFieldName.size());
-    }
+    public:
+	// virtuals from DocumentSource
+	virtual ~DocumentSourceGroup();
+	virtual bool eof();
+	virtual bool advance();
+	virtual shared_ptr<Document> getCurrent();
 
-    pair<string, shared_ptr<const Value>> FieldIterator::next()
-    {
-	assert(more());
-	pair<string, shared_ptr<const Value>> result(
-	    pDocument->vFieldName[index], pDocument->vpValue[index]);
-	++index;
-	return result;
-    }
+	static shared_ptr<DocumentSourceGroup> create(
+	    shared_ptr<DocumentSource> pSource);
+
+    private:
+	DocumentSourceGroup(shared_ptr<DocumentSource> pTheSource);
+
+	shared_ptr<DocumentSource> pSource;
+    };
 }

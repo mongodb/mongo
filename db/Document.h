@@ -21,7 +21,7 @@
 
 namespace mongo
 {
-    class Field;
+    class Value;
     class FieldIterator;
 
     class Document :
@@ -51,9 +51,9 @@ namespace mongo
 	/*
 	  Clone a document.
 
-	  The new document shares all the fields with the original.
+	  The new document shares all the fields' values with the original.
 	*/
-	static shared_ptr<Document> clone(shared_ptr<Document> pDocument);
+	shared_ptr<Document> clone();
 
 	/*
 	  Add this document to the BSONObj under construction with the
@@ -68,12 +68,12 @@ namespace mongo
 	FieldIterator *createFieldIterator();
 
 	/*
-	  Get a pointer to the requested field.
+	  Get the value of the specified field.
 
 	  @param fieldName the name of the field
 	  @return point to the requested field
 	*/
-	shared_ptr<const Field> getField(string fieldName);
+	shared_ptr<const Value> getValue(string fieldName);
 
 	/*
 	  Add the given field to the Document.
@@ -81,10 +81,10 @@ namespace mongo
 	  BSON documents' fields are ordered; the new Field will be
 	  appened to the current list of fields.
 
-	  It is an error to add a Field that has the same name as another
+	  It is an error to add a field that has the same name as another
 	  field.
 	*/
-	void addField(shared_ptr<const Field> pField);
+	void addField(string fieldName, shared_ptr<const Value> pValue);
 
 	/*
 	  Set the given field to be at the specified position in the
@@ -92,12 +92,17 @@ namespace mongo
 	  position.  The index must be within the current range of field
 	  indices.
 	*/
-	void setField(size_t index, shared_ptr<const Field> pField);
+	void setField(size_t index,
+		      string fieldName, shared_ptr<const Value> pValue);
 
     private:
+	friend class FieldIterator;
+
 	Document();
 	Document(BSONObj *pBsonObj);
 
-	vector<shared_ptr<const Field>> fieldPtr;
+	/* these two vectors parallel each other */
+	vector<string> vFieldName;
+	vector<shared_ptr<const Value>> vpValue;
     };
 }

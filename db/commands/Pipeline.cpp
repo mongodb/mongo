@@ -22,6 +22,7 @@
 #include "../DocumentSource.h"
 #include "../DocumentSourceCursor.h"
 #include "../DocumentSourceFilter.h"
+#include "../DocumentSourceGroup.h"
 #include "../DocumentSourceProject.h"
 #include "../ExpressionAnd.h"
 #include "../ExpressionCompare.h"
@@ -355,8 +356,7 @@ namespace mongo
 		{
 		    shared_ptr<Expression> pExpression(
 			ExpressionFieldPath::create(inFieldName));
-		    pProject->includeField(
-			outFieldName, pExpression, ravelArray);
+		    pProject->addField(outFieldName, pExpression, ravelArray);
 		}
 		break;
 
@@ -413,7 +413,7 @@ namespace mongo
 
 			shared_ptr<Expression> pExpression(
 			    ExpressionFieldPath::create(inFieldName));
-			pProject->includeField(
+			pProject->addField(
 			    outFieldName, pExpression, ravelArray);
 		    }
 		    else
@@ -421,7 +421,7 @@ namespace mongo
 			shared_ptr<Expression> pExpression(
 			    parseExpression(pOpName, &exprElement));
 
-			pProject->includeField(
+			pProject->addField(
 			    outFieldName, pExpression, false);
 		    }
 		}
@@ -469,5 +469,40 @@ namespace mongo
 	    DocumentSourceFilter::create(pExpression, pSource));
 
 	return pFilter;
+    }
+
+    shared_ptr<DocumentSource> Pipeline::setupGroup(
+	BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource)
+    {
+	assert(pBsonElement->type() == Object); // CW TODO must be an object
+
+	shared_ptr<DocumentSourceGroup> pGroup(
+	    DocumentSourceGroup::create(pSource));
+
+	BSONObj groupObj(pBsonElement->Obj());
+	BSONObjIterator groupIterator(groupObj);
+	while(groupIterator.more())
+	{
+	    BSONElement groupField(groupIterator.next());
+	    const char *pFieldName = groupField.fieldName();
+
+	    if (strcmp(pFieldName, "_id") == 0)
+	    {
+		/*
+		  Use the array of field paths to create the group-by key.
+		 */
+		assert(false); // unimplemented
+	    }
+	    else
+	    {
+		/*
+		  Treat as a projection field with the additional ability to
+		  add aggregation operators.
+		*/
+		assert(false); // unimplemented
+	    }
+	}
+
+	return pGroup;
     }
 }

@@ -22,9 +22,6 @@
 
 namespace mongo
 {
-    class Document;
-    class Field;
-
     class ExpressionFieldPath :
         public Expression,
         public boost::enable_shared_from_this<ExpressionFieldPath>
@@ -32,7 +29,7 @@ namespace mongo
     public:
 	// virtuals from Expression
 	virtual ~ExpressionFieldPath();
-	virtual shared_ptr<const Field> evaluate(
+	virtual shared_ptr<const Value> evaluate(
 	    shared_ptr<Document> pDocument) const;
 
 	static shared_ptr<ExpressionFieldPath> create(string fieldPath);
@@ -40,6 +37,6 @@ namespace mongo
     private:
 	ExpressionFieldPath(string fieldPath);
 
-	vector<string> fieldPath;
+	vector<string> vFieldPath;
     };
 }

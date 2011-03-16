@@ -21,7 +21,7 @@
 namespace mongo
 {
     class Document;
-    class Field;
+    class Value;
 
     class Expression :
         boost::noncopyable
@@ -30,11 +30,11 @@ namespace mongo
 	virtual ~Expression() {};
 
 	/*
-	  Evaluate the expression using the given document.
+	  Evaluate the expression using the given document as input.
 
-	  @return a Field value
+	  @return computed value
 	*/
-	virtual shared_ptr<const Field> evaluate(
+	virtual shared_ptr<const Value> evaluate(
 	    shared_ptr<Document> pDocument) const = 0;
     };
 }
