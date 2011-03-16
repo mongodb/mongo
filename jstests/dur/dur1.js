@@ -106,7 +106,7 @@ stopMongod(30000);
 
 // durable version
 log();
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--journal", "--smallfiles", "--journalOptions", 8);
 work();
 
 // wait for group commit.
@@ -119,7 +119,7 @@ stopMongod(30001, /*signal*/9);
 
 // restart and recover
 log();
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--journal", "--smallfiles", "--journalOptions", 8);
 verify();
 
 log("stop");
