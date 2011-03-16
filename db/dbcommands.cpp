@@ -112,7 +112,7 @@ namespace mongo {
             Client& c = cc();
             c.appendLastOp( result );
 
-            result.appendNumber( "connectionId" , c.getConnectionId() );
+            result.appendNumber( "connectionId" , c.getConnectionId() ); // for sharding; also useful in general for debugging
 
             BSONObj cmdObj = _cmdObj;
             {
