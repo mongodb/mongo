@@ -47,13 +47,13 @@ typedef struct {
 	void *wts_conn;				/* WT CONNECTION handle */
 	void *wts_cursor;			/* WT CURSOR handle */
 	void *wts_session;			/* WT SESSION handle */
-	FILE *wts_log;				/* WT log file stream */
 
 	FILE *rand_log;				/* Random number log */
 
 	uint32_t run_cnt;			/* Run counter */
 
-	int replay;				/* Replaying a run */
+	int logging;				/* Are we logging everything? */
+	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
 	int verbose;				/* Verbosity */
 
@@ -111,7 +111,7 @@ uint32_t wts_rand(void);
 int	 wts_read_col_scan(void);
 int	 wts_read_row_scan(void);
 int	 wts_salvage(void);
-int	 wts_startup(int);
+int	 wts_startup(void);
 int	 wts_stats(void);
 void	 wts_teardown(void);
 int	 wts_verify(void);

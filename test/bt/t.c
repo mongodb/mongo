@@ -15,7 +15,7 @@ static void usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, log, reps;
+	int ch, reps;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -35,7 +35,6 @@ main(int argc, char *argv[])
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	log = 0;
 	while ((ch = getopt(argc, argv, "1C:clqrv")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
@@ -47,8 +46,8 @@ main(int argc, char *argv[])
 		case 'c':			/* Display config strings */
 			config_names();
 			return (EXIT_SUCCESS);
-		case 'l':			/* Log operations */
-			log = 1;
+		case 'l':
+			g.logging = 1;
 			break;
 		case 'r':			/* Replay a run */
 			g.replay = 1;
@@ -77,7 +76,7 @@ main(int argc, char *argv[])
 		key_gen_setup();
 
 		bdb_startup();			/* Initial file config */
-		if (wts_startup(log))
+		if (wts_startup())
 			return (EXIT_FAILURE);
 
 		config_print(0);		/* Dump run configuration */
@@ -106,7 +105,7 @@ main(int argc, char *argv[])
 				goto err;
 
 			wts_teardown();		/* Close and  re-open */
-			if (wts_startup(0))
+			if (wts_startup())
 				goto err;
 
 			if (wts_verify())	/* Verify the file */

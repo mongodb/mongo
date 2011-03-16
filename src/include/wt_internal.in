@@ -91,6 +91,7 @@ struct __wt_walk_entry; typedef struct __wt_walk_entry WT_WALK_ENTRY;
 #include "config.h"
 #include "debug.h"
 #include "fh.h"
+#include "log.h"
 #include "misc.h"
 #include "stat.h"
 
@@ -130,6 +131,8 @@ struct __wt_free_entry {
 #include "serial.h"
 #include "extern.h"
 #include "verify_build.h"
+
+#include "log.i"
 
 #if defined(__cplusplus)
 }

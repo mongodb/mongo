@@ -71,5 +71,5 @@ __wt_config_def_verify_table =
 const char *
 __wt_config_def_wiredtiger_open =
     "cache_size=20MB,create=false,data_update_min=8KB,data_update_max=32KB,"
-    "exclusive=false,error_prefix=,hazard_size=15,session_max=50,"
+    "exclusive=false,error_prefix=,hazard_size=15,logging=false,session_max=50,"
     "multiprocess=false,verbose=";

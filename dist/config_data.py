@@ -117,6 +117,8 @@ config_types = {
 		Prefix string for error messages'''),
 	Config('hazard_size', '15', r'''
 		number of hazard references per session'''),
+	Config('logging', 'false', r'''
+		enable logging'''),
 	Config('session_max', '50', r'''
 		maximum expected number of sessions (including server threads)'''),
 	Config('multiprocess', 'false', r'''

@@ -236,6 +236,9 @@ struct __session {
 	WT_BUF	**scratch;		/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
 
+	WT_BUF	logrec_buf;		/* Buffer for log records */
+	WT_BUF	logprint_buf;		/* Buffer for debug log records */
+
 					/* SESSION workQ request */
 	wq_state_t volatile wq_state;	/* Request state */
 	int	  wq_ret;		/* Return value */
@@ -339,9 +342,10 @@ struct __connection {
 
 	WT_CACHE  *cache;		/* Page cache */
 
-	WT_STATS *stats;		/* Environment handle statistics */
-	WT_STATS *method_stats;		/* Environment method statistics */
+	WT_STATS  *stats;		/* Environment handle statistics */
+	WT_STATS  *method_stats;	/* Environment method statistics */
 
+	WT_FH	  *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
 	uint32_t flags;

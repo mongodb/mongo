@@ -34,6 +34,7 @@ run "python api_flags.py" "Building API flags include file"
 run "python api.py" "Building API methods"
 run "python api_err.py" "Building error return API"
 run "python config.py" "Building configuration code"
+run "python log.py" "Building logging layer"
 run "python stat.py" "Building statistics support"
 run "python serial.py" "Building serial function support"
 

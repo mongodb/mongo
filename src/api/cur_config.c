@@ -145,10 +145,8 @@ __wt_curconfig_open(SESSION *session,
 		__curconfig_remove,
 		__curconfig_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		{ NULL, 0 },		/* WT_ITEM key */
-		{ NULL, 0 },		/* WT_ITEM value */
-		{ NULL, 0, 0 },		/* WT_BUF key_buf */
-		{ NULL, 0, 0 },		/* WT_BUF value_buf */
+		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};

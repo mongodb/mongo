@@ -1,4 +1,11 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
+
+#ifdef __GNUC__
+#define	WT_GCC_ATTRIBUTE(x)	__attribute__(x)
+#else
+#define	WT_GCC_ATTRIBUTE(x)
+#endif
+
 void __wt_methods_btree_config_default(BTREE *btree);
 void __wt_methods_btree_lockout(BTREE *btree);
 void __wt_methods_btree_init_transition(BTREE *btree);
@@ -261,6 +268,13 @@ int __wt_connection_stat_clear(CONNECTION *conn);
 void __wt_stat_print(CONNECTION *conn, WT_STATS *s, FILE *stream);
 int __wt_connection_sync(CONNECTION *conn, void (*f)(const char *, uint64_t));
 void *__wt_workq_srvr(void *arg);
+int __wt_log_put(SESSION *session, WT_LOGREC_DESC *recdesc, ...);
+int __wt_log_printf(SESSION *session,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    2,
+    3)));
+WT_LOGREC_DESC __wt_logdesc_debug;
 void __wt_abort(SESSION *session);
 int __wt_calloc(SESSION *session, size_t number, size_t size, void *retp);
 int __wt_realloc(SESSION *session,
@@ -403,3 +417,8 @@ int __wt_stat_alloc_fh_stats(SESSION *session, WT_STATS **statsp);
 void __wt_stat_clear_fh_stats(WT_STATS *stats);
 int __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp);
 void __wt_stat_clear_method_stats(WT_STATS *stats);
+
+#ifdef __GNUC__
+#undef	WT_GCC_ATTRIBUTE
+#define	WT_GCC_ATTRIBUTE(x)
+#endif

@@ -61,6 +61,8 @@ src/env/env_session.c
 src/env/env_stat.c
 src/env/env_sync.c
 src/env/env_workq.c
+src/log/log.c
+src/log/log_desc.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_filesize.c

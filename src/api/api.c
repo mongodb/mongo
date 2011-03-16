@@ -318,6 +318,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	}
 
 	__wt_free(&conn->default_session, conn->home);
+	if (conn->log_fh != NULL) {
+		WT_TRET(__wt_close(&conn->default_session, conn->log_fh));
+		conn->log_fh = NULL;
+	}
 	WT_TRET(conn->close(conn, 0));
 	return (ret);
 }
@@ -403,9 +407,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_open_session
 	};
 	CONNECTION *conn;
+	WT_CONFIG_ITEM cval;
+	const char *cfg[] = { __wt_config_def_wiredtiger_open, config, NULL };
 	int ret;
-
-	WT_UNUSED(config);
 
 	*wt_connp = NULL;
 
@@ -437,9 +441,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* XXX conn flags, including WT_MEMORY_CHECK */
 	WT_ERR(__wt_connection_config(conn));
 
-	/* XXX configure cache size */
+	WT_ERR(__wt_config_checkone(&conn->default_session,
+	    __wt_config_def_wiredtiger_open, config));
+
+	WT_ERR(__wt_config_gets(cfg, "cache_size", &cval));
+	WT_ERR(conn->cache_size_set(conn, (uint32_t)cval.val));
 
 	WT_ERR(conn->open(conn, home, 0644, 0));
+
+	WT_ERR(__wt_config_gets(cfg, "logging", &cval));
+	if (cval.val != 0)
+		WT_ERR(__wt_open(&conn->default_session,
+		    "__wt.log", 0666, 1, &conn->log_fh));
 
 	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
 	*wt_connp = &conn->iface;

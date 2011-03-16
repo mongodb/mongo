@@ -844,6 +844,7 @@ struct wt_connection {
  * @config{exclusive, fail if the database already exists}
  * @config{error_prefix, Prefix string for error messages}
  * @config{hazard_size, number of hazard references per session}
+ * @config{logging, enable logging}
  * @config{session_max, maximum expected number of sessions (including server
  * threads)}
  * @config{multiprocess, permit sharing between processes (will automatically

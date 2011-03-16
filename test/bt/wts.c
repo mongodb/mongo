@@ -19,7 +19,7 @@ static int wts_sync(void);
 WT_EVENT_HANDLER event_handler = {};
 
 int
-wts_startup(int logfile)
+wts_startup()
 {
 	time_t now;
 	WT_CONNECTION *conn;
@@ -29,32 +29,10 @@ wts_startup(int logfile)
 	int ret;
 	char config[200], *end, *p;
 
-	if (logfile) {
-		if (g.wts_log != NULL) {
-			(void)fclose(g.wts_log);
-			g.wts_log = NULL;
-		}
-
-		p = fname("log");
-		if ((g.wts_log = fopen(p, "w")) == NULL) {
-			fprintf(stderr,
-			    "%s: %s: %s\n", g.progname, p, strerror(errno));
-			exit (EXIT_FAILURE);
-		}
-	}
-
-	if (g.wts_log != NULL) {
-		fprintf(
-		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-		(void)time(&now);
-		fprintf(g.wts_log, "WT startup: %s", ctime(&now));
-		fprintf(
-		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-	}
-
 	snprintf(config, sizeof(config),
-	    "error_prefix='%s',cachesize=%d,verbose=[%s]",
+	    "error_prefix='%s',cachesize=%d,%sverbose=[%s]",
 	    g.progname, g.c_cache,
+	    g.logging ? ",logging" : "",
 	    ""
 	    // "fileops,"
 	    // "hazard,"
@@ -121,6 +99,10 @@ wts_startup(int logfile)
 		return (1);
 	}
 
+	if (g.logging)
+		__wt_log_printf((SESSION *)session,
+		    "WT startup: %s", ctime(&now));
+
 	g.wts_conn = conn;
 	g.wts_session = session;
 	g.wts_cursor = cursor;
@@ -132,18 +114,14 @@ void
 wts_teardown(void)
 {
 	WT_CONNECTION *conn;
+	SESSION *session;
 	time_t now;
 
 	conn = g.wts_conn;
+	session = g.wts_session;
 
-	if (g.wts_log != NULL) {
-		fprintf(
-		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-		(void)time(&now);
-		fprintf(g.wts_log, "WT teardown: %s", ctime(&now));
-		fprintf(
-		    g.wts_log, "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-	}
+	if (g.logging)
+		__wt_log_printf(session, "WT teardown: %s", ctime(&now));
 
 	assert(wts_sync() == 0);
 	assert(conn->close(conn, NULL) == 0);
@@ -319,14 +297,14 @@ cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 		break;
 	case ROW:
 		*keyp = &key;
-		if (g.wts_log != NULL)
-			fprintf(g.wts_log, "%-10s{%.*s}\n",
+		if (g.logging)
+			__wt_log_printf(g.wts_session, "%-10s{%.*s}\n",
 			    "bulk key", (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
-	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "%-10s{%.*s}\n",
+	if (g.logging)
+		__wt_log_printf(g.wts_session, "%-10s{%.*s}\n",
 		    "bulk value", (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
@@ -451,8 +429,8 @@ wts_read(uint64_t keyno)
 	session = g.wts_session;
 
 	/* Log the operation */
-	if (g.wts_log != NULL)
-		fprintf(g.wts_log,
+	if (g.logging)
+		__wt_log_printf(session,
 		    "%-10s%llu\n", "read", (unsigned long long)keyno);
 
 	/* Retrieve the BDB value. */
@@ -515,8 +493,8 @@ wts_put_row(uint64_t keyno, int insert)
 	value_gen(&value.data, &value.size, 0);
 
 	/* Log the operation */
-	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "%-10s{%.*s}\n%-10s{%.*s}\n",
+	if (g.logging)
+		__wt_log_printf(session, "%-10s{%.*s}\n%-10s{%.*s}\n",
 		    "put key", (int)key.size, (char *)key.data,
 		    "put data", (int)value.size, (char *)value.data);
 
@@ -551,8 +529,8 @@ wts_put_col(uint64_t keyno)
 	value_gen(&value.data, &value.size, 0);
 
 	/* Log the operation */
-	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "%-10s%llu {%.*s}\n",
+	if (g.logging)
+		__wt_log_printf(session, "%-10s%llu {%.*s}\n",
 		    "put", (unsigned long long)keyno,
 		    (int)value.size, (char *)value.data);
 
@@ -588,8 +566,8 @@ wts_del_row(uint64_t keyno)
 	key_gen(&key.data, &key.size, keyno, 0);
 
 	/* Log the operation */
-	if (g.wts_log != NULL)
-		fprintf(g.wts_log,
+	if (g.logging)
+		__wt_log_printf(session,
 		    "%-10s%llu\n", "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
@@ -621,8 +599,8 @@ wts_del_col(uint64_t keyno)
 	session = g.wts_session;
 
 	/* Log the operation */
-	if (g.wts_log != NULL)
-		fprintf(g.wts_log,
+	if (g.logging)
+		__wt_log_printf(session,
 		    "%-10s%llu\n", "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
