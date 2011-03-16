@@ -51,17 +51,17 @@ __wt_bt_tree_sync(SESSION *session, WT_PAGE *page, void *arg)
 	WT_UNUSED(arg);
 
 	/*
-	 * Reconcile any dirty pages.
+	 * We ignore hazard references because sync is single-threaded by the
+	 * API layer, there's no other threads of control in the tree.
+	 *
+	 * If the page is dirty, call the reconciliation code to write the
+	 * page and update the parent's information.
 	 *
 	 * The tree walk is depth first, that is, the worker function is not
-	 * called on internal pages until all children have been visited; so,
-	 * we don't have to worry about reconciling a page that still has a
-	 * child page, or reading a page after we discard it,
-	 *
-	 * We ignore WT_REF connections because file sync is single-threaded
-	 * by the API layer, there's no other threads of control in the system.
+	 * called on internal pages until all children have been visited; we
+	 * don't have to worry about reconciling a page that still has a child
+	 * page, or reading a page after we discard it,
 	 */
-	if (WT_PAGE_IS_MODIFIED(page))
-		WT_RET(__wt_page_reconcile(session, page));
-	return (0);
+	return (WT_PAGE_IS_MODIFIED(page) ?
+	    __wt_page_reconcile(session, page, 0) : 0);
 }

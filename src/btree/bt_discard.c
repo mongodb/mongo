@@ -43,8 +43,15 @@ __wt_row_key_on_page(WT_PAGE *page, void *key)
 void
 __wt_page_discard(SESSION *session, WT_PAGE *page)
 {
+	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
+	    (session, "discard addr %lu (type %s)",
+	    (u_long)page->addr, __wt_page_type_string(page->dsk)));
+
 	/* Never discard a dirty page. */
 	WT_ASSERT(session, !WT_PAGE_IS_MODIFIED(page));
+
+	/* We've got more space. */
+	WT_CACHE_PAGE_OUT(S2C(session)->cache, page->size);
 
 	switch (page->dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -70,6 +77,7 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	if (page->dsk != NULL)
 		__wt_free(session, page->dsk);
 	__wt_free(session, page);
+
 }
 
 /*

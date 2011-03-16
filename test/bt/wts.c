@@ -68,7 +68,7 @@ wts_startup(int logfile)
 		    // WT_VERB_HAZARD |
 		    // WT_VERB_MUTEX |
 		    // WT_VERB_READ |
-		    // WT_VERB_EVICT |
+		    WT_VERB_EVICT |
 		    0);
 		(void)conn->msgfile_set(conn, g.wts_log);
 	}

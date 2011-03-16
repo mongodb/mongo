@@ -8,17 +8,20 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int __wt_rec_col_fix(SESSION *, WT_PAGE *);
-static int __wt_rec_col_int(SESSION *, WT_PAGE *);
-static int __wt_rec_col_rle(SESSION *, WT_PAGE *);
-static int __wt_rec_col_split(SESSION *, uint32_t *, uint32_t *);
-static int __wt_rec_col_var(SESSION *, WT_PAGE *);
-static int __wt_rec_page_delete(SESSION *, WT_PAGE *);
-static int __wt_rec_parent_update(SESSION *, WT_PAGE *);
-static int __wt_rec_row_int(SESSION *, WT_PAGE *);
-static int __wt_rec_row_leaf(SESSION *, WT_PAGE *);
-static int __wt_rec_row_split(SESSION *, uint32_t *, uint32_t *);
-static int __wt_rle_expand_compare(const void *, const void *);
+static int  __wt_rec_col_fix(SESSION *, WT_PAGE *);
+static int  __wt_rec_col_int(SESSION *, WT_PAGE *);
+static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
+static int  __wt_rec_col_split(SESSION *, uint32_t *, uint32_t *);
+static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
+static int  __wt_rec_page_delete(SESSION *, WT_PAGE *);
+static void __wt_rec_parent_update_clean(WT_PAGE *);
+static int  __wt_rec_parent_update_dirty(
+		SESSION *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
+static int  __wt_rec_row_int(SESSION *, WT_PAGE *);
+static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *);
+static int  __wt_rec_row_split(SESSION *, uint32_t *, uint32_t *);
+static int  __wt_rle_expand_compare(const void *, const void *);
+static int  __wt_rec_finish(SESSION *, WT_PAGE *);
 
 static int __wt_rec_helper(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *, int);
@@ -71,7 +74,7 @@ __wt_block_free_ovfl(SESSION *session, WT_OVFL *ovfl)
  *	Format an in-memory page to its on-disk format, and write it.
  */
 int
-__wt_page_reconcile(SESSION *session, WT_PAGE *page)
+__wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 {
 	BTREE *btree;
 	WT_PAGE_DISK *dsk;
@@ -79,49 +82,63 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page)
 	btree = session->btree;
 	dsk = page->dsk;
 
-	/* If the page isn't dirty, we should never have been called. */
-	WT_ASSERT(session, WT_PAGE_IS_MODIFIED(page));
-
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "reconcile addr %lu (page %p, type %s)",
-	    (u_long)page->addr, page, __wt_page_type_string(dsk)));
+	    (session, "reconcile %s page addr %lu (type %s)",
+	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
+	    (u_long)page->addr, __wt_page_type_string(dsk)));
 
-	/*
-	 * Update the disk generation before reading the page.  The workQ will
-	 * update the write generation after it makes a change, and if we have
-	 * different disk and write generation numbers, the page may be dirty.
-	 * We technically requires a flush (the eviction server might run on a
-	 * different core before a flush naturally occurred).
-	 */
-	WT_PAGE_DISK_WRITE(page);
-	WT_MEMORY_FLUSH;
+	/* Write dirty pages. */
+	if (WT_PAGE_IS_MODIFIED(page)) {
+		/*
+		 * Update the disk generation before reading the page.  The
+		 * workQ will update the write generation after it makes a
+		 * change, and if we have different disk and write generation
+		 * numbers, the page may be dirty.  We technically require a
+		 * flush (the eviction server might run on a different core
+		 * before a flush naturally occurred).
+		 */
+		WT_PAGE_DISK_WRITE(page);
+		WT_MEMORY_FLUSH;
 
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_rec_col_fix(session, page));
-		break;
-	case WT_PAGE_COL_RLE:
-		WT_RET(__wt_rec_col_rle(session, page));
-		break;
-	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_rec_col_var(session, page));
-		break;
-	case WT_PAGE_COL_INT:
-		WT_RET(__wt_rec_col_int(session, page));
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_rec_row_int(session, page));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_rec_row_leaf(session, page));
-		break;
-	WT_ILLEGAL_FORMAT(btree);
-	}
+		switch (dsk->type) {
+		case WT_PAGE_COL_FIX:
+			WT_RET(__wt_rec_col_fix(session, page));
+			break;
+		case WT_PAGE_COL_RLE:
+			WT_RET(__wt_rec_col_rle(session, page));
+			break;
+		case WT_PAGE_COL_VAR:
+			WT_RET(__wt_rec_col_var(session, page));
+			break;
+		case WT_PAGE_COL_INT:
+			WT_RET(__wt_rec_col_int(session, page));
+			break;
+		case WT_PAGE_ROW_INT:
+			WT_RET(__wt_rec_row_int(session, page));
+			break;
+		case WT_PAGE_ROW_LEAF:
+			WT_RET(__wt_rec_row_leaf(session, page));
+			break;
+		WT_ILLEGAL_FORMAT(btree);
+		}
 
-	WT_RET(__wt_rec_parent_update(session, page));
+		/* Free the original disk blocks. */
+		WT_RET(__wt_block_free(session, page->addr, page->size));
 
-	/* Free the original disk page. */
-	return (__wt_block_free(session, page->addr, page->size));
+		/*
+		 * Resolve the WT_REC_LIST information: the page was: replaced
+		 * by a single new page, split into multiple new pages, or
+		 * deleted.
+		 */
+		WT_RET(__wt_rec_finish(session, page));
+	} else
+		__wt_rec_parent_update_clean(page);
+
+	/* Optionaly discard the in-memory page. */
+	if (discard)
+		__wt_page_discard(session, page);
+
+	return (0);
 }
 
 /*
@@ -1172,11 +1189,11 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_parent_update --
- *	Update a parent page's reference when a page is reconciled.
+ * __wt_rec_finish  --
+ *	Resolve the WT_REC_LIST information.
  */
 static int
-__wt_rec_parent_update(SESSION *session, WT_PAGE *page)
+__wt_rec_finish(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
 	WT_REC_LIST *r;
@@ -1187,55 +1204,98 @@ __wt_rec_parent_update(SESSION *session, WT_PAGE *page)
 	r = &S2C(session)->cache->reclist;
 	stats = btree->stats;
 
+	/* If all entries on the page were deleted, delete the page. */
+	if (r->list[0].deleted) {
+		__wt_rec_parent_update_dirty(
+		    session, page, WT_ADDR_INVALID, 0, WT_REF_DELETED);
+
+		WT_RET(__wt_rec_page_delete(session, page));
+
+		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
+		    "reconcile: delete page %lu (%luB)",
+		    (u_long)page->addr, (u_long)page->size));
+
+		return (0);
+	}
+
 	/*
 	 * Because WiredTiger's pages grow without splitting, we're replacing a
 	 * single page with another single page most of the time.
 	 */
 	if (r->l_next == 1) {
-		addr = r->list[0].off.addr;
-		size = r->list[0].off.size;
+		__wt_rec_parent_update_dirty(session, page,
+		    r->list[0].off.addr, r->list[0].off.size, WT_REF_DISK);
 
-		/* If all entries on a page were deleted, delete the page. */
-		if (r->list[0].deleted) {
-			WT_RET(__wt_rec_page_delete(session, page));
-
-			WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
-			    "reconcile: delete page %lu (%luB)",
-			    (u_long)page->addr, (u_long)page->size));
-		}
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: move %lu to %lu, (%luB to %luB)",
-		    (u_long)page->addr, (u_long)addr,
-		    (u_long)page->size, (u_long)size));
-	} else {
-		/*
-		 * A page grew so large we had to divide it into two or more
-		 * physical pages -- create a new internal page.
-		 */
-		WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-		    (session, "reconcile: %lu (%luB) splitting",
-		    (u_long)page->addr, (u_long)page->size));
-		switch (page->dsk->type) {
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_COL_INT:
-			WT_STAT_INCR(stats, PAGE_SPLIT_INTL);
-			break;
-		case WT_PAGE_ROW_LEAF:
-		case WT_PAGE_COL_VAR:
-			WT_STAT_INCR(stats, PAGE_SPLIT_LEAF);
-			break;
-		}
-		switch (page->dsk->type) {
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			WT_RET(__wt_rec_row_split(session, &addr, &size));
-			break;
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_COL_VAR:
-			WT_RET(__wt_rec_col_split(session, &addr, &size));
-			break;
-		}
+		    (u_long)page->addr, r->list[0].off.addr,
+		    (u_long)page->size, r->list[0].off.size));
+
+		return (0);
 	}
+
+	/*
+	 * A page grew so large we had to divide it into two or more physical
+	 * pages -- create a new internal page.
+	 */
+	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
+	    (session, "reconcile: %lu (%luB) splitting",
+	    (u_long)page->addr, (u_long)page->size));
+	switch (page->dsk->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_COL_INT:
+		WT_STAT_INCR(stats, PAGE_SPLIT_INTL);
+		break;
+	case WT_PAGE_ROW_LEAF:
+	case WT_PAGE_COL_VAR:
+		WT_STAT_INCR(stats, PAGE_SPLIT_LEAF);
+		break;
+	}
+	switch (page->dsk->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		WT_RET(__wt_rec_row_split(session, &addr, &size));
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		WT_RET(__wt_rec_col_split(session, &addr, &size));
+		break;
+	}
+
+	__wt_rec_parent_update_dirty(session, page, addr, size, WT_REF_DISK);
+
+	return (0);
+}
+
+/*
+ * __wt_rec_parent_update_clean  --
+ *	Update a parent page's reference for a discarded, clean page.
+ */
+static void
+__wt_rec_parent_update_clean(WT_PAGE *page)
+{
+	/* If we're reconciling the root page, there's no work to do. */
+	if (page->parent == NULL)
+		return;
+
+	/*
+	 * Update the relevant WT_REF structure; no memory flush is needed,
+	 * the state field is declared volatile.
+	 */
+	page->parent_ref->state = WT_REF_DISK;
+}
+
+/*
+ * __wt_rec_parent_update_dirty  --
+ *	Update a parent page's reference to a reconciled page.
+ */
+static int
+__wt_rec_parent_update_dirty(SESSION *session,
+    WT_PAGE *page, uint32_t addr, uint32_t size, uint32_t state)
+{
+	BTREE *btree;
+
+	btree = session->btree;
 
 	/*
 	 * If we're reconciling the root page, update the descriptor record,
@@ -1248,13 +1308,14 @@ __wt_rec_parent_update(SESSION *session, WT_PAGE *page)
 	 }
 
 	/*
-	 * Update the relevant WT_REF structure.  Two memory locations change
-	 * (address and size), and we could race, but that's not a problem.
-	 * Only a single thread reconciles pages, and pages cannot leave memory
-	 * if they have children.
+	 * Update the relevant WT_REF structure, flush memory, and then update
+	 * the state of the parent reference.  No further memory flush needed,
+	 * the state field is declared volatile.
 	 */
 	page->parent_ref->addr = addr;
 	page->parent_ref->size = size;
+	WT_MEMORY_FLUSH;
+	page->parent_ref->state = state;
 
 	/*
 	 * Mark the parent page as dirty.

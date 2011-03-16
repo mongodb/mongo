@@ -152,7 +152,7 @@ __wt_cache_read_serial_func(SESSION *session);
 void *
 __wt_cache_read_server(void *arg);
 int
-__wt_page_reconcile(SESSION *session, WT_PAGE *page);
+__wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard);
 int
 __wt_rle_expand_sort(SESSION *session,
     WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, WT_BUF **tmpp);

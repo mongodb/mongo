@@ -66,10 +66,6 @@ __wt_btree_close(SESSION *session, uint32_t flags)
 	btree = session->btree;
 	ret = 0;
 
-	/* Flush the underlying Btree. */
-	if (!LF_ISSET(WT_NOWRITE))
-		WT_TRET(__wt_bt_sync(session));
-
 	/* Close the underlying Btree. */
 	ret = __wt_bt_close(session);
 

@@ -306,8 +306,7 @@ methods['btree.close'] = Api(
 	'btree.close',
 	'method, session',
 	['flags/uint32_t @S'],
-	['NOWRITE',
-	 'OSWRITE'],
+	['OSWRITE'],
 	['init'], [])
 
 methods['btree.col_del'] = Api(

@@ -9,12 +9,11 @@
 #include "btree.i"
 
 static int  __wt_evict(SESSION *);
-static void __wt_evict_clean(SESSION *);
 static int  __wt_evict_compare_lru(const void *a, const void *b);
 static int  __wt_evict_compare_page(const void *a, const void *b);
-static int  __wt_evict_dirty(SESSION *);
 static void __wt_evict_hazard_check(SESSION *);
 static int  __wt_evict_hazard_compare(const void *a, const void *b);
+static int  __wt_evict_page(SESSION *);
 static void __wt_evict_set(SESSION *);
 static void __wt_evict_state_check(SESSION *);
 static int  __wt_evict_subtrees(WT_PAGE *);
@@ -258,26 +257,16 @@ done_duplicates:
 	    (size_t)elem, sizeof(WT_EVICT_LIST), __wt_evict_compare_lru);
 
 	/*
-	 * Discarding pages is done in 5 steps:
+	 * Discarding pages is done in 4 steps:
 	 *	Set the WT_REF_EVICT state
 	 *	Check for any hazard references
-	 *	Discard clean pages
-	 *	Reconcile dirty pages (making them clean)
-	 *	Discard clean pages
-	 *
-	 * The reason we release clean pages first, then release dirty pages,
-	 * is because reconciling a dirty page is a slow operation, and it
-	 * releases space sooner.   (Arguably, we are going to discard all of
-	 * the pages anyway, so what does it matter if we make clean pages
-	 * wait for the dirty page writes?   On the other hand, it's a small
-	 * change and benefits any thread waiting to read a clean page picked
-	 * for discarding, unlikely though that may be.)
+	 *	Check the page's state (for example, in-memory children)
+	 *	Reconcile and discard the page
 	 */
 	__wt_evict_set(session);
 	__wt_evict_hazard_check(session);
 	__wt_evict_state_check(session);
-	__wt_evict_clean(session);
-	WT_RET(__wt_evict_dirty(session));
+	WT_RET(__wt_evict_page(session));
 
 	return (0);
 }
@@ -561,60 +550,11 @@ skip:		/*
 }
 
 /*
- * __wt_evict_clean --
- *	Discard clean cache pages.
- */
-static void
-__wt_evict_clean(SESSION *session)
-{
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	WT_PAGE *page;
-	WT_REF *ref;
-	WT_STATS *stats;
-	u_int i;
-
-	cache = S2C(session)->cache;
-	stats = cache->stats;
-
-	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
-			continue;
-		page = ref->page;
-		if (WT_PAGE_IS_MODIFIED(page))
-			continue;
-
-#ifdef HAVE_DIAGNOSTIC
-		__wt_evict_hazard_validate(S2C(session), page);
-#endif
-		WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
-		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
-		    "cache evicting clean page addr %lu", page->addr));
-
-		/*
-		 * Clear the cache entry -- no memory flush needed, the state
-		 * field is declared volatile.
-		 */
-		ref->page = NULL;
-		ref->state = WT_REF_DISK;
-
-		/* Remove the entry from the eviction list. */
-		WT_EVICT_CLR(evict);
-
-		/* We've got more space. */
-		WT_CACHE_PAGE_OUT(cache, page->size);
-
-		/* The page can no longer be found, free the memory. */
-		__wt_page_discard(session, page);
-	}
-}
-
-/*
- * __wt_evict_dirty --
- *	Discard dirty cache pages.
+ * __wt_evict_page --
+ *	Reconcile and discard cache pages.
  */
 static int
-__wt_evict_dirty(SESSION *session)
+__wt_evict_page(SESSION *session)
 {
 	CONNECTION *conn;
 	WT_CACHE *cache;
@@ -635,22 +575,25 @@ __wt_evict_dirty(SESSION *session)
 			continue;
 		page = ref->page;
 
-		/*
-		 * We are going to write a page, which means any running
-		 * verification may be incorrect -- see the comment in
-		 * the WT_CACHE structure declaration for a explanation.
-		 */
-		if (!update_gen) {
-			update_gen = 1;
-			++cache->evict_rec_gen;
-		}
+		if (WT_PAGE_IS_MODIFIED(page)) {
+			/*
+			 * Any running verification may be incorrect if we write
+			 * a page -- see the WT_CACHE structure comment for an
+			 * explanation.
+			 */
+			if (!update_gen) {
+				update_gen = 1;
+				++cache->evict_rec_gen;
+			}
+			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
+		} else
+			WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
 
 #ifdef HAVE_DIAGNOSTIC
 		__wt_evict_hazard_validate(conn, page);
 #endif
-		WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
 		WT_VERBOSE(conn, WT_VERB_EVICT, (session,
-		    "cache evicting dirty page addr %lu", page->addr));
+		    "cache evicting page addr %lu", page->addr));
 
 		/*
 		 * We're using our session handle, it needs to reference the
@@ -662,26 +605,10 @@ __wt_evict_dirty(SESSION *session)
 		 * code.
 		 */
 		session->btree = evict->btree;
-		WT_ERR(__wt_page_reconcile(session, page));
-
-		/*
-		 * One special case -- if the page was deleted, the state has
-		 * been reset to WT_REF_DELETED.  If still in "evict" mode,
-		 * clear the cache entry -- no memory flush needed, the state
-		 * field is declared volatile.
-		 */
-		ref->page = NULL;
-		if (ref->state == WT_REF_EVICT)
-			ref->state = WT_REF_DISK;
+		WT_ERR(__wt_page_reconcile(session, page, 1));
 
 		/* Remove the entry from the eviction list. */
 		WT_EVICT_CLR(evict);
-
-		/* We've got more space. */
-		WT_CACHE_PAGE_OUT(cache, page->size);
-
-		/* The page can no longer be found, free the memory. */
-		__wt_page_discard(session, page);
 	}
 	return (0);
 
