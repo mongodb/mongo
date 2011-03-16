@@ -137,6 +137,21 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 }
 
 /*
+ * __add_btree --
+ *	Add a btree handle to the session's cache.
+ */
+int
+__wt_session_add_btree(SESSION *session, BTREE *btree)
+{
+	BTREE_SESSION *btree_session;
+	WT_RET(__wt_calloc(session, 1, sizeof(BTREE_SESSION), &btree_session));
+	btree_session->btree = btree;
+	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
+
+	return (0);
+}
+
+/*
  * __get_btree --
  *	Get the btree handle for the named table.
  */
@@ -144,8 +159,10 @@ static int
 __get_btree(SESSION *session, const char *name, size_t namelen, BTREE **btreep)
 {
 	BTREE *btree;
+	BTREE_SESSION *btree_session;
 
-	TAILQ_FOREACH(btree, &session->btrees, q) {
+	TAILQ_FOREACH(btree_session, &session->btrees, q) {
+		btree = btree_session->btree;
 		if (strncmp(name, btree->name, namelen) == 0 &&
 		    btree->name[namelen] == '\0') {
 			*btreep = btree;
@@ -205,9 +222,9 @@ __wt_cursor_open(SESSION *session,
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
 		WT_RET(conn->btree(conn, 0, &btree));
-		WT_RET(btree->open(btree, tablename, 0, 0));
+		WT_RET(btree->open(btree, tablename, 0666, 0));
 
-		TAILQ_INSERT_HEAD(&session->btrees, btree, q);
+		WT_RET(__wt_session_add_btree(session, btree));
 	} else
 		WT_RET(ret);
 

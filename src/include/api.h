@@ -7,6 +7,7 @@
 
 /* Forward declarations of internal handle types. */
 struct __btree;			typedef struct __btree BTREE;
+struct __btree_session;		typedef struct __btree_session BTREE_SESSION;
 struct __connection;		typedef struct __connection CONNECTION;
 struct __session;		typedef struct __session SESSION;
 
@@ -196,6 +197,12 @@ struct __btree {
 	uint32_t flags;
 };
 
+struct __btree_session {
+	BTREE *btree;
+
+	TAILQ_ENTRY(__btree_session) q;
+};
+
 /*******************************************
  * Application session information
  *******************************************/
@@ -214,7 +221,7 @@ struct __session {
 	TAILQ_ENTRY(__session) q;
 	TAILQ_HEAD(__cursors, wt_cursor) cursors;
 
-	TAILQ_HEAD(__btrees, __btree) btrees;
+	TAILQ_HEAD(__btrees, __btree_session) btrees;
 
 	char err_buf[32];		/* Last-ditch error buffer */
 

@@ -14,7 +14,7 @@
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-	BTREE *btree;
+	BTREE_SESSION *btree_session;
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CURSOR *cursor;
@@ -28,15 +28,15 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
 
-	while ((btree = TAILQ_FIRST(&session->btrees)) != NULL) {
-		TAILQ_REMOVE(&session->btrees, btree, q);
-		WT_TRET(btree->close(btree, 0));
+	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
+		TAILQ_REMOVE(&session->btrees, btree_session, q);
+		WT_TRET(btree_session->btree->close(btree_session->btree, 0));
+		__wt_free(session, btree_session);
 	}
 
+	TAILQ_REMOVE(&conn->sessions_head, session, q);
 	WT_TRET(__wt_session_close(session));
 
-	TAILQ_REMOVE(&conn->sessions_head, session, q);
-	__wt_free(NULL, session);
 	return (0);
 }
 
@@ -79,9 +79,9 @@ __session_create_table(WT_SESSION *wt_session,
 	conn = (CONNECTION *)wt_session->connection;
 
 	WT_RET(conn->btree(conn, 0, &btree));
-	WT_RET(btree->open(btree, name, 0, WT_CREATE));
+	WT_RET(btree->open(btree, name, 0666, WT_CREATE));
 
-	TAILQ_INSERT_HEAD(&session->btrees, btree, q);
+	WT_RET(__wt_session_add_btree(session, btree));
 
 	return (0);
 }
@@ -347,22 +347,24 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	SESSION *session;
 	int ret;
 
-	WT_UNUSED(error_handler);
 	WT_UNUSED(config);
 
 	conn = (CONNECTION *)wt_conn;
 
-	WT_RET(__wt_calloc(&conn->default_session, 1, sizeof(SESSION), &session));
+	WT_ERR(__wt_connection_session(conn, &session));
+	/*
+	 * XXX
+	 * Kludge while there is a separate __wt_conection_session method.
+	 * We shouldn't be overwriting the connection pointer, particularly not
+	 * through a static struct that is shared between threads.
+	 */
+	stds.connection = wt_conn;
+	session->iface = stds;
 	TAILQ_INIT(&session->cursors);
 	TAILQ_INIT(&session->btrees);
-
-	session->iface = stds;
-	session->iface.connection = wt_conn;
-
-	session->error_handler = (error_handler != NULL) ?
-	    error_handler : conn->default_session.error_handler;
-
-	WT_ERR(__wt_connection_session(conn, &session));
+	WT_ASSERT(NULL, conn->default_session.error_handler != NULL);
+	if (error_handler != NULL)
+		session->error_handler = error_handler;
 
 	TAILQ_INSERT_HEAD(&conn->sessions_head, session, q);
 
@@ -419,10 +421,11 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 
 	/*
 	 * !!!
-	 * We don't have a session handle to pass to the memory allocation
+	 * We don't yet have a session handle to pass to the memory allocation
 	 * functions.
 	 */
 	WT_RET(__wt_calloc(NULL, 1, sizeof(CONNECTION), &conn));
+	conn->iface = stdc;
 	WT_ERR(__wt_strdup(NULL, home, &conn->home));
 	TAILQ_INIT(&conn->sessions_head);
 
@@ -437,7 +440,6 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 	WT_ERR(conn->open(conn, home, 0644, 0));
 
 	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
-	conn->iface = stdc;
 	*wt_connp = &conn->iface;
 
 	if (0) {

@@ -19,7 +19,7 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 
 	*sessionp = NULL;
 
-	/* Check to see if there's an available SESSION slot. */
+	/* Check to see if there's an available session slot. */
 	if (conn->toc_cnt == conn->session_size - 1) {
 		__wt_err(&conn->default_session, 0,
 		    "WiredTiger only configured to support %d thread contexts",
@@ -28,18 +28,19 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 	}
 
 	/*
-	 * The SESSION reference list is compact, the SESSION array is not.
-	 * Find the first empty SESSION slot.
+	 * The session reference list is compact, the session array is not.
+	 * Find the first empty session slot.
 	 */
 	for (slot = 0, session = conn->toc_array;
 	    session->iface.connection != NULL;
 	    ++session, ++slot)
 		;
 
-	/* Clear previous contents of the SESSION entry, they get re-used. */
-	memset(session, 0, sizeof(SESSION));
+	/* Session entries are re-used, clear the old contents. */
+	WT_CLEAR(*session);
 
 	session->iface.connection = &conn->iface;
+	session->error_handler = conn->default_session.error_handler;
 	session->hazard = conn->hazard + slot * conn->hazard_size;
 
 	/* We can't use the new session: it hasn't been configured yet. */
@@ -77,14 +78,14 @@ __wt_session_close(SESSION *session)
 
 	/*
 	 * The "in" reference count is artificially incremented by 1 as
-	 * long as an SESSION buffer is referenced by the SESSION thread;
+	 * long as a session buffer is referenced by the session thread;
 	 * we don't want them freed because a page was evicted and their
 	 * count went to 0.  Decrement the reference count on the buffer
 	 * as part of releasing it.  There's a similar reference count
-	 * decrement when the SESSION structure is discarded.
+	 * decrement when the session structure is discarded.
 	 *
 	 * XXX
-	 * There's a race here: if this code, or the SESSION structure
+	 * There's a race here: if this code, or the session structure
 	 * close code, and the page discard code race, it's possible
 	 * neither will realize the buffer is no longer needed and free
 	 * it.  The fix is to involve the eviction or workQ threads:
@@ -108,9 +109,9 @@ __wt_session_close(SESSION *session)
 	}
 
 	/*
-	 * Replace the SESSION reference we're closing with the last entry in
+	 * Replace the session reference we're closing with the last entry in
 	 * the table, then clear the last entry.  As far as the walk of the
-	 * workQ is concerned, it's OK if the SESSION appears twice, or if it
+	 * workQ is concerned, it's OK if the session appears twice, or if it
 	 * doesn't appear at all, so these lines can race all they want.
 	 */
 	for (tp = conn->sessions; *tp != session; ++tp)
@@ -119,7 +120,7 @@ __wt_session_close(SESSION *session)
 	*tp = conn->sessions[conn->toc_cnt];
 	conn->sessions[conn->toc_cnt] = NULL;
 
-	/* Make the SESSION array entry available for re-use. */
+	/* Make the session array entry available for re-use. */
 	session->iface.connection = NULL;
 	WT_MEMORY_FLUSH;
 
@@ -137,10 +138,10 @@ __wt_session_api_set(
 	SESSION *session;
 
 	/*
-	 * We pass around SESSIONs internally in the Btree, (rather than a
-	 * BTREE), because the BTREE's are free-threaded, and the SESSIONs are
+	 * We pass around sessions internally in the Btree, (rather than a
+	 * BTREE), because the BTREE's are free-threaded, and the sessions are
 	 * per-thread.  Lots of the API calls don't require the application to
-	 * allocate and manage the SESSION, which means we have to do it for
+	 * allocate and manage the session, which means we have to do it for
 	 * them.
 	 *
 	 * SESSIONs always reference a BTREE handle, and we do that here, as
@@ -163,7 +164,7 @@ int
 __wt_session_api_clr(SESSION *session, const char *name, int islocal)
 {
 	/*
-	 * The SESSION should hold no more hazard references; this is a
+	 * The session should hold no more hazard references; this is a
 	 * diagnostic check, but it's cheap so we do it all the time.
 	 */
 	__wt_hazard_empty(session, name);

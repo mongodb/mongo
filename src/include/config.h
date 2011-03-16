@@ -31,6 +31,8 @@ struct __wt_config_item
 	WT_CONFIG_ITEM __ckey;						\
 	int __cret;							\
 									\
+	if (cstr == NULL)						\
+		break;							\
 	WT_RET(__wt_config_init(&__conf, (cstr), strlen(cstr)));	\
 	while ((__cret = 						\
 	    __wt_config_next(&__conf, &__ckey, &(cvalue))) == 0) {	\

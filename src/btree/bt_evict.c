@@ -99,19 +99,29 @@ void *
 __wt_cache_evict_server(void *arg)
 {
 	CONNECTION *conn;
-	WT_CACHE *cache;
 	SESSION *session;
+	WT_CACHE *cache;
+	WT_CONNECTION *wt_conn;
 	uint64_t bytes_inuse, bytes_max;
 	int ret;
 
 	conn = arg;
+	wt_conn = &conn->iface;
 	cache = conn->cache;
 	ret = 0;
 
-	/* We need a thread of control because we're reading/writing pages. */
-	session = NULL;
-	WT_ERR(__wt_session_api_set(conn,
-	    "CacheReconciliation", NULL, &session));
+	/*
+	 * We need a thread of control because we're reading/writing pages.
+	 * Start with the default session to keep error handling simple.
+	 *
+	 * There is some complexity involved in using the public API, because
+	 * public sessions are implicitly closed during WT_CONNECTION->close.
+	 * If the eviction thread's session were to go on the public list, the
+	 * eviction thread would have to be shut down before the public session
+	 * handles are closed.
+	 */
+	session = &conn->default_session;
+	WT_ERR(__wt_connection_session(conn, &session));
 
 	/*
 	 * Multiple pages are marked for eviction by the eviction server, which
@@ -179,14 +189,15 @@ err:	if (cache->evict != NULL)
 		__wt_free(session, cache->evict);
 	if (cache->hazard != NULL)
 		__wt_free(session, cache->hazard);
-	if (session != NULL)
-		WT_TRET(session->close(session, 0));
 
 	if (ret != 0)
 		__wt_err(session, ret, "cache eviction server error");
 
-	WT_VERBOSE(
-	    conn, WT_VERB_EVICT, (session, "cache eviction server exiting"));
+	WT_VERBOSE(conn, WT_VERB_EVICT,
+	    (session, "cache eviction server exiting"));
+
+	if (session != &conn->default_session)
+		WT_TRET(__wt_session_close(session));
 
 	return (NULL);
 }

@@ -181,15 +181,16 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 	page = e->ref->page;
 
 	/*
-	 * Coming into this function we have a tree internal page and we're
-	 * walking the array of children.
+	 * Coming into this function we should have a tree internal page and
+	 * we're walking the array of children.  If page is NULL, the tree is
+	 * empty.
 	 *
 	 * If we've reached the end of this page, and haven't yet returned it,
 	 * do that now.  If the page has been returned, traversal is finished:
 	 * pop the stack and call ourselve recursively, unless the entire tree
 	 * has been traversed, in which case we return NULL.
 	 */
-	if (e->visited) {
+	if (e->visited || page == NULL) {
 		if (walk->tree_slot == 0) {
 			*refp = NULL;
 			return (0);
@@ -197,12 +198,11 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 			--walk->tree_slot;
 			return (__wt_walk_next(session, walk, flags, refp));
 		}
-	} else
-		if (e->indx == page->indx_count) {
-eop:			e->visited = 1;
-			*refp = e->ref;
-			return (0);
-		}
+	} else if (e->indx == page->indx_count) {
+eop:		e->visited = 1;
+		*refp = e->ref;
+		return (0);
+	}
 
 	/*
 	 * Check to see if the page has sub-trees associated with it, in which

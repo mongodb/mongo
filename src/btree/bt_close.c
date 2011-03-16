@@ -31,7 +31,7 @@ __wt_bt_close(SESSION *session)
 	 * higher level API has to ensure this.
 	 */
 	if (WT_UNOPENED_FILE(btree))
-		return (0);
+		goto done;
 
 	/*
 	 * The tree walk is depth first, that is, the worker function is not
@@ -54,7 +54,7 @@ __wt_bt_close(SESSION *session)
 	WT_TRET(__wt_block_write(session));
 
 	/* Close the underlying file handle. */
-	WT_TRET(__wt_close(session, btree->fh));
+done:	WT_TRET(__wt_close(session, btree->fh));
 	btree->fh = NULL;
 
 	return (ret);

@@ -24,6 +24,8 @@ __wt_config_init(WT_CONFIG *conf, const char *str, size_t len);
 int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 int
+__wt_session_add_btree(SESSION *session, BTREE *btree);
+int
 __wt_cursor_open(SESSION *session,
     const char *uri, const char *config, WT_CURSOR **cursorp);
 int

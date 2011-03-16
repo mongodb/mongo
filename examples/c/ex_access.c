@@ -31,8 +31,8 @@ int main(void)
 	ret = session->create_table(session, "access",
 	    "key_format=S,value_format=S");
 
-	ret = session->open_cursor(session, "table:access", NULL, "overwrite",
-	    &cursor);
+	ret = session->open_cursor(session, "table:access",
+	    NULL, NULL, &cursor);
 
 	/* Insert a record. */
 	cursor->set_key(cursor, "key1");
