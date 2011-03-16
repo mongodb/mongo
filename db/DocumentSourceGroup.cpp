@@ -58,4 +58,8 @@ namespace mongo
 	pSource(pTheSource)
     {
     }
+
+    void populate()
+    {
+    }
 }

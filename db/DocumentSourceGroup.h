@@ -39,6 +39,8 @@ namespace mongo
     private:
 	DocumentSourceGroup(shared_ptr<DocumentSource> pTheSource);
 
+	void populate();
+
 	shared_ptr<DocumentSource> pSource;
     };
 }
