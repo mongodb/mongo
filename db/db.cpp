@@ -809,7 +809,7 @@ int main(int argc, char* argv[]) {
             cmdLine.durOptions = params["durOptions"].as<int>();
         }
         if (params.count("journalOptions")) {
-            cmdLine.durOptions = params["durOptions"].as<int>();
+            cmdLine.durOptions = params["journalOptions"].as<int>();
         }
         if (params.count("objcheck")) {
             objcheck = true;
