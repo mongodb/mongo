@@ -147,7 +147,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::collection , BSONObj() );
         vector< string > collections;
         while ( cursor->more() ) {
-            BSONObj col = cursor->next();
+            BSONObj col = cursor->nextSafe();
 
             // sharded collections will have a shard "key".
             if ( ! col["key"].eoo() )
@@ -199,7 +199,7 @@ namespace mongo {
             map< string,vector<BSONObj> > shardToChunksMap;
             cursor = conn.query( ShardNS::chunk , QUERY( "ns" << ns ).sort( "min" ) );
             while ( cursor->more() ) {
-                BSONObj chunk = cursor->next();
+                BSONObj chunk = cursor->nextSafe();
                 vector<BSONObj>& chunks = shardToChunksMap[chunk["shard"].String()];
                 chunks.push_back( chunk.getOwned() );
             }
