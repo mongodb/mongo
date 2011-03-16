@@ -773,4 +773,14 @@ again:
 
     TicketHolder connTicketHolder(DEFAULT_MAX_CONN);
 
+    int AbstractMessagingPort::getClientId() {
+        if ( _clientId == 0 ) {
+            int x = remotePort();
+            x = x << 16;
+            x |= ( ( 0xFF0 & (long long)this ) >> 9 ); // lowest byte in pointer often meaningless
+            _clientId = x;
+        }
+        return _clientId;
+    }
+
 } // namespace mongo
