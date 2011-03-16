@@ -414,3 +414,120 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	/* We're either at the end of the string or we failed to parse. */
 	return ((conf->depth == 0) ? WT_NOTFOUND : EINVAL);
 }
+
+/*
+ * __wt_config_get --
+ *	Given a NULL-terminated list of configuration strings, find
+ *	the final value for a given key.
+ */
+int
+__wt_config_get(const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM k, v;
+	int found, ret;
+
+	for (found = 0; *cfg != NULL; cfg++) {
+		WT_RET(__wt_config_init(&cparser, *cfg, strlen(*cfg)));
+		while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
+			if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
+			    strncasecmp(key->str, k.str,
+			    WT_MIN(key->len, k.len)) == 0) {
+				*value = v;
+				found = 1;
+			}
+		}
+		if (ret != WT_NOTFOUND)
+			return (ret);
+	}
+
+	return (found ? 0 : WT_NOTFOUND);
+}
+
+/*
+ * __wt_config_gets --
+ *	Given a NULL-terminated list of configuration strings, find the final
+ *	value for a given string key.
+ */
+int
+__wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG_ITEM key_item;
+
+	key_item.type = ITEM_STRING;
+	key_item.str = key;
+	key_item.len = strlen(key);
+
+	return (__wt_config_get(cfg, &key_item, value));
+}
+
+/*
+ * __wt_config_getone --
+ *
+ */
+ int
+__wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	const char *cfgs[2];
+	cfgs[0] = cfg;
+	cfgs[1] = NULL;
+
+	return (__wt_config_get(cfgs, key, value));
+}
+
+/*
+ * __wt_config_check --
+ *	Given a NULL-terminated list of default configuration strings,
+ *	check that all keys in an application-supplied config string appear
+ *	somewhere in the defaults.
+ */
+int
+__wt_config_check(SESSION *session, const char **defaults, const char *config)
+{
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM k, v;
+	int ret;
+
+	WT_RET(__wt_config_init(&cparser, config, strlen(config)));
+	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
+		if (k.type != ITEM_STRING && k.type != ITEM_ID) {
+			__wt_errx(session,
+			    "Invalid configuration key found: '%s'\n", k.str);
+			return (EINVAL);
+		}
+		/*
+		 * TODO
+		 * Need to handle configuration keys that only match a prefix
+		 * such as "index_1=(),index_2=()".
+		 */
+		if ((ret = __wt_config_get(defaults, &k, &v)) != 0) {
+			if (ret == WT_NOTFOUND) {
+				__wt_errx(session,
+				    "Unknown configuration key found: '%.*s'\n",
+				    k.len, k.str);
+				ret = EINVAL;
+			}
+			return (ret);
+		}
+	}
+
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+
+	return (ret);
+}
+
+/*
+ * __wt_config_checkone --
+ *	Given a default configuration string, check that all keys in an
+ *	application-supplied config string appear somewhere in the defaults.
+ */
+int
+__wt_config_checkone(SESSION *session, const char *defaults, const char *config)
+{
+	const char *defs[2];
+	defs[0] = defaults;
+	defs[1] = NULL;
+
+	return (__wt_config_check(session, defs, config));
+}

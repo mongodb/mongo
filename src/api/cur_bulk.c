@@ -23,7 +23,6 @@ __curbulk_insert(WT_CURSOR *cursor)
 	WT_RET(__wt_bulk_var_insert(cbulk));
 
 	return (0);
-
 }
 
 /*

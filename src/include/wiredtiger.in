@@ -347,7 +347,8 @@ struct wt_cursor {
 	 * @skipline cursor->close
 	 *
 	 * @param cursor the cursor handle
-	 * @configempty
+	 * @configstart{cursor_close, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(close)(WT_CURSOR *cursor, const char *config);
@@ -402,7 +403,8 @@ struct wt_session {
 	 * @skipline session->close
 	 *
 	 * @param session the session handle
-	 * @configempty
+	 * @configstart{session_close, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(close)(WT_SESSION *session, const char *config);
@@ -454,16 +456,14 @@ struct wt_session {
 	 * @param uri the data source on which the cursor operates
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
-	 * @configstart
-	 * @config{dup,,duplicate handling\, one of "all" or "first" or "last";
-	 * 	default "all"}
-	 * @config{isolation,,the isolation level for this cursor\, one of
-	 * 	"snapshot" or "read-committed" or "read-uncommitted"; default
-	 * 	"read-committed".  Ignored for transactional cursors}
-	 * @config{overwrite,,if an existing key is inserted\,
-	 * 	overwrite the existing value}
-	 * @config{raw,,ignore the encodings for the key and
-	 * 	value\, manage data as if the formats were \c "u"}
+	 * @configstart{open_cursor, maintained in dist/config_data.py}
+	 * @config{isolation, the isolation level for this cursor\, one of
+	 * "snapshot" or "read-committed" or "read-uncommitted".  Ignored for
+	 * transactional cursors}
+	 * @config{overwrite, if an existing key is inserted\, overwrite the
+	 * existing value}
+	 * @config{raw, ignore the encodings for the key and value\, manage data
+	 * as if the formats were \c "u"}
 	 * @configend
 	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors
@@ -485,30 +485,28 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
-	 * @configstart
-	 * @config{columns,,List of the column names.
-	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
-	 * 	The number of entries must match the total number of values in
-	 * 	\c key_format and \c value_format.}
-	 * @config{colgroup.\<name\>,,Named group of columns to store together.
-	 * 	Comma-separated list of the form <code>(column[\,...])</code>.
-	 * 	Each column group is stored separately\, keyed by the primary
-	 * 	key of the table.  Any column that does not appear in a column
-	 * 	group is stored in a default, unnamed, column group for the
-	 *	table.}
-	 * @config{exclusive,,Fail if the table exists (if "no"\, the
-	 * 	default\, verifies that the table exists and has the specified
-	 * 	schema.}
-	 * @config{index.\<name\>,,Named index on a list of columns.
-	 * 	Comma-separated list of the form <code>(column[\,...])</code>.}
-	 * @config{key_format,,The format of the data packed into key items.
-	 * 	See @ref packing for details.  If not set\, a
-	 * 	default value of \c "u" is assumed\, and applications use the
-	 * 	WT_ITEM struct to manipulate raw byte arrays.}
-	 * @config{value_format,,The format of the data packed into value
-	 * 	items.  See @ref packing for details.  If not set\,
-	 * 	a default value of \c "u" is assumed\, and applications use the
-	 * 	WT_ITEM struct to manipulate raw byte arrays.}
+	 * @configstart{create_table, maintained in dist/config_data.py}
+	 * @config{columns, list of the column names.  Comma-separated list of
+	 * the form <code>(column[\,...])</code>.  The number of entries must
+	 * match the total number of values in \c key_format and \c
+	 * value_format.}
+	 * @config{colgroup.\<name\>, named group of columns to store together.
+	 * Comma-separated list of the form <code>(column[\,...])</code>.  Each
+	 * column group is stored separately\, keyed by the primary key of the
+	 * table.  Any column that does not appear in a column group is stored
+	 * in a default\, unnamed\, column group for the table.}
+	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
+	 * verifies that the table exists and has the specified schema.}
+	 * @config{index.\<name\>, named index on a list of columns.  Comma-
+	 * separated list of the form <code>(column[\,...])</code>.}
+	 * @config{key_format, the format of the data packed into key items.
+	 * See @ref packing for details.  If not set\, a default value of \c "u"
+	 * is assumed\, and applications use the WT_ITEM struct to manipulate
+	 * raw byte arrays.}
+	 * @config{value_format, the format of the data packed into value items.
+	 * See @ref packing for details.  If not set\, a default value of \c "u"
+	 * is assumed\, and applications use the WT_ITEM struct to manipulate
+	 * raw byte arrays.}
 	 * @configend
 	 * @errors
 	 */
@@ -523,7 +521,8 @@ struct wt_session {
 	 * @param session the session handle
 	 * @param oldname the current name of the table
 	 * @param newname the new name of the table
-	 * @configempty
+	 * @configstart{rename_table, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(rename_table)(WT_SESSION *session,
@@ -536,7 +535,8 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
-	 * @configempty
+	 * @configstart{rename_table, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(drop_table)(WT_SESSION *session,
@@ -556,7 +556,8 @@ struct wt_session {
 	 * operation.  If <code>NULL</code>, the truncate continues to the end
 	 * of the table
 	 * @param name the name of the table
-	 * @configempty
+	 * @configstart{truncate_table, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(truncate_table)(WT_SESSION *session, const char *name,
@@ -571,7 +572,8 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
-	 * @configempty
+	 * @configstart{verify_table, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(verify_table)(WT_SESSION *session, const char *name,
@@ -596,15 +598,16 @@ struct wt_session {
 	 * @skipline ->begin_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart
-	 * @config{isolation,,the isolation level for this transaction\, one of
-	 * 	"serializable"\, "snapshot"\, "read-committed" or
-	 * 	"read-uncommitted"; default "serializable"}
-	 * @config{name,,name of the transaction for tracing and debugging}
-	 * @config{sync,,how to sync log records when the transaction commits\,
-	 * 	one of "full"\, "flush"\, "write" or "none"; default "full"}
-	 * @config{priority,,priority of the transaction for resolving
-	 * 	conflicts\, an integer between -100 and 100; default 0}
+	 * @configstart{begin_transaction, maintained in dist/config_data.py}
+	 * @config{isolation, the isolation level for this transaction\, one of
+	 * "serializable"\, "snapshot"\, "read-committed" or "read-uncommitted";
+	 * default "serializable"}
+	 * @config{name, name of the transaction for tracing and debugging}
+	 * @config{sync, how to sync log records when the transaction commits\,
+	 * one of "full"\, "flush"\, "write" or "none"}
+	 * @config{priority, priority of the transaction for resolving
+	 * conflicts\, an integer between -100 and 100.  Transactions with
+	 * higher values are less likely to abort}
 	 * @configend
 	 * @errors
 	 */
@@ -621,7 +624,8 @@ struct wt_session {
 	 * @skipline ->commit_transaction
 	 *
 	 * @param session the session handle
-	 * @configempty
+	 * @configstart{commit_transaction, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
@@ -637,7 +641,8 @@ struct wt_session {
 	 * @skipline ->rollback_transaction
 	 *
 	 * @param session the session handle
-	 * @configempty
+	 * @configstart{rollback_transaction, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
@@ -648,18 +653,17 @@ struct wt_session {
 	 * @skipline ->checkpoint
 	 *
 	 * @param session the session handle
-	 * @configstart
-	 * @config{archive,,remove log files no longer required for
-	 * 	transactional durabilty}
-	 * @config{force,,write a new checkpoint even if nothing
-	 * 	has changed since the last one}
-	 * @config{flush_cache,,flush the cache; default on}
-	 * @config{flush_log,,flush the log; default on}
-	 * @config{log_size,,only proceed if more than the specified
-	 * 	amount of log records have been written since the last
-	 * 	checkpoint}
-	 * @config{timeout,,only proceed if more than the specified
-	 * 	number of milliseconds have elapsed since the last checkpoint}
+	 * @configstart{checkpoint, maintained in dist/config_data.py}
+	 * @config{archive, remove log files no longer required for
+	 * transactional durabilty}
+	 * @config{force, write a new checkpoint even if nothing has changed
+	 * since the last one}
+	 * @config{flush_cache, flush the cache}
+	 * @config{flush_log, flush the log}
+	 * @config{log_size, only proceed if more than the specified number of
+	 * bytes of log records have been written since the last checkpoint}
+	 * @config{timeout, only proceed if more than the specified number of
+	 * milliseconds have elapsed since the last checkpoint}
 	 * @configend
 	 * @errors
 	 */
@@ -685,11 +689,10 @@ struct wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
-	 * @configstart
-	 * @config{entry,,the entry point of the
-	 * extension; default \c "wiredtiger_extension_init"}
-	 * @config{prefix,,a prefix for all names registered by this
-	 * extension (e.g.\, to make namespaces distinct or during upgrades}
+	 * @configstart{load_extension, maintained in dist/config_data.py}
+	 * @config{entry, the entry point of the extension}
+	 * @config{prefix, a prefix for all names registered by this extension
+	 * (e.g.\, to make namespaces distinct or during upgrades}
 	 * @configend
 	 * @errors
 	 */
@@ -714,7 +717,8 @@ struct wt_connection {
 	 * WT_SESSION::open_cursor
 	 * @param ctype the application-supplied code to manage cursors of
 	 * this type
-	 * @configempty
+	 * @configstart{add_cursor_type, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(add_cursor_type)(WT_CONNECTION *connection,
@@ -737,7 +741,8 @@ struct wt_connection {
 	 * @param name the name of the collation to be used in calls to
 	 * 	WT_SESSION::create_table
 	 * @param collator the application-supplied collation handler
-	 * @configempty
+	 * @configstart{add_collator, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(add_collator)(WT_CONNECTION *connection,
@@ -760,7 +765,8 @@ struct wt_connection {
 	 * @param name the name of the extractor to be used in calls to
 	 * 	WT_SESSION::create_table
 	 * @param extractor the application-supplied extractor
-	 * @configempty
+	 * @configstart{add_extractor, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
@@ -774,7 +780,8 @@ struct wt_connection {
 	 * @skipline conn->close
 	 *
 	 * @param connection the connection handle
-	 * @configempty
+	 * @configstart{connection_close, maintained in dist/config_data.py}
+	 * @configend
 	 * @errors
 	 */
 	int __F(close)(WT_CONNECTION *connection, const char *config);
@@ -829,17 +836,22 @@ struct wt_connection {
  * @param home The path to the database home directory
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
  * handler is installed that writes error messages to stderr
- * @configstart
- * @config{create,,create the database if it does not exist}
- * @config{exclusive,,fail if the database already exists}
- * @config{error_prefix,,Prefix string for error messages}
- * @config{multiprocess,,permit sharing between processes (will
- * automatically start an RPC server for primary processes and use RPC for
- * secondary processes)}
- * @config{cachesize,,maximum heap memory to allocate for the cache;
- * 	default \c "10MB"}
- * @config{max_threads,,maximum expected number of threads (including
- * 	server threads)}
+ * @configstart{wiredtiger_open, maintained in dist/config_data.py}
+ * @config{cache_size, maximum heap memory to allocate for the cache}
+ * @config{create, create the database if it does not exist}
+ * @config{data_update_min, minimum update buffer size for a session}
+ * @config{data_update_max, maximum update buffer size for a session}
+ * @config{exclusive, fail if the database already exists}
+ * @config{error_prefix, Prefix string for error messages}
+ * @config{hazard_size, number of hazard references per session}
+ * @config{session_max, maximum expected number of sessions (including server
+ * threads)}
+ * @config{multiprocess, permit sharing between processes (will automatically
+ * start an RPC server for primary processes and use RPC for secondary
+ * processes)}
+ * @config{verbose, enable messages for various events.  One or more of "all"\,
+ * "evict"\, "fileops"\, "hazard"\, "mutex"\, "read".  Multiple options are
+ * given as a list such as \c "verbose=[evict\,read]"}
  * @configend
  * @param connectionp A pointer to the newly opened connection handle
  * @errors

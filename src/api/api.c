@@ -53,6 +53,8 @@ __session_open_cursor(WT_SESSION *wt_session,
 
 	session = (SESSION *)wt_session;
 
+	if (strncmp(uri, "config:", 6) == 0)
+		return (__wt_curconfig_open(session, uri, config, cursorp));
 	if (strncmp(uri, "table:", 6) == 0)
 		return (__wt_cursor_open(session, uri, config, cursorp));
 

@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Build a list of internal function prototypes.
+# Build a list of internal function and variable prototypes.
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
@@ -18,8 +18,11 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e ': loop' \
 	    -e H \
 	    -e n \
+	    -e '/;/b end' \
 	    -e '/^{/!b loop' \
+	    -e ': end' \
 	    -e x \
+	    -e 's/ =.*$//' \
 	    -e 's/$/;/p' \
 	    < ../$i
 done) | awk '{

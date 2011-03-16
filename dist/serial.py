@@ -1,6 +1,5 @@
 # Output serialization #defines.
 
-import os
 from dist import compare_srcfile
 
 serial = {}
@@ -89,5 +88,3 @@ tfile.write('/* DO NOT EDIT: automatically built by dist/serial.py. */\n')
 func_serial(tfile)
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/serial.h')
-
-os.remove(tmp_file)

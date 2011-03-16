@@ -46,6 +46,10 @@ typedef struct {
 	uint8_t *first_free;
 } CURSOR_BULK;
 
+typedef struct {
+	WT_CURSOR iface;
+} CURSOR_CONFIG;
+
 struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
 
@@ -348,6 +352,10 @@ struct __connection {
 	 */
 	uint32_t cache_size;
 
+	uint32_t data_update_max;
+
+	uint32_t data_update_min;
+
 	uint32_t hazard_size;
 
 	void (*msgcall)(const CONNECTION *, const char *);
@@ -376,6 +384,18 @@ struct __connection {
 	    CONNECTION *, uint32_t );
 
 	int (*close)(
+	    CONNECTION *, uint32_t );
+
+	int (*data_update_max_get)(
+	    CONNECTION *, uint32_t *);
+
+	int (*data_update_max_set)(
+	    CONNECTION *, uint32_t );
+
+	int (*data_update_min_get)(
+	    CONNECTION *, uint32_t *);
+
+	int (*data_update_min_set)(
 	    CONNECTION *, uint32_t );
 
 	int (*hazard_size_get)(

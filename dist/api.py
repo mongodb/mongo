@@ -1,7 +1,7 @@
 # Read the api file and output C for the SESSION/BTREE structures, getter/setter
 # functions, and other API initialization.
 
-import os, string, sys
+import string, sys
 from dist import compare_srcfile
 
 # Temporary file.
@@ -448,5 +448,3 @@ for line in open('../src/include/api.h', 'r'):
 
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/api.h')
-
-os.remove(tmp_file)

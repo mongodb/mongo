@@ -594,6 +594,66 @@ static int __wt_api_connection_close(
 	return (ret);
 }
 
+static int __wt_api_connection_data_update_max_get(
+	CONNECTION *connection,
+	uint32_t *data_update_max);
+static int __wt_api_connection_data_update_max_get(
+	CONNECTION *connection,
+	uint32_t *data_update_max)
+{
+	SESSION *session = &connection->default_session;
+	__wt_lock(session, connection->mtx);
+	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MAX_GET);
+	*data_update_max = connection->data_update_max;
+	__wt_unlock(session, connection->mtx);
+	return (0);
+}
+
+static int __wt_api_connection_data_update_max_set(
+	CONNECTION *connection,
+	uint32_t data_update_max);
+static int __wt_api_connection_data_update_max_set(
+	CONNECTION *connection,
+	uint32_t data_update_max)
+{
+	SESSION *session = &connection->default_session;
+	__wt_lock(session, connection->mtx);
+	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MAX_SET);
+	connection->data_update_max = data_update_max;
+	__wt_unlock(session, connection->mtx);
+	return (0);
+}
+
+static int __wt_api_connection_data_update_min_get(
+	CONNECTION *connection,
+	uint32_t *data_update_min);
+static int __wt_api_connection_data_update_min_get(
+	CONNECTION *connection,
+	uint32_t *data_update_min)
+{
+	SESSION *session = &connection->default_session;
+	__wt_lock(session, connection->mtx);
+	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MIN_GET);
+	*data_update_min = connection->data_update_min;
+	__wt_unlock(session, connection->mtx);
+	return (0);
+}
+
+static int __wt_api_connection_data_update_min_set(
+	CONNECTION *connection,
+	uint32_t data_update_min);
+static int __wt_api_connection_data_update_min_set(
+	CONNECTION *connection,
+	uint32_t data_update_min)
+{
+	SESSION *session = &connection->default_session;
+	__wt_lock(session, connection->mtx);
+	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MIN_SET);
+	connection->data_update_min = data_update_min;
+	__wt_unlock(session, connection->mtx);
+	return (0);
+}
+
 static int __wt_api_connection_hazard_size_get(
 	CONNECTION *connection,
 	uint32_t *hazard_size);
@@ -995,6 +1055,8 @@ void
 __wt_methods_connection_config_default(CONNECTION *connection)
 {
 	connection->cache_size = 20;
+	connection->data_update_max = 32 * 1024;
+	connection->data_update_min = 8 * 1024;
 	connection->hazard_size = 15;
 	connection->session_size = 50;
 }
@@ -1009,6 +1071,18 @@ __wt_methods_connection_lockout(CONNECTION *connection)
 	    (CONNECTION *, uint32_t *))
 	    __wt_connection_lockout;
 	connection->cache_size_set = (int (*)
+	    (CONNECTION *, uint32_t ))
+	    __wt_connection_lockout;
+	connection->data_update_max_get = (int (*)
+	    (CONNECTION *, uint32_t *))
+	    __wt_connection_lockout;
+	connection->data_update_max_set = (int (*)
+	    (CONNECTION *, uint32_t ))
+	    __wt_connection_lockout;
+	connection->data_update_min_get = (int (*)
+	    (CONNECTION *, uint32_t *))
+	    __wt_connection_lockout;
+	connection->data_update_min_set = (int (*)
 	    (CONNECTION *, uint32_t ))
 	    __wt_connection_lockout;
 	connection->hazard_size_get = (int (*)
@@ -1084,6 +1158,10 @@ __wt_methods_connection_init_transition(CONNECTION *connection)
 	connection->cache_size_get = __wt_api_connection_cache_size_get;
 	connection->cache_size_set = __wt_api_connection_cache_size_set;
 	connection->close = __wt_api_connection_close;
+	connection->data_update_max_get = __wt_api_connection_data_update_max_get;
+	connection->data_update_max_set = __wt_api_connection_data_update_max_set;
+	connection->data_update_min_get = __wt_api_connection_data_update_min_get;
+	connection->data_update_min_set = __wt_api_connection_data_update_min_set;
 	connection->hazard_size_get = __wt_api_connection_hazard_size_get;
 	connection->hazard_size_set = __wt_api_connection_hazard_size_set;
 	connection->msgcall_get = __wt_api_connection_msgcall_get;

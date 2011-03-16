@@ -87,5 +87,3 @@ for line in open('../src/include/api.h', 'r'):
 		tfile.write(flag_info)
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/api.h')
-
-os.remove(tmp_file)

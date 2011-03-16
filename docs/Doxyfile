@@ -205,10 +205,6 @@ TAB_SIZE               = 8
 ALIASES                = \
                          "errors=\returns zero on success and a non-zero error code on failure" \
                          "ex_ref{1}=\ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
-                         "configstart=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table><tr><th>Key</th><th>Effect [Default]</th></tr>" \
-                         "config{3}=<tr><td>\1</td><td>\3 \2</td></tr>" \
-                         "configend=</table>" \
-                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
 			 "hrow{1}=<tr><th>\1</th></tr>" \
 			 "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
 			 "hrow{3}=<tr><th>\1</th><th>\2</th><th>\3</th></tr>" \
@@ -218,7 +214,11 @@ ALIASES                = \
 			 "row{2}=<tr><td>\1</td><td>\2</td></tr>" \
 			 "row{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr>" \
 			 "row{4}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>" \
-			 "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>"
+			 "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>" \
+                         "configstart{2}=\param config Configuration string, see \ref config_strings.  Permitted values:\n\n<table>@hrow{Key,Effect [Default]}" \
+                         "config{2}=\row{\1,\2}" \
+                         "configend=</table>" \
+                         "configempty=\param config Configuration string, see \ref config_strings.  No values currently permitted." \
 			 
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 

@@ -55,3 +55,4 @@ def compare_srcfile(tmp, src):
 	    not filecmp.cmp(tmp, src, False):
 		print('Updating ' + src)
 		shutil.copyfile(tmp, src)
+	os.remove(tmp)
