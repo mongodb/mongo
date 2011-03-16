@@ -1,5 +1,24 @@
 #! /bin/sh
 
+# Figure out what gcc warnings we want to use.
+set_warn_flags()
+{
+	WARN='-Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunsafe-loop-optimizations -Wunused -Wwrite-strings'
+
+	# GCC 4.2.1 on OS X thinks calls to memset are unreachable.
+	v="`gcc --version | sed -e 's/ .*//' -e q`"
+	if test "$v" != "i686-apple-darwin10-gcc-4.2.1"; then
+		WARN="$WARN -Wunreachable-code"
+	fi
+
+	# Additional warnings on gcc45.
+	if test "$CC" = "gcc45"; then
+		WARN="$WARN -Wconversion -Wlogical-op -Wuninitialized"
+	fi
+
+	export WARN
+}
+
 # Configure and build the WiredTiger library.
 conf()
 {
@@ -12,14 +31,9 @@ conf()
 
 	env CFLAGS=-g ./configure $args
 
-	warn='-Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunreachable-code -Wunsafe-loop-optimizations -Wunused -Wwrite-strings'
-	if test "$CC" = "gcc45"; then
-		warn="$warn -Wconversion -Wlogical-op -Wuninitialized"
-	fi
-
 	(
 	echo '/^CFLAGS[	 ]*=/' &&
-	echo "s/\$/ $warn/p"
+	echo "s/\$/ $WARN/p"
 	echo 'w'
 	echo 'q'
 	) | ed Makefile
@@ -49,6 +63,8 @@ while :
 		break;;
 	esac
 done
+
+set_warn_flags
 
 test "$build" -eq 0 || rebuild
 (cd ../../build_posix && make > /dev/null) && make > /dev/null
