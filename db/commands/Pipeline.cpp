@@ -29,7 +29,6 @@
 #include "../ExpressionConstant.h"
 #include "../ExpressionFieldPath.h"
 #include "../ExpressionOr.h"
-#include "../Field.h"
 #include "../FieldIterator.h"
 #include "../pdfile.h"
 

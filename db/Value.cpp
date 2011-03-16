@@ -54,6 +54,13 @@ namespace mongo
 	simple.intValue = intValue;
     }
 
+    Value::Value(shared_ptr<Document> pDocument):
+	type(Object),
+	pDocumentValue(pDocument),
+	vpValue()
+    {
+    }
+
     Value::~Value()
     {
     }
@@ -160,6 +167,13 @@ namespace mongo
     shared_ptr<const Value> Value::createInt(int value)
     {
 	shared_ptr<const Value> pValue(new Value(value));
+	return pValue;
+    }
+
+    shared_ptr<const Value> Value::createDocument(
+	shared_ptr<Document> pDocument)
+    {
+	shared_ptr<const Value> pValue(new Value(pDocument));
 	return pValue;
     }
 

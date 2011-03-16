@@ -47,8 +47,20 @@ namespace mongo
 
 	  For commonly used values, consider using one of the singleton
 	  instances defined below.
+
+	  @param value the value
+	  @returns a Value with the given value
 	*/
 	static shared_ptr<const Value> createInt(int value);
+
+	/*
+	  Construct a document-valued Value.
+
+	  @param value the value
+	  @returns a Value with the given value
+	*/
+	static shared_ptr<const Value> createDocument(
+	    shared_ptr<Document> pDocument);
 
 	/*
 	  Get the BSON type of the field.
@@ -123,6 +135,7 @@ namespace mongo
 
 	Value(bool boolValue);
 	Value(int intValue);
+	Value(shared_ptr<Document> pDocument);
 
 	BSONType type;
 

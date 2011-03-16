@@ -19,7 +19,7 @@
 #include "DocumentSourceGroup.h"
 
 #include "Expression.h"
-#include "Field.h"
+#include "Value.h"
 
 namespace mongo
 {

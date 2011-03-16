@@ -18,7 +18,6 @@
 #include "ExpressionNary.h"
 
 #include "Document.h"
-#include "Field.h"
 
 namespace mongo
 {
