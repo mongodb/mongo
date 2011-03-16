@@ -775,9 +775,19 @@ again:
 
     int AbstractMessagingPort::getClientId() {
         if ( _clientId == 0 ) {
+            /**
+             * highest 2 bytes is port
+             * this is unique except when there are multiple ips
+             * or can be issue with high connection churn
+             * 
+             * lowest 2 bytes is part of the address
+             * space there is 128 * 2^16
+             * so if there is 8gb of heap area for sockets, then this 100% unique
+             */
+            DEV assert( sizeof( MessagingPort ) > 128 );
             int x = remotePort();
             x = x << 16;
-            x |= ( ( 0xFF0 & (long long)this ) >> 9 ); // lowest byte in pointer often meaningless
+            x |= ( ( (long long)this >> 7 ) & 0xFFFF ); // lowest 7 bits isn't helpful
             _clientId = x;
         }
         return _clientId;
