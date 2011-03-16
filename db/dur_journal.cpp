@@ -266,6 +266,8 @@ namespace mongo {
             AlignedBuilder b(BLKSZ);            
             assert( len % BLKSZ == 0 );
 
+            ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
+
             File f;
             f.open( p.string().c_str() , false , true );
             assert( f.is_open() );
@@ -273,6 +275,7 @@ namespace mongo {
             while ( loc < len ) {
                 f.write( loc , b.buf() , BLKSZ );
                 loc += BLKSZ;
+                m.hit(BLKSZ);
             }
             assert( loc == len );
             f.fsync();
