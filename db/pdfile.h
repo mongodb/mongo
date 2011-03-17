@@ -204,6 +204,13 @@ namespace mongo {
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
 
+        DiskLoc nextInExtent(const DiskLoc& myLoc) { 
+            if ( nextOfs == DiskLoc::NullOfs )
+                return DiskLoc();
+            assert( nextOfs );
+            return DiskLoc(myLoc.a(), nextOfs);
+        }
+
         struct NP {
             int nextOfs;
             int prevOfs;
@@ -293,7 +300,7 @@ namespace mongo {
         */
         FL* fl() { return (FL*) &firstRecord; }
     private:
-        DiskLoc _reuse(const char *nsname);
+        DiskLoc _reuse(const char *nsname); // recycle an extent and reuse it for a different ns
     };
 
     /*  a datafile - i.e. the "dbname.<#>" files :

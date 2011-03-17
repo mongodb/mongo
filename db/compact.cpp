@@ -29,26 +29,27 @@
 
 namespace mongo {
 
-    class CompactJob : public task::Task {
+    class CompactJob {
     public:
-        CompactJob(string ns) : _ns(ns) { }
+        CompactJob(string ns, BSONObjBuilder& result) : _ns(ns), _result(result) { }
+        void go();
     private:
-        virtual string name() const { return "compact"; }
-        virtual void doWork();
-        NamespaceDetails * beginBlock();
+        BSONObjBuilder& _result; // return value sent to the client from the compact command
+        const string _ns;
+        NamespaceDetails * nsd();
         void doBatch();
         void prep();
-        const string _ns;
-        unsigned long long _nrecords;
-        unsigned long long _ncompacted;
-        DiskLoc _firstExtent;
+        //unsigned long long _nrecords;
+        //unsigned long long _ncompacted;
+        //DiskLoc _firstExtent;
     };
 
     // lock & set context first.  this checks that collection still exists, and that it hasn't
     // morphed into a capped collection between locks (which is possible)
-    NamespaceDetails * CompactJob::beginBlock() {
+    NamespaceDetails * CompactJob::nsd() {
         NamespaceDetails *nsd = nsdetails(_ns.c_str());
-        if( nsd == 0 ) throw "ns no longer present";
+        if( nsd == 0 ) 
+            throw "ns no longer present";
         if( nsd->firstExtent.isNull() )
             throw "no first extent";
         if( nsd->capped )
@@ -57,8 +58,25 @@ namespace mongo {
     }
 
     void CompactJob::doBatch() {
-        unsigned n = 0;
+
         {
+            readlock lk;
+            Client::Context ctx(_ns);
+            NamespaceDetails *d = nsd();
+            Extent *e = d->firstExtent.ext();
+            DiskLoc L = e->firstRecord;
+            while( 1 ) { 
+                if( L.isNull() ) 
+                    break;
+                log() << L.toString() << endl;
+                L = L.rec()->nextInExtent(L);
+            }
+        }
+
+
+#if 0
+        unsigned n = 0;
+        if( 0 ) {
             /* pre-touch records in a read lock so that paging happens in read not write lock.
                note we are only touching the records though; if indexes aren't in RAM, they will
                page later.  So the concept is only partial.
@@ -79,7 +97,7 @@ namespace mongo {
                     break;
             }
         }
-        {
+        if( 0 ) {
             writelock lk;
             Client::Context ctx(_ns);
             NamespaceDetails *nsd = beginBlock();
@@ -108,31 +126,39 @@ namespace mongo {
                     throw "interrupted";
             }
         }
+#endif
     }
 
     void CompactJob::prep() {
-        readlock lk;
-        Client::Context ctx(_ns);
-        NamespaceDetails *nsd = beginBlock();
-        DiskLoc L = nsd->firstExtent;
-        assert( !L.isNull() );
-        _firstExtent = L;
-        _nrecords = nsd->stats.nrecords;
-        _ncompacted = 0;
+        readlock lk(_ns);
+        Client::Context ctxt(_ns);
+        NamespaceDetails *d = nsd();
+
+        DiskLoc L = d->firstExtent;
+        int ne = 0;
+        if( !L.isNull() ) {
+            Extent *e = L.ext();
+            do {
+                ne++;
+                e = e->getNextExtent();
+            } while( e );
+        }
+
+        _result.append("nExtents", ne);
+        //        
+        //        assert( !L.isNull() );
+        //        _firstExtent = L;
+        //_nrecords = nsd->stats.nrecords;
+        //_ncompacted = 0;
     }
 
-    static mutex m("compact");
-    static volatile bool running;
-
-    void CompactJob::doWork() {
-        Client::initThread("compact");
-        cc().curop()->reset();
-        cc().curop()->setNS(_ns.c_str());
-        cc().curop()->markCommand();
-        sleepsecs(60);
+    void CompactJob::go() {
+        //cc().curop()->reset();
+        //cc().curop()->setNS(_ns.c_str());
+        //cc().curop()->markCommand();
         try {
             prep();
-            while( _ncompacted < _nrecords )
+            //while( 1 )
                 doBatch();
         }
         catch(const char *p) {
@@ -141,44 +167,12 @@ namespace mongo {
         catch(...) {
             log() << "info: exception compact" << endl;
         }
-        mongo::running = false;
-        cc().shutdown();
     }
 
-    /* --- CompactCmd --- */
+    static mutex m("compact");
 
     class CompactCmd : public Command {
     public:
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || db.empty() ) {
-                errmsg = "no collection name specified";
-                return false;
-            }
-            string ns = db + '.' + coll;
-            assert( isANormalNSName(ns.c_str()) );
-            {
-                readlock lk;
-                Client::Context ctx(ns);
-                if( nsdetails(ns.c_str()) == 0 ) {
-                    errmsg = "namespace " + ns + " does not exist";
-                    return false;
-                }
-            }
-            {
-                scoped_lock lk(m);
-                if( running ) {
-                    errmsg = "a compaction is already running";
-                    return false;
-                }
-                running = true;
-                task::fork( new CompactJob(ns) );
-                return true;
-            }
-            errmsg = "not done";
-            return false;
-        }
-
         virtual LockType locktype() const { return NONE; }
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
@@ -188,11 +182,36 @@ namespace mongo {
                  "{ compact : <collection> }";
         }
         virtual bool requiresAuth() { return true; }
-
-        /** @param webUI expose the command in the web ui as localhost:28017/<name>
-            @param oldName an optional old, deprecated name for the command
-        */
         CompactCmd() : Command("compact") { }
+
+        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string coll = cmdObj.firstElement().valuestr();
+            if( coll.empty() || db.empty() ) {
+                errmsg = "no collection name specified";
+                return false;
+            }
+            string ns = db + '.' + coll;
+            assert( isANormalNSName(ns.c_str()) );
+            assert( !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
+            {
+                readlock lk;
+                Client::Context ctx(ns);
+                if( nsdetails(ns.c_str()) == 0 ) {
+                    errmsg = "namespace " + ns + " does not exist";
+                    return false;
+                }
+            }
+
+            mutex::try_lock lk(m);
+            if( !lk.ok ) {
+                errmsg = "a compaction is already running";
+                return false;
+            }
+            CompactJob j(ns, result);
+            j.go();
+            errmsg = "compact is not yet implemented";
+            return false;
+        }
     };
     static CompactCmd compactCmd;
 
