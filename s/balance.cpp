@@ -34,10 +34,9 @@ namespace mongo {
 
     Balancer balancer;
 
-    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy ) {}
+    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy() ) {}
 
     Balancer::~Balancer() {
-        delete _policy;
     }
 
     int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks ) {
