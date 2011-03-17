@@ -35,7 +35,6 @@ DBQuery.prototype.help = function () {
     print("\t.showDiskLoc() - adds a $diskLoc field to each returned object")
     print("\nCursor methods");
     print("\t.forEach( func )")
-    print("\t.print() - output to console in full pretty format")
     print("\t.map( func )")
     print("\t.hasNext()")
     print("\t.next()")
