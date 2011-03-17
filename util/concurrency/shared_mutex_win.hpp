@@ -7,10 +7,31 @@
 //  accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt)
 
-// MongoDB : 
-//
-// Slightly modified boost file to not die above 127 pending writes
-// 
+/* MongoDB : 
+  Slightly modified boost file to not die above 127 pending writes
+  Here is what changed (from boost 1.42.0 shared_mutex.hpp):
+    1,2c1,2
+    < #ifndef BOOST_THREAD_WIN32_SHARED_MUTEX_HPP
+    < #define BOOST_THREAD_WIN32_SHARED_MUTEX_HPP
+    ---
+    > #ifndef BOOST_THREAD_WIN32_SHARED_MUTEX_HPP_MODIFIED
+    > #define BOOST_THREAD_WIN32_SHARED_MUTEX_HPP_MODIFIED
+    22c27
+    <     class shared_mutex:
+    ---
+    >     class modified_shared_mutex:
+    73c78
+    <         shared_mutex():
+    ---
+    >         modified_shared_mutex():
+    84c89
+    <         ~shared_mutex()
+    ---
+    >         ~modified_shared_mutex()
+    283a289,290
+    >                         if( new_state.exclusive_waiting == 127 ) // the maximum already!
+    >                             break;
+*/
 
 #include <boost/assert.hpp>
 #include <boost/detail/interlocked.hpp>
