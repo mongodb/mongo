@@ -366,6 +366,7 @@ namespace mongo {
        db.$cmd.sys.unlock.findOne()
     */
     class FSyncCommand : public Command {
+        static const char* url() { return  "http://www.mongodb.org/display/DOCS/fsync+Command"; }
         class LockDBJob : public BackgroundJob {
         protected:
             virtual string name() const { return "lockdbjob"; }
@@ -378,7 +379,8 @@ namespace mongo {
                 }
                 readlock lk("");
                 MemoryMappedFile::flushAll(true);
-                log() << "db is now locked for snapshotting, no writes allowed. use db.fsyncUnlock() to unlock" << endl;
+                log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
+                log() << "    For more info see " << FSyncCommand::url() << endl;
                 _ready = true;
                 while( 1 ) {
                     if( unlockRequested ) {
@@ -408,7 +410,7 @@ namespace mongo {
             string x = cmdObj["exec"].valuestrsafe();
             return !x.empty();
         }*/
-        virtual void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/fsync+Command"; }
+        virtual void help(stringstream& h) const { h << url(); }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
             bool lock = cmdObj["lock"].trueValue();
@@ -445,7 +447,8 @@ namespace mongo {
                 while( !ready ) {
                     sleepmillis(10);
                 }
-                result.append("info", "now locked against writes, use db.$cmd.sys.unlock.findOne() to unlock");
+                result.append("info", "now locked against writes, use use db.fsyncUnlock() to unlock");
+                result.append("seeAlso", url());
             }
             else {
                 // the simple fsync command case
