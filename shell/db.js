@@ -312,6 +312,8 @@ DB.prototype.help = function() {
     print("\tdb.stats()");
     print("\tdb.version() current version of the server");
     print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
+    print("\tdb.fsyncLock() flush data to disk and lock server for backups");
+    print("\tdb.fsyncUnock() unlocks server following a db.fsyncLock()");
 
     return __magicNoPrint;
 }
@@ -776,6 +778,14 @@ DB.prototype.listCommands = function(){
 
 DB.prototype.printShardingStatus = function( verbose ){
     printShardingStatus( this.getSiblingDB( "config" ) , verbose );
+}
+
+DB.prototype.fsyncLock = function() {
+    return db.adminCommand({fsync:1, lock:true});
+}
+
+DB.prototype.fsyncUnlock = function() {
+    return db.getSiblingDB("admin").$cmd.sys.unlock.findOne()
 }
 
 DB.autocomplete = function(obj){

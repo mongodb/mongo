@@ -111,7 +111,7 @@ namespace mongo {
             unsigned x = lockedForWriting;
             if( x ) {
                 b.append("fsyncLock", x);
-                b.append("info", "use db.$cmd.sys.unlock.findOne() to terminate the fsync write/snapshot lock");
+                b.append("info", "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
             }
         }
 
@@ -144,8 +144,11 @@ namespace mongo {
 
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
-        if( ! cc().isAdmin() || strncmp(ns, "admin.", 6) != 0 ) {
+        if ( ! cc().isAdmin() ) { // checks auth
             obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else if (strncmp(ns, "admin.", 6) != 0 ) {
+            obj = fromjson("{\"err\":\"unauthorized - this command must be run against the admin DB\"}");
         }
         else {
             if( lockedForWriting ) {

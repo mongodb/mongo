@@ -378,7 +378,7 @@ namespace mongo {
                 }
                 readlock lk("");
                 MemoryMappedFile::flushAll(true);
-                log() << "db is now locked for snapshotting, no writes allowed. use db.$cmd.sys.unlock.findOne() to unlock" << endl;
+                log() << "db is now locked for snapshotting, no writes allowed. use db.fsyncUnlock() to unlock" << endl;
                 _ready = true;
                 while( 1 ) {
                     if( unlockRequested ) {
