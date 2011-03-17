@@ -71,7 +71,7 @@ namespace mongo {
         virtual void onHandedOut( DBClientBase * conn ) {
             ClientInfo::get()->addShard( conn->getServerAddress() );
         }
-    } shardingConnectionHook;
+    };
 
     class ShardedMessageHandler : public MessageHandler {
     public:
@@ -279,7 +279,7 @@ int _main(int argc, char* argv[]) {
     
     // set some global state
 
-    pool.addHook( &shardingConnectionHook );
+    pool.addHook( new ShardingConnectionHook() );
     pool.setName( "mongos connectionpool" );
     
     DBClientConnection::setLazyKillCursor( false );
