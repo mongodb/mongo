@@ -22,6 +22,8 @@ checkDir = function( dir ) {
 
     files = listFiles( dir + baseName );
     for( f in files ) {
+        if ( files[f].isDirectory )
+            continue;
         assert( new RegExp( baseName + "/" + baseName + "." ).test( files[ f ].name ) , "B dir:" + dir + " f: " + f );
     }
 }
