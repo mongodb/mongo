@@ -130,7 +130,7 @@ namespace mongo {
 
             uassert( 10257 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
 
-            BSONObjBuilder lst;
+            BSONArrayBuilder lst;
 
             string rootname = args.firstElement().valuestrsafe();
             path root( rootname );
@@ -142,7 +142,6 @@ namespace mongo {
             directory_iterator end;
             directory_iterator i( root);
 
-            int num =0;
             while ( i != end ) {
                 path p = *i;
                 BSONObjBuilder b;
@@ -158,14 +157,10 @@ namespace mongo {
                     }
                 }
 
-                stringstream ss;
-                ss << num;
-                string name = ss.str();
-                lst.append( name, b.done() );
-                num++;
+                lst.append( b.obj() );
                 i++;
             }
-
+            
             BSONObjBuilder ret;
             ret.appendArray( "", lst.done() );
             return ret.obj();
