@@ -1,22 +1,4 @@
-
-var waitForAllMembers = function(master) {
-  var ready = false;
-
-  outer:
-  while (true) {
-    var state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
-    printjson(state);
-
-    for (var m in state.members) {
-      if (state.members[m].state != 2 && state.members[m].state != 1) {
-        sleep(10000);
-        continue outer;
-      }
-    }
-    return;
-  }
-};
-
+load("jstests/replsets/rslib.js");
 
 doTest = function( signal ) {
 
@@ -30,7 +12,7 @@ doTest = function( signal ) {
   /* set slaveDelay to 30 seconds */
   var config = replTest.getReplSetConfig();
   config.members[2].priority = 0;
-  config.members[2].slaveDelay = 30;
+  config.members[2].slaveDelay = 10;
   
   replTest.initiate(config);
 
@@ -59,11 +41,16 @@ doTest = function( signal ) {
   // make sure delayed slave doesn't have it
   assert.eq(slave[1].foo.findOne(), null);
 
-  // wait 35 seconds
-  sleep(35000);
-
+  for (var i=0; i<8; i++) {
+      assert.eq(slave[1].foo.findOne(), null);
+      sleep(1000);
+  }
+  
   // now delayed slave should have it
-  assert.eq(slave[1].foo.findOne().x, 1);
+  assert.soon(function() {
+          var z = slave[1].foo.findOne();
+          return z && z.x == 1;
+      });
 
   
   /************* Part 2 *******************/
@@ -79,9 +66,15 @@ doTest = function( signal ) {
   assert.eq(slave[0].foo.findOne({_id : 99}).foo, "bar");
   assert.eq(slave[1].foo.findOne({_id : 99}), null);
 
-  sleep(35000); 
-
-  assert.eq(slave[1].foo.findOne({_id : 99}).foo, "bar");
+  for (var i=0; i<8; i++) {
+      assert.eq(slave[1].foo.findOne({_id:99}), null);
+      sleep(1000);
+  }
+  
+  assert.soon(function() {
+          var z = slave[1].foo.findOne({_id : 99});
+          return z && z.foo == "bar";
+      });
  
   /************* Part 3 *******************/
 
@@ -94,34 +87,53 @@ doTest = function( signal ) {
   config.version++;
   config.members.push({_id : 3, host : host+":31007",priority:0, slaveDelay:10});
 
-  var admin = master.getSisterDB("admin");
-  try {
-    var ok = admin.runCommand({replSetReconfig : config});
-    assert.eq(ok.ok,1);
-  }
-  catch(e) {
-    print(e);
-  }
-
-  master = replTest.getMaster().getDB(name);
-
-  waitForAllMembers(master);
-
-  sleep(15000);
-
+  master = reconfig(replTest, config);
+  master = master.getSisterDB(name);
+  
   // it should be all caught up now
 
   master.foo.insert({_id : 123, "x" : "foo"});
   master.runCommand({getlasterror:1,w:2});
 
   conn.setSlaveOk();
-  assert.eq(conn.getDB(name).foo.findOne({_id:123}), null);
-  
-  sleep(15000);
 
-  assert.eq(conn.getDB(name).foo.findOne({_id:123}).x, "foo");  
+  for (var i=0; i<8; i++) {
+      assert.eq(conn.getDB(name).foo.findOne({_id:123}), null);
+      sleep(1000);
+  }
   
-  replTest.stopSet();
+  assert.soon(function() {
+          var z = conn.getDB(name).foo.findOne({_id:123});
+          return z != null && z.x == "foo"
+      });  
+  
+  /************* Part 4 ******************/
+  
+  print("reconfigure slavedelay");
+  
+  config.version++;
+  config.members[3].slaveDelay = 15;
+
+  master = reconfig(replTest, config);
+  master = master.getSisterDB(name);
+  assert.soon(function() {
+          return conn.getDB("local").system.replset.findOne().version == config.version;
+      });
+  
+  master.foo.insert({_id : 124, "x" : "foo"});
+  
+  for (var i=0; i<13; i++) {
+      assert.eq(conn.getDB(name).foo.findOne({_id:124}), null);
+      sleep(1000);
+  }
+  
+  assert.soon(function() {
+          var z = conn.getDB(name).foo.findOne({_id:124});
+          return z != null && z.x == "foo"
+      });
+  
+  
+  replTest.stopSet();  
 }
 
 doTest(15);
