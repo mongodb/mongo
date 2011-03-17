@@ -865,7 +865,6 @@ namespace mongo {
                 theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
-            result.append( "ok" , 1 );
             result.append( "nIndexes" , (int)all.size() );
             result.appendArray( "indexes" , b.obj() );
             return true;
