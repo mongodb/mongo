@@ -274,6 +274,7 @@ namespace mongo {
         qr->startingFrom = 0;
         qr->len = b.len();
         qr->setOperation(opReply);
+        qr->initializeResultFlags();
         qr->nReturned = 0;
         b.decouple();
         return qr;
