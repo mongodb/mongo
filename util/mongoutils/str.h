@@ -48,13 +48,11 @@ namespace mongoutils {
         class stream {
         public:
             mongo::StringBuilder ss;
-
             template<class T>
             stream& operator<<(const T& v) {
                 ss << v;
                 return *this;
             }
-
             operator std::string () const { return ss.str(); }
         };
 
