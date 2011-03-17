@@ -2505,7 +2505,6 @@ const StringData _jscode_raw_query =
 "print(\"\\t.showDiskLoc() - adds a $diskLoc field to each returned object\")\n" 
 "print(\"\\nCursor methods\");\n" 
 "print(\"\\t.forEach( func )\")\n" 
-"print(\"\\t.print() - output to console in full pretty format\")\n" 
 "print(\"\\t.map( func )\")\n" 
 "print(\"\\t.hasNext()\")\n" 
 "print(\"\\t.next()\")\n" 
