@@ -566,7 +566,7 @@ namespace mongo {
                     conn.done();
                     return false;
                 }
-                catch( UpdateNotTheSame& e) {
+                catch( UpdateNotTheSame&) {
                     // Abort since we aren't yet sure if we have multiple lock entries to timeout on the
                     // diff config servers, or this was just interference from other forcing.
                     warning() << "lock forcing '" << lockName << "' inconsistent, aborting." << endl;
