@@ -18,7 +18,7 @@ AddOption( "--prefix",
            help="installation root" )
 
 
-env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
+env = Environment( MSVS_ARCH=None , tools = ["default", "gch"], toolpath = '.' )
 
 def addExtraLibs( s ):
     for x in s.split(","):
