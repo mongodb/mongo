@@ -435,14 +435,18 @@ namespace mongo {
         }
 
         virtual bool prepareToYield() {
-            if ( ! _cc ) {
+            if ( _c && !_cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _ns.c_str() ) );
             }
-            return _cc->prepareToYield( _yieldData );
+            if ( _cc ) {
+	            return _cc->prepareToYield( _yieldData );
+            }
+            // no active cursor - ok to yield
+            return true;
         }
 
         virtual void recoverFromYield() {
-            if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
+            if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
                 _c.reset();
                 _cc.reset();
 
@@ -698,11 +702,15 @@ namespace mongo {
                 return _findingStartCursor->prepareToYield();
             }
             else {
-                if ( ! _cc ) {
+                if ( _c && !_cc ) {
                     _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
                 }
-                return _cc->prepareToYield( _yieldData );
+                if ( _cc ) {
+	                return _cc->prepareToYield( _yieldData );
+                }
             }
+            // no active cursor - ok to yield
+            return true;
         }
 
         virtual void recoverFromYield() {
@@ -711,7 +719,7 @@ namespace mongo {
             if ( _findingStartCursor.get() ) {
                 _findingStartCursor->recoverFromYield();
             }
-            else if ( ! ClientCursor::recoverFromYield( _yieldData ) ) {
+            else if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
                 _c.reset();
                 _cc.reset();
                 _so.reset();

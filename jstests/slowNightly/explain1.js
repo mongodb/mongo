@@ -1,8 +1,5 @@
 // SERVER-2662 - drop client cursor in a context where query will yield frequently
 
-// disabled until SERVER-2662 fixed
-if ( false ) {
-
 t = db.jstests_slowNightly_explain1;
 t.drop();
 
@@ -18,5 +15,3 @@ s3 = startParallelShell( "t = db.jstests_slowNightly_explain1; for( var i = 0; i
 s1();
 s2();
 s3();
-
-}
