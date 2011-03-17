@@ -33,6 +33,7 @@
 #include "../util/background.h"
 #include "../util/logfile.h"
 #include "../util/alignedbuilder.h"
+#include "../util/paths.h"
 #include "../scripting/engine.h"
 
 namespace mongo {
@@ -130,6 +131,11 @@ namespace mongo {
 
             try { 
                 remove(p);
+            }
+            catch(...) { }
+
+            try {
+                result.append("onSamePartition", onSamePartition(dur::getJournalDir().string(), dbpath));
             }
             catch(...) { }
 
