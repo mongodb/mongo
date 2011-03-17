@@ -36,7 +36,7 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    void ensureParentDirCreated(const boost::filesystem::path& p){
+    boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p){
         const boost::filesystem::path parent = p.branch_path();
 		
         if (! boost::filesystem::exists(parent)){
@@ -45,8 +45,9 @@ namespace mongo {
             boost::filesystem::create_directory(parent);
             flushMyDirectory(parent); // flushes grandparent to ensure parent exists after crash
         }
-
+        
         assert(boost::filesystem::is_directory(parent));
+        return parent;
     }
 
 #if defined(_WIN32)
@@ -199,9 +200,9 @@ namespace mongo {
         return false;
     }
 
-    string makeTempFileName() {
+    string makeTempFileName( path root ) {
         while( 1 ) {
-            path p = path(dbpath) / "_tmp";
+            path p = root / "_tmp";
             stringstream ss;
             ss << (unsigned) rand();
             p /= ss.str();
@@ -230,11 +231,15 @@ namespace mongo {
                     name = fa->_pending.front();
                     size = fa->_pendingSize[ name ];
                 }
-                string tmp = makeTempFileName();
+
+                string tmp;
                 try {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
-                    ensureParentDirCreated(name);
+                    
+                    boost::filesystem::path parent = ensureParentDirCreated(name);
+                    tmp = makeTempFileName( parent );
                     ensureParentDirCreated(tmp);
+
                     long fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                     if ( fd <= 0 ) {
                         log() << "FileAllocator: couldn't create " << name << " (" << tmp << ") " << errnoWithDescription() << endl;
@@ -271,7 +276,8 @@ namespace mongo {
                     log() << "error failed to allocate new file: " << name
                           << " size: " << size << ' ' << errnoWithDescription() << endl;
                     try {
-                        BOOST_CHECK_EXCEPTION( boost::filesystem::remove( tmp ) );
+                        if ( tmp.size() )
+                            BOOST_CHECK_EXCEPTION( boost::filesystem::remove( tmp ) );
                         BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
                     }
                     catch ( ... ) {
