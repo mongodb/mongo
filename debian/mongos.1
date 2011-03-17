@@ -1,4 +1,3 @@
-.\" Documentation for the MongoDB dump tool
 .TH MONGOS "1" "June 2009" "10gen" "Mongo Database"
 .SH "NAME"
 mongos \- the Mongo sharding server
@@ -22,18 +21,70 @@ starts three servers to set up sharding
 .B \-\-help
 show usage information
 .TP
-.B \-\-port N
-port on which to listen
+.B \-h, \-\-help
+show this usage information
 .TP
-.B \-\-configdb DATABASE+
-one or more databases to use as the configuration databases
+.B \-\-version
+show version information
 .TP
-.B \-v+
-verbosity
+.B \-f, \-\-config arg
+configuration file specifying additional options
+.TP
+.B \-v, \-\-verbose
+be more verbose (include multiple times for more verbosity
+e.g. -vvvvv)
+.TP
+.B \-\-quiet                quieter output
+.TP
+.B \-\-port arg             specify port number
+.TP
+.B \-\-bind_ip arg
+comma separated list of ip addresses to listen on - all local ips by
+default
+.TP
+.B \-\-logpath arg
+log file to send write to instead of stdout - has to be a file, not
+directory
+.TP
+.B \-\-logappend
+append to logpath instead of over-writing
+.TP
+.B \-\-pidfilepath arg
+full path to pidfile (if not set, no pidfile is created)
+.TP
+.B \-\-keyFile arg
+private key for cluster authentication (only for replica sets)
+.TP
+.B \-\-unixSocketPrefix arg
+alternative directory for UNIX domain sockets (defaults to /tmp)
+.TP
+.B \-\-fork
+fork server process
+
+.SH "SHARDING OPTIONS"
+.TP
+.B \-\-configdb arg
+1 or 3 comma separated config servers
+.TP
+.B \-\-test
+just run unit tests
+.TP
+.B \-\-upgrade
+upgrade meta data version
+.TP
+.B \-\-chunkSize arg
+maximum amount of data per chunk
+.TP
+.B \-\-ipv6
+enable IPv6 support (disabled by default)
+.TP
+.B \-\-jsonp
+allow JSONP access via http (has security implications)
 .SH "COPYRIGHT"
 .PP
-Copyright 2007\-2009 10gen
+Copyright 2007\-2011 10gen
 .SH "SEE ALSO"
-For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+For more information, please refer to the MongoDB wiki, available at
+http://www.mongodb.org.
 .SH "AUTHOR"
 Kristina Chodorow

@@ -612,7 +612,7 @@ build-stamp: configure-stamp
 # THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
 \t# scons 
         #docbook-to-man debian/mongodb.sgml > mongodb.1
-\tls debian/*.1 > debian/mongodb.manpages
+\tls debian/*.1 > debian/@@PACKAGE_NAME@@.manpages
 
 \ttouch $@
 
@@ -893,6 +893,7 @@ fi
 %defattr(-,root,root,-)
 #%doc README GNU-AGPL-3.0.txt
 
+%{_bindir}/bsondump
 %{_bindir}/mongo
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
@@ -900,19 +901,19 @@ fi
 %{_bindir}/mongoimport
 %{_bindir}/mongorestore
 %{_bindir}/mongostat
-%{_bindir}/bsondump
 # FIXME: uncomment when mongosniff is back in the package
 #%{_bindir}/mongosniff
 
+%{_mandir}/man1/bsondump.1*
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
+%{_mandir}/man1/mongorestore.1*
+%{_mandir}/man1/mongostat.1*
 # FIXME: uncomment when mongosniff is back in the package
 #%{_mandir}/man1/mongosniff.1*
-%{_mandir}/man1/mongostat.1*
-%{_mandir}/man1/mongorestore.1*
 
 %files server
 %defattr(-,root,root,-)
