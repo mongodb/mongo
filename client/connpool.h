@@ -114,7 +114,7 @@ namespace mongo {
         mongo::mutex _mutex;
         typedef map<string,PoolForHost,serverNameCompare> PoolMap; // servername -> pool
         PoolMap _pools;
-        list<DBConnectionHook*> _hooks;
+        list<DBConnectionHook*> _hooks; // pointers owned by me, right now they leak on shutdown
         string _name;
 
         DBClientBase* _get( const string& ident );
@@ -144,7 +144,7 @@ namespace mongo {
             scoped_lock L(_mutex);
             _pools[host].done(c);
         }
-        void addHook( DBConnectionHook * hook );
+        void addHook( DBConnectionHook * hook ); // we take ownership
         void appendInfo( BSONObjBuilder& b );
     };
 
