@@ -21,7 +21,7 @@
 
 namespace mongo {
 
-    const LabeledLevel DistributedLock::logLvl( 1 );
+    LabeledLevel DistributedLock::logLvl( 1 );
 
     ThreadLocalValue<string> distLockIds("");
 
