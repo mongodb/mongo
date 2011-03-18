@@ -915,14 +915,7 @@ namespace mongo {
                 }
             }
             else {
-                if (dur::haveJournalFiles()) {
-                    errmsg = str::stream() << "**************\n"
-                                         << "Error: journal files are present in journal directory, yet starting without --dur enabled.\n"
-                                         << "It is recommended that you start with journaling enabled so that recovery may occur.\n"
-                                         << "Alternatively (NOT recommended), you can backup everything, then delete the journal files, and run --repair\n"
-                                         << "**************";
-                }
-                else {
+                if (!dur::haveJournalFiles()) {
                     errmsg = str::stream()
                              << "************** \n"
                              << "old lock file: " << name << ".  probably means unclean shutdown\n"
