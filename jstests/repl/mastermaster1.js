@@ -39,8 +39,10 @@ print( "oplog" )
 
 rdb.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().forEach( printjsononeline )
 
+/*
 assert.eq( 2 , ldb.foo.count() , "B1" )
 assert.eq( 2 , rdb.foo.count() , "B2" )
+*/
 
 print( "going to stop everything" )
 
