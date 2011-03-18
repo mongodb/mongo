@@ -20,9 +20,8 @@
 
 #ifndef WIN32
 #define USE_LINENOISE
-extern "C" {
+
 #include "../third_party/linenoise/linenoise.h"
-}
 
 // this is for ctrl-c handling
 #include <setjmp.h>

@@ -1189,7 +1189,7 @@ elif not onlyServer:
     coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
 
     if not windows:
-        coreShellFiles.append( "third_party/linenoise/linenoise.c" )
+        coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
 
     if weird:
         shell32BitFiles = coreShellFiles
