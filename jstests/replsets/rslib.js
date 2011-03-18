@@ -61,3 +61,39 @@ var getLatestOp = function(server) {
     }
     return null;
 };
+
+
+var waitForAllMembers = function(master) {
+  var ready = false;
+
+  outer:
+  while (true) {
+    var state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
+    printjson(state);
+
+    for (var m in state.members) {
+      if (state.members[m].state != 2 && state.members[m].state != 1) {
+        sleep(10000);
+        continue outer;
+      }
+    }
+    return;
+  }
+};
+
+var reconfig = function(rs, config) {
+    var admin = rs.getMaster().getDB("admin");
+    
+    try {
+        var ok = admin.runCommand({replSetReconfig : config});
+        assert.eq(ok.ok,1);
+    }
+    catch(e) {
+        print(e);
+    }
+
+    master = rs.getMaster().getDB("admin");
+    waitForAllMembers(master);
+
+    return master;
+};

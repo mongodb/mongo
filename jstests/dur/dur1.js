@@ -75,7 +75,7 @@ function work() {
 }
 
 function verify() { 
-    log("verify");
+    log("verify test.foo.count == 2");
     var d = conn.getDB("test");
     var ct = d.foo.count();
     if (ct != 2) {
@@ -99,13 +99,13 @@ var path1 = "/data/db/" + testname+"nodur";
 var path2 = "/data/db/" + testname+"dur";
 
 // non-durable version
-log();
+log("run mongod without journaling");
 conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles");
 work();
 stopMongod(30000);
 
 // durable version
-log();
+log("run mongod with --journal");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--journal", "--smallfiles", "--journalOptions", 8);
 work();
 
@@ -113,23 +113,24 @@ work();
 printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
 
 // kill the process hard
+log("kill 9");
 stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
-log();
+log("restart mongod --journal and recover");
 conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--journal", "--smallfiles", "--journalOptions", 8);
 verify();
 
-log("stop");
+log("stop mongod");
 stopMongod(30002);
 
 // stopMongod seems to be asynchronous (hmmm) so we sleep here.
-sleep(5000);
+// sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
-log("check no journal files");
+log("check no journal files (after presumably clean shutdown)");
 checkNoJournalFiles(path2 + "/journal");
 
 log("check data matches ns");

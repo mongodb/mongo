@@ -355,17 +355,17 @@ namespace mongo {
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) {
                 const ReplSetConfig::MemberCfg& m = *i;
+                
                 if( m.h.isSelf() ) {
-                    nfound++;
                     me++;
-                    if( !reconf || (_self && _self->id() == (unsigned) m._id) )
-                        ;
-                    else {
-                        log() << "replSet " << _self->id() << ' ' << m._id << rsLog;
+                }
+                
+                if( reconf ) {
+                    if (m.h.isSelf() && (!_self || (int)_self->id() != m._id)) {
+                        log() << "self doesn't match: " << m._id << rsLog;
                         assert(false);
                     }
-                }
-                else if( reconf ) {
+
                     const Member *old = findById(m._id);
                     if( old ) {
                         nfound++;
@@ -377,6 +377,9 @@ namespace mongo {
                     else {
                         newOnes.push_back(&m);
                     }
+                }
+                else {
+                    additive = false;
                 }
 
                 // change timeout settings, if necessary

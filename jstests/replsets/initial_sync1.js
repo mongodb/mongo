@@ -95,12 +95,11 @@ replTest.stop(1);
 
 print("8. Eventually it should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-sleep(5*60*1000);
 wait(function() {
     var status = admin_s2.runCommand({replSetGetStatus:1});
     occasionally(function() { printjson(status); });
     return status.members[2].state == 2;
-  });
+    }, 350);
 
 
 print("9. Bring #2 back up");

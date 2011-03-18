@@ -1289,7 +1289,7 @@ namespace mongo {
             prep(ns.c_str(), d);
             assert( idxNo == d->nIndexes );
             try {
-                idx.head = BtreeBucket::addBucket(idx);
+                idx.head.writing() = BtreeBucket::addBucket(idx);
                 n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
             }
             catch(...) {

@@ -1639,6 +1639,7 @@ namespace mongo {
         // promoting a split key.  These are the only two cases where _insert()
         // is called currently.
         if ( child.isNull() || !rChild.isNull() ) {
+            // A new key will be inserted at the same tree height as an adjacent existing key.
             insertHere(thisLoc, pos, recordLoc, key, order, lChild, rChild, idx);
             return 0;
         }

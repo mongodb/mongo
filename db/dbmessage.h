@@ -53,6 +53,9 @@ namespace mongo {
         void setResultFlagsToOk() {
             _resultFlags() = ResultFlag_AwaitCapable;
         }
+        void initializeResultFlags() {
+            _resultFlags() = 0;   
+        }
     };
 #pragma pack()
 

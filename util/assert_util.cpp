@@ -67,7 +67,7 @@ namespace mongo {
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     void wasserted(const char *msg, const char *file, unsigned line) {
-        problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        problem() << "warning Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
         raiseError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );

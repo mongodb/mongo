@@ -171,9 +171,8 @@ namespace mongo {
                     }
                     sleepmillis( i * 200 );
                 }
-
-                assert( gotThrough );
-
+                
+                assert( inShutdown() || gotThrough );
             }
         }
 

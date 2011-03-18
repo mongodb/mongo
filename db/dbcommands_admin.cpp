@@ -33,6 +33,7 @@
 #include "../util/background.h"
 #include "../util/logfile.h"
 #include "../util/alignedbuilder.h"
+#include "../util/paths.h"
 #include "../scripting/engine.h"
 
 namespace mongo {
@@ -130,6 +131,11 @@ namespace mongo {
 
             try { 
                 remove(p);
+            }
+            catch(...) { }
+
+            try {
+                result.append("onSamePartition", onSamePartition(dur::getJournalDir().string(), dbpath));
             }
             catch(...) { }
 
@@ -330,9 +336,11 @@ namespace mongo {
         }
     } validateCmd;
 
-    extern bool unlockRequested;
-    extern unsigned lockedForWriting;
-    extern mongo::mutex lockedForWritingMutex;
+    bool lockedForWriting = false; // read from db/instance.cpp
+    static bool unlockRequested = false;
+    static mongo::mutex fsyncLockMutex("fsyncLock");
+    static boost::condition fsyncLockCondition;
+    static OID fsyncLockID; // identifies the current lock job
 
     /*
         class UnlockCommand : public Command {
@@ -360,6 +368,7 @@ namespace mongo {
        db.$cmd.sys.unlock.findOne()
     */
     class FSyncCommand : public Command {
+        static const char* url() { return  "http://www.mongodb.org/display/DOCS/fsync+Command"; }
         class LockDBJob : public BackgroundJob {
         protected:
             virtual string name() const { return "lockdbjob"; }
@@ -367,23 +376,26 @@ namespace mongo {
                 Client::initThread("fsyncjob");
                 Client& c = cc();
                 {
-                    scoped_lock lk(lockedForWritingMutex);
-                    lockedForWriting++;
+                    scoped_lock lk(fsyncLockMutex);
+                    while (lockedForWriting){ // there is a small window for two LockDBJob's to be active. This prevents it.
+                        fsyncLockCondition.wait(lk.boost());
+                    }
+                    lockedForWriting = true;
+                    fsyncLockID.init();
                 }
                 readlock lk("");
                 MemoryMappedFile::flushAll(true);
-                log() << "db is now locked for snapshotting, no writes allowed. use db.$cmd.sys.unlock.findOne() to unlock" << endl;
+                log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
+                log() << "    For more info see " << FSyncCommand::url() << endl;
                 _ready = true;
-                while( 1 ) {
-                    if( unlockRequested ) {
-                        unlockRequested = false;
-                        break;
-                    }
-                    sleepmillis(20);
-                }
                 {
-                    scoped_lock lk(lockedForWritingMutex);
-                    lockedForWriting--;
+                    scoped_lock lk(fsyncLockMutex);
+                    while( !unlockRequested ) {
+                        fsyncLockCondition.wait(lk.boost());
+                    }
+                    unlockRequested = false;
+                    lockedForWriting = false;
+                    fsyncLockCondition.notify_all();
                 }
                 c.shutdown();
             }
@@ -402,7 +414,7 @@ namespace mongo {
             string x = cmdObj["exec"].valuestrsafe();
             return !x.empty();
         }*/
-        virtual void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/fsync+Command"; }
+        virtual void help(stringstream& h) const { h << url(); }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
             bool lock = cmdObj["lock"].trueValue();
@@ -433,13 +445,19 @@ namespace mongo {
                 LockDBJob *l = new LockDBJob(ready);
 
                 dbMutex.releaseEarly();
+                
+                // There is a narrow window for another lock request to come in
+                // here before the LockDBJob grabs the readlock. LockDBJob will
+                // ensure that the requests are serialized and never running
+                // concurrently
 
                 l->go();
                 // don't return until background thread has acquired the read lock
                 while( !ready ) {
                     sleepmillis(10);
                 }
-                result.append("info", "now locked against writes, use db.$cmd.sys.unlock.findOne() to unlock");
+                result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
+                result.append("seeAlso", url());
             }
             else {
                 // the simple fsync command case
@@ -453,7 +471,21 @@ namespace mongo {
 
     } fsyncCmd;
 
-
-
+    // Note that this will only unlock the current lock.  If another thread
+    // relocks before we return we still consider the unlocking successful.
+    // This is imporant because if two scripts are trying to fsync-lock, each
+    // one must be assured that between the fsync return and the call to unlock
+    // that the database is fully locked
+    void unlockFsyncAndWait(){
+        scoped_lock lk(fsyncLockMutex);
+        if (lockedForWriting) { // could have handled another unlock before we grabbed the lock
+            OID curOp = fsyncLockID;
+            unlockRequested = true;
+            fsyncLockCondition.notify_all();
+            while (lockedForWriting && fsyncLockID == curOp){
+                fsyncLockCondition.wait( lk.boost() );
+            }
+        }
+    }
 }
 

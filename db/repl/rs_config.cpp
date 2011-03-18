@@ -322,12 +322,12 @@ namespace mongo {
                 }
                 if( m.h.isLocalHost() )
                     localhosts++;
-                m.arbiterOnly = mobj.getBoolField("arbiterOnly");
+                m.arbiterOnly = mobj["arbiterOnly"].trueValue();
                 m.slaveDelay = mobj["slaveDelay"].numberInt();
                 if( mobj.hasElement("hidden") )
-                    m.hidden = mobj.getBoolField("hidden");
+                    m.hidden = mobj["hidden"].trueValue();
                 if( mobj.hasElement("buildIndexes") )
-                    m.buildIndexes = mobj.getBoolField("buildIndexes");
+                    m.buildIndexes = mobj["buildIndexes"].trueValue();
                 if( mobj.hasElement("priority") )
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )

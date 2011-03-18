@@ -142,6 +142,9 @@ namespace mongo {
 
     class TestDistLockWithSkew: public Command {
     public:
+
+        static const int logLvl = 1;
+
         TestDistLockWithSkew() :
             Command("_testDistLockWithSkew") {
         }
@@ -225,36 +228,36 @@ namespace mongo {
 
             bool errors = false;
             while (keepGoing) {
-        	try {
+                try {
 
-        	    if (myLock->lock_try("Testing distributed lock with skew.")) {
+                    if (myLock->lock_try("Testing distributed lock with skew.")) {
 
-			log() << "**** Locked for thread " << threadId << endl;
+                        log() << "**** Locked for thread " << threadId << endl;
 
-			count++;
-			int before = count;
-			int sleep = randomWait();
-			sleepmillis(sleep);
-			int after = count;
+                        count++;
+                        int before = count;
+                        int sleep = randomWait();
+                        sleepmillis(sleep);
+                        int after = count;
 
-			if(after != before) {
-			    errors = true;
-			    log() << "**** !Bad increment while sleeping with lock for: " << sleep << "ms" << endl;
-			    break;
-			}
+                        if(after != before) {
+                            errors = true;
+                            log() << "**** !Bad increment while sleeping with lock for: " << sleep << "ms" << endl;
+                            break;
+                        }
 
-			// Unlock only half the time...
-			if(hangThreads == 0 || threadId % hangThreads != 0) {
-			    log() << "**** Unlocking for thread " << threadId << endl;
-			    myLock->unlock();
-			}
-			else {
-			    log() << "**** Not unlocking for thread " << threadId << endl;
-			    DistributedLock::killPinger( *myLock );
-			    // We're simulating a crashed process...
-			    break;
-			}
-		    }
+                        // Unlock only half the time...
+                        if(hangThreads == 0 || threadId % hangThreads != 0) {
+                            log() << "**** Unlocking for thread " << threadId << endl;
+                            myLock->unlock();
+                        }
+                        else {
+                            log() << "**** Not unlocking for thread " << threadId << endl;
+                            DistributedLock::killPinger( *myLock );
+                            // We're simulating a crashed process...
+                            break;
+                        }
+                    }
 
                 }
                 catch( LockException& e ) {
@@ -342,12 +345,12 @@ namespace mongo {
             if(cmdObj.hasField("skewHosts")) {
                 bsonArrToNumVector<long long>(cmdObj["skewHosts"], skew);
             }
-            else{
-            	log( LLL ) << "No host clocks to skew." << endl;
-            	return;
+            else {
+                log( logLvl ) << "No host clocks to skew." << endl;
+                return;
             }
 
-            log( LLL ) << "Skewing clocks of hosts " << cluster << endl;
+            log( logLvl ) << "Skewing clocks of hosts " << cluster << endl;
 
             unsigned s = 0;
             for(vector<long long>::iterator i = skew.begin(); i != skew.end(); ++i,s++) {
@@ -359,9 +362,9 @@ namespace mongo {
                 try {
                     bool success = conn->runCommand( string("admin"), BSON( "_skewClockCommand" << 1 << "skew" << *i ), result );
                     // TODO:  Better error code
-                    uassert_msg(70000, "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
+                    uassert_msg(13678, "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
 
-                    log( LLL + 1 ) << " Skewed host " << server << " clock by " << *i << endl;
+                    log( logLvl + 1 ) << " Skewed host " << server << " clock by " << *i << endl;
                 }
                 catch(...) {
                     conn.done();
