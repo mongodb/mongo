@@ -1,4 +1,4 @@
-]// @file dur.cpp durability in the storage engine (crash-safeness / journaling)
+// @file dur.cpp durability in the storage engine (crash-safeness / journaling)
 
 /**
 *    Copyright (C) 2009 10gen Inc.
