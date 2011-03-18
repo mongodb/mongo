@@ -327,9 +327,8 @@ def make_package(distro, arch, spec, srcdir):
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
         print "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
-        # FIXME: investigate whether shutil.copytree does this job as
-        # effectively and without agonizing edge cases.
-        sysassert(["cp", "-r", "%s/%s" % (srcdir, pkgdir), sdir])
+        # FIXME: sh-dash-cee is bad. See if tarfile can do this.
+        sysassert(["sh", "-c", "(cd \"%s\" && git archive r%s %s/ ) | (cd \"%s\" && tar xvf -)" % (srcdir, spec.version(), pkgdir, sdir)])
     # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the binaries to wherever they
     # need to go.  
@@ -904,7 +903,9 @@ fi
 # FIXME: uncomment when mongosniff is back in the package
 #%{_bindir}/mongosniff
 
-%{_mandir}/man1/bsondump.1*
+# FIXME: uncomment this when there's a stable release whose source
+# tree contains a bsondump man page.
+#%{_mandir}/man1/bsondump.1*
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
