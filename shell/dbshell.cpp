@@ -83,8 +83,6 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
 
 #ifdef USE_READLINE
 static char** completionHook(const char* text , int start ,int end ) {
-    static map<string,string> m;
-
     vector<string> all;
 
     generateCompletions( string(text,end) , all );
