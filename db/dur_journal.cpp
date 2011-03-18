@@ -264,6 +264,7 @@ namespace mongo {
 
             const unsigned BLKSZ = 1024 * 64;
             AlignedBuilder b(BLKSZ);            
+            memset((void*)b.buf(), 0, BLKSZ);
             assert( len % BLKSZ == 0 );
 
             ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
