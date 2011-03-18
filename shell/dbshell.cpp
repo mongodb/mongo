@@ -43,10 +43,14 @@ static volatile bool atPrompt = false; // can eval before getting to prompt
 bool autoKillOp = false;
 
 
-#if defined(USE_LINENOISE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
+#if defined(USE_LINENOISE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32) && !defined(WIN32)
 // this is for ctrl-c handling
 #include <setjmp.h>
 jmp_buf jbuf;
+#endif
+
+#if defined(USE_LINENOISE) && !defined(WIN32) && !defined(_WIN32) 
+#define USE_HISTORY
 #endif
 
 namespace mongo {
@@ -86,7 +90,7 @@ void completionHook(const char* text , linenoiseCompletions* lc ) {
 #endif
 
 void shellHistoryInit() {
-#ifdef USE_LINENOISE
+#ifdef USE_HISTORY
     stringstream ss;
     char * h = getenv( "HOME" );
     if ( h )
@@ -102,12 +106,12 @@ void shellHistoryInit() {
 #endif
 }
 void shellHistoryDone() {
-#ifdef USE_LINENOISE
+#ifdef USE_HISTORY
     linenoiseHistorySave( (char*)historyFile.c_str() );
 #endif
 }
 void shellHistoryAdd( const char * line ) {
-#ifdef USE_LINENOISE
+#ifdef USE_HISTORY
     if ( line[0] == '\0' )
         return;
 
