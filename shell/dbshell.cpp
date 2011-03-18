@@ -18,16 +18,9 @@
 #include "pch.h"
 #include <stdio.h>
 
-#ifndef WIN32
+
 #define USE_LINENOISE
-
 #include "../third_party/linenoise/linenoise.h"
-
-// this is for ctrl-c handling
-#include <setjmp.h>
-jmp_buf jbuf;
-
-#endif
 
 #include "../scripting/engine.h"
 #include "../client/dbclient.h"
@@ -51,7 +44,9 @@ bool autoKillOp = false;
 
 
 #if defined(USE_LINENOISE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
-#define CTRLC_HANDLE
+// this is for ctrl-c handling
+#include <setjmp.h>
+jmp_buf jbuf;
 #endif
 
 namespace mongo {

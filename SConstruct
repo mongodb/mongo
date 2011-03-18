@@ -1190,6 +1190,8 @@ elif not onlyServer:
 
     if not windows:
         coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
+    else:
+        coreShellFiles.append( "third_party/linenoise/linenoise_win32.cpp" )
 
     if weird:
         shell32BitFiles = coreShellFiles
