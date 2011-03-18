@@ -266,10 +266,7 @@ namespace mongo {
             assert( len % BLKSZ == 0 );
 
             AlignedBuilder b(BLKSZ);            
-            // we don't rezero a journal file upon recycling (see removeOldJournalFile).  given that, its contents 
-            // don't matter, the important thing is it is prealloced.  so we fill it with a rand # here : if it not 
-            // being zeroed were a problem, we'd want to catch that sooner than later (upon a recycling)
-            memset((void*)b.buf(), rand(), BLKSZ);
+            memset((void*)b.buf(), 0, BLKSZ);
 
             ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
 
@@ -327,7 +324,17 @@ namespace mongo {
                         filesystem::path filepath = getJournalDir() / fn;
                         if( !filesystem::exists(filepath) ) {
                             // we can recycle this file into this prealloc file location
-                            boost::filesystem::rename(p, filepath);
+                            filesystem::path temppath = getJournalDir() / (fn+".temp");
+                            boost::filesystem::rename(p, temppath);
+                            {
+                                // zero the header
+                                File f;
+                                f.open(temppath.string().c_str(), false, true);
+                                char buf[8192];
+                                memset(buf, 0, 8192);
+                                f.write(0, buf, 8192);
+                            }
+                            boost::filesystem::rename(temppath, filepath);
                             return;
                         }
                     }
