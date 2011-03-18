@@ -305,8 +305,8 @@ namespace mongo {
             void operator () (MongoFile *mf) {
                 if( mf->isMongoMMF() ) {
                     MongoMMF *mmf = (MongoMMF*) mf;
-                    const char *p = (const char *) mmf->getView();
-                    const char *w = (const char *) mmf->view_write();
+                    const unsigned char *p = (const unsigned char *) mmf->getView();
+                    const unsigned char *w = (const unsigned char *) mmf->view_write();
 
                     if (!p || !w) return; // File not fully opened yet
 
@@ -330,6 +330,8 @@ namespace mongo {
                                 log() << endl; // separate blocks of mismatches
                             lastMismatch= i;
                             if( ++logged < 60 ) {
+                                if( logged == 1 )
+                                    log() << "ofs % 628 = 0x" << hex << (i%628) << endl; // for .ns files to find offset in record
                                 stringstream ss;
                                 ss << "mismatch ofs:" << hex << i <<  "\tfilemap:" << setw(2) << (unsigned) w[i] << "\tprivmap:" << setw(2) << (unsigned) p[i];
                                 if( p[i] > 32 && p[i] <= 126 )
