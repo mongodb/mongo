@@ -915,12 +915,21 @@ namespace mongo {
                 }
             }
             else {
-                errmsg = str::stream()
-                         << "************** \n"
-                         << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                         << "recommend removing file and running --repair\n"
-                         << "see: http://dochub.mongodb.org/core/repair for more information\n"
-                         << "*************";
+                if (dur::haveJournalFiles()) {
+                    errmsg = str::stream() << "**************\n"
+                                         << "Error: journal files are present in journal directory, yet starting without --dur enabled.\n"
+                                         << "It is recommended that you start with journaling enabled so that recovery may occur.\n"
+                                         << "Alternatively (NOT recommended), you can backup everything, then delete the journal files, and run --repair\n"
+                                         << "**************";
+                }
+                else {
+                    errmsg = str::stream()
+                             << "************** \n"
+                             << "old lock file: " << name << ".  probably means unclean shutdown\n"
+                             << "recommend removing file and running --repair\n"
+                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                             << "*************";
+                }
             }
 
             if (!errmsg.empty()) {
@@ -940,7 +949,7 @@ namespace mongo {
             cout << "**************" << endl;
             cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
-            cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
+            cout << "Alternatively (NOT recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
             uasserted(13597, "can't start without --dur enabled when journal/ files are present");
         }
