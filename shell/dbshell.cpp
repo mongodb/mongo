@@ -18,7 +18,7 @@
 #include "pch.h"
 #include <stdio.h>
 
-#ifndef _WIN32
+#ifndef WIN32
 #define USE_LINENOISE
 extern "C" {
 #include "../third_party/linenoise/linenoise.h"
