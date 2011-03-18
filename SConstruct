@@ -1187,7 +1187,9 @@ elif not onlyServer:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
     coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
-    coreShellFiles.append( "third_party/linenoise/linenoise.c" )
+
+    if not windows:
+        coreShellFiles.append( "third_party/linenoise/linenoise.c" )
 
     if weird:
         shell32BitFiles = coreShellFiles
