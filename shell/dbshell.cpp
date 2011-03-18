@@ -99,8 +99,8 @@ void shellHistoryInit() {
     ss << ".dbshell";
     historyFile = ss.str();
 
-    linenoiseHistoryLoad( (char*)historyFile.c_str() );
 #ifdef USE_TABCOMPLETION
+    linenoiseHistoryLoad( (char*)historyFile.c_str() );
     linenoiseSetCompletionCallback( completionHook );
 #endif
 
@@ -109,12 +109,12 @@ void shellHistoryInit() {
 #endif
 }
 void shellHistoryDone() {
-#ifdef USE_LINENOISE
+#ifdef USE_TABCOMPLETION
     linenoiseHistorySave( (char*)historyFile.c_str() );
 #endif
 }
 void shellHistoryAdd( const char * line ) {
-#ifdef USE_LINENOISE
+#ifdef USE_TABCOMPLETION
     if ( line[0] == '\0' )
         return;
 
