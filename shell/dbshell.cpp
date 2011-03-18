@@ -49,6 +49,11 @@ bool autoKillOp = false;
 jmp_buf jbuf;
 #endif
 
+#if defined(USE_LINENOISE) && !defined(WIN32) && !defined(_WIN32) 
+#define USE_TABCOMPLETION
+#endif
+
+
 namespace mongo {
 
     Scope * shellMainScope;
@@ -74,7 +79,7 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
 
 }
 
-#ifdef USE_LINENOISE
+#ifdef USE_TABCOMPLETION
 void completionHook(const char* text , linenoiseCompletions* lc ) {
     vector<string> all;
     generateCompletions( text , all );
@@ -95,7 +100,9 @@ void shellHistoryInit() {
     historyFile = ss.str();
 
     linenoiseHistoryLoad( (char*)historyFile.c_str() );
+#ifdef USE_TABCOMPLETION
     linenoiseSetCompletionCallback( completionHook );
+#endif
 
 #else
     //cout << "type \"exit\" to exit" << endl;
