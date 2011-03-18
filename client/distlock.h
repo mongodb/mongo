@@ -67,7 +67,7 @@ namespace mongo {
     class DistributedLock {
     public:
 
-    	static const LabeledLevel logLvl;
+    	static LabeledLevel logLvl;
 
         /**
          * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired.
