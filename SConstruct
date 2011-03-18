@@ -606,10 +606,6 @@ elif "win32" == os.sys.platform:
         if debugLogging:
             env.Append( CPPDEFINES=[ "_DEBUG" ] )
 
-    if os.path.exists("../readline/lib") :
-        env.Append( LIBPATH=["../readline/lib"] )
-        env.Append( CPPPATH=["../readline/include"] )
-
     if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
         env.Append( LIBPATH=[ boostDir + "/lib/vs2010_64" ] )
     elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
@@ -944,29 +940,6 @@ def doConfigure( myenv , needPcre=True , shell=False ):
         else:
             myCheckLib( "v8" , True )
 
-    if shell:
-        haveReadLine = False
-        if darwin:
-            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            if force64:
-                myCheckLib( "readline" , True )
-                myCheckLib( "ncurses" , True )
-            else:
-                myenv.Append( LINKFLAGS=" /usr/lib/libreadline.dylib " )
-        elif openbsd:
-            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            myCheckLib( "termcap" , True )
-            myCheckLib( "readline" , True )
-        elif myCheckLib( "readline" , release and nix , staticOnly=release ):
-            myenv.Append( CPPDEFINES=[ "USE_READLINE" ] )
-            myCheckLib( "ncurses" , staticOnly=release )
-            myCheckLib( "tinfo" , staticOnly=release )
-        else:
-            print( "\n*** notice: no readline library, mongo shell will not have nice interactive line editing ***\n" )
-
-        if linux:
-            myCheckLib( "rt" , True )
-
     # requires ports devel/libexecinfo to be installed
     if freebsd or openbsd:
         myCheckLib( "execinfo", True )
@@ -1214,6 +1187,7 @@ elif not onlyServer:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
     coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
+    coreShellFiles.append( "third_party/linenoise/linenoise.c" )
 
     if weird:
         shell32BitFiles = coreShellFiles
