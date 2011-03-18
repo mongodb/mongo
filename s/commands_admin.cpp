@@ -397,9 +397,12 @@ namespace mongo {
                 //
                 // We enforce both these conditions in what comes next.
 
+                bool careAboutUnique = cmdObj["unique"].trueValue();
+
                 {
                     ShardKeyPattern proposedKey( key );
                     bool hasShardIndex = false;
+                    bool hasUniqueShardIndex = false;
 
                     ScopedDbConnection conn( config->getPrimary() );
                     BSONObjBuilder b;
@@ -409,13 +412,21 @@ namespace mongo {
                     while ( cursor->more() ) {
                         BSONObj idx = cursor->next();
 
+                        log() << "Index: " << idx << endl;
+
+                        bool idIndex = ! idx["name"].eoo() && idx["name"].String() == "_id_";
+                        bool uniqueIndex = ( ! idx["unique"].eoo() && idx["unique"].trueValue() ) ||
+                        		           idIndex;
+
                         // Is index key over the sharding key? Remember that.
                         if ( key.woCompare( idx["key"].embeddedObjectUserCheck() ) == 0 ) {
                             hasShardIndex = true;
+                            hasUniqueShardIndex = uniqueIndex;
+                            continue;
                         }
 
                         // Not a unique index? Move on.
-                        if ( idx["unique"].eoo() || ! idx["unique"].trueValue() )
+                        if ( ! uniqueIndex || idIndex )
                             continue;
 
                         // Shard key is prefix of unique index? Move on.
@@ -423,6 +434,12 @@ namespace mongo {
                             continue;
 
                         errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
+                        conn.done();
+                        return false;
+                    }
+
+                    if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
+                        errmsg = (string)"can't shard collection " + ns + ", index not unique";
                         conn.done();
                         return false;
                     }
@@ -458,7 +475,7 @@ namespace mongo {
 
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
-                config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
+                config->shardCollection( ns , key , careAboutUnique );
 
                 result << "collectionsharded" << ns;
                 return true;
