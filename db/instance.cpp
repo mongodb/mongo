@@ -942,7 +942,6 @@ namespace mongo {
             cout << "**************" << endl;
             cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
-            cout << "Alternatively (NOT recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
             uasserted(13597, "can't start without --dur enabled when journal/ files are present");
         }
