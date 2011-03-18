@@ -86,7 +86,8 @@ namespace mongo {
             DurScanOnly = 2,      // don't do any real work, just scan and dump if dump specified
             DurRecoverOnly = 4,   // terminate after recovery step
             DurParanoid = 8,      // paranoid mode enables extra checks
-            DurAlwaysCommit = 16  // do a group commit every time the writelock is released
+            DurAlwaysCommit = 16, // do a group commit every time the writelock is released
+            DurAlwaysRemap = 32   // remap the private view after every group commit (may lag to the next write lock acquisition, but will do all files then)
         };
         int durOptions;          // --durOptions <n> for debugging
 

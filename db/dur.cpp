@@ -1,4 +1,4 @@
-// @file dur.cpp durability in the storage engine (crash-safeness / journaling)
+]// @file dur.cpp durability in the storage engine (crash-safeness / journaling)
 
 /**
 *    Copyright (C) 2009 10gen Inc.
@@ -395,6 +395,8 @@ namespace mongo {
             // remapping.
             unsigned long long now = curTimeMicros64();
             double fraction = (now-lastRemap)/2000000.0;
+            if( cmdLine.durOptions & CmdLine::DurAlwaysRemap )
+                fraction = 1;
             lastRemap = now;
 
             RWLockRecursive::Shared lk(MongoFile::mmmutex);
@@ -605,7 +607,7 @@ namespace mongo {
         static void go() {
             const int N = 10;
             static int n;
-            if( privateMapBytes < UncommittedBytesLimit && ++n % N ) {
+            if( privateMapBytes < UncommittedBytesLimit && ++n % N && (cmdLine.durOptions&CmdLine::DurAlwaysRemap)==0 ) {
                 // limited locks version doesn't do any remapprivateview at all, so only try this if privateMapBytes
                 // is in an acceptable range.  also every Nth commit, we do everything so we can do some remapping;
                 // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
@@ -702,6 +704,19 @@ namespace mongo {
         void startup() {
             if( !cmdLine.dur )
                 return;
+
+#if defined(_DURABLEDEFAULTON)
+            DEV { 
+                if( time(0) & 1 ) {
+                    cmdLine.durOptions |= CmdLine::DurAlwaysCommit;
+                    log() << "_DEBUG _DURABLEDEFAULTON : forcing DurAlwaysCommit mode for this run" << endl;
+                }
+                if( time(0) & 2 ) {
+                    cmdLine.durOptions |= CmdLine::DurAlwaysRemap;
+                    log() << "_DEBUG _DURABLEDEFAULTON : forcing DurAlwaysRemap mode for this run" << endl;
+                }
+            }
+#endif
 
             DurableInterface::enableDurability();
 
