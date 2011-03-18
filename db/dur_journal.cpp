@@ -266,7 +266,10 @@ namespace mongo {
             assert( len % BLKSZ == 0 );
 
             AlignedBuilder b(BLKSZ);            
-            memset((void*)b.buf(), 0, BLKSZ);
+            // we don't rezero a journal file upon recycling (see removeOldJournalFile).  given that, its contents 
+            // don't matter, the important thing is it is prealloced.  so we fill it with a rand # here : if it not 
+            // being zeroed were a problem, we'd want to catch that sooner than later (upon a recycling)
+            memset((void*)b.buf(), rand(), BLKSZ);
 
             ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
 
