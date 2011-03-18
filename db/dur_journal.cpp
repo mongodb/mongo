@@ -262,15 +262,16 @@ namespace mongo {
             
             log() << "preallocating a journal file " << p.string() << endl;
 
-            const unsigned BLKSZ = 1024 * 64;
+            const unsigned BLKSZ = 1024 * 1024;
+            assert( len % BLKSZ == 0 );
+
             AlignedBuilder b(BLKSZ);            
             memset((void*)b.buf(), 0, BLKSZ);
-            assert( len % BLKSZ == 0 );
 
             ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
 
             File f;
-            f.open( p.string().c_str() , false , true );
+            f.open( p.string().c_str() , /*read-only*/false , /*direct-io*/false );
             assert( f.is_open() );
             fileofs loc = 0;
             while ( loc < len ) {
