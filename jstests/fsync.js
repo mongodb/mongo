@@ -11,10 +11,11 @@ y = db.currentOp();
 assert(y.fsyncLock,"B");
 
 z = db.fsyncUnlock();
+assert( db.currentOp().fsyncLock == null, "A2" );
 
-// it will take some time to unlock, and unlock does not block and wait for that
-// doing a write will make us wait until db is writeable.
+// make sure the db is unlocked
 db.jstests_fsync.insert({x:1});
+db.getLastError();
 
 assert( db.currentOp().fsyncLock == null, "A" );
 

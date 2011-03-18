@@ -76,9 +76,7 @@ namespace mongo {
 #endif
 
     // see FSyncCommand:
-    unsigned lockedForWriting;
-    mongo::mutex lockedForWritingMutex("lockedForWriting");
-    bool unlockRequested = false;
+    extern bool lockedForWriting;
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
@@ -142,6 +140,7 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
+    void unlockFsyncAndWait();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
         if ( ! cc().isAdmin() ) { // checks auth
@@ -153,8 +152,8 @@ namespace mongo {
         else {
             if( lockedForWriting ) {
                 log() << "command: unlock requested" << endl;
-                obj = fromjson("{ok:1,\"info\":\"unlock requested\"}");
-                unlockRequested = true;
+                obj = fromjson("{ok:1,\"info\":\"unlock completed\"}");
+                unlockFsyncAndWait();
             }
             else {
                 obj = fromjson("{ok:0,\"errmsg\":\"not locked\"}");
