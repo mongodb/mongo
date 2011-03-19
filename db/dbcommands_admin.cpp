@@ -223,6 +223,7 @@ namespace mongo {
                 if( scanData ) {
                     shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                     int n = 0;
+                    int nInvalid = 0;
                     long long len = 0;
                     long long nlen = 0;
                     int outOfOrder = 0;
@@ -242,6 +243,25 @@ namespace mongo {
                         Record *r = c->_current();
                         len += r->lengthWithHeaders;
                         nlen += r->netLength();
+
+                        BSONObj obj(r);
+                        if (!obj.isValid() && !obj.valid()){ // both fast and deep checks
+                            valid = false;
+                            nInvalid++;
+                            if (strcmp("_id", obj.firstElement().fieldName()) == 0){
+                                try {
+                                    obj.firstElement().validate(); // throws on error
+                                    log() << "Invalid bson detected in " << ns << " with _id: " << obj.firstElement().toString(false) << endl;
+                                }
+                                catch(...){
+                                    log() << "Invalid bson detected in " << ns << " with corrupt _id" << endl;
+                                }
+                            }
+                            else {
+                                log() << "Invalid bson detected in " << ns << " and couldn't find _id" << endl;
+                            }
+                        }
+
                         c->advance();
                     }
                     if ( d->capped && !d->capLooped() ) {
@@ -254,6 +274,8 @@ namespace mongo {
                         ss << '\n';
                     }
                     ss << "  " << n << " objects found, nobj:" << d->stats.nrecords << '\n';
+                    ss << "  " << nInvalid << " corrupt objects found\n";
+
                     ss << "  " << len << " bytes data w/headers\n";
                     ss << "  " << nlen << " bytes data wout/headers\n";
                 }
