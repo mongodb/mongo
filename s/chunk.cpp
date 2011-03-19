@@ -45,6 +45,8 @@ namespace mongo {
     string Chunk::chunkMetadataNS = "config.chunks";
 
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
+    int Chunk::MaxObjectPerChunk = 250000;
+    
 
     Chunk::Chunk( ChunkManager * manager ) : _manager(manager), _lastmod(0) {
         _setDataWritten();
@@ -182,8 +184,7 @@ namespace mongo {
         if ( ! force ) {
             vector<BSONObj> candidates;
             const int maxPoints = 2;
-            const int maxObjs = 250000;
-            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
+            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , MaxObjectPerChunk );
             if ( candidates.size() <= 1 ) {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
