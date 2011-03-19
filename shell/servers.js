@@ -500,7 +500,7 @@ printShardingStatus = function( configDB , verbose ){
                                 );
                             }
                             else {
-                                output( "\t\t\ttoo many chunksn to print, use verbose if you want to force print" );
+                                output( "\t\t\ttoo many chunks to print, use verbose if you want to force print" );
                             }
                         }
                     }
