@@ -245,7 +245,7 @@ namespace mongo {
                         nlen += r->netLength();
 
                         BSONObj obj(r);
-                        if (!obj.isValid() && !obj.valid()){ // both fast and deep checks
+                        if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
                             valid = false;
                             nInvalid++;
                             if (strcmp("_id", obj.firstElement().fieldName()) == 0){
