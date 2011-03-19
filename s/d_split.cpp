@@ -269,7 +269,7 @@ namespace mongo {
                 maxSplitPoints = maxSplitPointsElem.numberLong();
             }
 
-            long long maxChunkObjects = 0;
+            long long maxChunkObjects = Chunk::MaxObjectPerChunk;
             BSONElement MaxChunkObjectsElem = jsobj[ "maxChunkObjects" ];
             if ( MaxChunkObjectsElem.isNumber() ) {
                 maxChunkObjects = MaxChunkObjectsElem.numberLong();
@@ -425,7 +425,8 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
                     
-                    c.reset( new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) );
+                    bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                    c.reset( bc );
                     cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 }
                 
@@ -442,6 +443,7 @@ namespace mongo {
                 
                 // Remove the sentinel at the beginning before returning and add fieldnames.
                 splitKeys.erase( splitKeys.begin() );
+                assert( c.get() );
                 for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ) {
                     *it = bc->prettyKey( *it );
                 }
