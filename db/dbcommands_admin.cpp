@@ -274,7 +274,7 @@ namespace mongo {
                         ss << '\n';
                     }
                     ss << "  " << n << " objects found, nobj:" << d->stats.nrecords << '\n';
-                    ss << "  " << nInvalid << " corrupt objects found\n";
+                    ss << "  " << nInvalid << " invalid BSON objects found\n";
 
                     ss << "  " << len << " bytes data w/headers\n";
                     ss << "  " << nlen << " bytes data wout/headers\n";
