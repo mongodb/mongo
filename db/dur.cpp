@@ -143,14 +143,22 @@ namespace mongo {
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
+            // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
+            DEV dbMutex.assertAtLeastReadLocked();
+
             MemoryMappedFile::makeWritable(dst, len);
+
+            // we enter the RecoveryJob mutex here, so that if WRITETODATAFILES is happening we do not 
+            // conflict with it
+            scoped_lock lk1( RecoveryJob::get()._mx );
 
             // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
             //
-            // this also makes setNoJournal threadsafe, which is good as we call it from a read (not a write) lock 
-            // in class SlaveTracking
+            // either of these mutexes also makes setNoJournal threadsafe, which is good as we call it from a read 
+            // (not a write) lock in class SlaveTracking
             //
             scoped_lock lk( privateViews._mutex() );
+
             size_t ofs;
             MongoMMF *f = privateViews.find_inlock(dst, ofs);
             assert(f);

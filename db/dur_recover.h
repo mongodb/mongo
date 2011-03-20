@@ -34,9 +34,9 @@ namespace mongo {
 
             unsigned long long _lastDataSyncedFromLastRun;
             unsigned long long _lastSeqMentionedInConsoleLog;
-
-            mongo::mutex _mx; // protects _mmfs
-
+        public:
+            mongo::mutex _mx; // protects _mmfs; see setNoJournal() too
+        private:
             bool _recovering; // are we in recovery or WRITETODATAFILES
 
             static RecoveryJob &_instance;
