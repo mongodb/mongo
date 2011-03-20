@@ -465,6 +465,3 @@ flags['btree'] = [
 	'RLE' ]
 flags['buf'] = [
 	'BUF_INUSE' ]
-flags['session'] = [
-	'READ_EVICT',
-	'READ_PRIORITY' ]
