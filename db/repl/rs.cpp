@@ -378,9 +378,6 @@ namespace mongo {
                         newOnes.push_back(&m);
                     }
                 }
-                else {
-                    additive = false;
-                }
 
                 // change timeout settings, if necessary
                 ScopedConn conn(m.h.toString());
