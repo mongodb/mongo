@@ -48,7 +48,8 @@ bdb_teardown(void)
 }
 
 void
-bdb_insert(const void *key_data, u_int32_t key_size, const void *data_data, u_int32_t data_size)
+bdb_insert(const void *key_data,
+    u_int32_t key_size, const void *data_data, u_int32_t data_size)
 {
 	static DBT key, data;
 	DB *db;
@@ -90,7 +91,8 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 }
 
 int
-bdb_put(u_int64_t keyno, const void *arg_data, u_int32_t arg_size, int *notfoundp)
+bdb_put(
+    u_int64_t keyno, const void *arg_data, u_int32_t arg_size, int *notfoundp)
 {
 	static DBT key, data;
 	DB *db;

@@ -661,7 +661,8 @@ wts_del_row(u_int64_t keyno)
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
-	if ((ret = btree->row_del(btree, session, &key, 0)) != 0 && ret != WT_NOTFOUND) {
+	if ((ret = btree->row_del(
+	    btree, session, &key, 0)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_del_row: delete row %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
@@ -695,7 +696,8 @@ wts_del_col(u_int64_t keyno)
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
-	if ((ret = btree->col_del(btree, session, keyno, 0)) != 0 && ret != WT_NOTFOUND) {
+	if ((ret = btree->col_del(
+	    btree, session, keyno, 0)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_del_col: delete col %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
