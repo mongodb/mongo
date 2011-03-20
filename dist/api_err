@@ -8,7 +8,6 @@
 WT_DEADLOCK	conflict with concurrent operation
 WT_ERROR	non-specific WiredTiger error
 WT_NOTFOUND	item not found
-WT_PAGE_DELETED	requested page was deleted
 WT_READONLY	attempt to modify a read-only value
 WT_RESTART	restart the operation (internal)
 WT_TOOSMALL	buffer too small
