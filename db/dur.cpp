@@ -143,9 +143,6 @@ namespace mongo {
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-#if 1 //TODO: fix non-journaling impl
-            memcpy(writingPtr(dst,len), src, len);
-#else
             MemoryMappedFile::makeWritable(dst, len);
 
             // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
@@ -165,7 +162,6 @@ namespace mongo {
                 // to keep them in sync.  we do this as we do not want to cause a copy on write unnecessarily.
                 memcpy(dst, src, len);
             }
-#endif
         }
 
         /** base declare write intent function that all the helpers call. */
