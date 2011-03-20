@@ -54,7 +54,8 @@ wts_startup(int logfile)
 	}
 
 	/* XXX add cachesize to config */
-	if ((ret = wiredtiger_simple_setup(g.progname, "memcheck", &btree)) != 0) {
+	if ((ret =
+	    wiredtiger_simple_setup(g.progname, "memcheck", &btree)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_simple_setup: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
