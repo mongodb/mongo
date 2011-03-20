@@ -155,7 +155,7 @@ namespace PerfTests {
     public:
         void say(unsigned long long n, int ms, string s) {
             //cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
-            cout << "stats\t" << s << '\t' << n*1000/ms << "\t" << ms << "ms\t"
+          cout << "stats\t" << setw(36) << left << s << '\t' << n*1000/ms << "\t" << ms << "ms\t"
                  << dur::stats.curr->_asCSV() << endl;
         }
         void run() {
@@ -369,7 +369,7 @@ namespace PerfTests {
             add< Checksum >();
             add< TaskQueueTest >();
             cout << "stats\t" 
-                << "test\trps\ttime\t"
+                << "test                                \trps\ttime\t"
                 << dur::stats.curr->_CSVHeader() << endl;
             add< InsertDup >();
             add< Insert1 >();
