@@ -21,5 +21,5 @@ assert.eq( "1,2" , res.values , "A2" );
 assert.eq( undefined , res.count , "A3" );
 
 res = db.runCommand( { distinct : "distinctCount1" , key : "a" , query : { a : { $lt : 3 } } , count : "true" } );
-assert.eq( "1,2" , res.values , "A2" );
-assert.eq( undefined , res.count , "A3" );
+assert.eq( "1,2" , res.values , "A4" );
+assert.eq( undefined , res.count , "A5" );
