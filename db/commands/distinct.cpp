@@ -29,7 +29,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
+            help << "{ distinct : 'collection name' , key : 'a.b' , query : {}, count : true }";
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
@@ -38,6 +38,8 @@ namespace mongo {
 
             string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );
+
+            bool isCountCommand = cmdObj.getBoolField("count");
 
             BSONObj query = getQuery( cmdObj );
 
@@ -51,12 +53,17 @@ namespace mongo {
             long long nscanned = 0; // locations looked at
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
+            long long nCount = 0;
             MatchDetails md;
 
             NamespaceDetails * d = nsdetails( ns.c_str() );
 
             if ( ! d ) {
-                result.appendArray( "values" , BSONObj() );
+                if(isCountCommand) {
+                    result.appendNumber("count", 0);
+                } else {
+                    result.appendArray( "values" , BSONObj() );
+                }
                 result.append( "stats" , BSON( "n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0 ) );
                 return true;
             }
@@ -107,14 +114,21 @@ namespace mongo {
                         if ( values.count( e ) )
                             continue;
 
-                        int now = bb.len();
 
-                        uassert(10044,  "distinct too big, 4mb cap", ( now + e.size() + 1024 ) < bufSize );
+                        if(!isCountCommand) {
+                          int now = bb.len();
 
-                        arr.append( e );
-                        BSONElement x( start + now );
+                          uassert(10044,  "distinct too big, 16mb cap", ( now + e.size() + 1024 ) < bufSize );
+                          arr.append( e );
 
-                        values.insert( x );
+
+                          BSONElement x( start + now );
+                          values.insert( x );
+                        } else {
+                          nCount++;
+
+                          values.insert( e );
+                        }
                     }
                 }
 
@@ -131,7 +145,11 @@ namespace mongo {
 
             assert( start == bb.buf() );
 
-            result.appendArray( "values" , arr.done() );
+            if(isCountCommand) {
+                result.appendNumber( "count" , nCount );
+            } else {
+                result.appendArray( "values" , arr.done() );
+            }
 
             {
                 BSONObjBuilder b;
