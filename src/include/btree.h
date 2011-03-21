@@ -248,14 +248,21 @@ struct __wt_page_disk {
  */
 struct __wt_ref {
 	/*
-	 * WT_REF_DISK has a value of 0, we're in the correct default state
+	 * Page state
+	 *
+	 * WT_REF_DISK has a value of 0, we're in the common default state
 	 * after allocating zero'd memory.
 	 */
 #define	WT_REF_DISK		0x00	/* Page is on disk */
 #define	WT_REF_EVICTED		0x01	/* Page was evicted, not discarded */
-#define	WT_REF_MEM		0x02	/* Page is in cache */
+#define	WT_REF_MEM		0x02	/* Page is in cache and valid */
+
+	/*
+	 * Page flags
+	 */
 #define	WT_REF_EVICT		0x80	/* Page being evaluated for eviction */
 #define	WT_REF_MERGE		0x40	/* Page should be merged into parent */
+
 #define	WT_REF_STATE(s)							\
 	((s) & (WT_REF_DISK | WT_REF_EVICTED | WT_REF_MEM))
 #define	WT_REF_SET_STATE(ref, s) do {					\
