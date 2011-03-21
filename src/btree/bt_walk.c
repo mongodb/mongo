@@ -21,7 +21,6 @@
  *    + to walk the tree a few pages at a time, that is, periodically wake,
  *	visit some pages, then go back to sleep, which requires enough state
  *	to restart the traversal at any point,
- *    + to only visit pages that currently appear in the cache,
  *    + to return the WT_REF structure (not the WT_PAGE structure),
  *    + to walk files not associated with the current SESSION's BTREE handle,
  *    + and finally, it doesn't require a hazard reference.
@@ -43,9 +42,7 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	BTREE *btree;
 	WT_COL_REF *cref;
 	WT_ROW_REF *rref;
-	WT_REF *ref;
 	uint32_t i;
-	int ret;
 
 	 WT_CONN_FCHK(
 	     S2C(session), "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
@@ -56,49 +53,54 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	if (page == NULL)
 		page = btree->root_page.page;
 
+	/*
+	 * WT_TREE_WALK_DESCEND --
+	 *	The code to descend the tree is identical for both row- and
+	 * column-store pages, except for finding the WT_REF structure.
+	 */
+#define	WT_TREE_WALK_DESCEND(session, page, ref, flags, work, arg) do {	\
+	WT_PAGE *__ref_page;						\
+	int __tret;							\
+	/* ref references the subtree containing the child page. */	\
+	switch (WT_REF_STATE((ref)->state)) {				\
+	case WT_REF_MEM:						\
+		break;							\
+	case WT_REF_DISK:						\
+	case WT_REF_EVICTED:						\
+		/* Optionally skip pages that aren't in the cache. */	\
+		if (LF_ISSET(WT_WALK_CACHE))				\
+			continue;					\
+		break;							\
+	}								\
+									\
+	/*								\
+	 * Tree-walk is called with work functions that reconcile pages	\
+	 * (specifically the sync code).  If sync splits a page, the	\
+	 * WT_REF page may change underfoot.  That's OK because sync is	\
+	 * single-threaded and has locked out the eviction thread, but	\
+	 * we can't re-use ref->page to clear the hazard reference, it	\
+	 * may have changed.  Save a copy of the page reference on which\
+	 * we acquired the hazard reference.				\
+	 */								\
+	__ref_page = (ref)->page;					\
+	WT_RET(__wt_page_in(session, page, ref, 0));			\
+	__tret = __wt_tree_walk(session, __ref_page, flags, work, arg);	\
+	__wt_hazard_clear(session, __ref_page);				\
+	if (__tret != 0)						\
+		return (__tret);					\
+} while (0)
+
 	/* Walk internal pages, descending through any off-page references. */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		WT_COL_REF_FOREACH(page, cref, i) {
-			/* cref references the subtree containing the record */
-			switch (WT_REF_STATE(WT_COL_REF_STATE(cref))) {
-			case WT_REF_MEM:
-				break;
-			case WT_REF_DISK:
-			case WT_REF_EVICTED:
-				if (LF_ISSET(WT_WALK_CACHE))
-					continue;
-				break;
-			}
-			ref = &cref->ref;
-			WT_RET(__wt_page_in(session, page, ref, 0));
-			ret = __wt_tree_walk(
-			    session, ref->page, flags, work, arg);
-			__wt_hazard_clear(session, ref->page);
-			if (ret != 0)
-				return (ret);
-		}
+		WT_COL_REF_FOREACH(page, cref, i)
+			WT_TREE_WALK_DESCEND(
+			    session, page, &cref->ref, flags, work, arg);
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ROW_REF_FOREACH(page, rref, i) {
-			/* rref references the subtree containing the record */
-			switch (WT_REF_STATE(WT_ROW_REF_STATE(rref))) {
-			case WT_REF_MEM:
-				break;
-			case WT_REF_DISK:
-			case WT_REF_EVICTED:
-				if (LF_ISSET(WT_WALK_CACHE))
-					continue;
-				break;
-			}
-			ref = &rref->ref;
-			WT_RET(__wt_page_in(session, page, ref, 0));
-			ret = __wt_tree_walk(
-			    session, ref->page, flags, work, arg);
-			__wt_hazard_clear(session, ref->page);
-			if (ret != 0)
-				return (ret);
-		}
+		WT_ROW_REF_FOREACH(page, rref, i)
+			WT_TREE_WALK_DESCEND(
+			    session, page, &rref->ref, flags, work, arg);
 		break;
 	}
 
