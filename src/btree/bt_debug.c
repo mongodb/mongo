@@ -174,7 +174,6 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 		fprintf(fp, ", starting recno %llu",
 		    (unsigned long long)page->u.col_int.recno);
 		break;
-
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
