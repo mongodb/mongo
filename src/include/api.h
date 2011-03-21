@@ -69,7 +69,8 @@ struct __btree {
 	 * its root page, and the root page brought into memory.  If no root
 	 * page has been acquired, there's usually not much work to do.
 	 */
-#define	WT_UNOPENED_FILE(btree)	((btree)->root_page.state != WT_REF_CACHE)
+#define	WT_UNOPENED_FILE(btree)						\
+	(WT_REF_STATE((btree)->root_page.state) != WT_REF_MEM)
 
 	WT_REF		root_page;	/* Root page reference */
 
@@ -276,8 +277,6 @@ struct __session {
 	 * SESSION methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
-
-	uint32_t flags;
 };
 
 /*******************************************
@@ -475,8 +474,6 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_OSWRITE					0x00000001
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
-#define	WT_READ_EVICT					0x00000002
-#define	WT_READ_PRIORITY				0x00000001
 #define	WT_RLE						0x00000001
 #define	WT_SERVER_RUN					0x00000004
 #define	WT_TELEPHONE					0x00000001
@@ -518,7 +515,6 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_APIMASK_CONNECTION_STAT_PRINT		0x00000000
 #define	WT_APIMASK_CONNECTION_SYNC			0x00000000
 #define	WT_APIMASK_CONNECTION_VERBOSE_SET		0x0000003f
-#define	WT_APIMASK_SESSION				0x00000003
 #define	WT_APIMASK_SESSION_CLOSE			0x00000000
 #define	WT_APIMASK_WIREDTIGER_CONN_INIT			0x00000001
 /*

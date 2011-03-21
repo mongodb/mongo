@@ -139,15 +139,6 @@ struct __wt_page_disk {
 		uint32_t datalen;	/* 20-23: overflow data length */
 	} u;
 
-#define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col store fixed-len leaf */
-#define	WT_PAGE_COL_INT		2	/* Col store internal page */
-#define	WT_PAGE_COL_RLE		3	/* Col store run-length encoded leaf */
-#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
-#define	WT_PAGE_OVFL		5	/* Page of untyped data */
-#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* 24: page type */
 
 	/*
@@ -173,13 +164,11 @@ struct __wt_page_disk {
 #define	WT_PAGE_DISK_SIZE		28
 
 /*
- * WT_PAGE_DISK_BYTE, WT_PAGE_BYTE --
+ * WT_PAGE_DISK_BYTE --
  * The first usable data byte on the page (past the header).
  */
 #define	WT_PAGE_DISK_BYTE(dsk)						\
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
-#define	WT_PAGE_BYTE(page)						\
-	WT_PAGE_DISK_BYTE((page)->dsk)
 
 /*
  * WT_PAGE_DISK_OFFSET --
@@ -192,42 +181,92 @@ struct __wt_page_disk {
 
 /*
  * WT_REF --
- * A single in-memory page, and the structure used to determine if it's OK to
- * dereference the pointer to the page.
+ * A single in-memory page and the state information used to determine if it's
+ * OK to dereference the pointer to the page.
  *
- * Synchronization is based on the WT_REF->state field:
- * WT_REF_CACHE:
- *	The page is in the cache and the page reference is valid.  Readers check
- *	the state field and if it's WT_REF_CACHE, they set a hazard reference
- *	to the page, flush memory and re-confirm the state of the page.  If the
- *	page state is still WT_REF_CACHE, the reader has a valid reference and
- *	can proceed.
- * WT_REF_DELETED:
- *      The page has been deleted.
+ * Synchronization is based on the WT_REF->state field, which is divided into
+ * two parts, a state and two flags.  The state value is one of the following:
+ *
+ * WT_REF_MEM:
+ *	Set by the read server on initial read from disk; the page is in the
+ *	cache and the page reference is OK.
  * WT_REF_DISK:
- *      The page is on disk, but needs to be read into the cache before use.
+ *      Set by the eviction server after page reconciliation; the page is on
+ *	disk, but needs to be read into memory before use.
+ * WT_REF_EVICTED:
+ *	Set by the eviction server after page reconciliation; the page was
+ *	logically evicted, but is waiting on its parent to be evicted so it
+ *	can be merged into the parent.
+ *
+ * The flag values are one or more of the following:
+ *
  * WT_REF_EVICT:
- *	The eviction server chose this page and is checking hazard references.
- *	When the eviction server wants to discard a page from the tree, it sets
- *	state to WT_EVICT, flushes memory, then checks hazard references.  If
- *	the eviction server finds a hazard reference, it resets the state to
- *	WT_CACHE, restoring the page to the readers.  If the eviction server
- *	does not find a hazard reference, the page is then evicted.  Regardless,
- *	the page will revert to one of the WT_REF_{CACHE,DISK} states.
+ *	Set by the eviction server; the eviction server has selected this page
+ *	and is checking hazard references.
+ * WT_REF_MERGE:
+ *	Set by the eviction server during page reconciliation; the page is
+ *	expected to be merged into its parent when the parent is reconciled.
+ *
+ * The life cycle of a page goes like this: pages are read into memory from disk
+ * and the read server sets the state to WT_REF_MEM.  When the eviction server
+ * selects the page for eviction, the server adds the WT_REF_EVICT flag.  (In
+ * all cases, the eviction server clears the WT_REF_EVICT flag when finished
+ * with the page.)  If eviction was possible, the server sets the page state to
+ * WT_REF_DISK.
+ *
+ * There are more complicated scenarios:
+ *
+ * Scenario #1: the page is entirely empty.  In this case the eviction server
+ * sets the WT_REF_MERGE and WT_REF_EVICTED flags.  Ideally, when the page's
+ * parent is evicted, the empty page will be discarded.  Alternatively, if the
+ * page is accessed again, the read server will clear the WT_REF_MERGE and
+ * WT_REF_EVICTED flags and set the state to WT_REF_MEM.  This process repeats
+ * until the parent of the page is evicted and the page is merged into the
+ * parent, or the page is no longer empty and a more normal page reconciliation
+ * will occur.
+ *
+ * Scenario #2: the page requires a split.  In this case the eviction server
+ * creates a new, in-memory internal page to reference the split pages: this new
+ * page has a WT_REF_MEM state and the WT_REF_MERGE and WT_REF_EVICTED flags.
+ * Ideally, when the parent of the new page is evicted, the page will be merged
+ * into the parent.  Alternatively, if the new page is accessed, the read server
+ * will clear the WT_REF_EVICTED flag and set the state to WT_REF_MEM.  This
+ * process will repeat until the parent of the page is evicted and the page is
+ * merged into the parent (internal pages created for the purpose of a split are
+ * never written to disk, they are always merged into the parent in order to
+ * guarantee tree depth over time).
+ *
+ * Readers check the state field and if it's WT_REF_MEM, they set a hazard
+ * reference to the page, flush memory and re-confirm the page state.  If the
+ * page state is unchanged, the reader has a valid reference and can proceed.
+ *
+ * When the eviction server wants to discard a page from the tree, it sets the
+ * WT_REF_EVICT flag, flushes memory, then checks hazard references.  If the
+ * eviction server finds a hazard reference, it resets the state to WT_REF_MEM,
+ * restoring the page to its readers.  If the eviction server does not find a
+ * hazard reference, the page is evicted and the state set to WT_REF_DISK.
  */
 struct __wt_ref {
 	/*
 	 * WT_REF_DISK has a value of 0, we're in the correct default state
 	 * after allocating zero'd memory.
 	 */
-#define	WT_REF_DISK	0		/* Page is on disk */
-#define	WT_REF_CACHE	1		/* Page is in cache */
-#define	WT_REF_DELETED	2		/* Page was deleted */
-#define	WT_REF_EVICT	3		/* Cache page selected for eviction */
+#define	WT_REF_DISK		0x00	/* Page is on disk */
+#define	WT_REF_EVICTED		0x01	/* Page was evicted, not discarded */
+#define	WT_REF_MEM		0x02	/* Page is in cache */
+#define	WT_REF_EVICT		0x80	/* Page being evaluated for eviction */
+#define	WT_REF_MERGE		0x40	/* Page should be merged into parent */
+#define	WT_REF_STATE(s)							\
+	((s) & (WT_REF_DISK | WT_REF_EVICTED | WT_REF_MEM))
+#define	WT_REF_SET_STATE(ref, s) do {					\
+	(ref)->state =							\
+	    ((ref)->state & (WT_REF_EVICT | WT_REF_MERGE)) | (s);	\
+} while (0)
+
 	uint32_t volatile state;
 
-	uint32_t addr;			/* Address */
-	uint32_t size;			/* Size */
+	uint32_t addr;			/* Backing disk address */
+	uint32_t size;			/* Backing disk size */
 
 	/* !!!
 	 * The layout is deliberate.  On a 64-bit machine, when you tuck this
@@ -261,13 +300,6 @@ struct __wt_row_ref {
 };
 
 /*
- * WT_ROW_REF_SLOT --
- *	Return the array offset based on a WT_ROW_REF reference.
- */
-#define	WT_ROW_REF_SLOT(page, rref)					\
-	((uint32_t)((rref) - (page)->u.row_int.t))
-
-/*
  * WT_ROW_REF_FOREACH --
  * Macro to walk the off-page subtree array of an in-memory internal page.
  */
@@ -282,7 +314,7 @@ struct __wt_row_ref {
 struct __wt_col_ref {
 	uint64_t recno;			/* Starting record number */
 
-	WT_REF ref;			/* Subtree page */
+	WT_REF	 ref;			/* Subtree page */
 #define	WT_COL_REF_ADDR(cref)	((cref)->ref.addr)
 #define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
 #define	WT_COL_REF_SIZE(cref)	((cref)->ref.size)
@@ -303,22 +335,11 @@ struct __wt_col_ref {
  */
 struct __wt_page {
 	/*
-	 * This limits a page size to 4GB -- we could use off_t's here if we
-	 * need something bigger, but the page-size configuration code limits
-	 * page sizes already.
-	 */
-	uint32_t addr;			/* Original file allocation address */
-	uint32_t size;			/* Size in bytes */
-
-	/*
 	 * Two links to the parent's WT_PAGE structure -- the physical parent
-	 * page, and the WT_OFF or WT_OFF_RECORD structure used to find this
-	 * page.
+	 * page, and the WT_REF structure used to find this page.
 	 */
 	WT_PAGE	*parent;		/* Page's parent */
 	WT_REF	*parent_ref;		/* Page's parent reference */
-
-	WT_PAGE_DISK *dsk;		/* Page's on-disk representation */
 
 	/*
 	 * We maintain 3 "generation" numbers for a page: the disk, read and
@@ -390,7 +411,7 @@ struct __wt_page {
 	uint32_t disk_gen;
 	uint32_t write_gen;
 
-	/* But the entires are wildly different, based on the page type. */
+	/* But the entries are wildly different, based on the page type. */
 	union {
 		/* Row-store internal information. */
 		struct {
@@ -405,12 +426,16 @@ struct __wt_page {
 
 		/* Column-store internal information. */
 		struct {
+			uint64_t recno;		/* Starting recno */
+
 			WT_COL_REF *t;		/* Subtrees */
 			WT_UPDATE **upd;	/* Updates */
 		} col_int;
 
 		/* Column-store leaf information. */
 		struct {
+			uint64_t recno;		/* Starting recno */
+
 			WT_COL	   *d;		/* V objects */
 			WT_UPDATE **upd;	/* Updates */
 
@@ -419,11 +444,35 @@ struct __wt_page {
 	} u;
 
 	/*
+	 * Page's on-disk representation: NULL for pages created in memory, and
+	 * most code should never look at this value.
+	 *
+	 * XXX
+	 * I don't think we actually need the addr field, it's only used as a
+	 * unique identifier for an in-memory page, that is, debugging.  It's
+	 * here because the bulk read code uses it, and we should try and get
+	 * rid of it when that code gets re-written.
+	 */
+	WT_PAGE_DISK *XXdsk;
+	uint32_t addr;				/* Original file address */
+	uint32_t size;				/* Original size */
+
+	/*
 	 * Every in-memory page references a number of entries, originally
-	 * based on the number of on-disk entries found.  We put this at the
-	 * end of the struct to avoid internal padding.
+	 * based on the number of on-disk entries found.
 	 */
 	uint32_t indx_count;
+
+#define	WT_PAGE_INVALID		0	/* Invalid page */
+#define	WT_PAGE_COL_FIX		1	/* Col store fixed-len leaf */
+#define	WT_PAGE_COL_INT		2	/* Col store internal page */
+#define	WT_PAGE_COL_RLE		3	/* Col store run-length encoded leaf */
+#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Page of untyped data */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
+#define	WT_PAGE_FREELIST	8	/* Free-list page */
+	uint8_t type;			/* Page type */
 };
 /*
  * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure
@@ -434,9 +483,9 @@ struct __wt_page {
  * The compiler will pad this to be a multiple of the pointer size, so take
  * that into account.
  */
-#define	WT_PAGE_SIZE	WT_ALIGN(					\
-	6 * sizeof(void *) + 5 * sizeof(uint32_t) + sizeof(uint64_t),	\
-	sizeof(void *))
+#define	WT_PAGE_SIZE							\
+	WT_ALIGN(6 * sizeof(void *) + 2 * sizeof(uint64_t) +		\
+	    5 * sizeof(uint32_t) + sizeof(uint8_t), sizeof(void *))
 
 /*
  * WT_ROW --
@@ -522,8 +571,8 @@ struct __wt_col {
  * WT_COL_PTR --
  *	Return a pointer corresponding to the data offset.
  */
-#define	WT_COL_PTR(dsk, cip)						\
-	WT_PAGE_DISK_REF(dsk, (cip)->data)
+#define	WT_COL_PTR(page, cip)						\
+	WT_PAGE_DISK_REF((page)->XXdsk, (cip)->data)
 
 /*
  * WT_COL_INDX_FOREACH --
@@ -647,14 +696,14 @@ struct __wt_rle_expand {
  * find the original key WT_CELL.
  */
 #define	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i)		\
-	for ((key_cell) = WT_PAGE_BYTE(page),				\
+	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->XXdsk),		\
 	    (rref) = (page)->u.row_int.t, (i) = (page)->indx_count;	\
 	    (i) > 0;							\
 	    ++(rref),							\
 	    key_cell = --(i) == 0 ?					\
 	    NULL : WT_CELL_NEXT(WT_CELL_NEXT(key_cell)))
 #define	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_cell, i)		\
-	for ((key_cell) = WT_PAGE_BYTE(page),				\
+	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->XXdsk),		\
 	    (rip) = (page)->u.row_leaf.d, (i) = (page)->indx_count;	\
 	    (i) > 0;							\
 	    ++(rip),							\

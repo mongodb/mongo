@@ -60,7 +60,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 				F_CLR(cursor, WT_CURSTD_POSITIONED);
 				return (WT_NOTFOUND);
 			}
-			if (cbt->ref->page->dsk->type != WT_PAGE_ROW_LEAF)
+			if (cbt->ref->page->type != WT_PAGE_ROW_LEAF)
 				continue;
 
 			cbt->nitems = cbt->ref->page->indx_count;

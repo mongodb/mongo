@@ -57,63 +57,43 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 		page = btree->root_page.page;
 
 	/* Walk internal pages, descending through any off-page references. */
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/* cref references the subtree containing the record */
-			switch (WT_COL_REF_STATE(cref)) {
-			case WT_REF_CACHE:
+			switch (WT_REF_STATE(WT_COL_REF_STATE(cref))) {
+			case WT_REF_MEM:
 				break;
-			case WT_REF_DELETED:
-				continue;
 			case WT_REF_DISK:
-			case WT_REF_EVICT:
+			case WT_REF_EVICTED:
 				if (LF_ISSET(WT_WALK_CACHE))
 					continue;
 				break;
 			}
 			ref = &cref->ref;
-			switch (ret = __wt_page_in(session, page, ref, 0)) {
-			case 0:				/* Valid page */
-				ret = __wt_tree_walk(
-				    session, ref->page, flags, work, arg);
-				__wt_hazard_clear(session, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
-			if (ret != 0)
-				return (ret);
+			WT_RET(__wt_page_in(session, page, ref, 0));
+			ret = __wt_tree_walk(
+			    session, ref->page, flags, work, arg);
+			__wt_hazard_clear(session, ref->page);
 		}
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i) {
 			/* rref references the subtree containing the record */
-			switch (WT_ROW_REF_STATE(rref)) {
-			case WT_REF_CACHE:
+			switch (WT_REF_STATE(WT_ROW_REF_STATE(rref))) {
+			case WT_REF_MEM:
 				break;
-			case WT_REF_DELETED:
-				continue;
 			case WT_REF_DISK:
-			case WT_REF_EVICT:
+			case WT_REF_EVICTED:
 				if (LF_ISSET(WT_WALK_CACHE))
 					continue;
 				break;
 			}
 			ref = &rref->ref;
-			switch (ret = __wt_page_in(session, page, ref, 0)) {
-			case 0:				/* Valid page */
-				ret = __wt_tree_walk(
-				    session, ref->page, flags, work, arg);
-				__wt_hazard_clear(session, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
-			if (ret != 0)
-				return (ret);
+			WT_RET(__wt_page_in(session, page, ref, 0));
+			ret = __wt_tree_walk(
+			    session, ref->page, flags, work, arg);
+			__wt_hazard_clear(session, ref->page);
 		}
 		break;
 	}
@@ -175,7 +155,6 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 	WT_ROW_REF *rref;
 	WT_WALK_ENTRY *e;
 	u_int elem;
-	int ret;
 
 	e = &walk->tree[walk->tree_slot];
 	page = e->ref->page;
@@ -208,25 +187,18 @@ eop:		e->visited = 1;
 	 * Check to see if the page has sub-trees associated with it, in which
 	 * case we traverse those pages.
 	 */
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* Find the next subtree present in the cache. */
 		for (;;) {
 			cref = &page->u.col_int.t[e->indx];
 			ref = &cref->ref;
 
-			/* We only care about pages in the cache. */
-			if (ref->state == WT_REF_CACHE)
+			if (WT_REF_STATE(ref->state) == WT_REF_MEM)
 				break;
-			else if (ref->state != WT_REF_DELETED &&
-			    !LF_ISSET(WT_WALK_CACHE)) {
-				ret = __wt_page_in(session, page, ref, 0);
-				if (ret == 0)
-					break;			/* Valid page */
-				else if (ret == WT_PAGE_DELETED)
-					ret = 0;
-				else
-					return (ret);
+			if (!LF_ISSET(WT_WALK_CACHE)) {
+				WT_RET(__wt_page_in(session, page, ref, 0));
+				break;
 			}
 
 			/*
@@ -243,18 +215,11 @@ eop:		e->visited = 1;
 			rref = &page->u.row_int.t[e->indx];
 			ref = &rref->ref;
 
-			/* We only care about pages in the cache. */
-			if (ref->state == WT_REF_CACHE)
+			if (WT_REF_STATE(ref->state) == WT_REF_MEM)
 				break;
-			else if (ref->state != WT_REF_DELETED &&
-			    !LF_ISSET(WT_WALK_CACHE)) {
-				ret = __wt_page_in(session, page, ref, 0);
-				if (ret == 0)
-					break;			/* Valid page */
-				else if (ret == WT_PAGE_DELETED)
-					ret = 0;
-				else
-					return (ret);
+			if (!LF_ISSET(WT_WALK_CACHE)) {
+				WT_RET(__wt_page_in(session, page, ref, 0));
+				break;
 			}
 
 			/*
@@ -267,7 +232,7 @@ eop:		e->visited = 1;
 		break;
 	}
 
-	switch (ref->page->dsk->type) {
+	switch (ref->page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* The page has children; first, move past this child. */

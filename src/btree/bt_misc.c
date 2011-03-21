@@ -12,9 +12,9 @@
  *	Return a string representing the page type.
  */
 const char *
-__wt_page_type_string(WT_PAGE_DISK *dsk)
+__wt_page_type_string(u_int type)
 {
-	switch (dsk->type) {
+	switch (type) {
 	case WT_PAGE_INVALID:
 		return ("invalid");
 	case WT_PAGE_COL_FIX:

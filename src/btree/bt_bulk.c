@@ -20,6 +20,31 @@ static int __wt_bulk_var(SESSION *, void (*)(const char *,
 static int __wt_item_build_key(SESSION *, WT_ITEM *, WT_CELL *, WT_OVFL *);
 
 /*
+ * __wt_init_ff_and_sa --
+ *	Initialize first-free and space-available values for a page.
+ */
+static inline void
+__wt_init_ff_and_sa(
+    WT_PAGE *page, uint8_t **first_freep, uint32_t *space_availp)
+{
+	uint8_t *p;
+
+	*first_freep = p = WT_PAGE_DISK_BYTE(page->XXdsk);
+	*space_availp = page->size - (uint32_t)(p - (uint8_t *)page->XXdsk);
+}
+
+/*
+ * __wt_page_write --
+ *	Write a file page.
+ */
+static inline int
+__wt_page_write(SESSION *session, WT_PAGE *page)
+{
+	return (
+	    __wt_disk_write(session, page->XXdsk, page->addr, page->size));
+}
+
+/*
  * __wt_btree_bulk_load --
  *	Db.bulk_load method.
  */
@@ -93,7 +118,7 @@ __wt_bulk_fix(SESSION *session,
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bulk_scratch_page(session, btree->leafmin,
 	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX,&page, &tmp));
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 	dsk->recno = 1;
 	__wt_init_ff_and_sa(page, &first_free, &space_avail);
 
@@ -238,7 +263,7 @@ __wt_bulk_var(SESSION *session,
 	    session, btree->leafmin, page_type,&page, &tmp));
 	__wt_init_ff_and_sa(page, &first_free, &space_avail);
 	if (is_column)
-		page->dsk->recno = 1;
+		page->XXdsk->recno = 1;
 
 	while ((ret = cb(btree, &key, &value)) == 0) {
 		if (F_ISSET(btree, WT_COLUMN) ) {
@@ -333,12 +358,12 @@ __wt_bulk_var(SESSION *session,
 			    btree->leafmin, page_type, &page, &tmp));
 			__wt_init_ff_and_sa(page, &first_free, &space_avail);
 			if (is_column)
-				page->dsk->recno = insert_cnt;
+				page->XXdsk->recno = insert_cnt;
 		}
 
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
-			++page->dsk->u.entries;
+			++page->XXdsk->u.entries;
 			memcpy(first_free, &key_item, sizeof(key_item));
 			memcpy(first_free +
 			    sizeof(key_item), key->data, key->size);
@@ -348,7 +373,7 @@ __wt_bulk_var(SESSION *session,
 
 		/* Copy the data item onto the page. */
 		if (value != NULL) {
-			++page->dsk->u.entries;
+			++page->XXdsk->u.entries;
 			memcpy(first_free, &value_item, sizeof(value_item));
 			memcpy(first_free +
 			    sizeof(value_item), value->data, value->size);
@@ -363,7 +388,7 @@ __wt_bulk_var(SESSION *session,
 	ret = 0;
 
 	/* Promote a key from any partially-filled page and write it. */
-	if (page->dsk->u.entries != 0) {
+	if (page->XXdsk->u.entries != 0) {
 		WT_ERR(__wt_bulk_promote(session, page, &stack, 0));
 		WT_ERR(__wt_page_write(session, page));
 	}
@@ -418,7 +443,7 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 	__wt_init_ff_and_sa(cbulk->page,
 	    &cbulk->first_free, &cbulk->space_avail);
 	if (is_column)
-		cbulk->page->dsk->recno = 1;
+		cbulk->page->XXdsk->recno = 1;
 
 	return (0);
 }
@@ -538,12 +563,12 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 		__wt_init_ff_and_sa(cbulk->page,
 		    &cbulk->first_free, &cbulk->space_avail);
 		if (is_column)
-			cbulk->page->dsk->recno = ++cbulk->insert_cnt;
+			cbulk->page->XXdsk->recno = ++cbulk->insert_cnt;
 	}
 
 	/* Copy the key item onto the page. */
 	if (key != NULL) {
-		++cbulk->page->dsk->u.entries;
+		++cbulk->page->XXdsk->u.entries;
 		memcpy(cbulk->first_free, &key_item, sizeof(key_item));
 		memcpy(cbulk->first_free +
 		    sizeof(key_item), key->data, key->size);
@@ -553,7 +578,7 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 
 	/* Copy the data item onto the page. */
 	if (value != NULL) {
-		++cbulk->page->dsk->u.entries;
+		++cbulk->page->XXdsk->u.entries;
 		memcpy(cbulk->first_free, &value_item, sizeof(value_item));
 		memcpy(cbulk->first_free +
 		    sizeof(value_item), value->data, value->size);
@@ -578,7 +603,7 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	ret = 0;
 
 	/* Promote a key from any partially-filled page and write it. */
-	if (cbulk->page->dsk->u.entries != 0) {
+	if (cbulk->page->XXdsk->u.entries != 0) {
 		WT_ERR(__wt_bulk_promote(session,
 		    cbulk->page, &cbulk->stack, 0));
 		WT_ERR(__wt_page_write(session, cbulk->page));
@@ -619,7 +644,7 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 	void *parent_data;
 
 	btree = session->btree;
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 	WT_CLEAR(item);
 	next_tmp = NULL;
 	next = parent = NULL;
@@ -646,7 +671,7 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 		key = &key_build;
 		WT_CLEAR(key_build);
 
-		key_item = WT_PAGE_BYTE(page);
+		key_item = WT_PAGE_DISK_BYTE(page->XXdsk);
 		switch (WT_CELL_TYPE(key_item)) {
 		case WT_CELL_KEY:
 			key->data = WT_CELL_BYTE(key_item);
@@ -775,7 +800,7 @@ split:		switch (dsk->type) {
 		 * the type of the file, it's simpler to just promote 0 up the
 		 * tree in in row-store files.
 		 */
-		next->dsk->recno = page->dsk->recno;
+		next->XXdsk->recno = page->XXdsk->recno;
 
 		/*
 		 * If we don't have a parent page, it's case #1 -- allocate the
@@ -825,7 +850,7 @@ split:		switch (dsk->type) {
 	 *
 	 * If there's room, copy the promoted data onto the parent's page.
 	 */
-	switch (parent->dsk->type) {
+	switch (parent->XXdsk->type) {
 	case WT_PAGE_COL_INT:
 		if (elem->space_avail < sizeof(WT_OFF_RECORD))
 			goto split;
@@ -836,10 +861,10 @@ split:		switch (dsk->type) {
 		 */
 		off_record.addr = page->addr;
 		off_record.size = page->size;
-		WT_RECNO(&off_record) = page->dsk->recno;
+		WT_RECNO(&off_record) = page->XXdsk->recno;
 
 		/* Store the data item. */
-		++parent->dsk->u.entries;
+		++parent->XXdsk->u.entries;
 		parent_data = elem->first_free;
 		memcpy(elem->first_free, &off_record, sizeof(off_record));
 		elem->first_free += sizeof(WT_OFF_RECORD);
@@ -855,7 +880,7 @@ split:		switch (dsk->type) {
 			goto split;
 
 		/* Store the key. */
-		++parent->dsk->u.entries;
+		++parent->XXdsk->u.entries;
 		memcpy(elem->first_free, &item, sizeof(item));
 		memcpy(elem->first_free + sizeof(item), key->data, key->size);
 		elem->first_free += WT_CELL_SPACE_REQ(key->size);
@@ -867,7 +892,7 @@ split:		switch (dsk->type) {
 		off.size = page->size;
 
 		/* Store the data item. */
-		++parent->dsk->u.entries;
+		++parent->XXdsk->u.entries;
 		parent_data = elem->first_free;
 		memcpy(elem->first_free, &item, sizeof(item));
 		memcpy(elem->first_free + sizeof(item), &off, sizeof(off));
@@ -1071,7 +1096,7 @@ __wt_bulk_ovfl_write(SESSION *session, WT_ITEM *item, WT_OVFL *to)
 	to->size = item->size;
 
 	/* Initialize the page header and copy the record into place. */
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 	dsk->u.datalen = item->size;
 	memcpy((uint8_t *)dsk + WT_PAGE_DISK_SIZE, item->data, item->size);
 
@@ -1116,7 +1141,7 @@ __wt_bulk_scratch_page(SESSION *session, uint32_t page_size,
 	 * of the file, which means we can grab file space whenever we want.
 	 */
 	page = tmp->mem;
-	page->dsk = dsk =
+	page->XXdsk = dsk =
 	    (WT_PAGE_DISK *)((uint8_t *)tmp->item.data + sizeof(WT_PAGE));
 	WT_ERR(__wt_block_alloc(session, &page->addr, page_size));
 	page->size = page_size;

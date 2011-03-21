@@ -21,18 +21,16 @@ int
 __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg)
 {
 	BTREE *btree;
-	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 
 	btree = session->btree;
-	dsk = page->dsk;
 	stats = btree->fstats;
 
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
 	 * a count of the page type.
 	 */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		WT_STAT_INCR(stats, PAGE_COL_FIX);
 		WT_RET(__wt_stat_page_col_fix(session, page));
@@ -71,18 +69,16 @@ static int
 __wt_stat_page_col_fix(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
 	uint32_t i;
 
-	dsk = page->dsk;
 	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i)
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL)
-			if (WT_FIX_DELETE_ISSET(WT_COL_PTR(dsk, cip)))
+			if (WT_FIX_DELETE_ISSET(WT_COL_PTR(page, cip)))
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			else
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
@@ -102,19 +98,17 @@ static int
 __wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
 
-	dsk = page->dsk;
 	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 			WT_STAT_INCRV(stats,
 			    ITEM_COL_DELETED, WT_RLE_REPEAT_COUNT(cipdata));
@@ -154,13 +148,11 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
 	uint32_t i;
 
 	btree = session->btree;
-	dsk = page->dsk;
 	stats = btree->fstats;
 
 	/*
@@ -171,7 +163,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 	 * there's Huffman encoding).
 	 */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		switch (WT_CELL_TYPE(WT_COL_PTR(dsk, cip))) {
+		switch (WT_CELL_TYPE(WT_COL_PTR(page, cip))) {
 		case WT_CELL_DATA:
 			upd = WT_COL_UPDATE(page, cip);
 			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))

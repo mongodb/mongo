@@ -135,13 +135,12 @@ __wt_verify_tree(
 	WT_VSTUFF *vs)		/* The verify package */
 {
 	WT_COL_REF *cref;
-	WT_PAGE_DISK *dsk;
 	WT_REF *ref;
 	WT_ROW_REF *rref;
+	uint64_t recno;
 	uint32_t i;
 	int ret;
 
-	dsk = page->dsk;
 	ret = 0;
 
 	/*
@@ -180,17 +179,21 @@ __wt_verify_tree(
 #endif
 
 	/* Check the starting record number. */
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
+		recno = page->u.col_int.recno;
+		goto recno_chk;
+		break;
+	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		if (parent_recno != dsk->recno) {
+		recno = page->u.col_leaf.recno;
+recno_chk:	if (parent_recno != recno) {
 			__wt_errx(session,
 			    "page at addr %lu has a starting record of %llu "
 			    "where the expected starting record was %llu",
 			    (u_long)page->addr,
-			    (unsigned long long)dsk->recno,
+			    (unsigned long long)recno,
 			    (unsigned long long)parent_recno);
 			goto err;
 		}
@@ -212,7 +215,7 @@ __wt_verify_tree(
 	 * satisfied in the operating system buffer cache, and not worry about
 	 * it.  Table verify isn't likely to be a performance path anyway.
 	 */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -221,22 +224,16 @@ __wt_verify_tree(
 	}
 
 	/* Check tree connections and recursively descend the tree. */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
-			switch (ret = __wt_page_in(session, page, ref, 1)) {
-			case 0:				/* Valid page */
-				ret = __wt_verify_tree(
-				    session, NULL, ref->page, cref->recno, vs);
-				__wt_hazard_clear(session, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
+			WT_ERR(__wt_page_in(session, page, ref, 1));
+			ret = __wt_verify_tree(
+			    session, NULL, ref->page, cref->recno, vs);
+			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
 				goto err;
 		}
@@ -284,25 +281,19 @@ __wt_verify_tree(
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
-			switch (ret = __wt_page_in(session, page, ref, 1)) {
-			case 0:				/* Valid page */
-				ret = __wt_verify_tree(
-				    session, rref, ref->page, (uint64_t)0, vs);
-				/*
-				 * Remaining special handling of the last
-				 * verified leaf page: if we kept a reference
-				 * to that page, don't release the hazard
-				 * reference until after comparing the last key
-				 * on that page against the next key in the
-				 * tree.
-				 */
-				if (vs->leaf != ref->page)
-					__wt_hazard_clear(session, ref->page);
-				break;
-			case WT_PAGE_DELETED:
-				ret = 0;		/* Skip deleted pages */
-				break;
-			}
+			WT_ERR(__wt_page_in(session, page, ref, 1));
+			ret = __wt_verify_tree(
+			    session, rref, ref->page, (uint64_t)0, vs);
+
+			/*
+			 * Remaining special handling of the last verified leaf
+			 * page: if we kept a reference to that page, don't
+			 * release the hazard reference until after comparing
+			 * the last key on that page against the next key in the
+			 * tree.
+			 */
+			if (vs->leaf != ref->page)
+				__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
 				goto err;
 		}
@@ -346,7 +337,7 @@ __wt_verify_pc(SESSION *session,
 	 * right WT_ROW_REF or WT_ROW structure; the first two fields of the
 	 * structures are a void *data/uint32_t size pair.
 	 */
-	switch (child->dsk->type) {
+	switch (child->type) {
 	case WT_PAGE_ROW_INT:
 		child_key = (WT_ROW *)(first_entry ? child->u.row_int.t :
 		    child->u.row_int.t + (child->indx_count - 1));
@@ -412,7 +403,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
 
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 
 	/*
 	 * Overflow items aren't "in-memory", they're on-disk.  Ignore the fact

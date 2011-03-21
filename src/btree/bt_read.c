@@ -139,8 +139,7 @@ __wt_cache_read_server(void *arg)
 			for (rr = cache->read_request; rr < rr_end; ++rr) {
 				if ((session = rr->session) == NULL)
 					continue;
-				if (cache->read_lockout &&
-				    !F_ISSET(session, WT_READ_PRIORITY))
+				if (cache->read_lockout)
 					continue;
 
 				/*
@@ -200,11 +199,28 @@ __wt_cache_read(WT_READ_REQ *rr)
 	size = ref->size;
 
 	cache = S2C(session)->cache;
+	page = NULL;
+	dsk = NULL;
 	ret = 0;
 
-	/* If the state is anything other than on-disk, not our problem. */
-	if (ref->state != WT_REF_DISK)
+	/* Review the possible page states. */
+	switch (WT_REF_STATE(ref->state)) {
+	case WT_REF_DISK:			/* On-disk, read it */
+		break;
+	case WT_REF_MEM:			/* In-memory, already read */
 		return (0);
+	case WT_REF_EVICTED:			/* Logically evicted */
+		/*
+		 * The page was logically evicted, waiting on a merge with its
+		 * parent during the parent's eviction, when it was accessed.
+		 * Re-activate the page.   We could probably do this in the
+		 * page read function, but this shouldn't be a common path and
+		 * I'm hesitant to have multiple threads of control working on
+		 * a page's state.
+		 */
+		WT_REF_SET_STATE(ref, WT_REF_MEM);
+		return (0);
+	}
 
 	/*
 	 * The page isn't in the cache, and since we're the only path for the
@@ -238,7 +254,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	page->size = size;
 	page->parent = rr->parent;
 	page->parent_ref = ref;
-	page->dsk = dsk;
+	page->XXdsk = dsk;
 
 	/*
 	 * Build the in-memory version of the page -- just return on error,
@@ -253,14 +269,13 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 */
 	page->read_gen = ++cache->read_gen;
 	ref->page = page;
-	ref->state = WT_REF_CACHE;
+	WT_REF_SET_STATE(ref, WT_REF_MEM);
 
 	return (0);
 
-err:	if (page != NULL) {
-		if (page->dsk != NULL)
-			__wt_free(session, page->dsk);
+err:	if (dsk != NULL)
+		__wt_free(session, dsk);
+	if (page != NULL)
 		__wt_free(session, page);
-	}
 	return (ret);
 }

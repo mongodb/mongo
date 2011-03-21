@@ -18,7 +18,6 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	WT_COL *cip;
 	WT_COL_REF *cref;
 	WT_PAGE *page;
-	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp;
 	WT_UPDATE *upd;
 	uint64_t record_cnt, start_recno;
@@ -45,21 +44,21 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		write_gen = page->write_gen;
 
 		/* Walk the page looking for the record. */
-		dsk = page->dsk;
-		switch (dsk->type) {
+		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			cip = page->u.col_leaf.d + (recno - dsk->recno);
-			cipdata = WT_COL_PTR(dsk, cip);
+			cip = page->u.col_leaf.d +
+			    (recno - page->u.col_leaf.recno);
+			cipdata = WT_COL_PTR(page, cip);
 			goto done;
 		case WT_PAGE_COL_RLE:
 			/*
 			 * Walk the page, counting records -- do the record
 			 * count calculation in a funny way to avoid overflow.
 			 */
-			record_cnt = recno - dsk->recno;
+			record_cnt = recno - page->u.col_leaf.recno;
 			WT_COL_INDX_FOREACH(page, cip, i) {
-				cipdata = WT_COL_PTR(dsk, cip);
+				cipdata = WT_COL_PTR(page, cip);
 				if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata))
 					break;
 				record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
@@ -104,24 +103,11 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			cref = page->u.col_int.t + (base == 0 ? 0 : base - 1);
 
 		/* cip references the subtree containing the record. */
-		switch (ret = __wt_page_in(session, page, &cref->ref, 0)) {
-		case 0:				/* Valid page */
-			/* Swap the parent page for the child page. */
-			if (page != btree->root_page.page)
-				__wt_hazard_clear(session, page);
-			break;
-		case WT_PAGE_DELETED:
-			/*
-			 * !!!
-			 * See __wt_rec_page_delete() for an explanation of page
-			 * deletion.  As there are no real deletions of entries
-			 * in column-store files, pages should never be deleted,
-			 * and this shouldn't happen.
-			 */
-			goto notfound;
-		default:
-			goto err;
-		}
+		WT_ERR(__wt_page_in(session, page, &cref->ref, 0));
+
+		/* Swap the parent page for the child page. */
+		if (page != btree->root_page.page)
+			__wt_hazard_clear(session, page);
 		page = WT_COL_REF_PAGE(cref);
 	}
 
@@ -130,7 +116,7 @@ done:	/*
 	 * first step; the record may have been updated since reading the page
 	 * into the cache.
 	 */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		/* Find the item's WT_UPDATE slot if it exists. */
 		upd = WT_COL_UPDATE(page, cip);

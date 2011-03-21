@@ -21,7 +21,6 @@ __wt_value_return(
 	WT_COL *cip;
 	WT_CELL *cell;
 	WT_PAGE *page;
-	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	const void *value_ret;
@@ -33,7 +32,6 @@ __wt_value_return(
 	ret = 0;
 
 	page = session->srch_page;
-	dsk = page->dsk;
 	cip = session->srch_ip;
 	rip = session->srch_ip;
 	upd = session->srch_upd;
@@ -98,17 +96,17 @@ __wt_value_return(
 	}
 
 	/* Otherwise, take the item from the original page. */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		value_ret = WT_COL_PTR(dsk, cip);
+		value_ret = WT_COL_PTR(page, cip);
 		size_ret = btree->fixed_len;
 		break;
 	case WT_PAGE_COL_RLE:
-		value_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(dsk, cip));
+		value_ret = WT_RLE_REPEAT_DATA(WT_COL_PTR(page, cip));
 		size_ret = btree->fixed_len;
 		break;
 	case WT_PAGE_COL_VAR:
-		cell = WT_COL_PTR(dsk, cip);
+		cell = WT_COL_PTR(page, cip);
 		goto cell_set;
 	case WT_PAGE_ROW_LEAF:
 		cell = rip->value;

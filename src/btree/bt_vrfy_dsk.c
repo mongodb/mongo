@@ -176,7 +176,7 @@ cell_vs_page:			__wt_errx(session,
 				    "cell on a %s page)",
 				    (u_long)cell_num, (u_long)addr,
 				    __wt_cell_type_string(cell),
-				    __wt_page_type_string(dsk));
+				    __wt_page_type_string(dsk->type));
 				return (WT_ERROR);
 			}
 			break;
@@ -514,7 +514,7 @@ __wt_verify_dsk_chunk(
 	if (dsk->u.datalen == 0) {
 		__wt_errx(session,
 		    "%s page at addr %lu has no data",
-		    __wt_page_type_string(dsk), (u_long)addr);
+		    __wt_page_type_string(dsk->type), (u_long)addr);
 		return (WT_ERROR);
 	}
 
@@ -525,7 +525,7 @@ __wt_verify_dsk_chunk(
 		if (*p != '\0') {
 			__wt_errx(session,
 			    "%s page at addr %lu has non-zero trailing bytes",
-			    __wt_page_type_string(dsk), (u_long)addr);
+			    __wt_page_type_string(dsk->type), (u_long)addr);
 			return (WT_ERROR);
 		}
 

@@ -84,7 +84,7 @@ __wt_col_update(
 	 * a new WT_RLE_EXPAND/WT_UPDATE pair, link it into the WT_RLE_EXPAND
 	 * array.
 	 */
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate an update array if necessary. */

@@ -123,20 +123,6 @@ __wt_cache_evict_server(void *arg)
 	WT_ERR(__wt_connection_session(conn, &session));
 
 	/*
-	 * Multiple pages are marked for eviction by the eviction server, which
-	 * means nobody can read them -- but, this thread of control has to
-	 * update higher pages in the tree when it writes this page, which
-	 * requires reading other pages, which might themselves be marked for
-	 * eviction.   Set a flag to allow this thread of control to see pages
-	 * marked for eviction -- we know it's safe, because only this thread
-	 * is writing pages.
-	 *
-	 * Reconciliation is probably running because the cache is full, which
-	 * means reads are locked out -- reconciliation can read, regardless.
-	 */
-	F_SET(session, WT_READ_EVICT | WT_READ_PRIORITY);
-
-	/*
 	 * Allocate memory for a copy of the hazard references -- it's a fixed
 	 * size so doesn't need run-time adjustments.
 	 */
@@ -258,7 +244,7 @@ done_duplicates:
 
 	/*
 	 * Discarding pages is done in 4 steps:
-	 *	Set the WT_REF_EVICT state
+	 *	Set the WT_REF_EVICT flag
 	 *	Check for any hazard references
 	 *	Check the page's state (for example, in-memory children)
 	 *	Reconcile and discard the page
@@ -411,7 +397,7 @@ __wt_evict_set(SESSION *session)
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
-		ref->state = WT_REF_EVICT;
+		FLD_SET(ref->state, WT_REF_EVICT);
 	}
 }
 
@@ -481,7 +467,7 @@ __wt_evict_hazard_check(SESSION *session)
 			 * Discard our reference.
 			 */
 			page->read_gen = ++cache->read_gen;
-			ref->state = WT_REF_CACHE;
+			FLD_CLR(ref->state, WT_REF_EVICT);
 			WT_EVICT_CLR(evict);
 		}
 	}
@@ -524,7 +510,7 @@ __wt_evict_state_check(SESSION *session)
 		}
 
 		/* Ignore pages with in-memory subtrees. */
-		switch (page->dsk->type) {
+		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
 			if (__wt_evict_subtrees(page)) {
@@ -544,7 +530,7 @@ skip:		/*
 		 * Discard our reference.
 		 */
 		page->read_gen = ++cache->read_gen;
-		ref->state = WT_REF_CACHE;
+		FLD_CLR(ref->state, WT_REF_EVICT);
 		WT_EVICT_CLR(evict);
 	}
 }
@@ -619,8 +605,8 @@ err:	/*
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
-		if (ref->state == WT_REF_EVICT)
-			ref->state = WT_REF_CACHE;
+		if (FLD_ISSET(ref->state, WT_REF_EVICT))
+			FLD_CLR(ref->state, WT_REF_EVICT);
 	}
 	return (ret);
 }
@@ -638,28 +624,19 @@ __wt_evict_subtrees(WT_PAGE *page)
 
 	/*
 	 * Return if a page has an in-memory subtree -- this array search could
-	 * be replaced by a reference count in the page, but (1) the eviction
-	 * thread isn't where I expect performance problems, (2) I hate to lose
-	 * more bytes on every page, (3) how often will an internal page be
-	 * evicted anyway?
-	 *
-	 * The state check can't be for (state == WT_REF_CACHE) because we may
-	 * be evicting pages from more than a single level of the tree, and in
-	 * that case, the parent's page will have a WT_REF with state equal to
-	 * WT_REF_EVICT, and we still can't touch the parent until the child
-	 * is flushed.
+	 * be replaced by reference counts in the page, but the eviction thread
+	 * isn't where I expect performance problems and internal pages are not
+	 * evicted that often (hopefully!)
 	 */
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_COL_REF_STATE(cref) != WT_REF_DISK &&
-			    WT_COL_REF_STATE(cref) != WT_REF_DELETED)
+			if (WT_REF_STATE(WT_COL_REF_STATE(cref)) == WT_REF_MEM)
 				return (1);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK &&
-			    WT_ROW_REF_STATE(rref) != WT_REF_DELETED)
+			if (WT_REF_STATE(WT_ROW_REF_STATE(cref)) == WT_REF_MEM)
 				return (1);
 		break;
 	}

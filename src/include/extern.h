@@ -130,7 +130,7 @@ __wt_evict_cache_count(SESSION *session, uint64_t *nodesp);
 int
 __wt_evict_tree_count(SESSION *session, BTREE *btree, uint64_t *nodesp);
 const char *
-__wt_page_type_string(WT_PAGE_DISK *dsk);
+__wt_page_type_string(u_int type);
 const char *
 __wt_cell_type_string(WT_CELL *cell);
 int

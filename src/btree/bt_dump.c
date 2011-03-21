@@ -81,7 +81,7 @@ __wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
 	btree = session->btree;
 	dp = arg;
 
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		break;
@@ -116,17 +116,15 @@ __wt_dump_page_col_fix(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	BTREE *btree;
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
 
 	btree = session->btree;
-	dsk = page->dsk;
 
 	/* Walk the page, dumping data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
 			if (!WT_FIX_DELETE_ISSET(cipdata))
 				dp->p(cipdata, btree->fixed_len, dp->stream);
@@ -148,7 +146,6 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	FILE *fp;
 	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_UPDATE *upd;
 	uint64_t recno;
@@ -160,12 +157,11 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	btree = session->btree;
 	fp = dp->stream;
 	tmp = NULL;
-	dsk = page->dsk;
 	ret = 0;
 
-	recno = page->dsk->recno;
+	recno = page->u.col_leaf.recno;
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		/*
 		 * Get a sorted list of any expansion entries we've created for
 		 * this set of records.  The sort function returns a NULL-
@@ -213,14 +209,12 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_CELL *cell;
-	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	int ret;
 	uint32_t i;
 	void *huffman;
 
 	btree = session->btree;
-	dsk = page->dsk;
 	huffman = btree->huffman_data;
 	ret = 0;
 
@@ -235,7 +229,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		}
 
 		/* Process the original data. */
-		cell = WT_COL_PTR(dsk, cip);
+		cell = WT_COL_PTR(page, cip);
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {

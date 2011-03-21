@@ -32,8 +32,8 @@ __wt_row_key_on_page(WT_PAGE *page, void *key)
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
 	p = ((WT_ROW *)key)->key;
-	return (p >= (uint8_t *)page->dsk &&
-	    p < (uint8_t *)page->dsk + page->size ? 1 : 0);
+	return (p >= (uint8_t *)page->XXdsk &&
+	    p < (uint8_t *)page->XXdsk + page->size ? 1 : 0);
 }
 
 /*
@@ -45,7 +45,7 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 {
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "discard addr %lu (type %s)",
-	    (u_long)page->addr, __wt_page_type_string(page->dsk)));
+	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/* Never discard a dirty page. */
 	WT_ASSERT(session, !WT_PAGE_IS_MODIFIED(page));
@@ -53,7 +53,7 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	/* We've got more space. */
 	WT_CACHE_PAGE_OUT(S2C(session)->cache, page->size);
 
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		__wt_discard_page_col_fix(session, page);
 		break;
@@ -74,8 +74,8 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 		break;
 	}
 
-	if (page->dsk != NULL)
-		__wt_free(session, page->dsk);
+	if (page->XXdsk != NULL)
+		__wt_free(session, page->XXdsk);
 	__wt_free(session, page);
 
 }

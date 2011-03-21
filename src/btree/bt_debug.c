@@ -102,20 +102,20 @@ __wt_debug_disk(
 	case WT_PAGE_COL_VAR:
 		fprintf(fp,
 		    "%s page: starting recno %llu, entries %lu, lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk), (unsigned long long)dsk->recno,
-		    (u_long)dsk->u.entries,
+		    __wt_page_type_string(dsk->type),
+		    (unsigned long long)dsk->recno, (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		fprintf(fp,
 		    "%s page: entries %lu, lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk), (u_long)dsk->u.entries,
+		    __wt_page_type_string(dsk->type), (u_long)dsk->u.entries,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	case WT_PAGE_OVFL:
 		fprintf(fp, "%s page: data size %lu, lsn %lu/%lu\n",
-		    __wt_page_type_string(dsk), (u_long)dsk->u.datalen,
+		    __wt_page_type_string(dsk->type), (u_long)dsk->u.datalen,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
 	WT_ILLEGAL_FORMAT(btree);
@@ -154,25 +154,27 @@ int
 __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 {
 	BTREE *btree;
-	WT_PAGE_DISK *dsk;
 	int do_close;
 
 	btree = session->btree;
-	dsk = page->dsk;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
 	fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu",
 	    (u_long)page->addr,
 	    (u_long)page->addr + (WT_OFF_TO_ADDR(btree, page->size) - 1),
-	    __wt_page_type_string(dsk), (u_long)page->size);
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
+	    __wt_page_type_string(page->type), (u_long)page->size);
+	switch (page->type) {
 	case WT_PAGE_COL_INT:
+		fprintf(fp, ", starting recno %llu",
+		    (unsigned long long)page->u.col_int.recno);
+		break;
+
+	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		fprintf(fp,
-		    ", starting recno %llu", (unsigned long long)dsk->recno);
+		fprintf(fp, ", starting recno %llu",
+		    (unsigned long long)page->u.col_leaf.recno);
 		break;
 	default:
 		break;
@@ -180,7 +182,7 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 	fprintf(fp, "\n");
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		__wt_debug_page_col_fix(session, page, fp);
 		break;
@@ -220,19 +222,17 @@ static void
 __wt_debug_page_col_fix(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	uint32_t fixed_len, i;
 	void *cipdata;
 
-	dsk = page->dsk;
 	fixed_len = session->btree->fixed_len;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		fprintf(fp, "\tdata {");
 		if (WT_FIX_DELETE_ISSET(cipdata))
 			fprintf(fp, "deleted");
@@ -274,19 +274,17 @@ static void
 __wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp;
 	uint32_t fixed_len, i;
 	void *cipdata;
 
-	dsk = page->dsk;
 	fixed_len = session->btree->fixed_len;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		fprintf(fp,
 		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cipdata));
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
@@ -309,18 +307,15 @@ static int
 __wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	uint32_t i;
 	void *cipdata;
-
-	dsk = page->dsk;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		fprintf(fp, "\tdata {");
 		WT_RET(__wt_debug_cell_data(session, cipdata, fp));
 		fprintf(fp, "}\n");

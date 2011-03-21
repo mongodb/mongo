@@ -29,8 +29,8 @@ __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 	cache = S2C(session)->cache;
 
 	for (;;)
-		switch (ref->state) {
-		case WT_REF_CACHE:
+		switch (WT_REF_STATE(ref->state)) {
+		case WT_REF_MEM:
 			/*
 			 * The page is in memory: get a hazard reference, update
 			 * the page's LRU and return.  The expected reason we
@@ -41,22 +41,10 @@ __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 				ref->page->read_gen = ++cache->read_gen;
 				return (0);
 			}
-			/* FALLTHROUGH */
-		case WT_REF_EVICT:
-			/*
-			 * The page is being considered for eviction, wait for
-			 * that to resolve.
-			 */
 			__wt_yield();
 			break;
-		case WT_REF_DELETED:
-			/*
-			 * if the page were to be emptied and reconciled, it may
-			 * have been deleted.  Any thread walking the tree needs
-			 * to be notified.
-			 */
-			return (WT_PAGE_DELETED);
 		case WT_REF_DISK:
+		case WT_REF_EVICTED:
 			/* The page isn't in memory, request it be read. */
 			__wt_cache_read_serial(
 			    session, parent, ref, dsk_verify, ret);
@@ -82,11 +70,28 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 	int ret;
 
 	btree = session->btree;
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 	ret = 0;
 
 	WT_ASSERT(session, dsk->u.entries > 0);
 	WT_ASSERT(session, page->indx_count == 0);
+
+	page->type = dsk->type;
+
+	switch (dsk->type) {
+	case WT_PAGE_COL_INT:
+		page->u.col_int.recno = dsk->recno;
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
+		page->u.col_leaf.recno = dsk->recno;
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		break;
+	WT_ILLEGAL_FORMAT(btree);
+	}
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -107,7 +112,6 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 	case WT_PAGE_ROW_LEAF:
 		WT_ERR(__wt_page_inmem_row_leaf(session, page));
 		break;
-	WT_ILLEGAL_FORMAT(btree);
 	}
 	return (0);
 
@@ -129,7 +133,7 @@ __wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
 	uint8_t *p;
 
 	btree = session->btree;
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -162,7 +166,7 @@ __wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -202,7 +206,7 @@ __wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
 	uint8_t *p;
 
 	btree = session->btree;
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -236,7 +240,7 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -274,7 +278,7 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 	void *huffman;
 
 	btree = session->btree;
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 	huffman = btree->huffman_key;
 
 	/*
@@ -306,8 +310,8 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 			break;
 		case WT_CELL_OFF:
 			off = WT_CELL_BYTE_OFF(cell);
-			WT_COL_REF_ADDR(rref) = off->addr;
-			WT_COL_REF_SIZE(rref) = off->size;
+			WT_ROW_REF_ADDR(rref) = off->addr;
+			WT_ROW_REF_SIZE(rref) = off->size;
 			++rref;
 			break;
 		}
@@ -330,7 +334,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 	uint32_t i, nindx;
 
 	btree = session->btree;
-	dsk = page->dsk;
+	dsk = page->XXdsk;
 
 	/*
 	 * Leaf row-store page entries map to a maximum of two-to-one to the

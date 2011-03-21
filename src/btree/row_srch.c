@@ -45,9 +45,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 {
 	BTREE *btree;
 	WT_PAGE *page;
-	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
-	WT_ROW_REF *rref, *t;
+	WT_ROW_REF *rref;
 	WT_UPDATE *upd;
 	uint32_t base, indx, limit, write_gen;
 	int cmp, isleaf, ret;
@@ -73,8 +72,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		 */
 		write_gen = page->write_gen;
 
-		dsk = page->dsk;
-		switch (dsk->type) {
+		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 			isleaf = 0;
 			for (base = 0,
@@ -159,48 +157,12 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		if (isleaf)
 			break;
 
-deleted_retry:	/* rref references the subtree containing the record. */
-		switch (ret = __wt_page_in(session, page, &rref->ref, 0)) {
-		case 0:				/* Valid page */
-			/* Swap the parent page for the child page. */
-			if (page != btree->root_page.page)
-				__wt_hazard_clear(session, page);
-			break;
-		case WT_PAGE_DELETED:
-			/*
-			 * !!!
-			 * See __wt_rec_page_delete() for an explanation of page
-			 * deletion.  In this code, we first do an easy test --
-			 * if we're a reader, we're done because we know the
-			 * key/data pair doesn't exist.
-			 */
-			if (!LF_ISSET(WT_INSERT))
-				goto notfound;
-			/*
-			 * If we're a writer, there are 3 steps: (1) move to a
-			 * lower valid page entry; (2) if that isn't possible,
-			 * move to a larger valid page entry; (3) if that isn't
-			 * possible, restart the operation.
-			 */
-			for (t = rref,
-			    indx = WT_ROW_REF_SLOT(page, rref);
-			    indx > 0; --indx, --t)
-				if (WT_ROW_REF_STATE(t) != WT_REF_DELETED) {
-					rref = t;
-					goto deleted_retry;
-				}
-			for (t = rref,
-			    indx = WT_ROW_REF_SLOT(page, rref);
-			    indx < page->indx_count; ++indx, ++t)
-				if (WT_ROW_REF_STATE(t) != WT_REF_DELETED) {
-					rref = t;
-					goto deleted_retry;
-				}
-			ret = WT_RESTART;
-			/* FALLTHROUGH */
-		default:
-			goto err;
-		}
+		/* rref references the subtree containing the record. */
+		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
+
+		/* Swap the parent page for the child page. */
+		if (page != btree->root_page.page)
+			__wt_hazard_clear(session, page);
 		page = WT_ROW_REF_PAGE(rref);
 	}
 
@@ -211,7 +173,7 @@ deleted_retry:	/* rref references the subtree containing the record. */
 	 * we're done, return the information.   Otherwise, check to see if the
 	 * item was modified/deleted.
 	 */
-	switch (dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_ROW_LEAF:
 		if (LF_ISSET(WT_INSERT))
 			break;

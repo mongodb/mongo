@@ -10,16 +10,19 @@
 
 static int  __wt_rec_col_fix(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_int(SESSION *, WT_PAGE *);
+static int  __wt_rec_col_int_loop(SESSION *,
+		WT_PAGE *, uint64_t *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
-static int  __wt_rec_col_split(SESSION *, uint32_t *, uint32_t *);
+static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
-static int  __wt_rec_page_delete(SESSION *, WT_PAGE *);
 static void __wt_rec_parent_update_clean(WT_PAGE *);
 static int  __wt_rec_parent_update_dirty(
-		SESSION *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
+		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static int  __wt_rec_row_int(SESSION *, WT_PAGE *);
+static int  __wt_rec_row_int_loop(
+		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *);
-static int  __wt_rec_row_split(SESSION *, uint32_t *, uint32_t *);
+static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rle_expand_compare(const void *, const void *);
 static int  __wt_rec_finish(SESSION *, WT_PAGE *);
 
@@ -77,15 +80,13 @@ int
 __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 {
 	BTREE *btree;
-	WT_PAGE_DISK *dsk;
 
 	btree = session->btree;
-	dsk = page->dsk;
 
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile %s page addr %lu (type %s)",
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
-	    (u_long)page->addr, __wt_page_type_string(dsk)));
+	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/* Write dirty pages. */
 	if (WT_PAGE_IS_MODIFIED(page)) {
@@ -100,7 +101,7 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 		WT_PAGE_DISK_WRITE(page);
 		WT_MEMORY_FLUSH;
 
-		switch (dsk->type) {
+		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 			WT_RET(__wt_rec_col_fix(session, page));
 			break;
@@ -168,10 +169,8 @@ __wt_rec_helper_init(SESSION *session,
 	 */
 	dsk = r->dsk_tmp->mem;
 	WT_CLEAR(*dsk);
-	dsk->lsn_file = page->dsk->lsn_file;
-	dsk->lsn_off = page->dsk->lsn_off;
-	dsk->type = page->dsk->type;
-	dsk->recno = page->dsk->recno;
+	dsk->type = page->type;
+	dsk->recno = *recnop;
 
 	/*
 	 * If we have to split, we want to choose a smaller page size for the
@@ -252,7 +251,6 @@ __wt_rec_helper_init(SESSION *session,
 	 * Set the caller's information and configure so the loop calls us
 	 * when approaching the split boundary.
 	 */
-	*recnop = page->dsk->recno;
 	*first_freep = WT_PAGE_DISK_BYTE(dsk);
 	*space_availp = space_avail;
 	return (0);
@@ -539,10 +537,10 @@ __wt_rec_helper_write(
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		cs = WT_PAGE_DISK_BYTE(dsk);
-		size = WT_PTRDIFF32(WT_CELL_NEXT(cs), cs);
+		size = WT_CELL_LEN(cs);
 		if (size > r_list->key.mem_size)
 			WT_RET(__wt_buf_grow(session, &r_list->key, size));
-		memcpy(r_list->key.mem, cs, size);
+		memcpy(r_list->key.mem, WT_CELL_BYTE(cs), size);
 		r_list->key.item.data = r_list->key.mem;
 		r_list->key.item.size = size;
 		break;
@@ -564,24 +562,71 @@ __wt_rec_helper_write(
 static int
 __wt_rec_col_int(SESSION *session, WT_PAGE *page)
 {
-	WT_COL_REF *cref;
-	WT_OFF_RECORD *from, _from;
 	uint64_t recno;
-	uint32_t entries, i, space_avail;
+	uint32_t entries, space_avail;
 	uint8_t *first_free;
 
-	recno = page->dsk->recno;
+	recno = page->u.col_int.recno;
 	entries = 0;
 	WT_RET(__wt_rec_helper_init(session, page, session->btree->intlmax,
 	    session->btree->intlmin, &recno, &first_free, &space_avail));
 
-	/* For each entry in the in-memory page... */
+	/*
+	 * There may be subtrees that we're merging into this page, and they
+	 * may be multiple levels deep -- it's not likely, but it's possible.
+	 * Call a looping routine for each page.
+	 */
+	WT_RET(__wt_rec_col_int_loop(
+	    session, page, &recno, &entries, &first_free, &space_avail));
+
+	/* Write the remnant page. */
+	return (__wt_rec_helper(
+	    session, &recno, &entries, &first_free, &space_avail, 1));
+}
+
+/*
+ * __wt_rec_col_int_loop --
+ *	Recursively walk a column-store internal tree of merge pages.
+ */
+static int
+__wt_rec_col_int_loop(SESSION *session, WT_PAGE *page, uint64_t *recnop,
+    uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
+{
+	WT_COL_REF *cref;
+	WT_OFF_RECORD *from, _from;
+	WT_PAGE *ref_page;
+	uint64_t recno;
+	uint32_t entries, i, space_avail;
+	uint8_t *first_free;
+
+	recno = *recnop;
+	entries = *entriesp;
+	first_free = *first_freep;
+	space_avail = *space_availp;
+
+	/* For each entry in the page... */
 	from = &_from;
 	WT_COL_REF_FOREACH(page, cref, i) {
+		/*
+		 * If this is a reference to a merge page, check the page type.
+		 * A leaf page must be an empty page, we're done.  An internal
+		 * page must have resulted from a page split, recursively call
+		 * ourselves and walk that page.
+		 */
+		if (WT_REF_STATE(WT_COL_REF_STATE(cref)) == WT_REF_MERGE) {
+			ref_page = WT_COL_REF_PAGE(cref);
+			if (ref_page->type == WT_PAGE_COL_INT)
+				WT_RET(__wt_rec_col_int_loop(
+				    session, ref_page, recnop,
+				    entriesp, first_freep, space_availp));
+			__wt_page_discard(session, ref_page);
+			continue;
+		}
+
 		/* Boundary: allocate, split or write the page. */
 		if (sizeof(WT_OFF_RECORD) > space_avail)
 			WT_RET(__wt_rec_helper(session,
-			    &recno, &entries, &first_free, &space_avail, 0));
+			    recnop, entriesp, first_freep, space_availp, 0));
 
 		/* Copy a new WT_OFF_RECORD structure into place. */
 		from->addr = WT_COL_REF_ADDR(cref);
@@ -596,9 +641,11 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page)
 		recno += cref->recno;
 	}
 
-	/* Write the remnant page. */
-	return (__wt_rec_helper(
-	    session, &recno, &entries, &first_free, &space_avail, 1));
+	*recnop = recno;
+	*entriesp = entries;
+	*first_freep = first_free;
+	*space_availp = space_avail;
+	return (0);
 }
 
 /*
@@ -612,7 +659,6 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	uint64_t unused;
 	uint32_t entries, i, len, space_avail;
@@ -622,7 +668,6 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 
 	btree = session->btree;
 	tmp = NULL;
-	dsk = page->dsk;
 	ret = 0;
 
 	/*
@@ -639,14 +684,14 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	 * functions because they don't add much overhead, and it's better
 	 * if all the reconciliation functions look the same.
 	 */
-	unused = page->dsk->recno;
+	unused = page->u.col_leaf.recno;
 	entries = 0;
 	WT_ERR(__wt_rec_helper_init(session, page, session->btree->leafmax,
 	    session->btree->leafmin, &unused, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 
 		/*
 		 * Get a reference to the data, on- or off- page, and see if
@@ -660,7 +705,7 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 		} else if (WT_FIX_DELETE_ISSET(cipdata))
 			data = tmp->mem;		/* On-disk deleted */
 		else					/* On-disk data */
-			data = WT_COL_PTR(dsk, cip);
+			data = WT_COL_PTR(page, cip);
 
 		/*
 		 * When reconciling a fixed-width page that doesn't support
@@ -692,7 +737,6 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_PAGE_DISK *dsk;
 	WT_RLE_EXPAND *exp, **expsort, **expp;
 	WT_UPDATE *upd;
 	uint64_t recno;
@@ -704,7 +748,6 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	btree = session->btree;
 	tmp = NULL;
-	dsk = page->dsk;
 	last_data = NULL;
 	ret = 0;
 
@@ -719,7 +762,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	WT_RLE_REPEAT_COUNT(tmp->mem) = 1;
 	WT_FIX_DELETE_SET(WT_RLE_REPEAT_DATA(tmp->mem));
 
-	recno = page->dsk->recno;
+	recno = page->u.col_leaf.recno;
 	entries = 0;
 	WT_RET(__wt_rec_helper_init(session, page, session->btree->leafmax,
 	    session->btree->leafmin, &recno, &first_free, &space_avail));
@@ -740,7 +783,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 		 * records, checking for WT_RLE_EXPAND entries that match the
 		 * current record number.
 		 */
-		cipdata = WT_COL_PTR(dsk, cip);
+		cipdata = WT_COL_PTR(page, cip);
 		nrepeat = WT_RLE_REPEAT_COUNT(cipdata);
 		for (expp = expsort, n = 1;
 		    n <= nrepeat; n += repeat_count, recno += repeat_count) {
@@ -900,19 +943,16 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 	WT_ITEM *value, value_item;
 	WT_CELL value_cell, *cell;
 	WT_OVFL value_ovfl;
-	WT_PAGE_DISK *dsk;
 	WT_UPDATE *upd;
 	uint32_t entries, i, len, space_avail;
 	uint64_t recno;
 	uint8_t *first_free;
 
-	dsk = page->dsk;
-
 	WT_CLEAR(value_cell);
 	WT_CLEAR(value_item);
 	value = &value_item;
 
-	recno = page->dsk->recno;
+	recno = page->u.col_leaf.recno;
 	entries = 0;
 	WT_RET(__wt_rec_helper_init(session, page, session->btree->leafmax,
 	    session->btree->leafmin, &recno, &first_free, &space_avail));
@@ -923,7 +963,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 		 * Get a reference to the value: it's either an update or the
 		 * original on-page item.
 		 */
-		cell = WT_COL_PTR(dsk, cip);
+		cell = WT_COL_PTR(page, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			/*
 			 * If we update an overflow value, free the underlying
@@ -991,17 +1031,49 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 static int
 __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 {
-	WT_CELL *key_cell, *value_cell;
-	WT_OFF *from;
-	WT_ROW_REF *rref;
 	uint64_t unused;
-	uint32_t entries, i, len, space_avail;
+	uint32_t entries, space_avail;
 	uint8_t *first_free;
 
 	unused = 0;
 	entries = 0;
 	WT_RET(__wt_rec_helper_init(session, page, session->btree->intlmax,
 	    session->btree->intlmin, &unused, &first_free, &space_avail));
+
+	/*
+	 * There may be subtrees that we're merging into this page, and they
+	 * may be multiple levels deep -- it's not likely, but it's possible.
+	 * Call a looping routine for each page.
+	 */
+	WT_RET(__wt_rec_row_int_loop(
+	    session, page, &entries, &first_free, &space_avail));
+
+	/* Write the remnant page. */
+	return (__wt_rec_helper(
+	    session, &unused, &entries, &first_free, &space_avail, 1));
+}
+
+/*
+ * __wt_rec_row_int_loop --
+ *	Recursively walk a row-store internal tree of merge pages.
+ */
+static int
+__wt_rec_row_int_loop(SESSION *session, WT_PAGE *page,
+    uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
+{
+	WT_CELL *key_cell, *value_cell;
+	WT_OFF *from;
+	WT_PAGE *ref_page;
+	WT_ROW_REF *rref;
+	uint64_t unused;
+	uint32_t entries, i, len, space_avail;
+	uint8_t *first_free;
+
+	entries = *entriesp;
+	first_free = *first_freep;
+	space_avail = *space_availp;
+
+	unused = 0;
 
 	/*
 	 * We have to walk both the WT_ROW structures and the original page --
@@ -1011,10 +1083,19 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i) {
 		/*
-		 * Skip deleted pages; if we delete an overflow key, free the
-		 * underlying file space.
+		 * If this is a reference to a merge page, check the page type.
+		 * A leaf page must be an empty page, we're done.  An internal
+		 * page must have resulted from a page split, recursively call
+		 * ourselves and walk that page.
 		 */
-		if (WT_ROW_REF_STATE(rref) == WT_REF_DELETED) {
+		if (WT_REF_STATE(WT_ROW_REF_STATE(rref)) == WT_REF_MERGE) {
+			ref_page = WT_ROW_REF_PAGE(rref);
+			if (ref_page->type == WT_PAGE_ROW_INT)
+				WT_RET(__wt_rec_row_int_loop(session, ref_page,
+				    entriesp, first_freep, space_availp));
+			__wt_page_discard(session, ref_page);
+
+			/* Delete any underlying overflow key. */
 			if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
 				WT_RET(__wt_block_free_ovfl(
 				    session, WT_CELL_BYTE_OVFL(key_cell)));
@@ -1045,9 +1126,10 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 		entries += 2;
 	}
 
-	/* Write the remnant page. */
-	return (__wt_rec_helper(
-	    session, &unused, &entries, &first_free, &space_avail, 1));
+	*entriesp = entries;
+	*first_freep = first_free;
+	*space_availp = space_avail;
+	return (0);
 }
 
 /*
@@ -1196,24 +1278,25 @@ static int
 __wt_rec_finish(SESSION *session, WT_PAGE *page)
 {
 	BTREE *btree;
+	WT_PAGE *new;
 	WT_REC_LIST *r;
 	WT_STATS *stats;
-	uint32_t addr, size;
 
 	btree = session->btree;
 	r = &S2C(session)->cache->reclist;
 	stats = btree->stats;
 
-	/* If all entries on the page were deleted, delete the page. */
+	/*
+	 * If all entries on the page were deleted, mark the page for eventual
+	 * merge.
+	 */
 	if (r->list[0].deleted) {
-		__wt_rec_parent_update_dirty(
-		    session, page, WT_ADDR_INVALID, 0, WT_REF_DELETED);
-
-		WT_RET(__wt_rec_page_delete(session, page));
-
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: delete page %lu (%luB)",
 		    (u_long)page->addr, (u_long)page->size));
+
+		__wt_rec_parent_update_dirty(session, page,
+		    NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE);
 
 		return (0);
 	}
@@ -1223,7 +1306,7 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 	 * single page with another single page most of the time.
 	 */
 	if (r->l_next == 1) {
-		__wt_rec_parent_update_dirty(session, page,
+		__wt_rec_parent_update_dirty(session, page, NULL,
 		    r->list[0].off.addr, r->list[0].off.size, WT_REF_DISK);
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
@@ -1241,7 +1324,7 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile: %lu (%luB) splitting",
 	    (u_long)page->addr, (u_long)page->size));
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, PAGE_SPLIT_INTL);
@@ -1251,18 +1334,19 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 		WT_STAT_INCR(stats, PAGE_SPLIT_LEAF);
 		break;
 	}
-	switch (page->dsk->type) {
+	switch (page->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_rec_row_split(session, &addr, &size));
+		WT_RET(__wt_rec_row_split(session, &new, page));
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_rec_col_split(session, &addr, &size));
+		WT_RET(__wt_rec_col_split(session, &new, page));
 		break;
 	}
 
-	__wt_rec_parent_update_dirty(session, page, addr, size, WT_REF_DISK);
+	__wt_rec_parent_update_dirty(session,
+	    page, new, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE);
 
 	return (0);
 }
@@ -1291,8 +1375,9 @@ __wt_rec_parent_update_clean(WT_PAGE *page)
  */
 static int
 __wt_rec_parent_update_dirty(SESSION *session,
-    WT_PAGE *page, uint32_t addr, uint32_t size, uint32_t state)
+    WT_PAGE *page, WT_PAGE *split, uint32_t addr, uint32_t size, uint32_t state)
 {
+	WT_REF *parent_ref;
 	BTREE *btree;
 
 	btree = session->btree;
@@ -1302,20 +1387,24 @@ __wt_rec_parent_update_dirty(SESSION *session,
 	 * there's no parent.
 	 */
 	if (page->parent == NULL) {
-		  btree->root_page.addr = addr;
-		  btree->root_page.size = size;
-		  return (__wt_desc_write(session));
-	 }
+		WT_ASSERT(session, split == NULL);
+		btree->root_page.addr = addr;
+		btree->root_page.size = size;
+		return (__wt_desc_write(session));
+	}
 
 	/*
 	 * Update the relevant WT_REF structure, flush memory, and then update
 	 * the state of the parent reference.  No further memory flush needed,
 	 * the state field is declared volatile.
 	 */
-	page->parent_ref->addr = addr;
-	page->parent_ref->size = size;
+	parent_ref = page->parent_ref;
+	if (split != NULL)
+		parent_ref->page = split;
+	parent_ref->addr = addr;
+	parent_ref->size = size;
 	WT_MEMORY_FLUSH;
-	page->parent_ref->state = state;
+	parent_ref->state = state;
 
 	/*
 	 * Mark the parent page as dirty.
@@ -1339,79 +1428,44 @@ __wt_rec_parent_update_dirty(SESSION *session,
  *	Update a row-store parent page's reference when a page is split.
  */
 static int
-__wt_rec_row_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
+__wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 {
-	BTREE *btree;
-	WT_BUF *tmp;
-	WT_CELL cell, *cellp;
-	WT_OVFL *from, to;
-	WT_PAGE_DISK *dsk;
+	WT_CACHE *cache;
+	WT_PAGE *page;
 	WT_REC_LIST *r;
+	WT_ROW_REF *rref;
 	struct rec_list *r_list;
-	uint32_t addr, i, size;
-	uint8_t *first_free;
+	uint32_t i;
 	int ret;
 
-	btree = session->btree;
-	tmp = NULL;
-	r = &S2C(session)->cache->reclist;
+	cache = S2C(session)->cache;
+	r = &cache->reclist;
 	ret = 0;
 
-	WT_CLEAR(cell);
+	/* Allocate a row-store internal page. */
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_ERR(__wt_calloc_def(
+	    session, (size_t)r->l_next - 1, &page->u.row_int.t));
 
-	/*
-	 * The disk image is a header plus room for the key and WT_OFF pairs;
-	 * walk the list and figure out how much room we need.
-	 */
-	for (size = WT_PAGE_DISK_SIZE,
-	    r_list = r->list, i = 0; i < r->l_next; ++r_list, ++i)
-		size +=
-		    r_list->key.item.size + WT_CELL_SPACE_REQ(sizeof(WT_OFF));
-	WT_ERR(__wt_scr_alloc(session, WT_ALIGN(size, btree->allocsize), &tmp));
-	dsk = tmp->mem;
-	WT_CLEAR(*dsk);
-	dsk->u.entries = r->l_next * 2;
-	dsk->type = WT_PAGE_ROW_INT;
+	/* Fill it in. */
+	page->parent = orig->parent;
+	page->parent_ref = orig->parent_ref;
+	page->read_gen = ++cache->read_gen;
+	page->indx_count = r->l_next;
+	page->type = WT_PAGE_ROW_INT;
 
-	/* Lay the key/WT_OFF pairs out on the page. */
-	first_free = WT_PAGE_DISK_BYTE(dsk);
-	for (r_list = r->list, i = 0; i < r->l_next; ++r_list, ++i) {
-		/* If the cell references an overflow item, copy it. */
-		cellp = (WT_CELL *)r_list->key.item.data;
-		if (WT_CELL_TYPE(cellp) == WT_CELL_KEY_OVFL) {
-			from = WT_CELL_BYTE_OVFL(cellp);
-			WT_RET(__wt_bulk_ovfl_copy(session, from, &to));
-			*from = to;
-		}
-		/* Copy the key onto the page. */
-		memcpy(
-		    first_free, r_list->key.item.data, r_list->key.item.size);
-		first_free += r_list->key.item.size;
-
-		/* Copy the WT_OFF onto the page. */
-		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
-		memcpy(first_free, &cell, sizeof(WT_CELL));
-		first_free += sizeof(WT_CELL);
-		memcpy(first_free, &r_list->off, sizeof(WT_OFF));
-		first_free += sizeof(WT_OFF);
+	for (rref = page->u.row_int.t,
+	    r_list = r->list, i = 0; i < r->l_next; ++rref, ++r_list, ++i) {
+		__wt_key_set(
+		    rref, r_list->key.item.data, r_list->key.item.size);
+		WT_ROW_REF_ADDR(rref) = r_list->off.addr;
+		WT_ROW_REF_SIZE(rref) = r_list->off.size;
 	}
 
-	/*
-	 * Set the disk block size and clear trailing bytes.
-	 * Allocate file space.
-	 * Write the disk block.
-	 */
-	size = __wt_allocation_size(session, dsk, first_free);
-	WT_ERR(__wt_block_alloc(session, &addr, size));
-	WT_ERR(__wt_disk_write(session, dsk, addr, size));
+	*splitp = page;
+	return (0);
 
-	/* Return the address information to the caller. */
-	*addrp = addr;
-	*sizep = size;
-
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
-
+err:	__wt_free(session, page);
 	return (ret);
 }
 
@@ -1420,38 +1474,40 @@ err:	if (tmp != NULL)
  *	Update a column-store parent page's reference when a page is split.
  */
 static int
-__wt_rec_col_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
+__wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 {
-	BTREE *btree;
-	WT_BUF *tmp;
+	WT_CACHE *cache;
+	WT_COL_REF *cref;
 	WT_OFF_RECORD *off;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE *page;
 	WT_REC_LIST *r;
 	struct rec_list *r_list;
-	uint32_t addr, i, size;
-	uint8_t *first_free;
+	uint32_t i;
 	int ret;
 
-	btree = session->btree;
-	tmp = NULL;
-	r = &S2C(session)->cache->reclist;
+	cache = S2C(session)->cache;
+	r = &cache->reclist;
 	ret = 0;
 
-	/* The disk image is a header plus room for the WT_OFF_RECORD values. */
-	size = WT_PAGE_DISK_SIZE + (r->l_next - 1) * WT_SIZEOF32(WT_OFF_RECORD);
-	WT_ERR(__wt_scr_alloc(session, WT_ALIGN(size, btree->allocsize), &tmp));
-	dsk = tmp->mem;
-	WT_CLEAR(*dsk);
-	dsk->recno = WT_RECNO(&r->list[0].off);
-	dsk->u.entries = r->l_next;
-	dsk->type = WT_PAGE_COL_INT;
+	/* Allocate a column-store internal page. */
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_ERR(__wt_calloc_def(
+	    session, (size_t)r->l_next - 1, &page->u.col_int.t));
 
-	/* Lay the WT_OFF_RECORD values out on the page. */
-	first_free = WT_PAGE_DISK_BYTE(dsk);
-	for (r_list = r->list, i = 0; i < r->l_next; ++r_list, ++i) {
+	/* Fill it in. */
+	page->parent = orig->parent;
+	page->parent_ref = orig->parent_ref;
+	page->read_gen = ++cache->read_gen;
+	page->u.col_int.recno = WT_RECNO(&r->list->off);
+	page->indx_count = r->l_next;
+	page->type = WT_PAGE_COL_INT;
+
+	for (cref = page->u.col_int.t,
+	    r_list = r->list, i = 0; i < r->l_next; ++cref, ++r_list, ++i) {
 		off = &r_list->off;
-		memcpy(first_free, off, sizeof(WT_OFF_RECORD));
-		first_free += sizeof(WT_OFF_RECORD);
+		WT_COL_REF_ADDR(cref) = off->addr;
+		WT_COL_REF_SIZE(cref) = off->size;
+		cref->recno = WT_RECNO(off);
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "split: %lu (%luB), starting record %llu",
@@ -1459,140 +1515,9 @@ __wt_rec_col_split(SESSION *session, uint32_t *addrp, uint32_t *sizep)
 		    (unsigned long long)WT_RECNO(&r_list->off)));
 	}
 
-	/*
-	 * Set the disk block size and clear trailing bytes.
-	 * Allocate file space.
-	 * Write the disk block.
-	 */
-	size = __wt_allocation_size(session, dsk, first_free);
-	WT_ERR(__wt_block_alloc(session, &addr, size));
-	WT_ERR(__wt_disk_write(session, dsk, addr, size));
+	*splitp = page;
+	return (0);
 
-	/* Return the address information to the caller. */
-	*addrp = addr;
-	*sizep = size;
-
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
-
+err:	__wt_free(session, page);
 	return (ret);
-}
-
-/*
- * __wt_rec_page_delete --
- *	Delete a page from the tree.
- */
-static int
-__wt_rec_page_delete(SESSION *session, WT_PAGE *page)
-{
-	WT_COL_REF *cref;
-	WT_PAGE *parent;
-	WT_ROW_REF *rref;
-	uint32_t i;
-
-	/* If we reach the root of the tree, we're done by definition. */
-	if ((parent = page->parent) == NULL)
-		return (0);
-
-	/*
-	 * Any future reader/writer of the page has to deal with deleted pages.
-	 *
-	 * Threads sequentially reading pages (for example, any dump/statistics
-	 * threads), skip deleted pages and continue on.  There are no threads
-	 * sequentially writing pages, so this is a pretty simple case.
-	 *
-	 * Threads binarily searching the tree (for example, threads retrieving
-	 * or storing key/value pairs) are a harder problem.  Imagine a thread
-	 * ending up on a deleted page entry, in other words, a thread getting
-	 * the WT_PAGE_DELETED error returned from the page-get function while
-	 * descending the tree.
-	 *
-	 * If that thread is a reader, it's simple and we can return not-found,
-	 * obviously the key doesn't exist in the tree.
-	 *
-	 * If the thread is a writer, we first try to switch from the deleted
-	 * entry to a lower page entry.  This works because deleting a page
-	 * from the tree's key range is equivalent to merging the page's key
-	 * range into the previous page's key range.
-	 *
-	 * For example, imagine a parent page with 3 child pages: the parent has
-	 * 3 keys A, C, and E, and the child pages have the key ranges A-B, C-D
-	 * and E-F.  If the page with C-D is deleted, the parent's reference
-	 * for the key C is marked deleted and the page with the key range A-B
-	 * immediately extends to the range A-D because future searches for keys
-	 * starting with C or D will compare greater than A and less than E, and
-	 * will descend into the page referenced by the key A.  In other words,
-	 * the search key associated with any page is the lowest key associated
-	 * with the page and there's no upper bound.   By switching our writing
-	 * thread to the lower entry, we're mimicing what will happen on future
-	 * searches.
-	 *
-	 * If there's no lower page entry (if, in the example, we deleted the
-	 * key A and the child page with the range A-B), the thread switches to
-	 * the next larger page entry.  This works because the search algorithm
-	 * that landed us on this page ignores any lower boundary for the first
-	 * entry in the page.  In other words, if there's no lower entry on the
-	 * page, then the next larger entry, as the lowest entry on the page,
-	 * holds the lowest keys referenced from this page.  Again, by switching
-	 * our writing thread to the larger entry, we're mimicing what happens
-	 * on future searches.
-	 *
-	 * If there's no entry at all, either smaller or larger (that is, the
-	 * parent no longer references any valid entries at all), it gets hard.
-	 * In that case, we can't fix our writer's position: our writer is in
-	 * the wrong part of the tree, a section of the tree being discarded.
-	 * In this case, we return the WT_RESTART error up the call stack and
-	 * restart the search operation.  Unfortunately, that's not sufficient:
-	 * a restarted search will only come back into the same page without
-	 * any valid entries, encounter the same error, and infinitely loop.
-	 *
-	 * To break the infinite loop, we mark the parent's parent reference as
-	 * deleted, too.  That way, our restarted search will hit a deleted
-	 * entry and be indirected to some other entry, and not back down into
-	 * the same page.  A few additional points:
-	 *
-	 * First, we have to repeat this check all the way up the tree, until
-	 * we reach the root or a page that has non-deleted entries.  In other
-	 * words, deleting our parent in our parent's parent page might just
-	 * result in another page in our search path without any valid entries,
-	 * and its the existence of a page of deleted references that results
-	 * in the infinite loop.
-	 *
-	 * Second, we're discarding a chunk of the tree, because no search can
-	 * ever reach it.  That's OK: those pages will eventually be selected
-	 * for eviction, we're re-discover that they have no entries, and we'll
-	 * discard their contents then.
-	 *
-	 * So, let's get to it: walk the chain of parent pages from the current
-	 * page, stopping at the root or the first page with valid entries and
-	 * deleting as we go.
-	 *
-	 * Search the current parent page for a valid child page entry.  We can
-	 * do this because there's a valid child for the page in the tree (so it
-	 * can't be evicted), and we're the eviction thread and no other thread
-	 * deletes pages from the tree, so the address fields can't change from
-	 * underneath us.  If we find a valid page entry, we're done, we've gone
-	 * as far up the tree as we need to go.
-	 */
-	switch (parent->dsk->type) {
-	case WT_PAGE_COL_INT:
-		WT_COL_REF_FOREACH(parent, cref, i)
-			if (WT_COL_REF_STATE(cref) != WT_REF_DELETED)
-				return (0);
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ROW_REF_FOREACH(parent, rref, i)
-			if (WT_ROW_REF_STATE(rref) != WT_REF_DELETED)
-				return (0);
-		break;
-	}
-
-	/*
-	 * The current page has no valid child page entries -- mark the page as
-	 * deleted.
-	 */
-	page->parent_ref->state = WT_REF_DELETED;
-
-	/* Lather, rinse, repeat. */
-	return (__wt_rec_page_delete(session, parent));
 }
