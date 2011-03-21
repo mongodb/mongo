@@ -108,10 +108,10 @@ typedef struct {
  *	Encapsulation of a read request.
  */
 struct __wt_read_req {
-	SESSION *session;				/* Requesting thread */
+	SESSION *session;			/* Requesting thread */
 	WT_PAGE *parent;			/* Parent */
-	WT_REF *ref;				/* Address */
-	int	dsk_verify;			/* Verify the disk image */
+	WT_REF  *ref;				/* Reference/Address */
+	int	 dsk_verify;			/* Verify the disk image */
 };
 #define	WT_READ_REQ_ISEMPTY(r)						\
 	((r)->session == NULL)
