@@ -73,9 +73,6 @@ __wt_session_close(SESSION *session)
 	conn = S2C(session);
 	ret = 0;
 
-	WT_CONN_FCHK_RET(
-	    conn, "SESSION.close", session->flags, WT_APIMASK_SESSION, ret);
-
 	/*
 	 * The "in" reference count is artificially incremented by 1 as
 	 * long as a session buffer is referenced by the session thread;
