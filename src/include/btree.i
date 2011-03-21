@@ -90,30 +90,6 @@ __wt_key_process(void *ref)
 }
 
 /*
- * __wt_page_write --
- *	Write a file page.
- */
-static inline int
-__wt_page_write(SESSION *session, WT_PAGE *page)
-{
-	return (__wt_disk_write(session, page->dsk, page->addr, page->size));
-}
-
-/*
- * __wt_init_ff_and_sa --
- *	Initialize first-free and space-available values for a page.
- */
-static inline void
-__wt_init_ff_and_sa(
-    WT_PAGE *page, uint8_t **first_freep, uint32_t *space_availp)
-{
-	uint8_t *p;
-
-	*first_freep = p = WT_PAGE_BYTE(page);
-	*space_availp = page->size - (uint32_t)(p - (uint8_t *)page->dsk);
-}
-
-/*
  * __wt_page_write_gen_check --
  *	Confirm the page's write generation number is correct.
  */
