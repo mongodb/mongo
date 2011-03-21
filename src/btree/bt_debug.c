@@ -160,10 +160,15 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
-	fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu",
-	    (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(btree, page->size) - 1),
-	    __wt_page_type_string(page->type), (u_long)page->size);
+	if (page->addr == WT_ADDR_INVALID)
+		fprintf(fp, "addr: [not set]: {\n\t%s",
+		    __wt_page_type_string(page->type));
+	else
+		fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu",
+		    (u_long)page->addr,
+		    (u_long)page->addr +
+		    (WT_OFF_TO_ADDR(btree, page->size) - 1),
+		    __wt_page_type_string(page->type), (u_long)page->size);
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		fprintf(fp, ", starting recno %llu",
