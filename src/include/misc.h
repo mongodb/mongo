@@ -50,11 +50,11 @@ extern "C" {
 #define	__wt_calloc_def(a, b, c)	__wt_calloc(a, b, sizeof(**(c)), c)
 /*
  * Our internal free function clears the underlying address atomically so there
- * is no chance of racing threads seeing intermediate results while a structure
- * is being free'd.   (That would be a bug, of course, but I'd rather not drop
- * core, just the same.)  That's a non-standard "free" API, and the resulting
- * bug is a mother to find -- make sure we get it right, don't make the caller
- * remember to put the & operator on the pointer.
+ * is a smaller chance of racing threads seeing intermediate results while a
+ * structure is being free'd.   (That would be a bug, of course, but I'd rather
+ * not drop core, just the same.)  That's a non-standard "free" API, and the
+ * resulting bug is a mother to find -- make sure we get it right, don't make
+ * the caller remember to put the & operator on the pointer.
  */
 #define	__wt_free(a, b)			__wt_free_int(a, &(b))
 
