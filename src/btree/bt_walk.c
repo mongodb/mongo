@@ -75,6 +75,8 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 			ret = __wt_tree_walk(
 			    session, ref->page, flags, work, arg);
 			__wt_hazard_clear(session, ref->page);
+			if (ret != 0)
+				return (ret);
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -94,6 +96,8 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 			ret = __wt_tree_walk(
 			    session, ref->page, flags, work, arg);
 			__wt_hazard_clear(session, ref->page);
+			if (ret != 0)
+				return (ret);
 		}
 		break;
 	}
