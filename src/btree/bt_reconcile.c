@@ -314,8 +314,8 @@ __wt_split(SESSION *session, uint64_t *recnop,
 	 *
 	 * #1
 	 * We're done reconciling a page, in which case we can ignore any split
-	 * split information we've accumulated to that point and write whatever
-	 * we have in the current buffer.
+	 * information we've accumulated to that point and write whatever we
+	 * have in the current buffer.
 	 *
 	 * #2
 	 * Not done, and about to cross a split boundary, in which case we save
