@@ -822,12 +822,12 @@ struct __wt_cell {
  * may be WT_OFF, WT_OFF_RECORD or WT_OVFL structures.  These macros do the
  * cast to the right type.
  */
-#define	WT_CELL_BYTE_OFF(addr)						\
-	((WT_OFF *)(WT_CELL_BYTE(addr)))
-#define	WT_CELL_BYTE_OFF_RECORD(addr)					\
-	((WT_OFF_RECORD *)(WT_CELL_BYTE(addr)))
-#define	WT_CELL_BYTE_OVFL(addr)						\
-	((WT_OVFL *)(WT_CELL_BYTE(addr)))
+#define	WT_CELL_BYTE_OFF(cell)						\
+	((WT_OFF *)(WT_CELL_BYTE(cell)))
+#define	WT_CELL_BYTE_OFF_RECORD(cell)					\
+	((WT_OFF_RECORD *)(WT_CELL_BYTE(cell)))
+#define	WT_CELL_BYTE_OVFL(cell)						\
+	((WT_OVFL *)(WT_CELL_BYTE(cell)))
 
 /*
  * Bytes required to store a WT_CELL followed by additional bytes of data.
