@@ -97,6 +97,9 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_ERR(__wt_page_inmem_col_int(session, page));
+
+		/* Column-store internal pages do not require a disk image. */
+		__wt_free(session, page->XXdsk);
 		break;
 	case WT_PAGE_COL_RLE:
 		WT_ERR(__wt_page_inmem_col_rle(session, page));
