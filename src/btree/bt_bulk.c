@@ -9,6 +9,7 @@
 
 static int __wt_bulk_fix(SESSION *, void (*)(const char *,
 		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
+static int __wt_bulk_ovfl_copy(SESSION *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(SESSION *, WT_ITEM *, WT_OVFL *);
 static int __wt_bulk_promote(SESSION *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
@@ -16,7 +17,6 @@ static int __wt_bulk_scratch_page(
 static int __wt_bulk_stack_put(SESSION *, WT_STACK *);
 static int __wt_bulk_var(SESSION *, void (*)(const char *,
 		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
-static int __wt_item_build_key(SESSION *, WT_ITEM *, WT_CELL *, WT_OVFL *);
 
 /*
  * __wt_init_ff_and_sa --
@@ -921,7 +921,7 @@ err:	if (next_tmp != NULL)
  *	Process an inserted key item and return an WT_CELL structure and byte
  *	string to be stored on the page.
  */
-static int
+int
 __wt_item_build_key(
     SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
 {
@@ -937,12 +937,11 @@ __wt_item_build_key(
 	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
 	 * it.
 	 *
-	 * For Huffman-encoded key/data cells, we need a chunk of new space;
-	 * use the SESSION key/data return memory: this routine is called during
-	 * bulk insert and reconciliation, we aren't returning key/data pairs.
+	 * Optionally compress the data using the Huffman engine.  For Huffman-
+	 * encoded key/data cells, we need additional memory; use the SESSION
+	 * key/data return memory: this routine is called during bulk insert and
+	 * reconciliation, we aren't returning key/data pairs.
 	 */
-
-	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(btree->huffman_key,
 		    item->data, item->size, &session->key));
@@ -1031,7 +1030,7 @@ __wt_item_build_value(SESSION *session,
  *	Copy bulk-loaded overflow items in the file, returning the WT_OVFL
  *	structure, filled in.
  */
-int
+static int
 __wt_bulk_ovfl_copy(SESSION *session, WT_OVFL *from, WT_OVFL *to)
 {
 	BTREE *btree;
