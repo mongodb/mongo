@@ -1435,7 +1435,6 @@ __wt_rec_parent_update_dirty(SESSION *session,
 	 * there's no parent.
 	 */
 	if (page->parent == NULL) {
-		WT_ASSERT(session, split == NULL);
 		btree->root_page.addr = addr;
 		btree->root_page.size = size;
 		return (__wt_desc_write(session));
