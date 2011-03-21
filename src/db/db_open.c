@@ -63,6 +63,8 @@ __wt_btree_close(SESSION *session, uint32_t flags)
 	BTREE *btree;
 	int ret;
 
+	WT_UNUSED(flags);
+
 	btree = session->btree;
 	ret = 0;
 
