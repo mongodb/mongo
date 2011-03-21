@@ -76,7 +76,7 @@ main(int argc, char *argv[])
 		if (wts_startup(log))
 			return (EXIT_FAILURE);
 
-		config_dump(0);			/* Dump run configuration */
+		config_print(0);		/* Dump run configuration */
 
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
@@ -140,7 +140,7 @@ main(int argc, char *argv[])
 
 	return (EXIT_SUCCESS);
 
-err:	config_dump(1);
+err:	config_print(1);
 	return (EXIT_FAILURE);
 }
 

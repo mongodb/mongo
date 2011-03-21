@@ -119,11 +119,11 @@ config_names(void)
 }
 
 /*
- * config_dump --
- *	Dump configuration structure.
+ * config_print --
+ *	Print configuration information.
  */
 void
-config_dump(int error_display)
+config_print(int error_display)
 {
 	CONFIG *cp;
 	FILE *fp;
