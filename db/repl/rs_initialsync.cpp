@@ -252,7 +252,6 @@ namespace mongo {
         /* apply relevant portion of the oplog
         */
         {
-            sethbmsg("initial sync initial oplog application");
             isyncassert( "initial sync source must remain readable throughout our initial sync [2]", source->state().readable() );
             if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
