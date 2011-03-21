@@ -613,7 +613,7 @@ __wt_rec_col_int_loop(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 		 * page must have resulted from a page split, recursively call
 		 * ourselves and walk that page.
 		 */
-		if (WT_REF_STATE(WT_COL_REF_STATE(cref)) == WT_REF_MERGE) {
+		if (FLD_ISSET(WT_COL_REF_STATE(cref), WT_REF_MERGE)) {
 			ref_page = WT_COL_REF_PAGE(cref);
 			if (ref_page->type == WT_PAGE_COL_INT)
 				WT_RET(__wt_rec_col_int_loop(
@@ -1088,7 +1088,7 @@ __wt_rec_row_int_loop(SESSION *session, WT_PAGE *page,
 		 * page must have resulted from a page split, recursively call
 		 * ourselves and walk that page.
 		 */
-		if (WT_REF_STATE(WT_ROW_REF_STATE(rref)) == WT_REF_MERGE) {
+		if (FLD_ISSET(WT_ROW_REF_STATE(rref), WT_REF_MERGE)) {
 			ref_page = WT_ROW_REF_PAGE(rref);
 			if (ref_page->type == WT_PAGE_ROW_INT)
 				WT_RET(__wt_rec_row_int_loop(session, ref_page,
@@ -1295,10 +1295,8 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 		    "reconcile: delete page %lu (%luB)",
 		    (u_long)page->addr, (u_long)page->size));
 
-		__wt_rec_parent_update_dirty(session, page,
-		    NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE);
-
-		return (0);
+		return (__wt_rec_parent_update_dirty(session, page,
+		    NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE));
 	}
 
 	/*
@@ -1306,15 +1304,13 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 	 * single page with another single page most of the time.
 	 */
 	if (r->l_next == 1) {
-		__wt_rec_parent_update_dirty(session, page, NULL,
-		    r->list[0].off.addr, r->list[0].off.size, WT_REF_DISK);
-
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: move %lu to %lu, (%luB to %luB)",
 		    (u_long)page->addr, r->list[0].off.addr,
 		    (u_long)page->size, r->list[0].off.size));
 
-		return (0);
+		return (__wt_rec_parent_update_dirty(session, page, NULL,
+		    r->list[0].off.addr, r->list[0].off.size, WT_REF_DISK));
 	}
 
 	/*
@@ -1345,10 +1341,8 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 		break;
 	}
 
-	__wt_rec_parent_update_dirty(session,
-	    page, new, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE);
-
-	return (0);
+	return (__wt_rec_parent_update_dirty(session,
+	    page, new, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE));
 }
 
 /*
