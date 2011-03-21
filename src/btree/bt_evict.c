@@ -100,12 +100,10 @@ __wt_cache_evict_server(void *arg)
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CACHE *cache;
-	WT_CONNECTION *wt_conn;
 	uint64_t bytes_inuse, bytes_max;
 	int ret;
 
 	conn = arg;
-	wt_conn = &conn->iface;
 	cache = conn->cache;
 	ret = 0;
 
@@ -636,7 +634,7 @@ __wt_evict_subtrees(WT_PAGE *page)
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_REF_STATE(WT_ROW_REF_STATE(cref)) == WT_REF_MEM)
+			if (WT_REF_STATE(WT_ROW_REF_STATE(rref)) == WT_REF_MEM)
 				return (1);
 		break;
 	}
