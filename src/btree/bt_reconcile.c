@@ -1441,6 +1441,8 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->parent = orig->parent;
 	page->parent_ref = orig->parent_ref;
 	page->read_gen = ++cache->read_gen;
+	page->addr = WT_ADDR_INVALID;
+	page->size = 0;
 	page->indx_count = r->l_next;
 	page->type = WT_PAGE_ROW_INT;
 
@@ -1489,6 +1491,8 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->parent_ref = orig->parent_ref;
 	page->read_gen = ++cache->read_gen;
 	page->u.col_int.recno = WT_RECNO(&r->list->off);
+	page->addr = WT_ADDR_INVALID;
+	page->size = 0;
 	page->indx_count = r->l_next;
 	page->type = WT_PAGE_COL_INT;
 
