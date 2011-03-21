@@ -28,6 +28,13 @@ __wt_row_key_on_page(WT_PAGE *page, void *key)
 	uint8_t *p;
 
 	/*
+	 * There may be no underlying page, in which case the reference is
+	 * off-page by definition.
+	 */
+	if (page->XXdsk == NULL)
+		return (0);
+
+	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
 	 * of the structures are a void *data/uint32_t size pair.
 	 */
