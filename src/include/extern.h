@@ -379,15 +379,15 @@ int
 __wt_api_arg_max(SESSION *session,
     const char *name, const char *arg_name, uint32_t v, uint32_t max);
 int
-__wt_file_method_type(BTREE *btree, const char *name, int column_err);
+__wt_file_method_type(SESSION *session, const char *name, int column_err);
 int
-__wt_file_wrong_fixed_size(SESSION *session, uint32_t len);
+__wt_file_wrong_fixed_size(SESSION *session, uint32_t len, uint32_t config_len);
 int
-__wt_file_readonly(BTREE *btree, const char *name);
+__wt_file_readonly(SESSION *session, const char *name);
 int
-__wt_file_format(BTREE *btree);
+__wt_file_format(SESSION *session);
 int
-__wt_file_item_too_big(BTREE *btree);
+__wt_file_item_too_big(SESSION *session);
 int
 __wt_session_lockout(SESSION *session);
 int

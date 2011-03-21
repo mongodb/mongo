@@ -207,7 +207,7 @@ done:	/*
 		 */
 		session->srch_upd = WT_COL_UPDATE(page, cip);
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	session->srch_page = page;

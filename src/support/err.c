@@ -143,12 +143,8 @@ __wt_api_arg_max(SESSION *session,
  *	for a file type.
  */
 int
-__wt_file_method_type(BTREE *btree, const char *name, int column_err)
+__wt_file_method_type(SESSION *session, const char *name, int column_err)
 {
-	SESSION *session;
-
-	session = &btree->conn->default_session;
-
 	__wt_errx(session,
 	    "%s: this method is not supported for a %s file",
 	    name, column_err ? "column-store" : "row-store");
@@ -161,16 +157,12 @@ __wt_file_method_type(BTREE *btree, const char *name, int column_err)
  *	into a fixed-size file.
  */
 int
-__wt_file_wrong_fixed_size(SESSION *session, uint32_t len)
+__wt_file_wrong_fixed_size(SESSION *session, uint32_t len, uint32_t config_len)
 {
-	BTREE *btree;
-
-	btree = session->btree;
-
 	__wt_errx(session,
 	    "%s: length of %lu does not match fixed-length file configuration "
 	    "of %lu",
-	     session->name, (u_long)len, (u_long)btree->fixed_len);
+	    session->name, (u_long)len, (u_long)config_len);
 	return (WT_ERROR);
 }
 
@@ -179,12 +171,8 @@ __wt_file_wrong_fixed_size(SESSION *session, uint32_t len)
  *	Print a standard error message on attempts to modify a read-only file.
  */
 int
-__wt_file_readonly(BTREE *btree, const char *name)
+__wt_file_readonly(SESSION *session, const char *name)
 {
-	SESSION *session;
-
-	session = &btree->conn->default_session;
-
 	__wt_errx(session,
 	    "%s: the file was opened read-only and may not be modified", name);
 	return (WT_READONLY);
@@ -196,12 +184,8 @@ __wt_file_readonly(BTREE *btree, const char *name)
  *	discovered.
  */
 int
-__wt_file_format(BTREE *btree)
+__wt_file_format(SESSION *session)
 {
-	SESSION *session;
-
-	session = &btree->conn->default_session;
-
 	__wt_errx(session, "the file is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the file");
 	return (WT_ERROR);
@@ -212,12 +196,8 @@ __wt_file_format(BTREE *btree)
  *	Print a standard error message when an element is too large to store.
  */
 int
-__wt_file_item_too_big(BTREE *btree)
+__wt_file_item_too_big(SESSION *session)
 {
-	SESSION *session;
-
-	session = &btree->conn->default_session;
-
 	__wt_errx(session, "the item is too large for the file to store");
 	return (WT_ERROR);
 }

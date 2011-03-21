@@ -65,11 +65,9 @@ __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 int
 __wt_page_inmem(SESSION *session, WT_PAGE *page)
 {
-	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	int ret;
 
-	btree = session->btree;
 	dsk = page->XXdsk;
 	ret = 0;
 
@@ -90,7 +88,7 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	switch (dsk->type) {
@@ -437,7 +435,7 @@ offpage:	/*
 		p = tmp->item.data;
 		size = tmp->item.size;
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*

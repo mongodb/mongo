@@ -120,13 +120,10 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
 int
 __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 {
-	BTREE *btree;
 	SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
 	uint32_t align_size, alloc_size, size;
 	int single_use;
-
-	btree = session->btree;
 
 	/*
 	 * Allocate memory for an insert or change; there's a buffer in the
@@ -162,10 +159,10 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 	 */
 	size = value == NULL ? 0 : value->size;
 	if (size > UINT32_MAX - (sizeof(WT_UPDATE) + sizeof(uint32_t)))
-		return (__wt_file_item_too_big(btree));
+		return (__wt_file_item_too_big(session));
 	align_size = WT_ALIGN(size + sizeof(WT_UPDATE), sizeof(uint32_t));
 	if (align_size > UINT32_MAX - sizeof(SESSION_BUFFER))
-		return (__wt_file_item_too_big(btree));
+		return (__wt_file_item_too_big(session));
 
 	/*
 	 * If we already have a buffer and the data fits, copy the WT_UPDATE

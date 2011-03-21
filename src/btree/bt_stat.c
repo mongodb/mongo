@@ -56,7 +56,7 @@ __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg)
 		WT_STAT_INCR(stats, PAGE_ROW_LEAF);
 		WT_RET(__wt_stat_page_row_leaf(session, page, arg));
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 	return (0);
 }
@@ -179,7 +179,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 		case WT_CELL_DEL:
 			WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			break;
-		WT_ILLEGAL_FORMAT(btree);
+		WT_ILLEGAL_FORMAT(session);
 		}
 	}
 	return (0);
@@ -224,7 +224,7 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
 			break;
-		WT_ILLEGAL_FORMAT(btree);
+		WT_ILLEGAL_FORMAT(session);
 		}
 
 		/*
@@ -246,7 +246,7 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 			case WT_CELL_KEY:
 				WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
 				break;
-			WT_ILLEGAL_FORMAT(btree);
+			WT_ILLEGAL_FORMAT(session);
 			}
 		else
 			WT_STAT_INCR(stats, ITEM_TOTAL_KEY);

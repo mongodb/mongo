@@ -123,10 +123,10 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 			value_ret = session->value.item.data;
 			size_ret = session->value.item.size;
 			break;
-		WT_ILLEGAL_FORMAT(btree);
+		WT_ILLEGAL_FORMAT(session);
 		}
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*

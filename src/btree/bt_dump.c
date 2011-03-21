@@ -75,10 +75,8 @@ __wt_btree_dump(SESSION *session,
 static int
 __wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
 {
-	BTREE *btree;
 	WT_DSTUFF *dp;
 
-	btree = session->btree;
 	dp = arg;
 
 	switch (page->type) {
@@ -97,7 +95,7 @@ __wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_dump_page_row_leaf(session, page, dp));
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/* Report progress every 10 pages. */
@@ -244,7 +242,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			break;
 		case WT_CELL_DEL:
 			break;
-		WT_ILLEGAL_FORMAT_ERR(btree, ret);
+		WT_ILLEGAL_FORMAT_ERR(session, ret);
 		}
 	}
 
@@ -321,7 +319,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			WT_ERR(__wt_cell_process(session, cell, value_tmp));
 			value = &value_tmp->item;
 			break;
-		WT_ILLEGAL_FORMAT_ERR(btree, ret);
+		WT_ILLEGAL_FORMAT_ERR(session, ret);
 		}
 
 		dp->p(key->data, key->size, dp->stream);

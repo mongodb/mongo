@@ -28,10 +28,6 @@ int
 __wt_verify_dsk_page(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
-	BTREE *btree;
-
-	btree = session->btree;
-
 	/* Check the page type. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -85,7 +81,7 @@ __wt_verify_dsk_page(
 	case WT_PAGE_OVFL:
 		WT_RET(__wt_verify_dsk_chunk(session, dsk, addr, size));
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	return (0);

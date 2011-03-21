@@ -184,7 +184,7 @@ static int __wt_api_btree_bulk_load(
 	SESSION *session = NULL;
 	int ret;
 
-	WT_DB_RDONLY(btree, method_name);
+	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_STAT_INCR(connection->method_stats, BTREE_BULK_LOAD);
 	ret = __wt_btree_bulk_load(session, progress, cb);
@@ -227,8 +227,8 @@ static int __wt_api_btree_col_del(
 	CONNECTION *connection = btree->conn;
 	int ret;
 
-	WT_DB_COL_ONLY(btree, method_name);
-	WT_DB_RDONLY(btree, method_name);
+	WT_DB_COL_ONLY(session, btree, method_name);
+	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_COL_DEL);
 	WT_STAT_INCR(connection->method_stats, BTREE_COL_DEL);
@@ -255,7 +255,7 @@ static int __wt_api_btree_col_get(
 	CONNECTION *connection = btree->conn;
 	int ret;
 
-	WT_DB_COL_ONLY(btree, method_name);
+	WT_DB_COL_ONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_COL_GET);
 	WT_STAT_INCR(connection->method_stats, BTREE_COL_GET);
@@ -281,8 +281,8 @@ static int __wt_api_btree_col_put(
 	CONNECTION *connection = btree->conn;
 	int ret;
 
-	WT_DB_COL_ONLY(btree, method_name);
-	WT_DB_RDONLY(btree, method_name);
+	WT_DB_COL_ONLY(session, btree, method_name);
+	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_COL_PUT);
 	WT_STAT_INCR(connection->method_stats, BTREE_COL_PUT);
@@ -409,8 +409,8 @@ static int __wt_api_btree_row_del(
 	CONNECTION *connection = btree->conn;
 	int ret;
 
-	WT_DB_ROW_ONLY(btree, method_name);
-	WT_DB_RDONLY(btree, method_name);
+	WT_DB_ROW_ONLY(session, btree, method_name);
+	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_ROW_DEL);
 	WT_STAT_INCR(connection->method_stats, BTREE_ROW_DEL);
@@ -437,7 +437,7 @@ static int __wt_api_btree_row_get(
 	CONNECTION *connection = btree->conn;
 	int ret;
 
-	WT_DB_ROW_ONLY(btree, method_name);
+	WT_DB_ROW_ONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_ROW_GET);
 	WT_STAT_INCR(connection->method_stats, BTREE_ROW_GET);
@@ -463,8 +463,8 @@ static int __wt_api_btree_row_put(
 	CONNECTION *connection = btree->conn;
 	int ret;
 
-	WT_DB_ROW_ONLY(btree, method_name);
-	WT_DB_RDONLY(btree, method_name);
+	WT_DB_ROW_ONLY(session, btree, method_name);
+	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_ROW_PUT);
 	WT_STAT_INCR(connection->method_stats, BTREE_ROW_PUT);
@@ -527,7 +527,7 @@ static int __wt_api_btree_sync(
 	SESSION *session = NULL;
 	int ret;
 
-	WT_DB_RDONLY(btree, method_name);
+	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_SYNC);
 	WT_STAT_INCR(connection->method_stats, BTREE_SYNC);

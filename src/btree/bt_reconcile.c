@@ -79,10 +79,6 @@ __wt_block_free_ovfl(SESSION *session, WT_OVFL *ovfl)
 int
 __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 {
-	BTREE *btree;
-
-	btree = session->btree;
-
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile %s page addr %lu (type %s)",
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
@@ -120,7 +116,7 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 		case WT_PAGE_ROW_LEAF:
 			WT_RET(__wt_rec_row_leaf(session, page));
 			break;
-		WT_ILLEGAL_FORMAT(btree);
+		WT_ILLEGAL_FORMAT(session);
 		}
 
 		/* Free the original disk blocks. */

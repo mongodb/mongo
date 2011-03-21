@@ -130,8 +130,8 @@ __wt_bulk_fix(SESSION *session,
 			goto err;
 		}
 		if (value->size != btree->fixed_len)
-			WT_ERR(
-			    __wt_file_wrong_fixed_size(session, value->size));
+			WT_ERR(__wt_file_wrong_fixed_size(
+			    session, value->size, btree->fixed_len));
 
 		/*
 		 * We use the high bit of the value as a "deleted" value,
@@ -690,10 +690,10 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 			key->size = sizeof(tmp_ovfl);
 			WT_CELL_SET(&item, WT_CELL_KEY_OVFL, sizeof(WT_OVFL));
 			break;
-		WT_ILLEGAL_FORMAT(btree);
+		WT_ILLEGAL_FORMAT(session);
 		}
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*
@@ -785,7 +785,7 @@ split:		switch (dsk->type) {
 		case WT_PAGE_ROW_LEAF:
 			type = WT_PAGE_ROW_INT;
 			break;
-		WT_ILLEGAL_FORMAT(btree);
+		WT_ILLEGAL_FORMAT(session);
 		}
 
 		WT_ERR(__wt_bulk_scratch_page(

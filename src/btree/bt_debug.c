@@ -118,7 +118,7 @@ __wt_debug_disk(
 		    __wt_page_type_string(dsk->type), (u_long)dsk->u.datalen,
 		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	switch (dsk->type) {
@@ -208,7 +208,7 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 		break;
 	case WT_PAGE_OVFL:
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	fprintf(fp, "}\n");
@@ -451,15 +451,12 @@ __wt_debug_dsk_item(SESSION *session, WT_PAGE_DISK *dsk, FILE *fp)
 static int
 __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 {
-	BTREE *btree;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
 	WT_OVFL *ovfl;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
-
-	btree = session->btree;
 
 	fprintf(fp, "\t%s: len %lu",
 	    __wt_cell_type_string(cell), (u_long)WT_CELL_LEN(cell));
@@ -487,7 +484,7 @@ __wt_debug_cell(SESSION *session, WT_CELL *cell, FILE *fp)
 		    (u_long)off_record->addr, (u_long)off_record->size,
 		    (unsigned long long)WT_RECNO(off_record));
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	fprintf(fp, "\n\t{");
@@ -614,7 +611,7 @@ process:	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		p = (uint8_t *)"offpage_record";
 		size = sizeof("offpage_record") - 1;
 		break;
-	WT_ILLEGAL_FORMAT_ERR(btree, ret);
+	WT_ILLEGAL_FORMAT_ERR(session, ret);
 	}
 
 	__wt_print_byte_string(p, size, fp);

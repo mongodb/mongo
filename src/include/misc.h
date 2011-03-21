@@ -74,17 +74,17 @@ extern "C" {
 	WT_CONN_FCHK((btree)->conn, (name), (f), (mask))
 
 /* Read-only file check. */
-#define	WT_DB_RDONLY(btree, name)					\
+#define	WT_DB_RDONLY(session, btree, name)				\
 	if (F_ISSET((btree), WT_RDONLY))				\
-		return (__wt_file_readonly((btree), (name)));
+		return (__wt_file_readonly((session), (name)));
 
 /* Column- and row-only file check. */
-#define	WT_DB_ROW_ONLY(btree, name)					\
+#define	WT_DB_ROW_ONLY(session, btree, name)				\
 	if (F_ISSET((btree), WT_COLUMN))				\
-		return (__wt_file_method_type((btree), (name), 1));
-#define	WT_DB_COL_ONLY(btree, name)					\
+		return (__wt_file_method_type((session), (name), 1));
+#define	WT_DB_COL_ONLY(session, btree, name)				\
 	if (!F_ISSET((btree), WT_COLUMN))				\
-		return (__wt_file_method_type((btree), (name), 0));
+		return (__wt_file_method_type((session), (name), 0));
 
 /*
  * Flag set, clear and test.
@@ -123,12 +123,12 @@ extern "C" {
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-#define	WT_ILLEGAL_FORMAT(btree)					\
+#define	WT_ILLEGAL_FORMAT(session)					\
 	default:							\
-		return (__wt_file_format((btree)))
-#define	WT_ILLEGAL_FORMAT_ERR(btree, ret)				\
+		return (__wt_file_format(session))
+#define	WT_ILLEGAL_FORMAT_ERR(session, ret)				\
 	default:							\
-		ret = __wt_file_format((btree));			\
+		ret = __wt_file_format(session);			\
 		goto err
 
 /*

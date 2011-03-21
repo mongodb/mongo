@@ -296,13 +296,13 @@ def func_method(a, f):
 
 	# Check if the method is illegal for the database type.
 	if colonly:
-		f.write('\tWT_DB_COL_ONLY(btree, method_name);\n')
+		f.write('\tWT_DB_COL_ONLY(session, btree, method_name);\n')
 	if rowonly:
-		f.write('\tWT_DB_ROW_ONLY(btree, method_name);\n')
+		f.write('\tWT_DB_ROW_ONLY(session, btree, method_name);\n')
 
 	# Check if the method is illegal for read-only databases.
 	if rdonly:
-		f.write('\tWT_DB_RDONLY(btree, method_name);\n')
+		f.write('\tWT_DB_RDONLY(session, btree, method_name);\n')
 
 	# If entering the API with a SESSION handle, allocate/initialize it.
 	if session:

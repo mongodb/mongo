@@ -32,7 +32,8 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
 	btree = session->btree;
 
 	if (btree->fixed_len != 0 && value->size != btree->fixed_len)
-		WT_RET(__wt_file_wrong_fixed_size(session, value->size));
+		WT_RET(__wt_file_wrong_fixed_size(
+		    session, value->size, btree->fixed_len));
 
 	return (__wt_col_update(session, recno, value, 1));
 }
@@ -45,13 +46,10 @@ static int
 __wt_col_update(
     SESSION *session, uint64_t recno, WT_ITEM *value, int overwrite)
 {
-	BTREE *btree;
 	WT_PAGE *page;
 	WT_RLE_EXPAND *exp, **new_rleexp;
 	WT_UPDATE **new_upd, *upd;
 	int ret;
-
-	btree = session->btree;
 
 	page = NULL;
 	exp = NULL;
@@ -130,7 +128,7 @@ __wt_col_update(
 		    WT_COL_INDX_SLOT(page, session->srch_ip),
 		    new_rleexp, exp, ret);
 		break;
-	WT_ILLEGAL_FORMAT_ERR(btree, ret);
+	WT_ILLEGAL_FORMAT_ERR(session, ret);
 	}
 
 	if (ret != 0) {

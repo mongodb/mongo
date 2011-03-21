@@ -193,7 +193,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		 */
 		session->srch_upd = WT_ROW_UPDATE(page, rip);
 		break;
-	WT_ILLEGAL_FORMAT(btree);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	session->srch_page = page;
