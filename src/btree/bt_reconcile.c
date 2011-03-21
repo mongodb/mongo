@@ -10,7 +10,7 @@
 
 static int  __wt_rec_col_fix(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_int(SESSION *, WT_PAGE *);
-static int  __wt_rec_col_int_loop(SESSION *,
+static int  __wt_rec_col_merge(SESSION *,
 		WT_PAGE *, uint64_t *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
@@ -19,9 +19,9 @@ static void __wt_rec_parent_update_clean(WT_PAGE *);
 static int  __wt_rec_parent_update_dirty(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static int  __wt_rec_row_int(SESSION *, WT_PAGE *);
-static int  __wt_rec_row_int_loop(
-		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *);
+static int  __wt_rec_row_merge(
+		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rle_expand_compare(const void *, const void *);
 static int  __wt_rec_finish(SESSION *, WT_PAGE *);
@@ -488,10 +488,10 @@ static int
 __wt_rec_helper_write(
     SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 {
+	WT_CELL *cell;
 	WT_REC_LIST *r;
 	struct rec_list *r_list;
 	uint32_t addr, size;
-	void *cs;
 
 	r = &S2C(session)->cache->reclist;
 
@@ -532,13 +532,19 @@ __wt_rec_helper_write(
 	switch (dsk->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		cs = WT_PAGE_DISK_BYTE(dsk);
-		size = WT_CELL_LEN(cs);
-		if (size > r_list->key.mem_size)
-			WT_RET(__wt_buf_grow(session, &r_list->key, size));
-		memcpy(r_list->key.mem, WT_CELL_BYTE(cs), size);
-		r_list->key.item.data = r_list->key.mem;
-		r_list->key.item.size = size;
+		cell = WT_PAGE_DISK_BYTE(dsk);
+		if (WT_CELL_TYPE(cell) == WT_CELL_KEY_OVFL)
+			WT_RET(__wt_ovfl_in(
+			    session, WT_CELL_BYTE_OVFL(cell), &r_list->key));
+		else {
+			size = WT_CELL_LEN(cell);
+			if (size > r_list->key.mem_size)
+				WT_RET(
+				    __wt_buf_grow(session, &r_list->key, size));
+			memcpy(r_list->key.mem, WT_CELL_BYTE(cell), size);
+			r_list->key.item.data = r_list->key.mem;
+			r_list->key.item.size = size;
+		}
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
@@ -568,11 +574,16 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page)
 	    session->btree->intlmin, &recno, &first_free, &space_avail));
 
 	/*
-	 * There may be subtrees that we're merging into this page, and they
-	 * may be multiple levels deep -- it's not likely, but it's possible.
-	 * Call a looping routine for each page.
+	 * Walking the row-store internal pages is complicated by the fact that
+	 * we're taking keys from the underlying disk image for the top-level
+	 * page and we're taking keys from in-memory structures for merge pages.
+	 * Column-store is simpler because the only information we copy is the
+	 * WT_OFF_RECORD structure, and it comes from in-memory structures in
+	 * both the top-level and merge cases.  In short, both the top-level
+	 * and merge page walks look the same, and we just call the merge page
+	 * function on the top-level page.
 	 */
-	WT_RET(__wt_rec_col_int_loop(
+	WT_RET(__wt_rec_col_merge(
 	    session, page, &recno, &entries, &first_free, &space_avail));
 
 	/* Write the remnant page. */
@@ -581,15 +592,15 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_col_int_loop --
+ * __wt_rec_col_merge --
  *	Recursively walk a column-store internal tree of merge pages.
  */
 static int
-__wt_rec_col_int_loop(SESSION *session, WT_PAGE *page, uint64_t *recnop,
+__wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
     uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
 {
 	WT_COL_REF *cref;
-	WT_OFF_RECORD *from, _from;
+	WT_OFF_RECORD off;
 	WT_PAGE *ref_page;
 	uint64_t recno;
 	uint32_t entries, i, space_avail;
@@ -601,7 +612,6 @@ __wt_rec_col_int_loop(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 	space_avail = *space_availp;
 
 	/* For each entry in the page... */
-	from = &_from;
 	WT_COL_REF_FOREACH(page, cref, i) {
 		/*
 		 * If this is a reference to a merge page, check the page type.
@@ -612,7 +622,7 @@ __wt_rec_col_int_loop(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 		if (FLD_ISSET(WT_COL_REF_STATE(cref), WT_REF_MERGE)) {
 			ref_page = WT_COL_REF_PAGE(cref);
 			if (ref_page->type == WT_PAGE_COL_INT)
-				WT_RET(__wt_rec_col_int_loop(
+				WT_RET(__wt_rec_col_merge(
 				    session, ref_page, recnop,
 				    entriesp, first_freep, space_availp));
 			__wt_page_discard(session, ref_page);
@@ -625,10 +635,10 @@ __wt_rec_col_int_loop(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 			    recnop, entriesp, first_freep, space_availp, 0));
 
 		/* Copy a new WT_OFF_RECORD structure into place. */
-		from->addr = WT_COL_REF_ADDR(cref);
-		from->size = WT_COL_REF_SIZE(cref);
-		WT_RECNO(from) = cref->recno;
-		memcpy(first_free, from, sizeof(WT_OFF_RECORD));
+		off.addr = WT_COL_REF_ADDR(cref);
+		off.size = WT_COL_REF_SIZE(cref);
+		WT_RECNO(&off) = cref->recno;
+		memcpy(first_free, &off, sizeof(WT_OFF_RECORD));
 		first_free += sizeof(WT_OFF_RECORD);
 		space_avail -= WT_SIZEOF32(WT_OFF_RECORD);
 		++entries;
@@ -1027,36 +1037,6 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 static int
 __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 {
-	uint64_t unused;
-	uint32_t entries, space_avail;
-	uint8_t *first_free;
-
-	unused = 0;
-	entries = 0;
-	WT_RET(__wt_rec_helper_init(session, page, session->btree->intlmax,
-	    session->btree->intlmin, &unused, &first_free, &space_avail));
-
-	/*
-	 * There may be subtrees that we're merging into this page, and they
-	 * may be multiple levels deep -- it's not likely, but it's possible.
-	 * Call a looping routine for each page.
-	 */
-	WT_RET(__wt_rec_row_int_loop(
-	    session, page, &entries, &first_free, &space_avail));
-
-	/* Write the remnant page. */
-	return (__wt_rec_helper(
-	    session, &unused, &entries, &first_free, &space_avail, 1));
-}
-
-/*
- * __wt_rec_row_int_loop --
- *	Recursively walk a row-store internal tree of merge pages.
- */
-static int
-__wt_rec_row_int_loop(SESSION *session, WT_PAGE *page,
-    uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
-{
 	WT_CELL *key_cell, *value_cell;
 	WT_OFF *from;
 	WT_PAGE *ref_page;
@@ -1065,11 +1045,10 @@ __wt_rec_row_int_loop(SESSION *session, WT_PAGE *page,
 	uint32_t entries, i, len, space_avail;
 	uint8_t *first_free;
 
-	entries = *entriesp;
-	first_free = *first_freep;
-	space_avail = *space_availp;
-
 	unused = 0;
+	entries = 0;
+	WT_RET(__wt_rec_helper_init(session, page, session->btree->intlmax,
+	    session->btree->intlmin, &unused, &first_free, &space_avail));
 
 	/*
 	 * We have to walk both the WT_ROW structures and the original page --
@@ -1081,14 +1060,16 @@ __wt_rec_row_int_loop(SESSION *session, WT_PAGE *page,
 		/*
 		 * If this is a reference to a merge page, check the page type.
 		 * A leaf page must be an empty page, we're done.  An internal
-		 * page must have resulted from a page split, recursively call
-		 * ourselves and walk that page.
+		 * page must have resulted from a page split: we may be merging
+		 * subtrees into this page, and they may be multiple levels deep
+		 * -- it's not likely, but it's possible.  Call a routine for
+		 * each such subtree.
 		 */
 		if (FLD_ISSET(WT_ROW_REF_STATE(rref), WT_REF_MERGE)) {
 			ref_page = WT_ROW_REF_PAGE(rref);
 			if (ref_page->type == WT_PAGE_ROW_INT)
-				WT_RET(__wt_rec_row_int_loop(session, ref_page,
-				    entriesp, first_freep, space_availp));
+				WT_RET(__wt_rec_row_merge(session, ref_page,
+				    &entries, &first_free, &space_avail));
 			__wt_page_discard(session, ref_page);
 
 			/* Delete any underlying overflow key. */
@@ -1119,6 +1100,83 @@ __wt_rec_row_int_loop(SESSION *session, WT_PAGE *page,
 		memcpy(first_free, key_cell, len);
 		first_free += len;
 		space_avail -= len;
+		entries += 2;
+	}
+
+	/* Write the remnant page. */
+	return (__wt_rec_helper(
+	    session, &unused, &entries, &first_free, &space_avail, 1));
+}
+
+/*
+ * __wt_rec_row_merge --
+ *	Recursively walk a row-store internal tree of merge pages.
+ */
+static int
+__wt_rec_row_merge(SESSION *session, WT_PAGE *page,
+    uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
+{
+	WT_CELL cell;
+	WT_OFF off;
+	WT_ITEM key;
+	WT_OVFL key_ovfl;
+	WT_PAGE *ref_page;
+	WT_ROW_REF *rref;
+	uint64_t unused;
+	uint32_t entries, i, space_avail;
+	uint8_t *first_free;
+
+	entries = *entriesp;
+	first_free = *first_freep;
+	space_avail = *space_availp;
+
+	unused = 0;
+
+	/*
+	 * For each entry in the in-memory page...
+	 */
+	WT_ROW_REF_FOREACH(page, rref, i) {
+		/*
+		 * If this is a reference to a merge page, check the page type.
+		 * A leaf page must be an empty page, we're done.  An internal
+		 * page must have resulted from a page split, recursively call
+		 * ourselves and walk that page.
+		 */
+		if (FLD_ISSET(WT_ROW_REF_STATE(rref), WT_REF_MERGE)) {
+			ref_page = WT_ROW_REF_PAGE(rref);
+			if (ref_page->type == WT_PAGE_ROW_INT)
+				WT_RET(__wt_rec_row_merge(session, ref_page,
+				    &entries, &first_free, &space_avail));
+			__wt_page_discard(session, ref_page);
+			continue;
+		}
+
+		/* Build a key to store on the page. */
+		key.data = rref->key;
+		key.size = rref->size;
+		WT_RET(__wt_item_build_key(session, &key, &cell, &key_ovfl));
+
+		/* Boundary: allocate, split or write the page. */
+		if (WT_CELL_SPACE_REQ(key.size) +
+		    WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > space_avail)
+			WT_RET(__wt_rec_helper(session,
+			    &unused, &entries, &first_free, &space_avail, 0));
+
+		/* Copy the key into place. */
+		memcpy(first_free, &cell, sizeof(WT_CELL));
+		memcpy(first_free + sizeof(WT_CELL), key.data, key.size);
+		first_free += WT_CELL_SPACE_REQ(key.size);
+		space_avail -= WT_CELL_SPACE_REQ(key.size);
+
+		/* Copy the off-page reference into place. */
+		off.addr = WT_ROW_REF_ADDR(rref);
+		off.size = WT_ROW_REF_SIZE(rref);
+		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
+		memcpy(first_free, &cell, sizeof(WT_CELL));
+		memcpy(first_free + sizeof(WT_CELL), &off, sizeof(WT_OFF));
+		first_free += WT_CELL_SPACE_REQ(sizeof(WT_OFF));
+		space_avail -= WT_CELL_SPACE_REQ(sizeof(WT_OFF));
+
 		entries += 2;
 	}
 
@@ -1425,8 +1483,9 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	WT_REC_LIST *r;
 	WT_ROW_REF *rref;
 	struct rec_list *r_list;
-	uint32_t i;
+	uint32_t i, size;
 	int ret;
+	void *p;
 
 	cache = S2C(session)->cache;
 	r = &cache->reclist;
@@ -1434,8 +1493,7 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(
-	    session, (size_t)r->l_next - 1, &page->u.row_int.t));
+	WT_ERR(__wt_calloc_def(session, (size_t)r->l_next, &page->u.row_int.t));
 
 	/* Fill it in. */
 	page->parent = orig->parent;
@@ -1448,8 +1506,16 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 
 	for (rref = page->u.row_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++rref, ++r_list, ++i) {
-		__wt_key_set(
-		    rref, r_list->key.item.data, r_list->key.item.size);
+		/*
+		 * Copy the split key into place (we could take the temporary
+		 * split buffer's pointer and clear that memory, but this isn't
+		 * a performance path and it's simpler to do the copy and leave
+		 * the temporary split buffer in place for the next split).
+		 */
+		size = r_list->key.item.size;
+		WT_RET(__wt_calloc(session, size, 1, &p));
+		memcpy(p, r_list->key.item.data, size);
+		__wt_key_set(rref, p, size);
 		WT_ROW_REF_ADDR(rref) = r_list->off.addr;
 		WT_ROW_REF_SIZE(rref) = r_list->off.size;
 	}
@@ -1483,8 +1549,7 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(
-	    session, (size_t)r->l_next - 1, &page->u.col_int.t));
+	WT_ERR(__wt_calloc_def(session, (size_t)r->l_next, &page->u.col_int.t));
 
 	/* Fill it in. */
 	page->parent = orig->parent;
