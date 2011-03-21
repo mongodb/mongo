@@ -16,7 +16,7 @@ __wt_workq_srvr(void *arg)
 {
 	CONNECTION *conn;
 	SESSION **tp, *session;
-	int chk_read, read_force, request;
+	int chk_read, request;
 
 	conn = (CONNECTION *)arg;
 
@@ -25,7 +25,7 @@ __wt_workq_srvr(void *arg)
 		++conn->api_gen;
 		WT_STAT_INCR(conn->stats, WORKQ_PASSES);
 
-		chk_read = read_force = request = 0;
+		chk_read = request = 0;
 		for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
 			switch (session->wq_state) {
 			case WT_WORKQ_NONE:
@@ -67,15 +67,13 @@ __wt_workq_srvr(void *arg)
 				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
 				chk_read = 1;
-				if (F_ISSET(session, WT_READ_PRIORITY))
-					read_force = 1;
 				break;
 			}
 		}
 
 		/* If a read is scheduled, check on the read server. */
 		if (chk_read)
-			__wt_workq_read_server(conn, read_force);
+			__wt_workq_read_server(conn, 0);
 
 		/* Check on the cache eviction server. */
 		__wt_workq_evict_server(conn, 0);
