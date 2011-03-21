@@ -5,9 +5,9 @@ set_warn_flags()
 {
 	WARN='-Wall -Wextra -Waddress -Waggregate-return -Wbad-function-cast -Wcast-align -Wdeclaration-after-statement -Wformat-security -Wformat-nonliteral -Wformat=2 -Winline -Wmissing-declarations -Wmissing-field-initializers -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wundef -Wunsafe-loop-optimizations -Wunused -Wwrite-strings'
 
-	# GCC 4.2.1 on OS X thinks calls to memset are unreachable.
-	v="`gcc --version | sed -e 's/ .*//' -e q`"
-	if test "$v" != "i686-apple-darwin10-gcc-4.2.1"; then
+	# GCC 4.2.1 thinks calls to memset are unreachable.
+	v="`gcc --version | sed -e 's/.*\(4\.2\.1\).*/\1/' -e q`"
+	if test "$v" != "4.2.1"; then
 		WARN="$WARN -Wunreachable-code"
 	fi
 
