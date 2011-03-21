@@ -183,7 +183,6 @@ __wt_verify_tree(
 	case WT_PAGE_COL_INT:
 		recno = page->u.col_int.recno;
 		goto recno_chk;
-		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
