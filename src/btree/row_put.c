@@ -96,17 +96,26 @@ __wt_item_update_serial_func(SESSION *session)
 	 * If the page does not yet have an update array, our caller passed
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect & free the passed-in expansion array if we don't use it.)
-	 */
-	if (page->u.row_leaf.upd == NULL)
-		page->u.row_leaf.upd = new_upd;
-
-	/*
+	 *
 	 * Insert the new WT_UPDATE as the first item in the forward-linked list
 	 * of updates, flush memory to ensure the list is never broken.
 	 */
-	upd->next = page->u.row_leaf.upd[slot];
-	WT_MEMORY_FLUSH;
-	page->u.row_leaf.upd[slot] = upd;
+	switch (page->type) {
+	case WT_PAGE_ROW_LEAF:
+		if (page->u.row_leaf.upd == NULL)
+			page->u.row_leaf.upd = new_upd;
+		upd->next = page->u.row_leaf.upd[slot];
+		WT_MEMORY_FLUSH;
+		page->u.row_leaf.upd[slot] = upd;
+		break;
+	default:
+		if (page->u.col_leaf.upd == NULL)
+			page->u.col_leaf.upd = new_upd;
+		upd->next = page->u.col_leaf.upd[slot];
+		WT_MEMORY_FLUSH;
+		page->u.col_leaf.upd[slot] = upd;
+		break;
+	}
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 	return (0);
