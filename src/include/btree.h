@@ -529,7 +529,7 @@ struct __wt_row {
 	 * Huffman encoded key), the key field points to the on-page key,
 	 * but the size is set to 0 to indicate the key is not yet processed.
 	 */
-	void	 *key;			/* Key */
+	const void *key;		/* Key */
 	uint32_t  size;			/* Key length */
 
 	/*

@@ -50,7 +50,7 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
  *	Set a key/size pair, where the key does not require further processing.
  */
 static inline void
-__wt_key_set(void *ref, void *key, uint32_t size)
+__wt_key_set(void *ref, const void *key, uint32_t size)
 {
 	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
@@ -124,7 +124,7 @@ __wt_key_cell_next(WT_CELL *key_cell)
  *	Return if a pointer references off-page data.
  */
 static inline int
-__wt_ref_off_page(WT_PAGE *page, void *p)
+__wt_ref_off_page(WT_PAGE *page, const void *p)
 {
 	/*
 	 * There may be no underlying page, in which case the reference is

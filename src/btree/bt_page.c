@@ -380,7 +380,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
  *	Copy an on-page key into a return buffer, processing as needed.
  */
 int
-__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
+__wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf)
 {
 	BTREE *btree;
 	WT_BUF *tmp;

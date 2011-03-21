@@ -16,7 +16,7 @@ int
 __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 {
 	WT_BUF *tmp, __tmp;
-	WT_CELL *cell;
+	const WT_CELL *cell;
 	WT_ROW *rip;
 	int ret;
 

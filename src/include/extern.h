@@ -151,7 +151,7 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 int
 __wt_page_inmem(SESSION *session, WT_PAGE *page);
 int
-__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf);
+__wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf);
 void
 __wt_workq_read_server(CONNECTION *conn, int force);
 int
