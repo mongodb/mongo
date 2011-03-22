@@ -623,8 +623,8 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 			ref_page = WT_COL_REF_PAGE(cref);
 			if (ref_page->type == WT_PAGE_COL_INT)
 				WT_RET(__wt_rec_col_merge(
-				    session, ref_page, recnop,
-				    entriesp, first_freep, space_availp));
+				    session, ref_page, &recno,
+				    &entries, &first_free, &space_avail));
 			__wt_page_discard(session, ref_page);
 			continue;
 		}
@@ -632,7 +632,7 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 		/* Boundary: allocate, split or write the page. */
 		if (sizeof(WT_OFF_RECORD) > space_avail)
 			WT_RET(__wt_rec_helper(session,
-			    recnop, entriesp, first_freep, space_availp, 0));
+			    &recno, &entries, &first_free, &space_avail, 0));
 
 		/* Copy a new WT_OFF_RECORD structure into place. */
 		off.addr = WT_COL_REF_ADDR(cref);
