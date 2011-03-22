@@ -606,7 +606,7 @@ namespace mongo {
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             string ns = cmdObj["getShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
-                errmsg = "need to speciy fully namespace";
+                errmsg = "need to specify full namespace";
                 return false;
             }
 
