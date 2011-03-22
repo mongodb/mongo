@@ -511,7 +511,7 @@ struct __wt_row {
 	 * but the size is set to 0 to indicate the key is not yet processed.
 	 */
 	void	 *key;			/* Key */
-	uint32_t size;			/* Key length */
+	uint32_t  size;			/* Key length */
 
 	void	 *value;		/* Data */
 };
