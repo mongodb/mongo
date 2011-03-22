@@ -539,8 +539,7 @@ __wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 			if (size > r_list->key.mem_size)
 				WT_RET(
 				    __wt_buf_grow(session, &r_list->key, size));
-			memcpy(r_list->key.mem, WT_CELL_BYTE(cell), size);
-			r_list->key.item.data = r_list->key.mem;
+			memcpy(r_list->key.item.data, WT_CELL_BYTE(cell), size);
 			r_list->key.item.size = size;
 		}
 		break;
