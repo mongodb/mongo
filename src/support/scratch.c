@@ -32,9 +32,21 @@ __wt_buf_free(SESSION *session, WT_BUF *buf)
 {
 	if (buf->mem != NULL)
 		__wt_free(session, buf->mem);
+	__wt_buf_clear(buf);
+}
 
+/*
+ * __wt_buf_clear --
+ *	Clear a buffer (after stealing the pointer for another purpose).
+ */
+void
+__wt_buf_clear(WT_BUF *buf)
+{
 	buf->item.data = NULL;
-	buf->mem_size = buf->item.size = 0;
+	buf->item.size = 0;
+
+	buf->mem = NULL;
+	buf->mem_size = 0;
 }
 
 /*

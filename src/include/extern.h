@@ -432,6 +432,8 @@ int
 __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz);
 void
 __wt_buf_free(SESSION *session, WT_BUF *buf);
+void
+__wt_buf_clear(WT_BUF *buf);
 int
 __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp);
 void

@@ -1482,9 +1482,8 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	WT_REC_LIST *r;
 	WT_ROW_REF *rref;
 	struct rec_list *r_list;
-	uint32_t i, size;
+	uint32_t i;
 	int ret;
-	void *p;
 
 	cache = S2C(session)->cache;
 	r = &cache->reclist;
@@ -1506,15 +1505,15 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	for (rref = page->u.row_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++rref, ++r_list, ++i) {
 		/*
-		 * Copy the split key into place (we could take the temporary
-		 * split buffer's pointer and clear that memory, but this isn't
-		 * a performance path and it's simpler to do the copy and leave
-		 * the temporary split buffer in place for the next split).
+		 * Steal the split buffer's pointer -- we could allocate and
+		 * copy here, but that means split buffers would potentially
+		 * grow without bound, this way we do the same number of
+		 * memory allocations and the split buffers don't just keep
+		 * getting bigger.
 		 */
-		size = r_list->key.item.size;
-		WT_RET(__wt_calloc(session, size, 1, &p));
-		memcpy(p, r_list->key.item.data, size);
-		__wt_key_set(rref, p, size);
+		__wt_key_set(
+		    rref, r_list->key.item.data, r_list->key.item.size);
+		__wt_buf_clear(&r_list->key);
 		WT_ROW_REF_ADDR(rref) = r_list->off.addr;
 		WT_ROW_REF_SIZE(rref) = r_list->off.size;
 	}
