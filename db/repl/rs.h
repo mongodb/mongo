@@ -41,6 +41,8 @@ namespace mongo {
 
     /* member of a replica set */
     class Member : public List1<Member>::Base {
+    private:
+        ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
 
