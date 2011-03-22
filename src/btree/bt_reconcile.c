@@ -24,7 +24,7 @@ static int  __wt_rec_row_merge(
 		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rle_expand_compare(const void *, const void *);
-static int  __wt_rec_finish(SESSION *, WT_PAGE *);
+static int  __wt_rec_finish(SESSION *, WT_PAGE *, int);
 
 static int __wt_split(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *, int);
@@ -127,7 +127,7 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 		 * by a single new page, split into multiple new pages, or
 		 * deleted.
 		 */
-		WT_RET(__wt_rec_finish(session, page));
+		WT_RET(__wt_rec_finish(session, page, discard));
 	} else
 		__wt_rec_parent_update_clean(page);
 
@@ -1326,7 +1326,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
  *	Resolve the WT_REC_LIST information.
  */
 static int
-__wt_rec_finish(SESSION *session, WT_PAGE *page)
+__wt_rec_finish(SESSION *session, WT_PAGE *page, int discard)
 {
 	BTREE *btree;
 	WT_PAGE *new;
@@ -1360,8 +1360,10 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page)
 		    (u_long)page->addr, r->list[0].off.addr,
 		    (u_long)page->size, r->list[0].off.size));
 
-		return (__wt_rec_parent_update_dirty(session, page, NULL,
-		    r->list[0].off.addr, r->list[0].off.size, WT_REF_DISK));
+		return (__wt_rec_parent_update_dirty(
+		    session, page, NULL,
+		    r->list[0].off.addr, r->list[0].off.size,
+		    discard ? WT_REF_DISK : WT_REF_MEM));
 	}
 
 	/*
