@@ -85,6 +85,7 @@ namespace mongo {
             }
         }
         virtual long long nscanned() {
+            // We don't support yielding, so will always have c_.
             assert( c_.get() );
             return c_->nscanned();
         }
