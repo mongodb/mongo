@@ -351,7 +351,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 
 	conn = (CONNECTION *)wt_conn;
 
-	WT_ERR(__wt_connection_session(conn, &session));
+	WT_ERR(conn->session(conn, 0, &session));
 	/*
 	 * XXX
 	 * Kludge while there is a separate __wt_conection_session method.

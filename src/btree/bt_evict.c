@@ -118,7 +118,7 @@ __wt_cache_evict_server(void *arg)
 	 * handles are closed.
 	 */
 	session = &conn->default_session;
-	WT_ERR(__wt_connection_session(conn, &session));
+	WT_ERR(conn->session(conn, 0, &session));
 
 	/*
 	 * Allocate memory for a copy of the hazard references -- it's a fixed
