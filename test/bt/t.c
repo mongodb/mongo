@@ -33,27 +33,33 @@ main(int argc, char *argv[])
 		config_file("CONFIG");
 	}
 
+	/* Track progress unless we're re-directing output to a file. */
+	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
+
 	/* Set values from the command line. */
 	log = 0;
-	while ((ch = getopt(argc, argv, "1C:clrv")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:clqrv")) != EOF)
 		switch (ch) {
-		case '1':
+		case '1':			/* One run */
 			g.c_runs = 1;
 			break;
-		case 'C':
+		case 'C':			/* Configuration from a file */
 			config_file(optarg);
 			break;
-		case 'c':
+		case 'c':			/* Display config strings */
 			config_names();
 			return (EXIT_SUCCESS);
-		case 'l':
+		case 'l':			/* Log operations */
 			log = 1;
 			break;
-		case 'r':
+		case 'r':			/* Replay a run */
 			g.replay = 1;
 			g.c_runs = 1;
 			break;
-		case 'v':
+		case 'q':			/* Quiet */
+			g.track = 0;
+			break;
+		case 'v':			/* Verbose */
 			g.verbose = 1;
 			break;
 		default:
@@ -162,7 +168,7 @@ static void
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-1clrv] [-C config] [name=value ...]\n",
+	    "usage: %s [-1clqrv] [-C config] [name=value ...]\n",
 	    g.progname);
 	exit(EXIT_FAILURE);
 }

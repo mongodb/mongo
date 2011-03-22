@@ -53,7 +53,8 @@ typedef struct {
 
 	u_int32_t run_cnt;			/* Run counter */
 
-	int replay;				/* Replaying a run. */
+	int replay;				/* Replaying a run */
+	int track;				/* Track progress */
 	int verbose;				/* Verbosity */
 
 	char *key_gen_buf;
