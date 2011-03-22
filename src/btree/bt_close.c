@@ -83,5 +83,5 @@ __wt_bt_close_page(SESSION *session, WT_PAGE *page, void *arg)
 	 * don't have to worry about reconciling a page that still has a child
 	 * page, or reading a page after we discard it,
 	 */
-	 return (__wt_page_reconcile(session, page, 1));
+	return (__wt_page_reconcile(session, page, 1));
 }
