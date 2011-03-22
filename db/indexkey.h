@@ -122,7 +122,7 @@ namespace mongo {
             : _details(0) , _finishedInit(false) {
         }
 
-        IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
+        explicit IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
             : keyPattern(k) , info(m) , _details(0) , _finishedInit(false) {
             _init();
         }
@@ -131,7 +131,7 @@ namespace mongo {
            this is a DiscLoc of an IndexDetails info
            should have a key field
          */
-        IndexSpec( const DiskLoc& loc ) {
+        explicit IndexSpec( const DiskLoc& loc ) {
             reset( loc );
         }
 

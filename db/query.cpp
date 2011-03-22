@@ -76,8 +76,7 @@ namespace mongo {
             }
         }
         virtual long long nscanned() {
-            assert( c_.get() );
-            return c_->nscanned();
+            return c_.get() ? c_->nscanned() : _nscanned;
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -417,6 +416,7 @@ namespace mongo {
             _ns(ns), _capped(false), _count(), _myCount(),
             _skip( spec["skip"].numberLong() ),
             _limit( spec["limit"].numberLong() ),
+            _nscanned(),
             _bc() {
         }
 
@@ -431,8 +431,7 @@ namespace mongo {
         }
 
         virtual long long nscanned() {
-            assert( _c.get() );
-            return _c->nscanned();
+            return _c.get() ? _c->nscanned() : _nscanned;
         }
 
         virtual bool prepareToYield() {
@@ -466,6 +465,7 @@ namespace mongo {
                 return;
             }
 
+            _nscanned = _c->nscanned();
             if ( _bc ) {
                 if ( _firstMatch.isEmpty() ) {
                     _firstMatch = _bc->currKeyNode().key.copy();
@@ -528,6 +528,7 @@ namespace mongo {
         long long _myCount;
         long long _skip;
         long long _limit;
+        long long _nscanned;
         shared_ptr<Cursor> _c;
         BSONObj _query;
         BtreeCursor * _bc;
@@ -741,8 +742,7 @@ namespace mongo {
             if ( _findingStartCursor.get() ) {
                 return 0; // should only be one query plan, so value doesn't really matter.
             }
-            assert( _c.get() );
-            return _c->nscanned();
+            return _c.get() ? _c->nscanned() : _nscanned;
         }
 
         virtual void next() {
@@ -859,6 +859,7 @@ namespace mongo {
 
         // this plan won, so set data for response broadly
         void finish( bool stop ) {
+            massert( 13638, "client cursor dropped during explain query yield", !_pq.isExplain() || _c.get() );
 
             if ( _pq.isExplain() ) {
                 _n = _inMemSort ? _so->size() : _n;
@@ -880,7 +881,6 @@ namespace mongo {
             }
 
             if ( _pq.isExplain() ) {
-                massert( 13638, "client cursor dropped during explain query yield", _c.get() );
                 _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(),
                               _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields ,
                               _nChunkSkips, _keyFieldsOnly.get() > 0 );

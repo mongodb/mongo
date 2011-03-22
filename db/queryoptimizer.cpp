@@ -95,6 +95,7 @@ namespace mongo {
         }
 
         BSONObj idxKey = _index->keyPattern();
+        const IndexSpec &idxSpec = _index->getSpec();
         BSONObjIterator o( order );
         BSONObjIterator k( idxKey );
         if ( !o.moreWithEOO() )
@@ -163,8 +164,8 @@ doneCheckOrder:
                 exactIndexedQueryCount == _originalQuery.nFields() ) {
             _exactKeyMatch = true;
         }
-        _frv.reset( new FieldRangeVector( fbs, idxKey, _direction ) );
-        _originalFrv.reset( new FieldRangeVector( originalFrs, idxKey, _direction ) );
+        _frv.reset( new FieldRangeVector( fbs, idxSpec, _direction ) );
+        _originalFrv.reset( new FieldRangeVector( originalFrs, idxSpec, _direction ) );
         if ( _startOrEndSpec ) {
             BSONObj newStart, newEnd;
             if ( !startKey.isEmpty() )
@@ -400,12 +401,17 @@ doneCheckOrder:
         }
 
         if ( _honorRecordedPlan ) {
-            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-            NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
-            BSONObj bestIndex = nsd.indexForPattern( _fbs->pattern( _order ) );
+            BSONObj bestIndex;
+            long long oldNScanned;
+            {
+                scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+                NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
+                bestIndex = nsd.indexForPattern( _fbs->pattern( _order ) );
+                oldNScanned = nsd.nScannedForPattern( _fbs->pattern( _order ) );
+            }
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
-                _oldNScanned = nsd.nScannedForPattern( _fbs->pattern( _order ) );
+                _oldNScanned = oldNScanned;
                 if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
                     p.reset( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) );

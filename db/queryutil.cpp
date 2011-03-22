@@ -914,19 +914,16 @@ namespace mongo {
     }
 
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
-        if ( !_indexSpec.get() ) {
-            _indexSpec.reset( new IndexSpec( _keyPattern ) );
-        }
         // TODO The representation of matching keys could potentially be optimized
         // more for the case at hand.  (For example, we can potentially consider
         // fields individually instead of constructing several bson objects using
         // multikey arrays.)  But getKeys() canonically defines the key set for a
         // given object and for now we are using it as is.
         BSONObjSetDefaultOrder keys;
-        _indexSpec->getKeys( obj, keys );
+        _indexSpec.getKeys( obj, keys );
         for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
             BSONObjIterator j( *i );
-            BSONObjIterator k( _keyPattern );
+            BSONObjIterator k( _indexSpec.keyPattern );
             bool match = true;
             for( int l = 0; l < (int)_ranges.size(); ++l ) {
                 int number = (int) k.next().number();
@@ -947,7 +944,7 @@ namespace mongo {
     // TODO optimize more
     int FieldRangeVector::Iterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
-        BSONObjIterator o( _v._keyPattern );
+        BSONObjIterator o( _v._indexSpec.keyPattern );
         // track first field for which we are not at the end of the valid values,
         // since we may need to advance from the key prefix ending with this field
         int latestNonEndpoint = -1;
