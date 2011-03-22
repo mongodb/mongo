@@ -486,7 +486,6 @@ err:	if (tmp != NULL)
 static int
 __wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 {
-	WT_CELL *cell;
 	WT_REC_LIST *r;
 	struct rec_list *r_list;
 	uint32_t addr, size;
@@ -524,24 +523,14 @@ __wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 	}
 
 	/*
-	 * For a column-store, the key is the recno, for a row-store, it's a
-	 * variable-length byte string.
+	 * For a column-store, the key is the recno, for a row-store, it's the
+	 * first key on the page, a variable-length byte string.
 	 */
 	switch (dsk->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		cell = WT_PAGE_DISK_BYTE(dsk);
-		if (WT_CELL_TYPE(cell) == WT_CELL_KEY_OVFL)
-			WT_RET(__wt_ovfl_in(
-			    session, WT_CELL_BYTE_OVFL(cell), &r_list->key));
-		else {
-			size = WT_CELL_LEN(cell);
-			if (size > r_list->key.mem_size)
-				WT_RET(
-				    __wt_buf_grow(session, &r_list->key, size));
-			memcpy(r_list->key.item.data, WT_CELL_BYTE(cell), size);
-			r_list->key.item.size = size;
-		}
+		WT_RET(__wt_cell_process(
+		    session, WT_PAGE_DISK_BYTE(dsk), &r_list->key));
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
