@@ -134,7 +134,7 @@ void
 track(const char *s, u_int64_t i)
 {
 	static int lastlen = 0;
-	int len;
+	int len, tlen;
 	char *p, msg[128];
 
 	if (!g.track)
@@ -147,12 +147,14 @@ track(const char *s, u_int64_t i)
 	else
 		len = snprintf(msg, sizeof(msg),
 		    "%4d: %s %llu", g.run_cnt, s, (unsigned long long)i);
+	tlen = len;
 
-	for (p = msg + len; len < lastlen; ++len)
+	for (p = msg + len; tlen < lastlen; ++tlen)
 		*p++ = ' ';
 	*p = '\0';
 	lastlen = len;
-	(void)printf("\r%s", msg);
+
+	(void)printf("%s\r", msg);
 	(void)fflush(stdout);
 }
 
