@@ -82,6 +82,11 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+        // this is so we notice it happened more often
+        log() << "\n\n***aborting after assert() failure in a debug/test build\n\n" << endl;
+        abort();
+#endif
         throw e;
     }
 
