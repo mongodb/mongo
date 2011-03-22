@@ -443,12 +443,12 @@ offpage:	/*
 
 	/*
 	 * If the item is not compressed, and it is not an overflow item, copy
-	 * it into the caller's WT_ITEM.  If the item is not compressed, and
+	 * it into the caller's WT_BUF.  If the item is not compressed, and
 	 * it is an overflow item, it was already copied into the caller's
-	 * WT_ITEM.
+	 * WT_BUF.
 	 *
 	 * If the item is compressed, pass it to the decode routines, they'll
-	 * copy a decoded version into the caller's WT_ITEM.
+	 * copy a decoded version into the caller's WT_BUF.
 	 */
 	if (huffman == NULL) {
 		if (tmp != scratch) {
