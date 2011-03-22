@@ -71,7 +71,7 @@ __wt_col_update(
 	 * added to the page's modification array.  There are three code paths:
 	 *
 	 * 1: column-store deletes other than RLE column stores: delete an entry
-	 * from the on-disk page by creating a new WT_UPDTAE entry, and linking
+	 * from the on-disk page by creating a new WT_UPDATE entry, and linking
 	 * it into the WT_UPDATE array.
 	 *
 	 * 2: an RLE column-store delete of an already modified record: create
