@@ -216,6 +216,8 @@ __wt_update_free(SESSION *session, WT_UPDATE *upd);
 int
 __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
 int
+__wt_key_build_serial_func(SESSION *session);
+int
 __wt_btree_btree_compare_int_set_verify(BTREE *btree, int btree_compare_int);
 int
 __wt_btree_column_set_verify(

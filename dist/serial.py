@@ -18,6 +18,12 @@ serial['cache_read'] = Serial(
 	 'void */parent_ref',
 	 'int/dsk_verify'])
 
+serial['key_build'] = Serial(
+	'key_build',
+	'WT_WORKQ_FUNC', '0',
+	['void */key_arg',
+	 'WT_BUF */tmp'])
+
 serial['item_update'] = Serial(
 	'item_update',
 	'WT_WORKQ_FUNC', '1',

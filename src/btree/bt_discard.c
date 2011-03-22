@@ -6,6 +6,7 @@
  */
 
 #include "wt_internal.h"
+#include "btree.i"
 
 static void __wt_discard_page_col_fix(SESSION *, WT_PAGE *);
 static void __wt_discard_page_col_int(SESSION *, WT_PAGE *);
@@ -16,32 +17,6 @@ static void __wt_discard_page_row_leaf(SESSION *, WT_PAGE *);
 static void __wt_discard_relexp(SESSION *, WT_PAGE *);
 static void __wt_discard_update(SESSION *, WT_UPDATE **, uint32_t);
 static void __wt_discard_update_list(SESSION *, WT_UPDATE *);
-static inline int __wt_row_key_off_page(WT_PAGE *, void *);
-
-/*
- * __wt_row_key_off_page --
- *	Return if a WT_ROW structure's key references off-page data.
- */
-static inline int
-__wt_row_key_off_page(WT_PAGE *page, void *key)
-{
-	uint8_t *p;
-
-	/*
-	 * There may be no underlying page, in which case the reference is
-	 * off-page by definition.
-	 */
-	if (page->XXdsk == NULL)
-		return (1);
-
-	/*
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
-	 * of the structures are a void *data/uint32_t size pair.
-	 */
-	p = ((WT_ROW *)key)->key;
-	return (p < (uint8_t *)page->XXdsk ||
-	    p >= (uint8_t *)page->XXdsk + page->size ? 1 : 0);
-}
 
 /*
  * __wt_page_discard --
@@ -164,7 +139,7 @@ __wt_discard_page_row_int(SESSION *session, WT_PAGE *page)
 	 * if it points somewhere other than the original page), and free it.
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
-		if (__wt_row_key_off_page(page, rref))
+		if (__wt_ref_off_page(page, rref->key))
 			__wt_free(session, rref->key);
 
 	/* Free the subtree-reference array. */
@@ -190,7 +165,7 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 	 * the memory.
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i)
-		if (__wt_row_key_off_page(page, rip))
+		if (__wt_ref_off_page(page, rip->key))
 			__wt_free(session, rip->key);
 	__wt_free(session, page->u.row_leaf.d);
 

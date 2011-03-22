@@ -118,3 +118,21 @@ __wt_key_cell_next(WT_CELL *key_cell)
 		key_cell = WT_CELL_NEXT(key_cell);
 	return (key_cell);
 }
+
+/*
+ * __wt_ref_off_page --
+ *	Return if a pointer references off-page data.
+ */
+static inline int
+__wt_ref_off_page(WT_PAGE *page, void *p)
+{
+	/*
+	 * There may be no underlying page, in which case the reference is
+	 * off-page by definition.
+	 */
+	if (page->XXdsk == NULL)
+		return (1);
+
+	return (p < (void *)page->XXdsk ||
+	    p >= (void *)((uint8_t *)page->XXdsk + page->size) ? 1 : 0);
+}
