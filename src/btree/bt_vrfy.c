@@ -16,17 +16,6 @@ typedef struct {
 	uint32_t  frags;			/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
 
-	/*
-	 * When tree verification starts, copy the eviction generation number,
-	 * updated by the eviction thread before it writes pages.  The problem
-	 * is we have to turn off our checks that every fragment in a file is
-	 * verified once (and only once) if the eviction thread writes pages,
-	 * because we can race with the eviction thread.
-	 */
-#define	WT_EVICT_CURRENT(session, vs)					\
-	((vs)->evict_rec_gen == S2C(session)->cache->evict_rec_gen)
-	uint64_t  evict_rec_gen;		/* Eviction generation */
-
 	FILE	*stream;			/* Dump file stream */
 
 	void (*f)(const char *, uint64_t);	/* Progress callback */
@@ -60,14 +49,15 @@ __wt_btree_verify(SESSION *session, void (*f)(const char *, uint64_t))
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_verify(
-    SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
+__wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 {
 	BTREE *btree;
+	WT_CACHE *cache;
 	WT_VSTUFF vstuff;
 	int ret;
 
 	btree = session->btree;
+	cache = S2C(session)->cache;
 	ret = 0;
 
 	WT_CLEAR(vstuff);
@@ -92,7 +82,6 @@ __wt_verify(
 		goto err;
 	}
 	WT_ERR(bit_alloc(session, vstuff.frags, &vstuff.fragbits));
-	vstuff.evict_rec_gen = S2C(session)->cache->evict_rec_gen;
 	vstuff.stream = stream;
 	vstuff.f = f;
 
@@ -102,6 +91,11 @@ __wt_verify(
 	 */
 	bit_nset(vstuff.fragbits, 0, 0);
 
+	/* During eviction, we can only evict clean pages. */
+	__wt_lock(session, cache->mtx_reconcile);
+	cache->only_evict_clean = 1;
+	__wt_unlock(session, cache->mtx_reconcile);
+
 	/* Verify the tree, starting at the root. */
 	WT_ERR(__wt_verify_tree(session, NULL,
 	    btree->root_page.page, (uint64_t)1, &vstuff));
@@ -109,6 +103,10 @@ __wt_verify(
 	WT_ERR(__wt_verify_freelist(session, &vstuff));
 
 	WT_ERR(__wt_verify_checkfrag(session, &vstuff));
+
+	__wt_lock(session, cache->mtx_reconcile);
+	cache->only_evict_clean = 0;
+	__wt_unlock(session, cache->mtx_reconcile);
 
 err:	/* Wrap up reporting and free allocated memory. */
 	if (vstuff.f != NULL)
@@ -129,10 +127,10 @@ err:	/* Wrap up reporting and free allocated memory. */
 static int
 __wt_verify_tree(
 	SESSION *session,		/* Thread of control */
-	WT_ROW_REF *parent_rref,/* Internal key referencing this page, if any */
-	WT_PAGE *page,		/* Page to verify */
-	uint64_t parent_recno,	/* First record in this subtree */
-	WT_VSTUFF *vs)		/* The verify package */
+	WT_ROW_REF *parent_rref,	/* Parent key for this page, if any */
+	WT_PAGE *page,			/* Page to verify */
+	uint64_t parent_recno,		/* First record in this subtree */
+	WT_VSTUFF *vs)			/* The verify package */
 {
 	WT_COL_REF *cref;
 	WT_REF *ref;
@@ -163,9 +161,9 @@ __wt_verify_tree(
 	 * into a physical verification, which allows the in-memory version
 	 * of the page to be built, and then a subsequent logical verification
 	 * which happens here.
+	 *
+	 * Report progress every 10 pages.
 	 */
-
-	/* Report progress every 10 pages. */
 	if (vs->f != NULL && ++vs->fcnt % 10 == 0)
 		vs->f(session->name, vs->fcnt);
 
@@ -490,29 +488,14 @@ static int
 __wt_verify_freelist(SESSION *session, WT_VSTUFF *vs)
 {
 	BTREE *btree;
-	WT_CACHE *cache;
 	WT_FREE_ENTRY *fe;
 	int ret;
 
 	btree = session->btree;
-	cache = S2C(session)->cache;
 	ret = 0;
 
-	/*
-	 * If the eviction thread ran during verification, these checks aren't
-	 * possible.
-	 */
-	if (!WT_EVICT_CURRENT(session, vs))
-		return (0);
-
-	/*
-	 * Lock out the eviction thread -- we're going to read through the
-	 * freelist, and that's owned and operated by the eviction thread.
-	 */
-	__wt_lock(session, cache->mtx_reconcile);
 	TAILQ_FOREACH(fe, &btree->freeqa, qa)
 		WT_TRET(__wt_verify_addfrag(session, fe->addr, fe->size, vs));
-	__wt_unlock(session, cache->mtx_reconcile);
 
 	return (ret);
 }
@@ -530,13 +513,6 @@ __wt_verify_addfrag(
 	uint32_t frags, i;
 
 	btree = session->btree;
-
-	/*
-	 * If the eviction thread ran during verification, these checks aren't
-	 * possible.
-	 */
-	if (!WT_EVICT_CURRENT(session, vs))
-		return (0);
 
 	frags = WT_OFF_TO_ADDR(btree, size);
 	for (i = 0; i < frags; ++i)
@@ -561,13 +537,6 @@ __wt_verify_checkfrag(SESSION *session, WT_VSTUFF *vs)
 
 	frags = (int)vs->frags;		/* XXX: bitstring.h wants "ints" */
 	ret = 0;
-
-	/*
-	 * If the eviction thread ran during verification, these checks aren't
-	 * possible.
-	 */
-	if (!WT_EVICT_CURRENT(session, vs))
-		return (0);
 
 	/* Check for file fragments we haven't verified. */
 	for (ffc_start = ffc_end = -1;;) {

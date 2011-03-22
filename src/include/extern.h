@@ -173,8 +173,7 @@ __wt_bt_sync(SESSION *session);
 int
 __wt_btree_verify(SESSION *session, void (*f)(const char *, uint64_t));
 int
-__wt_verify(
-    SESSION *session, void (*f)(const char *, uint64_t), FILE *stream);
+__wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream);
 int
 __wt_verify_dsk_page(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);

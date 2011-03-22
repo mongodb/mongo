@@ -304,7 +304,7 @@ static int
 __wt_evict_walk_single(SESSION *session, BTREE *btree, u_int slot)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
+	WT_REF *ref;
 	int i, restarted_once;
 
 	cache = S2C(session)->cache;
@@ -322,23 +322,26 @@ restart:	WT_RET(__wt_walk_begin(session,
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	do {
-		evict = &cache->evict[slot];
 		WT_RET(__wt_walk_next(session,
-		    &btree->evict_walk, WT_WALK_CACHE, &evict->ref));
+		    &btree->evict_walk, WT_WALK_CACHE, &ref));
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
 		 * restart we've already acquired all of the pages, and we
 		 * could loop infinitely on a tree with a single, pinned, page).
 		 */
-		if (evict->ref == NULL) {
+		if (ref == NULL) {
 			if (restarted_once++)
 				break;
 			goto restart;
 		}
 
-		evict->btree = btree;
-		++slot;
+		/* During verification, we can only evict clean pages. */
+		if (cache->only_evict_clean && WT_PAGE_IS_MODIFIED(ref->page))
+			continue;
+
+		cache->evict[slot++].ref = ref;
+		cache->evict[slot++].btree = btree;
 	} while (++i < WT_EVICT_WALK_PER_TABLE);
 
 	return (0);
@@ -547,30 +550,20 @@ __wt_evict_page(SESSION *session)
 	WT_REF *ref;
 	WT_STATS *stats;
 	u_int i;
-	int ret, update_gen;
+	int ret;
 
 	conn = S2C(session);
 	cache = conn->cache;
 	stats = cache->stats;
-	update_gen = 0;
 
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
 		page = ref->page;
 
-		if (WT_PAGE_IS_MODIFIED(page)) {
-			/*
-			 * Any running verification may be incorrect if we write
-			 * a page -- see the WT_CACHE structure comment for an
-			 * explanation.
-			 */
-			if (!update_gen) {
-				update_gen = 1;
-				++cache->evict_rec_gen;
-			}
+		if (WT_PAGE_IS_MODIFIED(page))
 			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
-		} else
+		else
 			WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
 
 #ifdef HAVE_DIAGNOSTIC
