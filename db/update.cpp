@@ -920,7 +920,7 @@ namespace mongo {
                 setComplete();
                 return;
             }
-            _nscanned++;
+            _nscanned = _c->nscanned();
             if ( matcher()->matches(_c->currKey(), _c->currLoc(), &_details ) ) {
                 setComplete();
                 return;
