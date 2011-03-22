@@ -89,7 +89,7 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 		 * If we find a buffer that's not in-use, check its size.  If it
 		 * is large enough, we're done; otherwise, remember it.
 		 */
-		if (size == 0 || buf->mem_size >= size) {
+		if (buf->mem_size >= size) {
 			F_SET(buf, WT_BUF_INUSE);
 			buf->item.data = buf->mem;
 			*scratchp = buf;
