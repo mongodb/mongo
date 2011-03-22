@@ -224,8 +224,6 @@ struct __session {
 
 	TAILQ_HEAD(__btrees, __btree_session) btrees;
 
-	char err_buf[32];		/* Last-ditch error buffer */
-
 	WT_MTX	 *mtx;			/* Blocking mutex */
 
 	const char *name;		/* Name */
