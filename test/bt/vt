@@ -6,11 +6,15 @@ rm -f vgout.*
 r=1
 test $# -eq 0 || r=$1
 
+# Add
+#	--db-attach=yes
+# to wait on a debugger attach.
 while test $r -gt 0; do
 	r=`expr $r - 1`
 	valgrind \
 	    --leak-check=yes \
 	    --log-file=vgout.%p \
+	    --read-var-info=yes \
 	    --suppressions=vt.suppress \
 	    --track-fds=yes \
 	    ./t -1
