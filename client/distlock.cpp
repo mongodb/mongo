@@ -628,7 +628,7 @@ namespace mongo {
         }
         catch ( UpdateNotTheSame& up ) {
             // this means our update got through on some, but not others
-            warning() << "distributed lock '" << lockName << " did not propagate properly." /* << m_caused_by(up) */ << endl;
+            warning() << "distributed lock '" << lockName << " did not propagate properly." << m_caused_by(up) << endl;
 
             // Find the highest OID value on the diff. servers, that will be the value that
             // "wins"

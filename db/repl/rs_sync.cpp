@@ -88,6 +88,9 @@ namespace mongo {
                     log() << "replSet initial sync but received a first optime of " << t << " from " << hn << rsLog;
                     return false;
                 }
+
+                sethbmsg(str::stream() << "initial oplog application from " << hn << " starting at "
+                         << t.toStringPretty() << " to " << minValid.toStringPretty());
             }
         }
         catch(DBException& e) {
@@ -100,6 +103,7 @@ namespace mongo {
 
         // todo : use exhaust
         OpTime ts;
+        time_t start = time(0);
         unsigned long long n = 0;
         while( 1 ) {
             try {
@@ -132,9 +136,15 @@ namespace mongo {
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
                 }
-                if( ++n % 100000 == 0 ) {
-                    // simple progress metering
-                    log() << "replSet initialSyncOplogApplication " << n << rsLog;
+
+                if ( ++n % 1000 == 0 ) {
+                    time_t now = time(0);
+                    if (now - start > 10) {
+                        // simple progress metering
+                        log() << "initialSyncOplogApplication applied " << n << " operations, synced to "
+                              << ts.toStringPretty() << rsLog;
+                        start = now;
+                    }
                 }
                 
                 getDur().commitIfNeeded();

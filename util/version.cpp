@@ -141,7 +141,7 @@ namespace mongo {
             cout << endl;
             cout << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << endl;
             cout << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << endl;
-            cout << "**       with --dur, the limit is lower" << endl;
+            cout << "**       with --journal, the limit is lower" << endl;
             warned = true;
         }
 

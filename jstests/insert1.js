@@ -39,3 +39,6 @@ assert.eq(id1, id2, "ids match 4");
 assert.eq(o, {a:4, _id:id1}, "input unchanged 4");
 assert.eq(t.findOne({_id:id1}).a, 4, "find by id 4");
 assert.eq(t.findOne({a:4})._id, id1 , "find by val 4");
+
+var stats = db.runCommand({ collstats: "insert1" });
+assert(stats.paddingFactor == 1.0);
