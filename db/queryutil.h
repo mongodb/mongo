@@ -18,6 +18,7 @@
 #pragma once
 
 #include "jsobj.h"
+#include "indexkey.h"
 
 namespace mongo {
 
@@ -356,13 +357,13 @@ namespace mongo {
     public:
         /**
          * @param frs The valid ranges for all fields, as defined by the query spec
-         * @prarm keyPattern The index key pattern
+         * @param indexSpec The index spec (key pattern and info)
          * @param direction The direction of index traversal
          */
-        FieldRangeVector( const FieldRangeSet &frs, const BSONObj &keyPattern, int direction )
-            :_keyPattern( keyPattern ), _direction( direction >= 0 ? 1 : -1 ) {
+        FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction )
+            :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
             _queries = frs._queries;
-            BSONObjIterator i( _keyPattern );
+            BSONObjIterator i( _indexSpec.keyPattern );
             while( i.more() ) {
                 BSONElement e = i.next();
                 int number = (int) e.number(); // returns 0.0 if not numeric
@@ -403,7 +404,7 @@ namespace mongo {
         }
         BSONObj obj() const {
             BSONObjBuilder b;
-            BSONObjIterator k( _keyPattern );
+            BSONObjIterator k( _indexSpec.keyPattern );
             for( int i = 0; i < (int)_ranges.size(); ++i ) {
                 BSONArrayBuilder a( b.subarrayStart( k.next().fieldName() ) );
                 for( vector< FieldInterval >::const_iterator j = _ranges[ i ].intervals().begin();
@@ -502,11 +503,9 @@ namespace mongo {
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
         vector< FieldRange > _ranges;
-        BSONObj _keyPattern;
+        const IndexSpec &_indexSpec;
         int _direction;
         vector< BSONObj > _queries; // make sure mem owned
-        // This IndexSpec is lazily constructed directly from _keyPattern if needed.
-        mutable shared_ptr< IndexSpec > _indexSpec;
     };
 
     // generages FieldRangeSet objects, accounting for or clauses

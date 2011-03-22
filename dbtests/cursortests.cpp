@@ -45,7 +45,9 @@ namespace CursorTests {
                         s.range( "a" ) |= s2.range( "a" );
                     }
                 }
-                return new FieldRangeVector( s, BSON( "a" << 1 ), direction );
+                // orphan idxSpec for this test
+                IndexSpec *idxSpec = new IndexSpec( BSON( "a" << 1 ) );
+                return new FieldRangeVector( s, *idxSpec, direction );
             }
         private:
             vector< BSONObj > _objs;
@@ -147,7 +149,9 @@ namespace CursorTests {
                 _c.ensureIndex( ns(), idx() );
                 Client::Context ctx( ns() );
                 FieldRangeSet frs( ns(), spec );
-                boost::shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, idx(), direction() ) );
+                // orphan spec for this test.
+                IndexSpec *idxSpec = new IndexSpec( idx() );
+                boost::shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, *idxSpec, direction() ) );
                 BtreeCursor c( nsdetails( ns() ), 1, nsdetails( ns() )->idx( 1 ), frv, direction() );
                 Matcher m( spec );
                 int count = 0;
