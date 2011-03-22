@@ -87,14 +87,14 @@ namespace mongo {
                         string _CSVHeader();
 
         string Stats::S::_CSVHeader() { 
-            return "commits\tjrnMB\twrDFMB\tcommitsInWriteLock\tearlyCommits\tprepLogBuffer\twriteToJournal\twriteToDataFiles\tremapPrivateView";
+            return "cmts  jrnMB\twrDFMB\tcIWLk\tearly\tprpLgB  wrToJ\twrToDF\trmpPrVw";
         }
 
         string Stats::S::_asCSV() { 
             stringstream ss;
             ss << 
                 setprecision(2) << 
-                _commits << '\t' << 
+                _commits << '\t' << fixed << 
                 _journaledBytes / 1000000.0 << '\t' << 
                 _writeToDataFilesBytes / 1000000.0 << '\t' << 
                 _commitsInWriteLock << '\t' << 
