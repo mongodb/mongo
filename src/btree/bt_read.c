@@ -129,10 +129,7 @@ __wt_cache_read_server(void *arg)
 		 * Walk the read-request queue, looking for reads (defined by
 		 * a valid SESSION handle).  If we find a read request, perform
 		 * it, flush the result and clear the request slot, then wake
-		 * up the requesting thread.  The request slot clear doesn't
-		 * need to be flushed, but we have to flush the read result,
-		 * might as well include it.  If we don't find any work, go to
-		 * sleep.
+		 * up the requesting thread.
 		 */
 		do {
 			didwork = 0;
@@ -141,37 +138,22 @@ __wt_cache_read_server(void *arg)
 					continue;
 				if (cache->read_lockout)
 					continue;
-
-				/*
-				 * The read server thread does both general file
-				 * allocation and cache page instantiation.   In
-				 * a file allocation, there's no pagep field in
-				 * in which to return a page.
-				 */
-				ret = __wt_cache_read(rr);
-
-				WT_READ_REQ_CLR(rr);
-				__wt_session_serialize_wrapup(
-				    session, NULL, ret);
-
 				didwork = 1;
 
+				ret = __wt_cache_read(rr);
+
 				/*
-				 * Any error terminates the request; a serious
-				 * error causes the read server to exit.
+				 * The request slot clear doesn't need to be
+				 * flushed, but we have to flush the read
+				 * result, might as well include it.
 				 */
-				if (ret != 0) {
-					if (ret != WT_RESTART)
-						goto err;
-					ret = 0;
-				}
+				WT_READ_REQ_CLR(rr);
+
+				__wt_session_serialize_wrapup(
+				    session, NULL, ret);
 			}
 		} while (didwork);
 	}
-
-	if (ret != 0)
-err:		__wt_err(&conn->default_session,
-		    ret, "cache read server error");
 
 	WT_VERBOSE(conn, WT_VERB_READ,
 	    (&conn->default_session, "cache read server exiting"));
