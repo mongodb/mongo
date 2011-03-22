@@ -859,6 +859,7 @@ namespace mongo {
 
         // this plan won, so set data for response broadly
         void finish( bool stop ) {
+            massert( 13638, "client cursor dropped during explain query yield", !_pq.isExplain() || _c.get() );
 
             if ( _pq.isExplain() ) {
                 _n = _inMemSort ? _so->size() : _n;
@@ -880,7 +881,6 @@ namespace mongo {
             }
 
             if ( _pq.isExplain() ) {
-                massert( 13638, "client cursor dropped during explain query yield", _c.get() );
                 _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(),
                               _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields ,
                               _nChunkSkips, _keyFieldsOnly.get() > 0 );
