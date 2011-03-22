@@ -913,8 +913,7 @@ namespace mongo {
             }
         }
         virtual long long nscanned() {
-            assert( _c.get() );
-            return _c->nscanned();
+            return _c.get() ? _c->nscanned() : _nscanned;
         }
         virtual void next() {
             if ( ! _c->ok() ) {
