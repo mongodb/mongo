@@ -85,32 +85,6 @@ methods['connection.close'] = Api(
 	['__NONE__'],
 	['init'], [])
 
-methods['connection.data_update_initial_get'] = Api(
-	'connection.data_update_initial_get',
-	'method, getter',
-	['data_update_initial/uint32_t *@S'],
-	[],
-	['init'], [])
-methods['connection.data_update_initial_set'] = Api(
-	'connection.data_update_initial_set',
-	'method, setter',
-	['data_update_initial/uint32_t @S/8 * 1024'],
-	[],
-	['init'], [])
-
-methods['connection.data_update_max_get'] = Api(
-	'connection.data_update_max_get',
-	'method, getter',
-	['data_update_max/uint32_t *@S'],
-	[],
-	['init'], [])
-methods['connection.data_update_max_set'] = Api(
-	'connection.data_update_max_set',
-	'method, setter',
-	['data_update_max/uint32_t @S/32 * 1024'],
-	[],
-	['init'], [])
-
 methods['connection.btree'] = Api(
 	'connection.btree',
 	'method',

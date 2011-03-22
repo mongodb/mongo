@@ -219,7 +219,7 @@ __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(session, 53, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(session, 49, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BTREE_BTREE_COMPARE_GET].desc =
 	    "btree.btree_compare_get";
@@ -267,14 +267,6 @@ __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp)
 	stats[WT_STAT_CONNECTION_CACHE_SIZE_SET].desc =
 	    "connection.cache_size_set";
 	stats[WT_STAT_CONNECTION_CLOSE].desc = "connection.close";
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_INITIAL_GET].desc =
-	    "connection.data_update_initial_get";
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_INITIAL_SET].desc =
-	    "connection.data_update_initial_set";
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_MAX_GET].desc =
-	    "connection.data_update_max_get";
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_MAX_SET].desc =
-	    "connection.data_update_max_set";
 	stats[WT_STAT_CONNECTION_HAZARD_SIZE_GET].desc =
 	    "connection.hazard_size_get";
 	stats[WT_STAT_CONNECTION_HAZARD_SIZE_SET].desc =
@@ -335,10 +327,6 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_CONNECTION_CACHE_SIZE_GET].v = 0;
 	stats[WT_STAT_CONNECTION_CACHE_SIZE_SET].v = 0;
 	stats[WT_STAT_CONNECTION_CLOSE].v = 0;
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_INITIAL_GET].v = 0;
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_INITIAL_SET].v = 0;
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_MAX_GET].v = 0;
-	stats[WT_STAT_CONNECTION_DATA_UPDATE_MAX_SET].v = 0;
 	stats[WT_STAT_CONNECTION_HAZARD_SIZE_GET].v = 0;
 	stats[WT_STAT_CONNECTION_HAZARD_SIZE_SET].v = 0;
 	stats[WT_STAT_CONNECTION_MSGCALL_GET].v = 0;

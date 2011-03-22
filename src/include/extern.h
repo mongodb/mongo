@@ -421,6 +421,8 @@ int
 __wt_huffman_decode(void *huffman_arg,
     const uint8_t *from, uint32_t from_len, WT_BUF *to_buf);
 uint32_t
+__wt_nlpo2_round(uint32_t v);
+uint32_t
 __wt_nlpo2(uint32_t v);
 int
 __wt_ispo2(uint32_t v);

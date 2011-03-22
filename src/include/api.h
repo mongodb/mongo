@@ -246,6 +246,7 @@ struct __session {
 	WT_FLIST *flist;		/* Memory free list */
 
 	SESSION_BUFFER *sb;		/* Per-thread update buffer */
+	uint32_t update_alloc_size;	/* Allocation size */
 
 					/* Search return values: */
 	WT_PAGE   *srch_page;		/*    page */
@@ -349,10 +350,6 @@ struct __connection {
 	 */
 	uint32_t cache_size;
 
-	uint32_t data_update_initial;
-
-	uint32_t data_update_max;
-
 	uint32_t hazard_size;
 
 	void (*msgcall)(const CONNECTION *, const char *);
@@ -381,18 +378,6 @@ struct __connection {
 	    CONNECTION *, uint32_t );
 
 	int (*close)(
-	    CONNECTION *, uint32_t );
-
-	int (*data_update_initial_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*data_update_initial_set)(
-	    CONNECTION *, uint32_t );
-
-	int (*data_update_max_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*data_update_max_set)(
 	    CONNECTION *, uint32_t );
 
 	int (*hazard_size_get)(

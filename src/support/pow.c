@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 /*
- * __wt_nlpo2 --
- *	Return the next-largest power-of-two for a 32-bit unsigned value.
+ * __wt_nlpo2_round --
+ *	Round up to the next-largest power-of-two for a 32-bit unsigned value.
  *
  * In 12 operations, this code computes the next highest power of 2 for a 32-bit
  * integer. The result may be expressed by the formula 1U << (lg(v - 1) + 1).
@@ -31,16 +31,26 @@
  *	Sean Eron Anderson, seander@cs.stanford.edu
  */
 uint32_t
-__wt_nlpo2(uint32_t v)
+__wt_nlpo2_round(uint32_t v)
 {
-	v--;
+	v--;				/* If v is a power-of-two, return it. */
 	v |= v >> 1;
 	v |= v >> 2;
 	v |= v >> 4;
 	v |= v >> 8;
 	v |= v >> 16;
-	v++;
-	return (v);
+	return (v + 1);
+}
+
+uint32_t
+__wt_nlpo2(uint32_t v)
+{
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	return (v + 1);
 }
 
 /*

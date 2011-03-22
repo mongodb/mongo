@@ -182,28 +182,32 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 		goto no_allocation;
 
 	/*
+	 * We start by allocating 4KB for the thread, then every time we have
+	 * to re-allocate the buffer, we double the allocation size, up to a
+	 * total of 256KB, that way any thread that is doing a lot of updates
+	 * doesn't keep churning through memory.
+	 */
+	if (session->update_alloc_size == 0)
+		session->update_alloc_size = 4 * 1024;
+
+	/*
 	 * Decide how much memory to allocate: if it's a one-off (that is, the
 	 * value is bigger than anything we'll aggregate into these buffers,
 	 * it's a one-off.  Otherwise, allocate the next power-of-two larger
 	 * than 4 times the requested size and at least the default buffer size.
-	 *
-	 * XXX
-	 * I have no reason for the 4x the request size, I just hate to allocate
-	 * a buffer for every change to the file.  A better approach would be to
-	 * grow the allocation buffer as the thread makes more changes; if a
-	 * thread is doing lots of work, give it lots of memory, otherwise only
-	 * allocate as it's necessary.
 	 */
-	if (align_size > S2C(session)->data_update_max) {
+	if (align_size > session->update_alloc_size) {
 		alloc_size = WT_SIZEOF32(SESSION_BUFFER) + align_size;
 		single_use = 1;
 	} else {
-		alloc_size = __wt_nlpo2(
-		    WT_MAX(align_size * 4, S2C(session)->data_update_initial));
+		if (session->update_alloc_size < 256 * 1024)
+			session->update_alloc_size =
+			    __wt_nlpo2(session->update_alloc_size);
+		alloc_size = session->update_alloc_size;
 		single_use = 0;
 	}
-	WT_RET(__wt_calloc(session, 1, alloc_size, &sb));
 
+	WT_RET(__wt_calloc(session, 1, alloc_size, &sb));
 	sb->len = alloc_size;
 	sb->space_avail = alloc_size - WT_SIZEOF32(SESSION_BUFFER);
 	sb->first_free = (uint8_t *)sb + sizeof(SESSION_BUFFER);
