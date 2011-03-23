@@ -319,6 +319,7 @@ namespace mongo {
                 // 'end' has been found and removed, so break.
                 break;
             }
+            getDur().commitIfNeeded();
             // 'curr' will point to the newest document in the collection.
             DiskLoc curr = theCapExtent()->lastRecord;
             assert( !curr.isNull() );
