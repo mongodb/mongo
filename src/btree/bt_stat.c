@@ -210,7 +210,11 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 	 * there's Huffman encoding).
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
-		switch (WT_CELL_TYPE(rip->value)) {
+		if (WT_ROW_EMPTY_ISSET(rip)) {
+			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+			continue;
+		}
+		switch (WT_CELL_TYPE(WT_ROW_PTR(page, rip))) {
 		case WT_CELL_DATA:
 			upd = WT_ROW_UPDATE(page, rip);
 			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))

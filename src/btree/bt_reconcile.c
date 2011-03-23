@@ -1181,15 +1181,14 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
 	WT_ITEM *key, key_item, *value, value_item;
-	WT_CELL value_cell, *empty_cell, *key_cell;
+	WT_CELL value_cell, *key_cell;
 	WT_OVFL value_ovfl;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint64_t unused;
 	uint32_t entries, i, len, space_avail;
 	uint8_t *first_free;
-
-	empty_cell = &session->btree->empty_cell;
+	void *ripvalue;
 
 	WT_CLEAR(key_item);
 	key = &key_item;
@@ -1219,9 +1218,13 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 			 * If we update an overflow value, free the underlying
 			 * file space.
 			 */
-			if (WT_CELL_TYPE(rip->value) == WT_CELL_DATA_OVFL)
-				WT_RET(__wt_block_free_ovfl(
-				    session, WT_CELL_BYTE_OVFL(rip->value)));
+			if (!WT_ROW_EMPTY_ISSET(rip)) {
+				ripvalue = WT_ROW_PTR(page, rip);
+				if (WT_CELL_TYPE(ripvalue) == WT_CELL_DATA_OVFL)
+					WT_RET(__wt_block_free_ovfl(
+					    session,
+					    WT_CELL_BYTE_OVFL(ripvalue)));
+			}
 
 			/*
 			 * If this key/value pair was deleted, we're done.  If
@@ -1257,12 +1260,13 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 			 * item, that is, it may have been zero length.  Catch
 			 * that case.
 			 */
-			if (rip->value == empty_cell)
+			if (WT_ROW_EMPTY_ISSET(rip))
 				data_loc = EMPTY_DATA;
 			else {
-				value->data = rip->value;
+				ripvalue = WT_ROW_PTR(page, rip);
+				value->data = ripvalue;
 				value->size =
-				    WT_CELL_SPACE_REQ(WT_CELL_LEN(rip->value));
+				    WT_CELL_SPACE_REQ(WT_CELL_LEN(ripvalue));
 				data_loc = DATA_ON_PAGE;
 				len += value->size;
 			}

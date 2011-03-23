@@ -502,9 +502,9 @@ struct __wt_page {
  */
 struct __wt_row {
 	/*
-	 * The first fields of the WT_ROW structure are the same as the first
-	 * fields of a WT_ITEM so we can pass it to a comparison function
-	 * without copying.
+	 * The first two fields of the WT_ROW structure are the same as the
+	 * first two fields of a WT_ITEM so we can pass it to a comparison
+	 * function without copying.
 	 *
 	 * If a key requires processing (for example, an overflow key or an
 	 * Huffman encoded key), the key field points to the on-page key,
@@ -513,7 +513,19 @@ struct __wt_row {
 	void	 *key;			/* Key */
 	uint32_t  size;			/* Key length */
 
-	void	 *value;		/* Data */
+	/*
+	 * Row-store data references are page offsets, not pointers (we boldly
+	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
+	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
+	 *
+	 * We don't store empty data items, that is, if the data doesn't exist,
+	 * the key is stored but there's no data.   Since it's impossible to
+	 * have a data item at the beginning of the page, we use a page offset
+	 * of 0 to flag non-existent data items.
+	 */
+#define	WT_ROW_EMPTY			0
+#define	WT_ROW_EMPTY_ISSET(rip)		((rip)->value == WT_ROW_EMPTY)
+	uint32_t  value;
 };
 /*
  * WT_ROW_SIZE is the expected structure size -- we verify the build to ensure
@@ -522,7 +534,14 @@ struct __wt_row {
  * are a lot of these structures.
  */
 #define	WT_ROW_SIZE							\
-	WT_ALIGN(2 * sizeof(void *) + sizeof(uint32_t), sizeof(void *))
+	(sizeof(void *) + 2 * sizeof(uint32_t))
+
+/*
+ * WT_ROW_PTR --
+ *	Return a pointer corresponding to the data offset.
+ */
+#define	WT_ROW_PTR(page, rip)						\
+	WT_PAGE_DISK_REF((page)->XXdsk, (rip)->value)
 
 /*
  * WT_ROW_INDX_FOREACH --
@@ -555,10 +574,9 @@ struct __wt_row {
  */
 struct __wt_col {
 	/*
-	 * Column-store leaf page references are page offsets, not pointers (we
-	 * boldly re-invent short pointers).  The trade-off is 4B per data cell
-	 * on a 64-bit machine vs. a single cycle to do an addition to the base
-	 * pointer.
+	 * Col-store data references are page offsets, not pointers (we boldly
+	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
+	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
 	 *
 	 * The on-page data is untyped for column-store pages -- if the page
 	 * has variable-length objects, it's a WT_CELL layout, like row-store

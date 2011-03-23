@@ -86,8 +86,6 @@ struct __btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */
 
-	WT_CELL empty_cell;		/* Empty cell */
-
 	WT_STATS *stats;		/* Btree handle statistics */
 	WT_STATS *fstats;		/* File statistics */
 

@@ -313,15 +313,15 @@ __wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t i;
-	void *cipvalue;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipvalue = WT_COL_PTR(page, cip);
+
 		fprintf(fp, "\tdata {");
-		WT_RET(__wt_debug_cell_data(session, cipvalue, fp));
+		WT_RET(
+		    __wt_debug_cell_data(session, WT_COL_PTR(page, cip), fp));
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
@@ -351,7 +351,9 @@ __wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 			__wt_debug_item("\tkey", rip, fp);
 
 		fprintf(fp, "\tdata: {");
-		WT_RET(__wt_debug_cell_data(session, rip->value, fp));
+		if (!WT_ROW_EMPTY_ISSET(rip))
+			WT_RET(__wt_debug_cell_data(
+			    session, WT_ROW_PTR(page, rip), fp));
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)

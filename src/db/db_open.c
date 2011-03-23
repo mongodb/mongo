@@ -37,10 +37,6 @@ __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 	 */
 	WT_CLEAR(btree->root_page);
 
-	/* Initialize the zero-length WT_CELL. */
-	WT_CELL_SET_TYPE(&btree->empty_cell, WT_CELL_DATA);
-	WT_CELL_SET_LEN(&btree->empty_cell, 0);
-
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(btree, WT_RDONLY);
 

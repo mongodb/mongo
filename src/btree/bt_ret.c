@@ -109,7 +109,12 @@ __wt_value_return(
 		cell = WT_COL_PTR(page, cip);
 		goto cell_set;
 	case WT_PAGE_ROW_LEAF:
-		cell = rip->value;
+		if (WT_ROW_EMPTY_ISSET(rip)) {
+			value_ret = "";
+			size_ret = 0;
+			break;
+		}
+		cell = WT_ROW_PTR(page, rip);
 cell_set:	switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (btree->huffman_data == NULL) {

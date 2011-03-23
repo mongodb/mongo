@@ -41,18 +41,16 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_UPDATE *upd;
 	void *huffman;
-	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	huffman = btree->huffman_data;
 	session = (SESSION *)cbt->iface.session;
-	ret = 0;
 
 	if (cbt->walk.tree == NULL)
 		return (__wt_btcur_first(cbt));
 
-	do {
+	for (;;) {
 		while (cbt->nitems == 0) {
 			WT_RET(__wt_walk_next(session, &cbt->walk,
 			    0, &cbt->ref));
@@ -87,8 +85,8 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			cursor->key.item = *key;
 
 			/*
-			 * If the item was ever upd, dump the data from the
-			 * upd entry.
+			 * If the item was ever modified, dump the data from
+			 * the WT_UPDATE entry.
 			 */
 			if (upd != NULL) {
 				cursor->value.item.data = WT_UPDATE_DATA(upd);
@@ -96,9 +94,17 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 				break;
 			}
 
-			/* Set data to reference the data we'll dump. */
-			cell = cbt->rip->value;
-			if (WT_CELL_TYPE(cell) == WT_CELL_DATA) {
+			/* Check for empty data. */
+			if (WT_ROW_EMPTY_ISSET(cbt->rip)) {
+				cursor->value.item.data = "";
+				cursor->value.item.size = 0;
+				break;
+			}
+
+			/* Set cell to reference the value we'll dump. */
+			cell = WT_ROW_PTR(cbt->ref->page, cbt->rip);
+			switch (WT_CELL_TYPE(cell)) {
+			case WT_CELL_DATA:
 				if (huffman == NULL) {
 					cursor->value.item.data =
 					    WT_CELL_BYTE(cell);
@@ -106,13 +112,14 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 					    WT_CELL_LEN(cell);
 					break;
 				}
-			} else if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL) {
+				/* FALLTHROUGH */
+			case WT_CELL_DATA_OVFL:
 				WT_RET(__wt_cell_process(session,
 				    cell, cbt->value_tmp));
 				cursor->value.item = cbt->value_tmp->item;
 				break;
-			} else
-				continue;
+			}
+			break;
 		}
 
 		if (cbt->nitems == 0)
@@ -122,9 +129,8 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 		++cbt->rip;
 		cbt->nitems--;
 		return (0);
-	} while (0);
-
-	return (ret);
+	}
+	/* NOTREACHED */
 }
 
 /*

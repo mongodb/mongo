@@ -304,8 +304,15 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			continue;
 		}
 
-		/* Set value to reference the value we'll dump. */
-		cell = rip->value;
+		/* Check for an empty item. */
+		if (WT_ROW_EMPTY_ISSET(rip)) {
+			dp->p(key->data, key->size, dp->stream);
+			dp->p(NULL, 0, dp->stream);
+			continue;
+		}
+
+		/* Set cell to reference the value we'll dump. */
+		cell = WT_ROW_PTR(page, rip);
 		switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
 			if (huffman == NULL) {

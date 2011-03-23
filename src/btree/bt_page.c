@@ -374,11 +374,11 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 			 * implies a zero-length data item.  Initialize the
 			 * slot as if it's going to happen.
 			 */
-			rip->value = &btree->empty_cell;
+			rip->value = WT_ROW_EMPTY;
 			break;
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
-			rip->value = cell;
+			rip->value = WT_PAGE_DISK_OFFSET(dsk, cell);
 			break;
 		}
 
