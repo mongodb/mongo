@@ -290,6 +290,10 @@ namespace mongo {
             return _hits;
         }
 
+        void setTotalWhileRunning( unsigned long long total ) {
+            _total = total;
+        }
+
         string toString() const {
             if ( ! _active )
                 return "";
