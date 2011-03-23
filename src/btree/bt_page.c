@@ -149,7 +149,7 @@ __wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_FIX_FOREACH(btree, dsk, p, i)
-		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, p);
+		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, p);
 
 	page->indx_count = dsk->u.entries;
 	return (0);
@@ -222,7 +222,7 @@ __wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
-		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, p);
+		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, p);
 
 	page->indx_count = dsk->u.entries;
 	return (0);
@@ -257,7 +257,7 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_leaf.d;
 	WT_CELL_FOREACH(dsk, cell, i)
-		(cip++)->data = WT_PAGE_DISK_OFFSET(dsk, cell);
+		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, cell);
 
 	page->indx_count = dsk->u.entries;
 	return (0);

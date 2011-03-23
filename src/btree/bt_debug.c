@@ -228,7 +228,7 @@ __wt_debug_page_col_fix(SESSION *session, WT_PAGE *page, FILE *fp)
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t fixed_len, i;
-	void *cipdata;
+	void *cipvalue;
 
 	fixed_len = session->btree->fixed_len;
 
@@ -236,12 +236,12 @@ __wt_debug_page_col_fix(SESSION *session, WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
+		cipvalue = WT_COL_PTR(page, cip);
 		fprintf(fp, "\tdata {");
-		if (WT_FIX_DELETE_ISSET(cipdata))
+		if (WT_FIX_DELETE_ISSET(cipvalue))
 			fprintf(fp, "deleted");
 		else
-			__wt_print_byte_string(cipdata, fixed_len, fp);
+			__wt_print_byte_string(cipvalue, fixed_len, fp);
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)
@@ -280,7 +280,7 @@ __wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 	WT_COL *cip;
 	WT_RLE_EXPAND *exp;
 	uint32_t fixed_len, i;
-	void *cipdata;
+	void *cipvalue;
 
 	fixed_len = session->btree->fixed_len;
 
@@ -288,14 +288,14 @@ __wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
+		cipvalue = WT_COL_PTR(page, cip);
 		fprintf(fp,
-		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cipdata));
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
+		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cipvalue));
+		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipvalue)))
 			fprintf(fp, "deleted");
 		else
 			__wt_print_byte_string(
-			    WT_RLE_REPEAT_DATA(cipdata), fixed_len, fp);
+			    WT_RLE_REPEAT_DATA(cipvalue), fixed_len, fp);
 		fprintf(fp, "}\n");
 
 		if ((exp = WT_COL_RLEEXP(page, cip)) != NULL)
@@ -313,15 +313,15 @@ __wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
 	WT_COL *cip;
 	WT_UPDATE *upd;
 	uint32_t i;
-	void *cipdata;
+	void *cipvalue;
 
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
+		cipvalue = WT_COL_PTR(page, cip);
 		fprintf(fp, "\tdata {");
-		WT_RET(__wt_debug_cell_data(session, cipdata, fp));
+		WT_RET(__wt_debug_cell_data(session, cipvalue, fp));
 		fprintf(fp, "}\n");
 
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL)

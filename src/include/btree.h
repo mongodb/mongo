@@ -564,7 +564,7 @@ struct __wt_col {
 	 * has variable-length objects, it's a WT_CELL layout, like row-store
 	 * pages.  If the page has fixed-length objects, it's untyped bytes.
 	 */
-	uint32_t data;
+	uint32_t value;
 };
 /*
  * WT_COL_SIZE is the expected structure size -- we verify the build to ensure
@@ -579,7 +579,7 @@ struct __wt_col {
  *	Return a pointer corresponding to the data offset.
  */
 #define	WT_COL_PTR(page, cip)						\
-	WT_PAGE_DISK_REF((page)->XXdsk, (cip)->data)
+	WT_PAGE_DISK_REF((page)->XXdsk, (cip)->value)
 
 /*
  * WT_COL_INDX_FOREACH --
