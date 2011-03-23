@@ -14,39 +14,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "ExpressionOr.h"
+#pragma once
 
-#include "Value.h"
+#include "pch.h"
+
+#include "db/Accumulator.h"
 
 namespace mongo
 {
-    ExpressionOr::~ExpressionOr()
+    class AccumulatorSum :
+        public Accumulator
     {
-    }
+    public:
+	// virtuals from Expression
+	virtual shared_ptr<const Value> evaluate(
+	    shared_ptr<Document> pDocument) const;
 
-    shared_ptr<ExpressionNary> ExpressionOr::create()
-    {
-	shared_ptr<ExpressionNary> pExpression(new ExpressionOr());
-	return pExpression;
-    }
+	/*
+	  Create a summing accumulator.
 
-    ExpressionOr::ExpressionOr():
-	ExpressionNary()
-    {
-    }
+	  @returns the created accumulator
+	 */
+	static shared_ptr<Accumulator> create();
 
-    shared_ptr<const Value> ExpressionOr::evaluate(
-	shared_ptr<Document> pDocument) const
-    {
-	const size_t n = vpOperand.size();
-	for(size_t i = 0; i < n; ++i)
-	{
-	    shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-	    if (pValue->coerceToBool())
-		return Value::getTrue();
-	}
-
-	return Value::getFalse();
-    }
+    protected:
+	AccumulatorSum();
+    };
 }

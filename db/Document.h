@@ -44,9 +44,11 @@ namespace mongo
 	/*
 	  Create a new empty Document.
 
+	  @param sizeHint a hint at what the number of fields will be; if
+	    known, this can be used to increase memory allocation efficiency
 	  @returns shared pointer to the newly created Document
 	*/
-	static shared_ptr<Document> create();
+	static shared_ptr<Document> create(size_t sizeHint = 0);
 
 	/*
 	  Clone a document.
@@ -95,10 +97,21 @@ namespace mongo
 	void setField(size_t index,
 		      string fieldName, shared_ptr<const Value> pValue);
 
+	/*
+	  Compare two documents.
+
+	  BSON document field order is significant, so this just goes through
+	  the fields in order.  The comparison is done in roughly the same way
+	  as strings are compared, but comparing one field at a time instead
+	  of one character at a time.
+	*/
+	static int compare(const shared_ptr<Document> &rL,
+			   const shared_ptr<Document> &rR);
+
     private:
 	friend class FieldIterator;
 
-	Document();
+	Document(size_t sizeHint);
 	Document(BSONObj *pBsonObj);
 
 	/* these two vectors parallel each other */

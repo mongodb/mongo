@@ -54,6 +54,25 @@ namespace mongo
 	static shared_ptr<const Value> createInt(int value);
 
 	/*
+	  Construct an long(long)-valued Value.
+
+	  For commonly used values, consider using one of the singleton
+	  instances defined below.
+
+	  @param value the value
+	  @returns a Value with the given value
+	*/
+	static shared_ptr<const Value> createLong(long long value);
+
+	/*
+	  Construct a double-valued Value.
+
+	  @param value the value
+	  @returns a Value with the given value
+	*/
+	static shared_ptr<const Value> createDouble(double value);
+
+	/*
 	  Construct a document-valued Value.
 
 	  @param value the value
@@ -115,19 +134,35 @@ namespace mongo
 	/*
 	  Coerce (cast) a value to a native bool, using JSON rules.
 
-	  @param pValue the field value to coerce
 	  @returns the bool value
 	*/
-	static bool coerceToBool(shared_ptr<const Value> pValue);
+	bool coerceToBool() const;
 
 	/*
 	  Coerce (cast) a value to a Boolean Value, using JSON rules.
 
-	  @param pValue the field value to coerce
 	  @returns the Boolean Value value
 	*/
-	static shared_ptr<const Value> coerceToBoolean(
-	    shared_ptr<const Value> pValue);
+	shared_ptr<const Value> coerceToBoolean() const;
+
+	/*
+	  Coerce (cast) a value to a double Value, using JSON rules.
+
+	  @returns the double value
+	*/
+	double coerceToDouble() const;
+	
+	/*
+	  Compare two Values.
+
+	  @param rL left value
+	  @param rR right value
+	  @returns an integer less than zero, zero, or an integer greater than
+	    zero, depending on whether rL < rR, rL == rR, or rL > rR
+	 */
+	static int Value::compare(const shared_ptr<const Value> &rL,
+				  const shared_ptr<const Value> &rR);
+
 
     private:
 	Value(); // creates null value
@@ -135,6 +170,8 @@ namespace mongo
 
 	Value(bool boolValue);
 	Value(int intValue);
+	Value(long long longValue);
+	Value(double doubleValue);
 	Value(shared_ptr<Document> pDocument);
 
 	BSONType type;

@@ -41,9 +41,8 @@ namespace mongo
     shared_ptr<const Value> ExpressionDocument::evaluate(
 	shared_ptr<Document> pDocument) const
     {
-	shared_ptr<Document> pResult(Document::create());
-
 	const size_t n = vFieldName.size();
+	shared_ptr<Document> pResult(Document::create(n));
 	for(size_t i = 0; i < n; ++i)
 	{
 	    pResult->addField(vFieldName[i],

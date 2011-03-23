@@ -51,25 +51,27 @@ namespace mongo
 	    vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);
     }
 
-    shared_ptr<Document> Document::create()
+    shared_ptr<Document> Document::create(size_t sizeHint)
     {
-        shared_ptr<Document> pDocument(new Document());
+        shared_ptr<Document> pDocument(new Document(sizeHint));
 	return pDocument;
     }
 
-    Document::Document():
+    Document::Document(size_t sizeHint):
 	vFieldName(),
 	vpValue()
     {
+	if (sizeHint)
+	{
+	    vFieldName.reserve(sizeHint);
+	    vpValue.reserve(sizeHint);
+	}
     }
 
     shared_ptr<Document> Document::clone()
     {
-	shared_ptr<Document> pNew(Document::create());
-
 	const size_t n = vFieldName.size();
-	pNew->vFieldName.reserve(n);
-	pNew->vpValue.reserve(n);
+	shared_ptr<Document> pNew(Document::create(n));
 	for(size_t i = 0; i < n; ++i)
 	    pNew->addField(vFieldName[i], vpValue[i]);
 
@@ -118,5 +120,38 @@ namespace mongo
     {
 	vFieldName[index] = fieldName;
 	vpValue[index] = pValue;
+    }
+
+    int Document::compare(const shared_ptr<Document> &rL,
+			  const shared_ptr<Document> &rR)
+    {
+	const size_t lSize = rL->vFieldName.size();
+	const size_t rSize = rR->vFieldName.size();
+
+	for(size_t i = 0; true; ++i)
+	{
+	    if (i >= lSize)
+	    {
+		if (i >= rSize)
+		    return 0; // documents are the same length
+
+		return-1; // left document is shorter
+	    }
+
+	    if (i >= rSize)
+		return 1; // right document is shorter
+
+	    const int nameCmp = rL->vFieldName[i].compare(rR->vFieldName[i]);
+	    if (nameCmp)
+		return nameCmp; // field names are unequal
+
+	    const int valueCmp = Value::compare(rL->vpValue[i], rR->vpValue[i]);
+	    if (valueCmp)
+		return valueCmp; // fields are unequal
+	}
+
+	/* NOTREACHED */
+	assert(false); // CW TODO
+	return 0;
     }
 }

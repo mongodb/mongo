@@ -42,7 +42,7 @@ namespace mongo
 	    hasNext = pSource->advance();
 
 	    shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
-	    bool pass = Value::coerceToBool(pValue);
+	    bool pass = pValue->coerceToBool();
 	    if (pass)
 	    {
 		pCurrent = pDocument;

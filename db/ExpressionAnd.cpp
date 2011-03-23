@@ -43,8 +43,7 @@ namespace mongo
 	for(size_t i = 0; i < n; ++i)
 	{
 	    shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-	    shared_ptr<const Value> pBool(Value::coerceToBoolean(pValue));
-	    if (!pBool->getBool())
+	    if (!pValue->coerceToBool())
 		return Value::getFalse();
 	}
 

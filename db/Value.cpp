@@ -28,6 +28,10 @@ namespace mongo
     const Value Value::fieldZero(0);
     const Value Value::fieldOne(1);
 
+    Value::~Value()
+    {
+    }
+
     Value::Value():
 	type(jstNULL),
 	oidValue(),
@@ -44,25 +48,6 @@ namespace mongo
 	vpValue()
     {
 	simple.boolValue = boolValue;
-    }
-
-    Value::Value(int intValue):
-	type(NumberInt),
-	pDocumentValue(),
-	vpValue()
-    {
-	simple.intValue = intValue;
-    }
-
-    Value::Value(shared_ptr<Document> pDocument):
-	type(Object),
-	pDocumentValue(pDocument),
-	vpValue()
-    {
-    }
-
-    Value::~Value()
-    {
     }
 
     shared_ptr<const Value> Value::createFromBsonElement(
@@ -164,10 +149,53 @@ namespace mongo
 	}
     }
 
+    Value::Value(int intValue):
+	type(NumberInt),
+	pDocumentValue(),
+	vpValue()
+    {
+	simple.intValue = intValue;
+    }
+
     shared_ptr<const Value> Value::createInt(int value)
     {
 	shared_ptr<const Value> pValue(new Value(value));
 	return pValue;
+    }
+
+    Value::Value(long long longValue):
+	type(NumberLong),
+	pDocumentValue(),
+	vpValue()
+    {
+	simple.longValue = longValue;
+    }
+
+    shared_ptr<const Value> Value::createLong(long long value)
+    {
+	shared_ptr<const Value> pValue(new Value(value));
+	return pValue;
+    }
+
+    Value::Value(double value):
+	type(NumberDouble),
+	pDocumentValue(),
+	vpValue()
+    {
+	simple.doubleValue = value;
+    }
+
+    shared_ptr<const Value> Value::createDouble(double value)
+    {
+	shared_ptr<const Value> pValue(new Value(value));
+	return pValue;
+    }
+
+    Value::Value(shared_ptr<Document> pDocument):
+	type(Object),
+	pDocumentValue(pDocument),
+	vpValue()
+    {
     }
 
     shared_ptr<const Value> Value::createDocument(
@@ -179,7 +207,13 @@ namespace mongo
 
     double Value::getDouble() const
     {
-	assert(getType() == NumberDouble);
+	BSONType type = getType();
+	if (type == NumberInt)
+	    return simple.intValue;
+	if (type == NumberLong)
+	    return simple.longValue;
+
+	assert(type == NumberDouble);
 	return simple.doubleValue;
     }
 
@@ -245,7 +279,11 @@ namespace mongo
 
     long long Value::getLong() const
     {
-	assert(getType() == NumberLong);
+	BSONType type = getType();
+	if (type == NumberInt)
+	    return simple.intValue;
+
+	assert(type == NumberLong);
 	return simple.longValue;
     }
 
@@ -433,13 +471,13 @@ namespace mongo
 	}
     }
 
-    bool Value::coerceToBool(shared_ptr<const Value> pValue)
+    bool Value::coerceToBool() const
     {
-	BSONType type = pValue->getType();
+	BSONType type = getType();
 	switch(type)
 	{
 	case NumberDouble:
-	    if (pValue->simple.doubleValue != 0)
+	    if (simple.doubleValue != 0)
 		return true;
 	    break;
 
@@ -455,7 +493,7 @@ namespace mongo
 	    return true;
 
 	case Bool:
-	    if (pValue->simple.boolValue)
+	    if (simple.boolValue)
 		return true;
 	    break;
 
@@ -464,12 +502,12 @@ namespace mongo
 	    break;
 
 	case NumberInt:
-	    if (pValue->simple.intValue != 0)
+	    if (simple.intValue != 0)
 		return true;
 	    break;
 
 	case NumberLong:
-	    if (pValue->simple.longValue != 0)
+	    if (simple.longValue != 0)
 		return true;
 	    break;
 
@@ -491,12 +529,185 @@ namespace mongo
 	return false;
     }
 
-    shared_ptr<const Value> Value::coerceToBoolean(
-	shared_ptr<const Value> pValue)
+    shared_ptr<const Value> Value::coerceToBoolean() const
     {
-	bool result = coerceToBool(pValue);
+	bool result = coerceToBool();
+
+	/* always normalize to the singletons */
 	if (result)
 	    return Value::getTrue();
 	return Value::getFalse();
+    }
+
+    double Value::coerceToDouble() const
+    {
+	switch(type)
+	{
+	    case NumberDouble:
+		return simple.doubleValue;
+
+	    case NumberInt:
+		return (double)simple.intValue;
+
+	    case NumberLong:
+		return (double)simple.longValue;
+
+	    case String:
+		assert(false); // CW TODO try to convert w/atod()
+		return (double)0;
+
+	    case Object:
+	    case Array:
+	    case BinData:
+	    case jstOID:
+	    case jstNULL:
+	    case Bool:
+	    case Date:
+	    case RegEx:
+	    case Symbol:
+	    case CodeWScope:
+	    case Timestamp:
+	    case MinKey:
+	    case EOO:
+	    case Undefined:
+	    case DBRef:
+	    case Code:
+	    case MaxKey:
+		assert(false); // CW TODO no conversion available
+		return (double)0;
+	} // switch(type)
+
+	/* NOTREACHED */
+	return (double)0;
+    }
+
+    int Value::compare(const shared_ptr<const Value> &rL,
+			const shared_ptr<const Value> &rR)
+    {
+	BSONType lType = rL->getType();
+	assert(lType == rR->getType());
+	    // CW TODO for now, only compare like values
+
+	switch(lType)
+	{
+	    case NumberDouble:
+		if (rL->simple.doubleValue < rR->simple.doubleValue)
+		    return -1;
+		if (rL->simple.doubleValue > rR->simple.doubleValue)
+		    return 1;
+		return 0;
+
+	    case String:
+		return rL->stringValue.compare(rR->stringValue);
+
+	    case Object:
+		return Document::compare(rL->getDocument(), rR->getDocument());
+
+	    case Array:
+	    {
+		const vector<shared_ptr<const Value>> *pvpLV = rL->getArray();
+		const vector<shared_ptr<const Value>> *pvpRV = rR->getArray();
+
+		const size_t lSize = pvpLV->size();
+		const size_t rSize = pvpRV->size();
+
+		for(size_t i = 0; true; ++i)
+		{
+		    /* have we run out of left array? */
+		    if (i >= lSize)
+		    {
+			if (i >= rSize)
+			    return 0; // arrays are the same length
+
+			return -1; // left array is shorter
+		    }
+
+		    /* have we run out of right array? */
+		    if (i >= rSize)
+			return 1; // right array is shorter
+
+		    /* compare corresponding array elements */
+		    const int cmp = Value::compare((*pvpLV)[i], (*pvpRV)[i]);
+		    if (cmp)
+			return cmp; // values are unequal
+		}
+
+		/* NOTREACHED */
+		assert(false); // CW TODO
+		break;
+	    }
+
+	    case BinData:
+		// pBuilder->appendBinData(fieldName, ...);
+		assert(false); // CW TODO unimplemented
+		break;
+
+	    case jstOID:
+		if (rL->oidValue < rR->oidValue)
+		    return -1;
+		if (rL->oidValue == rR->oidValue)
+		    return 0;
+		return 1;
+
+	    case Bool:
+		if (rL->simple.boolValue == rR->simple.boolValue)
+		    return 0;
+		if (rL->simple.boolValue)
+		    return 1;
+		return -1;
+
+	    case Date:
+		if (rL->dateValue < rR->dateValue)
+		    return -1;
+		if (rL->dateValue > rR->dateValue)
+		    return 1;
+		return 0;
+
+	    case RegEx:
+		return rL->stringValue.compare(rR->stringValue);
+
+	    case Symbol:
+		assert(false); // CW TODO unimplemented
+		break;
+
+	    case CodeWScope:
+		assert(false); // CW TODO unimplemented
+		break;
+
+	    case NumberInt:
+		if (rL->simple.intValue < rR->simple.intValue)
+		    return -1;
+		if (rL->simple.intValue > rR->simple.intValue)
+		    return 1;
+		return 0;
+
+	    case Timestamp:
+		if (rL->dateValue < rR->dateValue)
+		    return -1;
+		if (rL->dateValue > rR->dateValue)
+		    return 1;
+		return 0;
+
+	    case NumberLong:
+		if (rL->simple.longValue < rR->simple.longValue)
+		    return -1;
+		if (rL->simple.longValue > rR->simple.longValue)
+		    return 1;
+		return 0;
+
+		/* these shouldn't happen in this context */
+	    case MinKey:
+	    case EOO:
+	    case Undefined:
+	    case jstNULL:
+	    case DBRef:
+	    case Code:
+	    case MaxKey:
+		assert(false); // CW TODO better message
+		break;
+	} // switch(lType)
+
+	/* NOTREACHED */
+	return 0;
     }
 }

@@ -15,38 +15,24 @@
  */
 
 #include "pch.h"
-#include "ExpressionOr.h"
-
-#include "Value.h"
+#include "Accumulator.h"
 
 namespace mongo
 {
-    ExpressionOr::~ExpressionOr()
+    void Accumulator::addOperand(
+	shared_ptr<Expression> pExpression)
     {
+	assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
+	ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<ExpressionNary> ExpressionOr::create()
+    shared_ptr<const Value> Accumulator::getValue() const
     {
-	shared_ptr<ExpressionNary> pExpression(new ExpressionOr());
-	return pExpression;
+	return pValue;
     }
 
-    ExpressionOr::ExpressionOr():
-	ExpressionNary()
+    Accumulator::Accumulator(shared_ptr<const Value> pStartValue):
+	pValue(pStartValue)
     {
-    }
-
-    shared_ptr<const Value> ExpressionOr::evaluate(
-	shared_ptr<Document> pDocument) const
-    {
-	const size_t n = vpOperand.size();
-	for(size_t i = 0; i < n; ++i)
-	{
-	    shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-	    if (pValue->coerceToBool())
-		return Value::getTrue();
-	}
-
-	return Value::getFalse();
     }
 }

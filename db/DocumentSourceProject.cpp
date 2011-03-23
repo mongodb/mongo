@@ -77,13 +77,13 @@ namespace mongo
 	if (!pNoRavelDocument.get())
 	{
 	    shared_ptr<Document> pInDocument(pSource->getCurrent());
-	    pNoRavelDocument = Document::create();
 
 	    /*
 	      Use the expressions to create a new Document out of the
 	      source Document
 	    */
 	    const size_t n = vFieldName.size();
+	    pNoRavelDocument = Document::create(n);
 	    for(size_t i = 0; i < n; ++i)
 	    {
 		string outName(vFieldName[i]);

@@ -14,39 +14,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "ExpressionOr.h"
+#pragma once
 
-#include "Value.h"
+#include "pch.h"
+
+#include "db/ExpressionNary.h"
 
 namespace mongo
 {
-    ExpressionOr::~ExpressionOr()
+    class Accumulator :
+        public ExpressionNary
     {
-    }
+    public:
+	// virtuals from ExpressionNary
+	virtual void addOperand(shared_ptr<Expression> pExpression);
 
-    shared_ptr<ExpressionNary> ExpressionOr::create()
-    {
-	shared_ptr<ExpressionNary> pExpression(new ExpressionOr());
-	return pExpression;
-    }
+	/*
+	  Get the accumulated value.
 
-    ExpressionOr::ExpressionOr():
-	ExpressionNary()
-    {
-    }
+	  @returns the accumulated value
+	 */
+	virtual shared_ptr<const Value> getValue() const;
 
-    shared_ptr<const Value> ExpressionOr::evaluate(
-	shared_ptr<Document> pDocument) const
-    {
-	const size_t n = vpOperand.size();
-	for(size_t i = 0; i < n; ++i)
-	{
-	    shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-	    if (pValue->coerceToBool())
-		return Value::getTrue();
-	}
+    protected:
+	Accumulator(shared_ptr<const Value> pStartValue);
 
-	return Value::getFalse();
-    }
+	/*
+	  Expression evaluation should be const, but accumulators have
+	  this value, which mutates as a side-effect of the evaluation.
+	*/
+	mutable shared_ptr<const Value> pValue;
+    };
 }

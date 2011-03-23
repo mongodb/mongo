@@ -18,6 +18,7 @@
 #include "Pipeline.h"
 
 #include "../cursor.h"
+#include "../AccumulatorSum.h"
 #include "../Document.h"
 #include "../DocumentSource.h"
 #include "../DocumentSourceCursor.h"
@@ -27,6 +28,7 @@
 #include "../ExpressionAnd.h"
 #include "../ExpressionCompare.h"
 #include "../ExpressionConstant.h"
+#include "../ExpressionDocument.h"
 #include "../ExpressionFieldPath.h"
 #include "../ExpressionOr.h"
 #include "../FieldIterator.h"
@@ -131,6 +133,8 @@ namespace mongo
 		    pSource = setupProject(&bsonElement, pSource);
 		else if (strcmp(pFieldName, "$filter") == 0)
 		    pSource = setupFilter(&bsonElement, pSource);
+		else if (strcmp(pFieldName, "$group") == 0)
+		    pSource = setupGroup(&bsonElement, pSource);
 		else
 		{
 		    ostringstream sb;
@@ -162,6 +166,57 @@ namespace mongo
 	return true;
     }
 
+    shared_ptr<Expression> Pipeline::parseOperand(BSONElement *pBsonElement)
+    {
+	BSONType type = pBsonElement->type();
+
+	switch(type)
+	{
+	case String:
+	{
+	    /*
+	      This could be a field path, or it could be a constant
+	      string.
+
+	      We make a copy of the BSONElement reader so we can read its
+	      value without advancing its state, in case we need to read it
+	      again in the constant code path.
+	    */
+	    BSONElement opCopy(*pBsonElement);
+	    string value(opCopy.String());
+	    
+	    /* check for a field path */
+	    if (value.compare(0, 10, "$document.") != 0)
+		goto ExpectConstant;  // assume plain string constant
+
+	    /* if we got here, this is a field path expression */
+	    string fieldPath(value.substr(10));
+	    shared_ptr<Expression> pFieldExpr(
+		ExpressionFieldPath::create(fieldPath));
+	    return pFieldExpr;
+	}
+	    
+	case Object:
+	{
+	    shared_ptr<Expression> pSubExpression(
+		parseDocument(pBsonElement));
+	    return pSubExpression;
+	}
+
+	default:
+	ExpectConstant:
+	{
+	    shared_ptr<Expression> pOperand(
+		ExpressionConstant::createFromBsonElement(pBsonElement));
+	    return pOperand;
+	}
+	
+	} // switch(type)
+
+	/* NOTREACHED */
+	assert(false);
+	return shared_ptr<Expression>();
+    }
 
     struct OpDesc
     {
@@ -205,71 +260,47 @@ namespace mongo
 	const OpDesc *pOp = (const OpDesc *)bsearch(
 	    &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
 
-	assert(pOp); // CW TODO invalid operator
+	assert(pOp); // CW TODO error: invalid operator
 	shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
 
-	/* add the operands */
-	assert(pBsonElement->type() == Array); // CW TODO malformed operands
-	vector<BSONElement> bsonArray(pBsonElement->Array());
-	const size_t n = bsonArray.size();
-	for(size_t i = 0; i < n; ++i)
-	{
-	    BSONElement *pBsonOperand = &bsonArray[i];
-	    BSONType type = pBsonOperand->type();
-
-	    switch(type)
-	    {
-	    case String:
-	    {
-		/*
-		  This could be a field path, or it could be a constant
-		  string.
-
-		  We make a copy of the BSONElement reader so we can read its
-		  value without advancing its state, in case we need to read it
-		  again in the constant code path.
-		*/
-		BSONElement opCopy(*pBsonOperand);
-		string value(opCopy.String());
-
-		/* check for a field path */
-		if (value.compare(0, 10, "$document.") != 0)
-		    goto ExpectConstant;  // assume plain string constant
-
-		/* if we got here, this is a field path expression */
-		string fieldPath(value.substr(10));
-		shared_ptr<Expression> pFieldExpr(
-		    ExpressionFieldPath::create(fieldPath));
-		pExpression->addOperand(pFieldExpr);
-		break;
-	    }
-	    
-	    case Object:
-	    {
-		shared_ptr<Expression> pSubExpression(
-		    parseDocument(pBsonOperand));
-		pExpression->addOperand(pSubExpression);
-		break;
-	    }
-
-	    default:
-	    ExpectConstant:
-	    {
-		shared_ptr<Expression> pOperand(
-		    ExpressionConstant::createFromBsonElement(pBsonOperand));
-		pExpression->addOperand(pOperand);
-		break;
-	    }
-
-	    } // switch(type)
-	}
-
+	parseExpressionOperands(pExpression, pBsonElement);
 	return pExpression;
+    }
+
+    void Pipeline::parseExpressionOperands(
+	shared_ptr<ExpressionNary> pExpression, BSONElement *pBsonElement)
+    {
+	/* add the operands to the operator expression */
+	BSONType elementType = pBsonElement->type();
+	if (elementType == Object)
+	{
+	    shared_ptr<Expression> pOperand(parseDocument(pBsonElement));
+	    pExpression->addOperand(pOperand);
+	}
+	else if (elementType == Array)
+	{
+	    /* multiple operands - an n-ary operator */
+	    vector<BSONElement> bsonArray(pBsonElement->Array());
+	    const size_t n = bsonArray.size();
+	    for(size_t i = 0; i < n; ++i)
+	    {
+		BSONElement *pBsonOperand = &bsonArray[i];
+		shared_ptr<Expression> pOperand(parseOperand(pBsonOperand));
+		pExpression->addOperand(pOperand);
+	    }
+	}
+	else /* assume its an atomic operand */
+	{
+	    shared_ptr<Expression> pOperand(parseOperand(pBsonElement));
+	    pExpression->addOperand(pOperand);
+	}
     }
 
     shared_ptr<Expression> Pipeline::parseDocument(BSONElement *pBsonElement)
     {
 	shared_ptr<Expression> pExpression; // the result
+	shared_ptr<ExpressionDocument> pExpressionDocument; // alt result
+	int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
 
 	/*
 	  We're looking at an operand or the value of a field.  This could be
@@ -277,21 +308,57 @@ namespace mongo
 	*/
 	BSONObj opObj(pBsonElement->Obj());
 
-	/* check the first field to see if it is an operator */
 	BSONObjIterator objIterator(opObj);
 	for(size_t fieldCount = 0; objIterator.more(); ++fieldCount)
 	{
 	    BSONElement subField(objIterator.next());
 	    string subFieldName(subField.fieldName());
 
-	    if (subFieldName.at(0) != '$')
-	    {
-		assert(false); // CW TODO virtual ExpressionDocument
-	    }
-	    else
+	    /* check the field to see if it is an operator */
+	    if (subFieldName.at(0) == '$')
 	    {
 		assert(fieldCount == 0); // CW TODO operator must be only field
 		pExpression = parseExpression(subFieldName.c_str(), &subField);
+		isOp = 1;
+	    }
+	    else /* it's just a regular field name */
+	    {
+		assert(isOp != 1); // can't accompany an operator
+
+		/* if it's out first time, create the document expression */
+		if (!pExpression.get())
+		{
+		    pExpressionDocument = ExpressionDocument::create();
+		    pExpression = pExpressionDocument;
+		}
+
+		BSONType subType = subField.type();
+		if (subType == Object)
+		{
+		    /* its a nested document */
+		    shared_ptr<Expression> pNested(parseDocument(&subField));
+		    pExpressionDocument->addField(subFieldName, pNested);
+		}
+		else if (subType == String)
+		{
+		    /* its a renamed field */
+		    shared_ptr<Expression> pPath(
+			ExpressionFieldPath::create(subField.String()));
+		    pExpressionDocument->addField(subFieldName, pPath);
+		}
+		else if (subType == NumberDouble)
+		{
+		    /* its an inclusion specification */
+		    shared_ptr<Expression> pPath(
+			ExpressionFieldPath::create(subFieldName));
+		    pExpressionDocument->addField(subFieldName, pPath);
+		}
+		else /* nothing else is allowed */
+		{
+		    assert(false); // CW TODO error
+		}
+
+		isOp = 0;
 	    }
 	}
 
@@ -398,8 +465,9 @@ namespace mongo
 		    if (pOpName[0] != '$')
 		    {
 			/* create a virtual document */
-			assert(false); // CW TODO unimplemented
-			// CW TODO ExpressionDocument?
+			shared_ptr<Expression> pDocExpr(
+			    parseDocument(&exprElement));
+			pProject->addField(outFieldName, pDocExpr, false);
 		    }
 		    else if (strcmp(pOpName, "$ravel") == 0)
 		    {
@@ -470,6 +538,31 @@ namespace mongo
 	return pFilter;
     }
 
+    struct GroupOpDesc
+    {
+	const char *pName;
+	shared_ptr<Accumulator> (*pFactory)(void);
+    };
+
+    static int GroupOpDescCmp(const void *pL, const void *pR)
+    {
+	return strcmp(((const GroupOpDesc *)pL)->pName,
+		      ((const GroupOpDesc *)pR)->pName);
+    }
+
+    /*
+      Keep these sorted alphabetically so we can bsearch() them using
+      GroupOpDescCmp() above.
+    */
+    static const GroupOpDesc GroupOpTable[] =
+    {
+//	{"$min", AccumulatorMin::create},
+//	{"$max", AccumulatorMax::create},
+	{"$sum", AccumulatorSum::create},
+    };
+
+    static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);
+
     shared_ptr<DocumentSource> Pipeline::setupGroup(
 	BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource)
     {
@@ -477,6 +570,7 @@ namespace mongo
 
 	shared_ptr<DocumentSourceGroup> pGroup(
 	    DocumentSourceGroup::create(pSource));
+	bool idSet = false;
 
 	BSONObj groupObj(pBsonElement->Obj());
 	BSONObjIterator groupIterator(groupObj);
@@ -487,10 +581,16 @@ namespace mongo
 
 	    if (strcmp(pFieldName, "_id") == 0)
 	    {
+		assert(!idSet); // CW TODO _id specified multiple times
+		assert(groupField.type() == Object); // CW TODO error message
+
 		/*
-		  Use the array of field paths to create the group-by key.
+		  Use the projection-like set of field paths to create the
+		  group-by key.
 		 */
-		assert(false); // unimplemented
+		shared_ptr<Expression> pId(parseDocument(&groupField));
+		pGroup->setIdExpression(pId);
+		idSet = true;
 	    }
 	    else
 	    {
@@ -498,9 +598,51 @@ namespace mongo
 		  Treat as a projection field with the additional ability to
 		  add aggregation operators.
 		*/
-		assert(false); // unimplemented
+		assert(*pFieldName != '$');
+                    // CW TODO error: field name can't be an operator
+		assert(groupField.type() == Object);
+		    // CW TODO error: must be an operator expression
+
+		BSONObj subField(groupField.Obj());
+		BSONObjIterator subIterator(subField);
+		size_t subCount = 0;
+		for(; subIterator.more(); ++subCount)
+		{
+		    BSONElement subElement(subIterator.next());
+
+		    /* look for the specified operator */
+		    GroupOpDesc key;
+		    key.pName = subElement.fieldName();
+		    const GroupOpDesc *pOp = (const GroupOpDesc *)bsearch(
+			&key, GroupOpTable, NGroupOp, sizeof(GroupOpDesc),
+			GroupOpDescCmp);
+
+		    assert(pOp); // CW TODO error: operator not found
+
+		    shared_ptr<Expression> pGroupExpr;
+
+		    BSONType elementType = subElement.type();
+		    if (elementType == Object)
+			pGroupExpr = parseDocument(&subElement);
+		    else if (elementType == Array)
+		    {
+			assert(false); // CW TODO group operators are unary
+		    }
+		    else /* assume its an atomic single operand */
+		    {
+			pGroupExpr = parseOperand(&subElement);
+		    }
+
+		    pGroup->addAccumulator(
+			pFieldName, pOp->pFactory, pGroupExpr); 
+		}
+
+		assert(subCount == 1);
+                    // CW TODO error: only one operator allowed
 	    }
 	}
+
+	assert(idSet); // CW TODO error: missing _id specification
 
 	return pGroup;
     }

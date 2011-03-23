@@ -30,7 +30,7 @@ namespace mongo
     {
     public:
 	/*
-	  Add an operand the the n-ary expression.
+	  Add an operand to the n-ary expression.
 
 	  @param pExpression the expression to add
 	*/

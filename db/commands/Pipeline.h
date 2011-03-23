@@ -28,6 +28,8 @@ namespace mongo
     class BSONObjBuilder;
     class DocumentSource;
     class Expression;
+    class ExpressionNary;
+    struct OpDesc; // local private struct
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
@@ -47,7 +49,7 @@ namespace mongo
 	Pipeline();
 
     private:
-	/* these statics could move elsewhere */
+	/* these statics should move elsewhere; probably a parser class */
 	static shared_ptr<DocumentSource> setupProject(
 	    BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
 	static shared_ptr<DocumentSource> setupFilter(
@@ -59,8 +61,11 @@ namespace mongo
 	    BSONElement *pBsonElement);
 	static shared_ptr<Expression> parseDocument(BSONElement *pBsonElement);
 
+	static shared_ptr<Expression> parseOperand(BSONElement *pBsonElement);
 	static shared_ptr<Expression> parseExpression(
 	    const char *pOpName, BSONElement *pBsonElement);
+	static void parseExpressionOperands(
+	    shared_ptr<ExpressionNary> pExpression, BSONElement *pBsonElement);
     };
 
 } // namespace mongo
