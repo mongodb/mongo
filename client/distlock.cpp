@@ -561,7 +561,7 @@ namespace mongo {
                     }
 
                 }
-                catch( UpdateNotTheSame& e ) {
+                catch( UpdateNotTheSame& ) {
                     // Ok to continue since we know we forced at least one lock document, and all lock docs
                     // are required for a lock to be held.
                     warning() << "lock forcing " << lockName << " inconsistent" << endl;
