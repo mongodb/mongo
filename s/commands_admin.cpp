@@ -253,19 +253,23 @@ namespace mongo {
                       << " to: " << s.toString() << endl;
 
                 // Locking enabled now...
-		DistributedLock lockSetup( configServer.getConnectionString(), dbname + "-movePrimary" );
-		dist_lock_try dlk;
+                DistributedLock lockSetup( configServer.getConnectionString(), dbname + "-movePrimary" );
+                dist_lock_try dlk;
 
-		// Distributed locking added.
-		try{
-		    dlk = dist_lock_try( &lockSetup , string("Moving primary shard of ") + dbname );
-		}
-		catch( LockException& e ){
-		    errmsg = string("Error locking distributed lock to move primary shard of ") + dbname + m_caused_by(e);
-		    warning() << errmsg << endl;
-		    return false;
-		}
+                // Distributed locking added.
+                try{
+                    dlk = dist_lock_try( &lockSetup , string("Moving primary shard of ") + dbname );
+                }
+                catch( LockException& e ){
+	                errmsg = string("error locking distributed lock to move primary shard of ") + dbname + m_caused_by(e);
+	                warning() << errmsg << endl;
+	                return false;
+                }
 
+                if ( ! dlk.got() ) {
+	                errmsg = (string)"metadata lock is already taken for moving " + dbname;
+	                return false;
+                }
 
                 ScopedDbConnection toconn( s.getConnString() );
 
