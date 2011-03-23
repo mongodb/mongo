@@ -1,27 +1,27 @@
 #!/bin/sh
 #
-# mongod       init file for starting up the MongoDB server
+# mongos       init file for starting up the MongoDB Shard server
 #
-# chkconfig:   - 21 83
+# chkconfig:   - 23 81
 # description: Starts and stops the MongDB daemon that handles all \
 #              database requests.
 
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-EXEC="/usr/bin/mongod"
-PROG="mongod"
-LOGFILE="/var/log/mongodb/mongod.log"
-OPTIONS=" -f /etc/mongod.conf"
-PIDFILE="/var/run/mongodb/mongod.pid"
-LOCKFILE="/var/lock/subsys/mongod"
+EXEC="/usr/bin/mongos"
+PROG="mongos"
+LOGFILE="/var/log/mongodb/mongos.log"
+OPTIONS=" -f /etc/mongos.conf"
+PIDFILE="/var/run/mongodb/mongos.pid"
+LOCKFILE="/var/lock/subsys/mongos"
 
 [ -e /etc/sysconfig/$PROG ] && . /etc/sysconfig/$PROG
 
 start() {
     [ -x $EXEC ] || exit 5
     echo -n $"Starting $PROG: "
-    daemon --pidfile=${PIDFILE} --user mongodb "$EXEC --quiet $OPTIONS run >> $LOGFILE 2>&1 &"
+    daemon --pidfile=${PIDFILE} --user mongodb "$EXEC --quiet $OPTIONS >> $LOGFILE 2>&1 &"
     retval=$?
     echo
     [ $retval -eq 0 ] && touch $LOCKFILE

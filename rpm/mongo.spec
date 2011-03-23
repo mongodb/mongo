@@ -53,10 +53,16 @@ scons --prefix=$RPM_BUILD_ROOT/usr install
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
+cp rpm/init.d-mongoc $RPM_BUILD_ROOT/etc/rc.d/init.d/mongoc
+chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongoc
 cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+cp rpm/init.d-mongos $RPM_BUILD_ROOT/etc/rc.d/init.d/mongos
+chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongos
 mkdir -p $RPM_BUILD_ROOT/etc
+cp rpm/mongoc.conf $RPM_BUILD_ROOT/etc/mongoc.conf
 cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
+cp rpm/mongos.conf $RPM_BUILD_ROOT/etc/mongos.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
@@ -119,19 +125,25 @@ fi
 
 %files server
 %defattr(-,root,root,-)
+%config(noreplace) /etc/mongoc.conf
 %config(noreplace) /etc/mongod.conf
+%config(noreplace) /etc/mongos.conf
 %{_bindir}/mongod
 %{_bindir}/mongos
 #%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
+/etc/rc.d/init.d/mongos
 /etc/rc.d/init.d/mongod
+/etc/rc.d/init.d/mongoc
 /etc/sysconfig/mongod
-#/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
 %changelog
+* Wed Mar 23 2011 Daris A Nevil <dnevil@intrusion.com>
+- Added Fedora-style init scripts and config files for mongos and the config server
+
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
 
