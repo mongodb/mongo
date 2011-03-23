@@ -699,15 +699,15 @@ namespace mongo {
             dist_lock_try dlk;
 
             try{
-            	dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
+                dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
             }
             catch( LockException& e ){
-            	errmsg = string("Error locking distributed lock for migration.") + m_caused_by(e);
-            	return false;
+                errmsg = (string)"error locking distributed lock for migration " + "migrate-" + min.toString() + m_caused_by(e);
+                return false;
             }
 
             if ( ! dlk.got() ) {
-                errmsg = "The collection's metadata lock is already taken.";
+                errmsg = (string)"the collection metadata could not be locked with lock " + "migrate-" + min.toString();
                 result.append( "who" , dlk.other() );
                 return false;
             }
