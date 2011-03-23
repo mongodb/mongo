@@ -673,7 +673,6 @@ namespace mongo {
                                       << m_error_message( e.what() ) );
                 }
 
-                // Locks on all servers are now set and safe until forcing
                 assert( !indUpdate.isEmpty() );
 
                 // Find max TS value
@@ -684,6 +683,8 @@ namespace mongo {
                 indDB.done();
 
             }
+
+            // Locks on all servers are now set and safe until forcing
 
             // No longer need to update currLock when exiting below here
 
