@@ -1114,7 +1114,7 @@ namespace mongo {
         dbexit( EXIT_ABRUPT );
     }
 
-    void abruptQuitWithAddrSignal( int signal, struct __siginfo *siginfo, void * ) {
+    void abruptQuitWithAddrSignal( int signal, siginfo_t *siginfo, void * ) {
         ostringstream oss;
         oss << "Invalid";
         if ( signal == SIGSEGV || signal == SIGBUS ) {
@@ -1150,6 +1150,7 @@ namespace mongo {
 
     void setupSignals( bool inFork ) {
         struct sigaction addrSignals;
+        memset( &addrSignals, 0, sizeof( struct sigaction ) );
         addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
         sigemptyset( &addrSignals.sa_mask );
         addrSignals.sa_flags = SA_SIGINFO;
