@@ -1114,6 +1114,19 @@ namespace mongo {
         dbexit( EXIT_ABRUPT );
     }
 
+    void abruptQuitWithAddrSignal( int signal, struct __siginfo *siginfo, void * ) {
+        ostringstream oss;
+        oss << "Invalid";
+        if ( signal == SIGSEGV || signal == SIGBUS ) {
+            oss << " access";
+        } else {
+            oss << " operation";   
+        }
+        oss << " at address: " << siginfo->si_addr << endl;
+        rawOut( oss.str() );
+        abruptQuit( signal );   
+    }
+        
     sigset_t asyncSignals;
     // The above signals will be processed by this thread only, in order to
     // ensure the db and log mutexes aren't held.
@@ -1136,10 +1149,17 @@ namespace mongo {
     void setupSignals_ignoreHelper( int signal ) {}
 
     void setupSignals( bool inFork ) {
-        assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
-        assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
+        struct sigaction addrSignals;
+        addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
+        sigemptyset( &addrSignals.sa_mask );
+        addrSignals.sa_flags = SA_SIGINFO;
+       
+        assert( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
+        assert( sigaction(SIGBUS, &addrSignals, 0) == 0 );
+        assert( sigaction(SIGILL, &addrSignals, 0) == 0 );
+        assert( sigaction(SIGFPE, &addrSignals, 0) == 0 );
+        
         assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
         assert( signal(SIGQUIT, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
 
