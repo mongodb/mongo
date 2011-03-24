@@ -16,7 +16,7 @@
  *	    bluebook/21/crc/node6.html#SECTION00060000000000000000
  */
 uint32_t
-__wt_cksum(void *chunk, uint32_t bytes)
+__wt_cksum(const void *chunk, uint32_t bytes)
 {
 	#if 0
 	/*
@@ -114,8 +114,8 @@ __wt_cksum(void *chunk, uint32_t bytes)
 		0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
 		0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 	};
+	const uint8_t *data;
 	uint32_t i, result;
-	uint8_t *data;
 
 	data = chunk;
 	result  = (uint32_t)*data++ << 24;
