@@ -145,14 +145,9 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	/*
 	 * We've got the right on-page WT_ROW structure (an exact match in the
 	 * case of a lookup, or the smallest key on the page less than or equal
-	 * to the specified key in the case of an insert).   If it's an insert,
-	 * we're done, return the information.   Otherwise, check to see if the
-	 * item was modified/deleted.
+	 * to the specified key in the case of an insert).
 	 */
-	switch (page->type) {
-	case WT_PAGE_ROW_LEAF:
-		if (LF_ISSET(WT_INSERT))
-			break;
+	if (!LF_ISSET(WT_INSERT)) {
 		if (cmp != 0)				/* No match */
 			goto notfound;
 							/* Deleted match. */
@@ -161,15 +156,6 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 				goto notfound;
 			session->srch_upd = upd;
 		}
-		break;
-	case WT_PAGE_ROW_INT:
-		/*
-		 * When returning internal pages, set the item's WT_UPDATE slot
-		 * if it exists, otherwise we're done.
-		 */
-		session->srch_upd = WT_ROW_UPDATE(page, rip);
-		break;
-	WT_ILLEGAL_FORMAT(session);
 	}
 
 	session->srch_page = page;
