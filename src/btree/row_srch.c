@@ -23,7 +23,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	WT_ROW_REF *rref;
 	WT_UPDATE *upd;
 	uint32_t base, indx, limit, write_gen;
-	int cmp, isleaf, ret;
+	int cmp, ret;
 
 	session->srch_page = NULL;			/* Return values. */
 	session->srch_ip = NULL;
@@ -48,7 +48,6 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
-			isleaf = 0;
 			for (base = 0,
 			    limit = page->indx_count; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
@@ -102,7 +101,6 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 				    (base == 0 ? 0 : base - 1);
 			break;
 		case WT_PAGE_ROW_LEAF:
-			isleaf = 1;
 			for (base = 0,
 			    limit = page->indx_count; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
@@ -126,12 +124,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 				base = indx + 1;
 				--limit;
 			}
-			break;
+			goto done;
 		}
-
-		/* If we've reached the leaf page, we're done. */
-		if (isleaf)
-			break;
 
 		/* rref references the subtree containing the record. */
 		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
@@ -142,7 +136,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		page = WT_ROW_REF_PAGE(rref);
 	}
 
-	/*
+done:	/*
 	 * We've got the right on-page WT_ROW structure (an exact match in the
 	 * case of a lookup, or the smallest key on the page less than or equal
 	 * to the specified key in the case of an insert).
