@@ -1325,6 +1325,7 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page, int discard)
 	WT_PAGE *new;
 	WT_REC_LIST *r;
 	WT_STATS *stats;
+	uint32_t state;
 
 	btree = session->btree;
 	r = &S2C(session)->cache->reclist;
@@ -1387,8 +1388,15 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page, int discard)
 		break;
 	}
 
-	return (__wt_rec_parent_update_dirty(session,
-	    page, new, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE));
+	/*
+	 * Newly created internal pages are merged back into their parent when
+	 * the parent is reconciled; newly split root pages can't be merged,
+	 * the new root page must eventually be written to disk.
+	 */
+	state = page->parent == NULL ?
+	    WT_REF_MEM : WT_REF_EVICTED | WT_REF_MERGE;
+	return (__wt_rec_parent_update_dirty(
+	    session, page, new, WT_ADDR_INVALID, 0, state));
 }
 
 /*
