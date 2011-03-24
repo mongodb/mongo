@@ -1167,17 +1167,6 @@ if release and ( ( darwin and force64 ) or linux64 ):
 if noshell:
     print( "not building shell" )
 elif not onlyServer:
-    weird = force64 and not windows and not solaris
-
-    if weird:
-        shellEnv["CFLAGS"].remove("-m64")
-        shellEnv["CXXFLAGS"].remove("-m64")
-        shellEnv["LINKFLAGS"].remove("-m64")
-        shellEnv["CPPPATH"].remove( "/usr/64/include" )
-        shellEnv["LIBPATH"].remove( "/usr/64/lib" )
-        shellEnv.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
-        shellEnv.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib" , "/usr/lib", "/usr/local/lib" ]) )
-
     l = shellEnv["LIBS"]
 
     removeIfInList( l , "pcre" )
@@ -1193,25 +1182,12 @@ elif not onlyServer:
     else:
         coreShellFiles.append( "third_party/linenoise/linenoise_win32.cpp" )
 
-    if weird:
-        shell32BitFiles = coreShellFiles
-        for f in allClientFiles + scriptingFiles + processInfoFiles + mmapFiles:
-            shell32BitFiles.append( "32bit/" + str( f ) )
-        shellEnv.VariantDir( "32bit" , "." , duplicate=1 )
-    else:
-        shellEnv.Prepend( LIBPATH=[ "." ] )
-
+    shellEnv.Prepend( LIBPATH=[ "." ] )
+        
     shellEnv = doConfigure( shellEnv , needPcre=False , shell=True )
 
-    if weird:
-        mongo = shellEnv.Program( "mongo" , shell32BitFiles )
-    else:
-        shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
-        mongo = shellEnv.Program( "mongo" , coreShellFiles )
-
-    if weird:
-        Depends( "32bit/shell/mongo.cpp" , "shell/mongo.cpp" )
-        Depends( "32bit/shell/mongo-server.cpp" , "shell/mongo-server.cpp" )
+    shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
+    mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
 
 #  ---- RUNNING TESTS ----
