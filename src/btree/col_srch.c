@@ -200,14 +200,6 @@ done:	/*
 			if (WT_CELL_TYPE(cipdata) == WT_CELL_DEL)
 				goto notfound;
 		break;
-	case WT_PAGE_COL_INT:
-		/*
-		 * When returning internal pages, set the item's WT_UPDATE slot
-		 * if it exists, otherwise we're done.
-		 */
-		session->srch_upd = WT_COL_UPDATE(page, cip);
-		break;
-	WT_ILLEGAL_FORMAT(session);
 	}
 
 	session->srch_page = page;
