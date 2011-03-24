@@ -1438,6 +1438,9 @@ namespace mongo {
     BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
     bool replAuthenticate(DBClientBase *conn) {
+        if( noauth ) {
+            return true;
+        }
         if( ! cc().isAdmin() ) {
             log() << "replauthenticate: requires admin permissions, failing\n";
             return false;
@@ -1458,7 +1461,7 @@ namespace mongo {
                         // try the first user in local
                         !Helpers::getSingleton("local.system.users", user) ) {
                     log() << "replauthenticate: no user in local.system.users to use for authentication\n";
-                    return noauth;
+                    return false;
                 }
             }
             u = user.getStringField("user");
