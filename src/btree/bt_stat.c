@@ -162,7 +162,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 	 * figure out if it will require the same space or not, especially if
 	 * there's Huffman encoding).
 	 */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_INDX_FOREACH(page, cip, i)
 		switch (WT_CELL_TYPE(WT_COL_PTR(page, cip))) {
 		case WT_CELL_DATA:
 			upd = WT_COL_UPDATE(page, cip);
@@ -179,9 +179,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 		case WT_CELL_DEL:
 			WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			break;
-		WT_ILLEGAL_FORMAT(session);
 		}
-	}
 	return (0);
 }
 
@@ -210,51 +208,33 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 	 * there's Huffman encoding).
 	 */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
-		if (WT_ROW_EMPTY_ISSET(rip)) {
-			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			continue;
-		}
-		switch (WT_CELL_TYPE(WT_ROW_PTR(page, rip))) {
-		case WT_CELL_DATA:
-			upd = WT_ROW_UPDATE(page, rip);
-			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-				continue;
-			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			break;
-		case WT_CELL_DATA_OVFL:
-			upd = WT_ROW_UPDATE(page, rip);
-			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-				continue;
-			WT_STAT_INCR(stats, ITEM_DATA_OVFL);
-			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			break;
-		WT_ILLEGAL_FORMAT(session);
-		}
+		if (!WT_ROW_EMPTY_ISSET(rip))
+			switch (WT_CELL_TYPE(WT_ROW_PTR(page, rip))) {
+			case WT_CELL_DATA:
+				upd = WT_ROW_UPDATE(page, rip);
+				if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+					continue;
+				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+				break;
+			case WT_CELL_DATA_OVFL:
+				upd = WT_ROW_UPDATE(page, rip);
+				if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+					continue;
+				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+				WT_STAT_INCR(stats, ITEM_DATA_OVFL);
+				break;
+			}
 
 		/*
 		 * If the data item wasn't deleted, count the key.
 		 *
 		 * If we have processed the key, we have lost the information as
-		 * to whether or not it's an overflow key -- we can figure out
-		 * if it's Huffman encoded by looking at the huffman key, but
-		 * that doesn't tell us if it's an overflow key or not.  To fix
-		 * this we'd have to maintain a reference to the on-page key and
-		 * check it, and I'm not willing to spend the additional pointer
-		 * in the WT_ROW structure.
+		 * to whether or not it's an overflow key.
 		 */
-		if (__wt_key_process(rip))
-			switch (WT_CELL_TYPE(rip->key)) {
-			case WT_CELL_KEY_OVFL:
-				WT_STAT_INCR(stats, ITEM_KEY_OVFL);
-				/* FALLTHROUGH */
-			case WT_CELL_KEY:
-				WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
-				break;
-			WT_ILLEGAL_FORMAT(session);
-			}
-		else
-			WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
-
+		WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
+		if (__wt_key_process(rip) &&
+		    WT_CELL_TYPE(rip->key) == WT_CELL_KEY_OVFL)
+			WT_STAT_INCR(stats, ITEM_KEY_OVFL);
 	}
 	return (0);
 }
