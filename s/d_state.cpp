@@ -642,7 +642,7 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , bool isWriteOp , string& errmsg ) {
+    bool shardVersionOk( const string& ns , string& errmsg ) {
         if ( ! shardingState.enabled() )
             return true;
 

@@ -176,7 +176,7 @@ namespace mongo {
             break;
         default: {
             string errmsg;
-            if ( ! shardVersionOk( _ns , lockState > 0 , errmsg ) ) {
+            if ( ! shardVersionOk( _ns , errmsg ) ) {
                 ostringstream os;
                 os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
                 msgassertedNoTrace( StaleConfigInContextCode , os.str().c_str() );
