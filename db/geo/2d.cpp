@@ -32,6 +32,7 @@
 namespace mongo {
 
 #if 0
+# define GEODEBUGGING
 # define GEODEBUG(x) cout << x << endl;
 # define GEODEBUGPRINT(x) PRINT(x)
     inline void PREFIXDEBUG(GeoHash prefix, const GeoConvert* g) {
@@ -866,6 +867,9 @@ namespace mongo {
             return ss.str();
         }
 
+        // Returns the min and max keys which bound a particular location.
+        // The only time these may be equal is when we actually equal the location
+        // itself, otherwise our expanding algorithm will fail.
         static bool initial( const IndexDetails& id , const Geo2dType * spec ,
                              BtreeLocation& min , BtreeLocation&  max ,
                              GeoHash start ,
@@ -874,15 +878,17 @@ namespace mongo {
             Ordering ordering = Ordering::make(spec->_order);
 
             min.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
-                                                  ordering , min.pos , min.found , minDiskLoc );
-            if (hopper) min.checkCur( found , hopper );
-            max = min;
+                                                  ordering , min.pos , min.found , minDiskLoc, -1 );
 
-            if ( min.bucket.isNull() || ( hopper && !(hopper->found()) ) ) {
-                min.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
-                                                      ordering , min.pos , min.found , minDiskLoc , -1 );
-                if (hopper) min.checkCur( found , hopper );
-            }
+            if (hopper) min.checkCur( found , hopper );
+
+            // TODO: Might be able to avoid doing a full lookup in some cases here,
+            // but would add complexity and we're hitting pretty much the exact same data.
+            // Cannot set this = min in general, however.
+            max.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
+                                                  ordering , max.pos , max.found , minDiskLoc, 1 );
+
+            if (hopper) max.checkCur( found , hopper );
 
             return ! min.bucket.isNull() || ! max.bucket.isNull();
         }
@@ -1505,6 +1511,17 @@ namespace mongo {
                 int started = _found;
                 while ( started == _found || _state == DONE ) {
                     GEODEBUG( "box prefix [" << _prefix << "]" );
+
+#ifdef GEODEBUGGING
+                    if( _prefix.constrains() ){
+                    	Box in( _g , GeoHash( _prefix ) );
+                    	log() << "current expand box : " << in.toString() << endl;
+                    }
+                    else{
+                    	log() << "max expand box." << endl;
+                    }
+#endif
+
                     while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
                     while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
 
