@@ -37,7 +37,7 @@ namespace mongo
 	 */
 	static shared_ptr<Accumulator> create();
 
-    protected:
+    private:
 	AccumulatorSum();
     };
 }

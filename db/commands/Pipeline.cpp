@@ -18,6 +18,7 @@
 #include "Pipeline.h"
 
 #include "../cursor.h"
+#include "../AccumulatorMinMax.h"
 #include "../AccumulatorSum.h"
 #include "../Document.h"
 #include "../DocumentSource.h"
@@ -28,6 +29,7 @@
 #include "../ExpressionAnd.h"
 #include "../ExpressionCompare.h"
 #include "../ExpressionConstant.h"
+#include "../ExpressionDivide.h"
 #include "../ExpressionDocument.h"
 #include "../ExpressionFieldPath.h"
 #include "../ExpressionOr.h"
@@ -238,7 +240,7 @@ namespace mongo
 //	{"$add", ExpressionAdd::create},
 	{"$and", ExpressionAnd::create},
 	{"$cmp", ExpressionCompare::createCmp},
-//	{"$divide", ExpressionDivide::create},
+	{"$divide", ExpressionDivide::create},
 	{"$eq", ExpressionCompare::createEq},
 	{"$gt", ExpressionCompare::createGt},
 	{"$gte", ExpressionCompare::createGte},
@@ -556,8 +558,8 @@ namespace mongo
     */
     static const GroupOpDesc GroupOpTable[] =
     {
-//	{"$min", AccumulatorMin::create},
-//	{"$max", AccumulatorMax::create},
+	{"$min", AccumulatorMinMax::createMin},
+	{"$max", AccumulatorMinMax::createMax},
 	{"$sum", AccumulatorSum::create},
     };
 

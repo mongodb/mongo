@@ -27,16 +27,23 @@ namespace mongo
 	assert(vpOperand.size() == 1);
 	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
-	int cmp = Value::compare(pValue, prhs) * sense;
-	if (cmp > 0)
+	/* if this is the first value, just use it */
+	if (!pValue.get())
 	    pValue = prhs;
+	else
+	{
+	    /* compare with the current value; swap if appropriate */
+	    int cmp = Value::compare(pValue, prhs) * sense;
+	    if (cmp > 0)
+		pValue = prhs;
+	}
 
 	return pValue;
     }
 
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
-	Accumulator(Value::getZero()),
-	sense(int theSense)
+	Accumulator(shared_ptr<Value>()),
+	sense(theSense)
     {
 	assert((sense == 1) || (sense == -1)); // CW TODO error
     }

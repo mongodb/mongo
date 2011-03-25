@@ -39,7 +39,7 @@ namespace mongo
 	static shared_ptr<Accumulator> createMax();
 
     private:
-	AccumulatorMinMax();
+	AccumulatorMinMax(int theSense);
 
 	int sense; /* 1 for min, -1 for max; used to "scale" comparison */
     };
