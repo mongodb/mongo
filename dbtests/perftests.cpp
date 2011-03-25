@@ -34,6 +34,9 @@
 #include "dbtests.h"
 #include "../db/dur_stats.h"
 #include "../util/checksum.h"
+#include "../util/version.h"
+
+using namespace bson;
 
 namespace PerfTests {
     typedef DBDirectClient DBClientType;
@@ -119,12 +122,65 @@ namespace PerfTests {
         /* override if your test output doesn't need that */
         virtual bool showDurStats() { return true; }
 
+        static DBClientConnection *conn;
+
     public:
         void say(unsigned long long n, int ms, string s) {
-          cout << "stats " << setw(33) << left << s << ' ' << setw(8) << /*rps*/n*1000/ms << ' ' << right << setw(6) << ms << "ms ";
-          if( showDurStats() )
-              cout << dur::stats.curr->_asCSV();
-          cout << endl;
+            unsigned long long rps = n*1000/ms;
+            cout << "stats " << setw(33) << left << s << ' ' << setw(8) << rps << ' ' << right << setw(6) << ms << "ms ";
+            if( showDurStats() )
+                cout << dur::stats.curr->_asCSV();
+            cout << endl;
+
+            /* if you want recording of the timings, place the password for the perf database 
+               in a "pstats.login" text file in the current directory for the test binary
+            */
+            if( exists("pstats.login") ) {
+                try {
+                    if( conn == 0 ) {
+                        MemoryMappedFile f;
+                        void *p = f.mapWithOptions("pstats.login", MongoFile::READONLY);
+                        string pwd((const char *)p, (unsigned) f.length());
+                        conn = new DBClientConnection(false, 0, 10);
+                        string err;
+                        if( conn->connect("mongo05.10gen.cust.cbici.net", err) ) { 
+                            if( !conn->auth("perf", "perf", pwd, err) ) { 
+                                cout << "info: authentication with stats before logging failed: " << err << endl;
+                                assert(false);
+                            }
+                        }
+                        else { 
+                            cout << err << " (to log pstats)" << endl;
+                        }
+                    }
+                    if( conn && !conn->isFailed() ) { 
+                        bob b;
+                        b.append("host", getHostName());
+                        b.appendTimeT("when", time(0));
+                        b.append("test", s);
+                        b.append("rps", (int) rps);
+                        b.append("millis", ms);
+                        b.appendBool("dur", cmdLine.dur);
+                        if( showDurStats() && cmdLine.dur ) 
+                            b.append("durStats", dur::stats.curr->_asObj());
+                        {
+                            bob inf;
+                            inf.append("version", versionString);
+                            if( sizeof(int*) == 4 ) inf.append("bits", 32);
+    #if defined(_WIN32)
+                            inf.append("os", "win");
+    #endif
+                            inf.append("git", gitVersion());
+                            inf.append("boost", BOOST_VERSION);
+                            b.append("info", inf.obj());
+                        }
+
+                        conn->insert("perf.pstats", b.obj());
+                    }
+                }
+                catch(...) { 
+                }
+            }
         }
         void run() {
             _ns = string("perftest.") + name();
@@ -187,6 +243,8 @@ namespace PerfTests {
             }
         }
     };
+
+    DBClientConnection *B::conn;
 
     unsigned dontOptimizeOutHopefully;
 
