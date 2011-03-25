@@ -419,7 +419,7 @@ namespace mongo {
 
     Matcher::Matcher( const Matcher &other, const BSONObj &key ) :
         where(0), constrainIndexKey_( key ), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
-        // do not include fields which would make keyMatch() false
+        // do not include field matches which would make keyMatch() false
         for( vector< ElementMatcher >::const_iterator i = other.basics.begin(); i != other.basics.end(); ++i ) {
             if ( key.hasField( i->toMatch.fieldName() ) ) {
                 switch( i->compareOp ) {
@@ -436,12 +436,14 @@ namespace mongo {
                             break;
                         }
                     }
+                    // Can't match an array to its first indexed element.
                     if ( !i->isNot && !inContainsArray ) {
                         basics.push_back( *i );
                     }
                     break;
                 }
                 default: {
+                    // Can't match an array to its first indexed element.
                     if ( !i->isNot && i->toMatch.type() != Array ) {
                         basics.push_back( *i );
                     }
