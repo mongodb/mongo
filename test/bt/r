@@ -1,5 +1,13 @@
 #! /bin/sh
 
+# FreeBSD's make's compatibility mode is on by default and off if "-j" is
+# specified.  In compatibility mode, FreeBSD's make treats all targets as
+# out of date once any source is out of date, rather than using timestamps.
+test "`uname -s`" = "FreeBSD" && {
+	MAKEFLAGS="-j 4"
+	export MAKEFLAGS
+}
+
 # Figure out what gcc warnings we want to use.
 set_warn_flags()
 {
