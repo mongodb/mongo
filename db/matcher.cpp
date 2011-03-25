@@ -210,10 +210,17 @@ namespace mongo {
         }
         case BSONObj::opALL:
             all = true;
-        case BSONObj::opIN:
+        case BSONObj::opIN: {
             uassert( 13276 , "$in needs an array" , fe.isABSONObj() );
             basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
+            BSONObjIterator i( fe.embeddedObject() );
+            while( i.more() ) {
+                if ( i.next().type() == Array ) {
+                    hasArray = true;
+                }
+            }
             break;
+        }
         case BSONObj::NIN:
             uassert( 13277 , "$nin needs an array" , fe.isABSONObj() );
             haveNeg = true;
@@ -421,6 +428,19 @@ namespace mongo {
                 case BSONObj::NE:
                 case BSONObj::NIN:
                     break;
+                case BSONObj::opIN: {
+                    bool inContainsArray = false;
+                    for( set<BSONElement,element_lt>::const_iterator j = i->myset->begin(); j != i->myset->end(); ++j ) {
+                        if ( j->type() == Array ) {
+                            inContainsArray = true;
+                            break;
+                        }
+                    }
+                    if ( !i->isNot && !inContainsArray ) {
+                        basics.push_back( *i );
+                    }
+                    break;
+                }
                 default: {
                     if ( !i->isNot && i->toMatch.type() != Array ) {
                         basics.push_back( *i );
@@ -732,11 +752,13 @@ namespace mongo {
 
             }
 
+            // match an entire array to itself
             if ( compareOp == BSONObj::Equality && e.woCompare( toMatch , false ) == 0 ) {
-                // match an entire array to itself
                 return 1;
             }
-
+            if ( compareOp == BSONObj::opIN && valuesMatch( e, toMatch, compareOp, em ) ) {
+             	return 1;   
+            }
         }
         else if ( e.eoo() ) {
             // 0 indicates "missing element"

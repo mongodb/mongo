@@ -149,7 +149,14 @@ namespace mongo {
                     regexes.push_back( FieldRange( ie, false, optimize ) );
                 }
                 else {
-                    vals.insert( ie );
+                    // A document array may be indexed by its first element, or
+                    // as a full array if it is embedded within another array.
+                    vals.insert( ie );                        
+                    if ( ie.type() == Array ) {
+                        if ( !ie.embeddedObject().firstElement().eoo() ) {
+                         	vals.insert( ie.embeddedObject().firstElement() );
+                        }
+                    }
                 }
             }
 
@@ -162,10 +169,11 @@ namespace mongo {
             return;
         }
 
+        // A document array may be indexed by its first element, or
+        // as a full array if it is embedded within another array.
         if ( e.type() == Array && e.getGtLtOp() == BSONObj::Equality ) {
 
             _intervals.push_back( FieldInterval(e) );
-
             const BSONElement& temp = e.embeddedObject().firstElement();
             if ( ! temp.eoo() ) {
                 if ( temp < e )
