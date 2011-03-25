@@ -29,9 +29,6 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	    (session, "discard addr %lu (type %s)",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
-	/* Never discard a dirty page. */
-	WT_ASSERT(session, !WT_PAGE_IS_MODIFIED(page));
-
 	/* We've got more space. */
 	WT_CACHE_PAGE_OUT(S2C(session)->cache, page->size);
 

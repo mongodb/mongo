@@ -24,7 +24,7 @@ static int  __wt_rec_row_merge(
 		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rle_expand_compare(const void *, const void *);
-static int  __wt_rec_finish(SESSION *, WT_PAGE *, int);
+static int  __wt_rec_wrapup(SESSION *, WT_PAGE *, int);
 
 static int __wt_split(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *, int);
@@ -79,63 +79,88 @@ __wt_block_free_ovfl(SESSION *session, WT_OVFL *ovfl)
 int
 __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 {
+	BTREE *btree;
+
+	btree = session->btree;
+
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile %s page addr %lu (type %s)",
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
-	/* Write dirty pages. */
-	if (WT_PAGE_IS_MODIFIED(page)) {
-		/*
-		 * Update the disk generation before reading the page.  The
-		 * workQ will update the write generation after it makes a
-		 * change, and if we have different disk and write generation
-		 * numbers, the page may be dirty.  We technically require a
-		 * flush (the eviction server might run on a different core
-		 * before a flush naturally occurred).
-		 */
-		WT_PAGE_DISK_WRITE(page);
-		WT_MEMORY_FLUSH;
-
-		switch (page->type) {
-		case WT_PAGE_COL_FIX:
-			WT_RET(__wt_rec_col_fix(session, page));
-			break;
-		case WT_PAGE_COL_RLE:
-			WT_RET(__wt_rec_col_rle(session, page));
-			break;
-		case WT_PAGE_COL_VAR:
-			WT_RET(__wt_rec_col_var(session, page));
-			break;
-		case WT_PAGE_COL_INT:
-			WT_RET(__wt_rec_col_int(session, page));
-			break;
-		case WT_PAGE_ROW_INT:
-			WT_RET(__wt_rec_row_int(session, page));
-			break;
-		case WT_PAGE_ROW_LEAF:
-			WT_RET(__wt_rec_row_leaf(session, page));
-			break;
-		WT_ILLEGAL_FORMAT(session);
-		}
-
-		/* Free the original disk blocks. */
-		WT_RET(__wt_block_free(session, page->addr, page->size));
-
-		/*
-		 * Resolve the WT_REC_LIST information: the page was: replaced
-		 * by a single new page, split into multiple new pages, or
-		 * deleted.
-		 */
-		WT_RET(__wt_rec_finish(session, page, discard));
-	} else
+	/*
+	 * Clean pages are simple: update the parent's state and optionally
+	 * discard the page.
+	 */
+	if (!WT_PAGE_IS_MODIFIED(page)) {
 		__wt_rec_parent_update_clean(page);
 
-	/* Optionaly discard the in-memory page. */
+		if (discard)
+			__wt_page_discard(session, page);
+		return (0);
+	}
+
+	/*
+	 * Update the disk generation before reading the page.  The workQ will
+	 * update the write generation after it makes a change, and if we have
+	 * different disk and write generation numbers, the page may be dirty.
+	 * We technically require a flush (the eviction server might run on a
+	 * different core before a flush naturally occurred).
+	 */
+	WT_PAGE_DISK_WRITE(page);
+	WT_MEMORY_FLUSH;
+
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		WT_RET(__wt_rec_col_fix(session, page));
+		break;
+	case WT_PAGE_COL_RLE:
+		WT_RET(__wt_rec_col_rle(session, page));
+		break;
+	case WT_PAGE_COL_VAR:
+		WT_RET(__wt_rec_col_var(session, page));
+		break;
+	case WT_PAGE_COL_INT:
+		WT_RET(__wt_rec_col_int(session, page));
+		break;
+	case WT_PAGE_ROW_INT:
+		WT_RET(__wt_rec_row_int(session, page));
+		break;
+	case WT_PAGE_ROW_LEAF:
+		WT_RET(__wt_rec_row_leaf(session, page));
+		break;
+	WT_ILLEGAL_FORMAT(session);
+	}
+
+	/* Resolve the WT_REC_LIST information and update the parent. */
+	WT_RET(__wt_rec_wrapup(session, page, discard));
+
+	/* Free any original disk blocks. */
+	if (page->addr != WT_ADDR_INVALID)
+		WT_RET(__wt_block_free(session, page->addr, page->size));
+
+	/* Optionally discard the in-memory page. */
 	if (discard)
 		__wt_page_discard(session, page);
 
-	return (0);
+	/*
+	 * Newly created internal pages are normally merged into their parents
+	 * when said parent is reconciled.  Newly split root pages can't be
+	 * merged (as they have no parent), the new root page must be written.
+	 *
+	 * We detect root splits when the tree's root page is flagged to merge.
+	 * We do the check here because I don't want the reconciliation code to
+	 * handle two pages at once, and we've just finished with the original
+	 * page.
+	 *
+	 * Reconcile the new root page explicitly rather than waiting for a
+	 * natural reconcile, because root splits result from walking the tree
+	 * during a sync or close call, and the new root page won't be visited
+	 * as part of that walk.
+	 */
+	return (
+	    FLD_ISSET(btree->root_page.state, WT_REF_MERGE) ?
+	    __wt_page_reconcile(session, btree->root_page.page, discard) : 0);
 }
 
 /*
@@ -1037,6 +1062,19 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	    session->btree->intlmin, &unused, &first_free, &space_avail));
 
 	/*
+	 * There are two kinds of row-store internal pages we walk: the first
+	 * is a page created in-memory, in which case there's no underlying
+	 * disk image.  The second is a page read from disk, in which case we
+	 * take the keys from the underlying disk image.
+	 */
+	if (page->XXdsk == NULL) {
+		WT_RET(__wt_rec_row_merge(
+		    session, page, &entries, &first_free, &space_avail));
+		return (__wt_split(
+		    session, &unused, &entries, &first_free, &space_avail, 1));
+	}
+
+	/*
 	 * We have to walk both the WT_ROW structures and the original page --
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 *
@@ -1315,25 +1353,24 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_finish  --
+ * __wt_rec_wrapup  --
  *	Resolve the WT_REC_LIST information.
  */
 static int
-__wt_rec_finish(SESSION *session, WT_PAGE *page, int discard)
+__wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 {
 	BTREE *btree;
 	WT_PAGE *new;
 	WT_REC_LIST *r;
 	WT_STATS *stats;
-	uint32_t state;
 
 	btree = session->btree;
 	r = &S2C(session)->cache->reclist;
 	stats = btree->stats;
 
 	/*
-	 * If all entries on the page were deleted, mark the page for eventual
-	 * merge.
+	 * If all entries on the page were deleted, mark the page to be merged
+	 * into its parent when the parent is evicted.
 	 */
 	if (r->list[0].deleted) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
@@ -1389,14 +1426,11 @@ __wt_rec_finish(SESSION *session, WT_PAGE *page, int discard)
 	}
 
 	/*
-	 * Newly created internal pages are merged back into their parent when
-	 * the parent is reconciled; newly split root pages can't be merged,
-	 * the new root page must eventually be written to disk.
+	 * Update the parent to reference the new internal page, and flag the
+	 * page to be merged into the parent when the parent is reconciled.
 	 */
-	state = page->parent == NULL ?
-	    WT_REF_MEM : WT_REF_EVICTED | WT_REF_MERGE;
-	return (__wt_rec_parent_update_dirty(
-	    session, page, new, WT_ADDR_INVALID, 0, state));
+	return (__wt_rec_parent_update_dirty(session,
+	    page, new, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE));
 }
 
 /*
@@ -1427,34 +1461,33 @@ __wt_rec_parent_update_dirty(SESSION *session,
 {
 	WT_REF *parent_ref;
 	BTREE *btree;
+	int is_root;
 
 	btree = session->btree;
+	is_root = page->parent == NULL ? 1 : 0;
 
 	/*
-	 * If we're reconciling the root page, update the descriptor record,
-	 * there's no parent.
+	 * Update the relevant parent WT_REF structure, flush memory, and then
+	 * update the state of the parent reference.  No further memory flush
+	 * needed, the state field is declared volatile.
 	 */
-	if (page->parent == NULL) {
-		btree->root_page.addr = addr;
-		btree->root_page.size = size;
-		return (__wt_desc_write(session));
-	}
-
-	/*
-	 * Update the relevant WT_REF structure, flush memory, and then update
-	 * the state of the parent reference.  No further memory flush needed,
-	 * the state field is declared volatile.
-	 */
-	parent_ref = page->parent_ref;
-	if (split != NULL)
-		parent_ref->page = split;
+	if (is_root)
+		parent_ref = &btree->root_page;
+	else
+		parent_ref = page->parent_ref;
 	parent_ref->addr = addr;
 	parent_ref->size = size;
+	if (split != NULL)
+		parent_ref->page = split;
 	WT_MEMORY_FLUSH;
 	parent_ref->state = state;
 
+	/* If we're reconciling the root page, update the descriptor record. */
+	if (is_root)
+		return (__wt_desc_write(session));
+
 	/*
-	 * Mark the parent page as dirty.
+	 * Mark the parent page dirty.
 	 *
 	 * There's no chance we need to flush this write -- the eviction thread
 	 * is the only thread that eventually cares if the page is dirty or not,
@@ -1501,6 +1534,7 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->size = 0;
 	page->indx_count = r->l_next;
 	page->type = WT_PAGE_ROW_INT;
+	WT_PAGE_SET_MODIFIED(page);
 
 	for (rref = page->u.row_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++rref, ++r_list, ++i) {
@@ -1558,6 +1592,7 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->size = 0;
 	page->indx_count = r->l_next;
 	page->type = WT_PAGE_COL_INT;
+	WT_PAGE_SET_MODIFIED(page);
 
 	for (cref = page->u.col_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++cref, ++r_list, ++i) {
