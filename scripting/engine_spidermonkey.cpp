@@ -39,7 +39,15 @@
 #define CHECKJSALLOC( newthing )                \
     massert( 13615 , "JS allocation failed, either memory leak or using too much memory" , newthing )
 
+#ifndef JS_ARGV_CALLEE
+#define JS_ARGV_CALLEE(argv) argv[-2]
+#endif
+
 namespace mongo {
+
+	typedef map<JSFunction*, NativeFunction> FuncMap;
+	typedef FuncMap::const_iterator FuncMapIter;
+	FuncMap _funcMap;
 
     class InvalidUTF8Exception : public UserException {
     public:
@@ -602,7 +610,7 @@ namespace mongo {
                 while ( i.more() ){
                     const BSONElement& e = i.next();
                     jsval v = toval( e );
-                    assert( JS_SetElement( _context , array , atoi(e.fieldName()) , &v ) );
+                    assert( JS_DefineElement( _context , array , atoi(e.fieldName()) , v, NULL, NULL, 0 ) );
                 }
 
                 return myarray;
@@ -917,10 +925,17 @@ namespace mongo {
     }
 
     JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
+
+		JSFunction* callee = JS_ValueToFunction(cx, JS_ARGV_CALLEE(argv));
+		FuncMapIter iter = _funcMap.find(callee);
+		
+		assert(iter!=_funcMap.end());
+		NativeFunction func = iter->second;
+
         Convertor c(cx);
 
-        NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
-        assert( func );
+//        NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
+//        assert( func );
 
         BSONObj a;
         if ( argc > 0 ) {
@@ -1045,7 +1060,7 @@ namespace mongo {
 
         assert( ! holder->_inResolve );
         holder->_inResolve = true;
-        assert( JS_SetProperty( cx , obj , s.c_str() , &val ) );
+		assert( JS_DefineProperty( cx , obj , s.c_str() , val, NULL, NULL, JSPROP_ENUMERATE ) );
         holder->_inResolve = false;
 
         if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ) {
@@ -1374,8 +1389,10 @@ namespace mongo {
         // immediately
         static JSBool _interrupt( JSContext *cx ) {
             TimeoutSpec &spec = *(TimeoutSpec *)( JS_GetContextPrivate( cx ) );
-            if ( ++spec.count % 1000 != 0 )
+            if ( ++spec.count<1000 )
                 return JS_TRUE;
+			else
+				spec.count = 0;
             const char * interrupt = ScriptEngine::checkInterrupt();
             if ( interrupt && interrupt[ 0 ] ) {
                 return JS_FALSE;
@@ -1383,7 +1400,7 @@ namespace mongo {
             if ( spec.timeout.ticks() == 0 ) {
                 return JS_TRUE;
             }
-            boost::posix_time::time_duration elapsed = ( boost::posix_time::microsec_clock::local_time() - spec.start );
+            boost::posix_time::time_duration elapsed = ( boost::posix_time::microsec_clock::universal_time() - spec.start );
             if ( elapsed < spec.timeout ) {
                 return JS_TRUE;
             }
@@ -1399,7 +1416,7 @@ namespace mongo {
             if ( timeoutMs != 0 || ScriptEngine::haveCheckInterruptCallback() ) {
                 TimeoutSpec *spec = new TimeoutSpec;
                 spec->timeout = boost::posix_time::millisec( timeoutMs );
-                spec->start = boost::posix_time::microsec_clock::local_time();
+                spec->start = boost::posix_time::microsec_clock::universal_time();
                 spec->count = 0;
                 JS_SetContextPrivate( _context, (void*)spec );
 #if defined(SM181) && !defined(XULRUNNER190)
@@ -1516,6 +1533,11 @@ namespace mongo {
 
         void injectNative( const char *field, NativeFunction func ) {
             smlock;
+
+			JSFunction* jsfunc = JS_DefineFunction(_context, _global, field, native_helper, 0, 0);
+			_funcMap[jsfunc] = func;
+
+			/*
             string name = field;
             _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
 
@@ -1523,6 +1545,7 @@ namespace mongo {
             code << field << "_" << " = { x : " << field << "_ }; ";
             code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
             exec( code.str() );
+			*/
         }
 
         virtual void gc() {
