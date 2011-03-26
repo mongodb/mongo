@@ -122,8 +122,8 @@ namespace mongo {
 
         double _configval( const IndexSpec* spec , const string& name , double def ) {
             BSONElement e = spec->info[name];
-            if ( e.isNumber() ){
-            	return e.numberDouble();
+            if ( e.isNumber() ) {
+                return e.numberDouble();
             }
             return def;
         }
@@ -159,7 +159,13 @@ namespace mongo {
             if ( geo.eoo() )
                 return;
 
-            BSONObjBuilder b(64);
+            //
+            // Grammar for location lookup:
+            // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc}|loc
+            // loc  ::= { <k1> : #, <k2> : # }|[#, #]|{}
+            //
+            // Empty locations are ignored, preserving single-location semantics
+            //
 
             if ( ! geo.isABSONObj() )
                 return;
@@ -168,40 +174,68 @@ namespace mongo {
             if ( embed.isEmpty() )
                 return;
 
-            _hash( embed ).append( b , "" );
+            // Differentiate between location arrays and locations
+            // by seeing if the first element value is a number
+            bool singleElement = embed.firstElement().isNumber();
 
-            // Go through all the other index keys
-            for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ){
+            BSONObjIterator oi(embed);
 
-            	// Get *all* fields for the index key
-				BSONElementSet eSet;
-				obj.getFieldsDotted( *i, eSet );
+            while( oi.more() ) {
+
+                BSONObj locObj;
+
+                if( singleElement ) locObj = embed;
+                else {
+                    BSONElement locElement = oi.next();
+
+                    uassert( 13654, str::stream() << "location object expected, location array not in correct format",
+                             locElement.isABSONObj() );
+
+                    locObj = locElement.embeddedObject();
+
+                    if( locObj.isEmpty() )
+                        continue;
+                }
+
+                BSONObjBuilder b(64);
+
+                _hash( locObj ).append( b , "" );
+
+                // Go through all the other index keys
+                for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ) {
+
+                    // Get *all* fields for the index key
+                    BSONElementSet eSet;
+                    obj.getFieldsDotted( *i, eSet );
 
 
-				if ( eSet.size() == 0 )
-					b.appendAs( _spec->missingField(), "" );
-				else if ( eSet.size() == 1 )
-					b.appendAs( *(eSet.begin()), "" );
-				else{
+                    if ( eSet.size() == 0 )
+                        b.appendAs( _spec->missingField(), "" );
+                    else if ( eSet.size() == 1 )
+                        b.appendAs( *(eSet.begin()), "" );
+                    else {
 
-					// If we have more than one key, store as an array of the objects
-					// TODO:  Store multiple keys?
+                        // If we have more than one key, store as an array of the objects
 
-					BSONArrayBuilder aBuilder;
+                        BSONArrayBuilder aBuilder;
 
-					for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ){
-						aBuilder.append( *ei );
-					}
+                        for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ) {
+                            aBuilder.append( *ei );
+                        }
 
-					BSONArray arr = aBuilder.arr();
+                        BSONArray arr = aBuilder.arr();
 
-					b.append( "", arr );
+                        b.append( "", arr );
 
-				}
+                    }
 
-			}
+                }
 
-            keys.insert( b.obj() );
+                keys.insert( b.obj() );
+
+                if( singleElement ) break;
+
+            }
         }
 
         GeoHash _tohash( const BSONElement& e ) const {
@@ -307,9 +341,9 @@ namespace mongo {
                 }
             }
             case Array:
-            	// Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
-            	// additional criteria
-            	if ( query.nFields() > 1 ) return USELESS;
+                // Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
+                // additional criteria
+                if ( query.nFields() > 1 ) return USELESS;
                 return HELPFUL;
             default:
                 return USELESS;
@@ -710,10 +744,13 @@ namespace mongo {
         }
 
         virtual void add( const KeyNode& node ) {
-            // when looking at other boxes, don't want to look at some object twice
-            pair<set<DiskLoc>::iterator,bool> seenBefore = _seen.insert( node.recordLoc );
+
+            GEODEBUG( "\t\t\t\t checking key " << node.key.toString() )
+
+            // when looking at other boxes, don't want to look at some key/object pair twice
+            pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.objdata(), node.recordLoc) );
             if ( ! seenBefore.second ) {
-                GEODEBUG( "\t\t\t\t already seen : " << node.recordLoc.obj()["_id"] );
+                GEODEBUG( "\t\t\t\t already seen : " << node.key.toString() << " with " << node.recordLoc.obj()["_id"] );
                 return;
             }
             _lookedAt++;
@@ -726,21 +763,34 @@ namespace mongo {
             }
             GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << d );
 
-            // matcher
-            MatchDetails details;
-            if ( _matcher.get() ) {
-                bool good = _matcher->matches( node.key , node.recordLoc , &details );
-                if ( details.loadedObject )
+            // Remember match results for each object
+            map<DiskLoc, bool>::iterator match = _matched.find( node.recordLoc );
+            if( match == _matched.end() ) {
+
+                // matcher
+                MatchDetails details;
+                if ( _matcher.get() ) {
+                    bool good = _matcher->matches( node.key , node.recordLoc , &details );
+                    if ( details.loadedObject )
+                        _objectsLoaded++;
+
+                    if ( ! good ) {
+                        GEODEBUG( "\t\t\t\t didn't match : " << node.recordLoc.obj()["_id"] );
+                        _matched[ node.recordLoc ] = false;
+                        return;
+                    }
+                }
+
+                _matched[ node.recordLoc ] = true;
+
+                if ( ! details.loadedObject ) // don't double count
                     _objectsLoaded++;
 
-                if ( ! good ) {
-                    GEODEBUG( "\t\t\t\t didn't match : " << node.recordLoc.obj()["_id"] );
-                    return;
-                }
             }
-
-            if ( ! details.loadedObject ) // dont double count
-                _objectsLoaded++;
+            else if( !((*match).second) ) {
+                GEODEBUG( "\t\t\t\t previously didn't match : " << node.recordLoc.obj()["_id"] );
+                return;
+            }
 
             addSpecific( node , d );
             _found++;
@@ -754,7 +804,8 @@ namespace mongo {
         }
 
         const Geo2dType * _g;
-        set<DiskLoc> _seen;
+        set< pair<const char*, DiskLoc> > _seen;
+        map<DiskLoc, bool> _matched;
         auto_ptr<CoveredIndexMatcher> _matcher;
 
         long long _lookedAt;
@@ -1513,12 +1564,12 @@ namespace mongo {
                     GEODEBUG( "box prefix [" << _prefix << "]" );
 
 #ifdef GEODEBUGGING
-                    if( _prefix.constrains() ){
-                    	Box in( _g , GeoHash( _prefix ) );
-                    	log() << "current expand box : " << in.toString() << endl;
+                    if( _prefix.constrains() ) {
+                        Box in( _g , GeoHash( _prefix ) );
+                        log() << "current expand box : " << in.toString() << endl;
                     }
-                    else{
-                    	log() << "max expand box." << endl;
+                    else {
+                        log() << "max expand box." << endl;
                     }
 #endif
 
