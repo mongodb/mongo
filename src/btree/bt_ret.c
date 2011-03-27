@@ -34,7 +34,7 @@ __wt_value_return(
 	page = session->srch_page;
 	cip = session->srch_ip;
 	rip = session->srch_ip;
-	upd = session->srch_upd;
+	upd = session->srch_vupdate;
 
 	/*
 	 * Handle the key item -- the key may be unchanged, in which case we

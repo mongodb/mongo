@@ -3,8 +3,6 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
  */
 
 #include <sys/types.h>
@@ -62,10 +60,11 @@ typedef struct {
 	u_int32_t c_cache;			/* Config values */
 	u_int32_t c_data_max;
 	u_int32_t c_data_min;
-	u_int32_t c_file_type;
 	u_int32_t c_delete_pct;
+	u_int32_t c_file_type;
 	u_int32_t c_huffman_data;
 	u_int32_t c_huffman_key;
+	u_int32_t c_insert_pct;
 	u_int32_t c_intl_node_max;
 	u_int32_t c_intl_node_min;
 	u_int32_t c_key_cnt;
@@ -86,7 +85,7 @@ extern GLOBAL g;
 
 int	 bdb_del(u_int64_t, int *);
 void	 bdb_insert(const void *, u_int32_t, const void *, u_int32_t);
-int	 bdb_put(u_int64_t, const void *, u_int32_t, int *);
+int	 bdb_put(const void *, uint32_t, const void *, u_int32_t, int *);
 int	 bdb_read(u_int64_t, void *, u_int32_t *, int *);
 void	 bdb_startup(void);
 void	 bdb_teardown(void);
@@ -99,7 +98,7 @@ void	 config_setup(void);
 void	 config_single(char *, int);
 void	 data_gen(void *, uint32_t *, int);
 char	*fname(const char *);
-void	 key_gen(void *, uint32_t *, u_int64_t);
+void	 key_gen(void *, uint32_t *, u_int64_t, int);
 void	 key_gen_setup(void);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);

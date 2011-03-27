@@ -420,9 +420,9 @@ flags['wiredtiger_conn_init'] = [
 # Internal routine flag declarations
 ###################################################
 flags['bt_search_col'] = [
-	'DATA_OVERWRITE' ]
+	'WRITE' ]
 flags['bt_search_key_row'] = [
-	'INSERT' ]
+	'WRITE' ]
 flags['bt_tree_walk'] = [
 	'WALK_CACHE' ]
 

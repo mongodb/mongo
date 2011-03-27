@@ -18,20 +18,20 @@ serial['cache_read'] = Serial(
 	 'void */parent_ref',
 	 'int/dsk_verify'])
 
+serial['insert'] = Serial(
+	'insert',
+	'WT_WORKQ_FUNC', '1',
+	['WT_PAGE */page',
+	 'uint32_t/write_gen',
+	 'WT_INSERT **/new_ins',
+	 'WT_INSERT **/srch_ins',
+	 'WT_INSERT */ins'])
+
 serial['key_build'] = Serial(
 	'key_build',
 	'WT_WORKQ_FUNC', '0',
 	['void */key_arg',
 	 'WT_BUF */tmp'])
-
-serial['item_update'] = Serial(
-	'item_update',
-	'WT_WORKQ_FUNC', '1',
-	['WT_PAGE */page',
-	 'uint32_t/write_gen',
-	 'uint32_t/slot',
-	 'WT_UPDATE **/new_upd',
-	 'WT_UPDATE */upd'])
 
 serial['rle_expand'] = Serial(
 	'rle_expand',
@@ -48,6 +48,15 @@ serial['rle_expand_update'] = Serial(
 	['WT_PAGE */page',
 	 'uint32_t/write_gen',
 	 'WT_RLE_EXPAND */exp',
+	 'WT_UPDATE */upd'])
+
+serial['update'] = Serial(
+	'update',
+	'WT_WORKQ_FUNC', '1',
+	['WT_PAGE */page',
+	 'uint32_t/write_gen',
+	 'WT_UPDATE **/new_upd',
+	 'WT_UPDATE **/srch_upd',
 	 'WT_UPDATE */upd'])
 
 # func_serial --

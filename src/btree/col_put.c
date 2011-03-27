@@ -43,8 +43,7 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
  *	Column-store delete and update.
  */
 static int
-__wt_col_update(
-    SESSION *session, uint64_t recno, WT_ITEM *value, int overwrite)
+__wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
 {
 	WT_PAGE *page;
 	WT_RLE_EXPAND *exp, **new_rleexp;
@@ -58,8 +57,7 @@ __wt_col_update(
 	upd = NULL;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_col_search(
-	    session, recno, overwrite ? WT_DATA_OVERWRITE : 0));
+	WT_RET(__wt_col_search(session, recno, is_write ? WT_WRITE : 0));
 	page = session->srch_page;
 
 	/*
@@ -86,22 +84,28 @@ __wt_col_update(
 	case WT_PAGE_COL_FIX:				/* #1 */
 	case WT_PAGE_COL_VAR:
 		/* Allocate an update array if necessary. */
-		if (page->u.col_leaf.upd == NULL)
-			WT_ERR(__wt_calloc_def(session,
-			    page->indx_count, &new_upd));
+		if (session->srch_upd == NULL) {
+			WT_ERR(__wt_calloc_def(
+			    session, page->indx_count, &new_upd));
+			/*
+			 * If there was no update array, the search function
+			 * could not have set the WT_UPDATE location.
+			 */
+			session->srch_upd = &new_upd[session->srch_slot];
+		}
 
-		/* Allocate a WT_UPDATE structure and fill it in. */
-		WT_ERR(__wt_update_alloc(session, &upd, value));
+		/* Allocate room for the new value from per-thread memory. */
+		WT_ERR(__wt_update_alloc(session, value, &upd));
 
-		/* workQ: schedule insert of the WT_UPDATE structure. */
-		__wt_item_update_serial(session, page, session->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, session->srch_ip),
-		    new_upd, upd, ret);
+		/* Schedule the workQ to insert the WT_UPDATE structure. */
+		__wt_update_serial(
+		    session, page, session->srch_write_gen,
+		    new_upd, session->srch_upd, upd, ret);
 		 break;
 	case WT_PAGE_COL_RLE:
-		if (session->srch_upd != NULL) {		/* #2 */
+		if (session->srch_vupdate != NULL) {	/* #2 */
 			/* Allocate a WT_UPDATE structure and fill it in. */
-			WT_ERR(__wt_update_alloc(session, &upd, value));
+			WT_ERR(__wt_update_alloc(session, value, &upd));
 
 			/* workQ: schedule insert of the WT_UPDATE structure. */
 			__wt_rle_expand_update_serial(session, page,
@@ -116,7 +120,7 @@ __wt_col_update(
 			    session, page->indx_count, &new_rleexp));
 
 		/* Allocate a WT_UPDATE structure and fill it in. */
-		WT_ERR(__wt_update_alloc(session, &upd, value));
+		WT_ERR(__wt_update_alloc(session, value, &upd));
 
 		/* Allocate a WT_RLE_EXPAND structure and fill it in. */
 		WT_ERR(__wt_calloc_def(session, 1, &exp));
@@ -135,7 +139,7 @@ __wt_col_update(
 err:		if (exp != NULL)
 			__wt_free(session, exp);
 		if (upd != NULL)
-			__wt_update_free(session, upd);
+			__wt_sb_free_error(session, upd->sb);
 	}
 
 	/* Free any allocated page expansion array unless the workQ used it. */

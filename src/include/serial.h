@@ -26,30 +26,30 @@ typedef struct {
 typedef struct {
 	WT_PAGE * page;
 	uint32_t write_gen;
-	uint32_t slot;
-	WT_UPDATE ** new_upd;
-	WT_UPDATE * upd;
-} __wt_item_update_args;
-#define	__wt_item_update_serial(\
-    session, _page, _write_gen, _slot, _new_upd, _upd, ret) do {\
-	__wt_item_update_args _args;\
+	WT_INSERT ** new_ins;
+	WT_INSERT ** srch_ins;
+	WT_INSERT * ins;
+} __wt_insert_args;
+#define	__wt_insert_serial(\
+    session, _page, _write_gen, _new_ins, _srch_ins, _ins, ret) do {\
+	__wt_insert_args _args;\
 	_args.page = _page;\
 	_args.write_gen = _write_gen;\
-	_args.slot = _slot;\
-	_args.new_upd = _new_upd;\
-	_args.upd = _upd;\
+	_args.new_ins = _new_ins;\
+	_args.srch_ins = _srch_ins;\
+	_args.ins = _ins;\
 	(ret) = __wt_session_serialize_func(session,\
-	    WT_WORKQ_FUNC, 1, __wt_item_update_serial_func, &_args);\
+	    WT_WORKQ_FUNC, 1, __wt_insert_serial_func, &_args);\
 } while (0)
-#define	__wt_item_update_unpack(\
-    session, _page, _write_gen, _slot, _new_upd, _upd) do {\
-	__wt_item_update_args *_args =\
-	    (__wt_item_update_args *)(session)->wq_args;\
+#define	__wt_insert_unpack(\
+    session, _page, _write_gen, _new_ins, _srch_ins, _ins) do {\
+	__wt_insert_args *_args =\
+	    (__wt_insert_args *)(session)->wq_args;\
 	_page = _args->page;\
 	_write_gen = _args->write_gen;\
-	_slot = _args->slot;\
-	_new_upd = _args->new_upd;\
-	_upd = _args->upd;\
+	_new_ins = _args->new_ins;\
+	_srch_ins = _args->srch_ins;\
+	_ins = _args->ins;\
 } while (0)
 
 typedef struct {
@@ -124,5 +124,34 @@ typedef struct {
 	_page = _args->page;\
 	_write_gen = _args->write_gen;\
 	_exp = _args->exp;\
+	_upd = _args->upd;\
+} while (0)
+
+typedef struct {
+	WT_PAGE * page;
+	uint32_t write_gen;
+	WT_UPDATE ** new_upd;
+	WT_UPDATE ** srch_upd;
+	WT_UPDATE * upd;
+} __wt_update_args;
+#define	__wt_update_serial(\
+    session, _page, _write_gen, _new_upd, _srch_upd, _upd, ret) do {\
+	__wt_update_args _args;\
+	_args.page = _page;\
+	_args.write_gen = _write_gen;\
+	_args.new_upd = _new_upd;\
+	_args.srch_upd = _srch_upd;\
+	_args.upd = _upd;\
+	(ret) = __wt_session_serialize_func(session,\
+	    WT_WORKQ_FUNC, 1, __wt_update_serial_func, &_args);\
+} while (0)
+#define	__wt_update_unpack(\
+    session, _page, _write_gen, _new_upd, _srch_upd, _upd) do {\
+	__wt_update_args *_args =\
+	    (__wt_update_args *)(session)->wq_args;\
+	_page = _args->page;\
+	_write_gen = _args->write_gen;\
+	_new_upd = _args->new_upd;\
+	_srch_upd = _args->srch_upd;\
 	_upd = _args->upd;\
 } while (0)

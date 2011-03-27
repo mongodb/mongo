@@ -258,9 +258,10 @@ static int
 __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	BTREE *btree;
-	WT_ITEM *key, *value, key_local, value_local;
 	WT_BUF *key_tmp, *value_tmp;
 	WT_CELL *cell;
+	WT_INSERT *ins;
+	WT_ITEM *key, *value, key_local, value_local;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -278,11 +279,24 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_CLEAR(key_local);
 	WT_CLEAR(value_local);
 
+	/*
+	 * Dump any K/V pairs inserted into the page before the first from-disk
+	 * key on the page.
+	 */
+	for (ins = WT_ROW_INSERT_SMALLEST(page); ins != NULL; ins = ins->next) {
+		upd = ins->upd;
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			continue;
+		dp->p(WT_INSERT_DATA(ins), ins->size, dp->stream);
+		dp->p(WT_UPDATE_DATA(upd), upd->size, dp->stream);
+	}
+
+	/* Dump the page's K/V pairs. */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
 		/* Check for deletion. */
 		upd = WT_ROW_UPDATE(page, rip);
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-			continue;
+			goto dump_insert;
 
 		/*
 		 * The key and value variables reference the items we will
@@ -301,14 +315,14 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		if (upd != NULL) {
 			dp->p(key->data, key->size, dp->stream);
 			dp->p(WT_UPDATE_DATA(upd), upd->size, dp->stream);
-			continue;
+			goto dump_insert;
 		}
 
 		/* Check for an empty item. */
 		if (WT_ROW_EMPTY_ISSET(rip)) {
 			dp->p(key->data, key->size, dp->stream);
 			dp->p(NULL, 0, dp->stream);
-			continue;
+			goto dump_insert;
 		}
 
 		/* Set cell to reference the value we'll dump. */
@@ -331,6 +345,16 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 		dp->p(key->data, key->size, dp->stream);
 		dp->p(value->data, value->size, dp->stream);
+
+dump_insert:	/* Dump inserted K/V pairs. */
+		for (ins =
+		    WT_ROW_INSERT(page, rip); ins != NULL; ins = ins->next) {
+			upd = ins->upd;
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				continue;
+			dp->p(WT_INSERT_DATA(ins), ins->size, dp->stream);
+			dp->p(WT_UPDATE_DATA(upd), upd->size, dp->stream);
+		}
 	}
 
 err:	/* Discard any space allocated to hold off-page key/value items. */

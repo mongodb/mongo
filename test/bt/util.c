@@ -3,8 +3,6 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
  */
 
 #include "wts.h"
@@ -19,11 +17,18 @@ fname(const char *name)
 }
 
 void
-key_gen(void *datap, uint32_t *sizep, u_int64_t keyno)
+key_gen(void *datap, uint32_t *sizep, u_int64_t keyno, int insert)
 {
-	/* The key always starts with a 10-digit string (the specified cnt). */
-	sprintf(g.key_gen_buf, "%010llu", keyno);
-	g.key_gen_buf[10] = '/';
+	int len;
+
+	/*
+	 * The key always starts with a 10-digit string (the specified cnt).
+	 * If the operation is an insert, append a unique trailing string.
+	 */
+	len = insert ?
+	    sprintf(g.key_gen_buf, "%010llu.%d", keyno, (int)MMRAND(0, 10)) :
+	    sprintf(g.key_gen_buf, "%010llu", keyno);
+	g.key_gen_buf[len] = '/';
 
 	*(void **)datap = g.key_gen_buf;
 	*sizep = g.key_rand_len[keyno %

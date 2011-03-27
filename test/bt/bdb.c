@@ -3,8 +3,6 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
  */
 
 #define	BDB	1			/* Berkeley DB header files */
@@ -24,7 +22,8 @@ bdb_startup(void)
 	assert(dbenv->set_cachesize(dbenv, 0, 50 * 1024 * 1024, 1) == 0);
 	assert(dbenv->open(dbenv, NULL,
 	    DB_CREATE |
-	    (g.c_delete_pct == 100 && g.c_write_pct == 100 ? 0 : DB_INIT_LOCK) |
+	    (g.c_delete_pct == 0 && g.c_insert_pct == 0 && g.c_write_pct == 0 ?
+	    0 : DB_INIT_LOCK) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
 
@@ -74,7 +73,7 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 	db = g.bdb_db;
 	*notfoundp = 0;
 
-	key_gen(&key.data, &key.size, keyno);
+	key_gen(&key.data, &key.size, keyno, 0);
 
 	if ((ret = db->get(db, NULL, &key, &data, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
@@ -91,8 +90,8 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 }
 
 int
-bdb_put(
-    u_int64_t keyno, const void *arg_data, u_int32_t arg_size, int *notfoundp)
+bdb_put(const void *arg_key, uint32_t arg_key_size,
+    const void *arg_data, u_int32_t arg_data_size, int *notfoundp)
 {
 	static DBT key, data;
 	DB *db;
@@ -101,9 +100,10 @@ bdb_put(
 	db = g.bdb_db;
 	*notfoundp = 0;
 
-	key_gen(&key.data, &key.size, keyno);
+	key.data = (void *)arg_key;
+	key.size = arg_key_size;
 	data.data = (void *)arg_data;
-	data.size = arg_size;
+	data.size = arg_data_size;
 
 	if ((ret = db->put(db, NULL, &key, &data, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {
@@ -128,7 +128,7 @@ bdb_del(u_int64_t keyno, int *notfoundp)
 	db = g.bdb_db;
 	*notfoundp = 0;
 
-	key_gen(&key.data, &key.size, keyno);
+	key_gen(&key.data, &key.size, keyno, 0);
 
 	if ((ret = db->del(db, NULL, &key, 0)) != 0) {
 		if (ret == DB_NOTFOUND) {

@@ -241,18 +241,19 @@ struct __session {
 
 	WT_PAGE	**hazard;		/* Hazard reference array */
 
-	WT_FLIST *flist;		/* Memory free list */
-
 	SESSION_BUFFER *sb;		/* Per-thread update buffer */
 	uint32_t update_alloc_size;	/* Allocation size */
 
 					/* Search return values: */
-	WT_PAGE   *srch_page;		/*    page */
-	uint32_t   srch_write_gen;	/*    page's write-generation */
-	void	  *srch_ip;		/*    WT_{COL,ROW} index */
-	WT_UPDATE *srch_upd;		/*    WT_UPD array index */
-					/* RLE column-store only: */
-	WT_RLE_EXPAND *srch_exp;	/*    WT_RLE_EXPAND array index */
+	WT_PAGE		*srch_page;	/* page */
+	uint32_t	 srch_write_gen;/* page's write-generation */
+	int		 srch_match;	/* an exact match */
+	void		*srch_ip;	/* WT_{COL,ROW} index */
+	WT_UPDATE	*srch_vupdate;	/* WT_UPDATE value node */
+	WT_INSERT      **srch_ins;	/* WT_INSERT insert node */
+	WT_UPDATE      **srch_upd;	/* WT_UPDATE insert node */
+	uint32_t	 srch_slot;	/* WT_INSERT/WT_UPDATE slot */
+	WT_RLE_EXPAND	*srch_exp;	/* WT_RLE_EXPAND node */
 
 	void (*msgcall)(const CONNECTION *, const char *);
 
@@ -446,11 +447,9 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
-#define	WT_DATA_OVERWRITE				0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
-#define	WT_INSERT					0x00000001
 #define	WT_MEMORY_CHECK					0x00000001
 #define	WT_OSWRITE					0x00000001
 #define	WT_PRINTABLES					0x00000001
@@ -466,6 +465,7 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_VERB_READ					0x00000001
 #define	WT_WALK_CACHE					0x00000001
 #define	WT_WORKQ_RUN					0x00000002
+#define	WT_WRITE					0x00000001
 
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001

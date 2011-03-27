@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 #include "btree.i"
 
+static inline int __wt_ins_search(SESSION *, WT_INSERT *, WT_ITEM *);
 static inline int __wt_key_build(SESSION *, WT_PAGE *, void *);
 
 /*
@@ -18,18 +19,22 @@ int
 __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 {
 	BTREE *btree;
+	WT_INSERT *ins;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
-	WT_UPDATE *upd;
-	uint32_t base, indx, limit, write_gen;
+	uint32_t base, indx, limit, slot, write_gen;
 	int cmp, ret;
 
 	session->srch_page = NULL;			/* Return values. */
-	session->srch_ip = NULL;
-	session->srch_upd = NULL;
-	session->srch_exp = NULL;
 	session->srch_write_gen = 0;
+	session->srch_match = 0;
+	session->srch_ip = NULL;
+	session->srch_vupdate = NULL;
+	session->srch_ins = NULL;
+	session->srch_upd = NULL;
+	session->srch_slot = UINT32_MAX;
+	session->srch_exp = NULL;
 
 	cmp = 0;
 	btree = session->btree;
@@ -39,122 +44,219 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	    "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
 	/* Search the tree. */
-	for (page = btree->root_page.page;;) {
-		/*
-		 * Copy the page's write generation value before reading
-		 * anything on the page.
-		 */
-		write_gen = page->write_gen;
-
-		switch (page->type) {
-		case WT_PAGE_ROW_INT:
-			for (base = 0,
-			    limit = page->indx_count; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
-				rref = page->u.row_int.t + indx;
-
-				/*
-				 * If the key is compressed or an overflow, it
-				 * may not have been instantiated yet.
-				 */
-				if (__wt_key_process(rref))
-					WT_ERR(__wt_key_build(
-					    session, page, rref));
-
-				/*
-				 * If we're about to compare an application key
-				 * with the 0th index on an internal page,
-				 * pretend the 0th index sorts less than any
-				 * application key.  This test is so we don't
-				 * have to update internal pages if the
-				 * application stores a new, "smallest" key in
-				 * the tree.
-				 *
-				 * For the record, we still maintain the key at
-				 * the 0th location because it means tree
-				 * verification and other code that processes a
-				 * level of the tree doesn't need to know about
-				 * this hack.
-				 */
-				if (indx != 0) {
-					cmp = btree->btree_compare(
-					    btree, key, (WT_ITEM *)rref);
-					if (cmp == 0)
-						break;
-					if (cmp < 0)
-						continue;
-				}
-				base = indx + 1;
-				--limit;
-			}
+	for (page = btree->root_page.page; page->type == WT_PAGE_ROW_INT;) {
+		/* Binary search of internal pages. */
+		for (base = 0,
+		    limit = page->indx_count; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			rref = page->u.row_int.t + indx;
 
 			/*
-			 * Reference the slot used for next step down the tree.
-			 * Base is the smallest index greater than key and may
-			 * be the 0th index or the (last + 1) indx.  If base is
-			 * not the 0th index (remember, the 0th index always
-			 * sorts less than any application key), decrement it
-			 * to the smallest index less than or equal to key.
+			 * If the key is compressed or an overflow, it may not
+			 * have been instantiated yet.
 			 */
-			if (cmp != 0)
-				rref = page->u.row_int.t +
-				    (base == 0 ? 0 : base - 1);
-			break;
-		case WT_PAGE_ROW_LEAF:
-			for (base = 0,
-			    limit = page->indx_count; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
-				rip = page->u.row_leaf.d + indx;
+			if (__wt_key_process(rref))
+				WT_ERR(__wt_key_build(
+				    session, page, rref));
 
-				/*
-				 * If the key is compressed or an overflow, it
-				 * may not have been instantiated yet.
-				 */
-				if (__wt_key_process(rip))
-					WT_ERR(
-					    __wt_key_build(session, page, rip));
-
+			/*
+			 * If we're about to compare an application key with the
+			 * 0th index on an internal page, pretend the 0th index
+			 * sorts less than any application key.  This test is so
+			 * we don't have to update internal pages if the
+			 * application stores a new, "smallest" key in the tree.
+			 *
+			 * For the record, we still maintain the key at the 0th
+			 * location because it means tree verification and other
+			 * code that processes a level of the tree doesn't need
+			 * to know about this hack.
+			 */
+			if (indx != 0) {
 				cmp = btree->btree_compare(
-				    btree, key, (WT_ITEM *)rip);
+				    btree, key, (WT_ITEM *)rref);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
 					continue;
-
-				base = indx + 1;
-				--limit;
 			}
-			goto done;
+			base = indx + 1;
+			--limit;
 		}
 
-		/* rref references the subtree containing the record. */
-		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
+		/*
+		 * Reference the slot used for next step down the tree.
+		 *
+		 * Base is the smallest index greater than key and may be the
+		 * (last + 1) index.  (Base cannot be the 0th index as the 0th
+		 * index always sorts less than any application key).  The slot
+		 * for descent is the one before base.
+		 */
+		if (cmp != 0)
+			rref = page->u.row_int.t + (base - 1);
 
 		/* Swap the parent page for the child page. */
+		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
 		if (page != btree->root_page.page)
 			__wt_hazard_clear(session, page);
 		page = WT_ROW_REF_PAGE(rref);
 	}
 
-done:	/*
-	 * We've got the right on-page WT_ROW structure (an exact match in the
-	 * case of a lookup, or the smallest key on the page less than or equal
-	 * to the specified key in the case of an insert).
+	/*
+	 * Copy the page's write generation value before reading anything on
+	 * the page.
 	 */
-	if (!LF_ISSET(WT_INSERT)) {
-		if (cmp != 0)				/* No match */
-			goto notfound;
-							/* Deleted match. */
-		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
-				goto notfound;
-			session->srch_upd = upd;
-		}
+	write_gen = page->write_gen;
+
+	/*
+	 * There are 4 pieces of information regarding updates and inserts
+	 * that are set in the next few lines of code.
+	 *
+	 * For an update, we set session->srch_upd and session->srch_slot.
+	 * For an insert, we set session->srch_ins and session->srch_slot.
+	 * For an exact match, we set session->srch_vupdate.
+	 *
+	 * The session->srch_slot only serves a single purpose, indicating the
+	 * slot in the WT_ROW array where a new update/insert entry goes when
+	 * entering the first such item for the page (that is, the slot to use
+	 * when allocating the update/insert array itself).
+	 *
+	 * In other words, we would like to pass back to our caller a pointer
+	 * to a pointer to an update/insert structure, in front of which our
+	 * caller will insert a new update or insert structure.  The problem is
+	 * if the update/insert arrays don't yet exist, in which case we have
+	 * to return the WT_ROW array slot information so our caller can first
+	 * allocate the update/insert array, and then figure out which slot to
+	 * use.
+	 *
+	 * Do a binary search of the leaf page.
+	 */
+	for (base = 0, limit = page->indx_count; limit != 0; limit >>= 1) {
+		indx = base + (limit >> 1);
+		rip = page->u.row_leaf.d + indx;
+
+		/*
+		 * If the key is compressed or an overflow, it may not have
+		 * been instantiated yet.
+		 */
+		if (__wt_key_process(rip))
+			WT_ERR(__wt_key_build(session, page, rip));
+
+		cmp = btree->btree_compare(btree, key, (WT_ITEM *)rip);
+		if (cmp == 0)
+			break;
+		if (cmp < 0)
+			continue;
+
+		base = indx + 1;
+		--limit;
 	}
 
+	/*
+	 * If we found a match in the page on-disk information, set srch_upd
+	 * or srch_slot.
+	 */
+	if (cmp == 0) {
+		slot = WT_ROW_INDX_SLOT(page, rip);
+		if (page->u.row_leaf.upd == NULL)
+			session->srch_slot = slot;
+		else {
+			session->srch_upd = &page->u.row_leaf.upd[slot];
+			session->srch_vupdate = page->u.row_leaf.upd[slot];
+		}
+		goto done;
+	}
+
+	/*
+	 * No match found.
+	 *
+	 * Base is the smallest index greater than key and may be the 0th index
+	 * or the (last + 1) index.  Set the WT_ROW reference to be the largest
+	 * index less than the key if that's possible (if base is the 0th index
+	 * it means the application is inserting a key before any key found on
+	 * the page).
+	 */
+	rip = page->u.row_leaf.d;
+	if (base != 0)
+		rip += base - 1;
+
+	/*
+	 * Figure out which insert chain to search.  If inserting a key smaller
+	 * than any from-disk key found on the page, use the extra slot of the
+	 * insert array, otherwise use the usual one-to-one mapping.
+	 */
+	ins = base == 0 ?
+	    WT_ROW_INSERT_SMALLEST(page) : WT_ROW_INSERT(page, rip);
+
+	/*
+	 * If there's no insert chain to search, we're done.
+	 *
+	 * If not doing an insert, we've failed.
+	 * If doing an insert, set srch_ins and srch_slot and return.
+	 */
+	if (ins == NULL) {
+		if (!LF_ISSET(WT_WRITE))
+			goto notfound;
+
+		if (page->u.row_leaf.ins == NULL) {
+			if (base == 0)
+				session->srch_slot = page->indx_count;
+			else
+				session->srch_slot =
+				    WT_ROW_INDX_SLOT(page, rip);
+			goto done;
+		}
+	} else {
+		/*
+		 * Search the insert tree for a match.  If we find a match the
+		 * called function will set the session->search_upd field for
+		 * us, no further work to be done.
+		 */
+		if ((cmp = __wt_ins_search(session, ins, key)) == 0)
+			goto done;
+
+		/*
+		 * No match found.
+		 *
+		 * If not doing an insert, we've failed.
+		 */
+		if (!LF_ISSET(WT_WRITE))
+			goto notfound;
+
+		/*
+		 * If __wt_ins_search() found a WT_INSERT node that sorted less
+		 * than our key, it set session->srch_ins to reference a memory
+		 * location for the insert of our item.  If that's not the case,
+		 * then our item must be a new item at the head of the list.
+		 */
+		if (session->srch_ins != NULL)
+			goto done;
+	}
+
+	/*
+	 * It's an insert, and we either didn't find an insert list to search,
+	 * or we searched it only to find our new item will be inserted at the
+	 * head of the list.  Set session->srch_ins appropriately.
+	 */
+	if (base == 0)
+		session->srch_ins = &page->u.row_leaf.ins[page->indx_count];
+	else
+		session->srch_ins =
+		    &page->u.row_leaf.ins[WT_ROW_INDX_SLOT(page, rip)];
+
+done:	/*
+	 * If we found a match and it's not an insert operation, review any
+	 * updates to the key's value: a deleted object returns not-found.
+	 */
+	if (!LF_ISSET(WT_WRITE) &&
+	    session->srch_upd != NULL &&
+	    *session->srch_upd != NULL &&
+	    WT_UPDATE_DELETED_ISSET(*session->srch_upd))
+		goto notfound;
+
 	session->srch_page = page;
-	session->srch_ip = rip;
 	session->srch_write_gen = write_gen;
+	session->srch_match = cmp == 0 ? 1 : 0;
+	session->srch_ip = rip;
 	return (0);
 
 notfound:
@@ -165,10 +267,44 @@ err:	WT_PAGE_OUT(session, page);
 }
 
 /*
+ * __wt_ins_search --
+ *	Search the page's insert tree.
+ */
+static inline int
+__wt_ins_search(SESSION *session, WT_INSERT *ins, WT_ITEM *key)
+{
+	WT_ITEM insert_key;
+	BTREE *btree;
+	int cmp;
+
+	btree = session->btree;
+
+	/*
+	 * The insert list is a sorted, forward-linked list -- on average, we
+	 * have to search half of it.
+	 */
+	for (; ins != NULL; ins = ins->next) {
+		insert_key.data = WT_INSERT_DATA(ins);
+		insert_key.size = ins->size;
+		cmp = btree->btree_compare(btree, key, &insert_key);
+		if (cmp == 0) {
+			session->srch_ins = NULL;
+			session->srch_vupdate = ins->upd;
+			session->srch_upd = &ins->upd;
+			return (0);
+		}
+		if (cmp < 0)
+			break;
+		session->srch_ins = &ins->next;
+	}
+	return (1);
+}
+
+/*
  * __wt_key_build --
  *	Instantiate an overflow or compressed key into a WT_ROW structure.
  */
-static int
+static inline int
 __wt_key_build(SESSION *session, WT_PAGE *page, void *key_arg)
 {
 	WT_BUF tmp;

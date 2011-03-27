@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 #include "btree.i"
 
+static void __wt_discard_insert(SESSION *, WT_INSERT **, uint32_t);
 static void __wt_discard_page_col_fix(SESSION *, WT_PAGE *);
 static void __wt_discard_page_col_int(SESSION *, WT_PAGE *);
 static void __wt_discard_page_col_rle(SESSION *, WT_PAGE *);
@@ -17,6 +18,7 @@ static void __wt_discard_page_row_leaf(SESSION *, WT_PAGE *);
 static void __wt_discard_relexp(SESSION *, WT_PAGE *);
 static void __wt_discard_update(SESSION *, WT_UPDATE **, uint32_t);
 static void __wt_discard_update_list(SESSION *, WT_UPDATE *);
+static inline void __wt_sb_free(SESSION *, SESSION_BUFFER *);
 
 /*
  * __wt_page_discard --
@@ -166,9 +168,39 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 			__wt_free(session, rip->key);
 	__wt_free(session, page->u.row_leaf.d);
 
+	if (page->u.row_leaf.ins != NULL)
+		__wt_discard_insert(
+		    session, page->u.row_leaf.ins, page->indx_count);
+
 	if (page->u.row_leaf.upd != NULL)
 		__wt_discard_update(
 		    session, page->u.row_leaf.upd, page->indx_count);
+}
+
+/*
+ * __wt_discard_insert --
+ *	Discard the insert array.
+ */
+static void
+__wt_discard_insert(
+    SESSION *session, WT_INSERT **insert_head, uint32_t indx_count)
+{
+	WT_INSERT **insp, *ins, *next;
+
+	/*
+	 * For each non-NULL slot in the page's array of inserts, free the
+	 * linked list anchored in that slot.
+	 */
+	for (insp = insert_head; indx_count > 0; --indx_count, ++insp)
+		for (ins = *insp; ins != NULL; ins = next) {
+			__wt_discard_update_list(session, ins->upd);
+
+			next = ins->next;
+			__wt_sb_free(session, ins->sb);
+		}
+
+	/* Free the page's array of inserts. */
+	__wt_free(session, insert_head);
 }
 
 /*
@@ -234,15 +266,22 @@ __wt_discard_relexp(SESSION *session, WT_PAGE *page)
 static void
 __wt_discard_update_list(SESSION *session, WT_UPDATE *upd)
 {
-	WT_UPDATE *a;
-	SESSION_BUFFER *sb;
+	WT_UPDATE *next;
 
 	do {
-		a = upd->next;
+		next = upd->next;
+		__wt_sb_free(session, upd->sb);
+	} while ((upd = next) != NULL);
+}
 
-		sb = upd->sb;
-		WT_ASSERT(session, sb->out < sb->in);
-		if (++sb->out == sb->in)
-			__wt_free(session, sb);
-	} while ((upd = a) != NULL);
+/*
+ * __wt_sb_free --
+ *	Free a chunk of memory from a per-SESSION buffer.
+ */
+static inline void
+__wt_sb_free(SESSION *session, SESSION_BUFFER *sb)
+{
+	WT_ASSERT(session, sb->out < sb->in);
+	if (++sb->out == sb->in)
+		__wt_free(session, sb);
 }

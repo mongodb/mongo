@@ -2,10 +2,11 @@
 # cache
 # data_max
 # data_min
-# file_type
 # delete_pct
+# file_type
 # huffman_data
 # huffman_key
+# insert_pct
 # intl_node_max
 # intl_node_min
 # key_max

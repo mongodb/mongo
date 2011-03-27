@@ -21,66 +21,35 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	WT_RLE_EXPAND *exp;
 	WT_UPDATE *upd;
 	uint64_t record_cnt, start_recno;
-	uint32_t base, i, indx, limit, write_gen;
+	uint32_t base, i, indx, limit, slot, write_gen;
 	int ret;
 	void *cipdata;
 
 	session->srch_page = NULL;			/* Return values. */
-	session->srch_ip = NULL;
-	session->srch_upd = NULL;
-	session->srch_exp = NULL;
 	session->srch_write_gen = 0;
+	session->srch_match = 0;
+	session->srch_ip = NULL;
+	session->srch_vupdate = NULL;
+	session->srch_ins = NULL;
+	session->srch_upd = NULL;
+	session->srch_slot = UINT32_MAX;
+	session->srch_exp = NULL;
 
 	btree = session->btree;
 
 	WT_DB_FCHK(btree, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
 
 	/* Search the tree. */
-	for (page = btree->root_page.page;;) {
+	for (page = btree->root_page.page; page->type == WT_PAGE_COL_INT;) {
 		/*
-		 * Copy the page's write generation value before reading
-		 * anything on the page.
-		 */
-		write_gen = page->write_gen;
-
-		/* Walk the page looking for the record. */
-		switch (page->type) {
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_VAR:
-			cip = page->u.col_leaf.d +
-			    (recno - page->u.col_leaf.recno);
-			cipdata = WT_COL_PTR(page, cip);
-			goto done;
-		case WT_PAGE_COL_RLE:
-			/*
-			 * Walk the page, counting records -- do the record
-			 * count calculation in a funny way to avoid overflow.
-			 */
-			record_cnt = recno - page->u.col_leaf.recno;
-			WT_COL_INDX_FOREACH(page, cip, i) {
-				cipdata = WT_COL_PTR(page, cip);
-				if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata))
-					break;
-				record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
-			}
-			goto done;
-		}
-
-		/*
-		 * Binary search of the page, looking for the right starting
-		 * record.
+		 * Binary search of internal pages, looking for the right
+		 * starting record.
 		 */
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			cref = page->u.col_int.t + indx;
 
-			/*
-			 * Like a row-store page, the 0th key sorts less than
-			 * any application key.  Don't bother skipping the 0th
-			 * index the way we do in the row-store binary search,
-			 * key comparisons are cheap here.
-			 */
 			start_recno = cref->recno;
 			if (recno == start_recno)
 				break;
@@ -94,52 +63,79 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		 * Reference the slot used for next step down the tree.
 		 *
 		 * Base is the smallest index greater than recno and may be the
-		 * 0th index or the (last + 1) indx.  If base is not the 0th
-		 * index (remember, the 0th index always sorts less than any
-		 * application recno), decrement it to the smallest index less
-		 * than or equal to recno.
+		 * (last + 1) index.  The slot for descent is the one before
+		 * base.
 		 */
 		if (recno != start_recno)
-			cref = page->u.col_int.t + (base == 0 ? 0 : base - 1);
-
-		/* cip references the subtree containing the record. */
-		WT_ERR(__wt_page_in(session, page, &cref->ref, 0));
+			cref = page->u.col_int.t + base - 1;
 
 		/* Swap the parent page for the child page. */
+		WT_ERR(__wt_page_in(session, page, &cref->ref, 0));
 		if (page != btree->root_page.page)
 			__wt_hazard_clear(session, page);
 		page = WT_COL_REF_PAGE(cref);
 	}
 
-done:	/*
-	 * We've found the right on-page WT_COL structure, but that's only the
-	 * first step; the record may have been updated since reading the page
-	 * into the cache.
+	/*
+	 * Copy the page's write generation value before reading anything on
+	 * the page.
+	 */
+	write_gen = page->write_gen;
+
+	/* Search the leaf page. */
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		cip = page->u.col_leaf.d + (recno - page->u.col_leaf.recno);
+		cipdata = WT_COL_PTR(page, cip);
+		break;
+	case WT_PAGE_COL_RLE:
+		/*
+		 * Walk the page, counting records -- do the record count
+		 * calculation in a funny way to avoid overflow.
+		 */
+		record_cnt = recno - page->u.col_leaf.recno;
+		WT_COL_INDX_FOREACH(page, cip, i) {
+			cipdata = WT_COL_PTR(page, cip);
+			if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata))
+				break;
+			record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
+		}
+		break;
+	}
+
+	/*
+	 * We have the right WT_COL slot: if it's a write, set up the return
+	 * information in session->{srch_upd,slot}.  If it's a read, set up
+	 * the return information in session->srch_vupdate.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		/* Find the item's WT_UPDATE slot if it exists. */
-		upd = WT_COL_UPDATE(page, cip);
-
-		/*
-		 * If overwriting an existing data item, we don't care if the
-		 * item was previously deleted, return the gathered information.
-		 */
-		if (LF_ISSET(WT_DATA_OVERWRITE)) {
-			session->srch_upd = upd;
-			break;
+	case WT_PAGE_COL_VAR:
+		slot = WT_COL_INDX_SLOT(page, cip);
+		if (page->u.col_leaf.upd == NULL)
+			session->srch_slot = slot;
+		else {
+			session->srch_upd = &page->u.col_leaf.upd[slot];
+			session->srch_vupdate = page->u.col_leaf.upd[slot];
 		}
 
 		/*
-		 * Otherwise, check for deletion, in either the WT_UPDATE slot
-		 * or in the original data.
+		 * If writing data, we're done, we don't care if the item was
+		 * deleted or not.
 		 */
-		if (upd != NULL) {
+		if (LF_ISSET(WT_WRITE))
+			break;
+
+		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				goto notfound;
-			session->srch_upd = upd;
-		} else
+			session->srch_vupdate = upd;
+		} else if (page->type == WT_PAGE_COL_FIX) {
 			if (WT_FIX_DELETE_ISSET(cipdata))
+				goto notfound;
+		} else
+			if (WT_CELL_TYPE(cipdata) == WT_CELL_DEL)
 				goto notfound;
 		break;
 	case WT_PAGE_COL_RLE:
@@ -153,10 +149,10 @@ done:	/*
 		 * If overwriting an existing data item, we don't care if the
 		 * item was previously deleted, return the gathered information.
 		 */
-		if (LF_ISSET(WT_DATA_OVERWRITE)) {
+		if (LF_ISSET(WT_WRITE)) {
 			if (exp != NULL) {
 				session->srch_exp = exp;
-				session->srch_upd = exp->upd;
+				session->srch_vupdate = exp->upd;
 			}
 			break;
 		}
@@ -169,42 +165,16 @@ done:	/*
 			if (WT_UPDATE_DELETED_ISSET(exp->upd))
 				goto notfound;
 			session->srch_exp = exp;
-			session->srch_upd = exp->upd;
+			session->srch_vupdate = exp->upd;
 		} else
 			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
-				goto notfound;
-		break;
-	case WT_PAGE_COL_VAR:
-		/* Find the item's WT_UPDATE slot if it exists. */
-		upd = WT_COL_UPDATE(page, cip);
-
-		/*
-		 * If overwriting an existing data item, we don't care if the
-		 * item was previously deleted, return the gathered information.
-		 */
-		if (LF_ISSET(WT_DATA_OVERWRITE)) {
-			session->srch_upd = upd;
-			break;
-		}
-
-		/*
-		 * Otherwise, check for deletion, in either the WT_UPDATE slot
-		 * or in the original data.
-		 */
-		if (upd != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
-				goto notfound;
-			session->srch_upd = upd;
-			break;
-		} else
-			if (WT_CELL_TYPE(cipdata) == WT_CELL_DEL)
 				goto notfound;
 		break;
 	}
 
 	session->srch_page = page;
-	session->srch_ip = cip;
 	session->srch_write_gen = write_gen;
+	session->srch_ip = cip;
 	return (0);
 
 notfound:

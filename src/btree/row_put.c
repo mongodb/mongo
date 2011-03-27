@@ -35,34 +35,89 @@ __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value)
  *	Row-store delete and update.
  */
 static int
-__wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int insert)
+__wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int is_write)
 {
+	WT_INSERT **new_ins, *ins;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd;
 	int ret;
 
+	new_ins = NULL;
+	ins = NULL;
 	new_upd = NULL;
 	upd = NULL;
+	ret = 0;
 
 	/* Search the btree for the key. */
-	WT_RET(__wt_row_search(session, key, insert ? WT_INSERT : 0));
+	WT_RET(__wt_row_search(session, key, is_write ? WT_WRITE : 0));
 	page = session->srch_page;
 
-	/* Allocate an update array as necessary. */
-	if (page->u.row_leaf.upd == NULL)
-		WT_ERR(__wt_calloc_def(session, page->indx_count, &new_upd));
+	/*
+	 * Replace: allocate an update array as necessary, build a WT_UPDATE
+	 * structure in per-thread memory, and schedule the workQ to insert
+	 * the WT_UPDATE structure.
+	 *
+	 * Insert: allocate an insert array as necessary, build a WT_INSERT
+	 * structure in per-thread memory, and schedule the workQ to insert
+	 * the WT_INSERT structure.
+	 */
+	if (session->srch_match == 1) {
+		/* Allocate an update array as necessary. */
+		if (session->srch_upd == NULL) {
+			WT_ERR(__wt_calloc_def(
+			    session, page->indx_count, &new_upd));
+			/*
+			 * If there was no update array, the search function
+			 * could not have set the WT_UPDATE location.
+			 */
+			session->srch_upd = &new_upd[session->srch_slot];
+		}
 
-	/* Allocate room for the new value from per-thread memory. */
-	WT_ERR(__wt_update_alloc(session, &upd, value));
+		/* Allocate room for the new value from per-thread memory. */
+		WT_ERR(__wt_update_alloc(session, value, &upd));
 
-	/* Schedule the workQ to insert the WT_UPDATE structure. */
-	__wt_item_update_serial(session, page, session->srch_write_gen,
-	    WT_ROW_INDX_SLOT(page, session->srch_ip), new_upd, upd, ret);
+		/* Schedule the workQ to insert the WT_UPDATE structure. */
+		__wt_update_serial(
+		    session, page, session->srch_write_gen,
+		    new_upd, session->srch_upd, upd, ret);
+	} else {
+		/*
+		 * Allocate an insert array as necessary -- note we allocate
+		 * one additional slot for insert keys sorting less than any
+		 * original key on the page.
+		 */
+		if (session->srch_ins == NULL) {
+			WT_ERR(__wt_calloc_def(
+			    session, page->indx_count + 1, &new_ins));
+			/*
+			 * If there was no insert array, the search function
+			 * could not have set the WT_INSERT location.
+			 */
+			session->srch_ins = &new_ins[session->srch_slot];
+		}
+
+		/*
+		 * Allocate room for the new key/value pair from per-thread
+		 * memory.
+		 */
+		WT_ERR(__wt_insert_alloc(session, key, value, &ins));
+
+		/* Schedule the workQ to insert the WT_INSERT structure. */
+		__wt_insert_serial(
+		    session, page, session->srch_write_gen,
+		    new_ins, session->srch_ins, ins, ret);
+	}
 
 	if (ret != 0) {
-err:		if (upd != NULL)
-			__wt_update_free(session, upd);
+err:		if (ins != NULL)
+			__wt_sb_free_error(session, ins->sb);
+		if (upd != NULL)
+			__wt_sb_free_error(session, upd->sb);
 	}
+
+	/* Free any insert array unless the workQ used it. */
+	if (new_ins != NULL && new_ins != page->u.row_leaf.ins)
+		__wt_free(session, new_ins);
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.row_leaf.upd)
@@ -70,55 +125,81 @@ err:		if (upd != NULL)
 
 	WT_PAGE_OUT(session, page);
 
+	return (ret);
+}
+
+/*
+ * __wt_insert_alloc --
+ *	Allocate a WT_INSERT structure and associated value from the SESSION's
+ *	buffer and fill it in.
+ */
+int
+__wt_insert_alloc(
+    SESSION *session, WT_ITEM *key, WT_ITEM *value, WT_INSERT **insp)
+{
+	SESSION_BUFFER *sb;
+	WT_INSERT *ins;
+	uint32_t size;
+	int ret;
+
+	/*
+	 * Allocate the WT_INSERT structure and room for the key, then copy
+	 * the key into place.
+	 */
+	size = key->size;
+	WT_RET(__wt_sb_alloc(session, sizeof(WT_INSERT) + size, &ins, &sb));
+
+	ins->sb = sb;
+	ins->size = size;
+	memcpy(WT_INSERT_DATA(ins), key->data, size);
+
+	/* Allocate the WT_UPDATE structure and room for the value. */
+	if ((ret = __wt_update_alloc(session, value, &ins->upd)) != 0) {
+		__wt_sb_free_error(session, ins->sb);
+		return (ret);
+	}
+
+	*insp = ins;
 	return (0);
 }
 
 /*
- * __wt_item_update_serial_func --
- *	Server function to update a WT_UPDATE entry in the modification array.
+ * __wt_insert_serial_func --
+ *	Server function to add an WT_INSERT entry to the page tree.
  */
 int
-__wt_item_update_serial_func(SESSION *session)
+__wt_insert_serial_func(SESSION *session)
 {
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *upd;
-	uint32_t slot, write_gen;
+	WT_INSERT **new_ins, **srch_ins, *ins;
+	uint32_t write_gen;
 	int ret;
 
-	__wt_item_update_unpack(session, page, write_gen, slot, new_upd, upd);
-
 	ret = 0;
+
+	__wt_insert_unpack(session, page, write_gen, new_ins, srch_ins, ins);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
-	 * If the page does not yet have an update array, our caller passed
+	 * If the page does not yet have an insert array, our caller passed
 	 * us one of the correct size.   (It's the caller's responsibility to
-	 * detect & free the passed-in expansion array if we don't use it.)
-	 *
-	 * Insert the new WT_UPDATE as the first item in the forward-linked list
-	 * of updates, flush memory to ensure the list is never broken.
+	 * detect and free the passed-in expansion array if we don't use it.)
 	 */
-	switch (page->type) {
-	case WT_PAGE_ROW_LEAF:
-		if (page->u.row_leaf.upd == NULL)
-			page->u.row_leaf.upd = new_upd;
-		upd->next = page->u.row_leaf.upd[slot];
-		WT_MEMORY_FLUSH;
-		page->u.row_leaf.upd[slot] = upd;
-		break;
-	default:
-		if (page->u.col_leaf.upd == NULL)
-			page->u.col_leaf.upd = new_upd;
-		upd->next = page->u.col_leaf.upd[slot];
-		WT_MEMORY_FLUSH;
-		page->u.col_leaf.upd[slot] = upd;
-		break;
-	}
+	if (page->u.row_leaf.ins == NULL)
+		page->u.row_leaf.ins = new_ins;
 
-err:	__wt_session_serialize_wrapup(session, page, ret);
-	return (0);
+	/*
+	 * Insert the new WT_INSERT item into the linked list and flush memory
+	 * to ensure the list is never broken.
+	 */
+	ins->next = *srch_ins;
+	WT_MEMORY_FLUSH;
+	*srch_ins = ins;
+
+err:	__wt_session_serialize_wrapup(session, page, 0);
+	return (ret);
 }
 
 /*
@@ -127,11 +208,85 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  *	buffer and fill it in.
  */
 int
-__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
+__wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp)
 {
 	SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
-	uint32_t align_size, alloc_size, size;
+	uint32_t size;
+
+	/*
+	 * Allocate the WT_UPDATE structure and room for the value, then copy
+	 * the value into place.
+	 */
+	size = value == NULL ? 0 : value->size;
+	WT_RET(__wt_sb_alloc(session, sizeof(WT_UPDATE) + size, &upd, &sb));
+	upd->sb = sb;
+	if (value == NULL)
+		WT_UPDATE_DELETED_SET(upd);
+	else {
+		upd->size = size;
+		memcpy(WT_UPDATE_DATA(upd), value->data, size);
+	}
+
+	*updp = upd;
+	return (0);
+}
+
+/*
+ * __wt_update_serial_func --
+ *	Server function to add an WT_UPDATE entry in the page array.
+ */
+int
+__wt_update_serial_func(SESSION *session)
+{
+	WT_PAGE *page;
+	WT_UPDATE **new_upd, **srch_upd, *upd;
+	uint32_t write_gen;
+	int ret;
+
+	ret = 0;
+
+	__wt_update_unpack(session, page, write_gen, new_upd, srch_upd, upd);
+
+	/* Check the page's write-generation. */
+	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+
+	/*
+	 * If the page does not yet have an update array, our caller passed
+	 * us one of the correct size.   (It's the caller's responsibility to
+	 * detect and free the passed-in expansion array if we don't use it.)
+	 */
+	switch (page->type) {
+	case WT_PAGE_ROW_LEAF:
+		if (page->u.row_leaf.upd == NULL)
+			page->u.row_leaf.upd = new_upd;
+		break;
+	default:
+		if (page->u.col_leaf.upd == NULL)
+			page->u.col_leaf.upd = new_upd;
+		break;
+	}
+	/*
+	 * Insert the new WT_UPDATE item into the linked list and flush memory
+	 * to ensure the list is never broken.
+	 */
+	upd->next = *srch_upd;
+	WT_MEMORY_FLUSH;
+	*srch_upd = upd;
+
+err:	__wt_session_serialize_wrapup(session, page, 0);
+	return (ret);
+}
+
+/*
+ * __wt_sb_alloc --
+ *	Allocate memory from the SESSION's buffer and fill it in.
+ */
+int
+__wt_sb_alloc(SESSION *session, uint32_t size, void *retp, SESSION_BUFFER **sbp)
+{
+	SESSION_BUFFER *sb;
+	uint32_t align_size, alloc_size;
 	int single_use;
 
 	/*
@@ -166,17 +321,13 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 	 * Check first we won't overflow when calculating an aligned size, then
 	 * check the total required space for this item.
 	 */
-	size = value == NULL ? 0 : value->size;
 	if (size > UINT32_MAX - (sizeof(WT_UPDATE) + sizeof(uint32_t)))
 		return (__wt_file_item_too_big(session));
 	align_size = WT_ALIGN(size + sizeof(WT_UPDATE), sizeof(uint32_t));
 	if (align_size > UINT32_MAX - sizeof(SESSION_BUFFER))
 		return (__wt_file_item_too_big(session));
 
-	/*
-	 * If we already have a buffer and the data fits, copy the WT_UPDATE
-	 * structure and data into place, we're done.
-	 */
+	/* If we already have a buffer and the data fits, we're done. */
 	sb = session->sb;
 	if (sb != NULL && align_size <= sb->space_avail)
 		goto no_allocation;
@@ -242,30 +393,22 @@ __wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value)
 	}
 
 no_allocation:
-	/* Copy the WT_UPDATE structure into place. */
-	upd = (WT_UPDATE *)sb->first_free;
-	upd->sb = sb;
-	if (value == NULL)
-		WT_UPDATE_DELETED_SET(upd);
-	else {
-		upd->size = value->size;
-		memcpy(WT_UPDATE_DATA(upd), value->data, value->size);
-	}
+	*(void **)retp = sb->first_free;
+	*sbp = sb;
 
 	sb->first_free += align_size;
 	sb->space_avail -= align_size;
 	++sb->in;
 
-	*updp = upd;
 	return (0);
 }
 
 /*
- * __wt_update_free --
- *	Free a WT_UPDATE structure and associated data from the SESSION_BUFFER.
+ * __wt_sb_free_error --
+ *	Free a chunk of data from the SESSION_BUFFER, in an error path.
  */
 void
-__wt_update_free(SESSION *session, WT_UPDATE *upd)
+__wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb)
 {
 	/*
 	 * It's possible we allocated a WT_UPDATE structure and associated item
@@ -273,14 +416,16 @@ __wt_update_free(SESSION *session, WT_UPDATE *upd)
 	 * try and clean up the SESSION buffer, it's simpler to decrement the
 	 * use count and let the page discard code deal with it during the
 	 * page reconciliation process.  (Note we're still in the allocation
-	 * path, so we decrement the "in" field, not the "out" field.)
+	 * path, so we decrement the "in" field, instead of incrementing the
+	 * "out" field -- if the eviction thread updates that field, we could
+	 * race.
 	 */
-	--upd->sb->in;
+	--sb->in;
 
 	/*
 	 * One other thing: if the SESSION buffer was a one-off, we have to free
 	 * it here, it's not linked to any WT_PAGE in the system.
 	 */
-	if (upd->sb->in == 0)
-		__wt_free(session, upd->sb);
+	if (sb->in == 0)
+		__wt_free(session, sb);
 }

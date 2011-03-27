@@ -42,6 +42,7 @@ static CONFIG c[] = {
 	{ "delete_pct",  0,  0,  0, 45,  &g.c_delete_pct },
 	{ "huffman_data", C_ROW|C_VAR, C_BOOL,  0, 10,  &g.c_huffman_data },
 	{ "huffman_key", C_ROW,  C_BOOL,  0, 10,  &g.c_huffman_key },
+	{ "insert_pct",  0,  0,  0, 45,  &g.c_insert_pct },
 	{ "intl_node_max", 0,  0,  9, 17,  &g.c_intl_node_max },
 	{ "intl_node_min", 0,  0,  9, 17,  &g.c_intl_node_min },
 	{ "key_max",  C_ROW,  0,  64, 128,  &g.c_key_max },

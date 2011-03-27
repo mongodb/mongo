@@ -423,11 +423,11 @@ struct __wt_page {
 		/* Row-store internal information. */
 		struct {
 			WT_ROW_REF *t;		/* Subtrees */
-			WT_UPDATE **upd;	/* Updates */
 		} row_int;
 
 		struct {
 			WT_ROW	   *d;		/* K/V pairs */
+			WT_INSERT **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
 		} row_leaf;
 
@@ -436,7 +436,6 @@ struct __wt_page {
 			uint64_t recno;		/* Starting recno */
 
 			WT_COL_REF *t;		/* Subtrees */
-			WT_UPDATE **upd;	/* Updates */
 		} col_int;
 
 		/* Column-store leaf information. */
@@ -616,18 +615,17 @@ struct __wt_col {
 
 /*
  * WT_UPDATE --
- *	Updates: entries on leaf pages can be modified or deleted, and new
- * entries can be inserted in row-store leaf pages, and both row-store and
- * column store internal pages.
- *
- * Modifications or deletions are stored in the update array of the page.
- * When the first element on a page is modified, the array is allocated, with
- * one slot for every existing element in the page.  A slot points to a
- * WT_UPDATE; if more than one update is done for a single entry, the WT_UPDATE
- * structures are formed into a forward-linked list.
+ * Entries on leaf pages can be updated, either modified or deleted.  Updates
+ * to entries referenced from the WT_ROW and WT_COL arrays are stored in the
+ * page's WT_UPDATE array.  When the first element on a page is updated, the
+ * WT_UPDATE array is allocated, with one slot for every existing element in
+ * the page.  A slot points to a WT_UPDATE structure; if more than one update
+ * is done for an entry, WT_UPDATE structures are formed into a forward-linked
+ * list.
  */
 struct __wt_update {
 	SESSION_BUFFER *sb;		/* session buffer holding this update */
+
 	WT_UPDATE *next;		/* forward-linked list */
 
 	/*
@@ -638,11 +636,38 @@ struct __wt_update {
 	 */
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
-	uint32_t size;			/* data length */
+	uint32_t size;			/* update length */
 
-	/* The untyped data immediately follows the upd structure. */
+	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\
-	((void *)((uint8_t *)upd + sizeof(WT_UPDATE)))
+	((void *)((uint8_t *)(upd) + sizeof(WT_UPDATE)))
+};
+
+/*
+ * WT_INSERT --
+ * Row-store leaf pages support inserts of new K/V pairs.  When the first K/V
+ * pair is inserted, the WT_INSERT array is allocated, with one slot for every
+ * existing element in the page, plus one additional slot.  A slot points to a
+ * WT_INSERT structure which sorts after the WT_ROW element that references it
+ * and before the subsequent WT_ROW element; if more than one insert is done
+ * between two page entries, the WT_INSERT structures are formed into a key-
+ * sorted, forward-linked list.  The additional slot is because it's possible to
+ * insert items smaller than any existing key on the page -- for that reason,
+ * the first slot of the insert array holds keys smaller than any other key on
+ * the page.
+ */
+struct __wt_insert {
+	SESSION_BUFFER *sb;		/* session buffer holding this update */
+
+	WT_INSERT *next;		/* forward-linked list */
+
+	WT_UPDATE *upd;			/* value */
+
+	uint32_t  size;			/* key length */
+
+	/* The untyped key immediately follows the WT_INSERT structure. */
+#define	WT_INSERT_DATA(ins)						\
+	((void *)((uint8_t *)(ins) + sizeof(WT_INSERT)))
 };
 
 /*
@@ -655,9 +680,8 @@ struct __wt_update {
  * handle this by "inserting" a new entry into the rleexp array.  This is the
  * only case where it's possible to "insert" into a column-store, it's normally
  * only possible to append to a column-store as insert requires re-numbering
- * subsequent records.  (Berkeley DB did support the re-numbering
- * functionality, but it won't scale and it isn't useful enough to
- * re-implement, IMNSHO.)
+ * subsequent records.  (Berkeley DB did support mutable records, but it won't
+ * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_rle_expand {
 	uint64_t recno;			/* recno */
@@ -677,24 +701,37 @@ struct __wt_rle_expand {
 	    (exp) = (page)->u.col_leaf.rleexp; (i) > 0; ++(exp), --(i))
 
 /*
- * The upd and rleexp  arrays may not exist, and are arrays of pointers to
- * individually allocated structures.   The following macros return an array
- * entry if the array of pointers and the specific structure exist, otherwise
- * NULL.
+ * The column-store leaf page insert and RLE expansion arrays are arrays of
+ * pointers to structures, and may not exist.  The following macros return an
+ * array entry if the array of pointers and the specific structure exist,
+ * otherwise NULL.
  */
-#define	__WT_COL_ARRAY(page, ip, field)					\
-	((page)->field == NULL ?					\
-	    NULL : (page)->field[WT_COL_INDX_SLOT(page, ip)])
 #define	WT_COL_UPDATE(page, ip)						\
-	__WT_COL_ARRAY(page, ip, u.col_leaf.upd)
+	((page)->u.col_leaf.upd == NULL ?				\
+	    NULL : (page)->u.col_leaf.upd[WT_COL_INDX_SLOT(page, ip)])
 #define	WT_COL_RLEEXP(page, ip)						\
-	__WT_COL_ARRAY(page, ip, u.col_leaf.rleexp)
+	((page)->u.col_leaf.rleexp == NULL ?				\
+	    NULL : (page)->u.col_leaf.rleexp[WT_COL_INDX_SLOT(page, ip)])
 
-#define	__WT_ROW_ARRAY(page, ip, field)					\
-	((page)->field == NULL ?					\
-	    NULL : (page)->field[WT_ROW_INDX_SLOT(page, ip)])
+/*
+ * The row-store leaf page insert and update arrays are arrays of pointers to
+ * structures, and may not exist.  The following macros return an array entry
+ * if the array of pointers and the specific structure exist, otherwise NULL.
+ *
+ * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
+ * the "one per WT_ROW slot" insert array.  That's because the insert array
+ * requires an extra slot to hold keys that sort before any key found on the
+ * original page.
+ */
+#define	WT_ROW_INSERT_SMALLEST(page)					\
+	((page)->u.row_leaf.ins == NULL ?				\
+	    NULL : (page)->u.row_leaf.ins[(page)->indx_count])
+#define	WT_ROW_INSERT(page, ip)						\
+	((page)->u.row_leaf.ins == NULL ?				\
+	    NULL : (page)->u.row_leaf.ins[WT_ROW_INDX_SLOT(page, ip)])
 #define	WT_ROW_UPDATE(page, ip)						\
-	__WT_ROW_ARRAY(page, ip, u.row_leaf.upd)
+	((page)->u.row_leaf.upd == NULL ?				\
+	    NULL : (page)->u.row_leaf.upd[WT_ROW_INDX_SLOT(page, ip)])
 
 /*
  * WT_ROW_{REF,INDX}_AND_KEY_FOREACH --
@@ -770,6 +807,12 @@ struct __wt_cell {
  * sure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_CELL_SIZE	4
+
+/*
+ * WT_CELL_CLEAR --
+ *	Fast clear of the cell, so we can set bits in it.
+ */
+#define	WT_CELL_CLEAR(cell)	((cell)->__cell_chunk = 0)
 
 /*
  * There are 2 basic types: key and data cells, each of which has an overflow

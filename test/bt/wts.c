@@ -3,8 +3,6 @@
  *
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
- *
- * $Id$
  */
 
 #include "wts.h"
@@ -14,7 +12,7 @@ static int wts_del_col(u_int64_t);
 static int wts_del_row(u_int64_t);
 static int wts_notfound_chk(const char *, int, int, u_int64_t);
 static int wts_put_col(u_int64_t);
-static int wts_put_row(u_int64_t);
+static int wts_put_row(u_int64_t, int);
 static int wts_read_col(u_int64_t);
 static int wts_read_row(u_int64_t);
 static int wts_sync(void);
@@ -302,7 +300,7 @@ cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **datap)
 		return (1);
 	}
 
-	key_gen(&key.data, &key.size, g.key_cnt);
+	key_gen(&key.data, &key.size, g.key_cnt, 0);
 	data_gen(&data.data, &data.size, 1);
 
 	switch (g.c_file_type) {
@@ -313,14 +311,14 @@ cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **datap)
 	case ROW:
 		*keyp = &key;
 		if (g.wts_log != NULL)
-			fprintf(g.wts_log, "load key {%.*s}\n",
-			    (int)key.size, (char *)key.data);
+			fprintf(g.wts_log, "%-10s{%.*s}\n",
+			    "bulk key", (int)key.size, (char *)key.data);
 		break;
 	}
 	*datap = &data;
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log,
-		    "load data {%.*s}\n", (int)data.size, (char *)data.data);
+		fprintf(g.wts_log, "%-10s{%.*s}\n",
+		    "bulk data", (int)data.size, (char *)data.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, data.data, data.size);
@@ -337,19 +335,20 @@ wts_ops(void)
 {
 	u_int64_t keyno;
 	u_int cnt;
-	int op;
+	uint32_t op;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		keyno = MMRAND(1, g.c_rows);
 
 		/*
-		 * Perform some number of read/write/delete operations; the
-		 * number of deletes and writes are specified, reads are the
-		 * rest.  A read operation always follows a delete or write
-		 * operation to confirm it worked.
+		 * Perform some number of operations: the percentage of deletes,
+		 * inserts and writes are specified, reads are the rest.  The
+		 * percentages don't have to add up to 100, a high percentage
+		 * of deletes will mean fewer inserts and writes.  A read
+		 * operation always follows a modification to confirm it worked.
 		 */
-		op = wts_rand() % 100;
-		if ((u_int32_t)op < g.c_delete_pct) {
+		op = (uint32_t)(wts_rand() % 100);
+		if (op < g.c_delete_pct) {
 			switch (g.c_file_type) {
 			case ROW:
 				if (wts_del_row(keyno))
@@ -361,10 +360,15 @@ wts_ops(void)
 					return (1);
 				break;
 			}
-		} else if ((u_int32_t)op < g.c_delete_pct + g.c_write_pct) {
+		} else if (g.c_file_type == ROW &&
+		    op < g.c_delete_pct + g.c_insert_pct) {
+			if (wts_put_row(keyno, 1))
+				return (1);
+		} else if (
+		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (wts_put_row(keyno))
+				if (wts_put_row(keyno, 0))
 					return (1);
 				break;
 			case FIX:
@@ -448,14 +452,15 @@ wts_read_row(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "read %llu\n", (unsigned long long)keyno);
+		fprintf(g.wts_log,
+		    "%-10s%llu\n", "read", (unsigned long long)keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
 		return (1);
 
 	/* Retrieve the key/data pair by key. */
-	key_gen(&key.data, &key.size, keyno);
+	key_gen(&key.data, &key.size, keyno, 0);
 	if ((ret = btree->row_get(btree, session, &key, &data, 0)) != 0 &&
 	    ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_read_key: read row %llu by key: %s\n",
@@ -524,7 +529,8 @@ wts_read_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "read %llu\n", (unsigned long long)keyno);
+		fprintf(g.wts_log,
+		    "%-10s%llu\n", "read", (unsigned long long)keyno);
 
 	/* Retrieve the BDB data item. */
 	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
@@ -562,7 +568,7 @@ wts_read_col(u_int64_t keyno)
  *	Replace an element in a row-store file.
  */
 static int
-wts_put_row(u_int64_t keyno)
+wts_put_row(u_int64_t keyno, int insert)
 {
 	static WT_ITEM key, data;
 	BTREE *btree;
@@ -574,16 +580,16 @@ wts_put_row(u_int64_t keyno)
 	session = g.wts_session;
 	conn = btree->conn;
 
-	key_gen(&key.data, &key.size, keyno);
+	key_gen(&key.data, &key.size, keyno, insert);
 	data_gen(&data.data, &data.size, 0);
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "put %llu {%.*s}\n",
-		    (unsigned long long)keyno,
-		    (int)data.size, (char *)data.data);
+		fprintf(g.wts_log, "%-10s{%.*s}\n%-10s{%.*s}\n",
+		    "put key", (int)key.size, (char *)key.data,
+		    "put data", (int)data.size, (char *)data.data);
 
-	if (bdb_put(keyno, data.data, data.size, &notfound))
+	if (bdb_put(key.data, key.size, data.data, data.size, &notfound))
 		return (1);
 
 	if ((ret = btree->row_put(
@@ -603,7 +609,7 @@ wts_put_row(u_int64_t keyno)
 static int
 wts_put_col(u_int64_t keyno)
 {
-	static WT_ITEM data;
+	static WT_ITEM key, data;
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
@@ -617,11 +623,12 @@ wts_put_col(u_int64_t keyno)
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
-		fprintf(g.wts_log, "put %llu {%.*s}\n",
-		    (unsigned long long)keyno,
+		fprintf(g.wts_log, "%-10s%llu {%.*s}\n",
+		    "put", (unsigned long long)keyno,
 		    (int)data.size, (char *)data.data);
 
-	if (bdb_put(keyno, data.data, data.size, &notfound))
+	key_gen(&key.data, &key.size, keyno, 0);
+	if (bdb_put(key.data, key.size, data.data, data.size, &notfound))
 		return (1);
 	
 	if ((ret = btree->col_put(
@@ -651,12 +658,12 @@ wts_del_row(u_int64_t keyno)
 	session = g.wts_session;
 	conn = btree->conn;
 
-	key_gen(&key.data, &key.size, keyno);
+	key_gen(&key.data, &key.size, keyno, 0);
 
 	/* Log the operation */
 	if (g.wts_log != NULL)
 		fprintf(g.wts_log,
-		    "delete %llu\n", (unsigned long long)keyno);
+		    "%-10s%llu\n", "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
@@ -691,7 +698,7 @@ wts_del_col(u_int64_t keyno)
 	/* Log the operation */
 	if (g.wts_log != NULL)
 		fprintf(g.wts_log,
-		    "delete %llu\n", (unsigned long long)keyno);
+		    "%-10s%llu\n", "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);

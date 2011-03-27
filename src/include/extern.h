@@ -60,8 +60,8 @@ int
 __wt_item_build_key(
     SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl);
 int
-__wt_item_build_value(SESSION *session,
-    WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl);
+__wt_item_build_value(
+    SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl);
 int
 __wt_cache_create(CONNECTION *conn);
 void
@@ -208,11 +208,21 @@ __wt_btree_row_del(SESSION *session, WT_ITEM *key);
 int
 __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value);
 int
-__wt_item_update_serial_func(SESSION *session);
+__wt_insert_alloc(
+    SESSION *session, WT_ITEM *key, WT_ITEM *value, WT_INSERT **insp);
 int
-__wt_update_alloc(SESSION *session, WT_UPDATE **updp, WT_ITEM *value);
+__wt_insert_serial_func(SESSION *session);
+int
+__wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
+int
+__wt_update_serial_func(SESSION *session);
+int
+__wt_sb_alloc(SESSION *session,
+    uint32_t size,
+    void *retp,
+    SESSION_BUFFER **sbp);
 void
-__wt_update_free(SESSION *session, WT_UPDATE *upd);
+__wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb);
 int
 __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
 int
@@ -358,7 +368,7 @@ __wt_thread_join(pthread_t tid);
 void
 __wt_yield(void);
 uint32_t
-__wt_cksum(void *chunk, uint32_t bytes);
+__wt_cksum(const void *chunk, uint32_t bytes);
 void
 __wt_msg_call(void *cb, void *handle,
     const char *pfx1, const char *pfx2,
