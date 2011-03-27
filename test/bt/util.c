@@ -22,12 +22,13 @@ key_gen(void *datap, uint32_t *sizep, u_int64_t keyno, int insert)
 	int len;
 
 	/*
-	 * The key always starts with a 10-digit string (the specified cnt).
-	 * If the operation is an insert, append a unique trailing string.
+	 * The key always starts with a 10-digit string (the specified cnt)
+	 * followed by two digits, a random number between 1 and 15 if it's
+	 * an insert, otherwise 00.
 	 */
 	len = insert ?
-	    sprintf(g.key_gen_buf, "%010llu.%d", keyno, (int)MMRAND(0, 10)) :
-	    sprintf(g.key_gen_buf, "%010llu", keyno);
+	    sprintf(g.key_gen_buf, "%010llu.%02d", keyno, (int)MMRAND(1, 15)) :
+	    sprintf(g.key_gen_buf, "%010llu.00", keyno);
 	g.key_gen_buf[len] = '/';
 
 	*(void **)datap = g.key_gen_buf;
