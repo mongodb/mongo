@@ -1955,7 +1955,9 @@ namespace mongo {
         }
 
         if ( !res ) {
-            problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
+            errmsg = str::stream() << "clone failed for " << dbName << " with error: " << errmsg;
+            problem() << errmsg << endl;
+
             if ( !preserveClonedFilesOnFailure )
                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 
