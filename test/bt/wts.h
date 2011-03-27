@@ -49,7 +49,7 @@ typedef struct {
 
 	FILE *rand_log;				/* Random number log */
 
-	u_int32_t run_cnt;			/* Run counter */
+	uint32_t run_cnt;			/* Run counter */
 
 	int replay;				/* Replaying a run */
 	int track;				/* Track progress */
@@ -57,36 +57,36 @@ typedef struct {
 
 	char *key_gen_buf;
 
-	u_int32_t c_cache;			/* Config values */
-	u_int32_t c_data_max;
-	u_int32_t c_data_min;
-	u_int32_t c_delete_pct;
-	u_int32_t c_file_type;
-	u_int32_t c_huffman_data;
-	u_int32_t c_huffman_key;
-	u_int32_t c_insert_pct;
-	u_int32_t c_intl_node_max;
-	u_int32_t c_intl_node_min;
-	u_int32_t c_key_cnt;
-	u_int32_t c_key_max;
-	u_int32_t c_key_min;
-	u_int32_t c_leaf_node_max;
-	u_int32_t c_leaf_node_min;
-	u_int32_t c_ops;
-	u_int32_t c_repeat_comp_pct;
-	u_int32_t c_rows;
-	u_int32_t c_runs;
-	u_int32_t c_write_pct;
+	uint32_t c_cache;			/* Config values */
+	uint32_t c_data_max;
+	uint32_t c_data_min;
+	uint32_t c_delete_pct;
+	uint32_t c_file_type;
+	uint32_t c_huffman_data;
+	uint32_t c_huffman_key;
+	uint32_t c_insert_pct;
+	uint32_t c_intl_node_max;
+	uint32_t c_intl_node_min;
+	uint32_t c_key_cnt;
+	uint32_t c_key_max;
+	uint32_t c_key_min;
+	uint32_t c_leaf_node_max;
+	uint32_t c_leaf_node_min;
+	uint32_t c_ops;
+	uint32_t c_repeat_comp_pct;
+	uint32_t c_rows;
+	uint32_t c_runs;
+	uint32_t c_write_pct;
 
-	u_int32_t key_cnt;			/* Keys loaded so far */
-	u_int16_t key_rand_len[1031];		/* Key lengths */
+	uint32_t key_cnt;			/* Keys loaded so far */
+	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
 
-int	 bdb_del(u_int64_t, int *);
-void	 bdb_insert(const void *, u_int32_t, const void *, u_int32_t);
-int	 bdb_put(const void *, uint32_t, const void *, u_int32_t, int *);
-int	 bdb_read(u_int64_t, void *, u_int32_t *, int *);
+int	 bdb_del(uint64_t, int *);
+void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
+int	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
+int	 bdb_read(uint64_t, void *, uint32_t *, int *);
 void	 bdb_startup(void);
 void	 bdb_teardown(void);
 const char *
@@ -98,11 +98,11 @@ void	 config_setup(void);
 void	 config_single(char *, int);
 void	 data_gen(void *, uint32_t *, int);
 char	*fname(const char *);
-void	 key_gen(void *, uint32_t *, u_int64_t, int);
+void	 key_gen(void *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(void);
-void	 track(const char *, u_int64_t);
+void	 track(const char *, uint64_t);
 int	 wts_bulk_load(void);
-int	 wts_del(u_int64_t);
+int	 wts_del(uint64_t);
 int	 wts_dump(void);
 int	 wts_ops(void);
 int	 wts_rand(void);

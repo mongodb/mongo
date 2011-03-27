@@ -8,13 +8,13 @@
 #include "wts.h"
 
 static int cb_bulk(BTREE *, WT_ITEM **, WT_ITEM **);
-static int wts_del_col(u_int64_t);
-static int wts_del_row(u_int64_t);
-static int wts_notfound_chk(const char *, int, int, u_int64_t);
-static int wts_put_col(u_int64_t);
-static int wts_put_row(u_int64_t, int);
-static int wts_read_col(u_int64_t);
-static int wts_read_row(u_int64_t);
+static int wts_del_col(uint64_t);
+static int wts_del_row(uint64_t);
+static int wts_notfound_chk(const char *, int, int, uint64_t);
+static int wts_put_col(uint64_t);
+static int wts_put_row(uint64_t, int);
+static int wts_read_col(uint64_t);
+static int wts_read_row(uint64_t);
 static int wts_sync(void);
 
 int
@@ -24,7 +24,7 @@ wts_startup(int logfile)
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
-	u_int32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
+	uint32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
 	int ret;
 	char *p;
 
@@ -333,7 +333,7 @@ cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **datap)
 int
 wts_ops(void)
 {
-	u_int64_t keyno;
+	uint64_t keyno;
 	u_int cnt;
 	uint32_t op;
 
@@ -404,7 +404,7 @@ wts_ops(void)
 int
 wts_read_row_scan(void)
 {
-	u_int64_t cnt, last_cnt;
+	uint64_t cnt, last_cnt;
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
@@ -438,7 +438,7 @@ wts_read_row_scan(void)
  *	Read and verify a single element in a row-store file.
  */
 static int
-wts_read_row(u_int64_t keyno)
+wts_read_row(uint64_t keyno)
 {
 	static WT_ITEM key, data, bdb_data;
 	BTREE *btree;
@@ -492,7 +492,7 @@ wts_read_row(u_int64_t keyno)
 int
 wts_read_col_scan(void)
 {
-	u_int64_t cnt, last_cnt;
+	uint64_t cnt, last_cnt;
 
 	/* Check a random subset of the records using the record number. */
 	for (last_cnt = cnt = 0; cnt < g.c_rows;) {
@@ -515,7 +515,7 @@ wts_read_col_scan(void)
  *	Read and verify a single element in a column-store file.
  */
 static int
-wts_read_col(u_int64_t keyno)
+wts_read_col(uint64_t keyno)
 {
 	static WT_ITEM data, bdb_data;
 	BTREE *btree;
@@ -568,7 +568,7 @@ wts_read_col(u_int64_t keyno)
  *	Replace an element in a row-store file.
  */
 static int
-wts_put_row(u_int64_t keyno, int insert)
+wts_put_row(uint64_t keyno, int insert)
 {
 	static WT_ITEM key, data;
 	BTREE *btree;
@@ -607,7 +607,7 @@ wts_put_row(u_int64_t keyno, int insert)
  *	Replace an element in a column-store file.
  */
 static int
-wts_put_col(u_int64_t keyno)
+wts_put_col(uint64_t keyno)
 {
 	static WT_ITEM key, data;
 	BTREE *btree;
@@ -646,7 +646,7 @@ wts_put_col(u_int64_t keyno)
  *	Delete an element from a row-store file.
  */
 static int
-wts_del_row(u_int64_t keyno)
+wts_del_row(uint64_t keyno)
 {
 	static WT_ITEM key;
 	BTREE *btree;
@@ -684,7 +684,7 @@ wts_del_row(u_int64_t keyno)
  *	Delete an element from a column-store file.
  */
 static int
-wts_del_col(u_int64_t keyno)
+wts_del_col(uint64_t keyno)
 {
 	BTREE *btree;
 	CONNECTION *conn;
@@ -720,7 +720,7 @@ wts_del_col(u_int64_t keyno)
  *	Compare notfound returns for consistency.
  */
 static int
-wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, u_int64_t keyno)
+wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 {
 	/* Check for not found status. */
 	if (bdb_notfound) {

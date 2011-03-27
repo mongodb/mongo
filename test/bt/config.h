@@ -8,7 +8,7 @@ typedef struct {
 #define	C_FIX		0x01			/* File types */
 #define	C_VAR		0x02
 #define	C_ROW		0x04
-	u_int8_t	 type_mask;		/* File type mask */
+	uint8_t	 	type_mask;		/* File type mask */
 
 	/* Value is a boolean, yes/no if roll 1 between 1 and N. */
 #define	C_BOOL		0x01
@@ -21,11 +21,11 @@ typedef struct {
 
 	/* Value isn't random for this run, ignore just for this run. */
 #define	C_TEMP		0x08
-	u_int8_t	 flags;
+	uint8_t	 	flags;
 
-	u_int32_t	 min;			/* Minimum value */
-	u_int32_t	 max;			/* Maximum value */
-	u_int32_t	 *v;			/* Value for this run */
+	uint32_t	 min;			/* Minimum value */
+	uint32_t	 max;			/* Maximum value */
+	uint32_t	 *v;			/* Value for this run */
 } CONFIG;
 
 /*

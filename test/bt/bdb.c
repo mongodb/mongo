@@ -48,7 +48,7 @@ bdb_teardown(void)
 
 void
 bdb_insert(const void *key_data,
-    u_int32_t key_size, const void *data_data, u_int32_t data_size)
+    uint32_t key_size, const void *data_data, uint32_t data_size)
 {
 	static DBT key, data;
 	DB *db;
@@ -64,7 +64,7 @@ bdb_insert(const void *key_data,
 }
 
 int
-bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
+bdb_read(uint64_t keyno, void *datap, uint32_t *sizep, int *notfoundp)
 {
 	static DBT key, data;
 	DB *db;
@@ -91,7 +91,7 @@ bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 
 int
 bdb_put(const void *arg_key, uint32_t arg_key_size,
-    const void *arg_data, u_int32_t arg_data_size, int *notfoundp)
+    const void *arg_data, uint32_t arg_data_size, int *notfoundp)
 {
 	static DBT key, data;
 	DB *db;
@@ -119,7 +119,7 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 }
 
 int
-bdb_del(u_int64_t keyno, int *notfoundp)
+bdb_del(uint64_t keyno, int *notfoundp)
 {
 	static DBT key;
 	DB *db;
