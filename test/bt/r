@@ -75,6 +75,10 @@ done
 set_warn_flags
 
 test "$build" -eq 0 || rebuild
-(cd ../../build_posix && make > /dev/null) && make > /dev/null
+((cd ../../build_posix && make) && make) |
+    sed	-e '/^ar /d' \
+	-e '/^cc /d' \
+	-e '/^mv /d' \
+	-e '/^rm /d'
 
 exit 0
