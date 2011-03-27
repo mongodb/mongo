@@ -78,4 +78,5 @@ src/support/prime.c
 src/support/progress.c
 src/support/scratch.c
 src/support/serial.c
+src/support/sess_buf.c
 src/support/stat.c

@@ -217,13 +217,6 @@ __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
 int
 __wt_update_serial_func(SESSION *session);
 int
-__wt_sb_alloc(SESSION *session,
-    uint32_t size,
-    void *retp,
-    SESSION_BUFFER **sbp);
-void
-__wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb);
-int
 __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
 int
 __wt_key_build_serial_func(SESSION *session);
@@ -459,6 +452,13 @@ __wt_session_serialize_func(SESSION *session,
     wq_state_t op, int spin, int (*func)(SESSION *), void *args);
 void
 __wt_session_serialize_wrapup(SESSION *session, WT_PAGE *page, int ret);
+int
+__wt_sb_alloc(SESSION *session,
+    uint32_t size,
+    void *retp,
+    SESSION_BUFFER **sbp);
+void
+__wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb);
 int
 __wt_stat_alloc_btree_handle_stats(SESSION *session, WT_STATS **statsp);
 void
