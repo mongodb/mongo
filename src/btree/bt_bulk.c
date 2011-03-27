@@ -931,16 +931,18 @@ __wt_item_build_key(
 	btree = session->btree;
 	stats = btree->stats;
 
+	WT_CELL_CLEAR(cell);
+
 	/*
 	 * We're called with a WT_ITEM that references a data/size pair.  We can
 	 * re-point that WT_ITEM's data and size fields to other memory, but we
 	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
 	 * it.
 	 *
-	 * Optionally compress the data using the Huffman engine.  For Huffman-
+	 * Optionally compress the value using the Huffman engine.  For Huffman-
 	 * encoded key/data cells, we need additional memory; use the SESSION
-	 * key/data return memory: this routine is called during bulk insert and
-	 * reconciliation, we aren't returning key/data pairs.
+	 * key/value return memory: this routine is called during bulk insert
+	 * and reconciliation, we aren't returning key/data pairs.
 	 */
 	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(btree->huffman_key,
@@ -970,8 +972,8 @@ __wt_item_build_key(
  *	string to be stored on the page.
  */
 int
-__wt_item_build_value(SESSION *session,
-    WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
+__wt_item_build_value(
+    SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
 	WT_STATS *stats;
@@ -979,17 +981,19 @@ __wt_item_build_value(SESSION *session,
 	btree = session->btree;
 	stats = btree->stats;
 
+	WT_CELL_CLEAR(cell);
+
 	/*
 	 * We're called with a WT_ITEM that references a data/size pair.  We can
 	 * re-point that WT_ITEM's data and size fields to other memory, but we
 	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
 	 * it.
 	 *
-	 * For Huffman-encoded key/data cells, we need a chunk of new space;
-	 * use the SESSION key/data return memory: this routine is called during
-	 * bulk insert and reconciliation, we aren't returning key/data pairs.
+	 * Optionally compress the value using the Huffman engine.  For Huffman-
+	 * encoded key/data cells, we need additional memory; use the SESSION
+	 * key/value return memory: this routine is called during bulk insert
+	 * and reconciliation, we aren't returning key/data pairs.
 	 */
-	WT_CLEAR(*cell);
 	WT_CELL_SET_TYPE(cell, WT_CELL_DATA);
 
 	/*
