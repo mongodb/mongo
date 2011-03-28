@@ -352,11 +352,20 @@ namespace PerfTests {
 
     class Insert1 : public InsertDup {
         const BSONObj x;
+        OID oid;
+        BSONObj query;
     public:
-        Insert1() : x( BSON("x" << 99) ) { }
+        Insert1() : x( BSON("x" << 99) ) { 
+            oid.init();
+            query = BSON("_id" << oid);
+        }
         string name() { return "insert-simple"; }
         void timed() {
             client().insert( ns(), x );
+        }
+        const char * timed2() {
+            client().findOne(ns(), query);
+            return "findOne_by_id";
         }
         void post() {
             assert( client().count(ns()) > 100 );
