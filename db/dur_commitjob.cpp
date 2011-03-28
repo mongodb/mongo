@@ -211,7 +211,7 @@ namespace mongo {
                             }
                         }
 #endif
-                        if (_bytes < UncommittedBytesLimit * 3) {
+                        if (_bytes > UncommittedBytesLimit * 3) {
                             if (DEBUG_BUILD) {
                                 log() <<  "DR102 too much data written uncommitted" << endl;
                                 abort();
