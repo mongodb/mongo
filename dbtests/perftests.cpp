@@ -135,22 +135,39 @@ namespace PerfTests {
             /* if you want recording of the timings, place the password for the perf database 
                in a "pstats.login" text file in the current directory for the test binary
             */
-            if( exists("pstats.login") ) {
+            const char *fn = "../../settings.py";
+            static bool ok = true;
+            if( ok && exists(fn) ) {
                 try {
                     if( conn == 0 ) {
                         MemoryMappedFile f;
-                        void *p = f.mapWithOptions("pstats.login", MongoFile::READONLY);
-                        string pwd((const char *)p, (unsigned) f.length());
-                        conn = new DBClientConnection(false, 0, 10);
-                        string err;
-                        if( conn->connect("mongo05.10gen.cust.cbici.net", err) ) { 
-                            if( !conn->auth("perf", "perf", pwd, err) ) { 
-                                cout << "info: authentication with stats before logging failed: " << err << endl;
-                                assert(false);
+                        const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
+                        string pwd;
+
+                        {
+                            const char *q = str::after(p, "pstatspassword=\"");
+                            if( *q == 0 ) {
+                                cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
+                                ok = false;
+                            }
+                            else {
+                                pwd = str::before(q, '\"');
                             }
                         }
-                        else { 
-                            cout << err << " (to log pstats)" << endl;
+
+                        if( ok ) {
+                            conn = new DBClientConnection(false, 0, 10);
+                            string err;
+                            if( conn->connect("mongo05.10gen.cust.cbici.net", err) ) { 
+                                if( !conn->auth("perf", "perf", pwd, err) ) { 
+                                    cout << "info: authentication with stats db failed: " << err << endl;
+                                    assert(false);
+                                }
+                            }
+                            else { 
+                                cout << err << " (to log perfstats)" << endl;
+                                ok = false;
+                            }
                         }
                     }
                     if( conn && !conn->isFailed() ) { 
