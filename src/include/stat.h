@@ -61,24 +61,22 @@ struct __wt_stats {
 #define	WT_STAT_INTLMAX				    3
 #define	WT_STAT_INTLMIN				    4
 #define	WT_STAT_ITEM_COL_DELETED		    5
-#define	WT_STAT_ITEM_DATA_OVFL			    6
-#define	WT_STAT_ITEM_KEY_OVFL			    7
-#define	WT_STAT_ITEM_TOTAL_DATA			    8
-#define	WT_STAT_ITEM_TOTAL_KEY			    9
-#define	WT_STAT_LEAFMAX				   10
-#define	WT_STAT_LEAFMIN				   11
-#define	WT_STAT_MAGIC				   12
-#define	WT_STAT_MAJOR				   13
-#define	WT_STAT_MINOR				   14
-#define	WT_STAT_PAGE_COL_FIX			   15
-#define	WT_STAT_PAGE_COL_INTERNAL		   16
-#define	WT_STAT_PAGE_COL_RLE			   17
-#define	WT_STAT_PAGE_COL_VARIABLE		   18
-#define	WT_STAT_PAGE_OVERFLOW			   19
-#define	WT_STAT_PAGE_ROW_INTERNAL		   20
-#define	WT_STAT_PAGE_ROW_LEAF			   21
-#define	WT_STAT_PAGE_SPLIT_INTL			   22
-#define	WT_STAT_PAGE_SPLIT_LEAF			   23
+#define	WT_STAT_ITEM_TOTAL_DATA			    6
+#define	WT_STAT_ITEM_TOTAL_KEY			    7
+#define	WT_STAT_LEAFMAX				    8
+#define	WT_STAT_LEAFMIN				    9
+#define	WT_STAT_MAGIC				   10
+#define	WT_STAT_MAJOR				   11
+#define	WT_STAT_MINOR				   12
+#define	WT_STAT_PAGE_COL_FIX			   13
+#define	WT_STAT_PAGE_COL_INTERNAL		   14
+#define	WT_STAT_PAGE_COL_RLE			   15
+#define	WT_STAT_PAGE_COL_VARIABLE		   16
+#define	WT_STAT_PAGE_OVERFLOW			   17
+#define	WT_STAT_PAGE_ROW_INTERNAL		   18
+#define	WT_STAT_PAGE_ROW_LEAF			   19
+#define	WT_STAT_PAGE_SPLIT_INTL			   20
+#define	WT_STAT_PAGE_SPLIT_LEAF			   21
 
 /*
  * Statistics entries for CACHE handle.

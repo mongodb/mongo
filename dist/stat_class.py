@@ -66,8 +66,6 @@ btree_fstats = {
     'INTLMAX' : Stat('maximum internal page size'),
     'INTLMIN' : Stat('minimum internal page size'),
     'ITEM_COL_DELETED' : Stat('column-store deleted data items'),
-    'ITEM_DATA_OVFL' : Stat('total overflow data items'),
-    'ITEM_KEY_OVFL' : Stat('total overflow keys'),
     'ITEM_TOTAL_DATA' : Stat('total data items'),
     'ITEM_TOTAL_KEY' : Stat('total keys'),
     'LEAFMAX' : Stat('maximum leaf page size'),

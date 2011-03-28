@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static int __wt_stat_page_col_fix(SESSION *, WT_PAGE *);
 static int __wt_stat_page_col_rle(SESSION *, WT_PAGE *);
@@ -120,7 +119,10 @@ __wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
 			orig_deleted = 0;
 		}
 
-		/* Walk the insert list, checking for changes. */
+		/*
+		 * Walk the insert list, checking for changes.  For each insert
+		 * we find, correct the original count based on its state.
+		 */
 		for (ins =
 		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
 			upd = ins->upd;
@@ -166,17 +168,13 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 	WT_COL_INDX_FOREACH(page, cip, i)
 		switch (WT_CELL_TYPE(WT_COL_PTR(page, cip))) {
 		case WT_CELL_DATA:
-			upd = WT_COL_UPDATE(page, cip);
-			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			break;
 		case WT_CELL_DATA_OVFL:
 			upd = WT_COL_UPDATE(page, cip);
 			if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd)) {
-				WT_STAT_INCR(stats, ITEM_DATA_OVFL);
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+				break;
 			}
-			break;
+			/* FALLTHROUGH */
 		case WT_CELL_DEL:
 			WT_STAT_INCR(stats, ITEM_COL_DELETED);
 			break;
@@ -196,7 +194,7 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 	WT_ROW *rip;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
-	uint32_t i;
+	uint32_t cnt, i;
 
 	WT_UNUSED(arg);
 	btree = session->btree;
@@ -206,57 +204,26 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 	 * Stat any K/V pairs inserted into the page before the first from-disk
 	 * key on the page.
 	 */
+	cnt = 0;
 	for (ins = WT_ROW_INSERT_SMALLEST(page); ins != NULL; ins = ins->next)
-		if (!WT_UPDATE_DELETED_ISSET(ins->upd)) {
-			WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
-			WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-		}
+		if (!WT_UPDATE_DELETED_ISSET(ins->upd))
+			++cnt;
 
-	/*
-	 * Stat the page's K/V pairs.
-	 *
-	 * Walk the page, counting regular and overflow data items, and checking
-	 * to be sure any updates weren't deletions.  If the item was updated,
-	 * assume it was updated by an item of the same size (it's expensive to
-	 * figure out if it will require the same space or not, especially if
-	 * there's Huffman encoding).
-	 */
+	/* Stat the page's K/V pairs. */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
-		if (!WT_ROW_EMPTY_ISSET(rip))
-			switch (WT_CELL_TYPE(WT_ROW_PTR(page, rip))) {
-			case WT_CELL_DATA:
-				upd = WT_ROW_UPDATE(page, rip);
-				if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-					goto stat_insert;
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-				break;
-			case WT_CELL_DATA_OVFL:
-				upd = WT_ROW_UPDATE(page, rip);
-				if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-					goto stat_insert;
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-				WT_STAT_INCR(stats, ITEM_DATA_OVFL);
-				break;
-			}
+		upd = WT_ROW_UPDATE(page, rip);
+		if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
+			++cnt;
 
-		/*
-		 * If the data item wasn't deleted, count the key.
-		 *
-		 * If we have processed the key, we have lost the information as
-		 * to whether or not it's an overflow key.
-		 */
-		WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
-		if (__wt_key_process(rip) &&
-		    WT_CELL_TYPE(rip->key) == WT_CELL_KEY_OVFL)
-			WT_STAT_INCR(stats, ITEM_KEY_OVFL);
-
-stat_insert:	/* Stat inserted K/V pairs. */
+		/* Stat inserted K/V pairs. */
 		for (ins =
 		    WT_ROW_INSERT(page, rip); ins != NULL; ins = ins->next)
-			if (!WT_UPDATE_DELETED_ISSET(ins->upd)) {
-				WT_STAT_INCR(stats, ITEM_TOTAL_KEY);
-				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
-			}
+			if (!WT_UPDATE_DELETED_ISSET(ins->upd))
+				++cnt;
 	}
+
+	WT_STAT_INCRV(stats, ITEM_TOTAL_KEY, cnt);
+	WT_STAT_INCRV(stats, ITEM_TOTAL_DATA, cnt);
+
 	return (0);
 }

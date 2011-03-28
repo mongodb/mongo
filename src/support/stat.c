@@ -53,7 +53,7 @@ __wt_stat_alloc_btree_file_stats(SESSION *session, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(session, 25, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(session, 23, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_FIXED_LEN].desc = "fixed-record size";
@@ -63,8 +63,6 @@ __wt_stat_alloc_btree_file_stats(SESSION *session, WT_STATS **statsp)
 	stats[WT_STAT_INTLMIN].desc = "minimum internal page size";
 	stats[WT_STAT_ITEM_COL_DELETED].desc =
 	    "column-store deleted data items";
-	stats[WT_STAT_ITEM_DATA_OVFL].desc = "total overflow data items";
-	stats[WT_STAT_ITEM_KEY_OVFL].desc = "total overflow keys";
 	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total data items";
 	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total keys";
 	stats[WT_STAT_LEAFMAX].desc = "maximum leaf page size";
@@ -98,8 +96,6 @@ __wt_stat_clear_btree_file_stats(WT_STATS *stats)
 	stats[WT_STAT_INTLMAX].v = 0;
 	stats[WT_STAT_INTLMIN].v = 0;
 	stats[WT_STAT_ITEM_COL_DELETED].v = 0;
-	stats[WT_STAT_ITEM_DATA_OVFL].v = 0;
-	stats[WT_STAT_ITEM_KEY_OVFL].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_DATA].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
 	stats[WT_STAT_LEAFMAX].v = 0;
