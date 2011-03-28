@@ -60,7 +60,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool])");
-    print("\tdb." + shortName + ".validate() - SLOW");
+    print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     return __magicNoPrint;
 }
@@ -374,8 +374,15 @@ DBCollection.prototype.renameCollection = function( newName , dropTarget ){
                                      dropTarget : dropTarget } )
 }
 
-DBCollection.prototype.validate = function() {
-    var res = this._db.runCommand( { validate: this.getName() } );
+DBCollection.prototype.validate = function(full) {
+    var cmd = { validate: this.getName() };
+
+    if (typeof(full) == 'object') // support arbitrary options here
+        Object.extend(cmd, full);
+    else
+        cmd.full = full;
+
+    var res = this._db.runCommand( cmd );
 
     res.valid = false;
 

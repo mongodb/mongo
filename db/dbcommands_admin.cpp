@@ -151,10 +151,11 @@ namespace mongo {
             return true;
         }
 
-        virtual void help(stringstream& h) const { h << "Validate contents of a namespace by scanning its data structures for correctness.  Slow."; }
+        virtual void help(stringstream& h) const { h << "Validate contents of a namespace by scanning its data structures for correctness.  Slow.\n"
+                                                        "Add full:true option to do a more thorough check"; }
 
         virtual LockType locktype() const { return READ; }
-        //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
+        //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 
         bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
@@ -177,6 +178,9 @@ namespace mongo {
             bool scanData = true;
             if( cmdObj && cmdObj->hasElement("scandata") && !cmdObj->getBoolField("scandata") )
                 scanData = false;
+
+            bool full = cmdObj && (*cmdObj)["full"].trueValue();
+
             bool valid = true;
             stringstream ss;
             ss << "\nvalidate\n";
@@ -244,21 +248,23 @@ namespace mongo {
                         len += r->lengthWithHeaders;
                         nlen += r->netLength();
 
-                        BSONObj obj(r);
-                        if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
-                            valid = false;
-                            nInvalid++;
-                            if (strcmp("_id", obj.firstElement().fieldName()) == 0){
-                                try {
-                                    obj.firstElement().validate(); // throws on error
-                                    log() << "Invalid bson detected in " << ns << " with _id: " << obj.firstElement().toString(false) << endl;
+                        if (full){
+                            BSONObj obj(r);
+                            if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
+                                valid = false;
+                                nInvalid++;
+                                if (strcmp("_id", obj.firstElement().fieldName()) == 0){
+                                    try {
+                                        obj.firstElement().validate(); // throws on error
+                                        log() << "Invalid bson detected in " << ns << " with _id: " << obj.firstElement().toString(false) << endl;
+                                    }
+                                    catch(...){
+                                        log() << "Invalid bson detected in " << ns << " with corrupt _id" << endl;
+                                    }
                                 }
-                                catch(...){
-                                    log() << "Invalid bson detected in " << ns << " with corrupt _id" << endl;
+                                else {
+                                    log() << "Invalid bson detected in " << ns << " and couldn't find _id" << endl;
                                 }
-                            }
-                            else {
-                                log() << "Invalid bson detected in " << ns << " and couldn't find _id" << endl;
                             }
                         }
 
@@ -274,7 +280,8 @@ namespace mongo {
                         ss << '\n';
                     }
                     ss << "  " << n << " objects found, nobj:" << d->stats.nrecords << '\n';
-                    ss << "  " << nInvalid << " invalid BSON objects found\n";
+                    if (full)
+                        ss << "  " << nInvalid << " invalid BSON objects found\n";
 
                     ss << "  " << len << " bytes data w/headers\n";
                     ss << "  " << nlen << " bytes data wout/headers\n";
@@ -354,6 +361,9 @@ namespace mongo {
             if ( !valid )
                 ss << " ns corrupt, requires dbchk\n";
 
+            if ( !full )
+                ss << " warning: full check not done. Rerun with full:true for more thorough validation.\n";
+            
             return ss.str();
         }
     } validateCmd;
