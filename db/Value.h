@@ -146,7 +146,14 @@ namespace mongo
 	shared_ptr<const Value> coerceToBoolean() const;
 
 	/*
-	  Coerce (cast) a value to a double Value, using JSON rules.
+	  Coerce (cast) a value to a long long, using JSON rules.
+
+	  @returns the long value
+	*/
+	long long coerceToLong() const;
+
+	/*
+	  Coerce (cast) a value to a double, using JSON rules.
 
 	  @returns the double value
 	*/
@@ -160,9 +167,21 @@ namespace mongo
 	  @returns an integer less than zero, zero, or an integer greater than
 	    zero, depending on whether rL < rR, rL == rR, or rL > rR
 	 */
-	static int Value::compare(const shared_ptr<const Value> &rL,
-				  const shared_ptr<const Value> &rR);
+	static int compare(const shared_ptr<const Value> &rL,
+			   const shared_ptr<const Value> &rR);
 
+
+	/*
+	  Figure out what the widest of two numeric types is.
+
+	  Widest can be thought of as "most capable," or "able to hold the
+	  largest or most precise value."  The progression is Int, Long, Double.
+
+	  @param rL left value
+	  @param rR right value
+	  @returns a BSONType of NumberInt, NumberLong, or NumberDouble
+	*/
+	static BSONType getWidestNumeric(BSONType lType, BSONType rType);
 
     private:
 	Value(); // creates null value

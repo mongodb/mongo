@@ -26,12 +26,15 @@
 #include "../DocumentSourceFilter.h"
 #include "../DocumentSourceGroup.h"
 #include "../DocumentSourceProject.h"
+#include "../ExpressionAdd.h"
 #include "../ExpressionAnd.h"
 #include "../ExpressionCompare.h"
 #include "../ExpressionConstant.h"
 #include "../ExpressionDivide.h"
 #include "../ExpressionDocument.h"
 #include "../ExpressionFieldPath.h"
+#include "../ExpressionIfNull.h"
+#include "../ExpressionNot.h"
 #include "../ExpressionOr.h"
 #include "../FieldIterator.h"
 #include "../pdfile.h"
@@ -168,6 +171,35 @@ namespace mongo
 	return true;
     }
 
+    Pipeline::MiniContext::MiniContext(int theOptions):
+	options(theOptions),
+	raveledField()
+    {
+    }
+
+    inline bool Pipeline::MiniContext::ravelOk() const
+    {
+	return ((options & RAVEL_OK) != 0);
+    }
+
+    inline bool Pipeline::MiniContext::ravelUsed() const
+    {
+	return (raveledField.size() != 0);
+    }
+
+    void Pipeline::MiniContext::ravel(string fieldName)
+    {
+	assert(ravelOk());
+	assert(!ravelUsed());
+	assert(fieldName.size());
+	raveledField = fieldName;
+    }
+
+    bool Pipeline::MiniContext::documentOk() const
+    {
+	return ((options & DOCUMENT_OK) != 0);
+    }
+
     shared_ptr<Expression> Pipeline::parseOperand(BSONElement *pBsonElement)
     {
 	BSONType type = pBsonElement->type();
@@ -201,7 +233,8 @@ namespace mongo
 	case Object:
 	{
 	    shared_ptr<Expression> pSubExpression(
-		parseDocument(pBsonElement));
+		parseObject(pBsonElement,
+			    &MiniContext(MiniContext::DOCUMENT_OK)));
 	    return pSubExpression;
 	}
 
@@ -237,17 +270,18 @@ namespace mongo
     */
     static const OpDesc OpTable[] =
     {
-//	{"$add", ExpressionAdd::create},
+	{"$add", ExpressionAdd::create},
 	{"$and", ExpressionAnd::create},
 	{"$cmp", ExpressionCompare::createCmp},
 	{"$divide", ExpressionDivide::create},
 	{"$eq", ExpressionCompare::createEq},
 	{"$gt", ExpressionCompare::createGt},
 	{"$gte", ExpressionCompare::createGte},
+	{"$ifnull", ExpressionIfNull::create},
 	{"$lt", ExpressionCompare::createLt},
 	{"$lte", ExpressionCompare::createLte},
 	{"$ne", ExpressionCompare::createNe},
-//	{"$not", ExpressionNot::create},
+	{"$not", ExpressionNot::create},
 	{"$or", ExpressionOr::create},
     };
 
@@ -263,20 +297,19 @@ namespace mongo
 	    &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
 
 	assert(pOp); // CW TODO error: invalid operator
+
+	/* make the expression node */
 	shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
 
-	parseExpressionOperands(pExpression, pBsonElement);
-	return pExpression;
-    }
-
-    void Pipeline::parseExpressionOperands(
-	shared_ptr<ExpressionNary> pExpression, BSONElement *pBsonElement)
-    {
-	/* add the operands to the operator expression */
+	/* add the operands to the expression node */
 	BSONType elementType = pBsonElement->type();
 	if (elementType == Object)
 	{
-	    shared_ptr<Expression> pOperand(parseDocument(pBsonElement));
+	    /* the operator must be unary and accept an object argument */
+	    BSONObj objOperand(pBsonElement->Obj());
+	    shared_ptr<Expression> pOperand(
+		parseObject(pBsonElement,
+			    &MiniContext(MiniContext::DOCUMENT_OK)));
 	    pExpression->addOperand(pOperand);
 	}
 	else if (elementType == Array)
@@ -291,77 +324,10 @@ namespace mongo
 		pExpression->addOperand(pOperand);
 	    }
 	}
-	else /* assume its an atomic operand */
+	else /* assume it's an atomic operand */
 	{
 	    shared_ptr<Expression> pOperand(parseOperand(pBsonElement));
 	    pExpression->addOperand(pOperand);
-	}
-    }
-
-    shared_ptr<Expression> Pipeline::parseDocument(BSONElement *pBsonElement)
-    {
-	shared_ptr<Expression> pExpression; // the result
-	shared_ptr<ExpressionDocument> pExpressionDocument; // alt result
-	int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
-
-	/*
-	  We're looking at an operand or the value of a field.  This could be
-	  a virtual document, or it could be an expression.
-	*/
-	BSONObj opObj(pBsonElement->Obj());
-
-	BSONObjIterator objIterator(opObj);
-	for(size_t fieldCount = 0; objIterator.more(); ++fieldCount)
-	{
-	    BSONElement subField(objIterator.next());
-	    string subFieldName(subField.fieldName());
-
-	    /* check the field to see if it is an operator */
-	    if (subFieldName.at(0) == '$')
-	    {
-		assert(fieldCount == 0); // CW TODO operator must be only field
-		pExpression = parseExpression(subFieldName.c_str(), &subField);
-		isOp = 1;
-	    }
-	    else /* it's just a regular field name */
-	    {
-		assert(isOp != 1); // can't accompany an operator
-
-		/* if it's out first time, create the document expression */
-		if (!pExpression.get())
-		{
-		    pExpressionDocument = ExpressionDocument::create();
-		    pExpression = pExpressionDocument;
-		}
-
-		BSONType subType = subField.type();
-		if (subType == Object)
-		{
-		    /* its a nested document */
-		    shared_ptr<Expression> pNested(parseDocument(&subField));
-		    pExpressionDocument->addField(subFieldName, pNested);
-		}
-		else if (subType == String)
-		{
-		    /* its a renamed field */
-		    shared_ptr<Expression> pPath(
-			ExpressionFieldPath::create(subField.String()));
-		    pExpressionDocument->addField(subFieldName, pPath);
-		}
-		else if (subType == NumberDouble)
-		{
-		    /* its an inclusion specification */
-		    shared_ptr<Expression> pPath(
-			ExpressionFieldPath::create(subFieldName));
-		    pExpressionDocument->addField(subFieldName, pPath);
-		}
-		else /* nothing else is allowed */
-		{
-		    assert(false); // CW TODO error
-		}
-
-		isOp = 0;
-	    }
 	}
 
 	return pExpression;
@@ -384,6 +350,7 @@ namespace mongo
 	 */
 	BSONObj projectObj(pBsonElement->Obj());
 	BSONObjIterator fieldIterator(projectObj);
+	MiniContext miniCtx(MiniContext::RAVEL_OK | MiniContext::DOCUMENT_OK);
 	while(fieldIterator.more())
 	{
 	    BSONElement outFieldElement(fieldIterator.next());
@@ -391,7 +358,6 @@ namespace mongo
 	    string inFieldName(outFieldName);
 	    BSONType specType = outFieldElement.type();
 	    int fieldInclusion = -1;
-	    bool ravelArray = false;
 
 	    assert(outFieldName.find('.') == outFieldName.npos);
 	        // CW TODO user error: out field name can't use dot notation
@@ -424,7 +390,7 @@ namespace mongo
 		{
 		    shared_ptr<Expression> pExpression(
 			ExpressionFieldPath::create(inFieldName));
-		    pProject->addField(outFieldName, pExpression, ravelArray);
+		    pProject->addField(outFieldName, pExpression, false);
 		}
 		break;
 
@@ -441,60 +407,20 @@ namespace mongo
 
 	    case Object:
 	    {
+		bool hasRaveled = miniCtx.ravelUsed();
+
+		shared_ptr<Expression> pDocument(
+		    parseObject(&outFieldElement, &miniCtx));
+
 		/*
-		  A computed expression, or a ravel (unwinding an array
-		  one element at a time).
-
-		  We handle $ravel as a special case,
-		  because this is done by the projection source.  For any
-		  other expression, we hand over control to code that parses
-		  the expression and returns an expression.
-
-		  field expressions will look like one of
-		  f0: {f1: ..., f2: ..., f3: ...}
-		  f0: {$operator:[operand1, operand2, ...]}
-		  f0: {$ravel:"f1"}
-		*/
-		BSONObj fieldExprObj(outFieldElement.Obj());
-		BSONObjIterator exprIterator(fieldExprObj);
-		size_t subFieldCount = 0;
-		while(exprIterator.more())
-		{
-		    ++subFieldCount;
-
-		    BSONElement exprElement(exprIterator.next());
-		    const char *pOpName = exprElement.fieldName();
-		    if (pOpName[0] != '$')
-		    {
-			/* create a virtual document */
-			shared_ptr<Expression> pDocExpr(
-			    parseDocument(&exprElement));
-			pProject->addField(outFieldName, pDocExpr, false);
-		    }
-		    else if (strcmp(pOpName, "$ravel") == 0)
-		    {
-			assert(subFieldCount == 1);
-			    // CW TODO usage error
-			assert(exprElement.type() == String);
-			    // CW TODO $ravel operand must be single field name
-			ravelArray = true;
-			inFieldName = exprElement.String();
-
-			shared_ptr<Expression> pExpression(
-			    ExpressionFieldPath::create(inFieldName));
-			pProject->addField(
-			    outFieldName, pExpression, ravelArray);
-		    }
-		    else
-		    {
-			shared_ptr<Expression> pExpression(
-			    parseExpression(pOpName, &exprElement));
-
-			pProject->addField(
-			    outFieldName, pExpression, false);
-		    }
-		}
-
+		  Add The document expression to the projection.  We detect
+		  a raveled field if we haven't raveled a field yet for this
+		  projection, and after parsing find that we have just gotten a
+		  $ravel specification.
+		 */
+		pProject->addField(
+		    outFieldName, pDocument,
+		    !hasRaveled && miniCtx.ravelUsed());
 		break;
 	    }
 
@@ -507,33 +433,14 @@ namespace mongo
 	return pProject;
     }
 
-    shared_ptr<Expression> Pipeline::parseExpressionObject(
-	BSONElement *pBsonElement)
-    {
-	assert(pBsonElement->type() == Object);
-  	    // CW TODO expression object must be an object
-
-	shared_ptr<Expression> pExpression;
-
-	BSONObj filterObj(pBsonElement->Obj());
-	BSONObjIterator filterIterator(filterObj);
-	for(size_t i = 0; filterIterator.more(); ++i)
-	{
-	    assert(i == 0);
-	        // CW TODO error only one field allowed in an expression object
-
-	    BSONElement filterExpr(filterIterator.next());
-	    const char *pOpName = filterExpr.fieldName();
-	    pExpression = parseExpression(pOpName, &filterExpr);
-	}
-
-	return pExpression;
-    }
-
     shared_ptr<DocumentSource> Pipeline::setupFilter(
 	BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource)
     {
-	shared_ptr<Expression> pExpression(parseExpressionObject(pBsonElement));
+	assert(pBsonElement->type() == Object);
+  	    // CW TODO error: expression object must be an object
+	
+	shared_ptr<Expression> pExpression(
+	    parseObject(pBsonElement, 0));
 	shared_ptr<DocumentSourceFilter> pFilter(
 	    DocumentSourceFilter::create(pExpression, pSource));
 
@@ -590,7 +497,9 @@ namespace mongo
 		  Use the projection-like set of field paths to create the
 		  group-by key.
 		 */
-		shared_ptr<Expression> pId(parseDocument(&groupField));
+		shared_ptr<Expression> pId(
+		    parseObject(&groupField,
+				&MiniContext(MiniContext::DOCUMENT_OK)));
 		pGroup->setIdExpression(pId);
 		idSet = true;
 	    }
@@ -625,7 +534,9 @@ namespace mongo
 
 		    BSONType elementType = subElement.type();
 		    if (elementType == Object)
-			pGroupExpr = parseDocument(&subElement);
+			pGroupExpr = parseObject(
+			    &subElement,
+			    &MiniContext(MiniContext::DOCUMENT_OK));
 		    else if (elementType == Array)
 		    {
 			assert(false); // CW TODO group operators are unary
@@ -647,5 +558,120 @@ namespace mongo
 	assert(idSet); // CW TODO error: missing _id specification
 
 	return pGroup;
+    }
+
+    shared_ptr<Expression> Pipeline::parseObject(
+	BSONElement *pBsonElement, MiniContext *pCtx)
+    {
+	/*
+	  An object expression can take any of the following forms:
+
+	  f0: {f1: ..., f2: ..., f3: ...}
+	  f0: {$operator:[operand1, operand2, ...]}
+	  f0: {$ravel:"fieldpath"}
+
+	  We handle $ravel as a special case, because this is done by the
+	  projection source.  For any other expression, we hand over control to
+	  code that parses the expression and returns an expression.
+	*/
+
+	shared_ptr<Expression> pExpression; // the result
+	shared_ptr<ExpressionDocument> pExpressionDocument; // alt result
+	int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
+	enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
+
+	BSONObj obj(pBsonElement->Obj());
+	BSONObjIterator iter(obj);
+	for(size_t fieldCount = 0; iter.more(); ++fieldCount)
+	{
+	    BSONElement fieldElement(iter.next());
+	    const char *pFieldName = fieldElement.fieldName();
+
+	    if (pFieldName[0] == '$')
+	    {
+		assert(fieldCount == 0);
+                    // CW TODO error:  operator must be only field
+
+		/* we've determined this "object" is an operator expression */
+		isOp = 1;
+		kind = OPERATOR;
+
+		if (strcmp(pFieldName, "$ravel") != 0)
+		{
+		    pExpression = parseExpression(pFieldName, &fieldElement);
+		}
+		else
+		{
+		    assert(pCtx->ravelOk());
+    		        // CW TODO error: it's not OK to ravel in this context
+
+		    assert(!pCtx->ravelUsed());
+		        // CW TODO error: this projection already has a ravel
+
+		    assert(fieldElement.type() == String);
+		        // CW TODO $ravel operand must be single field name
+
+		    // TODO should we require leading "$document." here?
+		    string fieldPath(fieldElement.String());
+		    pExpression = ExpressionFieldPath::create(fieldPath);
+		    pCtx->ravel(fieldPath);
+		}
+	    }
+	    else
+	    {
+		assert(isOp != 1);
+		assert(kind != OPERATOR);
+                    // CW TODO error: can't accompany an operator expression
+
+		/* if it's our first time, create the document expression */
+		if (!pExpression.get())
+		{
+		    assert(pCtx->documentOk());
+		        // CW TODO error: document not allowed in this context
+
+		    pExpressionDocument = ExpressionDocument::create();
+		    pExpression = pExpressionDocument;
+
+		    /* this "object" is not an operator expression */
+		    isOp = 0;
+		    kind = NOTOPERATOR;
+		}
+
+		BSONType fieldType = fieldElement.type();
+		string fieldName(pFieldName);
+		if (fieldType == Object)
+		{
+		    /* it's a nested document */
+		    shared_ptr<Expression> pNested(
+			parseObject(&fieldElement, &MiniContext(
+			 (pCtx->documentOk() ? MiniContext::DOCUMENT_OK : 0))));
+		    pExpressionDocument->addField(fieldName, pNested);
+		}
+		else if (fieldType == String)
+		{
+		    /* it's a renamed field */
+		    shared_ptr<Expression> pPath(
+			ExpressionFieldPath::create(fieldElement.String()));
+		    pExpressionDocument->addField(fieldName, pPath);
+		}
+		else if (fieldType == NumberDouble)
+		{
+		    /* it's an inclusion specification */
+		    int inclusion = (int)fieldElement.Double();
+		    assert(inclusion == 1);
+		        // CW TODO error: only positive inclusions allowed here
+
+		    shared_ptr<Expression> pPath(
+			ExpressionFieldPath::create(fieldName));
+		    pExpressionDocument->addField(fieldName, pPath);
+		}
+		else /* nothing else is allowed */
+		{
+		    assert(false); // CW TODO error
+		}
+	    }
+	}
+
+	return pExpression;
     }
 }

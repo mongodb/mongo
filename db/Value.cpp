@@ -539,42 +539,51 @@ namespace mongo
 	return Value::getFalse();
     }
 
+    long long Value::coerceToLong() const
+    {
+	switch(type)
+	{
+	case NumberDouble:
+	    return (long long)simple.doubleValue;
+
+	case NumberInt:
+	    return simple.intValue;
+
+	case NumberLong:
+	    return simple.longValue;
+
+	case String:
+	    assert(false); // CW TODO try to convert w/atod()
+	    return (double)0;
+
+	default:
+	    assert(false); // CW TODO no conversion available
+	} // switch(type)
+
+	/* NOTREACHED */
+	return (double)0;
+	
+    }
+
     double Value::coerceToDouble() const
     {
 	switch(type)
 	{
-	    case NumberDouble:
-		return simple.doubleValue;
+	case NumberDouble:
+	    return simple.doubleValue;
 
-	    case NumberInt:
-		return (double)simple.intValue;
+	case NumberInt:
+	    return (double)simple.intValue;
 
-	    case NumberLong:
-		return (double)simple.longValue;
+	case NumberLong:
+	    return (double)simple.longValue;
 
-	    case String:
-		assert(false); // CW TODO try to convert w/atod()
-		return (double)0;
+	case String:
+	    assert(false); // CW TODO try to convert w/atod()
+	    return (double)0;
 
-	    case Object:
-	    case Array:
-	    case BinData:
-	    case jstOID:
-	    case jstNULL:
-	    case Bool:
-	    case Date:
-	    case RegEx:
-	    case Symbol:
-	    case CodeWScope:
-	    case Timestamp:
-	    case MinKey:
-	    case EOO:
-	    case Undefined:
-	    case DBRef:
-	    case Code:
-	    case MaxKey:
-		assert(false); // CW TODO no conversion available
-		return (double)0;
+	default:
+	    assert(false); // CW TODO no conversion available
 	} // switch(type)
 
 	/* NOTREACHED */
@@ -709,5 +718,35 @@ namespace mongo
 
 	/* NOTREACHED */
 	return 0;
+    }
+
+    BSONType Value::getWidestNumeric(BSONType lType, BSONType rType)
+    {
+	/* check that the left operand is numeric */
+	assert((lType == NumberDouble) || (lType == NumberLong) ||
+	       (lType == NumberInt)); // CW TODO rL is not numeric
+
+	/*
+	  Check the right operand for numeric types.  Start with the largest
+	  and go to the smallest.  If either value has that type, that's
+	  the wider of the two.
+
+	  We check the right operand first because we already know the
+	  left operand is numeric, but we don't know if the right one is or not.
+	 */
+	if ((rType == NumberDouble) || (lType == NumberDouble))
+	    return NumberDouble;
+
+	if ((rType == NumberLong) || (lType == NumberLong))
+	    return NumberLong;
+
+	/* if we got here, lType must be NumberInt */
+	if (rType == NumberInt)
+	    return NumberInt;
+
+	/* if we got here, rType must not be numeric */
+	assert(false); // CW TODO rR is not numeric
+	/* NOTREACHED */
+	return jstNULL;
     }
 }
