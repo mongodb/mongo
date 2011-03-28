@@ -131,6 +131,7 @@ add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boo
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
+add_option( "cppflags", "set custom cppflags, overriding everything else" , 1, True )
 
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
@@ -675,9 +676,13 @@ if nix:
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
         
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if linux:
+    cppflags = GetOption("cppflags")
+    if cppflags:
+        env.Append( CPPFLAGS= cppflags )
+    else:
+        env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
+    if linux and not cppflags:
         env.Append( CPPFLAGS=" -Werror " )
         if not has_option('clang'): 
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
@@ -696,7 +701,7 @@ if nix:
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
-    else:
+    elif not cppflags:
         env.Append( CPPFLAGS=" -O3" )
         #env.Append( CPPFLAGS=" -fprofile-generate" )
         #env.Append( LINKFLAGS=" -fprofile-generate" )
@@ -1147,8 +1152,8 @@ if darwin or clientEnv["_HAVEPCAP"]:
     else:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
+    sniffEnv.Prepend( LIBS=[ "mongotestfiles" ] )
     sniffEnv.Prepend( LIBPATH=["."] )
-    sniffEnv.Append( LIBS=[ "mongotestfiles" ] )
 
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
