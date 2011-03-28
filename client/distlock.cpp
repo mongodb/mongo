@@ -769,7 +769,7 @@ namespace mongo {
                 conn.done();
                 return;
             }
-            catch( UpdateNotTheSame& e ) {
+            catch( UpdateNotTheSame& ) {
                 log( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked (messily). " << endl;
                 conn.done();
                 break;
