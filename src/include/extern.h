@@ -353,7 +353,7 @@ __wt_thread_join(pthread_t tid);
 void
 __wt_yield(void);
 uint32_t
-__wt_cksum(const void *chunk, uint32_t bytes);
+__wt_cksum(const void *chunk, uint32_t len);
 void
 __wt_msg_call(void *cb, void *handle,
     const char *pfx1, const char *pfx2,
