@@ -5,12 +5,6 @@
  *	All rights reserved.
  */
 
-/* Forward declarations of internal handle types. */
-struct __btree;			typedef struct __btree BTREE;
-struct __btree_session;		typedef struct __btree_session BTREE_SESSION;
-struct __connection;		typedef struct __connection CONNECTION;
-struct __session;		typedef struct __session SESSION;
-
 typedef struct {
 	WT_CURSOR iface;
 
@@ -253,7 +247,6 @@ struct __session {
 	WT_INSERT      **srch_ins;	/* WT_INSERT insert node */
 	WT_UPDATE      **srch_upd;	/* WT_UPDATE insert node */
 	uint32_t	 srch_slot;	/* WT_INSERT/WT_UPDATE slot */
-	WT_RLE_EXPAND	*srch_exp;	/* WT_RLE_EXPAND node */
 
 	void (*msgcall)(const CONNECTION *, const char *);
 

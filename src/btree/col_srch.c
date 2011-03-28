@@ -33,7 +33,6 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	session->srch_ins = NULL;
 	session->srch_upd = NULL;
 	session->srch_slot = UINT32_MAX;
-	session->srch_exp = NULL;
 
 	btree = session->btree;
 

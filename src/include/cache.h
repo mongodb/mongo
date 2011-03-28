@@ -9,9 +9,6 @@
 extern "C" {
 #endif
 
-struct __wt_evict_list;		typedef struct __wt_evict_list WT_EVICT_LIST;
-struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
-
 /*
  * WT_EVICT_LIST --
  *	Encapsulation of an eviction choice.

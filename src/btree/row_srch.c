@@ -34,7 +34,6 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	session->srch_ins = NULL;
 	session->srch_upd = NULL;
 	session->srch_slot = UINT32_MAX;
-	session->srch_exp = NULL;
 
 	cmp = 0;
 	btree = session->btree;

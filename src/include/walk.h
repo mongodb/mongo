@@ -9,9 +9,6 @@
 extern "C" {
 #endif
 
-struct __wt_walk;		typedef struct __wt_walk WT_WALK;
-struct __wt_walk_entry;		typedef struct __wt_walk_entry WT_WALK_ENTRY;
-
 struct __wt_walk_entry {
 	WT_REF	*ref;		/* Page reference */
 	uint32_t indx;		/* Not-yet-visited slot on the page */

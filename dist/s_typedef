@@ -1,22 +1,67 @@
 #! /bin/sh
 
-# Complain about unused #typedefs.
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-# List of files to search.
-l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
-l="$l `echo ../src/utilities/*.c`"
+build() {
+	# Build the standard typedefs.
+	f=../src/include/wt_internal.in
+	(sed -e '/Forward structure declarations .*: BEGIN/{' \
+	    -e 'n' \
+	    -e 'q' \
+	    -e '}' < $f
 
-(
-# Get the list of typedefs
-search=`cat ../src/include/*.h ../src/include/*.in |
-    sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' -e d |
-    sort -u`
-echo "$search"
-fgrep -who "$search" $l
-) | sort | uniq -u > $t
+	l=`echo ../src/include/*.h ../src/include/*.in |
+	    sed -e 's/wiredtiger.in//' -e 's/queue.h//'`
+	for i in \
+	    `egrep -h '^struct[	 ]*__.*[	 ]*{$' $l |
+	    sed -e 's/struct[	 ]*__//' -e 's/[	 ]*{$//' | sort`; do
+		upper=`echo $i | tr a-z A-Z`
+		echo "struct __$i; typedef struct __$i $upper;"
+	done
 
-test -s $t && cat $t
+	echo '/*'
+	sed -e '/Forward structure declarations .*: END/,${' \
+	    -e 'p' \
+	    -e '}' \
+	    -e 'd' < $f) > $t
+	cmp $t $f > /dev/null 2>&1 ||
+	    (echo "Building $f" && rm -f $f && cp $t $f && chmod 444 $f)
+}
 
+check() {
+	# Complain about unused #typedefs.
+	# List of files to search.
+	l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
+	l="$l `echo ../src/utilities/*.c`"
+
+	(
+	# Get the list of typedefs
+	search=`cat ../src/include/*.h ../src/include/*.in |
+	    sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' -e d |
+	    sort -u`
+	echo "$search"
+	fgrep -who "$search" $l
+	) | sort | uniq -u > $t
+
+	test -s $t && cat $t
+}
+
+while :
+	do case "$1" in
+	-b)				# -b builds the typedefs
+		build
+		shift;;
+	-c)				# -d checks the typedefs
+		check
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+test "$#" -eq 0 || {
+	echo 'usage: s_typedef [-bc]' >&2
+	exit 1
+}
 exit 0

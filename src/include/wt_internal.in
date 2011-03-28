@@ -40,27 +40,42 @@ extern "C" {
 /*******************************************
  * Forward structure declarations for internal structures.
  *******************************************/
-struct __session_buffer;	typedef struct __session_buffer SESSION_BUFFER;
-struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
-struct __wt_cell;		typedef struct __wt_cell WT_CELL;
-struct __wt_col;		typedef struct __wt_col WT_COL;
-struct __wt_col_ref;		typedef struct __wt_col_ref WT_COL_REF;
-struct __wt_fh;			typedef struct __wt_fh WT_FH;
-struct __wt_free_entry;		typedef struct __wt_free_entry WT_FREE_ENTRY;
-struct __wt_insert;		typedef struct __wt_insert WT_INSERT;
-struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
-struct __wt_off;		typedef struct __wt_off WT_OFF;
-struct __wt_off_record;		typedef struct __wt_off_record WT_OFF_RECORD;
-struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
-struct __wt_page;		typedef struct __wt_page WT_PAGE;
-struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
-struct __wt_page_disk;		typedef struct __wt_page_disk WT_PAGE_DISK;
-struct __wt_ref;		typedef struct __wt_ref WT_REF;
-struct __wt_rle_expand;		typedef struct __wt_rle_expand WT_RLE_EXPAND;
-struct __wt_row;		typedef struct __wt_row WT_ROW;
-struct __wt_row_ref;		typedef struct __wt_row_ref WT_ROW_REF;
-struct __wt_stats;		typedef struct __wt_stats WT_STATS;
-struct __wt_update;		typedef struct __wt_update WT_UPDATE;
+/*
+ * DO NOT EDIT: automatically built by dist/s_typedef.
+ * Forward structure declarations for internal structures: BEGIN
+ */
+struct __btree; typedef struct __btree BTREE;
+struct __btree_session; typedef struct __btree_session BTREE_SESSION;
+struct __connection; typedef struct __connection CONNECTION;
+struct __session; typedef struct __session SESSION;
+struct __session_buffer; typedef struct __session_buffer SESSION_BUFFER;
+struct __wt_cache; typedef struct __wt_cache WT_CACHE;
+struct __wt_cell; typedef struct __wt_cell WT_CELL;
+struct __wt_col; typedef struct __wt_col WT_COL;
+struct __wt_col_ref; typedef struct __wt_col_ref WT_COL_REF;
+struct __wt_evict_list; typedef struct __wt_evict_list WT_EVICT_LIST;
+struct __wt_fh; typedef struct __wt_fh WT_FH;
+struct __wt_free_entry; typedef struct __wt_free_entry WT_FREE_ENTRY;
+struct __wt_insert; typedef struct __wt_insert WT_INSERT;
+struct __wt_mtx; typedef struct __wt_mtx WT_MTX;
+struct __wt_off; typedef struct __wt_off WT_OFF;
+struct __wt_off_record; typedef struct __wt_off_record WT_OFF_RECORD;
+struct __wt_ovfl; typedef struct __wt_ovfl WT_OVFL;
+struct __wt_page; typedef struct __wt_page WT_PAGE;
+struct __wt_page_desc; typedef struct __wt_page_desc WT_PAGE_DESC;
+struct __wt_page_disk; typedef struct __wt_page_disk WT_PAGE_DISK;
+struct __wt_read_req; typedef struct __wt_read_req WT_READ_REQ;
+struct __wt_ref; typedef struct __wt_ref WT_REF;
+struct __wt_row; typedef struct __wt_row WT_ROW;
+struct __wt_row_ref; typedef struct __wt_row_ref WT_ROW_REF;
+struct __wt_stats; typedef struct __wt_stats WT_STATS;
+struct __wt_update; typedef struct __wt_update WT_UPDATE;
+struct __wt_walk; typedef struct __wt_walk WT_WALK;
+struct __wt_walk_entry; typedef struct __wt_walk_entry WT_WALK_ENTRY;
+/*
+ * Forward structure declarations for internal structures: END
+ * DO NOT EDIT: automatically built by dist/s_typedef.
+ */
 
 /*******************************************
  * WiredTiger internal include files.
