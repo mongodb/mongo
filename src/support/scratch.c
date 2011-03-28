@@ -14,11 +14,12 @@
 int
 __wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz)
 {
+	WT_ASSERT(session, sz <= UINT32_MAX);
+
 	if (sz > buf->mem_size)
 		WT_RET(__wt_realloc(session, &buf->mem_size, sz, &buf->mem));
 
 	buf->item.data = buf->mem;
-	WT_ASSERT(session, sz <= UINT32_MAX);
 	buf->item.size = (uint32_t)sz;
 	return (0);
 }
