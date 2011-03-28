@@ -143,7 +143,12 @@ namespace mongo {
         // fast rough check to see if we must load the real doc - we also
         // compare field counts against covereed index matcher; for $or clauses
         // we just compare field counts
-        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
+        bool keyMatch() const { return
+            !all
+            && !haveSize
+            && !hasArray // We can't match an array to its first indexed element using keymatch
+            && !haveNeg;
+        }
 
         bool atomic() const { return _atomic; }
 

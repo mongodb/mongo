@@ -606,7 +606,7 @@ namespace mongo {
         bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             string ns = cmdObj["getShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
-                errmsg = "need to speciy fully namespace";
+                errmsg = "need to specify full namespace";
                 return false;
             }
 
@@ -642,7 +642,7 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , bool isWriteOp , string& errmsg ) {
+    bool shardVersionOk( const string& ns , string& errmsg ) {
         if ( ! shardingState.enabled() )
             return true;
 

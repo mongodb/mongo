@@ -283,8 +283,10 @@ namespace mongo {
             BSONElement e = cmdObj.firstElement();
             log() << "repairDatabase " << dbname << endl;
             int p = (int) e.number();
-            if ( p != 1 )
+            if ( p != 1 ) {
+                errmsg = "bad option";
                 return false;
+            }
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
             e = cmdObj.getField( "backupOriginalFiles" );

@@ -1255,8 +1255,11 @@ namespace mongo {
                 }
                 n++;
                 progress.hit();
-
-                if ( n % 128 == 0 && !cc->yield() ) {
+                
+                if ( cc->yieldSometimes() ) {
+                    progress.setTotalWhileRunning( d->stats.nrecords );
+                }
+                else {
                     cc.release();
                     uasserted(12584, "cursor gone during bg index");
                     break;
@@ -1952,7 +1955,9 @@ namespace mongo {
         }
 
         if ( !res ) {
-            problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
+            errmsg = str::stream() << "clone failed for " << dbName << " with error: " << errmsg;
+            problem() << errmsg << endl;
+
             if ( !preserveClonedFilesOnFailure )
                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 

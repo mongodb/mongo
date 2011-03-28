@@ -34,6 +34,9 @@
 #include "dbtests.h"
 #include "../db/dur_stats.h"
 #include "../util/checksum.h"
+#include "../util/version.h"
+
+using namespace bson;
 
 namespace PerfTests {
     typedef DBDirectClient DBClientType;
@@ -65,46 +68,6 @@ namespace PerfTests {
     };
     DBClientType ClientBase::_client;
 
-    class Checksum {
-    public:
-        void run() {
-            {
-                // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
-                unsigned long long x = 0xffffffffffffffffULL;
-                ASSERT( x+2 == 1 );
-            }
-
-            unsigned sz = 1024 * 1024 * 100 + 3;
-            void *p = malloc(sz);
-            for (unsigned i = 0; i<sz; i++)
-                ((char*)p)[i] = rand();
-
-            mongo::Checksum last = {};
-            for( int i = 0; i < 4; i++ ) { 
-                Timer t;
-                mongo::Checksum c;
-                c.gen(p, sz);
-                cout << "checksum " << t.millis() << "ms" << endl;
-                ASSERT( i == 0 || c == last );
-                last = c;
-            }
-            {
-                mongo::Checksum c;
-                c.gen(p, sz-1);
-                ASSERT( c != last );
-                ((char *&)p)[0]++; // check same data, different order, doesn't give same checksum
-                ((char *&)p)[1]--;
-                c.gen(p, sz);
-                ASSERT( c != last );
-                ((char *&)p)[1]++; // check same data, different order, doesn't give same checksum (different longwords case)
-                ((char *&)p)[8]--;
-                c.gen(p, sz);
-                ASSERT( c != last );
-            }
-            free(p);
-        }
-    };
-
     // todo: use a couple threads. not a very good test yet.
     class TaskQueueTest {
         static int tot;
@@ -133,14 +96,13 @@ namespace PerfTests {
     };
     int TaskQueueTest::tot;
 
-    class CappedTest : public ClientBase {
-    };
-
     class B : public ClientBase {
         string _ns;
     protected:
         const char *ns() { return _ns.c_str(); }
-        virtual void prep() = 0;
+
+        // anything you want to do before being timed
+        virtual void prep() { }
 
         virtual void timed() = 0;
 
@@ -149,14 +111,76 @@ namespace PerfTests {
         virtual const char * timed2() { return 0; }
 
         virtual void post() { }
+
         virtual string name() = 0;
-        virtual unsigned long long expectation() = 0;
-        virtual int howLongMillis() { return 5000; } // how long to run test
+        virtual unsigned long long expectation() { return 0; }
+        virtual int expectationTimeMillis() { return -1; }
+
+        // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
+        virtual int howLongMillis() { return 5000; } 
+
+        /* override if your test output doesn't need that */
+        virtual bool showDurStats() { return true; }
+
+        static DBClientConnection *conn;
+
     public:
         void say(unsigned long long n, int ms, string s) {
-            //cout << setw(36) << left << s << ' ' << right << setw(7) << n*1000/ms << "/sec   " << setw(4) << ms << "ms" << endl;
-          cout << "stats\t" << setw(36) << left << s << '\t' << n*1000/ms << "\t" << ms << "ms\t"
-                 << dur::stats.curr->_asCSV() << endl;
+            unsigned long long rps = n*1000/ms;
+            cout << "stats " << setw(33) << left << s << ' ' << setw(8) << rps << ' ' << right << setw(6) << ms << "ms ";
+            if( showDurStats() )
+                cout << dur::stats.curr->_asCSV();
+            cout << endl;
+
+            /* if you want recording of the timings, place the password for the perf database 
+               in a "pstats.login" text file in the current directory for the test binary
+            */
+            if( exists("pstats.login") ) {
+                try {
+                    if( conn == 0 ) {
+                        MemoryMappedFile f;
+                        void *p = f.mapWithOptions("pstats.login", MongoFile::READONLY);
+                        string pwd((const char *)p, (unsigned) f.length());
+                        conn = new DBClientConnection(false, 0, 10);
+                        string err;
+                        if( conn->connect("mongo05.10gen.cust.cbici.net", err) ) { 
+                            if( !conn->auth("perf", "perf", pwd, err) ) { 
+                                cout << "info: authentication with stats before logging failed: " << err << endl;
+                                assert(false);
+                            }
+                        }
+                        else { 
+                            cout << err << " (to log pstats)" << endl;
+                        }
+                    }
+                    if( conn && !conn->isFailed() ) { 
+                        bob b;
+                        b.append("host", getHostName());
+                        b.appendTimeT("when", time(0));
+                        b.append("test", s);
+                        b.append("rps", (int) rps);
+                        b.append("millis", ms);
+                        b.appendBool("dur", cmdLine.dur);
+                        if( showDurStats() && cmdLine.dur ) 
+                            b.append("durStats", dur::stats.curr->_asObj());
+                        {
+                            bob inf;
+                            inf.append("version", versionString);
+                            if( sizeof(int*) == 4 ) inf.append("bits", 32);
+    #if defined(_WIN32)
+                            inf.append("os", "win");
+    #endif
+                            inf.append("git", gitVersion());
+                            inf.append("boost", BOOST_VERSION);
+                            b.append("info", inf.obj());
+                        }
+
+                        conn->insert("perf.pstats", b.obj());
+                    }
+                }
+                catch(...) { 
+                }
+            }
         }
         void run() {
             _ns = string("perftest.") + name();
@@ -171,20 +195,32 @@ namespace PerfTests {
             Timer t;
             unsigned long long n = 0;
             const unsigned Batch = 50;
-            do {
-                unsigned i;
-                for( i = 0; i < Batch; i++ )
-                    timed();
-                n += i;
+
+            if( hlm == 0 ) { 
+                // means just do once
+                timed();
             }
-            while( t.millis() < hlm );
+            else {
+                do {
+                    unsigned i;
+                    for( i = 0; i < Batch; i++ )
+                        timed();
+                    n += i;
+                } while( t.millis() < hlm );
+            }
+
             client().getLastError(); // block until all ops are finished
             int ms = t.millis();
             say(n, ms, name());
 
-            if( n < expectation() ) {
-                cout << "\ntest " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
-                cout << endl;
+            int etm = expectationTimeMillis();
+            if( etm > 0 ) { 
+                if( ms > etm*2 ) { 
+                    cout << "test  " << name() << " seems slow expected ~" << etm << "ms" << endl;
+                }
+            }
+            else if( n < expectation() ) {
+                cout << "test  " << name() << " seems slow n:" << n << " ops/sec but expect greater than:" << expectation() << endl;
             }
 
             {
@@ -205,6 +241,76 @@ namespace PerfTests {
                     say(n, ms, test2name);
                 }
             }
+        }
+    };
+
+    DBClientConnection *B::conn;
+
+    unsigned dontOptimizeOutHopefully;
+
+    // test thread local speed
+    class TLS : public B {
+    public:
+        TLS() { }
+        string name() { return "thread-local-storage"; }
+        void timed() {
+            if( &cc() )
+                dontOptimizeOutHopefully++;
+        }
+        unsigned long long expectation() { return 1000000; }
+        virtual bool showDurStats() { return false; }
+    };
+
+    // test speed of checksum method
+    class ChecksumTest : public B {
+    public:
+        const unsigned sz;
+        ChecksumTest() : sz(1024*1024*100+3)
+        { }
+        string name() { return "checksum"; }
+        virtual int howLongMillis() { return 0; } 
+        int expectationTimeMillis() { return 200; }
+        virtual bool showDurStats() { return false; }
+
+        void *p;
+
+        void prep() { 
+            {
+                // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
+                unsigned long long x = 0xffffffffffffffffULL;
+                ASSERT( x+2 == 1 );
+            }
+
+            p = malloc(sz);
+            for (unsigned i = 0; i<sz; i++)
+                ((char*)p)[i] = rand();
+        }
+
+        Checksum last;
+
+        void timed() {
+            for( int i = 0; i < 4; i++ ) { 
+                Checksum c;
+                c.gen(p, sz);
+                ASSERT( i == 0 || c == last );
+                last = c;
+            }
+        }
+        void post() {
+            {
+                mongo::Checksum c;
+                c.gen(p, sz-1);
+                ASSERT( c != last );
+                ((char *&)p)[0]++; // check same data, different order, doesn't give same checksum
+                ((char *&)p)[1]--;
+                c.gen(p, sz);
+                ASSERT( c != last );
+                ((char *&)p)[1]++; // check same data, different order, doesn't give same checksum (different longwords case)
+                ((char *&)p)[8]--;
+                c.gen(p, sz);
+                ASSERT( c != last );
+            }
+            free(p);
         }
     };
 
@@ -366,11 +472,12 @@ namespace PerfTests {
         }
 
         void setupTests() {
-            add< Checksum >();
-            add< TaskQueueTest >();
-            cout << "stats\t" 
-                << "test                                \trps\ttime\t"
+            cout
+                << "stats test                              rps        time   "
                 << dur::stats.curr->_CSVHeader() << endl;
+            add< ChecksumTest >();
+            add< TaskQueueTest >();
+            add< TLS >();
             add< InsertDup >();
             add< Insert1 >();
             add< InsertRandom >();

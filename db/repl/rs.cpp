@@ -263,7 +263,7 @@ namespace mongo {
         mgr( new Manager(this) ) {
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
-        *_hbmsg = '.'; // temp...just to see
+        strcpy( _hbmsg , "initial startup" );
         lastH = 0;
         changeState(MemberState::RS_STARTUP);
 

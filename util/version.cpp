@@ -36,7 +36,6 @@ namespace mongo {
      */
     const char versionString[] = "1.9.0-pre-";
 
-
     // See unit test for example outputs
     static BSONArray _versionArray(const char* version){
         // this is inefficient, but cached so it doesn't matter
