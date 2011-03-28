@@ -392,7 +392,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
  *	we look at them.
  */
 int
-__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *scratch)
+__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
 {
 	BTREE *btree;
 	WT_BUF *tmp;
@@ -431,7 +431,7 @@ offpage:	/*
 		 * WT_ITEM.
 		 */
 		if (huffman == NULL)
-			tmp = scratch;
+			tmp = retbuf;
 		else
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_RET(__wt_ovfl_in(session, WT_CELL_BYTE_OVFL(cell), tmp));
@@ -451,14 +451,14 @@ offpage:	/*
 	 * copy a decoded version into the caller's WT_BUF.
 	 */
 	if (huffman == NULL) {
-		if (tmp != scratch) {
-			WT_ERR(__wt_buf_grow(session, scratch, size));
-			memcpy(scratch->mem, p, size);
+		if (tmp != retbuf) {
+			WT_ERR(__wt_buf_grow(session, retbuf, size));
+			memcpy(retbuf->mem, p, size);
 		}
 	} else
-		WT_ERR(__wt_huffman_decode(huffman, p, size, scratch));
+		WT_ERR(__wt_huffman_decode(huffman, p, size, retbuf));
 
-err:	if (tmp != NULL && tmp != scratch)
+err:	if (tmp != NULL && tmp != retbuf)
 		__wt_scr_release(&tmp);
 
 	return (ret);
