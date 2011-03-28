@@ -142,9 +142,8 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 {
 	BTREE *btree;
 	FILE *fp;
-	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_RLE_EXPAND *exp, **expsort, **expp;
+	WT_INSERT *ins;
 	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t i;
@@ -154,44 +153,30 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 	btree = session->btree;
 	fp = dp->stream;
-	tmp = NULL;
 	ret = 0;
 
 	recno = page->u.col_leaf.recno;
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 		/*
-		 * Get a sorted list of any expansion entries we've created for
-		 * this set of records.  The sort function returns a NULL-
-		 * terminated array of references to WT_RLE_EXPAND structures,
-		 * sorted by record number.
-		 */
-		WT_ERR(
-		    __wt_rle_expand_sort(session, page, cip, &expsort, &tmp));
-
-		/*
 		 * Dump the records.   We use the WT_UPDATE entry for records in
-		 * in the WT_RLE_EXPAND array, and original data otherwise.
+		 * in the WT_INSERT array, and original data otherwise.
 		 */
-		for (expp = expsort,
+		for (ins = WT_COL_INSERT(page, cip),
 		    n_repeat = WT_RLE_REPEAT_COUNT(cipdata);
 		    n_repeat > 0; --n_repeat, ++recno)
-			if ((exp = *expp) != NULL && exp->recno == recno) {
-				++expp;
-				upd = exp->upd;
+			if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
+				upd = ins->upd;
 				if (!WT_UPDATE_DELETED_ISSET(upd))
 					dp->p(
 					    WT_UPDATE_DATA(upd), upd->size, fp);
+				ins = ins->next;
 			} else
 				if (!WT_FIX_DELETE_ISSET(
 				    WT_RLE_REPEAT_DATA(cipdata)))
 					dp->p(WT_RLE_REPEAT_DATA(
 					    cipdata), btree->fixed_len, fp);
 	}
-
-	/* Free the sort array. */
-err:	if (tmp != NULL)
-		__wt_scr_release(&tmp);
 
 	return (ret);
 }
@@ -287,7 +272,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		upd = ins->upd;
 		if (WT_UPDATE_DELETED_ISSET(upd))
 			continue;
-		dp->p(WT_INSERT_DATA(ins), ins->size, dp->stream);
+		dp->p(WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), dp->stream);
 		dp->p(WT_UPDATE_DATA(upd), upd->size, dp->stream);
 	}
 
@@ -352,7 +337,8 @@ dump_insert:	/* Dump inserted K/V pairs. */
 			upd = ins->upd;
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
-			dp->p(WT_INSERT_DATA(ins), ins->size, dp->stream);
+			dp->p(WT_INSERT_KEY(ins),
+			    WT_INSERT_KEY_SIZE(ins), dp->stream);
 			dp->p(WT_UPDATE_DATA(upd), upd->size, dp->stream);
 		}
 	}

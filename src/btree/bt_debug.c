@@ -11,11 +11,11 @@
 #ifdef HAVE_DIAGNOSTIC
 static int  __wt_debug_cell(SESSION *, WT_CELL *, FILE *fp);
 static int  __wt_debug_cell_data(SESSION *, WT_CELL *, FILE *);
+static void __wt_debug_col_insert(WT_INSERT *, FILE *);
 static void __wt_debug_dsk_col_fix(BTREE *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(BTREE *, WT_PAGE_DISK *, FILE *);
 static int  __wt_debug_dsk_item(SESSION *, WT_PAGE_DISK *, FILE *);
-static void __wt_debug_insert(WT_INSERT *, FILE *);
 static void __wt_debug_page_col_fix(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_page_col_int(WT_PAGE *, FILE *);
 static void __wt_debug_page_col_rle(SESSION *, WT_PAGE *, FILE *);
@@ -24,7 +24,8 @@ static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_leaf(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
 static void __wt_debug_update(WT_UPDATE *, FILE *);
-static void __wt_debug_rleexp(WT_RLE_EXPAND *, FILE *);
+static void __wt_debug_ref(WT_REF *, FILE *);
+static void __wt_debug_row_insert(WT_INSERT *, FILE *);
 static int  __wt_debug_set_fp(const char *, FILE **, int *);
 
 /*
@@ -263,12 +264,11 @@ __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_COL_REF_FOREACH(page, cref, i)
+	WT_COL_REF_FOREACH(page, cref, i) {
 		fprintf(fp,
-		    "\toffpage: addr %lu, size %lu, starting recno %llu\n",
-		    (u_long)WT_COL_REF_ADDR(cref),
-		    (u_long)WT_COL_REF_SIZE(cref),
-		    (unsigned long long)cref->recno);
+		    "\tstarting recno %llu\n", (unsigned long long)cref->recno);
+		__wt_debug_ref(&cref->ref, fp);
+	}
 }
 
 /*
@@ -279,7 +279,7 @@ static void
 __wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 {
 	WT_COL *cip;
-	WT_RLE_EXPAND *exp;
+	WT_INSERT *ins;
 	uint32_t fixed_len, i;
 	void *cipvalue;
 
@@ -299,8 +299,8 @@ __wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 			    WT_RLE_REPEAT_DATA(cipvalue), fixed_len, fp);
 		fprintf(fp, "}\n");
 
-		if ((exp = WT_COL_RLEEXP(page, cip)) != NULL)
-			__wt_debug_rleexp(exp, fp);
+		if ((ins = WT_COL_INSERT(page, cip)) != NULL)
+			__wt_debug_col_insert(ins, fp);
 	}
 }
 
@@ -349,9 +349,7 @@ __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 			fprintf(fp, "\tK: {requires processing}\n");
 		else
 			__wt_debug_item("\tK", rref, fp);
-		fprintf(fp, "\toffpage: addr %lu, size %lu\n",
-		    (u_long)WT_ROW_REF_ADDR(rref),
-		    (u_long)WT_ROW_REF_SIZE(rref));
+		__wt_debug_ref(&rref->ref, fp);
 	}
 }
 
@@ -375,7 +373,7 @@ __wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 	 * key on the page.
 	 */
 	if ((ins = WT_ROW_INSERT_SMALLEST(page)) != NULL)
-		__wt_debug_insert(ins, fp);
+		__wt_debug_row_insert(ins, fp);
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_INDX_FOREACH(page, rip, i) {
@@ -394,24 +392,42 @@ __wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 			__wt_debug_update(upd, fp);
 
 		if ((ins = WT_ROW_INSERT(page, rip)) != NULL)
-			__wt_debug_insert(ins, fp);
+			__wt_debug_row_insert(ins, fp);
 	}
 
 	return (0);
 }
 
 /*
- * __wt_debug_insert --
- *	Dump an insert array.
+ * __wt_debug_col_insert --
+ *	Dump an RLE column-store insert array.
  */
 static void
-__wt_debug_insert(WT_INSERT *ins, FILE *fp)
+__wt_debug_col_insert(WT_INSERT *ins, FILE *fp)
 {
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
 	for (; ins != NULL; ins = ins->next) {
-		__wt_debug_pair("\tinsert", WT_INSERT_DATA(ins), ins->size, fp);
+		fprintf(fp, "\tinsert %llu\n",
+		    (unsigned long long)WT_INSERT_RECNO(ins));
+		__wt_debug_update(ins->upd, fp);
+	}
+}
+
+/*
+ * __wt_debug_row_insert --
+ *	Dump an insert array.
+ */
+static void
+__wt_debug_row_insert(WT_INSERT *ins, FILE *fp)
+{
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
+
+	for (; ins != NULL; ins = ins->next) {
+		__wt_debug_pair("\tinsert",
+		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), fp);
 		__wt_debug_update(ins->upd, fp);
 	}
 }
@@ -432,28 +448,6 @@ __wt_debug_update(WT_UPDATE *upd, FILE *fp)
 		else
 			__wt_debug_pair(
 			    "\tupdate", WT_UPDATE_DATA(upd), upd->size, fp);
-}
-
-/*
- * __wt_debug_rleexp --
- *	Dump a column-store expansion array.
- */
-static void
-__wt_debug_rleexp(WT_RLE_EXPAND *exp, FILE *fp)
-{
-	WT_UPDATE *upd;
-
-	if (fp == NULL)				/* Default to stderr */
-		fp = stderr;
-
-	for (; exp != NULL; exp = exp->next) {
-		upd = exp->upd;
-		if (WT_UPDATE_DELETED_ISSET(upd))
-			fprintf(fp, "\tupdate: {deleted}\n");
-		else
-			__wt_debug_pair(
-			    "\tupdate", WT_UPDATE_DATA(upd), upd->size, fp);
-	}
 }
 
 /*
@@ -686,5 +680,30 @@ __wt_debug_pair(const char *tag, const void *data, uint32_t size, FILE *fp)
 	fprintf(fp, "%lu {",  (u_long)size);
 	__wt_print_byte_string(data, size, fp);
 	fprintf(fp, "}\n");
+}
+
+/*
+ * __wt_debug_ref --
+ *	Print out a page's in-memory WT_REF state.
+ */
+static void
+__wt_debug_ref(WT_REF *ref, FILE *fp)
+{
+	if (fp == NULL)				/* Default to stderr */
+		fp = stderr;
+
+	fprintf(fp, "\tref: addr %lu, size %lu, state:",
+	    (u_long)ref->addr, (u_long)ref->size);
+	if (FLD_ISSET(ref->state, WT_REF_DISK))
+		fprintf(fp, " disk");
+	if (FLD_ISSET(ref->state, WT_REF_EVICTED))
+		fprintf(fp, " evicted");
+	if (FLD_ISSET(ref->state, WT_REF_MEM))
+		fprintf(fp, " mem");
+	if (FLD_ISSET(ref->state, WT_REF_EVICT))
+		fprintf(fp, " evict");
+	if (FLD_ISSET(ref->state, WT_REF_MERGE))
+		fprintf(fp, " merge");
+	fprintf(fp, "\n");
 }
 #endif

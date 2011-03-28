@@ -6,8 +6,8 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
+static int __wt_col_insert_alloc(SESSION *, uint64_t, WT_INSERT **);
 static int __wt_col_update(SESSION *, uint64_t, WT_ITEM *, int);
 
 /*
@@ -46,44 +46,45 @@ static int
 __wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
 {
 	WT_PAGE *page;
-	WT_RLE_EXPAND *exp, **new_rleexp;
+	WT_INSERT **new_ins, *ins;
 	WT_UPDATE **new_upd, *upd;
 	int ret;
 
-	page = NULL;
-	exp = NULL;
-	new_rleexp = NULL;
+	new_ins = NULL;
+	ins = NULL;
 	new_upd = NULL;
 	upd = NULL;
+	ret = 0;
 
 	/* Search the btree for the key. */
 	WT_RET(__wt_col_search(session, recno, is_write ? WT_WRITE : 0));
 	page = session->srch_page;
 
 	/*
-	 * Run-length encoded (RLE) column-store operations are hard because
-	 * each original on-disk index for an RLE can represent large numbers
-	 * of records, and we're only deleting a single one of those records,
-	 * which means working in the WT_RLE_EXPAND array.  All other column
-	 * store deletes are simple changes where a new WT_UPDATE entry is
-	 * added to the page's modification array.  There are three code paths:
+	 * Delete or update a column-store entry.
 	 *
-	 * 1: column-store deletes other than RLE column stores: delete an entry
-	 * from the on-disk page by creating a new WT_UPDATE entry, and linking
-	 * it into the WT_UPDATE array.
+	 * Run-length encoded (RLE) column-store changes are hard because each
+	 * original on-disk index for an RLE can represent a large number of
+	 * records, and we're only changing a single one of those records,
+	 * which means working in the WT_INSERT array.  All other column-store
+	 * modifications are simple, adding a new WT_UPDATE entry to the page's
+	 * modification array.  There are three code paths:
 	 *
-	 * 2: an RLE column-store delete of an already modified record: create
-	 * a new WT_UPDATE entry, and link it to the WT_RLE_EXPAND entry's
+	 * 1: column-store changes other than RLE column stores: update the
+	 * original on-disk page entry by creating a new WT_UPDATE entry and
+	 * linking it into the WT_UPDATE array.
+	 *
+	 * 2: RLE column-store changes of an already changed record: create
+	 * a new WT_UPDATE entry, and link it to an existing WT_INSERT entry's
 	 * WT_UPDATE list.
 	 *
-	 * 3: an RLE column-store delete of a record not yet modified: create
-	 * a new WT_RLE_EXPAND/WT_UPDATE pair, link it into the WT_RLE_EXPAND
-	 * array.
+	 * 3: RLE column-store change of not-yet-changed record: create a new
+	 * WT_INSERT/WT_UPDATE pair and link it into the WT_INSERT array.
 	 */
 	switch (page->type) {
-	case WT_PAGE_COL_FIX:				/* #1 */
+	case WT_PAGE_COL_FIX:					/* #1 */
 	case WT_PAGE_COL_VAR:
-		/* Allocate an update array if necessary. */
+		/* Allocate an update array as necessary. */
 		if (session->srch_upd == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->indx_count, &new_upd));
@@ -93,58 +94,52 @@ __wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
 			 */
 			session->srch_upd = &new_upd[session->srch_slot];
 		}
-
-		/* Allocate room for the new value from per-thread memory. */
-		WT_ERR(__wt_update_alloc(session, value, &upd));
-
-		/* Schedule the workQ to insert the WT_UPDATE structure. */
-		__wt_update_serial(
-		    session, page, session->srch_write_gen,
-		    new_upd, session->srch_upd, upd, ret);
-		 break;
+		goto simple_update;
 	case WT_PAGE_COL_RLE:
-		if (session->srch_vupdate != NULL) {	/* #2 */
-			/* Allocate a WT_UPDATE structure and fill it in. */
-			WT_ERR(__wt_update_alloc(session, value, &upd));
+		/* Allocate an update array as necessary. */
+		if (session->srch_upd != NULL) {		/* #2 */
+simple_update:		WT_ERR(__wt_update_alloc(session, value, &upd));
 
-			/* workQ: schedule insert of the WT_UPDATE structure. */
-			__wt_rle_expand_update_serial(session, page,
-			    session->srch_write_gen, session->srch_exp,
-			    upd, ret);
+			/* workQ: insert the WT_UPDATE structure. */
+			__wt_update_serial(
+			    session, page, session->srch_write_gen,
+			    new_upd, session->srch_upd, upd, ret);
 			break;
 		}
-							/* #3 */
-		/* Allocate a page expansion array as necessary. */
-		if (page->u.col_leaf.rleexp == NULL)
+								/* #3 */
+		/* Allocate an insert array as necessary. */
+		if (session->srch_ins == NULL) {
 			WT_ERR(__wt_calloc_def(
-			    session, page->indx_count, &new_rleexp));
+			    session, page->indx_count, &new_ins));
+			/*
+			 * If there was no insert array, the search function
+			 * could not have set the WT_INSERT location.
+			 */
+			session->srch_ins = &new_ins[session->srch_slot];
+		}
 
-		/* Allocate a WT_UPDATE structure and fill it in. */
+		/* Allocate a WT_INSERT/WT_UPDATE pair. */
+		WT_ERR(__wt_col_insert_alloc(session, recno, &ins));
 		WT_ERR(__wt_update_alloc(session, value, &upd));
+		ins->upd = upd;
 
-		/* Allocate a WT_RLE_EXPAND structure and fill it in. */
-		WT_ERR(__wt_calloc_def(session, 1, &exp));
-		exp->recno = recno;
-		exp->upd = upd;
-
-		/* Schedule the workQ to link in the WT_RLE_EXPAND structure. */
-		__wt_rle_expand_serial(session, page, session->srch_write_gen,
-		    WT_COL_INDX_SLOT(page, session->srch_ip),
-		    new_rleexp, exp, ret);
+		/* workQ: insert the WT_INSERT structure. */
+		__wt_insert_serial(
+		    session, page, session->srch_write_gen,
+		    new_ins, session->srch_ins, ins, ret);
 		break;
-	WT_ILLEGAL_FORMAT_ERR(session, ret);
 	}
 
 	if (ret != 0) {
-err:		if (exp != NULL)
-			__wt_free(session, exp);
+err:		if (ins != NULL)
+			__wt_sb_free_error(session, ins->sb);
 		if (upd != NULL)
 			__wt_sb_free_error(session, upd->sb);
 	}
 
-	/* Free any allocated page expansion array unless the workQ used it. */
-	if (new_rleexp != NULL && new_rleexp != page->u.col_leaf.rleexp)
-		__wt_free(session, new_rleexp);
+	/* Free any insert array unless the workQ used it. */
+	if (new_ins != NULL && new_ins != page->u.col_leaf.ins)
+		__wt_free(session, new_ins);
 
 	/* Free any update array unless the workQ used it. */
 	if (new_upd != NULL && new_upd != page->u.col_leaf.upd)
@@ -156,76 +151,26 @@ err:		if (exp != NULL)
 }
 
 /*
- * __wt_rle_expand_serial_func --
- *	Server function to expand a run-length encoded column-store during a
- *	delete.
+ * __wt_col_insert_alloc --
+ *	Column-store insert: allocate a WT_INSERT structure from the SESSION's
+ *	buffer and fill it in.
  */
-int
-__wt_rle_expand_serial_func(SESSION *session)
+static int
+__wt_col_insert_alloc(SESSION *session, uint64_t recno, WT_INSERT **insp)
 {
-	WT_PAGE *page;
-	WT_RLE_EXPAND **new_rleexp, *exp;
-	uint32_t slot, write_gen;
-	int ret;
-
-	ret = 0;
-
-	__wt_rle_expand_unpack(session, page, write_gen, slot, new_rleexp, exp);
-
-	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+	SESSION_BUFFER *sb;
+	WT_INSERT *ins;
 
 	/*
-	 * If the page does not yet have an expansion array, our caller passed
-	 * us one of the correct size.   (It's the caller's responsibility to
-	 * detect & free the passed-in expansion array if we don't use it.)
+	 * Allocate the WT_INSERT structure and room for the key, then copy
+	 * the key into place.
 	 */
-	if (page->u.col_leaf.rleexp == NULL)
-		page->u.col_leaf.rleexp = new_rleexp;
+	WT_RET(__wt_sb_alloc(
+	    session, sizeof(WT_INSERT) + sizeof(uint64_t), &ins, &sb));
 
-	/*
-	 * Insert the new WT_RLE_EXPAND as the first item in the forward-linked
-	 * list of expansion structures.  Flush memory to ensure the list is
-	 * never broken.
-	 */
-	exp->next = page->u.col_leaf.rleexp[slot];
-	WT_MEMORY_FLUSH;
-	page->u.col_leaf.rleexp[slot] = exp;
+	ins->sb = sb;
+	WT_INSERT_RECNO(ins) = recno;
 
-err:	__wt_session_serialize_wrapup(session, page, ret);
-	return (0);
-}
-
-/*
- * __wt_rle_expand_update_serial_func --
- *	Server function to update a WT_UPDATE entry in an already expanded
- *	run-length encoded column-store during a delete.
- */
-int
-__wt_rle_expand_update_serial_func(SESSION *session)
-{
-	WT_PAGE *page;
-	WT_RLE_EXPAND *exp;
-	WT_UPDATE *upd;
-	uint32_t write_gen;
-	int ret;
-
-	ret = 0;
-
-	__wt_rle_expand_update_unpack(session, page, write_gen, exp, upd);
-
-	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
-
-	/*
-	 * Insert the new WT_UPDATE as the first item in the forward-linked list
-	 * of update structures from the WT_RLE_EXPAND structure.  Flush memory
-	 * to ensure the list is never broken.
-	 */
-	upd->next = exp->upd;
-	WT_MEMORY_FLUSH;
-	exp->upd = upd;
-
-err:	__wt_session_serialize_wrapup(session, page, ret);
+	*insp = ins;
 	return (0);
 }

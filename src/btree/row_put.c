@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 #include "btree.i"
 
+static int __wt_row_insert_alloc(SESSION *, WT_ITEM *, WT_INSERT **);
 static int __wt_row_update(SESSION *, WT_ITEM *, WT_ITEM *, int);
 
 /*
@@ -76,7 +77,7 @@ __wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int is_write)
 		/* Allocate room for the new value from per-thread memory. */
 		WT_ERR(__wt_update_alloc(session, value, &upd));
 
-		/* Schedule the workQ to insert the WT_UPDATE structure. */
+		/* workQ: to insert the WT_UPDATE structure. */
 		__wt_update_serial(
 		    session, page, session->srch_write_gen,
 		    new_upd, session->srch_upd, upd, ret);
@@ -96,13 +97,12 @@ __wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int is_write)
 			session->srch_ins = &new_ins[session->srch_slot];
 		}
 
-		/*
-		 * Allocate room for the new key/value pair from per-thread
-		 * memory.
-		 */
-		WT_ERR(__wt_insert_alloc(session, key, value, &ins));
+		/* Allocate a WT_INSERT/WT_UPDATE pair. */
+		WT_ERR(__wt_row_insert_alloc(session, key, &ins));
+		WT_ERR(__wt_update_alloc(session, value, &upd));
+		ins->upd = upd;
 
-		/* Schedule the workQ to insert the WT_INSERT structure. */
+		/* workQ: insert the WT_INSERT structure. */
 		__wt_insert_serial(
 		    session, page, session->srch_write_gen,
 		    new_ins, session->srch_ins, ins, ret);
@@ -129,35 +129,28 @@ err:		if (ins != NULL)
 }
 
 /*
- * __wt_insert_alloc --
- *	Allocate a WT_INSERT structure and associated value from the SESSION's
+ * __wt_row_insert_alloc --
+ *	Row-store insert: allocate a WT_INSERT structure from the SESSION's
  *	buffer and fill it in.
  */
-int
-__wt_insert_alloc(
-    SESSION *session, WT_ITEM *key, WT_ITEM *value, WT_INSERT **insp)
+static int
+__wt_row_insert_alloc(SESSION *session, WT_ITEM *key, WT_INSERT **insp)
 {
 	SESSION_BUFFER *sb;
 	WT_INSERT *ins;
 	uint32_t size;
-	int ret;
 
 	/*
 	 * Allocate the WT_INSERT structure and room for the key, then copy
 	 * the key into place.
 	 */
 	size = key->size;
-	WT_RET(__wt_sb_alloc(session, sizeof(WT_INSERT) + size, &ins, &sb));
+	WT_RET(__wt_sb_alloc(
+	    session, sizeof(WT_INSERT) + sizeof(uint32_t) + size, &ins, &sb));
 
 	ins->sb = sb;
-	ins->size = size;
-	memcpy(WT_INSERT_DATA(ins), key->data, size);
-
-	/* Allocate the WT_UPDATE structure and room for the value. */
-	if ((ret = __wt_update_alloc(session, value, &ins->upd)) != 0) {
-		__wt_sb_free_error(session, ins->sb);
-		return (ret);
-	}
+	WT_INSERT_KEY_SIZE(ins) = size;
+	memcpy(WT_INSERT_KEY(ins), key->data, size);
 
 	*insp = ins;
 	return (0);
@@ -187,8 +180,16 @@ __wt_insert_serial_func(SESSION *session)
 	 * us one of the correct size.   (It's the caller's responsibility to
 	 * detect and free the passed-in expansion array if we don't use it.)
 	 */
-	if (page->u.row_leaf.ins == NULL)
-		page->u.row_leaf.ins = new_ins;
+	switch (page->type) {
+	case WT_PAGE_ROW_LEAF:
+		if (page->u.row_leaf.ins == NULL)
+			page->u.row_leaf.ins = new_ins;
+		break;
+	default:
+		if (page->u.col_leaf.ins == NULL)
+			page->u.col_leaf.ins = new_ins;
+		break;
+	}
 
 	/*
 	 * Insert the new WT_INSERT item into the linked list and flush memory

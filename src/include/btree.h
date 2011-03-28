@@ -443,9 +443,8 @@ struct __wt_page {
 			uint64_t recno;		/* Starting recno */
 
 			WT_COL	   *d;		/* V objects */
+			WT_INSERT **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
-
-			WT_RLE_EXPAND **rleexp;	/* RLE expansion array */
 		} col_leaf;
 	} u;
 
@@ -562,14 +561,6 @@ struct __wt_row {
  * Each in-memory column-store leaf page has an array of WT_COL structures:
  * this is created from on-page data when a page is read from the file.
  * It's fixed in size, and references data on the page.
- *
- * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
- * pages), a single indx entry may reference a large number of records, because
- * there's a single on-page entry that represents many identical records.   (We
- * can't expand those entries when the page comes into memory, as that would
- * require resources as pages are moved to/from the cache, including read-only
- * files.)  Instead, a single indx entry represents all of the identical records
- * originally found on the page.
  */
 struct __wt_col {
 	/*
@@ -645,6 +636,7 @@ struct __wt_update {
 
 /*
  * WT_INSERT --
+ *
  * Row-store leaf pages support inserts of new K/V pairs.  When the first K/V
  * pair is inserted, the WT_INSERT array is allocated, with one slot for every
  * existing element in the page, plus one additional slot.  A slot points to a
@@ -655,6 +647,21 @@ struct __wt_update {
  * insert items smaller than any existing key on the page -- for that reason,
  * the first slot of the insert array holds keys smaller than any other key on
  * the page.
+ *
+ * In column-store fixed-length run-length encoded pages (WT_PAGE_COL_RLE type
+ * pages), a single indx entry may reference a large number of records, because
+ * there's a single on-page entry that represents many identical records.   (We
+ * can't expand those entries when the page comes into memory, as that would
+ * require resources as pages are moved to/from the cache, including read-only
+ * files.)  Instead, a single indx entry represents all of the identical records
+ * originally found on the page.
+ *	Modifying (or deleting) run-length encoded column-store records is hard
+ * because the page's entry no longer references a set of identical items.  We
+ * handle this by "inserting" a new entry into the insert array.  This is the
+ * only case where it's possible to "insert" into a column-store, it's normally
+ * only possible to append to a column-store as insert requires re-numbering
+ * subsequent records.  (Berkeley DB did support mutable records, but it won't
+ * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_insert {
 	SESSION_BUFFER *sb;		/* session buffer holding this update */
@@ -663,61 +670,35 @@ struct __wt_insert {
 
 	WT_UPDATE *upd;			/* value */
 
-	uint32_t  size;			/* key length */
-
-	/* The untyped key immediately follows the WT_INSERT structure. */
-#define	WT_INSERT_DATA(ins)						\
-	((void *)((uint8_t *)(ins) + sizeof(WT_INSERT)))
+	/*
+	 * In a row-store leaf page, the WT_INSERT structure is immediately
+	 * followed by a key-size/key pair.
+	 */
+#define	WT_INSERT_KEY_SIZE(ins)						\
+	(*(uint32_t *)((uint8_t *)(ins) + sizeof(WT_INSERT)))
+#define	WT_INSERT_KEY(ins)						\
+	((void *)((uint8_t *)(ins) + (sizeof(WT_INSERT) + sizeof(uint32_t))))
+	/*
+	 * In a column-store leaf page, the WT_INSERT structure is immediately
+	 * followed by a record number.
+	 */
+#define	WT_INSERT_RECNO(ins)						\
+	(*(uint64_t *)((uint8_t *)(ins) + sizeof(WT_INSERT)))
 };
 
 /*
- * WT_RLE_EXPAND --
- * In-memory information about a replaced key/data pair on a run-length encoded,
- * column-store file page.
- *
- * Modifying (or deleting) run-length encoded column-store records is tricky
- * because the page's entry no longer references a set of identical items.  We
- * handle this by "inserting" a new entry into the rleexp array.  This is the
- * only case where it's possible to "insert" into a column-store, it's normally
- * only possible to append to a column-store as insert requires re-numbering
- * subsequent records.  (Berkeley DB did support mutable records, but it won't
- * scale and it isn't useful enough to re-implement, IMNSHO.)
- */
-struct __wt_rle_expand {
-	uint64_t recno;			/* recno */
-
-	WT_UPDATE *upd;			/* updates */
-
-	WT_RLE_EXPAND *next;		/* forward-linked list */
-};
-
-/*
- * WT_RLE_EXPAND_FOREACH --
- * Macro to walk the run-length encoded column-store expansion  array of an
- * in-memory page.
- */
-#define	WT_RLE_EXPAND_FOREACH(page, exp, i)				\
-	for ((i) = (page)->indx_count,					\
-	    (exp) = (page)->u.col_leaf.rleexp; (i) > 0; ++(exp), --(i))
-
-/*
- * The column-store leaf page insert and RLE expansion arrays are arrays of
+ * The row- and column-store leaf page insert and update arrays are arrays of
  * pointers to structures, and may not exist.  The following macros return an
- * array entry if the array of pointers and the specific structure exist,
- * otherwise NULL.
+ * array entry if the array of pointers and the specific structure exist, else
+ * NULL.
  */
 #define	WT_COL_UPDATE(page, ip)						\
 	((page)->u.col_leaf.upd == NULL ?				\
 	    NULL : (page)->u.col_leaf.upd[WT_COL_INDX_SLOT(page, ip)])
-#define	WT_COL_RLEEXP(page, ip)						\
-	((page)->u.col_leaf.rleexp == NULL ?				\
-	    NULL : (page)->u.col_leaf.rleexp[WT_COL_INDX_SLOT(page, ip)])
-
+#define	WT_COL_INSERT(page, ip)						\
+	((page)->u.col_leaf.ins == NULL ?				\
+	    NULL : (page)->u.col_leaf.ins[WT_COL_INDX_SLOT(page, ip)])
 /*
- * The row-store leaf page insert and update arrays are arrays of pointers to
- * structures, and may not exist.  The following macros return an array entry
- * if the array of pointers and the specific structure exist, otherwise NULL.
- *
  * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
  * the "one per WT_ROW slot" insert array.  That's because the insert array
  * requires an extra slot to hold keys that sort before any key found on the

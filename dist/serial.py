@@ -33,23 +33,6 @@ serial['key_build'] = Serial(
 	['void */key_arg',
 	 'WT_BUF */tmp'])
 
-serial['rle_expand'] = Serial(
-	'rle_expand',
-	'WT_WORKQ_FUNC', '1',
-	['WT_PAGE */page',
-	 'uint32_t/write_gen',
-	 'uint32_t/slot',
-	 'WT_RLE_EXPAND **/new_rleexp',
-	 'WT_RLE_EXPAND */exp'])
-
-serial['rle_expand_update'] = Serial(
-	'rle_expand_update',
-	'WT_WORKQ_FUNC', '1',
-	['WT_PAGE */page',
-	 'uint32_t/write_gen',
-	 'WT_RLE_EXPAND */exp',
-	 'WT_UPDATE */upd'])
-
 serial['update'] = Serial(
 	'update',
 	'WT_WORKQ_FUNC', '1',
@@ -105,6 +88,6 @@ tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/serial.py. */\n')
 func_serial(tfile)
 tfile.close()
-compare_srcfile(tmp_file, '../src//include/serial.h')
+compare_srcfile(tmp_file, '../src/include/serial.h')
 
 os.remove(tmp_file)

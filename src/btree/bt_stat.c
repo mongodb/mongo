@@ -98,10 +98,11 @@ static int
 __wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
 {
 	WT_COL *cip;
-	WT_RLE_EXPAND *exp;
+	WT_INSERT *ins;
 	WT_STATS *stats;
 	WT_UPDATE *upd;
 	uint32_t i;
+	int orig_deleted;
 	void *cipdata;
 
 	stats = session->btree->fstats;
@@ -109,31 +110,31 @@ __wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
 	/* Walk the page, counting data items. */
 	WT_COL_INDX_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
-		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
+		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata))) {
 			WT_STAT_INCRV(stats,
 			    ITEM_COL_DELETED, WT_RLE_REPEAT_COUNT(cipdata));
-		else
+			orig_deleted = 1;
+		} else {
 			WT_STAT_INCRV(stats,
 			    ITEM_TOTAL_DATA, WT_RLE_REPEAT_COUNT(cipdata));
+			orig_deleted = 0;
+		}
 
-		/*
-		 * Check for corrections.
-		 *
-		 * XXX
-		 * This gets the count wrong if an application changes existing
-		 * records, or updates a deleted record two times in a row --
-		 * we'll incorrectly count the records as unique, when they are
-		 * changes to the same record.  I'm not fixing it as I don't
-		 * expect the WT_COL_RLEEXP data structure to be permanent, it's
-		 * too likely to become a linked list in bad cases.
-		 */
-		for (exp =
-		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next) {
-			upd = exp->upd;
-			if (WT_UPDATE_DELETED_ISSET(upd))
+		/* Walk the insert list, checking for changes. */
+		for (ins =
+		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
+			upd = ins->upd;
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
+				if (orig_deleted)
+					continue;
 				WT_STAT_INCR(stats, ITEM_COL_DELETED);
-			else
+				WT_STAT_DECR(stats, ITEM_TOTAL_DATA);
+			} else {
+				if (!orig_deleted)
+					continue;
+				WT_STAT_DECR(stats, ITEM_COL_DELETED);
 				WT_STAT_INCR(stats, ITEM_TOTAL_DATA);
+			}
 		}
 	}
 	return (0);

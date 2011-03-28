@@ -15,7 +15,6 @@ static void __wt_discard_page_col_rle(SESSION *, WT_PAGE *);
 static void __wt_discard_page_col_var(SESSION *, WT_PAGE *);
 static void __wt_discard_page_row_int(SESSION *, WT_PAGE *);
 static void __wt_discard_page_row_leaf(SESSION *, WT_PAGE *);
-static void __wt_discard_relexp(SESSION *, WT_PAGE *);
 static void __wt_discard_update(SESSION *, WT_UPDATE **, uint32_t);
 static void __wt_discard_update_list(SESSION *, WT_UPDATE *);
 static inline void __wt_sb_free(SESSION *, SESSION_BUFFER *);
@@ -101,9 +100,10 @@ __wt_discard_page_col_rle(SESSION *session, WT_PAGE *page)
 	if (page->u.col_leaf.d != NULL)
 		__wt_free(session, page->u.col_leaf.d);
 
-	/* Free the run-length encoded column-store expansion array. */
-	if (page->u.col_leaf.rleexp != NULL)
-		__wt_discard_relexp(session, page);
+	/* Free the insert array. */
+	if (page->u.col_leaf.ins != NULL)
+		__wt_discard_insert(
+		    session, page->u.col_leaf.ins, page->indx_count);
 }
 
 /*
@@ -168,10 +168,12 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 			__wt_free(session, rip->key);
 	__wt_free(session, page->u.row_leaf.d);
 
+	/* Free the insert array. */
 	if (page->u.row_leaf.ins != NULL)
 		__wt_discard_insert(
 		    session, page->u.row_leaf.ins, page->indx_count);
 
+	/* Free the update array. */
 	if (page->u.row_leaf.upd != NULL)
 		__wt_discard_update(
 		    session, page->u.row_leaf.upd, page->indx_count);
@@ -223,39 +225,6 @@ __wt_discard_update(
 
 	/* Free the page's array of updates. */
 	__wt_free(session, update_head);
-}
-
-/*
- * __wt_discard_relexp --
- *	Discard the run-length encoded column-store expansion array.
- */
-static void
-__wt_discard_relexp(SESSION *session, WT_PAGE *page)
-{
-	WT_RLE_EXPAND **expp, *exp, *a;
-	u_int i;
-
-	/*
-	 * For each non-NULL slot in the page's run-length encoded column
-	 * store expansion array, free the linked list of WT_RLE_EXPAND
-	 * structures anchored in that slot.
-	 */
-	WT_RLE_EXPAND_FOREACH(page, expp, i) {
-		if ((exp = *expp) == NULL)
-			continue;
-		/*
-		 * Free the linked list of WT_UPDATE structures anchored in the
-		 * WT_RLE_EXPAND entry.
-		 */
-		__wt_discard_update_list(session, exp->upd);
-		do {
-			a = exp->next;
-			__wt_free(session, exp);
-		} while ((exp = a) != NULL);
-	}
-
-	/* Free the page's expansion array. */
-	__wt_free(session, page->u.col_leaf.rleexp);
 }
 
 /*

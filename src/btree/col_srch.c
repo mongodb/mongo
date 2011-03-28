@@ -17,11 +17,11 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	BTREE *btree;
 	WT_COL *cip;
 	WT_COL_REF *cref;
+	WT_INSERT *ins;
 	WT_PAGE *page;
-	WT_RLE_EXPAND *exp;
 	WT_UPDATE *upd;
 	uint64_t record_cnt, start_recno;
-	uint32_t base, i, indx, limit, slot, write_gen;
+	uint32_t base, i, indx, limit, match, slot, write_gen;
 	int ret;
 	void *cipdata;
 
@@ -139,33 +139,44 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 				goto notfound;
 		break;
 	case WT_PAGE_COL_RLE:
-		/* Find the item's WT_COL_EXP slot if it exists. */
-		for (exp =
-		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next)
-			if (exp->recno == recno)
-				break;
-
 		/*
-		 * If overwriting an existing data item, we don't care if the
-		 * item was previously deleted, return the gathered information.
+		 * Search the WT_COL's insert list for the record's WT_INSERT
+		 * slot.  The insert list is a sorted, forward-linked list --
+		 * on average, we have to search half of it.
+		 *
+		 * Do an initial setup of the return information (we'll correct
+		 * it as needed depending on what we find).
 		 */
-		if (LF_ISSET(WT_WRITE)) {
-			if (exp != NULL) {
-				session->srch_exp = exp;
-				session->srch_vupdate = exp->upd;
+		session->srch_slot = WT_COL_INDX_SLOT(page, cip);
+		if (page->u.col_leaf.ins != NULL)
+			session->srch_ins =
+			    &page->u.col_leaf.ins[session->srch_slot];
+
+		for (match = 0, ins =
+		    WT_COL_INSERT(page, cip); ins != NULL; ins = ins->next) {
+			if (WT_INSERT_RECNO(ins) == recno) {
+				match = 1;
+				session->srch_ins = NULL;
+				session->srch_vupdate = ins->upd;
+				session->srch_upd = &ins->upd;
+				break;
 			}
-			break;
+			if (WT_INSERT_RECNO(ins) > recno)
+				break;
+			session->srch_ins = &ins->next;
 		}
 
 		/*
-		 * Otherwise, check for deletion, in either the WT_UPDATE slot
-		 * (referenced by the WT_COL_EXP slot), or in the original data.
+		 * If we're not updating an existing data item, check to see if
+		 * the item has been deleted.   If we found a match, use the
+		 * WT_INSERT's WT_UPDATE value.   If we didn't find a match, use
+		 * use the original data.
 		 */
-		if (exp != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(exp->upd))
+		if (LF_ISSET(WT_WRITE))
+			break;
+		if (match) {
+			if (WT_UPDATE_DELETED_ISSET(ins->upd))
 				goto notfound;
-			session->srch_exp = exp;
-			session->srch_vupdate = exp->upd;
 		} else
 			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 				goto notfound;

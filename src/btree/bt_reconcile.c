@@ -25,7 +25,6 @@ static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *);
 static int  __wt_rec_row_merge(
 		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
-static int  __wt_rle_expand_compare(const void *, const void *);
 static int  __wt_rec_wrapup(SESSION *, WT_PAGE *, int);
 
 static int __wt_split(
@@ -756,13 +755,12 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_RLE_EXPAND *exp, **expsort, **expp;
-	WT_UPDATE *upd;
+	WT_INSERT *ins;
 	uint64_t recno;
 	uint32_t entries, i, len, space_avail;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *first_free, *last_data;
-	int from_upd, ret;
+	int ret;
 	void *cipdata;
 
 	btree = session->btree;
@@ -775,11 +773,10 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	 * SESSION's scratch buffer is big enough.  Clear the buffer's contents
 	 * and set the delete flag.
 	 */
-	len = btree->fixed_len + WT_SIZEOF32(uint16_t);
+	len = btree->fixed_len;
 	WT_ERR(__wt_scr_alloc(session, len, &tmp));
 	memset(tmp->mem, 0, len);
-	WT_RLE_REPEAT_COUNT(tmp->mem) = 1;
-	WT_FIX_DELETE_SET(WT_RLE_REPEAT_DATA(tmp->mem));
+	WT_FIX_DELETE_SET(tmp->mem);
 
 	recno = page->u.col_leaf.recno;
 	entries = 0;
@@ -788,53 +785,41 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	/* For each entry in the in-memory page... */
 	WT_COL_INDX_FOREACH(page, cip, i) {
-		/*
-		 * Get a sorted list of any expansion entries we've created for
-		 * this set of records.  The sort function returns a NULL-
-		 * terminated array of references to WT_RLE_EXPAND structures,
-		 * sorted by record number.
-		 */
-		WT_ERR(__wt_rle_expand_sort(session, page, cip,
-		    &expsort, &S2C(session)->cache->reclist.expsort));
-
+		cipdata = WT_COL_PTR(page, cip);
 		/*
 		 * Generate entries for the new page: loop through the repeat
-		 * records, checking for WT_RLE_EXPAND entries that match the
-		 * current record number.
+		 * records, checking for WT_INSERT entries matching the record
+		 * number.
 		 */
-		cipdata = WT_COL_PTR(page, cip);
+		ins = WT_COL_INSERT(page, cip),
 		nrepeat = WT_RLE_REPEAT_COUNT(cipdata);
-		for (expp = expsort, n = 1;
-		    n <= nrepeat; n += repeat_count, recno += repeat_count) {
-			from_upd = 0;
-			if ((exp = *expp) != NULL && recno == exp->recno) {
-				++expp;
-
-				/* Use the WT_RLE_EXPAND's WT_UPDATE field. */
-				upd = exp->upd;
-				if (WT_UPDATE_DELETED_ISSET(upd))
+		for (n = 0;
+		    n < nrepeat; n += repeat_count, recno += repeat_count) {
+			if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
+				/* Use the WT_INSERT's WT_UPDATE field. */
+				if (WT_UPDATE_DELETED_ISSET(ins->upd))
 					data = tmp->mem;
-				else {
-					from_upd = 1;
-					data = WT_UPDATE_DATA(upd);
-				}
+				else
+					data = WT_UPDATE_DATA(ins->upd);
 				repeat_count = 1;
+
+				ins = ins->next;
 			} else {
 				if (WT_FIX_DELETE_ISSET(cipdata))
 					data = tmp->mem;
 				else
-					data = cipdata;
+					data = WT_RLE_REPEAT_DATA(cipdata);
 				/*
 				 * The repeat count is the number of records
-				 * up to the next WT_RLE_EXPAND record, or
-				 * up to the end of this entry if we have no
-				 * more WT_RLE_EXPAND records.
+				 * up to the next WT_INSERT record, or up to
+				 * the end of this entry if we have no more
+				 * WT_INSERT records.
 				 */
-				if (exp == NULL)
-					repeat_count = (nrepeat - n) + 1;
+				if (ins == NULL)
+					repeat_count = nrepeat - n;
 				else
-					repeat_count =
-					    (uint16_t)(exp->recno - recno);
+					repeat_count = (uint16_t)
+					    (WT_INSERT_RECNO(ins) - recno);
 			}
 
 			/*
@@ -842,9 +827,8 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 			 * page to see if it's identical, and increment its
 			 * repeat count where possible.
 			 */
-			if (last_data != NULL &&
-			    memcmp(WT_RLE_REPEAT_DATA(last_data),
-			    WT_RLE_REPEAT_DATA(data), btree->fixed_len) == 0 &&
+			if (last_data != NULL && memcmp(
+			    WT_RLE_REPEAT_DATA(last_data), data, len) == 0 &&
 			    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
 				WT_RLE_REPEAT_COUNT(last_data) += repeat_count;
 				continue;
@@ -855,22 +839,12 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 				WT_ERR(__wt_split(session, &recno,
 				    &entries, &first_free, &space_avail, 0));
 
-			/*
-			 * Most of the formats already include a repeat count:
-			 * specifically the deleted buffer, or any entry we're
-			 * copying from the original page.   However, updated
-			 * entries are read from a WT_UPDATE structure, which
-			 * has no repeat count.
-			 */
 			last_data = first_free;
-			if (from_upd) {
-				WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
-				memcpy(WT_RLE_REPEAT_DATA(
-				    last_data), data, btree->fixed_len);
-			} else
-				memcpy(last_data, data, len);
-			first_free += len;
-			space_avail -= len;
+			WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
+			memcpy(WT_RLE_REPEAT_DATA(last_data), data, len);
+
+			first_free += len + sizeof(uint16_t);
+			space_avail -= len + WT_SIZEOF32(uint16_t);
 			++entries;
 		}
 	}
@@ -883,71 +857,6 @@ err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
 	return (ret);
-}
-
-/*
- * __wt_rle_expand_compare --
- *	Qsort function: sort WT_RLE_EXPAND structures based on the record
- *	offset, in ascending order.
- */
-static int
-__wt_rle_expand_compare(const void *a, const void *b)
-{
-	WT_RLE_EXPAND *a_exp, *b_exp;
-
-	a_exp = *(WT_RLE_EXPAND **)a;
-	b_exp = *(WT_RLE_EXPAND **)b;
-
-	return (a_exp->recno > b_exp->recno ? 1 : 0);
-}
-
-/*
- * __wt_rle_expand_sort --
- *	Return the current on-page index's array of WT_RLE_EXPAND structures,
- *	sorted by record offset.
- */
-int
-__wt_rle_expand_sort(SESSION *session,
-    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, WT_BUF **tmpp)
-{
-	WT_BUF *tmp;
-	WT_RLE_EXPAND **expsort;
-	WT_RLE_EXPAND *exp;
-	uint32_t sz;
-	uint16_t n;
-
-	/* Figure out how big the array needs to be. */
-	for (n = 0,
-	    exp = WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next, ++n)
-		;
-
-	/*
-	 * Allocate a temporary buffer, and/or grow it as necessary.  Our caller
-	 * expects a NULL-terminated array, so always add an extra slot.
-	 */
-	sz = (n + 1) * WT_SIZEOF32(WT_RLE_EXPAND *);
-	if ((tmp = *tmpp) == NULL) {
-		WT_RET(__wt_scr_alloc(session, sz, tmpp));
-		tmp = *tmpp;
-	} else
-		if (sz > tmp->mem_size)
-			WT_RET(__wt_buf_grow(session, tmp, sz));
-	expsort = tmp->mem;
-
-	/* NULL-terminate the array. */
-	expsort[n] = NULL;
-
-	/* Enter the WT_RLE_EXPAND structures into the array and sort them. */
-	if (n != 0) {
-		for (exp =
-		    WT_COL_RLEEXP(page, cip); exp != NULL; exp = exp->next)
-			*expsort++ = exp;
-		qsort(tmp->mem, (size_t)n,
-		    sizeof(WT_RLE_EXPAND *), __wt_rle_expand_compare);
-	}
-
-	*expsortp = tmp->mem;
-	return (0);
 }
 
 /*
@@ -1400,8 +1309,8 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
 		}
 
 		/* Build a key to store on the page. */
-		key_item.data = WT_INSERT_DATA(ins);
-		key_item.size = ins->size;
+		key_item.data = WT_INSERT_KEY(ins);
+		key_item.size = WT_INSERT_KEY_SIZE(ins);
 		WT_RET(__wt_item_build_key(
 		    session, &key_item, &key_cell, &key_ovfl));
 		key_len = WT_CELL_SPACE_REQ(key_item.size);

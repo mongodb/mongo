@@ -155,9 +155,6 @@ __wt_cache_read_server(void *arg);
 int
 __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard);
 int
-__wt_rle_expand_sort(SESSION *session,
-    WT_PAGE *page, WT_COL *cip, WT_RLE_EXPAND ***expsortp, WT_BUF **tmpp);
-int
 __wt_value_return(
     SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);
 int
@@ -196,10 +193,6 @@ __wt_btree_col_del(SESSION *session, uint64_t recno);
 int
 __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value);
 int
-__wt_rle_expand_serial_func(SESSION *session);
-int
-__wt_rle_expand_update_serial_func(SESSION *session);
-int
 __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags);
 int
 __wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value);
@@ -207,9 +200,6 @@ int
 __wt_btree_row_del(SESSION *session, WT_ITEM *key);
 int
 __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value);
-int
-__wt_insert_alloc(
-    SESSION *session, WT_ITEM *key, WT_ITEM *value, WT_INSERT **insp);
 int
 __wt_insert_serial_func(SESSION *session);
 int

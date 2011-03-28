@@ -65,8 +65,6 @@ _DB_QUEUE_H_
 _SYS_BITSTRING_H_
 __F
 __WIREDTIGER_H_
-__WT_COL_ARRAY
-__WT_ROW_ARRAY
 _bit_byte
 _bit_mask
 bit_clear

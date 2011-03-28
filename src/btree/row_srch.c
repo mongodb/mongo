@@ -152,14 +152,12 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	}
 
 	/*
-	 * If we found a match in the page on-disk information, set srch_upd
-	 * or srch_slot.
+	 * If we found a match in the page on-disk information, set the return
+	 * information, we're done.
 	 */
 	if (cmp == 0) {
-		slot = WT_ROW_INDX_SLOT(page, rip);
-		if (page->u.row_leaf.upd == NULL)
-			session->srch_slot = slot;
-		else {
+		session->srch_slot = slot = WT_ROW_INDX_SLOT(page, rip);
+		if (page->u.row_leaf.upd != NULL) {
 			session->srch_upd = &page->u.row_leaf.upd[slot];
 			session->srch_vupdate = page->u.row_leaf.upd[slot];
 		}
@@ -180,68 +178,52 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		rip += base - 1;
 
 	/*
-	 * Figure out which insert chain to search.  If inserting a key smaller
-	 * than any from-disk key found on the page, use the extra slot of the
-	 * insert array, otherwise use the usual one-to-one mapping.
+	 *
+	 * Figure out which insert chain to search, and do initial setup of the
+	 * return information for the insert chain (we'll correct it as needed
+	 * depending on what we find.)
+	 *
+	 * If inserting a key smaller than any from-disk key found on the page,
+	 * use the extra slot of the insert array, otherwise use the usual
+	 * one-to-one mapping.
 	 */
-	ins = base == 0 ?
-	    WT_ROW_INSERT_SMALLEST(page) : WT_ROW_INSERT(page, rip);
+	if (base == 0) {
+		ins = WT_ROW_INSERT_SMALLEST(page);
+		session->srch_slot = page->indx_count;
+	} else {
+		ins = WT_ROW_INSERT(page, rip);
+		session->srch_slot = WT_ROW_INDX_SLOT(page, rip);
+	}
+	if (page->u.row_leaf.ins != NULL)
+		session->srch_ins = &page->u.row_leaf.ins[session->srch_slot];
 
 	/*
 	 * If there's no insert chain to search, we're done.
 	 *
 	 * If not doing an insert, we've failed.
-	 * If doing an insert, set srch_ins and srch_slot and return.
+	 * If doing an insert, srch_slot and srch_ins have been set, we're done.
 	 */
 	if (ins == NULL) {
 		if (!LF_ISSET(WT_WRITE))
 			goto notfound;
-
-		if (page->u.row_leaf.ins == NULL) {
-			if (base == 0)
-				session->srch_slot = page->indx_count;
-			else
-				session->srch_slot =
-				    WT_ROW_INDX_SLOT(page, rip);
-			goto done;
-		}
 	} else {
 		/*
-		 * Search the insert tree for a match.  If we find a match the
-		 * called function will set the session->search_upd field for
-		 * us, no further work to be done.
-		 */
-		if ((cmp = __wt_ins_search(session, ins, key)) == 0)
-			goto done;
-
-		/*
-		 * No match found.
+		 * Search the insert tree for a match -- if we don't find a
+		 * match, we fail, unless we're inserting new data.
 		 *
-		 * If not doing an insert, we've failed.
+		 * No matter how things turn out, __wt_ins_search resets the
+		 * session->srch_XXX fields appropriately, there's no more
+		 * work to be done.
 		 */
-		if (!LF_ISSET(WT_WRITE))
-			goto notfound;
-
-		/*
-		 * If __wt_ins_search() found a WT_INSERT node that sorted less
-		 * than our key, it set session->srch_ins to reference a memory
-		 * location for the insert of our item.  If that's not the case,
-		 * then our item must be a new item at the head of the list.
-		 */
-		if (session->srch_ins != NULL)
-			goto done;
+		if ((cmp = __wt_ins_search(session, ins, key)) != 0) {
+			/*
+			 * No match found.
+			 * If not doing an insert, we've failed.
+			 */
+			if (!LF_ISSET(WT_WRITE))
+				goto notfound;
+		}
 	}
-
-	/*
-	 * It's an insert, and we either didn't find an insert list to search,
-	 * or we searched it only to find our new item will be inserted at the
-	 * head of the list.  Set session->srch_ins appropriately.
-	 */
-	if (base == 0)
-		session->srch_ins = &page->u.row_leaf.ins[page->indx_count];
-	else
-		session->srch_ins =
-		    &page->u.row_leaf.ins[WT_ROW_INDX_SLOT(page, rip)];
 
 done:	/*
 	 * If we found a match and it's not an insert operation, review any
@@ -268,7 +250,7 @@ err:	WT_PAGE_OUT(session, page);
 
 /*
  * __wt_ins_search --
- *	Search the page's insert tree.
+ *	Search the slot's insert list.
  */
 static inline int
 __wt_ins_search(SESSION *session, WT_INSERT *ins, WT_ITEM *key)
@@ -284,8 +266,8 @@ __wt_ins_search(SESSION *session, WT_INSERT *ins, WT_ITEM *key)
 	 * have to search half of it.
 	 */
 	for (; ins != NULL; ins = ins->next) {
-		insert_key.data = WT_INSERT_DATA(ins);
-		insert_key.size = ins->size;
+		insert_key.data = WT_INSERT_KEY(ins);
+		insert_key.size = WT_INSERT_KEY_SIZE(ins);
 		cmp = btree->btree_compare(btree, key, &insert_key);
 		if (cmp == 0) {
 			session->srch_ins = NULL;
