@@ -364,13 +364,13 @@ __wt_verify_pc(SESSION *session,
 	if (__wt_key_process(child_key)) {
 		WT_ERR(__wt_scr_alloc(session, 0, &scratch1));
 		WT_ERR(__wt_cell_process(session, child_key->key, scratch1));
-		cd_ref = &scratch1->item;
+		cd_ref = (WT_ITEM *)&scratch1;
 	} else
 		cd_ref = (WT_ITEM *)child_key;
 	if (__wt_key_process(parent_rref)) {
 		WT_ERR(__wt_scr_alloc(session, 0, &scratch2));
 		WT_RET(__wt_cell_process(session, parent_rref->key, scratch2));
-		pd_ref = &scratch2->item;
+		pd_ref = (WT_ITEM *)&scratch2;
 	} else
 		pd_ref = (WT_ITEM *)parent_rref;
 

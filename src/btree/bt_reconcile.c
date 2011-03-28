@@ -1561,8 +1561,7 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 		 * memory allocations and the split buffers don't just keep
 		 * getting bigger.
 		 */
-		__wt_key_set(
-		    rref, r_list->key.item.data, r_list->key.item.size);
+		__wt_key_set(rref, r_list->key.data, r_list->key.size);
 		__wt_buf_clear(&r_list->key);
 		WT_ROW_REF_ADDR(rref) = r_list->off.addr;
 		WT_ROW_REF_SIZE(rref) = r_list->off.size;

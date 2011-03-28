@@ -3,7 +3,7 @@ SRC=	../../src
 WT=	../../build_posix
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 
-CFLAGS=-g ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include
+CFLAGS=-g -Wall -Wuninitialized -O ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include
 
 HDRS=	config.h wts.h
 SRCS=	bdb.c config.c t.c util.c wts.c

@@ -419,8 +419,8 @@ offpage:	/*
 		else
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_RET(__wt_ovfl_in(session, WT_CELL_BYTE_OVFL(cell), tmp));
-		p = tmp->item.data;
-		size = tmp->item.size;
+		p = tmp->data;
+		size = tmp->size;
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -436,7 +436,7 @@ offpage:	/*
 	 */
 	if (huffman == NULL) {
 		if (tmp != retbuf) {
-			WT_ERR(__wt_buf_grow(session, retbuf, size));
+			WT_ERR(__wt_buf_setsize(session, retbuf, size));
 			memcpy(retbuf->mem, p, size);
 		}
 	} else

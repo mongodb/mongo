@@ -92,8 +92,7 @@ __wt_cache_destroy(CONNECTION *conn)
 	if (reclist->list != NULL) {
 		for (r_list = reclist->list,
 		    i = 0; i < reclist->l_entries; ++r_list, ++i)
-			if (r_list->key.mem != NULL)
-				__wt_free(session, r_list->key.mem);
+			__wt_buf_free(session, &r_list->key);
 		__wt_free(session, reclist->list);
 	}
 	if (reclist->save != NULL)

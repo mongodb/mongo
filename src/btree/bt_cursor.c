@@ -35,7 +35,6 @@ int
 __wt_btcur_next(CURSOR_BTREE *cbt)
 {
 	BTREE *btree;
-	WT_ITEM *key;
 	SESSION *session;
 	WT_CELL *cell;
 	WT_CURSOR *cursor;
@@ -75,29 +74,28 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			 * The key and value variables reference the items we'll
 			 * print.  Set the key.
 			 */
-			if (__wt_key_process(cbt->rip)) {
+			if (__wt_key_process(cbt->rip))
 				WT_RET(__wt_key_build(session,
-				    cbt->ref->page, cbt->rip, cbt->key_tmp));
-				key = &cbt->key_tmp->item;
-			} else
-				key = (WT_ITEM *)cbt->rip;
+				    cbt->ref->page, cbt->rip,
+				    &cursor->key));
 
-			cursor->key.item = *key;
+			cursor->key.data = cbt->rip->key;
+			cursor->key.size = cbt->rip->size;
 
 			/*
 			 * If the item was ever modified, dump the data from
 			 * the WT_UPDATE entry.
 			 */
 			if (upd != NULL) {
-				cursor->value.item.data = WT_UPDATE_DATA(upd);
-				cursor->value.item.size = upd->size;
+				cursor->value.data = WT_UPDATE_DATA(upd);
+				cursor->value.size = upd->size;
 				break;
 			}
 
 			/* Check for empty data. */
 			if (WT_ROW_EMPTY_ISSET(cbt->rip)) {
-				cursor->value.item.data = "";
-				cursor->value.item.size = 0;
+				cursor->value.data = "";
+				cursor->value.size = 0;
 				break;
 			}
 
@@ -106,17 +104,14 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			switch (WT_CELL_TYPE(cell)) {
 			case WT_CELL_DATA:
 				if (huffman == NULL) {
-					cursor->value.item.data =
-					    WT_CELL_BYTE(cell);
-					cursor->value.item.size =
-					    WT_CELL_LEN(cell);
+					cursor->value.data = WT_CELL_BYTE(cell);
+					cursor->value.size = WT_CELL_LEN(cell);
 					break;
 				}
 				/* FALLTHROUGH */
 			case WT_CELL_DATA_OVFL:
-				WT_RET(__wt_cell_process(session,
-				    cell, cbt->value_tmp));
-				cursor->value.item = cbt->value_tmp->item;
+				WT_RET(__wt_cell_process(session, cell,
+				    &cursor->value));
 				break;
 			}
 			break;
@@ -152,10 +147,17 @@ __wt_btcur_prev(CURSOR_BTREE *cbt)
 int
 __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 {
-	WT_UNUSED(cbt);
-	WT_UNUSED(exact);
+	BTREE *btree;
+	SESSION *session;
+	WT_CURSOR *cursor;
 
-	return (ENOTSUP);
+	btree = cbt->btree;
+	cursor = &cbt->iface;
+	session = (SESSION *)cursor->session;
+
+	*exact = 0;
+	return (__wt_btree_row_get(session,
+	    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
 }
 
 /*
@@ -165,9 +167,16 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 int
 __wt_btcur_insert(CURSOR_BTREE *cbt)
 {
-	WT_UNUSED(cbt);
+	BTREE *btree;
+	SESSION *session;
+	WT_CURSOR *cursor;
 
-	return (ENOTSUP);
+	btree = cbt->btree;
+	cursor = &cbt->iface;
+	session = (SESSION *)cursor->session;
+
+	return (__wt_btree_row_put(session,
+	    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
 }
 
 /*
@@ -177,9 +186,16 @@ __wt_btcur_insert(CURSOR_BTREE *cbt)
 int
 __wt_btcur_update(CURSOR_BTREE *cbt)
 {
-	WT_UNUSED(cbt);
+	BTREE *btree;
+	SESSION *session;
+	WT_CURSOR *cursor;
 
-	return (ENOTSUP);
+	btree = cbt->btree;
+	cursor = &cbt->iface;
+	session = (SESSION *)cursor->session;
+
+	return (__wt_btree_row_put(session,
+	    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
 }
 
 /*
@@ -189,9 +205,15 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
 int
 __wt_btcur_remove(CURSOR_BTREE *cbt)
 {
-	WT_UNUSED(cbt);
+	BTREE *btree;
+	SESSION *session;
+	WT_CURSOR *cursor;
 
-	return (ENOTSUP);
+	btree = cbt->btree;
+	cursor = &cbt->iface;
+	session = (SESSION *)cursor->session;
+
+	return (__wt_btree_row_del(session, (WT_ITEM *)&cursor->key));
 }
 
 /*

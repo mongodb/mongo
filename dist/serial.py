@@ -31,7 +31,7 @@ serial['key_build'] = Serial(
 	'key_build',
 	'WT_WORKQ_FUNC', '0',
 	['void */key_arg',
-	 'WT_BUF */tmp'])
+	 'WT_ITEM */item'])
 
 serial['update'] = Serial(
 	'update',

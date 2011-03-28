@@ -9,14 +9,14 @@
 #include "btree.i"
 
 /*
- * __wt_value_return --
+ * __wt_return_data --
  *	Return a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
-__wt_value_return(
-    SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
+__wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 {
 	BTREE *btree;
+	WT_CURSOR *cursor;
 	WT_ITEM local_key, local_value;
 	WT_COL *cip;
 	WT_CELL *cell;
@@ -28,6 +28,7 @@ __wt_value_return(
 	int (*callback)(BTREE *, WT_ITEM *, WT_ITEM *), ret;
 
 	btree = session->btree;
+	cursor = session->cursor;
 	callback = NULL; /* TODO: was value->callback */
 	ret = 0;
 
@@ -63,16 +64,16 @@ __wt_value_return(
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(
-			    __wt_key_build(session, page, rip, &session->key));
-
-			*key = session->key.item;
+			WT_RET(__wt_key_build(session,
+			    page, rip, &cursor->key));
+			key->data = rip->key;
+			key->size = rip->size;
 		} else if (callback == NULL) {
-			WT_RET(
-			    __wt_buf_grow(session, &session->key, rip->size));
-			memcpy(session->key.mem, rip->key, rip->size);
+			WT_RET(__wt_buf_setsize(session,
+			    &cursor->key, rip->size));
+			memcpy(cursor->key.mem, rip->key, rip->size);
 
-			*key = session->key.item;
+			*key = *(WT_ITEM *)&cursor->key;
 		} else {
 			WT_CLEAR(local_key);
 			key = &local_key;
@@ -123,10 +124,10 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_RET(
-			    __wt_cell_process(session, cell, &session->value));
-			value_ret = session->value.item.data;
-			size_ret = session->value.item.size;
+			WT_RET(__wt_cell_process(
+			    session, cell, &cursor->value));
+			value_ret = cursor->value.data;
+			size_ret = cursor->value.size;
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
@@ -147,13 +148,13 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 		 * return WT_ITEM (potentially done by __wt_cell_process), do
 		 * so now.
 		 */
-		if (value_ret != session->value.item.data) {
-			WT_RET(__wt_buf_grow(
-			    session, &session->value, size_ret));
-			memcpy(session->value.mem, value_ret, size_ret);
+		if (value_ret != cursor->value.data) {
+			WT_RET(__wt_buf_setsize(session,
+			    &cursor->value, size_ret));
+			memcpy(cursor->value.mem, value_ret, size_ret);
 		}
 
-		*value = session->value.item;
+		*value = *(WT_ITEM *)&cursor->value;
 	} else {
 		/*
 		 * If we're given a callback function, use the data_ret/size_ret

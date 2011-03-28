@@ -223,7 +223,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
 			WT_ERR(__wt_cell_process(session, cell, tmp));
-			dp->p(tmp->item.data, tmp->item.size, dp->stream);
+			dp->p(tmp->data, tmp->size, dp->stream);
 			break;
 		case WT_CELL_DEL:
 			break;
@@ -287,11 +287,10 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * The key and value variables reference the items we will
 		 * print.  Set the key.
 		 */
-		if (__wt_key_process(rip)) {
+		if (__wt_key_process(rip))
 			WT_ERR(__wt_key_build(session, page, rip, key_tmp));
-			key = &key_tmp->item;
-		} else
-			key = (WT_ITEM *)rip;
+
+		key = (WT_ITEM *)rip;
 
 		/*
 		 * If the item was ever updated, dump the data from the
@@ -323,7 +322,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
 			WT_ERR(__wt_cell_process(session, cell, value_tmp));
-			value = &value_tmp->item;
+			value = (WT_ITEM *)value_tmp;
 			break;
 		WT_ILLEGAL_FORMAT_ERR(session, ret);
 		}

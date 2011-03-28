@@ -20,7 +20,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	WT_ROW *rip;
 	int ret;
 
-	ret = 0;
+	WT_CLEAR(__tmp);
 
 	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
@@ -49,7 +49,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 */
 	if (__wt_ref_off_page(page, cell)) {
 		if (store != NULL) {
-			WT_RET(__wt_buf_grow(session, store, rip->size));
+			WT_RET(__wt_buf_setsize(session, store, rip->size));
 			memcpy(store->mem, rip->key, rip->size);
 		}
 		return (0);
@@ -70,13 +70,13 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 
 	/* Serialize the swap of the key into place. */
 	if (store == NULL)
-		__wt_key_build_serial(session, rip_arg, tmp, ret);
+		__wt_key_build_serial(session, rip_arg, (WT_ITEM *)tmp, ret);
 
 	/*
 	 * Free any "permanent" memory we allocated the workQ didn't use for
 	 * the key.
 	 */
-	if (store == NULL && rip->key != tmp->item.data)
+	if (store == NULL && rip->key != tmp->mem)
 		__wt_buf_free(session, tmp);
 
 	return (ret);
@@ -89,10 +89,10 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 int
 __wt_key_build_serial_func(SESSION *session)
 {
-	WT_BUF *tmp;
+	WT_ITEM *item;
 	WT_ROW *rip;
 
-	__wt_key_build_unpack(session, rip, tmp);
+	__wt_key_build_unpack(session, rip, item);
 
 	/*
 	 * We don't care about the page's write generation -- there's a simpler
@@ -110,9 +110,9 @@ __wt_key_build_serial_func(SESSION *session)
 		 * we'll resolve it all here), or see a non-zero size and valid
 		 * pointer pair.
 		 */
-		rip->key = tmp->item.data;
+		rip->key = item->data;
 		WT_MEMORY_FLUSH;
-		rip->size = tmp->item.size;
+		rip->size = item->size;
 	}
 
 	__wt_session_serialize_wrapup(session, NULL, 0);

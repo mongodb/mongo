@@ -40,7 +40,7 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 	WT_CLEAR(*session);
 
 	session->iface.connection = &conn->iface;
-	session->error_handler = conn->default_session.error_handler;
+	session->event_handler = conn->default_session.event_handler;
 	session->hazard = conn->hazard + slot * conn->hazard_size;
 
 	/* We can't use the new session: it hasn't been configured yet. */
@@ -94,9 +94,7 @@ __wt_session_close(SESSION *session)
 	if (sb != NULL && --sb->in == sb->out)
 		__wt_free(session, sb);
 
-	/* Discard WT_ITEM memory. */
-	__wt_free(session, session->key.item.data);
-	__wt_free(session, session->value.item.data);
+	/* Discard scratch buffers. */
 	__wt_scr_free(session);
 
 	/* Unlock and destroy the thread's mutex. */

@@ -326,7 +326,8 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
  */
 static int
 __conn_open_session(WT_CONNECTION *wt_conn,
-    WT_ERROR_HANDLER *error_handler, const char *config, WT_SESSION **wt_sessionp)
+    WT_EVENT_HANDLER *event_handler, const char *config,
+    WT_SESSION **wt_sessionp)
 {
 	static WT_SESSION stds = {
 		NULL,
@@ -361,9 +362,9 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	session->iface = stds;
 	TAILQ_INIT(&session->cursors);
 	TAILQ_INIT(&session->btrees);
-	WT_ASSERT(NULL, conn->default_session.error_handler != NULL);
-	if (error_handler != NULL)
-		session->error_handler = error_handler;
+	WT_ASSERT(NULL, conn->default_session.event_handler != NULL);
+	if (event_handler != NULL)
+		session->event_handler = event_handler;
 
 	TAILQ_INSERT_HEAD(&conn->sessions_head, session, q);
 
@@ -385,7 +386,7 @@ err:		if (session != NULL)
  *	database.
  */
 int
-wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
+wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static int library_init = 0;
@@ -406,8 +407,8 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 
 	*wt_connp = NULL;
 
-	if (error_handler == NULL)
-		error_handler = __wt_error_handler_default;
+	if (event_handler == NULL)
+		event_handler = __wt_event_handler_default;
 
 	/*
 	 * We end up here before we do any real work.   Check the build itself,
@@ -429,7 +430,7 @@ wiredtiger_open(const char *home, WT_ERROR_HANDLER *error_handler,
 	TAILQ_INIT(&conn->sessions_head);
 
 	conn->default_session.iface.connection = &conn->iface;
-	conn->default_session.error_handler = error_handler;
+	conn->default_session.event_handler = event_handler;
 
 	/* XXX conn flags, including WT_MEMORY_CHECK */
 	WT_ERR(__wt_connection_config(conn));

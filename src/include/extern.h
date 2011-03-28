@@ -35,7 +35,7 @@ __wt_curdump_init(WT_CURSOR *cursor);
 int
 __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 void
-__wt_cursor_init(WT_CURSOR *cursor);
+__wt_cursor_init(WT_CURSOR *cursor, const char *config);
 int
 __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size);
 int
@@ -162,8 +162,10 @@ int
 __wt_page_reconcile(
     SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int discard);
 int
-__wt_value_return(
-    SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);
+__wt_return_data(SESSION *session,
+    WT_ITEM *key,
+    WT_ITEM *value,
+    int key_return);
 int
 __wt_disk_read(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
@@ -441,11 +443,11 @@ __wt_prime(uint32_t n);
 void
 __wt_progress(const char *s, uint64_t v);
 int
-__wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz);
-void
-__wt_buf_free(SESSION *session, WT_BUF *buf);
+__wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz);
 void
 __wt_buf_clear(WT_BUF *buf);
+void
+__wt_buf_free(SESSION *session, WT_BUF *buf);
 int
 __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp);
 void

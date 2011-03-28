@@ -622,8 +622,8 @@ onpage:		p = WT_CELL_BYTE(cell);
 	case WT_CELL_DATA_OVFL:
 process:	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_cell_process(session, cell, tmp));
-		p = tmp->item.data;
-		size = tmp->item.size;
+		p = tmp->data;
+		size = tmp->size;
 		break;
 	case WT_CELL_DEL:
 		p = (uint8_t *)"deleted";

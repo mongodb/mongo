@@ -7,7 +7,12 @@
 
 #include "wt_internal.h"
 
-static int __curbtree_next(WT_CURSOR *cursor);
+#define	API_CALL(c, s, n)	do {					\
+	(s) = (SESSION *)(c)->session;					\
+	(s)->cursor = (c);						\
+	(s)->btree = ((CURSOR_BTREE *)(c))->btree;			\
+	(s)->name = (n);						\
+} while (0)
 
 /*
  * __curbtree_first --
@@ -16,6 +21,10 @@ static int __curbtree_next(WT_CURSOR *cursor);
 static int
 __curbtree_first(WT_CURSOR *cursor)
 {
+	SESSION *session;
+
+	API_CALL(cursor, session, "first");
+
 	return (__wt_btcur_first((CURSOR_BTREE *)cursor));
 }
 
@@ -38,13 +47,9 @@ __curbtree_last(WT_CURSOR *cursor)
 static int
 __curbtree_next(WT_CURSOR *cursor)
 {
-	/*
-	 * TODO: fix this, currently done by the internal API layer, lower
-	 * levels should be passed the handles they need, rather than putting
-	 * everything in SESSION / SESSION.
-	 */
-	((SESSION *)cursor->session)->btree = ((CURSOR_BTREE *)cursor)->btree;
+	SESSION *session;
 
+	API_CALL(cursor, session, "next");
 	return (__wt_btcur_next((CURSOR_BTREE *)cursor));
 }
 
@@ -61,28 +66,17 @@ __curbtree_prev(WT_CURSOR *cursor)
 }
 
 /*
- * __curbtree_search --
- *	WT_CURSOR->search method for the btree cursor type.
- */
-static int
-__curbtree_search(WT_CURSOR *cursor)
-{
-	int exact;
-	return (cursor->search_near(cursor, &exact) ||
-	    (exact != 0 ? WT_NOTFOUND : 0));
-}
-
-/*
  * __curbtree_search_near --
  *	WT_CURSOR->search_near method for the btree cursor type.
  */
 static int
-__curbtree_search_near(WT_CURSOR *cursor, int *exact)
+__curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
-	WT_UNUSED(cursor);
-	WT_UNUSED(exact);
+	SESSION *session;
 
-	return (ENOTSUP);
+	API_CALL(cursor, session, "search_near");
+	WT_RET(__wt_btcur_search_near((CURSOR_BTREE *)cursor, lastcmp));
+	return (0);
 }
 
 /*
@@ -92,9 +86,11 @@ __curbtree_search_near(WT_CURSOR *cursor, int *exact)
 static int
 __curbtree_insert(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	SESSION *session;
 
-	return (ENOTSUP);
+	/* Only support exact searches for now */
+	API_CALL(cursor, session, "insert");
+	return (__wt_btcur_insert((CURSOR_BTREE *)cursor));
 }
 
 /*
@@ -193,16 +189,17 @@ __wt_cursor_open(SESSION *session,
 		__curbtree_last,
 		__curbtree_next,
 		__curbtree_prev,
-		__curbtree_search,
+		NULL,
 		__curbtree_search_near,
 		__curbtree_insert,
 		__curbtree_update,
 		__curbtree_remove,
 		__curbtree_close,
-		{ NULL, NULL },
-		{ { NULL, 0 }, NULL, 0, 0 },
-		{ { NULL, 0 }, NULL, 0, 0 },
-		0,
+		{ NULL, NULL },		/* TAILQ_ENTRY q */
+		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
+		0,			/* int saved_err */
+		0			/* uint32_t flags */
 	};
 	const char *tablename;
 	BTREE *btree;
@@ -243,16 +240,13 @@ __wt_cursor_open(SESSION *session,
 	*cursor = iface;
 	cursor->session = &session->iface;
 	cursor->key_format = cursor->value_format = "u";
-	__wt_cursor_init(cursor);
+	__wt_cursor_init(cursor, config);
 
 	cbt->btree = btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((CURSOR_BULK *)cbt));
 	if (dump)
 		__wt_curdump_init(cursor);
-
-	WT_ERR(__wt_scr_alloc(session, 0, &cbt->key_tmp));
-	WT_ERR(__wt_scr_alloc(session, 0, &cbt->value_tmp));
 
 	STATIC_ASSERT(offsetof(CURSOR_BTREE, iface) == 0);
 	TAILQ_INSERT_HEAD(&session->cursors, cursor, q);

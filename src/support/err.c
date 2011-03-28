@@ -247,7 +247,7 @@ void
 __wt_errv(SESSION *session, int error,
     const char *prefix, const char *fmt, va_list ap)
 {
-	WT_ERROR_HANDLER *handler;
+	WT_EVENT_HANDLER *handler;
 	char *end, *p;
 
 	/*
@@ -269,8 +269,8 @@ __wt_errv(SESSION *session, int error,
 		p += snprintf(p,
 		    (size_t)(end - p), ": %s", wiredtiger_strerror(error));
 
-	handler = session->error_handler;
-	(void)handler->handle_error(handler, error, s);
+	handler = session->event_handler;
+	handler->handle_error(handler, error, s);
 }
 
 /*

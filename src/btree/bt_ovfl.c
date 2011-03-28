@@ -53,7 +53,7 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
 	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
-	WT_RET(__wt_buf_grow(session, store, size));
+	WT_RET(__wt_buf_setsize(session, store, size));
 
 	/* Read the page. */
 	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, size));
@@ -61,7 +61,7 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	/* Copy the actual data in the WT_ITEM down to the start of the data. */
 	(void)memmove(store->mem,
 	    (uint8_t *)store->mem + WT_PAGE_DISK_SIZE, ovfl->size);
-	store->item.size = ovfl->size;
+	store->size = ovfl->size;
 
 	return (0);
 }

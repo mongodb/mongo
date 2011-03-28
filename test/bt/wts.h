@@ -44,6 +44,8 @@ typedef struct {
 	void *bdb_db;				/* Berkeley DB handle */
 
 	void *wts_btree;			/* WT BTREE handle */
+	void *wts_conn;				/* WT CONNECTION handle */
+	void *wts_cursor;			/* WT CURSOR handle */
 	void *wts_session;			/* WT SESSION handle */
 	FILE *wts_log;				/* WT log file stream */
 

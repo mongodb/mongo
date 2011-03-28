@@ -13,7 +13,6 @@ typedef struct {
 	WT_REF *ref;
 	WT_COL *cip;
 	WT_ROW *rip;
-	WT_BUF *key_tmp, *value_tmp;
 	uint32_t nitems;
 } CURSOR_BTREE;
 
@@ -146,9 +145,6 @@ struct __btree {
 	int (*col_del)(
 	    BTREE *, SESSION *, uint64_t , uint32_t );
 
-	int (*col_get)(
-	    BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t );
-
 	int (*col_put)(
 	    BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t );
 
@@ -166,9 +162,6 @@ struct __btree {
 
 	int (*row_del)(
 	    BTREE *, SESSION *, WT_ITEM *, uint32_t );
-
-	int (*row_get)(
-	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
 
 	int (*row_put)(
 	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
@@ -222,7 +215,7 @@ struct __wt_hazard {
 struct __session {
 	WT_SESSION iface;
 
-	WT_ERROR_HANDLER *error_handler;
+	WT_EVENT_HANDLER *event_handler;
 
 	TAILQ_ENTRY(__session) q;
 	TAILQ_HEAD(__cursors, wt_cursor) cursors;
@@ -234,7 +227,7 @@ struct __session {
 	const char *name;		/* Name */
 
 	BTREE	*btree;			/* Current file */
-	WT_BUF	 key, value;		/* Returned key/value pairs */
+	WT_CURSOR *cursor;		/* Current cursor */
 
 	WT_BUF	**scratch;		/* Temporary memory for any function */
 	u_int	 scratch_alloc;		/* Currently allocated */
@@ -443,7 +436,7 @@ void	 wiredtiger_err_stream(FILE *);
 int	 wiredtiger_simple_setup(const char *, const char *, BTREE **);
 int	 wiredtiger_simple_teardown(const char *, BTREE *);
 
-extern WT_ERROR_HANDLER *__wt_error_handler_default;
+extern WT_EVENT_HANDLER *__wt_event_handler_default;
 
 /*
  * DO NOT EDIT: automatically built by dist/api_flags.py.
@@ -479,14 +472,12 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_APIMASK_BTREE				0x00000007
 #define	WT_APIMASK_BTREE_CLOSE				0x00000001
 #define	WT_APIMASK_BTREE_COL_DEL			0x00000000
-#define	WT_APIMASK_BTREE_COL_GET			0x00000000
 #define	WT_APIMASK_BTREE_COL_PUT			0x00000000
 #define	WT_APIMASK_BTREE_COLUMN_SET			0x00000001
 #define	WT_APIMASK_BTREE_DUMP				0x00000003
 #define	WT_APIMASK_BTREE_HUFFMAN_SET			0x0000000f
 #define	WT_APIMASK_BTREE_OPEN				0x00000003
 #define	WT_APIMASK_BTREE_ROW_DEL			0x00000000
-#define	WT_APIMASK_BTREE_ROW_GET			0x00000000
 #define	WT_APIMASK_BTREE_ROW_PUT			0x00000000
 #define	WT_APIMASK_BTREE_SALVAGE			0x00000000
 #define	WT_APIMASK_BTREE_STAT_CLEAR			0x00000000

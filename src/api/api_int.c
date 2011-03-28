@@ -238,32 +238,6 @@ static int __wt_api_btree_col_del(
 	return (ret);
 }
 
-static int __wt_api_btree_col_get(
-	BTREE *btree,
-	SESSION *session,
-	uint64_t recno,
-	WT_ITEM *value,
-	uint32_t flags);
-static int __wt_api_btree_col_get(
-	BTREE *btree,
-	SESSION *session,
-	uint64_t recno,
-	WT_ITEM *value,
-	uint32_t flags)
-{
-	const char *method_name = "BTREE.col_get";
-	CONNECTION *connection = btree->conn;
-	int ret;
-
-	WT_DB_COL_ONLY(session, btree, method_name);
-	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
-	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_COL_GET);
-	WT_STAT_INCR(connection->method_stats, BTREE_COL_GET);
-	ret = __wt_btree_col_get(session, recno, value);
-	WT_TRET(__wt_session_api_clr(session, method_name, 0));
-	return (ret);
-}
-
 static int __wt_api_btree_col_put(
 	BTREE *btree,
 	SESSION *session,
@@ -416,32 +390,6 @@ static int __wt_api_btree_row_del(
 	WT_STAT_INCR(connection->method_stats, BTREE_ROW_DEL);
 	while ((ret = __wt_btree_row_del(session, key)) == WT_RESTART)
 		WT_STAT_INCR(connection->method_stats, BTREE_ROW_DEL_RESTART);
-	WT_TRET(__wt_session_api_clr(session, method_name, 0));
-	return (ret);
-}
-
-static int __wt_api_btree_row_get(
-	BTREE *btree,
-	SESSION *session,
-	WT_ITEM *key,
-	WT_ITEM *value,
-	uint32_t flags);
-static int __wt_api_btree_row_get(
-	BTREE *btree,
-	SESSION *session,
-	WT_ITEM *key,
-	WT_ITEM *value,
-	uint32_t flags)
-{
-	const char *method_name = "BTREE.row_get";
-	CONNECTION *connection = btree->conn;
-	int ret;
-
-	WT_DB_ROW_ONLY(session, btree, method_name);
-	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
-	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_ROW_GET);
-	WT_STAT_INCR(connection->method_stats, BTREE_ROW_GET);
-	ret = __wt_btree_row_get(session, key, value);
 	WT_TRET(__wt_session_api_clr(session, method_name, 0));
 	return (ret);
 }
@@ -954,9 +902,6 @@ __wt_methods_btree_lockout(BTREE *btree)
 	btree->col_del = (int (*)
 	    (BTREE *, SESSION *, uint64_t , uint32_t ))
 	    __wt_btree_lockout;
-	btree->col_get = (int (*)
-	    (BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t ))
-	    __wt_btree_lockout;
 	btree->col_put = (int (*)
 	    (BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
@@ -974,9 +919,6 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    __wt_btree_lockout;
 	btree->row_del = (int (*)
 	    (BTREE *, SESSION *, WT_ITEM *, uint32_t ))
-	    __wt_btree_lockout;
-	btree->row_get = (int (*)
-	    (BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->row_put = (int (*)
 	    (BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t ))
@@ -1038,11 +980,9 @@ __wt_methods_btree_open_transition(BTREE *btree)
 	    __wt_btree_lockout;
 	btree->bulk_load = __wt_api_btree_bulk_load;
 	btree->col_del = __wt_api_btree_col_del;
-	btree->col_get = __wt_api_btree_col_get;
 	btree->col_put = __wt_api_btree_col_put;
 	btree->dump = __wt_api_btree_dump;
 	btree->row_del = __wt_api_btree_row_del;
-	btree->row_get = __wt_api_btree_row_get;
 	btree->row_put = __wt_api_btree_row_put;
 	btree->salvage = __wt_api_btree_salvage;
 	btree->stat_clear = __wt_api_btree_stat_clear;

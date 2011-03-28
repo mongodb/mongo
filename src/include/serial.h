@@ -54,22 +54,22 @@ typedef struct {
 
 typedef struct {
 	void * key_arg;
-	WT_BUF * tmp;
+	WT_ITEM * item;
 } __wt_key_build_args;
 #define	__wt_key_build_serial(\
-    session, _key_arg, _tmp, ret) do {\
+    session, _key_arg, _item, ret) do {\
 	__wt_key_build_args _args;\
 	_args.key_arg = _key_arg;\
-	_args.tmp = _tmp;\
+	_args.item = _item;\
 	(ret) = __wt_session_serialize_func(session,\
 	    WT_WORKQ_FUNC, 0, __wt_key_build_serial_func, &_args);\
 } while (0)
 #define	__wt_key_build_unpack(\
-    session, _key_arg, _tmp) do {\
+    session, _key_arg, _item) do {\
 	__wt_key_build_args *_args =\
 	    (__wt_key_build_args *)(session)->wq_args;\
 	_key_arg = _args->key_arg;\
-	_tmp = _args->tmp;\
+	_item = _args->item;\
 } while (0)
 
 typedef struct {

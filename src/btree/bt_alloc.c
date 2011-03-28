@@ -228,12 +228,13 @@ __wt_block_read(SESSION *session)
 	WT_RET(__wt_scr_alloc(session, btree->free_size, &tmp));
 
 	/* Read in the free-list. */
-	WT_ERR(__wt_disk_read(
-	    session, tmp->mem, btree->free_addr, btree->free_size));
+	WT_ERR(__wt_disk_read(session,
+	    tmp->mem, btree->free_addr, btree->free_size));
 
 	/* Insert the free-list items into the linked list. */
-	for (p = (uint32_t *)((uint8_t *)
-	    tmp->item.data + WT_PAGE_DISK_SIZE); *p != WT_ADDR_INVALID; p += 2)
+	for (p = (uint32_t *)((uint8_t *)tmp->mem + WT_PAGE_DISK_SIZE);
+	    *p != WT_ADDR_INVALID;
+	    p += 2)
 		WT_ERR(__wt_block_free(session, p[0], p[1]));
 
 err:	if (tmp != NULL)

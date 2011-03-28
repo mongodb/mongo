@@ -9,48 +9,49 @@
 
 /*
  * __handle_error_default --
- *	Default WT_ERROR_HANDLER->handle_error implementation.
+ *	Default WT_EVENT_HANDLER->handle_error implementation: send to stderr.
  */
-static int
-__handle_error_default(WT_ERROR_HANDLER *handler, int error, const char *errmsg)
+static void
+__handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
 	WT_UNUSED(error);
 
 	fprintf(stderr, "%s\n", errmsg);
+}
+
+/*
+ * __handle_message_default --
+ *	Default WT_EVENT_HANDLER->handle_message implementation: ignore.
+ */
+static int
+__handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
+{
+	WT_UNUSED(handler);
+	WT_UNUSED(message);
 
 	return (0);
 }
 
 /*
- * __get_messages_default --
- *	Default WT_ERROR_HANDLER->get_messages implementation.
+ * __handle_progress_default --
+ *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-__get_messages_default(WT_ERROR_HANDLER *handler, const char **errmsgp)
+__handle_progress_default(WT_EVENT_HANDLER *handler,
+     const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
-	WT_UNUSED(errmsgp);
+	WT_UNUSED(operation);
+	WT_UNUSED(progress);
 
-	return (ENOTSUP);
+	return (0);
 }
 
-/*
- * __clear_messages_default --
- *	Default WT_ERROR_HANDLER->clear_messages implementation.
- */
-static int
-__clear_messages_default(WT_ERROR_HANDLER *handler)
-{
-	WT_UNUSED(handler);
-
-	return (ENOTSUP);
-}
-
-static WT_ERROR_HANDLER __error_handler_default = {
+static WT_EVENT_HANDLER __event_handler_default = {
 	__handle_error_default,
-	__get_messages_default,
-	__clear_messages_default,
+	__handle_message_default,
+	__handle_progress_default
 };
 
-WT_ERROR_HANDLER *__wt_error_handler_default = &__error_handler_default;
+WT_EVENT_HANDLER *__wt_event_handler_default = &__event_handler_default;

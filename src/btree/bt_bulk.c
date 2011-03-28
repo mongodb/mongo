@@ -509,13 +509,13 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	if (is_column)
 		key = NULL;
 	else {
-		key_copy = cursor->key.item;
+		key_copy = *(WT_ITEM *)&cursor->key;
 		key = &key_copy;
 	}
-	if (cursor->value.item.size == 0 && !is_column)
+	if (cursor->value.size == 0 && !is_column)
 		value = NULL;
 	else {
-		value_copy = cursor->value.item;
+		value_copy = *(WT_ITEM *)&cursor->value;
 		value = &value_copy;
 	}
 
@@ -926,9 +926,11 @@ __wt_item_build_key(
     SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
+	WT_CURSOR *cursor;
 	WT_STATS *stats;
 
 	btree = session->btree;
+	cursor = session->cursor;
 	stats = btree->stats;
 
 	WT_CELL_CLEAR(cell);
@@ -946,11 +948,11 @@ __wt_item_build_key(
 	 */
 	if (btree->huffman_key != NULL) {
 		WT_RET(__wt_huffman_encode(btree->huffman_key,
-		    item->data, item->size, &session->key));
-		if (session->key.item.size > item->size)
+		    item->data, item->size, &cursor->key));
+		if (cursor->key.size > item->size)
 			WT_STAT_INCRV(stats, FILE_HUFFMAN_KEY,
-			    session->key.item.size - item->size);
-		*item = session->key.item;
+			    cursor->key.size - item->size);
+		*item = *(WT_ITEM *)&cursor->key;
 	}
 
 	/* Create an overflow object if the data won't fit. */
@@ -976,9 +978,11 @@ __wt_item_build_value(
     SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
+	WT_CURSOR *cursor;
 	WT_STATS *stats;
 
 	btree = session->btree;
+	cursor = session->cursor;
 	stats = btree->stats;
 
 	WT_CELL_CLEAR(cell);
@@ -1008,11 +1012,11 @@ __wt_item_build_value(
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_data != NULL) {
 		WT_RET(__wt_huffman_encode(btree->huffman_data,
-		    item->data, item->size, &session->value));
-		if (session->value.item.size > item->size)
+		    item->data, item->size, &cursor->value));
+		if (cursor->value.size > item->size)
 			WT_STAT_INCRV(stats, FILE_HUFFMAN_DATA,
-			    session->value.item.size - item->size);
-		*item = session->value.item;
+			    cursor->value.size - item->size);
+		*item = *(WT_ITEM *)&cursor->value;
 	}
 
 	/* Create an overflow object if the data won't fit. */
@@ -1144,7 +1148,7 @@ __wt_bulk_scratch_page(SESSION *session, uint32_t page_size,
 	 */
 	page = tmp->mem;
 	page->XXdsk = dsk =
-	    (WT_PAGE_DISK *)((uint8_t *)tmp->item.data + sizeof(WT_PAGE));
+	    (WT_PAGE_DISK *)((uint8_t *)tmp->mem + sizeof(WT_PAGE));
 	WT_ERR(__wt_block_alloc(session, &page->addr, page_size));
 	page->size = page_size;
 	dsk->type = (uint8_t)page_type;

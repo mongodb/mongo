@@ -440,7 +440,7 @@ __wt_huffman_encode(void *huffman_arg,
 	 * 0-length byte strings, but there's no reason to do any work.
 	 */
 	if (from_len == 0) {
-		to_buf->item.size = 0;
+		to_buf->size = 0;
 		return (0);
 	}
 
@@ -452,7 +452,7 @@ __wt_huffman_encode(void *huffman_arg,
 	 * our caller may have only set the initial target buffer length, not
 	 * the initial pointer value.
 	 */
-	WT_RET(__wt_buf_grow(session, to_buf, from_len + 1));
+	WT_RET(__wt_buf_setsize(session, to_buf, from_len + 1));
 	to = to_buf->mem;
 	memset(to, 0, from_len + 1);
 
@@ -512,7 +512,7 @@ __wt_huffman_encode(void *huffman_arg,
 	padding_info = (bitpos % 8) << 5;
 	*to |= padding_info;
 
-	to_buf->item.size = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
+	to_buf->size = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
 	return (0);
 }
 
@@ -538,7 +538,7 @@ __wt_huffman_decode(void *huffman_arg,
 	 * 0-length byte strings, but there's no reason to do any work.
 	 */
 	if (from_len == 0) {
-		to_buf->item.size = 0;
+		to_buf->size = 0;
 		return (0);
 	}
 
@@ -550,7 +550,7 @@ __wt_huffman_decode(void *huffman_arg,
 	 * our caller may have only set the initial target buffer length, not
 	 * the initial pointer value.
 	 */
-	WT_RET(__wt_buf_grow(session, to_buf, 2 * from_len + 1));
+	WT_RET(__wt_buf_setsize(session, to_buf, 2 * from_len + 1));
 	to = to_buf->mem;
 
 	bitpos = 4;			/* Skipping the first 3 bits. */
@@ -609,7 +609,7 @@ __wt_huffman_decode(void *huffman_arg,
 	}
 
 	/* Return the number of bytes used. */
-	to_buf->item.size = bytes;
+	to_buf->size = bytes;
 
 	return (0);
 }

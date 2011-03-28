@@ -13,10 +13,10 @@
  *	convert it to a dumpable string.
  */
 static int
-__convert_to_dump(CONNECTION *conn, WT_BUF *scratch)
+__convert_to_dump(SESSION *session, WT_BUF *buf)
 {
-	WT_UNUSED(conn);
-	WT_UNUSED(scratch);
+	WT_UNUSED(session);
+	WT_UNUSED(buf);
 
 	return (0);
 }
@@ -27,10 +27,10 @@ __convert_to_dump(CONNECTION *conn, WT_BUF *scratch)
  *	convert it to a raw value.
  */
 static int
-__convert_from_dump(CONNECTION *conn, WT_BUF *scratch)
+__convert_from_dump(SESSION *session, WT_BUF *buf)
 {
-	WT_UNUSED(conn);
-	WT_UNUSED(scratch);
+	WT_UNUSED(session);
+	WT_UNUSED(buf);
 
 	return (0);
 }
@@ -42,17 +42,23 @@ __convert_from_dump(CONNECTION *conn, WT_BUF *scratch)
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
-	CONNECTION *conn;
+	SESSION *session;
+	WT_ITEM *key;
 	va_list ap;
 
-	conn = (CONNECTION *)cursor->session->connection;
+	session = (SESSION *)cursor->session;
 
-	if (!F_ISSET(cursor, WT_CURSTD_DUMPKEY)) {
-		WT_RET(__convert_to_dump(conn, &cursor->key));
-		F_SET(cursor, WT_CURSTD_DUMPKEY);
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
+		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
+
+	if (F_ISSET(cursor, WT_CURSTD_KEY_RAW)) {
+		WT_RET(__convert_to_dump(session, &cursor->key));
+		F_CLR(cursor, WT_CURSTD_KEY_RAW);
 	}
 	va_start(ap, cursor);
-	*va_arg(ap, WT_ITEM *) = cursor->key.item;
+	key = va_arg(ap, WT_ITEM *);
+	key->data = cursor->key.data;
+	key->size = cursor->key.size;
 	va_end(ap);
 
 	return (0);
@@ -65,17 +71,23 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
-	CONNECTION *conn;
+	SESSION *session;
+	WT_ITEM *value;
 	va_list ap;
 
-	conn = (CONNECTION *)cursor->session->connection;
+	session = (SESSION *)cursor->session;
 
-	if (!F_ISSET(cursor, WT_CURSTD_DUMPVALUE)) {
-		WT_RET(__convert_to_dump(conn, &cursor->value));
-		F_SET(cursor, WT_CURSTD_DUMPVALUE);
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
+		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
+
+	if (F_ISSET(cursor, WT_CURSTD_VALUE_RAW)) {
+		WT_RET(__convert_to_dump(session, &cursor->value));
+		F_SET(cursor, WT_CURSTD_VALUE_RAW);
 	}
 	va_start(ap, cursor);
-	*va_arg(ap, WT_ITEM *) = cursor->value.item;
+	value = va_arg(ap, WT_ITEM *);
+	value->data = cursor->value.data;
+	value->size = cursor->value.size;
 	va_end(ap);
 
 	return (0);
@@ -88,18 +100,21 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 static void
 __curdump_set_key(WT_CURSOR *cursor, ...)
 {
-	CONNECTION *conn;
+	SESSION *session;
 	va_list ap;
+	int ret;
 
-	conn = (CONNECTION *)cursor->session->connection;
+	session = (SESSION *)cursor->session;
 
 	va_start(ap, cursor);
-	cursor->key.item = *va_arg(ap, WT_ITEM *);
+	*(WT_ITEM *)&cursor->key = *va_arg(ap, WT_ITEM *);
 
-	if (__convert_from_dump(conn, &cursor->key) == 0)
-		F_CLR(cursor, WT_CURSTD_BADKEY);
-	else
-		F_SET(cursor, WT_CURSTD_BADKEY);
+	if ((ret = __convert_from_dump(session, &cursor->key)) == 0)
+		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_KEY_RAW);
+	else {
+		cursor->saved_err = ret;
+		F_CLR(cursor, WT_CURSTD_KEY_SET);
+	}
 
 	va_end(ap);
 }
@@ -111,18 +126,21 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 static void
 __curdump_set_value(WT_CURSOR *cursor, ...)
 {
-	CONNECTION *conn;
+	SESSION *session;
 	va_list ap;
+	int ret;
 
-	conn = (CONNECTION *)cursor->session->connection;
+	session = (SESSION *)cursor->session;
 
 	va_start(ap, cursor);
-	cursor->value.item = *va_arg(ap, WT_ITEM *);
+	*(WT_ITEM *)&cursor->value = *va_arg(ap, WT_ITEM *);
 
-	if (__convert_from_dump(conn, &cursor->value) == 0)
-		F_CLR(cursor, WT_CURSTD_BADKEY);
-	else
-		F_SET(cursor, WT_CURSTD_BADKEY);
+	if ((ret = __convert_from_dump(session, &cursor->value)) == 0)
+		F_SET(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_RAW);
+	else {
+		cursor->saved_err = ret;
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+	}
 
 	va_end(ap);
 }

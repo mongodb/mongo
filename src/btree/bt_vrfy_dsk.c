@@ -307,7 +307,7 @@ cell_len:			__wt_errx(session,
 		case WT_CELL_KEY_OVFL:
 			WT_RET(
 			    __wt_cell_process(session, cell, current->scratch));
-			current->item = current->scratch->item;
+			current->item = *(WT_ITEM *)current->scratch;
 			break;
 		default:
 			continue;

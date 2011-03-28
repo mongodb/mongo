@@ -324,8 +324,7 @@ __slvg_read(SESSION *session, WT_STUFF *ss)
 			goto skip_allocsize;
 
 		/* The page size isn't insane, read the entire page. */
-		if (size > t->mem_size)
-			WT_ERR(__wt_buf_grow(session, t, size));
+		WT_ERR(__wt_buf_setsize(session, t, size));
 		WT_ERR(__wt_read(session, fh, off, size, t->mem));
 		dsk = t->mem;
 
@@ -1166,8 +1165,8 @@ __slvg_range_row(SESSION *session, WT_STUFF *ss)
 			 * subsequent pages can overlap our page.
 			 */
 			if (func(btree,
-			    &ss->pages[j]->u.row.range_start.item,
-			    &ss->pages[i]->u.row.range_stop.item) > 0)
+			    (WT_ITEM *)&ss->pages[j]->u.row.range_start,
+			    (WT_ITEM *)&ss->pages[i]->u.row.range_stop) > 0)
 				break;
 
 			/* There's an overlap, fix it up. */
@@ -1232,10 +1231,11 @@ __slvg_range_overlap_row(
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-#define	A_TRK_START	(&a_trk->u.row.range_start.item)
-#define	A_TRK_STOP	(&a_trk->u.row.range_stop.item)
-#define	B_TRK_START	(&b_trk->u.row.range_start.item)
-#define	B_TRK_STOP	(&b_trk->u.row.range_stop.item)
+#define	A_TRK_START	((WT_ITEM *)&a_trk->u.row.range_start)
+#define	A_TRK_STOP	((WT_ITEM *)&a_trk->u.row.range_stop)
+#define	B_TRK_START	((WT_ITEM *)&b_trk->u.row.range_start)
+#define	B_TRK_STOP	((WT_ITEM *)&b_trk->u.row.range_stop)
+#define	A_TRK_START_BUF	(&a_trk->u.row.range_start)
 #define	A_TRK_STOP_BUF	(&a_trk->u.row.range_stop)
 #define	B_TRK_START_BUF	(&b_trk->u.row.range_start)
 #define	B_TRK_STOP_BUF	(&b_trk->u.row.range_stop)
@@ -1423,7 +1423,7 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 				continue;
 		} else {
 			rref->key = trk->u.row.range_start.mem;
-			rref->size = trk->u.row.range_start.item.size;
+			rref->size = trk->u.row.range_start.size;
 			__wt_buf_clear(&trk->u.row.range_start);
 			if (ss->range_merge)
 				__slvg_trk_ovfl_ref(session, trk, ss);
@@ -1493,12 +1493,12 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			if (__wt_key_process(rip)) {
 				WT_ERR(
 				    __wt_cell_process(session, rip->key, key));
-				item = &key->item;
+				item = (WT_ITEM *)key;
 			} else
 				item = (WT_ITEM *)rip;
 
-			if  (func(
-			    btree, item, &trk->u.row.range_start.item) > 0)
+			if  (func(btree,
+			    item, (WT_ITEM *)&trk->u.row.range_start) > 0)
 				break;
 			++skip_start;
 		}
@@ -1507,10 +1507,11 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			if (__wt_key_process(rip)) {
 				WT_ERR(
 				    __wt_cell_process(session, rip->key, key));
-				item = &key->item;
+				item = (WT_ITEM *)key;
 			} else
 				item = (WT_ITEM *)rip;
-			if  (func(btree, item, &trk->u.row.range_stop.item) < 0)
+			if  (func(btree,
+			    item, (WT_ITEM *)&trk->u.row.range_stop) < 0)
 				break;
 			++skip_stop;
 		}
@@ -1581,13 +1582,11 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 		if (__wt_key_process(rip))
 			WT_ERR(__wt_cell_process(session, rip->key, key));
 		else {
-			if (rip->size > key->mem_size)
-				WT_ERR(__wt_buf_grow(session, key, rip->size));
+			WT_ERR(__wt_buf_setsize(session, key, rip->size));
 			memcpy(key->mem, rip->key, rip->size);
-			key->item.size = rip->size;
 		}
 		rref->key = key->mem;
-		rref->size = key->item.size;
+		rref->size = key->size;
 		__wt_buf_clear(key);
 	}
 
@@ -1727,8 +1726,8 @@ __slvg_trk_compare(const void *a, const void *b)
 	case WT_PAGE_ROW_LEAF:
 		btree = a_trk->ss->btree;
 		if ((cmp = btree->btree_compare(btree,
-		    &a_trk->u.row.range_start.item,
-		    &b_trk->u.row.range_start.item)) != 0)
+		    (WT_ITEM *)&a_trk->u.row.range_start,
+		    (WT_ITEM *)&b_trk->u.row.range_start)) != 0)
 			return (cmp);
 		break;
 	}
@@ -1750,10 +1749,8 @@ __slvg_trk_compare(const void *a, const void *b)
 static int
 __slvg_key_copy(SESSION *session, WT_BUF *dst, WT_BUF *src)
 {
-	if (src->mem_size > dst->mem_size)
-		WT_RET(__wt_buf_grow(session, dst, src->mem_size));
-	memcpy(dst->mem, src->mem, src->item.size);
-	dst->item.size = src->item.size;
+	WT_RET(__wt_buf_setsize(session, dst, src->size));
+	memcpy(dst->mem, src->mem, src->size);
 	return (0);
 }
 
@@ -1985,9 +1982,9 @@ __slvg_trk_dump_row(WT_TRACK *trk)
 	fprintf(stderr, "%6lu/%-6lu (%llu)\n\t%.*s\n\t%.*s\n",
 	    (u_long)trk->addr, (u_long)trk->size,
 	    (unsigned long long)trk->lsn,
-	    trk->u.row.range_start.item.size,
-	    (char *)trk->u.row.range_start.item.data,
-	    trk->u.row.range_stop.item.size,
-	    (char *)trk->u.row.range_stop.item.data);
+	    trk->u.row.range_start.size,
+	    (char *)trk->u.row.range_start.data,
+	    trk->u.row.range_stop.size,
+	    (char *)trk->u.row.range_stop.data);
 }
 #endif

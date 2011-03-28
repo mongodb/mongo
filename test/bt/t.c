@@ -89,17 +89,8 @@ main(int argc, char *argv[])
 			goto err;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
-			switch (g.c_file_type) {
-			case ROW:
-				if (wts_read_row_scan())
-					goto err;
-				break;
-			case FIX:
-			case VAR:
-				if (wts_read_col_scan())
-					goto err;
-				break;
-			}
+			if (wts_read_scan())
+				goto err;
 
 			/*
 			 * If no operations scheduled, quit after a single

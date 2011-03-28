@@ -78,7 +78,7 @@ struct wt_collator;	    typedef struct wt_collator WT_COLLATOR;
 struct wt_connection;	    typedef struct wt_connection WT_CONNECTION;
 struct wt_cursor;	    typedef struct wt_cursor WT_CURSOR;
 struct wt_cursor_type;	    typedef struct wt_cursor_type WT_CURSOR_TYPE;
-struct wt_error_handler;    typedef struct wt_error_handler WT_ERROR_HANDLER;
+struct wt_event_handler;    typedef struct wt_event_handler WT_EVENT_HANDLER;
 struct wt_extractor;	    typedef struct wt_extractor WT_EXTRACTOR;
 struct wt_item;		    typedef struct wt_item WT_ITEM;
 struct wt_session;	    typedef struct wt_session WT_SESSION;
@@ -106,16 +106,31 @@ struct wt_item {
 };
 
 /*!
- * A data item with memory management.  Used to manage returned keys and values
- * in the WT_CURSOR implementation.
+ * @internal
+ * A data item with memory management.  Used internally to manage returned keys
+ * and values in the WT_CURSOR implementation.
  */
 typedef struct {
-	WT_ITEM item;
-	void *mem;
+	/*
+	 * Note: the first two fields must match WT_ITEM, we cast between
+	 * those types.  In a WT_BUF, the data is "ours", so the pointer isn't
+	 * qualified with const.
+	 */
+	const void *data;
+	uint32_t size;
+
+	/*
+	 * Managed memory chunk.  We swap the order here to avoid padding on
+	 * 64-bit systems.
+	 */
 	uint32_t mem_size;
+	void *mem;
 
 	uint32_t flags;
 } WT_BUF;
+/*!
+ * @endinternal
+ */
 #endif
 
 /*!
@@ -353,11 +368,12 @@ struct wt_cursor {
 	} q;                            /* Linked list of WT_CURSORs. */
 
 	WT_BUF key, value;
+	int saved_err;			/* Saved error in set_{key,value}. */
 
-#define	WT_CURSTD_BADKEY	0x01
-#define	WT_CURSTD_BADVALUE	0x02
-#define	WT_CURSTD_DUMPKEY	0x04
-#define	WT_CURSTD_DUMPVALUE	0x08
+#define	WT_CURSTD_KEY_SET	0x01
+#define	WT_CURSTD_KEY_RAW	0x02
+#define	WT_CURSTD_VALUE_RAW	0x04
+#define	WT_CURSTD_VALUE_SET	0x08
 #define	WT_CURSTD_POSITIONED	0x10
 #define	WT_CURSTD_RAW		0x20
 	uint32_t flags;
@@ -800,7 +816,7 @@ struct wt_connection {
 	 * @errors
 	 */
 	int __F(open_session)(WT_CONNECTION *connection,
-	    WT_ERROR_HANDLER *errhandler, const char *config,
+	    WT_EVENT_HANDLER *errhandler, const char *config,
 	    WT_SESSION **sessionp);
 };
 
@@ -829,7 +845,7 @@ struct wt_connection {
  * @errors
  */
 int wiredtiger_open(const char *home,
-    WT_ERROR_HANDLER *errhandler, const char *config,
+    WT_EVENT_HANDLER *errhandler, const char *config,
     WT_CONNECTION **connectionp);
 
 /*! Get information about an error as a string.
@@ -843,19 +859,20 @@ int wiredtiger_open(const char *home,
 const char *wiredtiger_strerror(int err);
 
 /*!
- * The interface implemented by applications in order to handle errors.
+ * The interface implemented by applications in order to handle errors messages,
+ * information messages and progress.
  */
-struct wt_error_handler {
-	/*! Callback to handle errors within the session. */
-	int (*handle_error)(WT_ERROR_HANDLER *handler,
+struct wt_event_handler {
+	/*! Callback to handle errors. */
+	void (*handle_error)(WT_EVENT_HANDLER *handler,
 	    int error, const char *errmsg);
 
-	/*! Optional callback to retrieve buffered messages. */
-	int (*get_messages)(WT_ERROR_HANDLER *handler,
-	    const char **errmsgp);
+	/*! Callback to handle informational messages. */
+	int (*handle_message)(WT_EVENT_HANDLER *handler, const char *message);
 
-	/*! Optional callback to clear buffered messages. */
-	int (*clear_messages)(WT_ERROR_HANDLER *handler);
+	/*! Callback to handle informational messages. */
+	int (*handle_progress)(WT_EVENT_HANDLER *handler,
+	    const char *operation, uint64_t progress);
 };
 
 /*! Pack a structure into a buffer.

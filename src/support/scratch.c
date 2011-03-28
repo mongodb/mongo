@@ -8,20 +8,33 @@
 #include "wt_internal.h"
 
 /*
- * __wt_buf_grow --
+ * __wt_buf_setsize --
  *	Ensure that a buffer is at least as big as required.
  */
 int
-__wt_buf_grow(SESSION *session, WT_BUF *buf, size_t sz)
+__wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz)
 {
 	WT_ASSERT(session, sz <= UINT32_MAX);
 
 	if (sz > buf->mem_size)
 		WT_RET(__wt_realloc(session, &buf->mem_size, sz, &buf->mem));
 
-	buf->item.data = buf->mem;
-	buf->item.size = (uint32_t)sz;
 	return (0);
+}
+
+/*
+ * __wt_buf_clear --
+ *	Clear a buffer (after stealing the pointer for another purpose).
+ *	Note: don't clear the flags, the buffer remains marked in-use.
+ */
+void
+__wt_buf_clear(WT_BUF *buf)
+{
+	buf->data = NULL;
+	buf->size = 0;
+
+	buf->mem = NULL;
+	buf->mem_size = 0;
 }
 
 /*
@@ -34,20 +47,6 @@ __wt_buf_free(SESSION *session, WT_BUF *buf)
 	if (buf->mem != NULL)
 		__wt_free(session, buf->mem);
 	__wt_buf_clear(buf);
-}
-
-/*
- * __wt_buf_clear --
- *	Clear a buffer (after stealing the pointer for another purpose).
- */
-void
-__wt_buf_clear(WT_BUF *buf)
-{
-	buf->item.data = NULL;
-	buf->item.size = 0;
-
-	buf->mem = NULL;
-	buf->mem_size = 0;
 }
 
 /*
@@ -92,7 +91,6 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 		 */
 		if (buf->mem_size >= size) {
 			F_SET(buf, WT_BUF_INUSE);
-			buf->item.data = buf->mem;
 			*scratchp = buf;
 			return (0);
 		}
@@ -105,7 +103,7 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 	 * Try and grow it.
 	 */
 	if (small != NULL) {
-		WT_ERR(__wt_buf_grow(session, small, size));
+		WT_ERR(__wt_buf_setsize(session, small, size));
 
 		F_SET(small, WT_BUF_INUSE);
 		*scratchp = small;

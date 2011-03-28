@@ -30,18 +30,17 @@ __wt_bt_open(SESSION *session, int ok_create)
 
 	/*
 	 * If the file size is 0, write a description page; if the file size
-	 * is non-zero, update the BTREE handle based on the on-disk description
-	 * page.  (If the file isn't empty, there must be a description page.)
+	 * is non-zero, update the BTREE handle based on the on-disk
+	 * description page.  (If the file isn't empty, there must be a
+	 * description page.)
 	 */
 	if (btree->fh->file_size == 0)
 		WT_RET(__wt_desc_write(session));
-	else {
+	else
 		WT_RET(__wt_desc_read(session));
 
-		/* If there's a root page, pin it. */
-		if (btree->root_page.addr != WT_ADDR_INVALID)
-			WT_RET(__wt_root_pin(session));
-	}
+	/* Pin the root, creating an empty root if necessary. */
+	WT_RET(__wt_root_pin(session));
 
 	/* Read the free-list into memory. */
 	WT_RET(__wt_block_read(session));
@@ -255,8 +254,18 @@ int
 __wt_root_pin(SESSION *session)
 {
 	BTREE *btree;
+	WT_PAGE *page;
 
 	btree = session->btree;
+
+	if (btree->root_page.addr == 0) {
+		WT_RET(__wt_calloc_def(session, 1, &page));
+		page->type = WT_PAGE_ROW_LEAF;
+		WT_PAGE_SET_MODIFIED(page);
+
+		btree->root_page.page = page;
+		btree->root_page.state = WT_REF_MEM;
+	}
 
 	/* Get the root page, which had better be there. */
 	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));

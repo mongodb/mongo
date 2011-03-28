@@ -34,7 +34,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	session->srch_upd = NULL;
 	session->srch_slot = UINT32_MAX;
 
-	cmp = 0;
+	/* Assume we don't match in case we're searching an empty tree. */
+	cmp = -1;
 	btree = session->btree;
 	rip = NULL;
 

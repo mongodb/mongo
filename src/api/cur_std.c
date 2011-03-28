@@ -14,15 +14,14 @@
 static int
 __cursor_get_key(WT_CURSOR *cursor, ...)
 {
-	WT_ITEM *item;
 	const char *fmt;
 	va_list ap;
 	int ret;
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	item = &cursor->key.item;
-	ret = wiredtiger_struct_unpackv(item->data, item->size, fmt, ap);
+	ret = wiredtiger_struct_unpackv(
+	    cursor->key.data, cursor->key.size, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -35,15 +34,14 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 static int
 __cursor_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_ITEM *item;
 	const char *fmt;
 	va_list ap;
 	int ret;
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
-	item = &cursor->value.item;
-	ret = wiredtiger_struct_unpackv(item->data, item->size, fmt, ap);
+	ret = wiredtiger_struct_unpackv(
+	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -57,10 +55,12 @@ static void
 __cursor_set_key(WT_CURSOR *cursor, ...)
 {
 	SESSION *session;
+	WT_BUF *buf;
 	WT_ITEM *item;
 	const char *fmt, *str;
 	size_t sz;
 	va_list ap;
+	int ret;
 
 	session = (SESSION *)cursor->session;
 
@@ -69,24 +69,25 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	if (fmt[0] == 'S' && fmt[1] == '\0') {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
-		cursor->key.item.data = str;
+		cursor->key.data = (void *)str;
 	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
-		cursor->key.item.data = item->data;
+		cursor->key.data = (void *)item->data;
 	} else {
+		buf = &cursor->key;
 		sz = wiredtiger_struct_sizev(fmt, ap);
-		if (__wt_buf_grow(session, &cursor->key, sz) == 0 &&
-		    wiredtiger_struct_packv(cursor->key.mem, sz, fmt, ap) == 0)
-			F_CLR(cursor, WT_CURSTD_BADKEY);
+		if ((ret = __wt_buf_setsize(session, buf, sz)) == 0 &&
+		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
+			F_SET(cursor, WT_CURSTD_KEY_SET);
 		else {
-			F_SET(cursor, WT_CURSTD_BADKEY);
+			cursor->saved_err = ret;
+			F_CLR(cursor, WT_CURSTD_KEY_SET);
 			return;
 		}
-		cursor->key.item.data = cursor->key.mem;
 	}
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
-	cursor->key.item.size = (uint32_t)sz;
+	cursor->key.size = (uint32_t)sz;
 	va_end(ap);
 }
 
@@ -98,10 +99,12 @@ static void
 __cursor_set_value(WT_CURSOR *cursor, ...)
 {
 	SESSION *session;
+	WT_BUF *buf;
 	WT_ITEM *item;
 	const char *fmt, *str;
 	size_t sz;
 	va_list ap;
+	int ret;
 
 	session = (SESSION *)cursor->session;
 
@@ -110,26 +113,40 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	if (fmt[0] == 'S' && fmt[1] == '\0') {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
-		cursor->value.item.data = str;
+		cursor->value.data = str;
 	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
-		cursor->value.item.data = item->data;
+		cursor->value.data = item->data;
 	} else {
+		buf = &cursor->value;
 		sz = wiredtiger_struct_sizev(fmt, ap);
-		if (__wt_buf_grow(session, &cursor->value, sz) == 0 &&
-		    wiredtiger_struct_packv(
-		    cursor->value.mem, sz, fmt, ap) == 0)
-			F_CLR(cursor, WT_CURSTD_BADVALUE);
+		if ((ret = __wt_buf_setsize(session, buf, sz)) == 0 &&
+		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
+			F_SET(cursor, WT_CURSTD_KEY_SET);
 		else {
-			F_SET(cursor, WT_CURSTD_BADVALUE);
+			cursor->saved_err = ret;
+			F_CLR(cursor, WT_CURSTD_KEY_SET);
 			return;
 		}
-		cursor->value.item.data = cursor->value.mem;
+		cursor->value.data = buf->mem;
 	}
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
-	cursor->value.item.size = (uint32_t)sz;
+	cursor->value.size = (uint32_t)sz;
 	va_end(ap);
+}
+
+/*
+ * __cursor_search --
+ *	WT_CURSOR->search default implementation.
+ */
+static int
+__cursor_search(WT_CURSOR *cursor)
+{
+	int lastcmp;
+
+	WT_RET(cursor->search_near(cursor, &lastcmp));
+	return ((lastcmp != 0) ? WT_NOTFOUND : 0);
 }
 
 /*
@@ -161,15 +178,20 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
  *	Default cursor initialization.
  */
 void
-__wt_cursor_init(WT_CURSOR *cursor)
+__wt_cursor_init(WT_CURSOR *cursor, const char *config)
 {
+	WT_UNUSED(config);
+
 	cursor->get_key = __cursor_get_key;
 	cursor->get_value = __cursor_get_value;
 	cursor->set_key = __cursor_set_key;
 	cursor->set_value = __cursor_set_value;
 
-	cursor->value.item.data = cursor->value.mem = NULL;
-	cursor->value.mem_size = 0;
+	if (cursor->search == NULL)
+		cursor->search = __cursor_search;
 
-	cursor->flags = WT_CURSTD_BADKEY | WT_CURSTD_BADVALUE;
+	WT_CLEAR(cursor->key);
+	WT_CLEAR(cursor->value);
+
+	cursor->flags = 0;
 }

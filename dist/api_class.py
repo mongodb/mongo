@@ -292,16 +292,6 @@ methods['btree.col_del'] = Api(
 	['__NONE__'],
 	['open'], [])
 
-methods['btree.col_get'] = Api(
-	'btree.col_get',
-	'method, colonly, session',
-	['session/SESSION *@S',
-	 'recno/uint64_t @S',
-	 'value/WT_ITEM *@S',
-	 'flags/uint32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
 methods['btree.col_put'] = Api(
 	'btree.col_put',
 	'method, colonly, rdonly, restart, session',
@@ -355,16 +345,6 @@ methods['btree.row_del'] = Api(
 	'method, rdonly, restart, rowonly, session',
 	['session/SESSION *@S',
 	 'key/WT_ITEM *@S',
-	 'flags/uint32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
-methods['btree.row_get'] = Api(
-	'btree.row_get',
-	'method, rowonly, session',
-	['session/SESSION *@S',
-	 'key/WT_ITEM *@S',
-	 'value/WT_ITEM *@S',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])

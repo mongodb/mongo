@@ -217,7 +217,7 @@ __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(session, 50, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(session, 48, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BTREE_BTREE_COMPARE_GET].desc =
 	    "btree.btree_compare_get";
@@ -241,7 +241,6 @@ __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp)
 	stats[WT_STAT_BTREE_COL_DEL].desc = "btree.col_del";
 	stats[WT_STAT_BTREE_COL_DEL_RESTART].desc =
 	    "btree.col_del method restarts";
-	stats[WT_STAT_BTREE_COL_GET].desc = "btree.col_get";
 	stats[WT_STAT_BTREE_COL_PUT].desc = "btree.col_put";
 	stats[WT_STAT_BTREE_COL_PUT_RESTART].desc =
 	    "btree.col_put method restarts";
@@ -251,7 +250,6 @@ __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp)
 	stats[WT_STAT_BTREE_ROW_DEL].desc = "btree.row_del";
 	stats[WT_STAT_BTREE_ROW_DEL_RESTART].desc =
 	    "btree.row_del method restarts";
-	stats[WT_STAT_BTREE_ROW_GET].desc = "btree.row_get";
 	stats[WT_STAT_BTREE_ROW_PUT].desc = "btree.row_put";
 	stats[WT_STAT_BTREE_ROW_PUT_RESTART].desc =
 	    "btree.row_put method restarts";
@@ -307,7 +305,6 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_BTREE_COLUMN_SET].v = 0;
 	stats[WT_STAT_BTREE_COL_DEL].v = 0;
 	stats[WT_STAT_BTREE_COL_DEL_RESTART].v = 0;
-	stats[WT_STAT_BTREE_COL_GET].v = 0;
 	stats[WT_STAT_BTREE_COL_PUT].v = 0;
 	stats[WT_STAT_BTREE_COL_PUT_RESTART].v = 0;
 	stats[WT_STAT_BTREE_DUMP].v = 0;
@@ -315,7 +312,6 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_BTREE_OPEN].v = 0;
 	stats[WT_STAT_BTREE_ROW_DEL].v = 0;
 	stats[WT_STAT_BTREE_ROW_DEL_RESTART].v = 0;
-	stats[WT_STAT_BTREE_ROW_GET].v = 0;
 	stats[WT_STAT_BTREE_ROW_PUT].v = 0;
 	stats[WT_STAT_BTREE_ROW_PUT_RESTART].v = 0;
 	stats[WT_STAT_BTREE_SALVAGE].v = 0;
