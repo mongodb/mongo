@@ -145,7 +145,7 @@ __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify);
 int
 __wt_page_inmem(SESSION *session, WT_PAGE *page);
 int
-__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *scratch);
+__wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf);
 void
 __wt_workq_read_server(CONNECTION *conn, int force);
 int
@@ -197,6 +197,10 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags);
 int
 __wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value);
 int
+__wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store);
+int
+__wt_key_build_serial_func(SESSION *session);
+int
 __wt_btree_row_del(SESSION *session, WT_ITEM *key);
 int
 __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value);
@@ -208,8 +212,6 @@ int
 __wt_update_serial_func(SESSION *session);
 int
 __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
-int
-__wt_key_build_serial_func(SESSION *session);
 int
 __wt_btree_btree_compare_int_set_verify(BTREE *btree, int btree_compare_int);
 int

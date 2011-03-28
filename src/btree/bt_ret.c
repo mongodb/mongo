@@ -63,8 +63,8 @@ __wt_value_return(
 	 */
 	if (key_return) {
 		if (__wt_key_process(rip)) {
-			WT_RET(__wt_cell_process(
-			    session, rip->key, &session->key));
+			WT_RET(
+			    __wt_key_build(session, page, rip, &session->key));
 
 			*key = session->key.item;
 		} else if (callback == NULL) {
@@ -123,8 +123,8 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
-			WT_RET(__wt_cell_process(
-			    session, cell, &session->value));
+			WT_RET(
+			    __wt_cell_process(session, cell, &session->value));
 			value_ret = session->value.item.data;
 			size_ret = session->value.item.size;
 			break;

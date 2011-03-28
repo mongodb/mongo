@@ -41,6 +41,7 @@ src/btree/col_get.c
 src/btree/col_put.c
 src/btree/col_srch.c
 src/btree/row_get.c
+src/btree/row_key.c
 src/btree/row_put.c
 src/btree/row_srch.c
 src/db/db_getset.c

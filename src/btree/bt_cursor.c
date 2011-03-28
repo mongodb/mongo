@@ -76,8 +76,8 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			 * print.  Set the key.
 			 */
 			if (__wt_key_process(cbt->rip)) {
-				WT_RET(__wt_cell_process(session,
-				    cbt->rip->key, cbt->key_tmp));
+				WT_RET(__wt_key_build(session,
+				    cbt->ref->page, cbt->rip, cbt->key_tmp));
 				key = &cbt->key_tmp->item;
 			} else
 				key = (WT_ITEM *)cbt->rip;

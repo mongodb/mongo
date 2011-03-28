@@ -288,7 +288,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * print.  Set the key.
 		 */
 		if (__wt_key_process(rip)) {
-			WT_ERR(__wt_cell_process(session, rip->key, key_tmp));
+			WT_ERR(__wt_key_build(session, page, rip, key_tmp));
 			key = &key_tmp->item;
 		} else
 			key = (WT_ITEM *)rip;
