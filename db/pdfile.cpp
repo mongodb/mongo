@@ -1257,7 +1257,9 @@ namespace mongo {
                 }
                 n++;
                 progress.hit();
-                
+
+                getDur().commitIfNeeded();
+
                 if ( cc->yieldSometimes() ) {
                     progress.setTotalWhileRunning( d->stats.nrecords );
                 }
