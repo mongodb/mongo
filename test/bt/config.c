@@ -197,7 +197,7 @@ config_clear(void)
 
 	/* Display configuration names. */
 	for (cp = c; cp->name != NULL; ++cp)
-		cp->flags &= ~C_TEMP;
+		cp->flags &= ~(uint32_t)C_TEMP;
 }
 
 
