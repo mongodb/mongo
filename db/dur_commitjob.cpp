@@ -204,11 +204,11 @@ namespace mongo {
 #if defined(_DEBUG)
                         _nSinceCommitIfNeededCall++;
                         if( _nSinceCommitIfNeededCall >= 80 ) {
- 			  if( _nSinceCommitIfNeededCall % 40 == 0 ) {
-			    log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-			    if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
-			      printStackTrace();
-			  }
+                            if( _nSinceCommitIfNeededCall % 40 == 0 ) {
+                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
+                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
+                                    printStackTrace();
+                            }
                         }
 #endif
                         if (_bytes < UncommittedBytesLimit * 3)
