@@ -55,14 +55,14 @@ key_gen_setup(void)
 		g.key_gen_buf = NULL;
 	}
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-		g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
+		g.key_rand_len[i] = (uint16_t)MMRAND(g.c_key_min, g.c_key_max);
 		
 	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL) {
 		fprintf(stderr, "%s: %s\n", g.progname, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	for (i = 0; i < g.c_key_max; ++i)
-		g.key_gen_buf[i] = 'a' + i % 26;
+		g.key_gen_buf[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
 }
 
 void
@@ -93,7 +93,7 @@ data_gen(void *datap, uint32_t *sizep, int grow_ok)
 			exit(EXIT_FAILURE);
 		}
 		for (i = 0; i < blen; ++i)
-			buf[i] = 'A' + i % 26;
+			buf[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 	}
 
 	/*
@@ -168,12 +168,12 @@ track(const char *s, u_int64_t i)
  * wts_rand --
  *	Return a random number.
  */
-int
+uint32_t
 wts_rand(void)
 {
 	const char *p;
 	char buf[64];
-	u_int r;
+	uint32_t r;
 
 	/*
 	 * We can entirely reproduce a run based on the random numbers used
@@ -204,10 +204,10 @@ wts_rand(void)
 			exit(EXIT_FAILURE);
 		}
 
-		r = (u_int)strtoul(buf, NULL, 10);
+		r = (uint32_t)strtoul(buf, NULL, 10);
 	} else {
-		r = (u_int)rand();
-		fprintf(g.rand_log, "%u\n", r);
+		r = (uint32_t)rand();
+		fprintf(g.rand_log, "%lu\n", (u_long)r);
 	}
-	return ((int)r);
+	return (r);
 }

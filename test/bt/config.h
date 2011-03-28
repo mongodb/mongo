@@ -21,7 +21,7 @@ typedef struct {
 
 	/* Value isn't random for this run, ignore just for this run. */
 #define	C_TEMP		0x08
-	uint8_t	 	flags;
+	uint32_t 	flags;
 
 	uint32_t	 min;			/* Minimum value */
 	uint32_t	 max;			/* Maximum value */

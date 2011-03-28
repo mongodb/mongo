@@ -105,7 +105,7 @@ int	 wts_bulk_load(void);
 int	 wts_del(uint64_t);
 int	 wts_dump(void);
 int	 wts_ops(void);
-int	 wts_rand(void);
+uint32_t wts_rand(void);
 int	 wts_read_col_scan(void);
 int	 wts_read_row_scan(void);
 int	 wts_startup(int);
