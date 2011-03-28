@@ -1198,8 +1198,10 @@ namespace mongo {
 
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
-        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
+        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
+            getDur().commitIfNeeded();
+        }
 
         return n;
     }
