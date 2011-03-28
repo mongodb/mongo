@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "btree.i"
 
 static int __wt_err_delfmt(SESSION *, uint32_t, uint32_t);
 static int __wt_err_eof(SESSION *, uint32_t, uint32_t);
@@ -97,8 +96,7 @@ __wt_verify_dsk_item(
 {
 	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
 	struct {
-		WT_ROW   rip;			/* Reference to on-page data */
-		WT_ITEM	*item;			/* WT_ITEM to compare */
+		WT_ITEM	 item;			/* WT_ITEM to compare */
 		WT_BUF	*scratch;		/* scratch buffer */
 	} *current, *last, *tmp, _a, _b;
 	BTREE *btree;
@@ -106,7 +104,6 @@ __wt_verify_dsk_item(
 	WT_OVFL *ovfl;
 	WT_OFF *off;
 	WT_OFF_RECORD *off_record;
-	WT_ROW *rip;
 	off_t file_size;
 	uint8_t *end;
 	void *huffman;
@@ -291,35 +288,27 @@ cell_len:			__wt_errx(session,
 		if (dsk->type == WT_PAGE_COL_VAR)
 			continue;
 
-		/*
-		 * Skip values.  Otherwise build the keys and compare them.
-		 */
-		rip = &current->rip;
+		/* Build the keys and compare them, skipping values. */
 		switch (cell_type) {
 		case WT_CELL_KEY:
 			if (huffman == NULL) {
-				__wt_key_set(rip,
-				    WT_CELL_BYTE(cell), WT_CELL_LEN(cell));
+				current->item.data = WT_CELL_BYTE(cell);
+				current->item.size = WT_CELL_LEN(cell);
 				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_KEY_OVFL:
-			__wt_key_set_process(rip, cell);
+			WT_RET(
+			    __wt_cell_process(session, cell, current->scratch));
+			current->item = current->scratch->item;
 			break;
 		default:
 			continue;
 		}
 
-		if (__wt_key_process(rip)) {
-			WT_RET(__wt_cell_process(
-			    session, rip->key, current->scratch));
-			current->item = &current->scratch->item;
-		} else
-			current->item = (WT_ITEM *)rip;
-
 		/* Compare the current key against the last key. */
-		if (last->item != NULL &&
-		    func(btree, last->item, current->item) >= 0) {
+		if (cell_num > 1 &&
+		    func(btree, &last->item, &current->item) >= 0) {
 			__wt_errx(session,
 			    "the %lu and %lu keys on page at addr %lu are "
 			    "incorrectly sorted",
