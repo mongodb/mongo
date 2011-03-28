@@ -152,9 +152,11 @@ namespace mongo {
             return getFieldDotted( name.c_str() );
         }
 
-        /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects
+        /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects.
+         *  Turning off expandLastArray allows you to retrieve nested array objects instead of
+         *  their contents.
          */
-        void getFieldsDotted(const StringData& name, BSONElementSet &ret ) const;
+        void getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray = true ) const;
         /** Like getFieldDotted(), but returns first array encountered while traversing the
             dotted fields of name.  The name variable is updated to represent field
             names with respect to the returned element. */

@@ -155,87 +155,100 @@ namespace mongo {
         }
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-            BSONElement geo = obj.getFieldDotted(_geo.c_str());
-            if ( geo.eoo() )
+
+            BSONElementSet bSet;
+            // Get all the nested location fields, but don't return individual elements from
+            // the last array, if it exists.
+            obj.getFieldsDotted(_geo.c_str(), bSet, false);
+
+            if( bSet.empty() )
                 return;
 
-            //
-            // Grammar for location lookup:
-            // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc}|loc
-            // loc  ::= { <k1> : #, <k2> : # }|[#, #]|{}
-            //
-            // Empty locations are ignored, preserving single-location semantics
-            //
+            for( BSONElementSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI ) {
 
-            if ( ! geo.isABSONObj() )
-                return;
+                BSONElement geo = *setI;
 
-            BSONObj embed = geo.embeddedObject();
-            if ( embed.isEmpty() )
-                return;
+                GEODEBUG( "Element " << geo << " found for query " << _geo.c_str() );
 
-            // Differentiate between location arrays and locations
-            // by seeing if the first element value is a number
-            bool singleElement = embed.firstElement().isNumber();
+                if ( geo.eoo() || ! geo.isABSONObj() )
+                    continue;
 
-            BSONObjIterator oi(embed);
+                //
+                // Grammar for location lookup:
+                // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc}|loc
+                // loc  ::= { <k1> : #, <k2> : # }|[#, #]|{}
+                //
+                // Empty locations are ignored, preserving single-location semantics
+                //
 
-            while( oi.more() ) {
+                BSONObj embed = geo.embeddedObject();
+                if ( embed.isEmpty() )
+                    continue;
 
-                BSONObj locObj;
+                // Differentiate between location arrays and locations
+                // by seeing if the first element value is a number
+                bool singleElement = embed.firstElement().isNumber();
 
-                if( singleElement ) locObj = embed;
-                else {
-                    BSONElement locElement = oi.next();
+                BSONObjIterator oi(embed);
 
-                    uassert( 13654, str::stream() << "location object expected, location array not in correct format",
-                             locElement.isABSONObj() );
+                while( oi.more() ) {
 
-                    locObj = locElement.embeddedObject();
+                    BSONObj locObj;
 
-                    if( locObj.isEmpty() )
-                        continue;
-                }
-
-                BSONObjBuilder b(64);
-
-                _hash( locObj ).append( b , "" );
-
-                // Go through all the other index keys
-                for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ) {
-
-                    // Get *all* fields for the index key
-                    BSONElementSet eSet;
-                    obj.getFieldsDotted( *i, eSet );
-
-
-                    if ( eSet.size() == 0 )
-                        b.appendAs( _spec->missingField(), "" );
-                    else if ( eSet.size() == 1 )
-                        b.appendAs( *(eSet.begin()), "" );
+                    if( singleElement ) locObj = embed;
                     else {
+                        BSONElement locElement = oi.next();
 
-                        // If we have more than one key, store as an array of the objects
+                        uassert( 13654, str::stream() << "location object expected, location array not in correct format",
+                                 locElement.isABSONObj() );
 
-                        BSONArrayBuilder aBuilder;
+                        locObj = locElement.embeddedObject();
 
-                        for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ) {
-                            aBuilder.append( *ei );
+                        if( locObj.isEmpty() )
+                            continue;
+                    }
+
+                    BSONObjBuilder b(64);
+
+                    _hash( locObj ).append( b , "" );
+
+                    // Go through all the other index keys
+                    for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ) {
+
+                        // Get *all* fields for the index key
+                        BSONElementSet eSet;
+                        obj.getFieldsDotted( *i, eSet );
+
+
+                        if ( eSet.size() == 0 )
+                            b.appendAs( _spec->missingField(), "" );
+                        else if ( eSet.size() == 1 )
+                            b.appendAs( *(eSet.begin()), "" );
+                        else {
+
+                            // If we have more than one key, store as an array of the objects
+
+                            BSONArrayBuilder aBuilder;
+
+                            for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ) {
+                                aBuilder.append( *ei );
+                            }
+
+                            BSONArray arr = aBuilder.arr();
+
+                            b.append( "", arr );
+
                         }
-
-                        BSONArray arr = aBuilder.arr();
-
-                        b.append( "", arr );
 
                     }
 
+                    keys.insert( b.obj() );
+
+                    if( singleElement ) break;
+
                 }
-
-                keys.insert( b.obj() );
-
-                if( singleElement ) break;
-
             }
+
         }
 
         GeoHash _tohash( const BSONElement& e ) const {
@@ -765,7 +778,8 @@ namespace mongo {
 
             // Remember match results for each object
             map<DiskLoc, bool>::iterator match = _matched.find( node.recordLoc );
-            if( match == _matched.end() ) {
+            bool newDoc = match == _matched.end();
+            if( newDoc ) {
 
                 // matcher
                 MatchDetails details;
@@ -792,11 +806,11 @@ namespace mongo {
                 return;
             }
 
-            addSpecific( node , d );
+            addSpecific( node , d, newDoc );
             _found++;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d ) = 0;
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) = 0;
         virtual bool checkDistance( const GeoHash& node , double& d ) = 0;
 
         long long found() const {
@@ -838,7 +852,7 @@ namespace mongo {
             return good;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d ) {
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
             _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
             if ( _points.size() > _max ) {
@@ -1278,7 +1292,10 @@ namespace mongo {
         virtual bool moreToDo() = 0;
         virtual void fillStack() = 0;
 
-        virtual void addSpecific( const KeyNode& node , double d ) {
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+
+            if( ! newDoc ) return;
+
             if ( _cur.isEmpty() )
                 _cur = GeoPoint( node , d );
             else
