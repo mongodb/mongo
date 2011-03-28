@@ -19,13 +19,12 @@
 #include "mmap.h"
 #include "file_allocator.h"
 #include "../db/concurrency.h"
-
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include "../util/processinfo.h"
 #include "mongoutils/str.h"
 using namespace mongoutils;
 
@@ -53,6 +52,10 @@ namespace mongo {
 #define O_NOATIME (0)
 #endif
 
+#ifndef MAP_NORESERVE
+#define MAP_NORESERVE (0)
+#endif
+
     void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
         // length may be updated by callee.
         setFilename(filename);
@@ -64,6 +67,7 @@ namespace mongo {
         fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
             log() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
+            fd = 0; // our sentinel for not opened
             return 0;
         }
 
@@ -118,7 +122,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::createPrivateMap() {
-        void * x = mmap( /*start*/0 , len , PROT_READ|PROT_WRITE , MAP_PRIVATE , fd , 0 );
+        void * x = mmap( /*start*/0 , len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_NORESERVE , fd , 0 );
         if( x == MAP_FAILED ) {
             if ( errno == ENOMEM ) {
                 if( sizeof(void*) == 4 ) {
@@ -140,11 +144,12 @@ namespace mongo {
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
         // don't unmap, just mmap over the old region
-        void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_FIXED , fd , 0 );
+        void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_NORESERVE|MAP_FIXED , fd , 0 );
         if( x == MAP_FAILED ) {
             int err = errno;
             error()  << "13601 Couldn't remap private view: " << errnoWithDescription(err) << endl;
             log() << "aborting" << endl;
+            printMemInfo();
             abort();
         }
         assert( x == oldPrivateAddr );
@@ -154,7 +159,7 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         if ( views.empty() || fd == 0 )
             return;
-        if ( msync(views[0], len, sync ? MS_SYNC : MS_ASYNC) )
+        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) )
             problem() << "msync " << errnoWithDescription() << endl;
     }
 
@@ -177,7 +182,7 @@ namespace mongo {
     };
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new PosixFlushable( views.empty() ? 0 : views[0] , fd , len );
+        return new PosixFlushable( viewForFlushing() , fd , len );
     }
 
     void MemoryMappedFile::_lock() {

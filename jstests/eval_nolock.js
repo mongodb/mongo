@@ -10,7 +10,7 @@ res = db.runCommand( { eval :
                   db.eval_nolock.insert( { _id : 123 } );
                   return db.eval_nolock.count();
               }
-              , nlock : true } );
+              , nolock : true } );
     
 assert.eq( 11 , res.retval , "A" )
 

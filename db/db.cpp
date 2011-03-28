@@ -56,7 +56,6 @@ namespace mongo {
     /* only off if --nohints */
     extern bool useHints;
 
-    extern char *appsrvPath;
     extern int diagLogging;
     extern unsigned lenForNewNsFiles;
     extern int lockFile;
@@ -276,21 +275,21 @@ sendmore:
             dbMsgPort->shutdown();
         }
         catch ( SocketException& ) {
-            problem() << "SocketException in connThread, closing client connection" << endl;
+            log() << "SocketException in connThread, closing client connection" << endl;
             dbMsgPort->shutdown();
         }
         catch ( const ClockSkewException & ) {
             exitCleanly( EXIT_CLOCK_SKEW );
         }
         catch ( std::exception &e ) {
-            problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
+            error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
         catch ( ... ) {
-            problem() << "Uncaught exception, terminating" << endl;
+            error() << "Uncaught exception, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
-
+        
         // thread ending...
         {
             Client * c = currentClient.get();
@@ -464,7 +463,7 @@ sendmore:
         return cc().curop()->opNum();
     }
 
-    void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
+    void _initAndListen(int listenPort ) {
 
         Client::initThread("initandlisten");
 
@@ -554,8 +553,10 @@ sendmore:
 
     void testPretouch();
 
-    void initAndListen(int listenPort, const char *appserverLoc = NULL) {
-        try { _initAndListen(listenPort, appserverLoc); }
+    void initAndListen(int listenPort) {
+        try { 
+            _initAndListen(listenPort); 
+        }
         catch ( std::exception &e ) {
             log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
@@ -573,7 +574,7 @@ sendmore:
 #if defined(_WIN32)
     bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
-        initAndListen( cmdLine.port, appsrvPath );
+        initAndListen( cmdLine.port );
         return true;
     }
 #endif
@@ -635,14 +636,12 @@ int main(int argc, char* argv[]) {
     ("dbpath", po::value<string>() , "directory for datafiles")
     ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
     ("directoryperdb", "each database will be stored in a separate directory")
-    ("dur", "enable journaling")
-    ("durOptions", po::value<int>(), "durability diagnostic options")
+    ("journal", "enable journaling")
+    ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("ipv6", "enable IPv6 support (disabled by default)")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("maxConns",po::value<int>(), "max number of simultaneous connections")
     ("noauth", "run without security")
-    ("nocursors", "diagnostic/debugging option")
-    ("nohints", "ignore query hints")
     ("nohttpinterface", "disable http interface")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
@@ -702,7 +701,12 @@ int main(int argc, char* argv[]) {
     ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
     ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
     ("nodur", "disable journaling (currently the default)")
-    ("appsrvpath", po::value<string>(), "root directory for the babble app server")
+    ("nojournal", "disable journaling (currently the default)")
+    // things we don't want people to use
+    ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
+    ("nohints", "ignore query hints")
+    ("dur", "enable journaling") // deprecated version
+    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
     ;
 
 
@@ -723,7 +727,11 @@ int main(int argc, char* argv[]) {
     dbExecCommand = argv[0];
 
     srand(curTimeMicros());
+#if( BOOST_VERSION >= 104500 )
+    boost::filesystem::path::default_name_check( boost::filesystem2::no_check );
+#else
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
+#endif
 
     {
         unsigned x = 0x12345678;
@@ -792,21 +800,20 @@ int main(int argc, char* argv[]) {
             cmdLine.quota = true;
             cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
-        if( params.count("nodur") ) {
+        if( params.count("nodur") || params.count( "nojournal" ) ) {
             cmdLine.dur = false;
         }
-        if( params.count("dur") ) {
+        if( params.count("dur") || params.count( "journal" ) ) {
             cmdLine.dur = true;
         }
         if (params.count("durOptions")) {
             cmdLine.durOptions = params["durOptions"].as<int>();
         }
+        if (params.count("journalOptions")) {
+            cmdLine.durOptions = params["journalOptions"].as<int>();
+        }
         if (params.count("objcheck")) {
             objcheck = true;
-        }
-        if (params.count("appsrvpath")) {
-            /* casting away the const-ness here */
-            appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
         }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
@@ -1047,7 +1054,7 @@ int main(int argc, char* argv[]) {
     }
 
     UnitTest::runTests();
-    initAndListen(cmdLine.port, appsrvPath);
+    initAndListen(cmdLine.port);
     dbexit(EXIT_CLEAN);
     return 0;
 }
@@ -1099,9 +1106,27 @@ namespace mongo {
         oss << "Backtrace:" << endl;
         printStackTrace( oss );
         rawOut( oss.str() );
+
+        if( cmdLine.dur ) { 
+            ::exit(EXIT_ABRUPT);
+        }
+
         dbexit( EXIT_ABRUPT );
     }
 
+    void abruptQuitWithAddrSignal( int signal, siginfo_t *siginfo, void * ) {
+        ostringstream oss;
+        oss << "Invalid";
+        if ( signal == SIGSEGV || signal == SIGBUS ) {
+            oss << " access";
+        } else {
+            oss << " operation";   
+        }
+        oss << " at address: " << siginfo->si_addr << endl;
+        rawOut( oss.str() );
+        abruptQuit( signal );   
+    }
+        
     sigset_t asyncSignals;
     // The above signals will be processed by this thread only, in order to
     // ensure the db and log mutexes aren't held.
@@ -1124,10 +1149,18 @@ namespace mongo {
     void setupSignals_ignoreHelper( int signal ) {}
 
     void setupSignals( bool inFork ) {
-        assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
-        assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
+        struct sigaction addrSignals;
+        memset( &addrSignals, 0, sizeof( struct sigaction ) );
+        addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
+        sigemptyset( &addrSignals.sa_mask );
+        addrSignals.sa_flags = SA_SIGINFO;
+       
+        assert( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
+        assert( sigaction(SIGBUS, &addrSignals, 0) == 0 );
+        assert( sigaction(SIGILL, &addrSignals, 0) == 0 );
+        assert( sigaction(SIGFPE, &addrSignals, 0) == 0 );
+        
         assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
         assert( signal(SIGQUIT, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
 

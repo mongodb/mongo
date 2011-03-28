@@ -45,6 +45,8 @@ namespace mongo {
     string Chunk::chunkMetadataNS = "config.chunks";
 
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
+    int Chunk::MaxObjectPerChunk = 250000;
+    
 
     Chunk::Chunk( ChunkManager * manager ) : _manager(manager), _lastmod(0) {
         _setDataWritten();
@@ -182,8 +184,7 @@ namespace mongo {
         if ( ! force ) {
             vector<BSONObj> candidates;
             const int maxPoints = 2;
-            const int maxObjs = 250000;
-            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , maxObjs );
+            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , MaxObjectPerChunk );
             if ( candidates.size() <= 1 ) {
                 // no split points means there isn't enough data to split on
                 // 1 split point means we have between half the chunk size to full chunk size
@@ -824,7 +825,14 @@ namespace mongo {
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
 
-        dist_lock_try dlk( &_nsLock  , "drop" );
+        dist_lock_try dlk;
+        try{
+        	dlk = dist_lock_try( &_nsLock  , "drop" );
+        }
+        catch( LockException& e ){
+        	uassert_msg( 70008, "Error locking distributed lock for chunk drop." << m_caused_by(e), false);
+        }
+
         uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
 
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );

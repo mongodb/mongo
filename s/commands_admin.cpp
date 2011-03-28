@@ -62,6 +62,15 @@ namespace mongo {
 
             // all grid commands are designed not to lock
             virtual LockType locktype() const { return NONE; }
+
+            bool okForConfigChanges( string& errmsg ) {
+                string e;
+                if ( ! configServer.allUp(e) ) {
+                    errmsg = str::stream() << "not all config servers are up: " << e;
+                    return false;
+                }
+                return true;
+            }
         };
 
         // --------------- misc commands ----------------------
@@ -203,7 +212,6 @@ namespace mongo {
             MoveDatabasePrimaryCommand() : GridAdminCmd("movePrimary") { }
             virtual void help( stringstream& help ) const {
                 help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
-                // TODO: locking?
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 string dbname = cmdObj.firstElement().valuestrsafe();
@@ -241,10 +249,27 @@ namespace mongo {
                     return false;
                 }
 
-                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString()
+                log() << "Moving " << dbname << " primary from: " << config->getPrimary().toString()
                       << " to: " << s.toString() << endl;
 
-                // TODO LOCKING: this is not safe with multiple mongos
+                // Locking enabled now...
+                DistributedLock lockSetup( configServer.getConnectionString(), dbname + "-movePrimary" );
+                dist_lock_try dlk;
+
+                // Distributed locking added.
+                try{
+                    dlk = dist_lock_try( &lockSetup , string("Moving primary shard of ") + dbname );
+                }
+                catch( LockException& e ){
+	                errmsg = string("error locking distributed lock to move primary shard of ") + dbname + m_caused_by(e);
+	                warning() << errmsg << endl;
+	                return false;
+                }
+
+                if ( ! dlk.got() ) {
+	                errmsg = (string)"metadata lock is already taken for moving " + dbname;
+	                return false;
+                }
 
                 ScopedDbConnection toconn( s.getConnString() );
 
@@ -295,6 +320,9 @@ namespace mongo {
                     errmsg = "already enabled";
                     return false;
                 }
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
 
                 log() << "enabling sharding on: " << dbname << endl;
 
@@ -351,6 +379,9 @@ namespace mongo {
                     errmsg = "can't shard system namespaces";
                     return false;
                 }
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
 
                 // Sharding interacts with indexing in at least two ways:
                 //
@@ -480,6 +511,10 @@ namespace mongo {
             }
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
+
                 ShardConnection::sync();
 
                 string ns = cmdObj.firstElement().valuestrsafe();
@@ -534,7 +569,7 @@ namespace mongo {
                     result.append( "cause" , res );
                     return false;
                 }
-
+                config->getChunkManager( ns , true );
                 return true;
             }
         } splitCollectionCmd;
@@ -546,6 +581,10 @@ namespace mongo {
                 help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+
+                if ( ! okForConfigChanges( errmsg ) )
+                    return false;
+
                 ShardConnection::sync();
 
                 Timer t;
@@ -959,6 +998,13 @@ namespace mongo {
             BSONArrayBuilder bb( result.subarrayStart( "databases" ) );
             for ( map<string,long long>::iterator i=sizes.begin(); i!=sizes.end(); ++i ) {
                 string name = i->first;
+
+                if ( name == "local" ) {
+                    // we don't return local
+                    // since all shards have their own independant local
+                    continue;
+                }
+
                 long long size = i->second;
                 totalSize += size;
 

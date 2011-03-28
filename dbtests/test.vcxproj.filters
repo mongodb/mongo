@@ -244,6 +244,12 @@
     <ClInclude Include="..\db\mongomutex.h">
       <Filter>db</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\mongoutils\hash.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\checksum.h">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -766,6 +772,9 @@
     </ClCompile>
     <ClCompile Include="..\util\file_allocator.cpp">
       <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dbcommands_admin.cpp">
+      <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

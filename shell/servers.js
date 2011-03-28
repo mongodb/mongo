@@ -329,6 +329,19 @@ ShardingTest.prototype.getOther = function( one ){
     return this._connections[0];
 }
 
+ShardingTest.prototype.getAnother = function( one ){
+    if(this._connections.length < 2)
+    	throw "getAnother() only works with multiple servers";
+	
+	if ( one._mongo )
+        one = one._mongo
+    
+    for(var i = 0; i < this._connections.length; i++){
+    	if(this._connections[i] == one)
+    		return this._connections[(i + 1) % this._connections.length];
+    }
+}
+
 ShardingTest.prototype.getFirstOther = function( one ){
     for ( var i=0; i<this._connections.length; i++ ){
         if ( this._connections[i] != one )
@@ -478,7 +491,7 @@ printShardingStatus = function( configDB , verbose ){
                                 output( "\t\t\t\t" + z.shard + "\t" + z.nChunks );
                             } )
                             
-                            if ( totalChunks < 1000 || verbose ){
+                            if ( totalChunks < 20 || verbose ){
                                 configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                                     function(chunk){
                                         output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
@@ -487,7 +500,7 @@ printShardingStatus = function( configDB , verbose ){
                                 );
                             }
                             else {
-                                output( "\t\t\ttoo many chunksn to print, use verbose if you want to force print" );
+                                output( "\t\t\ttoo many chunks to print, use verbose if you want to force print" );
                             }
                         }
                     }

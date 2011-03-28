@@ -28,7 +28,7 @@ namespace mongo {
     ourbitset writable;
 
     /** notification on unmapping so we can clear writable bits */
-    void MemoryMappedFile::unmapped(void *p) {
+    void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
             writable.clear(i);
             assert( !writable.get(i) );
@@ -45,7 +45,7 @@ namespace mongo {
 
     void MemoryMappedFile::close() {
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
-            unmapped(*i);
+            clearWritableBits(*i);
             UnmapViewOfFile(*i);
         }
         views.clear();
@@ -183,13 +183,13 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f( views[0] , fd , filename() , _flushMutex);
+            WindowsFlushable f( viewForFlushing() , fd , filename() , _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable( views.empty() ? 0 : views[0] , fd , filename() , _flushMutex );
+        return new WindowsFlushable( viewForFlushing() , fd , filename() , _flushMutex );
     }
     void MemoryMappedFile::_lock() {}
     void MemoryMappedFile::_unlock() {}

@@ -99,6 +99,7 @@ namespace mongo {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "paths.h"
 
 namespace mongo {
 
@@ -118,6 +119,7 @@ namespace mongo {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
 
+        flushMyDirectory(name);
     }
 
     LogFile::~LogFile() {
@@ -136,7 +138,7 @@ namespace mongo {
         }
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << " errno:" << errno << endl;
+            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << ' ' << errnoWithDescription() << endl;
             uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
         }
 

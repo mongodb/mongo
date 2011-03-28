@@ -15,7 +15,7 @@ namespace mongo {
          */
         class RecoveryJob : boost::noncopyable {
         public:
-            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery") { _lastSeqMentionedInConsoleLog = 1; }
+            RecoveryJob() :_lastDataSyncedFromLastRun(0), _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
             void go(vector<path>& files);
             ~RecoveryJob();
             void processSection(const void *, unsigned len);
@@ -34,12 +34,12 @@ namespace mongo {
 
             unsigned long long _lastDataSyncedFromLastRun;
             unsigned long long _lastSeqMentionedInConsoleLog;
-
-            mongo::mutex _mx; // protects _mmfs
-
+        public:
+            mongo::mutex _mx; // protects _mmfs; see setNoJournal() too
+        private:
             bool _recovering; // are we in recovery or WRITETODATAFILES
 
-            static RecoveryJob _instance;
+            static RecoveryJob &_instance;
         };
     }
 }

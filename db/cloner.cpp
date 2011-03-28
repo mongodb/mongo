@@ -244,6 +244,7 @@ namespace mongo {
             string temp = ctx.db()->name + ".system.indexes";
             copy( temp.c_str() , temp.c_str() , /*isindex*/true , logForRepl , false , true , BSON( "ns" << ns ) );
         }
+        getDur().commitIfNeeded();
         return true;
     }
 

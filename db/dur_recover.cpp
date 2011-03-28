@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "dur.h"
+#include "dur_stats.h"
 #include "dur_recover.h"
 #include "dur_journal.h"
 #include "dur_journalformat.h"
@@ -30,6 +31,7 @@
 #include "database.h"
 #include "db.h"
 #include "../util/unittest.h"
+#include "../util/checksum.h"
 #include "cmdline.h"
 #include "curop.h"
 #include "mongommf.h"
@@ -73,16 +75,17 @@ namespace mongo {
                     if( m.count(u) ) {
                         uasserted(13531, str::stream() << "unexpected files in journal directory " << dir.string() << " : " << fileName);
                     }
-                    if( !m.empty() && !m.count(u-1) ) {
-                        uasserted(13532,
-                                  str::stream() << "unexpected file in journal directory " << dir.string()
-                                  << " : " << fileName << " : can't find its preceeding file");
-                    }
                     m.insert( pair<unsigned,path>(u,filepath) );
                 }
             }
-            for( map<unsigned,path>::iterator i = m.begin(); i != m.end(); ++i )
+            for( map<unsigned,path>::iterator i = m.begin(); i != m.end(); ++i ) {
+                if( i != m.begin() && m.count(i->first - 1) == 0 ) {
+                    uasserted(13532,
+                    str::stream() << "unexpected file in journal directory " << dir.string()
+                      << " : " << filesystem::path(i->second).leaf() << " : can't find its preceeding file");
+                }
                 files.push_back(i->second);
+            }
         }
 
         /** read through the memory mapped data of a journal file (journal/j._<n> file)
@@ -119,10 +122,7 @@ namespace mongo {
                             const JSectFooter& footer = *(const JSectFooter*)pos;
                             int len = pos - (char*)_sectHead;
                             if (!footer.checkHash(_sectHead, len)) {
-                                massert(13594, str::stream() << "Journal checksum doesn't match. recorded: "
-                                        << toHex(footer.hash, sizeof(footer.hash))
-                                        << " actual: " << md5simpledigest(_sectHead, len)
-                                        , false);
+                                massert(13594, "dur journal checksum doesn't match", false);
                             }
                         }
                         return false; // false return value denotes end of section
@@ -186,8 +186,10 @@ namespace mongo {
         }
 
         RecoveryJob::~RecoveryJob() {
-            if( !_mmfs.empty() )
-                close();
+            DESTRUCTOR_GUARD(
+                if( !_mmfs.empty() )
+                    close();
+            )
         }
 
         void RecoveryJob::close() {
@@ -224,6 +226,7 @@ namespace mongo {
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
                 void* dest = (char*)mmf->view_write() + entry.e->ofs;
                 memcpy(dest, entry.e->srcData(), entry.e->len);
+                stats.curr->_writeToDataFilesBytes += entry.e->len;
             }
             else {
                 massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
@@ -445,8 +448,8 @@ namespace mongo {
             }
         } brunittest;
 
-
-        RecoveryJob RecoveryJob::_instance;
+        // can't free at termination because order of destruction of global vars is arbitrary
+        RecoveryJob &RecoveryJob::_instance = *(new RecoveryJob());
 
     } // namespace dur
 

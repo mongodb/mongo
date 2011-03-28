@@ -178,18 +178,37 @@ namespace mongo {
             }
 
             // for now, the only check is that all shard keys are filled
+            // null is ok, 
             // TODO if $exist for nulls were picking the index, it could be used instead efficiently
             while ( cc->ok() ) {
                 BSONObj currKey = c->currKey();
-                BSONForEach(key, currKey) {
-                    if ( key.type() == jstNULL ) {
-                        ostringstream os;
-                        os << "found null value in key " << bc->prettyKey( currKey );
-                        log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
+                
+                BSONObjIterator i( currKey );
+                int n = 0;
+                while ( i.more() ) {
+                    BSONElement key = i.next();
+                    n++;
 
-                        errmsg = os.str();
-                        return false;
-                    }
+                    if ( key.type() && key.type() != jstNULL )
+                        continue;
+                    
+                    BSONObj obj = c->current();
+                    BSONObjIterator j( keyPattern );
+                    BSONElement real;
+                    for ( int x=0; x<n; x++ )
+                        real = j.next();
+                    
+                    real = obj.getFieldDotted( real.fieldName() );
+
+                    if ( real.type() )
+                        continue;
+                    
+                    ostringstream os;
+                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: " << real["_id"];
+                    log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
+                    
+                    errmsg = os.str();
+                    return false;
                 }
                 cc->advance();
             }
@@ -250,7 +269,7 @@ namespace mongo {
                 maxSplitPoints = maxSplitPointsElem.numberLong();
             }
 
-            long long maxChunkObjects = 0;
+            long long maxChunkObjects = Chunk::MaxObjectPerChunk;
             BSONElement MaxChunkObjectsElem = jsobj[ "maxChunkObjects" ];
             if ( MaxChunkObjectsElem.isNumber() ) {
                 maxChunkObjects = MaxChunkObjectsElem.numberLong();
@@ -353,48 +372,62 @@ namespace mongo {
                 // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and
                 // split on the following key.
                 set<BSONObj> tooFrequentKeys;
-                splitKeys.push_back( c->currKey() );
-                while ( cc->ok() ) {
-                    currCount++;
-                    BSONObj currKey = c->currKey();
-                    
-                    DEV assert( currKey.woCompare( max ) <= 0 );
-                    
-                    if ( currCount > keyCount ) {
-                        // Do not use this split key if it is the same used in the previous split point.
-                        if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
-                            tooFrequentKeys.insert( currKey.getOwned() );
+                splitKeys.push_back( c->currKey().getOwned() );
+                while ( 1 ) {
+                    while ( cc->ok() ) {
+                        currCount++;
+                        BSONObj currKey = c->currKey();
+                        
+                        DEV assert( currKey.woCompare( max ) <= 0 );
+                        
+                        if ( currCount > keyCount ) {
+                            // Do not use this split key if it is the same used in the previous split point.
+                            if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
+                                tooFrequentKeys.insert( currKey.getOwned() );
+                                
+                            }
+                            else {
+                                splitKeys.push_back( currKey.getOwned() );
+                                currCount = 0;
+                                numChunks++;
+                                
+                                LOG(4) << "picked a split key: " << bc->prettyKey( currKey ) << endl;
+                            }
                             
                         }
-                        else {
-                            splitKeys.push_back( currKey.getOwned() );
-                            currCount = 0;
-                            numChunks++;
-                            
-                            LOG(4) << "picked a split key: " << bc->prettyKey( currKey ) << endl;
+                        
+                        cc->advance();
+                        
+                        // Stop if we have enough split points.
+                        if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ) {
+                            log() << "max number of requested split points reached (" << numChunks
+                                  << ") before the end of chunk " << ns << " " << min << " -->> " << max
+                                  << endl;
+                            break;
                         }
                         
+                        if ( ! cc->yieldSometimes() ) {
+                            // we were near and and got pushed to the end
+                            // i think returning the splits we've already found is fine
+                            
+                            // don't use the btree cursor pointer to acces keys beyond this point but ok
+                            // to use it for format the keys we've got already
+                            
+                            break;
+                        }
                     }
-
-                    cc->advance();
                     
-                    // Stop if we have enough split points.
-                    if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ) {
-                        log() << "max number of requested split points reached (" << numChunks
-                              << ") before the end of chunk " << ns << " " << min << " -->> " << max
-                              << endl;
+                    if ( splitKeys.size() > 1 || ! force )
                         break;
-                    }
                     
-                    if ( ! cc->yieldSometimes() ) {
-                        // we were near and and got pushed to the end
-                        // i think returning the splits we've already found is fine
-                        
-                        // don't use the btree cursor pointer to acces keys beyond this point but ok
-                        // to use it for format the keys we've got already
-                        
-                        break;
-                    }
+                    force = false;
+                    keyCount = currCount / 2;
+                    currCount = 0;
+                    log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
+                    
+                    bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                    c.reset( bc );
+                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 }
                 
                 //
@@ -410,6 +443,7 @@ namespace mongo {
                 
                 // Remove the sentinel at the beginning before returning and add fieldnames.
                 splitKeys.erase( splitKeys.begin() );
+                assert( c.get() );
                 for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ) {
                     *it = bc->prettyKey( *it );
                 }
@@ -552,7 +586,16 @@ namespace mongo {
             //
 
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC) , ns );
-            dist_lock_try dlk( &lockSetup, string("split-") + min.toString() );
+            dist_lock_try dlk;
+
+            try{
+            	dlk = dist_lock_try( &lockSetup, string("split-") + min.toString() );
+            }
+            catch( LockException& e ){
+            	errmsg = string("Error locking distributed lock for split.") + m_caused_by(e);
+            	return false;
+            }
+
             if ( ! dlk.got() ) {
                 errmsg = "the collection's metadata lock is taken";
                 result.append( "who" , dlk.other() );

@@ -1,5 +1,4 @@
 // Election when master fails and remaining nodes are an arbiter and a slave.
-// Note that in this scenario, the arbiter needs two votes.
 
 doTest = function( signal ) {
 
@@ -12,7 +11,7 @@ doTest = function( signal ) {
     var r = replTest.initiate({"_id" : "unicomplex", 
                 "members" : [
                              {"_id" : 0, "host" : nodes[0] },
-                             {"_id" : 1, "host" : nodes[1], "arbiterOnly" : true, "votes": 2},
+                             {"_id" : 1, "host" : nodes[1], "arbiterOnly" : true, "votes": 1},
                              {"_id" : 2, "host" : nodes[2] }]});
 
     // Make sure we have a master

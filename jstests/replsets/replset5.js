@@ -49,6 +49,23 @@ doTest = function (signal) {
     var master1count = master.getDB(testDB).foo.count();
     assert( master1count == docNum, "Master has " + master1count + " of " + docNum + " documents!");
 
+    print("reconfigure with hidden=1");
+    config = master.getDB("local").system.replset.findOne();
+    config.version++;
+    config.members[2].priority = 0;
+    config.members[2].hidden = 1;
+
+    try {
+        master.adminCommand({replSetReconfig : config});
+    }
+    catch(e) {
+        print(e);
+    }
+
+    config = master.getDB("local").system.replset.findOne();
+    printjson(config);
+    assert.eq(config.members[2].hidden, true);
+
     replTest.stopSet(signal);
 }
 

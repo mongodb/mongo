@@ -88,8 +88,10 @@ namespace mongo {
 
             }
 
-
-
+            
+            assert( cursor );
+            string cursorName = cursor->toString();
+            
             scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
             while ( cursor->ok() ) {
@@ -139,6 +141,7 @@ namespace mongo {
                 b.appendNumber( "nscanned" , nscanned );
                 b.appendNumber( "nscannedObjects" , nscannedObjects );
                 b.appendNumber( "timems" , t.millis() );
+                b.append( "cursor" , cursorName );
                 result.append( "stats" , b.obj() );
             }
 

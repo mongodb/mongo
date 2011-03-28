@@ -41,6 +41,8 @@ namespace mongo {
 
     /* member of a replica set */
     class Member : public List1<Member>::Base {
+    private:
+        ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
 
@@ -92,7 +94,8 @@ namespace mongo {
             time_t when;
             unsigned who;
         };
-        Atomic<LastYea> ly;
+        static mutex lyMutex;
+        Guarded<LastYea,lyMutex> ly;
         unsigned yea(unsigned memberId); // throws VoteException
         void electionFailed(unsigned meid);
         void _electSelf();
@@ -133,6 +136,7 @@ namespace mongo {
             log() << "replSet ~RSBase called" << rsLog;
         }
 
+    public:
         class lock {
             RSBase& rsbase;
             auto_ptr<scoped_lock> sl;
@@ -156,7 +160,6 @@ namespace mongo {
             }
         };
 
-    public:
         /* for asserts */
         bool locked() const { return _locked != 0; }
 
@@ -270,7 +273,6 @@ namespace mongo {
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
         const Member* getMemberToSyncTo();
-        void _changeArbiterState();
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"

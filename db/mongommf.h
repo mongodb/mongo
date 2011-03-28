@@ -27,6 +27,9 @@ namespace mongo {
         not this.
     */
     class MongoMMF : private MemoryMappedFile {
+    protected:
+        virtual void* viewForFlushing() { return _view_write; }
+
     public:
         MongoMMF();
         virtual ~MongoMMF();
@@ -127,6 +130,8 @@ namespace mongo {
         /** for doing many finds in a row with one lock operation */
         mutex& _mutex() { return _m; }
         MongoMMF* find_inlock(void *p, /*out*/ size_t& ofs);
+
+        map<void*,MongoMMF*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
 
     private:
         mutex _m;

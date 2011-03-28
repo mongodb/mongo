@@ -2,9 +2,7 @@
 t = db.borders
 t.drop()
 
-// FIXME:  FAILS for all epsilon < 1
-epsilon = 1
-//epsilon = 0.99
+epsilon = 0.0001;
 
 // For these tests, *required* that step ends exactly on max
 min = -1
@@ -26,7 +24,6 @@ overallMax = 1
 t.ensureIndex({ loc : "2d" }, { max : overallMax - epsilon / 2, min : overallMin + epsilon / 2})
 assert(db.getLastError(), "A1")
 
-// FIXME:  FAILS for all epsilon < 1
 // Create a point index only slightly bigger than the points we have
 t.ensureIndex({ loc : "2d" }, { max : overallMax + epsilon, min : overallMin - epsilon })
 assert.isnull(db.getLastError(), "A2")

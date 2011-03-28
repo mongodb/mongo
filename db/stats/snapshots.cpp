@@ -38,19 +38,21 @@ namespace mongo {
         : _older( older ) , _newer( newer ) {
         assert( _newer._created > _older._created );
         _elapsed = _newer._created - _older._created;
-
     }
 
     Top::CollectionData SnapshotDelta::globalUsageDiff() {
         return Top::CollectionData( _older._globalUsage , _newer._globalUsage );
     }
     Top::UsageMap SnapshotDelta::collectionUsageDiff() {
+        assert( _newer._created > _older._created );
         Top::UsageMap u;
 
         for ( Top::UsageMap::const_iterator i=_newer._usage.begin(); i != _newer._usage.end(); i++ ) {
             Top::UsageMap::const_iterator j = _older._usage.find(i->first);
             if (j != _older._usage.end())
                 u[i->first] = Top::CollectionData( j->second , i->second );
+            else
+                u[i->first] = i->second;
         }
         return u;
     }
@@ -112,14 +114,10 @@ namespace mongo {
             try {
                 const SnapshotData* s = statsSnapshots.takeSnapshot();
 
-                if ( prev ) {
+                if ( prev && cmdLine.cpu ) {
                     unsigned long long elapsed = s->_created - prev->_created;
-
-                    if ( cmdLine.cpu ) {
-                        SnapshotDelta d( *prev , *s );
-                        log() << "cpu: elapsed:" << (elapsed/1000) <<"  writelock: " << (int)(100*d.percentWriteLocked()) << "%" << endl;
-                    }
-
+                    SnapshotDelta d( *prev , *s );
+                    log() << "cpu: elapsed:" << (elapsed/1000) <<"  writelock: " << (int)(100*d.percentWriteLocked()) << "%" << endl;
                 }
 
                 prev = s;

@@ -142,6 +142,8 @@ namespace mongo {
             if ( _start == 0 )
                 _start = _checkpoint = curTimeMicros64();
         }
+        bool isStarted() const { return _start > 0; }
+
         void enter( Client::Context * context ) {
             ensureStarted();
             setNS( context->ns() );

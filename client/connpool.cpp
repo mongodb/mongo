@@ -37,7 +37,12 @@ namespace mongo {
     }
 
     void PoolForHost::done( DBClientBase * c ) {
-        _pool.push(c);
+        if ( _pool.size() >= _maxPerHost ) {
+            delete c;
+        }
+        else {
+            _pool.push(c);
+        }
     }
 
     DBClientBase * PoolForHost::get() {
@@ -86,9 +91,17 @@ namespace mongo {
         _created++;
     }
 
+    unsigned PoolForHost::_maxPerHost = 50;
+
     // ------ DBConnectionPool ------
 
     DBConnectionPool pool;
+
+    DBConnectionPool::DBConnectionPool() 
+        : _mutex("DBConnectionPool") , 
+          _name( "dbconnectionpool" ) , 
+          _hooks( new list<DBConnectionHook*>() ) { 
+    }
 
     DBClientBase* DBConnectionPool::_get(const string& ident) {
         scoped_lock L(_mutex);
@@ -153,23 +166,23 @@ namespace mongo {
     }
 
     void DBConnectionPool::addHook( DBConnectionHook * hook ) {
-        _hooks.push_back( hook );
+        _hooks->push_back( hook );
     }
 
     void DBConnectionPool::onCreate( DBClientBase * conn ) {
-        if ( _hooks.size() == 0 )
+        if ( _hooks->size() == 0 )
             return;
 
-        for ( list<DBConnectionHook*>::iterator i = _hooks.begin(); i != _hooks.end(); i++ ) {
+        for ( list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++ ) {
             (*i)->onCreate( conn );
         }
     }
 
     void DBConnectionPool::onHandedOut( DBClientBase * conn ) {
-        if ( _hooks.size() == 0 )
+        if ( _hooks->size() == 0 )
             return;
 
-        for ( list<DBConnectionHook*>::iterator i = _hooks.begin(); i != _hooks.end(); i++ ) {
+        for ( list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++ ) {
             (*i)->onHandedOut( conn );
         }
     }

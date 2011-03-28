@@ -18,18 +18,9 @@
 #include "pch.h"
 #include <stdio.h>
 
-#if defined(_WIN32)
-# if defined(USE_READLINE)
-# define USE_READLINE_STATIC
-# endif
-#endif
 
-#ifdef USE_READLINE
-#include <readline/readline.h>
-#include <readline/history.h>
-#include <setjmp.h>
-jmp_buf jbuf;
-#endif
+#define USE_LINENOISE
+#include "../third_party/linenoise/linenoise.h"
 
 #include "../scripting/engine.h"
 #include "../client/dbclient.h"
@@ -52,9 +43,16 @@ static volatile bool atPrompt = false; // can eval before getting to prompt
 bool autoKillOp = false;
 
 
-#if defined(USE_READLINE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
-#define CTRLC_HANDLE
+#if defined(USE_LINENOISE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
+// this is for ctrl-c handling
+#include <setjmp.h>
+jmp_buf jbuf;
 #endif
+
+#if defined(USE_LINENOISE) && !defined(WIN32) && !defined(_WIN32) 
+#define USE_TABCOMPLETION
+#endif
+
 
 namespace mongo {
 
@@ -81,45 +79,19 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
 
 }
 
-#ifdef USE_READLINE
-static char** completionHook(const char* text , int start ,int end ) {
-    static map<string,string> m;
-
+#ifdef USE_TABCOMPLETION
+void completionHook(const char* text , linenoiseCompletions* lc ) {
     vector<string> all;
+    generateCompletions( text , all );
 
-    generateCompletions( string(text,end) , all );
+    for ( unsigned i=0; i<all.size(); i++ )
+        linenoiseAddCompletion( lc , (char*)all[i].c_str() );
 
-    if ( all.size() == 0 ) {
-        return 0;
-    }
-
-    string longest = all[0];
-    for ( vector<string>::iterator i=all.begin(); i!=all.end(); ++i ) {
-        string s = *i;
-        for ( unsigned j=0; j<s.size(); j++ ) {
-            if ( longest[j] == s[j] )
-                continue;
-            longest = longest.substr(0,j);
-            break;
-        }
-    }
-
-    char ** matches = (char**)malloc( sizeof(char*) * (all.size()+2) );
-    unsigned x=0;
-    matches[x++] = strdup( longest.c_str() );
-    for ( unsigned i=0; i<all.size(); i++ ) {
-        matches[x++] = strdup( all[i].c_str() );
-    }
-    matches[x++] = 0;
-
-    rl_completion_append_character = '\0'; // don't add a space after completions
-
-    return matches;
 }
 #endif
 
 void shellHistoryInit() {
-#ifdef USE_READLINE
+#ifdef USE_LINENOISE
     stringstream ss;
     char * h = getenv( "HOME" );
     if ( h )
@@ -127,22 +99,22 @@ void shellHistoryInit() {
     ss << ".dbshell";
     historyFile = ss.str();
 
-    using_history();
-    read_history( historyFile.c_str() );
-
-    rl_attempted_completion_function = completionHook;
+    linenoiseHistoryLoad( (char*)historyFile.c_str() );
+#ifdef USE_TABCOMPLETION
+    linenoiseSetCompletionCallback( completionHook );
+#endif
 
 #else
     //cout << "type \"exit\" to exit" << endl;
 #endif
 }
 void shellHistoryDone() {
-#ifdef USE_READLINE
-    write_history( historyFile.c_str() );
+#ifdef USE_LINENOISE
+    linenoiseHistorySave( (char*)historyFile.c_str() );
 #endif
 }
 void shellHistoryAdd( const char * line ) {
-#ifdef USE_READLINE
+#ifdef USE_LINENOISE
     if ( line[0] == '\0' )
         return;
 
@@ -153,7 +125,7 @@ void shellHistoryAdd( const char * line ) {
     lastLine = line;
 
     if ((strstr(line, ".auth")) == NULL)
-        add_history( line );
+        linenoiseHistoryAdd( line );
 #endif
 }
 
@@ -226,14 +198,12 @@ void quitNicely( int sig ) {
 char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 
     atPrompt = true;
-#ifdef USE_READLINE
-
-    rl_bind_key('\t',rl_complete);
+#ifdef USE_LINENOISE
 
 
 #ifdef CTRLC_HANDLE
     if ( ! handlesigint ) {
-        char* ret = readline( prompt );
+        char* ret = linenoise( prompt );
         atPrompt = false;
         return ret;
     }
@@ -246,7 +216,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
     signal( SIGINT , intr );
 #endif
 
-    char * ret = readline( prompt );
+    char * ret = linenoise( prompt );
     signal( SIGINT , quitNicely );
     atPrompt = false;
     return ret;

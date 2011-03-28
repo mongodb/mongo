@@ -135,7 +135,7 @@ namespace mongo {
     void ReplSetConfig::MemberCfg::check() const {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
-        mchk(votes >= 0 && votes <= 100);
+        mchk(votes <= 100); // votes >= 0 because it is unsigned
         uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
@@ -190,12 +190,20 @@ namespace mongo {
         }
 
         map<HostAndPort,const ReplSetConfig::MemberCfg*> old;
+        bool isLocalHost = false;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = o.members.begin(); i != o.members.end(); i++ ) {
+            if (i->h.isLocalHost()) {
+                isLocalHost = true;
+            }
             old[i->h] = &(*i);
         }
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = n.members.begin(); i != n.members.end(); i++ ) {
             const ReplSetConfig::MemberCfg& m = *i;
+            if ( isLocalHost && !m.h.isLocalHost() ) {
+                log() << "reconfig error: " << m.h.toString() << " cannot be used from localhost replset" << rsLog;
+                uasserted(13645, "hosts cannot change from localhost to hostname");
+            }
             if( old.count(m.h) ) {
                 const ReplSetConfig::MemberCfg& oldCfg = *old[m.h];
                 if( oldCfg._id != m._id ) {
@@ -314,12 +322,12 @@ namespace mongo {
                 }
                 if( m.h.isLocalHost() )
                     localhosts++;
-                m.arbiterOnly = mobj.getBoolField("arbiterOnly");
+                m.arbiterOnly = mobj["arbiterOnly"].trueValue();
                 m.slaveDelay = mobj["slaveDelay"].numberInt();
                 if( mobj.hasElement("hidden") )
-                    m.hidden = mobj.getBoolField("hidden");
+                    m.hidden = mobj["hidden"].trueValue();
                 if( mobj.hasElement("buildIndexes") )
-                    m.buildIndexes = mobj.getBoolField("buildIndexes");
+                    m.buildIndexes = mobj["buildIndexes"].trueValue();
                 if( mobj.hasElement("priority") )
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )

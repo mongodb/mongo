@@ -57,6 +57,9 @@ namespace mongo {
         void done( DBClientBase * c );
 
         void flush();
+
+        static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
+        static unsigned getMaxPerHost() { return _maxPerHost; }
     private:
 
         struct StoredConnection {
@@ -71,6 +74,8 @@ namespace mongo {
         std::stack<StoredConnection> _pool;
         long long _created;
         ConnectionString::ConnectionType _type;
+
+        static unsigned _maxPerHost;
     };
 
     class DBConnectionHook {
@@ -95,29 +100,11 @@ namespace mongo {
            c.conn()...
         }
     */
-    class DBConnectionPool {
+    class DBConnectionPool : boost::noncopyable {
         
     public:
 
-        /** compares server namees, but is smart about replica set names */
-        struct serverNameCompare {
-            bool operator()( const string& a , const string& b ) const;
-        };
-
-    private:
-
-        mongo::mutex _mutex;
-        typedef map<string,PoolForHost,serverNameCompare> PoolMap; // servername -> pool
-        PoolMap _pools;
-        list<DBConnectionHook*> _hooks;
-        string _name;
-
-        DBClientBase* _get( const string& ident );
-
-        DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
-
-    public:
-        DBConnectionPool() : _mutex("DBConnectionPool") , _name( "dbconnectionpool" ) { }
+        DBConnectionPool();
         ~DBConnectionPool();
 
         /** right now just controls some asserts.  defaults to "dbconnectionpool" */
@@ -139,8 +126,30 @@ namespace mongo {
             scoped_lock L(_mutex);
             _pools[host].done(c);
         }
-        void addHook( DBConnectionHook * hook );
+        void addHook( DBConnectionHook * hook ); // we take ownership
         void appendInfo( BSONObjBuilder& b );
+
+        /** compares server namees, but is smart about replica set names */
+        struct serverNameCompare {
+            bool operator()( const string& a , const string& b ) const;
+        };
+
+    private:
+
+        DBClientBase* _get( const string& ident );
+
+        DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
+        
+        typedef map<string,PoolForHost,serverNameCompare> PoolMap; // servername -> pool
+
+        mongo::mutex _mutex;
+        string _name;
+        
+        PoolMap _pools;
+
+        // pointers owned by me, right now they leak on shutdown
+        // _hooks itself also leaks because it creates a shutdown race condition
+        list<DBConnectionHook*> * _hooks; 
     };
 
     extern DBConnectionPool pool;

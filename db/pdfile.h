@@ -204,6 +204,13 @@ namespace mongo {
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
 
+        DiskLoc nextInExtent(const DiskLoc& myLoc) { 
+            if ( nextOfs == DiskLoc::NullOfs )
+                return DiskLoc();
+            assert( nextOfs );
+            return DiskLoc(myLoc.a(), nextOfs);
+        }
+
         struct NP {
             int nextOfs;
             int prevOfs;
@@ -272,6 +279,7 @@ namespace mongo {
         Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
 
         static int maxSize();
+        static int minSize() { return 0x100; }
         /**
          * @param len lengt of record we need
          * @param lastRecord size of last extent which is a factor in next extent size
@@ -292,7 +300,7 @@ namespace mongo {
         */
         FL* fl() { return (FL*) &firstRecord; }
     private:
-        DiskLoc _reuse(const char *nsname);
+        DiskLoc _reuse(const char *nsname); // recycle an extent and reuse it for a different ns
     };
 
     /*  a datafile - i.e. the "dbname.<#>" files :
@@ -325,11 +333,12 @@ namespace mongo {
 
         bool uninitialized() const { return version == 0; }
 
-        void init(int fileno, int filelength) {
+        void init(int fileno, int filelength, const char* filename) {
             if ( uninitialized() ) {
                 if( !(filelength > 32768 ) ) { 
                     massert(13640, str::stream() << "DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:" << fileno, false);
                 }
+                getDur().createdFile(filename, filelength);
                 assert( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;

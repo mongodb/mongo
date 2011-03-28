@@ -21,15 +21,21 @@ using namespace mongo;
 using namespace bson;
 
 int main() {
-    cout << "connecting to localhost..." << endl;
-    DBClientConnection c;
-    c.connect("localhost");
-    cout << "connected ok" << endl;
-    unsigned long long count = c.count("test.foo");
-    cout << "count of exiting documents in collection test.foo : " << count << endl;
+    try {
+        cout << "connecting to localhost..." << endl;
+        DBClientConnection c;
+        c.connect("localhost");
+        cout << "connected ok" << endl;
+        unsigned long long count = c.count("test.foo");
+        cout << "count of exiting documents in collection test.foo : " << count << endl;
 
-    bo o = BSON( "hello" << "world" );
-    c.insert("test.foo", o);
+        bo o = BSON( "hello" << "world" );
+        c.insert("test.foo", o);
+    } 
+    catch(DBException& e) { 
+        cout << "caught DBException " << e.toString() << endl;
+        return 1;
+    }
 
     return 0;
 }

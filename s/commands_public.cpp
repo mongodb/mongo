@@ -545,12 +545,8 @@ namespace mongo {
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();
 
-                if (ok || (strcmp(res["errmsg"].valuestrsafe(), "No matching object found") != 0)) {
-                    result.appendElements(res);
-                    return ok;
-                }
-
-                return true;
+                result.appendElements(res);
+                return ok;
             }
 
         } findAndModifyCmd;

@@ -78,15 +78,11 @@ namespace mongo {
 
 namespace mongo {
 
-    inline void dbunlocking_write() { }
-    inline void dbunlocking_read() { }
-
     struct writelock {
         writelock() { dbMutex.lock(); }
         writelock(const string& ns) { dbMutex.lock(); }
         ~writelock() {
             DESTRUCTOR_GUARD(
-                dbunlocking_write();
                 dbMutex.unlock();
             );
         }
@@ -99,7 +95,6 @@ namespace mongo {
         readlock() { dbMutex.lock_shared(); }
         ~readlock() {
             DESTRUCTOR_GUARD(
-                dbunlocking_read();
                 dbMutex.unlock_shared();
             );
         }
@@ -111,7 +106,6 @@ namespace mongo {
         }
         ~readlocktry() {
             if ( _got ) {
-                dbunlocking_read();
                 dbMutex.unlock_shared();
             }
         }
@@ -126,7 +120,6 @@ namespace mongo {
         }
         ~writelocktry() {
             if ( _got ) {
-                dbunlocking_read();
                 dbMutex.unlock();
             }
         }
@@ -175,11 +168,9 @@ namespace mongo {
         ~mongolock() {
             DESTRUCTOR_GUARD(
             if( _writelock ) {
-            dbunlocking_write();
                 dbMutex.unlock();
             }
             else {
-                dbunlocking_read();
                 dbMutex.unlock_shared();
             }
             );

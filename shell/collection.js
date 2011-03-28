@@ -530,12 +530,20 @@ DBCollection.prototype.isCapped = function(){
     return ( e && e.options && e.options.capped ) ? true : false;
 }
 
-DBCollection.prototype.distinct = function( keyString , query ){
-    var res = this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
+DBCollection.prototype._distinct = function( keyString , query ){
+    return this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
     if ( ! res.ok )
         throw "distinct failed: " + tojson( res );
     return res.values;
 }
+
+DBCollection.prototype.distinct = function( keyString , query ){
+    var res = this._distinct( keyString , query );
+    if ( ! res.ok )
+        throw "distinct failed: " + tojson( res );
+    return res.values;
+}
+
 
 DBCollection.prototype.group = function( params ){
     params.ns = this._shortName;
@@ -578,7 +586,8 @@ MapReduceResult.prototype.drop = function(){
 */
 MapReduceResult.prototype.convertToSingleObject = function(){
     var z = {};
-    this._coll.find().forEach( function(a){ z[a._id] = a.value; } );
+    var it = this.results != null ? this.results : this._coll.find();
+    it.forEach( function(a){ z[a._id] = a.value; } );
     return z;
 }
 

@@ -23,6 +23,7 @@
 #include "../../s/d_logic.h"
 #include "rs.h"
 #include "connections.h"
+#include "../repl.h"
 
 namespace mongo {
 
@@ -262,7 +263,7 @@ namespace mongo {
         mgr( new Manager(this) ) {
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
-        *_hbmsg = '.'; // temp...just to see
+        strcpy( _hbmsg , "initial startup" );
         lastH = 0;
         changeState(MemberState::RS_STARTUP);
 
@@ -345,28 +346,31 @@ namespace mongo {
         }
 
         list<const ReplSetConfig::MemberCfg*> newOnes;
+        // additive short-cuts the new config setup. If we are just adding a
+        // node/nodes and nothing else is changing, this is additive. If it's
+        // not a reconfig, we're not adding anything
         bool additive = reconf;
         {
             unsigned nfound = 0;
             int me = 0;
             for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) {
                 const ReplSetConfig::MemberCfg& m = *i;
+                
                 if( m.h.isSelf() ) {
-                    nfound++;
                     me++;
-                    if( !reconf || (_self && _self->id() == (unsigned) m._id) )
-                        ;
-                    else {
-                        log() << "replSet " << _self->id() << ' ' << m._id << rsLog;
+                }
+                
+                if( reconf ) {
+                    if (m.h.isSelf() && (!_self || (int)_self->id() != m._id)) {
+                        log() << "self doesn't match: " << m._id << rsLog;
                         assert(false);
                     }
-                }
-                else if( reconf ) {
+
                     const Member *old = findById(m._id);
                     if( old ) {
                         nfound++;
                         assert( (int) old->id() == m._id );
-                        if( old->config() == m ) {
+                        if( old->config() != m ) {
                             additive = false;
                         }
                     }
@@ -380,6 +384,10 @@ namespace mongo {
                 conn.setTimeout(c.ho.heartbeatTimeoutMillis/1000.0);
             }
             if( me == 0 ) {
+                // initial startup with fastsync
+                if (!reconf && replSettings.fastsync) {
+                    return false;
+                }
                 // log() << "replSet config : " << _cfg->toString() << rsLog;
                 log() << "replSet error self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
@@ -387,6 +395,7 @@ namespace mongo {
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 
+            // if we found different members that the original config, reload everything
             if( reconf && config().members.size() != nfound )
                 additive = false;
         }
@@ -397,6 +406,7 @@ namespace mongo {
         _name = _cfg->_id;
         assert( !_name.empty() );
 
+        // this is a shortcut for simple changes
         if( additive ) {
             log() << "replSet info : additive change to configuration" << rsLog;
             for( list<const ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
@@ -428,7 +438,6 @@ namespace mongo {
         }
         forgetPrimary();
 
-        bool iWasArbiterOnly = _self ? iAmArbiterOnly() : false;
         setSelfTo(0);
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) {
             const ReplSetConfig::MemberCfg& m = *i;
@@ -437,11 +446,6 @@ namespace mongo {
                 assert( _self == 0 );
                 mi = new Member(m.h, m._id, &m, true);
                 setSelfTo(mi);
-
-                // if the arbiter status changed
-                if (iWasArbiterOnly ^ iAmArbiterOnly()) {
-                    _changeArbiterState();
-                }
 
                 if( (int)mi->id() == oldPrimaryId )
                     box.setSelfPrimary(mi);
@@ -455,37 +459,6 @@ namespace mongo {
             }
         }
         return true;
-    }
-
-    void startSyncThread();
-
-    void ReplSetImpl::_changeArbiterState() {
-        if (iAmArbiterOnly()) {
-            changeState(MemberState::RS_ARBITER);
-
-            // if there is an oplog, free it
-            // not sure if this is necessary, maybe just leave the oplog and let
-            // the user delete it if they want the space?
-            writelock lk(rsoplog);
-            Client::Context c(rsoplog);
-            NamespaceDetails *d = nsdetails(rsoplog);
-            if (d) {
-                string errmsg;
-                bob res;
-                dropCollection(rsoplog, errmsg, res);
-
-                // clear last op time to force initial sync (if the arbiter
-                // becomes a "normal" server again)
-                lastOpTimeWritten = OpTime();
-            }
-        }
-        else {
-            changeState(MemberState::RS_RECOVERING);
-
-            // oplog will be allocated when sync begins
-            /* TODO : could this cause two sync threads to exist (race condition)? */
-            boost::thread t(startSyncThread);
-        }
     }
 
     // Our own config must be the first one.

@@ -1,0 +1,31 @@
+.TH BSONDUMP "1" "March 2011" "10gen" "MongoDB Database"
+.SH NAME
+bsondump \- print BSON documents as JSON
+.SH DESCRIPTION
+usage: bsondump [options] <bson filename>
+options:
+.TP
+\fB\-\-help\fR
+produce help message
+.TP
+.B \-\-version
+show version information
+.TP
+\fB\-v\fR [ \fB\-\-verbose\fR ]
+be more verbose (include multiple times for more
+verbosity e.g. \fB\-vvvvv\fR)
+.TP
+\fB\-\-objcheck\fR
+validate object before inserting
+.TP
+\fB\-\-filter\fR arg
+filter to apply before inserting
+.TP
+\fB\-\-type\fR arg (=json)
+type of output: json,debug
+.SH "COPYRIGHT"
+.PP
+Copyright 2011 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at
+http://www.mongodb.org.

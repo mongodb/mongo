@@ -169,11 +169,6 @@ namespace mongo {
             uassert( 13005 , "can't create db, keeps getting closed" , _db );
         }
 
-        _client->_context = this;
-        _client->_curOp->enter( this );
-        if ( doauth )
-            _auth( lockState );
-
         switch ( _client->_curOp->getOp() ) {
         case dbGetMore: // getMore's are special and should be handled else where
         case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
@@ -181,13 +176,18 @@ namespace mongo {
             break;
         default: {
             string errmsg;
-            if ( ! shardVersionOk( _ns , lockState > 0 , errmsg ) ) {
+            if ( ! shardVersionOk( _ns , errmsg ) ) {
                 ostringstream os;
                 os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
                 msgassertedNoTrace( StaleConfigInContextCode , os.str().c_str() );
             }
         }
         }
+
+        _client->_context = this;
+        _client->_curOp->enter( this );
+        if ( doauth )
+            _auth( lockState );
     }
 
     void Client::Context::_auth( int lockState ) {

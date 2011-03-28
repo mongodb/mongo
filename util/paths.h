@@ -19,6 +19,9 @@
 #pragma once
 
 #include "mongoutils/str.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 using namespace mongoutils;
 
@@ -75,5 +78,40 @@ namespace mongo {
         }
 
     };
+
+    inline dev_t getPartition(const string& path){
+        struct stat stats;
+
+        if (stat(path.c_str(), &stats) != 0){
+            uasserted(13646, str::stream() << "stat() failed for file: " << path << " " << errnoWithDescription());
+        }
+
+        return stats.st_dev;
+    }
+    
+    inline bool onSamePartition(const string& path1, const string& path2){
+        dev_t dev1 = getPartition(path1);
+        dev_t dev2 = getPartition(path2);
+
+        return dev1 == dev2;
+    }
+
+    inline void flushMyDirectory(const boost::filesystem::path& file){
+#ifdef __linux__ // this isn't needed elsewhere
+        massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(), file.has_branch_path());
+        boost::filesystem::path dir = file.branch_path(); // parent_path in new boosts
+
+        log(1) << "flushing directory " << dir.string() << endl;
+
+        int fd = ::open(dir.string().c_str(), O_RDONLY); // DO NOT THROW OR ASSERT BEFORE CLOSING
+        massert(13650, str::stream() << "Couldn't open directory '" << dir.string() << "' for flushing: " << errnoWithDescription(), fd >= 0);
+        if (fsync(fd) != 0){
+            int e = errno;
+            close(fd);
+            massert(13651, str::stream() << "Couldn't fsync directory '" << dir.string() << "': " << errnoWithDescription(e), false);
+        }
+        close(fd);
+#endif
+    }
 
 }

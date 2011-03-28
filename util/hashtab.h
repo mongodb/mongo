@@ -54,7 +54,7 @@ namespace mongo {
             }
         };
         void* _buf;
-        int n;
+        int n; // number of hashtable buckets
         int maxChain;
 
         Node& nodes(int i) {
@@ -156,9 +156,9 @@ namespace mongo {
         typedef void (*IteratorCallback)( const Key& k , Type& v );
         void iterAll( IteratorCallback callback ) {
             for ( int i=0; i<n; i++ ) {
-                if ( ! nodes(i).inUse() )
-                    continue;
-                callback( nodes(i).k , nodes(i).value );
+                if ( nodes(i).inUse() ) {
+                    callback( nodes(i).k , nodes(i).value );
+                }
             }
         }
 
@@ -166,9 +166,9 @@ namespace mongo {
         typedef void (*IteratorCallback2)( const Key& k , Type& v , void * extra );
         void iterAll( IteratorCallback2 callback , void * extra ) {
             for ( int i=0; i<n; i++ ) {
-                if ( ! nodes(i).inUse() )
-                    continue;
-                callback( nodes(i).k , nodes(i).value , extra );
+                if ( nodes(i).inUse() ) {
+                    callback( nodes(i).k , nodes(i).value , extra );
+                }
             }
         }
 

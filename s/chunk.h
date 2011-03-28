@@ -174,7 +174,7 @@ namespace mongo {
 
         static string chunkMetadataNS;
         static int MaxChunkSize;
-
+        static int MaxObjectPerChunk;
         //
         // accessors and helpers
         //
@@ -189,10 +189,11 @@ namespace mongo {
         const char * getNS() { return "config.chunks"; }
         Shard getShard() const { return _shard; }
         const ChunkManager* getManager() const { return _manager; }
+        
 
     private:
         // main shard info
-
+        
         ChunkManager * _manager;
 
         BSONObj _min;

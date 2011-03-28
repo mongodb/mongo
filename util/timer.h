@@ -26,42 +26,63 @@ namespace mongo {
      */
     class Timer {
     public:
-        Timer() {
-            reset();
-        }
-
-        Timer( unsigned long long start ) {
-            old = start;
-        }
-
-        int seconds() const {
-            return (int)(micros() / 1000000);
-        }
-
-        int millis() const {
-            return (long)(micros() / 1000);
-        }
-
+        Timer() { reset(); }
+        Timer( unsigned long long start ) { old = start; }
+        int seconds() const { return (int)(micros() / 1000000); }
+        int millis() const { return (long)(micros() / 1000); }
         unsigned long long micros() const {
             unsigned long long n = curTimeMicros64();
             return n - old;
         }
-
         unsigned long long micros(unsigned long long & n) const { // returns cur time in addition to timer result
             n = curTimeMicros64();
             return n - old;
         }
-
-        unsigned long long startTime() {
-            return old;
-        }
-
-        void reset() {
-            old = curTimeMicros64();
-        }
-
+        unsigned long long startTime() { return old; }
+        void reset() { old = curTimeMicros64(); }
     private:
         unsigned long long old;
     };
+
+#if 1
+    class DevTimer {
+    public:
+        class scoped { 
+        public:
+            scoped(DevTimer& dt) { }
+            ~scoped() { }
+        };
+        DevTimer(string) { }
+        ~DevTimer() { }
+    };
+#elif defined(_WIN32)
+    class DevTimer {
+        const string _name;
+    public:
+        unsigned long long _ticks;
+        class scoped { 
+            DevTimer& _dt;
+            unsigned long long _start;
+        public:
+            scoped(DevTimer& dt) : _dt(dt) { 
+                LARGE_INTEGER i;
+                QueryPerformanceCounter(&i);
+                _start = i.QuadPart;
+            }
+            ~scoped() { 
+                LARGE_INTEGER i;
+                QueryPerformanceCounter(&i);
+                _dt._ticks += (i.QuadPart - _start);
+            }
+        };
+        DevTimer(string name) : _name(name), _ticks(0) { 
+        }
+        ~DevTimer() {
+            LARGE_INTEGER freq;
+            assert( QueryPerformanceFrequency(&freq) );
+            cout << "devtimer\t" << _name << '\t' << _ticks*1000.0/freq.QuadPart << "ms" << endl;
+        }
+    };
+#endif
 
 }  // namespace mongo

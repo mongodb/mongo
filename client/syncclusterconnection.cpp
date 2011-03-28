@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L) : _mutex("SynClusterConnection") {
+    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L) : _mutex("SyncClusterConnection") {
         {
             stringstream s;
             int n=0;
@@ -284,7 +284,7 @@ namespace mongo {
                 throw UserException( 8005 , (string)"SyncClusterConnection::udpate prepare failed: " + errmsg );
         }
 
-        for ( size_t i=0; i<_conns.size(); i++ ) {
+        for ( size_t i = 0; i < _conns.size(); i++ ) {
             try {
                 _conns[i]->update( ns , query , obj , upsert , multi );
             }

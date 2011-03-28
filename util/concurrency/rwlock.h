@@ -57,8 +57,9 @@ namespace mongo {
 
     class RWLock {
     public:
-        RWLock(const char *) { InitializeSRWLock(&_lock); }
+        RWLock(const char *, int lowPriorityWaitMS=0 ) { _lowPriorityWaitMS=lowPriorityWaitMS; InitializeSRWLock(&_lock); }
         ~RWLock() { }
+        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         void lock()          { AcquireSRWLockExclusive(&_lock); }
         void unlock()        { ReleaseSRWLockExclusive(&_lock); }
         void lock_shared()   { AcquireSRWLockShared(&_lock); }
@@ -87,18 +88,23 @@ namespace mongo {
         }
     private:
         SRWLOCK _lock;
+        int _lowPriorityWaitMS();
     };
 
 #elif defined(BOOST_RWLOCK)
     class RWLock {
         shared_mutex _m;
+        int _lowPriorityWaitMS;
     public:
 #if defined(_DEBUG)
         const char *_name;
-        RWLock(const char *name) : _name(name) { }
+        RWLock(const char *name, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) , _name(name) { }
 #else
-        RWLock(const char *) { }
+        RWLock(const char *, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) { }
 #endif
+
+        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
+
         void lock() {
             _m.lock();
 #if defined(_DEBUG)
@@ -121,18 +127,14 @@ namespace mongo {
         }
 
         bool lock_shared_try( int millis ) {
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(millis);
-            if( _m.timed_lock_shared( until ) ) {
+            if( _m.timed_lock_shared( boost::posix_time::milliseconds(millis) ) ) {
                 return true;
             }
             return false;
         }
 
         bool lock_try( int millis = 0 ) {
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(millis);
-            if( _m.timed_lock( until ) ) {
+            if( _m.timed_lock( boost::posix_time::milliseconds(millis) ) ) {
 #if defined(_DEBUG)
                 mutexDebugger.entering(_name);
 #endif
@@ -146,29 +148,35 @@ namespace mongo {
 #else
     class RWLock {
         pthread_rwlock_t _lock;
-
+        int _lowPriorityWaitMS;
+        
         inline void check( int x ) {
             if( x == 0 )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
             assert( x == 0 );
         }
-
+        
     public:
 #if defined(_DEBUG)
         const char *_name;
-        RWLock(const char *name) : _name(name) {
-#else
-        RWLock(const char *) {
-#endif
+        RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name) {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
+#else
+        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS ) {
+            check( pthread_rwlock_init( &_lock , 0 ) );
+        }
+#endif
+        
 
         ~RWLock() {
             if ( ! StaticObserver::_destroyingStatics ) {
                 check( pthread_rwlock_destroy( &_lock ) );
             }
         }
+
+        int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
 
         void lock() {
             check( pthread_rwlock_wrlock( &_lock ) );
@@ -245,16 +253,56 @@ namespace mongo {
         RWLock& _l;
     };
 
+    class rwlock_shared : boost::noncopyable {
+    public:
+        rwlock_shared(RWLock& rwlock) : _r(rwlock) {_r.lock_shared(); }
+        ~rwlock_shared() { _r.unlock_shared(); }
+    private:
+        RWLock& _r;
+    };
+
     /* scoped lock for RWLock */
     class rwlock {
     public:
-        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false )
+        /**
+         * @param write acquire write lock if true sharable if false
+         * @param lowPriority if > 0, will try to get the lock non-greedily for that many ms
+         */
+        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false , int lowPriorityWaitMS = 0 )
             : _lock( (RWLock&)lock ) , _write( write ) {
+            
+            // alreadyHaveLock should probably go away.  this as a starter in that direction:
+            dassert(!alreadyHaveLock);
+
             if ( ! alreadyHaveLock ) {
-                if ( _write )
-                    _lock.lock();
-                else
+                
+                if ( _write ) {
+                    
+                    if ( ! lowPriorityWaitMS && lock.lowPriorityWaitMS() )
+                        lowPriorityWaitMS = lock.lowPriorityWaitMS();
+                    
+                    if ( lowPriorityWaitMS ) { 
+                        bool got = false;
+                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {  // we divide by 2 since we sleep a bit
+                            if ( _lock.lock_try(0) ) {
+                                got = true;
+                                break;
+                            }
+                            sleepmillis(1);
+                        }
+                        if ( ! got ) {
+                            log() << "couldn't get lazy rwlock" << endl;
+                            _lock.lock();
+                        }
+                    }
+                    else { 
+                        _lock.lock();
+                    }
+
+                }
+                else { 
                     _lock.lock_shared();
+                }
             }
         }
         ~rwlock() {
@@ -266,5 +314,38 @@ namespace mongo {
     private:
         RWLock& _lock;
         const bool _write;
+    };
+
+    /** recursive on shared locks is ok for this implementation */
+    class RWLockRecursive {
+        ThreadLocalValue<int> _state;
+        RWLock _lk;
+        friend class Exclusive;
+    public:
+        RWLockRecursive(const char *name, int lpwait) : _lk(name, lpwait) { }
+
+        class Exclusive { 
+            rwlock _scopedLock;
+        public:
+            Exclusive(RWLockRecursive& r) : _scopedLock(r._lk, true) { }
+        };
+
+        class Shared { 
+            RWLockRecursive& _r;
+        public:
+            Shared(RWLockRecursive& r) : _r(r) {
+                int s = _r._state.get();
+                if( s == 0 )
+                    _r._lk.lock_shared(); 
+                _r._state.set(++s);
+            }
+            ~Shared() {
+                int s = _r._state.get() - 1;
+                if( s == 0 ) 
+                    _r._lk.unlock_shared();
+                _r._state.set(s);
+                dassert( s >= 0 );
+            }
+        };
     };
 }

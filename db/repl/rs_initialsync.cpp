@@ -171,11 +171,11 @@ namespace mongo {
             return const_cast<Member*>(m);
         }
 
-        sethbmsg( str::stream() << "couldn't find a member matching the sync criteria: " <<
-                  "\nstate? " << (secondaryOnly ? "2" : "none") <<
-                  "\nname? " << (name ? name : "none") <<
-                  "\n_id? " << id <<
-                  "\noptime? " << optime.toStringPretty() );
+        sethbmsg( str::stream() << "couldn't find a member matching the sync criteria:" <<
+                  " state? " << (secondaryOnly ? "2" : "none") <<
+                  " name? " << (name ? name : "none") <<
+                  " _id? " << id <<
+                  " optime? " << optime.toStringPretty() );
 
         return NULL;
     }
@@ -252,7 +252,6 @@ namespace mongo {
         /* apply relevant portion of the oplog
         */
         {
-            sethbmsg("initial sync initial oplog application");
             isyncassert( "initial sync source must remain readable throughout our initial sync [2]", source->state().readable() );
             if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
