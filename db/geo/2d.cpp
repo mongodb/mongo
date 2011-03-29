@@ -1323,6 +1323,9 @@ namespace mongo {
     class GeoCircleBrowse : public GeoBrowse {
     public:
 
+    	// The max points which should be returned by an expand at one time
+    	static const int maxPointsHeuristic = 300;
+
         enum State {
             START ,
             DOING_EXPAND ,
@@ -1334,8 +1337,12 @@ namespace mongo {
             : GeoBrowse( g , "circle" , filter ) {
 
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
+
             BSONObjIterator i(circle);
             BSONElement center = i.next();
+
+            uassert( 13656 , "the first field of $center object must be a location object" , center.isABSONObj() );
+
             _start = g->_tohash(center);
             _startPt = Point(center);
             _prefix = _start;
@@ -1415,11 +1422,19 @@ namespace mongo {
             }
 
             if (_state == DOING_EXPAND) {
+
+                // Make sure we don't jump off an expand-cliff and try to
+                // remember millions of points at once
+                int maxFound = _found + maxPointsHeuristic;
+
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
                 PREFIXDEBUG(_prefix, _g);
 
-                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
-                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
+                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
+
+                if( _found >= maxFound )
+                	return;
 
                 if ( ! _prefix.constrains() ) {
                     GEODEBUG( "\t exhausted the btree" );
@@ -1521,7 +1536,10 @@ namespace mongo {
     class GeoBoxBrowse : public GeoBrowse {
     public:
 
-        enum State {
+    	// The max points which should be returned by an expand at one time
+    	static const int maxPointsHeuristic = 300;
+
+    	enum State {
             START ,
             DOING_EXPAND ,
             DONE
@@ -1577,6 +1595,11 @@ namespace mongo {
 
             if ( _state == DOING_EXPAND ) {
                 int started = _found;
+
+                // Make sure we don't jump off an expand-cliff and try to
+                // remember millions of points at once
+                int maxFound = _found + maxPointsHeuristic;
+
                 while ( started == _found || _state == DONE ) {
                     GEODEBUG( "box prefix [" << _prefix << "]" );
 
@@ -1590,8 +1613,11 @@ namespace mongo {
                     }
 #endif
 
-                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
-                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
+                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
+
+                    if( _found >= maxFound )
+                    	return;
 
                     if ( _state == DONE )
                         return;
@@ -1666,7 +1692,6 @@ namespace mongo {
 
         double _fudge;
     };
-
 
     shared_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
         if ( numWanted < 0 )
