@@ -79,6 +79,7 @@ __wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 	vstuff.frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
 	if (vstuff.frags > INT_MAX) {
 		__wt_errx(session, "file is too large to verify");
+		ret = WT_ERROR;
 		goto err;
 	}
 	WT_ERR(bit_alloc(session, vstuff.frags, &vstuff.fragbits));
