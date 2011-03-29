@@ -473,7 +473,7 @@ namespace mongo {
     public:
         bool isHead() const { return parent.isNull(); }
         void dumpTree(const DiskLoc &thisLoc, const BSONObj &order) const;
-        int fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount = 0, bool strict = false) const; /* traverses everything */
+        long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount = 0, bool strict = false) const; /* traverses everything */
 
         bool isUsed( int i ) const { return k(i).isUsed(); }
         string bucketSummary() const;

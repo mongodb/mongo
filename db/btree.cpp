@@ -128,7 +128,7 @@ namespace mongo {
         bt_dmp=0;
     }
 
-    int BtreeBucket::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, int *unusedCount, bool strict) const {
+    long long BtreeBucket::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict) const {
         {
             bool f = false;
             assert( f = true );
@@ -144,7 +144,7 @@ namespace mongo {
         }
 
         // keycount
-        int kc = 0;
+        long long kc = 0;
 
         for ( int i = 0; i < n; i++ ) {
             const _KeyNode& kn = k(i);
