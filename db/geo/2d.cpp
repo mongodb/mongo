@@ -763,7 +763,7 @@ namespace mongo {
             // when looking at other boxes, don't want to look at some key/object pair twice
             pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.objdata(), node.recordLoc) );
             if ( ! seenBefore.second ) {
-                GEODEBUG( "\t\t\t\t already seen : " << node.key.toString() << " with " << node.recordLoc.obj()["_id"] );
+                GEODEBUG( "\t\t\t\t already seen : " << node.key.toString() << " @ " << Point( _g, GeoHash( node.key.firstElement() ) ).toString() << " with " << node.recordLoc.obj()["_id"] );
                 return;
             }
             _lookedAt++;
@@ -1221,7 +1221,7 @@ namespace mongo {
         virtual long long nscanned() { return _nscanned; }
 
         virtual CoveredIndexMatcher *matcher() const {
-        	return _s->_hopper->_matcher.get();
+            return _s->_hopper->_matcher.get();
         }
 
         shared_ptr<GeoSearch> _s;
@@ -1234,9 +1234,27 @@ namespace mongo {
 
     class GeoBrowse : public GeoCursorBase , public GeoAccumulator {
     public:
+
+        // The max points which should be added to an expanding box
+        static const int maxPointsHeuristic = 300;
+
+        // Expand states
+        enum State {
+            START ,
+            DOING_EXPAND ,
+            DONE_NEIGHBOR ,
+            DONE
+        } _state;
+
         GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj() )
             : GeoCursorBase( g ) ,GeoAccumulator( g , filter ) ,
-              _type( type ) , _filter( filter ) , _firstCall(true), _nscanned() {
+              _type( type ) , _filter( filter ) , _firstCall(true), _nscanned(), _centerPrefix(0, 0, 0) {
+
+            // Set up the initial expand state
+            _state = START;
+            _neighbor = -1;
+            _found = 0;
+
         }
 
         virtual string toString() {
@@ -1246,7 +1264,7 @@ namespace mongo {
         virtual bool ok() {
             bool first = _firstCall;
             if ( _firstCall ) {
-                fillStack();
+                fillStack( maxPointsHeuristic );
                 _firstCall = false;
             }
             if ( ! _cur.isEmpty() || _stack.size() ) {
@@ -1257,7 +1275,7 @@ namespace mongo {
             }
 
             while ( moreToDo() ) {
-                fillStack();
+                fillStack( maxPointsHeuristic );
                 if ( ! _cur.isEmpty() ) {
                     if ( first ) {
                         ++_nscanned;
@@ -1283,7 +1301,7 @@ namespace mongo {
                 return false;
 
             while ( _cur.isEmpty() && moreToDo() )
-                fillStack();
+                fillStack( maxPointsHeuristic );
             return ! _cur.isEmpty() && ++_nscanned;
         }
 
@@ -1292,12 +1310,177 @@ namespace mongo {
         virtual DiskLoc currLoc() { assert(ok()); return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
+
         virtual CoveredIndexMatcher *matcher() const {
-        	return _matcher.get();
+            return _matcher.get();
         }
 
-        virtual bool moreToDo() = 0;
-        virtual void fillStack() = 0;
+        // Are we finished getting points?
+        virtual bool moreToDo() {
+            return _state != DONE;
+        }
+
+        // Fills the stack, but only checks a maximum number of maxToCheck points at a time.
+        // Further calls to this function will continue the expand/check neighbors algorithm.
+        virtual void fillStack( int maxToCheck ) {
+
+#ifdef GEODEBUGGING
+
+            int s = _state;
+            log() << "Filling stack with maximum of " << maxToCheck << ", state : " << s << endl;
+
+#endif
+
+            int maxFound = _found + maxToCheck;
+            bool isNeighbor = _centerPrefix.constrains();
+
+            // Starting a box expansion
+            if ( _state == START ) {
+
+                // Get the very first hash point, if required
+                if( ! isNeighbor )
+                    _prefix = expandStartHash();
+
+                GEODEBUG( "initializing btree" );
+
+                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , _prefix , _found , this ) )
+                    _state = isNeighbor ? DONE_NEIGHBOR : DONE;
+                else
+                    _state = DOING_EXPAND;
+
+                GEODEBUG( (_state == DONE_NEIGHBOR || _state == DONE ? "not initialized" : "initializedFig") );
+
+            }
+
+            // Doing the actual box expansion
+            if ( _state == DOING_EXPAND ) {
+
+                while ( true ) {
+
+                    GEODEBUG( "box prefix [" << _prefix << "]" );
+
+#ifdef GEODEBUGGING
+                    if( _prefix.constrains() ) {
+                        Box in( _g , GeoHash( _prefix ) );
+                        log() << "current expand box : " << in.toString() << endl;
+                    }
+                    else {
+                        log() << "max expand box." << endl;
+                    }
+#endif
+
+                    GEODEBUG( "expanding box points... ");
+
+                    // Find points inside this prefix
+                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
+                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
+
+                    GEODEBUG( "finished expand, found : " << ( maxToCheck - ( maxFound - _found ) ) );
+
+                    if( _found >= maxFound ) return;
+
+                    // If we've searched the entire space, we're finished.
+                    if ( ! _prefix.constrains() ) {
+                        GEODEBUG( "box exhausted" );
+                        _state = DONE;
+                        return;
+                    }
+
+                    if ( ! fitsInBox( _g->sizeEdge( _prefix ) ) ) {
+
+                        // If we're still not expanded bigger than the box size, expand again
+                        // TODO: Is there an advantage to scanning prior to expanding?
+                        _prefix = _prefix.up();
+                        continue;
+
+                    }
+
+                    // We're done and our size is large enough
+                    _state = DONE_NEIGHBOR;
+                    // Go to the next neighbor
+                    _neighbor++;
+                    break;
+
+                }
+            }
+
+            // If we're done expanding the current box...
+            if( _state == DONE_NEIGHBOR ) {
+
+                // Iterate to the next neighbor
+                // Loop is useful for cases where we want to skip over boxes entirely,
+                // otherwise recursion increments the neighbors.
+                for ( ; _neighbor < 9; _neighbor++ ) {
+
+                    int i = (_neighbor / 3) - 1;
+                    int j = (_neighbor % 3) - 1;
+
+                    if ( i == 0 && j == 0 )
+                        continue; // main box
+
+                    if( ! isNeighbor ) {
+                        _centerPrefix = _prefix;
+                        isNeighbor = true;
+                    }
+
+                    // Make sure we've got a reasonable center
+                    assert( _centerPrefix.constrains() );
+
+                    GeoHash newBox = _centerPrefix;
+                    newBox.move( i, j );
+                    _prefix = newBox;
+
+                    GEODEBUG( "moving to " << i << " , " << j );
+                    PREFIXDEBUG( _centerPrefix, _g );
+                    PREFIXDEBUG( newBox , _g );
+
+                    Box cur( _g , newBox );
+                    if ( intersectsBox( cur ) ) {
+
+                        // TODO: Consider exploiting recursion to do an expand search
+                        // from a smaller region
+
+                        // Restart our search from a diff box.
+                        _state = START;
+
+                        fillStack( maxFound - _found );
+
+                        // When we return from the recursive fillStack call, we'll either have checked enough points or
+                        // be entirely done.  Max recurse depth is 8.
+
+                        // If we're maxed out on points, return
+                        if( _found >= maxFound ) {
+                            // Make sure we'll come back to add more points
+                            assert( _state == DOING_EXPAND );
+                            return;
+                        }
+
+                        // Otherwise we must be finished to return
+                        assert( _state == DONE );
+                        return;
+
+                    }
+                    else {
+                        GEODEBUG( "skipping box" );
+                        continue;
+                    }
+
+                }
+
+                // Finished with neighbors
+                _state = DONE;
+            }
+
+        }
+
+        // The initial geo hash box for our first expansion
+        virtual GeoHash expandStartHash() = 0;
+
+        // Whether the current box width is big enough for our search area
+        virtual bool fitsInBox( double width ) = 0;
+
+        // Whether the current box overlaps our search area
+        virtual bool intersectsBox( Box& cur ) = 0;
 
         virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
 
@@ -1325,20 +1508,24 @@ namespace mongo {
 
         long long _nscanned;
 
+        // The current box we're expanding (-1 is first/center box)
+        int _neighbor;
+
+        // The points we've found so far
+        int _found;
+
+        // The current hash prefix we're expanding and the center-box hash prefix
+        GeoHash _prefix;
+        GeoHash _centerPrefix;
+
+        // Start and end of our search range in the current box
+        BtreeLocation _min;
+        BtreeLocation _max;
+
     };
 
     class GeoCircleBrowse : public GeoBrowse {
     public:
-
-    	// The max points which should be returned by an expand at one time
-    	static const int maxPointsHeuristic = 300;
-
-        enum State {
-            START ,
-            DOING_EXPAND ,
-            DOING_AROUND ,
-            DONE
-        } _state;
 
         GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() , const string& type="$center")
             : GeoBrowse( g , "circle" , filter ) {
@@ -1350,22 +1537,23 @@ namespace mongo {
 
             uassert( 13656 , "the first field of $center object must be a location object" , center.isABSONObj() );
 
+            // Get geohash and exact center point
             _start = g->_tohash(center);
             _startPt = Point(center);
-            _prefix = _start;
+
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
             _maxDistance += g->_error;
 
-            _state = START;
-            _found = 0;
-
             if (type == "$center") {
+                // Look in box with bounds of maxDistance in either direction
                 _type = GEO_PLAIN;
                 _xScanDistance = _maxDistance;
                 _yScanDistance = _maxDistance;
             }
             else if (type == "$centerSphere") {
+                // Same, but compute maxDistance using spherical transform
+
                 uassert(13461, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
 
                 _type = GEO_SPHERE;
@@ -1375,141 +1563,37 @@ namespace mongo {
                 uassert(13462, "Spherical distance would require wrapping, which isn't implemented yet",
                         (_startPt._x + _xScanDistance < 180) && (_startPt._x - _xScanDistance > -180) &&
                         (_startPt._y + _yScanDistance < 90) && (_startPt._y - _yScanDistance > -90));
-
-                GEODEBUGPRINT(_maxDistance);
-                GEODEBUGPRINT(_xScanDistance);
-                GEODEBUGPRINT(_yScanDistance);
             }
             else {
                 uassert(13460, "invalid $center query type: " + type, false);
             }
 
+            // Bounding box includes fudge factor.
+            // TODO:  Is this correct, since fudge factor may be spherically transformed?
+            _bBox._min = Point( _startPt._x - _xScanDistance, _startPt._y - _yScanDistance );
+            _bBox._max = Point( _startPt._x + _xScanDistance, _startPt._y + _yScanDistance );
+
+            GEODEBUG( "Bounding box for circle query : " << _bBox.toString() << " (max distance : " << _maxDistance << ")" );
+
             ok();
         }
 
-        virtual bool moreToDo() {
-            return _state != DONE;
+        virtual GeoHash expandStartHash() {
+            return _start;
         }
 
-        virtual void fillStack() {
-
-            if ( _state == START ) {
-                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max ,
-                                               _prefix , _found , this ) ) {
-                    _state = DONE;
-                    return;
-                }
-                _state = DOING_EXPAND;
-            }
-
-
-            if ( _state == DOING_AROUND ) {
-                // TODO could rework and return rather than looping
-                for (int i=-1; i<=1; i++) {
-                    for (int j=-1; j<=1; j++) {
-                        if (i == 0 && j == 0)
-                            continue; // main box
-
-                        GeoHash newBox = _prefix;
-                        newBox.move(i, j);
-
-                        PREFIXDEBUG(newBox, _g);
-                        if (needToCheckBox(newBox)) {
-                            // TODO consider splitting into quadrants
-                            getPointsForPrefix(newBox);
-                        }
-                        else  {
-                            GEODEBUG("skipping box");
-                        }
-                    }
-                }
-
-                _state = DONE;
-                return;
-            }
-
-            if (_state == DOING_EXPAND) {
-
-                // Make sure we don't jump off an expand-cliff and try to
-                // remember millions of points at once
-                int maxFound = _found + maxPointsHeuristic;
-
-                GEODEBUG( "circle prefix [" << _prefix << "]" );
-                PREFIXDEBUG(_prefix, _g);
-
-                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
-                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
-
-                if( _found >= maxFound )
-                	return;
-
-                if ( ! _prefix.constrains() ) {
-                    GEODEBUG( "\t exhausted the btree" );
-                    _state = DONE;
-                    return;
-                }
-
-                Point ll (_g, _prefix);
-                GeoHash trHash = _prefix;
-                trHash.move( 1 , 1 );
-                Point tr (_g, trHash);
-                double sideLen = fabs(tr._x - ll._x);
-
-                if (sideLen > std::max(_xScanDistance, _yScanDistance)) { // circle must be contained by surrounding squares
-                    if ( (ll._x + _xScanDistance < _startPt._x && ll._y + _yScanDistance < _startPt._y) &&
-                            (tr._x - _xScanDistance > _startPt._x && tr._y - _yScanDistance > _startPt._y) ) {
-                        GEODEBUG("square fully contains circle");
-                        _state = DONE;
-                    }
-                    else if (_prefix.getBits() > 1) {
-                        GEODEBUG("checking surrounding squares");
-                        _state = DOING_AROUND;
-                    }
-                    else {
-                        GEODEBUG("using simple search");
-                        _prefix = _prefix.up();
-                    }
-                }
-                else {
-                    _prefix = _prefix.up();
-                }
-
-                return;
-            }
-
-            /* Clients are expected to use moreToDo before calling
-             * fillStack, so DONE is checked for there. If any more
-             * State values are defined, you should handle them
-             * here. */
-            assert(0);
+        virtual bool fitsInBox( double width ) {
+            return width >= std::max(_xScanDistance, _yScanDistance);
         }
 
-        bool needToCheckBox(const GeoHash& prefix) {
-            Point ll (_g, prefix);
-            if (fabs(ll._x - _startPt._x) <= _xScanDistance) return true;
-            if (fabs(ll._y - _startPt._y) <= _yScanDistance) return true;
-
-            GeoHash trHash = prefix;
-            trHash.move( 1 , 1 );
-            Point tr (_g, trHash);
-
-            if (fabs(tr._x - _startPt._x) <= _xScanDistance) return true;
-            if (fabs(tr._y - _startPt._y) <= _yScanDistance) return true;
-
-            return false;
+        virtual bool intersectsBox( Box& cur ) {
+            return _bBox.intersects( cur );
         }
-
-        void getPointsForPrefix(const GeoHash& prefix) {
-            if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , prefix , _found , this ) ) {
-                return;
-            }
-
-            while ( _min.hasPrefix( prefix ) && _min.advance( -1 , _found , this ) );
-            while ( _max.hasPrefix( prefix ) && _max.advance( 1 , _found , this ) );
-        }
-
 
         virtual bool checkDistance( const GeoHash& h , double& d ) {
+
+            // TODO:  Inexact hash distance checks.
+
             switch (_type) {
             case GEO_PLAIN:
                 d = _g->distance( _start , h );
@@ -1531,173 +1615,69 @@ namespace mongo {
         double _maxDistance; // user input
         double _xScanDistance; // effected by GeoDistType
         double _yScanDistance; // effected by GeoDistType
-
-        int _found;
-
-        GeoHash _prefix;
-        BtreeLocation _min;
-        BtreeLocation _max;
+        Box _bBox;
 
     };
 
     class GeoBoxBrowse : public GeoBrowse {
     public:
 
-    	// The max points which should be returned by an expand at one time
-    	static const int maxPointsHeuristic = 300;
-
-    	enum State {
-            START ,
-            DOING_EXPAND ,
-            DONE
-        } _state;
-
         GeoBoxBrowse( const Geo2dType * g , const BSONObj& box , BSONObj filter = BSONObj() )
             : GeoBrowse( g , "box" , filter ) {
 
             uassert( 13063 , "$box needs 2 fields (bottomLeft,topRight)" , box.nFields() == 2 );
-            BSONObjIterator i(box);
-            _bl = g->_tohash( i.next() );
-            _tr = g->_tohash( i.next() );
 
-            _want._min = Point( _g , _bl );
-            _want._max = Point( _g , _tr );
+            // Initialize an *exact* box from the given obj.
+            BSONObjIterator i(box);
+            _want._min = Point( i.next() );
+            _want._max = Point( i.next() );
 
             uassert( 13064 , "need an area > 0 " , _want.area() > 0 );
 
-            _state = START;
-            _found = 0;
-
             Point center = _want.center();
-            _prefix = _g->hash( center._x , center._y );
+            _start = _g->hash( center._x , center._y );
 
             GEODEBUG( "center : " << center.toString() << "\t" << _prefix );
 
-            {
-                GeoHash a(0LL,32);
-                GeoHash b(0LL,32);
-                b.move(1,1);
-                _fudge = _g->distance(a,b);
-            }
-
-            _wantLen = _fudge + std::max((_want._max._x - _want._min._x), (_want._max._y - _want._min._y));
+            _fudge = _g->_error;
+            _wantLen = _fudge +
+                       std::max( ( _want._max._x - _want._min._x ) ,
+                                 ( _want._max._y - _want._min._y ) );
 
             ok();
         }
 
-        virtual bool moreToDo() {
-            return _state != DONE;
+        virtual GeoHash expandStartHash() {
+            return _start;
         }
 
-        virtual void fillStack() {
-            if ( _state == START ) {
-
-                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max ,
-                                               _prefix , _found , this ) ) {
-                    _state = DONE;
-                    return;
-                }
-                _state = DOING_EXPAND;
-            }
-
-            if ( _state == DOING_EXPAND ) {
-                int started = _found;
-
-                // Make sure we don't jump off an expand-cliff and try to
-                // remember millions of points at once
-                int maxFound = _found + maxPointsHeuristic;
-
-                while ( started == _found || _state == DONE ) {
-                    GEODEBUG( "box prefix [" << _prefix << "]" );
-
-#ifdef GEODEBUGGING
-                    if( _prefix.constrains() ) {
-                        Box in( _g , GeoHash( _prefix ) );
-                        log() << "current expand box : " << in.toString() << endl;
-                    }
-                    else {
-                        log() << "max expand box." << endl;
-                    }
-#endif
-
-                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
-                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
-
-                    if( _found >= maxFound )
-                    	return;
-
-                    if ( _state == DONE )
-                        return;
-
-                    if ( ! _prefix.constrains() ) {
-                        GEODEBUG( "box exhausted" );
-                        _state = DONE;
-                        return;
-                    }
-
-                    if (_g->sizeEdge(_prefix) < _wantLen) {
-                        _prefix = _prefix.up();
-                    }
-                    else {
-                        for (int i=-1; i<=1; i++) {
-                            for (int j=-1; j<=1; j++) {
-
-                                if (i == 0 && j == 0)
-                                    continue; // main box
-
-                                GeoHash newBox = _prefix;
-                                newBox.move(i, j);
-
-                                PREFIXDEBUG(newBox, _g);
-
-                                Box cur( _g , newBox );
-                                if (_want.intersects(cur)) {
-                                    // TODO consider splitting into quadrants
-                                    getPointsForPrefix(newBox);
-                                }
-                                else  {
-                                    GEODEBUG("skipping box");
-                                }
-                            }
-                        }
-                        _state = DONE;
-                    }
-
-                }
-                return;
-            }
-
+        virtual bool fitsInBox( double width ) {
+            return width >= _wantLen;
         }
 
-        void getPointsForPrefix(const GeoHash& prefix) {
-            if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , prefix , _found , this ) ) {
-                return;
-            }
-
-            while ( _min.hasPrefix( prefix ) && _min.advance( -1 , _found , this ) );
-            while ( _max.hasPrefix( prefix ) && _max.advance( 1 , _found , this ) );
+        virtual bool intersectsBox( Box& cur ) {
+            return _want.intersects( cur );
         }
 
         virtual bool checkDistance( const GeoHash& h , double& d ) {
+
+            // Check whether hash of point is inside box.
+            // TODO:  This is only exact up to the fudge factor
             bool res = _want.inside( Point( _g , h ) , _fudge );
-            GEODEBUG( "\t want : " << _want.toString()
+
+            GEODEBUG( "checking point : " << _want.toString()
                       << " point: " << Point( _g , h ).toString()
                       << " in : " << res );
+
             return res;
         }
 
-        GeoHash _bl;
-        GeoHash _tr;
         Box _want;
         double _wantLen;
-
-        int _found;
-
-        GeoHash _prefix;
-        BtreeLocation _min;
-        BtreeLocation _max;
-
         double _fudge;
+
+        GeoHash _start;
+
     };
 
     shared_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
