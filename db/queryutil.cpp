@@ -79,16 +79,30 @@ namespace mongo {
                 return r; //breaking here fails with /^a?/
             }
             else if (c == '\\') {
-                // slash followed by non-alphanumeric represents the following char
                 c = *(regex++);
-                if ((c >= 'A' && c <= 'Z') ||
+                if (c == 'Q'){
+                    // \Q...\E quotes everything inside
+                    while (*regex) {
+                        c = (*regex++);
+                        if (c == '\\' && (*regex == 'E')){
+                            regex++; //skip the 'E'
+                            break; // go back to start of outer loop
+                        }
+                        else {
+                            ss << c; // character should match itself
+                        }
+                    }
+                }
+                else if ((c >= 'A' && c <= 'Z') ||
                         (c >= 'a' && c <= 'z') ||
                         (c >= '0' && c <= '0') ||
                         (c == '\0')) {
+                    // don't know what to do with these
                     r = ss.str();
                     break;
                 }
                 else {
+                    // slash followed by non-alphanumeric represents the following char
                     ss << c;
                 }
             }
@@ -1153,6 +1167,16 @@ namespace mongo {
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "foo #" );
             }
+            {
+                assert( simpleRegex("^\\Qasdf\\E", "", NULL) == "asdf" );
+                assert( simpleRegex("^\\Qasdf\\E.*", "", NULL) == "asdf" );
+                assert( simpleRegex("^\\Qasdf", "", NULL) == "asdf" ); // PCRE supports this
+                assert( simpleRegex("^\\Qasdf\\\\E", "", NULL) == "asdf\\" );
+                assert( simpleRegex("^\\Qas.*df\\E", "", NULL) == "as.*df" );
+                assert( simpleRegex("^\\Qas\\Q[df\\E", "", NULL) == "as\\Q[df" );
+                assert( simpleRegex("^\\Qas\\E\\\\E\\Q$df\\E", "", NULL) == "as\\E$df" ); // quoted string containing \E
+            }
+
         }
     } simple_regex_unittest;
 
