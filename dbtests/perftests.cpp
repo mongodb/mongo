@@ -265,6 +265,27 @@ namespace PerfTests {
 
     unsigned dontOptimizeOutHopefully;
 
+    class BSONIter : public B { 
+    public:
+        int n;
+        bo b, sub;
+        string name() { return "BSONIter"; }
+        BSONIter() { 
+            n = 0;
+            bo sub = bob().appendTimeT("t", time(0)).appendBool("abool", true).appendBinData("somebin", 3, BinDataGeneral, "abc").appendNull("anullone").obj();
+            b = BSON( "_id" << OID() << "x" << 3 << "yaaaaaa" << 3.00009 << "zz" << 1 << "q" << false << "obj" << sub << "zzzzzzz" << "a string a string" );
+        }
+        virtual bool showDurStats() { return false; }
+        void timed() { 
+            for( bo::iterator i = b.begin(); i.more(); )
+                if( i.next().fieldName() )
+                    n++;
+            for( bo::iterator i = sub.begin(); i.more(); )
+                if( i.next().fieldName() )
+                    n++;
+        }
+    };
+
     // test thread local speed
     class TLS : public B {
     public:
@@ -501,6 +522,7 @@ namespace PerfTests {
             cout
                 << "stats test                              rps        time   "
                 << dur::stats.curr->_CSVHeader() << endl;
+            add< BSONIter >();
             add< ChecksumTest >();
             add< TaskQueueTest >();
             add< TLS >();
