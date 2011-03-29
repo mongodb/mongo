@@ -54,24 +54,7 @@ namespace mongo {
         newDb = namespaceIndex.exists();
         profile = 0;
 
-        {
-            vector<string> others;
-            getDatabaseNames( others , path );
-
-            for ( unsigned i=0; i<others.size(); i++ ) {
-
-                if ( strcasecmp( others[i].c_str() , nm ) )
-                    continue;
-
-                if ( strcmp( others[i].c_str() , nm ) == 0 )
-                    continue;
-
-                stringstream ss;
-                ss << "db already exists with different case other: [" << others[i] << "] me [" << nm << "]";
-                uasserted( DatabaseDifferCaseCode , ss.str() );
-            }
-        }
-
+        checkDuplicateUncasedNames();
 
         // If already exists, open.  Otherwise behave as if empty until
         // there's a write, then open.
@@ -90,6 +73,29 @@ namespace mongo {
                 delete files[i];
             throw;
         }
+    }
+    
+    void Database::checkDuplicateUncasedNames() const {
+        vector<string> others;
+        getDatabaseNames( others , path );
+
+        set<string> allShortNames;
+        dbHolder.getAllShortNames( allShortNames );
+        
+        others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
+        
+        for ( unsigned i=0; i<others.size(); i++ ) {
+            
+            if ( strcasecmp( others[i].c_str() , name.c_str() ) )
+                continue;
+            
+            if ( strcmp( others[i].c_str() , name.c_str() ) == 0 )
+                continue;
+            
+            stringstream ss;
+            ss << "db already exists with different case other: [" << others[i] << "] me [" << name << "]";
+            uasserted( DatabaseDifferCaseCode , ss.str() );
+        }        
     }
 
     boost::filesystem::path Database::fileName( int n ) const {

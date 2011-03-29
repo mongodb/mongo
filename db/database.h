@@ -107,6 +107,12 @@ namespace mongo {
         }
 
         static bool validDBName( const string& ns );
+        
+        /**
+         * @throws DatabaseDifferCaseCode if the name is a duplicate based on
+         * case insensitive matching.
+         */
+        void checkDuplicateUncasedNames() const;
 
     public: // this should be private later
 
