@@ -109,9 +109,11 @@ __wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 	cache->only_evict_clean = 0;
 	__wt_unlock(session, cache->mtx_reconcile);
 
-err:	/* Wrap up reporting and free allocated memory. */
+err:	/* Wrap up reporting. */
 	if (vstuff.f != NULL)
 		vstuff.f(session->name, vstuff.fcnt);
+
+	/* Free allocated memory. */
 	if (vstuff.fragbits != NULL)
 		__wt_free(session, vstuff.fragbits);
 
