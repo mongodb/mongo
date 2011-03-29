@@ -142,9 +142,10 @@ namespace mongo {
             checkShardVersion( conn , ns , 1 , tryNumber + 1 );
             return true;
         }
-
-        log() << "     setShardVersion failed: " << result << endl;
-        massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
+        
+        string errmsg = str::stream() << "setShardVersion failed host[" << conn.getServerAddress() << "] " << result;
+        log() << "     " << errmsg << endl;
+        massert( 10429 , errmsg , 0 );
         return true;
     }
 
