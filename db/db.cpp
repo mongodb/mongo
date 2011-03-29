@@ -65,7 +65,6 @@ namespace mongo {
     void setupSignals( bool inFork );
     void startReplSets(ReplSetCmdline*);
     void startReplication();
-    void pairWith(const char *remoteEnd, const char *arb);
     void exitCleanly( ExitCode code );
 
     CmdLine cmdLine;
@@ -596,18 +595,6 @@ void show_help_text(po::options_description options) {
 
 /* Return error string or "" if no errors. */
 string arg_error_check(int argc, char* argv[]) {
-    for (int i = 1; i < argc; i++) {
-        string s = argv[i];
-        /* check for inclusion of old-style arbiter setting. */
-        if (s == "--pairwith") {
-            if (argc > i + 2) {
-                string old_arbiter = argv[i + 2];
-                if (old_arbiter == "-" || old_arbiter.substr(0, 1) != "-") {
-                    return "Specifying arbiter using --pairwith is no longer supported, please use --arbiter";
-                }
-            }
-        }
-    }
     return "";
 }
 
@@ -697,9 +684,6 @@ int main(int argc, char* argv[]) {
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     // these move to unhidden later:
-    ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids for replica pairs DEPRECATED")
-    ("pairwith", po::value<string>(), "address of server to pair with DEPRECATED")
-    ("arbiter", po::value<string>(), "address of replica pair arbiter server DEPRECATED")
     ("nodur", "disable journaling (currently the default)")
     ("nojournal", "disable journaling (currently the default)")
     // things we don't want people to use
@@ -909,25 +893,6 @@ int main(int argc, char* argv[]) {
         if (params.count("only")) {
             cmdLine.only = params["only"].as<string>().c_str();
         }
-        if (params.count("pairwith")) {
-            cout << "***********************************\n"
-                 << "WARNING WARNING WARNING\n"
-                 << " replica pairs are deprecated\n"
-                 << " see: http://www.mongodb.org/display/DOCS/Replica+Pairs \n"
-                 << "***********************************" << endl;
-            string paired = params["pairwith"].as<string>();
-            if (params.count("arbiter")) {
-                string arbiter = params["arbiter"].as<string>();
-                pairWith(paired.c_str(), arbiter.c_str());
-            }
-            else {
-                pairWith(paired.c_str(), "-");
-            }
-        }
-        else if (params.count("arbiter")) {
-            out() << "specifying --arbiter without --pairwith" << endl;
-            dbexit( EXIT_BADOPTIONS );
-        }
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();
             if (x <= 0 || x > (0x7fffffff/1024/1024)) {
@@ -950,15 +915,6 @@ int main(int argc, char* argv[]) {
             }
             cmdLine.oplogSize = x * 1024 * 1024;
             assert(cmdLine.oplogSize > 0);
-        }
-        if (params.count("opIdMem")) {
-            long x = params["opIdMem"].as<long>();
-            if (x <= 0) {
-                out() << "bad --opIdMem arg" << endl;
-                dbexit( EXIT_BADOPTIONS );
-            }
-            replSettings.opIdMem = x;
-            assert(replSettings.opIdMem > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();

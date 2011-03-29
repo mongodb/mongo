@@ -29,7 +29,7 @@
 #include "json.h"
 #include "repl.h"
 #include "repl_block.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"
@@ -715,7 +715,7 @@ namespace mongo {
             return false;
         }
         virtual bool slaveOk() const {
-            // ok on --slave setups, not ok for nonmaster of a repl pair (unless override)
+            // ok on --slave setups
             return replSettings.slave == SimpleSlave;
         }
         virtual bool slaveOverrideOk() {

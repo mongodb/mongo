@@ -27,7 +27,7 @@
 #include "lasterror.h"
 #include "security.h"
 #include "json.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
 #include "../util/goodies.h"

@@ -26,7 +26,7 @@
 #include "../queryoptimizer.h"
 #include "../matcher.h"
 #include "../clientcursor.h"
-#include "../replpair.h"
+#include "../replutil.h"
 #include "../../s/d_chunk_manager.h"
 #include "../../s/d_logic.h"
 

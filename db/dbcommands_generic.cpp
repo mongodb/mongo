@@ -33,7 +33,7 @@
 #include "json.h"
 #include "repl.h"
 #include "repl_block.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"
