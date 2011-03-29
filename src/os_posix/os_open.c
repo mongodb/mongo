@@ -18,7 +18,7 @@ __wt_open(
 	BTREE *btree;
 	CONNECTION *conn;
 	WT_FH *fh;
-	int f, fd, ret;
+	int f, fd, matched, ret;
 
 	conn = S2C(session);
 	fh = NULL;
@@ -27,6 +27,7 @@ __wt_open(
 	    (session, "fileops: %s: open", name));
 
 	/* Increment the reference count if we already have the file open. */
+	matched = 0;
 	__wt_lock(session, conn->mtx);
 	TAILQ_FOREACH(btree, &conn->dbqh, q) {
 		if ((fh = btree->fh) == NULL)
@@ -34,11 +35,12 @@ __wt_open(
 		if (strcmp(name, btree->name) == 0) {
 			++fh->refcnt;
 			*fhp = fh;
+			matched = 1;
 			break;
 		}
 	}
 	__wt_unlock(session, conn->mtx);
-	if (fh != NULL)
+	if (matched)
 		return (0);
 
 	f = O_RDWR;
