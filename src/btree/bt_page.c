@@ -388,8 +388,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 
 /*
  * __wt_cell_process --
- *	Overflow and/or compressed on-page cells need processing before
- *	we look at them.
+ *	Copy an on-page key into a return buffer, processing as needed.
  */
 int
 __wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
@@ -405,10 +404,6 @@ __wt_cell_process(SESSION *session, WT_CELL *cell, WT_BUF *retbuf)
 	tmp = NULL;
 	ret = 0;
 
-	/*
-	 * 3 cases: compressed on-page item or, compressed or uncompressed
-	 * overflow item.
-	 */
 	switch (WT_CELL_TYPE(cell)) {
 	case WT_CELL_KEY:
 		huffman = btree->huffman_key;
