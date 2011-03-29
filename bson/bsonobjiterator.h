@@ -72,7 +72,7 @@ namespace mongo {
 
         BSONElement operator*() {
             assert( _pos < _theend );
-            return BSONElement(_pos, -1);
+            return BSONElement(_pos);
         }
 
     private:
