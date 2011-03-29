@@ -484,7 +484,7 @@ namespace mongo {
             log() << "resync: cloning database " << db << " to get an initial copy" << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true);
             if ( !ok ) {
                 problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
                 throw SyncException();

@@ -21,6 +21,7 @@
 #include "rs.h"
 #include "../repl.h"
 #include "../query.h"
+#include "../cloner.h"
 
 /* Scenarios
 
@@ -62,7 +63,6 @@ namespace mongo {
 
     using namespace bson;
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logforrepl);
     void incRBID();
 
     class rsfatal : public std::exception {
@@ -393,7 +393,7 @@ namespace mongo {
                     dropCollection(ns, errmsg, res);
                     {
                         dbtemprelease r;
-                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false);
+                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false, true);
                         if( !ok ) {
                             log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
                             throw "rollback error resyncing rollection [1]";

@@ -37,6 +37,7 @@
 #include "oplog.h"
 #include "../util/concurrency/thread_pool.h"
 #include "oplogreader.h"
+#include "cloner.h"
 
 namespace mongo {
 
@@ -65,9 +66,6 @@ namespace mongo {
     };
 
     extern ReplSettings replSettings;
-
-    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication,
-                   bool slaveOk, bool useReplAuth, bool snapshot);
 
     /* A replication exception */
     class SyncException : public DBException {

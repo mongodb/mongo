@@ -57,19 +57,14 @@ namespace mongo {
         }
     }
 
-    bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication,
-                   bool slaveOk, bool useReplAuth, bool snapshot);
-
     /* todo : progress metering to sethbmsg. */
     static bool clone(const char *master, string db) {
         string err;
         return cloneFrom(master, err, db, false,
-                         /* slave_ok */ true, true, false);
+                         /* slave_ok */ true, true, false, /*mayYield*/true);
     }
 
     void _logOpObjRS(const BSONObj& op);
-
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string &errmsg, bool logforrepl);
 
     static void emptyOplog() {
         writelock lk(rsoplog);
