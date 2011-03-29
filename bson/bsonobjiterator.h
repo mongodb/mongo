@@ -63,8 +63,8 @@ namespace mongo {
         }
         BSONElement next() {
             assert( _pos < _theend );
-            BSONElement e( _pos, -1 );
-            _pos += e.size( -1 );
+            BSONElement e(_pos);
+            _pos += e.size();
             return e;
         }
         void operator++() { next(); }
