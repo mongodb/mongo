@@ -425,6 +425,72 @@ namespace mongo {
         return totalSize;
     }
 
+    inline int BSONElement::size() const {
+        if ( totalSize >= 0 )
+            return totalSize;
+
+        int x = 0;
+        switch ( type() ) {
+        case EOO:
+        case Undefined:
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+            break;
+        case mongo::Bool:
+            x = 1;
+            break;
+        case NumberInt:
+            x = 4;
+            break;
+        case Timestamp:
+        case mongo::Date:
+        case NumberDouble:
+        case NumberLong:
+            x = 8;
+            break;
+        case jstOID:
+            x = 12;
+            break;
+        case Symbol:
+        case Code:
+        case mongo::String:
+            x = valuestrsize() + 4;
+            break;
+        case DBRef:
+            x = valuestrsize() + 4 + 12;
+            break;
+        case CodeWScope:
+        case Object:
+        case mongo::Array:
+            x = objsize();
+            break;
+        case BinData:
+            x = valuestrsize() + 4 + 1/*subtype*/;
+            break;
+        case RegEx: 
+            {
+                const char *p = value();
+                size_t len1 = strlen(p);
+                p = p + len1 + 1;
+                size_t len2;
+                len2 = strlen( p );
+                x = (int) (len1 + 1 + len2 + 1);
+            }
+            break;
+        default: 
+            {
+                StringBuilder ss;
+                ss << "BSONElement: bad type " << (int) type();
+                string msg = ss.str();
+                massert(10320 , msg.c_str(),false);
+            }
+        }
+        totalSize =  x + fieldNameSize() + 1; // BSONType
+
+        return totalSize;
+    }
+
     inline string BSONElement::toString( bool includeFieldName, bool full ) const {
         StringBuilder s;
         toString(s, includeFieldName, full);

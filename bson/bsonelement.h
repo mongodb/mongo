@@ -120,7 +120,8 @@ namespace mongo {
         /** Size of the element.
             @param maxLen If maxLen is specified, don't scan more than maxLen bytes to calculate size.
         */
-        int size( int maxLen = -1 ) const;
+        int size( int maxLen ) const;
+        int size() const;
 
         /** Wrap this element up as a singleton object. */
         BSONObj wrap() const;
