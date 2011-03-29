@@ -1,4 +1,4 @@
-// SERVER-2111 Check that an in memory db name will block another db with a similar case.
+// SERVER-2111 Check that an in memory db name will block creation of a db with a similar but differently cased name.
 
 a = db.getSisterDB( "dbcasetest_dbnamea" )
 b = db.getSisterDB( "dbcasetest_dbnameA" )
