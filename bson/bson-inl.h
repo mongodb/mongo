@@ -417,7 +417,7 @@ namespace mongo {
             StringBuilder ss;
             ss << "BSONElement: bad type " << (int) type();
             string msg = ss.str();
-            massert( 10320 , msg.c_str(),false);
+            massert( 13655 , msg.c_str(),false);
         }
         }
         totalSize =  x + fieldNameSize() + 1; // BSONType
