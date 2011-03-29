@@ -9,10 +9,10 @@
 #include "btree.i"
 
 static int  __wt_evict(SESSION *);
-static int  __wt_evict_compare_lru(const void *a, const void *b);
-static int  __wt_evict_compare_page(const void *a, const void *b);
+static int  __wt_evict_compare_lru(const void *, const void *);
+static int  __wt_evict_compare_page(const void *, const void *);
 static void __wt_evict_hazard_check(SESSION *);
-static int  __wt_evict_hazard_compare(const void *a, const void *b);
+static int  __wt_evict_hazard_compare(const void *, const void *);
 static int  __wt_evict_page(SESSION *);
 static void __wt_evict_set(SESSION *);
 static void __wt_evict_state_check(SESSION *);
