@@ -205,6 +205,20 @@ namespace mongo
 	return pValue;
     }
 
+    Value::Value(const vector<shared_ptr<const Value>> &thevpValue):
+	type(Array),
+	pDocumentValue(),
+	vpValue(thevpValue)
+    {
+    }
+
+    shared_ptr<const Value> Value::createArray(
+	const vector<shared_ptr<const Value>> &vpValue)
+    {
+	shared_ptr<const Value> pValue(new Value(vpValue));
+	return pValue;
+    }
+
     double Value::getDouble() const
     {
 	BSONType type = getType();
@@ -229,10 +243,30 @@ namespace mongo
 	return pDocumentValue;
     }
 
-    const vector<shared_ptr<const Value>> *Value::getArray() const
+    bool Value::vi::more() const
+    {
+	return (nextIndex < size);
+    }
+
+    shared_ptr<const Value> Value::vi::next()
+    {
+	assert(more());
+	return (*pvpValue)[nextIndex++];
+    }
+
+    Value::vi::vi(shared_ptr<const Value> pValue,
+		  const vector<shared_ptr<const Value>> *thepvpValue):
+	size(thepvpValue->size()),
+	nextIndex(0),
+	pvpValue(thepvpValue)
+    {
+    }
+
+    shared_ptr<ValueIterator> Value::getArray() const
     {
 	assert(getType() == Array);
-	return &vpValue;
+	shared_ptr<ValueIterator> pVI(new vi(shared_from_this(), &vpValue));
+	return pVI;
     }
 
     OID Value::getOid() const
@@ -614,35 +648,34 @@ namespace mongo
 
 	    case Array:
 	    {
-		const vector<shared_ptr<const Value>> *pvpLV = rL->getArray();
-		const vector<shared_ptr<const Value>> *pvpRV = rR->getArray();
+		shared_ptr<ValueIterator> pli(rL->getArray());
+		shared_ptr<ValueIterator> pri(rR->getArray());
 
-		const size_t lSize = pvpLV->size();
-		const size_t rSize = pvpRV->size();
-
-		for(size_t i = 0; true; ++i)
+		while(true)
 		{
 		    /* have we run out of left array? */
-		    if (i >= lSize)
+		    if (!pli->more())
 		    {
-			if (i >= rSize)
-			    return 0; // arrays are the same length
+			if (!pri->more())
+			    return 0; // the arrays are the same length
 
-			return -1; // left array is shorter
+			return -1; // the left array is shorter
 		    }
 
 		    /* have we run out of right array? */
-		    if (i >= rSize)
-			return 1; // right array is shorter
+		    if (!pri->more())
+			return 1; // the right array is shorter
 
-		    /* compare corresponding array elements */
-		    const int cmp = Value::compare((*pvpLV)[i], (*pvpRV)[i]);
+		    /* compare the two corresponding elements */
+		    shared_ptr<const Value> plv(pli->next());
+		    shared_ptr<const Value> prv(pri->next());
+		    const int cmp = Value::compare(plv, prv);
 		    if (cmp)
 			return cmp; // values are unequal
 		}
 
 		/* NOTREACHED */
-		assert(false); // CW TODO
+		assert(false);
 		break;
 	    }
 

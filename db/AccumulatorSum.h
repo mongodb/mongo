@@ -20,15 +20,18 @@
 
 #include "db/Accumulator.h"
 
+#include "bson/bsontypes.h"
+
 namespace mongo
 {
     class AccumulatorSum :
         public Accumulator
     {
     public:
-	// virtuals from Expression
+	// virtuals from Accumulator
 	virtual shared_ptr<const Value> evaluate(
 	    shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<const Value> getValue() const;
 
 	/*
 	  Create a summing accumulator.
@@ -39,5 +42,9 @@ namespace mongo
 
     private:
 	AccumulatorSum();
+
+	mutable BSONType resultType;
+	mutable long long longResult;
+	mutable double doubleResult;
     };
 }

@@ -27,31 +27,32 @@ namespace mongo
 	assert(vpOperand.size() == 1);
 	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
-	BSONType resultType = NumberInt;
-	BSONType valueType = pValue->getType();
+	/* upgrade to the widest type required to hold the result */
 	BSONType rhsType = prhs->getType();
-	if ((valueType == NumberLong) || (rhsType == NumberLong))
+	if ((resultType == NumberLong) || (rhsType == NumberLong))
 	    resultType = NumberLong;
-	if ((valueType == NumberDouble) || (rhsType == NumberDouble))
+	if ((resultType == NumberDouble) || (rhsType == NumberDouble))
 	    resultType = NumberDouble;
 
 	if (resultType == NumberInt)
 	{
-	    int result = pValue->getInt() + prhs->getInt();
-	    pValue = Value::createInt(result);
+	    int v = prhs->getInt();
+	    longResult += v;
+	    doubleResult += v;
 	}
 	else if (resultType == NumberLong)
 	{
-	    long long result = pValue->getLong() + prhs->getLong();
-	    pValue = Value::createLong(result);
+	    long long v = prhs->getLong();
+	    longResult += v;
+	    doubleResult += v;
 	}
 	else /* (resultType == NumberDouble) */
 	{
-	    double result = pValue->getDouble() + prhs->getDouble();
-	    pValue = Value::createDouble(result);
+	    double v = prhs->getDouble();
+	    doubleResult += v;
 	}
 
-	return pValue;
+	return Value::getZero();
     }
 
     shared_ptr<Accumulator> AccumulatorSum::create()
@@ -60,8 +61,20 @@ namespace mongo
 	return pSummer;
     }
 
+    shared_ptr<const Value> AccumulatorSum::getValue() const
+    {
+	if (resultType == NumberInt)
+	    return Value::createInt((int)longResult);
+	if (resultType == NumberLong)
+	    return Value::createLong(longResult);
+	return Value::createDouble(doubleResult);
+    }
+
     AccumulatorSum::AccumulatorSum():
-	Accumulator(Value::getZero())
+	Accumulator(),
+	resultType(NumberInt),
+	longResult(0),
+	doubleResult(0)
     {
     }
 }

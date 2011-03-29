@@ -14,36 +14,37 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
-
 #include "pch.h"
+#include "db/AccumulatorAppend.h"
 
-#include "db/Accumulator.h"
+#include "db/Value.h"
 
 namespace mongo
 {
-    class AccumulatorMinMax :
-        public Accumulator
+    shared_ptr<const Value> AccumulatorAppend::evaluate(
+	shared_ptr<Document> pDocument) const
     {
-    public:
-	// virtuals from Expression
-	virtual shared_ptr<const Value> evaluate(
-	    shared_ptr<Document> pDocument) const;
-	virtual shared_ptr<const Value> getValue() const;
+	assert(vpOperand.size() == 1);
+	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	vpValue.push_back(prhs);
 
-	/*
-	  Create a summing accumulator.
+	return Value::getNull();
+    }
 
-	  @returns the created accumulator
-	 */
-	static shared_ptr<Accumulator> createMin();
-	static shared_ptr<Accumulator> createMax();
+    shared_ptr<const Value> AccumulatorAppend::getValue() const
+    {
+	return Value::createArray(vpValue);
+    }
 
-    private:
-	AccumulatorMinMax(int theSense);
+    AccumulatorAppend::AccumulatorAppend():
+	Accumulator(),
+	vpValue()
+    {
+    }
 
-	int sense; /* 1 for min, -1 for max; used to "scale" comparison */
-
-	mutable shared_ptr<const Value> pValue; /* current min/max */
-    };
+    shared_ptr<Accumulator> AccumulatorAppend::create()
+    {
+	shared_ptr<AccumulatorAppend> pAccumulator(new AccumulatorAppend());
+	return pAccumulator;
+    }
 }

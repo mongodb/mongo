@@ -22,7 +22,7 @@
 
 namespace mongo
 {
-    class AccumulatorMinMax :
+    class AccumulatorAppend :
         public Accumulator
     {
     public:
@@ -32,18 +32,15 @@ namespace mongo
 	virtual shared_ptr<const Value> getValue() const;
 
 	/*
-	  Create a summing accumulator.
+	  Create an appending accumulator.
 
 	  @returns the created accumulator
 	 */
-	static shared_ptr<Accumulator> createMin();
-	static shared_ptr<Accumulator> createMax();
+	static shared_ptr<Accumulator> create();
 
     private:
-	AccumulatorMinMax(int theSense);
+	AccumulatorAppend();
 
-	int sense; /* 1 for min, -1 for max; used to "scale" comparison */
-
-	mutable shared_ptr<const Value> pValue; /* current min/max */
+	mutable vector<shared_ptr<const Value>> vpValue;
     };
 }

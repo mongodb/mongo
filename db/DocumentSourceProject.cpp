@@ -36,10 +36,9 @@ namespace mongo
 	pSource(pTheSource),
 	vpExpression(),
 	ravelWhich(-1),
-	iRavel(0),
-	nRavel(0),
 	pNoRavelDocument(),
-	pRavelValue()
+	pRavelArray(),
+	pRavel()
     {
     }
 
@@ -49,7 +48,7 @@ namespace mongo
 	  If we're raveling an array, and there are more elements, then we
 	  can return more documents.
 	*/
-	if ((ravelWhich >= 0) && (iRavel < nRavel))
+	if (pRavel.get() && pRavel->more())
 	    return false;
 
 	return pSource->eof();
@@ -57,17 +56,16 @@ namespace mongo
 
     bool DocumentSourceProject::advance()
     {
-	if (ravelWhich >= 0)
+	if (pRavel.get() && pRavel->more())
 	{
-	    if (++iRavel < nRavel)
-		return true;
-
-	    /* restart array element iteration for the next document */
-	    iRavel = 0;
+	    pRavelValue = pRavel->next();
+	    return true;
 	}
 
 	/* release the last document and advance */
 	pRavelValue.reset();
+	pRavel.reset();
+	pRavelArray.reset();
 	pNoRavelDocument.reset();
 	return pSource->advance();
     }
@@ -100,17 +98,20 @@ namespace mongo
 		*/
 		if (((int)i == ravelWhich) && (pOutValue->getType() == Array))
 		{
-		    pRavelValue = pOutValue;
-		    nRavel = pRavelValue->getArray()->size();
+		    pRavelArray = pOutValue;
+		    pRavel = pRavelArray->getArray();
 
 		    /*
 		      The $ravel of an empty array is a nul value.  If we
 		      encounter this, use the non-ravel path, but replace
 		      pOutField with a nul.
 		    */
-		    if (nRavel == 0)
+		    if (pRavel->more())
+			pRavelValue = pRavel->next();
+		    else
 		    {
-			pRavelValue.reset();
+			pRavelArray.reset();
+			pRavel.reset();
 			pOutValue = Value::getNull();
 		    }
 		}
@@ -125,21 +126,14 @@ namespace mongo
 	  alternate (clone), replace the raveled array field with the element
 	  at the appropriate index.
 	 */
-	if (pRavelValue.get())
+	if (pRavelArray.get())
 	{
 	    /* clone the document with an array we're raveling */
 	    shared_ptr<Document> pRavelDocument(pNoRavelDocument->clone());
 
-	    /* get access to the array of values */
-	    const vector<shared_ptr<const Value>> *pvpValue =
-		pRavelValue->getArray();
-
-	    /* grab the individual array element */
-	    shared_ptr<const Value> pArrayValue((*pvpValue)[iRavel]);
-
 	    /* substitute the named field into the prototype document */
 	    pRavelDocument->setField(
-		(size_t)ravelWhich, vFieldName[ravelWhich], pArrayValue);
+		(size_t)ravelWhich, vFieldName[ravelWhich], pRavelValue);
 
 	    return pRavelDocument;
 	}

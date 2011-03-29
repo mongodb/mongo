@@ -18,6 +18,7 @@
 #include "Pipeline.h"
 
 #include "../cursor.h"
+#include "../AccumulatorAppend.h"
 #include "../AccumulatorMinMax.h"
 #include "../AccumulatorSum.h"
 #include "../Document.h"
@@ -465,8 +466,9 @@ namespace mongo
     */
     static const GroupOpDesc GroupOpTable[] =
     {
-	{"$min", AccumulatorMinMax::createMin},
+	{"$append", AccumulatorAppend::create},
 	{"$max", AccumulatorMinMax::createMax},
+	{"$min", AccumulatorMinMax::createMin},
 	{"$sum", AccumulatorSum::create},
     };
 

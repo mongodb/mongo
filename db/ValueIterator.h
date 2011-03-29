@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011 10gen Inc.
+ * Copyright 2011 10gen Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,32 +18,25 @@
 
 #include "pch.h"
 
-#include "db/Accumulator.h"
-
 namespace mongo
 {
-    class AccumulatorMinMax :
-        public Accumulator
+    class Value;
+
+    class ValueIterator
     {
     public:
-	// virtuals from Expression
-	virtual shared_ptr<const Value> evaluate(
-	    shared_ptr<Document> pDocument) const;
-	virtual shared_ptr<const Value> getValue() const;
+	/*
+	  Ask if there are more fields to return.
+
+	  @returns true if there are more fields, false otherwise
+	*/
+	virtual bool more() const = 0;
 
 	/*
-	  Create a summing accumulator.
+	  Move the iterator to point to the next field and return it.
 
-	  @returns the created accumulator
-	 */
-	static shared_ptr<Accumulator> createMin();
-	static shared_ptr<Accumulator> createMax();
-
-    private:
-	AccumulatorMinMax(int theSense);
-
-	int sense; /* 1 for min, -1 for max; used to "scale" comparison */
-
-	mutable shared_ptr<const Value> pValue; /* current min/max */
+	  @returns the next field's <name, Value>
+	*/
+	virtual shared_ptr<const Value> next() = 0;
     };
 }

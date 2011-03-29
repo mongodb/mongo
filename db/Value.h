@@ -19,6 +19,8 @@
 #include "pch.h"
 #include "jsobj.h"
 
+#include "db/ValueIterator.h"
+
 namespace mongo
 {
     class Document;
@@ -82,6 +84,15 @@ namespace mongo
 	    shared_ptr<Document> pDocument);
 
 	/*
+	  Construct an array-valued Value.
+
+	  @param value the value
+	  @returns a Value with the given value
+	*/
+	static shared_ptr<const Value> createArray(
+	    const vector<shared_ptr<const Value>> &vpValue);
+
+	/*
 	  Get the BSON type of the field.
 
 	  If the type is jstNULL, no value getter will work.
@@ -99,7 +110,7 @@ namespace mongo
 	double getDouble() const;
 	string getString() const;
 	shared_ptr<Document> getDocument() const;
-	const vector<shared_ptr<const Value>> *getArray() const;
+	shared_ptr<ValueIterator> getArray() const;
 	OID getOid() const;
 	bool getBool() const;
 	Date_t getDate() const;
@@ -192,6 +203,7 @@ namespace mongo
 	Value(long long longValue);
 	Value(double doubleValue);
 	Value(shared_ptr<Document> pDocument);
+	Value(const vector<shared_ptr<const Value>> &vpValue);
 
 	BSONType type;
 
@@ -234,6 +246,26 @@ namespace mongo
 	    void operator()(void const *) const
 	    {
 	    }
+	};
+
+	/* this implementation is used for getArray() */
+	class vi :
+	    public ValueIterator,
+	    boost::noncopyable
+	{
+	public:
+	    // virtuals from ValueIterator
+	    virtual bool more() const;
+	    virtual shared_ptr<const Value> next();
+
+	private:
+	    friend class Value;
+	    vi(shared_ptr<const Value> pSource,
+	       const vector<shared_ptr<const Value>> *pvpValue);
+
+	    size_t size;
+	    size_t nextIndex;
+	    const vector<shared_ptr<const Value>> *pvpValue;
 	};
 
     };

@@ -26,13 +26,8 @@ namespace mongo
 	ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> Accumulator::getValue() const
-    {
-	return pValue;
-    }
-
-    Accumulator::Accumulator(shared_ptr<const Value> pStartValue):
-	pValue(pStartValue)
+    Accumulator::Accumulator():
+	ExpressionNary()
     {
     }
 }

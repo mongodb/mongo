@@ -34,15 +34,9 @@ namespace mongo
 
 	  @returns the accumulated value
 	 */
-	virtual shared_ptr<const Value> getValue() const;
+	virtual shared_ptr<const Value> getValue() const = 0;
 
     protected:
-	Accumulator(shared_ptr<const Value> pStartValue);
-
-	/*
-	  Expression evaluation should be const, but accumulators have
-	  this value, which mutates as a side-effect of the evaluation.
-	*/
-	mutable shared_ptr<const Value> pValue;
+	Accumulator();
     };
 }

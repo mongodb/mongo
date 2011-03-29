@@ -41,9 +41,14 @@ namespace mongo
 	return pValue;
     }
 
+    shared_ptr<const Value> AccumulatorMinMax::getValue() const
+    {
+	return pValue;
+    }
+
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
-	Accumulator(shared_ptr<Value>()),
-	sense(theSense)
+	sense(theSense),
+	pValue(shared_ptr<const Value>())
     {
 	assert((sense == 1) || (sense == -1)); // CW TODO error
     }

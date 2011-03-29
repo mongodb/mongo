@@ -23,6 +23,7 @@ namespace mongo
 {
     class Expression;
     class Value;
+    class ValueIterator;
 
     class DocumentSourceProject :
         public DocumentSource,
@@ -68,9 +69,9 @@ namespace mongo
 	int ravelWhich; // index of raveled field, if any, otherwise -1
 
 	// iteration state
-	size_t iRavel; // next index in current ravel
-	size_t nRavel; // size of array to be raveled
 	shared_ptr<Document> pNoRavelDocument; // document to return, pre-ravel
-	shared_ptr<const Value> pRavelValue; // field being raveled
+	shared_ptr<const Value> pRavelArray; // field being raveled
+	shared_ptr<ValueIterator> pRavel; // iterator used for raveling
+	shared_ptr<const Value> pRavelValue; // current value
     };
 }
