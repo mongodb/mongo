@@ -1254,6 +1254,8 @@ namespace mongo {
                 n++;
                 progress.hit();
 
+                getDur().commitIfNeeded();
+
                 if ( n % 128 == 0 && !cc->yield() ) {
                     cc.release();
                     uasserted(12584, "cursor gone during bg index");
