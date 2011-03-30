@@ -544,19 +544,20 @@ again:
         while( len > 0 ) {
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {
-                if ( errno != EAGAIN || _timeout == 0 ) {
+                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+                    if ( !serverAlive( farEnd.toString() ) ) {
+                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
+                        throw SocketException( SocketException::SEND_ERROR );
+                    }
+                    // should just retry
+                }
+                else {
                     SocketException::Type t = SocketException::SEND_ERROR;
 #if defined(_WINDOWS)
                     if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
 #endif
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
                     throw SocketException( t );
-                }
-                else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::SEND_ERROR );
-                    }
                 }
             }
             else {
