@@ -758,7 +758,18 @@ namespace mongo {
         BSONObj fast_emit( const BSONObj& args ) {
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
             uassert( 13069 , "an emit can't be more than half max bson size" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
-            (*_tl)->emit( args );
+            
+            if ( args.firstElement().type() == Undefined ) {
+                BSONObjBuilder b( args.objsize() );
+                b.appendNull( "" );
+                BSONObjIterator i( args );
+                i.next();
+                b.append( i.next() );
+                (*_tl)->emit( b.obj() );
+            }
+            else {
+                (*_tl)->emit( args );
+            }
             return BSONObj();
         }
 
