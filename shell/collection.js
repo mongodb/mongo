@@ -384,7 +384,7 @@ DBCollection.prototype.validate = function(full) {
 
     var res = this._db.runCommand( cmd );
 
-    if (typeof(res.valid) == undefined) {
+    if (typeof(res.valid) == 'undefined') {
         // old-style format just put everything in a string. Now using proper fields
 
         res.valid = false;

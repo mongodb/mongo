@@ -3185,7 +3185,7 @@ const StringData _jscode_raw_collection =
 "\n" 
 "var res = this._db.runCommand( cmd );\n" 
 "\n" 
-"if (typeof(res.valid) == undefined) {\n" 
+"if (typeof(res.valid) == 'undefined') {\n" 
 "// old-style format just put everything in a string. Now using proper fields\n" 
 "\n" 
 "res.valid = false;\n" 
