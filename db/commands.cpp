@@ -127,7 +127,6 @@ namespace mongo {
         if ( strcmp(p, ".$cmd") != 0 ) return false;
 
         bool ok = false;
-        bool valid = false;
 
         BSONElement e = jsobj.firstElement();
         map<string,Command*>::iterator i;
@@ -138,7 +137,6 @@ namespace mongo {
            migrated over to the command object format.
            */
         else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
-            valid = true;
             string errmsg;
             Command *c = i->second;
             if ( c->adminOnly() && !startsWith(ns, "admin.") ) {
