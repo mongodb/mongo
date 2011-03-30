@@ -319,7 +319,6 @@ __wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
 		fp = stderr;
 
 	WT_COL_INDX_FOREACH(page, cip, i) {
-
 		fprintf(fp, "\tV {");
 		WT_RET(
 		    __wt_debug_cell_data(session, WT_COL_PTR(page, cip), fp));
