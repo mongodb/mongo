@@ -918,13 +918,14 @@ namespace mongo {
 
     void DBClientConnection::checkResponse( const char *data, int nReturned ) {
         /* check for errors.  the only one we really care about at
-         this stage is "not master" */
+         * this stage is "not master" 
+        */
+        
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);
-            BSONElement e = o.firstElement();
-            if ( strcmp(e.fieldName(), "$err") == 0 &&
-                    e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
+            BSONElement e = o["$err"];
+            if ( e.type() == String && str::contains( e.valuestr() , "not master" ) ) {
                 clientSet->isntMaster();
             }
         }
