@@ -384,18 +384,22 @@ DBCollection.prototype.validate = function(full) {
 
     var res = this._db.runCommand( cmd );
 
-    res.valid = false;
+    if (typeof(res.valid) == undefined) {
+        // old-style format just put everything in a string. Now using proper fields
 
-    var raw = res.result || res.raw;
+        res.valid = false;
 
-    if ( raw ){
-        var str = "-" + tojson( raw );
-        res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
+        var raw = res.result || res.raw;
 
-        var p = /lastExtentSize:(\d+)/;
-        var r = p.exec( str );
-        if ( r ){
-            res.lastExtentSize = Number( r[1] );
+        if ( raw ){
+            var str = "-" + tojson( raw );
+            res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
+
+            var p = /lastExtentSize:(\d+)/;
+            var r = p.exec( str );
+            if ( r ){
+                res.lastExtentSize = Number( r[1] );
+            }
         }
     }
 

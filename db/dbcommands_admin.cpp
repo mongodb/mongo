@@ -169,27 +169,35 @@ namespace mongo {
             }
 
             result.append( "ns", ns );
-            result.append( "result" , validateNS( ns.c_str() , d, &cmdObj ) );
+            result.append( "result" , validateNS( ns.c_str() , d, cmdObj, result) );
             return 1;
         }
 
-
-        string validateNS(const char *ns, NamespaceDetails *d, BSONObj *cmdObj) {
+    private:
+        // For historical reasons, all info is available both in a string field (returned) as well as normal fields
+        string validateNS(const char *ns, NamespaceDetails *d, const BSONObj& cmdObj, BSONObjBuilder& result) {
             bool scanData = true;
-            if( cmdObj && cmdObj->hasElement("scandata") && !cmdObj->getBoolField("scandata") )
+            if( cmdObj.hasElement("scandata") && !cmdObj.getBoolField("scandata") )
                 scanData = false;
 
-            bool full = cmdObj && (*cmdObj)["full"].trueValue();
+            bool full = cmdObj["full"].trueValue();
 
             bool valid = true;
+            BSONArrayBuilder errors; // explanation(s) for why valid = false
             stringstream ss;
             ss << "\nvalidate\n";
             //ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
-            if ( d->capped )
+            if ( d->capped ){
                 ss << "  capped:" << d->capped << " max:" << d->max << '\n';
+                result.append("capped", d->capped);
+                result.append("max", d->max);
+            }
 
             ss << "  firstExtent:" << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString()<< '\n';
             ss << "  lastExtent:" << d->lastExtent.toString()    << " ns:" << d->lastExtent.ext()->nsDiagnostic.toString() << '\n';
+
+            result.append("firstExtent", str::stream() << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
+            result.append( "lastExtent", str::stream() <<  d->lastExtent.toString() << " ns:" <<  d->lastExtent.ext()->nsDiagnostic.toString());
             try {
                 d->firstExtent.ext()->assertOk();
                 d->lastExtent.ext()->assertOk();
@@ -204,23 +212,33 @@ namespace mongo {
                     killCurrentOp.checkForInterrupt();
                 }
                 ss << "  # extents:" << ne << '\n';
+                result.append("extentCount", ne);
             }
             catch (...) {
                 valid=false;
                 ss << " extent asserted ";
+                errors << "extent asserted";
             }
 
             ss << "  datasize?:" << d->stats.datasize << " nrecords?:" << d->stats.nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
             ss << "  padding:" << d->paddingFactor << '\n';
+
+            result.appendNumber("datasize", d->stats.datasize);
+            result.appendNumber("nrecords", d->stats.nrecords);
+            result.appendNumber("lastExtentSize", d->lastExtentSize);
+            result.appendNumber("padding", d->paddingFactor);
+
             try {
 
                 try {
                     ss << "  first extent:\n";
-                    d->firstExtent.ext()->dump(ss);
+                    d->firstExtent.ext()->dump(ss); //TODO: should this be in output object?
                     valid = valid && d->firstExtent.ext()->validates();
                 }
                 catch (...) {
                     ss << "\n    exception firstextent\n" << endl;
+                    errors << "exception firstextent";
+                    valid = false;
                 }
 
                 set<DiskLoc> recs;
@@ -252,6 +270,9 @@ namespace mongo {
                             BSONObj obj(r);
                             if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
                                 valid = false;
+                                if (nInvalid == 0) // only log once;
+                                    errors << "invalid bson object detected (see logs for more info)";
+
                                 nInvalid++;
                                 if (strcmp("_id", obj.firstElement().fieldName()) == 0){
                                     try {
@@ -272,24 +293,35 @@ namespace mongo {
                     }
                     if ( d->capped && !d->capLooped() ) {
                         ss << "  capped outOfOrder:" << outOfOrder;
+                        result.append("cappedOutOfOrder", outOfOrder);
                         if ( outOfOrder > 1 ) {
                             valid = false;
                             ss << " ???";
+                            errors << "too many out of order records";
                         }
                         else ss << " (OK)";
                         ss << '\n';
                     }
                     ss << "  " << n << " objects found, nobj:" << d->stats.nrecords << '\n';
-                    if (full)
+                    result.append("objectsFound", n);
+
+                    if (full) {
                         ss << "  " << nInvalid << " invalid BSON objects found\n";
+                        result.append("invalidObjects", nInvalid);
+                    }
 
                     ss << "  " << len << " bytes data w/headers\n";
                     ss << "  " << nlen << " bytes data wout/headers\n";
+
+                    result.appendNumber("bytesWithHeaders", len);
+                    result.appendNumber("bytesWithoutHeaders", nlen);
                 }
 
                 ss << "  deletedList: ";
+                BSONArrayBuilder deletedListArray;
                 for ( int i = 0; i < Buckets; i++ ) {
                     ss << (d->deletedList[i].isNull() ? '0' : '1');
+                    deletedListArray << d->deletedList[i].isNull();
                 }
                 ss << endl;
                 int ndel = 0;
@@ -314,6 +346,10 @@ namespace mongo {
 
                                 if ( loc.a() <= 0 || strstr(ns, "hudsonSmall") == 0 ) {
                                     ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
+
+                                    string err (str::stream() << "bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k);
+                                    errors << err;
+
                                     valid = false;
                                     break;
                                 }
@@ -328,41 +364,57 @@ namespace mongo {
                     }
                     catch (...) {
                         ss <<"    ?exception in deleted chain for bucket " << i << endl;
+                        errors << ("exception in deleted chain for bucket " + BSONObjBuilder::numStr(i));
                         valid = false;
                     }
                 }
                 ss << "  deleted: n: " << ndel << " size: " << delSize << endl;
+                result.appendNumber("deletedCount", ndel);
+                result.appendNumber("deletedSize", delSize);
+
                 if ( incorrect ) {
                     ss << "    ?corrupt: " << incorrect << " records from datafile are in deleted list\n";
+                    errors << (BSONObjBuilder::numStr(incorrect) + " records from datafile are in deleted list");
                     valid = false;
                 }
 
                 int idxn = 0;
                 try  {
                     ss << "  nIndexes:" << d->nIndexes << endl;
+                    result.append("nIndexes", d->nIndexes);
+                    BSONObjBuilder indexes; // not using subObjStart to be exception safe
                     NamespaceDetails::IndexIterator i = d->ii();
                     while( i.more() ) {
                         IndexDetails& id = i.next();
-                        ss << "    " << id.indexNamespace() << " keys:" <<
-                           id.head.btree()->fullValidate(id.head, id.keyPattern()) << endl;
+                        long long keys = id.head.btree()->fullValidate(id.head, id.keyPattern());
+                        ss << "    " << id.indexNamespace() << " keys:" << keys << endl;
+                        indexes.appendNumber(id.indexNamespace(), keys);
                     }
+                    result.append("keysPerIndex", indexes.done());
                 }
                 catch (...) {
                     ss << "\n    exception during index validate idxn:" << idxn << endl;
+                    errors << ("exception during index validate idxn " + BSONObjBuilder::numStr(idxn));
                     valid=false;
                 }
 
             }
             catch (AssertionException) {
                 ss << "\n    exception during validate\n" << endl;
+                errors << "exception during validate";
                 valid = false;
             }
 
             if ( !valid )
                 ss << " ns corrupt, requires dbchk\n";
 
-            if ( !full )
-                ss << " warning: full check not done. Rerun with full:true for more thorough validation.\n";
+            result.appendBool("valid", valid);
+            result.append("errors", errors.arr());
+
+            if ( !full ){
+                ss << " warning: Some checks omitted for speed.\n use {full:true} option to do more thorough scan.\n";
+                result.append("warning", "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
+            }
             
             return ss.str();
         }
