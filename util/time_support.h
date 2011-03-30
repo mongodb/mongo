@@ -174,12 +174,33 @@ namespace mongo {
         return (xt.sec & 0xfffff) * 1000 + t;
     }
 
+    extern long long jsTime_virtual_skew;
+    extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
+
+    // DO NOT TOUCH except for testing
+    inline void jsTimeVirtualSkew( long long skew ){
+	jsTime_virtual_skew = skew;
+    }
+    inline long long getJSTimeVirtualSkew(){
+	return jsTime_virtual_skew;
+    }
+
+    inline void jsTimeVirtualThreadSkew( long long skew ){
+	jsTime_virtual_thread_skew.reset(new long long(skew));
+    }
+    inline long long getJSTimeVirtualThreadSkew(){
+	if(jsTime_virtual_thread_skew.get()){
+	    return *(jsTime_virtual_thread_skew.get());
+	}
+	else return 0;
+    }
+
     /** Date_t is milliseconds since epoch */
     inline Date_t jsTime() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
         unsigned long long t = xt.nsec / 1000000;
-        return ((unsigned long long) xt.sec * 1000) + t;
+        return ((unsigned long long) xt.sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
     }
 
     inline unsigned long long curTimeMicros64() {

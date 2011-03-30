@@ -453,6 +453,7 @@ namespace mongo {
             @return error message text, or empty string if no error.
         */
         string getLastError();
+
         /** Get error result from the last operation on this connection.
             @return full error object.
         */
@@ -627,13 +628,14 @@ namespace mongo {
            @param ns collection to be indexed
            @param keys the "key pattern" for the index.  e.g., { name : 1 }
            @param unique if true, indicates that key uniqueness should be enforced for this index
-           @param name if not isn't specified, it will be created from the keys (recommended)
+           @param name if not specified, it will be created from the keys automatically (which is recommended)
            @param cache if set to false, the index cache for the connection won't remember this call
+           @param background build index in the background (see mongodb docs/wiki for details)
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
         virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "",
-                                  bool cache = true );
+                                  bool cache = true, bool background = false );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
@@ -785,7 +787,7 @@ namespace mongo {
            Connect timeout is fixed, but short, at 5 seconds.
          */
         DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
-            clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) {
+            clientSet(cp), _failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) {
             _numConnections++;
         }
 
@@ -856,14 +858,14 @@ namespace mongo {
            @return true if this connection is currently in a failed state.  When autoreconnect is on,
                    a connection will transition back to an ok state after reconnecting.
          */
-        bool isFailed() const { return failed; }
+        bool isFailed() const { return _failed; }
 
         MessagingPort& port() { return *p; }
 
         string toStringLong() const {
             stringstream ss;
             ss << _serverString;
-            if ( failed ) ss << " failed";
+            if ( _failed ) ss << " failed";
             return ss.str();
         }
 
@@ -895,7 +897,7 @@ namespace mongo {
         DBClientReplicaSet *clientSet;
         boost::scoped_ptr<MessagingPort> p;
         boost::scoped_ptr<SockAddr> server;
-        bool failed;
+        bool _failed;
         const bool autoReconnect;
         time_t lastReconnectTry;
         HostAndPort _server; // remember for reconnects
@@ -903,7 +905,7 @@ namespace mongo {
         void _checkConnection();
 
         // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
-        void checkConnection() { if( failed ) _checkConnection(); }
+        void checkConnection() { if( _failed ) _checkConnection(); }
 
         map< string, pair<string,string> > authCache;
         double _so_timeout;

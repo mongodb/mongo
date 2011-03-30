@@ -20,6 +20,13 @@
 
 #include "../db/lasterror.h"
 
+// MONGO_NORETURN undefed at end of file
+#ifdef __GNUC__
+# define MONGO_NORETURN __attribute__((__noreturn__))
+#else
+# define MONGO_NORETURN 
+#endif
+
 namespace mongo {
 
     enum CommonErrorCodes {
@@ -117,14 +124,13 @@ namespace mongo {
         virtual void appendPrefix( stringstream& ss ) const { ss << "massert:"; }
     };
 
-
-    void asserted(const char *msg, const char *file, unsigned line);
+    void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
     void wasserted(const char *msg, const char *file, unsigned line);
 
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
        could cause, such as dupliate key, disk full, etc.
     */
-    void uasserted(int msgid, const char *msg);
+    void uasserted(int msgid, const char *msg) MONGO_NORETURN;
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
 
     /** reported via lasterror, but don't throw exception */
@@ -133,9 +139,9 @@ namespace mongo {
     /** msgassert and massert are for errors that are internal but have a well defined error text string.
         a stack trace is logged.
     */
-    void msgassertedNoTrace(int msgid, const char *msg);
+    void msgassertedNoTrace(int msgid, const char *msg) MONGO_NORETURN;
     inline void msgassertedNoTrace(int msgid, const string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
-    void msgasserted(int msgid, const char *msg);
+    void msgasserted(int msgid, const char *msg) MONGO_NORETURN;
     inline void msgasserted(int msgid, string msg) { msgasserted(msgid, msg.c_str()); }
 
 #ifdef assert
@@ -148,6 +154,10 @@ namespace mongo {
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
 #define uassert MONGO_uassert
+
+    /* user assert with helpful message handling */
+#define MONGO_uassert_msg(msgid, msg, expr) { if(!(expr)){ stringstream ss; ss << msg; mongo::uasserted(msgid, ss.str()); } }
+#define uassert_msg MONGO_uassert_msg
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -179,7 +189,7 @@ namespace mongo {
     enum { ASSERT_ID_DUPKEY = 11000 };
 
     /* throws a uassertion with an appropriate msg */
-    void streamNotGood( int code , string msg , std::ios& myios );
+    void streamNotGood( int code , string msg , std::ios& myios ) MONGO_NORETURN;
 
     inline void assertStreamGood(unsigned msgid, string msg, std::ios& myios) {
         if( !myios.good() ) streamNotGood(msgid, msg, myios);
@@ -210,3 +220,18 @@ namespace mongo {
     } catch ( ... ) { \
         problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << endl; \
     }
+
+    /* Some useful utility defines, allowing more concise exception handling */
+#define MONGO_throw_exception(code, type, msg) { stringstream ss; ss << msg; throw type(ss.str().c_str(), code); }
+#define m_throw_exception MONGO_throw_exception
+
+#define MONGO_caused_by(e) ( string("\n  caused by : ") + e.toString() )
+#define m_caused_by MONGO_caused_by
+
+#define MONGO_error_message(e) ( string("\n  error message : ") + e )
+#define m_error_message MONGO_error_message
+
+#define MONGO_chain_exception(code, e, type, msg) { stringstream ss; ss << msg; ss << MONGO_caused_by(e); throw type(ss.str().c_str(), code); }
+#define m_chain_exception MONGO_chain_exception
+
+#undef MONGO_NORETURN

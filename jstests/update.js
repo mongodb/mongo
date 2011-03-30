@@ -23,3 +23,16 @@ for(var i=1; i<=5000; i++) {
 }
 
 assert(asdf.validate().valid);
+
+var stats = db.runCommand({ collstats: "asdf" });
+
+// some checks. want to check that padding factor is working; in addition this lets us do a little basic 
+// testing of the collstats command at the same time
+assert(stats.count == 5000);
+assert(stats.size < 140433012 * 5 && stats.size > 1000000);
+assert(stats.numExtents < 20);
+assert(stats.nindexes == 1);
+var pf = stats.paddingFactor;
+print("update.js padding factor: " + pf);
+assert(pf > 1.7 && pf < 2);
+

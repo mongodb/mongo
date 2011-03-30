@@ -9,8 +9,10 @@ if ( typeof( _startMongoProgram ) == "undefined" ){
 }
 else {
     spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "sleep( 2000 ); db.getCollection( '" + baseName + "' ).save( {a:1} );" );
-    
-    assert.soon( function() { return 1 == t.count(); } );
+
+//    assert.soon( function() { return 1 == t.count(); } );
+    // SERVER-2784 debugging - error message overwritten to indicate last count value.
+    assert.soon( "count = t.count(); msg = 'did not reach expected count, last value: ' + t.count(); 1 == count;" );
     
     stopMongoProgramByPid( spawn );
     

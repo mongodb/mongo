@@ -87,13 +87,14 @@ namespace mongo {
                         string _CSVHeader();
 
         string Stats::S::_CSVHeader() { 
-            return "commits\tjournaledMB\twriteToDataFilesMB\tcommitsInWriteLock\tearlyCommits\tprepLogBuffer\twriteToJournal\twriteToDataFiles\tremapPrivateView";
+            return "cmts  jrnMB\twrDFMB\tcIWLk\tearly\tprpLgB  wrToJ\twrToDF\trmpPrVw";
         }
 
         string Stats::S::_asCSV() { 
             stringstream ss;
             ss << 
-                _commits << '\t' << 
+                setprecision(2) << 
+                _commits << '\t' << fixed << 
                 _journaledBytes / 1000000.0 << '\t' << 
                 _writeToDataFilesBytes / 1000000.0 << '\t' << 
                 _commitsInWriteLock << '\t' << 
@@ -143,14 +144,22 @@ namespace mongo {
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
+            // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
+            DEV dbMutex.assertAtLeastReadLocked();
+
             MemoryMappedFile::makeWritable(dst, len);
+
+            // we enter the RecoveryJob mutex here, so that if WRITETODATAFILES is happening we do not 
+            // conflict with it
+            scoped_lock lk1( RecoveryJob::get()._mx );
 
             // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
             //
-            // this also makes setNoJournal threadsafe, which is good as we call it from a read (not a write) lock 
-            // in class SlaveTracking
+            // either of these mutexes also makes setNoJournal threadsafe, which is good as we call it from a read 
+            // (not a write) lock in class SlaveTracking
             //
             scoped_lock lk( privateViews._mutex() );
+
             size_t ofs;
             MongoMMF *f = privateViews.find_inlock(dst, ofs);
             assert(f);
@@ -191,7 +200,7 @@ namespace mongo {
         }
 
         bool DurableImpl::awaitCommit() {
-            commitJob.awaitNextCommit();
+            commitJob._notify.awaitBeyondNow();
             return true;
         }
 
@@ -231,14 +240,14 @@ namespace mongo {
             return p;
         }
 
-        void DurableImpl::commitIfNeeded() {
-#if defined(_DEBUG)
-            commitJob._nSinceCommitIfNeededCall = 0;
-#endif
+        bool DurableImpl::commitIfNeeded() {
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
             if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
                 stats.curr->_earlyCommits++;
                 groupCommit();
+                return true;
             }
+            return false;
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
@@ -305,8 +314,8 @@ namespace mongo {
             void operator () (MongoFile *mf) {
                 if( mf->isMongoMMF() ) {
                     MongoMMF *mmf = (MongoMMF*) mf;
-                    const char *p = (const char *) mmf->getView();
-                    const char *w = (const char *) mmf->view_write();
+                    const unsigned char *p = (const unsigned char *) mmf->getView();
+                    const unsigned char *w = (const unsigned char *) mmf->view_write();
 
                     if (!p || !w) return; // File not fully opened yet
 
@@ -330,6 +339,8 @@ namespace mongo {
                                 log() << endl; // separate blocks of mismatches
                             lastMismatch= i;
                             if( ++logged < 60 ) {
+                                if( logged == 1 )
+                                    log() << "ofs % 628 = 0x" << hex << (i%628) << endl; // for .ns files to find offset in record
                                 stringstream ss;
                                 ss << "mismatch ofs:" << hex << i <<  "\tfilemap:" << setw(2) << (unsigned) w[i] << "\tprivmap:" << setw(2) << (unsigned) p[i];
                                 if( p[i] > 32 && p[i] <= 126 )
@@ -377,6 +388,9 @@ namespace mongo {
             Call within write lock.
         */
         void _REMAPPRIVATEVIEW() {
+            // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
+            //       to assure very good behavior here.
+
             static unsigned startAt;
             static unsigned long long lastRemap;
 
@@ -389,10 +403,12 @@ namespace mongo {
             // faults after remapping, so doing a little bit at a time will avoid big load spikes on
             // remapping.
             unsigned long long now = curTimeMicros64();
-            double fraction = (now-lastRemap)/20000000.0;
+            double fraction = (now-lastRemap)/2000000.0;
+            if( cmdLine.durOptions & CmdLine::DurAlwaysRemap )
+                fraction = 1;
             lastRemap = now;
 
-            rwlock lk(MongoFile::mmmutex, false);
+            RWLockRecursive::Shared lk(MongoFile::mmmutex);
             set<MongoFile*>& files = MongoFile::getAllFiles();
             unsigned sz = files.size();
             if( sz == 0 )
@@ -444,9 +460,77 @@ namespace mongo {
 
         mutex groupCommitMutex("groupCommit");
 
-        /** locking: in read lock when called. */
+        bool _groupCommitWithLimitedLocks() {
+            scoped_ptr<readlocktry> lk1( new readlocktry("", 500) );
+            if( !lk1->got() )
+                return false;
+
+            scoped_lock lk2(groupCommitMutex);
+
+            commitJob.beginCommit();
+
+            if( !commitJob.hasWritten() ) {
+                // getlasterror request could have came after the data was already committed
+                commitJob.notifyCommitted();
+                return true;
+            }
+
+            PREPLOGBUFFER();
+
+            RWLockRecursive::Shared lk3(MongoFile::mmmutex);
+
+            unsigned abLen = commitJob._ab.len();
+            commitJob.reset(); // must be reset before allowing anyone to write
+            DEV assert( !commitJob.hasWritten() );
+
+            // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
+            lk1.reset();
+
+            // ****** now other threads can do writes ******
+
+            WRITETOJOURNAL(commitJob._ab);
+            assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
+
+            // data is now in the journal, which is sufficient for acknowledging getLastError.
+            // (ok to crash after that)
+            commitJob.notifyCommitted();
+
+            WRITETODATAFILES();
+            assert( abLen == commitJob._ab.len() ); // WRITETODATAFILES uses _ab also
+            commitJob._ab.reset();
+
+            // can't : dbMutex._remapPrivateViewRequested = true;
+
+            return true;
+        }
+
+       /** @return true if committed; false if lock acquisition timed out (we only try for a read lock herein and only wait for a certain duration). */
+       bool groupCommitWithLimitedLocks() {
+           try {
+               return _groupCommitWithLimitedLocks();
+           }
+           catch(DBException& e ) {
+               log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
+               abort();
+           }
+           catch(std::ios_base::failure& e) {
+               log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
+               abort();
+           }
+           catch(std::bad_alloc& e) {
+               log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
+               abort();
+           }
+           catch(std::exception& e) {
+               log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
+               abort();
+           }
+           return false;
+       }
+
+       /** locking: in read lock when called. */
         static void _groupCommit() {
-            stats.curr->_commits++;
+            commitJob.beginCommit();
 
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
@@ -470,8 +554,10 @@ namespace mongo {
             commitJob.notifyCommitted();
 
             WRITETODATAFILES();
+            debugValidateAllMapsMatch();
 
             commitJob.reset();
+            commitJob._ab.reset();
 
             // REMAPPRIVATEVIEW
             //
@@ -528,12 +614,16 @@ namespace mongo {
         }
 
         static void go() {
-            if( !commitJob.hasWritten() ){
-                commitJob.notifyCommitted();
-                return;
+            const int N = 10;
+            static int n;
+            if( privateMapBytes < UncommittedBytesLimit && ++n % N && (cmdLine.durOptions&CmdLine::DurAlwaysRemap)==0 ) {
+                // limited locks version doesn't do any remapprivateview at all, so only try this if privateMapBytes
+                // is in an acceptable range.  also every Nth commit, we do everything so we can do some remapping;
+                // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
+                if( groupCommitWithLimitedLocks() )
+                    return;
             }
-
-            {
+            else {
                 readlocktry lk("", 1000);
                 if( lk.got() ) {
                     groupCommit();
@@ -542,7 +632,9 @@ namespace mongo {
             }
 
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
-            // write lock instead.  otherwise writes could use too much RAM.
+            // write lock instead.  otherwise journaling could be delayed too long (too much data will 
+            // not accumulate though, as commitIfNeeded logic will have executed in the meantime if there 
+            // has been writes)
             writelock lk;
             groupCommit();
         }
@@ -607,18 +699,11 @@ namespace mongo {
         void recover();
 
         void releasingWriteLock() {
-            try {
-#if defined(_DEBUG)
-                commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
-#endif
-                if (commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit) {
-                    stats.curr->_earlyCommits++;
-                    groupCommit();
-                }
-            }
-            catch(std::exception& e) {
-                log() << "exception in dur::releasingWriteLock causing immediate shutdown: " << e.what() << endl;
-                abort(); // based on myTerminate()
+            // implicit commitIfNeeded check on each write unlock
+            DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
+            if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
+                stats.curr->_earlyCommits++;
+                groupCommit();
             }
         }
 
@@ -628,6 +713,19 @@ namespace mongo {
         void startup() {
             if( !cmdLine.dur )
                 return;
+
+#if defined(_DURABLEDEFAULTON)
+            DEV { 
+                if( time(0) & 1 ) {
+                    cmdLine.durOptions |= CmdLine::DurAlwaysCommit;
+                    log() << "_DEBUG _DURABLEDEFAULTON : forcing DurAlwaysCommit mode for this run" << endl;
+                }
+                if( time(0) & 2 ) {
+                    cmdLine.durOptions |= CmdLine::DurAlwaysRemap;
+                    log() << "_DEBUG _DURABLEDEFAULTON : forcing DurAlwaysRemap mode for this run" << endl;
+                }
+            }
+#endif
 
             DurableInterface::enableDurability();
 

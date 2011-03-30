@@ -32,9 +32,14 @@ f.ensureIndex( { x: 1 , y: 1 } );
 assert.eq( 0 , f.count() , "2. initial count should be zero" );
 
 f.save( { x: 1 , y : 1 } );
-f.save( { y: 2 } );
-assert.eq( 2 , f.count() , "2. count after initial insert should be 2" );
+f.save( { x: null , y : 1 } );
+
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1} , force: true });
-assert.eq( false , res.ok , "2a" );
+assert.eq( true , res.ok , "2a " + tojson(res) );
+
+f.save( { y: 2 } );
+assert.eq( 3 , f.count() , "2. count after initial insert should be 3" );
+res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1} , force: true });
+assert.eq( false , res.ok , "2b " + tojson(res) );
 
 print("PASSED");

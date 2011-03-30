@@ -34,10 +34,9 @@ namespace mongo {
 
     Balancer balancer;
 
-    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy ) {}
+    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy() ) {}
 
     Balancer::~Balancer() {
-        delete _policy;
     }
 
     int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks ) {
@@ -147,7 +146,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::collection , BSONObj() );
         vector< string > collections;
         while ( cursor->more() ) {
-            BSONObj col = cursor->next();
+            BSONObj col = cursor->nextSafe();
 
             // sharded collections will have a shard "key".
             if ( ! col["key"].eoo() )
@@ -199,7 +198,7 @@ namespace mongo {
             map< string,vector<BSONObj> > shardToChunksMap;
             cursor = conn.query( ShardNS::chunk , QUERY( "ns" << ns ).sort( "min" ) );
             while ( cursor->more() ) {
-                BSONObj chunk = cursor->next();
+                BSONObj chunk = cursor->nextSafe();
                 vector<BSONObj>& chunks = shardToChunksMap[chunk["shard"].String()];
                 chunks.push_back( chunk.getOwned() );
             }
@@ -267,7 +266,7 @@ namespace mongo {
             break;
         }
 
-        // getConnectioString and the constructor of a DistributedLock do not throw, which is what we expect on while
+        // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
         ConnectionString config = configServer.getConnectionString();
         DistributedLock balanceLock( config , "balancer" );
@@ -275,6 +274,15 @@ namespace mongo {
         while ( ! inShutdown() ) {
 
             try {
+                
+                // first make sure we should even be running
+                if ( ! grid.shouldBalance() ) {
+                    log(1) << "skipping balancing round because balancing is disabled" << endl;
+                    sleepsecs( 30 );
+                    continue;
+                }
+                
+
                 ScopedDbConnection conn( config );
 
                 _ping( conn.conn() );
@@ -291,14 +299,6 @@ namespace mongo {
                     conn.done();
 
                     sleepsecs( 30 ); // no need to wake up soon
-                    continue;
-                }
-
-                if ( ! grid.shouldBalance() ) {
-                    log(1) << "skipping balancing round because balancing is disabled" << endl;;
-                    conn.done();
-
-                    sleepsecs( 30 );
                     continue;
                 }
 
@@ -328,6 +328,7 @@ namespace mongo {
                 continue;
             }
         }
+
     }
 
 }  // namespace mongo

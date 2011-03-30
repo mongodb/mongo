@@ -506,7 +506,6 @@ namespace mongo {
                 // use the builder size instead of accumulating 'o's size so that we take into consideration
                 // the overhead of BSONArray indices
                 if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                    i--;
                     break;
                 }
                 a.append( o );
@@ -697,9 +696,18 @@ namespace mongo {
 
             // 2.
             DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
-            dist_lock_try dlk( &lockSetup , (string)"migrate-" + min.toString() );
+            dist_lock_try dlk;
+
+            try{
+                dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
+            }
+            catch( LockException& e ){
+                errmsg = (string)"error locking distributed lock for migration " + "migrate-" + min.toString() + m_caused_by(e);
+                return false;
+            }
+
             if ( ! dlk.got() ) {
-                errmsg = "the collection's metadata lock is taken";
+                errmsg = (string)"the collection metadata could not be locked with lock " + "migrate-" + min.toString();
                 result.append( "who" , dlk.other() );
                 return false;
             }
@@ -1162,7 +1170,7 @@ namespace mongo {
                 string system_indexes = cc().database()->name + ".system.indexes";
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
-                    theDataFileMgr.insert( system_indexes.c_str() , idx.objdata() , idx.objsize() );
+                    theDataFileMgr.insertAndLog( system_indexes.c_str() , idx );
                 }
 
                 timing.done(1);

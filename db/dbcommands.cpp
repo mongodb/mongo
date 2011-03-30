@@ -29,7 +29,7 @@
 #include "json.h"
 #include "repl.h"
 #include "repl_block.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"
@@ -94,9 +94,10 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "return error status of the last operation on this connection\n"
                  << "options:\n"
-                 << "  fsync - fsync before returning, or wait for journal commit if running with --dur\n"
-                 << "  w - await replication to w servers (including self) before returning\n"
-                 << "  wtimeout - timeout for w in milliseconds";
+                 << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
+                 << "  { j:true } - wait for journal commit if running with --journal\n"
+                 << "  { w:n } - await replication to n servers (including self) before returning\n"
+                 << "  { wtimeout:m} - timeout for w in m milliseconds";
         }
         bool run(const string& dbname, BSONObj& _cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
@@ -111,7 +112,7 @@ namespace mongo {
             Client& c = cc();
             c.appendLastOp( result );
 
-            result.appendNumber( "connectionId" , c.getConnectionId() );
+            result.appendNumber( "connectionId" , c.getConnectionId() ); // for sharding; also useful in general for debugging
 
             BSONObj cmdObj = _cmdObj;
             {
@@ -125,7 +126,17 @@ namespace mongo {
                 }
             }
 
-            if ( cmdObj["fsync"].trueValue() ) {
+            if ( cmdObj["j"].trueValue() ) { 
+                if( !getDur().awaitCommit() ) {
+                    // --journal is off
+                    result.append("jnote", "journaling not enabled on this server");
+                }
+                if( cmdObj["fsync"].trueValue() ) { 
+                    errmsg = "fsync and j options are not used together";
+                    return false;
+                }
+            }
+            else if ( cmdObj["fsync"].trueValue() ) {
                 Timer t;
                 if( !getDur().awaitCommit() ) {
                     // if get here, not running with --dur
@@ -272,8 +283,10 @@ namespace mongo {
             BSONElement e = cmdObj.firstElement();
             log() << "repairDatabase " << dbname << endl;
             int p = (int) e.number();
-            if ( p != 1 )
+            if ( p != 1 ) {
+                errmsg = "bad option";
                 return false;
+            }
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
             e = cmdObj.getField( "backupOriginalFiles" );
@@ -396,9 +409,11 @@ namespace mongo {
                 t.append("bits",  ( sizeof(int*) == 4 ? 32 : 64 ) );
 
                 ProcessInfo p;
+                int v = 0;
                 if ( p.supported() ) {
                     t.appendNumber( "resident" , p.getResidentSize() );
-                    t.appendNumber( "virtual" , p.getVirtualMemorySize() );
+                    v = p.getVirtualMemorySize();
+                    t.appendNumber( "virtual" , v );
                     t.appendBool( "supported" , true );
                 }
                 else {
@@ -406,7 +421,18 @@ namespace mongo {
                     t.appendBool( "supported" , false );
                 }
 
-                t.appendNumber( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+                timeBuilder.appendNumber( "middle of mem" , Listener::getElapsedTimeMillis() - start );
+
+                int m = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
+                t.appendNumber( "mapped" , m );
+                
+                if ( cmdLine.dur )
+                    m *= 2;
+                
+                if( v - m > 5000 ) { 
+                    t.append("note", "virtual minus mapped is large. could indicate a memory leak");
+                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large. could indicate a memory leak" << endl;
+                }
 
                 t.done();
 
@@ -689,7 +715,7 @@ namespace mongo {
             return false;
         }
         virtual bool slaveOk() const {
-            // ok on --slave setups, not ok for nonmaster of a repl pair (unless override)
+            // ok on --slave setups
             return replSettings.slave == SimpleSlave;
         }
         virtual bool slaveOverrideOk() {
@@ -841,7 +867,6 @@ namespace mongo {
                 theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
-            result.append( "ok" , 1 );
             result.append( "nIndexes" , (int)all.size() );
             result.appendArray( "indexes" , b.obj() );
             return true;
@@ -1222,7 +1247,9 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << " example: { dbStats:1 } ";
+            help << 
+                "Get stats on a database. Not instantaneous. Slower for databases with large .ns files.\n" << 
+                "Example: { dbStats:1 }";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             list<string> collections;
@@ -1270,6 +1297,8 @@ namespace mongo {
             result.appendNumber( "indexes" , indexes );
             result.appendNumber( "indexSize" , indexSize );
             result.appendNumber( "fileSize" , d->fileSize() );
+            if( d )
+                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
 
             return true;
         }
@@ -1386,116 +1415,6 @@ namespace mongo {
             return true;
         }
     } cmdConvertToCapped;
-
-    /* Find and Modify an object returning either the old (default) or new value*/
-    class CmdFindAndModify : public Command {
-    public:
-        virtual void help( stringstream &help ) const {
-            help <<
-                 "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: {processed:true}}, new: true}\n"
-                 "{ findAndModify: \"collection\", query: {processed:false}, remove: true, sort: {priority:-1}}\n"
-                 "Either update or remove is required, all other fields have default values.\n"
-                 "Output is in the \"value\" field\n";
-        }
-
-        CmdFindAndModify() : Command("findAndModify", false, "findandmodify") { }
-        virtual bool logTheOp() {
-            return false; // the modification will be logged directly
-        }
-        virtual bool slaveOk() const {
-            return false;
-        }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            static DBDirectClient db;
-
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-
-            BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
-            Query q (origQuery);
-            BSONElement sort = cmdObj["sort"];
-            if (!sort.eoo())
-                q.sort(sort.embeddedObjectUserCheck());
-
-            bool upsert = cmdObj["upsert"].trueValue();
-
-            BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
-            const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
-
-            BSONObj out = db.findOne(ns, q, fields);
-            if (out.isEmpty()) {
-                if (!upsert) {
-                    errmsg = "No matching object found";
-                    return false;
-                }
-
-                BSONElement update = cmdObj["update"];
-                uassert(13329, "upsert mode requires update field", !update.eoo());
-                uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
-                db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
-
-                BSONObj gle = db.getLastErrorDetailed();
-                if (gle["err"].type() == String) {
-                    errmsg = gle["err"].String();
-                    return false;
-                }
-
-                if (cmdObj["new"].trueValue()) {
-                    BSONElement _id = gle["upserted"];
-                    if (_id.eoo())
-                        _id = origQuery["_id"];
-
-                    out = db.findOne(ns, QUERY("_id" << _id), fields);
-                }
-
-            }
-            else {
-
-                if (cmdObj["remove"].trueValue()) {
-                    uassert(12515, "can't remove and update", cmdObj["update"].eoo());
-                    db.remove(ns, QUERY("_id" << out["_id"]), 1);
-
-                }
-                else {   // update
-
-                    BSONElement queryId = origQuery["_id"];
-                    if (queryId.eoo() || getGtLtOp(queryId) != BSONObj::Equality) {
-                        // need to include original query for $ positional operator
-
-                        BSONObjBuilder b;
-                        b.append(out["_id"]);
-                        BSONObjIterator it(origQuery);
-                        while (it.more()) {
-                            BSONElement e = it.next();
-                            if (strcmp(e.fieldName(), "_id"))
-                                b.append(e);
-                        }
-                        q = Query(b.obj());
-                    }
-
-                    if (q.isComplex()) // update doesn't work with complex queries
-                        q = Query(q.getFilter().getOwned());
-
-                    BSONElement update = cmdObj["update"];
-                    uassert(12516, "must specify remove or update", !update.eoo());
-                    db.update(ns, q, update.embeddedObjectUserCheck());
-
-                    BSONObj gle = db.getLastErrorDetailed();
-                    if (gle["err"].type() == String) {
-                        errmsg = gle["err"].String();
-                        return false;
-                    }
-
-                    if (cmdObj["new"].trueValue())
-                        out = db.findOne(ns, QUERY("_id" << out["_id"]), fields);
-                }
-            }
-
-            result.append("value", out);
-
-            return true;
-        }
-    } cmdFindAndModify;
 
     /* Returns client's uri */
     class CmdWhatsMyUri : public Command {

@@ -54,6 +54,14 @@ namespace mongo {
             cursor = _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk);
         }
 
+        void queryGTE(const char *ns, OpTime t) {
+            BSONObjBuilder q;
+            q.appendDate("$gte", t.asDate());
+            BSONObjBuilder q2;
+            q2.append("ts", q.done());
+            query(ns, q2.done());
+        }
+
         void tailingQuery(const char *ns, const BSONObj& query) {
             assert( !haveCursor() );
             log(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;

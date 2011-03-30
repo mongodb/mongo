@@ -21,12 +21,9 @@
 #include "db/json.h"
 #include "../util/httpclient.h"
 #include "../util/text.h"
-
 #include "tool.h"
-
 #include <fstream>
 #include <iostream>
-
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
@@ -65,24 +62,31 @@ namespace mongo {
         virtual void printExtraHelpAfter( ostream & out ) {
             out << "\n";
             out << " Fields\n";
-            out << "   inserts \t- # of inserts per second\n";
-            out << "   query   \t- # of queries per second\n";
-            out << "   update  \t- # of updates per second\n";
-            out << "   delete  \t- # of deletes per second\n";
-            out << "   getmore \t- # of get mores (cursor batch) per second\n";
-            out << "   command \t- # of commands per second\n";
-            out << "   flushes \t- # of fsync flushes per second\n";
-            out << "   mapped    \t- amount of data mmaped (total data size) megabytes\n";
-            out << "   visze     \t- virtual size of process in megabytes\n";
-            out << "   res       \t- resident size of process in megabytes\n";
-            out << "   faults  \t- # of pages faults per sec (linux only)\n";
-            out << "   locked    \t- percent of time in global write lock\n";
-            out << "   idx miss  \t- percent of btree page misses (sampled)\n";
-            out << "   qr|qw     \t- queue lengths for clients waiting (read|write)\n";
-            out << "   ar|aw     \t- active clients (read|write)\n";
-            out << "   netIn     \t- network traffic in - bits\n";
-            out << "   netOut     \t- network traffic out - bits\n";
-            out << "   conn      \t- number of open connections\n";
+            out << "   inserts  \t- # of inserts per second (* means replicated op)\n";
+            out << "   query    \t- # of queries per second\n";
+            out << "   update   \t- # of updates per second\n";
+            out << "   delete   \t- # of deletes per second\n";
+            out << "   getmore  \t- # of get mores (cursor batch) per second\n";
+            out << "   command  \t- # of commands per second, on a slave its local|replicated\n";
+            out << "   flushes  \t- # of fsync flushes per second\n";
+            out << "   mapped   \t- amount of data mmaped (total data size) megabytes\n";
+            out << "   vsize    \t- virtual size of process in megabytes\n";
+            out << "   res      \t- resident size of process in megabytes\n";
+            out << "   faults   \t- # of pages faults per sec (linux only)\n";
+            out << "   locked   \t- percent of time in global write lock\n";
+            out << "   idx miss \t- percent of btree page misses (sampled)\n";
+            out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
+            out << "   ar|aw    \t- active clients (read|write)\n";
+            out << "   netIn    \t- network traffic in - bits\n";
+            out << "   netOut   \t- network traffic out - bits\n";
+            out << "   conn     \t- number of open connections\n";
+            out << "   set      \t- replica set name\n";
+            out << "   repl     \t- replication type \n";
+            out << "            \t    M   - master\n";
+            out << "            \t    SEC - secondary\n";
+            out << "            \t    REC - recovering\n";
+            out << "            \t    UNK - unknown\n";
+            out << "            \t    SLV - slave\n";
         }
 
 
@@ -592,7 +596,6 @@ namespace mongo {
 
         int runMany() {
             StateMap threads;
-
 
             {
                 string orig = getParam( "host" );

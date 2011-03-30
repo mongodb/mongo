@@ -272,6 +272,7 @@
     <ClCompile Include="..\db\cap.cpp" />
     <ClCompile Include="..\db\commands\isself.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
+    <ClCompile Include="..\db\dbcommands_admin.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dur.cpp" />
     <ClCompile Include="..\db\durop.cpp" />
@@ -660,7 +661,6 @@
     <ClCompile Include="matchertests.cpp" />
     <ClCompile Include="mmaptests.cpp" />
     <ClCompile Include="namespacetests.cpp" />
-    <ClCompile Include="pairingtests.cpp" />
     <ClCompile Include="pdfiletests.cpp" />
     <ClCompile Include="perftests.cpp" />
     <ClCompile Include="queryoptimizertests.cpp" />

@@ -33,8 +33,8 @@ namespace ThreadedTests {
     class ThreadedTest {
     public:
         virtual void setup() {} //optional
-        virtual void subthread() = 0;
-        virtual void validate() = 0;
+        virtual void subthread(int remaining) = 0; // each thread whatever test work you want done
+        virtual void validate() = 0; // after work is done
 
         static const int nthreads = nthreads_param;
 
@@ -48,12 +48,11 @@ namespace ThreadedTests {
 
     private:
         void launch_subthreads(int remaining) {
-            if (!remaining) return;
+            if (!remaining) 
+                return;
 
-            boost::thread athread(boost::bind(&ThreadedTest::subthread, this));
-
+            boost::thread athread(boost::bind(&ThreadedTest::subthread, this, remaining));
             launch_subthreads(remaining - 1);
-
             athread.join();
         }
     };
@@ -76,7 +75,7 @@ namespace ThreadedTests {
         virtual void setup() {
             mm = new MongoMutex("MongoMutexTest");
         }
-        virtual void subthread() {
+        virtual void subthread(int) {
             Client::initThread("mongomutextest");
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
@@ -139,7 +138,7 @@ namespace ThreadedTests {
         static const int iterations = 1000000;
         AtomicUInt target;
 
-        void subthread() {
+        void subthread(int) {
             for(int i=0; i < iterations; i++) {
                 //target.x++; // verified to fail with this version
                 target++;
@@ -170,7 +169,7 @@ namespace ThreadedTests {
 
     public:
         MVarTest() : target(0) {}
-        void subthread() {
+        void subthread(int) {
             for(int i=0; i < iterations; i++) {
                 int val = target.take();
 #if BOOST_VERSION >= 103500
@@ -224,6 +223,64 @@ namespace ThreadedTests {
         }
     };
 
+    class RWLockTest1 { 
+    public:
+        void run() { 
+            RWLock lk( "eliot" );
+            {
+                rwlock r( lk , true , false , 1000 );
+            }
+        }
+    };
+
+    class RWLockTest2 { 
+    public:
+        
+        static void worker( const RWLock * lk , AtomicUInt * x ) {
+            (*x)++; // 1
+            cout << "lock b try" << endl;
+            rwlock b( *lk , true ); 
+            cout << "lock b got" << endl;
+            (*x)++; // 2
+        }
+
+        void run() { 
+            /**
+             * note: this test will deadlock if the code breaks
+             */
+            
+            RWLock lk( "eliot2" , 10000 );
+            
+            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            
+            AtomicUInt x = 0;
+            cout << "A : " << &x << endl;
+            boost::thread t( boost::bind( worker , &lk , &x ) );
+            while ( ! x );
+            assert( x == 1 );
+            sleepmillis( 500 );
+            assert( x == 1 );
+            
+            cout << "lock c try" << endl;
+            auto_ptr<rwlock> c( new rwlock( lk , false ) );
+            cout << "lock c got" << endl;
+
+            c.reset();
+            a.reset();
+
+            for ( int i=0; i<2000; i++ ) {
+                if ( x == 2 )
+                    break;
+                sleepmillis(1);
+            }
+
+            assert( x == 2 );
+            t.join();
+            
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ) {
@@ -234,6 +291,8 @@ namespace ThreadedTests {
             add< MVarTest >();
             add< ThreadPoolTest >();
             add< LockTest >();
+            add< RWLockTest1 >();
+            add< RWLockTest2 >();
             add< MongoMutexTest >();
         }
     } myall;

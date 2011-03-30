@@ -557,7 +557,7 @@ namespace mongo {
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
         if (server->getAddr() == "0.0.0.0") {
-            failed = true;
+            _failed = true;
             return false;
         }
 
@@ -565,14 +565,14 @@ namespace mongo {
             stringstream ss;
             ss << "couldn't connect to server " << _serverString;
             errmsg = ss.str();
-            failed = true;
+            _failed = true;
             return false;
         }
         return true;
     }
 
     void DBClientConnection::_checkConnection() {
-        if ( !failed )
+        if ( !_failed )
             return;
         if ( lastReconnectTry && time(0)-lastReconnectTry < 2 ) {
             // we wait a little before reconnect attempt to avoid constant hammering.
@@ -585,9 +585,9 @@ namespace mongo {
         lastReconnectTry = time(0);
         log(_logLevel) << "trying reconnect to " << _serverString << endl;
         string errmsg;
-        failed = false;
+        _failed = false;
         if ( ! _connect(errmsg) ) {
-            failed = true;
+            _failed = true;
             log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
             throw SocketException(SocketException::CONNECT_ERROR);
         }
@@ -674,7 +674,7 @@ namespace mongo {
             /* connection CANNOT be used anymore as more data may be on the way from the server.
                we have to reconnect.
                */
-            failed = true;
+            _failed = true;
             p->shutdown();
             throw;
         }
@@ -815,7 +815,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache ) {
+    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache, bool background ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -835,6 +835,9 @@ namespace mongo {
 
         if ( unique )
             toSave.appendBool( "unique", unique );
+
+        if( background ) 
+            toSave.appendBool( "background", true );
 
         if ( _seenIndexes.count( cacheKey ) )
             return 0;
@@ -879,7 +882,7 @@ namespace mongo {
             port().say( toSend );
         }
         catch( SocketException & ) {
-            failed = true;
+            _failed = true;
             throw;
         }
     }
@@ -899,7 +902,7 @@ namespace mongo {
         */
         try {
             if ( !port().call(toSend, response) ) {
-                failed = true;
+                _failed = true;
                 if ( assertOk )
                     uasserted( 10278 , str::stream() << "dbclient error communicating with server: " << getServerAddress() );
 
@@ -907,7 +910,7 @@ namespace mongo {
             }
         }
         catch( SocketException & ) {
-            failed = true;
+            _failed = true;
             throw;
         }
         return true;
@@ -915,13 +918,14 @@ namespace mongo {
 
     void DBClientConnection::checkResponse( const char *data, int nReturned ) {
         /* check for errors.  the only one we really care about at
-         this stage is "not master" */
+         * this stage is "not master" 
+        */
+        
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);
-            BSONElement e = o.firstElement();
-            if ( strcmp(e.fieldName(), "$err") == 0 &&
-                    e.type() == String && strncmp(e.valuestr(), "not master", 10) == 0 ) {
+            BSONElement e = o["$err"];
+            if ( e.type() == String && str::contains( e.valuestr() , "not master" ) ) {
                 clientSet->isntMaster();
             }
         }

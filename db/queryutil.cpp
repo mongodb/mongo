@@ -79,16 +79,30 @@ namespace mongo {
                 return r; //breaking here fails with /^a?/
             }
             else if (c == '\\') {
-                // slash followed by non-alphanumeric represents the following char
                 c = *(regex++);
-                if ((c >= 'A' && c <= 'Z') ||
+                if (c == 'Q'){
+                    // \Q...\E quotes everything inside
+                    while (*regex) {
+                        c = (*regex++);
+                        if (c == '\\' && (*regex == 'E')){
+                            regex++; //skip the 'E'
+                            break; // go back to start of outer loop
+                        }
+                        else {
+                            ss << c; // character should match itself
+                        }
+                    }
+                }
+                else if ((c >= 'A' && c <= 'Z') ||
                         (c >= 'a' && c <= 'z') ||
                         (c >= '0' && c <= '0') ||
                         (c == '\0')) {
+                    // don't know what to do with these
                     r = ss.str();
                     break;
                 }
                 else {
+                    // slash followed by non-alphanumeric represents the following char
                     ss << c;
                 }
             }
@@ -149,7 +163,14 @@ namespace mongo {
                     regexes.push_back( FieldRange( ie, false, optimize ) );
                 }
                 else {
-                    vals.insert( ie );
+                    // A document array may be indexed by its first element, or
+                    // as a full array if it is embedded within another array.
+                    vals.insert( ie );                        
+                    if ( ie.type() == Array ) {
+                        if ( !ie.embeddedObject().firstElement().eoo() ) {
+                         	vals.insert( ie.embeddedObject().firstElement() );
+                        }
+                    }
                 }
             }
 
@@ -162,10 +183,11 @@ namespace mongo {
             return;
         }
 
+        // A document array may be indexed by its first element, or
+        // as a full array if it is embedded within another array.
         if ( e.type() == Array && e.getGtLtOp() == BSONObj::Equality ) {
 
             _intervals.push_back( FieldInterval(e) );
-
             const BSONElement& temp = e.embeddedObject().firstElement();
             if ( ! temp.eoo() ) {
                 if ( temp < e )
@@ -914,19 +936,16 @@ namespace mongo {
     }
 
     bool FieldRangeVector::matches( const BSONObj &obj ) const {
-        if ( !_indexSpec.get() ) {
-            _indexSpec.reset( new IndexSpec( _keyPattern ) );
-        }
         // TODO The representation of matching keys could potentially be optimized
         // more for the case at hand.  (For example, we can potentially consider
         // fields individually instead of constructing several bson objects using
         // multikey arrays.)  But getKeys() canonically defines the key set for a
         // given object and for now we are using it as is.
         BSONObjSetDefaultOrder keys;
-        _indexSpec->getKeys( obj, keys );
+        _indexSpec.getKeys( obj, keys );
         for( BSONObjSetDefaultOrder::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
             BSONObjIterator j( *i );
-            BSONObjIterator k( _keyPattern );
+            BSONObjIterator k( _indexSpec.keyPattern );
             bool match = true;
             for( int l = 0; l < (int)_ranges.size(); ++l ) {
                 int number = (int) k.next().number();
@@ -947,7 +966,7 @@ namespace mongo {
     // TODO optimize more
     int FieldRangeVector::Iterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
-        BSONObjIterator o( _v._keyPattern );
+        BSONObjIterator o( _v._indexSpec.keyPattern );
         // track first field for which we are not at the end of the valid values,
         // since we may need to advance from the key prefix ending with this field
         int latestNonEndpoint = -1;
@@ -1148,6 +1167,16 @@ namespace mongo {
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "foo #" );
             }
+            {
+                assert( simpleRegex("^\\Qasdf\\E", "", NULL) == "asdf" );
+                assert( simpleRegex("^\\Qasdf\\E.*", "", NULL) == "asdf" );
+                assert( simpleRegex("^\\Qasdf", "", NULL) == "asdf" ); // PCRE supports this
+                assert( simpleRegex("^\\Qasdf\\\\E", "", NULL) == "asdf\\" );
+                assert( simpleRegex("^\\Qas.*df\\E", "", NULL) == "as.*df" );
+                assert( simpleRegex("^\\Qas\\Q[df\\E", "", NULL) == "as\\Q[df" );
+                assert( simpleRegex("^\\Qas\\E\\\\E\\Q$df\\E", "", NULL) == "as\\E$df" ); // quoted string containing \E
+            }
+
         }
     } simple_regex_unittest;
 

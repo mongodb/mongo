@@ -1,22 +1,21 @@
 // test the lock/unlock snapshotting feature a bit
 
-x=db.runCommand({fsync:1,lock:1});
+x=db.runCommand({fsync:1,lock:1}); // not on admin db
 assert(!x.ok,"D");
 
-d=db.getSisterDB("admin");
-
-x=d.runCommand({fsync:1,lock:1});
+x=db.fsyncLock(); // uses admin automatically
 
 assert(x.ok,"C");
 
-y = d.currentOp();
+y = db.currentOp();
 assert(y.fsyncLock,"B");
 
-z = d.$cmd.sys.unlock.findOne();
+z = db.fsyncUnlock();
+assert( db.currentOp().fsyncLock == null, "A2" );
 
-// it will take some time to unlock, and unlock does not block and wait for that
-// doing a write will make us wait until db is writeable.
+// make sure the db is unlocked
 db.jstests_fsync.insert({x:1});
+db.getLastError();
 
-assert( d.currentOp().fsyncLock == null, "A" );
+assert( db.currentOp().fsyncLock == null, "A" );
 

@@ -92,6 +92,8 @@ namespace mongo {
         virtual void printExtraHelp( ostream & out ) {}
         virtual void printExtraHelpAfter( ostream & out ) {}
 
+        virtual void printVersion(ostream &out);
+
     protected:
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );

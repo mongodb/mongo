@@ -91,6 +91,13 @@ namespace mongo {
                     _c = 0;
                 }
             }
+            /**
+             * call this if during a yield, the cursor got deleted
+             * if so, we don't want to use the point address
+             */
+            void deleted() {
+                _c = 0;
+            }
             ~Pointer() { release(); }
             Pointer(long long cursorid) {
                 recursive_scoped_lock lock(ccmutex);

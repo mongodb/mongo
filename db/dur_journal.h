@@ -27,8 +27,11 @@ namespace mongo {
         */
         extern bool okToCleanUp;
 
-        /** at termination after db files closed & fsynced */
-        void journalCleanup();
+        /** at termination after db files closed & fsynced 
+            also after covery
+            @param log report in log that we are cleaning up if we actually do any work
+        */
+        void journalCleanup(bool log = false);
 
         /** assure journal/ dir exists. throws */
         void journalMakeDir();

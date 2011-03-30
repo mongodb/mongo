@@ -152,6 +152,7 @@ namespace mongo {
                 ofs += w;
             }
             f.fsync();
+            flushMyDirectory(full);
             massert(13628, str::stream() << "recover failure writing file " << full, !f.bad() );
         }
 

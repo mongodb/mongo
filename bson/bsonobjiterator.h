@@ -55,19 +55,24 @@ namespace mongo {
         bool moreWithEOO() { return _pos < _theend; }
 
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
-        BSONElement next( bool checkEnd = false ) {
+        BSONElement next( bool checkEnd ) {
             assert( _pos < _theend );
             BSONElement e( _pos, checkEnd ? (int)(_theend - _pos) : -1 );
             _pos += e.size( checkEnd ? (int)(_theend - _pos) : -1 );
             return e;
         }
-
+        BSONElement next() {
+            assert( _pos < _theend );
+            BSONElement e(_pos);
+            _pos += e.size();
+            return e;
+        }
         void operator++() { next(); }
         void operator++(int) { next(); }
 
         BSONElement operator*() {
             assert( _pos < _theend );
-            return BSONElement(_pos, -1);
+            return BSONElement(_pos);
         }
 
     private:

@@ -272,8 +272,8 @@ namespace mongo {
             dur::startup();
 
             if( debug && cmdLine.dur ) {
-                cout << "setting cmdLine.durOptions=8" << endl;
-                cmdLine.durOptions = 8;
+                cout << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
+//                cmdLine.durOptions |= 8;
             }
 
             int ret = run(suites,filter);

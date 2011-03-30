@@ -32,19 +32,22 @@ using namespace mongoutils;
 #endif
 
 #include "file_allocator.h"
+#include "paths.h"
 
 namespace mongo {
 
-    void ensureParentDirCreated(const boost::filesystem::path& p){
+    boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p){
         const boost::filesystem::path parent = p.branch_path();
-
+		
         if (! boost::filesystem::exists(parent)){
             ensureParentDirCreated(parent);
             log() << "creating directory " << parent.string() << endl;
             boost::filesystem::create_directory(parent);
+            flushMyDirectory(parent); // flushes grandparent to ensure parent exists after crash
         }
-
+        
         assert(boost::filesystem::is_directory(parent));
+        return parent;
     }
 
 #if defined(_WIN32)
@@ -197,6 +200,19 @@ namespace mongo {
         return false;
     }
 
+    string makeTempFileName( path root ) {
+        while( 1 ) {
+            path p = root / "_tmp";
+            stringstream ss;
+            ss << (unsigned) rand();
+            p /= ss.str();
+            string fn = p.string();
+            if( !boost::filesystem::exists(p) )
+              return fn;
+        }
+        return "";
+	}
+
     void FileAllocator::run( FileAllocator * fa ) {
         setThreadName( "FileAllocator" );
         while( 1 ) {
@@ -215,19 +231,24 @@ namespace mongo {
                     name = fa->_pending.front();
                     size = fa->_pendingSize[ name ];
                 }
+
+                string tmp;
                 try {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
-                    ensureParentDirCreated(name);
-                    long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
+                    
+                    boost::filesystem::path parent = ensureParentDirCreated(name);
+                    tmp = makeTempFileName( parent );
+                    ensureParentDirCreated(tmp);
+
+                    long fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                     if ( fd <= 0 ) {
-                        stringstream ss;
-                        ss << "FileAllocator: couldn't open " << name << ' ' << errnoWithDescription();
-                        uassert( 10439 ,  ss.str(), fd <= 0 );
+                        log() << "FileAllocator: couldn't create " << name << " (" << tmp << ") " << errnoWithDescription() << endl;
+                        uasserted(10439, "");
                     }
 
 #if defined(POSIX_FADV_DONTNEED)
                     if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) {
-                        log() << "warning: posix_fadvise fails " << name << ' ' << errnoWithDescription() << endl;
+                        log() << "warning: posix_fadvise fails " << name << " (" << tmp << ") " << errnoWithDescription() << endl;
                     }
 #endif
 
@@ -236,18 +257,27 @@ namespace mongo {
                     /* make sure the file is the full desired length */
                     ensureLength( fd , size );
 
+                    close( fd );
+
+                    if( rename(tmp.c_str(), name.c_str()) ) { 
+                        log() << "error: couldn't rename " << tmp << " to " << name << ' ' << errnoWithDescription() << endl;
+                        uasserted(13653, "");
+                    }
+                    flushMyDirectory(name);
+
                     log() << "done allocating datafile " << name << ", "
                           << "size: " << size/1024/1024 << "MB, "
                           << " took " << ((double)t.millis())/1000.0 << " secs"
                           << endl;
 
-                    close( fd );
 
                 }
                 catch ( ... ) {
                     log() << "error failed to allocate new file: " << name
                           << " size: " << size << ' ' << errnoWithDescription() << endl;
                     try {
+                        if ( tmp.size() )
+                            BOOST_CHECK_EXCEPTION( boost::filesystem::remove( tmp ) );
                         BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
                     }
                     catch ( ... ) {

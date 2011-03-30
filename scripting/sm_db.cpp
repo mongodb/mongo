@@ -192,7 +192,15 @@ namespace mongo {
             return JS_FALSE;
         }
 
-        ScriptEngine::runConnectCallback( *conn );
+        try{
+        	ScriptEngine::runConnectCallback( *conn );
+        }
+        catch( std::exception& e ){
+        	// Can happen if connection goes down while we're starting up here
+		// Catch so that we don't get a hard-to-trace segfault from SM
+        	JS_ReportError( cx, ( (string)"Error during mongo startup." + m_error_message( e.what() ) ).c_str() );
+        	return JS_FALSE;
+        }
 
         assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );

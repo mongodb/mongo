@@ -21,6 +21,7 @@
 namespace mongo {
 
     // see also mongoutils/str.h - perhaps move these there?
+    // see also text.h
 
     void splitStringDelim( const string& str , vector<string>* res , char delim );
 

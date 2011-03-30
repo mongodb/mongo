@@ -47,7 +47,7 @@ namespace mongo {
             boost::filesystem::path getFilePathFor(int filenumber) const;
 
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
-            void cleanup();
+            void cleanup(bool log);
 
             // Rotate after reaching this data size in a journal (j._<n>) file
             // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
@@ -63,10 +63,10 @@ namespace mongo {
                     _open();
             }
 
-        private:
             /** open a journal file to journal operations to. */
             void open();
 
+        private:
             void _open();
             void closeCurrentJournalFile();
             void removeUnneededJournalFiles();

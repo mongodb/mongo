@@ -20,7 +20,8 @@
 
 namespace mongo {
 
-    Notification::Notification() : _mutex ( "Notification" ) , _notified( false ) { }
+    Notification::Notification() : _mutex ( "Notification" ) , _notified( false ) { 
+    }
 
     Notification::~Notification() { }
 
@@ -37,19 +38,36 @@ namespace mongo {
         _condition.notify_one();
     }
 
-    NotifyAll::NotifyAll() : _mutex("NotifyAll"), _counter(0) { }
+    /* --- NotifyAll --- */
 
-    void NotifyAll::wait() {
+    NotifyAll::NotifyAll() : _mutex("NotifyAll") { 
+        _lastDone = 0;
+        _lastReturned = 0;
+    }
+
+    NotifyAll::When NotifyAll::now() { 
         scoped_lock lock( _mutex );
-        unsigned long long old = _counter;
-        while( old == _counter ) {
+        return ++_lastReturned;
+    }
+
+    void NotifyAll::waitFor(When e) {
+        scoped_lock lock( _mutex );
+        while( _lastDone < e ) {
             _condition.wait( lock.boost() );
         }
     }
 
-    void NotifyAll::notifyAll() {
+    void NotifyAll::awaitBeyondNow() { 
         scoped_lock lock( _mutex );
-        ++_counter;
+        When e = ++_lastReturned;
+        while( _lastDone <= e ) {
+            _condition.wait( lock.boost() );
+        }
+    }
+
+    void NotifyAll::notifyAll(When e) {
+        scoped_lock lock( _mutex );
+        _lastDone = e;
         _condition.notify_all();
     }
 

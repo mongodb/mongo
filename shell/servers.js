@@ -329,6 +329,19 @@ ShardingTest.prototype.getOther = function( one ){
     return this._connections[0];
 }
 
+ShardingTest.prototype.getAnother = function( one ){
+    if(this._connections.length < 2)
+    	throw "getAnother() only works with multiple servers";
+	
+	if ( one._mongo )
+        one = one._mongo
+    
+    for(var i = 0; i < this._connections.length; i++){
+    	if(this._connections[i] == one)
+    		return this._connections[(i + 1) % this._connections.length];
+    }
+}
+
 ShardingTest.prototype.getFirstOther = function( one ){
     for ( var i=0; i<this._connections.length; i++ ){
         if ( this._connections[i] != one )
@@ -478,7 +491,7 @@ printShardingStatus = function( configDB , verbose ){
                                 output( "\t\t\t\t" + z.shard + "\t" + z.nChunks );
                             } )
                             
-                            if ( totalChunks < 1000 || verbose ){
+                            if ( totalChunks < 20 || verbose ){
                                 configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                                     function(chunk){
                                         output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
@@ -487,7 +500,7 @@ printShardingStatus = function( configDB , verbose ){
                                 );
                             }
                             else {
-                                output( "\t\t\ttoo many chunksn to print, use verbose if you want to force print" );
+                                output( "\t\t\ttoo many chunks to print, use verbose if you want to force print" );
                             }
                         }
                     }
@@ -666,15 +679,6 @@ MongodRunner.prototype.start = function( reuseData ) {
     args.push( this.port_ );
     args.push( "--dbpath" );
     args.push( this.dbpath_ );
-    if ( this.peer_ && this.arbiter_ ) {
-        args.push( "--pairwith" );
-        args.push( this.peer_ );
-        args.push( "--arbiter" );
-        args.push( this.arbiter_ );
-        args.push( "--oplogSize" );
-        // small oplog by default so startup fast
-        args.push( "1" );
-    }
     args.push( "--nohttpinterface" );
     args.push( "--noprealloc" );
     args.push( "--smallfiles" );
@@ -696,154 +700,6 @@ MongodRunner.prototype.start = function( reuseData ) {
 MongodRunner.prototype.port = function() { return this.port_; }
 
 MongodRunner.prototype.toString = function() { return [ this.port_, this.dbpath_, this.peer_, this.arbiter_ ].toString(); }
-
-
-ReplPair = function( left, right, arbiter ) {
-    this.left_ = left;
-    this.leftC_ = null;
-    this.right_ = right;
-    this.rightC_ = null;
-    this.arbiter_ = arbiter;
-    this.arbiterC_ = null;
-    this.master_ = null;
-    this.slave_ = null;
-}
-
-ReplPair.prototype.start = function( reuseData ) {
-    if ( this.arbiterC_ == null ) {
-        this.arbiterC_ = this.arbiter_.start();
-    }
-    if ( this.leftC_ == null ) {
-        this.leftC_ = this.left_.start( reuseData );
-    }
-    if ( this.rightC_ == null ) {
-        this.rightC_ = this.right_.start( reuseData );
-    }
-}
-
-ReplPair.prototype.isMaster = function( mongo, debug ) {
-    var im = mongo.getDB( "admin" ).runCommand( { ismaster : 1 } );
-    assert( im && im.ok, "command ismaster failed" );
-    if ( debug ) {
-        printjson( im );
-    }
-    return im.ismaster;
-}
-
-ReplPair.prototype.isInitialSyncComplete = function( mongo, debug ) {
-    var isc = mongo.getDB( "admin" ).runCommand( { isinitialsynccomplete : 1 } );
-    assert( isc && isc.ok, "command isinitialsynccomplete failed" );
-    if ( debug ) {
-        printjson( isc );
-    }
-    return isc.initialsynccomplete;
-}
-
-ReplPair.prototype.checkSteadyState = function( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ) {
-    leftValues = leftValues || {};
-    rightValues = rightValues || {};
-
-    var lm = null;
-    var lisc = null;
-    if ( this.leftC_ != null ) {
-        lm = this.isMaster( this.leftC_, debug );
-        leftValues[ lm ] = true;
-        lisc = this.isInitialSyncComplete( this.leftC_, debug );
-    }
-    var rm = null;
-    var risc = null;
-    if ( this.rightC_ != null ) {
-        rm = this.isMaster( this.rightC_, debug );
-        rightValues[ rm ] = true;
-        risc = this.isInitialSyncComplete( this.rightC_, debug );
-    }
-
-    var stateSet = {}
-    state.forEach( function( i ) { stateSet[ i ] = true; } );
-    if ( !( 1 in stateSet ) || ( ( risc || risc == null ) && ( lisc || lisc == null ) ) ) {
-        if ( rm == 1 && lm != 1 ) {
-            assert( twoMasterOk || !( 1 in leftValues ) );
-            this.master_ = this.rightC_;
-            this.slave_ = this.leftC_;
-        } else if ( lm == 1 && rm != 1 ) {
-            assert( twoMasterOk || !( 1 in rightValues ) );
-            this.master_ = this.leftC_;
-            this.slave_ = this.rightC_;
-        }
-        if ( !twoMasterOk ) {
-            assert( lm != 1 || rm != 1, "two masters" );
-        }
-        // check for expected state
-        if ( state.sort().toString() == [ lm, rm ].sort().toString() ) {
-            if ( expectedMasterHost != null ) {
-                if( expectedMasterHost == this.master_.host ) {
-                    return true;
-                }
-            } else {
-                return true;
-            }
-        }
-    }
-
-    this.master_ = null;
-    this.slave_ = null;
-    return false;
-}
-
-ReplPair.prototype.waitForSteadyState = function( state, expectedMasterHost, twoMasterOk, debug ) {
-    state = state || [ 1, 0 ];
-    twoMasterOk = twoMasterOk || false;
-    var rp = this;
-    var leftValues = {};
-    var rightValues = {};
-    assert.soon( function() { return rp.checkSteadyState( state, expectedMasterHost, twoMasterOk, leftValues, rightValues, debug ); },
-                 "rp (" + rp + ") failed to reach expected steady state (" + state + ")" , 60000 );
-}
-
-ReplPair.prototype.master = function() { return this.master_; }
-ReplPair.prototype.slave = function() { return this.slave_; }
-ReplPair.prototype.right = function() { return this.rightC_; }
-ReplPair.prototype.left = function() { return this.leftC_; }
-ReplPair.prototype.arbiter = function() { return this.arbiterC_; }
-
-ReplPair.prototype.killNode = function( mongo, signal ) {
-    signal = signal || 15;
-    if ( this.leftC_ != null && this.leftC_.host == mongo.host ) {
-        stopMongod( this.left_.port_ );
-        this.leftC_ = null;
-    }
-    if ( this.rightC_ != null && this.rightC_.host == mongo.host ) {
-        stopMongod( this.right_.port_ );
-        this.rightC_ = null;
-    }
-    if ( this.arbiterC_ != null && this.arbiterC_.host == mongo.host ) {
-        stopMongod( this.arbiter_.port_ );
-        this.arbiterC_ = null;
-    }
-}
-
-ReplPair.prototype._annotatedNode = function( mongo ) {
-    var ret = "";
-    if ( mongo != null ) {
-        ret += " (connected)";
-        if ( this.master_ != null && mongo.host == this.master_.host ) {
-            ret += "(master)";
-        }
-        if ( this.slave_ != null && mongo.host == this.slave_.host ) {
-            ret += "(slave)";
-        }
-    }
-    return ret;
-}
-
-ReplPair.prototype.toString = function() {
-    var ret = "";
-    ret += "left: " + this.left_;
-    ret += " " + this._annotatedNode( this.leftC_ );
-    ret += " right: " + this.right_;
-    ret += " " + this._annotatedNode( this.rightC_ );
-    return ret;
-}
 
 ToolTest = function( name ){
     this.name = name;

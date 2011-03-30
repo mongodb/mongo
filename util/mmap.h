@@ -100,7 +100,7 @@ namespace mongo {
         static set<MongoFile*> mmfiles;
     public:
         static map<string,MongoFile*> pathToFile;
-        static RWLock mmmutex;
+        static RWLockRecursive mmmutex;
     };
 
     /** look up a MMF by filename. scoped mutex locking convention.
@@ -111,7 +111,7 @@ namespace mongo {
     */
     class MongoFileFinder : boost::noncopyable {
     public:
-        MongoFileFinder() : _lk(MongoFile::mmmutex,false) { }
+        MongoFileFinder() : _lk(MongoFile::mmmutex) { }
 
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
@@ -122,7 +122,7 @@ namespace mongo {
         }
 
     private:
-        rwlock _lk;
+        RWLockRecursive::Shared _lk;
     };
 
     struct MongoFileAllowWrites {
@@ -135,6 +135,13 @@ namespace mongo {
     };
 
     class MemoryMappedFile : public MongoFile {
+    protected:
+        virtual void* viewForFlushing() { 
+            if( views.size() == 0 )
+                return 0;
+            assert( views.size() == 1 );
+            return views[0];
+        }
     public:
         MemoryMappedFile();
 
@@ -147,6 +154,8 @@ namespace mongo {
 
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map(const char *filename);
+
+        /** @param options see MongoFile::Options */
         void* mapWithOptions(const char *filename, int options);
 
         /* Creates with length if DNE, otherwise uses existing file length,
@@ -187,7 +196,7 @@ namespace mongo {
         HANDLE maphandle;
         vector<void *> views;
         unsigned long long len;
-
+        
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
         void clearWritableBits(void *privateView);
@@ -212,7 +221,7 @@ namespace mongo {
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
     template < class F >
     inline void MongoFile::forEach( F p ) {
-        rwlock lk( mmmutex , false );
+        RWLockRecursive::Shared lklk(mmmutex);
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
@@ -227,10 +236,11 @@ namespace mongo {
         bool get(unsigned i) const { 
             unsigned x = i / 32;
             assert( x < MemoryMappedFile::NChunks );
-            return bits[x] & (1 << (i%32));
+            return (bits[x] & (1 << (i%32))) != 0;
         }
         void set(unsigned i) { 
             unsigned x = i / 32;
+            wassert( x < (MemoryMappedFile::NChunks*2/3) ); // warn if getting close to limit
             assert( x < MemoryMappedFile::NChunks );
             bits[x] |= (1 << (i%32));
         }

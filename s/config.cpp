@@ -125,7 +125,8 @@ namespace mongo {
 
     ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ) {
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
-
+        uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
+        
         scoped_lock lk( _lock );
 
         CollectionInfo& ci = _collections[ns];

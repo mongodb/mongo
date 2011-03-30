@@ -62,6 +62,6 @@ namespace mongo {
 
     void writePidFile( const std::string& path );
 
-    void printMemInfo( const char * where );
+    void printMemInfo( const char * whereContextStr = 0 );
 
 }

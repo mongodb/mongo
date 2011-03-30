@@ -105,7 +105,7 @@ namespace mongo {
                 _combined = 0;
                 break;
             default:
-                assert(0);
+                massert( 13657 , str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
             }
             return *this;
         }

@@ -252,6 +252,10 @@ namespace mongo {
             while ( size > 0 ) {
                 int max = MongoDataFile::maxSize() - DataFileHeader::HeaderSize;
                 int desiredExtentSize = (int) (size > max ? max : size);
+                if ( desiredExtentSize < Extent::minSize() ) {
+                    desiredExtentSize = Extent::minSize();
+                }
+                desiredExtentSize &= 0xffffff00;
                 Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
@@ -403,7 +407,7 @@ namespace mongo {
             uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
         else
             uassert( 10085 , "can't map file memory", _mb != 0);
-        header()->init(fileNo, size);
+        header()->init(fileNo, size, filename);
     }
 
     void MongoDataFile::flush( bool sync ) {
@@ -435,11 +439,11 @@ namespace mongo {
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         massert( 10357 ,  "shutdown in progress", ! inShutdown() );
-        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= Extent::maxSize() );
+        massert( 10358 ,  "bad new extent size", approxSize >= Extent::minSize() && approxSize <= Extent::maxSize() );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
         int ExtentSize = approxSize <= header()->unusedLength ? approxSize : header()->unusedLength;
         DiskLoc loc;
-        if ( ExtentSize <= 0 ) {
+        if ( ExtentSize < Extent::minSize() ) {
             /* not there could be a lot of looping here is db just started and
                no files are open yet.  we might want to do something about that. */
             if ( loops > 8 ) {
@@ -805,8 +809,6 @@ namespace mongo {
         dropNS(name);
     }
 
-    int nUnindexes = 0;
-
     /* unindex all keys in index for this record. */
     static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
         BSONObjSetDefaultOrder keys;
@@ -817,7 +819,7 @@ namespace mongo {
                 out() << "_unindexRecord() " << obj.toString();
                 out() << "\n  unindex:" << j.toString() << endl;
             }
-            nUnindexes++;
+
             bool ok = false;
             try {
                 ok = id.head.btree()->unindex(id.head, id, j, dl);
@@ -832,7 +834,7 @@ namespace mongo {
             }
 
             if ( !ok && logMissing ) {
-                out() << "unindex failed (key too big?) " << id.indexNamespace() << '\n';
+                log() << "unindex failed (key too big?) " << id.indexNamespace() << " key: " << j << " " << obj["_id"] << endl;
             }
         }
     }
@@ -984,7 +986,11 @@ namespace mongo {
                 IndexDetails& idx = d->idx(x);
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
-                        idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
+                        bool found = idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
+                        if ( ! found ) {
+                            RARELY warning() << "ns: " << ns << " couldn't unindex key: " << *changes[x].removed[i] 
+                                             << " for doc: " << objOld["_id"] << endl;
+                        }
                     }
                     catch (AssertionException&) {
                         ss << " exception update unindex ";
@@ -1004,7 +1010,7 @@ namespace mongo {
                     }
                     catch (AssertionException& e) {
                         ss << " exception update index ";
-                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << endl;
+                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << " " << objNew["_id"] << endl;
                     }
                 }
             }
@@ -1065,7 +1071,7 @@ namespace mongo {
                     // dup key exception, presumably.
                     throw;
                 }
-                problem() << " caught assertion _indexRecord " << idx.indexNamespace() << endl;
+                problem() << " caught assertion _indexRecord " << idx.indexNamespace() << " " << obj["_id"] << endl;
             }
         }
     }
@@ -1187,13 +1193,17 @@ namespace mongo {
             op->setMessage( "index: (3/3) btree-middle" );
             log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
-            wassert( btBuilder.getn() == nkeys || dropDups );
+            if ( btBuilder.getn() != nkeys && ! dropDups ) {
+                warning() << "not all entries were added to the index, probably some keys were too large" << endl;
+            }
         }
 
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
-        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
+        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
+            getDur().commitIfNeeded();
+        }
 
         return n;
     }
@@ -1248,7 +1258,12 @@ namespace mongo {
                 n++;
                 progress.hit();
 
-                if ( n % 128 == 0 && !cc->yield() ) {
+                getDur().commitIfNeeded();
+
+                if ( cc->yieldSometimes() ) {
+                    progress.setTotalWhileRunning( d->stats.nrecords );
+                }
+                else {
                     cc.release();
                     uasserted(12584, "cursor gone during bg index");
                     break;
@@ -1281,7 +1296,7 @@ namespace mongo {
             prep(ns.c_str(), d);
             assert( idxNo == d->nIndexes );
             try {
-                idx.head = BtreeBucket::addBucket(idx);
+                idx.head.writing() = BtreeBucket::addBucket(idx);
                 n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
             }
             catch(...) {
@@ -1337,6 +1352,10 @@ namespace mongo {
         assert( d->indexBuildInProgress == 0 );
         assertInWriteLock();
         RecoverableIndexState recoverable( d );
+
+        // Build index spec here in case the collection is empty and the index details are invalid
+        idx.getSpec();
+
         if( inDBRepair || !background ) {
             n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
             assert( !idx.head.isNull() );
@@ -1935,12 +1954,14 @@ namespace mongo {
             assert( ctx.justCreated() );
 
             res = cloneFrom(localhost.c_str(), errmsg, dbName,
-                            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
+                            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false, /*mayYield*/false);
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 
         if ( !res ) {
-            problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
+            errmsg = str::stream() << "clone failed for " << dbName << " with error: " << errmsg;
+            problem() << errmsg << endl;
+
             if ( !preserveClonedFilesOnFailure )
                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 

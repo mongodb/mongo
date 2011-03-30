@@ -32,6 +32,7 @@
 namespace mongo {
 
 #if 0
+# define GEODEBUGGING
 # define GEODEBUG(x) cout << x << endl;
 # define GEODEBUGPRINT(x) PRINT(x)
     inline void PREFIXDEBUG(GeoHash prefix, const GeoConvert* g) {
@@ -98,14 +99,18 @@ namespace mongo {
 
             uassert( 13024 , "no geo field specified" , _geo.size() );
 
-            _bits = _configval( spec , "bits" , 26 ); // for lat/long, ~ 1ft
+            double bits =  _configval( spec , "bits" , 26 ); // for lat/long, ~ 1ft
 
-            uassert( 13028 , "can't have more than 32 bits in geo index" , _bits <= 32 );
+            uassert( 13028 , "bits in geo index must be between 1 and 32" , bits > 0 && bits <= 32 );
 
-            _max = _configval( spec , "max" , 180 );
-            _min = _configval( spec , "min" , -180 );
+            _bits = (unsigned) bits;
 
-            _scaling = (1024*1024*1024*4.0)/(_max-_min);
+            _max = _configval( spec , "max" , 180.0 );
+            _min = _configval( spec , "min" , -180.0 );
+
+            double numBuckets = (1024 * 1024 * 1024 * 4.0);
+
+            _scaling = numBuckets / ( _max - _min );
 
             _order = orderBuilder.obj();
 
@@ -115,10 +120,11 @@ namespace mongo {
             _error = distance(a, b);
         }
 
-        int _configval( const IndexSpec* spec , const string& name , int def ) {
+        double _configval( const IndexSpec* spec , const string& name , double def ) {
             BSONElement e = spec->info[name];
-            if ( e.isNumber() )
-                return e.numberInt();
+            if ( e.isNumber() ) {
+                return e.numberDouble();
+            }
             return def;
         }
 
@@ -149,53 +155,100 @@ namespace mongo {
         }
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-            BSONElement geo = obj.getFieldDotted(_geo.c_str());
-            if ( geo.eoo() )
+
+            BSONElementSet bSet;
+            // Get all the nested location fields, but don't return individual elements from
+            // the last array, if it exists.
+            obj.getFieldsDotted(_geo.c_str(), bSet, false);
+
+            if( bSet.empty() )
                 return;
 
-            BSONObjBuilder b(64);
+            for( BSONElementSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI ) {
 
-            if ( ! geo.isABSONObj() )
-                return;
+                BSONElement geo = *setI;
 
-            BSONObj embed = geo.embeddedObject();
-            if ( embed.isEmpty() )
-                return;
+                GEODEBUG( "Element " << geo << " found for query " << _geo.c_str() );
 
-            _hash( embed ).append( b , "" );
+                if ( geo.eoo() || ! geo.isABSONObj() )
+                    continue;
 
-            // Go through all the other index keys
-            for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ){
+                //
+                // Grammar for location lookup:
+                // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc}|loc
+                // loc  ::= { <k1> : #, <k2> : # }|[#, #]|{}
+                //
+                // Empty locations are ignored, preserving single-location semantics
+                //
 
-            	// Get *all* fields for the index key
-				BSONElementSet eSet;
-				obj.getFieldsDotted( *i, eSet );
+                BSONObj embed = geo.embeddedObject();
+                if ( embed.isEmpty() )
+                    continue;
+
+                // Differentiate between location arrays and locations
+                // by seeing if the first element value is a number
+                bool singleElement = embed.firstElement().isNumber();
+
+                BSONObjIterator oi(embed);
+
+                while( oi.more() ) {
+
+                    BSONObj locObj;
+
+                    if( singleElement ) locObj = embed;
+                    else {
+                        BSONElement locElement = oi.next();
+
+                        uassert( 13654, str::stream() << "location object expected, location array not in correct format",
+                                 locElement.isABSONObj() );
+
+                        locObj = locElement.embeddedObject();
+
+                        if( locObj.isEmpty() )
+                            continue;
+                    }
+
+                    BSONObjBuilder b(64);
+
+                    _hash( locObj ).append( b , "" );
+
+                    // Go through all the other index keys
+                    for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ) {
+
+                        // Get *all* fields for the index key
+                        BSONElementSet eSet;
+                        obj.getFieldsDotted( *i, eSet );
 
 
-				if ( eSet.size() == 0 )
-					b.appendAs( _spec->missingField(), "" );
-				else if ( eSet.size() == 1 )
-					b.appendAs( *(eSet.begin()), "" );
-				else{
+                        if ( eSet.size() == 0 )
+                            b.appendAs( _spec->missingField(), "" );
+                        else if ( eSet.size() == 1 )
+                            b.appendAs( *(eSet.begin()), "" );
+                        else {
 
-					// If we have more than one key, store as an array of the objects
-					// TODO:  Store multiple keys?
+                            // If we have more than one key, store as an array of the objects
 
-					BSONArrayBuilder aBuilder;
+                            BSONArrayBuilder aBuilder;
 
-					for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ){
-						aBuilder.append( *ei );
-					}
+                            for( BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei ) {
+                                aBuilder.append( *ei );
+                            }
 
-					BSONArray arr = aBuilder.arr();
+                            BSONArray arr = aBuilder.arr();
 
-					b.append( "", arr );
+                            b.append( "", arr );
 
-				}
+                        }
 
-			}
+                    }
 
-            keys.insert( b.obj() );
+                    keys.insert( b.obj() );
+
+                    if( singleElement ) break;
+
+                }
+            }
+
         }
 
         GeoHash _tohash( const BSONElement& e ) const {
@@ -231,9 +284,9 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert( 13027 , "point not in range" , in <= (_max + _error) && in >= (_min - _error) );
+            uassert_msg( 13027 , "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
             in -= _min;
-            assert( in > 0 );
+            uassert_msg( 14021 , "point not in range > " << _min , in > 0 );
             return (unsigned)(in * _scaling);
         }
 
@@ -301,9 +354,9 @@ namespace mongo {
                 }
             }
             case Array:
-            	// Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
-            	// additional criteria
-            	if ( query.nFields() > 1 ) return USELESS;
+                // Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
+                // additional criteria
+                if ( query.nFields() > 1 ) return USELESS;
                 return HELPFUL;
             default:
                 return USELESS;
@@ -314,8 +367,8 @@ namespace mongo {
         vector<string> _other;
 
         unsigned _bits;
-        int _max;
-        int _min;
+        double _max;
+        double _min;
         double _scaling;
 
         BSONObj _order;
@@ -704,10 +757,13 @@ namespace mongo {
         }
 
         virtual void add( const KeyNode& node ) {
-            // when looking at other boxes, don't want to look at some object twice
-            pair<set<DiskLoc>::iterator,bool> seenBefore = _seen.insert( node.recordLoc );
+
+            GEODEBUG( "\t\t\t\t checking key " << node.key.toString() )
+
+            // when looking at other boxes, don't want to look at some key/object pair twice
+            pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.objdata(), node.recordLoc) );
             if ( ! seenBefore.second ) {
-                GEODEBUG( "\t\t\t\t already seen : " << node.recordLoc.obj()["_id"] );
+                GEODEBUG( "\t\t\t\t already seen : " << node.key.toString() << " with " << node.recordLoc.obj()["_id"] );
                 return;
             }
             _lookedAt++;
@@ -720,27 +776,41 @@ namespace mongo {
             }
             GEODEBUG( "\t\t\t\t good distance : " << node.recordLoc.obj()  << "\t" << d );
 
-            // matcher
-            MatchDetails details;
-            if ( _matcher.get() ) {
-                bool good = _matcher->matches( node.key , node.recordLoc , &details );
-                if ( details.loadedObject )
+            // Remember match results for each object
+            map<DiskLoc, bool>::iterator match = _matched.find( node.recordLoc );
+            bool newDoc = match == _matched.end();
+            if( newDoc ) {
+
+                // matcher
+                MatchDetails details;
+                if ( _matcher.get() ) {
+                    bool good = _matcher->matches( node.key , node.recordLoc , &details );
+                    if ( details.loadedObject )
+                        _objectsLoaded++;
+
+                    if ( ! good ) {
+                        GEODEBUG( "\t\t\t\t didn't match : " << node.recordLoc.obj()["_id"] );
+                        _matched[ node.recordLoc ] = false;
+                        return;
+                    }
+                }
+
+                _matched[ node.recordLoc ] = true;
+
+                if ( ! details.loadedObject ) // don't double count
                     _objectsLoaded++;
 
-                if ( ! good ) {
-                    GEODEBUG( "\t\t\t\t didn't match : " << node.recordLoc.obj()["_id"] );
-                    return;
-                }
+            }
+            else if( !((*match).second) ) {
+                GEODEBUG( "\t\t\t\t previously didn't match : " << node.recordLoc.obj()["_id"] );
+                return;
             }
 
-            if ( ! details.loadedObject ) // dont double count
-                _objectsLoaded++;
-
-            addSpecific( node , d );
+            addSpecific( node , d, newDoc );
             _found++;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d ) = 0;
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) = 0;
         virtual bool checkDistance( const GeoHash& node , double& d ) = 0;
 
         long long found() const {
@@ -748,7 +818,8 @@ namespace mongo {
         }
 
         const Geo2dType * _g;
-        set<DiskLoc> _seen;
+        set< pair<const char*, DiskLoc> > _seen;
+        map<DiskLoc, bool> _matched;
         auto_ptr<CoveredIndexMatcher> _matcher;
 
         long long _lookedAt;
@@ -781,7 +852,7 @@ namespace mongo {
             return good;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d ) {
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
             _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
             if ( _points.size() > _max ) {
@@ -861,6 +932,9 @@ namespace mongo {
             return ss.str();
         }
 
+        // Returns the min and max keys which bound a particular location.
+        // The only time these may be equal is when we actually equal the location
+        // itself, otherwise our expanding algorithm will fail.
         static bool initial( const IndexDetails& id , const Geo2dType * spec ,
                              BtreeLocation& min , BtreeLocation&  max ,
                              GeoHash start ,
@@ -869,15 +943,17 @@ namespace mongo {
             Ordering ordering = Ordering::make(spec->_order);
 
             min.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
-                                                  ordering , min.pos , min.found , minDiskLoc );
-            if (hopper) min.checkCur( found , hopper );
-            max = min;
+                                                  ordering , min.pos , min.found , minDiskLoc, -1 );
 
-            if ( min.bucket.isNull() || ( hopper && !(hopper->found()) ) ) {
-                min.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
-                                                      ordering , min.pos , min.found , minDiskLoc , -1 );
-                if (hopper) min.checkCur( found , hopper );
-            }
+            if (hopper) min.checkCur( found , hopper );
+
+            // TODO: Might be able to avoid doing a full lookup in some cases here,
+            // but would add complexity and we're hitting pretty much the exact same data.
+            // Cannot set this = min in general, however.
+            max.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
+                                                  ordering , max.pos , max.found , minDiskLoc, 1 );
+
+            if (hopper) max.checkCur( found , hopper );
 
             return ! min.bucket.isNull() || ! max.bucket.isNull();
         }
@@ -1216,7 +1292,10 @@ namespace mongo {
         virtual bool moreToDo() = 0;
         virtual void fillStack() = 0;
 
-        virtual void addSpecific( const KeyNode& node , double d ) {
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+
+            if( ! newDoc ) return;
+
             if ( _cur.isEmpty() )
                 _cur = GeoPoint( node , d );
             else
@@ -1244,6 +1323,9 @@ namespace mongo {
     class GeoCircleBrowse : public GeoBrowse {
     public:
 
+    	// The max points which should be returned by an expand at one time
+    	static const int maxPointsHeuristic = 300;
+
         enum State {
             START ,
             DOING_EXPAND ,
@@ -1255,8 +1337,12 @@ namespace mongo {
             : GeoBrowse( g , "circle" , filter ) {
 
             uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
+
             BSONObjIterator i(circle);
             BSONElement center = i.next();
+
+            uassert( 13656 , "the first field of $center object must be a location object" , center.isABSONObj() );
+
             _start = g->_tohash(center);
             _startPt = Point(center);
             _prefix = _start;
@@ -1336,11 +1422,19 @@ namespace mongo {
             }
 
             if (_state == DOING_EXPAND) {
+
+                // Make sure we don't jump off an expand-cliff and try to
+                // remember millions of points at once
+                int maxFound = _found + maxPointsHeuristic;
+
                 GEODEBUG( "circle prefix [" << _prefix << "]" );
                 PREFIXDEBUG(_prefix, _g);
 
-                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
-                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
+                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
+
+                if( _found >= maxFound )
+                	return;
 
                 if ( ! _prefix.constrains() ) {
                     GEODEBUG( "\t exhausted the btree" );
@@ -1442,7 +1536,10 @@ namespace mongo {
     class GeoBoxBrowse : public GeoBrowse {
     public:
 
-        enum State {
+    	// The max points which should be returned by an expand at one time
+    	static const int maxPointsHeuristic = 300;
+
+    	enum State {
             START ,
             DOING_EXPAND ,
             DONE
@@ -1498,10 +1595,29 @@ namespace mongo {
 
             if ( _state == DOING_EXPAND ) {
                 int started = _found;
+
+                // Make sure we don't jump off an expand-cliff and try to
+                // remember millions of points at once
+                int maxFound = _found + maxPointsHeuristic;
+
                 while ( started == _found || _state == DONE ) {
                     GEODEBUG( "box prefix [" << _prefix << "]" );
-                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
-                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+
+#ifdef GEODEBUGGING
+                    if( _prefix.constrains() ) {
+                        Box in( _g , GeoHash( _prefix ) );
+                        log() << "current expand box : " << in.toString() << endl;
+                    }
+                    else {
+                        log() << "max expand box." << endl;
+                    }
+#endif
+
+                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
+                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
+
+                    if( _found >= maxFound )
+                    	return;
 
                     if ( _state == DONE )
                         return;
@@ -1576,7 +1692,6 @@ namespace mongo {
 
         double _fudge;
     };
-
 
     shared_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
         if ( numWanted < 0 )

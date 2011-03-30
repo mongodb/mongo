@@ -175,7 +175,7 @@ assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } 
 // --- listDatabases ---
 
 r = db.getMongo().getDBs()
-assert.eq( 4 , r.databases.length , "listDatabases 1 : " + tojson( r ) )
+assert.eq( 3 , r.databases.length , "listDatabases 1 : " + tojson( r ) )
 assert.lt( 10000 , r.totalSize , "listDatabases 2 : " + tojson( r ) );
 
 s.stop()

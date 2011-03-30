@@ -544,19 +544,20 @@ again:
         while( len > 0 ) {
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {
-                if ( errno != EAGAIN || _timeout == 0 ) {
+                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+                    if ( !serverAlive( farEnd.toString() ) ) {
+                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
+                        throw SocketException( SocketException::SEND_ERROR );
+                    }
+                    // should just retry
+                }
+                else {
                     SocketException::Type t = SocketException::SEND_ERROR;
 #if defined(_WINDOWS)
                     if( e == WSAETIMEDOUT ) t = SocketException::SEND_TIMEOUT;
 #endif
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
                     throw SocketException( t );
-                }
-                else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::SEND_ERROR );
-                    }
                 }
             }
             else {
@@ -703,7 +704,6 @@ again:
 
 
     MSGID NextMsgId;
-    ThreadLocalValue<int> clientId;
 
     struct MsgStart {
         MsgStart() {
@@ -719,14 +719,6 @@ again:
 
     bool doesOpGetAResponse( int op ) {
         return op == dbQuery || op == dbGetMore;
-    }
-
-    void setClientId( int id ) {
-        clientId.set( id );
-    }
-
-    int getClientId() {
-        return clientId.get();
     }
 
     const int DEFAULT_MAX_CONN = 20000;

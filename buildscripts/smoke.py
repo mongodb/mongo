@@ -110,7 +110,7 @@ class mongod(object):
         sock.connect(("localhost", int(port)))
         sock.close()
 
-    def did_mongod_start(self, port=mongod_port, timeout=20):
+    def did_mongod_start(self, port=mongod_port, timeout=90):
         while timeout > 0:
             time.sleep(1)
             try:
@@ -269,6 +269,8 @@ def runTest(test):
                     "--port", mongod_port]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
+    sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
+    sys.stderr.flush()
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
     t1 = time.time()

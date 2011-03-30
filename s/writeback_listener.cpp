@@ -159,7 +159,7 @@ namespace mongo {
                     DBConfigPtr db = grid.getDBConfig( ns );
                     ShardChunkVersion needVersion( data["version"] );
 
-                    log(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
+                    LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
                            << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
 
                     if ( logLevel ) log(1) << debugString( m ) << endl;

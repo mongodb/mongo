@@ -368,14 +368,14 @@ namespace BtreeTests {
                 unindex( o );
             }
 
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 0, bt()->fullValidate( dl(), order(), &unused, true ) );
 
             for ( long long i = 50000; i < 50100; ++i ) {
                 insert( i );
             }
 
-            int unused2 = 0;
+            long long unused2 = 0;
             ASSERT_EQUALS( 100, bt()->fullValidate( dl(), order(), &unused2, true ) );
 
 //            log() << "old unused: " << unused << ", new unused: " << unused2 << endl;
@@ -434,7 +434,7 @@ namespace BtreeTests {
             int expectedCount = 10 - unindexKeys();
 //            dump();
             ASSERT_EQUALS( 1, nsdetails( ns.c_str() )->stats.nrecords );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( expectedCount, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
         }
@@ -488,7 +488,7 @@ namespace BtreeTests {
             BSONObj k = key( 'a' + 17 );
             unindex( k );
             ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 17, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
         }
@@ -900,7 +900,7 @@ namespace BtreeTests {
             string ns = id().indexNamespace();
             const char *keys = delKeys();
             for( const char *i = keys; *i; ++i ) {
-                int unused = 0;
+                long long unused = 0;
                 ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), &unused, true ) );
                 ASSERT_EQUALS( 0, unused );
                 ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
@@ -912,7 +912,7 @@ namespace BtreeTests {
 
 //            dump();
 
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             validate();
@@ -1438,7 +1438,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1459,7 +1459,7 @@ namespace BtreeTests {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
             getDur().writingInt( const_cast< DiskLoc& >( bt()->keyNode( 1 ).prevChildBucket.btree()->keyNode( 0 ).recordLoc ).GETOFS() ) |= 1; // make unused
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );
             ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1481,7 +1481,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,_:{b:null}}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 2, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1502,7 +1502,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,y:{d:{c:{b:null}},_:{e:null}},z:null}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 5, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1523,7 +1523,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,_:{e:{c:null},_:{f:null}}}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1544,7 +1544,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,d:{c:{b:null}},e:null}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 5, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1565,7 +1565,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,_:{c:null,_:{d:null}}}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1586,7 +1586,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:null,$20:null,$30$10:{$25:{$23:null},_:{$27:null}},$40:null,$50:null,$60:null,$70:null,$80:null,$90:null,$100:null}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
@@ -1606,7 +1606,7 @@ namespace BtreeTests {
         void run() {
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:null,$20:null,$30:null,$40:null,$50:null,$60:null,$70:null,$80:null,$90:null,$100$10:{$95:{$93:null},_:{$97:null}}}", id() );
-            int unused = 0;
+            long long unused = 0;
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );

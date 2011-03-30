@@ -59,7 +59,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
     }
     
-    assert.gt( 100 , me );
+    assert.gt( 200 , me );
 
     if ( x.inprog.length == 0 )
         break;

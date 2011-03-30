@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "dur_commitjob.h"
+#include "dur_stats.h"
 #include "taskqueue.h"
 
 namespace mongo {
@@ -126,17 +127,24 @@ namespace mongo {
 
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
 
+        void CommitJob::beginCommit() { 
+            DEV dbMutex.assertAtLeastReadLocked();
+            _commitNumber = _notify.now();
+            stats.curr->_commits++;
+        }
+
         void CommitJob::reset() {
             _hasWritten = false;
             _wi.clear();
-            _ab.reset();
             privateMapBytes += _bytes;
             _bytes = 0;
             _nSinceCommitIfNeededCall = 0;
         }
 
         CommitJob::CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), 
-            _bytes(0), _nSinceCommitIfNeededCall(0) { }
+            _bytes(0), _nSinceCommitIfNeededCall(0) { 
+            _commitNumber = 0;
+        }
 
         void CommitJob::note(void* p, int len) {
             // from the point of view of the dur module, it would be fine (i think) to only
@@ -149,7 +157,7 @@ namespace mongo {
 
                 if( !_hasWritten ) {
                     // you can't be writing if one of these is pending, so this is a verification.
-                    assert( !dbMutex._remapPrivateViewRequested );
+                    assert( !dbMutex._remapPrivateViewRequested ); // safe to assert here since it must be the first write in a write lock
 
                     // we don't bother doing a group commit when nothing is written, so we have a var to track that
                     _hasWritten = true;
@@ -183,7 +191,7 @@ namespace mongo {
                 // remember intent. we will journal it in a bit
                 _wi.insertWriteIntent(p, len);
                 wassert( _wi._writes.size() <  2000000 );
-                assert(  _wi._writes.size() < 20000000 );
+                //assert(  _wi._writes.size() < 20000000 );
 
                 {
                     // a bit over conservative in counting pagebytes used
@@ -196,11 +204,16 @@ namespace mongo {
 #if defined(_DEBUG)
                         _nSinceCommitIfNeededCall++;
                         if( _nSinceCommitIfNeededCall >= 80 ) {
-                            if( _nSinceCommitIfNeededCall % 40 == 0 )
+                            if( _nSinceCommitIfNeededCall % 40 == 0 ) {
                                 log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
+                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
+                                    printStackTrace();
+                            }
                         }
 #endif
-                        uassert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
+                        if (_bytes > UncommittedBytesLimit * 3) {
+                            wassert(!"DR102 too much data written uncommitted");
+                        }
                     }
                 }
             }

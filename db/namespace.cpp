@@ -182,6 +182,7 @@ namespace mongo {
             maybeMkdir();
             unsigned long long l = lenForNewNsFiles;
             if( f.create(pathString, l, true) ) {
+                getDur().createdFile(pathString, l); // always a new file
                 len = l;
                 assert( len == lenForNewNsFiles );
                 p = f.getView();
@@ -193,6 +194,7 @@ namespace mongo {
             log() << "error couldn't open file " << pathString << " terminating" << endl;
             dbexit( EXIT_FS );
         }
+
 
         assert( len <= 0x7fffffff );
         ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");

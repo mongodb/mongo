@@ -96,8 +96,9 @@ namespace mongo {
                 (like creating an index or update with $atomic) can call this
                 whenever the db is in a sane state and it will prevent commits
                 from growing too large.
+                @return true if commited
             */
-            virtual void commitIfNeeded() = 0;
+            virtual bool commitIfNeeded() = 0;
 
             /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
@@ -172,7 +173,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
-            void commitIfNeeded() { }
+            bool commitIfNeeded() { return false; }
             void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal() {}
         };
@@ -185,7 +186,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len);
             bool awaitCommit();
             bool commitNow();
-            void commitIfNeeded();
+            bool commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal();
         };

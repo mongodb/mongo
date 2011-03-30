@@ -1,39 +1,114 @@
-.\" Documentation for the MongoDB shell
 .TH MONGOSTAT "1" "March 2010" "10gen" "Mongo Database"
 .SH "NAME"
 mongostat \- view statistics on a running mongod instance
 .SH "SYNOPSIS"
-\fBmongostat [\fIOPTIONS\fR]
+\fBmongostat [\fIOPTIONS\fR] [\fISLEEP TIME\fR]
 .SH "DESCRIPTION"
 .PP
 \fBmongostat\fR
-prints statistics on a running mongod instance.
+prints statistics on a running mongod instance.  [\fISLEEP TIME\fR] is
+time to wait (in seconds) between calls to servers
 .SH "OPTIONS"
 .TP
-.B \-\-help
-show usage information
+.B \-\-help                     
+produce help message
 .TP
-.B \-h, \-\-host HOST
-mongo host to connect to (use "left,right" for pairs)
-\" .TP
-\" .B \-\-port PORT
-\" port to connect to (default PORT=27017)
+.B \-\-version
+show version information
 .TP
-.B \-d, \-\-db ARG
-db to use
+.B \-v, \-\-verbose           
+be more verbose (include multiple times for more verbosity
+e.g. \-vvvvv)
 .TP
-.B \-c, \-\-collection ARG
-collection to use (some commands)
+.B \-h, \-\-host arg          
+mongo host to connect to ( <set name>/s1,s2 for sets)
 .TP
-.B \-u, \-\-username USERNAME
-specify user to log in as
+.B \-\-port arg                 
+server port. Can also use \-\-host hostname:port
 .TP
-.B \-p, \-\-password PASSWORD
-specify password of user (notice there is no space)
+.B \-\-ipv6                     
+enable IPv6 support (disabled by default)
+.TP
+.B \-u, \-\-username arg      
+username
+.TP
+.B \-p, \-\-password arg      
+password
+.TP
+.B \-\-noheaders                
+don't output column names
+.TP
+.B \-n, \-\-rowcount arg
+number of stats lines to print (0 for indefinite)
+.TP
+.B \-\-http                     
+use http instead of raw db connection
+.TP
+.B \-\-discover                 
+discover nodes and display stats for all
+.TP
+.B \-\-all                      
+all optional fields
+.SH "FIELDS"
+.TP
+.B inserts
+# of inserts per second
+.TP
+.B query
+# of queries per second
+.TP
+.B update
+# of updates per second
+.TP
+.B delete
+# of deletes per second
+.TP
+.B getmore
+# of get mores (cursor batch) per second
+.TP
+.B command
+# of commands per second
+.TP
+.B flushes
+# of fsync flushes per second
+.TP
+.B mapped
+amount of data mmaped (total data size) megabytes
+.TP
+.B visze
+virtual size of process in megabytes
+.TP
+.B res
+resident size of process in megabytes
+.TP
+.B faults
+# of pages faults per sec (linux only)
+.TP
+.B locked
+percent of time in global write lock
+.TP
+.B idx
+percent of btree page misses (sampled)
+.TP
+.B qr
+queue lengths for clients waiting (read|write)
+.TP
+.B ar
+active clients (read|write)
+.TP
+.B netIn
+network traffic in - bits
+.TP
+.B netOut
+network traffic out - bits
+.TP
+.B conn
+number of open connections
 .SH "COPYRIGHT"
 .PP
-Copyright 2010 10gen
+Copyright 2011 10gen
 .SH "SEE ALSO"
-For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+For more information, please refer to the MongoDB wiki, available at
+http://www.mongodb.org.
 .SH "AUTHOR"
 Eliot Horowitz

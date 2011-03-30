@@ -690,7 +690,7 @@ namespace mongo {
         return -1;
     }
 
-    void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret ) const {
+    void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray ) const {
         BSONElement e = getField( name );
         if ( e.eoo() ) {
             const char *p = strchr(name.data(), '.');
@@ -700,7 +700,7 @@ namespace mongo {
                 BSONElement e = getField( left.c_str() );
 
                 if (e.type() == Object) {
-                    e.embeddedObject().getFieldsDotted(next, ret);
+                    e.embeddedObject().getFieldsDotted(next, ret, expandLastArray );
                 }
                 else if (e.type() == Array) {
                     bool allDigits = false;
@@ -711,14 +711,14 @@ namespace mongo {
                         allDigits = (*temp == '.' || *temp == '\0');
                     }
                     if (allDigits) {
-                        e.embeddedObject().getFieldsDotted(next, ret);
+                        e.embeddedObject().getFieldsDotted(next, ret, expandLastArray );
                     }
                     else {
                         BSONObjIterator i(e.embeddedObject());
                         while ( i.more() ) {
                             BSONElement e2 = i.next();
                             if (e2.type() == Object || e2.type() == Array)
-                                e2.embeddedObject().getFieldsDotted(next, ret);
+                                e2.embeddedObject().getFieldsDotted(next, ret, expandLastArray );
                         }
                     }
                 }
@@ -728,7 +728,7 @@ namespace mongo {
             }
         }
         else {
-            if (e.type() == Array) {
+            if (e.type() == Array && expandLastArray) {
                 BSONObjIterator i(e.embeddedObject());
                 while ( i.more() )
                     ret.insert(i.next());
@@ -741,7 +741,7 @@ namespace mongo {
 
     BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
         const char *p = strchr(name, '.');
-        
+
         BSONElement sub;
 
         if ( p ) {

@@ -185,15 +185,20 @@ namespace mongo {
                 throw;
             }
             assert(!haveJournalFiles());
+
+            flushMyDirectory(getJournalDir() / "file"); // flushes parent of argument (in this case journal dir)
+
             log(1) << "removeJournalFiles end" << endl;
         }
 
         /** at clean shutdown */
         bool okToCleanUp = false; // successful recovery would set this to true
-        void Journal::cleanup() {
+        void Journal::cleanup(bool _log) {
             if( !okToCleanUp )
                 return;
 
+            if( _log )
+                log() << "journalCleanup..." << endl;
             try {
                 scoped_lock lk(_curLogFileMutex);
                 closeCurrentJournalFile();
@@ -204,7 +209,7 @@ namespace mongo {
                 throw;
             }
         }
-        void journalCleanup() { j.cleanup(); }
+        void journalCleanup(bool log) { j.cleanup(log); }
 
         bool _preallocateIsFaster() {
             bool faster = false;
@@ -237,21 +242,45 @@ namespace mongo {
             return faster;
         }
         bool preallocateIsFaster() {
-            return _preallocateIsFaster() && _preallocateIsFaster() && _preallocateIsFaster(); 
+            Timer t;
+            bool res = false;
+            if( _preallocateIsFaster() && _preallocateIsFaster() ) { 
+                // maybe system is just super busy at the moment? sleep a second to let it calm down.  
+                // deciding to to prealloc is a medium big decision:
+                sleepsecs(1);
+                res = _preallocateIsFaster();
+            }
+            if( t.millis() > 3000 ) 
+                log() << "preallocateIsFaster check took " << t.millis()/1000.0 << " secs" << endl;
+            return res;
         }
 
         // throws
         void preallocateFile(filesystem::path p, unsigned long long len) {
             if( exists(p) ) 
                 return;
+            
+            log() << "preallocating a journal file " << p.string() << endl;
 
             const unsigned BLKSZ = 1024 * 1024;
-            log() << "preallocating a journal file " << p.string() << endl;
-            LogFile f(p.string());
-            AlignedBuilder b(BLKSZ);
-            for( unsigned long long x = 0; x < len; x += BLKSZ ) { 
-                f.synchronousAppend(b.buf(), BLKSZ);
+            assert( len % BLKSZ == 0 );
+
+            AlignedBuilder b(BLKSZ);            
+            memset((void*)b.buf(), 0, BLKSZ);
+
+            ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
+
+            File f;
+            f.open( p.string().c_str() , /*read-only*/false , /*direct-io*/false );
+            assert( f.is_open() );
+            fileofs loc = 0;
+            while ( loc < len ) {
+                f.write( loc , b.buf() , BLKSZ );
+                loc += BLKSZ;
+                m.hit(BLKSZ);
             }
+            assert( loc == len );
+            f.fsync();
         }
 
         // throws
@@ -273,9 +302,9 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            if( preallocateIsFaster() ||
-                exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
-                exists(getJournalDir()/"prealloc.1") ) {
+            if( exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
+                exists(getJournalDir()/"prealloc.1") || 
+                preallocateIsFaster() ) {
                     usingPreallocate = true;
                     try {
                         _preallocateFiles();
@@ -284,6 +313,7 @@ namespace mongo {
                         log() << "warning caught exception in preallocateFiles, continuing" << endl;
                     }
             }
+            j.open();
         }
 
         void removeOldJournalFile(path p) { 
@@ -294,7 +324,17 @@ namespace mongo {
                         filesystem::path filepath = getJournalDir() / fn;
                         if( !filesystem::exists(filepath) ) {
                             // we can recycle this file into this prealloc file location
-                            boost::filesystem::rename(p, filepath);
+                            filesystem::path temppath = getJournalDir() / (fn+".temp");
+                            boost::filesystem::rename(p, temppath);
+                            {
+                                // zero the header
+                                File f;
+                                f.open(temppath.string().c_str(), false, true);
+                                char buf[8192];
+                                memset(buf, 0, 8192);
+                                f.write(0, buf, 8192);
+                            }
+                            boost::filesystem::rename(temppath, filepath);
                             return;
                         }
                     }
@@ -537,7 +577,7 @@ namespace mongo {
 
             scoped_lock lk(_curLogFileMutex);
 
-            if ( inShutdown() )
+            if ( inShutdown() || !_curLogFile )
                 return;
 
             j.updateLSNFile();

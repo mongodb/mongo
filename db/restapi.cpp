@@ -25,7 +25,7 @@
 #include "dbwebserver.h"
 #include "dbhelpers.h"
 #include "repl.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "clientcursor.h"
 #include "background.h"
 
@@ -279,14 +279,6 @@ namespace mongo {
             else {
                 ss << "\nmaster: " << replSettings.master << '\n';
                 ss << "slave:  " << replSettings.slave << '\n';
-                if ( replPair ) {
-                    ss << "replpair:\n";
-                    ss << replPair->getInfo();
-                }
-                bool seemCaughtUp = getInitialSyncCompleted();
-                if ( !seemCaughtUp ) ss << "<b>";
-                ss <<   "initialSyncCompleted: " << seemCaughtUp;
-                if ( !seemCaughtUp ) ss << "</b>";
                 ss << '\n';
             }
 

@@ -79,6 +79,8 @@
 #include "../db/nonce.cpp"
 #include "../db/commands.cpp"
 
+#include "../pch.cpp"
+
 extern "C" {
 #include "../util/md5.c"
 }

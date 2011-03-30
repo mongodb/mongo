@@ -59,8 +59,8 @@ namespace mongo {
         int _balancedLastTime;
 
         // decide which chunks to move; owned here.
-        BalancerPolicy* _policy;
-
+        scoped_ptr<BalancerPolicy> _policy;
+        
         /**
          * Checks that the balancer can connect to all servers it needs to do its job.
          *

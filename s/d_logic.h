@@ -219,7 +219,7 @@ namespace mongo {
     /**
      * @return true if the current threads shard version is ok, or not in sharded version
      */
-    bool shardVersionOk( const string& ns , bool write , string& errmsg );
+    bool shardVersionOk( const string& ns , string& errmsg );
 
     /**
      * @return true if we took care of the message and nothing else should be done

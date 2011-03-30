@@ -67,10 +67,15 @@ namespace mongo {
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     void wasserted(const char *msg, const char *file, unsigned line) {
-        problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        problem() << "warning Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
         raiseError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+        // this is so we notice in buildbot
+        log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
+        abort();
+#endif
     }
 
     void asserted(const char *msg, const char *file, unsigned line) {
@@ -82,6 +87,11 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
+#if defined(_DEBUG) || defined(_DURABLEDEFAULTON)
+        // this is so we notice in buildbot
+        log() << "\n\n***aborting after assert() failure in a debug/test build\n\n" << endl;
+        abort();
+#endif
         throw e;
     }
 

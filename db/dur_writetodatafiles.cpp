@@ -76,11 +76,8 @@ namespace mongo {
         }
 #endif
 
+        // concurrency: in mmmutex, not necessarily in dbMutex
         void WRITETODATAFILES() {
-            dbMutex.assertAtLeastReadLocked();
-
-            MongoFile::markAllWritable(); // for _DEBUG. normally we don't write in a read lock
-
             Timer t;
 #if defined(_EXPERIMENTAL)
             WRITETODATAFILES_Impl3();
@@ -89,10 +86,7 @@ namespace mongo {
 #endif
             stats.curr->_writeToDataFilesMicros += t.micros();
 
-            if (!dbMutex.isWriteLocked())
-                MongoFile::unmarkAllWritable();
 
-            debugValidateAllMapsMatch();
         }
 
     }

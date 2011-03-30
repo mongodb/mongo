@@ -155,7 +155,7 @@ namespace mongo {
 
     bool BalancerPolicy::isDraining( BSONObj limits ) {
         BSONElement draining = limits[ ShardFields::draining.name() ];
-        if ( draining.eoo() || ! draining.Bool() ) {
+        if ( draining.eoo() || ! draining.trueValue() ) {
             return false;
         }
 
@@ -164,7 +164,7 @@ namespace mongo {
 
     bool BalancerPolicy::hasOpsQueued( BSONObj limits ) {
         BSONElement opsQueued = limits[ LimitsFields::hasOpsQueued.name() ];
-        if ( opsQueued.eoo() || ! opsQueued.Bool() ) {
+        if ( opsQueued.eoo() || ! opsQueued.trueValue() ) {
             return false;
         }
         return true;

@@ -17,6 +17,16 @@
 
 #include "pch.h"
 
+#ifndef JSTIME_VIRTUAL_SKEW
+#define JSTIME_VIRTUAL_SKEW
+
+namespace mongo {
+    long long jsTime_virtual_skew = 0;
+    boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
+}
+
+#endif
+
 #if defined( __MSVC__ )
 // should probably check VS version here
 #elif defined( __GNUC__ )

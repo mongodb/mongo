@@ -53,16 +53,16 @@ namespace mongo {
     };
 
     inline void multiCommand(BSONObj cmd, list<Target>& L) {
-        list<BackgroundJob *> jobs;
+        list< shared_ptr<BackgroundJob> > jobs;
 
         for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             Target& d = *i;
             _MultiCommandJob *j = new _MultiCommandJob(cmd, d);
+            jobs.push_back( shared_ptr<BackgroundJob>(j) );
             j->go();
-            jobs.push_back(j);
         }
 
-        for( list<BackgroundJob*>::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
+        for( list< shared_ptr<BackgroundJob> >::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
             (*i)->wait();
         }
     }

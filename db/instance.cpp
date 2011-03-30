@@ -27,7 +27,7 @@
 #include "lasterror.h"
 #include "security.h"
 #include "json.h"
-#include "replpair.h"
+#include "replutil.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
 #include "../util/goodies.h"
@@ -56,8 +56,6 @@ namespace mongo {
 
     string dbExecCommand;
 
-    char *appsrvPath = NULL;
-
     DiagLog _diaglog;
 
     bool useCursors = true;
@@ -78,9 +76,7 @@ namespace mongo {
 #endif
 
     // see FSyncCommand:
-    unsigned lockedForWriting;
-    mongo::mutex lockedForWritingMutex("lockedForWriting");
-    bool unlockRequested = false;
+    extern bool lockedForWriting;
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
@@ -113,7 +109,7 @@ namespace mongo {
             unsigned x = lockedForWriting;
             if( x ) {
                 b.append("fsyncLock", x);
-                b.append("info", "use db.$cmd.sys.unlock.findOne() to terminate the fsync write/snapshot lock");
+                b.append("info", "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
             }
         }
 
@@ -144,16 +140,20 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
+    void unlockFsyncAndWait();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
-        if( ! cc().isAdmin() || strncmp(ns, "admin.", 6) != 0 ) {
+        if ( ! cc().isAdmin() ) { // checks auth
             obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else if (strncmp(ns, "admin.", 6) != 0 ) {
+            obj = fromjson("{\"err\":\"unauthorized - this command must be run against the admin DB\"}");
         }
         else {
             if( lockedForWriting ) {
                 log() << "command: unlock requested" << endl;
-                obj = fromjson("{ok:1,\"info\":\"unlock requested\"}");
-                unlockRequested = true;
+                obj = fromjson("{ok:1,\"info\":\"unlock completed\"}");
+                unlockFsyncAndWait();
             }
             else {
                 obj = fromjson("{ok:0,\"errmsg\":\"not locked\"}");
@@ -579,29 +579,32 @@ namespace mongo {
             return;
 
         Client::Context ctx(ns);
-        int n = 0;
-        while ( d.moreJSObjs() ) {
-            BSONObj js = d.nextJsObj();
-            uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        if( d.moreJSObjs() ) { 
+            int n = 0;
+            while ( 1 ) {
+                BSONObj js = d.nextJsObj();
+                uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
-            {
-                // check no $ modifiers
-                BSONObjIterator i( js );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                {
+                    // check no $ modifiers
+                    BSONObjIterator i( js );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        uassert( 13511 , "object to insert can't have $ modifiers" , e.fieldName()[0] != '$' );
+                    }
                 }
-            }
 
-            theDataFileMgr.insertWithObjMod(ns, js, false);
-            logOp("i", ns, js);
+                theDataFileMgr.insertWithObjMod(ns, js, false);
+                logOp("i", ns, js);
+                ++n;
 
-            if( ++n % 4 == 0 ) {
-                // if we are inserting quite a few, we may need to commit along the way
+                if( !d.moreJSObjs() )
+                    break;
+
                 getDur().commitIfNeeded();
             }
+            globalOpCounters.incInsertInWriteLock(n);
         }
-        globalOpCounters.incInsertInWriteLock(n);
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
@@ -763,8 +766,7 @@ namespace mongo {
         rawOut( ss3.str() );
 
         if( cmdLine.dur ) {
-            log() << "shutdown: journalCleanup..." << endl;
-            dur::journalCleanup();
+            dur::journalCleanup(true);
         }
 
 #if !defined(__sunos__)
@@ -913,12 +915,14 @@ namespace mongo {
                 }
             }
             else {
-                errmsg = str::stream()
-                         << "************** \n"
-                         << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                         << "recommend removing file and running --repair\n"
-                         << "see: http://dochub.mongodb.org/core/repair for more information\n"
-                         << "*************";
+                if (!dur::haveJournalFiles()) {
+                    errmsg = str::stream()
+                             << "************** \n"
+                             << "old lock file: " << name << ".  probably means unclean shutdown\n"
+                             << "recommend removing file and running --repair\n"
+                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
+                             << "*************";
+                }
             }
 
             if (!errmsg.empty()) {
@@ -936,11 +940,10 @@ namespace mongo {
         // Not related to lock file, but this is where we handle unclean shutdown
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
-            cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
+            cout << "Error: journal files are present in journal directory, yet starting without --journal enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
-            cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
-            uasserted(13597, "can't start without --dur enabled when journal/ files are present");
+            uasserted(13597, "can't start without --journal enabled when journal/ files are present");
         }
 
 #ifdef WIN32
@@ -951,6 +954,7 @@ namespace mongo {
         uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
         writePid( lockFile );
         fsync( lockFile );
+        flushMyDirectory(name);
 #endif
     }
 #else

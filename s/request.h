@@ -66,9 +66,6 @@ namespace mongo {
             return _chunkManager;
         }
 
-        int getClientId() const {
-            return _clientId;
-        }
         ClientInfo * getClientInfo() const {
             return _clientInfo;
         }
@@ -103,7 +100,6 @@ namespace mongo {
         DBConfigPtr _config;
         ChunkManagerPtr _chunkManager;
 
-        int _clientId;
         ClientInfo * _clientInfo;
 
         OpCounters* _counter;

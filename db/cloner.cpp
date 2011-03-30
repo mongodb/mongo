@@ -16,6 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "cloner.h"
 #include "pch.h"
 #include "pdfile.h"
 #include "../client/dbclient.h"
@@ -33,10 +34,18 @@ namespace mongo {
 
     bool replAuthenticate(DBClientBase *);
 
+    /** Selectively release the mutex based on a parameter. */
+    class dbtempreleaseif {
+    public:
+        dbtempreleaseif( bool release ) : _impl( release ? new dbtemprelease() : 0 ) {}
+    private:
+        shared_ptr< dbtemprelease > _impl;
+    };
+    
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientWithCommands > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
-                  bool masterSameProcess, bool slaveOk, Query q = Query());
+                  bool masterSameProcess, bool slaveOk, bool mayYield, Query q = Query());
         struct Fun;
     public:
         Cloner() { }
@@ -47,9 +56,9 @@ namespace mongo {
                          for example repairDatabase need not use it.
         */
         void setConnection( DBClientWithCommands *c ) { conn.reset( c ); }
-        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot);
+        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield);
 
-        bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes = true, bool logForRepl = true );
+        bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool copyIndexes = true, bool logForRepl = true );
     };
 
     /* for index info object:
@@ -95,7 +104,7 @@ namespace mongo {
 
             while( i.moreInCurrentBatch() ) {
                 if ( n % 128 == 127 /*yield some*/ ) {
-                    dbtemprelease t;
+                    dbtempreleaseif t( _mayYield );
                 }
 
                 BSONObj tmp = i.nextSafe();
@@ -151,12 +160,13 @@ namespace mongo {
         list<BSONObj> *storedForLater;
         bool logForRepl;
         Client::Context *context;
+        bool _mayYield;
     };
 
     /* copy the specified collection
        isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
     */
-    void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, Query query) {
+    void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, bool mayYield, Query query) {
         list<BSONObj> storedForLater;
 
         Fun f;
@@ -167,11 +177,12 @@ namespace mongo {
         f.saveLast = time( 0 );
         f.storedForLater = &storedForLater;
         f.logForRepl = logForRepl;
+        f._mayYield = mayYield;
 
         int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
         {
-            dbtemprelease r;
-            f.context = r._context;
+            f.context = cc().getContext();
+            dbtempreleaseif r( mayYield );
             DBClientConnection *remote = dynamic_cast< DBClientConnection* >( conn.get() );
             if ( remote ) {
                 remote->query( boost::function<void(DBClientCursorBatchIterator &)>( f ), from_collection, query, 0, options );
@@ -204,12 +215,12 @@ namespace mongo {
         }
     }
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl) {
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl, bool mayYield) {
         Cloner c;
-        return c.copyCollection(host, ns, query, errmsg , /*copyIndexes*/ true, logForRepl);
+        return c.copyCollection(host, ns, query, errmsg, mayYield, /*copyIndexes*/ true, logForRepl);
     }
 
-    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool copyIndexes, bool logForRepl ) {
+    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool copyIndexes, bool logForRepl ) {
         auto_ptr<DBClientConnection> myconn;
         myconn.reset( new DBClientConnection() );
         if ( ! myconn->connect( from , errmsg ) )
@@ -231,7 +242,7 @@ namespace mongo {
 
         {
             // main data
-            copy( ns.c_str() , ns.c_str() , /*isindex*/false , logForRepl , false , true , Query(query).snapshot() );
+            copy( ns.c_str() , ns.c_str() , /*isindex*/false , logForRepl , false , true , mayYield, Query(query).snapshot() );
         }
 
         /* TODO : copyIndexes bool does not seem to be implemented! */
@@ -242,15 +253,16 @@ namespace mongo {
         {
             // indexes
             string temp = ctx.db()->name + ".system.indexes";
-            copy( temp.c_str() , temp.c_str() , /*isindex*/true , logForRepl , false , true , BSON( "ns" << ns ) );
+            copy( temp.c_str() , temp.c_str() , /*isindex*/true , logForRepl , false , true , mayYield, BSON( "ns" << ns ) );
         }
+        getDur().commitIfNeeded();
         return true;
     }
 
     extern bool inDBRepair;
     void ensureIdIndexForNewNs(const char *ns);
 
-    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot) {
+    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield) {
 
         massert( 10289 ,  "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
 
@@ -273,7 +285,7 @@ namespace mongo {
         string ns = fromdb + ".system.namespaces";
         list<BSONObj> toClone;
         {
-            dbtemprelease r;
+            dbtempreleaseif r( mayYield );
 
             // just using exhaust for collection copying right now
             auto_ptr<DBClientCursor> c;
@@ -334,7 +346,7 @@ namespace mongo {
 
         for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
             {
-                dbtemprelease r;
+                dbtempreleaseif r( mayYield );
             }
             BSONObj collection = *i;
             log(2) << "  really will clone: " << collection << endl;
@@ -357,7 +369,7 @@ namespace mongo {
             Query q;
             if( snapshot )
                 q.snapshot();
-            copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk, q);
+            copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk, mayYield, q);
 
             if( wantIdIndex ) {
                 /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
@@ -384,20 +396,15 @@ namespace mongo {
                  rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
                  is dubious here at the moment.
         */
-        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk, BSON( "name" << NE << "_id_" ) );
+        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk, mayYield, BSON( "name" << NE << "_id_" ) );
 
         return true;
     }
 
-    /* slaveOk     - if true it is ok if the source of the data is !ismaster.
-       useReplAuth - use the credentials we normally use as a replication slave for the cloning
-       snapshot    - use $snapshot mode for copying collections.  note this should not be used when it isn't required, as it will be slower.
-                     for example repairDatabase need not use it.
-    */
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication,
-                   bool slaveOk, bool useReplAuth, bool snapshot) {
+                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield) {
         Cloner c;
-        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot);
+        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot, mayYield);
     }
 
     /* Usage:
@@ -422,7 +429,7 @@ namespace mongo {
                were to clone it would get a different point-in-time and not match.
                */
             return cloneFrom(from.c_str(), errmsg, dbname,
-                             /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true);
+                             /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true, /*mayYield*/true);
         }
     } cmdclone;
 
@@ -469,7 +476,7 @@ namespace mongo {
                   << " query: " << query << " " << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
 
             Cloner c;
-            return c.copyCollection( fromhost , collection , query, errmsg , copyIndexes );
+            return c.copyCollection( fromhost , collection , query, errmsg , true, copyIndexes );
         }
     } cmdclonecollection;
 
@@ -564,7 +571,7 @@ namespace mongo {
                 c.setConnection( authConn_.release() );
             }
             Client::Context ctx(todb);
-            bool res = c.go(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true);
+            bool res = c.go(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true, /*mayYield*/true);
             return res;
         }
     } cmdcopydb;

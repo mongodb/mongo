@@ -120,7 +120,8 @@ namespace mongo {
         /** Size of the element.
             @param maxLen If maxLen is specified, don't scan more than maxLen bytes to calculate size.
         */
-        int size( int maxLen = -1 ) const;
+        int size( int maxLen ) const;
+        int size() const;
 
         /** Wrap this element up as a singleton object. */
         BSONObj wrap() const;
@@ -366,8 +367,8 @@ namespace mongo {
             return compareElementValues(*this,other) < 0;
         }
 
-        // If maxLen is specified, don't scan more than maxLen bytes.
-        explicit BSONElement(const char *d, int maxLen = -1) : data(d) {
+        // @param maxLen don't scan more than maxLen bytes
+        explicit BSONElement(const char *d, int maxLen) : data(d) {
             fieldNameSize_ = -1;
             if ( eoo() )
                 fieldNameSize_ = 0;
@@ -378,6 +379,13 @@ namespace mongo {
                     fieldNameSize_ = size + 1;
                 }
             }
+            totalSize = -1;
+        }
+
+        explicit BSONElement(const char *d) : data(d) {
+            fieldNameSize_ = -1;
+            if ( eoo() )
+                fieldNameSize_ = 0;
             totalSize = -1;
         }
 

@@ -48,7 +48,7 @@ namespace mongo {
         const int _port;
 
         /**
-         * @return a rough estimate of elepased time since the server started
+         * @return a rough estimate of elapsed time since the server started
          */
         long long getMyElapsedTimeMillis() const { return _elapsedTime; }
 
@@ -85,12 +85,8 @@ namespace mongo {
         virtual HostAndPort remote() const = 0;
         virtual unsigned remotePort() const = 0;
 
-        virtual int getClientId() {
-            int x = remotePort();
-            x = x << 16;
-            x |= ( ( 0xFF0 & (long long)this ) >> 8 ); // lowest byte in pointer often meaningless
-            return x;
-        }
+    private:
+        int _clientId;
     };
 
     class MessagingPort : public AbstractMessagingPort {
@@ -470,9 +466,6 @@ namespace mongo {
     };
 
     MSGID nextMessageId();
-
-    void setClientId( int id );
-    int getClientId();
 
     extern TicketHolder connTicketHolder;
 

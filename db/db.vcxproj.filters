@@ -292,6 +292,7 @@
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="dur_journalimpl.h" />
     <ClInclude Include="..\util\concurrency\race.h" />
+    <ClInclude Include="..\util\alignedbuilder.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

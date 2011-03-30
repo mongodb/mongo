@@ -25,6 +25,7 @@
 
 #include "util/file_allocator.h"
 #include "util/password.h"
+#include "util/version.h"
 
 using namespace std;
 using namespace mongo;
@@ -44,6 +45,7 @@ namespace mongo {
         _options->add_options()
         ("help","produce help message")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
+        ("version", "print the program's version and exit" )
         ;
 
         if ( access & REMOTE_SERVER )
@@ -92,6 +94,12 @@ namespace mongo {
         printExtraHelpAfter(out);
     }
 
+    void Tool::printVersion(ostream &out) {
+        out << _name << " version " << mongo::versionString;
+        if (mongo::versionString[strlen(mongo::versionString)-1] == '-')
+            out << " (commit " << mongo::gitVersion() << ")";
+        out << endl;
+    }
     int Tool::main( int argc , char ** argv ) {
         static StaticObserver staticObserver;
 
@@ -101,7 +109,11 @@ namespace mongo {
         // we want durability to be disabled.
         cmdLine.dur = false;
 
-        boost::filesystem::path::default_name_check( boost::filesystem::no_check );
+#if( BOOST_VERSION >= 104500 )
+    boost::filesystem::path::default_name_check( boost::filesystem2::no_check );
+#else
+    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
+#endif
 
         _name = argv[0];
 
@@ -139,6 +151,11 @@ namespace mongo {
 
         if ( _params.count( "help" ) ) {
             printHelp(cout);
+            return 0;
+        }
+
+        if ( _params.count( "version" ) ) {
+            printVersion(cout);
             return 0;
         }
 

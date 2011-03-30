@@ -60,7 +60,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool])");
-    print("\tdb." + shortName + ".validate() - SLOW");
+    print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     return __magicNoPrint;
 }
@@ -374,21 +374,48 @@ DBCollection.prototype.renameCollection = function( newName , dropTarget ){
                                      dropTarget : dropTarget } )
 }
 
-DBCollection.prototype.validate = function() {
-    var res = this._db.runCommand( { validate: this.getName() } );
+DBCollection.prototype.validate = function(full) {
+    var cmd = { validate: this.getName() };
 
-    res.valid = false;
+    if (typeof(full) == 'object') // support arbitrary options here
+        Object.extend(cmd, full);
+    else
+        cmd.full = full;
 
-    var raw = res.result || res.raw;
+    var res = this._db.runCommand( cmd );
 
-    if ( raw ){
-        var str = "-" + tojson( raw );
-        res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
+    if (res.raw){
+        // sharded
 
-        var p = /lastExtentSize:(\d+)/;
-        var r = p.exec( str );
-        if ( r ){
-            res.lastExtentSize = Number( r[1] );
+        res.valid = true;
+        for (key in res.raw) {
+            if (typeof(res.raw[key].valid) == 'undefined'){
+                // if any shard is using old-style output use regex test
+                res.valid = undefined;
+                break;
+            }
+            else {
+                res.valid &= res.raw[key].valid;
+            }
+        }
+    }
+
+    if (typeof(res.valid) == 'undefined') {
+        // old-style format just put everything in a string. Now using proper fields
+
+        res.valid = false;
+
+        var raw = res.result || res.raw;
+
+        if ( raw ){
+            var str = "-" + tojson( raw );
+            res.valid = ! ( str.match( /exception/ ) || str.match( /corrupt/ ) );
+
+            var p = /lastExtentSize:(\d+)/;
+            var r = p.exec( str );
+            if ( r ){
+                res.lastExtentSize = Number( r[1] );
+            }
         }
     }
 
@@ -530,12 +557,20 @@ DBCollection.prototype.isCapped = function(){
     return ( e && e.options && e.options.capped ) ? true : false;
 }
 
-DBCollection.prototype.distinct = function( keyString , query ){
-    var res = this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
+DBCollection.prototype._distinct = function( keyString , query ){
+    return this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
     if ( ! res.ok )
         throw "distinct failed: " + tojson( res );
     return res.values;
 }
+
+DBCollection.prototype.distinct = function( keyString , query ){
+    var res = this._distinct( keyString , query );
+    if ( ! res.ok )
+        throw "distinct failed: " + tojson( res );
+    return res.values;
+}
+
 
 DBCollection.prototype.group = function( params ){
     params.ns = this._shortName;
@@ -578,7 +613,8 @@ MapReduceResult.prototype.drop = function(){
 */
 MapReduceResult.prototype.convertToSingleObject = function(){
     var z = {};
-    this._coll.find().forEach( function(a){ z[a._id] = a.value; } );
+    var it = this.results != null ? this.results : this._coll.find();
+    it.forEach( function(a){ z[a._id] = a.value; } );
     return z;
 }
 

@@ -111,56 +111,9 @@ namespace mongo {
         writable.set(chunkno);
     }
 
-    // align so that there is only one map per chunksize so our bitset works right
-    void* mapaligned(HANDLE h, unsigned long long _len) {
-        void *loc = 0;
-        int n = 0;
-        while( 1 ) { 
-            n++;
-            void *m = MapViewOfFileEx(h, FILE_MAP_READ, 0, 0, 0, loc);
-            if( m == 0 ) {
-                DWORD e = GetLastError();
-                if( n == 0 ) { 
-                    // if first fails, it isn't going to work
-                    log() << "mapaligned errno: " << e << endl;
-                    break;
-                }
-                if( debug && n == 1 ) { 
-                    log() << "mapaligned info e:" << e << " at n=1" << endl;
-                }
-                if( n > 98 ) {
-                    log() << "couldn't align mapped view of file len:" << _len/1024.0/1024.0 << "MB errno:" << e << endl;
-                    break;
-                }
-                loc = (void*) (((size_t)loc)+MemoryMappedFile::ChunkSize);
-                continue;
-            }
-
-            size_t x = (size_t) m;
-            if( x % MemoryMappedFile::ChunkSize == 0 ) {
-                void *end = (void*) (x+_len);
-                DEV log() << "mapaligned " << m << '-' << end << " len:" << _len << endl;
-                return m;
-            }
-
-            UnmapViewOfFile(m);
-            x = ((x+MemoryMappedFile::ChunkSize-1) / MemoryMappedFile::ChunkSize) * MemoryMappedFile::ChunkSize;
-            loc = (void*) x;
-            if( n % 20 == 0 ) { 
-                log() << "warning mapaligned n=20" << endl;
-            }
-            if( n > 100 ) {
-                log() << "couldn't align mapped view of file len:" << _len/1024.0/1024.0 << "MB" << endl;
-                break;
-            }
-        }
-        return 0;
-    }
-
     void* MemoryMappedFile::createPrivateMap() {
         assert( maphandle );
         scoped_lock lk(mapViewMutex);
-        //void *p = mapaligned(maphandle, len);
         void *p = MapViewOfFile(maphandle, FILE_MAP_READ, 0, 0, 0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
@@ -198,6 +151,7 @@ namespace mongo {
             assert(p);
         }
         assert(p == oldPrivateAddr);
+
         return p;
     }
 #endif
@@ -342,11 +296,7 @@ namespace mongo {
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) {
         setPath(fname);
-        bool preExisting = MemoryMappedFile::exists(fname.c_str());
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
-        if( cmdLine.dur && _view_write && !preExisting ) {
-            getDur().createdFile(fname, len);
-        }
         return finishOpening();
     }
 
@@ -382,8 +332,6 @@ namespace mongo {
     /*virtual*/ void MongoMMF::close() {
         {
             if( cmdLine.dur && _view_write/*actually was opened*/ ) {
-                if( debug )
-                    log() << "closingFileNotication:" << filename() << endl;
                 dur::closingFileNotification();
             }
             privateViews.remove(_view_private);
