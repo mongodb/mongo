@@ -52,13 +52,17 @@ namespace mongo {
         }
     protected:
         void run() {
+            log() << "starting" << endl;
             while ( ! inShutdown() ) {
                 sleepsecs( 20 );
                 try {
                     ReplicaSetMonitor::checkAll();
                 }
                 catch ( std::exception& e ) {
-                    error() << "ReplicaSetMonitorWatcher: check failed: " << e.what() << endl;
+                    error() << "check failed: " << e.what() << endl;
+                }
+                catch ( ... ) {
+                    error() << "unkown error" << endl;
                 }
             }
         }
@@ -121,6 +125,7 @@ namespace mongo {
         while ( true ) {
             ReplicaSetMonitorPtr m;
             {
+                scoped_lock lk( _setsLock );
                 for ( map<string,ReplicaSetMonitorPtr>::iterator i=_sets.begin(); i!=_sets.end(); ++i ) {
                     string name = i->first;
                     if ( seen.count( name ) )
@@ -175,8 +180,10 @@ namespace mongo {
     void ReplicaSetMonitor::notifyFailure( const HostAndPort& server ) {
         scoped_lock lk( _lock );
         if ( _master >= 0 && _master < (int)_nodes.size() ) {
-            if ( server == _nodes[_master].addr )
+            if ( server == _nodes[_master].addr ) {
+                _nodes[_master].ok = false; 
                 _master = -1;
+            }
         }
     }
 
@@ -190,7 +197,7 @@ namespace mongo {
         }
         
         _check();
-        
+
         scoped_lock lk( _lock );
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
         return _nodes[_master].addr;
@@ -427,7 +434,7 @@ namespace mongo {
         }
 
         _masterHost = _monitor->getMaster();
-        _master.reset( new DBClientConnection( true ) );
+        _master.reset( new DBClientConnection( true , this ) );
         string errmsg;
         if ( ! _master->connect( _masterHost , errmsg ) ) {
             _monitor->notifyFailure( _masterHost );
@@ -447,7 +454,7 @@ namespace mongo {
         }
         
         _slaveHost = _monitor->getSlave();
-        _slave.reset( new DBClientConnection( true ) );
+        _slave.reset( new DBClientConnection( true , this ) );
         _slave->connect( _slaveHost );
         _auth( _slave.get() );
         return _slave.get();
@@ -562,6 +569,11 @@ namespace mongo {
         assert(0);
     }
 
+    void DBClientReplicaSet::isntMaster() { 
+        log() << "got not master for: " << _masterHost << endl;
+        _monitor->notifyFailure( _masterHost );
+        _master.reset(); 
+    }
 
     bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( toSend.operation() == dbQuery ) {

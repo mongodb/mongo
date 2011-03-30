@@ -213,7 +213,7 @@ namespace mongo {
 
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
-        void isntMaster() { _master.reset(); }
+        void isntMaster();
 
         // ----- status ------
 
