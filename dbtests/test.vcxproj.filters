@@ -548,9 +548,6 @@
     <ClCompile Include="namespacetests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
-    <ClCompile Include="pairingtests.cpp">
-      <Filter>dbtests</Filter>
-    </ClCompile>
     <ClCompile Include="pdfiletests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
