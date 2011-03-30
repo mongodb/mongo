@@ -15,7 +15,7 @@
  */
 
 #include "pch.h"
-#include "db/commands/pipeline.h"
+#include "db/commands/pipeline2.h"
 
 #include "db/cursor.h"
 #include "db/pipeline/accumulator.h"
