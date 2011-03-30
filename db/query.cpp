@@ -1164,7 +1164,7 @@ namespace mongo {
                 cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
             }
             else {
-                cursor->setMatcher( dqo.matcher() );
+                if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher() );
                 cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
             cursorid = cc->cursorid();

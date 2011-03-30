@@ -1220,6 +1220,10 @@ namespace mongo {
 
         virtual long long nscanned() { return _nscanned; }
 
+        virtual CoveredIndexMatcher *matcher() const {
+        	return _s->_hopper->_matcher.get();
+        }
+
         shared_ptr<GeoSearch> _s;
         GeoHopper::Holder::iterator _cur;
         GeoHopper::Holder::iterator _end;
@@ -1288,6 +1292,9 @@ namespace mongo {
         virtual DiskLoc currLoc() { assert(ok()); return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
+        virtual CoveredIndexMatcher *matcher() const {
+        	return _matcher.get();
+        }
 
         virtual bool moreToDo() = 0;
         virtual void fillStack() = 0;
