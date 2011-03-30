@@ -67,4 +67,25 @@ assert.eq( N , viaS2.find().toArray().length , "other B" );
 
 printjson( primary._db._adminCommand( "shardingState" ) );
 
+
+// This tests sharding an existing collection that both shards are aware of (SERVER-2828)
+s1.getDB('test').existing.insert({_id:1})
+assert.eq(1, s1.getDB('test').existing.count({_id:1}));
+assert.eq(1, s2.getDB('test').existing.count({_id:1}));
+
+s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
+//assert.eq(true, s1.getDB('test').existing.stats().sharded); //SERVER-2828
+assert.eq(true, s2.getDB('test').existing.stats().sharded);
+
+
+if (0) // This should work but doesn't due to SERVER-2828
+    res = s1.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+else
+    res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+
+assert.eq(1 , res.ok, tojson(res));
+
+//assert.eq(1, s1.getDB('test').existing.count({_id:1})); // SERVER-2828
+assert.eq(1, s2.getDB('test').existing.count({_id:1}));
+
 s1.stop();
