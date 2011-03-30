@@ -449,7 +449,8 @@ namespace mongo {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
             auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
             shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, origFrs, query, sort ).getBestGuess()->newCursor();
-            if ( !query.isEmpty() ) {
+            // If we don't already have a matcher, supply one.
+            if ( !query.isEmpty() && ! ret->matcher() ) {
                 shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );
             }
