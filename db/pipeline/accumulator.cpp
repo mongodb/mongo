@@ -17,17 +17,14 @@
 #include "pch.h"
 #include "accumulator.h"
 
-namespace mongo
-{
+namespace mongo {
     void Accumulator::addOperand(
-	shared_ptr<Expression> pExpression)
-    {
-	assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
-	ExpressionNary::addOperand(pExpression);
+        shared_ptr<Expression> pExpression) {
+        assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
+        ExpressionNary::addOperand(pExpression);
     }
 
     Accumulator::Accumulator():
-	ExpressionNary()
-    {
+        ExpressionNary() {
     }
 }

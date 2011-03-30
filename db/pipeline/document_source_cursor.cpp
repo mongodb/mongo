@@ -22,32 +22,26 @@
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 
-namespace mongo
-{
+namespace mongo {
     DocumentSourceCursor::DocumentSourceCursor(shared_ptr<Cursor> pTheCursor):
-	pCursor(pTheCursor)
-    {
+        pCursor(pTheCursor) {
     }
 
-    bool DocumentSourceCursor::eof()
-    {
-	return pCursor->eof();
+    bool DocumentSourceCursor::eof() {
+        return pCursor->eof();
     }
 
-    bool DocumentSourceCursor::advance()
-    {
-	return pCursor->advance();
+    bool DocumentSourceCursor::advance() {
+        return pCursor->advance();
     }
 
-    shared_ptr<Document> DocumentSourceCursor::getCurrent()
-    {
-	BSONObj documentObj(pCursor->current());
-	shared_ptr<Document> pDocument(
-	    Document::createFromBsonObj(&documentObj));
-	return pDocument;
+    shared_ptr<Document> DocumentSourceCursor::getCurrent() {
+        BSONObj documentObj(pCursor->current());
+        shared_ptr<Document> pDocument(
+            Document::createFromBsonObj(&documentObj));
+        return pDocument;
     }
 
-    DocumentSourceCursor::~DocumentSourceCursor()
-    {
+    DocumentSourceCursor::~DocumentSourceCursor() {
     }
 }
