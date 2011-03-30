@@ -543,9 +543,10 @@ static const uint32_t g_crc_slicing[8][256] = {
  * http://www.strchr.com/crc32_popcnt
  */
 uint32_t
-__wt_cksum(const void *chunk, uint32_t len)
+__wt_cksum(const void *chunk, size_t len)
 {
-	uint32_t crc, next, nqwords;
+	uint32_t crc, next;
+	size_t nqwords;
 	const uint8_t *p;
 
 	crc = 0xffffffff;

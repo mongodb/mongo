@@ -361,7 +361,7 @@ __wt_thread_join(pthread_t tid);
 void
 __wt_yield(void);
 uint32_t
-__wt_cksum(const void *chunk, uint32_t len);
+__wt_cksum(const void *chunk, size_t len);
 void
 __wt_msg_call(void *cb, void *handle,
     const char *pfx1, const char *pfx2,
@@ -457,10 +457,7 @@ __wt_session_serialize_func(SESSION *session,
 void
 __wt_session_serialize_wrapup(SESSION *session, WT_PAGE *page, int ret);
 int
-__wt_sb_alloc(SESSION *session,
-    uint32_t size,
-    void *retp,
-    SESSION_BUFFER **sbp);
+__wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp);
 void
 __wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb);
 int

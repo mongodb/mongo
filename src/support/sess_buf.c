@@ -12,11 +12,13 @@
  *	Allocate memory from the SESSION's buffer and fill it in.
  */
 int
-__wt_sb_alloc(SESSION *session, uint32_t size, void *retp, SESSION_BUFFER **sbp)
+__wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 {
 	SESSION_BUFFER *sb;
 	uint32_t align_size, alloc_size;
 	int single_use;
+
+	WT_ASSERT(session, size < UINT32_MAX);
 
 	/*
 	 * Allocate memory for an insert or change; there's a buffer in the
