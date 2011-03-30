@@ -1,5 +1,5 @@
 /**
- * Copyright 2011 10gen Inc.
+ * Copyright (c) 2011 10gen Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,29 +15,36 @@
  */
 
 #include "pch.h"
-#include "FieldIterator.h"
+#include "accumulator.h"
 
-#include "Document.h"
+#include "db/pipeline/value.h"
 
 namespace mongo
 {
-    FieldIterator::FieldIterator(shared_ptr<Document> pTheDocument):
-	pDocument(pTheDocument),
-	index(0)
+    shared_ptr<const Value> AccumulatorAppend::evaluate(
+	shared_ptr<Document> pDocument) const
+    {
+	assert(vpOperand.size() == 1);
+	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	vpValue.push_back(prhs);
+
+	return Value::getNull();
+    }
+
+    shared_ptr<const Value> AccumulatorAppend::getValue() const
+    {
+	return Value::createArray(vpValue);
+    }
+
+    AccumulatorAppend::AccumulatorAppend():
+	Accumulator(),
+	vpValue()
     {
     }
 
-    bool FieldIterator::more() const
+    shared_ptr<Accumulator> AccumulatorAppend::create()
     {
-	return (index < pDocument->vFieldName.size());
-    }
-
-    pair<string, shared_ptr<const Value>> FieldIterator::next()
-    {
-	assert(more());
-	pair<string, shared_ptr<const Value>> result(
-	    pDocument->vFieldName[index], pDocument->vpValue[index]);
-	++index;
-	return result;
+	shared_ptr<AccumulatorAppend> pAccumulator(new AccumulatorAppend());
+	return pAccumulator;
     }
 }

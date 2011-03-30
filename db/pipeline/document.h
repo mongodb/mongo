@@ -17,12 +17,12 @@
 #pragma once
 
 #include "pch.h"
-#include "jsobj.h"
 
 namespace mongo
 {
-    class Value;
+    class BSONObj;
     class FieldIterator;
+    class Value;
 
     class Document :
         public boost::enable_shared_from_this<Document>,
@@ -117,5 +117,43 @@ namespace mongo
 	/* these two vectors parallel each other */
 	vector<string> vFieldName;
 	vector<shared_ptr<const Value>> vpValue;
+    };
+
+
+    class FieldIterator :
+        boost::noncopyable
+    {
+    public:
+	/*
+	  Ask if there are more fields to return.
+
+	  @return true if there are more fields, false otherwise
+	*/
+	bool more() const;
+
+	/*
+	  Move the iterator to point to the next field and return it.
+
+	  @return the next field's <name, Value>
+	*/
+	pair<string, shared_ptr<const Value>> next();
+
+    private:
+	friend class Document;
+
+	/*
+	  Constructor.
+
+	  @param pDocument points to the document whose fields are being
+	      iterated
+	*/
+	FieldIterator(shared_ptr<Document> pDocument);
+
+	/*
+	  We'll hang on to the original document to ensure we keep the
+	  fieldPtr vector alive.
+	*/
+	shared_ptr<Document> pDocument;
+	size_t index; // current field in iteration
     };
 }

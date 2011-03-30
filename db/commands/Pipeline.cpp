@@ -15,30 +15,14 @@
  */
 
 #include "pch.h"
-#include "Pipeline.h"
+#include "db/commands/pipeline.h"
 
-#include "../cursor.h"
-#include "../AccumulatorAppend.h"
-#include "../AccumulatorMinMax.h"
-#include "../AccumulatorSum.h"
-#include "../Document.h"
-#include "../DocumentSource.h"
-#include "../DocumentSourceCursor.h"
-#include "../DocumentSourceFilter.h"
-#include "../DocumentSourceGroup.h"
-#include "../DocumentSourceProject.h"
-#include "../ExpressionAdd.h"
-#include "../ExpressionAnd.h"
-#include "../ExpressionCompare.h"
-#include "../ExpressionConstant.h"
-#include "../ExpressionDivide.h"
-#include "../ExpressionDocument.h"
-#include "../ExpressionFieldPath.h"
-#include "../ExpressionIfNull.h"
-#include "../ExpressionNot.h"
-#include "../ExpressionOr.h"
-#include "../FieldIterator.h"
-#include "../pdfile.h"
+#include "db/cursor.h"
+#include "db/pipeline/accumulator.h"
+#include "db/pipeline/document.h"
+#include "db/pipeline/document_source.h"
+#include "db/pipeline/expression.h"
+#include "db/pdfile.h"
 
 namespace mongo
 {

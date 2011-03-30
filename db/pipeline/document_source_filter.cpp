@@ -16,10 +16,10 @@
 
 #include "pch.h"
 
-#include "DocumentSourceFilter.h"
+#include "db/pipeline/document_source.h"
 
-#include "Expression.h"
-#include "Value.h"
+#include "db/pipeline/expression.h"
+#include "db/pipeline/value.h"
 
 namespace mongo
 {

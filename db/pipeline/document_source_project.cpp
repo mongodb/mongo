@@ -15,11 +15,11 @@
  */
 
 #include "pch.h"
-#include "DocumentSourceProject.h"
+#include "db/pipeline/document_source.h"
 
-#include "Document.h"
-#include "Expression.h"
-#include "Value.h"
+#include "db/pipeline/document.h"
+#include "db/pipeline/expression.h"
+#include "db/pipeline/value.h"
 
 namespace mongo
 {

@@ -17,13 +17,33 @@
 #pragma once
 
 #include "pch.h"
-#include "jsobj.h"
-
-#include "db/ValueIterator.h"
+//#include "jsobj.h"
+#include "bson/bsontypes.h"
 
 namespace mongo
 {
+    class BSONElement;
     class Document;
+    class Value;
+
+    class ValueIterator
+    {
+    public:
+	/*
+	  Ask if there are more fields to return.
+
+	  @returns true if there are more fields, false otherwise
+	*/
+	virtual bool more() const = 0;
+
+	/*
+	  Move the iterator to point to the next field and return it.
+
+	  @returns the next field's <name, Value>
+	*/
+	virtual shared_ptr<const Value> next() = 0;
+    };
+
 
     /*
       Values are immutable, so these are passed around as
@@ -316,4 +336,6 @@ namespace mongo
 	shared_ptr<const Value> pValue(&fieldOne, null_deleter());
 	return pValue;
     }
+
+
 };

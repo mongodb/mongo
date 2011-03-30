@@ -15,9 +15,10 @@
  */
 
 #include "pch.h"
-#include "Value.h"
+#include "db/pipeline/value.h"
 
-#include "Document.h"
+#include "db/jsobj.h"
+#include "db/pipeline/document.h"
 
 namespace mongo
 {

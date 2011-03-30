@@ -15,9 +15,9 @@
  */
 
 #include "pch.h"
-#include "Document.h"
-#include "FieldIterator.h"
-#include "Value.h"
+#include "db/jsobj.h"
+#include "db/pipeline/document.h"
+#include "db/pipeline/value.h"
 
 namespace mongo
 {
@@ -153,5 +153,27 @@ namespace mongo
 	/* NOTREACHED */
 	assert(false); // CW TODO
 	return 0;
+    }
+
+/* ---------------------------- FieldIterator ----------------------------- */
+
+    FieldIterator::FieldIterator(shared_ptr<Document> pTheDocument):
+	pDocument(pTheDocument),
+	index(0)
+    {
+    }
+
+    bool FieldIterator::more() const
+    {
+	return (index < pDocument->vFieldName.size());
+    }
+
+    pair<string, shared_ptr<const Value>> FieldIterator::next()
+    {
+	assert(more());
+	pair<string, shared_ptr<const Value>> result(
+	    pDocument->vFieldName[index], pDocument->vpValue[index]);
+	++index;
+	return result;
     }
 }

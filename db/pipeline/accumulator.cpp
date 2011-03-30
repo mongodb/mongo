@@ -15,42 +15,19 @@
  */
 
 #include "pch.h"
-#include "ExpressionNot.h"
-
-#include "Value.h"
+#include "accumulator.h"
 
 namespace mongo
 {
-    ExpressionNot::~ExpressionNot()
+    void Accumulator::addOperand(
+	shared_ptr<Expression> pExpression)
     {
-    }
-
-    shared_ptr<ExpressionNary> ExpressionNot::create()
-    {
-	shared_ptr<ExpressionNot> pExpression(new ExpressionNot());
-	return pExpression;
-    }
-
-    ExpressionNot::ExpressionNot():
-	ExpressionNary()
-    {
-    }
-
-    void ExpressionNot::addOperand(shared_ptr<Expression> pExpression)
-    {
-	assert(vpOperand.size() < 1); // CW TODO user error
+	assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
 	ExpressionNary::addOperand(pExpression);
     }
 
-    shared_ptr<const Value> ExpressionNot::evaluate(
-	shared_ptr<Document> pDocument) const
+    Accumulator::Accumulator():
+	ExpressionNary()
     {
-	assert(vpOperand.size() == 1); // CW TODO user error
-	shared_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
-
-	bool b = pOp->coerceToBool();
-	if (b)
-	    return Value::getFalse();
-	return Value::getTrue();
     }
 }

@@ -15,9 +15,9 @@
  */
 
 #include "pch.h"
-#include "db/AccumulatorMinMax.h"
+#include "accumulator.h"
 
-#include "db/Value.h"
+#include "db/pipeline/value.h"
 
 namespace mongo
 {

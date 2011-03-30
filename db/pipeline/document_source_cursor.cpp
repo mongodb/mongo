@@ -16,10 +16,11 @@
 
 #include "pch.h"
 
-#include "Cursor.h"
-#include "Document.h"
-#include "DocumentSourceCursor.h"
-#include "Expression.h"
+#include "db/pipeline/document_source.h"
+
+#include "db/Cursor.h"
+#include "db/pipeline/document.h"
+#include "db/pipeline/expression.h"
 
 namespace mongo
 {

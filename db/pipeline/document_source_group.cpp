@@ -16,12 +16,12 @@
 
 #include "pch.h"
 
-#include "DocumentSourceGroup.h"
+#include "db/pipeline/document_source.h"
 
-#include "Accumulator.h"
-#include "Document.h"
-#include "Expression.h"
-#include "Value.h"
+#include "db/pipeline/accumulator.h"
+#include "db/pipeline/document.h"
+#include "db/pipeline/expression.h"
+#include "db/pipeline/value.h"
 
 namespace mongo
 {
