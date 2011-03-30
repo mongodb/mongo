@@ -787,7 +787,7 @@ namespace mongo {
            Connect timeout is fixed, but short, at 5 seconds.
          */
         DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
-            clientSet(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) {
+            clientSet(cp), _failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) {
             _numConnections++;
         }
 
@@ -858,14 +858,14 @@ namespace mongo {
            @return true if this connection is currently in a failed state.  When autoreconnect is on,
                    a connection will transition back to an ok state after reconnecting.
          */
-        bool isFailed() const { return failed; }
+        bool isFailed() const { return _failed; }
 
         MessagingPort& port() { return *p; }
 
         string toStringLong() const {
             stringstream ss;
             ss << _serverString;
-            if ( failed ) ss << " failed";
+            if ( _failed ) ss << " failed";
             return ss.str();
         }
 
@@ -897,7 +897,7 @@ namespace mongo {
         DBClientReplicaSet *clientSet;
         boost::scoped_ptr<MessagingPort> p;
         boost::scoped_ptr<SockAddr> server;
-        bool failed;
+        bool _failed;
         const bool autoReconnect;
         time_t lastReconnectTry;
         HostAndPort _server; // remember for reconnects
@@ -905,7 +905,7 @@ namespace mongo {
         void _checkConnection();
 
         // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
-        void checkConnection() { if( failed ) _checkConnection(); }
+        void checkConnection() { if( _failed ) _checkConnection(); }
 
         map< string, pair<string,string> > authCache;
         double _so_timeout;
