@@ -85,8 +85,6 @@ namespace mongo {
         virtual HostAndPort remote() const = 0;
         virtual unsigned remotePort() const = 0;
 
-        virtual int getClientId();
-        
     private:
         int _clientId;
     };
@@ -468,9 +466,6 @@ namespace mongo {
     };
 
     MSGID nextMessageId();
-
-    void setClientId( int id );
-    int getClientId();
 
     extern TicketHolder connTicketHolder;
 
