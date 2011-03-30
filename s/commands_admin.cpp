@@ -412,8 +412,6 @@ namespace mongo {
                     while ( cursor->more() ) {
                         BSONObj idx = cursor->next();
 
-                        log() << "Index: " << idx << endl;
-
                         bool idIndex = ! idx["name"].eoo() && idx["name"].String() == "_id_";
                         bool uniqueIndex = ( ! idx["unique"].eoo() && idx["unique"].trueValue() ) ||
                         		           idIndex;
