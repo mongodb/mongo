@@ -113,7 +113,7 @@ namespace mongo {
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
 
-        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns
+        LOG(2) << " have to set shard version for conn: " << &conn << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
                << endl;
@@ -126,7 +126,7 @@ namespace mongo {
             return true;
         }
 
-        log(1) << "       setShardVersion failed!\n" << result << endl;
+        LOG(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result.getBoolField( "need_authoritative" ) )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
@@ -137,7 +137,7 @@ namespace mongo {
         }
 
         if ( tryNumber < 4 ) {
-            log(1) << "going to retry checkShardVersion" << endl;
+            LOG(1) << "going to retry checkShardVersion" << endl;
             sleepmillis( 10 );
             checkShardVersion( conn , ns , 1 , tryNumber + 1 );
             return true;
