@@ -89,10 +89,10 @@ int main( int argc , const char ** argv ) {
 
     conn->dropCollection( collName );
     
-    vector<shared_ptr<boost::thread> > threads;
+    vector<boost::shared_ptr<boost::thread> > threads;
     for ( unsigned i=0; i<nThreads; i++ ) {
         string errmsg;
-        threads.push_back( shared_ptr<boost::thread>( new boost::thread( boost::bind( workerThread , collName , print , (DBClientReplicaSet*)cs.connect(errmsg) ) ) ) );
+        threads.push_back( boost::shared_ptr<boost::thread>( new boost::thread( boost::bind( workerThread , collName , print , (DBClientReplicaSet*)cs.connect(errmsg) ) ) ) );
     }
     
     for ( unsigned i=0; i<threads.size(); i++ ) {
