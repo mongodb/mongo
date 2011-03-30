@@ -691,6 +691,10 @@ int main(int argc, char* argv[]) {
     ("nohints", "ignore query hints")
     ("dur", "enable journaling") // deprecated version
     ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
+    // deprecated pairing command line options
+    ("pairwith", "DEPRECATED")
+    ("arbiter", "DEPRECATED")
+    ("opIdMem", "DEPRECATED")
     ;
 
 
@@ -970,6 +974,13 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("noMoveParanoia")) {
             cmdLine.moveParanoia = false;
+        }
+        if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
+            out() << "****" << endl;
+            out() << "Replica Pairs have been deprecated." << endl;
+            out() << "<http://www.mongodb.org/display/DOCS/Replica+Pairs>" << endl;
+            out() << "****" << endl;
+            dbexit( EXIT_BADOPTIONS );
         }
 
         Module::configAll( params );
