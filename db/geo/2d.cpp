@@ -284,9 +284,9 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert_msg( 13027 , "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
+            uassert( 13027 , str::stream() << "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
             in -= _min;
-            uassert_msg( 14021 , "point not in range > " << _min , in > 0 );
+            uassert( 14021 , str::stream() << "point not in range > " << _min , in > 0 );
             return (unsigned)(in * _scaling);
         }
 

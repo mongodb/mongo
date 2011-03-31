@@ -261,7 +261,7 @@ namespace mongo {
                     dlk = dist_lock_try( &lockSetup , string("Moving primary shard of ") + dbname );
                 }
                 catch( LockException& e ){
-	                errmsg = string("error locking distributed lock to move primary shard of ") + dbname + m_caused_by(e);
+	                errmsg = str::stream() << "error locking distributed lock to move primary shard of " << dbname << causedBy( e );
 	                warning() << errmsg << endl;
 	                return false;
                 }
