@@ -156,6 +156,12 @@ namespace mongo {
             log() << "couldn't find member with id " << whoid << rsLog;
             vote = -10000;
         }
+        else if( primary && primary == rs._self && rs.lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
+            // hbinfo is not updated, so we have to check the primary's last optime separately
+            log() << "I am already primary, " << hopeful->fullName()
+                  << " can try again once I've stepped down" << rsLog;
+            vote = -10000;
+        }
         else if( primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime ) {
             // other members might be aware of more up-to-date nodes
             log() << hopeful->fullName() << " is trying to elect itself but " <<
