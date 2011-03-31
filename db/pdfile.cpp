@@ -773,9 +773,9 @@ namespace mongo {
                 getDur().writingDiskLoc( a.ext()->xprev ) = d->lastExtent;
                 getDur().writingDiskLoc( d->lastExtent.ext()->xnext ) = a;
                 getDur().writingDiskLoc( freeExtents->firstExtent ) = d->firstExtent;
-                getDur().writingDiskLoc( d->firstExtent ).setInvalid();
-                getDur().writingDiskLoc( d->lastExtent ).setInvalid();
             }
+            getDur().writingDiskLoc( d->firstExtent ).setInvalid();
+            getDur().writingDiskLoc( d->lastExtent ).setInvalid();
         }
 
         // remove from the catalog hashtable
