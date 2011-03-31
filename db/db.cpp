@@ -109,11 +109,13 @@ namespace mongo {
                 boost::thread thr(boost::bind(&connThread,mp));
             }
             catch ( boost::thread_resource_error& ) {
+                connTicketHolder.release();
                 log() << "can't create new thread, closing connection" << endl;
                 mp->shutdown();
                 delete mp;
             }
             catch ( ... ) {
+                connTicketHolder.release();
                 log() << "unkonwn exception starting connThread" << endl;
                 mp->shutdown();
                 delete mp;
