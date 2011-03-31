@@ -85,7 +85,7 @@ else
 
 assert.eq(1 , res.ok, tojson(res));
 
-//assert.eq(1, s1.getDB('test').existing.count({_id:1})); // SERVER-2828
+assert.eq(1, s1.getDB('test').existing.count({_id:1})); // SERVER-2828
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
 s1.stop();
