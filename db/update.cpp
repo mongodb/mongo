@@ -570,12 +570,15 @@ namespace mongo {
 
             switch ( m.m->op ) {
             case Mod::UNSET:
-            case Mod::PULL:
-            case Mod::PULL_ALL:
             case Mod::ADDTOSET:
             case Mod::RENAME_FROM:
             case Mod::RENAME_TO:
                 // this should have been handled by prepare
+                break;
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+            case Mod::POP:
+                assert( m.old.eoo() || ( m.old.isABSONObj() && m.old.Obj().isEmpty() ) );
                 break;
                 // [dm] the BSONElementManipulator statements below are for replication (correct?)
             case Mod::INC:
