@@ -58,7 +58,7 @@ namespace mongo {
         shared_ptr<Cursor> newReverseCursor() const;
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
-        bool willScanTable() const { return !_index && _fbs.matchPossible(); }
+        bool willScanTable() const { return _idxNo < 0; }
         const char *ns() const { return _fbs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
