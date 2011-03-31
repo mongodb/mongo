@@ -53,7 +53,14 @@ __wt_verify_dsk_page(
 
 	/* Ignore the checksum -- it verified when we first read the page. */
 
-	if (dsk->unused[0] != '\0' || dsk->unused[1] != '\0') {
+	if (dsk->size != size) {
+		__wt_errx(session,
+		    "page at addr %lu has an incorrect size", (u_long)addr);
+		return (WT_ERROR);
+	}
+
+	if (dsk->unused[0] != '\0' ||
+	    dsk->unused[1] != '\0' || dsk->unused[2] != '\0') {
 		__wt_errx(session,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);
