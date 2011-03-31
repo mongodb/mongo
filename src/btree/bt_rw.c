@@ -56,6 +56,10 @@ __wt_disk_write(
 	fh = btree->fh;
 
 	/*
+	 * The disk write function sets a few things in the WT_PAGE_DISK header
+	 * simply because it's easy to do it here.  In a transactional store,
+	 * things may be a little harder.
+	 *
 	 * We increment the page LSN in non-transactional stores so it's easy
 	 * to identify newer versions of pages during salvage: both pages are
 	 * likely to be internally consistent, and might have the same initial
@@ -66,19 +70,17 @@ __wt_disk_write(
 	 * internal page may not have been written to disk after the leaf page
 	 * was updated.
 	 */
-	if (dsk->lsn_off == UINT32_MAX) {
-		++dsk->lsn_file;
-		dsk->lsn_off = 0;
-	} else
-		++dsk->lsn_off;
+	WT_LSN_INCR(btree->lsn);
+	dsk->lsn = btree->lsn;
+	dsk->size = size;
+
+	dsk->checksum = 0;
+	dsk->checksum = __wt_cksum(dsk, size);
 
 	WT_ASSERT(session, __wt_verify_dsk_page(session, dsk, addr, size) == 0);
 
 	WT_STAT_INCR(btree->stats, FILE_PAGE_WRITE);
 	WT_STAT_INCR(S2C(session)->cache->stats, CACHE_PAGE_WRITE);
-
-	dsk->checksum = 0;
-	dsk->checksum = __wt_cksum(dsk, size);
 
 	return (
 	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));
