@@ -123,8 +123,8 @@ wts_startup(int logfile)
 
 	p = fname("wt");
 	if ((ret = btree->open(btree, p, 0660, WT_CREATE)) != 0) {
-		fprintf(stderr, "%s: btree.open: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
+		fprintf(stderr, "%s: %s: btree.open: %s\n",
+		    p, g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
@@ -219,6 +219,25 @@ wts_dump(void)
 
 	return (0);
 }
+
+int
+wts_salvage(void)
+{
+	BTREE *btree;
+	int ret;
+	char *p;
+
+	btree = g.wts_btree;
+
+	p = fname("wt");
+	if ((ret = btree->salvage(btree, track, 0)) != 0) {
+		fprintf(stderr, "%s: btree.salvage: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+	return (0);
+}
+
 
 static int
 wts_sync(void)
