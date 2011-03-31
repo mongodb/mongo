@@ -129,17 +129,38 @@ struct __wt_page_disk {
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
-	uint32_t lsn_file;		/* 08-11: LSN file */
-	uint32_t lsn_off;		/* 12-15: LSN file offset */
+	/*
+	 * The LSN is a 64-bit chunk to make comparisons easier, but it's really
+	 * 2 32-bit values: a file number and a file offset.
+	 */
+#define	WT_LSN_FILE(lsn)						\
+	((uint32_t)(((lsn) & 0xffffffff00000000ULL) >> 32))
+#define	WT_LSN_OFFSET(lsn)						\
+	((uint32_t)((lsn) & 0xffffffff))
+#define	WT_LSN_INCR(lsn) do {						\
+	if (WT_LSN_OFFSET(lsn) == UINT32_MAX)				\
+		((lsn) = WT_LSN_FILE(lsn) + 0x100000000ULL);		\
+	else								\
+		++(lsn);						\
+} while (0)
+	uint64_t lsn;			/* 08-15: LSN file/offset pair */
 
 	uint32_t checksum;		/* 16-19: checksum */
 
+	/*
+	 * We don't need the page length for normal processing as the page's
+	 * parent knows how big it is.  However, we keep the page size in the
+	 * page header because it makes salvage easier, we know how long the
+	 * expected page is.
+	 */
+	uint32_t size;			/* 20-23: size of page */
+
 	union {
-		uint32_t entries;	/* 20-23: number of cells on page */
-		uint32_t datalen;	/* 20-23: overflow data length */
+		uint32_t entries;	/* 24-27: number of cells on page */
+		uint32_t datalen;	/* 24-27: overflow data length */
 	} u;
 
-	uint8_t type;			/* 24: page type */
+	uint8_t type;			/* 28: page type */
 
 	/*
 	 * It would be possible to decrease the size of the page header by 3
@@ -148,7 +169,7 @@ struct __wt_page_disk {
 	 * and having a little bit of on-page data to play with in the future
 	 * can be a good thing.
 	 */
-	uint8_t unused[3];		/* 25-27: unused padding */
+	uint8_t unused[3];		/* 29-31: unused padding */
 };
 /*
  * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
@@ -161,7 +182,7 @@ struct __wt_page_disk {
  * WT_PAGE_DISK_SIZE rather than sizeof to avoid writing 4 bytes of padding to
  * every page.
  */
-#define	WT_PAGE_DISK_SIZE		28
+#define	WT_PAGE_DISK_SIZE		32
 
 /*
  * WT_PAGE_DISK_BYTE --
