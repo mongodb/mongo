@@ -20,6 +20,8 @@ x = db.foo.stats();
 assert.eq( N , x.count , "total count" )
 assert.eq( N / 2 , x.shards.shard0000.count , "count on shard0000" )
 assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
+assert( x.totalIndexSize > 0 )
+assert( x.numExtents > 0 )
 
 start = new Date()
 
