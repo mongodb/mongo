@@ -416,8 +416,9 @@ namespace mongo {
     struct ipaddrValue {
         ipaddrValue( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            if (!b.ipaddr.parseIPv4( start )) {
-                b.ipaddr.parseIPv6( start );
+            std::string ip(start, end-start);
+            if (!b.ipaddr.parseIPv4( ip )) {
+                b.ipaddr.parseIPv6( ip );
             }
         }
         ObjectBuilder &b;
