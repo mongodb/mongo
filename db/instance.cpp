@@ -383,7 +383,7 @@ namespace mongo {
         x++; // reserved
         int n = *x++;
 
-        uassert( 13659 , "sent 0 cursors to kill" , n == 0 );
+        uassert( 13659 , "sent 0 cursors to kill" , n != 0 );
         massert( 13658 , str::stream() << "bad kill cursors size: " << m.dataSize() , m.dataSize() == 8 + ( 8 * n ) );
         uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
