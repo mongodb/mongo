@@ -383,9 +383,10 @@ namespace mongo {
         x++; // reserved
         int n = *x++;
 
-        assert( m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13659 , "sent 0 cursors " , n == 0 );
+        massert( 13658 , str::stream() << "bad kill cursors size: " << m.dataSize() , m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
-        uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
