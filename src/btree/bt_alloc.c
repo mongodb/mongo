@@ -273,8 +273,6 @@ __wt_block_write(SESSION *session)
 
 	/* Allocate room at the end of the file. */
 	__wt_block_extend(session, &addr, size);
-	btree->free_addr = addr;
-	btree->free_size = size;
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
@@ -305,19 +303,16 @@ __wt_block_write(SESSION *session)
 	*p++ = size;
 	*p++ = WT_ADDR_INVALID;		/* The list terminating value. */
 
-	/* Discard the free-list entries. */
-	while ((fe = TAILQ_FIRST(&btree->freeqa)) != NULL) {
-		TAILQ_REMOVE(&btree->freeqa, fe, qa);
-		TAILQ_REMOVE(&btree->freeqs, fe, qs);
+	/* Write the free list to disk. */
+	WT_ERR(__wt_disk_write(session, dsk, addr, size));
 
-		--btree->freelist_entries;
-		__wt_free(session, fe);
-	}
-
+	/* Update the file's meta-data. */
+	btree->free_addr = addr;
+	btree->free_size = size;
 	WT_ERR(__wt_desc_write(session));
 
-	/* Write the free list. */
-	ret = __wt_disk_write(session, dsk, addr, size);
+	/* Discard the in-memory free-list. */
+	__wt_block_discard(session);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -362,6 +357,27 @@ __wt_block_truncate(SESSION *session)
 		WT_RET(__wt_ftruncate(session, fh, fh->file_size));
 
 	return (0);
+}
+
+/*
+ * __wt_block_discard --
+ *	Discard any free-list entries.
+ */
+void
+__wt_block_discard(SESSION *session)
+{
+	BTREE *btree;
+	WT_FREE_ENTRY *fe;
+
+	btree = session->btree;
+
+	while ((fe = TAILQ_FIRST(&btree->freeqa)) != NULL) {
+		TAILQ_REMOVE(&btree->freeqa, fe, qa);
+		TAILQ_REMOVE(&btree->freeqs, fe, qs);
+
+		--btree->freelist_entries;
+		__wt_free(session, fe);
+	}
 }
 
 #ifdef HAVE_DIAGNOSTIC
