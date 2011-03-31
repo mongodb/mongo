@@ -181,7 +181,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(get_key)(WT_CURSOR *cursor, ...);
+	int __F(get_key)(WT_CURSOR *thiscursor, ...);
 
 	/*! Get the value for the current record.
 	 *
@@ -191,7 +191,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(get_value)(WT_CURSOR *cursor, ...);
+	int __F(get_value)(WT_CURSOR *thiscursor, ...);
 
 	/*! Set the key for the next operation.
 	 *
@@ -205,7 +205,7 @@ struct wt_cursor {
 	 * cursor, and the next operation to access the key will fail.  This
 	 * simplifies error handling in applications.
 	 */
-	void __F(set_key)(WT_CURSOR *cursor, ...);
+	void __F(set_key)(WT_CURSOR *thiscursor, ...);
 
 	/*! Set the data for the next operation.
 	 *
@@ -219,7 +219,7 @@ struct wt_cursor {
 	 * cursor, and the next operation to access the value will fail.  This
 	 * simplifies error handling in applications.
 	 */
-	void __F(set_value)(WT_CURSOR *cursor, ...);
+	void __F(set_value)(WT_CURSOR *thiscursor, ...);
 	/*! @} */
 
 	/*! @name Cursor positioning
@@ -233,7 +233,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(first)(WT_CURSOR *cursor);
+	int __F(first)(WT_CURSOR *thiscursor);
 
 	/*! Move to the last record.
 	 *
@@ -243,7 +243,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(last)(WT_CURSOR *cursor);
+	int __F(last)(WT_CURSOR *thiscursor);
 
 	/*! Move to the next record.
 	 *
@@ -253,7 +253,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(next)(WT_CURSOR *cursor);
+	int __F(next)(WT_CURSOR *thiscursor);
 
 	/*! Move to the previous record.
 	 *
@@ -263,7 +263,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(prev)(WT_CURSOR *cursor);
+	int __F(prev)(WT_CURSOR *thiscursor);
 
 	/*! Search for a record.
 	 *
@@ -275,7 +275,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(search)(WT_CURSOR *cursor);
+	int __F(search)(WT_CURSOR *thiscursor);
 
 	/*! Search for a record.
 	 *
@@ -289,7 +289,7 @@ struct wt_cursor {
 	 * found, -1 if a smaller key is found, +1 if a larger key is found
 	 * @errors
 	 */
-	int __F(search_near)(WT_CURSOR *cursor, int *exactp);
+	int __F(search_near)(WT_CURSOR *thiscursor, int *exactp);
 	/*! @} */
 
 	/*! @name Data modification
@@ -308,7 +308,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(insert)(WT_CURSOR *cursor);
+	int __F(insert)(WT_CURSOR *thiscursor);
 
 	/*! Update the current record.  The cursor must be positioned on a
 	 * record and the value of the record will be updated.  If the record
@@ -323,7 +323,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(update)(WT_CURSOR *cursor);
+	int __F(update)(WT_CURSOR *thiscursor);
 
 	/*! Remove the current record.
 	 *
@@ -333,7 +333,7 @@ struct wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(remove)(WT_CURSOR *cursor);
+	int __F(remove)(WT_CURSOR *thiscursor);
 	/*! @} */
 
 	/*! Close the cursor.
@@ -350,7 +350,7 @@ struct wt_cursor {
 	 * @configend
 	 * @errors
 	 */
-	int __F(close)(WT_CURSOR *cursor, const char *config);
+	int __F(close)(WT_CURSOR *thiscursor, const char *config);
 
 	/*
 	 * Protected fields, only to be used by cursor implementations.
@@ -407,7 +407,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(close)(WT_SESSION *session, const char *config);
+	int __F(close)(WT_SESSION *thissession, const char *config);
 
 	/*! @name Cursor handles
 	 * @{
@@ -468,7 +468,7 @@ struct wt_session {
 	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors
 	 */
-	int __F(open_cursor)(WT_SESSION *session,
+	int __F(open_cursor)(WT_SESSION *thissession,
 	    const char *uri, WT_CURSOR *to_dup,
 	    const char *config, WT_CURSOR **cursorp);
 	/*! @} */
@@ -522,7 +522,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(create_table)(WT_SESSION *session, const char *name,
+	int __F(create_table)(WT_SESSION *thissession, const char *name,
 	    const char *config);
 
 	/*! Rename a table.
@@ -537,7 +537,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(rename_table)(WT_SESSION *session,
+	int __F(rename_table)(WT_SESSION *thissession,
 	    const char *oldname, const char *newname, const char *config);
 
 	/*! Drop (delete) a table.
@@ -551,7 +551,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(drop_table)(WT_SESSION *session,
+	int __F(drop_table)(WT_SESSION *thissession,
 	     const char *name, const char *config);
 
 	/*! Truncate a table.
@@ -572,7 +572,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(truncate_table)(WT_SESSION *session, const char *name,
+	int __F(truncate_table)(WT_SESSION *thissession, const char *name,
 	    WT_CURSOR *start, WT_CURSOR *end, const char *config);
 
 	/*! Verify a table.
@@ -588,7 +588,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(verify_table)(WT_SESSION *session, const char *name,
+	int __F(verify_table)(WT_SESSION *thissession, const char *name,
 	    const char *config);
 	/*! @} */
 
@@ -623,7 +623,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(begin_transaction)(WT_SESSION *session, const char *config);
+	int __F(begin_transaction)(WT_SESSION *thissession, const char *config);
 
 	/*! Commit the current transaction.
 	 *
@@ -640,7 +640,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(commit_transaction)(WT_SESSION *session, const char *config);
+	int __F(commit_transaction)(WT_SESSION *thissession, const char *config);
 
 	/*! Roll back the current transaction.
 	 *
@@ -657,7 +657,7 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
+	int __F(rollback_transaction)(WT_SESSION *thissession, const char *config);
 
 	/*! Flush the cache and/or the log and optionally archive log files.
 	 *
@@ -708,7 +708,7 @@ struct wt_connection {
 	 * @configend
 	 * @errors
 	 */
-	int __F(load_extension)(WT_CONNECTION *connection,
+	int __F(load_extension)(WT_CONNECTION *thisconnection,
 	    const char *path, const char *config);
 
 	/*! Add a new type of cursor.
@@ -733,7 +733,7 @@ struct wt_connection {
 	 * @configend
 	 * @errors
 	 */
-	int __F(add_cursor_type)(WT_CONNECTION *connection,
+	int __F(add_cursor_type)(WT_CONNECTION *thisconnection,
 	    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config);
 
 	/*! Add a custom collation function.
@@ -757,7 +757,7 @@ struct wt_connection {
 	 * @configend
 	 * @errors
 	 */
-	int __F(add_collator)(WT_CONNECTION *connection,
+	int __F(add_collator)(WT_CONNECTION *thisconnection,
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
 	/*! Add a custom extractor for index keys or column groups.
@@ -781,7 +781,7 @@ struct wt_connection {
 	 * @configend
 	 * @errors
 	 */
-	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
+	int __F(add_extractor)(WT_CONNECTION *thisconnection, const char *name,
 	    WT_EXTRACTOR *extractor, const char *config);
 
 	/*! Close a connection.
@@ -796,7 +796,7 @@ struct wt_connection {
 	 * @configend
 	 * @errors
 	 */
-	int __F(close)(WT_CONNECTION *connection, const char *config);
+	int __F(close)(WT_CONNECTION *thisconnection, const char *config);
 
 	/*! The home directory of the connection.
 	 *
@@ -806,7 +806,7 @@ struct wt_connection {
 	 * @param connection the connection handle
 	 * @returns a pointer to a string naming the home directory
 	 */
-	const char *__F(get_home)(WT_CONNECTION *connection);
+	const char *__F(get_home)(WT_CONNECTION *thisconnection);
 
 	/*! Did opening this handle create the database?
 	 *
@@ -819,7 +819,7 @@ struct wt_connection {
 	 *    ::wiredtiger_open, true (non-zero) if it was created by opening
 	 *    this handle.
 	 */
-	int __F(is_new)(WT_CONNECTION *connection);
+	int __F(is_new)(WT_CONNECTION *thisconnection);
 
 	/*! Open a session.
 	 *
@@ -834,8 +834,8 @@ struct wt_connection {
 	 * @param sessionp the new session handle
 	 * @errors
 	 */
-	int __F(open_session)(WT_CONNECTION *connection,
-	    WT_EVENT_HANDLER *errhandler, const char *config,
+	int __F(open_session)(WT_CONNECTION *thisconnection,
+	    WT_ERROR_HANDLER *errhandler, const char *config,
 	    WT_SESSION **sessionp);
 };
 
