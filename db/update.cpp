@@ -577,6 +577,8 @@ namespace mongo {
                 break;
             case Mod::PULL:
             case Mod::PULL_ALL:
+                // this should have been handled by prepare
+                break;
             case Mod::POP:
                 assert( m.old.eoo() || ( m.old.isABSONObj() && m.old.Obj().isEmpty() ) );
                 break;
