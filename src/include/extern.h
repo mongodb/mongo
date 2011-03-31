@@ -45,6 +45,8 @@ __wt_block_read(SESSION *session);
 int
 __wt_block_write(SESSION *session);
 void
+__wt_block_discard(SESSION *session);
+void
 __wt_debug_block(SESSION *session);
 int
 __wt_btree_bulk_load(SESSION *session,
@@ -163,6 +165,8 @@ __wt_disk_read(
 int
 __wt_disk_write(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size);
+int
+__wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t));
 int
 __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg);
 int

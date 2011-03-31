@@ -87,7 +87,6 @@ main(int argc, char *argv[])
 
 		if (wts_verify())		/* Verify the file */
 			goto err;
-
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {		
 			switch (g.c_file_type) {
@@ -129,7 +128,14 @@ main(int argc, char *argv[])
 		track("shutting down BDB", 0);
 		bdb_teardown();	
 
-		if (wts_dump())
+		if (wts_dump())			/* Dump the file */
+			goto err;
+
+		track("salvage", 0);
+		if (wts_salvage())		/* Salvage the file */
+			goto err;
+
+		if (wts_verify())		/* Verify the file */
 			goto err;
 
 		track("shutting down WT", 0);

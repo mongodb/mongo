@@ -394,6 +394,14 @@ methods['btree.stat_print'] = Api(
 	['__NONE__'],
 	['open'], [])
 
+methods['btree.salvage'] = Api(
+	'btree.salvage',
+	'method, session',
+	['progress/void (*@S)(const char *, uint64_t)',
+	 'flags/uint32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
 methods['btree.sync'] = Api(
 	'btree.sync',
 	'method, rdonly, session',

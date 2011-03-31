@@ -55,6 +55,8 @@ struct __btree {
 	char	 *name;			/* File name */
 	mode_t	  mode;			/* File create mode */
 
+	uint64_t  lsn;			/* LSN file/offset pair */
+
 	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
@@ -170,6 +172,9 @@ struct __btree {
 
 	int (*row_put)(
 	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
+
+	int (*salvage)(
+	    BTREE *, void (*)(const char *, uint64_t), uint32_t );
 
 	int (*stat_clear)(
 	    BTREE *, uint32_t );
@@ -475,6 +480,7 @@ extern WT_ERROR_HANDLER *__wt_error_handler_default;
 #define	WT_APIMASK_BTREE_ROW_DEL			0x00000000
 #define	WT_APIMASK_BTREE_ROW_GET			0x00000000
 #define	WT_APIMASK_BTREE_ROW_PUT			0x00000000
+#define	WT_APIMASK_BTREE_SALVAGE			0x00000000
 #define	WT_APIMASK_BTREE_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_BTREE_STAT_PRINT			0x00000000
 #define	WT_APIMASK_BTREE_SYNC				0x00000001

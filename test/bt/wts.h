@@ -41,7 +41,7 @@
 typedef struct {
 	char *progname;				/* Program name */
 
-	void *bdb_db;				/* BDB DB handle */
+	void *bdb_db;				/* Berkeley DB handle */
 
 	void *wts_btree;			/* WT BTREE handle */
 	void *wts_session;			/* WT SESSION handle */
@@ -108,6 +108,7 @@ int	 wts_ops(void);
 uint32_t wts_rand(void);
 int	 wts_read_col_scan(void);
 int	 wts_read_row_scan(void);
+int	 wts_salvage(void);
 int	 wts_startup(int);
 int	 wts_stats(void);
 void	 wts_teardown(void);

@@ -474,6 +474,28 @@ static int __wt_api_btree_row_put(
 	return (ret);
 }
 
+static int __wt_api_btree_salvage(
+	BTREE *btree,
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags);
+static int __wt_api_btree_salvage(
+	BTREE *btree,
+	void (*progress)(const char *, uint64_t),
+	uint32_t flags)
+{
+	const char *method_name = "BTREE.salvage";
+	CONNECTION *connection = btree->conn;
+	SESSION *session = NULL;
+	int ret;
+
+	WT_RET(__wt_session_api_set(connection, method_name, btree, &session));
+	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_SALVAGE);
+	WT_STAT_INCR(connection->method_stats, BTREE_SALVAGE);
+	ret = __wt_btree_salvage(session, progress);
+	WT_TRET(__wt_session_api_clr(session, method_name, 1));
+	return (ret);
+}
+
 static int __wt_api_btree_stat_clear(
 	BTREE *btree,
 	uint32_t flags);
@@ -959,6 +981,9 @@ __wt_methods_btree_lockout(BTREE *btree)
 	btree->row_put = (int (*)
 	    (BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
+	btree->salvage = (int (*)
+	    (BTREE *, void (*)(const char *, uint64_t), uint32_t ))
+	    __wt_btree_lockout;
 	btree->stat_clear = (int (*)
 	    (BTREE *, uint32_t ))
 	    __wt_btree_lockout;
@@ -1019,6 +1044,7 @@ __wt_methods_btree_open_transition(BTREE *btree)
 	btree->row_del = __wt_api_btree_row_del;
 	btree->row_get = __wt_api_btree_row_get;
 	btree->row_put = __wt_api_btree_row_put;
+	btree->salvage = __wt_api_btree_salvage;
 	btree->stat_clear = __wt_api_btree_stat_clear;
 	btree->stat_print = __wt_api_btree_stat_print;
 	btree->sync = __wt_api_btree_sync;
