@@ -29,26 +29,56 @@ namespace mongo {
     class DocumentSource :
             boost::noncopyable {
     public:
-        virtual ~DocumentSource() {};
+	virtual ~DocumentSource();
 
+        /*
+	  Is the source at EOF?
+
+	  @returns true if the source has no more Documents to return.
+        */
         virtual bool eof() = 0;
-        /*
-        @return true if the source has no more Expressions to return.
-        */
 
+        /*
+	  Advance the state of the DocumentSource so that it will return the
+	  next Document.
+
+	  @returns whether there is another document to fetch, i.e., whether or
+	    not getCurrent() will succeed.
+        */
         virtual bool advance() = 0;
-        /*
-          Advanced the DocumentSource's position in the Document stream.
-        */
 
-        virtual shared_ptr<Document> getCurrent() = 0;
         /*
           Advance the source, and return the next Expression.
 
-              @return the current Expression
+	  @returns the current Document
           TODO throws an exception if there are no more expressions to return.
         */
+        virtual shared_ptr<Document> getCurrent() = 0;
+
+	/*
+	  Set the underlying source this source should use to get Documents
+	  from.
+
+	  It is an error to set the source more than once.  This is to
+	  prevent changing sources once the original source has been started;
+	  this could break the state maintained by the DocumentSource.
+
+	  @param pSource the underlying source to use
+	 */
+	virtual void setSource(shared_ptr<DocumentSource> pSource);
+
+    protected:
+	/*
+	  Most DocumentSources have an underlying source they get their data
+	  from.  This is a convenience for them.
+
+	  The default implementation of setSource() sets this; if you don't
+	  need a source, override that to assert().  The default is to
+	  assert() if this has already been set.
+	*/
+	shared_ptr<DocumentSource> pSource;
     };
+
 
     class DocumentSourceCursor :
         public DocumentSource {
@@ -59,11 +89,23 @@ namespace mongo {
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
 
-        DocumentSourceCursor(shared_ptr<Cursor> pTheCursor);
+	/*
+	  Create a document source based on a cursor.
+
+	  This is usually put at the beginning of a chain of document sources
+	  in order to fetch data from the database.
+
+	  @param pCursor the cursor to use to fetch data
+	*/
+	static shared_ptr<DocumentSourceCursor> create(
+	    shared_ptr<Cursor> pCursor);
 
     private:
+        DocumentSourceCursor(shared_ptr<Cursor> pTheCursor);
+
         boost::shared_ptr<Cursor> pCursor;
     };
+
 
     class DocumentSourceFilter :
         public DocumentSource {
@@ -77,19 +119,15 @@ namespace mongo {
         /*
           Create a filter.
 
-          @param pTheFilter the expression to use to filter
-          @param pTheSource the underlying source to use
+          @param pFilter the expression to use to filter
           @returns the filter
          */
         static shared_ptr<DocumentSourceFilter> create(
-            shared_ptr<Expression> pTheFilter,
-            shared_ptr<DocumentSource> pTheSource);
+            shared_ptr<Expression> pFilter);
 
     private:
-        DocumentSourceFilter(shared_ptr<Expression> pTheFilter,
-                             shared_ptr<DocumentSource> pTheSource);
+        DocumentSourceFilter(shared_ptr<Expression> pFilter);
 
-        shared_ptr<DocumentSource> pSource;
         shared_ptr<Expression> pFilter;
 
         void findNext();
@@ -110,9 +148,10 @@ namespace mongo {
 
         /*
           Create a new grouping DocumentSource.
+	  
+	  @returns the DocumentSource
          */
-        static shared_ptr<DocumentSourceGroup> create(
-            shared_ptr<DocumentSource> pSource);
+        static shared_ptr<DocumentSourceGroup> create();
 
         /*
           Set the Id Expression.
@@ -142,11 +181,16 @@ namespace mongo {
                             shared_ptr<Expression> pExpression);
 
     private:
-        DocumentSourceGroup(shared_ptr<DocumentSource> pTheSource);
+        DocumentSourceGroup();
 
+	/*
+	  Before returning anything, this source must fetch everything from
+	  the underlying source and group it.  populate() is used to do that
+	  on the first call to any method on this source.  The populated
+	  boolean indicates that this has been done.
+	 */
         void populate();
         bool populated;
-        shared_ptr<DocumentSource> pSource;
 
         struct KeyComparator {
             bool operator()(const shared_ptr<const Value> &rL,
@@ -184,6 +228,7 @@ namespace mongo {
         static string idName; // shared _id string
     };
 
+
     class DocumentSourceProject :
         public DocumentSource,
         public boost::enable_shared_from_this<DocumentSourceProject> {
@@ -197,12 +242,13 @@ namespace mongo {
 
         /*
           Create a new DocumentSource that can implement projection.
+
+	  @returns the projection DocumentSource
         */
-        static shared_ptr<DocumentSourceProject> create(
-            shared_ptr<DocumentSource> pSource);
+        static shared_ptr<DocumentSourceProject> create();
 
         /*
-          Add an Expression to the projection.
+          Add an output Expression to the projection.
 
           BSON document fields are ordered, so the new field will be
           appended to the existing set.
@@ -218,10 +264,9 @@ namespace mongo {
                       bool ravelArray);
 
     private:
-        DocumentSourceProject(shared_ptr<DocumentSource> pSource);
+        DocumentSourceProject();
 
         // configuration state
-        shared_ptr<DocumentSource> pSource; // underlying source
         vector<string> vFieldName; // inclusion field names
         vector<shared_ptr<Expression>> vpExpression; // inclusions
         int ravelWhich; // index of raveled field, if any, otherwise -1

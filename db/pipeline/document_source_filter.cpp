@@ -78,17 +78,14 @@ namespace mongo {
     }
 
     shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
-        shared_ptr<Expression> pTheFilter,
-        shared_ptr<DocumentSource> pTheSource) {
+        shared_ptr<Expression> pFilter) {
         shared_ptr<DocumentSourceFilter> pSource(
-            new DocumentSourceFilter(pTheFilter, pTheSource));
+            new DocumentSourceFilter(pFilter));
         return pSource;
     }
 
     DocumentSourceFilter::DocumentSourceFilter(
-        shared_ptr<Expression> pTheFilter,
-        shared_ptr<DocumentSource> pTheSource):
-        pSource(pTheSource),
+        shared_ptr<Expression> pTheFilter):
         pFilter(pTheFilter),
         unstarted(true),
         hasNext(false),

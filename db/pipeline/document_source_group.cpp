@@ -59,17 +59,14 @@ namespace mongo {
         return pCurrent;
     }
 
-    shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
-        shared_ptr<DocumentSource> pTheSource) {
+    shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create() {
         shared_ptr<DocumentSourceGroup> pSource(
-            new DocumentSourceGroup(pTheSource));
+            new DocumentSourceGroup());
         return pSource;
     }
 
-    DocumentSourceGroup::DocumentSourceGroup(
-        shared_ptr<DocumentSource> pTheSource):
+    DocumentSourceGroup::DocumentSourceGroup():
         populated(false),
-        pSource(pTheSource),
         pIdExpression(),
         groups(),
         vFieldName(),

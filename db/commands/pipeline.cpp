@@ -81,16 +81,11 @@ namespace mongo {
         }
 
         /*
-          If we get here, we've harvested the fields we expect
+          If we get here, we've harvested the fields we expect for a pipeline.
 
           Set up the document source pipeline.
         */
-        BSONArrayBuilder resultArray; // where we'll stash the results
-
-        /* connect up a cursor to the specified collection */
-        shared_ptr<Cursor> pCursor(
-            findTableScan(collectionName.c_str(), BSONObj()));
-        shared_ptr<DocumentSource> pSource(new DocumentSourceCursor(pCursor));
+	vector<shared_ptr<DocumentSource>> vpSource;
 
         /* iterate over the steps in the pipeline */
         const size_t nSteps = pipeline.size();
@@ -99,6 +94,8 @@ namespace mongo {
             BSONElement pipeElement(pipeline[iStep]);
             assert(pipeElement.type() == Object); // CW TODO user error
             BSONObj bsonObj(pipeElement.Obj());
+
+	    shared_ptr<DocumentSource> pSource;
 
             /* use the object to add a DocumentSource to the processing chain */
             BSONObjIterator bsonIterator(bsonObj);
@@ -122,11 +119,34 @@ namespace mongo {
                     return false;
                 }
             }
+
+	    vpSource.push_back(pSource);
         }
+
+	/* now hook up the pipeline */
+        /* connect up a cursor to the specified collection */
+        shared_ptr<Cursor> pCursor(
+            findTableScan(collectionName.c_str(), BSONObj()));
+        shared_ptr<DocumentSource> pSource(
+	    DocumentSourceCursor::create(pCursor));
+
+	/* now chain together the sources we found */
+	const size_t nSources = vpSource.size();
+	for(size_t iSource = 0; iSource < nSources; ++iSource)
+	{
+	    shared_ptr<DocumentSource> pTemp(vpSource[iSource]);
+	    pTemp->setSource(pSource);
+	    pSource = pTemp;
+	}
+	/*
+	  CW TODO - move filters up where possible, split pipeline for sharding
+	*/
+	/* pSource is left pointing at the last source in the chain */
 
         /*
           Iterate through the resulting documents, and add them to the result.
         */
+        BSONArrayBuilder resultArray; // where we'll stash the results
         for(bool hasDocument = !pSource->eof(); hasDocument;
                 hasDocument = pSource->advance()) {
             shared_ptr<Document> pDocument(pSource->getCurrent());
@@ -293,7 +313,7 @@ ExpectConstant: {
 
         /* chain the projection onto the original source */
         shared_ptr<DocumentSourceProject> pProject(
-            DocumentSourceProject::create(pSource));
+	    DocumentSourceProject::create());
 
         /*
           Pull out the $project object.  This should just be a list of
@@ -387,7 +407,7 @@ AddField:
         shared_ptr<Expression> pExpression(
             parseObject(pBsonElement, 0));
         shared_ptr<DocumentSourceFilter> pFilter(
-            DocumentSourceFilter::create(pExpression, pSource));
+            DocumentSourceFilter::create(pExpression));
 
         return pFilter;
     }
@@ -419,8 +439,7 @@ AddField:
         BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource) {
         assert(pBsonElement->type() == Object); // CW TODO must be an object
 
-        shared_ptr<DocumentSourceGroup> pGroup(
-            DocumentSourceGroup::create(pSource));
+        shared_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create());
         bool idSet = false;
 
         BSONObj groupObj(pBsonElement->Obj());

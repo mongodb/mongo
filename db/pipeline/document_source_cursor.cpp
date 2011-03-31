@@ -27,6 +27,13 @@ namespace mongo {
         pCursor(pTheCursor) {
     }
 
+    shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
+	shared_ptr<Cursor> pCursor) {
+	shared_ptr<DocumentSourceCursor> pSource(
+	    new DocumentSourceCursor(pCursor));
+	    return pSource;
+    }
+
     bool DocumentSourceCursor::eof() {
         return pCursor->eof();
     }

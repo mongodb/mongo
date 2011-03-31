@@ -22,16 +22,13 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<DocumentSourceProject> DocumentSourceProject::create(
-        shared_ptr<DocumentSource> pTheSource) {
+    shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
         shared_ptr<DocumentSourceProject> pSource(
-            new DocumentSourceProject(pTheSource));
+            new DocumentSourceProject());
         return pSource;
     }
 
-    DocumentSourceProject::DocumentSourceProject(
-        shared_ptr<DocumentSource> pTheSource):
-        pSource(pTheSource),
+    DocumentSourceProject::DocumentSourceProject():
         vpExpression(),
         ravelWhich(-1),
         pNoRavelDocument(),
