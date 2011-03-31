@@ -314,16 +314,21 @@ namespace mongo {
                     errmsg = "no db";
                     return false;
                 }
+                
+                if ( dbname == "admin" ) {
+                    errmsg = "can't shard the admin db";
+                    return false;
+                }
 
                 DBConfigPtr config = grid.getDBConfig( dbname );
                 if ( config->isShardingEnabled() ) {
                     errmsg = "already enabled";
                     return false;
                 }
-
+                
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
-
+                
                 log() << "enabling sharding on: " << dbname << endl;
 
                 config->enableSharding();
