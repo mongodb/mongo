@@ -200,7 +200,9 @@ namespace mongo {
                                 log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
                         }
 #endif
-                        uassert(13623, "DR102 too much data written uncommitted", _bytes < UncommittedBytesLimit * 3);
+                        if ( _bytes >= UncommittedBytesLimit * 3 ) {
+                            wassert( ! "DR102 too much data written uncommitted" );
+                        }
                     }
                 }
             }
