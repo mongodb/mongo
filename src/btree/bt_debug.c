@@ -106,19 +106,22 @@ __wt_debug_disk(
 		    "%s page: starting recno %llu, entries %lu, lsn %lu/%lu\n",
 		    __wt_page_type_string(dsk->type),
 		    (unsigned long long)dsk->recno, (u_long)dsk->u.entries,
-		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
+		    (u_long)WT_LSN_FILE(dsk->lsn),
+		    (u_long)WT_LSN_OFFSET(dsk->lsn));
 		break;
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		fprintf(fp,
 		    "%s page: entries %lu, lsn %lu/%lu\n",
 		    __wt_page_type_string(dsk->type), (u_long)dsk->u.entries,
-		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
+		    (u_long)WT_LSN_FILE(dsk->lsn),
+		    (u_long)WT_LSN_OFFSET(dsk->lsn));
 		break;
 	case WT_PAGE_OVFL:
 		fprintf(fp, "%s page: data size %lu, lsn %lu/%lu\n",
 		    __wt_page_type_string(dsk->type), (u_long)dsk->u.datalen,
-		    (u_long)dsk->lsn_file, (u_long)dsk->lsn_off);
+		    (u_long)WT_LSN_FILE(dsk->lsn),
+		    (u_long)WT_LSN_OFFSET(dsk->lsn));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
