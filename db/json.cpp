@@ -36,6 +36,8 @@
 #include "../bson/util/builder.h"
 #include "../util/base64.h"
 #include "../util/hex.h"
+#include "../util/ip_addr.h"
+#include "../util/mac_addr.h"
 
 
 using namespace boost::spirit;
@@ -113,6 +115,9 @@ namespace mongo {
         string regex;
         string regexOptions;
         Date_t date;
+        char uuid[16];
+        IP_Addr ipaddr;
+        MAC_Addr macaddr;
     };
 
     struct objectStart {
@@ -230,6 +235,9 @@ namespace mongo {
             massert( 10338 ,  "Invalid use of reserved field name",
                      name != "$oid" &&
                      name != "$binary" &&
+                     name != "$uuid" &&
+                     name != "$ipaddr" &&
+                     name != "$macaddr" &&
                      name != "$type" &&
                      name != "$date" &&
                      name != "$regex" &&
@@ -383,6 +391,62 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
+// NOTE s must be 32 characters.
+    void stringToUuid( const char *s, char* uuid ) {
+        for ( int i = 0; i < 16; ++i )
+            uuid[ i ] = fromHex( s + ( i * 2 ) );
+    }
+
+    struct uuidValue {
+        uuidValue( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            stringToUuid( start, b.uuid );
+        }
+        ObjectBuilder &b;
+    };
+
+    struct uuidEnd {
+        uuidEnd( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            b.back()->appendUUID( b.fieldName(), b.uuid );
+        }
+        ObjectBuilder &b;
+    };
+
+    struct ipaddrValue {
+        ipaddrValue( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            if (!b.ipaddr.parseIPv4( start )) {
+                b.ipaddr.parseIPv6( start );
+            }
+        }
+        ObjectBuilder &b;
+    };
+
+    struct ipaddrEnd {
+        ipaddrEnd( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            b.back()->appendIP( b.fieldName(), b.ipaddr );
+        }
+        ObjectBuilder &b;
+    };
+
+    struct macaddrValue {
+        macaddrValue( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            b.macaddr.parse( start );
+        }
+        ObjectBuilder &b;
+    };
+
+    struct macaddrEnd {
+        macaddrEnd( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            b.back()->appendMAC( b.fieldName(), b.macaddr );
+        }
+        ObjectBuilder &b;
+    };
+
     struct dateValue {
         dateValue( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( Date_t v ) const {
@@ -464,6 +528,9 @@ namespace mongo {
                     date[ dateEnd( self.b ) ] |
                     oid[ oidEnd( self.b ) ] |
                     bindata[ binDataEnd( self.b ) ] |
+                    uuid[ uuidEnd( self.b ) ] |
+                    ipaddr[ ipaddrEnd( self.b ) ] |
+                    macaddr[ macaddrEnd( self.b ) ] |
                     dbref[ dbrefEnd( self.b ) ] |
                     regex[ regexEnd( self.b ) ] |
                     object[ subobjectEnd( self.b ) ] ;
@@ -525,6 +592,22 @@ namespace mongo {
                           lexeme_d[ '"' >> ( *( range_p( 'A', 'Z' ) | range_p( 'a', 'z' ) | range_p( '0', '9' ) | ch_p( '+' ) | ch_p( '/' ) ) >> *ch_p( '=' ) )[ binDataBinary( self.b ) ] >> '"' ] >> ',' >> "\"$type\"" >> ':' >>
                           lexeme_d[ '"' >> ( repeat_p( 2 )[ xdigit_p ] )[ binDataType( self.b ) ] >> '"' ] >> '}';
 
+                uuid = uuidS | uuidT;
+                uuidS = ch_p( '{' ) >> "\"$uuid\"" >> ':' >> quotedUuid >> '}';
+                uuidT = str_p( "UUID" ) >> '(' >> quotedUuid >> ')';
+
+                quotedUuid = lexeme_d[ '"' >> ( repeat_p( 32 )[ xdigit_p ] )[ uuidValue( self.b ) ] >> '"' ];
+
+                ipaddr = ipaddrS | ipaddrT;
+                ipaddrS = ch_p( '{' ) >> "\"$ipaddr\"" >> ':' >> quotedIpaddr >> '}';
+                ipaddrT = str_p( "IpAddr" ) >> '(' >> quotedIpaddr >> ')';
+                quotedIpaddr = lexeme_d[ '"' >> ( *( xdigit_p | ch_p(':') | ch_p('.') ) )[ ipaddrValue( self.b ) ] >> '"' ];
+
+                macaddr = macaddrS | macaddrT;
+                macaddrS = ch_p( '{' ) >> "\"$macaddr\"" >> ':' >> quotedMacaddr >> '}';
+                macaddrT = str_p( "MacAddr" ) >> '(' >> quotedMacaddr >> ')';
+                quotedMacaddr = lexeme_d[ '"' >> ( *( xdigit_p | ch_p(':') ) )[ macaddrValue( self.b ) ] >> '"' ];
+
                 // TODO: this will need to use a signed parser at some point
                 date = dateS | dateT;
                 dateS = ch_p( '{' ) >> "\"$date\"" >> ':' >> uint_parser< Date_t >()[ dateValue( self.b ) ] >> '}';
@@ -548,8 +631,8 @@ namespace mongo {
                                    >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
             }
             rule< ScannerT > object, members, array, elements, value, str, number, integer,
-                  dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
-                  regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
+                  dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, uuid, uuidS, uuidT, ipaddr, ipaddrS, ipaddrT, macaddr, macaddrS, macaddrT, date, dateS, dateT,
+                  regex, regexS, regexT, quotedOid, quotedUuid, quotedIpaddr, quotedMacaddr, fieldName, unquotedFieldName, singleQuoteStr;
             const rule< ScannerT > &start() const {
                 return object;
             }
