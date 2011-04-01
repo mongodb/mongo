@@ -17,9 +17,11 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
 #include <set>
 #include <list>
 #include <vector>
+#include "util/atomic_int.h"
 #include "util/builder.h"
 #include "stringdata.h"
 
@@ -69,11 +71,19 @@ namespace mongo {
     public:
 
         /** Construct a BSONObj from data in the proper format.
-            @param ifree true if the BSONObj should free() the msgdata when
-            it destructs.
+         *  Use this constructor when something else owns msgdata's buffer
         */
-        explicit BSONObj(const char *msgdata, bool ifree = false) {
-            init(msgdata, ifree);
+        explicit BSONObj(const char *msgdata) {
+            init(msgdata);
+        }
+
+        /** Construct a BSONObj from data in the proper format.
+         *  Use this constructor when you want BSONObj to free(holder) when it is no longer needed
+         *  BSONObj::Holder has an extra 4 bytes for a ref-count before the start of the object
+        */
+        class Holder;
+        explicit BSONObj(Holder* holder) {
+            init(holder);
         }
 
         explicit BSONObj(const Record *r);
@@ -385,27 +395,40 @@ namespace mongo {
             b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
-    private:
-        class Holder {
-        public:
-            Holder( const char *objdata ) :
-                _objdata( objdata ) {
-            }
-            ~Holder() {
-                free((void *)_objdata);
-                _objdata = 0;
-            }
+#pragma pack(1)
+        class Holder : boost::noncopyable {
         private:
-            const char *_objdata;
-        };
+            Holder(); // this class should never be explicitly created
+            AtomicUInt refCount;
+        public:
+            char data[4]; // start of object
 
+            void zero() { refCount.zero(); }
+
+            // these are called automatically by boost::intrusive_ptr
+            friend void intrusive_ptr_add_ref(Holder* h) { h->refCount++; }
+            friend void intrusive_ptr_release(Holder* h) {
+#if defined(_DEBUG) // cant use dassert or DEV here
+                assert((int)h->refCount > 0); // make sure we haven't already freed the buffer
+#endif
+                if(--(h->refCount) == 0){
+                    free(h);
+                }
+            }
+        };
+#pragma pack()
+
+    private:
         const char *_objdata;
-        boost::shared_ptr< Holder > _holder;
+        boost::intrusive_ptr< Holder > _holder;
 
         void _assertInvalid() const;
-        void init(const char *data, bool ifree) {
-            if ( ifree )
-                _holder.reset( new Holder( data ) );
+
+        void init(Holder *holder) {
+            _holder.reset(holder);
+            init(holder->data);
+        }
+        void init(const char *data) {
             _objdata = data;
             if ( !isValid() )
                 _assertInvalid();

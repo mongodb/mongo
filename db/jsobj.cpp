@@ -897,8 +897,7 @@ namespace mongo {
         }
 
         if ( n ) {
-            int len;
-            init( b.decouple(len), true );
+            *this = b.obj();
         }
 
         return n;

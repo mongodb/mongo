@@ -81,8 +81,9 @@ namespace mongo {
     class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize), _offset( 0 ), _s( this ) , _tracker(0) , _doneCalled(false) {
-            _b.skip(4); /*leave room for size field*/
+        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
+            _b.appendNum((unsigned)0); // ref-count
+            _b.skip(4); /*leave room for size field and ref-count*/
         }
 
         /* dm why do we have this/need this? not clear to me, comment please tx. */
@@ -91,8 +92,9 @@ namespace mongo {
             _b.skip( 4 );
         }
 
-        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() ), _offset(0), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
-            _b.skip( 4 );
+        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
+            _b.appendNum((unsigned)0); // ref-count
+            _b.skip(4);
         }
 
         ~BSONObjBuilder() {
@@ -525,8 +527,10 @@ namespace mongo {
         BSONObj obj() {
             bool own = owned();
             massert( 10335 , "builder does not own memory", own );
-            int l;
-            return BSONObj(decouple(l), true);
+            doneFast();
+            BSONObj::Holder* h = (BSONObj::Holder*)_b.buf();
+            decouple(); // sets _b.buf() to NULL
+            return BSONObj(h);
         }
 
         /** Fetch the object we have built.
@@ -535,7 +539,7 @@ namespace mongo {
             would like the BSONObj to last longer than the builder.
         */
         BSONObj done() {
-            return BSONObj(_done(), /*ifree*/false);
+            return BSONObj(_done());
         }
 
         // Like 'done' above, but does not construct a BSONObj to return to the caller.

@@ -284,7 +284,7 @@ void processMessage( Connection& c , Message& m ) {
             mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
             out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
             if ( r->nReturned ) {
-                mongo::BSONObj o( r->data() , 0 );
+                mongo::BSONObj o( r->data() );
                 out() << "\t" << o << endl;
             }
             break;
