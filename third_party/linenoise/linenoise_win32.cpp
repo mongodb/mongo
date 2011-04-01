@@ -73,7 +73,8 @@ static void output(const char* str,
                    int         y)
 {
     COORD pos = { (SHORT)x, (SHORT)y };
-    WriteConsoleOutputCharacterA(console_out, str, len, pos, 0);
+    DWORD count = 0;
+    WriteConsoleOutputCharacterA(console_out, str, len, pos, &count);
 }
 
 static void refreshLine(const char* prompt,
