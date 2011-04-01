@@ -97,7 +97,7 @@ namespace mongo {
                     string err = conn->getLastError();
                     if ( ! err.empty() ) {
                         warning() << "pinging failed for distributed lock pinger '" << pingId << "'."
-                                  << m_error_message(err) << endl;
+                                  << causedBy( err ) << endl;
                         conn.done();
 
                         // Sleep for normal ping time
@@ -123,7 +123,7 @@ namespace mongo {
                     err = conn->getLastError();
                     if ( ! err.empty() ) {
                         warning() << "ping cleanup for distributed lock pinger '" << pingId << " failed."
-                                  << m_error_message(err) << endl;
+                                  << causedBy( err ) << endl;
                         conn.done();
 
                         // Sleep for normal ping time
@@ -144,7 +144,7 @@ namespace mongo {
                 }
                 catch ( std::exception& e ) {
                     warning() << "distributed lock pinger '" << pingId << "' detected an exception while pinging."
-                              << m_error_message(e.what()) << endl;
+                              << causedBy( e ) << endl;
                 }
 
                 sleepmillis(sleepTime);
@@ -164,7 +164,7 @@ namespace mongo {
                 _distLockPingThread( addr, processId, sleepTime );
             }
             catch ( std::exception& e ) {
-                error() << "unexpected error while running distributed lock pinger for " << addr << ", process " << processId << m_error_message(e.what()) << endl;
+                error() << "unexpected error while running distributed lock pinger for " << addr << ", process " << processId << causedBy( e ) << endl;
             }
             catch ( ... ) {
                 error() << "unknown error while running distributed lock pinger for " << addr << ", process " << processId << endl;
@@ -190,11 +190,11 @@ namespace mongo {
             // Check our clock skew
             try {
                 if( lock.isRemoteTimeSkewed() ) {
-                    m_throw_exception(13650, LockException, "clock skew of the cluster " << conn.toString() << " is too far out of bounds to allow distributed locking.");
+                    throw LockException( str::stream() << "clock skew of the cluster " << conn.toString() << " is too far out of bounds to allow distributed locking." , 13650 );
                 }
             }
             catch( LockException& e) {
-                m_chain_exception(13651, e, LockException, "error checking clock skew of cluster " << conn.toString());
+                throw LockException( str::stream() << "error checking clock skew of cluster " << conn.toString() << causedBy( e ) , 13651);
             }
 
             boost::thread t( boost::bind( &DistributedLockPinger::distLockPingThread, this, conn, getJSTimeVirtualThreadSkew(), processId, sleepTime) );
@@ -313,12 +313,17 @@ namespace mongo {
             delay = jsTime() - then;
 
             if( !success )
-                m_throw_exception( 13647, TimeNotFoundException, "could not get status from server " << server.toString() << " in cluster " << cluster.toString() << " to check time");
+                throw TimeNotFoundException( str::stream() << "could not get status from server "
+                                             << server.toString() << " in cluster " << cluster.toString()
+                                             << " to check time", 13647 );
 
             // Make sure that our delay is not more than 2x our maximum network skew, since this is the max our remote
             // time value can be off by if we assume a response in the middle of the delay.
             if( delay > (long long) (maxNetSkew * 2) )
-                m_throw_exception( 13648, TimeNotFoundException, "server " << server.toString() << " in cluster " << cluster.toString() << " did not respond within max network delay of " << maxNetSkew << "ms");
+                throw TimeNotFoundException( str::stream() << "server " << server.toString()
+                                             << " in cluster " << cluster.toString()
+                                             << " did not respond within max network delay of "
+                                             << maxNetSkew << "ms", 13648 );
         }
         catch(...) {
             conn.done();
@@ -444,7 +449,7 @@ namespace mongo {
                     conn->insert( _ns , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
                 }
                 catch ( UserException& e ) {
-                    warning() << "could not insert initial doc for distributed lock " << _name << m_caused_by(e) << endl;
+                    warning() << "could not insert initial doc for distributed lock " << _name << causedBy( e ) << endl;
                 }
             }
 
@@ -505,7 +510,7 @@ namespace mongo {
                     catch( LockException& e ) {
 
                         // Remote server cannot be found / is not responsive
-                        warning() << "Could not get remote time from " << _conn << m_caused_by(e);
+                        warning() << "Could not get remote time from " << _conn << causedBy( e );
 
                     }
 
@@ -540,7 +545,7 @@ namespace mongo {
                     // and after the lock times out, we can be pretty sure the time is
                     // increasing at the same rate on all servers and therefore our
                     // timeout is accurate
-                    uassert_msg( 13652, "remote time in cluster " << _conn.toString() << " is now skewed, cannot force lock.", !isRemoteTimeSkewed() );
+                    uassert( 14023, str::stream() << "remote time in cluster " << _conn.toString() << " is now skewed, cannot force lock.", !isRemoteTimeSkewed() );
 
                     // Make sure we break the lock with the correct "ts" (OID) value, otherwise
                     // we can overwrite a new lock inserted in the meantime.
@@ -553,7 +558,7 @@ namespace mongo {
                     // TODO: Clean up all the extra code to exit this method, probably with a refactor
                     if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
                         ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "Could not force lock '" << lockName << "' "
-                                << ( !errMsg.empty() ?  m_error_message(errMsg) : string("(another force won)") ) << endl;
+                                << ( !errMsg.empty() ? causedBy(errMsg) : string("(another force won)") ) << endl;
                         *other = o;
                         other->getOwned();
                         conn.done();
@@ -568,8 +573,8 @@ namespace mongo {
                 }
                 catch( std::exception& e ) {
                     conn.done();
-                    m_throw_exception(70000, LockException,
-                                      "exception forcing distributed lock " << lockName << m_error_message( e.what() ) );
+                    throw LockException( str::stream() << "exception forcing distributed lock "
+                                         << lockName << causedBy( e ), 13660);
                 }
 
                 // Lock forced, reset our timer
@@ -614,7 +619,7 @@ namespace mongo {
 
             if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
                 ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "could not acquire lock '" << lockName << "' "
-                        << ( !errMsg.empty() ?  m_error_message(errMsg) : string("(another update won)") ) << endl;
+                        << ( !errMsg.empty() ? causedBy( errMsg ) : string("(another update won)") ) << endl;
                 *other = currLock;
                 other->getOwned();
                 gotLock = false;
@@ -627,7 +632,7 @@ namespace mongo {
         catch ( UpdateNotTheSame& up ) {
 
             // this means our update got through on some, but not others
-            warning() << "distributed lock '" << lockName << " did not propagate properly." << m_caused_by(up) << endl;
+            warning() << "distributed lock '" << lockName << " did not propagate properly." << causedBy( up ) << endl;
 
             // Overall protection derives from:
             // All unlocking updates use the ts value when setting state to 0
@@ -668,9 +673,9 @@ namespace mongo {
                 }
                 catch( std::exception& e ) {
                     conn.done();
-                    m_throw_exception(70000, LockException,
-                                      "distributed lock " << lockName << " had errors communicating with individual server " << up[1].first
-                                      << m_error_message( e.what() ) );
+                    throw LockException( str::stream() << "distributed lock " << lockName
+                                         << " had errors communicating with individual server "
+                                         << up[1].first << causedBy( e ), 13661 );
                 }
 
                 assert( !indUpdate.isEmpty() );
@@ -701,7 +706,7 @@ namespace mongo {
                     string errMsg = DBClientWithCommands::getLastErrorString(err);
                     if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
                         warning() << "could not finalize winning lock " << lockName
-                                  << ( !errMsg.empty() ? m_error_message( errMsg ) : " (did not update lock) " ) << endl;
+                                  << ( !errMsg.empty() ? causedBy( errMsg ) : " (did not update lock) " ) << endl;
                         gotLock = false;
                     }
                     else {
@@ -712,8 +717,8 @@ namespace mongo {
                 }
                 catch( std::exception& e ) {
                     conn.done();
-                    m_throw_exception(70000, LockException,
-                                      "exception finalizing winning lock" << m_error_message( e.what() ) );
+                    throw LockException( str::stream() << "exception finalizing winning lock"
+                                         << causedBy( e ), 13662 );
                 }
 
             }
@@ -724,8 +729,8 @@ namespace mongo {
         }
         catch( std::exception& e ) {
             conn.done();
-            m_throw_exception(70000, LockException,
-                              "exception creating distributed lock " << lockName << m_error_message( e.what() ) );
+            throw LockException( str::stream() << "exception creating distributed lock "
+                                 << lockName << causedBy( e ), 13663 );
         }
 
         if(gotLock)
@@ -776,7 +781,7 @@ namespace mongo {
             }
             catch ( std::exception& e) {
                 warning() << "distributed lock '" << lockName << "' failed unlock attempt."
-                          << m_error_message(e.what()) <<  endl;
+                          << causedBy( e ) <<  endl;
 
                 conn.done();
                 // TODO:  If our lock timeout is small, sleeping this long may be unsafe.

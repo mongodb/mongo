@@ -58,7 +58,7 @@ namespace mongo {
         shared_ptr<Cursor> newReverseCursor() const;
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
-        bool willScanTable() const { return !_index && _fbs.matchPossible(); }
+        bool willScanTable() const { return _idxNo < 0; }
         const char *ns() const { return _fbs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
@@ -449,7 +449,8 @@ namespace mongo {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
             auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
             shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, origFrs, query, sort ).getBestGuess()->newCursor();
-            if ( !query.isEmpty() ) {
+            // If we don't already have a matcher, supply one.
+            if ( !query.isEmpty() && ! ret->matcher() ) {
                 shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );
             }

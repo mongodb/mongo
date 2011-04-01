@@ -69,21 +69,19 @@ namespace mongo {
         _type(0),
         _startOrEndSpec( !startKey.isEmpty() || !endKey.isEmpty() ) {
 
+        if ( willScanTable() ) {
+            if ( _order.isEmpty() || !strcmp( _order.firstElement().fieldName(), "$natural" ) )
+                _scanAndOrderRequired = false;
+            return;                
+        }
+            
+        // FIXME SERVER-1932 This check is only valid for non multikey indexes.
         if ( !_fbs.matchPossible() ) {
             _unhelpful = true;
             _scanAndOrderRequired = false;
             return;
-        }
-
-        if( _idxNo >= 0 ) {
-            _index = &d->idx(_idxNo);
-        }
-        else {
-            // full table scan case
-            if ( _order.isEmpty() || !strcmp( _order.firstElement().fieldName(), "$natural" ) )
-                _scanAndOrderRequired = false;
-            return;
-        }
+        }            
+        _index = &d->idx(_idxNo);
 
         if ( _special.size() ) {
             _optimal = true;
@@ -191,17 +189,21 @@ doneCheckOrder:
             return _type->newCursor( _originalQuery , _order , numWanted );
         }
 
-        if ( !_fbs.matchPossible() ) {
-            if ( _fbs.nNontrivialRanges() )
-                checkTableScanAllowed( _fbs.ns() );
-            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
-        }
-        if ( !_index ) {
+        if ( willScanTable() ) {
             if ( _fbs.nNontrivialRanges() )
                 checkTableScanAllowed( _fbs.ns() );
             return findTableScan( _fbs.ns(), _order, startLoc );
         }
-
+        
+        // FIXME SERVER-1932 This check is only valid for non multikey indexes.
+        if ( !_fbs.matchPossible() ) {
+            // TODO We might want to allow this dummy table scan even in no table
+            // scan mode, since it won't scan anything.
+            if ( _fbs.nNontrivialRanges() )
+                checkTableScanAllowed( _fbs.ns() );
+            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
+        }
+        
         massert( 10363 ,  "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
 
         if ( _startOrEndSpec ) {
@@ -217,9 +219,7 @@ doneCheckOrder:
     }
 
     shared_ptr<Cursor> QueryPlan::newReverseCursor() const {
-        if ( !_fbs.matchPossible() )
-            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
-        if ( !_index ) {
+        if ( willScanTable() ) {
             int orderSpec = _order.getIntField( "$natural" );
             if ( orderSpec == INT_MIN )
                 orderSpec = 1;
@@ -236,6 +236,7 @@ doneCheckOrder:
     }
 
     void QueryPlan::registerSelf( long long nScanned ) const {
+        // FIXME SERVER-2864 Otherwise no query pattern can be generated.
         if ( _fbs.matchPossible() ) {
             scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _fbs.pattern( _order ), indexKey(), nScanned );
@@ -336,7 +337,7 @@ doneCheckOrder:
 
         const char *ns = _fbs->ns();
         NamespaceDetails *d = nsdetails( ns );
-        if ( !d || !_fbs->matchPossible() ) {
+        if ( !d || !_fbs->matchPossible() ) { // FIXME SERVER-1932 This check is only valid for non multikey indexes.
             // Table scan plan, when no matches are possible
             _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) ) );
             return;
@@ -446,6 +447,7 @@ doneCheckOrder:
             return;
 
         // If table scan is optimal or natural order requested or tailable cursor requested
+        // FIXME SERVER-1932 This check is only valid for non multikey indexes.
         if ( !_fbs->matchPossible() || ( _fbs->nNontrivialRanges() == 0 && _order.isEmpty() ) ||
                 ( !_order.isEmpty() && !strcmp( _order.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan

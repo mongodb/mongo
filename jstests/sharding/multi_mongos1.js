@@ -67,4 +67,5 @@ assert.eq( N , viaS2.find().toArray().length , "other B" );
 
 printjson( primary._db._adminCommand( "shardingState" ) );
 
+
 s1.stop();

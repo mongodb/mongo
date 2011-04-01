@@ -46,8 +46,6 @@ namespace mongo {
 
         void openAllFiles();
 
-        void finishInit();
-
         /**
          * tries to make sure that this hasn't been deleted
          */

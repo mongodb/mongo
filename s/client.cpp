@@ -146,7 +146,7 @@ namespace mongo {
             }
             catch( std::exception &e ){
                 
-                warning() << "Could not get last error." << m_error_message( e.what() ) << endl;
+                warning() << "could not get last error." << causedBy( e ) << endl;
                 
                 // Catch everything that happens here, since we need to ensure we return our connection when we're
             	// finished.
@@ -219,7 +219,7 @@ namespace mongo {
         	    // Safe to return here, since we haven't started any extra processing yet, just collecting
         	    // responses.
                 
-        	    warning() << "Could not get last error." << m_error_message( e.what() ) << endl;
+        	    warning() << "could not get last error." << causedBy( e ) << endl;
                 conn.done();
                 
                 return false;

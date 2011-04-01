@@ -692,7 +692,23 @@ namespace mongo {
             return *this;
         }
 
-        BufBuilder &subobjStart( const StringData& name = "0" ) {
+        // These two just use next position
+        BufBuilder &subobjStart() { return _b.subobjStart( num() ); }
+        BufBuilder &subarrayStart() { return _b.subarrayStart( num() ); }
+
+        // These fill missing entries up to pos. if pos is < next pos is ignored
+        BufBuilder &subobjStart(int pos) {
+            fill(pos);
+            return _b.subobjStart( num() );
+        }
+        BufBuilder &subarrayStart(int pos) {
+            fill(pos);
+            return _b.subarrayStart( num() );
+        }
+
+        // These should only be used where you really need interface compatability with BSONObjBuilder
+        // Currently they are only used by update.cpp and it should probably stay that way
+        BufBuilder &subobjStart( const StringData& name ) {
             fill( name );
             return _b.subobjStart( num() );
         }
@@ -720,7 +736,11 @@ namespace mongo {
             long int n = strtol( name.data(), &r, 10 );
             if ( *r )
                 uasserted( 13048, (string)"can't append to array using string field name [" + name.data() + "]" );
-            while( _i < n )
+            fill(n);
+        }
+
+        void fill (int upTo){
+            while( _i < upTo )
                 append( nullElt() );
         }
 

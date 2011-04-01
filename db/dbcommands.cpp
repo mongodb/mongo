@@ -1001,29 +1001,21 @@ namespace mongo {
                 BSONObj obj = cursor->current();
                 cursor->advance();
 
+                BSONElement ne = obj["n"];
+                assert(ne.isNumber());
+                int myn = ne.numberInt();
+                if ( n != myn ) {
+                    log() << "should have chunk: " << n << " have:" << myn << endl;
+                    dumpChunks( ns , query , sort );
+                    uassert( 10040 ,  "chunks out of order" , n == myn );
+                }
+
+                int len;
+                const char * data = obj["data"].binDataClean( len );
+
                 ClientCursor::YieldLock yield (cc);
                 try {
-
-                    BSONElement ne = obj["n"];
-                    assert(ne.isNumber());
-                    int myn = ne.numberInt();
-                    if ( n != myn ) {
-                        log() << "should have chunk: " << n << " have:" << myn << endl;
-
-                        DBDirectClient client;
-                        Query q(query);
-                        q.sort(sort);
-                        auto_ptr<DBClientCursor> c = client.query(ns, q);
-                        while(c->more())
-                            PRINT(c->nextSafe());
-
-                        uassert( 10040 ,  "chunks out of order" , n == myn );
-                    }
-
-                    int len;
-                    const char * data = obj["data"].binDataClean( len );
                     md5_append( &st , (const md5_byte_t*)(data) , len );
-
                     n++;
                 }
                 catch (...) {
@@ -1041,6 +1033,15 @@ namespace mongo {
             result.append( "numChunks" , n );
             result.append( "md5" , digestToString( d ) );
             return true;
+        }
+
+        void dumpChunks( const string& ns , const BSONObj& query , const BSONObj& sort ) {
+            DBDirectClient client;
+            Query q(query);
+            q.sort(sort);
+            auto_ptr<DBClientCursor> c = client.query(ns, q);
+            while(c->more())
+                PRINT(c->nextSafe());
         }
     } cmdFileMD5;
 

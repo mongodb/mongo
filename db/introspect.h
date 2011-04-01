@@ -29,7 +29,6 @@ namespace mongo {
        do when database->profile is set
     */
 
-    void profile(const char *str,
-                 int millis);
+    void profile( const Client& c , CurOp& currentOp, int millis);
 
 } // namespace mongo

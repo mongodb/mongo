@@ -198,7 +198,7 @@ namespace mongo {
         catch( std::exception& e ){
         	// Can happen if connection goes down while we're starting up here
 		// Catch so that we don't get a hard-to-trace segfault from SM
-        	JS_ReportError( cx, ( (string)"Error during mongo startup." + m_error_message( e.what() ) ).c_str() );
+        	JS_ReportError( cx, ((string)( str::stream() << "Error during mongo startup." << causedBy( e ) )).c_str() );
         	return JS_FALSE;
         }
 

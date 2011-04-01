@@ -592,7 +592,7 @@ namespace mongo {
             	dlk = dist_lock_try( &lockSetup, string("split-") + min.toString() );
             }
             catch( LockException& e ){
-            	errmsg = string("Error locking distributed lock for split.") + m_caused_by(e);
+            	errmsg = str::stream() << "Error locking distributed lock for split." << causedBy( e );
             	return false;
             }
 

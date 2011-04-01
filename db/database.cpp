@@ -52,7 +52,7 @@ namespace mongo {
         }
 
         newDb = namespaceIndex.exists();
-        profile = 0;
+        profile = cmdLine.defaultProfile;
 
         checkDuplicateUncasedNames();
 
@@ -239,14 +239,6 @@ namespace mongo {
         }
         profile = newLevel;
         return true;
-    }
-
-    void Database::finishInit() {
-        if ( cmdLine.defaultProfile == profile )
-            return;
-
-        string errmsg;
-        massert( 12506 , errmsg , setProfilingLevel( cmdLine.defaultProfile , errmsg ) );
     }
 
     bool Database::validDBName( const string& ns ) {

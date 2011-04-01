@@ -113,6 +113,8 @@ namespace mongo {
         // The implementation may return different matchers depending on the
         // position of the cursor.  If matcher() is nonzero at the start,
         // matcher() should be checked each time advance() is called.
+        // Implementations which generate their own matcher should return this
+        // to avoid a matcher being set manually.
         virtual CoveredIndexMatcher *matcher() const { return 0; }
 
         // A convenience function for setting the value of matcher() manually

@@ -284,9 +284,9 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert_msg( 13027 , "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
+            uassert( 13027 , str::stream() << "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
             in -= _min;
-            uassert_msg( 14021 , "point not in range > " << _min , in > 0 );
+            uassert( 14021 , str::stream() << "point not in range > " << _min , in > 0 );
             return (unsigned)(in * _scaling);
         }
 
@@ -1220,6 +1220,10 @@ namespace mongo {
 
         virtual long long nscanned() { return _nscanned; }
 
+        virtual CoveredIndexMatcher *matcher() const {
+        	return _s->_hopper->_matcher.get();
+        }
+
         shared_ptr<GeoSearch> _s;
         GeoHopper::Holder::iterator _cur;
         GeoHopper::Holder::iterator _end;
@@ -1288,6 +1292,9 @@ namespace mongo {
         virtual DiskLoc currLoc() { assert(ok()); return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
+        virtual CoveredIndexMatcher *matcher() const {
+        	return _matcher.get();
+        }
 
         virtual bool moreToDo() = 0;
         virtual void fillStack() = 0;

@@ -43,8 +43,9 @@ namespace mongo {
      */
     class LockException : public DBException {
     public:
-	LockException( const char * msg , int code ) : DBException(msg, code) {}
-	virtual ~LockException() throw() { }
+    	LockException( const char * msg , int code ) : DBException( msg, code ) {}
+    	LockException( const string& msg, int code ) : DBException( msg, code ) {}
+    	virtual ~LockException() throw() { }
     };
 
     /**
@@ -52,7 +53,8 @@ namespace mongo {
      */
     class TimeNotFoundException : public LockException {
     public:
-        TimeNotFoundException( const char * msg , int code ) : LockException(msg, code) {}
+        TimeNotFoundException( const char * msg , int code ) : LockException( msg, code ) {}
+        TimeNotFoundException( const string& msg, int code ) : LockException( msg, code ) {}
         virtual ~TimeNotFoundException() throw() { }
     };
 

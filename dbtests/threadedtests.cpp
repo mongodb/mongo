@@ -236,12 +236,19 @@ namespace ThreadedTests {
     class RWLockTest2 { 
     public:
         
-        static void worker( const RWLock * lk , AtomicUInt * x ) {
+        static void worker1( const RWLock * lk , AtomicUInt * x ) {
             (*x)++; // 1
             cout << "lock b try" << endl;
             rwlock b( *lk , true ); 
             cout << "lock b got" << endl;
             (*x)++; // 2
+        }
+
+        static void worker2( const RWLock * lk , AtomicUInt * x ) {
+            cout << "lock c try" << endl;
+            rwlock c( *lk , false );
+            (*x)++;
+            cout << "lock c got" << endl;
         }
 
         void run() { 
@@ -253,29 +260,30 @@ namespace ThreadedTests {
             
             auto_ptr<rwlock> a( new rwlock( lk , false ) );
             
-            AtomicUInt x = 0;
-            cout << "A : " << &x << endl;
-            boost::thread t( boost::bind( worker , &lk , &x ) );
-            while ( ! x );
-            assert( x == 1 );
+            AtomicUInt x1 = 0;
+            cout << "A : " << &x1 << endl;
+            boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
+            while ( ! x1 );
+            assert( x1 == 1 );
             sleepmillis( 500 );
-            assert( x == 1 );
+            assert( x1 == 1 );
             
-            cout << "lock c try" << endl;
-            auto_ptr<rwlock> c( new rwlock( lk , false ) );
-            cout << "lock c got" << endl;
+            AtomicUInt x2 = 0;
 
-            c.reset();
+            boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
+            t2.join();
+            assert( x2 == 1 );
+
             a.reset();
 
             for ( int i=0; i<2000; i++ ) {
-                if ( x == 2 )
+                if ( x1 == 2 )
                     break;
                 sleepmillis(1);
             }
 
-            assert( x == 2 );
-            t.join();
+            assert( x1 == 2 );
+            t1.join();
             
         }
     };

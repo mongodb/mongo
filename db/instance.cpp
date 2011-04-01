@@ -367,8 +367,8 @@ namespace mongo {
             else {
                 writelock lk;
                 if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                    Client::Context c( currentOp.getNS() );
-                    profile(ss.str().c_str(), ms);
+                    Client::Context cx( currentOp.getNS() );
+                    profile(c , currentOp, ms);
                 }
                 else {
                     mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
@@ -383,9 +383,10 @@ namespace mongo {
         x++; // reserved
         int n = *x++;
 
-        assert( m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13659 , "sent 0 cursors to kill" , n != 0 );
+        massert( 13658 , str::stream() << "bad kill cursors size: " << m.dataSize() , m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
-        uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );

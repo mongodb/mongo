@@ -702,12 +702,12 @@ namespace mongo {
                 dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
             }
             catch( LockException& e ){
-                errmsg = (string)"error locking distributed lock for migration " + "migrate-" + min.toString() + m_caused_by(e);
+                errmsg = str::stream() << "error locking distributed lock for migration " << "migrate-" << min.toString() << causedBy( e );
                 return false;
             }
 
             if ( ! dlk.got() ) {
-                errmsg = (string)"the collection metadata could not be locked with lock " + "migrate-" + min.toString();
+                errmsg = str::stream() << "the collection metadata could not be locked with lock " << "migrate-" << min.toString();
                 result.append( "who" , dlk.other() );
                 return false;
             }

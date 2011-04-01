@@ -22,9 +22,16 @@ doTest = function( signal ) {
     s1Id = replTest.getNodeId( replTest.liveNodes.slaves[0] );
     s2Id = replTest.getNodeId( replTest.liveNodes.slaves[1] );
 
-    replTest.stop( mId );
     replTest.stop( s1Id );
     replTest.stop( s2Id );
+    
+    assert.soon(function() {
+            var status = master.getDB("admin").runCommand({replSetGetStatus: 1});
+            return status.members[1].state == 8 && status.members[2].state == 8;
+        });
+
+    
+    replTest.stop( mId );
 
     // Now let's restart these nodes
     replTest.restart( mId );
@@ -35,6 +42,11 @@ doTest = function( signal ) {
     master = replTest.getMaster();
     slaves = replTest.liveNodes.slaves;
 
+    assert.soon(function() {
+            var status = master.getDB("admin").runCommand({replSetGetStatus: 1});
+            return status.members[1].state != 8 && status.members[2].state != 8;
+        });
+    
     // Do a status check on each node
     // Master should be set to 1 (primary)
     assert.soon(function() {

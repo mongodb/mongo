@@ -116,6 +116,16 @@ namespace mongo {
 
                 sleepmillis(2);
             }
+            catch ( ... ) {
+                connTicketHolder.release();
+                log() << "unknown error accepting new socket" << endl;
+
+                p->shutdown();
+                delete p;
+
+                sleepmillis(2);
+            }
+
         }
 
         virtual void setAsTimeTracker() {

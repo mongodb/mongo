@@ -465,7 +465,7 @@ namespace mongo {
             getDur().commitIfNeeded();
         }
 
-        State::State( const Config& c ) : _config( c ), _size(0), _numEmits(0) {
+        State::State( const Config& c ) : _config( c ), _size(0), _dupCount(0), _numEmits(0) {
             _temp.reset( new InMemory() );
             _onDisk = _config.outType != Config::INMEMORY;
         }

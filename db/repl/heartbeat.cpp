@@ -233,6 +233,7 @@ namespace mongo {
             if( mem.upSince || mem.downSince == 0 ) {
                 mem.upSince = 0;
                 mem.downSince = jsTime();
+                mem.hbstate = MemberState::RS_DOWN;
                 log() << "replSet info " << h.toString() << " is down (or slow to respond): " << msg << rsLog;
             }
             mem.lastHeartbeatMsg = msg;
