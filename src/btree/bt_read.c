@@ -243,7 +243,10 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * the called function cleaned up everything, including the physical
 	 * page.
 	 */
-	WT_RET(__wt_page_inmem(session, page));
+	if ((ret = __wt_page_inmem(session, page)) != 0) {
+		__wt_page_discard(session, page);
+		goto err;
+	}
 
 	/*
 	 * The page is now available -- set the LRU so the page is not selected

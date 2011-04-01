@@ -76,48 +76,31 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 
 	page->type = dsk->type;
 
-	switch (dsk->type) {
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		page->u.col_leaf.recno = dsk->recno;
+		return (__wt_page_inmem_col_fix(session, page));
 	case WT_PAGE_COL_INT:
 		page->u.col_int.recno = dsk->recno;
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-		page->u.col_leaf.recno = dsk->recno;
-		break;
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
 
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
-		WT_ERR(__wt_page_inmem_col_fix(session, page));
-		break;
-	case WT_PAGE_COL_INT:
-		WT_ERR(__wt_page_inmem_col_int(session, page));
+		WT_RET(__wt_page_inmem_col_int(session, page));
 
 		/* Column-store internal pages do not require a disk image. */
 		__wt_free(session, page->XXdsk);
-		break;
+		return (0);
 	case WT_PAGE_COL_RLE:
-		WT_ERR(__wt_page_inmem_col_rle(session, page));
-		break;
+		page->u.col_leaf.recno = dsk->recno;
+		return (__wt_page_inmem_col_rle(session, page));
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__wt_page_inmem_col_var(session, page));
-		break;
+		page->u.col_leaf.recno = dsk->recno;
+		return (__wt_page_inmem_col_var(session, page));
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__wt_page_inmem_row_int(session, page));
-		break;
+		return (__wt_page_inmem_row_int(session, page));
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_page_inmem_row_leaf(session, page));
-		break;
+		return (__wt_page_inmem_row_leaf(session, page));
+	WT_ILLEGAL_FORMAT(session);
 	}
-	return (0);
-
-err:	__wt_page_discard(session, page);
-	return (ret);
+	/* NOTREACHED */
 }
 
 /*
