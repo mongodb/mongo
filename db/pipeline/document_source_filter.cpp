@@ -18,6 +18,7 @@
 
 #include "db/pipeline/document_source.h"
 
+#include "db/jsobj.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/value.h"
 
@@ -75,6 +76,26 @@ namespace mongo {
 
         assert(pCurrent.get() != NULL); // CW TODO error
         return pCurrent;
+    }
+
+    void DocumentSourceFilter::toBson(BSONObjBuilder *pBuilder) const {
+	BSONObjBuilder insides;
+	pFilter->toBson(&insides, "", false);
+	pBuilder->append("$filter", insides.done());
+    }
+
+    shared_ptr<DocumentSourceFilter> DocumentSourceFilter::createFromBson(
+	BSONElement *pBsonElement) {
+        assert(pBsonElement->type() == Object);
+        // CW TODO error: expression object must be an object
+
+        shared_ptr<Expression> pExpression(
+	    Expression::parseObject(pBsonElement,
+				    &Expression::ObjectCtx(0)));
+        shared_ptr<DocumentSourceFilter> pFilter(
+            DocumentSourceFilter::create(pExpression));
+
+        return pFilter;
     }
 
     shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(

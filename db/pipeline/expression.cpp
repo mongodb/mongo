@@ -17,17 +17,265 @@
 #include "pch.h"
 #include "db/pipeline/expression.h"
 
+#include <cstdio>
+#include "db/jsobj.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    /* ----------------------------- ExpressionAdd ----------------------------- */
+
+    /* --------------------------- Expression ------------------------------ */
+
+    Expression::ObjectCtx::ObjectCtx(int theOptions):
+        options(theOptions),
+        raveledField() {
+    }
+
+    void Expression::ObjectCtx::ravel(string fieldName) {
+        assert(ravelOk());
+        assert(!ravelUsed());
+        assert(fieldName.size());
+        raveledField = fieldName;
+    }
+
+    bool Expression::ObjectCtx::documentOk() const {
+        return ((options & DOCUMENT_OK) != 0);
+    }
+
+    shared_ptr<Expression> Expression::parseObject(
+        BSONElement *pBsonElement, ObjectCtx *pCtx) {
+        /*
+          An object expression can take any of the following forms:
+
+          f0: {f1: ..., f2: ..., f3: ...}
+          f0: {$operator:[operand1, operand2, ...]}
+          f0: {$ravel:"fieldpath"}
+
+          We handle $ravel as a special case, because this is done by the
+          projection source.  For any other expression, we hand over control to
+          code that parses the expression and returns an expression.
+        */
+
+        shared_ptr<Expression> pExpression; // the result
+        shared_ptr<ExpressionDocument> pExpressionDocument; // alt result
+        int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
+        enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
+
+        BSONObj obj(pBsonElement->Obj());
+        BSONObjIterator iter(obj);
+        for(size_t fieldCount = 0; iter.more(); ++fieldCount) {
+            BSONElement fieldElement(iter.next());
+            const char *pFieldName = fieldElement.fieldName();
+
+            if (pFieldName[0] == '$') {
+                assert(fieldCount == 0);
+                // CW TODO error:  operator must be only field
+
+                /* we've determined this "object" is an operator expression */
+                isOp = 1;
+                kind = OPERATOR;
+
+                if (strcmp(pFieldName, "$ravel") != 0) {
+                    pExpression = parseExpression(pFieldName, &fieldElement);
+                }
+                else {
+                    assert(pCtx->ravelOk());
+                    // CW TODO error: it's not OK to ravel in this context
+
+                    assert(!pCtx->ravelUsed());
+                    // CW TODO error: this projection already has a ravel
+
+                    assert(fieldElement.type() == String);
+                    // CW TODO $ravel operand must be single field name
+
+                    // TODO should we require leading "$document." here?
+                    string fieldPath(fieldElement.String());
+                    pExpression = ExpressionFieldPath::create(fieldPath);
+                    pCtx->ravel(fieldPath);
+                }
+            }
+            else {
+                assert(isOp != 1);
+                assert(kind != OPERATOR);
+                // CW TODO error: can't accompany an operator expression
+
+                /* if it's our first time, create the document expression */
+                if (!pExpression.get()) {
+                    assert(pCtx->documentOk());
+                    // CW TODO error: document not allowed in this context
+
+                    pExpressionDocument = ExpressionDocument::create();
+                    pExpression = pExpressionDocument;
+
+                    /* this "object" is not an operator expression */
+                    isOp = 0;
+                    kind = NOTOPERATOR;
+                }
+
+                BSONType fieldType = fieldElement.type();
+                string fieldName(pFieldName);
+                if (fieldType == Object) {
+                    /* it's a nested document */
+                    shared_ptr<Expression> pNested(
+                        parseObject(&fieldElement, &ObjectCtx(
+                         (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0))));
+                    pExpressionDocument->addField(fieldName, pNested);
+                }
+                else if (fieldType == String) {
+                    /* it's a renamed field */
+                    shared_ptr<Expression> pPath(
+                        ExpressionFieldPath::create(fieldElement.String()));
+                    pExpressionDocument->addField(fieldName, pPath);
+                }
+                else if (fieldType == NumberDouble) {
+                    /* it's an inclusion specification */
+                    int inclusion = (int)fieldElement.Double();
+                    assert(inclusion == 1);
+                    // CW TODO error: only positive inclusions allowed here
+
+                    shared_ptr<Expression> pPath(
+                        ExpressionFieldPath::create(fieldName));
+                    pExpressionDocument->addField(fieldName, pPath);
+                }
+                else { /* nothing else is allowed */
+                    assert(false); // CW TODO error
+                }
+            }
+        }
+
+        return pExpression;
+    }
+
+
+    struct OpDesc {
+        const char *pName;
+        shared_ptr<ExpressionNary> (*pFactory)(void);
+    };
+
+    static int OpDescCmp(const void *pL, const void *pR) {
+        return strcmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
+    }
+
+    /*
+      Keep these sorted alphabetically so we can bsearch() them using
+      OpDescCmp() above.
+    */
+    static const OpDesc OpTable[] = {
+        {"$add", ExpressionAdd::create},
+        {"$and", ExpressionAnd::create},
+        {"$cmp", ExpressionCompare::createCmp},
+        {"$divide", ExpressionDivide::create},
+        {"$eq", ExpressionCompare::createEq},
+        {"$gt", ExpressionCompare::createGt},
+        {"$gte", ExpressionCompare::createGte},
+        {"$ifnull", ExpressionIfNull::create},
+        {"$lt", ExpressionCompare::createLt},
+        {"$lte", ExpressionCompare::createLte},
+        {"$ne", ExpressionCompare::createNe},
+        {"$not", ExpressionNot::create},
+        {"$or", ExpressionOr::create},
+    };
+
+    static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
+
+    shared_ptr<Expression> Expression::parseExpression(
+        const char *pOpName, BSONElement *pBsonElement) {
+        /* look for the specified operator */
+        OpDesc key;
+        key.pName = pOpName;
+        const OpDesc *pOp = (const OpDesc *)bsearch(
+                                &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
+
+        assert(pOp); // CW TODO error: invalid operator
+
+        /* make the expression node */
+        shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
+
+        /* add the operands to the expression node */
+        BSONType elementType = pBsonElement->type();
+        if (elementType == Object) {
+            /* the operator must be unary and accept an object argument */
+            BSONObj objOperand(pBsonElement->Obj());
+            shared_ptr<Expression> pOperand(
+                Expression::parseObject(pBsonElement,
+                            &ObjectCtx(ObjectCtx::DOCUMENT_OK)));
+            pExpression->addOperand(pOperand);
+        }
+        else if (elementType == Array) {
+            /* multiple operands - an n-ary operator */
+            vector<BSONElement> bsonArray(pBsonElement->Array());
+            const size_t n = bsonArray.size();
+            for(size_t i = 0; i < n; ++i) {
+                BSONElement *pBsonOperand = &bsonArray[i];
+                shared_ptr<Expression> pOperand(
+		    Expression::parseOperand(pBsonOperand));
+                pExpression->addOperand(pOperand);
+            }
+        }
+        else { /* assume it's an atomic operand */
+            shared_ptr<Expression> pOperand(
+		Expression::parseOperand(pBsonElement));
+            pExpression->addOperand(pOperand);
+        }
+
+        return pExpression;
+    }
+
+    shared_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
+        BSONType type = pBsonElement->type();
+
+        switch(type) {
+        case String: {
+            /*
+              This could be a field path, or it could be a constant
+              string.
+
+              We make a copy of the BSONElement reader so we can read its
+              value without advancing its state, in case we need to read it
+              again in the constant code path.
+            */
+            BSONElement opCopy(*pBsonElement);
+            string value(opCopy.String());
+
+            /* check for a field path */
+            if (value.compare(0, 10, "$document.") != 0)
+                goto ExpectConstant;  // assume plain string constant
+
+            /* if we got here, this is a field path expression */
+            string fieldPath(value.substr(10));
+            shared_ptr<Expression> pFieldExpr(
+                ExpressionFieldPath::create(fieldPath));
+            return pFieldExpr;
+        }
+
+        case Object: {
+            shared_ptr<Expression> pSubExpression(
+                Expression::parseObject(pBsonElement,
+                            &ObjectCtx(ObjectCtx::DOCUMENT_OK)));
+            return pSubExpression;
+        }
+
+        default:
+ExpectConstant: {
+                shared_ptr<Expression> pOperand(
+                    ExpressionConstant::createFromBsonElement(pBsonElement));
+                return pOperand;
+            }
+
+        } // switch(type)
+
+        /* NOTREACHED */
+        assert(false);
+        return shared_ptr<Expression>();
+    }
+
+    /* ------------------------- ExpressionAdd ----------------------------- */
 
     ExpressionAdd::~ExpressionAdd() {
     }
 
     shared_ptr<ExpressionNary> ExpressionAdd::create() {
-        shared_ptr<ExpressionNary> pExpression(new ExpressionAdd());
+        shared_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
     }
 
@@ -63,7 +311,12 @@ namespace mongo {
         return Value::createInt((int)longTotal);
     }
 
-    /* ----------------------------- ExpressionAnd ----------------------------- */
+    void ExpressionAdd::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	operandsToBson(pBuilder, "$add", true);
+    }
+
+    /* ------------------------- ExpressionAnd ----------------------------- */
 
     ExpressionAnd::~ExpressionAnd() {
     }
@@ -89,7 +342,12 @@ namespace mongo {
         return Value::getTrue();
     }
 
-    /* --------------------------- ExpressionCompare --------------------------- */
+    void ExpressionAnd::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	operandsToBson(pBuilder, "$and", docPrefix);
+    }
+
+    /* ----------------------- ExpressionCompare --------------------------- */
 
     ExpressionCompare::~ExpressionCompare() {
     }
@@ -232,7 +490,43 @@ namespace mongo {
         return Value::getFalse();
     }
 
-    /* -------------------------- ExpressionConstant --------------------------- */
+    void ExpressionCompare::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	const char *pName = NULL;
+	switch(relop) {
+	case EQ:
+	    pName = "$eq";
+	    break;
+
+	case NE:
+	    pName = "$ne";
+	    break;
+
+	case GT:
+	    pName = "$gt";
+	    break;
+
+	case GTE:
+	    pName = "$gte";
+	    break;
+
+	case LT:
+	    pName = "$lt";
+	    break;
+
+	case LTE:
+	    pName = "$lte";
+	    break;
+
+	case CMP:
+	    pName = "$cmp";
+	    break;
+	}
+
+	operandsToBson(pBuilder, pName, true);
+    }
+
+    /* ---------------------- ExpressionConstant --------------------------- */
 
     ExpressionConstant::~ExpressionConstant() {
     }
@@ -253,7 +547,12 @@ namespace mongo {
         return pValue;
     }
 
-    /* --------------------------- ExpressionDivide ---------------------------- */
+    void ExpressionConstant::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	pValue->addToBsonObj(pBuilder, name);
+    }
+
+    /* ----------------------- ExpressionDivide ---------------------------- */
 
     ExpressionDivide::~ExpressionDivide() {
     }
@@ -309,7 +608,12 @@ namespace mongo {
         return Value::createDouble(left / right);
     }
 
-    /* -------------------------- ExpressionDocument --------------------------- */
+    void ExpressionDivide::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	operandsToBson(pBuilder, "$divide", true);
+    }
+
+    /* ---------------------- ExpressionDocument --------------------------- */
 
     ExpressionDocument::~ExpressionDocument() {
     }
@@ -343,7 +647,19 @@ namespace mongo {
         vpExpression.push_back(pExpression);
     }
 
-    /* ------------------------- ExpressionFieldPath --------------------------- */
+    void ExpressionDocument::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+
+	BSONObjBuilder builder;
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i)
+	    vpExpression[i]->toBson(&builder, vFieldName[i], docPrefix);
+
+	pBuilder->append(name, builder.done());
+    }
+
+
+    /* --------------------- ExpressionFieldPath --------------------------- */
 
     ExpressionFieldPath::~ExpressionFieldPath() {
     }
@@ -416,7 +732,22 @@ namespace mongo {
         return pValue;
     }
 
-    /* --------------------------- ExpressionIfNull ---------------------------- */
+    void ExpressionFieldPath::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	stringstream ss;
+	if (docPrefix)
+	    ss << "$document.";
+
+	ss << vFieldPath[0];
+
+	const size_t n = vFieldPath.size();
+	for(size_t i = 1; i < n; ++i)
+	    ss << "." << vFieldPath[i];
+
+	pBuilder->append(name, ss.str());
+    }
+
+    /* ----------------------- ExpressionIfNull ---------------------------- */
 
     ExpressionIfNull::~ExpressionIfNull() {
     }
@@ -447,7 +778,12 @@ namespace mongo {
         return pRight;
     }
 
-    /* ---------------------------- ExpressionNary ----------------------------- */
+    void ExpressionIfNull::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	operandsToBson(pBuilder, "$ifnull", docPrefix);
+    }
+
+    /* ------------------------ ExpressionNary ----------------------------- */
 
     ExpressionNary::ExpressionNary():
         vpOperand() {
@@ -458,7 +794,33 @@ namespace mongo {
         vpOperand.push_back(pExpression);
     }
 
-    /* ----------------------------- ExpressionNot ----------------------------- */
+    void ExpressionNary::operandsToBson(
+	BSONObjBuilder *pBuilder, string opName, bool docPrefix) const {
+	const size_t nOperand = vpOperand.size();
+	assert(nOperand > 0);
+	if (nOperand == 1)
+	    vpOperand[0]->toBson(pBuilder, opName, docPrefix);
+	else {
+	    /* build up the array */
+	    BSONObjBuilder builder;
+	    char indexBuffer[21];
+                // biggest unsigned long long is 18,446,744,073,709,551,615
+
+	    for(size_t i = 0; i < nOperand; ++i) {
+		// snprintf(indexBuffer, sizeof(indexBuffer), "%lu", i);
+                    // CW TODO llu?  What's a size_t in 64 builds?
+                    // CW TODO Do we care about such large arrays?
+		// CW TODO FEH: snprintf not available until C++0x-blah
+		// but this should be ok given max buffer size above
+		sprintf(indexBuffer, "%lu", i);
+		vpOperand[i]->toBson(&builder, indexBuffer, docPrefix);
+	    }
+
+	    pBuilder->appendArray(opName, builder.done());
+	}
+    }
+
+    /* ------------------------- ExpressionNot ----------------------------- */
 
     ExpressionNot::~ExpressionNot() {
     }
@@ -488,7 +850,12 @@ namespace mongo {
         return Value::getTrue();
     }
 
-    /* ------------------------------ ExpressionOr ----------------------------- */
+    void ExpressionNot::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	vpOperand[0]->toBson(pBuilder, "$not", docPrefix);
+    }
+
+    /* -------------------------- ExpressionOr ----------------------------- */
 
     ExpressionOr::~ExpressionOr() {
     }
@@ -514,4 +881,8 @@ namespace mongo {
         return Value::getFalse();
     }
 
+    void ExpressionOr::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	operandsToBson(pBuilder, "$or", docPrefix);
+    }
 }

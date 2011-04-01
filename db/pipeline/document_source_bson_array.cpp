@@ -18,41 +18,53 @@
 
 #include "db/pipeline/document_source.h"
 
-#include "db/Cursor.h"
 #include "db/pipeline/document.h"
 
 namespace mongo {
-    DocumentSourceCursor::DocumentSourceCursor(shared_ptr<Cursor> pTheCursor):
-        pCursor(pTheCursor) {
+
+    DocumentSourceBsonArray::~DocumentSourceBsonArray() {
     }
 
-    shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-	shared_ptr<Cursor> pCursor) {
-	shared_ptr<DocumentSourceCursor> pSource(
-	    new DocumentSourceCursor(pCursor));
-	    return pSource;
+    bool DocumentSourceBsonArray::eof() {
+	return !arrayIterator.more();
     }
 
-    bool DocumentSourceCursor::eof() {
-        return pCursor->eof();
+    bool DocumentSourceBsonArray::advance() {
+	if (eof())
+	    return false;
+
+	currentElement = arrayIterator.next();
+	return true;
     }
 
-    bool DocumentSourceCursor::advance() {
-        return pCursor->advance();
-    }
-
-    shared_ptr<Document> DocumentSourceCursor::getCurrent() {
-        BSONObj documentObj(pCursor->current());
+    shared_ptr<Document> DocumentSourceBsonArray::getCurrent() {
+        BSONObj documentObj(currentElement.Obj());
         shared_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
         return pDocument;
     }
 
-    void DocumentSourceCursor::setSource(shared_ptr<DocumentSource> pSource) {
+    void DocumentSourceBsonArray::setSource(shared_ptr<DocumentSource> pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
 
-    DocumentSourceCursor::~DocumentSourceCursor() {
+    DocumentSourceBsonArray::DocumentSourceBsonArray(
+	BSONElement *pBsonElement):
+        embeddedObject(pBsonElement->embeddedObject()),
+        arrayIterator(embeddedObject) {
+	if (arrayIterator.more())
+	    currentElement = arrayIterator.next();
     }
+
+    shared_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
+	BSONElement *pBsonElement) {
+
+	assert(pBsonElement->type() == Array);
+	shared_ptr<DocumentSourceBsonArray> pSource(
+	    new DocumentSourceBsonArray(pBsonElement));
+
+	return pSource;
+    }
+
 }

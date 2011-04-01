@@ -48,37 +48,6 @@ namespace mongo {
         Pipeline();
 
     private:
-        /* these statics should move elsewhere; probably a parser class */
-        static shared_ptr<DocumentSource> setupProject(
-            BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
-        static shared_ptr<DocumentSource> setupFilter(
-            BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
-        static shared_ptr<DocumentSource> setupGroup(
-            BSONElement *pBsonElement, shared_ptr<DocumentSource> pSource);
-
-        static shared_ptr<Expression> parseOperand(BSONElement *pBsonElement);
-        static shared_ptr<Expression> parseExpression(
-            const char *pOpName, BSONElement *pBsonElement);
-
-        class MiniContext {
-        public:
-            MiniContext(int options);
-            static const int RAVEL_OK = 0x0001;
-            static const int DOCUMENT_OK = 0x0002;
-
-            bool ravelOk() const;
-            bool ravelUsed() const;
-            void ravel(string fieldName);
-
-            bool documentOk() const;
-
-        private:
-            int options;
-            string raveledField;
-        };
-
-        static shared_ptr<Expression> parseObject(
-            BSONElement *pBsonElement, MiniContext *pCtx);
     };
 
 } // namespace mongo

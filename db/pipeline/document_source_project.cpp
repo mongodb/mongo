@@ -17,15 +17,14 @@
 #include "pch.h"
 #include "db/pipeline/document_source.h"
 
+#include "db/jsobj.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
-        shared_ptr<DocumentSourceProject> pSource(
-            new DocumentSourceProject());
-        return pSource;
+
+    DocumentSourceProject::~DocumentSourceProject() {
     }
 
     DocumentSourceProject::DocumentSourceProject():
@@ -126,7 +125,20 @@ namespace mongo {
         return pNoRavelDocument;
     }
 
-    DocumentSourceProject::~DocumentSourceProject() {
+    void DocumentSourceProject::toBson(BSONObjBuilder *pBuilder) const {
+	BSONObjBuilder insides;
+	
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i)
+	    vpExpression[i]->toBson(&insides, vFieldName[i], false);
+
+	pBuilder->append("$project", insides.done());
+    }
+
+    shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
+        shared_ptr<DocumentSourceProject> pSource(
+            new DocumentSourceProject());
+        return pSource;
     }
 
     void DocumentSourceProject::addField(
@@ -142,5 +154,100 @@ namespace mongo {
 
         vFieldName.push_back(fieldName);
         vpExpression.push_back(pExpression);
+    }
+
+    shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
+	BSONElement *pBsonElement) {
+        /* validate */
+        assert(pBsonElement->type() == Object); // CW TODO user error
+
+        /* chain the projection onto the original source */
+        shared_ptr<DocumentSourceProject> pProject(
+	    DocumentSourceProject::create());
+
+        /*
+          Pull out the $project object.  This should just be a list of
+          field inclusion or exclusion specifications.  Note you can't do
+          both, except for the case of _id.
+         */
+        BSONObj projectObj(pBsonElement->Obj());
+        BSONObjIterator fieldIterator(projectObj);
+	Expression::ObjectCtx objectCtx(
+	    Expression::ObjectCtx::RAVEL_OK |
+	    Expression::ObjectCtx::DOCUMENT_OK);
+        while(fieldIterator.more()) {
+            BSONElement outFieldElement(fieldIterator.next());
+            string outFieldName(outFieldElement.fieldName());
+            string inFieldName(outFieldName);
+            BSONType specType = outFieldElement.type();
+            int fieldInclusion = -1;
+
+            assert(outFieldName.find('.') == outFieldName.npos);
+            // CW TODO user error: out field name can't use dot notation
+
+            switch(specType) {
+            case NumberDouble: {
+                double inclusion = outFieldElement.numberDouble();
+                if ((inclusion == 0) || (inclusion == 1))
+                    fieldInclusion = (int)inclusion;
+                else {
+                    assert(false); // CW TODO unimplemented constant expression
+                }
+
+                goto AddField;
+            }
+
+            case NumberInt:
+                /* just a plain integer include/exclude specification */
+                fieldInclusion = outFieldElement.numberInt();
+                assert((fieldInclusion >= 0) && (fieldInclusion <= 1));
+                // CW TODO invalid field projection specification
+
+AddField:
+                if (fieldInclusion == 0)
+                    assert(false); // CW TODO unimplemented
+                else {
+                    shared_ptr<Expression> pExpression(
+                        ExpressionFieldPath::create(inFieldName));
+                    pProject->addField(outFieldName, pExpression, false);
+                }
+                break;
+
+            case Bool:
+                /* just a plain boolean include/exclude specification */
+                fieldInclusion = outFieldElement.Bool() ? 1 : 0;
+                goto AddField;
+
+            case String:
+                /* include a field, with rename */
+                fieldInclusion = 1;
+                inFieldName = outFieldElement.String();
+                goto AddField;
+
+            case Object: {
+                bool hasRaveled = objectCtx.ravelUsed();
+
+                shared_ptr<Expression> pDocument(
+                    Expression::parseObject(&outFieldElement, &objectCtx));
+
+                /*
+                  Add The document expression to the projection.  We detect
+                  a raveled field if we haven't raveled a field yet for this
+                  projection, and after parsing find that we have just gotten a
+                  $ravel specification.
+                 */
+                pProject->addField(
+                    outFieldName, pDocument,
+                    !hasRaveled && objectCtx.ravelUsed());
+                break;
+            }
+
+            default:
+                assert(false); // CW TODO invalid field projection specification
+            }
+
+        }
+
+        return pProject;
     }
 }

@@ -288,6 +288,7 @@ namespace mongo {
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
+
     inline BSONType Value::getType() const {
         return type;
     }
@@ -321,6 +322,4 @@ namespace mongo {
         shared_ptr<const Value> pValue(&fieldOne, null_deleter());
         return pValue;
     }
-
-
 };

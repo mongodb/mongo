@@ -26,4 +26,8 @@ namespace mongo {
 	assert(!pSource.get());
 	pSource = pTheSource;
     }
+
+    void DocumentSource::toBson(BSONObjBuilder *pBuilder) const {
+	assert(false);
+    }
 }

@@ -57,4 +57,9 @@ namespace mongo {
         shared_ptr<AccumulatorMinMax> pAccumulator(new AccumulatorMinMax(-1));
         return pAccumulator;
     }
+
+    void AccumulatorMinMax::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	opToBson(pBuilder, name, (sense == 1 ? "$min" : "$max"));
+    }
 }

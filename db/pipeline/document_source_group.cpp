@@ -18,6 +18,7 @@
 
 #include "db/pipeline/document_source.h"
 
+#include "db/jsobj.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
@@ -59,6 +60,22 @@ namespace mongo {
         return pCurrent;
     }
 
+    void DocumentSourceGroup::toBson(BSONObjBuilder *pBuilder) const {
+	/* add the _id */
+	BSONObjBuilder insides;
+	pIdExpression->toBson(&insides, "_id", false);
+
+	/* add the remaining fields */
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i) {
+	    shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])());
+	    pA->addOperand(vpExpression[i]);
+	    pA->toBson(&insides, vFieldName[i], true);
+	}
+
+	pBuilder->append("$group", insides.done());
+    }
+
     shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create() {
         shared_ptr<DocumentSourceGroup> pSource(
             new DocumentSourceGroup());
@@ -81,6 +98,112 @@ namespace mongo {
         vFieldName.push_back(fieldName);
         vpAccumulatorFactory.push_back(pAccumulatorFactory);
         vpExpression.push_back(pExpression);
+    }
+
+
+    struct GroupOpDesc {
+        const char *pName;
+        shared_ptr<Accumulator> (*pFactory)(void);
+    };
+
+    static int GroupOpDescCmp(const void *pL, const void *pR) {
+        return strcmp(((const GroupOpDesc *)pL)->pName,
+                      ((const GroupOpDesc *)pR)->pName);
+    }
+
+    /*
+      Keep these sorted alphabetically so we can bsearch() them using
+      GroupOpDescCmp() above.
+    */
+    static const GroupOpDesc GroupOpTable[] = {
+        {"$append", AccumulatorAppend::create},
+        {"$max", AccumulatorMinMax::createMax},
+        {"$min", AccumulatorMinMax::createMin},
+        {"$sum", AccumulatorSum::create},
+    };
+
+    static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);
+
+    shared_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
+	BSONElement *pBsonElement) {
+        assert(pBsonElement->type() == Object); // CW TODO must be an object
+
+        shared_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create());
+        bool idSet = false;
+
+        BSONObj groupObj(pBsonElement->Obj());
+        BSONObjIterator groupIterator(groupObj);
+        while(groupIterator.more()) {
+            BSONElement groupField(groupIterator.next());
+            const char *pFieldName = groupField.fieldName();
+
+            if (strcmp(pFieldName, "_id") == 0) {
+                assert(!idSet); // CW TODO _id specified multiple times
+                assert(groupField.type() == Object); // CW TODO error message
+
+                /*
+                  Use the projection-like set of field paths to create the
+                  group-by key.
+                 */
+                shared_ptr<Expression> pId(
+                    Expression::parseObject(&groupField,
+				 &Expression::ObjectCtx(
+					Expression::ObjectCtx::DOCUMENT_OK)));
+                pGroup->setIdExpression(pId);
+                idSet = true;
+            }
+            else {
+                /*
+                  Treat as a projection field with the additional ability to
+                  add aggregation operators.
+                */
+                assert(*pFieldName != '$');
+                // CW TODO error: field name can't be an operator
+                assert(groupField.type() == Object);
+                // CW TODO error: must be an operator expression
+
+                BSONObj subField(groupField.Obj());
+                BSONObjIterator subIterator(subField);
+                size_t subCount = 0;
+                for(; subIterator.more(); ++subCount) {
+                    BSONElement subElement(subIterator.next());
+
+                    /* look for the specified operator */
+                    GroupOpDesc key;
+                    key.pName = subElement.fieldName();
+                    const GroupOpDesc *pOp =
+			(const GroupOpDesc *)bsearch(
+                              &key, GroupOpTable, NGroupOp, sizeof(GroupOpDesc),
+                                      GroupOpDescCmp);
+
+                    assert(pOp); // CW TODO error: operator not found
+
+                    shared_ptr<Expression> pGroupExpr;
+
+                    BSONType elementType = subElement.type();
+                    if (elementType == Object)
+                        pGroupExpr = Expression::parseObject(&subElement,
+                                        &Expression::ObjectCtx(
+				     Expression::ObjectCtx::DOCUMENT_OK));
+                    else if (elementType == Array) {
+                        assert(false); // CW TODO group operators are unary
+                    }
+                    else { /* assume its an atomic single operand */
+                        pGroupExpr = Expression::parseOperand(&subElement);
+                    }
+
+                    pGroup->addAccumulator(
+                        pFieldName, pOp->pFactory, pGroupExpr);
+                }
+
+                assert(subCount == 1);
+                // CW TODO error: only one operator allowed
+            }
+        }
+
+        assert(idSet); // CW TODO error: missing _id specification
+
+        return pGroup;
     }
 
     void DocumentSourceGroup::populate() {

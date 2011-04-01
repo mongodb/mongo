@@ -15,7 +15,9 @@
  */
 
 #include "pch.h"
-#include "accumulator.h"
+#include "db/pipeline/accumulator.h"
+
+#include "db/jsobj.h"
 
 namespace mongo {
     void Accumulator::addOperand(
@@ -26,5 +28,12 @@ namespace mongo {
 
     Accumulator::Accumulator():
         ExpressionNary() {
+    }
+
+    void Accumulator::opToBson(
+	BSONObjBuilder *pBuilder, string name, string opName) const {
+	BSONObjBuilder builder;
+	vpOperand[0]->toBson(&builder, opName, true);
+	pBuilder->append(name, builder.done());
     }
 }

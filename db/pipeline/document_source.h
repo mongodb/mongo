@@ -18,6 +18,7 @@
 
 #include "pch.h"
 
+#include "db/jsobj.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
@@ -67,6 +68,17 @@ namespace mongo {
 	 */
 	virtual void setSource(shared_ptr<DocumentSource> pSource);
 
+        /*
+	  Add the pipeline operation to the builder.
+
+	  There are some operations for which this doesn't make sense; the
+	  default implementation is to assert(), and this can be used for
+	  those.
+
+	  @params pBuilder the builder to add the operation to.
+         */
+	virtual void toBson(BSONObjBuilder *pBuilder) const;
+
     protected:
 	/*
 	  Most DocumentSources have an underlying source they get their data
@@ -88,6 +100,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual void setSource(shared_ptr<DocumentSource> pSource);
 
 	/*
 	  Create a document source based on a cursor.
@@ -115,6 +128,16 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual void toBson(BSONObjBuilder *pBuilder) const;
+
+	/*
+	  Create a filter.
+
+          @param pBsonElement the raw BSON specification for the filter
+          @returns the filter
+	 */
+	static shared_ptr<DocumentSourceFilter> createFromBson(
+	    BSONElement *pBsonElement);
 
         /*
           Create a filter.
@@ -145,6 +168,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual void toBson(BSONObjBuilder *pBuilder) const;
 
         /*
           Create a new grouping DocumentSource.
@@ -179,6 +203,19 @@ namespace mongo {
         void addAccumulator(string fieldName,
                             shared_ptr<Accumulator> (*pAccumulatorFactory)(),
                             shared_ptr<Expression> pExpression);
+
+	/*
+	  Create a grouping DocumentSource from BSON.
+
+	  This is a convenience method that uses the above, and operates on
+	  a BSONElement that has been deteremined to be an Object with an
+	  element named $group.
+
+	  @param pBsonElement the BSONELement that defines the group
+	  @returns the grouping DocumentSource
+	 */
+        static shared_ptr<DocumentSource> createFromBson(
+	    BSONElement *pBsonElement);
 
     private:
         DocumentSourceGroup();
@@ -238,6 +275,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual void toBson(BSONObjBuilder *pBuilder) const;
 
 
         /*
@@ -263,6 +301,18 @@ namespace mongo {
         void addField(string fieldName, shared_ptr<Expression> pExpression,
                       bool ravelArray);
 
+	/*
+	  Create a new projection DocumentSource from BSON.
+
+	  This is a convenience for directly handling BSON, and relies on the
+	  above methods.
+
+	  @params pBsonElement the BSONElement with an object named $project
+	  @returns the created projection
+	 */
+        static shared_ptr<DocumentSource> createFromBson(
+            BSONElement *pBsonElement);
+
     private:
         DocumentSourceProject();
 
@@ -276,6 +326,39 @@ namespace mongo {
         shared_ptr<const Value> pRavelArray; // field being raveled
         shared_ptr<ValueIterator> pRavel; // iterator used for raveling
         shared_ptr<const Value> pRavelValue; // current value
+    };
+
+    class DocumentSourceBsonArray :
+        public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceBsonArray();
+        virtual bool eof();
+        virtual bool advance();
+        virtual shared_ptr<Document> getCurrent();
+	virtual void setSource(shared_ptr<DocumentSource> pSource);
+
+	/*
+	  Create a document source based on a BSON array.
+
+	  This is usually put at the beginning of a chain of document sources
+	  in order to fetch data from the database.
+
+	  CAUTION:  the BSON is not read until the source is used.  Any
+	  elements that appear after these documents must not be read until
+	  this source is exhausted.
+
+	  @param pCursor the cursor to use to fetch data
+	*/
+	static shared_ptr<DocumentSourceBsonArray> create(
+	    BSONElement *pBsonElement);
+
+    private:
+        DocumentSourceBsonArray(BSONElement *pBsonElement);
+
+	BSONObj embeddedObject;
+	BSONObjIterator arrayIterator;
+	BSONElement currentElement;
     };
 }
 

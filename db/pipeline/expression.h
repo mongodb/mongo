@@ -31,10 +31,83 @@ namespace mongo {
         /*
           Evaluate the expression using the given document as input.
 
-          @return computed value
+          @returns the computed value
         */
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const = 0;
+
+	/*
+	  Convert the Expression (and any descendant Expressions) into
+	  BSON.
+
+	  @params pBuilder the builder to add the expression to
+	  @params name the name the expression will be given in an object
+	  @params docPrefix whether or not any referenced field names must
+	    be preceded by "$document." to disambiguate them from string
+	    constants
+	 */
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const = 0;
+
+	/*
+	  Utility class for parseObject() below.
+
+	  Only one array can be raveled in a processing pipeline.  If the
+	  RAVEL_OK option is used, ravelOk() will return true, and a field
+	  can be declared as raveled using ravel(), after which ravelUsed()
+	  will return true.  Only specify RAVEL_OK if it is OK to ravel an
+	  array in the current context.
+
+	  DOCUMENT_OK indicates that it is OK to use a Document in the current
+	  context.
+	 */
+        class ObjectCtx {
+        public:
+            ObjectCtx(int options);
+            static const int RAVEL_OK = 0x0001;
+            static const int DOCUMENT_OK = 0x0002;
+
+            bool ravelOk() const;
+            bool ravelUsed() const;
+            void ravel(string fieldName);
+
+            bool documentOk() const;
+
+        private:
+            int options;
+            string raveledField;
+        };
+
+	/*
+	  Parse a BSONElement Object.  The object could represent a functional
+	  expression or a Document expression.
+
+	  @param pBsonElement the element representing the object
+	  @param pCtx a MiniCtx representing the options above
+	  @returns the parsed Expression
+	 */
+        static shared_ptr<Expression> parseObject(
+            BSONElement *pBsonElement, ObjectCtx *pCtx);
+
+        /*
+	  Parse a BSONElement Object which has already been determined to be
+	  functional expression.
+
+	  @param pOpName the name of the (prefix) operator
+	  @param pBsonElement the BSONElement to parse
+	  @returns the parsed Expression
+	*/
+        static shared_ptr<Expression> parseExpression(
+            const char *pOpName, BSONElement *pBsonElement);
+
+
+	/*
+	  Parse a BSONElement which is an operand in an Expression.
+
+	  @param pBsonElement the expected operand's BSONElement
+	  @returns the parsed operand, as an Expression
+	 */
+        static shared_ptr<Expression> parseOperand(BSONElement *pBsonElement);
     };
 
 
@@ -51,6 +124,20 @@ namespace mongo {
     protected:
         ExpressionNary();
 
+	/*
+	  Add the operands to the builder as an array.
+
+	  If there is only one operand (a unary operator), then the operand
+	  is added directly, without an array.
+
+	  @params pBuilder the builder to add the operands to
+	  @params opName the name of the operator
+	  @params docPrefix whether or not to add the "$document." prefix to
+	    field paths
+	 */
+	void operandsToBson(
+	    BSONObjBuilder *pBuilder, string opName, bool docPrefix) const;
+
         vector<shared_ptr<Expression>> vpOperand;
     };
 
@@ -63,6 +150,8 @@ namespace mongo {
         virtual ~ExpressionAdd();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create an expression that finds the sum of n operands.
@@ -84,6 +173,8 @@ namespace mongo {
         virtual ~ExpressionAnd();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -109,6 +200,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual void addOperand(shared_ptr<Expression> pExpression);
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Shorthands for creating various comparisons expressions.
@@ -154,6 +247,8 @@ namespace mongo {
         virtual ~ExpressionConstant();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         static shared_ptr<ExpressionConstant> createFromBsonElement(
             BSONElement *pBsonElement);
@@ -174,6 +269,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual void addOperand(shared_ptr<Expression> pExpression);
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         static shared_ptr<ExpressionNary> create();
 
@@ -190,6 +287,8 @@ namespace mongo {
         virtual ~ExpressionDocument();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create an empty expression.  Until fields are added, this
@@ -224,6 +323,8 @@ namespace mongo {
         virtual ~ExpressionFieldPath();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         static shared_ptr<ExpressionFieldPath> create(string fieldPath);
 
@@ -243,6 +344,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual void addOperand(shared_ptr<Expression> pExpression);
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         static shared_ptr<ExpressionNary> create();
 
@@ -260,6 +363,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual void addOperand(shared_ptr<Expression> pExpression);
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         static shared_ptr<ExpressionNary> create();
 
@@ -276,6 +381,8 @@ namespace mongo {
         virtual ~ExpressionOr();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -292,3 +399,18 @@ namespace mongo {
         ExpressionOr();
     };
 }
+
+
+/* ======================= INLINED IMPLEMENTATIONS ========================== */
+
+namespace mongo {
+
+    inline bool Expression::ObjectCtx::ravelOk() const {
+        return ((options & RAVEL_OK) != 0);
+    }
+
+    inline bool Expression::ObjectCtx::ravelUsed() const {
+        return (raveledField.size() != 0);
+    }
+
+};

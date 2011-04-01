@@ -37,6 +37,18 @@ namespace mongo {
 
     protected:
         Accumulator();
+
+	/*
+	  Convenience method for doing this for accumulators.  The pattern
+	  is always the same, so a common implementation works, but requires
+	  knowing the operator name.
+
+	  @params pBuilder the builder to add to
+	  @params name the projected name
+	  @params opName the operator name
+	 */
+	void opToBson(
+	    BSONObjBuilder *pBuilder, string name, string opName) const;
     };
 
 
@@ -47,6 +59,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create an appending accumulator.
@@ -69,6 +83,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create a summing accumulator.
@@ -94,6 +110,8 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
         /*
           Create a summing accumulator.

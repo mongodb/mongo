@@ -69,4 +69,9 @@ namespace mongo {
         longResult(0),
         doubleResult(0) {
     }
+
+    void AccumulatorSum::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	opToBson(pBuilder, name, "$sum");
+    }
 }
