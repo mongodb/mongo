@@ -259,6 +259,7 @@ namespace mongo {
     }
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
+        _hbmsgTime(0),
         _self(0),
         mgr( new Manager(this) ) {
         _cfg = 0;
