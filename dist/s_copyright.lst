@@ -17,12 +17,13 @@ add	examples/c/ex_transaction.c
 add	src/support/simple_setup.c
 add	src/utilities/util_dump.c
 add	src/utilities/util_load.c
+add	src/utilities/util_salvage.c
 add	src/utilities/util_stat.c
 add	src/utilities/util_verify.c
+skip	src/api/api_int.c
+skip	src/api/strerror.c
 skip	src/include/bitstring.h
 skip	src/include/extern.h
 skip	src/include/queue.h
 skip	src/include/serial.h
-skip	src/api/api_int.c
-skip	src/api/strerror.c
 skip	src/support/stat.c
