@@ -61,7 +61,7 @@ namespace mongo {
     static bool clone(const char *master, string db) {
         string err;
         return cloneFrom(master, err, db, false,
-                         /* slave_ok */ true, true, false, /*mayYield*/true);
+                         /* slave_ok */ true, true, false, /*mayYield*/true, /*mayBeInterrupted*/false);
     }
 
     void _logOpObjRS(const BSONObj& op);

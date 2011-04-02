@@ -27,8 +27,9 @@ namespace mongo {
      *                      for example repairDatabase need not use it.
      */
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication,
-                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield);
+                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield,
+                   bool mayBeInterrupted);
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl, bool mayYield);
+    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl, bool mayYield, bool mayBeInterrupted);
 
 } // namespace mongo
