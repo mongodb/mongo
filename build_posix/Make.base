@@ -2,9 +2,10 @@ wtdir = $(prefix)/wt
 wt_LIBRARIES = libwiredtiger.a
 LDADD = libwiredtiger.a -lpthread
 
-wt_PROGRAMS = wt_dump wt_load wt_stat wt_verify
+wt_PROGRAMS = wt_dump wt_load wt_salvage wt_stat wt_verify
 wt_dump_SOURCES = util_dump.c simple_setup.c
 wt_load_SOURCES = util_load.c simple_setup.c
+wt_salvage_SOURCES = util_salvage.c simple_setup.c
 wt_stat_SOURCES = util_stat.c simple_setup.c
 wt_verify_SOURCES = util_verify.c simple_setup.c
 
