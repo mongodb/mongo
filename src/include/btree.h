@@ -367,6 +367,8 @@ struct __wt_page {
 	 * Two links to the parent's WT_PAGE structure -- the physical parent
 	 * page, and the WT_REF structure used to find this page.
 	 */
+#define	WT_PAGE_IS_ROOT(page)						\
+	((page)->parent == NULL)
 	WT_PAGE	*parent;		/* Page's parent */
 	WT_REF	*parent_ref;		/* Page's parent reference */
 

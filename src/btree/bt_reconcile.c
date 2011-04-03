@@ -141,8 +141,15 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 		WT_RET(__wt_block_free(session, page->addr, page->size));
 
 	/* Optionally discard the in-memory page. */
-	if (discard)
+	if (discard) {
+		/*
+		 * If we discard the in-memory root page, kill the reference
+		 * to catch mistakes.
+		 */
+		if (WT_PAGE_IS_ROOT(page))
+			btree->root_page.page = NULL;
 		__wt_page_discard(session, page);
+	}
 
 	/*
 	 * Newly created internal pages are normally merged into their parents
@@ -1434,7 +1441,7 @@ static void
 __wt_rec_parent_update_clean(WT_PAGE *page)
 {
 	/* If we're reconciling the root page, there's no work to do. */
-	if (page->parent == NULL)
+	if (WT_PAGE_IS_ROOT(page))
 		return;
 
 	/*
@@ -1454,17 +1461,15 @@ __wt_rec_parent_update_dirty(SESSION *session,
 {
 	WT_REF *parent_ref;
 	BTREE *btree;
-	int is_root;
 
 	btree = session->btree;
-	is_root = page->parent == NULL ? 1 : 0;
 
 	/*
 	 * Update the relevant parent WT_REF structure, flush memory, and then
 	 * update the state of the parent reference.  No further memory flush
 	 * needed, the state field is declared volatile.
 	 */
-	if (is_root)
+	if (WT_PAGE_IS_ROOT(page))
 		parent_ref = &btree->root_page;
 	else
 		parent_ref = page->parent_ref;
@@ -1476,7 +1481,7 @@ __wt_rec_parent_update_dirty(SESSION *session,
 	parent_ref->state = state;
 
 	/* If we're reconciling the root page, update the descriptor record. */
-	if (is_root)
+	if (WT_PAGE_IS_ROOT(page))
 		return (__wt_desc_write(session));
 
 	/*
