@@ -108,7 +108,6 @@ namespace mongo {
             vector<const char*> v;
             get( v );
 
-            bool first = true;
             s << "<pre>\n";
             for( int i = 0; i < (int)v.size(); i++ ) {
                 assert( strlen(v[i]) > 20 );
@@ -126,7 +125,7 @@ namespace mongo {
                         stringstream r;
                         if( nr == 1 ) r << "repeat last line";
                         else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
-                        first = false; s << html::a("", r.str(), clean(v,i,x.str()));
+                        s << html::a("", r.str(), clean(v,i,x.str()));
                     }
                     else s << x.str();
                     s << '\n';
