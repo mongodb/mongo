@@ -259,6 +259,13 @@ __wt_block_write(SESSION *session)
 	btree = session->btree;
 	tmp = NULL;
 
+	/* If there aren't any free-list entries, we're done. */
+	if (btree->freelist_entries == 0) {
+		addr = WT_ADDR_INVALID;
+		size = 0;
+		goto done;
+	}
+
 	/* Truncate the file if possible. */
 	WT_RET(__wt_block_truncate(session));
 
@@ -306,7 +313,7 @@ __wt_block_write(SESSION *session)
 	/* Write the free list to disk. */
 	WT_ERR(__wt_disk_write(session, dsk, addr, size));
 
-	/* Update the file's meta-data. */
+done:	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
 	WT_ERR(__wt_desc_write(session));
