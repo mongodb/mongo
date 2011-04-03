@@ -92,7 +92,7 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 	 * a lot of space.
 	 */
 	if (btree->allocsize == 0)
-		btree->allocsize = WT_BTREE_ALLOCATION_SIZE;
+		btree->allocsize = WT_BTREE_ALLOCATION_SIZE_MIN;
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize)) {
