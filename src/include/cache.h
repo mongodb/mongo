@@ -201,9 +201,9 @@ struct __wt_cache {
 	uint32_t evict_elem;		/* Number of elements in the array */
 	uint32_t evict_len;		/* Bytes in the array */
 
-	WT_PAGE **hazard;		/* Copy of the hazard references */
-	uint32_t  hazard_elem;		/* Number of entries in the list */
-	uint32_t  hazard_len;		/* Bytes in the list */
+	WT_HAZARD *hazard;		/* Copy of the hazard references */
+	uint32_t   hazard_elem;		/* Number of entries in the list */
+	uint32_t   hazard_len;		/* Bytes in the list */
 
 	WT_STATS *stats;		/* Cache statistics */
 };

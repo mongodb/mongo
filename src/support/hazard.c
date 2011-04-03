@@ -12,10 +12,14 @@
  *	Set a hazard reference.
  */
 int
-__wt_hazard_set(SESSION *session, WT_REF *ref)
+__wt_hazard_set(SESSION *session, WT_REF *ref
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
 {
 	CONNECTION *conn;
-	WT_PAGE **hp;
+	WT_HAZARD *hp;
 
 	conn = S2C(session);
 
@@ -35,14 +39,18 @@ __wt_hazard_set(SESSION *session, WT_REF *ref)
 	 */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp) {
-		if (*hp != NULL)
+		if (hp->page != NULL)
 			continue;
 
 		/*
 		 * Memory flush needed; the hazard array isn't declared volatile
 		 * and an explicit memory flush is necessary.
 		 */
-		*hp = ref->page;
+		hp->page = ref->page;
+#ifdef HAVE_DIAGNOSTIC
+		hp->file = file;
+		hp->line = line;
+#endif
 		WT_MEMORY_FLUSH;
 
 		/*
@@ -66,7 +74,7 @@ __wt_hazard_set(SESSION *session, WT_REF *ref)
 		 * to minimize the amount of time we're tying down a pointer we
 		 * know we can't have.
 		 */
-		*hp = NULL;
+		hp->page = NULL;
 		WT_MEMORY_FLUSH;
 		return (0);
 	}
@@ -84,7 +92,7 @@ void
 __wt_hazard_clear(SESSION *session, WT_PAGE *page)
 {
 	CONNECTION *conn;
-	WT_PAGE **hp;
+	WT_HAZARD *hp;
 
 	conn = S2C(session);
 
@@ -93,10 +101,9 @@ __wt_hazard_clear(SESSION *session, WT_PAGE *page)
 
 	/* Clear the caller's hazard pointer. */
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size;
-	    ++hp)
-		if (*hp == page) {
-			*hp = NULL;
+	    hp < session->hazard + conn->hazard_size; ++hp)
+		if (hp->page == page) {
+			hp->page = NULL;
 			/*
 			 * We don't have to flush memory here for correctness;
 			 * it would give the page server thread faster access
@@ -118,7 +125,7 @@ void
 __wt_hazard_empty(SESSION *session, const char *name)
 {
 	CONNECTION *conn;
-	WT_PAGE **hp;
+	WT_HAZARD *hp;
 
 	conn = S2C(session);
 
@@ -133,13 +140,17 @@ __wt_hazard_empty(SESSION *session, const char *name)
 	 * blocks.
 	 */
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size;
-	    ++hp)
-		if (*hp != NULL) {
+	    hp < session->hazard + conn->hazard_size; ++hp)
+		if (hp->page != NULL) {
 			__wt_errx(session,
-			    "%s: returned with a hazard reference set (%p)",
-			    name, *hp);
-			*hp = NULL;
+#ifdef HAVE_DIAGNOSTIC
+			    "%s: hazard reference lost: (%p: %s, line %d)",
+			    name, hp->page, hp->file, hp->line);
+#else
+			    "%s: hazard reference lost: (%p)"
+			    name, hp->page)
+#endif
+			hp->page = NULL;
 			WT_MEMORY_FLUSH;
 		}
 }

@@ -59,6 +59,18 @@ extern "C" {
 #define	__wt_free(a, b)			__wt_free_int(a, &(b))
 
 /*
+ * In diagnostic mode we track the locations from which hazard references
+ * were acquired.
+ */
+#ifdef HAVE_DIAGNOSTIC
+#define	__wt_page_in(a, b, c, d)					\
+	__wt_page_in_func(a, b, c, d, __FILE__, __LINE__)
+#else
+#define	__wt_page_in(a, b, c, d)					\
+	__wt_page_in_func(a, b, c, d)
+#endif
+
+/*
  * Flag check for API functions.
  * Explicitly cast the hex bit mask to an unsigned value to avoid complaints
  * about implicit conversions of integers.  Using the largest unsigned type,

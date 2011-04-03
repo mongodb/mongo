@@ -143,7 +143,11 @@ __wt_root_pin(SESSION *session);
 int
 __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store);
 int
-__wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify);
+__wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    );
 int
 __wt_page_inmem(SESSION *session, WT_PAGE *page);
 int
@@ -403,7 +407,11 @@ __wt_err(SESSION *session, int error, const char *fmt, ...);
 void
 __wt_errx(SESSION *session, const char *fmt, ...);
 int
-__wt_hazard_set(SESSION *session, WT_REF *ref);
+__wt_hazard_set(SESSION *session, WT_REF *ref
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    );
 void
 __wt_hazard_clear(SESSION *session, WT_PAGE *page);
 void

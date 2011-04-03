@@ -211,6 +211,14 @@ typedef	enum {
 	WT_WORKQ_READ_SCHED=3		/* Waiting on read to complete */
 } wq_state_t;
 
+struct __wt_hazard {
+	WT_PAGE *page;			/* Page address */
+#ifdef HAVE_DIAGNOSTIC
+	const char *file;		/* File/line where hazard acquired */
+	int	    line;
+#endif
+};
+
 struct __session {
 	WT_SESSION iface;
 
@@ -238,7 +246,7 @@ struct __session {
 	void	 *wq_args;		/* Function argument */
 	int	  wq_sleeping;		/* Thread is blocked */
 
-	WT_PAGE	**hazard;		/* Hazard reference array */
+	WT_HAZARD *hazard;		/* Hazard reference array */
 
 	SESSION_BUFFER *sb;		/* Per-thread update buffer */
 	uint32_t update_alloc_size;	/* Allocation size */
@@ -330,7 +338,7 @@ struct __connection {
 	 * be able to easily copy and search it when evicting pages from the
 	 * cache.
 	 */
-	WT_PAGE **hazard;		/* Hazard references array */
+	WT_HAZARD *hazard;		/* Hazard references array */
 
 	WT_CACHE  *cache;		/* Page cache */
 

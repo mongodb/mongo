@@ -184,9 +184,9 @@ static const char *__wt_session_print_state(SESSION *);
 int
 __wt_session_dump(CONNECTION *conn)
 {
-	WT_MBUF mb;
 	SESSION *session, **tp;
-	WT_PAGE **hp;
+	WT_HAZARD *hp;
+	WT_MBUF mb;
 
 	__wt_mb_init(&conn->default_session, &mb);
 
@@ -205,9 +205,14 @@ __wt_session_dump(CONNECTION *conn)
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = session->hazard;
 		    hp < session->hazard + conn->hazard_size; ++hp)
-			__wt_mb_add(&mb, "%p ", *hp);
+#ifdef HAVE_DIAGNOSTIC
+			__wt_mb_add(&mb, "\t\t%p: %s, line %d\n",
+			    hp->page, hp->file, hp->line);
+#else
+			__wt_mb_add(&mb, "\t\t%p\n", hp->page);
+#endif
 
-		__wt_mb_add(&mb, "\n}");
+		__wt_mb_add(&mb, "}");
 		if (session->name != NULL)
 			__wt_mb_add(&mb, " %s", session->name);
 		__wt_mb_write(&mb);

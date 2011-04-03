@@ -21,7 +21,11 @@ static int __wt_page_inmem_row_leaf(SESSION *, WT_PAGE *);
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
+__wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
 {
 	WT_CACHE *cache;
 	int ret;
@@ -37,7 +41,11 @@ __wt_page_in(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 			 * can't get a hazard reference is because the page is
 			 * being evicted; yield and try again.
 			 */
-			if (__wt_hazard_set(session, ref)) {
+			if (__wt_hazard_set(session, ref
+#ifdef HAVE_DIAGNOSTIC
+			    , file, line
+#endif
+			    )) {
 				ref->page->read_gen = ++cache->read_gen;
 				return (0);
 			}
@@ -66,10 +74,8 @@ int
 __wt_page_inmem(SESSION *session, WT_PAGE *page)
 {
 	WT_PAGE_DISK *dsk;
-	int ret;
 
 	dsk = page->XXdsk;
-	ret = 0;
 
 	WT_ASSERT(session, dsk->u.entries > 0);
 	WT_ASSERT(session, page->indx_count == 0);

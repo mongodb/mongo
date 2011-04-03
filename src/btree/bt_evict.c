@@ -126,7 +126,7 @@ __wt_cache_evict_server(void *arg)
 	 */
 	cache->hazard_elem = conn->session_size * conn->hazard_size;
 	WT_ERR(__wt_calloc_def(session, cache->hazard_elem, &cache->hazard));
-	cache->hazard_len = cache->hazard_elem * WT_SIZEOF32(WT_PAGE *);
+	cache->hazard_len = cache->hazard_elem * WT_SIZEOF32(WT_HAZARD);
 
 	for (;;) {
 		WT_VERBOSE(conn,
@@ -413,7 +413,8 @@ __wt_evict_hazard_check(SESSION *session)
 	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	WT_PAGE **hazard, **end_hazard, *page;
+	WT_HAZARD *hazard, *end_hazard;
+	WT_PAGE *page;
 	WT_REF *ref;
 	WT_STATS *stats;
 	u_int i;
@@ -429,9 +430,9 @@ __wt_evict_hazard_check(SESSION *session)
 	/* Copy the hazard reference array and sort it by WT_PAGE address. */
 	hazard = cache->hazard;
 	end_hazard = hazard + cache->hazard_elem;
-	memcpy(hazard, conn->hazard, cache->hazard_elem * sizeof(WT_PAGE *));
+	memcpy(hazard, conn->hazard, cache->hazard_elem * sizeof(WT_HAZARD));
 	qsort(hazard, (size_t)cache->hazard_elem,
-	    sizeof(WT_PAGE *), __wt_evict_hazard_compare);
+	    sizeof(WT_HAZARD), __wt_evict_hazard_compare);
 
 	/* Walk the lists in parallel and look for matches. */
 	WT_EVICT_FOREACH(cache, evict, i) {
@@ -443,7 +444,7 @@ __wt_evict_hazard_check(SESSION *session)
 		 * of the list or find a hazard pointer larger than the page.
 		 */
 		for (page = ref->page;
-		    hazard < end_hazard && *hazard < page; ++hazard)
+		    hazard < end_hazard && hazard->page < page; ++hazard)
 			;
 		if (hazard == end_hazard)
 			break;
@@ -454,7 +455,7 @@ __wt_evict_hazard_check(SESSION *session)
 		 *
 		 * No memory flush needed, the state field is declared volatile.
 		 */
-		if (*hazard == page) {
+		if (hazard->page == page) {
 			WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 			    "eviction skipped page addr %lu (hazard reference)",
 			    page->addr));
@@ -699,8 +700,8 @@ __wt_evict_hazard_compare(const void *a, const void *b)
 {
 	WT_PAGE *a_page, *b_page;
 
-	a_page = *(WT_PAGE **)a;
-	b_page = *(WT_PAGE **)b;
+	a_page = ((WT_HAZARD *)a)->page;
+	b_page = ((WT_HAZARD *)b)->page;
 
 	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
 }
@@ -713,13 +714,13 @@ __wt_evict_hazard_compare(const void *a, const void *b)
 static void
 __wt_evict_hazard_validate(CONNECTION *conn, WT_PAGE *page)
 {
-	WT_PAGE **hp;
+	WT_HAZARD *hp;
 	SESSION **tp, *session;
 
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
 		for (hp = session->hazard;
 		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
-			if (*hp == page) {
+			if (hp->page == page) {
 				__wt_err(session, 0,
 				    "hazard eviction check for page %lu "
 				    "failed",
