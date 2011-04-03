@@ -82,8 +82,8 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	 * may have changed.  Save a copy of the page reference on which\
 	 * we acquired the hazard reference.				\
 	 */								\
-	__ref_page = (ref)->page;					\
 	WT_RET(__wt_page_in(session, page, ref, 0));			\
+	__ref_page = (ref)->page;					\
 	__tret = __wt_tree_walk(session, __ref_page, flags, work, arg);	\
 	__wt_hazard_clear(session, __ref_page);				\
 	if (__tret != 0)						\

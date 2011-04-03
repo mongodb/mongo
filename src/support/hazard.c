@@ -96,6 +96,12 @@ __wt_hazard_clear(SESSION *session, WT_PAGE *page)
 
 	conn = S2C(session);
 
+	/*
+	 * The default value for a WT_HAZARD slot is NULL, but clearing a
+	 * NULL reference isn't a good idea.
+	 */
+	WT_ASSERT(session, page != NULL);
+
 	WT_VERBOSE(conn, WT_VERB_HAZARD, (session,
 	    "session %p hazard %p: clr", session, page));
 
