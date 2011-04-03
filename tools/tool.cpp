@@ -413,14 +413,14 @@ namespace mongo {
         ProgressMeter m( fileLength );
 
         while ( read < fileLength ) {
-            int readlen = fread(buf, 4, 1, file);
+            fread(buf, 4, 1, file);
             int size = ((int*)buf)[0];
             if ( size >= BUF_SIZE ) {
                 cerr << "got an object of size: " << size << "  terminating..." << endl;
             }
             uassert( 10264 ,  "invalid object size" , size < BUF_SIZE );
 
-            readlen = fread(buf+4, size-4, 1, file);
+            fread(buf+4, size-4, 1, file);
 
             BSONObj o( buf );
             if ( _objcheck && ! o.valid() ) {

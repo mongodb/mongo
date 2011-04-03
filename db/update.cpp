@@ -992,7 +992,7 @@ namespace mongo {
                 BSONObj newObj = mss->createNewFromMods();
                 checkTooLarge(newObj);
                 assert(nsdt);
-                DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
             }
 
             if ( logop ) {

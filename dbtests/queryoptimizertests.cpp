@@ -1558,7 +1558,6 @@ namespace QueryOptimizerTests {
                     theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
-                BSONElement hintElt = hint.firstElement();
                 auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ) ) );
                 QueryPlan qp( nsd(), 1, *frs, *frs, fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
@@ -1581,7 +1580,6 @@ namespace QueryOptimizerTests {
                     theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
-                BSONElement hintElt = hint.firstElement();
                 auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ) ) );
                 QueryPlan qp( nsd(), 1, *frs, *frs, fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();

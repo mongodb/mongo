@@ -1460,7 +1460,7 @@ namespace mongo {
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
-            DiskLoc loc = theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
             return true;
         }
     } cmdGodInsert;
