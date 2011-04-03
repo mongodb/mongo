@@ -53,8 +53,9 @@ __wt_stat_alloc_btree_file_stats(SESSION *session, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(session, 23, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(session, 24, sizeof(WT_STATS), &stats));
 
+	stats[WT_STAT_ALLOCSIZE].desc = "page size allocation unit";
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_FIXED_LEN].desc = "fixed-record size";
 	stats[WT_STAT_FREELIST_ENTRIES].desc =
@@ -90,6 +91,7 @@ __wt_stat_alloc_btree_file_stats(SESSION *session, WT_STATS **statsp)
 void
 __wt_stat_clear_btree_file_stats(WT_STATS *stats)
 {
+	stats[WT_STAT_ALLOCSIZE].v = 0;
 	stats[WT_STAT_BASE_RECNO].v = 0;
 	stats[WT_STAT_FIXED_LEN].v = 0;
 	stats[WT_STAT_FREELIST_ENTRIES].v = 0;

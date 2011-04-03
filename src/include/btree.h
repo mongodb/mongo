@@ -37,9 +37,6 @@ extern "C" {
  * the largest key or data item is 4GB.  Record numbers are stored in 64-bit
  * unsigned integers, meaning the largest record number is "huge".
  */
-
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
-#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(256 * WT_MEGABYTE)
 
 #define	WT_ADDR_INVALID	UINT32_MAX	/* Invalid file address */
@@ -80,29 +77,33 @@ struct __wt_page_desc {
 #define	WT_BTREE_MINOR_VERSION	1
 	uint16_t minorv;		/* 06-07: Minor version */
 
+#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
+#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
+	uint32_t allocsize;		/* 08-11: Allocation size */
+
 #define	WT_BTREE_INTLMAX_DEFAULT	(2 * 1024)
 #define	WT_BTREE_INTLMIN_DEFAULT	(2 * 1024)
-	uint32_t intlmax;		/* 08-11: Maximum intl page size */
-	uint32_t intlmin;		/* 12-15: Minimum intl page size */
+	uint32_t intlmax;		/* 12-15: Maximum intl page size */
+	uint32_t intlmin;		/* 16-19: Minimum intl page size */
 
 #define	WT_BTREE_LEAFMAX_DEFAULT	WT_MEGABYTE
 #define	WT_BTREE_LEAFMIN_DEFAULT	(32 * 1024)
-	uint32_t leafmax;		/* 16-19: Maximum leaf page size */
-	uint32_t leafmin;		/* 20-23: Minimum leaf page size */
+	uint32_t leafmax;		/* 20-23: Maximum leaf page size */
+	uint32_t leafmin;		/* 24-27: Minimum leaf page size */
 
-	uint64_t recno_offset;		/* 24-31: Offset record number */
-	uint32_t root_addr;		/* 32-35: Root page address */
-	uint32_t root_size;		/* 36-39: Root page length */
-	uint32_t free_addr;		/* 40-43: Free list page address */
-	uint32_t free_size;		/* 44-47: Free list page length */
+	uint64_t recno_offset;		/* 28-35: Offset record number */
+	uint32_t root_addr;		/* 36-39: Root page address */
+	uint32_t root_size;		/* 40-43: Root page length */
+	uint32_t free_addr;		/* 44-47: Free list page address */
+	uint32_t free_size;		/* 48-51: Free list page length */
 
 #define	WT_PAGE_DESC_RLE	0x01	/* Run-length encoding */
-	uint32_t flags;			/* 48-51: Flags */
+	uint32_t flags;			/* 52-55: Flags */
 
-	uint8_t  fixed_len;		/* 52: Fixed length byte count */
-	uint8_t  unused1[3];		/* 53-55: Unused */
+	uint8_t  fixed_len;		/* 56: Fixed length byte count */
+	uint8_t  unused1[3];		/* 57-59: Unused */
 
-	uint32_t unused2[114];		/* Unused */
+	uint32_t unused2[113];		/* Unused */
 };
 /*
  * WT_PAGE_DESC_SIZE is the expected structure size -- we verify the build to

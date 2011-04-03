@@ -26,6 +26,7 @@ __wt_desc_stat(SESSION *session)
 	WT_STAT_SET(stats, MAGIC, desc.magic);
 	WT_STAT_SET(stats, MAJOR, desc.majorv);
 	WT_STAT_SET(stats, MINOR, desc.minorv);
+	WT_STAT_SET(stats, ALLOCSIZE, desc.allocsize);
 	WT_STAT_SET(stats, INTLMAX, desc.intlmax);
 	WT_STAT_SET(stats, INTLMIN, desc.intlmin);
 	WT_STAT_SET(stats, LEAFMAX, desc.leafmax);
@@ -50,7 +51,8 @@ __wt_desc_read(SESSION *session)
 
 	WT_RET(__wt_desc_io(session, &desc, 1));
 
-	btree->intlmax = desc.intlmax;		/* Update DB handle */
+	btree->allocsize = desc.allocsize;		/* Update DB handle */
+	btree->intlmax = desc.intlmax;
 	btree->intlmin = desc.intlmin;
 	btree->leafmax = desc.leafmax;
 	btree->leafmin = desc.leafmin;
@@ -89,6 +91,7 @@ __wt_desc_write(SESSION *session)
 	desc.magic = WT_BTREE_MAGIC;
 	desc.majorv = WT_BTREE_MAJOR_VERSION;
 	desc.minorv = WT_BTREE_MINOR_VERSION;
+	desc.allocsize = btree->allocsize;
 	desc.intlmax = btree->intlmax;
 	desc.intlmin = btree->intlmin;
 	desc.leafmax = btree->leafmax;

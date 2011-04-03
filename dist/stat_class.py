@@ -63,6 +63,7 @@ btree_fstats = {
     'BASE_RECNO' : Stat('base record number'),
     'FIXED_LEN' : Stat('fixed-record size'),
     'FREELIST_ENTRIES' : Stat('number of entries in the freelist'),
+    'ALLOCSIZE' : Stat('page size allocation unit'),
     'INTLMAX' : Stat('maximum internal page size'),
     'INTLMIN' : Stat('minimum internal page size'),
     'ITEM_COL_DELETED' : Stat('column-store deleted data items'),

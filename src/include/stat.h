@@ -55,28 +55,29 @@ struct __wt_stats {
 /*
  * Statistics entries for BTREE file.
  */
-#define	WT_STAT_BASE_RECNO			    0
-#define	WT_STAT_FIXED_LEN			    1
-#define	WT_STAT_FREELIST_ENTRIES		    2
-#define	WT_STAT_INTLMAX				    3
-#define	WT_STAT_INTLMIN				    4
-#define	WT_STAT_ITEM_COL_DELETED		    5
-#define	WT_STAT_ITEM_TOTAL_DATA			    6
-#define	WT_STAT_ITEM_TOTAL_KEY			    7
-#define	WT_STAT_LEAFMAX				    8
-#define	WT_STAT_LEAFMIN				    9
-#define	WT_STAT_MAGIC				   10
-#define	WT_STAT_MAJOR				   11
-#define	WT_STAT_MINOR				   12
-#define	WT_STAT_PAGE_COL_FIX			   13
-#define	WT_STAT_PAGE_COL_INTERNAL		   14
-#define	WT_STAT_PAGE_COL_RLE			   15
-#define	WT_STAT_PAGE_COL_VARIABLE		   16
-#define	WT_STAT_PAGE_OVERFLOW			   17
-#define	WT_STAT_PAGE_ROW_INTERNAL		   18
-#define	WT_STAT_PAGE_ROW_LEAF			   19
-#define	WT_STAT_PAGE_SPLIT_INTL			   20
-#define	WT_STAT_PAGE_SPLIT_LEAF			   21
+#define	WT_STAT_ALLOCSIZE			    0
+#define	WT_STAT_BASE_RECNO			    1
+#define	WT_STAT_FIXED_LEN			    2
+#define	WT_STAT_FREELIST_ENTRIES		    3
+#define	WT_STAT_INTLMAX				    4
+#define	WT_STAT_INTLMIN				    5
+#define	WT_STAT_ITEM_COL_DELETED		    6
+#define	WT_STAT_ITEM_TOTAL_DATA			    7
+#define	WT_STAT_ITEM_TOTAL_KEY			    8
+#define	WT_STAT_LEAFMAX				    9
+#define	WT_STAT_LEAFMIN				   10
+#define	WT_STAT_MAGIC				   11
+#define	WT_STAT_MAJOR				   12
+#define	WT_STAT_MINOR				   13
+#define	WT_STAT_PAGE_COL_FIX			   14
+#define	WT_STAT_PAGE_COL_INTERNAL		   15
+#define	WT_STAT_PAGE_COL_RLE			   16
+#define	WT_STAT_PAGE_COL_VARIABLE		   17
+#define	WT_STAT_PAGE_OVERFLOW			   18
+#define	WT_STAT_PAGE_ROW_INTERNAL		   19
+#define	WT_STAT_PAGE_ROW_LEAF			   20
+#define	WT_STAT_PAGE_SPLIT_INTL			   21
+#define	WT_STAT_PAGE_SPLIT_LEAF			   22
 
 /*
  * Statistics entries for CACHE handle.
