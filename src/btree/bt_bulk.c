@@ -64,7 +64,7 @@ __wt_btree_bulk_load(SESSION *session,
 	 * first sector, and this file extend makes sure we don't allocate it
 	 * as a table page.
 	 */
-	WT_RET(__wt_block_alloc(session, &addr, 512));
+	WT_RET(__wt_block_alloc(session, &addr, btree->allocsize));
 
 	/*
 	 * There are two styles of bulk-load: variable length pages or
