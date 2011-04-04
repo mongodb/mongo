@@ -543,7 +543,7 @@ namespace mongo {
     int retMissing( const ElementMatcher &bm ) {
         if ( bm.compareOp != BSONObj::opEXISTS )
             return 0;
-        return bm.toMatch.boolean() ? -1 : 1;
+        return ( bm.toMatch.boolean() ^ bm.isNot ) ? -1 : 1;
     }
 
     /* Check if a particular field matches.
@@ -677,6 +677,7 @@ namespace mongo {
                 }
             }
 
+            // An array was encountered while scanning for components of the field name.
             if ( isArr ) {
                 DEBUGMATCHER( "\t\t isArr 1 : obj : " << obj );
                 BSONObjIterator ai(obj);
@@ -708,6 +709,7 @@ namespace mongo {
             }
 
             if( p ) {
+                // Left portion of field name was not found.
                 return retMissing( em );
             }
             else {
@@ -764,6 +766,7 @@ namespace mongo {
         }
         else if ( e.eoo() ) {
             // 0 indicates "missing element"
+            // opEXISTS case already handled above, so retMissing() is unnecessary.
             return 0;
         }
         return -1;
