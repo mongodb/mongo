@@ -131,9 +131,11 @@ main(int argc, char *argv[])
 		if (wts_dump())			/* Dump the file */
 			goto err;
 
+#if 0
 		track("salvage", 0);
 		if (wts_salvage())		/* Salvage the file */
 			goto err;
+#endif
 
 		if (wts_verify())		/* Verify the file */
 			goto err;
