@@ -161,7 +161,7 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	qsort(stuff.pages, (size_t)stuff.pages_next,
 	    sizeof(WT_TRACK *), __slvg_track_compare);
 
-#ifdef HAVE_DIAGNOSTIC
+#if 0
 	__slvg_track_dump(&stuff);
 #endif
 
@@ -179,6 +179,10 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 		// WT_ERR(__slvg_range_row(session, &stuff));
 		break;
 	}
+
+#if 0
+	__slvg_track_dump(&stuff);
+#endif
 
 	/*
 	 * Discard any overflow pages that aren't referenced, and clear the

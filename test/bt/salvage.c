@@ -36,7 +36,7 @@ void run(int);
 
 FILE *res_fp;					/* Results file */
 
-int __start, __stop;				/* Records in the page */
+int __start, __cnt;				/* Records to build */
 int __column_store = 1;				/* Is a column-store file */
 
 int
@@ -79,20 +79,24 @@ run(int r)
 		 * Smoke test:
 		 * Sequential pages, all pages should be kept.
 		 */
-		build( 1, 20); copy(6,  1);
-		build(21, 40); copy(7, 21);
-		build(41, 60); copy(8, 41);
-		print_res(1, 60);
+		build(100, 20); copy(6,  1);
+		build(200, 20); copy(7, 21);
+		build(300, 20); copy(8, 41);
+		print_res(100, 20);
+		print_res(200, 20);
+		print_res(300, 20);
 		break;
 	case 2:
 		/*
 		 * Smoke test:
 		 * Sequential pages, all pages should be kept.
 		 */
-		build( 1, 20); copy(8,  1);
-		build(21, 40); copy(7, 21);
-		build(41, 60); copy(6, 41);
-		print_res(1, 60);
+		build(100, 20); copy(8,  1);
+		build(200, 20); copy(7, 21);
+		build(300, 20); copy(6, 41);
+		print_res(100, 20);
+		print_res(200, 20);
+		print_res(300, 20);
 		break;
 	case 3:
 		/*
@@ -101,10 +105,10 @@ run(int r)
 		 * record number 1, and sequential LSNs; salvage should leave
 		 * the page with the largest LSN, records 41-60.
 		 */
-		build( 1, 20); copy(6, 1);
-		build(21, 40); copy(7, 1);
-		build(41, 60); copy(8, 1);
-		print_res(41, 60);
+		build(100, 20); copy(6, 1);
+		build(200, 20); copy(7, 1);
+		build(300, 20); copy(8, 1);
+		print_res(300, 20);
 		break;
 	case 4:
 		/*
@@ -113,10 +117,10 @@ run(int r)
 		 * record number 1, and sequential LSNs; salvage should leave
 		 * the page with the largest LSN, records 41-60.
 		 */
-		build( 1, 20); copy(6, 1);
-		build(41, 60); copy(8, 1);
-		build(21, 40); copy(7, 1);
-		print_res(41, 60);
+		build(100, 20); copy(6, 1);
+		build(200, 20); copy(8, 1);
+		build(300, 20); copy(7, 1);
+		print_res(200, 20);
 		break;
 	case 5:
 		/*
@@ -125,10 +129,10 @@ run(int r)
 		 * record number 1, and sequential LSNs; salvage should leave
 		 * the page with the largest LSN, records 41-60.
 		 */
-		build(41, 60); copy(8, 1);
-		build(21, 40); copy(7, 1);
-		build( 1, 20); copy(6, 1);
-		print_res(41, 60);
+		build(100, 20); copy(8, 1);
+		build(200, 20); copy(7, 1);
+		build(300, 20); copy(6, 1);
+		print_res(100, 20);
 		break;
 	case 6:
 		/*
@@ -136,10 +140,10 @@ run(int r)
 		 * 2 column-store pages, where the second page overlaps with
 		 * the beginning of the first page.
 		 */
-		build( 1, 40); copy(6, 10);
-		build(21, 30); copy(7, 1);
-		print_res(21, 30);
-		print_res(11, 40);
+		build(100, 20); copy(6, 10);
+		build(200, 20); copy(7, 1);
+		print_res(200, 20);
+		print_res(110, 10);
 		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
@@ -164,7 +168,7 @@ run(int r)
  *	Build a row- or column-store page in a file.
  */
 void
-build(int start, int stop)
+build(int start, int cnt)
 {
 	BTREE *btree;
 	SESSION *session;
@@ -172,7 +176,7 @@ build(int start, int stop)
 	(void)remove(LOAD);
 
 	__start = start;
-	__stop = stop;
+	__cnt = cnt;
 	
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
 	assert(btree->column_set(btree, 0, NULL, 0) == 0);
@@ -284,9 +288,9 @@ process(void)
  *	Build results file.
  */
 void
-print_res(int start, int stop)
+print_res(int start, int cnt)
 {
-	for (; start <= stop; ++start)
+	for (; cnt > 0; ++start, --cnt)
 		fprintf(res_fp, "%010d VALUE----\n", start);
 }
 
@@ -300,8 +304,9 @@ bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **datap)
 	static WT_ITEM key, data;
 	char kbuf[64], dbuf[64];
 
-	if (__start > __stop)
+	if (__cnt == 0)
 		return (1);
+	--__cnt;
 
 	if (__column_store)
 		*keyp = NULL;
