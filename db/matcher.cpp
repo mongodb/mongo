@@ -718,7 +718,11 @@ namespace mongo {
         }
 
         if ( compareOp == BSONObj::opEXISTS ) {
-            return ( e.eoo() ^ ( toMatch.boolean() ^ em.isNot ) ) ? 1 : -1;
+            if( e.eoo() ) {
+             	return retMissing( em );   
+            } else {
+             	return -retMissing( em );   
+            }
         }
         else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
                   valuesMatch(e, toMatch, compareOp, em ) ) {
@@ -765,9 +769,7 @@ namespace mongo {
             }
         }
         else if ( e.eoo() ) {
-            // 0 indicates "missing element"
-            // opEXISTS case already handled above, so retMissing() is unnecessary.
-            return 0;
+            return retMissing( em );
         }
         return -1;
     }
