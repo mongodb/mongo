@@ -44,79 +44,33 @@
  * struct wt_xxx {
  *    int method(WT_XXX *, ...otherargs...);
  * };
- * as expected SWIG creates:
- *    wt_xxx.method(WT_XXX *, ...otherargs...);
- * so we'd like to eliminate the WT_XXX * and set its value to
- * the wt_xxx var.  To make life difficult, a typemap with numinputs=0
- * (which we want to use for WT_XXX *) seems to be emitted before
- * all other typemaps.  SWIG doc claims that adjacent args can be
- * typemapped as a single unit, that doesn't work here, I guess these two
- * args are apparently not considered adjacent.  Furthermore, 
- * there's no way to create an extra stack variable for them
- * to communicate.
- *
- * Our solution is to use argp1 (a var that will be used used by
- * wt_xxx *) as a holder.  The holder keeps the address where we want
- * stored the computed self value.  The 'in' typemap for WT_XXX * sets
- * that, and the 'in' typemape for wt_xxx * uses it to store the
- * value.  prepare_copy_self() and copy_self() encapsulate this
- * communication between the two typemaps.
+ * To SWIG, that is equivalent to:
+ *    int method(wt_xxx *self, WT_XXX *, ...otherargs...);
+ * and we use consecutive argument matching of typemaps to convert two args to one.
  */
-%{
-        static void prepare_copy_self(void ***holderp, void **myargp)
-        {
-                if (*holderp == NULL) {
-                        *holderp = myargp;
-                }
+%typemap(in) (struct wt_connection *self, WT_CONNECTION *) (void *argp = 0, int res = 0) %{
+        res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
+        if (!SWIG_IsOK(res)) { 
+                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
         }
-
-        static void copy_self(void **holder, void *self)
-        {
-                if (holder != NULL) {
-                        *holder = self;
-                }
-        }
+        $2 = $1 = ($ltype)(argp);
 %}
 
-// Can't do:  $1 = self; , when this typemap is used, we don't always have
-// self??  TODO: look at this more, it would clean things up some.
-%typemap(in, numinputs=0) WT_CONNECTION *thisconnection, WT_SESSION *thissession, WT_CURSOR *thiscursor %{
-        prepare_copy_self((void ***)&argp1, (void **)&$1);
+%typemap(in) (struct wt_session *self, WT_SESSION *) (void *argp = 0, int res = 0) %{
+        res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
+        if (!SWIG_IsOK(res)) { 
+                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
+        }
+        $2 = $1 = ($ltype)(argp);
 %}
 
-// For some reason the following three cannot be combined in a single typemap
-%typemap(in) struct wt_connection *self (void *argp = 0, int res = 0, void **copy) {
-        // struct wt_connection *
-        copy = (void **)argp;
-        res = SWIG_ConvertPtr($input, &argp,$descriptor, $disown | 0);
+%typemap(in) (struct wt_cursor *self, WT_CURSOR *) (void *argp = 0, int res = 0) %{
+        res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
         if (!SWIG_IsOK(res)) { 
                 SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
         }
-        $1 = ($ltype)(argp);
-        copy_self(copy, $1);
-}
-
-%typemap(in) struct wt_session *self (void *argp = 0, int res = 0, void **copy) {
-        // struct wt_session *
-        copy = (void **)argp;
-        res = SWIG_ConvertPtr($input, &argp,$descriptor, $disown | 0);
-        if (!SWIG_IsOK(res)) { 
-                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
-        }
-        $1 = ($ltype)(argp);
-        copy_self(copy, $1);
-}
-
-%typemap(in) struct wt_cursor *self (void *argp = 0, int res = 0, void **copy) {
-        // struct wt_cursor *
-        copy = (void **)argp;
-        res = SWIG_ConvertPtr($input, &argp,$descriptor, $disown | 0);
-        if (!SWIG_IsOK(res)) { 
-                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
-        }
-        $1 = ($ltype)(argp);
-        copy_self(copy, $1);
-}
+        $2 = $1 = ($ltype)(argp);
+%}
 
 /* WT_CURSOR customization.
  * We want our own 'next' function for wt_cursor, so we can
