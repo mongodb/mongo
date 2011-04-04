@@ -151,7 +151,7 @@ namespace mongo {
 #ifdef WIN32
     extern HANDLE lockFileHandle;
 #endif
-    void acquirePathLock();
+    void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
     void maybeCreatePidFile();
 
 } // namespace mongo

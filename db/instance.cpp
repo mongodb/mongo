@@ -850,7 +850,7 @@ namespace mongo {
 #endif
     }
 
-    void acquirePathLock() {
+    void acquirePathLock(bool doingRepair) {
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
         bool oldFile = false;
@@ -916,7 +916,7 @@ namespace mongo {
                 }
             }
             else {
-                if (!dur::haveJournalFiles()) {
+                if (!dur::haveJournalFiles() && !doingRepair) {
                     errmsg = str::stream()
                              << "************** \n"
                              << "old lock file: " << name << ".  probably means unclean shutdown\n"
@@ -959,7 +959,7 @@ namespace mongo {
 #endif
     }
 #else
-    void acquirePathLock() {
+    void acquirePathLock(bool) {
         // TODO - this is very bad that the code above not running here.
 
         // Not related to lock file, but this is where we handle unclean shutdown

@@ -499,7 +499,7 @@ sendmore:
             uassert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
         }
 
-        acquirePathLock();
+        acquirePathLock(forceRepair);
         remove_all( dbpath + "/_tmp/" );
 
         FileAllocator::get()->start();
