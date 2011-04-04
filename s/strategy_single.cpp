@@ -47,7 +47,13 @@ namespace mongo {
                 while ( true ) {
                     BSONObjBuilder builder;
                     try {
-                        bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
+                        BSONObj cmdObj = q.query;
+                        {
+                            BSONElement e = cmdObj.firstElement();
+                            if ( e.type() == Object && str::equals("query", e.fieldName()) )
+                                cmdObj = e.embeddedObject();
+                        }
+                        bool ok = Command::runAgainstRegistered(q.ns, cmdObj, builder);
                         if ( ok ) {
                             BSONObj x = builder.done();
                             replyToQuery(0, r.p(), r.m(), x);

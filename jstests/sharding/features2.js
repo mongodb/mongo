@@ -173,4 +173,10 @@ catch ( e ){
 
 assert.eq( x , y , "assert format" )
 
+// isMaster and query-wrapped-command
+isMaster = db.runCommand({isMaster:1});
+assert( isMaster.ismaster );
+assert.eq( 'isdbgrid', isMaster.msg );
+assert.eq( isMaster, db.runCommand({query: {isMaster:1}}) );
+
 s.stop();
