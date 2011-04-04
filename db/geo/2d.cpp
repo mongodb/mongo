@@ -284,9 +284,9 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert( 13027 , str::stream() << "point not in range between " << _min << " and " << _max, in <= (_max + _error) && in >= (_min - _error) );
+            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " )", in < _max && in >= _min );
             in -= _min;
-            uassert( 14021 , str::stream() << "point not in range > " << _min , in > 0 );
+            assert( in >= 0 );
             return (unsigned)(in * _scaling);
         }
 
@@ -1632,6 +1632,8 @@ namespace mongo {
             _want._min = Point( i.next() );
             _want._max = Point( i.next() );
 
+            fixBox( g, _want );
+
             uassert( 13064 , "need an area > 0 " , _want.area() > 0 );
 
             Point center = _want.center();
@@ -1645,6 +1647,27 @@ namespace mongo {
                                  ( _want._max._y - _want._min._y ) );
 
             ok();
+        }
+
+        void fixBox( const Geo2dType* g, Box& box ) {
+            if( _want._min._x > _want._max._x )
+                swap( _want._min._x, _want._max._x );
+            if( _want._min._y > _want._max._y )
+                swap( _want._min._y, _want._max._y );
+
+            double gMin = g->_min;
+            double gMax = g->_max;
+
+            if( _want._min._x < gMin ) _want._min._x = gMin;
+            if( _want._min._y < gMin ) _want._min._y = gMin;
+            if( _want._max._x > gMax) _want._max._x = gMax;
+            if( _want._max._y > gMax ) _want._max._y = gMax;
+        }
+
+        void swap( double& a, double& b ) {
+            double swap = a;
+            a = b;
+            b = swap;
         }
 
         virtual GeoHash expandStartHash() {
