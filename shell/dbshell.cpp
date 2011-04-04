@@ -307,7 +307,7 @@ string fixHost( string url , string host , string port ) {
     return newurl;
 }
 
-static string OpSymbols = "~!%^&*-+=|:,<>/?";
+static string OpSymbols = "~!%^&*-+=|:,<>/?.";
 
 bool isOpSymbol( char c ) {
     for ( size_t i = 0; i < OpSymbols.size(); i++ )
@@ -380,6 +380,9 @@ public:
         assert( ! isBalanced( "x = 5 +") );
         assert( isBalanced( " x ++") );
         assert( isBalanced( "-- x") );
+        assert( !isBalanced( "a.") );
+        assert( !isBalanced( "a. ") );
+        assert( isBalanced( "a.b") );
     }
 } balnaced_test;
 
