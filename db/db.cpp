@@ -526,7 +526,7 @@ sendmore:
 
         repairDatabasesAndCheckVersion();
 
-        /* we didn't want to pre-open all fiels for the repair check above. for regular
+        /* we didn't want to pre-open all files for the repair check above. for regular
            operation we do for read/write lock concurrency reasons.
         */
         Database::_openAllFiles = true;
