@@ -27,7 +27,7 @@ namespace mongo {
     mutex mapViewMutex("mapView");
     ourbitset writable;
 
-    MAdvise::MAdvise(void *,unsigned, Advise) { }
+    MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 
     /** notification on unmapping so we can clear writable bits */

@@ -25,8 +25,8 @@ namespace mongo {
         void *_p;
         unsigned _len;
     public:
-        enum Advise { Sequential=1 };
-        MAdvise(void *p, unsigned len, Advise a); 
+        enum Advice { Sequential=1 };
+        MAdvise(void *p, unsigned len, Advice a); 
         ~MAdvise(); // destructor resets the range to MADV_NORMAL
     };
 

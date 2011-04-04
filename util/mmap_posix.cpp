@@ -57,10 +57,10 @@ namespace mongo {
 #endif
 
 #if defined(__sunos__)
-    MAdvise::MAdvise(void *,unsigned, Advise) { }
+    MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 #else
-    MAdvise::MAdvise(void *p, unsigned len, Advise a) : _p(p), _len(len) {
+    MAdvise::MAdvise(void *p, unsigned len, Advice a) : _p(p), _len(len) {
         assert( a == Sequential ); // more later
         madvise(_p,_len,MADV_SEQUENTIAL);
     }
