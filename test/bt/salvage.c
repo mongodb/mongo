@@ -203,7 +203,7 @@ copy(int lsn, int recno)
 	 * page to the salvage file.
 	 */
 	assert((ifp = fopen(LOAD, "r")) != NULL);
-	first = access(SLVG, F_OK) ? 0 : 1;
+	first = access(SLVG, F_OK) ? 1 : 0;
 	assert((ofp = fopen(SLVG, "a")) != NULL);
 
 	/* Copy the first "page" (the metadata description). */
