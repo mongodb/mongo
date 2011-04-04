@@ -967,6 +967,7 @@ __slvg_build_leaf_col(SESSION *session,
 		memcpy(page->u.col_leaf.d,
 		    page->u.col_leaf.d + r_skip, r_take * sizeof(WT_COL));
 		page->indx_count = r_take;
+		page->u.col_leaf.recno = trk->u.col.range_start;
 		WT_PAGE_SET_MODIFIED(page);
 
 		/*
