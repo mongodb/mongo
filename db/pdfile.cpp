@@ -1152,7 +1152,6 @@ namespace mongo {
             shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
             p1.sorter.reset( new BSONObjExternalSorter(order) );
             p1.sorter->hintNumObjects( d->stats.nrecords );
-            BSONObjExternalSorter& sorter = *p1.sorter;
             const IndexSpec& spec = idx.getSpec();
             while ( c->ok() ) {
                 BSONObj o = c->current();
