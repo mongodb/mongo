@@ -224,5 +224,27 @@ int main( int argc, const char **argv ) {
         }
     }
 
+    {
+        //Map Reduce (this mostly just tests that it compiles with all output types)
+        const string ns = "test.mr";
+        conn.insert(ns, BSON("a" << 1));
+        conn.insert(ns, BSON("a" << 1));
+
+        const char* map = "function() { emit(this.a, 1); }";
+        const char* reduce = "function(key, values) { return Array.sum(values); }";
+
+        const string outcoll = ns + ".out";
+
+        BSONObj out;
+        out = conn.mapreduce(ns, map, reduce, BSONObj()); // default to inline
+        //MONGO_PRINT(out);
+        out = conn.mapreduce(ns, map, reduce, BSONObj(), outcoll);
+        //MONGO_PRINT(out);
+        out = conn.mapreduce(ns, map, reduce, BSONObj(), outcoll.c_str());
+        //MONGO_PRINT(out);
+        out = conn.mapreduce(ns, map, reduce, BSONObj(), BSON("reduce" << outcoll));
+        //MONGO_PRINT(out);
+    }
+
     cout << "client test finished!" << endl;
 }
