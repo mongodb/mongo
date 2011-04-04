@@ -1157,20 +1157,8 @@ namespace mongo {
             while ( c->ok() ) {
                 BSONObj o = c->current();
                 DiskLoc loc = c->currLoc();
-
-                BSONObjSetDefaultOrder keys;
-                spec.getKeys(o, keys);
-                int k = 0;
-                for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                    if( ++k == 2 ) {
-                        p1.multi = true;
-                    }
-                    sorter.add(*i, loc);
-                    p1.nkeys++;
-                }
-
+                p1.addKeys(spec, o, loc);
                 c->advance();
-                p1.n++;
                 pm.hit();
                 if ( logLevel > 1 && p1.n % 10000 == 0 ) {
                     printMemInfo( "\t iterating objects" );

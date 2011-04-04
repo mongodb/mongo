@@ -31,6 +31,20 @@ namespace mongo {
         unsigned long long n; // # of records
         unsigned long long nkeys;
         bool multi; // multikey index
+
+        void addKeys(const IndexSpec& spec, const BSONObj& o, DiskLoc loc) { 
+            BSONObjSetDefaultOrder keys;
+            spec.getKeys(o, keys);
+            int k = 0;
+            for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                if( ++k == 2 ) {
+                    multi = true;
+                }
+                sorter->add(*i, loc);
+                nkeys++;
+            }
+            n++;
+        }
     };
 
 }

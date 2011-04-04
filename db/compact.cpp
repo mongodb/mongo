@@ -88,17 +88,7 @@ namespace mongo {
                 {
                     // extract keys for all indexes we will be rebuilding
                     for( int x = 0; x < nidx; x++ ) { 
-                        BSONObjSetDefaultOrder keys;
-                        indexSpecs[x].getKeys(objOld, keys);
-                        SortPhaseOne& p1 = phase1[x];
-                        int k = 0;
-                        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                            if( ++k == 2 ) {
-                                p1.multi = true;
-                            }
-                            p1.sorter->add(*i, loc);
-                            p1.nkeys++;
-                        }                    
+                        phase1[x].addKeys(indexSpecs[x], objOld, loc);
                     }
                 }
 
