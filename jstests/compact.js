@@ -1,7 +1,5 @@
 // compact.js
 
-db.dropDatabase();
-
 t = db.compacttest;
 t.drop();
 t.insert({ x: 3 });
