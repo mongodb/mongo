@@ -76,7 +76,7 @@ namespace mongo {
         int quotaFiles;        // --quotaFiles
         bool cpu;              // --cpu show cpu time periodically
 
-        bool dur;              // --dur durability
+        bool dur;              // --dur durability (now --journal)
 
         /** --durOptions 7      dump journal and terminate without doing anything further
             --durOptions 4      recover and terminate without listening

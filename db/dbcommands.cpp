@@ -139,7 +139,7 @@ namespace mongo {
             else if ( cmdObj["fsync"].trueValue() ) {
                 Timer t;
                 if( !getDur().awaitCommit() ) {
-                    // if get here, not running with --dur
+                    // if get here, not running with --journal
                     log() << "fsync from getlasterror" << endl;
                     result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
                 }

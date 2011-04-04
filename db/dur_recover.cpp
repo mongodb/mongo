@@ -122,7 +122,7 @@ namespace mongo {
                             const JSectFooter& footer = *(const JSectFooter*)pos;
                             int len = pos - (char*)_sectHead;
                             if (!footer.checkHash(_sectHead, len)) {
-                                massert(13594, "dur journal checksum doesn't match", false);
+                                massert(13594, "journal checksum doesn't match", false);
                             }
                         }
                         return false; // false return value denotes end of section

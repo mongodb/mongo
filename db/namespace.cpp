@@ -99,7 +99,7 @@ namespace mongo {
 #if defined(_DEBUG)
     void NamespaceDetails::dump(const Namespace& k) {
         if( !cmdLine.dur )
-            cout << "ns offsets which follow will not display correctly with --dur disabled" << endl;
+            cout << "ns offsets which follow will not display correctly with --journal disabled" << endl;
 
         size_t ofs = 1; // 1 is sentinel that the find call below failed
         privateViews.find(this, /*out*/ofs);

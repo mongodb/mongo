@@ -93,7 +93,7 @@ namespace mongo {
             DEV log() << "checkHash len:" << len << " hash:" << toHex(hash, 16) << " current:" << toHex(c.bytes, 16) << endl;
             if( memcmp(hash, c.bytes, sizeof(hash)) == 0 ) 
                 return true;
-            log() << "dur checkHash mismatch, got: " << toHex(c.bytes, 16) << " expected: " << toHex(hash,16) << endl;
+            log() << "journal checkHash mismatch, got: " << toHex(c.bytes, 16) << " expected: " << toHex(hash,16) << endl;
             return false;
         }
 
