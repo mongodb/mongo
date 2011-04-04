@@ -425,7 +425,7 @@ namespace mongo {
         void _assertInvalid() const;
 
         void init(Holder *holder) {
-            _holder.reset(holder);
+            _holder = holder; // holder is now managed by intrusive_ptr
             init(holder->data);
         }
         void init(const char *data) {
