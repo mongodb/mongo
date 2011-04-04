@@ -147,7 +147,7 @@ namespace mongo {
                 BSONObj::iterator i(ii.next().info.obj());
                 while( i.more() ) { 
                     BSONElement e = i.next();
-                    if( strcmp(e.fieldName(), "v") != 0 && strcmp(e.fieldName(), "background") != 0 ) {
+                    if( !str::equals(e.fieldName(), "v") && !str::equals(e.fieldName(), "background") ) {
                         b.append(e);
                     }
                 }
