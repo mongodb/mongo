@@ -26,7 +26,9 @@ struct __wt_stuff {
 	uint32_t   ovfl_next;			/* Next empty slot */
 	uint32_t   ovfl_allocated;		/* Bytes allocated */
 
-	uint8_t  page_type;			/* Page type */
+	uint8_t    page_type;			/* Page type */
+
+	int	   range_merge;			/* If merged key ranges */
 
 	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
@@ -63,17 +65,21 @@ struct __wt_track {
 	} u;
 	WT_TRACK *range_list;			/* Split range linked list */
 
-#define	WT_TRACK_OVFL_MISSING	0x01		/* Overflow page missing */
-#define	WT_TRACK_OVFL_REFD	0x02		/* Overflow page referenced */
+#define	WT_TRACK_MERGE		0x01		/* Page required merging */
+#define	WT_TRACK_OVFL_MISSING	0x02		/* Overflow page missing */
+#define	WT_TRACK_OVFL_REFD	0x04		/* Overflow page referenced */
 	uint32_t flags;
 };
 
+static int  __slvg_build_internal_col(SESSION *, WT_STUFF *);
+static int  __slvg_build_leaf_col(SESSION *, WT_TRACK *, WT_PAGE *, WT_COL_REF *, WT_STUFF *);
+static void __slvg_col_ovfl_reference(WT_PAGE *, WT_STUFF *);
 static int  __slvg_discard_ovfl(SESSION *, WT_STUFF *);
 static int  __slvg_free(SESSION *, WT_STUFF *);
+static int  __slvg_free_merge_block(SESSION *, WT_STUFF *);
 static int  __slvg_free_trk_col(SESSION *, WT_TRACK **, int);
 static int  __slvg_free_trk_ovfl(SESSION *, WT_TRACK **, int);
 static int  __slvg_free_trk_row(SESSION *, WT_TRACK **, int);
-static int  __slvg_internal_col(SESSION *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_srch_col(SESSION *, WT_PAGE_DISK *, WT_TRACK *);
 static int  __slvg_ovfl_srch_row(SESSION *, WT_PAGE_DISK *, WT_TRACK *);
@@ -125,7 +131,8 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	/* If the file doesn't have any pages, we're done. */
 	if (btree->fh->file_size <= WT_PAGE_DESC_SIZE) {
 		__wt_errx(session, "file is too small to salvage");
-		goto err_set;
+		ret = WT_ERROR;
+		goto err;
 	}
 
 	/* Build the page list. */
@@ -141,7 +148,8 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	if (stuff.pages_next == 0) {
 		__wt_errx(session,
 		    "file has no valid pages and cannot be salvaged");
-		goto err_set;
+		ret = WT_ERROR;
+		goto err;
 	}
 
 	/*
@@ -184,16 +192,41 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
-		WT_ERR(__slvg_internal_col(session, &stuff));
+		WT_ERR(__slvg_build_internal_col(session, &stuff));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		// WT_ERR(__slvg_internal_row(session, &stuff));
+		// WT_ERR(__slvg_build_internal_row(session, &stuff));
 		break;
 	}
 
-	if (0) {
-err_set:	ret = WT_ERROR;
-	}
+	/*
+	 * If we had to merge key ranges, we have to do a final pass through
+	 * the leaf page array and discard file pages used during merges.
+	 * We can't do it earlier: if we free'd the file pages we're merging,
+	 * then the write of the newly created internal page might allocate
+	 * those file blocks, and if the write of the newly created internal
+	 * page partially fails, we've potentially overwritten pages that
+	 * were used to construct our final key range.  In other words, if the
+	 * salvage run fails, we don't want to corrupt data the next salvage
+	 * run will need.
+	 */
+	 if (stuff.range_merge)
+		WT_ERR(__slvg_free_merge_block(session, &stuff));
+
+	/*
+	 * If we have to merge key ranges, the list of referenced overflow
+	 * pages might be incorrect, that is, when we did the original pass to
+	 * detect unused overflow pages, we may have flagged some pages as
+	 * referenced which are no longer referenced after those keys were
+	 * discarded from their key range.  We reset the referenced overflow
+	 * page list when merging key ranges, and so now we have a correct
+	 * list.  Free any unused overflow pages.
+	 */
+	 if (stuff.range_merge)
+		WT_ERR(__slvg_discard_ovfl(session, &stuff));
+
+	/* Write out the free list. */
+	WT_TRET(__wt_block_write(session));
 
 err:	/* Wrap up reporting. */
 	if (stuff.f != NULL)
@@ -377,7 +410,7 @@ __slvg_track_leaf(
 		 * overflow items.
 		 */
 		trk->u.col.range_start = dsk->recno;
-		trk->u.col.range_stop = dsk->recno + dsk->u.entries;
+		trk->u.col.range_stop = dsk->recno + (dsk->u.entries - 1);
 
 		if (dsk->type == WT_PAGE_COL_VAR)
 			WT_ERR(__slvg_ovfl_srch_col(session, dsk, trk));
@@ -393,7 +426,7 @@ __slvg_track_leaf(
 			stop_recno += WT_RLE_REPEAT_COUNT(p);
 
 		trk->u.col.range_start = dsk->recno;
-		trk->u.col.range_stop = stop_recno;
+		trk->u.col.range_stop = stop_recno - 1;
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -723,13 +756,15 @@ __slvg_range_overlap_col(
 			 * is more desirable -- discard b_trk.
 			 */
 			goto delete;
-		else
-			/*
-			 * Case #9: b_trk is a superset of a_trk, but b_trk is
-			 * more desirable: keep both but delete a_trk's key
-			 * range from b_trk.
-			 */
-			b_trk->u.col.range_start = a_trk->u.col.range_start + 1;
+
+		/*
+		 * Case #9: b_trk is a superset of a_trk, but b_trk is more
+		 * desirable: keep both but delete a_trk's key range from
+		 * b_trk.
+		 */
+		b_trk->u.col.range_start = a_trk->u.col.range_start + 1;
+		F_SET(b_trk, WT_TRACK_MERGE);
+		ss->range_merge = 1;
 		return (0);
 	}
 
@@ -741,30 +776,35 @@ __slvg_range_overlap_col(
 			 * more desirable -- discard b_trk.
 			 */
 			goto delete;
-		else
-			/*
-			 * Case #6: a_trk is a superset of b_trk, but b_trk is
-			 * more desirable: keep both but delete b_trk's key
-			 * range from a_trk.
-			 */
-			 a_trk->u.col.range_stop = b_trk->u.col.range_stop - 1;
+
+		/*
+		 * Case #6: a_trk is a superset of b_trk, but b_trk is more
+		 * desirable: keep both but delete b_trk's key range from a_trk.
+		 */
+		a_trk->u.col.range_stop = b_trk->u.col.range_stop - 1;
+		F_SET(a_trk, WT_TRACK_MERGE);
+		ss->range_merge = 1;
 		return (0);
 	}
 
 	if  (a_trk->u.col.range_stop < b_trk->u.col.range_stop) {
 		/* Case #3/8. */
-		if (a_trk->lsn > b_trk->lsn)
+		if (a_trk->lsn > b_trk->lsn) {
 			/*
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
-			 b_trk->u.col.range_start = a_trk->u.col.range_stop + 1;
-		else
+			b_trk->u.col.range_start = a_trk->u.col.range_stop + 1;
+			F_SET(b_trk, WT_TRACK_MERGE);
+		} else {
 			/*
 			 * Case #3/8: b_trk is more desirable, delete b_trk's
 			 * key range from a_trk;
 			 */
-			 a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
+			a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
+			F_SET(a_trk, WT_TRACK_MERGE);
+		}
+		ss->range_merge = 1;
 		return (0);
 	}
 
@@ -789,27 +829,33 @@ delete:		--ss->leaf_cnt;
 	 * takes the second part.
 	 */
 	++ss->leaf_cnt;
+	ss->range_merge = 1;
+
 	WT_RET(__wt_calloc_def(session, 1, &trk));
 	trk->ss = a_trk->ss;
 	trk->lsn = a_trk->lsn;
 	trk->addr = a_trk->addr;
 	trk->size = a_trk->size;
+	F_SET(trk, WT_TRACK_MERGE);
+
 	a_trk->range_list = trk;
 
 	trk->u.col.range_start = b_trk->u.col.range_stop + 1;
 	trk->u.col.range_stop = a_trk->u.col.range_stop;
 	a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
+
 	return (0);
 }
 
 /*
- * __slvg_internal_col --
+ * __slvg_build_internal_col --
  *	Build a column-store in-memory page that references all of the leaf
  *	pages we've found.
  */
 static int
-__slvg_internal_col(SESSION *session, WT_STUFF *ss)
+__slvg_build_internal_col(SESSION *session, WT_STUFF *ss)
 {
+	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_TRACK *trk;
 	uint32_t i;
@@ -831,23 +877,141 @@ __slvg_internal_col(SESSION *session, WT_STUFF *ss)
 	page->type = WT_PAGE_COL_INT;
 	WT_PAGE_SET_MODIFIED(page);
 
-	for (i = 0; i < ss->pages_next; ++i) {
+	for (cref = page->u.col_int.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
-
-		/*
-		 * Visit the current leaf page, followed by any list of split
-		 * ranges.
-		 */
 		do {
-			/* Fix up trk */
+			cref->recno = trk->u.col.range_start;
+			WT_COL_REF_ADDR(cref) = trk->addr;
+			WT_COL_REF_SIZE(cref) = trk->size;
+			WT_COL_REF_STATE(cref) = WT_REF_DISK;
+
+			/*
+			 * If the page's key range is unmodified from when we
+			 * read it (in other words, we didn't merge part of this
+			 * page with another page), we can use the page without
+			 * change.  If we did merge with another page, we must
+			 * build a page that reflects the updated key range.
+			 *
+			 * If we merged any pages in this salvage, the list of
+			 * referenced overflow pages might be incorrect, that
+			 * is, when we did the original check for unused
+			 * overflow pages, that was based on the assumption that
+			 * there wouldn't be any need to merge.  If we did have
+			 * to merge, we may have flagged some overflow pages as
+			 * referenced which are no longer referenced because the
+			 * referencing keys were discarded from the key range.
+			 *
+			 * If we're not going to merge this page, do the check
+			 * here; else, the build-a-page function does the check
+			 * for us, based on the final list of keys included in
+			 * the merged, salvaged page.
+			 */
+			if (F_ISSET(trk, WT_TRACK_MERGE))
+				WT_ERR(__slvg_build_leaf_col(
+				    session, trk, page, cref, ss));
+			else
+				if (ss->range_merge &&
+				    ss->page_type == WT_PAGE_COL_VAR)
+					__slvg_trk_ovfl_reference(
+					    session, trk, ss);
+			++cref;
 		} while ((trk = trk->range_list) != NULL);
 	}
-	return (0);
 
-err:	__wt_free(session, page);
-	__wt_free(session, page->u.col_int.t);
+	/* Write the internal page to disk. */
+	return (__wt_page_reconcile(session, page, 1));
+
+err:	if (page->u.col_int.t != NULL)
+		__wt_free(session, page->u.col_int.t);
+	if (page != NULL)
+		__wt_free(session, page);
 	return (ret);
+}
+
+/*
+ * __slvg_build_leaf_col --
+ *	Build a column-store leaf page for a merged page.
+ */
+static int
+__slvg_build_leaf_col(SESSION *session,
+    WT_TRACK *trk, WT_PAGE *parent, WT_COL_REF *cref, WT_STUFF *ss)
+{
+	WT_PAGE *page;
+	uint32_t r_take, r_skip;
+	int ret;
+
+	/* Get the original page, including the full in-memory setup. */
+	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
+	page = WT_COL_REF_PAGE(cref);
+
+	/*
+	 * Create a new set of entries that only reference the keys we
+	 * care about.
+	 */
+	r_take = (uint32_t)(trk->u.col.range_stop - trk->u.col.range_start) + 1;
+	r_skip = (uint32_t)(trk->u.col.range_start - page->u.col_leaf.recno);
+
+	switch (page->type) {
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_COL_FIX:
+		/*
+		 * Variable-length and fixed-length column stores are easy
+		 * because each WT_COL entry maps to a single record -- we
+		 * can calculate how many references to copy.
+		 */
+		memcpy(page->u.col_leaf.d,
+		    page->u.col_leaf.d + r_skip, r_take * sizeof(WT_COL));
+		page->indx_count = r_take;
+		WT_PAGE_SET_MODIFIED(page);
+
+		/*
+		 * If we have to merge pages, the list of referenced overflow
+		 * pages might be incorrect, that is, when we did the original
+		 * pass to detect unused overflow pages, we may have flagged
+		 * some pages as referenced which are no longer referenced as
+		 * those keys were discarded from their key range.  Check again.
+		 */
+		if (page->type == WT_PAGE_COL_VAR)
+			__slvg_col_ovfl_reference(page, ss);
+		break;
+	case WT_PAGE_COL_RLE:
+		/* Harder... have to walk the records... */
+		/* CAN THIS OVERFLOW A uint32_t? */
+		break;
+	}
+
+	/* Write the leaf page to disk, and discard our hazard reference. */
+	ret = __wt_page_reconcile(session, page, 1);
+
+	__wt_hazard_clear(session, page);
+
+	return (ret);
+}
+
+/*
+ * __slvg_col_ovfl_reference --
+ *	Mark overflow pages referenced from this column-store page.
+ */
+static void
+__slvg_col_ovfl_reference(WT_PAGE *page, WT_STUFF *ss)
+{
+	WT_CELL *cell;
+	WT_COL *cip;
+	WT_OVFL *ovfl;
+	WT_TRACK **searchp;
+	uint32_t i;
+
+	WT_COL_INDX_FOREACH(page, cip, i) {
+		cell = WT_COL_PTR(page, cip);
+		if (WT_CELL_TYPE(cell) != WT_CELL_DATA_OVFL)
+			continue;
+		ovfl = WT_CELL_BYTE_OVFL(cell);
+		searchp =
+		    bsearch(&ovfl, ss->ovfl, ss->ovfl_next,
+		    sizeof(WT_TRACK *), __slvg_ovfl_compare);
+		F_SET(*searchp, WT_TRACK_OVFL_REFD);
+	}
 }
 
 /*
@@ -982,6 +1146,41 @@ __slvg_discard_ovfl(SESSION *session, WT_STUFF *ss)
 	}
 
 	ss->ovfl_next = WT_PTRDIFF32(p, ss->ovfl);
+	return (0);
+}
+
+/*
+ * __slvg_free_merge_block --
+ *	Free any file blocks that had to be merged back into the free-list.
+ */
+static int
+__slvg_free_merge_block(SESSION *session, WT_STUFF *ss)
+{
+	WT_TRACK *trk;
+	uint32_t i;
+
+	switch (ss->page_type) {
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
+		for (i = 0; i < ss->pages_next; ++i) {
+			if ((trk = ss->pages[i]) == NULL)
+				continue;
+			if (trk->range_list != NULL)
+				WT_RET(__slvg_free_trk_col(
+				    session, &ss->pages[i], 1));
+		}
+		break;
+	case WT_PAGE_ROW_LEAF:
+		for (i = 0; i < ss->pages_next; ++i) {
+			if ((trk = ss->pages[i]) == NULL)
+				continue;
+			if (trk->range_list != NULL)
+				WT_RET(__slvg_free_trk_row(
+				    session, &ss->pages[i], 1));
+		}
+	}
+
 	return (0);
 }
 
