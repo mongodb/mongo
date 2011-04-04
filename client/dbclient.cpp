@@ -442,15 +442,16 @@ namespace mongo {
         return false;
     }
 
-    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) {
+    DBClientWithCommands::MROutput DBClientWithCommands::MRInline (BSON("inline" << 1));
+
+    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, MROutput output) {
         BSONObjBuilder b;
         b.append("mapreduce", nsGetCollection(ns));
         b.appendCode("map", jsmapf);
         b.appendCode("reduce", jsreducef);
         if( !query.isEmpty() )
             b.append("query", query);
-        if( !outputcolname.empty() )
-            b.append("out", outputcolname);
+        b.append("out", output.out);
         BSONObj info;
         runCommand(nsGetDB(ns), b.done(), info);
         return info;

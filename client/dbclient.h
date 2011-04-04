@@ -529,6 +529,19 @@ namespace mongo {
         bool setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info = 0);
 
+
+        /** This implicitly converts from char*, string, and BSONObj to be an argument to mapreduce
+            You shouldn't need to explicitly construct this
+         */
+        struct MROutput {
+            MROutput(const char* collection) : out(BSON("replace" << collection)) {}
+            MROutput(const string& collection) : out(BSON("replace" << collection)) {}
+            MROutput(const BSONObj& obj) : out(obj) {}
+
+            BSONObj out;
+        };
+        static MROutput MRInline;
+
         /** Run a map/reduce job on the server.
 
             See http://www.mongodb.org/display/DOCS/MapReduce
@@ -537,8 +550,8 @@ namespace mongo {
             jsmapf    javascript map function code
             jsreducef javascript reduce function code.
             query     optional query filter for the input
-            output    optional permanent output collection name.  if not specified server will
-                      generate a temporary collection and return its name.
+            output    either a string collection name or an object representing output type
+                      if not specified uses inline output type
 
             returns a result object which contains:
              { result : <collection_name>,
@@ -552,7 +565,7 @@ namespace mongo {
                result.getField("ok").trueValue()
              on the result to check if ok.
         */
-        BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), const string& output = "");
+        BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), MROutput output = MRInline);
 
         /** Run javascript code on the database server.
            dbname    database SavedContext in which the code runs. The javascript variable 'db' will be assigned
