@@ -15,19 +15,17 @@ int
 __wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value)
 {
 	BTREE *btree;
-	WT_PAGE *page;
 	int ret;
 
 	btree = session->btree;
-	page = NULL;
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_row_search(session, key, 0));
-	page = session->srch_page;
-
+	WT_RET(__wt_row_search(session, key, 0));
+	
 	ret = __wt_value_return(session, key, value, 0);
 
-err:	if (page != btree->root_page.page)
-		__wt_hazard_clear(session, page);
+	if (session->srch_page != btree->root_page.page)
+		__wt_hazard_clear(session, session->srch_page);
+
 	return (ret);
 }
