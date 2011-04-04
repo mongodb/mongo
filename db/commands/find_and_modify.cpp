@@ -57,8 +57,8 @@ namespace mongo {
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {
                 if (!upsert) {
-                    errmsg = "No matching object found";
-                    return false;
+                    result.appendNull("value");
+                    return true;
                 }
 
                 BSONElement update = cmdObj["update"];
