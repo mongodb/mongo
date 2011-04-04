@@ -26,6 +26,8 @@
 #include "commands.h"
 #include "curop-inl.h"
 #include "background.h"
+#include "extsort.h"
+#include "compact.h"
 #include "../util/concurrency/task.h"
 
 namespace mongo {
@@ -36,7 +38,10 @@ namespace mongo {
     DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr);
     void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
-    void compactExtent(const char *ns, NamespaceDetails *d, DiskLoc ext, int n) { 
+    void compactExtent(const char *ns, NamespaceDetails *d, DiskLoc ext, int n,
+                const scoped_array<IndexSpec> &indexSpecs,
+                scoped_array<SortPhaseOne>& phase1, int nidx)
+    {
         log() << "compact extent #" << n << endl;
         Extent *e = ext.ext();
         e->assertOk();
@@ -68,6 +73,7 @@ namespace mongo {
                 L = recOld->nextInExtent(L);
                 nrecs++;
                 BSONObj objOld(recOld);
+
                 unsigned sz = objOld.objsize();
                 unsigned lenWHdr = sz + Record::HeaderSize;
                 totalSize += lenWHdr;
@@ -78,6 +84,23 @@ namespace mongo {
                 recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
                 addRecordToRecListInExtent(recNew, loc);
                 memcpy(recNew->data, objOld.objdata(), sz);
+
+                {
+                    // extract keys for all indexes we will be rebuilding
+                    for( int x = 0; x < nidx; x++ ) { 
+                        BSONObjSetDefaultOrder keys;
+                        indexSpecs[x].getKeys(objOld, keys);
+                        SortPhaseOne& p1 = phase1[x];
+                        int k = 0;
+                        for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                            if( ++k == 2 ) {
+                                p1.multi = true;
+                            }
+                            p1.sorter->add(*i, loc);
+                            p1.nkeys++;
+                        }                    
+                    }
+                }
 
                 if( L.isNull() ) { 
                     // we just did the very last record from the old extent.  it's still pointed to 
@@ -107,6 +130,8 @@ namespace mongo {
         // drop this extent
     }
 
+    extern SortPhaseOne *precalced;
+
     bool _compact(const char *ns, NamespaceDetails *d, string& errmsg) { 
         //int les = d->lastExtentSize;
 
@@ -121,18 +146,25 @@ namespace mongo {
         // same data, but might perform a little different after compact?
         NamespaceDetailsTransient::get_w(ns).clearQueryCache();
 
-        list<BSONObj> indexes;
+        int nidx = d->nIndexes;
+        scoped_array<IndexSpec> indexSpecs( new IndexSpec[nidx] );
+        scoped_array<SortPhaseOne> phase1( new SortPhaseOne[nidx] );
         {
             NamespaceDetails::IndexIterator ii = d->ii(); 
+            int x = 0;
             while( ii.more() ) { 
                 BSONObjBuilder b;
                 BSONObj::iterator i(ii.next().info.obj());
                 while( i.more() ) { 
                     BSONElement e = i.next();
-                    if( strcmp(e.fieldName(), "v") != 0 && strcmp(e.fieldName(), "background") != 0 )
+                    if( strcmp(e.fieldName(), "v") != 0 && strcmp(e.fieldName(), "background") != 0 ) {
                         b.append(e);
+                    }
                 }
-                indexes.push_back( b.obj() );
+                BSONObj o = b.obj().getOwned();
+                phase1[x].sorter.reset( new BSONObjExternalSorter( o.getObjectField("key") ) );
+                phase1[x].sorter->hintNumObjects( d->stats.nrecords );
+                indexSpecs[x++].reset(o);
             }
         }
 
@@ -156,7 +188,7 @@ namespace mongo {
 
         int n = 0;
         for( set<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            compactExtent(ns, d, *i, n++);
+            compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx);
         }
 
         assert( d->firstExtent.ext()->xprev.isNull() );
@@ -164,9 +196,18 @@ namespace mongo {
         // build indexes
         NamespaceString s(ns);
         string si = s.db + ".system.indexes";
-        for( list<BSONObj>::iterator i = indexes.begin(); i != indexes.end(); i++ ) {
-            log() << "compact create index " << (*i)["key"].Obj().toString() << endl;
-            theDataFileMgr.insert(si.c_str(), i->objdata(), i->objsize());
+        for( int i = 0; i < nidx; i++ ) {
+            BSONObj info = indexSpecs[i].info;
+            log() << "compact create index " << info["key"].Obj().toString() << endl;
+            try {
+                precalced = &phase1[i];
+                theDataFileMgr.insert(si.c_str(), info.objdata(), info.objsize());
+            }
+            catch(...) { 
+                precalced = 0;
+                throw;
+            }
+            precalced = 0;
         }
 
         return true;

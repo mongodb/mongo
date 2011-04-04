@@ -276,14 +276,13 @@ namespace mongo {
         return true;
     }
 
-
     void IndexSpec::reset( const IndexDetails * details ) {
         _details = details;
         reset( details->info );
     }
 
-    void IndexSpec::reset( const DiskLoc& loc ) {
-        info = loc.obj();
+    void IndexSpec::reset( const BSONObj& _info ) {
+        info = _info;
         keyPattern = info["key"].embeddedObjectUserCheck();
         if ( keyPattern.objsize() == 0 ) {
             out() << info.toString() << endl;

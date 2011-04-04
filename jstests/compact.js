@@ -4,7 +4,8 @@ db.dropDatabase();
 
 t = db.compacttest;
 t.drop();
-t.insert({});
+t.insert({ x: 3 });
+t.ensureIndex({ x: 1 });
 
 print("1");
 
@@ -16,7 +17,7 @@ var v = t.validate(true);
 assert(v.ok);
 assert(v.extentCount == 1);
 assert(v.deletedCount == 1);
-assert(t.getIndexes().length == 1);
+assert(t.getIndexes().length == 2);
 
 print("2");
 
@@ -27,4 +28,4 @@ assert(t.count() == 0);
 v = t.validate(true);
 assert(v.ok);
 assert(v.extentCount == 1);
-assert(t.getIndexes().length == 1);
+assert(t.getIndexes().length == 2);

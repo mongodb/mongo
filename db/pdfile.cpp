@@ -41,6 +41,7 @@ _ disallow system* manipulations from the database.
 #include "extsort.h"
 #include "curop-inl.h"
 #include "background.h"
+#include "compact.h"
 
 namespace mongo {
 
@@ -1123,6 +1124,8 @@ namespace mongo {
         }
     }
 
+    SortPhaseOne *precalced = 0;
+
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         CurOp * op = cc().curop();
@@ -1140,39 +1143,49 @@ namespace mongo {
         if ( logLevel > 1 ) printMemInfo( "before index start" );
 
         /* get and sort all the keys ----- */
-        unsigned long long n = 0;
-        shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-        BSONObjExternalSorter sorter(order);
-        sorter.hintNumObjects( d->stats.nrecords );
-        unsigned long long nkeys = 0;
         ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
-        while ( c->ok() ) {
-            BSONObj o = c->current();
-            DiskLoc loc = c->currLoc();
+        SortPhaseOne _ours;
+        SortPhaseOne *phase1 = precalced;
+        if( phase1 == 0 ) {
+            phase1 = &_ours;
+            SortPhaseOne& p1 = *phase1;
+            shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+            p1.sorter.reset( new BSONObjExternalSorter(order) );
+            p1.sorter->hintNumObjects( d->stats.nrecords );
+            BSONObjExternalSorter& sorter = *p1.sorter;
+            const IndexSpec& spec = idx.getSpec();
+            while ( c->ok() ) {
+                BSONObj o = c->current();
+                DiskLoc loc = c->currLoc();
 
-            BSONObjSetDefaultOrder keys;
-            idx.getKeysFromObject(o, keys);
-            int k = 0;
-            for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                if( ++k == 2 ) {
-                    d->setIndexIsMultikey(idxNo);
+                BSONObjSetDefaultOrder keys;
+                spec.getKeys(o, keys);
+                int k = 0;
+                for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                    if( ++k == 2 ) {
+                        p1.multi = true;
+                    }
+                    sorter.add(*i, loc);
+                    p1.nkeys++;
                 }
-                sorter.add(*i, loc);
-                nkeys++;
-            }
 
-            c->advance();
-            n++;
-            pm.hit();
-            if ( logLevel > 1 && n % 10000 == 0 ) {
-                printMemInfo( "\t iterating objects" );
-            }
-
-        };
+                c->advance();
+                p1.n++;
+                pm.hit();
+                if ( logLevel > 1 && p1.n % 10000 == 0 ) {
+                    printMemInfo( "\t iterating objects" );
+                }
+            };
+        }
         pm.finished();
 
+        BSONObjExternalSorter& sorter = *(phase1->sorter);
+
+        if( phase1->multi )
+            d->setIndexIsMultikey(idxNo);
+
         if ( logLevel > 1 ) printMemInfo( "before final sort" );
-        sorter.sort();
+        phase1->sorter->sort();
         if ( logLevel > 1 ) printMemInfo( "after final sort" );
 
         log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
@@ -1184,7 +1197,7 @@ namespace mongo {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            assert( pm == op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 ) );
+            assert( pm == op->setMessage( "index: (2/3) btree bottom up" , phase1->nkeys , 10 ) );
             while( i->more() ) {
                 RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
@@ -1216,7 +1229,7 @@ namespace mongo {
             op->setMessage( "index: (3/3) btree-middle" );
             log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
-            if ( btBuilder.getn() != nkeys && ! dropDups ) {
+            if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
                 warning() << "not all entries were added to the index, probably some keys were too large" << endl;
             }
         }
@@ -1228,7 +1241,7 @@ namespace mongo {
             getDur().commitIfNeeded();
         }
 
-        return n;
+        return phase1->n;
     }
 
     class BackgroundIndexBuildJob : public BackgroundOperation {
