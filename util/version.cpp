@@ -32,7 +32,7 @@ namespace mongo {
      *      1.2.3-pre-
      *      1.2.3-rc4 (up to rc9)
      *      1.2.3-rc4-pre-
-     * If you really need to do something else you'll need to fix versionArray()
+     * If you really need to do something else you'll need to fix _versionArray()
      */
     const char versionString[] = "1.9.0-pre-";
 
@@ -74,15 +74,8 @@ namespace mongo {
         b.append(finalPart);
         return b.arr();
     }
-    BSONArray versionArray(){
-        static BSONArray out;
-        if (out.isEmpty()) {
-            BSONArray tmp = _versionArray(versionString);
-            out = tmp;
-            return tmp;
-        }
-        return out;
-    }
+
+    const BSONArray versionArray = _versionArray(versionString);
 
     string mongodVersion() {
         stringstream ss;
@@ -210,8 +203,6 @@ namespace mongo {
             assert( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
             assert( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
             assert( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
-
-            versionArray(); // make sure we work on current versionString
 
             log(1) << "versionArrayTest passed" << endl;
         }

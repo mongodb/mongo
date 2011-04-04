@@ -59,7 +59,7 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
-            result << "versionArray" << versionArray();
+            result << "versionArray" << versionArray;
             result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             result.appendBool( "debug" , debug );
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);

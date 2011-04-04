@@ -10,7 +10,7 @@ namespace mongo {
 
     // mongo version
     extern const char versionString[];
-    BSONArray versionArray();
+    extern const BSONArray versionArray;
     string mongodVersion();
     int versionCmp(StringData rhs, StringData lhs); // like strcmp
 
