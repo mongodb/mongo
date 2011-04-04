@@ -1360,7 +1360,7 @@ const StringData _jscode_raw_utils =
 "}\n" 
 "return res;\n" 
 "}\n" 
-"rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:secs||60}); }\n" 
+"rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs === undefined) ? 60:secs}); }\n" 
 "rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }\n" 
 "rs.addArb = function (hn) { return this.add(hn, true); }\n" 
 "rs.conf = function () { return db.getSisterDB(\"local\").system.replset.findOne(); }\n" 

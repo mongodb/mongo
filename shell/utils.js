@@ -1355,7 +1355,7 @@ rs.add = function (hostport, arb) {
     }
     return res;
 }
-rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:secs||60}); }
+rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs === undefined) ? 60:secs}); }
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
