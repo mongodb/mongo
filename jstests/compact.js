@@ -8,7 +8,9 @@ t.insert({});
 
 print("1");
 
-assert(db.runCommand({ compact: 'compacttest', dev: true }).ok);
+var res = db.runCommand({ compact: 'compacttest', dev: true });
+printjson(res);
+assert(res.ok);
 assert(t.count() == 1);
 var v = t.validate(true);
 assert(v.ok);

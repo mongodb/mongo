@@ -61,7 +61,6 @@ namespace mongo {
             log() << "compact copying records" << endl;
             unsigned totalSize = 0;
             int nrecs = 0;
-            int prev = DiskLoc::NullOfs;
             DiskLoc L = e->firstRecord;
             if( !L.isNull() )
             while( 1 ) {
@@ -109,7 +108,7 @@ namespace mongo {
     }
 
     bool _compact(const char *ns, NamespaceDetails *d, string& errmsg) { 
-        int les = d->lastExtentSize;
+        //int les = d->lastExtentSize;
 
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitNow();
