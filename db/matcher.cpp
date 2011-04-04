@@ -543,7 +543,7 @@ namespace mongo {
     int retMissing( const ElementMatcher &bm ) {
         if ( bm.compareOp != BSONObj::opEXISTS )
             return 0;
-        return ( bm.toMatch.boolean() ^ bm.isNot ) ? -1 : 1;
+        return bm.toMatch.boolean() ? -1 : 1;
     }
 
     /* Check if a particular field matches.
@@ -788,7 +788,7 @@ namespace mongo {
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm , false , details );
-            if ( bm.compareOp != BSONObj::opEXISTS && bm.isNot )
+            if ( bm.isNot )
                 cmp = -cmp;
             if ( cmp < 0 )
                 return false;
