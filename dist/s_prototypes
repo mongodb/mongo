@@ -23,6 +23,9 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e ': end' \
 	    -e x \
 	    -e 's/ =.*$//' \
+	    -e '/#/!s/\n/ /g' \
+	    -e 's/\* /\*/g' \
+	    -e 's/  */ /g' \
 	    -e 's/$/;/p' \
 	    < ../$i
 done) | awk '{

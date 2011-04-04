@@ -463,7 +463,7 @@ __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 
 /*
  * __wt_config_getone --
- *
+ *	Get the value for a given key from a single config string.
  */
  int
 __wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
