@@ -344,6 +344,8 @@ public:
                 }
             }
 
+            auth("local");
+
             BSONObj op = conn(true).findOne(opLogName, Query().sort("$natural", -1), 0, QueryOption_SlaveOk);
             if (op.isEmpty()) {
                 cout << "No operations in oplog. Please ensure you are connecting to a master." << endl;
