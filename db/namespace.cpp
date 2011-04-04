@@ -253,7 +253,11 @@ namespace mongo {
         }
     }
 
-    // lenToAlloc is WITH header
+    /** allocate space for a new record from deleted lists.
+        @param lenToAlloc is WITH header
+        @param extentLoc OUT returns the extent location
+        @return null diskloc if no room - allocate a new extent then
+    */
     DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
         lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         DiskLoc loc = _alloc(ns, lenToAlloc);

@@ -533,17 +533,21 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
+    void Extent::markEmpty() { 
+        xnext.Null();
+        xprev.Null();
+        firstRecord.Null();
+        lastRecord.Null();
+    }
+
     DiskLoc Extent::reuse(const char *nsname) {
         return getDur().writing(this)->_reuse(nsname);
     }
     DiskLoc Extent::_reuse(const char *nsname) {
         log(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
         massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
-        xnext.Null();
-        xprev.Null();
         nsDiagnostic = nsname;
-        firstRecord.Null();
-        lastRecord.Null();
+        markEmpty();
 
         DiskLoc emptyLoc = myLoc;
         emptyLoc.inc( (int) (_extentData-(char*)this) );
@@ -713,7 +717,7 @@ namespace mongo {
 
     void printFreeList() {
         string s = cc().database()->name + ".$freelist";
-        log() << "dump freelist " << s << '\n';
+        log() << "dump freelist " << s << endl;
         NamespaceDetails *freeExtents = nsdetails(s.c_str());
         if( freeExtents == 0 ) {
             log() << "  freeExtents==0" << endl;
@@ -722,11 +726,48 @@ namespace mongo {
         DiskLoc a = freeExtents->firstExtent;
         while( !a.isNull() ) {
             Extent *e = a.ext();
-            log() << "  " << a.toString() << " len:" << e->length << " prev:" << e->xprev.toString() << '\n';
+            log() << "  extent " << a.toString() << " len:" << e->length << " prev:" << e->xprev.toString() << endl;
             a = e->xnext;
         }
 
-        log() << "  end freelist" << endl;
+        log() << "end freelist" << endl;
+    }
+
+    /** free a list of extents that are no longer in use.  this is a double linked list of extents 
+        (could be just one in the list)
+    */
+    void freeExtents(DiskLoc firstExt, DiskLoc lastExt) {
+        {
+            assert( !firstExt.isNull() && !lastExt.isNull() );
+            Extent *f = firstExt.ext();
+            Extent *l = lastExt.ext();
+            assert( f->xprev.isNull() );
+            assert( l->xnext.isNull() );
+            assert( f==l || !f->xnext.isNull() );
+            assert( f==l || !l->xprev.isNull() );
+        }
+
+        string s = cc().database()->name + ".$freelist";
+        NamespaceDetails *freeExtents = nsdetails(s.c_str());
+        if( freeExtents == 0 ) {
+            string err;
+            _userCreateNS(s.c_str(), BSONObj(), err, 0); // todo: this actually allocates an extent, which is bad!
+            freeExtents = nsdetails(s.c_str());
+            massert( 10361 , "can't create .$freelist", freeExtents);
+        }
+        if( freeExtents->firstExtent.isNull() ) {
+            freeExtents->firstExtent.writing() = firstExt;
+            freeExtents->lastExtent.writing() = lastExt;
+        }
+        else {
+            DiskLoc a = freeExtents->firstExtent;
+            assert( a.ext()->xprev.isNull() );
+            getDur().writingDiskLoc( a.ext()->xprev ) = lastExt;
+            getDur().writingDiskLoc( lastExt.ext()->xnext ) = a;
+            getDur().writingDiskLoc( freeExtents->firstExtent ) = firstExt;
+        }
+
+        //printFreeList();
     }
 
     /* drop a collection/namespace */
@@ -755,25 +796,7 @@ namespace mongo {
 
         // free extents
         if( !d->firstExtent.isNull() ) {
-            string s = cc().database()->name + ".$freelist";
-            NamespaceDetails *freeExtents = nsdetails(s.c_str());
-            if( freeExtents == 0 ) {
-                string err;
-                _userCreateNS(s.c_str(), BSONObj(), err, 0);
-                freeExtents = nsdetails(s.c_str());
-                massert( 10361 , "can't create .$freelist", freeExtents);
-            }
-            if( freeExtents->firstExtent.isNull() ) {
-                freeExtents->firstExtent.writing() = d->firstExtent;
-                freeExtents->lastExtent.writing() = d->lastExtent;
-            }
-            else {
-                DiskLoc a = freeExtents->firstExtent;
-                assert( a.ext()->xprev.isNull() );
-                getDur().writingDiskLoc( a.ext()->xprev ) = d->lastExtent;
-                getDur().writingDiskLoc( d->lastExtent.ext()->xnext ) = a;
-                getDur().writingDiskLoc( freeExtents->firstExtent ) = d->firstExtent;
-            }
+            freeExtents(d->firstExtent, d->lastExtent);
             getDur().writingDiskLoc( d->firstExtent ).setInvalid();
             getDur().writingDiskLoc( d->lastExtent ).setInvalid();
         }
@@ -1364,7 +1387,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
         }
-        tlog() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
+        tlog() << "done for " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     /* add keys to indexes for a new record */
@@ -1476,6 +1499,51 @@ namespace mongo {
         }
     }
 
+    /** add a record to the end of the linked list chain within this extent. 
+        require: you must have already declared write intent for the record header.        
+    */
+    void addRecordToRecListInExtent(Record *r, DiskLoc loc) {
+        dassert( loc.rec() == r );
+        Extent *e = r->myExtent(loc);
+        if ( e->lastRecord.isNull() ) {
+            Extent::FL *fl = getDur().writing(e->fl());
+            fl->firstRecord = fl->lastRecord = loc;
+            r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
+        }
+        else {
+            Record *oldlast = e->lastRecord.rec();
+            r->prevOfs = e->lastRecord.getOfs();
+            r->nextOfs = DiskLoc::NullOfs;
+            getDur().writingInt(oldlast->nextOfs) = loc.getOfs();
+            getDur().writingDiskLoc(e->lastRecord) = loc;
+        }
+    }
+
+    /** @return null loc if out of space */
+    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr) {
+        DiskLoc extentLoc;
+        DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+        if ( loc.isNull() ) {
+            // out of space
+            if ( d->capped == 0 ) { // size capped doesn't grow
+                log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
+                cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false);
+                loc = d->alloc(ns, lenWHdr, extentLoc);
+                if ( loc.isNull() ) {
+                    log() << "WARNING: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
+                    for ( int z=0; z<10 && lenWHdr > d->lastExtentSize; z++ ) {
+                        log() << "try #" << z << endl;
+                        cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false);
+                        loc = d->alloc(ns, lenWHdr, extentLoc);
+                        if ( ! loc.isNull() )
+                            break;
+                    }
+                }
+            }
+        }
+        return loc;
+    }
+
     /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc
              after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
     */
@@ -1556,7 +1624,6 @@ namespace mongo {
             BSONElementManipulator::lookForTimestamps( io );
         }
 
-        DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
         lenWHdr = (int) (lenWHdr * d->paddingFactor);
         if ( lenWHdr == 0 ) {
@@ -1572,29 +1639,11 @@ namespace mongo {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
-        DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
         if ( loc.isNull() ) {
-            // out of space
-            if ( d->capped == 0 ) { // size capped doesn't grow
-                log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
-                cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false);
-                loc = d->alloc(ns, lenWHdr, extentLoc);
-                if ( loc.isNull() ) {
-                    log() << "WARNING: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
-                    for ( int zzz=0; zzz<10 && lenWHdr > d->lastExtentSize; zzz++ ) {
-                        log() << "try #" << zzz << endl;
-                        cc().database()->allocExtent(ns, Extent::followupSize(len, d->lastExtentSize), false);
-                        loc = d->alloc(ns, lenWHdr, extentLoc);
-                        if ( ! loc.isNull() )
-                            break;
-                    }
-                }
-            }
-            if ( loc.isNull() ) {
-                log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
-                assert(d->capped);
-                return DiskLoc();
-            }
+            log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
+            assert(d->capped);
+            return DiskLoc();
         }
 
         Record *r = loc.rec();
@@ -1613,21 +1662,7 @@ namespace mongo {
             }
         }
 
-        {
-            Extent *e = r->myExtent(loc);
-            if ( e->lastRecord.isNull() ) {
-                Extent::FL *fl = getDur().writing(e->fl());
-                fl->firstRecord = fl->lastRecord = loc;
-                r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
-            }
-            else {
-                Record *oldlast = e->lastRecord.rec();
-                r->prevOfs = e->lastRecord.getOfs();
-                r->nextOfs = DiskLoc::NullOfs;
-                getDur().writingInt(oldlast->nextOfs) = loc.getOfs();
-                getDur().writingDiskLoc(e->lastRecord) = loc;
-            }
-        }
+        addRecordToRecListInExtent(r, loc);
 
         /* durability todo : this could be a bit annoying / slow to record constantly */
         {

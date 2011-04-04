@@ -174,7 +174,7 @@ namespace mongo {
     (11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
     (11:04:33 AM) dm10gen: see class DiskLoc for more info
     (11:04:43 AM) dm10gen: so that is how Record::myExtent() works
-    (11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must popular its extentOfs then
+    (11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must populate its extentOfs then
     */
     class Record {
     public:
@@ -299,6 +299,9 @@ namespace mongo {
             this helper is for that -- for use with getDur().writing() method
         */
         FL* fl() { return (FL*) &firstRecord; }
+
+        /** caller must declare write intent first */
+        void markEmpty();
     private:
         DiskLoc _reuse(const char *nsname); // recycle an extent and reuse it for a different ns
     };

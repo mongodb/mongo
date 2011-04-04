@@ -33,6 +33,10 @@ namespace mongo {
     ReplSet *theReplSet = 0;
     extern string *discoveredSeed;
 
+    bool isCurrentlyAReplSetPrimary() { 
+        return theReplSet && theReplSet->isPrimary();
+    }
+
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
         static time_t lastLogged;
         _hbmsgTime = time(0);

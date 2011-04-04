@@ -128,7 +128,7 @@ namespace mongo {
     void wasserted(const char *msg, const char *file, unsigned line);
 
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
-       could cause, such as dupliate key, disk full, etc.
+        could cause, such as duplicate key, disk full, etc.
     */
     void uasserted(int msgid, const char *msg) MONGO_NORETURN;
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }

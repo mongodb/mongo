@@ -233,7 +233,8 @@ namespace mongo {
                 try {
                     ss << "  first extent:\n";
                     d->firstExtent.ext()->dump(ss); //TODO: should this be in output object?
-                    valid = valid && d->firstExtent.ext()->validates();
+                    valid = valid && d->firstExtent.ext()->validates() && 
+                        d->firstExtent.ext()->xprev.isNull();
                 }
                 catch (...) {
                     ss << "\n    exception firstextent\n" << endl;
@@ -406,7 +407,7 @@ namespace mongo {
             }
 
             if ( !valid )
-                ss << " ns corrupt, requires dbchk\n";
+                ss << " ns corrupt, requires repair\n";
 
             result.appendBool("valid", valid);
             result.append("errors", errors.arr());

@@ -25,151 +25,180 @@
 #include "concurrency.h"
 #include "commands.h"
 #include "curop-inl.h"
+#include "background.h"
 #include "../util/concurrency/task.h"
 
 namespace mongo {
 
-    class CompactJob {
-    public:
-        CompactJob(string ns, BSONObjBuilder& result) : _ns(ns), _result(result) { }
-        void go();
-    private:
-        BSONObjBuilder& _result; // return value sent to the client from the compact command
-        const string _ns;
-        NamespaceDetails * nsd();
-        void doBatch();
-        void prep();
-        //unsigned long long _nrecords;
-        //unsigned long long _ncompacted;
-        //DiskLoc _firstExtent;
-    };
+    char faux;
 
-    // lock & set context first.  this checks that collection still exists, and that it hasn't
-    // morphed into a capped collection between locks (which is possible)
-    NamespaceDetails * CompactJob::nsd() {
-        NamespaceDetails *nsd = nsdetails(_ns.c_str());
-        if( nsd == 0 ) 
-            throw "ns no longer present";
-        if( nsd->firstExtent.isNull() )
-            throw "no first extent";
-        if( nsd->capped )
-            throw "capped collection";
-        return nsd;
-    }
+    void addRecordToRecListInExtent(Record *r, DiskLoc loc);
+    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr);
+    void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
-    void CompactJob::doBatch() {
+    void compactExtent(const char *ns, NamespaceDetails *d, DiskLoc ext, int n) { 
+        log() << "compact extent #" << n << endl;
+        Extent *e = ext.ext();
+        e->assertOk();
+        assert( e->validates() );
 
         {
-            readlock lk;
-            Client::Context ctx(_ns);
-            NamespaceDetails *d = nsd();
-            Extent *e = d->firstExtent.ext();
-            DiskLoc L = e->firstRecord;
-            while( 1 ) { 
-                if( L.isNull() ) 
-                    break;
-                log() << L.toString() << endl;
-                L = L.rec()->nextInExtent(L);
-            }
-        }
-
-
-#if 0
-        unsigned n = 0;
-        if( 0 ) {
-            /* pre-touch records in a read lock so that paging happens in read not write lock.
-               note we are only touching the records though; if indexes aren't in RAM, they will
-               page later.  So the concept is only partial.
-               */
-            readlock lk;
+            // the next/prev pointers within the extent might not be in order so we first page the whole thing in 
+            // sequentially
+            log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
             Timer t;
-            Client::Context ctx(_ns);
-            NamespaceDetails *nsd = beginBlock();
-            if( nsd->firstExtent != _firstExtent )  {
-                // TEMP DEV - stop after 1st extent
-                throw "change of first extent";
+            MAdvise adv(e, e->length, MAdvise::Sequential);
+            const char *p = (const char *) e;
+            for( int i = 0; i < e->length; i += 4096 ) { 
+                faux += *p;
             }
-            DiskLoc loc = nsd->firstExtent.ext()->firstRecord;
-            while( !loc.isNull() ) {
-                Record *r = loc.rec();
-                loc = r->getNext(loc);
-                if( ++n >= 100 || (n % 8 == 0 && t.millis() > 50) )
+            int ms = t.millis();
+            if( ms > 1000 ) 
+                log() << "compact end paging in " << ms << "ms " << e->length/1000000.0/ms << "MB/sec" << endl;
+        }
+
+        {
+            log() << "compact copying records" << endl;
+            unsigned totalSize = 0;
+            int nrecs = 0;
+            int prev = DiskLoc::NullOfs;
+            DiskLoc L = e->firstRecord;
+            if( !L.isNull() )
+            while( 1 ) {
+                Record *recOld = L.rec();
+                L = recOld->nextInExtent(L);
+                nrecs++;
+                BSONObj objOld(recOld);
+                unsigned sz = objOld.objsize();
+                unsigned lenWHdr = sz + Record::HeaderSize;
+                totalSize += lenWHdr;
+                DiskLoc extentLoc;
+                DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
+                uassert(10000, "compact error out of space during compaction", !loc.isNull());
+                Record *recNew = loc.rec();
+                recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
+                addRecordToRecListInExtent(recNew, loc);
+                memcpy(recNew->data, objOld.objdata(), sz);
+
+                if( L.isNull() ) { 
+                    // we just did the very last record from the old extent.  it's still pointed to 
+                    // by the old extent ext, but that will be fixed below after this loop
                     break;
+                }
+
+                // remove the old record (orphan it)
+                e->firstRecord.writing() = L;
+                Record *r = L.rec();
+                getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
+                getDur().commitIfNeeded();
+            }
+
+            assert( d->firstExtent == ext );
+            assert( d->lastExtent != ext );
+            DiskLoc newFirst = e->xnext;
+            d->firstExtent.writing() = newFirst;
+            newFirst.ext()->xprev.writing().Null();
+            getDur().writing(e)->markEmpty();
+            freeExtents(ext,ext);
+            getDur().commitNow();
+
+            log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
+        }
+
+        // drop this extent
+    }
+
+    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg) { 
+        int les = d->lastExtentSize;
+
+        // this is a big job, so might as well make things tidy before we start just to be nice.
+        getDur().commitNow();
+
+        set<DiskLoc> extents;
+        for( DiskLoc L = d->firstExtent; !L.isNull(); L = L.ext()->xnext ) 
+            extents.insert(L);
+        log() << "compact " << extents.size() << " extents" << endl;
+
+        // same data, but might perform a little different after compact?
+        NamespaceDetailsTransient::get_w(ns).clearQueryCache();
+
+        list<BSONObj> indexes;
+        {
+            NamespaceDetails::IndexIterator ii = d->ii(); 
+            while( ii.more() ) { 
+                BSONObjBuilder b;
+                BSONObj::iterator i(ii.next().info.obj());
+                while( i.more() ) { 
+                    BSONElement e = i.next();
+                    if( e.fieldName() != "v" && e.fieldName() != "background" )
+                        b.append(e);
+                }
+                indexes.push_back( b.obj() );
             }
         }
-        if( 0 ) {
+
+        log() << "compact orphan deleted lists" << endl;
+        for( int i = 0; i < Buckets; i++ ) { 
+            d->deletedList[i].writing().Null();
+        }
+
+        // before dropping indexes, at least make sure we can allocate one extent!
+        uassert(10000, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1).isNull());
+
+        // note that the drop indexes call also invalidates all clientcursors for the namespace, which is important and wanted here
+        log() << "compact dropping indexes" << endl;
+        BSONObjBuilder b;
+        if( !dropIndexes(d, ns, "*", errmsg, b, true) ) { 
+            log() << "compact drop indexes failed" << endl;
+            return false;
+        }
+
+        getDur().commitNow();
+
+        int n = 0;
+        for( set<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
+            compactExtent(ns, d, *i, n++);
+        }
+
+        assert( d->firstExtent.ext()->xprev.isNull() );
+
+        // build indexes
+        NamespaceString s(ns);
+        string si = s.db + ".system.indexes";
+        for( list<BSONObj>::iterator i = indexes.begin(); i != indexes.end(); i++ ) {
+            log() << "compact create index " << (*i)["key"].Obj().toString() << endl;
+            theDataFileMgr.insert(si.c_str(), i->objdata(), i->objsize());
+        }
+
+        return true;
+    }
+
+    bool compact(const string& ns, string &errmsg) {
+        massert( 13658, "bad ns", isANormalNSName(ns.c_str()) );
+        massert( 13659, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
+
+        bool ok;
+        {
             writelock lk;
-            Client::Context ctx(_ns);
-            NamespaceDetails *nsd = beginBlock();
-            for( unsigned i = 0; i < n; i++ ) {
-                if( nsd->firstExtent != _firstExtent )  {
-                    // TEMP DEV - stop after 1st extent
-                    throw "change of first extent (or it is now null)";
-                }
-                DiskLoc loc = nsd->firstExtent.ext()->firstRecord;
-                Record *rec = loc.rec();
-                BSONObj o = loc.obj().getOwned(); // todo: inefficient, double mem copy...
-                try {
-                    theDataFileMgr.deleteRecord(_ns.c_str(), rec, loc, false);
-                }
-                catch(DBException&) { throw "error deleting record"; }
-                try {
-                    theDataFileMgr.insertNoReturnVal(_ns.c_str(), o);
-                }
-                catch(DBException&) {
-                    /* todo: save the record somehow??? try again with 'avoid' logic? */
-                    log() << "compact: error re-inserting record ns:" << _ns << " n:" << _nrecords << " _id:" << o["_id"].toString() << endl;
-                    throw "error re-inserting record";
-                }
-                ++_ncompacted;
-                if( killCurrentOp.globalInterruptCheck() )
-                    throw "interrupted";
+            BackgroundOperation::assertNoBgOpInProgForNs(ns.c_str());
+            Client::Context ctx(ns);
+            NamespaceDetails *d = nsdetails(ns.c_str());
+            massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
+            massert( 13661, "cannot compact capped collection", !d->capped );
+            log() << "compact " << ns << " begin" << endl;
+            try { 
+                ok = _compact(ns.c_str(), d, errmsg);
             }
+            catch(...) { 
+                log() << "compact " << ns << " end (with error)" << endl;
+                throw;
+            }
+            log() << "compact " << ns << " end" << endl;
         }
-#endif
+        return ok;
     }
 
-    void CompactJob::prep() {
-        readlock lk(_ns);
-        Client::Context ctxt(_ns);
-        NamespaceDetails *d = nsd();
-
-        DiskLoc L = d->firstExtent;
-        int ne = 0;
-        if( !L.isNull() ) {
-            Extent *e = L.ext();
-            do {
-                ne++;
-                e = e->getNextExtent();
-            } while( e );
-        }
-
-        _result.append("nExtents", ne);
-        //        
-        //        assert( !L.isNull() );
-        //        _firstExtent = L;
-        //_nrecords = nsd->stats.nrecords;
-        //_ncompacted = 0;
-    }
-
-    void CompactJob::go() {
-        //cc().curop()->reset();
-        //cc().curop()->setNS(_ns.c_str());
-        //cc().curop()->markCommand();
-        try {
-            prep();
-            //while( 1 )
-                doBatch();
-        }
-        catch(const char *p) {
-            log() << "info: exception compact " << p << endl;
-        }
-        catch(...) {
-            log() << "info: exception compact" << endl;
-        }
-    }
-
-    static mutex m("compact");
+    bool isCurrentlyAReplSetPrimary();
 
     class CompactCmd : public Command {
     public:
@@ -178,8 +207,9 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual void help( stringstream& help ) const {
-            help << "compact / defragment a collection in the background, slowly, attempting to minimize disruptions to other operations\n"
-                 "{ compact : <collection> }";
+            help << "compact collection\n"
+                "  { compact : <collection_name>, [force:true] }"
+                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()";
         }
         virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
@@ -190,27 +220,21 @@ namespace mongo {
                 errmsg = "no collection name specified";
                 return false;
             }
-            string ns = db + '.' + coll;
-            assert( isANormalNSName(ns.c_str()) );
-            assert( !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
-            {
-                readlock lk;
-                Client::Context ctx(ns);
-                if( nsdetails(ns.c_str()) == 0 ) {
-                    errmsg = "namespace " + ns + " does not exist";
-                    return false;
-                }
-            }
 
-            mutex::try_lock lk(m);
-            if( !lk.ok ) {
-                errmsg = "a compaction is already running";
+            if( isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue() ) { 
+                errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }
-            CompactJob j(ns, result);
-            j.go();
-            errmsg = "compact is not yet implemented";
-            return false;
+
+            // temp
+            if( !cmdObj["dev"].trueValue() ) { 
+                errmsg = "compact is not yet implemented";
+                return false;
+            }
+
+            string ns = db + '.' + coll;
+            bool ok = compact(ns, errmsg);
+            return ok;
         }
     };
     static CompactCmd compactCmd;

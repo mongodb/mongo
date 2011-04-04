@@ -154,7 +154,7 @@ namespace mongo {
         unsigned long long reservedA;
         long long extraOffset;                // where the $extra info is located (bytes relative to this)
     public:
-        int indexBuildInProgress;   // 1 if in prog
+        int indexBuildInProgress;             // 1 if in prog
         unsigned reservedB;
         // ofs 424 (8)
         struct Capped2 {

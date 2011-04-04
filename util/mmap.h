@@ -21,6 +21,15 @@
 
 namespace mongo {
 
+    class MAdvise { 
+        void *_p;
+        unsigned _len;
+    public:
+        enum Advise { Sequential=1 };
+        MAdvise(void *p, unsigned len, Advise a); 
+        ~MAdvise(); // destructor resets the range to MADV_NORMAL
+    };
+
     /* the administrative-ish stuff here */
     class MongoFile : boost::noncopyable {
     public:

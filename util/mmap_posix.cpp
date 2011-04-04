@@ -56,6 +56,19 @@ namespace mongo {
 #define MAP_NORESERVE (0)
 #endif
 
+#if defined(__sunos__)
+    MAdvise::MAdvise(void *,unsigned) { }
+    MAdvise::~MAdvise() { }
+#else
+    MAdvise::MAdvise(void *p, unsigned len, Advise a) : _p(p), _len(len) {
+        assert( a == Sequential ); // more later
+        madvise(_p,_len,MADV_SEQUENTIAL);
+    }
+    MAdvise::~MAdvise() { 
+        madvise(_p,_len,MADV_NORMAL);
+    }
+#endif
+
     void* MemoryMappedFile::map(const char *filename, unsigned long long &length, int options) {
         // length may be updated by callee.
         setFilename(filename);

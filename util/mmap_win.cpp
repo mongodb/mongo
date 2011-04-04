@@ -27,6 +27,9 @@ namespace mongo {
     mutex mapViewMutex("mapView");
     ourbitset writable;
 
+    MAdvise::MAdvise(void *,unsigned, Advise) { }
+    MAdvise::~MAdvise() { }
+
     /** notification on unmapping so we can clear writable bits */
     void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
