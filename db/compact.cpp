@@ -130,7 +130,7 @@ namespace mongo {
                 BSONObj::iterator i(ii.next().info.obj());
                 while( i.more() ) { 
                     BSONElement e = i.next();
-                    if( e.fieldName() != "v" && e.fieldName() != "background" )
+                    if( strcmp(e.fieldName(), "v") != 0 && strcmp(e.fieldName(), "background") != 0 )
                         b.append(e);
                 }
                 indexes.push_back( b.obj() );
