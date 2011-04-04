@@ -67,6 +67,7 @@ namespace mongo {
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
                 BSONObj gle = db.getLastErrorDetailed();
+                result.append("lastErrorObject", gle);
                 if (gle["err"].type() == String) {
                     errmsg = gle["err"].String();
                     return false;
@@ -86,6 +87,13 @@ namespace mongo {
                 if (cmdObj["remove"].trueValue()) {
                     uassert(12515, "can't remove and update", cmdObj["update"].eoo());
                     db.remove(ns, QUERY("_id" << out["_id"]), 1);
+
+                    BSONObj gle = db.getLastErrorDetailed();
+                    result.append("lastErrorObject", gle);
+                    if (gle["err"].type() == String) {
+                        errmsg = gle["err"].String();
+                        return false;
+                    }
 
                 }
                 else {   // update
@@ -113,6 +121,7 @@ namespace mongo {
                     db.update(ns, q, update.embeddedObjectUserCheck());
 
                     BSONObj gle = db.getLastErrorDetailed();
+                    result.append("lastErrorObject", gle);
                     if (gle["err"].type() == String) {
                         errmsg = gle["err"].String();
                         return false;
