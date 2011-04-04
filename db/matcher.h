@@ -246,7 +246,6 @@ namespace mongo {
         Matcher _keyMatcher;
 
         bool _needRecord; // if the key itself isn't good enough to determine a positive match
-        bool _needRecordReject; // if the key itself isn't good enough to determine a negative match
         bool _useRecordOnly;
     };
 

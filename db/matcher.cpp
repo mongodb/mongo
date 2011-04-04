@@ -427,6 +427,7 @@ namespace mongo {
                 case BSONObj::opALL:
                 case BSONObj::NE:
                 case BSONObj::NIN:
+                case BSONObj::opEXISTS: // Not part of keyMatch(), but we can't match on index in this case.
                     break;
                 case BSONObj::opIN: {
                     bool inContainsArray = false;

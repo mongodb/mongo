@@ -48,8 +48,6 @@ namespace mongo {
             alwaysUseRecord ||
             ! ( _docMatcher->keyMatch() &&
                 _keyMatcher.sameCriteriaCount( *_docMatcher ) );
-
-        _needRecordReject = _keyMatcher.hasType( BSONObj::opEXISTS );
     }
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
@@ -61,7 +59,7 @@ namespace mongo {
         if ( details )
             details->reset();
 
-        if ( _needRecordReject == false && keyUsable ) {
+        if ( keyUsable ) {
 
             if ( !_keyMatcher.matches(key, details ) ) {
                 return false;
