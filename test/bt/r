@@ -31,7 +31,7 @@ set_warn_flags()
 conf()
 {
 	test -f configure || {
-		echo 'wtconf: not a build directory'
+		echo 'r: not a build directory'
 		exit 1
 	}
 
