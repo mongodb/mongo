@@ -368,6 +368,7 @@ struct wt_cursor {
 		WT_CURSOR **tqe_prev;
 	} q;                            /* Linked list of WT_CURSORs. */
 
+	wiredtiger_recno_t recno;
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
@@ -497,12 +498,23 @@ struct wt_session {
 	 * in a default\, unnamed\, column group for the table.}
 	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
 	 * verifies that the table exists and has the specified schema.}
+	 * @config{huffman_key, use Huffman encoding for the key.  Permitted
+	 * values are empty (off) or \c "english"}
+	 * @config{huffman_value, use Huffman encoding for the value.  Permitted
+	 * values are empty (off) or \c "english"}
 	 * @config{index.\<name\>, named index on a list of columns.  Comma-
 	 * separated list of the form <code>(column[\,...])</code>.}
+	 * @config{intl_node_max, maximum page size for internal nodes\, in
+	 * bytes}
+	 * @config{intl_node_min, minimum page size for internal nodes\, in
+	 * bytes}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref packing for details.  If not set\, a default value of \c "u"
 	 * is assumed\, and applications use the WT_ITEM struct to manipulate
 	 * raw byte arrays.}
+	 * @config{leaf_node_max, maximum page size for leaf nodes\, in bytes}
+	 * @config{leaf_node_min, minimum page size for leaf nodes\, in bytes}
+	 * @config{runlength_encoding, compress repeated adjacent values}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref packing for details.  If not set\, a default value of \c "u"
 	 * is assumed\, and applications use the WT_ITEM struct to manipulate

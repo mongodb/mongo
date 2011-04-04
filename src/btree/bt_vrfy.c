@@ -533,7 +533,8 @@ __wt_verify_addfrag(
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-	bit_nset(vs->fragbits, addr, addr + (frags - 1));
+	if (frags > 0)
+		bit_nset(vs->fragbits, addr, addr + (frags - 1));
 	return (0);
 }
 

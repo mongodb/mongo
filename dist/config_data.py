@@ -40,14 +40,30 @@ config_types = {
 	Config('exclusive', 'false', r'''
 		fail if the table exists (if "no", the default, verifies that the
 		table exists and has the specified schema.'''),
+	Config('huffman_key', '', r'''
+		use Huffman encoding for the key.  Permitted values are empty (off)
+		or \c "english"'''),
+	Config('huffman_value', '', r'''
+		use Huffman encoding for the value.  Permitted values are empty (off)
+		or \c "english"'''),
 	Config('index.name', '', r'''
 		named index on a list of columns.  Comma-separated list of the form
 		<code>(column[,...])</code>.'''),
-	Config('key_format', '', r'''
+	Config('intl_node_max', '2KB', r'''
+		maximum page size for internal nodes, in bytes'''),
+	Config('intl_node_min', '2KB', r'''
+		minimum page size for internal nodes, in bytes'''),
+	Config('key_format', 'u', r'''
 		the format of the data packed into key items.  See @ref packing for
 		details.  If not set, a default value of \c "u" is assumed, and
 		applications use the WT_ITEM struct to manipulate raw byte arrays.'''),
-	Config('value_format', '', r'''
+	Config('leaf_node_max', '1MB', r'''
+		maximum page size for leaf nodes, in bytes'''),
+	Config('leaf_node_min', '32KB', r'''
+		minimum page size for leaf nodes, in bytes'''),
+	Config('runlength_encoding', 'false', r'''
+		compress repeated adjacent values'''),
+	Config('value_format', 'u', r'''
 		the format of the data packed into value items.  See @ref packing
 		for details.  If not set, a default value of \c "u" is assumed, and
 		applications use the WT_ITEM struct to manipulate raw byte arrays.'''),

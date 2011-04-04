@@ -9,7 +9,8 @@
 
 /*
  * __wt_buf_setsize --
- *	Ensure that a buffer is at least as big as required.
+ *	Ensure that a buffer is at least as big as required and configure it
+ *	to return an item, so that data == mem.
  */
 int
 __wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz)
@@ -18,6 +19,9 @@ __wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz)
 
 	if (sz > buf->mem_size)
 		WT_RET(__wt_realloc(session, &buf->mem_size, sz, &buf->mem));
+
+	buf->data = buf->mem;
+	buf->size = sz;
 
 	return (0);
 }

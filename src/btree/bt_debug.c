@@ -613,7 +613,7 @@ __wt_debug_cell_data(SESSION *session, const WT_CELL *cell, FILE *fp)
 			goto process;
 		goto onpage;
 	case WT_CELL_DATA:
-		if (btree->huffman_data != NULL)
+		if (btree->huffman_value != NULL)
 			goto process;
 onpage:		p = WT_CELL_BYTE(cell);
 		size = WT_CELL_LEN(cell);

@@ -401,12 +401,12 @@ __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf)
 		huffman = btree->huffman_key;
 		goto offpage;
 	case WT_CELL_DATA:
-		huffman = btree->huffman_data;
+		huffman = btree->huffman_value;
 onpage:		p = WT_CELL_BYTE(cell);
 		size = WT_CELL_LEN(cell);
 		break;
 	case WT_CELL_DATA_OVFL:
-		huffman = btree->huffman_data;
+		huffman = btree->huffman_value;
 offpage:	/*
 		 * It's an overflow item -- if it's not encoded, we can read it
 		 * directly into the user's return WT_ITEM, otherwise we have

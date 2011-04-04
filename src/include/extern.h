@@ -50,7 +50,10 @@ const char *__wt_config_def_session_close;
 const char *__wt_config_def_truncate_table;
 const char *__wt_config_def_verify_table;
 const char *__wt_config_def_wiredtiger_open;
-int __wt_session_add_btree(SESSION *session, BTREE *btree);
+int __wt_session_add_btree(SESSION *session,
+    BTREE *btree,
+    const char *key_format,
+    const char *value_format);
 int __wt_cursor_open(SESSION *session,
     const char *uri,
     const char *config,

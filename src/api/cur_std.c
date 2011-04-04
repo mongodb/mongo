@@ -66,7 +66,11 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
-	if (fmt[0] == 'S' && fmt[1] == '\0') {
+	if (fmt[0] == 'r' && fmt[1] == '\0') {
+		cursor->recno = va_arg(ap, wiredtiger_recno_t);
+		cursor->key.data = &cursor->recno;
+		sz = sizeof(cursor->recno);
+	} else if (fmt[0] == 'S' && fmt[1] == '\0') {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
 		cursor->key.data = (void *)str;

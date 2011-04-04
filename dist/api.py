@@ -273,7 +273,9 @@ def func_method(a, f):
 			flagchk = 1
 
 	session = config.count('session')	# Handle a SESSION
-	have_session = handle == 'session' or args[0].count('session/')
+	have_session = (handle == 'session')
+	for arg in args:
+		have_session = have_session or arg.startswith('session/')
 
 	# We may need a method name.
 	if colonly or flagchk or rdonly or rowonly or session:

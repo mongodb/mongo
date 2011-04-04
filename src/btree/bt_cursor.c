@@ -43,7 +43,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
-	huffman = btree->huffman_data;
+	huffman = btree->huffman_value;
 	session = (SESSION *)cbt->iface.session;
 
 	if (cbt->walk.tree == NULL)
@@ -57,16 +57,36 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 				F_CLR(cursor, WT_CURSTD_POSITIONED);
 				return (WT_NOTFOUND);
 			}
-			if (cbt->ref->page->type != WT_PAGE_ROW_LEAF)
+			switch (cbt->ref->page->type) {
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_RLE:
+			case WT_PAGE_COL_VAR:
+				cbt->cip = cbt->ref->page->u.col_leaf.d;
+				cbt->recno = cbt->ref->page->u.col_leaf.recno;
+				break;
+			case WT_PAGE_ROW_LEAF:
+				cbt->rip = cbt->ref->page->u.row_leaf.d;
+				break;
+			default:
 				continue;
+			}
 
 			cbt->nitems = cbt->ref->page->indx_count;
-			cbt->rip = cbt->ref->page->u.row_leaf.d;
 		}
 
-		for (; cbt->nitems > 0; ++cbt->rip, cbt->nitems--) {
+		for (; cbt->nitems > 0;
+		    ++cbt->cip, ++cbt->rip, ++cbt->recno, cbt->nitems--) {
 			/* Check for deletion. */
-			upd = WT_ROW_UPDATE(cbt->ref->page, cbt->rip);
+			switch (cbt->ref->page->type) {
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_VAR:
+				upd = WT_COL_UPDATE(cbt->ref->page, cbt->cip);
+				break;
+			case WT_PAGE_ROW_LEAF:
+				upd = WT_ROW_UPDATE(cbt->ref->page, cbt->rip);
+				break;
+			}
+
 			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 
@@ -74,13 +94,15 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			 * The key and value variables reference the items we'll
 			 * print.  Set the key.
 			 */
-			if (__wt_key_process(cbt->rip))
-				WT_RET(__wt_key_build(session,
-				    cbt->ref->page, cbt->rip,
-				    &cursor->key));
+			if (!F_ISSET(btree, WT_COLUMN)) {
+				if (__wt_key_process(cbt->rip))
+					WT_RET(__wt_key_build(session,
+					    cbt->ref->page, cbt->rip,
+					    &cursor->key));
 
-			cursor->key.data = cbt->rip->key;
-			cursor->key.size = cbt->rip->size;
+				cursor->key.data = cbt->rip->key;
+				cursor->key.size = cbt->rip->size;
+			}
 
 			/*
 			 * If the item was ever modified, dump the data from
@@ -93,6 +115,29 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			}
 
 			/* Check for empty data. */
+			if (F_ISSET(btree, WT_COLUMN)) {
+				cell = WT_COL_PTR(cbt->ref->page, cbt->cip);
+				switch (WT_CELL_TYPE(cell)) {
+				case WT_CELL_DATA:
+					if (huffman == NULL) {
+						cursor->value.data =
+						    WT_CELL_BYTE(cell);
+						cursor->value.size =
+						    WT_CELL_LEN(cell);
+						break;
+					}
+					/* FALLTHROUGH */
+				case WT_CELL_DATA_OVFL:
+					WT_RET(__wt_cell_process(session,
+					    cell, &cursor->value));
+					break;
+				case WT_CELL_DEL:
+					continue;
+				WT_ILLEGAL_FORMAT(session);
+				}
+				break;
+			}
+
 			if (WT_ROW_EMPTY_ISSET(cbt->rip)) {
 				cursor->value.data = "";
 				cursor->value.size = 0;
@@ -121,8 +166,13 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			continue;
 
 		/* We have a key/value pair, return it and move on. */
-		++cbt->rip;
-		cbt->nitems--;
+		if (cbt->nrepeats > 0)
+			cbt->nrepeats--;
+		else {
+			cbt->nitems--;
+			++cbt->rip;
+			++cbt->cip;
+		}
 		return (0);
 	}
 	/* NOTREACHED */
@@ -156,8 +206,12 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 	session = (SESSION *)cursor->session;
 
 	*exact = 0;
-	return (__wt_btree_row_get(session,
-	    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+	if (F_ISSET(btree, WT_COLUMN))
+		return (__wt_btree_col_get(session,
+		    cursor->recno, (WT_ITEM *)&cursor->value));
+	else
+		return (__wt_btree_row_get(session,
+		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
 }
 
 /*
@@ -175,8 +229,12 @@ __wt_btcur_insert(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (SESSION *)cursor->session;
 
-	return (__wt_btree_row_put(session,
-	    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+	if (F_ISSET(btree, WT_COLUMN))
+		return (__wt_btree_col_put(session,
+		    cursor->recno, (WT_ITEM *)&cursor->value));
+	else
+		return (__wt_btree_row_put(session,
+		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
 }
 
 /*
@@ -194,8 +252,12 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (SESSION *)cursor->session;
 
-	return (__wt_btree_row_put(session,
-	    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+	if (F_ISSET(btree, WT_COLUMN))
+		return (__wt_btree_col_put(session,
+		    cursor->recno, (WT_ITEM *)&cursor->value));
+	else
+		return (__wt_btree_row_put(session,
+		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
 }
 
 /*
@@ -213,7 +275,10 @@ __wt_btcur_remove(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (SESSION *)cursor->session;
 
-	return (__wt_btree_row_del(session, (WT_ITEM *)&cursor->key));
+	if (F_ISSET(btree, WT_COLUMN))
+		return (__wt_btree_col_del(session, cursor->recno));
+	else
+		return (__wt_btree_row_del(session, (WT_ITEM *)&cursor->key));
 }
 
 /*

@@ -118,7 +118,7 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 		cell = WT_ROW_PTR(page, rip);
 cell_set:	switch (WT_CELL_TYPE(cell)) {
 		case WT_CELL_DATA:
-			if (btree->huffman_data == NULL) {
+			if (btree->huffman_value == NULL) {
 				value_ret = WT_CELL_BYTE(cell);
 				size_ret = WT_CELL_LEN(cell);
 			}

@@ -198,7 +198,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	void *huffman;
 
 	btree = session->btree;
-	huffman = btree->huffman_data;
+	huffman = btree->huffman_value;
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
@@ -256,7 +256,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	btree = session->btree;
 	key = value = NULL;
 	key_tmp = value_tmp = NULL;
-	huffman = btree->huffman_data;
+	huffman = btree->huffman_value;
 	ret = 0;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key_tmp));

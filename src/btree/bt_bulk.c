@@ -1010,11 +1010,11 @@ __wt_item_build_value(
 	}
 
 	/* Optionally compress the data using the Huffman engine. */
-	if (btree->huffman_data != NULL) {
-		WT_RET(__wt_huffman_encode(btree->huffman_data,
+	if (btree->huffman_value != NULL) {
+		WT_RET(__wt_huffman_encode(btree->huffman_value,
 		    item->data, item->size, &cursor->value));
 		if (cursor->value.size > item->size)
-			WT_STAT_INCRV(stats, FILE_HUFFMAN_DATA,
+			WT_STAT_INCRV(stats, FILE_HUFFMAN_VALUE,
 			    cursor->value.size - item->size);
 		*item = *(WT_ITEM *)&cursor->value;
 	}
@@ -1186,10 +1186,21 @@ __wt_bulk_stack_put(SESSION *session, WT_STACK *stack)
 		 * If we've reached the last element in the stack, it's the
 		 * root page of the tree.  Update the in-memory root address
 		 * and the descriptor record.
+		 *
+		 * An empty page was allocated when the btree handle was opened,
+		 * free it here.
 		 */
 		if ((elem + 1)->page == NULL) {
+			if (btree->root_page.page != NULL) {
+				WT_ASSERT(session, !WT_PAGE_IS_MODIFIED(
+				    btree->root_page.page));
+				__wt_free(session, btree->root_page.page);
+				/* Rely on __wt_free to set page to NULL. */
+			}
+
 			btree->root_page.addr = elem->page->addr;
 			btree->root_page.size = elem->page->size;
+			btree->root_page.state = WT_REF_DISK;
 			WT_TRET(__wt_desc_write(session));
 		}
 

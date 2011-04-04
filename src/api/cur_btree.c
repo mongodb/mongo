@@ -137,11 +137,16 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
  *	Add a btree handle to the session's cache.
  */
 int
-__wt_session_add_btree(SESSION *session, BTREE *btree)
+__wt_session_add_btree(SESSION *session, BTREE *btree,
+    const char *key_format, const char *value_format)
 {
 	BTREE_SESSION *btree_session;
 	WT_RET(__wt_calloc(session, 1, sizeof(BTREE_SESSION), &btree_session));
+
 	btree_session->btree = btree;
+	btree_session->key_format = key_format;
+	btree_session->value_format = value_format;
+
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
 
 	return (0);
@@ -152,7 +157,8 @@ __wt_session_add_btree(SESSION *session, BTREE *btree)
  *	Get the btree handle for the named table.
  */
 static int
-__get_btree(SESSION *session, const char *name, size_t namelen, BTREE **btreep)
+__get_btree(SESSION *session,
+    const char *name, size_t namelen, BTREE_SESSION **btree_sessionp)
 {
 	BTREE *btree;
 	BTREE_SESSION *btree_session;
@@ -161,7 +167,7 @@ __get_btree(SESSION *session, const char *name, size_t namelen, BTREE **btreep)
 		btree = btree_session->btree;
 		if (strncmp(name, btree->name, namelen) == 0 &&
 		    btree->name[namelen] == '\0') {
-			*btreep = btree;
+			*btree_sessionp = btree_session;
 			return (0);
 		}
 	}
@@ -196,6 +202,7 @@ __wt_cursor_open(SESSION *session,
 		__curbtree_remove,
 		__curbtree_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
+		0,			/* recno key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
 		0,			/* int saved_err */
@@ -203,10 +210,12 @@ __wt_cursor_open(SESSION *session,
 	};
 	const char *tablename;
 	BTREE *btree;
+	BTREE_SESSION *btree_session;
 	CONNECTION *conn;
 	CURSOR_BTREE *cbt;
 	WT_CONFIG_ITEM cvalue;
 	WT_CURSOR *cursor;
+	const char *key_format, *value_format;
 	int bulk, dump, ret;
 	size_t csize;
 
@@ -215,15 +224,26 @@ __wt_cursor_open(SESSION *session,
 	/* TODO: handle projections. */
 	tablename = uri + 6;
 
-	ret = __get_btree(session, tablename, strlen(tablename), &btree);
+	ret = __get_btree(session,
+	    tablename, strlen(tablename), &btree_session);
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
 		WT_RET(conn->btree(conn, 0, &btree));
 		WT_RET(btree->open(btree, tablename, 0666, 0));
 
-		WT_RET(__wt_session_add_btree(session, btree));
-	} else
-		WT_RET(ret);
+		/*
+		 * !!! TODO read key / value formats from a table-of-tables.
+		 */
+		key_format = F_ISSET(btree, WT_COLUMN) ? "r" : "u";
+		value_format = "u";
+		WT_RET(__wt_session_add_btree(session, btree,
+		    key_format, value_format));
+	} else {
+		WT_ERR(ret);
+		btree = btree_session->btree;
+		key_format = btree_session->key_format;
+		value_format = btree_session->value_format;
+	}
 
 	bulk = dump = 0;
 	CONFIG_LOOP(session, config, cvalue)
@@ -239,7 +259,8 @@ __wt_cursor_open(SESSION *session,
 	cursor = &cbt->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->key_format = cursor->value_format = "u";
+	cursor->key_format = key_format;
+	cursor->value_format = value_format;
 	__wt_cursor_init(cursor, config);
 
 	cbt->btree = btree;

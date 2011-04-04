@@ -203,27 +203,27 @@ err:		return (__wt_api_args(session, "Db.huffman_set"));
 	 */
 	if (LF_ISSET(WT_HUFFMAN_KEY) && btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
-		if (btree->huffman_data == btree->huffman_key)
-			btree->huffman_data = NULL;
+		if (btree->huffman_value == btree->huffman_key)
+			btree->huffman_value = NULL;
 		__wt_huffman_close(session, btree->huffman_key);
 		btree->huffman_key = NULL;
 	}
-	if (LF_ISSET(WT_HUFFMAN_DATA) && btree->huffman_data != NULL) {
-		__wt_huffman_close(session, btree->huffman_data);
-		btree->huffman_data = NULL;
+	if (LF_ISSET(WT_HUFFMAN_VALUE) && btree->huffman_value != NULL) {
+		__wt_huffman_close(session, btree->huffman_value);
+		btree->huffman_value = NULL;
 	}
 	if (LF_ISSET(WT_HUFFMAN_KEY)) {
 		WT_RET(__wt_huffman_open(session,
 		     huffman_table, huffman_table_size, &btree->huffman_key));
 		/* Key and data may use the same table. */
-		if (LF_ISSET(WT_HUFFMAN_DATA)) {
-			btree->huffman_data = btree->huffman_key;
-			LF_CLR(WT_HUFFMAN_DATA);
+		if (LF_ISSET(WT_HUFFMAN_VALUE)) {
+			btree->huffman_value = btree->huffman_key;
+			LF_CLR(WT_HUFFMAN_VALUE);
 		}
 	}
-	if (LF_ISSET(WT_HUFFMAN_DATA))
+	if (LF_ISSET(WT_HUFFMAN_VALUE))
 		WT_RET(__wt_huffman_open(session,
-		    huffman_table, huffman_table_size, &btree->huffman_data));
+		    huffman_table, huffman_table_size, &btree->huffman_value));
 
 	return (0);
 }

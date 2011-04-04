@@ -286,6 +286,27 @@ static int8_t goesc[256] = {
 };
 
 /*
+ * __process_value
+ *	Deal with special config values like true / false.
+ */
+static void
+__process_value(WT_CONFIG_ITEM *value)
+{
+    if (value->type == ITEM_ID && value->len > 0) {
+	if (strncasecmp(value->str, "true", value->len) == 0) {
+	    value->type = ITEM_NUM;
+	    value->val = 1;
+	} else if (strncasecmp(value->str, "false", value->len) == 0) {
+	    value->type = ITEM_NUM;
+	    value->val = 0;
+	}
+    } else if (value->type == ITEM_NUM) {
+	    /* !!! TODO need to add support for "KB", "MB", etc. suffixes. */
+	    value->val = strtol(value->str, NULL, 10);
+    }
+}
+
+/*
  * __wt_config_next --
  *	Get the next config item in the string.
  */
@@ -299,6 +320,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	};
 
 	key->len = 0;
+	*value = default_value;
 
 	if (conf->go == NULL)
 		conf->go = gostruct;
@@ -333,11 +355,8 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 
 		case A_NEXT:
 			if (conf->depth == conf->top && key->len > 0) {
-				/* Handle the case with no value */
-				if (out == key)
-					*value = default_value;
 				++conf->cur;
-				return (0);
+				goto val;
 			} else
 				break;
 
@@ -406,8 +425,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 
 	/* Did we find something? */
 	if (conf->depth <= conf->top && key->len > 0) {
-		if (out == key)
-			*value = default_value;
+val:		__process_value(value);
 		return (0);
 	}
 

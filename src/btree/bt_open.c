@@ -61,7 +61,7 @@ __wt_open_verify(SESSION *session, BTREE *btree)
 
 	/* Verify other configuration combinations. */
 	if (btree->fixed_len != 0 &&
-	    (btree->huffman_key || btree->huffman_data)) {
+	    (btree->huffman_key || btree->huffman_value)) {
 		__wt_err(session, 0,
 		    "Fixed-size column-store files may not be Huffman encoded");
 		return (WT_ERROR);
@@ -258,10 +258,11 @@ __wt_root_pin(SESSION *session)
 
 	btree = session->btree;
 
-	if (btree->root_page.addr == 0) {
+	if (btree->root_page.addr == 0 ||
+	    btree->root_page.addr == WT_ADDR_INVALID) {
 		WT_RET(__wt_calloc_def(session, 1, &page));
-		page->type = WT_PAGE_ROW_LEAF;
-		WT_PAGE_SET_MODIFIED(page);
+		page->type = F_ISSET(btree, WT_COLUMN) ?
+		    WT_PAGE_COL_INT : WT_PAGE_ROW_INT;
 
 		btree->root_page.page = page;
 		btree->root_page.state = WT_REF_MEM;

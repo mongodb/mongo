@@ -353,7 +353,7 @@ methods['btree.huffman_set'] = Api(
 	['huffman_table/uint8_t const *@S',
 	 'huffman_table_size/u_int @S',
 	 'huffman_flags/uint32_t @S'],
-	[ 'ASCII_ENGLISH', 'HUFFMAN_DATA', 'HUFFMAN_KEY', 'TELEPHONE' ],
+	[ 'ASCII_ENGLISH', 'HUFFMAN_VALUE', 'HUFFMAN_KEY', 'TELEPHONE' ],
 	['init'], ['open'])
 
 methods['btree.open'] = Api(

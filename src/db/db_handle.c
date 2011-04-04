@@ -97,14 +97,14 @@ __wt_btree_destroy(BTREE *btree)
 
 	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
-		if (btree->huffman_data == btree->huffman_key)
-			btree->huffman_data = NULL;
+		if (btree->huffman_value == btree->huffman_key)
+			btree->huffman_value = NULL;
 		__wt_huffman_close(session, btree->huffman_key);
 		btree->huffman_key = NULL;
 	}
-	if (btree->huffman_data != NULL) {
-		__wt_huffman_close(session, btree->huffman_data);
-		btree->huffman_data = NULL;
+	if (btree->huffman_value != NULL) {
+		__wt_huffman_close(session, btree->huffman_value);
+		btree->huffman_value = NULL;
 	}
 
 	__wt_walk_end(session, &btree->evict_walk);

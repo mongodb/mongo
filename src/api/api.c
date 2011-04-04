@@ -14,6 +14,7 @@
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
+	BTREE *btree;
 	BTREE_SESSION *btree_session;
 	CONNECTION *conn;
 	SESSION *session;
@@ -29,7 +30,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
 		TAILQ_REMOVE(&session->btrees, btree_session, q);
-		WT_TRET(btree_session->btree->close(btree_session->btree, 0));
+		btree = btree_session->btree;
+		WT_TRET(btree->close(btree, 0));
 		__wt_free(session, btree_session);
 	}
 
@@ -73,16 +75,89 @@ __session_create_table(WT_SESSION *wt_session,
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
+	WT_CONFIG_ITEM cval;
+	const char *key_format, *value_format;
+	uint32_t column_flags, fixed_len, huffman_flags;
+	uint32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
+	const char *cfg[] = { __wt_config_def_create_table, config, NULL };
 
 	WT_UNUSED(config);
 
 	session = (SESSION *)wt_session;
 	conn = (CONNECTION *)wt_session->connection;
 
+	WT_RET(__wt_config_checkone(session,
+	    __wt_config_def_create_table, config));
+
+	/*
+	 * Key / value formats.
+	 *
+	 * !!! TODO: these need to be saved in a table-of-tables.
+	 * Also, avoiding copies / memory allocation at the moment by
+	 * pointing to constant strings for the few cases we handle.
+	 */
+	fixed_len = 0;
+
+	WT_RET(__wt_config_gets(cfg, "key_format", &cval));
+	if (strncmp(cval.str, "r", cval.len) == 0)
+		key_format = "r";
+	else if (strncmp(cval.str, "S", cval.len) == 0)
+		key_format = "S";
+	else if (strncmp(cval.str, "u", cval.len) == 0)
+		key_format = "u";
+	else {
+		__wt_err(session, 0, "Unknown key_format '%.*s'\n",
+		    cval.len, cval.str);
+		return (EINVAL);
+	}
+
+	WT_RET(__wt_config_gets(cfg, "value_format", &cval));
+	if (strncmp(cval.str, "S", cval.len) == 0)
+		value_format = "S";
+	else if (strncmp(cval.str, "u", cval.len) == 0)
+		value_format = "u";
+	else if (cval.len > 1 && cval.str[cval.len - 1] == 'u') {
+		fixed_len = (uint32_t)strtol(cval.str, NULL, 10);
+		value_format = "u";
+	} else {
+		__wt_err(session, 0, "Unknown value_format '%.*s'\n",
+		    cval.len, cval.str);
+		return (EINVAL);
+	}
+
+	column_flags = 0;
+	WT_RET(__wt_config_gets(cfg, "runlength_encoding", &cval));
+	if (cval.val != 0)
+		column_flags |= WT_RLE;
+
+	huffman_flags = 0;
+	WT_RET(__wt_config_gets(cfg, "huffman_key", &cval));
+	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
+		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_KEY;
+	WT_RET(__wt_config_gets(cfg, "huffman_value", &cval));
+	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
+		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_VALUE;
+
+	WT_RET(__wt_config_gets(cfg, "intl_node_max", &cval));
+	intl_node_max = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(cfg, "intl_node_min", &cval));
+	intl_node_min = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(cfg, "leaf_node_max", &cval));
+	leaf_node_max = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(cfg, "leaf_node_min", &cval));
+	leaf_node_min = (uint32_t)cval.val;
+
 	WT_RET(conn->btree(conn, 0, &btree));
+	WT_RET(btree->btree_pagesize_set(btree, 0,
+	    intl_node_min, intl_node_max, leaf_node_min, leaf_node_max));
+	if (key_format[0] == 'r')
+		WT_RET(btree->column_set(btree, fixed_len, NULL, column_flags));
+	if (huffman_flags != 0)
+		WT_RET(btree->huffman_set(btree, NULL, 0, huffman_flags));
 	WT_RET(btree->open(btree, name, 0666, WT_CREATE));
 
-	WT_RET(__wt_session_add_btree(session, btree));
+	WT_RET(__wt_session_add_btree(session,
+	    btree, key_format, value_format));
 
 	return (0);
 }

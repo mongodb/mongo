@@ -43,8 +43,8 @@ struct __wt_stats {
 #define	WT_STAT_FILE_ALLOC			    0
 #define	WT_STAT_FILE_EXTEND			    1
 #define	WT_STAT_FILE_FREE			    2
-#define	WT_STAT_FILE_HUFFMAN_DATA		    3
-#define	WT_STAT_FILE_HUFFMAN_KEY		    4
+#define	WT_STAT_FILE_HUFFMAN_KEY		    3
+#define	WT_STAT_FILE_HUFFMAN_VALUE		    4
 #define	WT_STAT_FILE_ITEMS_INSERTED		    5
 #define	WT_STAT_FILE_OVERFLOW_DATA		    6
 #define	WT_STAT_FILE_OVERFLOW_KEY		    7

@@ -236,6 +236,13 @@ eop:		e->visited = 1;
 				goto eop;
 		}
 		break;
+
+	default:
+		/*
+		 * If we hit something that is not an internal page,
+		 * just return it.
+		 */
+		goto eop;
 	}
 
 	switch (ref->page->type) {

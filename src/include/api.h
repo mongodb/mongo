@@ -13,7 +13,9 @@ typedef struct {
 	WT_REF *ref;
 	WT_COL *cip;
 	WT_ROW *rip;
+	wiredtiger_recno_t recno;
 	uint32_t nitems;
+	uint32_t nrepeats;
 } CURSOR_BTREE;
 
 /*
@@ -83,7 +85,7 @@ struct __btree {
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 
 	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_data;		/* Data huffman encoding */
+	void *huffman_value;	/* Value huffman encoding */
 
 	WT_STATS *stats;		/* Btree handle statistics */
 	WT_STATS *fstats;		/* File statistics */
@@ -194,6 +196,9 @@ struct __btree {
 
 struct __btree_session {
 	BTREE *btree;
+
+	const char *key_format;
+	const char *value_format;
 
 	TAILQ_ENTRY(__btree_session) q;
 };
@@ -471,8 +476,8 @@ extern WT_EVENT_HANDLER *__wt_event_handler_default;
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_HUFFMAN_DATA					0x00000004
-#define	WT_HUFFMAN_KEY					0x00000002
+#define	WT_HUFFMAN_KEY					0x00000004
+#define	WT_HUFFMAN_VALUE				0x00000002
 #define	WT_MEMORY_CHECK					0x00000001
 #define	WT_OSWRITE					0x00000001
 #define	WT_PRINTABLES					0x00000001

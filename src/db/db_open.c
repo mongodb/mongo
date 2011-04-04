@@ -46,8 +46,14 @@ __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 	/* Turn on the methods that require open. */
 	__wt_methods_btree_open_transition(btree);
 
-	/* Put the BTREE handle into the cache. */
-	WT_RET(__wt_session_add_btree(session, btree));
+	/*
+	 * Put the BTREE handle into the cache.
+	 *
+	 * !!! TODO if this code survives, read the key / value formats from a
+	 * table-of-tables.
+	 */
+	WT_RET(__wt_session_add_btree(session, btree,
+	    F_ISSET(btree, WT_COLUMN) ? "r" : "u", "u"));
 
 	return (0);
 }

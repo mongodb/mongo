@@ -13,14 +13,14 @@ __wt_stat_alloc_btree_handle_stats(SESSION *session, WT_STATS **statsp)
 	stats[WT_STAT_FILE_EXTEND].desc =
 	    "file: block allocations require file extension";
 	stats[WT_STAT_FILE_FREE].desc = "file: block frees";
-	stats[WT_STAT_FILE_HUFFMAN_DATA].desc =
-	    "file: huffman data compression in bytes";
 	stats[WT_STAT_FILE_HUFFMAN_KEY].desc =
 	    "file: huffman key compression in bytes";
+	stats[WT_STAT_FILE_HUFFMAN_VALUE].desc =
+	    "file: huffman value compression in bytes";
 	stats[WT_STAT_FILE_ITEMS_INSERTED].desc =
-	    "file: key/data pairs inserted";
+	    "file: key/value pairs inserted";
 	stats[WT_STAT_FILE_OVERFLOW_DATA].desc =
-	    "file: overflow data items inserted";
+	    "file: overflow values inserted";
 	stats[WT_STAT_FILE_OVERFLOW_KEY].desc =
 	    "file: overflow key items inserted";
 	stats[WT_STAT_FILE_OVERFLOW_READ].desc =
@@ -38,8 +38,8 @@ __wt_stat_clear_btree_handle_stats(WT_STATS *stats)
 	stats[WT_STAT_FILE_ALLOC].v = 0;
 	stats[WT_STAT_FILE_EXTEND].v = 0;
 	stats[WT_STAT_FILE_FREE].v = 0;
-	stats[WT_STAT_FILE_HUFFMAN_DATA].v = 0;
 	stats[WT_STAT_FILE_HUFFMAN_KEY].v = 0;
+	stats[WT_STAT_FILE_HUFFMAN_VALUE].v = 0;
 	stats[WT_STAT_FILE_ITEMS_INSERTED].v = 0;
 	stats[WT_STAT_FILE_OVERFLOW_DATA].v = 0;
 	stats[WT_STAT_FILE_OVERFLOW_KEY].v = 0;
