@@ -1201,7 +1201,6 @@ namespace mongo {
                     errmsg = "scale has to be > 0";
                     return false;
                 }
-
             }
             else if ( jsobj["scale"].trueValue() ) {
                 errmsg = "scale has to be a number > 0";
@@ -1250,9 +1249,22 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << 
                 "Get stats on a database. Not instantaneous. Slower for databases with large .ns files.\n" << 
-                "Example: { dbStats:1 }";
+                "Example: { dbStats:1, scale:1 }";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            int scale = 1;
+            if ( jsobj["scale"].isNumber() ) {
+                scale = jsobj["scale"].numberInt();
+                if ( scale <= 0 ) {
+                    errmsg = "scale has to be > 0";
+                    return false;
+                }
+            }
+            else if ( jsobj["scale"].trueValue() ) {
+                errmsg = "scale has to be a number > 0";
+                return false;
+            }
+
             list<string> collections;
             Database* d = cc().database();
             if ( d )
@@ -1292,12 +1304,12 @@ namespace mongo {
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
             result.append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
-            result.appendNumber( "dataSize" , size );
-            result.appendNumber( "storageSize" , storageSize);
+            result.appendNumber( "dataSize" , size / scale );
+            result.appendNumber( "storageSize" , storageSize / scale);
             result.appendNumber( "numExtents" , numExtents );
             result.appendNumber( "indexes" , indexes );
-            result.appendNumber( "indexSize" , indexSize );
-            result.appendNumber( "fileSize" , d->fileSize() );
+            result.appendNumber( "indexSize" , indexSize / scale );
+            result.appendNumber( "fileSize" , d->fileSize() / scale );
             if( d )
                 result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
 

@@ -22,8 +22,8 @@ DB.prototype.getName = function(){
     return this._name;
 }
 
-DB.prototype.stats = function(){
-    return this.runCommand( { dbstats : 1 } );
+DB.prototype.stats = function(scale){
+    return this.runCommand( { dbstats : 1 , scale : scale } );
 }
 
 DB.prototype.getCollection = function( name ){
