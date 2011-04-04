@@ -1412,15 +1412,23 @@ namespace mongo {
                 // otherwise recursion increments the neighbors.
                 for ( ; _neighbor < 9; _neighbor++ ) {
 
+                    if( ! isNeighbor ) {
+                        _centerPrefix = _prefix;
+                        _centerBox = Box( _g, _centerPrefix );
+                        isNeighbor = true;
+                    }
+
                     int i = (_neighbor / 3) - 1;
                     int j = (_neighbor % 3) - 1;
 
-                    if ( i == 0 && j == 0 )
-                        continue; // main box
-
-                    if( ! isNeighbor ) {
-                        _centerPrefix = _prefix;
-                        isNeighbor = true;
+                    if ( ( i == 0 && j == 0 ) ||
+                    	 ( i < 0 && _centerBox._min._x <= _g->_min ) ||
+                    	 ( j < 0 && _centerBox._min._y <= _g->_min ) ||
+                    	 ( i > 0 && _centerBox._max._x >= _g->_max ) ||
+                    	 ( j > 0 && _centerBox._max._y >= _g->_max ) ){
+                    	continue; // main box or wrapped edge
+                    	// TODO:  We may want to enable wrapping in future, probably best as layer on top of
+                    	// this search.
                     }
 
                     // Make sure we've got a reasonable center
@@ -1517,6 +1525,7 @@ namespace mongo {
         // The current hash prefix we're expanding and the center-box hash prefix
         GeoHash _prefix;
         GeoHash _centerPrefix;
+        Box _centerBox;
 
         // Start and end of our search range in the current box
         BtreeLocation _min;
@@ -1538,6 +1547,8 @@ namespace mongo {
             uassert( 13656 , "the first field of $center object must be a location object" , center.isABSONObj() );
 
             // Get geohash and exact center point
+            // TODO: For wrapping search, may be useful to allow center points outside-of-bounds here.
+            // Calculating the nearest point as a hash start inside the region would then be required.
             _start = g->_tohash(center);
             _startPt = Point(center);
 
