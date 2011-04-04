@@ -153,8 +153,8 @@ __wt_hazard_empty(SESSION *session, const char *name)
 			    "%s: hazard reference lost: (%p: %s, line %d)",
 			    name, hp->page, hp->file, hp->line);
 #else
-			    "%s: hazard reference lost: (%p)"
-			    name, hp->page)
+			    "%s: hazard reference lost: (%p)",
+			    name, hp->page);
 #endif
 			hp->page = NULL;
 			WT_MEMORY_FLUSH;

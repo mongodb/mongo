@@ -232,6 +232,8 @@ __wt_split_init(SESSION *session,
 	 * lots of splits.
 	 */
 	r->split_page_size = min;
+#else
+	WT_UNUSED(min);
 #endif
 	/*
 	 * If the maximum page size is the same as the split page size, there
