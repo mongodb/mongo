@@ -752,7 +752,8 @@ __slvg_range_overlap_col(
 		 * in high-to-low order, which means a_trk has a higher LSN, and
 		 * is more desirable, than b_trk.  In cases #1 and #4 and #9,
 		 * where the start of the range is the same for the two pages,
-		 * this simplifies things.
+		 * this simplifies things, it guarantees a_trk has a higher LSN
+		 * than b_trk.
 		 */
 		if (a_trk->u.col.range_stop >= b_trk->u.col.range_stop)
 			/*
@@ -762,11 +763,11 @@ __slvg_range_overlap_col(
 			goto delete;
 
 		/*
-		 * Case #9: b_trk is a superset of a_trk, but b_trk is more
+		 * Case #9: b_trk is a superset of a_trk, but a_trk is more
 		 * desirable: keep both but delete a_trk's key range from
 		 * b_trk.
 		 */
-		b_trk->u.col.range_start = a_trk->u.col.range_start + 1;
+		b_trk->u.col.range_start = a_trk->u.col.range_stop + 1;
 		F_SET(b_trk, WT_TRACK_MERGE);
 		ss->range_merge = 1;
 		return (0);
