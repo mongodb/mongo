@@ -23,6 +23,7 @@
 #include "message_server.h"
 
 #include "../db/cmdline.h"
+#include "../db/lasterror.h"
 #include "../db/stats/counters.h"
 
 namespace mongo {
@@ -38,13 +39,18 @@ namespace mongo {
 
             setThreadName( "conn" );
 
-            auto_ptr<MessagingPort> p( inPort );
+            scoped_ptr<MessagingPort> p( inPort );
 
             string otherSide;
 
             Message m;
             try {
+                LastError * le = new LastError();
+                lastError.reset( le ); // lastError now has ownership
+
                 otherSide = p->farEnd.toString();
+
+                handler->connected( p.get() );
 
                 while ( 1 ) {
                     m.reset();
@@ -57,7 +63,7 @@ namespace mongo {
                         break;
                     }
 
-                    handler->process( m , p.get() );
+                    handler->process( m , p.get() , le );
                     networkCounter.hit( p->getBytesIn() , p->getBytesOut() );
                 }
             }
@@ -110,6 +116,16 @@ namespace mongo {
 
                 sleepmillis(2);
             }
+            catch ( ... ) {
+                connTicketHolder.release();
+                log() << "unknown error accepting new socket" << endl;
+
+                p->shutdown();
+                delete p;
+
+                sleepmillis(2);
+            }
+
         }
 
         virtual void setAsTimeTracker() {

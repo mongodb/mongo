@@ -288,7 +288,7 @@ namespace mongo {
                         return;
                     }
                 }
-                log() << "dur data after write area " << i.start() << " does not agree" << endl;
+                log() << "journal data after write area " << i.start() << " does not agree" << endl;
                 log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
                 log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
                 log() << " n:    " << n << endl;
@@ -355,7 +355,7 @@ namespace mongo {
                     }
                     if( low != 0xffffffff ) {
                         std::stringstream ss;
-                        ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
+                        ss << "journal error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << ' ' << endl;
                         set<WriteIntent>& b = commitJob.writes();
@@ -652,7 +652,7 @@ namespace mongo {
             else {
                 assert( inShutdown() );
                 if( commitJob.hasWritten() ) {
-                    log() << "dur warning files are closing outside locks with writes pending" << endl;
+                    log() << "journal warning files are closing outside locks with writes pending" << endl;
                 }
             }
         }
@@ -660,7 +660,7 @@ namespace mongo {
         CodeBlock durThreadMain;
 
         void durThread() {
-            Client::initThread("dur");
+            Client::initThread("journal");
             const int HowOftenToGroupCommitMs = 90;
             while( !inShutdown() ) {
                 sleepmillis(10);

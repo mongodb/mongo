@@ -331,7 +331,7 @@ namespace mongo {
 
                 if ( e.type() == CodeWScope ) {
                     where->setFunc( e.codeWScopeCode() );
-                    where->jsScope = new BSONObj( e.codeWScopeScopeData() , 0 );
+                    where->jsScope = new BSONObj( e.codeWScopeScopeData() );
                 }
                 else {
                     const char *code = e.valuestr();

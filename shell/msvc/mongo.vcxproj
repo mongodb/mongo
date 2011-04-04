@@ -117,6 +117,9 @@
     <ClCompile Include="..\..\scripting\engine_spidermonkey.cpp" />
     <ClCompile Include="..\..\scripting\utils.cpp" />
     <ClCompile Include="..\..\s\shardconnection.cpp" />
+    <ClCompile Include="..\..\third_party\linenoise\linenoise_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\util\background.cpp" />
     <ClCompile Include="..\..\util\log.cpp" />
     <ClCompile Include="..\..\util\mmap.cpp" />

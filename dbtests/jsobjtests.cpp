@@ -1528,7 +1528,7 @@ namespace JsobjTests {
             {
                 char * crap = (char*)malloc( x.objsize() );
                 memcpy( crap , x.objdata() , x.objsize() );
-                BSONObj y( crap , false );
+                BSONObj y( crap );
                 ASSERT_EQUALS( x , y );
                 free( crap );
             }
@@ -1540,7 +1540,7 @@ namespace JsobjTests {
                 foo[0] = 123123123;
                 int state = 0;
                 try {
-                    BSONObj y( crap , false );
+                    BSONObj y( crap );
                     state = 1;
                 }
                 catch ( std::exception& e ) {

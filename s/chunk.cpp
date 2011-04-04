@@ -830,7 +830,7 @@ namespace mongo {
         	dlk = dist_lock_try( &_nsLock  , "drop" );
         }
         catch( LockException& e ){
-        	uassert_msg( 70008, "Error locking distributed lock for chunk drop." << m_caused_by(e), false);
+        	uassert( 14022, str::stream() << "Error locking distributed lock for chunk drop." << causedBy( e ), false);
         }
 
         uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );

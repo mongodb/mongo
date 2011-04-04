@@ -81,8 +81,9 @@ namespace mongo {
     class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize), _offset( 0 ), _s( this ) , _tracker(0) , _doneCalled(false) {
-            _b.skip(4); /*leave room for size field*/
+        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
+            _b.appendNum((unsigned)0); // ref-count
+            _b.skip(4); /*leave room for size field and ref-count*/
         }
 
         /* dm why do we have this/need this? not clear to me, comment please tx. */
@@ -91,8 +92,9 @@ namespace mongo {
             _b.skip( 4 );
         }
 
-        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() ), _offset(0), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
-            _b.skip( 4 );
+        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() + sizeof(unsigned) ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
+            _b.appendNum((unsigned)0); // ref-count
+            _b.skip(4);
         }
 
         ~BSONObjBuilder() {
@@ -218,7 +220,7 @@ namespace mongo {
             long long x = n;
             if ( x < 0 )
                 x = x * -1;
-            if ( x < ( numeric_limits<int>::max() / 2 ) )
+            if ( x < ( (numeric_limits<int>::max)() / 2 ) ) // extra () to avoid max macro on windows
                 append( fieldName , (int)n );
             else
                 append( fieldName , n );
@@ -525,8 +527,10 @@ namespace mongo {
         BSONObj obj() {
             bool own = owned();
             massert( 10335 , "builder does not own memory", own );
-            int l;
-            return BSONObj(decouple(l), true);
+            doneFast();
+            BSONObj::Holder* h = (BSONObj::Holder*)_b.buf();
+            decouple(); // sets _b.buf() to NULL
+            return BSONObj(h);
         }
 
         /** Fetch the object we have built.
@@ -535,7 +539,7 @@ namespace mongo {
             would like the BSONObj to last longer than the builder.
         */
         BSONObj done() {
-            return BSONObj(_done(), /*ifree*/false);
+            return BSONObj(_done());
         }
 
         // Like 'done' above, but does not construct a BSONObj to return to the caller.
@@ -569,7 +573,7 @@ namespace mongo {
         void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
         static string numStr( int i ) {
-            if (i>=0 && i<100)
+            if (i>=0 && i<100 && numStrsReady)
                 return numStrs[i];
             StringBuilder o;
             o << i;
@@ -647,6 +651,7 @@ namespace mongo {
         bool _doneCalled;
 
         static const string numStrs[100]; // cache of 0 to 99 inclusive
+        static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
     };
 
     class BSONArrayBuilder : boost::noncopyable {
@@ -692,7 +697,23 @@ namespace mongo {
             return *this;
         }
 
-        BufBuilder &subobjStart( const StringData& name = "0" ) {
+        // These two just use next position
+        BufBuilder &subobjStart() { return _b.subobjStart( num() ); }
+        BufBuilder &subarrayStart() { return _b.subarrayStart( num() ); }
+
+        // These fill missing entries up to pos. if pos is < next pos is ignored
+        BufBuilder &subobjStart(int pos) {
+            fill(pos);
+            return _b.subobjStart( num() );
+        }
+        BufBuilder &subarrayStart(int pos) {
+            fill(pos);
+            return _b.subarrayStart( num() );
+        }
+
+        // These should only be used where you really need interface compatability with BSONObjBuilder
+        // Currently they are only used by update.cpp and it should probably stay that way
+        BufBuilder &subobjStart( const StringData& name ) {
             fill( name );
             return _b.subobjStart( num() );
         }
@@ -720,7 +741,11 @@ namespace mongo {
             long int n = strtol( name.data(), &r, 10 );
             if ( *r )
                 uasserted( 13048, (string)"can't append to array using string field name [" + name.data() + "]" );
-            while( _i < n )
+            fill(n);
+        }
+
+        void fill (int upTo){
+            while( _i < upTo )
                 append( nullElt() );
         }
 

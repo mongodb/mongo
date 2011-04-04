@@ -405,15 +405,17 @@ namespace mongo {
         if ( guess == 0 )
             return BSONObj();
 
-        char * buf = (char *) malloc(guess);
-        jobject bb = _getEnv()->NewDirectByteBuffer( (void*)buf , guess );
+        BSONObj::Holder* holder = (BSONObj::Holder*) malloc(guess + sizeof(unsigned));
+        holder->zero()
+
+        jobject bb = _getEnv()->NewDirectByteBuffer( (void*)holder->data , guess );
         jassert( bb );
 
         int len = _getEnv()->CallStaticIntMethod( _dbhook , _scopeGetObject , id , _getEnv()->NewStringUTF( field ) , bb );
         _getEnv()->DeleteLocalRef( bb );
         jassert( len > 0 && len < guess );
 
-        BSONObj obj(buf, true);
+        BSONObj obj(holder);
         assert( obj.objsize() <= guess );
         return obj;
     }

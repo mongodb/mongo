@@ -367,8 +367,8 @@ namespace mongo {
             else {
                 writelock lk;
                 if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                    Client::Context c( currentOp.getNS() );
-                    profile(ss.str().c_str(), ms);
+                    Client::Context cx( currentOp.getNS() );
+                    profile(c , currentOp, ms);
                 }
                 else {
                     mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
@@ -383,9 +383,10 @@ namespace mongo {
         x++; // reserved
         int n = *x++;
 
-        assert( m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13659 , "sent 0 cursors to kill" , n != 0 );
+        massert( 13658 , str::stream() << "bad kill cursors size: " << m.dataSize() , m.dataSize() == 8 + ( 8 * n ) );
+        uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
-        uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
@@ -964,11 +965,11 @@ namespace mongo {
         // Not related to lock file, but this is where we handle unclean shutdown
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
-            cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
+            cout << "Error: journal files are present in journal directory, yet starting without --journal enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
             cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
-            uasserted(13618, "can't start without --dur enabled when journal/ files are present");
+            uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
 #endif

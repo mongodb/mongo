@@ -26,11 +26,8 @@ namespace mongo {
      * currently implemented with a thread local
      */
     class ClientInfo {
-
-        typedef map<int,ClientInfo*> Cache;
-
     public:
-        ClientInfo( int clientId );
+        ClientInfo();
         ~ClientInfo();
 
         /** new request from client, adjusts internal state */
@@ -54,7 +51,7 @@ namespace mongo {
          * gets shards used on the previous request
          */
         set<string> * getPrev() const { return _prev; };
-
+        
         /**
          * gets all shards we've accessed since the last time we called clearSinceLastGetError
          */
@@ -64,6 +61,12 @@ namespace mongo {
          * clears list of shards we've talked to
          */
         void clearSinceLastGetError() { _sinceLastGetError.clear(); }
+
+
+        /**
+         * resets the list of shards using to process the current request
+         */
+        void clearCurrentShards(){ _cur->clear(); }
 
         /**
          * calls getLastError
@@ -77,8 +80,7 @@ namespace mongo {
         
         void noAutoSplit() { _autoSplitOk = false; }
 
-        static ClientInfo * get( int clientId = 0 , bool create = true );
-        static void disconnect( int clientId );
+        static ClientInfo * get();
 
     private:
 
@@ -111,8 +113,6 @@ namespace mongo {
         int _lastAccess;
         bool _autoSplitOk; 
 
-        static mongo::mutex _clientsLock;
-        static Cache& _clients;
         static boost::thread_specific_ptr<ClientInfo> _tlInfo;
     };
 

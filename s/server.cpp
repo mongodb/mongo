@@ -77,19 +77,19 @@ namespace mongo {
     public:
         virtual ~ShardedMessageHandler() {}
 
-        virtual void process( Message& m , AbstractMessagingPort* p ) {
+        virtual void connected( AbstractMessagingPort* p ) {
+            assert( ClientInfo::get() );
+        }
+
+        virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
             assert( p );
             Request r( m , p );
 
-            LastError * le = lastError.startRequest( m , r.getClientId() );
-            assert( le );
+            assert( le );            
+            lastError.startRequest( m , le );
 
-            if ( logLevel > 5 ) {
-                log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
-            }
             try {
                 r.init();
-                setClientId( r.getClientId() );
                 r.process();
             }
             catch ( AssertionException & e ) {
@@ -119,8 +119,7 @@ namespace mongo {
         }
 
         virtual void disconnected( AbstractMessagingPort* p ) {
-            ClientInfo::disconnect( p->getClientId() );
-            lastError.disconnect( p->getClientId() );
+            // all things are thread local
         }
     };
 

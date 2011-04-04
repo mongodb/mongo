@@ -393,7 +393,7 @@ namespace mongo {
                     dropCollection(ns, errmsg, res);
                     {
                         dbtemprelease r;
-                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false, true);
+                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false, true, false);
                         if( !ok ) {
                             log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
                             throw "rollback error resyncing rollection [1]";

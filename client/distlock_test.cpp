@@ -261,7 +261,7 @@ namespace mongo {
 
                 }
                 catch( LockException& e ) {
-                    log() << "*** !Could not try distributed lock." << m_caused_by(e) << endl;
+                    log() << "*** !Could not try distributed lock." << causedBy( e ) << endl;
                     break;
                 }
 
@@ -301,7 +301,7 @@ namespace mongo {
                 skewClocks( hostConn, cmdObj );
             }
             catch( DBException e ) {
-                errmsg = "Clocks could not be skewed." + m_caused_by(e);
+                errmsg = str::stream() << "Clocks could not be skewed." << causedBy( e );
                 return false;
             }
 
@@ -361,8 +361,8 @@ namespace mongo {
                 BSONObj result;
                 try {
                     bool success = conn->runCommand( string("admin"), BSON( "_skewClockCommand" << 1 << "skew" << *i ), result );
-                    // TODO:  Better error code
-                    uassert_msg(13678, "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
+
+                    uassert(13678, str::stream() << "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
 
                     log( logLvl + 1 ) << " Skewed host " << server << " clock by " << *i << endl;
                 }

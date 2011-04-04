@@ -1314,17 +1314,35 @@ rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
-rs.reconfig = function (cfg) {
-    cfg.version = rs.conf().version + 1;
+rs._runCmd = function (c) {
+    // after the command, catch the disconnect and reconnect if necessary
     var res = null;
     try {
-        res = db.adminCommand({ replSetReconfig: cfg });
+        res = db.adminCommand(c);
     }
     catch (e) {
-        print("shell got exception during reconfig: " + e);
-        print("in some circumstances, the primary steps down and closes connections on a reconfig");
+        if (("" + e).indexOf("error doing query") >= 0) {
+            // closed connection.  reconnect.
+            db.getLastErrorObj();
+            var o = db.getLastErrorObj();
+            if (o.ok) {
+                print("reconnected to server after rs command (which is normal)");
+            }
+            else {
+                printjson(o);
+            }
+        }
+        else {
+            print("shell got exception during repl set operation: " + e);
+            print("in some circumstances, the primary steps down and closes connections on a reconfig");
+        }
+        return "";
     }
     return res;
+}
+rs.reconfig = function (cfg) {
+    cfg.version = rs.conf().version + 1;
+    return this._runCmd({ replSetReconfig: cfg });
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
@@ -1345,17 +1363,9 @@ rs.add = function (hostport, arb) {
             cfg.arbiterOnly = true;
     }
     c.members.push(cfg);
-    var res = null;
-    try { 
-        res = db.adminCommand({ replSetReconfig: c });
-    }
-    catch (e) {
-        print("shell got exception during reconfig: " + e);
-        print("in some circumstances, the primary steps down and closes connections on a reconfig");
-    }
-    return res;
+    return this._runCmd({ replSetReconfig: c });
 }
-rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:secs||60}); }
+rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs === undefined) ? 60:secs}); }
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }

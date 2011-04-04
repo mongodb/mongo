@@ -500,7 +500,7 @@ namespace mongo {
     }
 
     inline BSONObj::BSONObj(const Record *r) {
-        init(r->data, false);
+        init(r->data);
     }
 
 } // namespace mongo

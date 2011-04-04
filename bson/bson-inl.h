@@ -64,9 +64,10 @@ namespace mongo {
        getOwned() method.  the presumption being that is better.
     */
     inline NOINLINE_DECL BSONObj BSONObj::copy() const {
-        char *p = (char*) malloc(objsize());
-        memcpy(p, objdata(), objsize());
-        return BSONObj(p, true);
+        Holder *h = (Holder*) malloc(objsize() + sizeof(unsigned));
+        h->zero();
+        memcpy(h->data, objdata(), objsize());
+        return BSONObj(h);
     }
 
     inline BSONObj BSONObj::getOwned() const {

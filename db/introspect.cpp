@@ -23,17 +23,33 @@
 #include "pdfile.h"
 #include "jsobj.h"
 #include "pdfile.h"
+#include "curop.h"
 
 namespace mongo {
 
-    void profile( const char *str, int millis) {
-        BSONObjBuilder b;
+    void profile( const Client& c , CurOp& currentOp, int millis) {
+        assertInWriteLock();
+        
+        string info = currentOp.debug().str.str();
+        int initSize = info.size() + 64;
+
+        BSONObjBuilder b( initSize );
+
         b.appendDate("ts", jsTime());
-        b.append("info", str);
+        b.append("info", info);
         b.append("millis", (double) millis);
+        if ( currentOp.getNS() )
+            b.append( "ns" , currentOp.getNS() );
+        b.append("client", c.clientAddress() );
+
+
         BSONObj p = b.done();
-        theDataFileMgr.insert(cc().database()->profileName.c_str(),
-                              p.objdata(), p.objsize(), true);
+        
+        if ( p.objsize() > initSize ) {
+            RARELY warning() << "profile had to increase size of BSONObj : " << p << endl;
+        }
+
+        theDataFileMgr.insert(c.database()->profileName.c_str(), p.objdata(), p.objsize(), true);
     }
 
 } // namespace mongo

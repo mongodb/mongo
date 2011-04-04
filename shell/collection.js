@@ -384,7 +384,23 @@ DBCollection.prototype.validate = function(full) {
 
     var res = this._db.runCommand( cmd );
 
-    if (typeof(res.valid) == undefined) {
+    if (res.raw){
+        // sharded
+
+        res.valid = true;
+        for (key in res.raw) {
+            if (typeof(res.raw[key].valid) == 'undefined'){
+                // if any shard is using old-style output use regex test
+                res.valid = undefined;
+                break;
+            }
+            else {
+                res.valid &= res.raw[key].valid;
+            }
+        }
+    }
+
+    if (typeof(res.valid) == 'undefined') {
         // old-style format just put everything in a string. Now using proper fields
 
         res.valid = false;

@@ -1989,7 +1989,8 @@ namespace mongo {
             assert( ctx.justCreated() );
 
             res = cloneFrom(localhost.c_str(), errmsg, dbName,
-                            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false, /*mayYield*/false);
+                            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false,
+                            /*snapshot*/false, /*mayYield*/false, /*mayBeInterrupted*/true);
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 

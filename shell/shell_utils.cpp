@@ -260,7 +260,7 @@ namespace mongo {
             BSONElement e = oneArg(args);
             bool found = false;
 
-            path root( args.firstElement().valuestrsafe() );
+            path root( e.valuestrsafe() );
             if ( boost::filesystem::exists( root ) ) {
                 found = true;
                 boost::filesystem::remove_all( root );

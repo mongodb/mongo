@@ -570,12 +570,17 @@ namespace mongo {
 
             switch ( m.m->op ) {
             case Mod::UNSET:
-            case Mod::PULL:
-            case Mod::PULL_ALL:
             case Mod::ADDTOSET:
             case Mod::RENAME_FROM:
             case Mod::RENAME_TO:
                 // this should have been handled by prepare
+                break;
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+                // this should have been handled by prepare
+                break;
+            case Mod::POP:
+                assert( m.old.eoo() || ( m.old.isABSONObj() && m.old.Obj().isEmpty() ) );
                 break;
                 // [dm] the BSONElementManipulator statements below are for replication (correct?)
             case Mod::INC:
@@ -987,7 +992,7 @@ namespace mongo {
                 BSONObj newObj = mss->createNewFromMods();
                 checkTooLarge(newObj);
                 assert(nsdt);
-                DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
             }
 
             if ( logop ) {

@@ -93,6 +93,7 @@ namespace mongo {
         }
         else {
             BufBuilder buf (obj.objsize());
+            buf.appendNum((unsigned)0); // refcount
             buf.appendNum(obj.objsize());
 
             vector<pair<const char*, size_t> > copies;
@@ -135,7 +136,7 @@ namespace mongo {
 
             buf.appendChar('\0');
 
-            BSONObj out (buf.buf(), true);
+            BSONObj out ((BSONObj::Holder*)buf.buf());
             buf.decouple();
             return out;
         }

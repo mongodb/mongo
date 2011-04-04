@@ -1226,8 +1226,6 @@ namespace mongo {
             out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
                   << lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;
 
-        DiskLoc oldLoc = thisLoc;
-
         if ( !basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
             // If basicInsert() fails, the bucket will be packed as required by split().
             thisLoc.btreemod()->split(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);

@@ -330,6 +330,35 @@ namespace BSON {
         BSONObj o_;
     };
 
+    template <int LEN>
+    class Copy {
+    public:
+        Copy(){
+            // putting it in a subobject to force copy on getOwned
+            BSONObjBuilder outer;
+            BSONObjBuilder b (outer.subobjStart("inner"));
+            while (b.len() < LEN)
+                b.append(BSONObjBuilder::numStr(b.len()), b.len());
+            b.done();
+            _base = outer.obj();
+        }
+
+        void run() {
+            int iterations = 1000*1000;
+            while (iterations--){
+                BSONObj temp = copy(_base.firstElement().embeddedObject().getOwned());
+            }
+        }
+
+    private:
+        // noinline should force copying even when optimized
+        NOINLINE_DECL BSONObj copy(BSONObj x){
+            return x;
+        }
+
+        BSONObj _base;
+    };
+
     class All : public RunnerSuite {
     public:
         All() : RunnerSuite( "bson" ) {}
@@ -338,6 +367,10 @@ namespace BSON {
             add< ShopwikiParse >();
             add< Json >();
             add< ShopwikiJson >();
+            add< Copy<10> >();
+            add< Copy<100> >();
+            add< Copy<1000> >();
+            add< Copy<10*1000> >();
         }
     } all;
 
@@ -684,7 +717,6 @@ namespace Plan {
             add< Query >();
         }
     } all;
-
 } // namespace Plan
 
 int main( int argc, char **argv ) {
@@ -693,3 +725,4 @@ int main( int argc, char **argv ) {
 
     return Suite::run(argc, argv, "/data/db/perftest");
 }
+

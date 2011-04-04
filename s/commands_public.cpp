@@ -463,9 +463,13 @@ namespace mongo {
                 cm->getAllShards(servers);
 
                 BSONObjBuilder shardStats;
+                map<string,long long> counts;
+                map<string,long long> indexSizes;
+                /*
                 long long count=0;
                 long long size=0;
                 long long storageSize=0;
+                */
                 int nindexes=0;
                 bool warnedAboutIndexes = false;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
@@ -476,39 +480,82 @@ namespace mongo {
                         return false;
                     }
                     conn.done();
+                    
+                    BSONObjIterator j( res );
+                    while ( j.more() ) {
+                        BSONElement e = j.next();
 
-                    count += res["count"].numberLong();
-                    size += res["size"].numberLong();
-                    storageSize += res["storageSize"].numberLong();
-
-                    int myIndexes = res["nindexes"].numberInt();
-
-                    if ( nindexes == 0 ) {
-                        nindexes = myIndexes;
-                    }
-                    else if ( nindexes == myIndexes ) {
-                        // no-op
-                    }
-                    else {
-                        // hopefully this means we're building an index
-
-                        if ( myIndexes > nindexes )
-                            nindexes = myIndexes;
-
-                        if ( ! warnedAboutIndexes ) {
-                            result.append( "warning" , "indexes don't all match - ok if ensureIndex is running" );
-                            warnedAboutIndexes = true;
+                        if ( str::equals( e.fieldName() , "ns" ) || 
+                             str::equals( e.fieldName() , "ok" ) || 
+                             str::equals( e.fieldName() , "avgObjSize" ) ||
+                             str::equals( e.fieldName() , "lastExtentSize" ) ||
+                             str::equals( e.fieldName() , "paddingFactor" ) ) {
+                            continue;
                         }
+                        else if ( str::equals( e.fieldName() , "count" ) ||
+                                  str::equals( e.fieldName() , "size" ) ||
+                                  str::equals( e.fieldName() , "storageSize" ) ||
+                                  str::equals( e.fieldName() , "numExtents" ) ||
+                                  str::equals( e.fieldName() , "totalIndexSize" ) ) {
+                            counts[e.fieldName()] += e.numberLong();
+                        }
+                        else if ( str::equals( e.fieldName() , "indexSizes" ) ) {
+                            BSONObjIterator k( e.Obj() );
+                            while ( k.more() ) {
+                                BSONElement temp = k.next();
+                                indexSizes[temp.fieldName()] += temp.numberLong();
+                            }
+                        }
+                        else if ( str::equals( e.fieldName() , "flags" ) ) {
+                            if ( ! result.hasField( e.fieldName() ) )
+                                result.append( e );
+                        }
+                        else if ( str::equals( e.fieldName() , "nindexes" ) ) {
+                            int myIndexes = e.numberInt();
+                            
+                            if ( nindexes == 0 ) {
+                                nindexes = myIndexes;
+                            }
+                            else if ( nindexes == myIndexes ) {
+                                // no-op
+                            }
+                            else {
+                                // hopefully this means we're building an index
+                                
+                                if ( myIndexes > nindexes )
+                                    nindexes = myIndexes;
+                                
+                                if ( ! warnedAboutIndexes ) {
+                                    result.append( "warning" , "indexes don't all match - ok if ensureIndex is running" );
+                                    warnedAboutIndexes = true;
+                                }
+                            }
+                        }
+                        else {
+                            warning() << "mongos collstats doesn't know about: " << e.fieldName() << endl;
+                        }
+                        
                     }
-
                     shardStats.append(i->getName(), res);
                 }
 
                 result.append("ns", fullns);
-                result.appendNumber("count", count);
-                result.appendNumber("size", size);
-                result.append      ("avgObjSize", double(size) / double(count));
-                result.appendNumber("storageSize", storageSize);
+                
+                for ( map<string,long long>::iterator i=counts.begin(); i!=counts.end(); ++i )
+                    result.appendNumber( i->first , i->second );
+                
+                {
+                    BSONObjBuilder ib( result.subobjStart( "indexSizes" ) );
+                    for ( map<string,long long>::iterator i=indexSizes.begin(); i!=indexSizes.end(); ++i )
+                        ib.appendNumber( i->first , i->second );
+                    ib.done();
+                }
+
+                if ( counts["count"] > 0 )
+                    result.append("avgObjSize", (double)counts["size"] / (double)counts["count"] );
+                else
+                    result.append( "avgObjSize", 0.0 );
+                
                 result.append("nindexes", nindexes);
 
                 result.append("nchunks", cm->numChunks());

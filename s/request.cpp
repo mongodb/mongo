@@ -41,8 +41,7 @@ namespace mongo {
         assert( _d.getns() );
         _id = _m.header()->id;
 
-        _clientId = p ? p->getClientId() : 0;
-        _clientInfo = ClientInfo::get( _clientId );
+        _clientInfo = ClientInfo::get();
         _clientInfo->newRequest( p );
 
     }
@@ -74,7 +73,7 @@ namespace mongo {
         }
 
         _m.header()->id = _id;
-
+        _clientInfo->clearCurrentShards();
     }
 
     Shard Request::primaryShard() const {

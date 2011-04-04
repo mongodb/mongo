@@ -48,7 +48,7 @@ namespace mongo {
         virtual void reset() = 0;
         virtual void init( const BSONObj * data ) = 0;
         void init( const char * data ) {
-            BSONObj o( data , 0 );
+            BSONObj o( data );
             init( &o );
         }
 
