@@ -573,7 +573,7 @@ namespace mongo {
         void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
         static string numStr( int i ) {
-            if (i>=0 && i<100)
+            if (i>=0 && i<100 && numStrsReady)
                 return numStrs[i];
             StringBuilder o;
             o << i;
@@ -651,6 +651,7 @@ namespace mongo {
         bool _doneCalled;
 
         static const string numStrs[100]; // cache of 0 to 99 inclusive
+        static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
     };
 
     class BSONArrayBuilder : boost::noncopyable {

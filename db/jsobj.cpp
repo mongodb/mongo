@@ -1311,6 +1311,12 @@ namespace mongo {
         "90", "91", "92", "93", "94", "95", "96", "97", "98", "99",
     };
 
+
+    // This is to ensure that BSONObjBuilder doesn't try to use numStrs before the strings have been constructed
+    // I've tested just making numStrs a char[][], but the overhead of constructing the strings each time was too high
+    // numStrsReady will be 0 until after numStrs is initialized because it is a static variable
+    bool BSONObjBuilder::numStrsReady = (numStrs[0].size() > 0);
+
     bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {
         if ( data.size() == 0 || data == "-")
             return false;
