@@ -63,11 +63,6 @@ extern "C" {
  * The file needs a description, here's the structure.  At the moment, this
  * structure is written into the first 512 bytes of the file, but that will
  * change in the future.
- *
- * !!!
- * Field order is important: there's a 8-byte type in the middle, and the
- * Solaris compiler inserts space into the structure if we don't put that
- * field on an 8-byte boundary.
  */
 struct __wt_page_desc {
 #define	WT_BTREE_MAGIC		120897
@@ -77,21 +72,23 @@ struct __wt_page_desc {
 #define	WT_BTREE_MINOR_VERSION	1
 	uint16_t minorv;		/* 06-07: Minor version */
 
+	/* !!! 64-bit types must be on an 8-byte boundary to avoid padding. */
+	uint64_t recno_offset;		/* 08-15: Offset record number */
+
 #define	WT_BTREE_ALLOCATION_SIZE_MIN	512
 #define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
-	uint32_t allocsize;		/* 08-11: Allocation size */
+	uint32_t allocsize;		/* 16-19: Allocation size */
 
 #define	WT_BTREE_INTLMAX_DEFAULT	(2 * 1024)
 #define	WT_BTREE_INTLMIN_DEFAULT	(2 * 1024)
-	uint32_t intlmax;		/* 12-15: Maximum intl page size */
-	uint32_t intlmin;		/* 16-19: Minimum intl page size */
+	uint32_t intlmax;		/* 20-23: Maximum intl page size */
+	uint32_t intlmin;		/* 24-27: Minimum intl page size */
 
 #define	WT_BTREE_LEAFMAX_DEFAULT	WT_MEGABYTE
 #define	WT_BTREE_LEAFMIN_DEFAULT	(32 * 1024)
-	uint32_t leafmax;		/* 20-23: Maximum leaf page size */
-	uint32_t leafmin;		/* 24-27: Minimum leaf page size */
+	uint32_t leafmax;		/* 28-31: Maximum leaf page size */
+	uint32_t leafmin;		/* 32-35: Minimum leaf page size */
 
-	uint64_t recno_offset;		/* 28-35: Offset record number */
 	uint32_t root_addr;		/* 36-39: Root page address */
 	uint32_t root_size;		/* 40-43: Root page length */
 	uint32_t free_addr;		/* 44-47: Free list page address */
