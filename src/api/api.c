@@ -20,7 +20,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_CURSOR *cursor;
 	int ret;
 
-	printf("WT_SESSION->close\n");
 	conn = (CONNECTION *)wt_session->connection;
 	session = (SESSION *)wt_session;
 	ret = 0;

@@ -81,8 +81,8 @@ struct __wt_page_desc {
 
 #define	WT_BTREE_INTLMAX_DEFAULT	(2 * 1024)
 #define	WT_BTREE_INTLMIN_DEFAULT	(2 * 1024)
-	uint32_t intlmax;		/* 20-23: Maximum intl page size */
-	uint32_t intlmin;		/* 24-27: Minimum intl page size */
+	uint32_t intlmax;		/* 20-23: Maximum internal page size */
+	uint32_t intlmin;		/* 24-27: Minimum internal page size */
 
 #define	WT_BTREE_LEAFMAX_DEFAULT	WT_MEGABYTE
 #define	WT_BTREE_LEAFMIN_DEFAULT	(32 * 1024)
