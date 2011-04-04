@@ -220,7 +220,7 @@ namespace mongo {
             long long x = n;
             if ( x < 0 )
                 x = x * -1;
-            if ( x < ( numeric_limits<int>::max() / 2 ) )
+            if ( x < ( (numeric_limits<int>::max)() / 2 ) ) // extra () to avoid max macro on windows
                 append( fieldName , (int)n );
             else
                 append( fieldName , n );
