@@ -35,12 +35,8 @@ namespace mongo {
         }
 
         CmdFindAndModify() : Command("findAndModify", false, "findandmodify") { }
-        virtual bool logTheOp() {
-            return false; // the modification will be logged directly
-        }
-        virtual bool slaveOk() const {
-            return false;
-        }
+        virtual bool logTheOp() { return false; } // the modifications will be logged directly
+        virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             static DBDirectClient db;
