@@ -74,7 +74,7 @@ namespace mongo {
                 totalSize += lenWHdr;
                 DiskLoc extentLoc;
                 DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
-                uassert(10000, "compact error out of space during compaction", !loc.isNull());
+                uassert(14024, "compact error out of space during compaction", !loc.isNull());
                 Record *recNew = loc.rec();
                 recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
                 addRecordToRecListInExtent(recNew, loc);
@@ -143,7 +143,7 @@ namespace mongo {
         }
 
         // before dropping indexes, at least make sure we can allocate one extent!
-        uassert(10000, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1).isNull());
+        uassert(14025, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1).isNull());
 
         // note that the drop indexes call also invalidates all clientcursors for the namespace, which is important and wanted here
         log() << "compact dropping indexes" << endl;
@@ -174,8 +174,8 @@ namespace mongo {
     }
 
     bool compact(const string& ns, string &errmsg) {
-        massert( 13658, "bad ns", isANormalNSName(ns.c_str()) );
-        massert( 13659, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
+        massert( 14028, "bad ns", isANormalNSName(ns.c_str()) );
+        massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
 
         bool ok;
         {

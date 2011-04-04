@@ -348,7 +348,7 @@ sendmore:
             if ( !h->isCurrentVersion() || forceRepair ) {
 
                 if( h->version <= 0 ) {
-                    uasserted(10000, str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version << " info: " << h->versionMinor << ' ' << h->fileLength);
+                    uasserted(14026, str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version << " info: " << h->versionMinor << ' ' << h->fileLength);
                 }
 
                 log() << "****" << endl;
