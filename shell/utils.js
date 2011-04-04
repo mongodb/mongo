@@ -1017,7 +1017,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
             var p = possibilities[i];
             if (typeof(curObj[p]) == "undefined" && curObj != global) continue; // extraGlobals aren't in the global object
             if (p.length == 0 || p.length < lastPrefix.length) continue;
-            if (isPrivate(p)) continue;
+            if (lastPrefix[0] != '_' && isPrivate(p)) continue;
             if (p.match(/^[0-9]+$/)) continue; // don't array number indexes
             if (p.substr(0, lastPrefix.length) != lastPrefix) continue;
 

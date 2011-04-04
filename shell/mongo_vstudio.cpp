@@ -1022,7 +1022,7 @@ const StringData _jscode_raw_utils =
 "var p = possibilities[i];\n" 
 "if (typeof(curObj[p]) == \"undefined\" && curObj != global) continue; // extraGlobals aren't in the global object\n" 
 "if (p.length == 0 || p.length < lastPrefix.length) continue;\n" 
-"if (isPrivate(p)) continue;\n" 
+"if (lastPrefix[0] != '_' && isPrivate(p)) continue;\n" 
 "if (p.match(/^[0-9]+$/)) continue; // don't array number indexes\n" 
 "if (p.substr(0, lastPrefix.length) != lastPrefix) continue;\n" 
 "\n" 
