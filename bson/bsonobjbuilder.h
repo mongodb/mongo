@@ -81,7 +81,7 @@ namespace mongo {
     class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
+        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
             _b.appendNum((unsigned)0); // ref-count
             _b.skip(4); /*leave room for size field and ref-count*/
         }
@@ -92,7 +92,7 @@ namespace mongo {
             _b.skip( 4 );
         }
 
-        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
+        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() + sizeof(unsigned) ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
             _b.appendNum((unsigned)0); // ref-count
             _b.skip(4);
         }
