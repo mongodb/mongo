@@ -203,6 +203,11 @@ namespace mongo {
         }
 
         void RecoveryJob::write(const ParsedJournalEntry& entry) {
+            //TODO(mathias): look into making some of these dasserts
+            assert(entry.e);
+            assert(entry.dbName);
+            assert(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;
             {
@@ -224,6 +229,9 @@ namespace mongo {
             }
 
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
+                assert(mmf->view_write());
+                assert(entry.e->srcData());
+
                 void* dest = (char*)mmf->view_write() + entry.e->ofs;
                 memcpy(dest, entry.e->srcData(), entry.e->len);
                 stats.curr->_writeToDataFilesBytes += entry.e->len;
