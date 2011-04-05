@@ -201,7 +201,7 @@ public:
                         ss << "first element: " << e;
                         log() << ss.str();
                     }
-                    catch ( std::exception& ee ) {
+                    catch ( std::exception& ) {
                     }
                 }
             }
