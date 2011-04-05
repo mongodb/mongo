@@ -352,6 +352,12 @@ int main(int argc, char* argv[]) {
 }
 
 #undef exit
+
+void mongo::exitCleanly( ExitCode code ) {
+    // TODO: do we need to add anything?
+    mongo::dbexit( code );
+}
+
 void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
     dbexitCalled = true;
     log() << "dbexit: " << why

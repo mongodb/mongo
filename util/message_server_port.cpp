@@ -34,11 +34,11 @@ namespace mongo {
 
         void threadRun( MessagingPort * inPort) {
             TicketHolderReleaser connTicketReleaser( &connTicketHolder );
-            
-            assert( inPort );
 
             setThreadName( "conn" );
-
+            
+            assert( inPort );
+            inPort->_logLevel = 1;
             scoped_ptr<MessagingPort> p( inPort );
 
             string otherSide;
@@ -52,7 +52,7 @@ namespace mongo {
 
                 handler->connected( p.get() );
 
-                while ( 1 ) {
+                while ( ! inShutdown() ) {
                     m.reset();
                     p->clearCounters();
 
@@ -67,14 +67,25 @@ namespace mongo {
                     networkCounter.hit( p->getBytesIn() , p->getBytesOut() );
                 }
             }
-            catch ( const SocketException& ) {
-                log() << "unclean socket shutdown from: " << otherSide << endl;
+            catch ( AssertionException& e ) {
+                log() << "AssertionException in connThread, closing client connection: " << e << endl;
+                p->shutdown();
             }
-            catch ( const std::exception& e ) {
-                problem() << "uncaught exception (" << e.what() << ")(" << demangleName( typeid(e) ) <<") in PortMessageServer::threadRun, closing connection" << endl;
+            catch ( SocketException& e ) {
+                log() << "SocketException in connThread, closing client connection: " << e << endl;
+                p->shutdown();
+            }
+            catch ( const ClockSkewException & ) {
+                log() << "ClockSkewException - shutting down" << endl;
+                exitCleanly( EXIT_CLOCK_SKEW );
+            }
+            catch ( std::exception &e ) {
+                error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
+                dbexit( EXIT_UNCAUGHT );
             }
             catch ( ... ) {
-                problem() << "uncaught exception in PortMessageServer::threadRun, closing connection" << endl;
+                error() << "Uncaught exception, terminating" << endl;
+                dbexit( EXIT_UNCAUGHT );
             }
 
             handler->disconnected( p.get() );

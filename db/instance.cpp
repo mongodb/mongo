@@ -221,7 +221,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -268,7 +268,7 @@ namespace mongo {
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
-        currentOp.reset(client,op);
+        currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
@@ -652,7 +652,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , HostAndPort( "localhost" , -1 ) );
         assert( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
@@ -664,7 +664,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , HostAndPort( "localhost" , -1 ) );
         getDur().commitIfNeeded();
     }
 

@@ -36,6 +36,7 @@
 #include "stats/snapshots.h"
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
+#include "../util/message_server.h"
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
@@ -195,6 +196,64 @@ namespace mongo {
     void beNice() {
         sleepmicros( Client::recommendedYieldMicros() );
     }
+
+    class MyMessageHandler : public MessageHandler {
+    public:
+        virtual void connected( AbstractMessagingPort* p ) {
+            Client& c = Client::initThread("conn", p);
+            c.getAuthenticationInfo()->isLocalHost = p->remote().isLocalHost();
+        }
+
+        virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
+            while ( true ) {
+                if ( inShutdown() ) {
+                    log() << "got request after shutdown()" << endl;
+                    break;
+                }
+
+                lastError.startRequest( m , le );
+
+                DbResponse dbresponse;
+                assembleResponse( m, dbresponse, port->remote() );
+
+                if ( dbresponse.response ) {
+                    port->reply(m, *dbresponse.response, dbresponse.responseTo);
+                    if( dbresponse.exhaust ) {
+                        MsgData *header = dbresponse.response->header();
+                        QueryResult *qr = (QueryResult *) header;
+                        long long cursorid = qr->cursorId;
+                        if( cursorid ) {
+                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
+                            string ns = dbresponse.exhaust; // before reset() free's it...
+                            m.reset();
+                            BufBuilder b(512);
+                            b.appendNum((int) 0 /*size set later in appendData()*/);
+                            b.appendNum(header->id);
+                            b.appendNum(header->responseTo);
+                            b.appendNum((int) dbGetMore);
+                            b.appendNum((int) 0);
+                            b.appendStr(ns);
+                            b.appendNum((int) 0); // ntoreturn
+                            b.appendNum(cursorid);
+                            m.appendData(b.buf(), b.len());
+                            b.decouple();
+                            DEV log() << "exhaust=true sending more" << endl;
+                            beNice();
+                            continue; // this goes back to top loop
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        virtual void disconnected( AbstractMessagingPort* p ) {
+            Client * c = currentClient.get();
+            if( c ) c->shutdown();
+            globalScriptEngine->threadDone();
+        }
+
+    };
 
     /* we create one thread for each connection from an app server database.
        app server will open a pool of threads.
