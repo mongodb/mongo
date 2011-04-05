@@ -36,8 +36,8 @@ void run(int);
 
 FILE *res_fp;					/* Results file */
 
-int __start, __cnt;				/* Records to build */
-int __column_store = 1;				/* Is a column-store file */
+int gstart, gcnt;				/* Records to build */
+int page_type;					/* Types of records */
 
 int
 main(int argc, char *argv[])
@@ -46,9 +46,15 @@ main(int argc, char *argv[])
 
 	if (argc == 2 && isdigit(argv[1][0]))
 		run (atoi(argv[1]));
-	else
-		for (r = 1; r <= 15; ++r)
+	else {
+		page_type = WT_PAGE_COL_FIX;
+		for (r = 1; r <= 21; ++r)
 			run(r);
+
+		page_type = WT_PAGE_COL_VAR;
+		for (r = 1; r <= 21; ++r)
+			run(r);
+	}
 
 	printf("salvage test run completed\n");
 	return (EXIT_SUCCESS);
@@ -59,7 +65,7 @@ run(int r)
 {
 	char buf[128];
 
-	printf("run %d\n", r);
+	printf("%s: run %d\n", __wt_page_type_string(page_type), r);
 
 	(void)remove(SLVG);
 
@@ -103,7 +109,7 @@ run(int r)
 		 * Case #1:
 		 * 3 column-store pages, each with 20 records starting with
 		 * record number 1, and sequential LSNs; salvage should leave
-		 * the page with the largest LSN, records 41-60.
+		 * the page with the largest LSN.
 		 */
 		build(100, 20); copy(6, 1);
 		build(200, 20); copy(7, 1);
@@ -115,7 +121,7 @@ run(int r)
 		 * Case #1:
 		 * 3 column-store pages, each with 20 records starting with
 		 * record number 1, and sequential LSNs; salvage should leave
-		 * the page with the largest LSN, records 41-60.
+		 * the page with the largest LSN.
 		 */
 		build(100, 20); copy(6, 1);
 		build(200, 20); copy(8, 1);
@@ -127,7 +133,7 @@ run(int r)
 		 * Case #1:
 		 * 3 column-store pages, each with 20 records starting with
 		 * record number 1, and sequential LSNs; salvage should leave
-		 * the page with the largest LSN, records 41-60.
+		 * the page with the largest LSN.
 		 */
 		build(100, 20); copy(8, 1);
 		build(200, 20); copy(7, 1);
@@ -246,6 +252,70 @@ run(int r)
 		print_res(100, 30);
 		print_res(200, 10);
 		break;
+	case 16:
+		/*
+		 * Case #9:
+		 * 2 column-store pages, where the first page is a prefix of
+		 * the second page, and the first page has a higher LSN.
+		 */
+		build(100, 20); copy(7, 1);
+		build(200, 40); copy(6, 1);
+		print_res(100, 20);
+		print_res(220, 20);
+		break;
+	case 17:
+		/*
+		 * Case #9:
+		 * 2 column-store pages, where the first page is a prefix of
+		 * the second page, and the second page has a higher LSN.
+		 */
+		build(100, 20); copy(6, 1);
+		build(200, 40); copy(7, 1);
+		print_res(200, 40);
+		break;
+	case 18:
+		/*
+		 * Case #10:
+		 * 2 column-store pages, where the first page is a suffix of
+		 * the second page, and the first page has a higher LSN.
+		 */
+		build(100, 10); copy(7, 31);
+		build(200, 40); copy(6, 1);
+		print_res(200, 30);
+		print_res(100, 10);
+		break;
+	case 19:
+		/*
+		 * Case #10:
+		 * 2 column-store pages, where the first page is a suffix of
+		 * the second page, and the second page has a higher LSN.
+		 */
+		build(100, 10); copy(6, 31);
+		build(200, 40); copy(7, 1);
+		print_res(200, 40);
+		break;
+	case 20:
+		/*
+		 * Case #11:
+		 * 2 column-store pages, where the first page is in the middle
+		 * of the second page, and the first page has a higher LSN.
+		 */
+		build(100, 10); copy(7, 21);
+		build(200, 40); copy(6, 1);
+		print_res(200, 20);
+		print_res(100, 10);
+		print_res(230, 10);
+		break;
+	case 21:
+		/*
+		 * Case #11:
+		 * 2 column-store pages, where the first page is in the middle
+		 * of the second page, and the second page has a higher LSN.
+		 */
+		build(100, 10); copy(6, 21);
+		build(200, 40); copy(7, 1);
+		print_res(200, 40);
+		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
 		exit (EXIT_FAILURE);
@@ -276,11 +346,12 @@ build(int start, int cnt)
 
 	(void)remove(LOAD);
 
-	__start = start;
-	__cnt = cnt;
+	gstart = start;
+	gcnt = cnt;
 	
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree, 0, NULL, 0) == 0);
+	assert(btree->column_set(btree,
+	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, LOAD, 0660, WT_CREATE) == 0);
@@ -352,7 +423,8 @@ process(void)
 	SESSION *session;
 
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree, 0, NULL, 0) == 0);
+	assert(btree->column_set(btree,
+	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
@@ -362,7 +434,8 @@ process(void)
 	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
 
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree, 0, NULL, 0) == 0);
+	assert(btree->column_set(btree,
+	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
@@ -372,7 +445,8 @@ process(void)
 	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
 
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree, 0, NULL, 0) == 0);
+	assert(btree->column_set(btree,
+	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
@@ -400,29 +474,37 @@ print_res(int start, int cnt)
  *	Bulk load records.
  */
 int
-bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **datap)
+bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 {
-	static WT_ITEM key, data;
-	char kbuf[64], dbuf[64];
+	static WT_ITEM key, value;
+	char kbuf[64], vbuf[64];
 
-	if (__cnt == 0)
+	if (gcnt == 0)
 		return (1);
-	--__cnt;
+	--gcnt;
 
-	if (__column_store)
+	/* Build the key. */
+	switch (page_type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
 		*keyp = NULL;
-	else {
-		snprintf(kbuf, sizeof(kbuf), "%010d KEY------", __start);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		snprintf(kbuf, sizeof(kbuf), "%010d KEY------", gstart);
 		key.data = kbuf;
 		key.size = 20;
 		*keyp = &key;
+		break;
 	}
-	snprintf(dbuf, sizeof(dbuf), "%010d VALUE----", __start);
-	data.data = dbuf;
-	data.size = 20;
-	*datap = &data;
 
-	++__start;
+	/* Build the value. */
+	snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", gstart);
+	value.data = vbuf;
+	value.size = 20;
+	*valuep = &value;
+
+	++gstart;
 
 	btree = NULL;
 	return (0);
