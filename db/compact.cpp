@@ -38,7 +38,7 @@ namespace mongo {
     DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr);
     void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
-    void compactExtent(const char *ns, NamespaceDetails *d, DiskLoc ext, int n,
+    void compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
                 const scoped_array<IndexSpec> &indexSpecs,
                 scoped_array<SortPhaseOne>& phase1, int nidx)
     {
@@ -114,7 +114,7 @@ namespace mongo {
             freeExtents(ext,ext);
             getDur().commitNow();
 
-            log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
+            log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB " << endl;
         }
 
         // drop this extent
@@ -128,9 +128,9 @@ namespace mongo {
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitNow();
 
-        set<DiskLoc> extents;
+        list<DiskLoc> extents;
         for( DiskLoc L = d->firstExtent; !L.isNull(); L = L.ext()->xnext ) 
-            extents.insert(L);
+            extents.push_back(L);
         log() << "compact " << extents.size() << " extents" << endl;
 
         // same data, but might perform a little different after compact?
@@ -177,7 +177,7 @@ namespace mongo {
         getDur().commitNow();
 
         int n = 0;
-        for( set<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
+        for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
             compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx);
         }
 
