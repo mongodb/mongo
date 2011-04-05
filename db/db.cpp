@@ -965,14 +965,6 @@ namespace mongo {
 
 #undef out
 
-    void exitCleanly( ExitCode code ) {
-        killCurrentOp.killAll();
-        {
-            dblock lk;
-            log() << "now exiting" << endl;
-            dbexit( code );
-        }
-    }
 
 #if !defined(_WIN32)
 

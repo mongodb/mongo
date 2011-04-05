@@ -789,6 +789,15 @@ namespace mongo {
 #endif
     }
 
+    void exitCleanly( ExitCode code ) {
+        killCurrentOp.killAll();
+        {
+            dblock lk;
+            log() << "now exiting" << endl;
+            dbexit( code );
+        }
+    }
+
     /* not using log() herein in case we are already locked */
     void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
 
