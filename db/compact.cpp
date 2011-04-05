@@ -114,7 +114,7 @@ namespace mongo {
             freeExtents(ext,ext);
             getDur().commitNow();
 
-            log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB " << endl;
+            log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
         }
 
         // drop this extent
