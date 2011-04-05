@@ -697,7 +697,7 @@ again:
     }
 
     HostAndPort MessagingPort::remote() const {
-        if ( _farEndParsed.port() == -1 )
+        if ( ! _farEndParsed.hasPort() )
             _farEndParsed = HostAndPort( farEnd );
         return _farEndParsed;
     }
