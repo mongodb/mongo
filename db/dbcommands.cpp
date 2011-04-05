@@ -1756,7 +1756,10 @@ namespace mongo {
         BSONObj jsobj;
         {
             BSONElement e = _cmdobj.firstElement();
-            if ( e.type() == Object && string("query") == e.fieldName() ) {
+            if ( e.type() == Object && (e.fieldName()[0] == '$'
+                                         ? str::equals("query", e.fieldName()+1)
+                                         : str::equals("query", e.fieldName())))
+            {
                 jsobj = e.embeddedObject();
             }
             else {
