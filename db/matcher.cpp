@@ -427,7 +427,7 @@ namespace mongo {
                 case BSONObj::opALL:
                 case BSONObj::NE:
                 case BSONObj::NIN:
-                case BSONObj::opEXISTS: // Not part of keyMatch(), but we can't match on index in this case.
+                case BSONObj::opEXISTS: // Not part of keyMatch() determination, but we can't match on index in this case.
                     break;
                 case BSONObj::opIN: {
                     bool inContainsArray = false;
@@ -544,7 +544,7 @@ namespace mongo {
     int retMissing( const ElementMatcher &bm ) {
         if ( bm.compareOp != BSONObj::opEXISTS )
             return 0;
-        return bm.toMatch.boolean() ? -1 : 1;
+        return bm.toMatch.trueValue() ? -1 : 1;
     }
 
     /* Check if a particular field matches.

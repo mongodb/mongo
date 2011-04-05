@@ -217,7 +217,7 @@ namespace mongo {
 
         bool existsSpec = false;
         if ( op == BSONObj::opEXISTS ) {
-            existsSpec = e.Bool();
+            existsSpec = e.trueValue();
         }
         
         if ( e.type() == RegEx
