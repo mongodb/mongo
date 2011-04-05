@@ -24,6 +24,7 @@
 #include "unittest.h"
 #include "version.h"
 #include "../db/jsobj.h"
+#include "file.h"
 
 namespace mongo {
 
@@ -142,6 +143,39 @@ namespace mongo {
             cout << endl;
             cout << "** WARNING: You are running in OpenVZ. This is known to be broken!!!" << endl;
             warned = true;
+        }
+
+        if (boost::filesystem::exists("/sys/devices/system/node/node1")){
+            // We are on a box with a NUMA enabled kernel and more than 1 numa node (they start at node0)
+            // Now we look at the first line of /proc/self/numa_maps
+            //
+            // Bad example:
+            // $ cat /proc/self/numa_maps
+            // 00400000 default file=/bin/cat mapped=6 N4=6
+            //
+            // Good example:
+            // $ numactl --interleave=all cat /proc/self/numa_maps
+            // 00400000 interleave:0-7 file=/bin/cat mapped=6 N4=6
+
+            File f;
+            f.open("/proc/self/numa_maps", /*read_only*/true);
+            char line[100]; //we only need the first line
+            f.read(0, line, sizeof(line));
+
+            // just in case...
+            line[98] = ' ';
+            line[99] = '\0';
+
+            // skip over pointer
+            const char* space = strchr(line, ' ');
+
+            if (!startsWith(space+1, "interleave")){
+                cout << endl;
+                cout << "** WARNING: You are running in on a NUMA machine." << endl;
+                cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
+                cout << "**              numactl --interleave=all mongod [other options]" << endl;
+                warned = true;
+            }
         }
 #endif
 
