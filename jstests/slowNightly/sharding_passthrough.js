@@ -9,7 +9,6 @@ var runnerStart = new Date()
 files.forEach(
     function(x) {
         
-// /(basic|update).*\.js$/
         if ( /[\/\\]_/.test(x.name) ||
              ! /\.js$/.test(x.name ) ){ 
             print(" >>>>>>>>>>>>>>> skipping " + x.name);
@@ -73,7 +72,7 @@ files.forEach(
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|compact|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would fail under sharding " + x.name)	    
 	    return;
 	}

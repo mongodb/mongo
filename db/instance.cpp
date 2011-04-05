@@ -221,7 +221,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -268,7 +268,7 @@ namespace mongo {
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
-        currentOp.reset(client,op);
+        currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
@@ -652,7 +652,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , _clientHost );
         assert( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
@@ -664,7 +664,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , _clientHost );
         getDur().commitIfNeeded();
     }
 
@@ -681,6 +681,8 @@ namespace mongo {
     void DBDirectClient::killCursor( long long id ) {
         ClientCursor::erase( id );
     }
+
+    HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
 
     unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
         readlock lk( ns );
@@ -787,6 +789,15 @@ namespace mongo {
 #endif
         }
 #endif
+    }
+
+    void exitCleanly( ExitCode code ) {
+        killCurrentOp.killAll();
+        {
+            dblock lk;
+            log() << "now exiting" << endl;
+            dbexit( code );
+        }
     }
 
     /* not using log() herein in case we are already locked */

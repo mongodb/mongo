@@ -38,7 +38,7 @@ namespace mongo {
     class CurOp;
     class Command;
     class Client;
-    class MessagingPort;
+    class AbstractMessagingPort;
 
     extern boost::thread_specific_ptr<Client> currentClient;
 
@@ -58,7 +58,7 @@ namespace mongo {
         /* each thread which does db operations has a Client object in TLS.
            call this when your thread starts.
         */
-        static Client& initThread(const char *desc, MessagingPort *mp = 0);
+        static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
         ~Client();
 
@@ -92,7 +92,7 @@ namespace mongo {
         void gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
-        MessagingPort * port() const { return _mp; }
+        AbstractMessagingPort * port() const { return _mp; }
         ConnectionId getConnectionId() const { return _connectionId; }
 
     private:
@@ -106,9 +106,9 @@ namespace mongo {
         ReplTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
-        MessagingPort * const _mp;
+        AbstractMessagingPort * const _mp;
 
-        Client(const char *desc, MessagingPort *p = 0);
+        Client(const char *desc, AbstractMessagingPort *p = 0);
 
         friend class CurOp;
 

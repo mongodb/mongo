@@ -103,7 +103,7 @@ namespace mongo {
         ~DbResponse() { delete response; }
     };
 
-    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort &client );
 
     void getDatabaseNames( vector< string > &names , const string& usePath = dbpath );
 
@@ -145,6 +145,9 @@ namespace mongo {
         virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
         
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
+
+    private:
+        static HostAndPort _clientHost;
     };
 
     extern int lockFile;

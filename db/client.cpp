@@ -43,7 +43,7 @@ namespace mongo {
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
-    Client& Client::initThread(const char *desc, MessagingPort *mp) {
+    Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         assert( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
@@ -51,7 +51,7 @@ namespace mongo {
         return *c;
     }
 
-    Client::Client(const char *desc, MessagingPort *p) :
+    Client::Client(const char *desc, AbstractMessagingPort *p) :
         _context(0),
         _shutdown(false),
         _desc(desc),

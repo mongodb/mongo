@@ -70,8 +70,10 @@ namespace mongo {
 
         bool isLocalHost() const;
 
-        // @returns host:port
-        string toString() const;
+        /**
+         * @param includePort host:port if true, host otherwise
+         */
+        string toString( bool includePort=true ) const;
 
         operator string() const { return toString(); }
 
@@ -130,7 +132,10 @@ namespace mongo {
         return HostAndPort(h, cmdLine.port);
     }
 
-    inline string HostAndPort::toString() const {
+    inline string HostAndPort::toString( bool includePort ) const {
+        if ( ! includePort )
+            return _host;
+
         stringstream ss;
         ss << _host;
         if ( _port != -1 ) {
