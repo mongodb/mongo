@@ -614,12 +614,20 @@ __slvg_ovfl_srch_row(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
  *
  * Review page 31: because page 31 has the range C-D and a higher LSN than page
  * 30, page 30 would "split" into two ranges, A-C and E-G, conceding the C-D
- * range to page 31.
+ * range to page 31.  The new track element would be inserted into array with
+ * the following result:
  *
- *	 30	 A-C	 3
- *		 E-G	 3	[new WT_TRACK element]
+ *	Page	Range	LSN
+ *	 30	 A-C	 3		<< Changed WT_TRACK element
  *	 31	 C-D	 4
  *	 32	 B-C	 5
+ *	 33	 C-F	 6
+ *	 34	 C-D	 7
+ *	 30	 E-G	 3		<< New WT_TRACK element
+ *	 35	 F-M	 8
+ *	 36	 H-O	 9
+ *
+ * Continue the review of the first element, using its new values.
  *
  * Review page 32: because page 31 has the range B-C and a higher LSN than page
  * 30, page 30's A-C range would be truncated, conceding the B-C range to page
@@ -629,39 +637,22 @@ __slvg_ovfl_srch_row(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
  *	 31	 C-D	 4
  *	 32	 B-C	 5
  *	 33	 C-F	 6
+ *	 34	 C-D	 7
  *
  * Review page 33: because page 33 has a starting key (C) past page 30's ending
- * key (B), we stop evaluating page 30's A-B range, because there can be no
- * further overlaps.
+ * key (B), we stop evaluating page 30's A-B range, as there can be no further
+ * overlaps.
  *
- * This process is repeated for each page through the array.  If new elements
- * are created, they are sorted into the correct spot in the array, at the time
- * they are created, and then we proceed.  In this example, page 30's newly
- * created E-G range would be sorted into the array:
+ * This process is repeated for each page in the array.
  *
- *	 30	 A-C	 3
- *	 31	 C-D	 4
- *	 32	 B-C	 5
- *	 33	 C-F	 6
- *	 34	 C-D	 7
- *	 30	 E-G	 3
- *	 35	 F-M	 8
- *	 36	 H-O	 9
- *
- * When page 33 was processed, we'd discover that page 33's C-F range overlaps
+ * When page 33 is processed, we'd discover that page 33's C-F range overlaps
  * page 30's E-G range, and page 30's E-G range would be updated, conceding the
  * E-F range to page 33.
- *
- * And so on, and so forth.
  *
  * This is not computationally expensive because we don't walk far forward in
  * the leaf array because it's sorted by starting key, and because WiredTiger
  * splits are rare, the chance of finding the kind of range overlap requiring
  * re-sorting the array is small.
- *
- * Finally, for each page from which we're going to salvage a key, mark the
- * overflow pages it references -- as soon as we're done with the leaf array,
- * we're going to free any overflow pages that are known not to be referenced.
  */
 static int
 __slvg_range_col(SESSION *session, WT_STUFF *ss)
@@ -681,7 +672,11 @@ __slvg_range_col(SESSION *session, WT_STUFF *ss)
 		if (ss->pages[i] == NULL)
 			continue;
 
-		/* Mark the overflow pages this page references. */
+		/*
+		 * Mark the overflow pages this page references -- as soon as
+		 * we're done with the page array, we'll free overflow pages
+		 * that are known not to be referenced.
+		 */
 		if (ss->pages[i]->ovfl_cnt != 0)
 			__slvg_trk_ovfl_reference(session, ss->pages[i], ss);
 
