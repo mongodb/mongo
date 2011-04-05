@@ -353,12 +353,25 @@ coreServerFiles += processInfoFiles
 if has_option( "asio" ):
     coreServerFiles += [ "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp db/queryoptimizer.cpp db/extsort.cpp db/cmdline.cpp db/pipeline/accumulator.cpp db/pipeline/accumulator_append.cpp db/pipeline/accumulator_min_max.cpp db/pipeline/accumulator_sum.cpp db/pipeline/document.cpp db/pipeline/document_source.cpp db/pipeline/document_source_bson_array.cpp db/pipeline/document_source_cursor.cpp db/pipeline/document_source_filter.cpp db/pipeline/document_source_group.cpp db/pipeline/document_source_project.cpp db/pipeline/expression.cpp db/pipeline/value.cpp" )
+serverOnlyFiles = Split( "util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp db/queryoptimizer.cpp db/extsort.cpp db/cmdline.cpp" )
 
 serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/geo/*.cpp" )
 
 serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
-serverOnlyFiles += Glob( "db/commands/*.cpp" )
+
+# most commands are only for mongod
+serverOnlyFiles += [
+    "db/commands/distinct.cpp",
+    "db/commands/find_and_modify.cpp",
+    "db/commands/group.cpp",
+    "db/commands/isself.cpp",
+    "db/commands/mr.cpp",
+    "db/commands/pipeline_command.cpp" ]
+
+# but the pipeline command works everywhere
+coreServerFiles += [ "db/commands/pipeline.cpp" ]
+coreServerFiles += Glob("db/pipeline/*.cpp")
+
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 

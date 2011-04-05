@@ -35,75 +35,67 @@ namespace mongo {
         subclass to make a command.  define a singleton object for it.
         */
     class Pipeline :
-        public Command {
+        boost::noncopyable {
     public:
-        // virtuals from Command
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg,
-                         BSONObjBuilder& result, bool fromRepl);
-        virtual LockType locktype() const;
-        virtual bool slaveOk() const;
-        virtual void help(stringstream& help) const;
         virtual ~Pipeline();
 
-        Pipeline();
+	/*
+	  Create a pipeline from the command.
 
-	class Spec :
-     	    boost::noncopyable {
-	public:
-	    static shared_ptr<Spec> parseCommand(
-		string &errmsg, BSONObj &cmdObj);
+	  @param errmsg where to write errors, if there are any
+	  @param cmdObj the command object sent from the client
+	  @returns the pipeline, if created, otherwise a NULL reference
+	 */
+	static shared_ptr<Pipeline> parseCommand(
+	    string &errmsg, BSONObj &cmdObj);
 
-	    /*
-	      Get the collection name from the command.
+	/*
+	  Get the collection name from the command.
 
-	      @returns the collection name
-	     */
-	    string getCollectionName() const;
+	  @returns the collection name
+	*/
+	string getCollectionName() const;
 
-	    /*
-	      Split the current spec into a pipeline for each shard, and
-	      a pipeline that combines the results within mongos.
+	/*
+	  Split the current Pipeline into a Pipeline for each shard, and
+	  a Pipeline that combines the results within mongos.
 
-	      This permanently alters the current spec for the merging
-	      operation.
+	  This permanently alters this pipeline for the merging operation.
 
-	      @returns the Spec for the pipeline command that should be sent
-	        to the shards
-	     */
-	    shared_ptr<Spec> splitForSharded();
+	  @returns the Spec for the pipeline command that should be sent
+	    to the shards
+	*/
+	shared_ptr<Pipeline> splitForSharded();
 
-	    /*
-	      Write the Spec as a BSONObj command.  This should be the
-	      inverse of parseCommand().
+	/*
+	  Write the Pipeline as a BSONObj command.  This should be the
+	  inverse of parseCommand().
 
-	      This is only intended to be used by the shard command obtained
-	      from splitForSharded().  Some pipeline operations in the merge
-	      process do not have equivalent command forms, and using this on
-	      the mongos Spec will cause assertions.
+	  This is only intended to be used by the shard command obtained
+	  from splitForSharded().  Some pipeline operations in the merge
+	  process do not have equivalent command forms, and using this on
+	  the mongos Pipeline will cause assertions.
 
-	      @param the builder to write the command to
-	     */
-	    void toBson(BSONObjBuilder *pBuilder) const;
+	  @param the builder to write the command to
+	*/
+	void toBson(BSONObjBuilder *pBuilder) const;
 
-	    /*
-	      Run the Spec on the given source.
+	/*
+	  Run the Pipeline on the given source.
 
-	      @param result builder to write the result to
-	      @param errmsg place to put error messages, if any
-	      @param pSource the document source to use at the head of the chain
-	      @returns true on success, false if an error occurs
-	     */
-	    bool run(BSONObjBuilder &result, string &errmsg,
-		shared_ptr<DocumentSource> pSource) const;
-
-	private:
-	    Spec();
-
-	    string collectionName;
-	    vector<shared_ptr<DocumentSource>> vpSource;
-	};
+	  @param result builder to write the result to
+	  @param errmsg place to put error messages, if any
+	  @param pSource the document source to use at the head of the chain
+	  @returns true on success, false if an error occurs
+	*/
+	bool run(BSONObjBuilder &result, string &errmsg,
+		 shared_ptr<DocumentSource> pSource) const;
 
     private:
+        Pipeline();
+
+	string collectionName;
+	vector<shared_ptr<DocumentSource>> vpSource;
     };
 
 } // namespace mongo
@@ -113,7 +105,7 @@ namespace mongo {
 
 namespace mongo {
 
-    inline string Pipeline::Spec::getCollectionName() const {
+    inline string Pipeline::getCollectionName() const {
 	return collectionName;
     }
 

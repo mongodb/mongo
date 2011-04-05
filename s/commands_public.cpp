@@ -24,6 +24,7 @@
 #include "../client/parallel.h"
 #include "../db/commands.h"
 #include "../db/query.h"
+#include "../db/commands/pipeline.h"
 
 #include "config.h"
 #include "chunk.h"
@@ -1042,6 +1043,11 @@ namespace mongo {
 
         } applyOpsCmd;
 
+
+	/*
+	  Note these are in the pub_grid_cmds namespace, so they don't
+	  conflict with those in db/commands/pipeline_command.cpp.
+	 */
 	class PipelineCommand :
 	    public PublicGridCommand {
 	public:
@@ -1054,7 +1060,7 @@ namespace mongo {
 
 	private:
 	    
-	} pipelineCommand;
+	};
 
 
 	/* -------------------- PipelineCommand ----------------------------- */
@@ -1068,7 +1074,82 @@ namespace mongo {
 	bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
 				  string &errmsg, BSONObjBuilder &result,
 				  bool fromRepl) {
-	    return false;
+	    //const string shardedOutputCollection = getTmpName( collection );
+
+	    /* parse the pipeline specification */
+	    shared_ptr<Pipeline> pPipeline(
+		Pipeline::parseCommand(errmsg, cmdObj));
+	    if (!pPipeline.get())
+		return false; // there was some parsing error
+
+	    string fullns = dbName + "." + pPipeline->getCollectionName();
+
+	    /*
+	      If the system isn't running sharded, or the target collection
+	      isn't sharded, pass this on to a mongod.
+	    */
+	    DBConfigPtr conf = grid.getDBConfig( dbName , false );
+	    if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
+		return passthrough(conf, cmdObj, result);
+
+	    /* split the pipeline into pieces for mongods and this mongos */
+	    shared_ptr<Pipeline> pShardPipeline(pPipeline->splitForSharded());
+
+	    /* create the command for the shards */
+	    BSONObjBuilder commandBuilder;
+	    pShardPipeline->toBson(&commandBuilder);
+	    BSONObj shardedCommand(commandBuilder.done());
+
+	    BSONObj shardQuery;
+	        // CW TODO need to extract this from pShardPipeline!!
+	    assert(false && "unimplemented");
+
+	    ChunkManagerPtr cm(conf->getChunkManager(fullns));
+	    set<Shard> shards;
+	    cm->getShardsForQuery(shards, shardQuery);
+
+	    /*
+	      From MRCmd::Run: "we need to use our connections to the shard
+	      so filtering is done correctly for un-owned docs so we allocate
+	      them in our thread and hand off"
+	    */
+	    vector<shared_ptr<ShardConnection>> shardConns;
+	    list<shared_ptr<Future::CommandResult>> futures;
+	    for (set<Shard>::iterator i=shards.begin(), end=shards.end();
+		 i != end; i++) {
+		shared_ptr<ShardConnection> temp(
+		    new ShardConnection(i->getConnString(), fullns));
+		assert(temp->get());
+		futures.push_back(
+		    Future::spawnCommand(i->getConnString(), dbName,
+					 shardedCommand ,temp->get()));
+		shardConns.push_back(temp);
+	    }
+                    
+	    bool failed = false;
+                    
+	    BSONObjBuilder shardresults;
+	    for (list<shared_ptr<Future::CommandResult>>::iterator i =
+		     futures.begin(); i!=futures.end(); ++i) {
+		 shared_ptr<Future::CommandResult> res = *i;
+		 if (!res->join()) {
+		     error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
+		     result.append( "cause" , res->result() );
+		     errmsg = "mongod mr failed: ";
+		     errmsg += res->result().toString();
+		     failed = true;
+		     continue;
+		 }
+		 shardresults.append( res->getServer() , res->result() );
+		 }
+
+	    for ( unsigned i=0; i<shardConns.size(); i++ )
+		shardConns[i]->done();
+
+	    if (failed)
+		return false;
+
+	    return true;
 	}
 
 
