@@ -176,8 +176,9 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	qsort(ss->pages, (size_t)ss->pages_next,
 	    sizeof(WT_TRACK *), __slvg_trk_compare);
 
-#if 0
-	__slvg_trk_dump("after sort", ss);
+#if HAVE_DIAGNOSTIC
+	if (0)
+		__slvg_trk_dump("after sort", ss);
 #endif
 
 	/*
@@ -195,8 +196,9 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 		break;
 	}
 
-#if 0
-	__slvg_trk_dump("after merge", ss);
+#if HAVE_DIAGNOSTIC
+	if (0)
+		__slvg_trk_dump("after merge", ss);
 #endif
 
 	/*
