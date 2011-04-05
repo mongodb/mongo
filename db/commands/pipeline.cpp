@@ -50,7 +50,30 @@ namespace mongo {
     bool Pipeline::run(const string &db, BSONObj &cmdObj,
                        string &errmsg,
                        BSONObjBuilder &result, bool fromRepl) {
-        string collectionName;
+	/* try to parse the command; if this fails, then we didn't run */
+	shared_ptr<Spec> pSpec(Spec::parseCommand(errmsg, cmdObj));
+	if (!pSpec.get())
+	    return false;
+
+	/* now hook up the pipeline */
+        /* connect up a cursor to the specified collection */
+        shared_ptr<Cursor> pCursor(
+            findTableScan(pSpec->getCollectionName().c_str(), BSONObj()));
+        shared_ptr<DocumentSource> pSource(
+	    DocumentSourceCursor::create(pCursor));
+
+	return pSpec->run(result, errmsg, pSource);
+    }
+
+
+    Pipeline::Spec::Spec():
+	collectionName(),
+	vpSource() {
+    }
+
+    shared_ptr<Pipeline::Spec> Pipeline::Spec::parseCommand(
+	string &errmsg, BSONObj &cmdObj) {
+	shared_ptr<Spec> pSpec(new Spec());
         vector<BSONElement> pipeline;
 
         /* gather the specification for the aggregation */
@@ -67,17 +90,17 @@ namespace mongo {
 
             /* check for the collection name */
             if (!strcmp(pFieldName, "collection")) {
-                collectionName = cmdElement.String();
+                pSpec->collectionName = cmdElement.String();
                 continue;
             }
 
             /* we didn't recognize a field in the command */
             ostringstream sb;
             sb <<
-               "Pipeline::run(): unrecognized field \"" <<
+               "Pipeline::parseCommand(): unrecognized field \"" <<
                cmdElement.fieldName();
             errmsg = sb.str();
-            return false;
+	    return shared_ptr<Spec>();
         }
 
         /*
@@ -85,7 +108,7 @@ namespace mongo {
 
           Set up the document source pipeline.
         */
-	vector<shared_ptr<DocumentSource>> vpSource;
+	vector<shared_ptr<DocumentSource>> *pvpSource = &pSpec->vpSource;
 
         /* iterate over the steps in the pipeline */
         const size_t nSteps = pipeline.size();
@@ -121,22 +144,26 @@ namespace mongo {
                        "Pipeline::run(): unrecognized pipeline op \"" <<
                        pFieldName;
                     errmsg = sb.str();
-                    return false;
+		    return shared_ptr<Spec>();
                 }
             }
 
-	    vpSource.push_back(pSource);
+	    pvpSource->push_back(pSource);
         }
 
+	/*
+	  CW TODO - move filters up where possible, split pipeline for sharding
+	*/
+
 	/* optimize the elements in the pipeline */
-	size_t nSources = vpSource.size();
+	size_t nSources = pvpSource->size();
 	for(size_t iSource = 0; iSource < nSources; ++iSource)
-	    vpSource[iSource]->optimize();
+	    (*pvpSource)[iSource]->optimize();
 
 	/* find the first group operation, if there is one */
 	size_t firstGroup = nSources + 1;
 	for(firstGroup = 0; firstGroup < nSources; ++firstGroup) {
-	    DocumentSource *pDS = vpSource[firstGroup].get();
+	    DocumentSource *pDS = (*pvpSource)[firstGroup].get();
 	    if (dynamic_cast<DocumentSourceGroup *>(pDS))
 		break;
 	}
@@ -151,24 +178,73 @@ namespace mongo {
 	*/
 	// CW TODO
 
-	/* now hook up the pipeline */
-        /* connect up a cursor to the specified collection */
-        shared_ptr<Cursor> pCursor(
-            findTableScan(collectionName.c_str(), BSONObj()));
-        shared_ptr<DocumentSource> pSource(
-	    DocumentSourceCursor::create(pCursor));
+	return pSpec;
+    }
 
+    shared_ptr<Pipeline::Spec> Pipeline::Spec::splitForSharded() {
+	/* create an initialize the shard spec we'll return */
+	shared_ptr<Spec> pShardSpec(new Spec());
+	pShardSpec->collectionName = collectionName;
+
+	/* look for a grouping operation */
+	const size_t nSources = vpSource.size();
+	DocumentSourceGroup *pGroup = NULL;
+	size_t iGroup = nSources;
+	for(size_t iSource = 0; iSource < nSources; ++iSource) {
+	    pGroup = dynamic_cast<DocumentSourceGroup *>(
+		vpSource[iSource].get());
+	    if (pGroup) {
+		iGroup = iSource;
+		break;
+	    }
+	}
+
+	/*
+	  If there is a group, create a new spec with everything up to
+	  and including that.
+
+	  If there is no group, the shard spec will include everything,
+	  and the merger spec will just include a union.
+	 */
+	const size_t copyLimit = pGroup ? (iGroup + 1) : nSources;
+	for(size_t iSource = 0; iSource < copyLimit; ++iSource)
+	    pShardSpec->vpSource.push_back(vpSource[iSource]);
+
+	/*
+	  If there was a grouping operator, fork that and put it at the
+	  beginning of the mongos spec.
+	*/
+	size_t iCopyTo = 0;
+    	if (pGroup)
+	    vpSource[iCopyTo++] = pGroup->createMerger();
+
+	/*
+	  In the original spec, move all the document sources down, eliminating
+	  those that were copied into the shard spec.  Then eliminate all the
+	  trailing entries.
+	 */
+	for(size_t iCopyFrom = copyLimit; iCopyFrom < nSources;
+	    ++iCopyTo, ++iCopyFrom)
+	    vpSource[iCopyTo] = vpSource[iCopyFrom];
+	vpSource.resize(iCopyTo);
+
+	return pShardSpec;
+    }
+
+    void Pipeline::Spec::toBson(BSONObjBuilder *pBuilder) const {
+	assert(false && "unimplemented");
+    }
+
+    bool Pipeline::Spec::run(BSONObjBuilder &result, string &errmsg,
+			     shared_ptr<DocumentSource> pSource) const {
 	/* now chain together the sources we found */
-	nSources = vpSource.size();  // the size of the chain might have changed
+	const size_t nSources = vpSource.size();
 	for(size_t iSource = 0; iSource < nSources; ++iSource)
 	{
 	    shared_ptr<DocumentSource> pTemp(vpSource[iSource]);
 	    pTemp->setSource(pSource);
 	    pSource = pTemp;
 	}
-	/*
-	  CW TODO - move filters up where possible, split pipeline for sharding
-	*/
 	/* pSource is left pointing at the last source in the chain */
 
         /*
@@ -189,4 +265,5 @@ namespace mongo {
 
         return true;
     }
-}
+
+} // namespace mongo

@@ -47,7 +47,76 @@ namespace mongo {
 
         Pipeline();
 
+	class Spec :
+     	    boost::noncopyable {
+	public:
+	    static shared_ptr<Spec> parseCommand(
+		string &errmsg, BSONObj &cmdObj);
+
+	    /*
+	      Get the collection name from the command.
+
+	      @returns the collection name
+	     */
+	    string getCollectionName() const;
+
+	    /*
+	      Split the current spec into a pipeline for each shard, and
+	      a pipeline that combines the results within mongos.
+
+	      This permanently alters the current spec for the merging
+	      operation.
+
+	      @returns the Spec for the pipeline command that should be sent
+	        to the shards
+	     */
+	    shared_ptr<Spec> splitForSharded();
+
+	    /*
+	      Write the Spec as a BSONObj command.  This should be the
+	      inverse of parseCommand().
+
+	      This is only intended to be used by the shard command obtained
+	      from splitForSharded().  Some pipeline operations in the merge
+	      process do not have equivalent command forms, and using this on
+	      the mongos Spec will cause assertions.
+
+	      @param the builder to write the command to
+	     */
+	    void toBson(BSONObjBuilder *pBuilder) const;
+
+	    /*
+	      Run the Spec on the given source.
+
+	      @param result builder to write the result to
+	      @param errmsg place to put error messages, if any
+	      @param pSource the document source to use at the head of the chain
+	      @returns true on success, false if an error occurs
+	     */
+	    bool run(BSONObjBuilder &result, string &errmsg,
+		shared_ptr<DocumentSource> pSource) const;
+
+	private:
+	    Spec();
+
+	    string collectionName;
+	    vector<shared_ptr<DocumentSource>> vpSource;
+	};
+
     private:
     };
 
 } // namespace mongo
+
+
+/* ======================= INLINED IMPLEMENTATIONS ========================== */
+
+namespace mongo {
+
+    inline string Pipeline::Spec::getCollectionName() const {
+	return collectionName;
+    }
+
+} // namespace mongo
+
+

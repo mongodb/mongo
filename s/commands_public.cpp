@@ -1042,6 +1042,35 @@ namespace mongo {
 
         } applyOpsCmd;
 
-    }
+	class PipelineCommand :
+	    public PublicGridCommand {
+	public:
+	    PipelineCommand();
 
-}
+	    // virtuals from Command
+	    virtual bool run(const string &dbName , BSONObj &cmdObj,
+			     string &errmsg, BSONObjBuilder &result,
+			     bool fromRepl);
+
+	private:
+	    
+	} pipelineCommand;
+
+
+	/* -------------------- PipelineCommand ----------------------------- */
+
+	static const PipelineCommand pipelineCommand;
+
+	PipelineCommand::PipelineCommand():
+	    PublicGridCommand("pipeline") {
+	}
+
+	bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
+				  string &errmsg, BSONObjBuilder &result,
+				  bool fromRepl) {
+	    return false;
+	}
+
+
+    } // namespace pub_grid_cmds
+} // namespace mongo
