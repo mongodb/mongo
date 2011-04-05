@@ -588,11 +588,63 @@ namespace mongo {
         return temp.empty();
     }
 
+    void FieldRange::setExclusiveBounds() {
+        for( vector< FieldInterval >::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+            i->_lower._inclusive = false;
+            i->_upper._inclusive = false;
+        }
+    }
+
+    void FieldRange::reverse( FieldRange &ret ) const {
+        assert( _special.empty() );
+        ret._intervals.clear();
+        ret._objData = _objData;
+        for( vector< FieldInterval >::const_reverse_iterator i = _intervals.rbegin(); i != _intervals.rend(); ++i ) {
+            FieldInterval fi;
+            fi._lower = i->_upper;
+            fi._upper = i->_lower;
+            ret._intervals.push_back( fi );
+        }
+    }
+    
     BSONObj FieldRange::addObj( const BSONObj &o ) {
         _objData.push_back( o );
         return o;
     }
 
+    /** for testing only - speed unimportant */
+    bool QueryPattern::operator==( const QueryPattern &other ) const {
+        bool less = operator<( other );
+        bool more = other.operator<( *this );
+        assert( !( less && more ) );
+        return !( less || more );
+    }
+    
+    /** for testing only - speed unimportant */
+    bool QueryPattern::operator!=( const QueryPattern &other ) const {
+        return !operator==( other );
+    }
+    
+    void QueryPattern::setSort( const BSONObj sort ) {
+        _sort = normalizeSort( sort );
+    }
+    
+    BSONObj QueryPattern::normalizeSort( const BSONObj &spec ) {
+        if ( spec.isEmpty() )
+            return spec;
+        int direction = ( spec.firstElement().number() >= 0 ) ? 1 : -1;
+        BSONObjIterator i( spec );
+        BSONObjBuilder b;
+        while( i.moreWithEOO() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            b.append( e.fieldName(), direction * ( ( e.number() >= 0 ) ? -1 : 1 ) );
+        }
+        return b.obj();
+    }
+    
+    
     string FieldRangeSet::getSpecial() const {
         string s = "";
         for ( map<string,FieldRange>::iterator i=_ranges.begin(); i!=_ranges.end(); i++ ) {
@@ -604,6 +656,101 @@ namespace mongo {
         return s;
     }
 
+    /**
+     * Btree scanning for a multidimentional key range will yield a
+     * multidimensional box.  The idea here is that if an 'other'
+     * multidimensional box contains the current box we don't have to scan
+     * the current box.  If the 'other' box contains the current box in
+     * all dimensions but one, we can safely subtract the values of 'other'
+     * along that one dimension from the values for the current box on the
+     * same dimension.  In other situations, subtracting the 'other'
+     * box from the current box yields a result that is not a box (but
+     * rather can be expressed as a union of boxes).  We don't support
+     * such splitting currently in calculating index ranges.  Note that
+     * where I have said 'box' above, I actually mean sets of boxes because
+     * a field range can consist of multiple intervals.
+     */    
+    const FieldRangeSet &FieldRangeSet::operator-=( const FieldRangeSet &other ) {
+        int nUnincluded = 0;
+        string unincludedKey;
+        map< string, FieldRange >::iterator i = _ranges.begin();
+        map< string, FieldRange >::const_iterator j = other._ranges.begin();
+        while( nUnincluded < 2 && i != _ranges.end() && j != other._ranges.end() ) {
+            int cmp = i->first.compare( j->first );
+            if ( cmp == 0 ) {
+                if ( i->second <= j->second ) {
+                    // nothing
+                }
+                else {
+                    ++nUnincluded;
+                    unincludedKey = i->first;
+                }
+                ++i;
+                ++j;
+            }
+            else if ( cmp < 0 ) {
+                ++i;
+            }
+            else {
+                // other has a bound we don't, nothing can be done
+                return *this;
+            }
+        }
+        if ( j != other._ranges.end() ) {
+            // other has a bound we don't, nothing can be done
+            return *this;
+        }
+        if ( nUnincluded > 1 ) {
+            return *this;
+        }
+        if ( nUnincluded == 0 ) {
+            makeEmpty();
+            return *this;
+        }
+        // nUnincluded == 1
+        _ranges[ unincludedKey ] -= other._ranges[ unincludedKey ];
+        appendQueries( other );
+        return *this;
+    }
+    
+    const FieldRangeSet &FieldRangeSet::operator&=( const FieldRangeSet &other ) {
+        map< string, FieldRange >::iterator i = _ranges.begin();
+        map< string, FieldRange >::const_iterator j = other._ranges.begin();
+        while( i != _ranges.end() && j != other._ranges.end() ) {
+            int cmp = i->first.compare( j->first );
+            if ( cmp == 0 ) {
+                i->second &= j->second;
+                ++i;
+                ++j;
+            }
+            else if ( cmp < 0 ) {
+                ++i;
+            }
+            else {
+                _ranges[ j->first ] = j->second;
+                ++j;
+            }
+        }
+        while( j != other._ranges.end() ) {
+            _ranges[ j->first ] = j->second;
+            ++j;
+        }
+        appendQueries( other );
+        return *this;
+    }    
+    
+    void FieldRangeSet::appendQueries( const FieldRangeSet &other ) {
+        for( vector< BSONObj >::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
+            _queries.push_back( *i );
+        }
+    }
+    
+    void FieldRangeSet::makeEmpty() {
+        for( map< string, FieldRange >::iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            i->second.makeEmpty();
+        }
+    }    
+    
     void FieldRangeSet::processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize ) {
         BSONElement g = f;
         int op2 = g.getGtLtOp();
@@ -705,68 +852,59 @@ namespace mongo {
             processQueryField( e, optimize );
         }
     }
-
-    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
-        : _baseSet( ns, query, optimize ), _orFound() {
-
-        BSONObjIterator i( _baseSet._queries[ 0 ] );
-
+    
+    FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction )
+    :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
+        _queries = frs._queries;
+        BSONObjIterator i( _indexSpec.keyPattern );
         while( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
-                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
-                BSONObjIterator j( e.embeddedObject() );
-                while( j.more() ) {
-                    BSONElement f = j.next();
-                    massert( 13263, "$or array must contain objects", f.type() == Object );
-                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
-                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
-                    _originalOrSets.push_back( _orSets.back() );
-                }
-                _orFound = true;
-                continue;
-            }
-        }
-    }
-    
-    /**
-     * Removes the top or clause, which would have been recently scanned, and
-     * removes the field ranges it covers from all subsequent or clauses.  As a
-     * side effect, this function may invalidate the return values of topFrs()
-     * calls made before this function was called.
-     * @param indexSpec - Keys of the index that was used to satisfy the last or
-     * clause.  Used to determine the range of keys that were scanned.  If
-     * empty we do not constrain the previous clause's ranges using index keys,
-     * which may reduce opportunities for range elimination.
-     */    
-    void FieldRangeOrSet::popOrClause( const BSONObj &indexSpec ) {
-        massert( 13274, "no or clause to pop", !orFinished() );
-        auto_ptr< FieldRangeSet > holder;
-        FieldRangeSet *toDiff = &_originalOrSets.front();
-        if ( toDiff->matchPossible() && !indexSpec.isEmpty() ) {
-            holder.reset( toDiff->subset( indexSpec ) );
-            toDiff = holder.get();
-        }
-        list< FieldRangeSet >::iterator i = _orSets.begin();
-        list< FieldRangeSet >::iterator j = _originalOrSets.begin();
-        ++i;
-        ++j;
-        while( i != _orSets.end() ) {
-            *i -= *toDiff;
-            if( !i->matchPossible() ) {
-                i = _orSets.erase( i );
-                j = _originalOrSets.erase( j );
+            int number = (int) e.number(); // returns 0.0 if not numeric
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
+            if ( forward ) {
+                _ranges.push_back( frs.range( e.fieldName() ) );
             }
             else {
-                ++i;
-                ++j;
+                _ranges.push_back( FieldRange() );
+                frs.range( e.fieldName() ).reverse( _ranges.back() );
             }
+            assert( !_ranges.back().empty() );
         }
-        _oldOrSets.push_front( _orSets.front() );
-        _orSets.pop_front();
-        _originalOrSets.pop_front();
+        uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded", size() < 1000000 );
+    }    
+
+    BSONObj FieldRangeVector::startKey() const {
+        BSONObjBuilder b;
+        for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            const FieldInterval &fi = i->intervals().front();
+            b.appendAs( fi._lower._bound, "" );
+        }
+        return b.obj();
     }
 
+    BSONObj FieldRangeVector::endKey() const {
+        BSONObjBuilder b;
+        for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            const FieldInterval &fi = i->intervals().back();
+            b.appendAs( fi._upper._bound, "" );
+        }
+        return b.obj();
+    }
+
+    BSONObj FieldRangeVector::obj() const {
+        BSONObjBuilder b;
+        BSONObjIterator k( _indexSpec.keyPattern );
+        for( int i = 0; i < (int)_ranges.size(); ++i ) {
+            BSONArrayBuilder a( b.subarrayStart( k.next().fieldName() ) );
+            for( vector< FieldInterval >::const_iterator j = _ranges[ i ].intervals().begin();
+                j != _ranges[ i ].intervals().end(); ++j ) {
+                a << BSONArray( BSON_ARRAY( j->_lower._bound << j->_upper._bound ).clientReadable() );
+            }
+            a.done();
+        }
+        return b.obj();
+    }
+    
     FieldRange *FieldRangeSet::__trivialRange = 0;
     FieldRange &FieldRangeSet::trivialRange() {
         if ( __trivialRange == 0 )
@@ -1138,6 +1276,94 @@ namespace mongo {
         }
     }
 
+    BSONObj FieldRangeVector::Iterator::startKey() {
+        BSONObjBuilder b;
+        for( int unsigned i = 0; i < _i.size(); ++i ) {
+            const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
+            b.appendAs( fi._lower._bound, "" );
+        }
+        return b.obj();
+    }
+
+    // temp
+    BSONObj FieldRangeVector::Iterator::endKey() {
+        BSONObjBuilder b;
+        for( int unsigned i = 0; i < _i.size(); ++i ) {
+            const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
+            b.appendAs( fi._upper._bound, "" );
+        }
+        return b.obj();
+    }
+    
+    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
+    : _baseSet( ns, query, optimize ), _orFound() {
+        
+        BSONObjIterator i( _baseSet._queries[ 0 ] );
+        
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+                massert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    BSONElement f = j.next();
+                    massert( 13263, "$or array must contain objects", f.type() == Object );
+                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
+                    massert( 13291, "$or may not contain 'special' query", _orSets.back().getSpecial().empty() );
+                    _originalOrSets.push_back( _orSets.back() );
+                }
+                _orFound = true;
+                continue;
+            }
+        }
+    }
+    
+    /**
+     * Removes the top or clause, which would have been recently scanned, and
+     * removes the field ranges it covers from all subsequent or clauses.  As a
+     * side effect, this function may invalidate the return values of topFrs()
+     * calls made before this function was called.
+     * @param indexSpec - Keys of the index that was used to satisfy the last or
+     * clause.  Used to determine the range of keys that were scanned.  If
+     * empty we do not constrain the previous clause's ranges using index keys,
+     * which may reduce opportunities for range elimination.
+     */    
+    void FieldRangeOrSet::popOrClause( const BSONObj &indexSpec ) {
+        massert( 13274, "no or clause to pop", !orFinished() );
+        auto_ptr< FieldRangeSet > holder;
+        FieldRangeSet *toDiff = &_originalOrSets.front();
+        if ( toDiff->matchPossible() && !indexSpec.isEmpty() ) {
+            holder.reset( toDiff->subset( indexSpec ) );
+            toDiff = holder.get();
+        }
+        list< FieldRangeSet >::iterator i = _orSets.begin();
+        list< FieldRangeSet >::iterator j = _originalOrSets.begin();
+        ++i;
+        ++j;
+        while( i != _orSets.end() ) {
+            *i -= *toDiff;
+            if( !i->matchPossible() ) {
+                i = _orSets.erase( i );
+                j = _originalOrSets.erase( j );
+            }
+            else {
+                ++i;
+                ++j;
+            }
+        }
+        _oldOrSets.push_front( _orSets.front() );
+        _orSets.pop_front();
+        _originalOrSets.pop_front();
+    }
+    
+    void FieldRangeOrSet::allClausesSimplified( vector< BSONObj > &ret ) const {
+        for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+            if ( i->matchPossible() ) {
+                ret.push_back( i->simplifiedQuery() );
+            }
+        }
+    }    
+    
     struct SimpleRegexUnitTest : UnitTest {
         void run() {
             {
