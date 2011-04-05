@@ -86,8 +86,9 @@ namespace mongo {
             _b.skip(4); /*leave room for size field and ref-count*/
         }
 
-        /* dm why do we have this/need this? not clear to me, comment please tx. */
-        /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder */
+        /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder
+         *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for example.
+         */
         BSONObjBuilder( BufBuilder &baseBuilder ) : _b( baseBuilder ), _buf( 0 ), _offset( baseBuilder.len() ), _s( this ) , _tracker(0) , _doneCalled(false) {
             _b.skip( 4 );
         }
@@ -150,7 +151,16 @@ namespace mongo {
 
 
         /** add header for a new subobject and return bufbuilder for writing to
-            the subobject's body */
+         *  the subobject's body
+         *
+         *  example:
+         *
+         *  BSONObjBuilder b;
+         *  BSONObjBuilder sub (b.subobjStart("fieldName"));
+         *  // use sub
+         *  sub.done()
+         *  // use b and convert to object
+         */
         BufBuilder &subobjStart(const StringData& fieldName) {
             _b.appendNum((char) Object);
             _b.appendStr(fieldName);
