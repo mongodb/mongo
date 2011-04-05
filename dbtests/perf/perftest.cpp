@@ -359,6 +359,8 @@ namespace BSON {
         BSONObj _base;
     };
 
+
+
     class All : public RunnerSuite {
     public:
         All() : RunnerSuite( "bson" ) {}
@@ -718,6 +720,37 @@ namespace Plan {
         }
     } all;
 } // namespace Plan
+
+namespace Misc {
+    class TimeMicros64 {
+    public:
+        void run() {
+            int iterations = 1000*1000;
+            while(iterations--){
+                curTimeMicros64();
+            }
+        }
+    };
+
+    class JSTime {
+    public:
+        void run() {
+            int iterations = 1000*1000;
+            while(iterations--){
+                jsTime();
+            }
+        }
+    };
+
+    class All : public RunnerSuite {
+    public:
+        All() : RunnerSuite("misc") {}
+        void setupTests() {
+            add< TimeMicros64 >();
+            add< JSTime >();
+        }
+    } all;
+}
 
 int main( int argc, char **argv ) {
     logLevel = -1;
