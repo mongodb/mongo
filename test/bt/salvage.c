@@ -47,7 +47,7 @@ main(int argc, char *argv[])
 	if (argc == 2 && isdigit(argv[1][0]))
 		run (atoi(argv[1]));
 	else
-		for (r = 1; r <= 7; ++r)
+		for (r = 1; r <= 13; ++r)
 			run(r);
 
 	printf("salvage test run completed\n");
@@ -138,12 +138,92 @@ run(int r)
 		/*
 		 * Case #2:
 		 * 2 column-store pages, where the second page overlaps with
-		 * the beginning of the first page.
+		 * the beginning of the first page, and the first page has a
+		 * higher LSN.
 		 */
-		build(100, 20); copy(6, 10);
+		build(100, 20); copy(7, 11);
+		build(200, 20); copy(6, 1);
+		print_res(200, 10);
+		print_res(100, 20);
+		break;
+	case 7:
+		/*
+		 * Case #2:
+		 * 2 column-store pages, where the second page overlaps with
+		 * the beginning of the first page, and the second page has a
+		 * higher LSN.
+		 */
+		build(100, 20); copy(6, 11);
 		build(200, 20); copy(7, 1);
 		print_res(200, 20);
 		print_res(110, 10);
+		break;
+	case 8:
+		/*
+		 * Case #3:
+		 * 2 column-store pages, where the second page overlaps with
+		 * the end of the first page, and the first page has a higher
+		 * LSN.
+		 */
+		build(100, 20); copy(7, 1);
+		build(200, 20); copy(6, 11);
+		print_res(100, 20);
+		print_res(210, 10);
+		break;
+	case 9:
+		/*
+		 * Case #3:
+		 * 2 column-store pages, where the second page overlaps with
+		 * the end of the first page, and the second page has a higher
+		 * LSN.
+		 */
+		build(100, 20); copy(6, 1);
+		build(200, 20); copy(7, 11);
+		print_res(100, 10);
+		print_res(200, 20);
+		break;
+	case 10:
+		/*
+		 * Case #4:
+		 * 2 column-store pages, where the second page is a prefix of
+		 * the first page, and the first page has a higher LSN.
+		 */
+		build(100, 20); copy(7, 1);
+		build(200, 5); copy(6, 1);
+		print_res(100, 20);
+		break;
+	case 11:
+		/*
+		 * Case #4:
+		 * 2 column-store pages, where the second page is a prefix of
+		 * the first page, and the second page has a higher LSN.
+		 */
+		build(100, 20); copy(6, 1);
+		build(200, 5); copy(7, 1);
+		print_res(200, 5);
+		print_res(105, 15);
+		break;
+	case 12:
+		/*
+		 * Case #5:
+		 * 2 column-store pages, where the second page is in the middle
+		 * of the first page, and the first page has a higher LSN.
+		 */
+		build(100, 40); copy(7, 1);
+		build(200, 10); copy(6, 10);
+		print_res(100, 40);
+		break;
+	case 13:
+		/*
+		 * Case #5:
+		 * 2 column-store pages, where the second page is in the middle
+		 * of the first page, and the second page has a higher LSN.
+		 */
+		build(100, 40); copy(6, 1);
+		build(200, 10); copy(7, 11);
+		print_res(100, 10);
+		print_res(200, 10);
+		print_res(120, 20);
 		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
