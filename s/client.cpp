@@ -55,7 +55,7 @@ namespace mongo {
 
         if ( p ) {
             HostAndPort r = p->remote();
-            if ( _remote.port() == -1 )
+            if ( ! _remote.hasPort() )
                 _remote = r;
             else if ( _remote != r ) {
                 stringstream ss;
