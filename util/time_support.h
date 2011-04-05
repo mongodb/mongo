@@ -232,7 +232,7 @@ namespace mongo {
     inline Date_t jsTime() {
         timeval tv;
         gettimeofday(&tv, NULL);
-        unsigned long long t = tv.tv_sec / 1000;
+        unsigned long long t = tv.tv_usec / 1000;
         return ((unsigned long long) tv.tv_sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
     }
     inline unsigned long long curTimeMicros64() {
