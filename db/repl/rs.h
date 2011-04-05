@@ -354,6 +354,7 @@ namespace mongo {
         bool _isStale(OplogReader& r, const string& hn);
     public:
         void syncThread();
+        const OpTime lastOtherOpTime() const;
     };
 
     class ReplSet : public ReplSetImpl {

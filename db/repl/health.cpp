@@ -350,6 +350,22 @@ namespace mongo {
                 return m;
         return 0;
     }
+    
+    const OpTime ReplSetImpl::lastOtherOpTime() const {
+        OpTime closest(0,0);
+        
+        for( Member *m = _members.head(); m; m=m->next() ) {                
+            if (!m->hbinfo().up()) {
+                continue;
+            }
+
+            if (m->hbinfo().opTime > closest) {
+                closest = m->hbinfo().opTime;
+            }
+        }
+
+        return closest;
+    }
 
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
         vector<BSONObj> v;

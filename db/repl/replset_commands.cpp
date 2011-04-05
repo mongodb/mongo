@@ -230,6 +230,31 @@ namespace mongo {
                 errmsg = "not primary so can't step down";
                 return false;
             }
+
+            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+
+            // only step down if there is another node synced to within 10
+            // seconds of this node
+            if (!force) {
+                unsigned lastOp = theReplSet->lastOpTimeWritten.getSecs();
+                unsigned closest = theReplSet->lastOtherOpTime().getSecs();
+
+                int diff = lastOp - closest;
+                result.append("closest", closest);
+                result.append("difference", diff);
+                
+                if (diff < 0) {
+                    // not our problem, but we'll wait until thing settle down
+                    errmsg = "someone is ahead of the primary?";
+                    return false;
+                }
+                                
+                if (diff > 10) {
+                    errmsg = "no secondaries within 10 seconds of my optime";
+                    return false;
+                }
+            }
+            
             int secs = (int) cmdObj.firstElement().numberInt();
             if( secs == 0 )
                 secs = 60;
