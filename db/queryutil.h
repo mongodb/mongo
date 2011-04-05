@@ -416,7 +416,7 @@ namespace mongo {
         }
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
-        static FieldRange *trivialRange_;
+        static FieldRange *__trivialRange;
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > _ranges;
         const char *_ns;

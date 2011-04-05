@@ -767,11 +767,11 @@ namespace mongo {
         _originalOrSets.pop_front();
     }
 
-    FieldRange *FieldRangeSet::trivialRange_ = 0;
+    FieldRange *FieldRangeSet::__trivialRange = 0;
     FieldRange &FieldRangeSet::trivialRange() {
-        if ( trivialRange_ == 0 )
-            trivialRange_ = new FieldRange();
-        return *trivialRange_;
+        if ( __trivialRange == 0 )
+            __trivialRange = new FieldRange();
+        return *__trivialRange;
     }
 
     BSONObj FieldRangeSet::simplifiedQuery( const BSONObj &_fields ) const {
