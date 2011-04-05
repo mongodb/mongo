@@ -713,7 +713,7 @@ namespace mongo {
             }
 
             if( p ) {
-                // Left portion of field name was not found.
+                // Left portion of field name was not found or wrong type.
                 return 0;
             }
             else {
