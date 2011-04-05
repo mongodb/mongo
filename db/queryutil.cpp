@@ -728,7 +728,17 @@ namespace mongo {
             }
         }
     }
-
+    
+    /**
+     * Removes the top or clause, which would have been recently scanned, and
+     * removes the field ranges it covers from all subsequent or clauses.  As a
+     * side effect, this function may invalidate the return values of topFrs()
+     * calls made before this function was called.
+     * @param indexSpec - Keys of the index that was used to satisfy the last or
+     * clause.  Used to determine the range of keys that were scanned.  If
+     * empty we do not constrain the previous clause's ranges using index keys,
+     * which may reduce opportunities for range elimination.
+     */    
     void FieldRangeOrSet::popOrClause( const BSONObj &indexSpec ) {
         massert( 13274, "no or clause to pop", !orFinished() );
         auto_ptr< FieldRangeSet > holder;
