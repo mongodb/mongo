@@ -23,7 +23,7 @@
 namespace mongo {
 
     /**
-     * One side of an interval of valid BSONElements, specified a value and a
+     * One side of an interval of valid BSONElements, specified by a value and a
      * boolean indicating whether the interval includes the value.
      */
     struct FieldBound {
