@@ -100,6 +100,9 @@ namespace mongo {
             */
             virtual bool commitIfNeeded() = 0;
 
+            /** @return true if time to commit but does NOT do a commit */
+            virtual bool aCommitIsNeeded() const = 0;
+
             /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
@@ -174,6 +177,7 @@ namespace mongo {
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
             bool commitIfNeeded() { return false; }
+            bool aCommitIsNeeded() const { return false; }
             void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal() {}
         };
@@ -186,6 +190,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len);
             bool awaitCommit();
             bool commitNow();
+            bool aCommitIsNeeded() const;
             bool commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal();

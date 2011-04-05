@@ -98,11 +98,13 @@ namespace mongo {
                     break;
                 }
 
-                // remove the old record (orphan it)
-                e->firstRecord.writing() = L;
-                Record *r = L.rec();
-                getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
-                getDur().commitIfNeeded();
+                // remove the old records (orphan them) periodically so our commit block doesn't get too large
+                if( getDur().aCommitIsNeeded() ) {
+                    e->firstRecord.writing() = L;
+                    Record *r = L.rec();
+                    getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
+                    getDur().commitIfNeeded();
+                }
             }
 
             assert( d->firstExtent == ext );
@@ -112,7 +114,7 @@ namespace mongo {
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             freeExtents(ext,ext);
-            getDur().commitNow();
+            getDur().commitIfNeeded();
 
             log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
         }
