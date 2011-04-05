@@ -166,14 +166,6 @@ namespace mongo {
         return WrappingInt::diff(tnew, told);
     }
 
-    /** curTimeMillis will overflow - use curTimeMicros64 instead if you care about that. */
-    inline unsigned curTimeMillis() {
-        boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
-        unsigned t = xt.nsec / 1000000;
-        return (xt.sec & 0xfffff) * 1000 + t;
-    }
-
     extern long long jsTime_virtual_skew;
     extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
 
@@ -193,6 +185,14 @@ namespace mongo {
 	    return *(jsTime_virtual_thread_skew.get());
 	}
 	else return 0;
+    }
+
+    /** curTimeMillis will overflow - use curTimeMicros64 instead if you care about that. */
+    inline unsigned curTimeMillis() {
+        boost::xtime xt;
+        boost::xtime_get(&xt, boost::TIME_UTC);
+        unsigned t = xt.nsec / 1000000;
+        return (xt.sec & 0xfffff) * 1000 + t;
     }
 
     /** Date_t is milliseconds since epoch */
