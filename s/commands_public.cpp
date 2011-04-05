@@ -1082,7 +1082,7 @@ namespace mongo {
 	    if (!pPipeline.get())
 		return false; // there was some parsing error
 
-	    string fullns = dbName + "." + pPipeline->getCollectionName();
+	    string fullns(dbName + "." + pPipeline->getCollectionName());
 
 	    /*
 	      If the system isn't running sharded, or the target collection

@@ -31,7 +31,7 @@ namespace mongo {
 
     Pipeline::Pipeline():
 	collectionName(),
-	vpSource() {
+	sourceList() {
     }
 
     shared_ptr<Pipeline> Pipeline::parseCommand(
@@ -69,9 +69,9 @@ namespace mongo {
         /*
           If we get here, we've harvested the fields we expect for a pipeline.
 
-          Set up the document source pipeline.
+          Set up the specified document source pipeline.
         */
-	vector<shared_ptr<DocumentSource>> *pvpSource = &pPipeline->vpSource;
+	SourceList *pSourceList = &pPipeline->sourceList; // set up shorthand
 
         /* iterate over the steps in the pipeline */
         const size_t nSteps = pipeline.size();
@@ -111,25 +111,17 @@ namespace mongo {
                 }
             }
 
-	    pvpSource->push_back(pSource);
+	    pSourceList->push_back(pSource);
         }
 
 	/*
-	  CW TODO - move filters up where possible, split pipeline for sharding
+	  CW TODO - move filters up where possible
 	*/
 
 	/* optimize the elements in the pipeline */
-	size_t nSources = pvpSource->size();
-	for(size_t iSource = 0; iSource < nSources; ++iSource)
-	    (*pvpSource)[iSource]->optimize();
-
-	/* find the first group operation, if there is one */
-	size_t firstGroup = nSources + 1;
-	for(firstGroup = 0; firstGroup < nSources; ++firstGroup) {
-	    DocumentSource *pDS = (*pvpSource)[firstGroup].get();
-	    if (dynamic_cast<DocumentSourceGroup *>(pDS))
-		break;
-	}
+	for(SourceList::iterator iter(pSourceList->begin()),
+		listEnd(pSourceList->end()); iter != listEnd; ++iter)
+	    (*iter)->optimize();
 
 	/*
 	  Break down any filters before groups into chunks we can convert for
@@ -149,47 +141,33 @@ namespace mongo {
 	shared_ptr<Pipeline> pShardPipeline(new Pipeline());
 	pShardPipeline->collectionName = collectionName;
 
+	/* put the source list aside */
+	SourceList tempList;
+	tempList.splice(tempList.begin(), sourceList);
+
+	/*
+	  Run through the operations, putting them onto the shard pipeline
+	  until we get to a group that indicates a split point.
+	 */
 	/* look for a grouping operation */
-	const size_t nSources = vpSource.size();
-	DocumentSourceGroup *pGroup = NULL;
-	size_t iGroup = nSources;
-	for(size_t iSource = 0; iSource < nSources; ++iSource) {
-	    pGroup = dynamic_cast<DocumentSourceGroup *>(
-		vpSource[iSource].get());
+	SourceList::iterator iter(tempList.begin());
+	SourceList::iterator listEnd(tempList.end());
+	for(; iter != listEnd; ++iter) {
+	    shared_ptr<DocumentSource> pSource(*iter);
+
+	    /* copy the operation to the shard pipeline */
+	    pShardPipeline->sourceList.push_back(pSource);
+
+	    /* remove it from the temporary list */
+	    iter = tempList.erase(iter);
+
+	    DocumentSourceGroup *pGroup =
+		dynamic_cast<DocumentSourceGroup *>(pSource.get());
 	    if (pGroup) {
-		iGroup = iSource;
+		sourceList.push_back(pGroup->createMerger());
 		break;
 	    }
 	}
-
-	/*
-	  If there is a group, create a new pipeline with everything up to
-	  and including that.
-
-	  If there is no group, the shard pipeline will include everything,
-	  and the merger pipeline will just include a union.
-	 */
-	const size_t copyLimit = pGroup ? (iGroup + 1) : nSources;
-	for(size_t iSource = 0; iSource < copyLimit; ++iSource)
-	    pShardPipeline->vpSource.push_back(vpSource[iSource]);
-
-	/*
-	  If there was a grouping operator, fork that and put it at the
-	  beginning of the mongos Pipeline.
-	*/
-	size_t iCopyTo = 0;
-    	if (pGroup)
-	    vpSource[iCopyTo++] = pGroup->createMerger();
-
-	/*
-	  In the original Pipeline, move all the document sources down,
-	  eliminating those that were copied into the shard spec.  Then
-	  eliminate all the trailing entries.
-	 */
-	for(size_t iCopyFrom = copyLimit; iCopyFrom < nSources;
-	    ++iCopyTo, ++iCopyFrom)
-	    vpSource[iCopyTo] = vpSource[iCopyFrom];
-	vpSource.resize(iCopyTo);
 
 	return pShardPipeline;
     }
@@ -199,12 +177,11 @@ namespace mongo {
     }
 
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
-		       shared_ptr<DocumentSource> pSource) const {
-	/* now chain together the sources we found */
-	const size_t nSources = vpSource.size();
-	for(size_t iSource = 0; iSource < nSources; ++iSource)
-	{
-	    shared_ptr<DocumentSource> pTemp(vpSource[iSource]);
+		       shared_ptr<DocumentSource> pSource) {
+	/* chain together the sources we found */
+	for(SourceList::iterator iter(sourceList.begin()),
+		listEnd(sourceList.end()); iter != listEnd; ++iter) {
+	    shared_ptr<DocumentSource> pTemp(*iter);
 	    pTemp->setSource(pSource);
 	    pSource = pTemp;
 	}

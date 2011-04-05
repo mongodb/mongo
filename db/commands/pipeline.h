@@ -89,13 +89,14 @@ namespace mongo {
 	  @returns true on success, false if an error occurs
 	*/
 	bool run(BSONObjBuilder &result, string &errmsg,
-		 shared_ptr<DocumentSource> pSource) const;
+		 shared_ptr<DocumentSource> pSource);
 
     private:
         Pipeline();
 
 	string collectionName;
-	vector<shared_ptr<DocumentSource>> vpSource;
+	typedef list<shared_ptr<DocumentSource>> SourceList;
+	SourceList sourceList;
     };
 
 } // namespace mongo
