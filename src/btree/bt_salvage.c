@@ -650,7 +650,7 @@ __slvg_ovfl_srch_row(SESSION *session, WT_PAGE_DISK *dsk, WT_TRACK *trk)
  *
  * When page 33 was processed, we'd discover that page 33's C-F range overlaps
  * page 30's E-G range, and page 30's E-G range would be updated, conceding the
- * E-F range to page 33.  
+ * E-F range to page 33.
  *
  * And so on, and so forth.
  *
