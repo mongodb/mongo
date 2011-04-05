@@ -45,6 +45,7 @@ namespace mongo {
         typedef int fd_type;
 #endif
         fd_type _fd;
+        bool _direct; // are we using direct I/O
     };
 
 }
