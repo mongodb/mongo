@@ -142,18 +142,17 @@ namespace mongo {
         int vote = 0;
         if( set != rs.name() ) {
             log() << "replSet error received an elect request for '" << set << "' but our set name is '" << rs.name() << "'" << rsLog;
-
         }
         else if( myver < cfgver ) {
             // we are stale.  don't vote
         }
         else if( myver > cfgver ) {
             // they are stale!
-            log() << "replSet info got stale version # during election" << rsLog;
+            log() << "replSet electCmdReceived info got stale version # during election" << rsLog;
             vote = -10000;
         }
         else if( !hopeful ) {
-            log() << "couldn't find member with id " << whoid << rsLog;
+            log() << "replSet electCmdReceived couldn't find member with id " << whoid << rsLog;
             vote = -10000;
         }
         else if( primary && primary == rs._self && rs.lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
@@ -171,11 +170,12 @@ namespace mongo {
         else {
             try {
                 vote = yea(whoid);
+                dassert( hopeful->id() == whoid );
                 rs.relinquish();
-                log() << "replSet info voting yea for " << whoid << rsLog;
+                log() << "replSet info voting yea for " <<  hopeful->fullName() << " (" << whoid << ')' << rsLog;
             }
             catch(VoteException&) {
-                log() << "replSet voting no already voted for another" << rsLog;
+                log() << "replSet voting no for " << hopeful->fullName() << " already voted for another" << rsLog;
             }
         }
 
