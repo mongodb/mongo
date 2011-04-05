@@ -788,7 +788,7 @@ __slvg_range_overlap_col(
 		 * Case #6: a_trk is a superset of b_trk, but b_trk is more
 		 * desirable: keep both but delete b_trk's key range from a_trk.
 		 */
-		a_trk->u.col.range_stop = b_trk->u.col.range_stop - 1;
+		a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
 		F_SET(a_trk, WT_TRACK_FREE_BLOCKS | WT_TRACK_MERGE);
 		ss->range_merge = 1;
 		return (0);

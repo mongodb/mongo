@@ -47,7 +47,7 @@ main(int argc, char *argv[])
 	if (argc == 2 && isdigit(argv[1][0]))
 		run (atoi(argv[1]));
 	else
-		for (r = 1; r <= 13; ++r)
+		for (r = 1; r <= 15; ++r)
 			run(r);
 
 	printf("salvage test run completed\n");
@@ -224,6 +224,27 @@ run(int r)
 		print_res(100, 10);
 		print_res(200, 10);
 		print_res(120, 20);
+		break;
+	case 14:
+		/*
+		 * Case #6:
+		 * 2 column-store pages, where the second page is a suffix of
+		 * the first page, and the first page has a higher LSN.
+		 */
+		build(100, 40); copy(7, 1);
+		build(200, 10); copy(6, 31);
+		print_res(100, 40);
+		break;
+	case 15:
+		/*
+		 * Case #6:
+		 * 2 column-store pages, where the second page is a suffix of
+		 * the first page, and the second page has a higher LSN.
+		 */
+		build(100, 40); copy(6, 1);
+		build(200, 10); copy(7, 31);
+		print_res(100, 30);
+		print_res(200, 10);
 		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
