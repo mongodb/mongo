@@ -68,11 +68,11 @@ namespace mongo {
                 }
             }
             catch ( AssertionException& e ) {
-                log() << "AssertionException in connThread, closing client connection: " << e << endl;
+                log() << "AssertionException handling request, closing client connection: " << e << endl;
                 p->shutdown();
             }
             catch ( SocketException& e ) {
-                log() << "SocketException in connThread, closing client connection: " << e << endl;
+                log() << "SocketException handling request, closing client connection: " << e << endl;
                 p->shutdown();
             }
             catch ( const ClockSkewException & ) {

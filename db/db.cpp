@@ -91,38 +91,6 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
-    void connThread( MessagingPort * p );
-
-    class OurListener : public Listener {
-    public:
-        OurListener(const string &ip, int p) : Listener(ip, p) { }
-        virtual void accepted(MessagingPort *mp) {
-
-            if ( ! connTicketHolder.tryAcquire() ) {
-                log() << "connection refused because too many open connections: " << connTicketHolder.used() << " of " << connTicketHolder.outof() << endl;
-                // TODO: would be nice if we notified them...
-                mp->shutdown();
-                delete mp;
-                return;
-            }
-
-            try {
-                boost::thread thr(boost::bind(&connThread,mp));
-            }
-            catch ( boost::thread_resource_error& ) {
-                connTicketHolder.release();
-                log() << "can't create new thread, closing connection" << endl;
-                mp->shutdown();
-                delete mp;
-            }
-            catch ( ... ) {
-                connTicketHolder.release();
-                log() << "unkonwn exception starting connThread" << endl;
-                mp->shutdown();
-                delete mp;
-            }
-        }
-    };
 
     /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
 // QueryOption_Exhaust
@@ -163,21 +131,6 @@ namespace mongo {
         cout << n << endl;
     };
 #endif
-
-    void listen(int port) {
-        //testTheDb();
-        log() << "waiting for connections on port " << port << endl;
-        OurListener l(cmdLine.bind_ip, port);
-        l.setAsTimeTracker();
-        startReplication();
-        if ( !noHttpInterface )
-            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
-
-#if(TESTEXHAUST)
-        boost::thread thr(testExhaust);
-#endif
-        l.initAndListen();
-    }
 
     void sysRuntimeInfo() {
         out() << "sysinfo:\n";
@@ -255,108 +208,27 @@ namespace mongo {
 
     };
 
-    /* we create one thread for each connection from an app server database.
-       app server will open a pool of threads.
-       todo: one day, asio...
-    */
-    void connThread( MessagingPort * inPort ) {
-        TicketHolderReleaser connTicketReleaser( &connTicketHolder );
+    void listen(int port) {
+        //testTheDb();
+        log() << "waiting for connections on port " << port << endl;
 
-        /* todo: move to Client object */
-        LastError *le = new LastError();
-        lastError.reset(le);
+        MessageServer::Options options;
+        options.port = port;
+        options.ipList = cmdLine.bind_ip;
 
-        inPort->_logLevel = 1;
-        auto_ptr<MessagingPort> dbMsgPort( inPort );
-        Client& c = Client::initThread("conn", inPort);
+        MessageServer * server = createServer( options , new MyMessageHandler() );
+        server->setAsTimeTracker();
 
-        try {
+        startReplication();
+        if ( !noHttpInterface )
+            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
 
-            c.getAuthenticationInfo()->isLocalHost = dbMsgPort->farEnd.isLocalHost();
-
-            Message m;
-            while ( 1 ) {
-                inPort->clearCounters();
-
-                if ( !dbMsgPort->recv(m) ) {
-                    if( !cmdLine.quiet )
-                        log() << "end connection " << dbMsgPort->farEnd.toString() << endl;
-                    dbMsgPort->shutdown();
-                    break;
-                }
-sendmore:
-                if ( inShutdown() ) {
-                    log() << "got request after shutdown()" << endl;
-                    break;
-                }
-
-                lastError.startRequest( m , le );
-
-                DbResponse dbresponse;
-                assembleResponse( m, dbresponse, dbMsgPort->farEnd );
-
-                if ( dbresponse.response ) {
-                    dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
-                    if( dbresponse.exhaust ) {
-                        MsgData *header = dbresponse.response->header();
-                        QueryResult *qr = (QueryResult *) header;
-                        long long cursorid = qr->cursorId;
-                        if( cursorid ) {
-                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
-                            string ns = dbresponse.exhaust; // before reset() free's it...
-                            m.reset();
-                            BufBuilder b(512);
-                            b.appendNum((int) 0 /*size set later in appendData()*/);
-                            b.appendNum(header->id);
-                            b.appendNum(header->responseTo);
-                            b.appendNum((int) dbGetMore);
-                            b.appendNum((int) 0);
-                            b.appendStr(ns);
-                            b.appendNum((int) 0); // ntoreturn
-                            b.appendNum(cursorid);
-                            m.appendData(b.buf(), b.len());
-                            b.decouple();
-                            DEV log() << "exhaust=true sending more" << endl;
-                            beNice();
-                            goto sendmore;
-                        }
-                    }
-                }
-
-                networkCounter.hit( inPort->getBytesIn() , inPort->getBytesOut() );
-
-                m.reset();
-            }
-
-        }
-        catch ( AssertionException& e ) {
-            log() << "AssertionException in connThread, closing client connection" << endl;
-            log() << ' ' << e.what() << endl;
-            dbMsgPort->shutdown();
-        }
-        catch ( SocketException& ) {
-            log() << "SocketException in connThread, closing client connection" << endl;
-            dbMsgPort->shutdown();
-        }
-        catch ( const ClockSkewException & ) {
-            exitCleanly( EXIT_CLOCK_SKEW );
-        }
-        catch ( std::exception &e ) {
-            error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
-        }
-        catch ( ... ) {
-            error() << "Uncaught exception, terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
-        }
-        
-        // thread ending...
-        {
-            Client * c = currentClient.get();
-            if( c ) c->shutdown();
-        }
-        globalScriptEngine->threadDone();
+#if(TESTEXHAUST)
+        boost::thread thr(testExhaust);
+#endif
+        server->run();
     }
+
 
     bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
         static DBDirectClient db;
