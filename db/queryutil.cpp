@@ -212,7 +212,14 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
+
         int op = e.getGtLtOp();
+
+        bool existsSpec = false;
+        if ( op == BSONObj::opEXISTS ) {
+            existsSpec = e.Bool();
+        }
+        
         if ( e.type() == RegEx
                 || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
            ) {
@@ -275,6 +282,9 @@ namespace mongo {
                 break;
             case BSONObj::GTE:
                 op = BSONObj::LT;
+                break;
+            case BSONObj::opEXISTS:
+                existsSpec = !existsSpec;
                 break;
             default: // otherwise doesn't matter
                 break;
@@ -378,6 +388,13 @@ namespace mongo {
         case BSONObj::opWITHIN:
             _special = "2d";
             break;
+        case BSONObj::opEXISTS: {
+            if ( !existsSpec ) {
+                lower = upper = staticNull.firstElement();
+            }
+            optimize = false;
+            break;
+        }
         default:
             break;
         }
