@@ -15,3 +15,11 @@ if ( 0 ) { // SERVER-2898
 assert.eq( 1, t.count( {'a.1.foo':4} ) );
 }
 assert.eq( 1, t.count( {'a.1.foo':5} ) );
+
+// Same issue with the $exists operator
+t.remove();
+t.save( {a:[{1:{foo:4}},{}]} );
+assert.eq( 1, t.count( {'a.1':{$exists:true}} ) );
+if ( 0 ) { // SERVER-2898
+assert.eq( 1, t.count( {'a.1.foo':{$exists:true}} ) );
+}
