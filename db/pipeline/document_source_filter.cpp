@@ -78,6 +78,10 @@ namespace mongo {
         return pCurrent;
     }
 
+    void DocumentSourceFilter::optimize() {
+	pFilter = pFilter->optimize();
+    }
+
     void DocumentSourceFilter::toBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
 	pFilter->toBson(&insides, "", false);
@@ -111,5 +115,9 @@ namespace mongo {
         unstarted(true),
         hasNext(false),
         pCurrent() {
+    }
+
+    void DocumentSourceFilter::toMatcherBson(BSONObjBuilder *pBuilder) const {
+	pFilter->toMatcherBson(pBuilder);
     }
 }

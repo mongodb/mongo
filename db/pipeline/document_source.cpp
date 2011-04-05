@@ -27,6 +27,9 @@ namespace mongo {
 	pSource = pTheSource;
     }
 
+    void DocumentSource::optimize() {
+    }
+
     void DocumentSource::toBson(BSONObjBuilder *pBuilder) const {
 	assert(false);
     }

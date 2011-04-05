@@ -125,6 +125,12 @@ namespace mongo {
         return pNoRavelDocument;
     }
 
+    void DocumentSourceProject::optimize() {
+	const size_t n = vpExpression.size();
+	for(size_t i = 0; i < n; ++i)
+	    vpExpression[i] = vpExpression[i]->optimize();
+    }
+
     void DocumentSourceProject::toBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
 	

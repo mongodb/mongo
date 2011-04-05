@@ -26,6 +26,10 @@ namespace mongo {
 
     /* --------------------------- Expression ------------------------------ */
 
+    void Expression::toMatcherBson(BSONObjBuilder *pBuilder) const {
+	assert(false && "Expression::toMatcherBson()");
+    }
+
     Expression::ObjectCtx::ObjectCtx(int theOptions):
         options(theOptions),
         raveledField() {
@@ -256,7 +260,7 @@ namespace mongo {
         }
 
         default:
-ExpectConstant: {
+	ExpectConstant: {
                 shared_ptr<Expression> pOperand(
                     ExpressionConstant::createFromBsonElement(pBsonElement));
                 return pOperand;
@@ -316,6 +320,10 @@ ExpectConstant: {
 	operandsToBson(pBuilder, "$add", true);
     }
 
+    shared_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
+	return ExpressionAdd::create;
+    }
+
     /* ------------------------- ExpressionAnd ----------------------------- */
 
     ExpressionAnd::~ExpressionAnd() {
@@ -328,6 +336,61 @@ ExpectConstant: {
 
     ExpressionAnd::ExpressionAnd():
         ExpressionNary() {
+    }
+
+    shared_ptr<Expression> ExpressionAnd::optimize() {
+	/* optimize the conjunction as much as possible */
+	shared_ptr<Expression> pE(ExpressionNary::optimize());
+
+	/* if the result isn't a conjunction, we can't do anything */
+	ExpressionAnd *pAnd = dynamic_cast<ExpressionAnd *>(pE.get());
+	if (!pAnd)
+	    return pE;
+
+	/*
+	  Check the last argument on the result; if it's not constant (as
+	  promised by ExpressionNary::optimize(),) then there's nothing
+	  we can do.
+	*/
+	const size_t n = pAnd->vpOperand.size();
+	shared_ptr<Expression> pLast(pAnd->vpOperand[n - 1]);
+	const ExpressionConstant *pConst =
+	    dynamic_cast<ExpressionConstant *>(pLast.get());
+	if (!pConst)
+	    return pE;
+
+	/*
+	  Evaluate and coerce the last argument to a boolean.  If it's false,
+	  then we can replace this entire expression.
+	 */
+	bool last = pLast->evaluate(shared_ptr<Document>())->coerceToBool();
+	if (!last) {
+	    shared_ptr<ExpressionConstant> pFinal(
+		ExpressionConstant::create(Value::getFalse()));
+	    return pFinal;
+	}
+
+	/*
+	  If we got here, the final operand was true, so we don't need it
+	  anymore.  If there was only one other operand, we don't need the
+	  conjunction either.  Note we still need to keep the promise that
+	  the result will be a boolean.
+	 */
+	if (n == 2) {
+	    shared_ptr<Expression> pFinal(
+		ExpressionCoerceToBool::create(pAnd->vpOperand[0]));
+	    return pFinal;
+	}
+
+	/*
+	  Remove the final "true" value, and return the new expression.
+
+	  CW TODO:
+	  Note that because of any implicit conversions, we may need to
+	  apply an implicit boolean conversion.
+	*/
+	pAnd->vpOperand.resize(n - 1);
+	return pE;
     }
 
     shared_ptr<const Value> ExpressionAnd::evaluate(
@@ -345,6 +408,75 @@ ExpectConstant: {
     void ExpressionAnd::toBson(
 	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
 	operandsToBson(pBuilder, "$and", docPrefix);
+    }
+
+    void ExpressionAnd::toMatcherBson(BSONObjBuilder *pBuilder) const {
+	/*
+	  There are two patterns we can handle:
+	  (1) one or two comparisons on the same field: { a:{$gte:3, $lt:7} }
+	  (2) multiple field comparisons: {a:7, b:{$lte:6}, c:2}
+	    This can be recognized as a conjunction of a set of  range
+	    expressions.  Direct equality is a degenerate range expression;
+	    range expressions can be open-ended.
+	*/
+	assert(false && "unimplemented");
+    }
+
+    shared_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
+	return ExpressionAnd::create;
+    }
+
+    /* -------------------- ExpressionCoerceToBool ------------------------- */
+
+    ExpressionCoerceToBool::~ExpressionCoerceToBool() {
+    }
+
+    shared_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
+	shared_ptr<Expression> pExpression) {
+        shared_ptr<ExpressionCoerceToBool> pNew(
+	    new ExpressionCoerceToBool(pExpression));
+        return pNew;
+    }
+
+    ExpressionCoerceToBool::ExpressionCoerceToBool(
+	shared_ptr<Expression> pTheExpression):
+        Expression(),
+        pExpression(pTheExpression) {
+    }
+
+    shared_ptr<Expression> ExpressionCoerceToBool::optimize() {
+	/* optimize the operand */
+	pExpression = pExpression->optimize();
+
+	/* if the operand already produces a boolean, then we don't need this */
+	/* LATER - Expression to support a "typeof" query? */
+	Expression *pE = pExpression.get();
+	if (dynamic_cast<ExpressionAnd *>(pE) ||
+	    dynamic_cast<ExpressionOr *>(pE) ||
+	    dynamic_cast<ExpressionNot *>(pE) ||
+	    dynamic_cast<ExpressionCoerceToBool *>(pE))
+	    return pExpression;
+
+	return shared_from_this();
+    }
+
+    shared_ptr<const Value> ExpressionCoerceToBool::evaluate(
+        shared_ptr<Document> pDocument) const {
+
+	shared_ptr<const Value> pResult(pExpression->evaluate(pDocument));
+        bool b = pResult->coerceToBool();
+        if (b)
+            return Value::getTrue();
+        return Value::getFalse();
+    }
+
+    void ExpressionCoerceToBool::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+	/*
+	  There is no equivalent of this; if we find we need this, we
+	  need to take other steps.
+	*/
+	assert(false && "not possible");
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -394,9 +526,9 @@ ExpectConstant: {
         return pExpression;
     }
 
-    ExpressionCompare::ExpressionCompare(RelOp theRelOp):
+    ExpressionCompare::ExpressionCompare(CmpOp theCmpOp):
         ExpressionNary(),
-        relop(theRelOp) {
+        cmpOp(theCmpOp) {
     }
 
     void ExpressionCompare::addOperand(shared_ptr<Expression> pExpression) {
@@ -469,7 +601,7 @@ ExpectConstant: {
             break;
         }
 
-        if (relop == CMP) {
+        if (cmpOp == CMP) {
             switch(cmp) {
             case -1:
                 return Value::getMinusOne();
@@ -484,7 +616,7 @@ ExpectConstant: {
             }
         }
 
-        bool returnValue = lookup[relop][cmp + 1];
+        bool returnValue = lookup[cmpOp][cmp + 1];
         if (returnValue)
             return Value::getTrue();
         return Value::getFalse();
@@ -493,7 +625,7 @@ ExpectConstant: {
     void ExpressionCompare::toBson(
 	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
 	const char *pName = NULL;
-	switch(relop) {
+	switch(cmpOp) {
 	case EQ:
 	    pName = "$eq";
 	    break;
@@ -540,6 +672,22 @@ ExpectConstant: {
 
     ExpressionConstant::ExpressionConstant(BSONElement *pBsonElement):
         pValue(Value::createFromBsonElement(pBsonElement)) {
+    }
+
+    shared_ptr<ExpressionConstant> ExpressionConstant::create(
+        shared_ptr<const Value> pValue) {
+        shared_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
+        return pEC;
+    }
+
+    ExpressionConstant::ExpressionConstant(shared_ptr<const Value> pTheValue):
+        pValue(pTheValue) {
+    }
+
+
+    shared_ptr<Expression> ExpressionConstant::optimize() {
+	/* nothing to do */
+	return shared_from_this();
     }
 
     shared_ptr<const Value> ExpressionConstant::evaluate(
@@ -628,6 +776,16 @@ ExpectConstant: {
         vpExpression() {
     }
 
+    shared_ptr<Expression> ExpressionDocument::optimize() {
+	const size_t n = vpExpression.size();
+	for(size_t i = 0; i < n; ++i) {
+	    shared_ptr<Expression> pE(vpExpression[i]->optimize());
+	    vpExpression[i] = pE;
+	}
+
+	return shared_from_this();
+    }
+
     shared_ptr<const Value> ExpressionDocument::evaluate(
         shared_ptr<Document> pDocument) const {
         const size_t n = vFieldName.size();
@@ -699,6 +857,11 @@ ExpectConstant: {
         }
     }
 
+    shared_ptr<Expression> ExpressionFieldPath::optimize() {
+	/* nothing can be done for these */
+	return shared_from_this();
+    }
+
     shared_ptr<const Value> ExpressionFieldPath::evaluate(
         shared_ptr<Document> pDocument) const {
         shared_ptr<const Value> pValue;
@@ -747,6 +910,33 @@ ExpectConstant: {
 	pBuilder->append(name, ss.str());
     }
 
+    /* --------------------- ExpressionFieldPath --------------------------- */
+
+    ExpressionFieldRange::~ExpressionFieldRange() {
+    }
+
+    shared_ptr<Expression> ExpressionFieldRange::optimize() {
+	assert(false && "unimplemented"); // CW TODO
+	return shared_ptr<Expression>();
+    }
+
+    shared_ptr<const Value> ExpressionFieldRange::evaluate(
+	shared_ptr<Document> pDocument) const {
+	assert(false && "unimplemented"); // CW TODO
+	return shared_ptr<const Value>();
+    }
+
+    void ExpressionFieldRange::toBson(
+	BSONObjBuilder *pBuilder, string name, bool docPrefix) {
+	assert(false && "unimplemented"); // CW TODO
+    }
+
+    void ExpressionFieldRange::toMatcherBson(
+	BSONObjBuilder *pBuilder) const {
+	assert(false && "unimplemented"); // CW TODO
+    }
+	
+
     /* ----------------------- ExpressionIfNull ---------------------------- */
 
     ExpressionIfNull::~ExpressionIfNull() {
@@ -789,9 +979,122 @@ ExpectConstant: {
         vpOperand() {
     }
 
+    shared_ptr<Expression> ExpressionNary::optimize() {
+	size_t nConst = 0; // count of constant operands
+	const size_t n = vpOperand.size();
+	for(size_t i = 0; i < n; ++i) {
+	    shared_ptr<Expression> pNew(vpOperand[i]->optimize());
+
+	    /* subsitute the optimized expression */
+	    vpOperand[i] = pNew;
+
+	    /* check to see if the result was a constant */
+	    if (dynamic_cast<ExpressionConstant *>(pNew.get()))
+		++nConst;
+	}
+
+	/*
+	  If all the operands are constant, we can replace this expression
+	  with a constant.  We can find the value by evaluating this
+	  expression over a NULL Document because evaluating the
+	  ExpressionConstant never refers to the argument Document.
+	*/
+	if (nConst == n) {
+	    shared_ptr<const Value> pResult(evaluate(shared_ptr<Document>()));
+	    shared_ptr<Expression> pReplacement(
+		ExpressionConstant::create(pResult));
+	    return pReplacement;
+	}
+
+	/*
+	  If the operator isn't commutative or associative, there's nothing
+	  more we can do.  We test that by seeing if we can get a factory;
+	  if we can, we can use it to construct a temporary expression which
+	  we'll evaluate to collapse as many constants as we can down to
+	  a single one.
+	 */
+	shared_ptr<ExpressionNary> (*const pFactory)() = getFactory();
+	if (!pFactory)
+	    return shared_from_this();
+
+	/*
+	  Create a new Expression that will be the replacement for this one.
+	  We actually create two:  one to hold constant expressions, and
+	  one to hold non-constants.  Once we've got these, we evaluate
+	  the constant expression to produce a single value, as above.
+	  We then add this operand to the end of the non-constant expression,
+	  and return that.
+	 */
+	shared_ptr<ExpressionNary> pNew((*pFactory)());
+	shared_ptr<ExpressionNary> pConst((*pFactory)());
+	for(size_t i = 0; i < n; ++i) {
+	    shared_ptr<Expression> pE(vpOperand[i]);
+	    if (dynamic_cast<ExpressionConstant *>(pE.get()))
+		pConst->addOperand(pE);
+	    else {
+		/*
+		  If the child operand is the same type as this, then we can
+		  extract its operands and inline them here because we already
+		  know this is commutative and associative because it has a
+		  factory.  We can detect sameness of the child operator by
+		  checking for equality of the factory
+
+		  Note we don't have to do this recursively, because we
+		  called optimize() on all the children first thing in
+		  this call to optimize().
+		*/
+		ExpressionNary *pNary =
+		    dynamic_cast<ExpressionNary *>(pE.get());
+		if (!pNary)
+		    pNew->addOperand(pE);
+		else {
+		    shared_ptr<ExpressionNary> (*const pChildFactory)() =
+			pNary->getFactory();
+		    if (pChildFactory != pFactory)
+			pNew->addOperand(pE);
+		    else {
+			/* same factory, so flatten */
+			size_t nChild = pNary->vpOperand.size();
+			for(size_t iChild = 0; iChild < nChild; ++iChild) {
+			    shared_ptr<Expression> pCE(
+				pNary->vpOperand[iChild]);
+			    if (dynamic_cast<ExpressionConstant *>(pCE.get()))
+				pConst->addOperand(pCE);
+			    else
+				pNew->addOperand(pCE);
+			}
+		    }
+		}
+	    }
+	}
+
+	/*
+	  If there was only one constant, add it to the end of the expression
+	  operand vector.
+	*/
+	if (pConst->vpOperand.size() == 1)
+	    pNew->addOperand(pConst->vpOperand[0]);
+	else if (pConst->vpOperand.size() > 1) {
+	    /*
+	      If there was more than one constant, collapse all the constants
+	      together before adding the result to the end of the expression
+	      operand vector.
+	    */
+	    shared_ptr<const Value> pResult(
+		pConst->evaluate(shared_ptr<Document>()));
+	    pNew->addOperand(ExpressionConstant::create(pResult));
+	}
+
+	return pNew;
+    }
+
     void ExpressionNary::addOperand(
         shared_ptr<Expression> pExpression) {
         vpOperand.push_back(pExpression);
+    }
+
+    shared_ptr<ExpressionNary> (*ExpressionNary::getFactory() const)() {
+	return NULL;
     }
 
     void ExpressionNary::operandsToBson(
@@ -884,5 +1187,69 @@ ExpectConstant: {
     void ExpressionOr::toBson(
 	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
 	operandsToBson(pBuilder, "$or", docPrefix);
+    }
+
+    void ExpressionOr::toMatcherBson(BSONObjBuilder *pBuilder) const {
+	BSONObjBuilder opArray;
+	const size_t n = vpOperand.size();
+	for(size_t i = 0; i < n; ++i)
+	    vpOperand[i]->toMatcherBson(&opArray);
+
+	pBuilder->append("$or", opArray.done());
+    }
+
+    shared_ptr<ExpressionNary> (*ExpressionOr::getFactory() const)() {
+	return ExpressionOr::create;
+    }
+
+    shared_ptr<Expression> ExpressionOr::optimize() {
+	/* optimize the disjunction as much as possible */
+	shared_ptr<Expression> pE(ExpressionNary::optimize());
+
+	/* if the result isn't a conjunction, we can't do anything */
+	ExpressionOr *pOr = dynamic_cast<ExpressionOr *>(pE.get());
+	if (!pOr)
+	    return pE;
+
+	/*
+	  Check the last argument on the result; if it's not constant (as
+	  promised by ExpressionNary::optimize(),) then there's nothing
+	  we can do.
+	*/
+	const size_t n = pOr->vpOperand.size();
+	shared_ptr<Expression> pLast(pOr->vpOperand[n - 1]);
+	const ExpressionConstant *pConst =
+	    dynamic_cast<ExpressionConstant *>(pLast.get());
+	if (!pConst)
+	    return pE;
+
+	/*
+	  Evaluate and coerce the last argument to a boolean.  If it's true,
+	  then we can replace this entire expression.
+	 */
+	bool last = pLast->evaluate(shared_ptr<Document>())->coerceToBool();
+	if (last) {
+	    shared_ptr<ExpressionConstant> pFinal(
+		ExpressionConstant::create(Value::getTrue()));
+	    return pFinal;
+	}
+
+	/*
+	  If we got here, the final operand was false, so we don't need it
+	  anymore.  If there was only one other operand, we don't need the
+	  conjunction either.  Note we still need to keep the promise that
+	  the result will be a boolean.
+	 */
+	if (n == 2) {
+	    shared_ptr<Expression> pFinal(
+		ExpressionCoerceToBool::create(pOr->vpOperand[0]));
+	    return pFinal;
+	}
+
+	/*
+	  Remove the final "false" value, and return the new expression.
+	*/
+	pOr->vpOperand.resize(n - 1);
+	return pE;
     }
 }

@@ -128,6 +128,29 @@ namespace mongo {
 	    vpSource.push_back(pSource);
         }
 
+	/* optimize the elements in the pipeline */
+	size_t nSources = vpSource.size();
+	for(size_t iSource = 0; iSource < nSources; ++iSource)
+	    vpSource[iSource]->optimize();
+
+	/* find the first group operation, if there is one */
+	size_t firstGroup = nSources + 1;
+	for(firstGroup = 0; firstGroup < nSources; ++firstGroup) {
+	    DocumentSource *pDS = vpSource[firstGroup].get();
+	    if (dynamic_cast<DocumentSourceGroup *>(pDS))
+		break;
+	}
+
+	/*
+	  Break down any filters before groups into chunks we can convert for
+	  matcher use.
+
+	  LATER -- we've move these further up the chain past projections
+	  where possible, remapping field names as they move past projections
+	  that rename the fields.
+	*/
+	// CW TODO
+
 	/* now hook up the pipeline */
         /* connect up a cursor to the specified collection */
         shared_ptr<Cursor> pCursor(
@@ -136,7 +159,7 @@ namespace mongo {
 	    DocumentSourceCursor::create(pCursor));
 
 	/* now chain together the sources we found */
-	const size_t nSources = vpSource.size();
+	nSources = vpSource.size();  // the size of the chain might have changed
 	for(size_t iSource = 0; iSource < nSources; ++iSource)
 	{
 	    shared_ptr<DocumentSource> pTemp(vpSource[iSource]);

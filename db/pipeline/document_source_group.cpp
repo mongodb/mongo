@@ -277,6 +277,30 @@ namespace mongo {
 
         return pResult;
     }
+
+    shared_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
+	shared_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create());
+
+	/* the merger will use the same grouping key */
+	pMerger->setIdExpression(pIdExpression);
+
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i) {
+	    /*
+	      The merger's output field names will be the same, as will the
+	      accumulator factories.  However, for some accumulators, the
+	      expression to be accumulated will be different.  The original
+	      accumulator may be collecting an expression based on a field
+	      expression or constant.  Here, we accumulate the output of the
+	      same name from the prior group.
+	    */
+	    pMerger->addAccumulator(
+		vFieldName[i], vpAccumulatorFactory[i],
+		ExpressionFieldPath::create(vFieldName[i]));
+	}
+
+	return pMerger;
+    }
 }
 
 

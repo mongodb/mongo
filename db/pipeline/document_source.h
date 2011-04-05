@@ -68,6 +68,16 @@ namespace mongo {
 	 */
 	virtual void setSource(shared_ptr<DocumentSource> pSource);
 
+	/*
+	  Optimize the pipeline operation, if possible.
+
+	  This is intended for any operations that include expressions, and
+	  provides a hook for those to optimize those operations.
+
+	  The default implementation is to do nothing.
+	 */
+	virtual void optimize();
+
         /*
 	  Add the pipeline operation to the builder.
 
@@ -128,6 +138,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual void optimize();
 	virtual void toBson(BSONObjBuilder *pBuilder) const;
 
 	/*
@@ -147,6 +158,19 @@ namespace mongo {
          */
         static shared_ptr<DocumentSourceFilter> create(
             shared_ptr<Expression> pFilter);
+
+	/*
+	  Create a BSONObj suitable for Matcher construction.
+
+	  This is used after filter analysis has moved as many filters to
+	  as early a point as possible in the document processing pipeline.
+	  See db/Matcher.h and the associated wiki documentation for the
+	  format.  This conversion is used to move back to the low-level
+	  find() Cursor mechanism.
+
+	  @params pBuilder the builder to write to
+	 */
+	void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
     private:
         DocumentSourceFilter(shared_ptr<Expression> pFilter);
@@ -217,6 +241,15 @@ namespace mongo {
         static shared_ptr<DocumentSource> createFromBson(
 	    BSONElement *pBsonElement);
 
+
+	/*
+	  Create a unifying group that can be used to combine group results
+	  from shards.
+
+	  @returns the grouping DocumentSource
+	*/
+	shared_ptr<DocumentSource> createMerger();
+
     private:
         DocumentSourceGroup();
 
@@ -275,6 +308,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual void optimize();
 	virtual void toBson(BSONObjBuilder *pBuilder) const;
 
 

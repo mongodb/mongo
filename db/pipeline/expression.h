@@ -28,8 +28,23 @@ namespace mongo {
     public:
         virtual ~Expression() {};
 
+	/*
+	  Optimize the Expression.
+
+	  This provides an opportunity to do constant folding, or to
+	  collapse nested operators that have the same precedence, such as
+	  $add, $and, or $or.
+
+	  The Expression should be replaced with the return value, which may
+	  or may not be the same object.  In the case of constant folding,
+	  a computed expression may be replaced by a constant.
+
+	  @returns the optimized Expression
+	 */
+	virtual shared_ptr<Expression> optimize() = 0;
+
         /*
-          Evaluate the expression using the given document as input.
+          Evaluate the Expression using the given document as input.
 
           @returns the computed value
         */
@@ -48,6 +63,26 @@ namespace mongo {
 	 */
 	virtual void toBson(
 	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const = 0;
+
+	/*
+	  Convert the expression into a BSONObj that corresponds to the
+	  db.collection.find() predicate language.  This is intended for
+	  use by DocumentSourceFilter.
+
+	  This is more limited than the full expression language supported
+	  by all available expressions in a DocumentSource processing
+	  pipeline, and will fail with an assertion if an attempt is made
+	  to go outside the bounds of the recognized patterns, which don't
+	  include full computed expressions.  There are other methods available
+	  on DocumentSourceFilter which can be used to analyze a filter
+	  predicate and break it up into appropriate expressions which can
+	  be translated within these constraints.  As a result, the default
+	  implementation is to fail with an assertion; only a subset of
+	  operators will be able to fulfill this request.
+
+	  @params pBuilder the builder to add the expression to.
+	 */
+	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
 	/*
 	  Utility class for parseObject() below.
@@ -108,18 +143,57 @@ namespace mongo {
 	  @returns the parsed operand, as an Expression
 	 */
         static shared_ptr<Expression> parseOperand(BSONElement *pBsonElement);
+
+	/*
+	  Enumeration of comparison operators.  These are shared between a
+	  few expression implementations, so they are factored out here.
+
+	  Any changes to these values require adjustment of the lookup
+	  table in the implementation.
+	*/
+	enum CmpOp {
+	    EQ = 0, // return true for a == b, false otherwise
+	    NE = 1, // return true for a != b, false otherwise
+	    GT = 2, // return true for a > b, false otherwise
+	    GTE = 3, // return true for a >= b, false otherwise
+	    LT = 4, // return true for a < b, false otherwise
+	    LTE = 5, // return true for a <= b, false otherwise
+	    CMP = 6, // return -1, 0, 1 for a < b, a == b, a > b
+	};
     };
 
 
     class ExpressionNary :
-        public Expression {
+	public Expression,
+        public boost::enable_shared_from_this<ExpressionNary> {
     public:
+        // virtuals from Expression
+	virtual shared_ptr<Expression> optimize();
+
         /*
           Add an operand to the n-ary expression.
 
           @param pExpression the expression to add
         */
         virtual void addOperand(shared_ptr<Expression> pExpression);
+
+	/*
+	  Return a factory function that will make Expression nodes of
+	  the same type as this.  This will be used to create constant
+	  expressions for constant folding for optimize().  Only return
+	  a factory function if this operator is both associative and
+	  commutative.  The default implementation returns NULL; optimize()
+	  will recognize that and stop.
+
+	  Note that ExpressionNary::optimize() promises that if it uses this
+	  to fold constants, then if optimize() returns an ExpressionNary,
+	  any remaining constant will be the last one in vpOperand.  Derived
+	  classes may take advantage of this to do further optimizations in
+	  their optimize().
+
+	  @returns pointer to a factory function or NULL
+	 */
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
     protected:
         ExpressionNary();
@@ -153,6 +227,9 @@ namespace mongo {
 	virtual void toBson(
 	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
 
+	// virtuals from ExpressionNary
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
+
         /*
           Create an expression that finds the sum of n operands.
 
@@ -171,10 +248,15 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionAnd();
+	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
 	virtual void toBson(
 	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
+	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+
+	// virtuals from ExpressionNary
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -190,6 +272,29 @@ namespace mongo {
     private:
         ExpressionAnd();
     };
+
+
+    class ExpressionCoerceToBool :
+	public Expression,
+        public boost::enable_shared_from_this<ExpressionCoerceToBool> {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionCoerceToBool();
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
+
+        static shared_ptr<ExpressionCoerceToBool> create(
+	    shared_ptr<Expression> pExpression);
+
+    private:
+        ExpressionCoerceToBool(shared_ptr<Expression> pExpression);
+
+	shared_ptr<Expression> pExpression;
+    };
+
 
     class ExpressionCompare :
         public ExpressionNary,
@@ -220,23 +325,9 @@ namespace mongo {
         static shared_ptr<ExpressionNary> createLte();
 
     private:
-        /*
-          Any changes to these values require adjustment of the lookup
-          table in the implementation.
-         */
-        enum RelOp {
-            EQ = 0, // return true for a == b, false otherwise
-            NE = 1, // return true for a != b, false otherwise
-            GT = 2, // return true for a > b, false otherwise
-            GTE = 3, // return true for a >= b, false otherwise
-            LT = 4, // return true for a < b, false otherwise
-            LTE = 5, // return true for a <= b, false otherwise
-            CMP = 6, // return -1, 0, 1 for a < b, a == b, a > b
-        };
+        ExpressionCompare(CmpOp cmpOp);
 
-        ExpressionCompare(RelOp relop);
-
-        RelOp relop;
+        CmpOp cmpOp;
     };
 
     class ExpressionConstant :
@@ -245,6 +336,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionConstant();
+	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
 	virtual void toBson(
@@ -252,9 +344,12 @@ namespace mongo {
 
         static shared_ptr<ExpressionConstant> createFromBsonElement(
             BSONElement *pBsonElement);
+	static shared_ptr<ExpressionConstant> create(
+	    shared_ptr<const Value> pValue);
 
     private:
         ExpressionConstant(BSONElement *pBsonElement);
+	ExpressionConstant(shared_ptr<const Value> pValue);
 
         shared_ptr<const Value> pValue;
     };
@@ -285,6 +380,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionDocument();
+	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
 	virtual void toBson(
@@ -321,6 +417,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionFieldPath();
+	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
 	virtual void toBson(
@@ -332,6 +429,31 @@ namespace mongo {
         ExpressionFieldPath(string fieldPath);
 
         vector<string> vFieldPath;
+    };
+
+
+    class ExpressionFieldRange :
+	public Expression {
+    public:
+	// virtuals from expression
+        virtual ~ExpressionFieldRange();
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            shared_ptr<Document> pDocument) const;
+	virtual void toBson(
+	    BSONObjBuilder *pBuilder, string name, bool docPrefix);
+	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+
+	static shared_ptr<ExpressionFieldRange> create();
+
+    private:
+	ExpressionFieldRange();
+
+	shared_ptr<ExpressionFieldPath> pPath;
+	CmpOp lowOp;
+	CmpOp highOp;
+	shared_ptr<const Value> pLower;
+	shared_ptr<const Value> pUpper;
     };
 
 
@@ -374,15 +496,19 @@ namespace mongo {
 
 
     class ExpressionOr :
-        public ExpressionNary,
-        public boost::enable_shared_from_this<ExpressionOr> {
+        public ExpressionNary {
     public:
         // virtuals from Expression
         virtual ~ExpressionOr();
+	virtual shared_ptr<Expression> optimize();
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
 	virtual void toBson(
 	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
+	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
+
+	// virtuals from ExpressionNary
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
         /*
           Create an expression that finds the conjunction of n operands.
