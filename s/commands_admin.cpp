@@ -88,6 +88,20 @@ namespace mongo {
             }
         } netstat;
 
+        class FlushRouterConfigCmd : public GridAdminCmd {
+        public:
+            FlushRouterConfigCmd() : GridAdminCmd("flushRouterConfig") { }
+            virtual void help( stringstream& help ) const {
+                help << "flush all router config";
+            }
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                grid.flushConfig();
+                result.appendBool( "flushed" , true );
+                return true;
+            }
+        } flushRouterConfigCmd;
+
+
         class ServerStatusCmd : public Command {
         public:
             ServerStatusCmd() : Command( "serverStatus" , true ) {
