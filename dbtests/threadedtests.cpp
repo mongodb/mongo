@@ -73,7 +73,7 @@ namespace ThreadedTests {
         }
     private:
         virtual void setup() {
-            mm = new MongoMutex("MongoMutexTest");
+            mm = &dbMutex;
         }
         virtual void subthread(int) {
             Client::initThread("mongomutextest");
