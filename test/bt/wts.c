@@ -16,8 +16,6 @@ static int wts_put_row(u_int64_t, int);
 static int wts_read(uint64_t);
 static int wts_sync(void);
 
-WT_EVENT_HANDLER event_handler = {};
-
 int
 wts_startup()
 {
@@ -30,7 +28,7 @@ wts_startup()
 	char config[200], *end, *p;
 
 	snprintf(config, sizeof(config),
-	    "error_prefix='%s',cachesize=%d,%sverbose=[%s]",
+	    "error_prefix=\"%s\",cache_size=%d,%sverbose=[%s]",
 	    g.progname, g.c_cache,
 	    g.logging ? ",logging" : "",
 	    ""
@@ -41,7 +39,7 @@ wts_startup()
 	    // "evict,"
 	);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0) {
+	if ((ret = wiredtiger_open(NULL, NULL, config, &conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_simple_setup: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -103,8 +101,8 @@ wts_startup()
 	}
 
 	if (g.logging)
-		__wt_log_printf((SESSION *)session,
-		    "WT startup: %s", ctime(&now));
+		__wt_log_printf((SESSION *)session, "WT startup: %s",
+		    ctime(&now));
 
 	g.wts_conn = conn;
 	g.wts_session = session;
@@ -124,7 +122,8 @@ wts_teardown(void)
 	session = g.wts_session;
 
 	if (g.logging)
-		__wt_log_printf(session, "WT teardown: %s", ctime(&now));
+		__wt_log_printf(session, "WT teardown: %s",
+		    ctime(&now));
 
 	assert(wts_sync() == 0);
 	assert(conn->close(conn, NULL) == 0);
@@ -193,13 +192,15 @@ int
 wts_salvage(void)
 {
 	BTREE *btree;
+	SESSION *session;
 	int ret;
 	char *p;
 
 	btree = g.wts_btree;
+	session = g.wts_session;
 
 	p = fname("wt");
-	if ((ret = btree->salvage(btree, track, 0)) != 0) {
+	if ((ret = btree->salvage(btree, session, track, 0)) != 0) {
 		fprintf(stderr, "%s: btree.salvage: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -212,11 +213,13 @@ static int
 wts_sync(void)
 {
 	BTREE *btree;
+	SESSION *session;
 	int ret;
 
 	btree = g.wts_btree;
+	session = g.wts_session;
 
-	if ((ret = btree->sync(btree, track, WT_OSWRITE)) != 0) {
+	if ((ret = btree->sync(btree, session, track, WT_OSWRITE)) != 0) {
 		fprintf(stderr, "%s: btree.sync: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -228,11 +231,13 @@ int
 wts_verify(void)
 {
 	BTREE *btree;
+	SESSION *session;
 	int ret;
 
 	btree = g.wts_btree;
+	session = g.wts_session;
 
-	if ((ret = btree->verify(btree, track, 0)) != 0) {
+	if ((ret = btree->verify(btree, session, track, 0)) != 0) {
 		fprintf(stderr, "%s: btree.verify: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -301,13 +306,13 @@ cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			__wt_log_printf(g.wts_session, "%-10s{%.*s}\n",
+			__wt_log_printf(g.wts_session, "%-10s{%.*s}",
 			    "bulk key", (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		__wt_log_printf(g.wts_session, "%-10s{%.*s}\n",
+		__wt_log_printf(g.wts_session, "%-10s{%.*s}",
 		    "bulk value", (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
@@ -433,8 +438,8 @@ wts_read(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session,
-		    "%-10s%llu\n", "read", (unsigned long long)keyno);
+		__wt_log_printf(session, "%-10s%llu", "read",
+		    (unsigned long long)keyno);
 
 	/* Retrieve the BDB value. */
 	if (bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound))
@@ -497,7 +502,7 @@ wts_put_row(uint64_t keyno, int insert)
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s{%.*s}\n%-10s{%.*s}\n",
+		__wt_log_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
 		    "put key", (int)key.size, (char *)key.data,
 		    "put data", (int)value.size, (char *)value.data);
 
@@ -533,7 +538,7 @@ wts_put_col(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s%llu {%.*s}\n",
+		__wt_log_printf(session, "%-10s%llu {%.*s}",
 		    "put", (unsigned long long)keyno,
 		    (int)value.size, (char *)value.data);
 
@@ -570,8 +575,8 @@ wts_del_row(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session,
-		    "%-10s%llu\n", "delete", (unsigned long long)keyno);
+		__wt_log_printf(session, "%-10s%llu",
+		    "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
@@ -603,8 +608,8 @@ wts_del_col(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session,
-		    "%-10s%llu\n", "delete", (unsigned long long)keyno);
+		__wt_log_printf(session, "%-10s%llu",
+		    "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);

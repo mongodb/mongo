@@ -37,7 +37,7 @@ main(int argc, char *argv[])
 		return (usage());
 
 	if ((ret = wiredtiger_simple_setup(progname, NULL, &btree)) == 0) {
-		if ((ret = btree->open(btree, *argv, 0, 0)) != 0) {
+		if ((ret = btree->open(btree, NULL, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: db.open(%s): %s\n",
 			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;

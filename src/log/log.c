@@ -57,7 +57,7 @@ __wt_log_printf(SESSION *session, const char *fmt, ...)
 	buf = &session->logprint_buf;
 
 	va_start(ap, fmt);
-	len = vsnprintf(NULL, 0, fmt, ap) + 1;
+	len = vsnprintf(NULL, 0, fmt, ap) + 2;
 	va_end(ap);
 
 	WT_RET(__wt_buf_setsize(session, buf, len));
@@ -71,7 +71,9 @@ __wt_log_printf(SESSION *session, const char *fmt, ...)
 	 * __wt_logput_debug to wrap this in a log header.
 	 */
 #if 1
-	return ((write(conn->log_fh->fd, buf->mem, len) == len) ? 0 : WT_ERROR);
+	strcpy((char *)buf->mem + len - 2, "\n");
+	return ((write(conn->log_fh->fd, buf->mem, len - 1) == len -1) ?
+	    0 : WT_ERROR);
 #else
 	return (__wt_logput_debug(session, (char *)buf->mem));
 #endif

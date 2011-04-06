@@ -260,10 +260,11 @@ int __wt_connection_open(CONNECTION *conn, const char *home, mode_t mode);
 int __wt_connection_close(CONNECTION *conn);
 int __wt_connection_session(CONNECTION *conn, SESSION **sessionp);
 int __wt_session_close(SESSION *session);
-int __wt_session_api_set( CONNECTION *conn,
+int __wt_session_api_set(CONNECTION *conn,
     const char *name,
     BTREE *btree,
-    SESSION **sessionp);
+    SESSION **sessionp,
+    int *islocal);
 int __wt_session_api_clr(SESSION *session, const char *name, int islocal);
 int __wt_session_dump(CONNECTION *conn);
 int __wt_connection_stat_print(CONNECTION *conn, FILE *stream);

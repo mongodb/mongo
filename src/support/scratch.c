@@ -21,7 +21,7 @@ __wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz)
 		WT_RET(__wt_realloc(session, &buf->mem_size, sz, &buf->mem));
 
 	buf->data = buf->mem;
-	buf->size = sz;
+	buf->size = (uint32_t)sz;
 
 	return (0);
 }

@@ -229,7 +229,7 @@ __wt_cursor_open(SESSION *session,
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
 		WT_RET(conn->btree(conn, 0, &btree));
-		WT_RET(btree->open(btree, tablename, 0666, 0));
+		WT_RET(btree->open(btree, session, tablename, 0666, 0));
 
 		/*
 		 * !!! TODO read key / value formats from a table-of-tables.

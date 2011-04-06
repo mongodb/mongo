@@ -127,8 +127,8 @@ __wt_session_close(SESSION *session)
  *	Pair SESSION and BTREE handle, allocating the SESSION as necessary.
  */
 int
-__wt_session_api_set(
-    CONNECTION *conn, const char *name, BTREE *btree, SESSION **sessionp)
+__wt_session_api_set(CONNECTION *conn, const char *name, BTREE *btree,
+    SESSION **sessionp, int *islocal)
 {
 	SESSION *session;
 
@@ -145,7 +145,9 @@ __wt_session_api_set(
 	if ((session = *sessionp) == NULL) {
 		WT_RET(conn->session(conn, 0, sessionp));
 		session = *sessionp;
-	}
+		*islocal = 1;
+	} else
+		*islocal = 0;
 	session->btree = btree;
 	session->name = name;
 	return (0);

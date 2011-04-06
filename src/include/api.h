@@ -146,7 +146,7 @@ struct __btree {
 	    BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
 
 	int (*close)(
-	    BTREE *, uint32_t );
+	    BTREE *, SESSION *, uint32_t );
 
 	int (*col_del)(
 	    BTREE *, SESSION *, uint64_t , uint32_t );
@@ -164,7 +164,7 @@ struct __btree {
 	    BTREE *, uint8_t const *, u_int , uint32_t );
 
 	int (*open)(
-	    BTREE *, const char *, mode_t , uint32_t );
+	    BTREE *, SESSION *, const char *, mode_t , uint32_t );
 
 	int (*row_del)(
 	    BTREE *, SESSION *, WT_ITEM *, uint32_t );
@@ -173,7 +173,7 @@ struct __btree {
 	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
 
 	int (*salvage)(
-	    BTREE *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t );
 
 	int (*stat_clear)(
 	    BTREE *, uint32_t );
@@ -182,10 +182,10 @@ struct __btree {
 	    BTREE *, FILE *, uint32_t );
 
 	int (*sync)(
-	    BTREE *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t );
 
 	int (*verify)(
-	    BTREE *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t );
 	/*
 	 * BTREE methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.

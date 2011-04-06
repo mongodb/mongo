@@ -41,12 +41,12 @@ main(int argc, char *argv[])
 		return (usage());
 
 	if ((ret = wiredtiger_simple_setup(progname, NULL, &btree)) == 0) {
-		if ((ret = btree->open(btree, *argv, 0, 0)) != 0) {
+		if ((ret = btree->open(btree, NULL, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: btree.open(%s): %s\n",
 			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
-		if ((ret = btree->verify(btree,
+		if ((ret = btree->verify(btree, NULL,
 		    verbose ? __wt_progress : NULL, 0)) != 0) {
 			fprintf(stderr, "%s: btree.verify(%s): %s\n",
 			    progname, *argv, wiredtiger_strerror(ret));

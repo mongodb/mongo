@@ -305,7 +305,8 @@ methods['btree.bulk_load'] = Api(
 methods['btree.close'] = Api(
 	'btree.close',
 	'method, session',
-	['flags/uint32_t @S'],
+	['session/SESSION *@S',
+	 'flags/uint32_t @S'],
 	['OSWRITE'],
 	['init'], [])
 
@@ -359,7 +360,8 @@ methods['btree.huffman_set'] = Api(
 methods['btree.open'] = Api(
 	'btree.open',
 	'method, session',
-	['name/const char *@S',
+	['session/SESSION *@S',
+	 'name/const char *@S',
 	 'mode/mode_t @S',
 	 'flags/uint32_t @S'],
 	[ 'CREATE',
@@ -403,7 +405,8 @@ methods['btree.stat_print'] = Api(
 methods['btree.salvage'] = Api(
 	'btree.salvage',
 	'method, session',
-	['progress/void (*@S)(const char *, uint64_t)',
+	['session/SESSION *@S',
+	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -411,7 +414,8 @@ methods['btree.salvage'] = Api(
 methods['btree.sync'] = Api(
 	'btree.sync',
 	'method, rdonly, session',
-	['progress/void (*@S)(const char *, uint64_t)',
+	['session/SESSION *@S',
+	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['OSWRITE'],
 	['open'], [])
@@ -419,7 +423,8 @@ methods['btree.sync'] = Api(
 methods['btree.verify'] = Api(
 	'btree.verify',
 	'method, session',
-	['progress/void (*@S)(const char *, uint64_t)',
+	['session/SESSION *@S',
+	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])

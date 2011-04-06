@@ -31,7 +31,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
 		TAILQ_REMOVE(&session->btrees, btree_session, q);
 		btree = btree_session->btree;
-		WT_TRET(btree->close(btree, 0));
+		WT_TRET(btree->close(btree, session, 0));
 		__wt_free(session, btree_session);
 	}
 
@@ -154,7 +154,7 @@ __session_create_table(WT_SESSION *wt_session,
 		WT_RET(btree->column_set(btree, fixed_len, NULL, column_flags));
 	if (huffman_flags != 0)
 		WT_RET(btree->huffman_set(btree, NULL, 0, huffman_flags));
-	WT_RET(btree->open(btree, name, 0666, WT_CREATE));
+	WT_RET(btree->open(btree, session, name, 0666, WT_CREATE));
 
 	WT_RET(__wt_session_add_btree(session,
 	    btree, key_format, value_format));

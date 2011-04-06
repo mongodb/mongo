@@ -76,7 +76,7 @@ __wt_connection_close(CONNECTION *conn)
 	while ((btree = TAILQ_FIRST(&conn->dbqh)) != NULL) {
 		__wt_errx(&conn->default_session,
 		    "Env handle has open Db handles: %s", btree->name);
-		WT_TRET(btree->close(btree, 0));
+		WT_TRET(btree->close(btree, &conn->default_session, 0));
 		secondary_err = WT_ERROR;
 	}
 

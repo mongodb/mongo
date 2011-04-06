@@ -294,6 +294,8 @@ def func_method(a, f):
 		f.write('\tSESSION *session = NULL;\n')
 	elif locking and not have_session:
 		f.write('\tSESSION *session = &connection->default_session;\n')
+	if session:
+		f.write('\tint islocal;\n')
 	f.write('\tint ret;\n\n')
 
 	# Check if the method is illegal for the database type.
@@ -309,7 +311,8 @@ def func_method(a, f):
 	# If entering the API with a SESSION handle, allocate/initialize it.
 	if session:
 		f.write('\tWT_RET(' +
-		    '__wt_session_api_set(connection, method_name, btree, &session));\n')
+		    '__wt_session_api_set(connection, method_name, btree, ' +
+			'&session, &islocal));\n')
 
 	# Check flags.
 	if flagchk:
@@ -357,11 +360,7 @@ def func_method(a, f):
 
 	# If entering the API with a SESSION handle, free/clear it.
 	if session:
-		f.write('\tWT_TRET(__wt_session_api_clr(session, method_name, ')
-		if not have_session:
-			f.write('1')
-		else:
-			f.write('0')
+		f.write('\tWT_TRET(__wt_session_api_clr(session, method_name, islocal')
 		f.write('));\n')
 
 	# And return.

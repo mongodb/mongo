@@ -56,7 +56,8 @@ wiredtiger_simple_teardown(const char *progname, BTREE *btree)
 	int ret, tret;
 
 	ret = 0;
-	if (btree != NULL && (tret = btree->close(btree, 0)) != 0) {
+	if (btree != NULL && (tret = btree->close(btree,
+	    &((CONNECTION *)wt_conn)->default_session, 0)) != 0) {
 		fprintf(stderr, "%s: Db.close: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		if (ret == 0)
