@@ -128,17 +128,17 @@ namespace mongo {
     void Client::Context::_finishInit( bool doauth ) {
         int lockState = dbMutex.getState();
         assert( lockState );
-
+        
         _db = dbHolder.get( _ns , _path );
         if ( _db ) {
             _justCreated = false;
         }
-        else if ( dbMutex.getState() > 0 ) {
+        else if ( lockState > 0 ) {
             // already in a write lock
             _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
             assert( _db );
         }
-        else if ( dbMutex.getState() < -1 ) {
+        else if ( lockState < -1 ) {
             // nested read lock :(
             assert( _lock );
             _lock->releaseAndWriteLock();
