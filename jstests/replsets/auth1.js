@@ -129,7 +129,7 @@ master.runCommand({getlasterror:1, w:3, wtimeout:60000});
 
 
 print("resync");
-rs.restart(0);
+rs.restart(0, {"keyFile" : path+"key1"});
 
 
 print("add some more data 2");
@@ -159,7 +159,7 @@ master.getSisterDB("admin").auth("foo", "bar");
 
 
 print("shouldn't ever sync");
-for (var i = 0; i<30; i++) {
+for (var i = 0; i<10; i++) {
     print("iteration: " +i);
     var results = master.adminCommand({replSetGetStatus:1});
     printjson(results);
