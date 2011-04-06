@@ -406,6 +406,7 @@ namespace mongo {
             bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
             bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
+            bb.append("ping", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);

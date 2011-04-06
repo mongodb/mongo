@@ -157,12 +157,17 @@ namespace mongo {
                 BSONObj info;
                 int theirConfigVersion = -10000;
 
-                time_t before = time(0);
+                Timer timer;
 
                 bool ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(), h.toString(), info, theReplSet->config().version, theirConfigVersion);
+                
+                mem.ping = (unsigned int)timer.micros();
 
-                time_t after = mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
-
+                time_t before = timer.startTime() / 1000000;
+                // we set this on any response - we don't get this far if
+                // couldn't connect because exception is thrown
+                time_t after = mem.lastHeartbeat = before + (mem.ping / 1000000);
+                
                 if ( info["time"].isNumber() ) {
                     long long t = info["time"].numberLong();
                     if( t > after )
