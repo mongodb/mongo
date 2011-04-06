@@ -24,6 +24,8 @@
 #define	RSLT	"__slvg.result"			/* Result file */
 #define	SLVG	"__slvg.build"			/* Salvage file */
 
+#define	PSIZE	(2 * 1024)
+
 void build(int, int, int);
 int  bulk(BTREE *, WT_ITEM **, WT_ITEM **);
 void copy(int, int);
@@ -147,7 +149,7 @@ run(int r)
 		 * the first page has a higher LSN.
 		 */
 		build(110, 100, 20); copy(7, 11);
-		build(100, 200, 20); copy(6, 1);
+		build(100, 200, 20); copy(6,  1);
 		print_res(100, 200, 10);
 		print_res(110, 100, 20);
 		break;
@@ -158,162 +160,159 @@ run(int r)
 		 * the second page has a higher LSN.
 		 */
 		build(110, 100, 20); copy(6, 11);
-		build(100, 200, 20); copy(7, 1);
+		build(100, 200, 20); copy(7,  1);
 		print_res(100, 200, 20);
 		print_res(120, 110, 10);
 		break;
 	case 8:
 		/*
-STOP
 		 * Case #3:
-		 * 2 column-store pages, where the second page overlaps with
-		 * the end of the first page, and the first page has a higher
-		 * LSN.
+		 * The second page overlaps with the end of the first page, and
+		 * the first page has a higher LSN.
 		 */
-		build(0, 100, 20); copy(7, 1);
-		build(0, 200, 20); copy(6, 11);
-		print_res(0, 100, 20);
-		print_res(0, 210, 10);
+		build(100, 100, 20); copy(7,  1);
+		build(110, 200, 20); copy(6, 11);
+		print_res(100, 100, 20);
+		print_res(120, 210, 10);
 		break;
 	case 9:
 		/*
 		 * Case #3:
-		 * 2 column-store pages, where the second page overlaps with
-		 * the end of the first page, and the second page has a higher
-		 * LSN.
+		 * The second page overlaps with the end of the first page, and
+		 * the second page has a higher LSN.
 		 */
-		build(0, 100, 20); copy(6, 1);
-		build(0, 200, 20); copy(7, 11);
-		print_res(0, 100, 10);
-		print_res(0, 200, 20);
+		build(100, 100, 20); copy(6,  1);
+		build(110, 200, 20); copy(7, 11);
+		print_res(100, 100, 10);
+		print_res(110, 200, 20);
 		break;
 	case 10:
 		/*
 		 * Case #4:
-		 * 2 column-store pages, where the second page is a prefix of
-		 * the first page, and the first page has a higher LSN.
+		 * The second page is a prefix of the first page, and the first
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 20); copy(7, 1);
-		build(0, 200, 5); copy(6, 1);
-		print_res(0, 100, 20);
+		build(100, 100, 20); copy(7, 1);
+		build(100, 200,  5); copy(6, 1);
+		print_res(100, 100, 20);
 		break;
 	case 11:
 		/*
 		 * Case #4:
-		 * 2 column-store pages, where the second page is a prefix of
-		 * the first page, and the second page has a higher LSN.
+		 * The second page is a prefix of the first page, and the second
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 20); copy(6, 1);
-		build(0, 200, 5); copy(7, 1);
-		print_res(0, 200, 5);
-		print_res(0, 105, 15);
+		build(100, 100, 20); copy(6, 1);
+		build(100, 200,  5); copy(7, 1);
+		print_res(100, 200, 5);
+		print_res(105, 105, 15);
 		break;
 	case 12:
 		/*
 		 * Case #5:
-		 * 2 column-store pages, where the second page is in the middle
-		 * of the first page, and the first page has a higher LSN.
+		 * The second page is in the middle of the first page, and the
+		 * first page has a higher LSN.
 		 */
-		build(0, 100, 40); copy(7, 1);
-		build(0, 200, 10); copy(6, 10);
-		print_res(0, 100, 40);
+		build(100, 100, 40); copy(7, 1);
+		build(110, 200, 10); copy(6, 11);
+		print_res(100, 100, 40);
 		break;
 	case 13:
 		/*
 		 * Case #5:
-		 * 2 column-store pages, where the second page is in the middle
-		 * of the first page, and the second page has a higher LSN.
+		 * The second page is in the middle of the first page, and the
+		 * second page has a higher LSN.
 		 */
-		build(0, 100, 40); copy(6, 1);
-		build(0, 200, 10); copy(7, 11);
-		print_res(0, 100, 10);
-		print_res(0, 200, 10);
-		print_res(0, 120, 20);
+		build(100, 100, 40); copy(6, 1);
+		build(110, 200, 10); copy(7, 11);
+		print_res(100, 100, 10);
+		print_res(110, 200, 10);
+		print_res(120, 120, 20);
 		break;
 	case 14:
 		/*
 		 * Case #6:
-		 * 2 column-store pages, where the second page is a suffix of
-		 * the first page, and the first page has a higher LSN.
+		 * The second page is a suffix of the first page, and the first
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 40); copy(7, 1);
-		build(0, 200, 10); copy(6, 31);
-		print_res(0, 100, 40);
+		build(100, 100, 40); copy(7, 1);
+		build(130, 200, 10); copy(6, 31);
+		print_res(100, 100, 40);
 		break;
 	case 15:
 		/*
 		 * Case #6:
-		 * 2 column-store pages, where the second page is a suffix of
-		 * the first page, and the second page has a higher LSN.
+		 * The second page is a suffix of the first page, and the second
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 40); copy(6, 1);
-		build(0, 200, 10); copy(7, 31);
-		print_res(0, 100, 30);
-		print_res(0, 200, 10);
+		build(100, 100, 40); copy(6, 1);
+		build(130, 200, 10); copy(7, 31);
+		print_res(100, 100, 30);
+		print_res(130, 200, 10);
 		break;
 	case 16:
 		/*
 		 * Case #9:
-		 * 2 column-store pages, where the first page is a prefix of
-		 * the second page, and the first page has a higher LSN.
+		 * The first page is a prefix of the second page, and the first
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 20); copy(7, 1);
-		build(0, 200, 40); copy(6, 1);
-		print_res(0, 100, 20);
-		print_res(0, 220, 20);
+		build(100, 100, 20); copy(7, 1);
+		build(100, 200, 40); copy(6, 1);
+		print_res(100, 100, 20);
+		print_res(120, 220, 20);
 		break;
 	case 17:
 		/*
 		 * Case #9:
-		 * 2 column-store pages, where the first page is a prefix of
-		 * the second page, and the second page has a higher LSN.
+		 * The first page is a prefix of the second page, and the second
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 20); copy(6, 1);
-		build(0, 200, 40); copy(7, 1);
-		print_res(0, 200, 40);
+		build(100, 100, 20); copy(6, 1);
+		build(100, 200, 40); copy(7, 1);
+		print_res(100, 200, 40);
 		break;
 	case 18:
 		/*
 		 * Case #10:
-		 * 2 column-store pages, where the first page is a suffix of
-		 * the second page, and the first page has a higher LSN.
+		 * The first page is a suffix of the second page, and the first
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 10); copy(7, 31);
-		build(0, 200, 40); copy(6, 1);
-		print_res(0, 200, 30);
-		print_res(0, 100, 10);
+		build(130, 100, 10); copy(7, 31);
+		build(100, 200, 40); copy(6, 1);
+		print_res(100, 200, 30);
+		print_res(130, 100, 10);
 		break;
 	case 19:
 		/*
 		 * Case #10:
-		 * 2 column-store pages, where the first page is a suffix of
-		 * the second page, and the second page has a higher LSN.
+		 * The first page is a suffix of the second page, and the second
+		 * page has a higher LSN.
 		 */
-		build(0, 100, 10); copy(6, 31);
-		build(0, 200, 40); copy(7, 1);
-		print_res(0, 200, 40);
+		build(130, 100, 10); copy(6, 31);
+		build(100, 200, 40); copy(7, 1);
+		print_res(100, 200, 40);
 		break;
 	case 20:
 		/*
 		 * Case #11:
-		 * 2 column-store pages, where the first page is in the middle
-		 * of the second page, and the first page has a higher LSN.
+		 * The first page is in the middle of the second page, and the
+		 * first page has a higher LSN.
 		 */
-		build(0, 100, 10); copy(7, 21);
-		build(0, 200, 40); copy(6, 1);
-		print_res(0, 200, 20);
-		print_res(0, 100, 10);
-		print_res(0, 230, 10);
+		build(110, 100, 10); copy(7, 11);
+		build(100, 200, 40); copy(6, 1);
+		print_res(100, 200, 10);
+		print_res(110, 100, 10);
+		print_res(120, 220, 20);
 		break;
 	case 21:
 		/*
 		 * Case #11:
-		 * 2 column-store pages, where the first page is in the middle
-		 * of the second page, and the second page has a higher LSN.
+		 * The first page is in the middle of the second page, and the
+		 * second page has a higher LSN.
 		 */
-		build(0, 100, 10); copy(6, 21);
-		build(0, 200, 40); copy(7, 1);
-		print_res(0, 200, 40);
+		build(110, 100, 10); copy(6, 11);
+		build(100, 200, 40); copy(7, 1);
+		print_res(100, 200, 40);
 		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
@@ -354,7 +353,7 @@ build(int key, int value, int cnt)
 		assert(btree->column_set(btree,
 		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
-	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
+	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
 	assert(btree->open(btree, LOAD, 0660, WT_CREATE) == 0);
 	assert(btree->conn->session(btree->conn, 0, &session) == 0);
 	assert(btree->bulk_load(btree, NULL, bulk) == 0);
@@ -373,7 +372,7 @@ copy(int lsn, int recno)
 	FILE *ifp, *ofp;
 	WT_PAGE_DISK *dsk;
 	int first;
-	char buf[1024];
+	char buf[PSIZE];
 
 	/*
 	 * If the file doesn't exist, then we're creating it, copy a metadata
@@ -386,25 +385,25 @@ copy(int lsn, int recno)
 	/* Copy the first "page" (the metadata description). */
 	if (first) {
 		assert((ofp = fopen(SLVG, "w")) != NULL);
-		assert(fread(buf, 1, 1024, ifp) == 1024);
-		assert(fwrite(buf, 1, 1024, ofp) == 1024);
+		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 
 	/* Copy/update the first formatted page. */
-	assert(fseek(ifp, 1024L, SEEK_SET) == 0);
-	assert(fread(buf, 1, 1024, ifp) == 1024);
+	assert(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
+	assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
 	dsk = (WT_PAGE_DISK *)buf;
 	dsk->lsn = (uint64_t)lsn;
 	if (page_type != WT_PAGE_ROW_LEAF)
 		dsk->recno = (uint64_t)recno;
 	dsk->checksum = 0;
-	dsk->checksum = __wt_cksum(dsk, 1024);
-	assert(fwrite(buf, 1, 1024, ofp) == 1024);
+	dsk->checksum = __wt_cksum(dsk, PSIZE);
+	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 
 #if 0
 	/* Throw some random garbage into the file. */
 	memset(buf, 'a', sizeof(buf));
-	assert(fwrite(buf, 1, 1024, ofp) == 1024);
+	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 #endif
 
 	assert(fclose(ifp) == 0);
@@ -427,7 +426,7 @@ process(void)
 		assert(btree->column_set(btree,
 		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
-	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
+	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
 	assert(btree->conn->session(btree->conn, 0, &session) == 0);
 	assert(btree->salvage(btree, NULL, 0) == 0);
@@ -439,7 +438,7 @@ process(void)
 		assert(btree->column_set(btree,
 		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
-	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
+	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
 	assert(btree->conn->session(btree->conn, 0, &session) == 0);
 	assert(btree->verify(btree, NULL, 0) == 0);
@@ -451,7 +450,7 @@ process(void)
 		assert(btree->column_set(btree,
 		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
-	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
+	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
 	assert(btree->conn->session(btree->conn, 0, &session) == 0);
 	assert((fp = fopen(DUMP, "w")) != NULL);
@@ -483,7 +482,7 @@ int
 bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 {
 	static WT_ITEM key, value;
-	char kbuf[64], vbuf[64];
+	static char kbuf[64], vbuf[64];
 
 	if (gcnt == 0)
 		return (1);

@@ -47,7 +47,7 @@ __wt_block_write(SESSION *session);
 void
 __wt_block_discard(SESSION *session);
 void
-__wt_block_debug(SESSION *session);
+__wt_block_dump(SESSION *session);
 int
 __wt_btree_bulk_load(SESSION *session,
     void (*f)(const char *, uint64_t),

@@ -66,10 +66,11 @@ struct __wt_track {
 
 #define	WT_TRACK_CHECK_START	0x001		/* Initial key updated */
 #define	WT_TRACK_CHECK_STOP	0x002		/* Last key updated */
-#define	WT_TRACK_FREE_BLOCKS	0x004		/* Free page's blocks */
-#define	WT_TRACK_MERGE		0x008		/* Page requires merging */
+#define	WT_TRACK_MERGE		0x004		/* Page requires merging */
+#define	WT_TRACK_NO_FB		0x008		/* Don't free blocks */
 #define	WT_TRACK_OVFL_MISSING	0x010		/* Overflow page missing */
 #define	WT_TRACK_OVFL_REFD	0x020		/* Overflow page referenced */
+
 	uint32_t flags;
 };
 
@@ -858,7 +859,7 @@ delete:		WT_RET(__slvg_free_trk_col(session, &ss->pages[b_slot], 1));
 
 	new->u.col.range_start = b_trk->u.col.range_stop + 1;
 	new->u.col.range_stop = a_trk->u.col.range_stop;
-	F_SET(new, WT_TRACK_MERGE);
+	F_SET(new, WT_TRACK_NO_FB | WT_TRACK_MERGE);
 
 	a_trk->u.col.range_stop = b_trk->u.col.range_start - 1;
 	F_SET(a_trk, WT_TRACK_MERGE);
@@ -1027,8 +1028,6 @@ __slvg_build_leaf_col(SESSION *session,
 		 * set a flag so we eventually free the blocks.
 		 */
 		page->addr = WT_ADDR_INVALID;
-		F_SET(trk, WT_TRACK_FREE_BLOCKS);
-
 		WT_PAGE_SET_MODIFIED(page);
 		ret = __wt_page_reconcile(session, page, 0, 0);
 
@@ -1287,7 +1286,7 @@ delete:		WT_RET(__slvg_free_trk_row(session, &ss->pages[b_slot], 1));
 	    __slvg_key_copy(session, &new->u.row.range_start, B_TRK_STOP_BUF));
 	WT_RET(
 	    __slvg_key_copy(session, &new->u.row.range_stop, A_TRK_STOP_BUF));
-	F_SET(new, WT_TRACK_CHECK_START | WT_TRACK_MERGE);
+	F_SET(new, WT_TRACK_CHECK_START | WT_TRACK_NO_FB | WT_TRACK_MERGE);
 
 	WT_RET(__slvg_key_copy(session, A_TRK_STOP_BUF, B_TRK_START_BUF));
 	F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
@@ -1522,8 +1521,6 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			 * eventually free the blocks.
 			 */
 			page->addr = WT_ADDR_INVALID;
-			F_SET(trk, WT_TRACK_FREE_BLOCKS);
-
 			WT_PAGE_SET_MODIFIED(page);
 			ret = __wt_page_reconcile(session, page, skip_start, 0);
 			page->indx_count += skip_stop;
@@ -1760,7 +1757,8 @@ __slvg_free_merge_block(SESSION *session, WT_STUFF *ss)
 		for (i = 0; i < ss->pages_next; ++i) {
 			if ((trk = ss->pages[i]) == NULL)
 				continue;
-			if (F_ISSET(trk, WT_TRACK_FREE_BLOCKS))
+			if (F_ISSET(trk, WT_TRACK_MERGE) &&
+			    !F_ISSET(trk, WT_TRACK_NO_FB))
 				WT_RET(__slvg_free_trk_col(
 				    session, &ss->pages[i], 1));
 		}
@@ -1769,7 +1767,8 @@ __slvg_free_merge_block(SESSION *session, WT_STUFF *ss)
 		for (i = 0; i < ss->pages_next; ++i) {
 			if ((trk = ss->pages[i]) == NULL)
 				continue;
-			if (F_ISSET(trk, WT_TRACK_FREE_BLOCKS))
+			if (F_ISSET(trk, WT_TRACK_MERGE) &&
+			    !F_ISSET(trk, WT_TRACK_NO_FB))
 				WT_RET(__slvg_free_trk_row(
 				    session, &ss->pages[i], 1));
 		}
