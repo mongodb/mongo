@@ -34,7 +34,7 @@ namespace mongo {
 
         QueryPlan(NamespaceDetails *d,
                   int idxNo, // -1 = no index
-                  const FieldRangeSet &fbs,
+                  const FieldRangeSet &frs,
                   const FieldRangeSet &originalFrs,
                   const BSONObj &originalQuery,
                   const BSONObj &order,
@@ -59,11 +59,11 @@ namespace mongo {
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
         bool willScanTable() const { return _idxNo < 0; }
-        const char *ns() const { return _fbs.ns(); }
+        const char *ns() const { return _frs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
-        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _fbs.simplifiedQuery( fields ); }
-        const FieldRange &range( const char *fieldName ) const { return _fbs.range( fieldName ); }
+        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _frs.simplifiedQuery( fields ); }
+        const FieldRange &range( const char *fieldName ) const { return _frs.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
         shared_ptr< FieldRangeVector > originalFrv() const { return _originalFrv; }
         // just for testing
@@ -73,7 +73,7 @@ namespace mongo {
     private:
         NamespaceDetails * _d;
         int _idxNo;
-        const FieldRangeSet &_fbs;
+        const FieldRangeSet &_frs;
         const BSONObj &_originalQuery;
         const BSONObj &_order;
         const IndexDetails * _index;
@@ -205,7 +205,7 @@ namespace mongo {
         bool usingPrerecordedPlan() const { return _usingPrerecordedPlan; }
         QueryPlanPtr getBestGuess() const;
         //for testing
-        const FieldRangeSet &fbs() const { return *_fbs; }
+        const FieldRangeSet &frs() const { return *_frs; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
@@ -233,7 +233,7 @@ namespace mongo {
 
         const char *_ns;
         BSONObj _originalQuery;
-        auto_ptr< FieldRangeSet > _fbs;
+        auto_ptr< FieldRangeSet > _frs;
         auto_ptr< FieldRangeSet > _originalFrs;
         PlanSet _plans;
         bool _mayRecordPlan;
