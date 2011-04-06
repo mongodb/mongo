@@ -146,7 +146,7 @@ namespace mongo {
         ExceptionInfo exception() const { return _exception; }
         const QueryPlan &qp() const { return *_qp; }
         // To be called by QueryPlanSet::Runner only.
-        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; }
+        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; assert( _qp != NULL ); }
         void setException( const DBException &e ) {
             _error = true;
             _exception = e.getInfo();
@@ -441,6 +441,9 @@ namespace mongo {
     }
 
     // matcher() will always work on the returned cursor
+    // It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
+    // for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
+    // no suitable indices exist.
     inline shared_ptr< Cursor > bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
         if( !query.getField( "$or" ).eoo() ) {
             return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
@@ -448,7 +451,13 @@ namespace mongo {
         else {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
             auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
-            shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, origFrs, query, sort ).getBestGuess()->newCursor();
+
+            QueryPlanSet qps( ns, frs, origFrs, query, sort );
+            QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
+            if( ! qpp.get() ) return shared_ptr< Cursor >();
+
+            shared_ptr< Cursor > ret = qpp->newCursor();
+
             // If we don't already have a matcher, supply one.
             if ( !query.isEmpty() && ! ret->matcher() ) {
                 shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );

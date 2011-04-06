@@ -523,17 +523,16 @@ doneCheckOrder:
                     return _plans[i];
             }
 
-            stringstream ss;
-            ss << "best guess plan requested, but scan and order required:";
-            ss << " query: " << _frs->simplifiedQuery();
-            ss << " order: " << _order;
-            ss << " choices: ";
-            for ( unsigned i=0; i<_plans.size(); i++ ) {
-                ss << _plans[i]->indexKey() << " ";
-            }
+            warning() << "best guess query plan requested, but scan and order are required for all plans "
+            		  << " query: " << _frs->simplifiedQuery()
+            		  << " order: " << _order
+            		  << " choices: ";
 
-            string s = ss.str();
-            msgassertedNoTrace( 13284, s.c_str() );
+            for ( unsigned i=0; i<_plans.size(); i++ )
+            	warning() << _plans[i]->indexKey() << " ";
+            warning() << endl;
+
+            return QueryPlanPtr();
         }
         return _plans[0];
     }
