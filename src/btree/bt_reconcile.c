@@ -21,7 +21,7 @@ static int  __wt_rec_parent_update_dirty(
 static int  __wt_rec_row_leaf_insert(
 		SESSION *, WT_INSERT *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_int(SESSION *, WT_PAGE *);
-static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *);
+static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *, uint32_t);
 static int  __wt_rec_row_merge(
 		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
@@ -78,7 +78,8 @@ __wt_block_free_ovfl(SESSION *session, WT_OVFL *ovfl)
  *	Format an in-memory page to its on-disk format, and write it.
  */
 int
-__wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
+__wt_page_reconcile(
+    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int discard)
 {
 	BTREE *btree;
 
@@ -128,7 +129,7 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 		WT_RET(__wt_rec_row_int(session, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_rec_row_leaf(session, page));
+		WT_RET(__wt_rec_row_leaf(session, page, slvg_skip));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -168,7 +169,8 @@ __wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard)
 	 */
 	return (
 	    FLD_ISSET(btree->root_page.state, WT_REF_MERGE) ?
-	    __wt_page_reconcile(session, btree->root_page.page, discard) : 0);
+	    __wt_page_reconcile(
+	    session, btree->root_page.page, 0, discard) : 0);
 }
 
 /*
@@ -1135,7 +1137,7 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page,
  *	Reconcile a row-store leaf page.
  */
 static int
-__wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
+__wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
 	WT_INSERT *ins;
@@ -1171,6 +1173,20 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page)
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
 	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_cell, i) {
+		/*
+		 * The salvage code, on some rare occasions, wants to reconcile
+		 * a page but skip some leading records on the page.  Because
+		 * the row-store leaf reconciliation function copies keys from
+		 * the original disk page, this is non-trivial -- just changing
+		 * the in-memory pointers isn't sufficient, we have to change
+		 * the WT_CELL structures on the disk page, too.  It's ugly, but
+		 * we pass in a value that tells us how many records to skip in
+		 * this case.
+		 */
+		if (slvg_skip != 0) {
+			--slvg_skip;
+			continue;
+		}
 		/*
 		 * Get a reference to the value.  We get the value first because
 		 * it may have been deleted, in which case we ignore the pair.

@@ -47,7 +47,7 @@ __wt_block_write(SESSION *session);
 void
 __wt_block_discard(SESSION *session);
 void
-__wt_debug_block(SESSION *session);
+__wt_block_debug(SESSION *session);
 int
 __wt_btree_bulk_load(SESSION *session,
     void (*f)(const char *, uint64_t),
@@ -159,7 +159,8 @@ __wt_cache_read_serial_func(SESSION *session);
 void *
 __wt_cache_read_server(void *arg);
 int
-__wt_page_reconcile(SESSION *session, WT_PAGE *page, int discard);
+__wt_page_reconcile(
+    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int discard);
 int
 __wt_value_return(
     SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return);

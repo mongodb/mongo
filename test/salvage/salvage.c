@@ -24,10 +24,10 @@
 #define	RSLT	"__slvg.result"			/* Result file */
 #define	SLVG	"__slvg.build"			/* Salvage file */
 
-void build(int, int);
+void build(int, int, int);
 int  bulk(BTREE *, WT_ITEM **, WT_ITEM **);
 void copy(int, int);
-void print_res(int, int);
+void print_res(int, int, int);
 void process(void);
 void run(int);
 
@@ -36,25 +36,25 @@ void run(int);
 
 FILE *res_fp;					/* Results file */
 
-int gstart, gcnt;				/* Records to build */
+int gkey, gvalue, gcnt;				/* Records to build */
 int page_type;					/* Types of records */
 
 int
-main(int argc, char *argv[])
+main(void)
 {
 	int r;
 
-	if (argc == 2 && isdigit(argv[1][0]))
-		run (atoi(argv[1]));
-	else {
-		page_type = WT_PAGE_COL_FIX;
-		for (r = 1; r <= 21; ++r)
-			run(r);
+	page_type = WT_PAGE_COL_FIX;
+	for (r = 1; r <= 21; ++r)
+		run(r);
 
-		page_type = WT_PAGE_COL_VAR;
-		for (r = 1; r <= 21; ++r)
-			run(r);
-	}
+	page_type = WT_PAGE_COL_VAR;
+	for (r = 1; r <= 21; ++r)
+		run(r);
+
+	page_type = WT_PAGE_ROW_LEAF;
+	for (r = 1; r <= 21; ++r)
+		run(r);
 
 	printf("salvage test run completed\n");
 	return (EXIT_SUCCESS);
@@ -85,96 +85,95 @@ run(int r)
 		 * Smoke test:
 		 * Sequential pages, all pages should be kept.
 		 */
-		build(100, 20); copy(6,  1);
-		build(200, 20); copy(7, 21);
-		build(300, 20); copy(8, 41);
-		print_res(100, 20);
-		print_res(200, 20);
-		print_res(300, 20);
+		build(100, 100, 20); copy(6,  1);
+		build(200, 200, 20); copy(7, 21);
+		build(300, 300, 20); copy(8, 41);
+		print_res(100, 100, 20);
+		print_res(200, 200, 20);
+		print_res(300, 300, 20);
 		break;
 	case 2:
 		/*
 		 * Smoke test:
 		 * Sequential pages, all pages should be kept.
 		 */
-		build(100, 20); copy(8,  1);
-		build(200, 20); copy(7, 21);
-		build(300, 20); copy(6, 41);
-		print_res(100, 20);
-		print_res(200, 20);
-		print_res(300, 20);
+		build(100, 100, 20); copy(8,  1);
+		build(200, 200, 20); copy(7, 21);
+		build(300, 300, 20); copy(6, 41);
+		print_res(100, 100, 20);
+		print_res(200, 200, 20);
+		print_res(300, 300, 20);
 		break;
 	case 3:
 		/*
 		 * Case #1:
-		 * 3 column-store pages, each with 20 records starting with
-		 * record number 1, and sequential LSNs; salvage should leave
-		 * the page with the largest LSN.
+		 * 3 pages, each with 20 records starting with the same record
+		 * and sequential LSNs; salvage should leave the page with the
+		 * largest LSN.
 		 */
-		build(100, 20); copy(6, 1);
-		build(200, 20); copy(7, 1);
-		build(300, 20); copy(8, 1);
-		print_res(300, 20);
+		build(100, 100, 20); copy(6, 1);
+		build(100, 200, 20); copy(7, 1);
+		build(100, 300, 20); copy(8, 1);
+		print_res(100, 300, 20);
 		break;
 	case 4:
 		/*
 		 * Case #1:
-		 * 3 column-store pages, each with 20 records starting with
-		 * record number 1, and sequential LSNs; salvage should leave
-		 * the page with the largest LSN.
+		 * 3 pages, each with 20 records starting with the same record
+		 * and sequential LSNs; salvage should leave the page with the
+		 * largest LSN.
 		 */
-		build(100, 20); copy(6, 1);
-		build(200, 20); copy(8, 1);
-		build(300, 20); copy(7, 1);
-		print_res(200, 20);
+		build(100, 100, 20); copy(6, 1);
+		build(100, 200, 20); copy(8, 1);
+		build(100, 300, 20); copy(7, 1);
+		print_res(100, 200, 20);
 		break;
 	case 5:
 		/*
 		 * Case #1:
-		 * 3 column-store pages, each with 20 records starting with
-		 * record number 1, and sequential LSNs; salvage should leave
-		 * the page with the largest LSN.
+		 * 3 pages, each with 20 records starting with the same record
+		 * and sequential LSNs; salvage should leave the page with the
+		 * largest LSN.
 		 */
-		build(100, 20); copy(8, 1);
-		build(200, 20); copy(7, 1);
-		build(300, 20); copy(6, 1);
-		print_res(100, 20);
+		build(100, 100, 20); copy(8, 1);
+		build(100, 200, 20); copy(7, 1);
+		build(100, 300, 20); copy(6, 1);
+		print_res(100, 100, 20);
 		break;
 	case 6:
 		/*
 		 * Case #2:
-		 * 2 column-store pages, where the second page overlaps with
-		 * the beginning of the first page, and the first page has a
-		 * higher LSN.
+		 * The second page overlaps the beginning of the first page, and
+		 * the first page has a higher LSN.
 		 */
-		build(100, 20); copy(7, 11);
-		build(200, 20); copy(6, 1);
-		print_res(200, 10);
-		print_res(100, 20);
+		build(110, 100, 20); copy(7, 11);
+		build(100, 200, 20); copy(6, 1);
+		print_res(100, 200, 10);
+		print_res(110, 100, 20);
 		break;
 	case 7:
 		/*
 		 * Case #2:
-		 * 2 column-store pages, where the second page overlaps with
-		 * the beginning of the first page, and the second page has a
-		 * higher LSN.
+		 * The second page overlaps the beginning of the first page, and
+		 * the second page has a higher LSN.
 		 */
-		build(100, 20); copy(6, 11);
-		build(200, 20); copy(7, 1);
-		print_res(200, 20);
-		print_res(110, 10);
+		build(110, 100, 20); copy(6, 11);
+		build(100, 200, 20); copy(7, 1);
+		print_res(100, 200, 20);
+		print_res(120, 110, 10);
 		break;
 	case 8:
 		/*
+STOP
 		 * Case #3:
 		 * 2 column-store pages, where the second page overlaps with
 		 * the end of the first page, and the first page has a higher
 		 * LSN.
 		 */
-		build(100, 20); copy(7, 1);
-		build(200, 20); copy(6, 11);
-		print_res(100, 20);
-		print_res(210, 10);
+		build(0, 100, 20); copy(7, 1);
+		build(0, 200, 20); copy(6, 11);
+		print_res(0, 100, 20);
+		print_res(0, 210, 10);
 		break;
 	case 9:
 		/*
@@ -183,10 +182,10 @@ run(int r)
 		 * the end of the first page, and the second page has a higher
 		 * LSN.
 		 */
-		build(100, 20); copy(6, 1);
-		build(200, 20); copy(7, 11);
-		print_res(100, 10);
-		print_res(200, 20);
+		build(0, 100, 20); copy(6, 1);
+		build(0, 200, 20); copy(7, 11);
+		print_res(0, 100, 10);
+		print_res(0, 200, 20);
 		break;
 	case 10:
 		/*
@@ -194,9 +193,9 @@ run(int r)
 		 * 2 column-store pages, where the second page is a prefix of
 		 * the first page, and the first page has a higher LSN.
 		 */
-		build(100, 20); copy(7, 1);
-		build(200, 5); copy(6, 1);
-		print_res(100, 20);
+		build(0, 100, 20); copy(7, 1);
+		build(0, 200, 5); copy(6, 1);
+		print_res(0, 100, 20);
 		break;
 	case 11:
 		/*
@@ -204,10 +203,10 @@ run(int r)
 		 * 2 column-store pages, where the second page is a prefix of
 		 * the first page, and the second page has a higher LSN.
 		 */
-		build(100, 20); copy(6, 1);
-		build(200, 5); copy(7, 1);
-		print_res(200, 5);
-		print_res(105, 15);
+		build(0, 100, 20); copy(6, 1);
+		build(0, 200, 5); copy(7, 1);
+		print_res(0, 200, 5);
+		print_res(0, 105, 15);
 		break;
 	case 12:
 		/*
@@ -215,9 +214,9 @@ run(int r)
 		 * 2 column-store pages, where the second page is in the middle
 		 * of the first page, and the first page has a higher LSN.
 		 */
-		build(100, 40); copy(7, 1);
-		build(200, 10); copy(6, 10);
-		print_res(100, 40);
+		build(0, 100, 40); copy(7, 1);
+		build(0, 200, 10); copy(6, 10);
+		print_res(0, 100, 40);
 		break;
 	case 13:
 		/*
@@ -225,11 +224,11 @@ run(int r)
 		 * 2 column-store pages, where the second page is in the middle
 		 * of the first page, and the second page has a higher LSN.
 		 */
-		build(100, 40); copy(6, 1);
-		build(200, 10); copy(7, 11);
-		print_res(100, 10);
-		print_res(200, 10);
-		print_res(120, 20);
+		build(0, 100, 40); copy(6, 1);
+		build(0, 200, 10); copy(7, 11);
+		print_res(0, 100, 10);
+		print_res(0, 200, 10);
+		print_res(0, 120, 20);
 		break;
 	case 14:
 		/*
@@ -237,9 +236,9 @@ run(int r)
 		 * 2 column-store pages, where the second page is a suffix of
 		 * the first page, and the first page has a higher LSN.
 		 */
-		build(100, 40); copy(7, 1);
-		build(200, 10); copy(6, 31);
-		print_res(100, 40);
+		build(0, 100, 40); copy(7, 1);
+		build(0, 200, 10); copy(6, 31);
+		print_res(0, 100, 40);
 		break;
 	case 15:
 		/*
@@ -247,10 +246,10 @@ run(int r)
 		 * 2 column-store pages, where the second page is a suffix of
 		 * the first page, and the second page has a higher LSN.
 		 */
-		build(100, 40); copy(6, 1);
-		build(200, 10); copy(7, 31);
-		print_res(100, 30);
-		print_res(200, 10);
+		build(0, 100, 40); copy(6, 1);
+		build(0, 200, 10); copy(7, 31);
+		print_res(0, 100, 30);
+		print_res(0, 200, 10);
 		break;
 	case 16:
 		/*
@@ -258,10 +257,10 @@ run(int r)
 		 * 2 column-store pages, where the first page is a prefix of
 		 * the second page, and the first page has a higher LSN.
 		 */
-		build(100, 20); copy(7, 1);
-		build(200, 40); copy(6, 1);
-		print_res(100, 20);
-		print_res(220, 20);
+		build(0, 100, 20); copy(7, 1);
+		build(0, 200, 40); copy(6, 1);
+		print_res(0, 100, 20);
+		print_res(0, 220, 20);
 		break;
 	case 17:
 		/*
@@ -269,9 +268,9 @@ run(int r)
 		 * 2 column-store pages, where the first page is a prefix of
 		 * the second page, and the second page has a higher LSN.
 		 */
-		build(100, 20); copy(6, 1);
-		build(200, 40); copy(7, 1);
-		print_res(200, 40);
+		build(0, 100, 20); copy(6, 1);
+		build(0, 200, 40); copy(7, 1);
+		print_res(0, 200, 40);
 		break;
 	case 18:
 		/*
@@ -279,10 +278,10 @@ run(int r)
 		 * 2 column-store pages, where the first page is a suffix of
 		 * the second page, and the first page has a higher LSN.
 		 */
-		build(100, 10); copy(7, 31);
-		build(200, 40); copy(6, 1);
-		print_res(200, 30);
-		print_res(100, 10);
+		build(0, 100, 10); copy(7, 31);
+		build(0, 200, 40); copy(6, 1);
+		print_res(0, 200, 30);
+		print_res(0, 100, 10);
 		break;
 	case 19:
 		/*
@@ -290,9 +289,9 @@ run(int r)
 		 * 2 column-store pages, where the first page is a suffix of
 		 * the second page, and the second page has a higher LSN.
 		 */
-		build(100, 10); copy(6, 31);
-		build(200, 40); copy(7, 1);
-		print_res(200, 40);
+		build(0, 100, 10); copy(6, 31);
+		build(0, 200, 40); copy(7, 1);
+		print_res(0, 200, 40);
 		break;
 	case 20:
 		/*
@@ -300,11 +299,11 @@ run(int r)
 		 * 2 column-store pages, where the first page is in the middle
 		 * of the second page, and the first page has a higher LSN.
 		 */
-		build(100, 10); copy(7, 21);
-		build(200, 40); copy(6, 1);
-		print_res(200, 20);
-		print_res(100, 10);
-		print_res(230, 10);
+		build(0, 100, 10); copy(7, 21);
+		build(0, 200, 40); copy(6, 1);
+		print_res(0, 200, 20);
+		print_res(0, 100, 10);
+		print_res(0, 230, 10);
 		break;
 	case 21:
 		/*
@@ -312,9 +311,9 @@ run(int r)
 		 * 2 column-store pages, where the first page is in the middle
 		 * of the second page, and the second page has a higher LSN.
 		 */
-		build(100, 10); copy(6, 21);
-		build(200, 40); copy(7, 1);
-		print_res(200, 40);
+		build(0, 100, 10); copy(6, 21);
+		build(0, 200, 40); copy(7, 1);
+		print_res(0, 200, 40);
 		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
@@ -339,19 +338,21 @@ run(int r)
  *	Build a row- or column-store page in a file.
  */
 void
-build(int start, int cnt)
+build(int key, int value, int cnt)
 {
 	BTREE *btree;
 	SESSION *session;
 
 	(void)remove(LOAD);
 
-	gstart = start;
+	gvalue = value;
+	gkey = key;
 	gcnt = cnt;
 	
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree,
-	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
+	if (page_type != WT_PAGE_ROW_LEAF)
+		assert(btree->column_set(btree,
+		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, LOAD, 0660, WT_CREATE) == 0);
@@ -393,9 +394,8 @@ copy(int lsn, int recno)
 	assert(fseek(ifp, 1024L, SEEK_SET) == 0);
 	assert(fread(buf, 1, 1024, ifp) == 1024);
 	dsk = (WT_PAGE_DISK *)buf;
-	if (lsn != 0)
-		dsk->lsn = (uint64_t)lsn;
-	if (recno != 0)
+	dsk->lsn = (uint64_t)lsn;
+	if (page_type != WT_PAGE_ROW_LEAF)
 		dsk->recno = (uint64_t)recno;
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, 1024);
@@ -423,8 +423,9 @@ process(void)
 	SESSION *session;
 
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree,
-	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
+	if (page_type != WT_PAGE_ROW_LEAF)
+		assert(btree->column_set(btree,
+		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
@@ -434,8 +435,9 @@ process(void)
 	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
 
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree,
-	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
+	if (page_type != WT_PAGE_ROW_LEAF)
+		assert(btree->column_set(btree,
+		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
@@ -445,8 +447,9 @@ process(void)
 	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
 
 	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	assert(btree->column_set(btree,
-	    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
+	if (page_type != WT_PAGE_ROW_LEAF)
+		assert(btree->column_set(btree,
+		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
 	assert(btree->btree_pagesize_set(
 	    btree, 1024, 1024, 1024, 1024, 1024) == 0);
 	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
@@ -463,10 +466,13 @@ process(void)
  *	Build results file.
  */
 void
-print_res(int start, int cnt)
+print_res(int key, int value, int cnt)
 {
-	for (; cnt > 0; ++start, --cnt)
-		fprintf(res_fp, "%010d VALUE----\n", start);
+	for (; cnt > 0; ++key, ++value, --cnt) {
+		if (page_type == WT_PAGE_ROW_LEAF)
+			fprintf(res_fp, "%010d KEY------\n", key);
+		fprintf(res_fp, "%010d VALUE----\n", value);
+	}
 }
 
 /*
@@ -491,7 +497,7 @@ bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 		*keyp = NULL;
 		break;
 	case WT_PAGE_ROW_LEAF:
-		snprintf(kbuf, sizeof(kbuf), "%010d KEY------", gstart);
+		snprintf(kbuf, sizeof(kbuf), "%010d KEY------", gkey);
 		key.data = kbuf;
 		key.size = 20;
 		*keyp = &key;
@@ -499,12 +505,13 @@ bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 	}
 
 	/* Build the value. */
-	snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", gstart);
+	snprintf(vbuf, sizeof(vbuf), "%010d VALUE----", gvalue);
 	value.data = vbuf;
 	value.size = 20;
 	*valuep = &value;
 
-	++gstart;
+	++gkey;
+	++gvalue;
 
 	btree = NULL;
 	return (0);

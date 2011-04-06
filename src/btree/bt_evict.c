@@ -583,7 +583,7 @@ __wt_evict_page(SESSION *session)
 		 * code.
 		 */
 		session->btree = evict->btree;
-		WT_ERR(__wt_page_reconcile(session, page, 1));
+		WT_ERR(__wt_page_reconcile(session, page, 0, 1));
 
 		/* Remove the entry from the eviction list. */
 		WT_EVICT_CLR(evict);

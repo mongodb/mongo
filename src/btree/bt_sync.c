@@ -63,5 +63,5 @@ __wt_bt_tree_sync(SESSION *session, WT_PAGE *page, void *arg)
 	 * page, or reading a page after we discard it,
 	 */
 	return (WT_PAGE_IS_MODIFIED(page) ?
-	    __wt_page_reconcile(session, page, 0) : 0);
+	    __wt_page_reconcile(session, page, 0, 0) : 0);
 }
