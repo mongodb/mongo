@@ -440,7 +440,13 @@ namespace mongo {
         return ( dbName == "local" ) || ( dbName == "admin" ) || ( dbName == "config" );
     }
 
+    void Grid::flushConfig() {
+        scoped_lock lk( _lock );
+        _databases.clear();
+    }
+
     Grid grid;
+
 
     // unit tests
 
