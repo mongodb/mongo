@@ -389,7 +389,7 @@ __wt_block_discard(SESSION *session)
 
 #ifdef HAVE_DIAGNOSTIC
 void
-__wt_block_debug(SESSION *session)
+__wt_block_dump(SESSION *session)
 {
 	BTREE *btree;
 	WT_FREE_ENTRY *fe;
