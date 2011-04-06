@@ -39,7 +39,7 @@ void run(int);
 FILE *res_fp;					/* Results file */
 
 int gkey, gvalue, gcnt;				/* Records to build */
-int page_type;					/* Types of records */
+u_int page_type;				/* Types of records */
 
 int
 main(void)
