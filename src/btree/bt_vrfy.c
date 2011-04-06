@@ -273,8 +273,8 @@ recno_chk:	if (parent_recno != recno) {
 			 * in a comparison.
 			 */
 			if (vs->leaf != NULL) {
-				WT_ERR(__wt_verify_pc(
-				    session, rref, vs->leaf, 0));
+				WT_ERR(
+				    __wt_verify_pc(session, rref, vs->leaf, 0));
 				__wt_hazard_clear(session, vs->leaf);
 				vs->leaf = NULL;
 			}
@@ -298,11 +298,19 @@ recno_chk:	if (parent_recno != recno) {
 				goto err;
 		}
 		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * See comments above in WT_PAGE_ROW_INT: on leaf pages, perform
+		 * the first connection check, and set up for the second.
+		 */
+		WT_ERR(__wt_verify_pc(session, parent_rref, page, 1));
+		vs->leaf = page;
+		return (0);
 	}
 
 	/*
-	 * The largest key on the last leaf page in the tree is never needed,
-	 * there aren't any internal pages after it.  So, we get here with
+	 * The largest key on the last leaf page in the tree is never needed
+	 * as there aren't any internal pages after it.  So, we get here with
 	 * vs->leaf needing to be released.
 	 */
 err:	if (vs->leaf != NULL) {
