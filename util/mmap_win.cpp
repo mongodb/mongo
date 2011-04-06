@@ -141,7 +141,8 @@ namespace mongo {
         }
         if ( view == 0 ) {
             DWORD e = GetLastError();
-            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
+            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << 
+                ((sizeof(void*)==4)?" (32 bit build)":"") << endl;
             close();
         }
         else {
