@@ -135,7 +135,6 @@ void intr( int sig ) {
 #endif
 }
 
-#if !defined(_WIN32)
 void killOps() {
     if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
         return;
@@ -180,20 +179,16 @@ void quitNicely( int sig ) {
         gotInterrupted = 1;
         return;
     }
+
+#if !defined(_WIN32)
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
+#endif
+
     killOps();
     shellHistoryDone();
     exit(0);
 }
-#else
-void quitNicely( int sig ) {
-    mongo::dbexitCalled = true;
-    //killOps();
-    shellHistoryDone();
-    exit(0);
-}
-#endif
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 
@@ -267,7 +262,9 @@ void setupSignals() {
     set_terminate( myterminate );
 }
 #else
-inline void setupSignals() {}
+inline void setupSignals() {
+    signal( SIGINT , quitNicely ); // surprisingly this works on windows too
+}
 #endif
 
 string fixHost( string url , string host , string port ) {
