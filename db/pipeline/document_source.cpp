@@ -27,6 +27,10 @@ namespace mongo {
 	pSource = pTheSource;
     }
 
+    bool DocumentSource::coalesce(shared_ptr<DocumentSource> pNextSource) {
+	return false;
+    }
+
     void DocumentSource::optimize() {
     }
 

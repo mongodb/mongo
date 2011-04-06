@@ -115,23 +115,54 @@ namespace mongo {
         }
 
 	/*
-	  CW TODO - move filters up where possible
+	  Move filters up where possible.
+
+	  CW TODO -- move filters past projections where possible, and noting
+	  corresponding field renaming.
+
+	  Then coalesce adjacent filters where possible.  Two adjacent filters
+	  are equivalent to one filter whose predicate is the conjunction of
+	  the two original filters' predicates.  For now, capture this by
+	  giving any DocumentSource the option to absorb it's successor; this
+	  will also allow adjacent projections to coalesce when possible.
+
+	  Run through the DocumentSources, and give each one the opportunity
+	  to coalesce with its successor.  If successful, remove the
+	  successor.
+
+	  Start by moving all document sources to a temporary list.
 	*/
+	SourceList tempList;
+	tempList.splice(tempList.begin(), *pSourceList);
+
+	/* move the first one to the final list */
+	pSourceList->push_back(tempList.front());
+	tempList.pop_front();
+
+	/* keep track of the last source seen */
+	shared_ptr<DocumentSource> &lastSource = pSourceList->back();
+
+	/* run through the sources, coalescing them or keeping them */
+	for(SourceList::iterator iter(tempList.begin()),
+		listEnd(tempList.end()); iter != listEnd; ++iter) {
+
+	    /*
+	      If we can't coalesce the source with the last, then move it
+	      to the final list, and make it the new last.  (If we succeeded,
+	      then we're still on the same last, and there's no need to move
+	      or do anything with the source -- the destruction of tempList
+	      will take care of the rest.)
+	    */
+	    if (!lastSource->coalesce(*iter)) {
+		pSourceList->push_back(*iter);
+		lastSource = pSourceList->back();
+	    }
+	}
 
 	/* optimize the elements in the pipeline */
 	for(SourceList::iterator iter(pSourceList->begin()),
 		listEnd(pSourceList->end()); iter != listEnd; ++iter)
 	    (*iter)->optimize();
-
-	/*
-	  Break down any filters before groups into chunks we can convert for
-	  matcher use.
-
-	  LATER -- we've move these further up the chain past projections
-	  where possible, remapping field names as they move past projections
-	  that rename the fields.
-	*/
-	// CW TODO
 
 	return pPipeline;
     }

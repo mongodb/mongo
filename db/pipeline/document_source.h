@@ -69,7 +69,25 @@ namespace mongo {
 	virtual void setSource(shared_ptr<DocumentSource> pSource);
 
 	/*
-	  Optimize the pipeline operation, if possible.
+	  Attempt to coalesce this DocumentSource with its successor in the
+	  document processing pipeline.  If successful, the successor
+	  DocumentSource should be removed from the pipeline and discarded.
+
+	  If successful, this operation can be applied repeatedly, in an
+	  attempt to coalesce several sources together.
+
+	  The default implementation is to do nothing, and return false.
+
+	  @param pNextSource the next source in the document processing chain.
+	  @returns whether or not the attempt to coalesce was successful or not;
+	    if the attempt was not successful, nothing has been changed
+	 */
+	virtual bool coalesce(shared_ptr<DocumentSource> pNextSource);
+
+	/*
+	  Optimize the pipeline operation, if possible.  This is a local
+	  optimization that only looks within this DocumentSource.  For best
+	  results, first coalesce compatible sources using coalesce().
 
 	  This is intended for any operations that include expressions, and
 	  provides a hook for those to optimize those operations.
@@ -138,6 +156,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
+	virtual bool coalesce(shared_ptr<DocumentSource> pNextSource);
 	virtual void optimize();
 	virtual void toBson(BSONObjBuilder *pBuilder) const;
 

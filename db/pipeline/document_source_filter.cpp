@@ -78,6 +78,27 @@ namespace mongo {
         return pCurrent;
     }
 
+    bool DocumentSourceFilter::coalesce(
+	shared_ptr<DocumentSource> pNextSource) {
+
+	/* we only know how to coalesce other filters */
+	DocumentSourceFilter *pDocFilter =
+	    dynamic_cast<DocumentSourceFilter *>(pNextSource.get());
+	if (!pDocFilter)
+	    return false;
+
+	/*
+	  Two adjacent filters can be combined by creating a conjunction of
+	  their predicates.
+	 */
+	shared_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
+	pAnd->addOperand(pFilter);
+	pAnd->addOperand(pDocFilter->pFilter);
+	pFilter = pAnd;
+
+	return true;
+    }
+
     void DocumentSourceFilter::optimize() {
 	pFilter = pFilter->optimize();
     }
