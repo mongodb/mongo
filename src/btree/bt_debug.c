@@ -696,12 +696,18 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 
 	fprintf(fp, "\tref: addr %lu, size %lu, state:",
 	    (u_long)ref->addr, (u_long)ref->size);
-	if (FLD_ISSET(ref->state, WT_REF_DISK))
+
+	switch (WT_REF_STATE(ref->state)) {
+	case WT_REF_DISK:
 		fprintf(fp, " disk");
-	if (FLD_ISSET(ref->state, WT_REF_EVICTED))
+		break;
+	case WT_REF_EVICTED:
 		fprintf(fp, " evicted");
-	if (FLD_ISSET(ref->state, WT_REF_MEM))
+		break;
+	case WT_REF_MEM:
 		fprintf(fp, " mem");
+		break;
+	}
 	if (FLD_ISSET(ref->state, WT_REF_EVICT))
 		fprintf(fp, " evict");
 	if (FLD_ISSET(ref->state, WT_REF_MERGE))
