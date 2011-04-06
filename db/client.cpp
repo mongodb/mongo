@@ -32,6 +32,7 @@
 #include "dbwebserver.h"
 #include "../util/mongoutils/html.h"
 #include "../util/mongoutils/checksum.h"
+#include "../util/file_allocator.h"
 
 namespace mongo {
 
@@ -129,6 +130,11 @@ namespace mongo {
         int lockState = dbMutex.getState();
         assert( lockState );
         
+        if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
+            // TODO: maybe we should assert here
+            OCCASIONALLY warning() << "getting a write lock and file allocator is in failed space, could run out of space" << endl;
+        }
+
         _db = dbHolder.get( _ns , _path );
         if ( _db ) {
             _justCreated = false;
