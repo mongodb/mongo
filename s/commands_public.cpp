@@ -1034,13 +1034,20 @@ namespace mongo {
         class ApplyOpsCmd : public PublicGridCommand {
         public:
             ApplyOpsCmd() : PublicGridCommand( "applyOps" ) {}
-
             virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
                 return false;
             }
-
         } applyOpsCmd;
+
+        class CompactCmd : public PublicGridCommand {
+        public:
+            CompactCmd() : PublicGridCommand( "compact" ) {}
+            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg = "compact not allowed through mongos";
+                return false;
+            }
+        } compactCmd;
 
     }
 
