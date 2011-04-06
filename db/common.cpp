@@ -27,7 +27,7 @@ namespace mongo {
     MongoMutex &dbMutex( *(new MongoMutex("rw:dbMutex")) );
 
     MongoMutex::MongoMutex(const char *name) : _m(name) {
-        static int n;
+        static int n = 0;
         assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
         _remapPrivateViewRequested = false;
     }
