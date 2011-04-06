@@ -569,6 +569,10 @@ struct __wt_row {
 #define	WT_ROW_INDX_FOREACH(page, rip, i)				\
 	for ((i) = (page)->indx_count,					\
 	    (rip) = (page)->u.row_leaf.d; (i) > 0; ++(rip), --(i))
+#define	WT_ROW_INDX_FOREACH_REVERSE(page, rip, i)			\
+	for ((i) = (page)->indx_count,					\
+	    (rip) = (page)->u.row_leaf.d + ((page)->indx_count - 1);	\
+	    (i) > 0; --(rip), --(i))
 
 /*
  * WT_ROW_INDX_SLOT --
