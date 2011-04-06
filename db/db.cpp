@@ -489,6 +489,10 @@ namespace mongo {
         try { 
             _initAndListen(listenPort); 
         }
+        catch ( DBException &e ) {
+            log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
+            dbexit( EXIT_UNCAUGHT );
+        }
         catch ( std::exception &e ) {
             log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );

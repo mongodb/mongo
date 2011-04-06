@@ -766,7 +766,7 @@ namespace mongo {
         log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
-        rawOut( ss3.str() );
+        log() << ss3.str() << endl;
 
         if( cmdLine.dur ) {
             dur::journalCleanup(true);
@@ -881,13 +881,15 @@ namespace mongo {
             FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
                 NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
                 (LPSTR)&msg, 0, NULL);
-            uasserted( 13627 , msg );
+            string m = msg;
+            str::stripTrailing(m, "\r\n");
+            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?" );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
         lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
         if( lockFile <= 0 ) {
-            uasserted( 10309 , str::stream() << "Unable to create / open lock file for lockfilepath: " << name << ' ' << errnoWithDescription());
+            uasserted( 10309 , str::stream() << "Unable to create/open lock file: " << name << ' ' << errnoWithDescription() << " Is a mongod instance already running?" );
         }
         if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
             close ( lockFile );
