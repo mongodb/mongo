@@ -104,17 +104,29 @@ namespace mongo {
 namespace mongo {
 
     LogFile::LogFile(string name) : _name(name) {
-        _fd = open(name.c_str(),
-                   O_CREAT
-                   | O_WRONLY
+        int options = O_CREAT
+                    | O_WRONLY
 #if defined(O_DIRECT)
-                   | O_DIRECT
+                    | O_DIRECT
 #endif
 #if defined(O_NOATIME)
-                   | O_NOATIME
+                    | O_NOATIME
 #endif
-                   ,
-                   S_IRUSR | S_IWUSR);
+                    ;
+
+        _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
+
+#if defined(O_DIRECT)
+        _direct = true;
+        if( _fd < 0 ) {
+            _direct = false;
+            options &= ~O_DIRECT;
+            _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
+        }
+#else
+        _direct = false;
+#endif
+
         if( _fd < 0 ) {
             uasserted(13516, str::stream() << "couldn't open file " << name << " for writing " << errnoWithDescription());
         }
@@ -129,6 +141,8 @@ namespace mongo {
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
+        off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
+
         const char *buf = (char *) b;
         assert(_fd);
         assert(((size_t)buf)%4096==0); // aligned
@@ -152,6 +166,10 @@ namespace mongo {
             uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
         }
 
+#ifdef POSIX_FADV_DONTNEED
+        if (!_direct)
+            posix_fadvise(_fd, pos, len, POSIX_FADV_DONTNEED);
+#endif
     }
 
 }
