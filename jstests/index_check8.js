@@ -10,7 +10,8 @@ t.ensureIndex({ a: 1, b: 1, d: 1, e: 1 })
 if ((new Date()) % 10 == 0) {
     var coll = t.toString().substring(db.toString().length + 1);
     print("compacting " + coll + " before continuing testing");
-    assert(db.runCommand({ compact: coll, dev: true }).ok, "compact failed");
+    // don't check return code - false for mongos
+    print("ok: " + db.runCommand({ compact: coll, dev: true }));
 }
 
 x = t.find( { a : 1 , b : 1 , d : 1 } ).sort( { e : 1 } ).explain()
