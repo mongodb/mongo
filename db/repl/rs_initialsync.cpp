@@ -77,102 +77,31 @@ namespace mongo {
 
         log(1) << "replSet empty oplog" << rsLog;
         d->emptyCappedCollection(rsoplog);
-
-        /*
-        string errmsg;
-        bob res;
-        dropCollection(rsoplog, errmsg, res);
-        log() << "replSet recreated oplog so it is empty.  todo optimize this..." << rsLog;
-        createOplog();*/
-
-        // TEMP: restart to recreate empty oplog
-        //log() << "replSet FATAL error during initial sync.  mongod restart required." << rsLog;
-        //dbexit( EXIT_CLEAN );
-
-        /*
-        writelock lk(rsoplog);
-        Client::Context c(rsoplog, dbpath, 0, doauth/false);
-        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
-        uassert(13412, str::stream() << "replSet error " << rsoplog << " is missing", oplogDetails != 0);
-        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
-        */
     }
 
-    /**
-     * Choose a member to sync from.
-     *
-     * The initalSync option is an object with 1 k/v pair:
-     *
-     * "state" : 1|2
-     * "name" : "host"
-     * "_id" : N
-     * "optime" : t
-     *
-     * All except optime are exact matches.  "optime" will find a secondary with
-     * an optime >= to the optime given.
-     */
     const Member* ReplSetImpl::getMemberToSyncTo() {
-        BSONObj sync = myConfig().initialSync;
-        bool secondaryOnly = false, isOpTime = false;
-        char *name = 0;
-        int id = -1;
-        OpTime optime;
-
+        Member *closest = 0;
+        
         StateBox::SP sp = box.get();
         assert( !sp.state.primary() ); // wouldn't make sense if we were.
 
-        // if it exists, we've already checked that these fields are valid in
-        // rs_config.cpp
-        if ( !sync.isEmpty() ) {
-            if (sync.hasElement("state")) {
-                if (sync["state"].Number() == 1) {
-                    if (sp.primary) {
-                        sethbmsg( str::stream() << "syncing to primary: " << sp.primary->fullName(), 0);
-                        return const_cast<Member*>(sp.primary);
-                    }
-                    else {
-                        sethbmsg("couldn't clone from primary");
-                        return NULL;
-                    }
-                }
-                else {
-                    secondaryOnly = true;
-                }
-            }
-            if (sync.hasElement("name")) {
-                name = (char*)sync["name"].valuestr();
-            }
-            if (sync.hasElement("_id")) {
-                id = (int)sync["_id"].Number();
-            }
-            if (sync.hasElement("optime")) {
-                isOpTime = true;
-                optime = sync["optime"]._opTime();
+        // find the member with the lowest ping time that has more data than me
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->hbinfo().up() &&
+                (m->state() == MemberState::RS_SECONDARY || m->state() == MemberState::RS_PRIMARY) &&
+                (!closest || m->hbinfo().ping < closest->hbinfo().ping) &&
+                 m->hbinfo().opTime > lastOpTimeWritten) {
+                closest = m;
             }
         }
 
-        for( Member *m = head(); m; m = m->next() ) {
-            if (!m->hbinfo().up() ||
-                    (m->state() != MemberState::RS_SECONDARY &&
-                     m->state() != MemberState::RS_PRIMARY) ||
-                    (secondaryOnly && m->state() != MemberState::RS_SECONDARY) ||
-                    (id != -1 && (int)m->id() != id) ||
-                    (name != 0 && strcmp(name, m->fullName().c_str()) != 0) ||
-                    (isOpTime && optime >= m->hbinfo().opTime)) {
-                continue;
-            }
-
-            sethbmsg( str::stream() << "syncing to: " << m->fullName(), 0);
-            return const_cast<Member*>(m);
+        if (!closest) {
+            sethbmsg("couldn't find a member to sync from");
+            return NULL;
         }
 
-        sethbmsg( str::stream() << "couldn't find a member matching the sync criteria:" <<
-                  " state? " << (secondaryOnly ? "2" : "none") <<
-                  " name? " << (name ? name : "none") <<
-                  " _id? " << id <<
-                  " optime? " << optime.toStringPretty() );
-
-        return NULL;
+        sethbmsg( str::stream() << "syncing to: " << closest->fullName(), 0);
+        return const_cast<Member*>(closest);
     }
 
     /**

@@ -272,6 +272,10 @@ namespace mongo {
         void assumePrimary();
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
+        
+        /**
+         * Find the closest member (using ping time) with a higher latest optime.
+         */
         const Member* getMemberToSyncTo();
     protected:
         // "heartbeat message"
