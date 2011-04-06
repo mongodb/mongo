@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include <stdio.h>
+#include <string.h>
 
 
 #define USE_LINENOISE
@@ -227,8 +228,18 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 #endif
 }
 
-#if !defined(_WIN32)
-#include <string.h>
+#ifdef _WIN32
+char * strsignal(int sig){
+    switch (sig){
+        case SIGINT: return "SIGINT";
+        case SIGTERM: return "SIGTERM";
+        case SIGABRT: return "SIGABRT";
+        case SIGSEGV: return "SIGSEGV";
+        case SIGFPE: return "SIGFPE";
+        default: return "unknown";
+    }
+}
+#endif
 
 void quitAbruptly( int sig ) {
     ostringstream ossSig;
@@ -254,18 +265,17 @@ void myterminate() {
 void setupSignals() {
     signal( SIGINT , quitNicely );
     signal( SIGTERM , quitNicely );
-    signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
     signal( SIGABRT , quitAbruptly );
     signal( SIGSEGV , quitAbruptly );
-    signal( SIGBUS , quitAbruptly );
     signal( SIGFPE , quitAbruptly );
+
+#if !defined(_WIN32) // surprisingly these are the only ones that don't work on windows
+    signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
+    signal( SIGBUS , quitAbruptly );
+#endif
+
     set_terminate( myterminate );
 }
-#else
-inline void setupSignals() {
-    signal( SIGINT , quitNicely ); // surprisingly this works on windows too
-}
-#endif
 
 string fixHost( string url , string host , string port ) {
     //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
