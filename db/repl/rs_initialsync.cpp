@@ -97,10 +97,12 @@ namespace mongo {
 
         if (!closest) {
             sethbmsg("couldn't find a member to sync from");
+            _currentSyncTarget = NULL;
             return NULL;
         }
 
         sethbmsg( str::stream() << "syncing to: " << closest->fullName(), 0);
+        _currentSyncTarget = closest;
         return const_cast<Member*>(closest);
     }
 

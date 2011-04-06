@@ -277,6 +277,7 @@ namespace mongo {
          * Find the closest member (using ping time) with a higher latest optime.
          */
         const Member* getMemberToSyncTo();
+        Member* _currentSyncTarget;
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"

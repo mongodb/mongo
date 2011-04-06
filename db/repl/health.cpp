@@ -417,6 +417,9 @@ namespace mongo {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
+        if (_currentSyncTarget) {
+            b.append("syncingTo", _currentSyncTarget->fullName());
+        }
         b.append("members", v);
         if( replSetBlind )
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
