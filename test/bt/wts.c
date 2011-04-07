@@ -40,7 +40,7 @@ wts_startup(void)
 	);
 
 	if ((ret = wiredtiger_open(NULL, NULL, config, &conn)) != 0) {
-		fprintf(stderr, "%s: wiredtiger_simple_setup: %s\n",
+		fprintf(stderr, "%s: wiredtiger_open: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -126,8 +126,7 @@ wts_teardown(void)
 	session = g.wts_session;
 
 	if (g.logging)
-		__wt_log_printf(session, "WT teardown: %s",
-		    ctime(&now));
+		__wt_log_printf(session, "WT teardown: %s", ctime(&now));
 
 	assert(wts_sync() == 0);
 	assert(conn->close(conn, NULL) == 0);
