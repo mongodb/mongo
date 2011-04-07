@@ -21,6 +21,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	int ret;
 
 	WT_CLEAR(__tmp);
+	ret = 0;
 
 	/*
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first two fields
