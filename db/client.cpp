@@ -32,6 +32,7 @@
 #include "dbwebserver.h"
 #include "../util/mongoutils/html.h"
 #include "../util/mongoutils/checksum.h"
+#include "../util/file_allocator.h"
 
 namespace mongo {
 
@@ -128,17 +129,22 @@ namespace mongo {
     void Client::Context::_finishInit( bool doauth ) {
         int lockState = dbMutex.getState();
         assert( lockState );
+        
+        if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
+            // TODO: maybe we should assert here
+            OCCASIONALLY warning() << "getting a write lock and file allocator is in failed space, could run out of space" << endl;
+        }
 
         _db = dbHolder.get( _ns , _path );
         if ( _db ) {
             _justCreated = false;
         }
-        else if ( dbMutex.getState() > 0 ) {
+        else if ( lockState > 0 ) {
             // already in a write lock
             _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
             assert( _db );
         }
-        else if ( dbMutex.getState() < -1 ) {
+        else if ( lockState < -1 ) {
             // nested read lock :(
             assert( _lock );
             _lock->releaseAndWriteLock();

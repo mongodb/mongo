@@ -8,8 +8,10 @@ if (1) {
     var start = new Date();
     function timed() {
         db.getLastError();
-        print("time: " + (new Date() - start));
+        var dt = (new Date()) - start;
+        print("time: " + dt);
         start = new Date();
+        return dt;
     }
 
     print("adding data");
@@ -18,7 +20,7 @@ if (1) {
         obj.z[1] = i;
         t.insert(obj);
     }
-    timed();
+    var a = timed();
 
     print("index");
     t.ensureIndex({ x: 1 });
@@ -27,24 +29,30 @@ if (1) {
     print("index");
     t.ensureIndex({ z: 1 });
 
-    timed();
+    a += timed();
 
     print("count:" + t.count());
 
     timed();
 
-    if (1) {
+    {
         print("compact");
         var res = db.runCommand({ compact: 'compactspeedtest', dev: true });
-        timed();
+        b = timed();
         printjson(res);
         assert(res.ok);
 
         print("validate");
         var v = t.validate(true);
-        timed();
 
         assert(v.ok);
         assert(t.getIndexes().length == 4);
+
+        if (b < a) {
+            // consider making this fail/assert
+            print("\n\n\nwarning WARNING compact command was slower than it should be");
+            print("a:" + a + " b:" + b);
+            print("\n\n\n");
+        }
     }
 }

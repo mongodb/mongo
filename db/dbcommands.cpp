@@ -1368,6 +1368,7 @@ namespace mongo {
             while( c->more() ) {
                 BSONObj obj = c->next();
                 theDataFileMgr.insertAndLog( toNs.c_str(), obj, true );
+                getDur().commitIfNeeded();
             }
 
             return true;
