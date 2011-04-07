@@ -34,7 +34,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	}
 
 	TAILQ_REMOVE(&conn->sessions_head, session, q);
-	WT_TRET(__wt_session_close(session));
+	WT_TRET(session->close(session, 0));
 
 	return (0);
 }
