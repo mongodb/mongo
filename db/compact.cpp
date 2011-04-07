@@ -38,7 +38,8 @@ namespace mongo {
     DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr);
     void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
-    void compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
+    /** @return number of skipped (invalid) documents */
+    unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
                 const scoped_array<IndexSpec> &indexSpecs,
                 scoped_array<SortPhaseOne>& phase1, int nidx, bool validate)
     {
@@ -46,6 +47,7 @@ namespace mongo {
         Extent *e = ext.ext();
         e->assertOk();
         assert( e->validates() );
+        unsigned skipped = 0;
 
         {
             // the next/prev pointers within the extent might not be in order so we first page the whole thing in 
@@ -94,7 +96,8 @@ namespace mongo {
                     }
                 }
                 else { 
-                    log() << "compact skipping invalid object" << endl;
+                    if( ++skipped <= 10 )
+                        log() << "compact skipping invalid object" << endl;
                 }
 
                 if( L.isNull() ) { 
@@ -124,12 +127,12 @@ namespace mongo {
             log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
         }
 
-        // drop this extent
+        return skipped;
     }
 
     extern SortPhaseOne *precalced;
 
-    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate) { 
+    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result) { 
         //int les = d->lastExtentSize;
 
         // this is a big job, so might as well make things tidy before we start just to be nice.
@@ -183,9 +186,14 @@ namespace mongo {
 
         getDur().commitNow();
 
+        long long skipped = 0;
         int n = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
+            skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
+        }
+
+        if( skipped ) {
+            result.append("invalidObjects", skipped);
         }
 
         assert( d->firstExtent.ext()->xprev.isNull() );
@@ -210,7 +218,7 @@ namespace mongo {
         return true;
     }
 
-    bool compact(const string& ns, string &errmsg, bool validate) {
+    bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result) {
         massert( 14028, "bad ns", isANormalNSName(ns.c_str()) );
         massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
 
@@ -224,7 +232,7 @@ namespace mongo {
             massert( 13661, "cannot compact capped collection", !d->capped );
             log() << "compact " << ns << " begin" << endl;
             try { 
-                ok = _compact(ns.c_str(), d, errmsg, validate);
+                ok = _compact(ns.c_str(), d, errmsg, validate, result);
             }
             catch(...) { 
                 log() << "compact " << ns << " end (with error)" << endl;
@@ -245,8 +253,10 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
-                "  { compact : <collection_name>, [force:true], [validate:true] }"
-                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()";
+                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
+                "{ compact : <collection_name>, [force:true], [validate:true] }\n"
+                "  force - allows to run on a replica set primary\n"
+                "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer\n";
         }
         virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
@@ -271,7 +281,7 @@ namespace mongo {
 
             string ns = db + '.' + coll;
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
-            bool ok = compact(ns, errmsg, validate);
+            bool ok = compact(ns, errmsg, validate, result);
             return ok;
         }
     };
