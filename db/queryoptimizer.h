@@ -154,18 +154,12 @@ namespace mongo {
         bool error() const { return _error; }
         /** @return the exception thrown by implementation if one was thrown. */
         ExceptionInfo exception() const { return _exception; }
-<<<<<<< HEAD
-        const QueryPlan &qp() const { return *_qp; }
-        // To be called by QueryPlanSet::Runner only.
-        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; assert( _qp != NULL ); }
-=======
         
         /** To be called by QueryPlanSet::Runner only. */
         
         QueryOp *createChild();
-        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; }
+        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; assert( _qp != NULL ); }
         void init();        
->>>>>>> queryoptimizer comments and cleanup
         void setException( const DBException &e ) {
             _error = true;
             _exception = e.getInfo();
