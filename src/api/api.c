@@ -77,7 +77,7 @@ __session_create_table(WT_SESSION *wt_session,
 	SESSION *session;
 	WT_CONFIG_ITEM cval;
 	const char *key_format, *value_format;
-	uint32_t column_flags, fixed_len, huffman_flags;
+	uint32_t alloc_size, column_flags, fixed_len, huffman_flags;
 	uint32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
 	const char *cfg[] = { __wt_config_def_create_table, config, NULL };
 
@@ -138,6 +138,8 @@ __session_create_table(WT_SESSION *wt_session,
 	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
 		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_VALUE;
 
+	WT_RET(__wt_config_gets(cfg, "allocation_size", &cval));
+	alloc_size = (uint32_t)cval.val;
 	WT_RET(__wt_config_gets(cfg, "intl_node_max", &cval));
 	intl_node_max = (uint32_t)cval.val;
 	WT_RET(__wt_config_gets(cfg, "intl_node_min", &cval));
@@ -148,7 +150,7 @@ __session_create_table(WT_SESSION *wt_session,
 	leaf_node_min = (uint32_t)cval.val;
 
 	WT_RET(conn->btree(conn, 0, &btree));
-	WT_RET(btree->btree_pagesize_set(btree, 0,
+	WT_RET(btree->btree_pagesize_set(btree, alloc_size,
 	    intl_node_min, intl_node_max, leaf_node_min, leaf_node_max));
 	if (key_format[0] == 'r')
 		WT_RET(btree->column_set(btree, fixed_len, NULL, column_flags));

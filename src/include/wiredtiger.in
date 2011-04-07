@@ -457,6 +457,7 @@ struct wt_session {
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart{open_cursor, maintained in dist/config_data.py}
+	 * @config{allocation_size, file unit allocation size\, in bytes}
 	 * @config{isolation, the isolation level for this cursor\, one of
 	 * "snapshot" or "read-committed" or "read-uncommitted".  Ignored for
 	 * transactional cursors}

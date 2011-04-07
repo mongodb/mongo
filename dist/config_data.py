@@ -15,6 +15,8 @@ config_types = {
 'session_close' : [],
 
 'open_cursor' : [
+	Config('allocation_size', '512B', r'''
+		file unit allocation size, in bytes'''),
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this cursor, one of "snapshot" or
 		"read-committed" or "read-uncommitted".  Ignored for transactional
