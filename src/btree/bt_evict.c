@@ -340,8 +340,9 @@ restart:	WT_RET(__wt_walk_begin(session,
 		if (cache->only_evict_clean && WT_PAGE_IS_MODIFIED(ref->page))
 			continue;
 
-		cache->evict[slot + i].ref = ref;
-		cache->evict[slot + i].btree = btree;
+		cache->evict[slot].ref = ref;
+		cache->evict[slot].btree = btree;
+		++slot;
 	} while (++i < WT_EVICT_WALK_PER_TABLE);
 
 	return (0);
