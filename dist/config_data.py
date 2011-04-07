@@ -15,8 +15,6 @@ config_types = {
 'session_close' : [],
 
 'open_cursor' : [
-	Config('allocation_size', '512B', r'''
-		file unit allocation size, in bytes'''),
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this cursor, one of "snapshot" or
 		"read-committed" or "read-uncommitted".  Ignored for transactional
@@ -29,6 +27,8 @@ config_types = {
 ],
 
 'create_table' : [
+	Config('allocation_size', '512B', r'''
+		file unit allocation size, in bytes'''),
 	Config('columns', '', r'''
 		list of the column names.  Comma-separated list of the form
 		<code>(column[,...])</code>.  The number of entries must match the

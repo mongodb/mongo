@@ -457,7 +457,6 @@ struct wt_session {
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart{open_cursor, maintained in dist/config_data.py}
-	 * @config{allocation_size, file unit allocation size\, in bytes}
 	 * @config{isolation, the isolation level for this cursor\, one of
 	 * "snapshot" or "read-committed" or "read-uncommitted".  Ignored for
 	 * transactional cursors}
@@ -487,6 +486,7 @@ struct wt_session {
 	 * @param session the session handle
 	 * @param name the name of the table
 	 * @configstart{create_table, maintained in dist/config_data.py}
+	 * @config{allocation_size, file unit allocation size\, in bytes}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  The number of entries must
 	 * match the total number of values in \c key_format and \c

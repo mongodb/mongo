@@ -33,10 +33,10 @@ __wt_config_def_connection_close =
 
 const char *
 __wt_config_def_create_table =
-    "allocation_size=512B,columns=,colgroup.name=,exclusive=false,"
-    "huffman_key=,huffman_value=,index.name=,intl_node_max=2KB,"
-    "intl_node_min=2KB,key_format=u,leaf_node_max=1MB,leaf_node_min=32KB,"
-    "runlength_encoding=false,value_format=u";
+    "allocation_size=512B,columns=,colgroup.name=,exclusive=false,huffman_key=,"
+    "huffman_value=,index.name=,intl_node_max=2KB,intl_node_min=2KB,key_format=u"
+    ",leaf_node_max=1MB,leaf_node_min=32KB,runlength_encoding=false,"
+    "value_format=u";
 
 const char *
 __wt_config_def_cursor_close =
@@ -48,7 +48,7 @@ __wt_config_def_load_extension =
 
 const char *
 __wt_config_def_open_cursor =
-    "allocation_size=512B,isolation=read-committed,overwrite=false,raw=false";
+    "isolation=read-committed,overwrite=false,raw=false";
 
 const char *
 __wt_config_def_rename_table =
