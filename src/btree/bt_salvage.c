@@ -102,7 +102,7 @@ static int  __slvg_trk_leaf(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_ovfl(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static void __slvg_trk_ovfl_ref(SESSION *, WT_TRACK *, WT_STUFF *);
 
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_DEBUG_SLVG
 static void __slvg_trk_dump(const char *, WT_STUFF *);
 static void __slvg_trk_dump_col(WT_TRACK *);
 static void __slvg_trk_dump_row(WT_TRACK *);
@@ -163,10 +163,6 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 		goto err;
 	}
 
-#if 0
-	__slvg_trk_dump("after read", ss);
-#endif
-
 	/*
 	 * Sort the page list by key, and secondarily, by LSN.
 	 *
@@ -175,11 +171,6 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	 */
 	qsort(ss->pages, (size_t)ss->pages_next,
 	    sizeof(WT_TRACK *), __slvg_trk_compare);
-
-#if HAVE_DIAGNOSTIC
-	if (0)
-		__slvg_trk_dump("after sort", ss);
-#endif
 
 	/*
 	 * Figure out the leaf pages we need and discard everything else.  At
@@ -195,11 +186,6 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 		WT_ERR(__slvg_range_row(session, ss));
 		break;
 	}
-
-#if HAVE_DIAGNOSTIC
-	if (0)
-		__slvg_trk_dump("after merge", ss);
-#endif
 
 	/*
 	 * Discard any overflow pages that aren't referenced, and clear the
@@ -374,6 +360,24 @@ skip_allocsize:		WT_RET(__wt_block_free(session, addr, allocsize));
 				    __wt_page_type_string(dsk->type));
 				return (WT_ERROR);
 			}
+
+			/*
+			 * After reading the file, we may write pages in order
+			 * to resolve key range overlaps.   We give our newly
+			 * written pages LSNs larger than any LSN found in the
+			 * file in case the salvage run fails and is restarted
+			 * later.  (Regardless of our LSNs, it's possible our
+			 * newly written pages will have to be merged in a
+			 * subsequent salvage run, at least if it's a row-store,
+			 * as the key ranges are not exact.  However, having
+			 * larger LSNs should make our newly written pages more
+			 * likely to win over previous pages, minimizing the
+			 * work done in subsequent salvage runs.)  Reset the
+			 * tree's current LSN to the largest LSN we read.
+			 */
+			if (btree->lsn < dsk->lsn)
+				btree->lsn = dsk->lsn;
+
 			WT_ERR(__slvg_trk_leaf(session, dsk, addr, ss));
 			break;
 		case WT_PAGE_OVFL:
@@ -1039,8 +1043,7 @@ __slvg_build_leaf_col(SESSION *session,
 					skip -= n_repeat;
 				} else {
 					forward = 0;
-					WT_RLE_REPEAT_COUNT(
-					    cipdata) -= (uint16_t)skip;
+					WT_RLE_REPEAT_COUNT(cipdata) -= skip;
 				}
 			else
 				/*
@@ -1051,8 +1054,7 @@ __slvg_build_leaf_col(SESSION *session,
 				if (n_repeat < take)
 					take -= n_repeat;
 				else {
-					WT_RLE_REPEAT_COUNT(
-					    cipdata) = (uint16_t)take;
+					WT_RLE_REPEAT_COUNT(cipdata) = take;
 					page->indx_count =
 					    WT_COL_INDX_SLOT(page, cip);
 					break;
@@ -1920,7 +1922,7 @@ __slvg_free_trk_ovfl(SESSION *session, WT_TRACK **trkp, int blocks)
 	return (0);
 }
 
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_DEBUG_SLVG
 /*
  * __slvg_trk_dump --
  *	Dump out the sorted track information.
