@@ -1235,7 +1235,6 @@ __slvg_range_overlap_row(
 #define	A_TRK_STOP	((WT_ITEM *)&a_trk->u.row.range_stop)
 #define	B_TRK_START	((WT_ITEM *)&b_trk->u.row.range_start)
 #define	B_TRK_STOP	((WT_ITEM *)&b_trk->u.row.range_stop)
-#define	A_TRK_START_BUF	(&a_trk->u.row.range_start)
 #define	A_TRK_STOP_BUF	(&a_trk->u.row.range_stop)
 #define	B_TRK_START_BUF	(&b_trk->u.row.range_start)
 #define	B_TRK_STOP_BUF	(&b_trk->u.row.range_stop)
