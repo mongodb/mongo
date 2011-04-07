@@ -102,8 +102,7 @@ static int  __slvg_trk_leaf(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_ovfl(SESSION *, WT_PAGE_DISK *, uint32_t, WT_STUFF *);
 static void __slvg_trk_ovfl_ref(SESSION *, WT_TRACK *, WT_STUFF *);
 
-#ifdef HAVE_DEBUG_SLVG
-static void __slvg_trk_dump(const char *, WT_STUFF *);
+#ifdef HAVE_DIAGNOSTIC
 static void __slvg_trk_dump_col(WT_TRACK *);
 static void __slvg_trk_dump_row(WT_TRACK *);
 #endif
@@ -981,15 +980,13 @@ __slvg_build_leaf_col(SESSION *session,
 {
 	WT_COL *cip, *save_col_leaf;
 	WT_PAGE *page;
-	int forward, ret;
+	int ret;
 	uint32_t i, n_repeat, skip, take, save_indx_count;
-	uint64_t save_recno;
 	void *cipdata;
 
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
 	page = WT_COL_REF_PAGE(cref);
-	save_recno = page->u.col_leaf.recno;
 	save_col_leaf = page->u.col_leaf.d;
 	save_indx_count = page->indx_count;
 
@@ -999,6 +996,7 @@ __slvg_build_leaf_col(SESSION *session,
 	 */
 	skip = (uint32_t)(trk->u.col.range_start - page->u.col_leaf.recno);
 	take = (uint32_t)(trk->u.col.range_stop - trk->u.col.range_start) + 1;
+	page->u.col_leaf.recno = trk->u.col.range_start;
 
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
@@ -1012,7 +1010,6 @@ __slvg_build_leaf_col(SESSION *session,
 		 */
 		page->u.col_leaf.d += skip;
 		page->indx_count = take;
-		page->u.col_leaf.recno = trk->u.col.range_start;
 
 		/*
 		 * If we have to merge pages, the list of referenced overflow
@@ -1028,38 +1025,43 @@ __slvg_build_leaf_col(SESSION *session,
 		/*
 		 * Adjust the page information to "see" only keys we care about.
 		 */
-		forward = 1;
 		WT_COL_INDX_FOREACH(page, cip, i) {
 			cipdata = WT_COL_PTR(page, cip);
 			n_repeat = WT_RLE_REPEAT_COUNT(cipdata);
-			if (forward)
+			if (skip > 0) {
 				/*
 				 * Initially, walk forward to the RLE entry that
 				 * has our first record number; adjust its count
 				 * count to reflect the right number of records.
 				 */
-				if (n_repeat < skip) {
+				if (n_repeat <= skip) {
 					++page->u.col_leaf.d;
 					skip -= n_repeat;
-				} else {
-					forward = 0;
-					WT_RLE_REPEAT_COUNT(cipdata) -= skip;
+					continue;
 				}
-			else
+
 				/*
-				 * Next, walk forward to the RLE entry that has
-				 * our last record number; adjust its count to
-				 * reflect the right number of records.
+				 * Switch to counting the records we're going
+				 * to keep.
 				 */
-				if (n_repeat < take)
-					take -= n_repeat;
-				else {
-					WT_RLE_REPEAT_COUNT(cipdata) = take;
-					page->indx_count =
-					    WT_COL_INDX_SLOT(page, cip);
-					break;
-				}
+				n_repeat -= skip;
+				WT_RLE_REPEAT_COUNT(cipdata) = n_repeat;
+				skip = 0;
+			}
+
+			/*
+			 * Next, walk forward to the RLE entry that has our last
+			 * record number; adjust its count to reflect the right
+			 * number of records.
+			 */
+			if (n_repeat <= take) {
+				take -= n_repeat;
+				continue;
+			}
+			WT_RLE_REPEAT_COUNT(cipdata) = take;
+			break;
 		}
+		page->indx_count = WT_COL_INDX_SLOT(page, cip);
 		break;
 	}
 
@@ -1080,14 +1082,11 @@ __slvg_build_leaf_col(SESSION *session,
 	ret = __wt_page_reconcile(session, page, 0, 0);
 
 	/*
-	 * Reset the page.
-	 *
-	 * !!!
-	 * We don't reset the RLE counts -- it doesn't matter at the moment.
+	 * Reset the page.  (Don't reset the record number or RLE counts -- it
+	 * doesn't matter at the moment.)
 	 */
 	page->u.col_leaf.d = save_col_leaf;
 	page->indx_count = save_indx_count;
-	page->u.col_leaf.recno = save_recno;
 
 	/* Discard the page and our hazard reference. */
 	__wt_page_discard(session, page);
@@ -1922,16 +1921,19 @@ __slvg_free_trk_ovfl(SESSION *session, WT_TRACK **trkp, int blocks)
 	return (0);
 }
 
-#ifdef HAVE_DEBUG_SLVG
+#ifdef HAVE_DIAGNOSTIC
 /*
- * __slvg_trk_dump --
+ * __wt_trk_dump --
  *	Dump out the sorted track information.
  */
-static void
-__slvg_trk_dump(const char *l, WT_STUFF *ss)
+void
+__wt_trk_dump(const char *l, void *ss_arg)
 {
+	WT_STUFF *ss;
 	WT_TRACK *trk;
 	uint32_t i;
+
+	ss = ss_arg;
 
 	fprintf(stderr, "salvage page track list (%s):\n", l);
 

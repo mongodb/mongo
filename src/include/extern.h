@@ -168,6 +168,7 @@ int __wt_disk_write( SESSION *session,
     uint32_t addr,
     uint32_t size);
 int __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t));
+void __wt_trk_dump(const char *l, void *ss_arg);
 int __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg);
 int __wt_bt_sync(SESSION *session);
 int __wt_btree_verify(SESSION *session, void (*f)(const char *, uint64_t));
