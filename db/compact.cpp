@@ -1,4 +1,4 @@
-@file compact.cpp
+/** @file compact.cpp
    compaction of deleted space in pdfiles (datafiles)
 */
 
