@@ -76,8 +76,10 @@ struct __wt_track {
 
 static int  __slvg_build_internal_col(SESSION *, uint32_t, WT_STUFF *);
 static int  __slvg_build_internal_row(SESSION *, uint32_t, WT_STUFF *);
-static int  __slvg_build_leaf_col(SESSION *, WT_TRACK *, WT_PAGE *, WT_COL_REF *, WT_STUFF *);
-static int  __slvg_build_leaf_row(SESSION *, WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *, int *);
+static int  __slvg_build_leaf_col(SESSION *,
+		WT_TRACK *, WT_PAGE *, WT_COL_REF *, WT_STUFF *);
+static int  __slvg_build_leaf_row(SESSION *,
+		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *, int *);
 static int  __slvg_discard_ovfl(SESSION *, WT_STUFF *);
 static int  __slvg_free(SESSION *, WT_STUFF *);
 static int  __slvg_free_merge_block(SESSION *, WT_STUFF *);
@@ -972,15 +974,18 @@ static int
 __slvg_build_leaf_col(SESSION *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_COL_REF *cref, WT_STUFF *ss)
 {
+	WT_COL *cip, *save_col_leaf;
 	WT_PAGE *page;
+	int forward, ret;
+	uint32_t i, n_repeat, skip, take, save_indx_count;
 	uint64_t save_recno;
-	uint32_t skip, take, save_indx_count;
-	int ret;
+	void *cipdata;
 
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
 	page = WT_COL_REF_PAGE(cref);
 	save_recno = page->u.col_leaf.recno;
+	save_col_leaf = page->u.col_leaf.d;
 	save_indx_count = page->indx_count;
 
 	/*
@@ -1013,35 +1018,75 @@ __slvg_build_leaf_col(SESSION *session,
 		 */
 		if (page->type == WT_PAGE_COL_VAR)
 			__slvg_ovfl_col_inmem_ref(page, ss);
-
-		/*
-		 * Write the new version of the leaf page to disk.
-		 *
-		 * We can't discard the original blocks associated with this
-		 * page now.  (The problem is we don't want to overwrite any
-		 * original information until the salvage run succeeds -- if
-		 * we free the blocks now, the next merge page we write might
-		 * allocate those blocks and overwrite them, and should the
-		 * salvage run eventually fail for any reason, the original
-		 * information would have been lost.)  Clear the page's addr
-		 * so reconciliation does not free the underlying blocks, and
-		 * set a flag so we eventually free the blocks.
-		 */
-		page->addr = WT_ADDR_INVALID;
-		WT_PAGE_SET_MODIFIED(page);
-		ret = __wt_page_reconcile(session, page, 0, 0);
-
-		/* Discard the page and our hazard reference. */
-		page->u.col_leaf.d -= skip;
-		page->indx_count = save_indx_count;
-		page->u.col_leaf.recno = save_recno;
 		break;
 	case WT_PAGE_COL_RLE:
-		/* Harder... have to walk the records... */
-		/* CAN THIS OVERFLOW A uint32_t? */
+		/*
+		 * Adjust the page information to "see" only keys we care about.
+		 */
+		forward = 1;
+		WT_COL_INDX_FOREACH(page, cip, i) {
+			cipdata = WT_COL_PTR(page, cip);
+			n_repeat = WT_RLE_REPEAT_COUNT(cipdata);
+			if (forward)
+				/*
+				 * Initially, walk forward to the RLE entry that
+				 * has our first record number; adjust its count
+				 * count to reflect the right number of records.
+				 */
+				if (n_repeat < skip) {
+					++page->u.col_leaf.d;
+					skip -= n_repeat;
+				} else {
+					forward = 0;
+					WT_RLE_REPEAT_COUNT(
+					    cipdata) -= (uint16_t)skip;
+				}
+			else
+				/*
+				 * Next, walk forward to the RLE entry that has
+				 * our last record number; adjust its count to
+				 * reflect the right number of records.
+				 */
+				if (n_repeat < take)
+					take -= n_repeat;
+				else {
+					WT_RLE_REPEAT_COUNT(
+					    cipdata) = (uint16_t)take;
+					page->indx_count =
+					    WT_COL_INDX_SLOT(page, cip);
+					break;
+				}
+		}
 		break;
 	}
 
+	/*
+	 * Write the new version of the leaf page to disk.
+	 *
+	 * We can't discard the original blocks associated with this page now.
+	 * (The problem is we don't want to overwrite any original information
+	 * until the salvage run succeeds -- if we free the blocks now, the next
+	 * merge page we write might allocate those blocks and overwrite them,
+	 * and should the salvage run eventually fail for any reason, the
+	 * original information would have been lost.)  Clear the page's addr so
+	 * reconciliation does not free the underlying blocks, and set a flag so
+	 * we eventually free the blocks.
+	 */
+	page->addr = WT_ADDR_INVALID;
+	WT_PAGE_SET_MODIFIED(page);
+	ret = __wt_page_reconcile(session, page, 0, 0);
+
+	/*
+	 * Reset the page.
+	 *
+	 * !!!
+	 * We don't reset the RLE counts -- it doesn't matter at the moment.
+	 */
+	page->u.col_leaf.d = save_col_leaf;
+	page->indx_count = save_indx_count;
+	page->u.col_leaf.recno = save_recno;
+
+	/* Discard the page and our hazard reference. */
 	__wt_page_discard(session, page);
 	__wt_hazard_clear(session, page);
 
@@ -1189,7 +1234,6 @@ __slvg_range_overlap_row(
 #define	A_TRK_STOP	(&a_trk->u.row.range_stop.item)
 #define	B_TRK_START	(&b_trk->u.row.range_start.item)
 #define	B_TRK_STOP	(&b_trk->u.row.range_stop.item)
-#define	A_TRK_START_BUF	(&a_trk->u.row.range_start)
 #define	A_TRK_STOP_BUF	(&a_trk->u.row.range_stop)
 #define	B_TRK_START_BUF	(&b_trk->u.row.range_start)
 #define	B_TRK_STOP_BUF	(&b_trk->u.row.range_stop)

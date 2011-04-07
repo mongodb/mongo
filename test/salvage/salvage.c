@@ -50,6 +50,10 @@ main(void)
 	for (r = 1; r <= 21; ++r)
 		run(r);
 
+	page_type = WT_PAGE_COL_RLE;
+	for (r = 1; r <= 21; ++r)
+		run(r);
+
 	page_type = WT_PAGE_COL_VAR;
 	for (r = 1; r <= 21; ++r)
 		run(r);
