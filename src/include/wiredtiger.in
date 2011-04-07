@@ -113,8 +113,7 @@ struct wt_item {
 typedef struct {
 	/*
 	 * Note: the first two fields must match WT_ITEM, we cast between
-	 * those types.  In a WT_BUF, the data is "ours", so the pointer isn't
-	 * qualified with const.
+	 * those types.
 	 */
 	const void *data;
 	uint32_t size;
