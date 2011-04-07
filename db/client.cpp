@@ -359,6 +359,9 @@ namespace mongo {
             }
         }
 
+        if( killed() ) 
+            b.append("killed", true);
+
         return b.obj();
     }
 
