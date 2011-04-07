@@ -1,4 +1,4 @@
-// queryutil-inl.h - Inline definitions for frequently called queryutil.h functions
+// @file queryutil-inl.h - Inline definitions for frequently called queryutil.h functions
 
 /*    Copyright 2011 10gen Inc.
  *
@@ -36,7 +36,7 @@ namespace mongo {
         if ( equality() ) {
             return true;
         }
-        for( vector< FieldInterval >::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+        for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
             if ( !i->equality() ) {
                 return false;
             }
@@ -57,8 +57,8 @@ namespace mongo {
     }
 
     inline bool QueryPattern::operator<( const QueryPattern &other ) const {
-        map< string, Type >::const_iterator i = _fieldTypes.begin();
-        map< string, Type >::const_iterator j = other._fieldTypes.begin();
+        map<string,Type>::const_iterator i = _fieldTypes.begin();
+        map<string,Type>::const_iterator j = other._fieldTypes.begin();
         while( i != _fieldTypes.end() ) {
             if ( j == other._fieldTypes.end() )
                 return false;
@@ -79,14 +79,14 @@ namespace mongo {
     }
 
     inline const FieldRange &FieldRangeSet::range( const char *fieldName ) const {
-        map< string, FieldRange >::const_iterator f = _ranges.find( fieldName );
+        map<string,FieldRange>::const_iterator f = _ranges.find( fieldName );
         if ( f == _ranges.end() )
             return trivialRange();
         return f->second;
     }
 
     inline FieldRange &FieldRangeSet::range( const char *fieldName ) {
-        map< string, FieldRange >::iterator f = _ranges.find( fieldName );
+        map<string,FieldRange>::iterator f = _ranges.find( fieldName );
         if ( f == _ranges.end() )
             return trivialRange();
         return f->second;
@@ -94,7 +94,7 @@ namespace mongo {
 
     inline int FieldRangeSet::nNontrivialRanges() const {
         int count = 0;
-        for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             if ( i->second.nontrivial() )
                 ++count;
         }
@@ -102,7 +102,7 @@ namespace mongo {
     }
 
     inline bool FieldRangeSet::matchPossible() const {
-        for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i )
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i )
             if ( i->second.empty() )
                 return false;
         return true;
@@ -110,7 +110,7 @@ namespace mongo {
 
     inline long long FieldRangeVector::size() {
         long long ret = 1;
-        for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             ret *= i->intervals().size();
         }
         return ret;

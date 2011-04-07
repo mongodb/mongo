@@ -1,4 +1,4 @@
-// queryutil.cpp
+// @file queryutil.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -153,8 +153,8 @@ namespace mongo {
     FieldRange::FieldRange( const BSONElement &e, bool isNot, bool optimize ) {
         // NOTE with $not, we could potentially form a complementary set of intervals.
         if ( !isNot && !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
-            set< BSONElement, element_lt > vals;
-            vector< FieldRange > regexes;
+            set<BSONElement,element_lt> vals;
+            vector<FieldRange> regexes;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() ) {
@@ -174,10 +174,10 @@ namespace mongo {
                 }
             }
 
-            for( set< BSONElement, element_lt >::const_iterator i = vals.begin(); i != vals.end(); ++i )
+            for( set<BSONElement,element_lt>::const_iterator i = vals.begin(); i != vals.end(); ++i )
                 _intervals.push_back( FieldInterval(*i) );
 
-            for( vector< FieldRange >::const_iterator i = regexes.begin(); i != regexes.end(); ++i )
+            for( vector<FieldRange>::const_iterator i = regexes.begin(); i != regexes.end(); ++i )
                 *this |= *i;
 
             return;
@@ -414,9 +414,9 @@ namespace mongo {
 
     }
 
-    void FieldRange::finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other ) {
+    void FieldRange::finishOperation( const vector<FieldInterval> &newIntervals, const FieldRange &other ) {
         _intervals = newIntervals;
-        for( vector< BSONObj >::const_iterator i = other._objData.begin(); i != other._objData.end(); ++i )
+        for( vector<BSONObj>::const_iterator i = other._objData.begin(); i != other._objData.end(); ++i )
             _objData.push_back( *i );
         if ( _special.size() == 0 && other._special.size() )
             _special = other._special;
@@ -446,9 +446,9 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
-        vector< FieldInterval > newIntervals;
-        vector< FieldInterval >::const_iterator i = _intervals.begin();
-        vector< FieldInterval >::const_iterator j = other._intervals.begin();
+        vector<FieldInterval> newIntervals;
+        vector<FieldInterval>::const_iterator i = _intervals.begin();
+        vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             FieldInterval overlap;
             if ( fieldIntervalOverlap( *i, *j, overlap ) ) {
@@ -465,7 +465,7 @@ namespace mongo {
         return *this;
     }
 
-    void handleInterval( const FieldInterval &lower, FieldBound &low, FieldBound &high, vector< FieldInterval > &newIntervals ) {
+    void handleInterval( const FieldInterval &lower, FieldBound &low, FieldBound &high, vector<FieldInterval> &newIntervals ) {
         if ( low._bound.eoo() ) {
             low = lower._lower; high = lower._upper;
         }
@@ -485,11 +485,11 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator|=( const FieldRange &other ) {
-        vector< FieldInterval > newIntervals;
+        vector<FieldInterval> newIntervals;
         FieldBound low;
         FieldBound high;
-        vector< FieldInterval >::const_iterator i = _intervals.begin();
-        vector< FieldInterval >::const_iterator j = other._intervals.begin();
+        vector<FieldInterval>::const_iterator i = _intervals.begin();
+        vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
             if ( ( cmp == 0 && i->_lower._inclusive ) || cmp < 0 ) {
@@ -518,9 +518,9 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator-=( const FieldRange &other ) {
-        vector< FieldInterval > newIntervals;
-        vector< FieldInterval >::iterator i = _intervals.begin();
-        vector< FieldInterval >::const_iterator j = other._intervals.begin();
+        vector<FieldInterval> newIntervals;
+        vector<FieldInterval>::iterator i = _intervals.begin();
+        vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
             if ( cmp < 0 ||
@@ -589,7 +589,7 @@ namespace mongo {
     }
 
     void FieldRange::setExclusiveBounds() {
-        for( vector< FieldInterval >::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+        for( vector<FieldInterval>::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
             i->_lower._inclusive = false;
             i->_upper._inclusive = false;
         }
@@ -599,7 +599,7 @@ namespace mongo {
         assert( _special.empty() );
         ret._intervals.clear();
         ret._objData = _objData;
-        for( vector< FieldInterval >::const_reverse_iterator i = _intervals.rbegin(); i != _intervals.rend(); ++i ) {
+        for( vector<FieldInterval>::const_reverse_iterator i = _intervals.rbegin(); i != _intervals.rend(); ++i ) {
             FieldInterval fi;
             fi._lower = i->_upper;
             fi._upper = i->_lower;
@@ -673,8 +673,8 @@ namespace mongo {
     const FieldRangeSet &FieldRangeSet::operator-=( const FieldRangeSet &other ) {
         int nUnincluded = 0;
         string unincludedKey;
-        map< string, FieldRange >::iterator i = _ranges.begin();
-        map< string, FieldRange >::const_iterator j = other._ranges.begin();
+        map<string,FieldRange>::iterator i = _ranges.begin();
+        map<string,FieldRange>::const_iterator j = other._ranges.begin();
         while( nUnincluded < 2 && i != _ranges.end() && j != other._ranges.end() ) {
             int cmp = i->first.compare( j->first );
             if ( cmp == 0 ) {
@@ -714,8 +714,8 @@ namespace mongo {
     }
     
     const FieldRangeSet &FieldRangeSet::operator&=( const FieldRangeSet &other ) {
-        map< string, FieldRange >::iterator i = _ranges.begin();
-        map< string, FieldRange >::const_iterator j = other._ranges.begin();
+        map<string,FieldRange>::iterator i = _ranges.begin();
+        map<string,FieldRange>::const_iterator j = other._ranges.begin();
         while( i != _ranges.end() && j != other._ranges.end() ) {
             int cmp = i->first.compare( j->first );
             if ( cmp == 0 ) {
@@ -740,13 +740,13 @@ namespace mongo {
     }    
     
     void FieldRangeSet::appendQueries( const FieldRangeSet &other ) {
-        for( vector< BSONObj >::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
+        for( vector<BSONObj>::const_iterator i = other._queries.begin(); i != other._queries.end(); ++i ) {
             _queries.push_back( *i );
         }
     }
     
     void FieldRangeSet::makeEmpty() {
-        for( map< string, FieldRange >::iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( map<string,FieldRange>::iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             i->second.makeEmpty();
         }
     }    
@@ -875,7 +875,7 @@ namespace mongo {
 
     BSONObj FieldRangeVector::startKey() const {
         BSONObjBuilder b;
-        for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             const FieldInterval &fi = i->intervals().front();
             b.appendAs( fi._lower._bound, "" );
         }
@@ -884,7 +884,7 @@ namespace mongo {
 
     BSONObj FieldRangeVector::endKey() const {
         BSONObjBuilder b;
-        for( vector< FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             const FieldInterval &fi = i->intervals().back();
             b.appendAs( fi._upper._bound, "" );
         }
@@ -896,7 +896,7 @@ namespace mongo {
         BSONObjIterator k( _indexSpec.keyPattern );
         for( int i = 0; i < (int)_ranges.size(); ++i ) {
             BSONArrayBuilder a( b.subarrayStart( k.next().fieldName() ) );
-            for( vector< FieldInterval >::const_iterator j = _ranges[ i ].intervals().begin();
+            for( vector<FieldInterval>::const_iterator j = _ranges[ i ].intervals().begin();
                 j != _ranges[ i ].intervals().end(); ++j ) {
                 a << BSONArray( BSON_ARRAY( j->_lower._bound << j->_upper._bound ).clientReadable() );
             }
@@ -916,7 +916,7 @@ namespace mongo {
         BSONObj fields = _fields;
         if ( fields.isEmpty() ) {
             BSONObjBuilder b;
-            for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
                 b.append( i->first, 1 );
             }
             fields = b.obj();
@@ -946,7 +946,7 @@ namespace mongo {
 
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
         QueryPattern qp;
-        for( map< string, FieldRange >::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             assert( !i->second.empty() );
             if ( i->second.equality() ) {
                 qp._fieldTypes[ i->first ] = QueryPattern::Equality;
@@ -968,9 +968,9 @@ namespace mongo {
 
     // TODO get rid of this
     BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
-        typedef vector< pair< shared_ptr< BSONObjBuilder >, shared_ptr< BSONObjBuilder > > > BoundBuilders;
+        typedef vector<pair<shared_ptr<BSONObjBuilder>, shared_ptr<BSONObjBuilder> > > BoundBuilders;
         BoundBuilders builders;
-        builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+        builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
         BSONObjIterator i( keyPattern );
         bool ineq = false; // until ineq is true, we are just dealing with equality and $in bounds
         while( i.more() ) {
@@ -990,16 +990,16 @@ namespace mongo {
                         ineq = true;
                     }
                     BoundBuilders newBuilders;
-                    const vector< FieldInterval > &intervals = fr.intervals();
+                    const vector<FieldInterval> &intervals = fr.intervals();
                     for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
                         BSONObj first = i->first->obj();
                         BSONObj second = i->second->obj();
 
                         const unsigned maxCombinations = 4000000;
                         if ( forward ) {
-                            for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
+                            for( vector<FieldInterval>::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
                                 uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
                                 newBuilders.back().first->appendAs( j->_lower._bound, "" );
@@ -1007,9 +1007,9 @@ namespace mongo {
                             }
                         }
                         else {
-                            for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
+                            for( vector<FieldInterval>::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
                                 uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
                                 newBuilders.back().first->appendElements( first );
                                 newBuilders.back().second->appendElements( second );
                                 newBuilders.back().first->appendAs( j->_upper._bound, "" );
@@ -1330,14 +1330,14 @@ namespace mongo {
      */    
     void FieldRangeOrSet::popOrClause( const BSONObj &indexSpec ) {
         massert( 13274, "no or clause to pop", !orFinished() );
-        auto_ptr< FieldRangeSet > holder;
+        auto_ptr<FieldRangeSet> holder;
         FieldRangeSet *toDiff = &_originalOrSets.front();
         if ( toDiff->matchPossible() && !indexSpec.isEmpty() ) {
             holder.reset( toDiff->subset( indexSpec ) );
             toDiff = holder.get();
         }
-        list< FieldRangeSet >::iterator i = _orSets.begin();
-        list< FieldRangeSet >::iterator j = _originalOrSets.begin();
+        list<FieldRangeSet>::iterator i = _orSets.begin();
+        list<FieldRangeSet>::iterator j = _originalOrSets.begin();
         ++i;
         ++j;
         while( i != _orSets.end() ) {
@@ -1356,8 +1356,8 @@ namespace mongo {
         _originalOrSets.pop_front();
     }
     
-    void FieldRangeOrSet::allClausesSimplified( vector< BSONObj > &ret ) const {
-        for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+    void FieldRangeOrSet::allClausesSimplified( vector<BSONObj> &ret ) const {
+        for( list<FieldRangeSet>::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
             if ( i->matchPossible() ) {
                 ret.push_back( i->simplifiedQuery() );
             }
