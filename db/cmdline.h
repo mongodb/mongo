@@ -41,6 +41,9 @@ namespace mongo {
         string binaryName;     // mongod or mongos
         string cwd;            // cwd of when process started
 
+        // this is suboptimal as someone could rename a binary.  todo...
+        bool isMongos() const { return binaryName == "mongos"; }
+
         int port;              // --port
         enum {
             DefaultDBPort = 27017,

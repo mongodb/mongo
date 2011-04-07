@@ -134,6 +134,7 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             if( cmdObj.hasElement("notablescan") ) {
+                assert( !cmdLine.isMongos() );
                 result.append("was", cmdLine.noTableScan);
                 cmdLine.noTableScan = cmdObj["notablescan"].Bool();
                 s++;
@@ -144,6 +145,7 @@ namespace mongo {
                 s++;
             }
             if( cmdObj.hasElement("syncdelay") ) {
+                assert( !cmdLine.isMongos() );
                 result.append("was", cmdLine.syncdelay );
                 cmdLine.syncdelay = cmdObj["syncdelay"].Number();
                 s++;
