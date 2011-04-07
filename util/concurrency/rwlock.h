@@ -21,10 +21,10 @@
 #include "mutex.h"
 #include "../time_support.h"
 
-// this requires Vista+ to work
+// this requires newer windows versions
 // it works better than sharable_mutex under high contention
 #if defined(_WIN64)
-#define MONGO_USE_SRW_ON_WINDOWS 1
+//#define MONGO_USE_SRW_ON_WINDOWS 1
 #endif
 
 #if !defined(MONGO_USE_SRW_ON_WINDOWS)
