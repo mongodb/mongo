@@ -54,14 +54,15 @@ wts_startup(void)
 
 	p = config;
 	end = config + sizeof(config);
-	p += snprintf(p, end - p, "key_format=%s,"
+	p += snprintf(p, (size_t)(end - p),
+	    "key_format=%s,"
 	    "intl_node_min=%d,intl_node_max=%d,"
 	    "leaf_node_min=%d,leaf_node_max=%d",
 	    (g.c_file_type == ROW) ? "u" : "r",
-	    intl_node_min = 1 << g.c_intl_node_min,
-	    intl_node_max = 1 << g.c_intl_node_max,
-	    leaf_node_min = 1 << g.c_leaf_node_min,
-	    leaf_node_max = 1 << g.c_leaf_node_max);
+	    intl_node_min = 1U << g.c_intl_node_min,
+	    intl_node_max = 1U << g.c_intl_node_max,
+	    leaf_node_min = 1U << g.c_leaf_node_min,
+	    leaf_node_max = 1U << g.c_leaf_node_max);
 
 	switch (g.c_file_type) {
 	case FIX:
@@ -71,17 +72,20 @@ wts_startup(void)
 		 */
 		if (20 * g.c_data_min > leaf_node_min)
 			g.c_data_min = leaf_node_min / 20;
-		p += snprintf(p, end - p,
-		    ",value_format=\"%du\"", g.c_data_min);
+		p += snprintf(p,
+		    (size_t)(end - p), ",value_format=\"%du\"", g.c_data_min);
 		if (g.c_repeat_comp_pct != 0)
-			p += snprintf(p, end - p, ",runlength_encoding");
+			p += snprintf(
+			    p, (size_t)(end - p), ",runlength_encoding");
 		break;
 	case VAR:
 	case ROW:
 		if (g.c_huffman_key)
-			p += snprintf(p, end - p, ",huffman_key=english");
+			p += snprintf(
+			    p, (size_t)(end - p), ",huffman_key=english");
 		if (g.c_huffman_data)
-			p += snprintf(p, end - p, ",huffman_value=english");
+			p += snprintf(
+			    p, (size_t)(end - p), ",huffman_value=english");
 		break;
 	}
 
