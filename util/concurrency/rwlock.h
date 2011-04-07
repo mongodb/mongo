@@ -23,7 +23,9 @@
 
 // this requires Vista+ to work
 // it works better than sharable_mutex under high contention
-//#define MONGO_USE_SRW_ON_WINDOWS 1
+#if defined(_WIN64)
+#define MONGO_USE_SRW_ON_WINDOWS 1
+#endif
 
 #if !defined(MONGO_USE_SRW_ON_WINDOWS)
 
@@ -57,7 +59,8 @@ namespace mongo {
 
     class RWLock {
     public:
-        RWLock(const char *, int lowPriorityWaitMS=0 ) { _lowPriorityWaitMS=lowPriorityWaitMS; InitializeSRWLock(&_lock); }
+        RWLock(const char *, int lowPriorityWaitMS=0 ) : _lowPriorityWaitMS(lowPriorityWaitMS)
+          { InitializeSRWLock(&_lock); }
         ~RWLock() { }
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         void lock()          { AcquireSRWLockExclusive(&_lock); }
@@ -65,30 +68,36 @@ namespace mongo {
         void lock_shared()   { AcquireSRWLockShared(&_lock); }
         void unlock_shared() { ReleaseSRWLockShared(&_lock); }
         bool lock_shared_try( int millis ) {
+            if( TryAcquireSRWLockShared(&_lock) )
+                return true;
+            if( millis == 0 )
+                return false;
             unsigned long long end = curTimeMicros64() + millis*1000;
             while( 1 ) {
+                Sleep(1);
                 if( TryAcquireSRWLockShared(&_lock) )
                     return true;
                 if( curTimeMicros64() >= end )
                     break;
-                Sleep(1);
             }
             return false;
         }
         bool lock_try( int millis = 0 ) {
+            if( TryAcquireSRWLockExclusive(&_lock) ) // quick check to optimistically avoid calling curTimeMicros64
+                return true;
+            if( millis == 0 )
+                return false;
             unsigned long long end = curTimeMicros64() + millis*1000;
-            while( 1 ) {
+            do {
+                Sleep(1);
                 if( TryAcquireSRWLockExclusive(&_lock) )
                     return true;
-                if( curTimeMicros64() >= end )
-                    break;
-                Sleep(1);
-            }
+            } while( curTimeMicros64() < end );
             return false;
         }
     private:
         SRWLOCK _lock;
-        int _lowPriorityWaitMS();
+        const int _lowPriorityWaitMS;
     };
 
 #elif defined(BOOST_RWLOCK)
