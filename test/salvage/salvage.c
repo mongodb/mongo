@@ -26,12 +26,14 @@
 
 #define	PSIZE	(2 * 1024)
 
-void build(int, int, int);
 int  bulk(BTREE *, WT_ITEM **, WT_ITEM **);
+void build(int, int, int);
 void copy(int, int);
 void print_res(int, int, int);
 void process(void);
 void run(int);
+void slvg_close(WT_CONNECTION *);
+void slvg_open(const char *, BTREE **, SESSION **, WT_CONNECTION **);
 
 #define	OP_APPEND	1
 #define	OP_FIRST	2
@@ -345,25 +347,18 @@ build(int key, int value, int cnt)
 {
 	BTREE *btree;
 	SESSION *session;
+	WT_CONNECTION *conn;
 
 	(void)remove(LOAD);
 
 	gvalue = value;
 	gkey = key;
 	gcnt = cnt;
-	
-	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	if (page_type != WT_PAGE_ROW_LEAF)
-		assert(btree->column_set(btree,
-		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
-	assert(btree->btree_pagesize_set(
-	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
-	assert(btree->open(btree, LOAD, 0660, WT_CREATE) == 0);
-	assert(btree->conn->session(btree->conn, 0, &session) == 0);
+
+	slvg_open(LOAD, &btree, &session, &conn);
 	assert(btree->bulk_load(btree, NULL, bulk) == 0);
-	assert(btree->sync(btree, NULL, 0) == 0);
-	assert(session->close(session, 0) == 0);
-	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
+	assert(btree->sync(btree, session, NULL, 0) == 0);
+	slvg_close(conn);
 }
 
 /*
@@ -424,44 +419,91 @@ process(void)
 	BTREE *btree;
 	FILE *fp;
 	SESSION *session;
+	WT_CONNECTION *conn;
 
-	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	if (page_type != WT_PAGE_ROW_LEAF)
-		assert(btree->column_set(btree,
-		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
-	assert(btree->btree_pagesize_set(
-	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
-	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
-	assert(btree->conn->session(btree->conn, 0, &session) == 0);
-	assert(btree->salvage(btree, NULL, 0) == 0);
-	assert(session->close(session, 0) == 0);
-	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
+	slvg_open(SLVG, &btree, &session, &conn);
+	assert(btree->salvage(btree, session, NULL, 0) == 0);
+	slvg_close(conn);
 
-	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	if (page_type != WT_PAGE_ROW_LEAF)
-		assert(btree->column_set(btree,
-		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
-	assert(btree->btree_pagesize_set(
-	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
-	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
-	assert(btree->conn->session(btree->conn, 0, &session) == 0);
-	assert(btree->verify(btree, NULL, 0) == 0);
-	assert(session->close(session, 0) == 0);
-	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
+	slvg_open(SLVG, &btree, &session, &conn);
+	assert(btree->verify(btree, session, NULL, 0) == 0);
+	slvg_close(conn);
 
-	assert(wiredtiger_simple_setup("salvage", NULL, &btree) == 0);
-	if (page_type != WT_PAGE_ROW_LEAF)
-		assert(btree->column_set(btree,
-		    page_type == WT_PAGE_COL_FIX ? 20 : 0, NULL, 0) == 0);
-	assert(btree->btree_pagesize_set(
-	    btree, PSIZE, PSIZE, PSIZE, PSIZE, PSIZE) == 0);
-	assert(btree->open(btree, SLVG, 0660, WT_CREATE) == 0);
-	assert(btree->conn->session(btree->conn, 0, &session) == 0);
+	slvg_open(SLVG, &btree, &session, &conn);
 	assert((fp = fopen(DUMP, "w")) != NULL);
 	assert(btree->dump(btree, fp, NULL, WT_PRINTABLES) == 0);
 	assert(fclose(fp) == 0);
-	assert(session->close(session, 0) == 0);
-	assert(wiredtiger_simple_teardown("salvage", btree) == 0);
+	slvg_close(conn);
+}
+
+/*
+ * slvg_open --
+ *	Open the salvage file.
+ */
+void
+slvg_open(
+    const char *name, BTREE **btreep, SESSION **sessionp, WT_CONNECTION **connp)
+{
+	WT_CONNECTION *conn;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	char buf[512];
+
+	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
+	
+	switch (page_type) {
+	case WT_PAGE_COL_FIX:
+		(void)snprintf(buf, sizeof(buf),
+		    "key_format=r,value_format=\"20u\","
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	case WT_PAGE_COL_RLE:
+		(void)snprintf(buf, sizeof(buf),
+		    "key_format=r,value_format=\"20u\",runlength_encoding,"
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	case WT_PAGE_COL_VAR:
+		(void)snprintf(buf, sizeof(buf),
+		    "key_format=r,"
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		(void)snprintf(buf, sizeof(buf),
+		    "key_format=u,"
+		    "allocation_size=%d,"
+		    "intl_node_min=%d,intl_node_max=%d,"
+		    "leaf_node_min=%d,leaf_node_max=%d",
+		    PSIZE, PSIZE, PSIZE, PSIZE, PSIZE);
+		break;
+	}
+
+	assert(session->create_table(session, name, buf) == 0);
+	snprintf(buf, sizeof(buf), "table:%s", name);
+	assert(session->open_cursor(session, buf, NULL, NULL, &cursor) == 0);
+
+	*btreep = ((CURSOR_BTREE *)cursor)->btree;
+	*sessionp = (SESSION *)session;
+	*connp = conn;
+}
+
+/*
+ * slvg_close --
+ *	Close the salvage file.
+ */
+void
+slvg_close(WT_CONNECTION *conn)
+{
+	assert(conn->close(conn, 0) == 0);
 }
 
 /*
