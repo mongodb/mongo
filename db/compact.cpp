@@ -1,4 +1,4 @@
-/* @file compact.cpp
+@file compact.cpp
    compaction of deleted space in pdfiles (datafiles)
 */
 
@@ -44,6 +44,7 @@ namespace mongo {
                 scoped_array<SortPhaseOne>& phase1, int nidx, bool validate)
     {
         log() << "compact extent #" << n << endl;
+
         Extent *e = ext.ext();
         e->assertOk();
         assert( e->validates() );
@@ -107,11 +108,14 @@ namespace mongo {
                 }
 
                 // remove the old records (orphan them) periodically so our commit block doesn't get too large
-                if( getDur().aCommitIsNeeded() ) {
+                bool stopping = false;
+                RARELY stopping = *killCurrentOp.checkForInterruptNoAssert(false) != 0;
+                if( stopping || getDur().aCommitIsNeeded() ) {
                     e->firstRecord.writing() = L;
                     Record *r = L.rec();
                     getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
                     getDur().commitIfNeeded();
+                    killCurrentOp.checkForInterrupt(false);
                 }
             }
 
@@ -180,7 +184,8 @@ namespace mongo {
         log() << "compact dropping indexes" << endl;
         BSONObjBuilder b;
         if( !dropIndexes(d, ns, "*", errmsg, b, true) ) { 
-            log() << "compact drop indexes failed" << endl;
+            errmsg = "compact drop indexes failed";
+            log() << errmsg << endl;
             return false;
         }
 
@@ -202,6 +207,7 @@ namespace mongo {
         NamespaceString s(ns);
         string si = s.db + ".system.indexes";
         for( int i = 0; i < nidx; i++ ) {
+            killCurrentOp.checkForInterrupt(false);
             BSONObj info = indexSpecs[i].info;
             log() << "compact create index " << info["key"].Obj().toString() << endl;
             try {
