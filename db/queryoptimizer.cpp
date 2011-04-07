@@ -242,12 +242,39 @@ doneCheckOrder:
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
         }
     }
+    
+    /**
+     * @return a copy of the inheriting class, which will be run with its own
+     * query plan.  If multiple plan sets are required for an $or query, the
+     * QueryOp of the winning plan from a given set will be cloned to generate
+     * QueryOps for the subsequent plan set.  This function should only be called
+     * after the query op has completed executing.
+     */    
+    QueryOp *QueryOp::createChild() {
+        if( _orConstraint.get() ) {
+            _matcher->advanceOrClause( _orConstraint );
+            _orConstraint.reset();
+        }
+        QueryOp *ret = _createChild();
+        ret->_oldMatcher = _matcher;
+        return ret;
+    }    
 
     bool QueryPlan::isMultiKey() const {
         if ( _idxNo < 0 )
             return false;
         return _d->isMultikey( _idxNo );
     }
+    
+    void QueryOp::init() {
+        if ( _oldMatcher.get() ) {
+            _matcher.reset( _oldMatcher->nextClauseMatcher( qp().indexKey() ) );
+        }
+        else {
+            _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey(), alwaysUseRecord() ) );
+        }
+        _init();
+    }    
 
     QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr< FieldRangeSet > frs, auto_ptr< FieldRangeSet > originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
         _ns(ns),
@@ -665,10 +692,10 @@ doneCheckOrder:
     bool QueryPlanSet::Runner::prepareToYield( QueryOp &op ) {
         GUARD_OP_EXCEPTION( op,
         if ( op.error() ) {
-        return true;
-    }
-    else {
-        return op.prepareToYield();
+            return true;
+        }
+        else {
+            return op.prepareToYield();
         } );
         return true;
     }
@@ -677,7 +704,31 @@ doneCheckOrder:
         GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.recoverFromYield(); } );
     }
 
-
+    /**
+     * NOTE on our $or implementation: In our current qo implementation we don't
+     * keep statistics on our data, but we can conceptualize the problem of
+     * selecting an index when statistics exist for all index ranges.  The
+     * d-hitting set problem on k sets and n elements can be reduced to the
+     * problem of index selection on k $or clauses and n index ranges (where
+     * d is the max number of indexes, and the number of ranges n is unbounded).
+     * In light of the fact that d-hitting set is np complete, and we don't even
+     * track statistics (so cost calculations are expensive) our first
+     * implementation uses the following greedy approach: We take one $or clause
+     * at a time and treat each as a separate query for index selection purposes.
+     * But if an index range is scanned for a particular $or clause, we eliminate
+     * that range from all subsequent clauses.  One could imagine an opposite
+     * implementation where we select indexes based on the union of index ranges
+     * for all $or clauses, but this can have much poorer worst case behavior.
+     * (An index range that suits one $or clause may not suit another, and this
+     * is worse than the typical case of index range choice staleness because
+     * with $or the clauses may likely be logically distinct.)  The greedy
+     * implementation won't do any worse than all the $or clauses individually,
+     * and it can often do better.  In the first cut we are intentionally using
+     * QueryPattern tracking to record successful plans on $or clauses for use by
+     * subsequent $or clauses, even though there may be a significant aggregate
+     * $nor component that would not be represented in QueryPattern.    
+     */
+    
     MultiPlanScanner::MultiPlanScanner( const char *ns,
                                         const BSONObj &query,
                                         const BSONObj &order,
@@ -779,7 +830,48 @@ doneCheckOrder:
         }
         return false;
     }
+    
+    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op, bool mayYield )
+    : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
+        if ( op.get() ) {
+            _op = op;
+        }
+        else {
+            _op.reset( new NoOp() );
+        }
+        if ( _mps->mayRunMore() ) {
+            nextClause();
+            if ( !ok() ) {
+                advance();
+            }
+        }
+        else {
+            _c.reset( new BasicCursor( DiskLoc() ) );
+        }
+    }    
 
+    MultiCursor::MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
+    : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ), _nscanned( -1 ) {
+        _mps->setBestGuessOnly();
+        _mps->mayYield( false ); // with a NoOp, there's no need to yield in QueryPlanSet
+        if ( !ok() ) {
+            // would have been advanced by UserQueryOp if possible
+            advance();
+        }
+    }
+    
+    void MultiCursor::nextClause() {
+        if ( _nscanned >= 0 && _c.get() ) {
+            _nscanned += _c->nscanned();
+        }
+        shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
+        if ( ! best->complete() )
+            throw MsgAssertionException( best->exception() );
+        _c = best->newCursor();
+        _matcher = best->matcher();
+        _op = best;
+    }    
+    
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
         BSONObjIterator k( sampleKey );
@@ -929,6 +1021,38 @@ doneCheckOrder:
         max = max.extractFieldsUnDotted( keyPattern );
 
         return id;
+    }
+    
+    bool isSimpleIdQuery( const BSONObj& query ) {
+        BSONObjIterator i(query);
+        if( !i.more() ) return false;
+        BSONElement e = i.next();
+        if( i.more() ) return false;
+        if( strcmp("_id", e.fieldName()) != 0 ) return false;
+        return e.isSimpleType(); // e.g. not something like { _id : { $gt : ...
+    }
+
+    shared_ptr< Cursor > bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
+        if( !query.getField( "$or" ).eoo() ) {
+            return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
+        }
+        else {
+            auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
+            auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
+
+            QueryPlanSet qps( ns, frs, origFrs, query, sort );
+            QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
+            if( ! qpp.get() ) return shared_ptr< Cursor >();
+
+            shared_ptr< Cursor > ret = qpp->newCursor();
+
+            // If we don't already have a matcher, supply one.
+            if ( !query.isEmpty() && ! ret->matcher() ) {
+                shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
+                ret->setMatcher( matcher );
+            }
+            return ret;
+        }
     }
 
 } // namespace mongo
