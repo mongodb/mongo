@@ -107,7 +107,7 @@ namespace mongo {
         BSONObj addObj( const BSONObj &o );
         void finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other );
         vector< FieldInterval > _intervals;
-        /** BSONObj references to keep our BSONElement memory valid. */
+        // BSONObj references to keep our BSONElement memory valid.
         vector< BSONObj > _objData;
         string _special;
     };
