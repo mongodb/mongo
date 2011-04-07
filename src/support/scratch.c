@@ -95,6 +95,7 @@ __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp)
 		 */
 		if (buf->mem_size >= size) {
 			F_SET(buf, WT_BUF_INUSE);
+			__wt_buf_setsize(session, buf, size);
 			*scratchp = buf;
 			return (0);
 		}
