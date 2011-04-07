@@ -135,7 +135,10 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	 */
 	__wt_block_discard(session);
 
-	/* Truncate the file to our minimal allocation size unit. */
+	/*
+	 * Truncate the file to our minimal allocation size unit -- anything
+	 * after the end of the file has to be garbage.
+	 */
 	allocsize = btree->allocsize;
 	len = (btree->fh->file_size / allocsize) * allocsize;
 	if (len != btree->fh->file_size)
@@ -152,8 +155,9 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	WT_ERR(__slvg_read(session, ss));
 
 	/*
-	 * If the file has no valid pages, we should probably not touch it,
-	 * somebody gave us a random file.
+	 * If the file has no pages we understand, we shouldn't overwrite it --
+	 * the user gave us the wrong file and right now they're frantically
+	 * pounding at their interrupt key.
 	 */
 	if (ss->pages_next == 0) {
 		__wt_errx(session,
@@ -168,12 +172,14 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	 * We don't have to sort the overflow array because we inserted the
 	 * records into the array in file addr order.
 	 */
-	qsort(ss->pages, (size_t)ss->pages_next,
-	    sizeof(WT_TRACK *), __slvg_trk_compare);
+	qsort(ss->pages,
+	    (size_t)ss->pages_next, sizeof(WT_TRACK *), __slvg_trk_compare);
 
 	/*
-	 * Figure out the leaf pages we need and discard everything else.  At
-	 * the same time, tag the overflow pages they reference.
+	 * Walk the list of leaf pages looking for overlapping ranges we need
+	 * to resolve.  At the same time, do a preliminary check of overflow
+	 * pages -- if a valid page references an overflow page, we may need
+	 * it, mark the overflow page as referenced.
 	 */
 	switch (ss->page_type) {
 	case WT_PAGE_COL_VAR:
@@ -187,17 +193,20 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	}
 
 	/*
-	 * Discard any overflow pages that aren't referenced, and clear the
-	 * reference count -- it was just a guess, we have to figure it out
-	 * for real as we write the internal page.
+	 * Discard any overflow pages that aren't referenced at all, and clear
+	 * the reference count.  (The reference count was just a guess: we do
+	 * not know what keys will be kept vs. discarded as part of resolving
+	 * key range overlaps.   When we resolve the key range overlaps we'll
+	 * figure out exactly what overflow pages we're using.)
 	 */
 	WT_ERR(__slvg_discard_ovfl(session, ss));
 
 	/*
-	 * Build the internal page that references all of these pages.
+	 * Build an internal page that references all of the leaf pages.
 	 *
 	 * Count how many internal page slots we need (we could track this
-	 * during the array shuffling/splitting, but I didn't bother).
+	 * during the array shuffling/splitting, but I didn't bother, it's
+	 * just a pass through the array).
 	 */
 	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
 		if (ss->pages[i] != NULL)
@@ -216,13 +225,12 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	/*
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during merges.
-	 * We can't do it earlier: if we free'd the file pages we're merging,
-	 * then the write of the newly created internal page might allocate
-	 * those file blocks, and if the write of the newly created internal
-	 * page partially fails, we've potentially overwritten pages that
-	 * were used to construct our final key range.  In other words, if the
-	 * salvage run fails, we don't want to corrupt data the next salvage
-	 * run will need.
+	 * We can't do it earlier: if we free'd the leaf pages we're merging as
+	 * we merged them, the write of subsequent leaf pages or the internal
+	 * page might allocate those free'd file blocks, and if the salvage run
+	 * subsequently fails, we've overwritten pages used to construct the
+	 * final key range.  In other words, if the salvage run fails, we don't
+	 * want to overwrite data the next salvage run might need.
 	 */
 	 if (ss->range_merge)
 		WT_ERR(__slvg_free_merge_block(session, ss));
@@ -231,10 +239,10 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	 * If we have to merge key ranges, the list of referenced overflow
 	 * pages might be incorrect, that is, when we did the original pass to
 	 * detect unused overflow pages, we may have flagged some pages as
-	 * referenced which are no longer referenced after those keys were
-	 * discarded from their key range.  We reset the referenced overflow
-	 * page list when merging key ranges, and so now we have a correct
-	 * list.  Free any unused overflow pages.
+	 * referenced which are no longer referenced after keys were discarded
+	 * from their key range.  We reset the referenced overflow page list
+	 * when merging key ranges, and so now we have a correct list.  Free
+	 * any unused overflow pages.
 	 */
 	 if (ss->range_merge)
 		WT_ERR(__slvg_discard_ovfl(session, ss));
