@@ -246,7 +246,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	WT_BUF *key_tmp, *value_tmp;
 	WT_CELL *cell;
 	WT_INSERT *ins;
-	WT_ITEM *key, *value, key_local, value_local;
+	WT_ITEM *key, *value, value_local;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -261,7 +261,6 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key_tmp));
 	WT_ERR(__wt_scr_alloc(session, 0, &value_tmp));
-	WT_CLEAR(key_local);
 	WT_CLEAR(value_local);
 
 	/*
@@ -287,10 +286,11 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 		 * The key and value variables reference the items we will
 		 * print.  Set the key.
 		 */
-		if (__wt_key_process(rip))
+		if (__wt_key_process(rip)) {
 			WT_ERR(__wt_key_build(session, page, rip, key_tmp));
-
-		key = (WT_ITEM *)rip;
+			key = (WT_ITEM *)key_tmp;
+		} else
+			key = (WT_ITEM *)rip;
 
 		/*
 		 * If the item was ever updated, dump the data from the
