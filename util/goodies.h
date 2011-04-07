@@ -421,7 +421,7 @@ namespace mongo {
     class ThreadSafeString {
     public:
         ThreadSafeString( size_t size=256 )
-            : _size( 256 ) , _buf( new char[256] ) {
+            : _size( size ) , _buf( new char[size] ) {
             memset( _buf , 0 , _size );
         }
 
