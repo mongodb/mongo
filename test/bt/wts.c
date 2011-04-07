@@ -17,7 +17,7 @@ static int wts_read(uint64_t);
 static int wts_sync(void);
 
 int
-wts_startup()
+wts_startup(void)
 {
 	time_t now;
 	WT_CONNECTION *conn;
