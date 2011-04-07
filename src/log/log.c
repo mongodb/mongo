@@ -72,8 +72,8 @@ __wt_log_printf(SESSION *session, const char *fmt, ...)
 	 */
 #if 1
 	strcpy((char *)buf->mem + len - 2, "\n");
-	return ((write(conn->log_fh->fd, buf->mem, len - 1) == len -1) ?
-	    0 : WT_ERROR);
+	return ((write(conn->log_fh->fd, buf->mem, len - 1) ==
+	    (ssize_t)len - 1) ?  0 : WT_ERROR);
 #else
 	return (__wt_logput_debug(session, (char *)buf->mem));
 #endif
