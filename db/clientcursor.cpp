@@ -75,8 +75,6 @@ namespace mongo {
 
     // ns is either a full namespace or "dbname." when invalidating for a whole db
     void ClientCursor::invalidate(const char *ns) {
-        vector<ClientCursor*> toDelete;
-
         int len = strlen(ns);
         const char* dot = strchr(ns, '.');
         assert( len > 0 && dot);
@@ -91,19 +89,22 @@ namespace mongo {
             assert(db);
             assert( str::startsWith(ns, db->name) );
 
-            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {
+            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); /*++i*/ ) {
                 ClientCursor *cc = i->second;
+
+                ++i; // we may be removing this node
+
                 if( cc->_db != db )
                     continue;
 
                 if (isDB) {
                     // already checked that db matched above
                     dassert( str::startsWith(cc->_ns.c_str(), ns) );
-                    toDelete.push_back(i->second);
+                    delete cc; //removes self from ccByID
                 }
                 else {
                     if ( str::equals(cc->_ns.c_str(), ns) )
-                        toDelete.push_back(i->second);
+                        delete cc; //removes self from ccByID
                 }
             }
 
@@ -120,9 +121,6 @@ namespace mongo {
                     toDelete.push_back(i->second);
                 }
             }*/
-
-            for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
-                delete (*i);
 
             /*cout << "TEMP after invalidate " << endl;
             for( auto i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {
