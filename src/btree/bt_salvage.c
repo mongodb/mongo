@@ -1451,11 +1451,11 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 {
 	BTREE *btree;
 	WT_BUF *key;
-	WT_ITEM *item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	uint32_t i, skip_start, skip_stop;
 	int (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *), ret;
+	void *item;
 
 	btree = session->btree;
 	func = btree->btree_compare;
@@ -1493,12 +1493,12 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			if (__wt_key_process(rip)) {
 				WT_ERR(
 				    __wt_cell_process(session, rip->key, key));
-				item = (WT_ITEM *)key;
+				item = key;
 			} else
-				item = (WT_ITEM *)rip;
+				item = rip;
 
-			if  (func(btree,
-			    item, (WT_ITEM *)&trk->u.row.range_start) > 0)
+			if  (func(btree, (WT_ITEM *)item,
+			    (WT_ITEM *)&trk->u.row.range_start) > 0)
 				break;
 			++skip_start;
 		}
@@ -1507,11 +1507,11 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			if (__wt_key_process(rip)) {
 				WT_ERR(
 				    __wt_cell_process(session, rip->key, key));
-				item = (WT_ITEM *)key;
+				item = key;
 			} else
-				item = (WT_ITEM *)rip;
-			if  (func(btree,
-			    item, (WT_ITEM *)&trk->u.row.range_stop) < 0)
+				item = rip;
+			if  (func(btree, (WT_ITEM *)item,
+			    (WT_ITEM *)&trk->u.row.range_stop) < 0)
 				break;
 			++skip_stop;
 		}
