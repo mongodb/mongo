@@ -53,37 +53,17 @@ catch(e) {
 }
 reconnect(master);
 
-print("sleeping 1");
-sleep(10000);
+print("clear slave ports");
 // these are already down, but this clears their ports from memory so that they
 // can be restarted later
-stopMongod(replTest.getPort(1));
-stopMongod(replTest.getPort(2));
-
+replTest.stop(1);
+replTest.stop(2);
 
 print("Bring slave1 back up");
-var paths = [ replTest.getPath(1), replTest.getPath(2) ];
-var ports = allocatePorts(2, replTest.getPort(2)+1);
-var args = ["mongod", "--port", ports[0], "--dbpath", paths[0], "--noprealloc", "--smallfiles", "--rest"];
-var conn = startMongoProgram.apply( null, args );
-conn.getDB("local").system.replset.remove();
-printjson(conn.getDB("local").runCommand({getlasterror:1}));
-stopMongod(ports[0]);
-
-replTest.restart(1);
-
+replTest.start(1);
 
 print("Bring slave2 back up");
-args[2] = ports[1];
-args[4] = paths[1];
-conn = startMongoProgram.apply( null, args );
-conn.getDB("local").system.replset.remove();
-print("path: "+paths[1]);
-stopMongod(ports[1]);
-
-replTest.restart(2);
-sleep(10000);
-
+replTest.start(2);
 
 print("Add them back as slaves");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
@@ -99,9 +79,9 @@ wait(function() {
     }
     reconnect(master);
 
+    printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
     master.setSlaveOk();
     var newConfig = master.getDB("local").system.replset.findOne();
-    printjson(newConfig);
     return newConfig.version == 4;
   });
 
