@@ -40,7 +40,7 @@ namespace mongo {
 
     void compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
                 const scoped_array<IndexSpec> &indexSpecs,
-                scoped_array<SortPhaseOne>& phase1, int nidx)
+                scoped_array<SortPhaseOne>& phase1, int nidx, bool validate)
     {
         log() << "compact extent #" << n << endl;
         Extent *e = ext.ext();
@@ -74,22 +74,27 @@ namespace mongo {
                 nrecs++;
                 BSONObj objOld(recOld);
 
-                unsigned sz = objOld.objsize();
-                unsigned lenWHdr = sz + Record::HeaderSize;
-                totalSize += lenWHdr;
-                DiskLoc extentLoc;
-                DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
-                uassert(14024, "compact error out of space during compaction", !loc.isNull());
-                Record *recNew = loc.rec();
-                recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
-                addRecordToRecListInExtent(recNew, loc);
-                memcpy(recNew->data, objOld.objdata(), sz);
+                if( !validate || objOld.valid() ) {
+                    unsigned sz = objOld.objsize();
+                    unsigned lenWHdr = sz + Record::HeaderSize;
+                    totalSize += lenWHdr;
+                    DiskLoc extentLoc;
+                    DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr);
+                    uassert(14024, "compact error out of space during compaction", !loc.isNull());
+                    Record *recNew = loc.rec();
+                    recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
+                    addRecordToRecListInExtent(recNew, loc);
+                    memcpy(recNew->data, objOld.objdata(), sz);
 
-                {
-                    // extract keys for all indexes we will be rebuilding
-                    for( int x = 0; x < nidx; x++ ) { 
-                        phase1[x].addKeys(indexSpecs[x], objOld, loc);
+                    {
+                        // extract keys for all indexes we will be rebuilding
+                        for( int x = 0; x < nidx; x++ ) { 
+                            phase1[x].addKeys(indexSpecs[x], objOld, loc);
+                        }
                     }
+                }
+                else { 
+                    log() << "compact skipping invalid object" << endl;
                 }
 
                 if( L.isNull() ) { 
@@ -124,7 +129,7 @@ namespace mongo {
 
     extern SortPhaseOne *precalced;
 
-    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg) { 
+    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate) { 
         //int les = d->lastExtentSize;
 
         // this is a big job, so might as well make things tidy before we start just to be nice.
@@ -180,7 +185,7 @@ namespace mongo {
 
         int n = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx);
+            compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
         }
 
         assert( d->firstExtent.ext()->xprev.isNull() );
@@ -205,7 +210,7 @@ namespace mongo {
         return true;
     }
 
-    bool compact(const string& ns, string &errmsg) {
+    bool compact(const string& ns, string &errmsg, bool validate) {
         massert( 14028, "bad ns", isANormalNSName(ns.c_str()) );
         massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
 
@@ -219,7 +224,7 @@ namespace mongo {
             massert( 13661, "cannot compact capped collection", !d->capped );
             log() << "compact " << ns << " begin" << endl;
             try { 
-                ok = _compact(ns.c_str(), d, errmsg);
+                ok = _compact(ns.c_str(), d, errmsg, validate);
             }
             catch(...) { 
                 log() << "compact " << ns << " end (with error)" << endl;
@@ -240,7 +245,7 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
-                "  { compact : <collection_name>, [force:true] }"
+                "  { compact : <collection_name>, [force:true], [validate:true] }"
                 "warning: this operation blocks the server and is slow. you can cancel with cancelOp()";
         }
         virtual bool requiresAuth() { return true; }
@@ -265,7 +270,8 @@ namespace mongo {
             }
 
             string ns = db + '.' + coll;
-            bool ok = compact(ns, errmsg);
+            bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
+            bool ok = compact(ns, errmsg, validate);
             return ok;
         }
     };

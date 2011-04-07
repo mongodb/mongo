@@ -78,7 +78,7 @@ namespace mongo {
 
                     if ( idx.inKeyPattern( key ) ) {
                         cursor = bestGuessCursor( ns.c_str() , BSONObj() , idx.keyPattern() );
-                        break;
+                        if( cursor.get() ) break;
                     }
 
                 }

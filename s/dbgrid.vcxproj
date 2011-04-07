@@ -191,6 +191,7 @@
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
+    <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
     <ClCompile Include="..\db\security_key.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />

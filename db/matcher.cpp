@@ -820,8 +820,18 @@ namespace mongo {
             BSONElementSet s;
             if ( !constrainIndexKey_.isEmpty() ) {
                 BSONElement e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);
-                if ( !e.eoo() )
+
+                // Should only have keys nested one deep here, for geo-indices
+                // TODO: future indices may nest deeper?
+                if( e.type() == Array ){
+                	BSONObjIterator i( e.Obj() );
+                	while( i.more() ){
+                		s.insert( i.next() );
+                	}
+                }
+                else if ( !e.eoo() )
                     s.insert( e );
+
             }
             else {
                 jsobj.getFieldsDotted( rm.fieldName, s );

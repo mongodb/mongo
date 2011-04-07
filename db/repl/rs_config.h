@@ -51,7 +51,6 @@ namespace mongo {
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
             set<string> tags;     /* tagging for data center, rack, etc. */
-            BSONObj initialSync;  /* directions for initial sync source */
 
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;

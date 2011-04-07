@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include <stdio.h>
+#include <string.h>
 
 
 #define USE_LINENOISE
@@ -135,7 +136,6 @@ void intr( int sig ) {
 #endif
 }
 
-#if !defined(_WIN32)
 void killOps() {
     if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
         return;
@@ -180,20 +180,16 @@ void quitNicely( int sig ) {
         gotInterrupted = 1;
         return;
     }
+
+#if !defined(_WIN32)
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
+#endif
+
     killOps();
     shellHistoryDone();
     exit(0);
 }
-#else
-void quitNicely( int sig ) {
-    mongo::dbexitCalled = true;
-    //killOps();
-    shellHistoryDone();
-    exit(0);
-}
-#endif
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 
@@ -232,8 +228,18 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 #endif
 }
 
-#if !defined(_WIN32)
-#include <string.h>
+#ifdef _WIN32
+char * strsignal(int sig){
+    switch (sig){
+        case SIGINT: return "SIGINT";
+        case SIGTERM: return "SIGTERM";
+        case SIGABRT: return "SIGABRT";
+        case SIGSEGV: return "SIGSEGV";
+        case SIGFPE: return "SIGFPE";
+        default: return "unknown";
+    }
+}
+#endif
 
 void quitAbruptly( int sig ) {
     ostringstream ossSig;
@@ -259,16 +265,17 @@ void myterminate() {
 void setupSignals() {
     signal( SIGINT , quitNicely );
     signal( SIGTERM , quitNicely );
-    signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
     signal( SIGABRT , quitAbruptly );
     signal( SIGSEGV , quitAbruptly );
-    signal( SIGBUS , quitAbruptly );
     signal( SIGFPE , quitAbruptly );
+
+#if !defined(_WIN32) // surprisingly these are the only ones that don't work on windows
+    signal( SIGPIPE , quitNicely ); // Maybe just log and continue?
+    signal( SIGBUS , quitAbruptly );
+#endif
+
     set_terminate( myterminate );
 }
-#else
-inline void setupSignals() {}
-#endif
 
 string fixHost( string url , string host , string port ) {
     //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;

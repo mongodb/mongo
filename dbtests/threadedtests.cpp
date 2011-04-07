@@ -73,7 +73,7 @@ namespace ThreadedTests {
         }
     private:
         virtual void setup() {
-            mm = new MongoMutex("MongoMutexTest");
+            mm = &dbMutex;
         }
         virtual void subthread(int) {
             Client::initThread("mongomutextest");
@@ -256,7 +256,7 @@ namespace ThreadedTests {
              * note: this test will deadlock if the code breaks
              */
             
-            RWLock lk( "eliot2" , 10000 );
+            RWLock lk( "eliot2" , 120 * 1000 );
             
             auto_ptr<rwlock> a( new rwlock( lk , false ) );
             

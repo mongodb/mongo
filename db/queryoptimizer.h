@@ -34,7 +34,7 @@ namespace mongo {
 
         QueryPlan(NamespaceDetails *d,
                   int idxNo, // -1 = no index
-                  const FieldRangeSet &fbs,
+                  const FieldRangeSet &frs,
                   const FieldRangeSet &originalFrs,
                   const BSONObj &originalQuery,
                   const BSONObj &order,
@@ -59,11 +59,11 @@ namespace mongo {
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
         bool willScanTable() const { return _idxNo < 0; }
-        const char *ns() const { return _fbs.ns(); }
+        const char *ns() const { return _frs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
-        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _fbs.simplifiedQuery( fields ); }
-        const FieldRange &range( const char *fieldName ) const { return _fbs.range( fieldName ); }
+        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _frs.simplifiedQuery( fields ); }
+        const FieldRange &range( const char *fieldName ) const { return _frs.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
         shared_ptr< FieldRangeVector > originalFrv() const { return _originalFrv; }
         // just for testing
@@ -73,7 +73,7 @@ namespace mongo {
     private:
         NamespaceDetails * _d;
         int _idxNo;
-        const FieldRangeSet &_fbs;
+        const FieldRangeSet &_frs;
         const BSONObj &_originalQuery;
         const BSONObj &_order;
         const IndexDetails * _index;
@@ -146,7 +146,7 @@ namespace mongo {
         ExceptionInfo exception() const { return _exception; }
         const QueryPlan &qp() const { return *_qp; }
         // To be called by QueryPlanSet::Runner only.
-        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; }
+        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; assert( _qp != NULL ); }
         void setException( const DBException &e ) {
             _error = true;
             _exception = e.getInfo();
@@ -205,7 +205,7 @@ namespace mongo {
         bool usingPrerecordedPlan() const { return _usingPrerecordedPlan; }
         QueryPlanPtr getBestGuess() const;
         //for testing
-        const FieldRangeSet &fbs() const { return *_fbs; }
+        const FieldRangeSet &frs() const { return *_frs; }
         const FieldRangeSet &originalFrs() const { return *_originalFrs; }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
@@ -233,7 +233,7 @@ namespace mongo {
 
         const char *_ns;
         BSONObj _originalQuery;
-        auto_ptr< FieldRangeSet > _fbs;
+        auto_ptr< FieldRangeSet > _frs;
         auto_ptr< FieldRangeSet > _originalFrs;
         PlanSet _plans;
         bool _mayRecordPlan;
@@ -441,6 +441,9 @@ namespace mongo {
     }
 
     // matcher() will always work on the returned cursor
+    // It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
+    // for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
+    // no suitable indices exist.
     inline shared_ptr< Cursor > bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
         if( !query.getField( "$or" ).eoo() ) {
             return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
@@ -448,7 +451,13 @@ namespace mongo {
         else {
             auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
             auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
-            shared_ptr< Cursor > ret = QueryPlanSet( ns, frs, origFrs, query, sort ).getBestGuess()->newCursor();
+
+            QueryPlanSet qps( ns, frs, origFrs, query, sort );
+            QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
+            if( ! qpp.get() ) return shared_ptr< Cursor >();
+
+            shared_ptr< Cursor > ret = qpp->newCursor();
+
             // If we don't already have a matcher, supply one.
             if ( !query.isEmpty() && ! ret->matcher() ) {
                 shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );

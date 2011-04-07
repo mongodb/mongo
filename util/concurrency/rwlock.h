@@ -288,7 +288,12 @@ namespace mongo {
                                 got = true;
                                 break;
                             }
-                            sleepmillis(1);
+                            
+                            int sleep = 1;
+                            if ( i > ( lowPriorityWaitMS / 20 ) )
+                                sleep = 10;
+                            sleepmillis(sleep);
+                            i += ( sleep - 1 );
                         }
                         if ( ! got ) {
                             log() << "couldn't get lazy rwlock" << endl;

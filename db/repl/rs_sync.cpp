@@ -264,8 +264,11 @@ namespace mongo {
         // todo : locking vis a vis the mgr...
         OplogReader r;
         string hn;
+        const Member *target = 0;
 
-        const Member *target = box.getPrimary();
+        // if we cannot reach the master but someone else is more up-to-date
+        // than we are, sync from them.
+        target = getMemberToSyncTo();
         if (target != 0) {
             hn = target->h().toString();
             if (!_getOplogReader(r, hn)) {
@@ -274,30 +277,15 @@ namespace mongo {
                 target = 0;
             }
         }
-
-        // if we cannot reach the master but someone else is more up-to-date
-        // than we are, sync from them.
-        if( target == 0 ) {
-            for(Member *m = head(); m; m=m->next()) {
-                hn = m->h().toString();
-                if (m->hbinfo().up() && m->state().readable() &&
-                        (m->hbinfo().opTime > lastOpTimeWritten) &&
-                        m->config().slaveDelay == 0 &&
-                        _getOplogReader(r, hn)) {
-                    target = m;
-                    break;
-                }
-            }
-
-            // no server found
-            if (target == 0) {
-                // if there is no one to sync from
-                OpTime minvalid;
-                tryToGoLiveAsASecondary(minvalid);
-                return;
-            }
+            
+        // no server found
+        if (target == 0) {
+            // if there is no one to sync from
+            OpTime minvalid;
+            tryToGoLiveAsASecondary(minvalid);
+            return;
         }
-
+        
         r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
         assert( r.haveCursor() );
 

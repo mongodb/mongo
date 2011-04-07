@@ -68,9 +68,6 @@ var args = ["mongod", "--port", ports[0], "--dbpath", paths[0], "--noprealloc", 
 var conn = startMongoProgram.apply( null, args );
 conn.getDB("local").system.replset.remove();
 printjson(conn.getDB("local").runCommand({getlasterror:1}));
-print(conn);
-print("sleeping 2");
-sleep(10000);
 stopMongod(ports[0]);
 
 replTest.restart(1);
@@ -82,8 +79,6 @@ args[4] = paths[1];
 conn = startMongoProgram.apply( null, args );
 conn.getDB("local").system.replset.remove();
 print("path: "+paths[1]);
-print("sleeping 3");
-sleep(10000);
 stopMongod(ports[1]);
 
 replTest.restart(2);
@@ -94,6 +89,7 @@ print("Add them back as slaves");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
 config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
 config.version = 4;
+printjson(config);
 wait(function() {
     try {
       master.getDB("admin").runCommand({replSetReconfig:config});
@@ -105,6 +101,7 @@ wait(function() {
 
     master.setSlaveOk();
     var newConfig = master.getDB("local").system.replset.findOne();
+    printjson(newConfig);
     return newConfig.version == 4;
   });
 

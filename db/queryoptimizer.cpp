@@ -53,9 +53,9 @@ namespace mongo {
 
     QueryPlan::QueryPlan(
         NamespaceDetails *d, int idxNo,
-        const FieldRangeSet &fbs, const FieldRangeSet &originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey , string special ) :
+        const FieldRangeSet &frs, const FieldRangeSet &originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
-        _fbs( fbs ),
+        _frs( frs ),
         _originalQuery( originalQuery ),
         _order( order ),
         _index( 0 ),
@@ -76,7 +76,7 @@ namespace mongo {
         }
             
         // FIXME SERVER-1932 This check is only valid for non multikey indexes.
-        if ( !_fbs.matchPossible() ) {
+        if ( !_frs.matchPossible() ) {
             _unhelpful = true;
             _scanAndOrderRequired = false;
             return;
@@ -113,7 +113,7 @@ namespace mongo {
                     goto doneCheckOrder;
                 if ( strcmp( oe.fieldName(), ke.fieldName() ) == 0 )
                     break;
-                if ( !fbs.range( ke.fieldName() ).equality() )
+                if ( !frs.range( ke.fieldName() ).equality() )
                     goto doneCheckOrder;
             }
             int d = elementDirection( oe ) == elementDirection( ke ) ? 1 : -1;
@@ -135,34 +135,34 @@ doneCheckOrder:
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            const FieldRange &fb = fbs.range( e.fieldName() );
+            const FieldRange &fr = frs.range( e.fieldName() );
             if ( stillOptimalIndexedQueryCount ) {
-                if ( fb.nontrivial() )
+                if ( fr.nontrivial() )
                     ++optimalIndexedQueryCount;
-                if ( !fb.equality() )
+                if ( !fr.equality() )
                     stillOptimalIndexedQueryCount = false;
             }
             else {
-                if ( fb.nontrivial() )
+                if ( fr.nontrivial() )
                     optimalIndexedQueryCount = -1;
             }
-            if ( fb.equality() ) {
-                BSONElement e = fb.max();
+            if ( fr.equality() ) {
+                BSONElement e = fr.max();
                 if ( !e.isNumber() && !e.mayEncapsulate() && e.type() != RegEx )
                     ++exactIndexedQueryCount;
             }
             orderFieldsUnindexed.erase( e.fieldName() );
         }
         if ( !_scanAndOrderRequired &&
-                ( optimalIndexedQueryCount == fbs.nNontrivialRanges() ) )
+                ( optimalIndexedQueryCount == frs.nNontrivialRanges() ) )
             _optimal = true;
-        if ( exactIndexedQueryCount == fbs.nNontrivialRanges() &&
+        if ( exactIndexedQueryCount == frs.nNontrivialRanges() &&
                 orderFieldsUnindexed.size() == 0 &&
                 exactIndexedQueryCount == _index->keyPattern().nFields() &&
                 exactIndexedQueryCount == _originalQuery.nFields() ) {
             _exactKeyMatch = true;
         }
-        _frv.reset( new FieldRangeVector( fbs, idxSpec, _direction ) );
+        _frv.reset( new FieldRangeVector( frs, idxSpec, _direction ) );
         _originalFrv.reset( new FieldRangeVector( originalFrs, idxSpec, _direction ) );
         if ( _startOrEndSpec ) {
             BSONObj newStart, newEnd;
@@ -177,7 +177,7 @@ doneCheckOrder:
         }
 
         if ( ( _scanAndOrderRequired || _order.isEmpty() ) &&
-                !fbs.range( idxKey.firstElement().fieldName() ).nontrivial() ) {
+                !frs.range( idxKey.firstElement().fieldName() ).nontrivial() ) {
             _unhelpful = true;
         }
     }
@@ -190,17 +190,17 @@ doneCheckOrder:
         }
 
         if ( willScanTable() ) {
-            if ( _fbs.nNontrivialRanges() )
-                checkTableScanAllowed( _fbs.ns() );
-            return findTableScan( _fbs.ns(), _order, startLoc );
+            if ( _frs.nNontrivialRanges() )
+                checkTableScanAllowed( _frs.ns() );
+            return findTableScan( _frs.ns(), _order, startLoc );
         }
         
         // FIXME SERVER-1932 This check is only valid for non multikey indexes.
-        if ( !_fbs.matchPossible() ) {
+        if ( !_frs.matchPossible() ) {
             // TODO We might want to allow this dummy table scan even in no table
             // scan mode, since it won't scan anything.
-            if ( _fbs.nNontrivialRanges() )
-                checkTableScanAllowed( _fbs.ns() );
+            if ( _frs.nNontrivialRanges() )
+                checkTableScanAllowed( _frs.ns() );
             return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
         
@@ -223,7 +223,7 @@ doneCheckOrder:
             int orderSpec = _order.getIntField( "$natural" );
             if ( orderSpec == INT_MIN )
                 orderSpec = 1;
-            return findTableScan( _fbs.ns(), BSON( "$natural" << -orderSpec ) );
+            return findTableScan( _frs.ns(), BSON( "$natural" << -orderSpec ) );
         }
         massert( 10364 ,  "newReverseCursor() not implemented for indexed plans", false );
         return shared_ptr<Cursor>();
@@ -237,9 +237,9 @@ doneCheckOrder:
 
     void QueryPlan::registerSelf( long long nScanned ) const {
         // FIXME SERVER-2864 Otherwise no query pattern can be generated.
-        if ( _fbs.matchPossible() ) {
+        if ( _frs.matchPossible() ) {
             scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-            NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _fbs.pattern( _order ), indexKey(), nScanned );
+            NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
         }
     }
 
@@ -252,7 +252,7 @@ doneCheckOrder:
     QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr< FieldRangeSet > frs, auto_ptr< FieldRangeSet > originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
         _ns(ns),
         _originalQuery( originalQuery ),
-        _fbs( frs ),
+        _frs( frs ),
         _originalFrs( originalFrs ),
         _mayRecordPlan( true ),
         _usingPrerecordedPlan( false ),
@@ -291,10 +291,10 @@ doneCheckOrder:
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
             // This reformats _min and _max to be used for index lookup.
-            massert( 10365 ,  errmsg, indexDetailsForRange( _fbs->ns(), errmsg, _min, _max, keyPattern ) );
+            massert( 10365 ,  errmsg, indexDetailsForRange( _frs->ns(), errmsg, _min, _max, keyPattern ) );
         }
         NamespaceDetails *d = nsdetails(_ns);
-        _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(id), *_fbs, *_originalFrs, _originalQuery, _order, _min, _max ) ) );
+        _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(id), *_frs, *_originalFrs, _originalQuery, _order, _min, _max ) ) );
     }
 
     // returns an IndexDetails * for a hint, 0 if hint is $natural.
@@ -335,11 +335,11 @@ doneCheckOrder:
         _mayRecordPlan = true;
         _usingPrerecordedPlan = false;
 
-        const char *ns = _fbs->ns();
+        const char *ns = _frs->ns();
         NamespaceDetails *d = nsdetails( ns );
-        if ( !d || !_fbs->matchPossible() ) { // FIXME SERVER-1932 This check is only valid for non multikey indexes.
+        if ( !d || !_frs->matchPossible() ) { // FIXME SERVER-1932 This check is only valid for non multikey indexes.
             // Table scan plan, when no matches are possible
-            _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) ) );
+            _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) ) );
             return;
         }
 
@@ -353,7 +353,7 @@ doneCheckOrder:
             else {
                 massert( 10366 ,  "natural order cannot be specified with $min/$max", _min.isEmpty() && _max.isEmpty() );
                 // Table scan plan
-                _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) ) );
+                _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) ) );
             }
             return;
         }
@@ -363,7 +363,7 @@ doneCheckOrder:
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( ns, errmsg, _min, _max, keyPattern );
             massert( 10367 ,  errmsg, idx );
-            _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(*idx), *_fbs, *_originalFrs, _originalQuery, _order, _min, _max ) ) );
+            _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(*idx), *_frs, *_originalFrs, _originalQuery, _order, _min, _max ) ) );
             return;
         }
 
@@ -372,19 +372,19 @@ doneCheckOrder:
             if ( idx >= 0 ) {
                 _usingPrerecordedPlan = true;
                 _mayRecordPlan = false;
-                _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_fbs , *_fbs , _originalQuery, _order ) ) );
+                _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_frs , *_frs , _originalQuery, _order ) ) );
                 return;
             }
         }
 
         if ( _originalQuery.isEmpty() && _order.isEmpty() ) {
-            _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) ) );
+            _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) ) );
             return;
         }
 
-        DEBUGQO( "\t special : " << _fbs->getSpecial() );
-        if ( _fbs->getSpecial().size() ) {
-            _special = _fbs->getSpecial();
+        DEBUGQO( "\t special : " << _frs->getSpecial() );
+        if ( _frs->getSpecial().size() ) {
+            _special = _frs->getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
                 int j = i.pos();
@@ -393,7 +393,7 @@ doneCheckOrder:
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
                     _usingPrerecordedPlan = true;
                     _mayRecordPlan = false;
-                    _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_fbs , *_fbs , _originalQuery, _order ,
+                    _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_frs , *_frs , _originalQuery, _order ,
                                                     BSONObj() , BSONObj() , _special ) ) );
                     return;
                 }
@@ -407,15 +407,15 @@ doneCheckOrder:
             {
                 scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
-                bestIndex = nsd.indexForPattern( _fbs->pattern( _order ) );
-                oldNScanned = nsd.nScannedForPattern( _fbs->pattern( _order ) );
+                bestIndex = nsd.indexForPattern( _frs->pattern( _order ) );
+                oldNScanned = nsd.nScannedForPattern( _frs->pattern( _order ) );
             }
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
                 _oldNScanned = oldNScanned;
                 if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
-                    p.reset( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) );
+                    p.reset( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) );
                 }
 
                 NamespaceDetails::IndexIterator i = d->ii();
@@ -423,7 +423,7 @@ doneCheckOrder:
                     int j = i.pos();
                     IndexDetails& ii = i.next();
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        p.reset( new QueryPlan( d, j, *_fbs, *_originalFrs, _originalQuery, _order ) );
+                        p.reset( new QueryPlan( d, j, *_frs, *_originalFrs, _originalQuery, _order ) );
                     }
                 }
 
@@ -441,17 +441,17 @@ doneCheckOrder:
     }
 
     void QueryPlanSet::addOtherPlans( bool checkFirst ) {
-        const char *ns = _fbs->ns();
+        const char *ns = _frs->ns();
         NamespaceDetails *d = nsdetails( ns );
         if ( !d )
             return;
 
         // If table scan is optimal or natural order requested or tailable cursor requested
         // FIXME SERVER-1932 This check is only valid for non multikey indexes.
-        if ( !_fbs->matchPossible() || ( _fbs->nNontrivialRanges() == 0 && _order.isEmpty() ) ||
+        if ( !_frs->matchPossible() || ( _frs->nNontrivialRanges() == 0 && _order.isEmpty() ) ||
                 ( !_order.isEmpty() && !strcmp( _order.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
-            addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) ), checkFirst );
+            addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) ), checkFirst );
             return;
         }
 
@@ -463,12 +463,12 @@ doneCheckOrder:
             const IndexSpec& spec = id.getSpec();
             IndexSuitability suitability = HELPFUL;
             if ( normalQuery ) {
-                suitability = spec.suitability( _fbs->simplifiedQuery() , _order );
+                suitability = spec.suitability( _frs->simplifiedQuery() , _order );
                 if ( suitability == USELESS )
                     continue;
             }
 
-            QueryPlanPtr p( new QueryPlan( d, i, *_fbs, *_originalFrs, _originalQuery, _order ) );
+            QueryPlanPtr p( new QueryPlan( d, i, *_frs, *_originalFrs, _originalQuery, _order ) );
             if ( p->optimal() ) {
                 addPlan( p, checkFirst );
                 return;
@@ -481,7 +481,7 @@ doneCheckOrder:
             addPlan( *i, checkFirst );
 
         // Table scan plan
-        addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_fbs, *_originalFrs, _originalQuery, _order ) ), checkFirst );
+        addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) ), checkFirst );
     }
 
     shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
@@ -493,7 +493,7 @@ doneCheckOrder:
                 return res;
             {
                 scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-                NamespaceDetailsTransient::get_inlock( _fbs->ns() ).registerIndexForPattern( _fbs->pattern( _order ), BSONObj(), 0 );
+                NamespaceDetailsTransient::get_inlock( _frs->ns() ).registerIndexForPattern( _frs->pattern( _order ), BSONObj(), 0 );
             }
             init();
         }
@@ -523,17 +523,16 @@ doneCheckOrder:
                     return _plans[i];
             }
 
-            stringstream ss;
-            ss << "best guess plan requested, but scan and order required:";
-            ss << " query: " << _fbs->simplifiedQuery();
-            ss << " order: " << _order;
-            ss << " choices: ";
-            for ( unsigned i=0; i<_plans.size(); i++ ) {
-                ss << _plans[i]->indexKey() << " ";
-            }
+            warning() << "best guess query plan requested, but scan and order are required for all plans "
+            		  << " query: " << _frs->simplifiedQuery()
+            		  << " order: " << _order
+            		  << " choices: ";
 
-            string s = ss.str();
-            msgassertedNoTrace( 13284, s.c_str() );
+            for ( unsigned i=0; i<_plans.size(); i++ )
+            	warning() << _plans[i]->indexKey() << " ";
+            warning() << endl;
+
+            return QueryPlanPtr();
         }
         return _plans[0];
     }

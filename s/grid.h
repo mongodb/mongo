@@ -83,6 +83,8 @@ namespace mongo {
         bool shouldBalance() const;
 
         unsigned long long getNextOpTime() const;
+        
+        void flushConfig();
 
         // exposed methods below are for testing only
 

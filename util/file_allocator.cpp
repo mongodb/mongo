@@ -77,6 +77,10 @@ namespace mongo {
         // TODO : we should to avoid fragmentation
     }
 
+    bool FileAllocator::hasFailed() const {
+        return false;
+    }
+
 #else
 
     FileAllocator::FileAllocator()
@@ -175,6 +179,10 @@ namespace mongo {
                 left -= written;
             }
         }
+    }
+
+    bool FileAllocator::hasFailed() const {
+        return _failed;
     }
 
     void FileAllocator::checkFailure() {
@@ -286,6 +294,10 @@ namespace mongo {
                     fa->_failed = true;
                     // not erasing from pending
                     fa->_pendingUpdated.notify_all();
+                    
+                    
+                    // TODO: we should sleep and continue rather than stop
+                    //       space might become available
                     return; // no more allocation
                 }
 
