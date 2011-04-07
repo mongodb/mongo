@@ -45,13 +45,16 @@ for ( var i = 0; i < scales.length; i++ ) {
 	var max = 10 * scale;
 	var min = -max;
 	var range = max - min;
-
+	var bits = 2 + Math.random() * 30
+	
 	var t = db["geo_small_large"]
 	t.drop();
-	t.ensureIndex( { p : "2d" }, { min : min, max : max, bits : 20 + Math.random() * 10 })
+	t.ensureIndex( { p : "2d" }, { min : min, max : max, bits : bits })
 
 	var outPoints = 0;
 	var inPoints = 0;
+	
+	printjson({ eps : eps, radius : radius, max : max, min : min, range : range, bits : bits })
 	
 	// Put a point slightly inside and outside our range
 	for ( var j = 0; j < 2; j++ ) {
@@ -65,24 +68,84 @@ for ( var i = 0; i < scales.length; i++ ) {
 	assert.eq( t.count( { p : { $within : { $center : [[0, 0], radius ] } } } ), 1, "Incorrect center points found!" )
 	assert.eq( t.count( { p : { $within : { $box : [ [ -radius, -radius ], [ radius, radius ] ] } } } ), 1,
 			"Incorrect box points found!" )
-
-	for ( var j = 0; j < 30; j++ ) {
-
-		var x = Math.random() * ( range - eps ) + eps + min;
-		var y = Math.random() * ( range - eps ) + eps + min;
+			
+	shouldFind = []
+	randoms = []
+		
+	for ( var j = 0; j < 2; j++ ) {
+		
+		var randX = Math.random(); // randoms[j].randX
+		var randY = Math.random(); // randoms[j].randY
+		
+		randoms.push({ randX : randX, randY : randY })
+		
+		var x = randX * ( range - eps ) + eps + min;
+		var y = randY * ( range - eps ) + eps + min;
 
 		t.insert( { p : [ x, y ] } );
 
-		if ( x * x + y * y > radius * radius )
+		if ( x * x + y * y > radius * radius ){
+			// print( "out point ");
+			// printjson({ x : x, y : y })
 			outPoints++
-		else
+		}
+		else{
+			// print( "in point ");
+			// printjson({ x : x, y : y })
 			inPoints++
+			shouldFind.push({ x : x, y : y, radius : Math.sqrt( x * x + y * y ) })
+		}
 	}
-
+	
+	/*
+	function printDiff( didFind, shouldFind ){
+		
+		for( var i = 0; i < shouldFind.length; i++ ){
+			var beenFound = false;			
+			for( var j = 0; j < didFind.length && !beenFound ; j++ ){
+				beenFound = shouldFind[i].x == didFind[j].x &&
+							shouldFind[i].y == didFind[j].y
+			}
+			
+			if( !beenFound ){
+				print( "Could not find: " )
+				shouldFind[i].inRadius = ( radius - shouldFind[i].radius >= 0 )
+				printjson( shouldFind[i] )
+			}
+		}
+	}
+		
+	print( "Finding random pts... ")
+	var found = t.find( { p : { $within : { $center : [[0, 0], radius ] } } } ).toArray()
+	var didFind = []
+	for( var f = 0; f < found.length; f++ ){
+		//printjson( found[f] )
+		var x = found[f].p.x != undefined ? found[f].p.x : found[f].p[0]
+		var y = found[f].p.y != undefined ? found[f].p.y : found[f].p[1]
+		didFind.push({ x : x, y : y, radius : Math.sqrt( x * x + y * y ) })
+	}
+	
+	print( "Did not find but should: ")
+	printDiff( didFind, shouldFind )
+	print( "Found but should not have: ")
+	printDiff( shouldFind, didFind )
+	*/
+	
 	assert.eq( t.count( { p : { $within : { $center : [[0, 0], radius ] } } } ), 1 + inPoints,
-			"Incorrect random center points found!" )
+			"Incorrect random center points found!\n" + tojson( randoms ) )
 			
 	print("Found " + inPoints + " points in and " + outPoints + " points out.");
+	
+	var found = t.find( { p : { $near : [0, 0], $maxDistance : radius } } ).toArray()
+	var dist = 0;
+	for( var f = 0; f < found.length; f++ ){
+		var x = found[f].p.x != undefined ? found[f].p.x : found[f].p[0]
+		var y = found[f].p.y != undefined ? found[f].p.y : found[f].p[1]
+		print( "Dist: x : " + x + " y : " + y + " dist : " + Math.sqrt( x * x + y * y) + " radius : " + radius )
+	}	
+	
+	assert.eq( t.count( { p : { $near : [0, 0], $maxDistance : radius } } ), 1 + inPoints,
+			   "Incorrect random center points found near!\n" + tojson( randoms ) )
 
 }
 

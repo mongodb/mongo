@@ -269,6 +269,10 @@ namespace mongo {
             return _hash == h._hash && _bits == h._bits;
         }
 
+        bool operator!=(const GeoHash& h ) {
+            return !( *this == h );
+        }
+
         GeoHash& operator+=( const char * s ) {
             unsigned pos = _bits * 2;
             _bits += strlen(s) / 2;
@@ -378,7 +382,36 @@ namespace mongo {
         double distance( const Point& p ) const {
             double a = _x - p._x;
             double b = _y - p._y;
+
+            // Avoid numerical error if possible...
+            if( a == 0 ) return abs( _y - p._y );
+            if( b == 0 ) return abs( _x - p._x );
+
             return sqrt( ( a * a ) + ( b * b ) );
+        }
+
+        /**
+         * Distance method that compares x or y coords when other direction is zero,
+         * avoids numerical error when distances are very close to radius but axis-aligned.
+         *
+         * An example of the problem is:
+         * (52.0 - 51.9999) - 0.0001 = 3.31965e-15 and 52.0 - 51.9999 > 0.0001 in double arithmetic
+         * but:
+         * 51.9999 + 0.0001 <= 52.0
+         *
+         * This avoids some (but not all!) suprising results in $center queries where points are
+         * ( radius + center.x, center.y ) or vice-versa.
+         */
+        bool distanceWithin( const Point& p, double radius ) const {
+            double a = _x - p._x;
+            double b = _y - p._y;
+
+            if( a == 0 )
+                return _y > p._y ? p._y + radius >= _y : _y + radius >= p._y;
+            if( b == 0 )
+                return _x > p._x ? p._x + radius >= _x : _x + radius >= p._x;
+
+            return sqrt( ( a * a ) + ( b * b ) ) <= radius;
         }
 
         string toString() const {

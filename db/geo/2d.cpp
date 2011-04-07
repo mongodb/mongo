@@ -154,7 +154,18 @@ namespace mongo {
             return b.obj();
         }
 
-        virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+        /** Finds the key objects to put in an index */
+        virtual void getKeys( const BSONObj& obj, BSONObjSetDefaultOrder& keys ) const {
+            getKeys( obj, &keys, NULL );
+        }
+
+        /** Finds all locations in a geo-indexed object */
+        void getKeys( const BSONObj& obj, vector< BSONObj >& locs ) const {
+            getKeys( obj, NULL, &locs );
+        }
+
+        /** Finds the key objects and/or locations for a geo-indexed object */
+        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder* keys, vector< BSONObj >* locs ) const {
 
             BSONElementSet bSet;
             // Get all the nested location fields, but don't return individual elements from
@@ -210,6 +221,16 @@ namespace mongo {
 
                     BSONObjBuilder b(64);
 
+                    // Remember the actual location object if needed
+                    if( locs )
+                        locs->push_back( locObj );
+
+                    // Stop if we don't need to get anything but location objects
+                    if( ! keys ) {
+                        if( singleElement ) break;
+                        else continue;
+                    }
+
                     _hash( locObj ).append( b , "" );
 
                     // Go through all the other index keys
@@ -242,7 +263,7 @@ namespace mongo {
 
                     }
 
-                    keys.insert( b.obj() );
+                    keys->insert( b.obj() );
 
                     if( singleElement ) break;
 
@@ -404,6 +425,10 @@ namespace mongo {
             return val + fudge >= min && val <= max + fudge;
         }
 
+        bool onBoundary( double bound, double val, double fudge = 0 ) const {
+            return ( val >= bound - fudge && val <= bound + fudge );
+        }
+
         bool mid( double amin , double amax , double bmin , double bmax , bool min , double& res ) const {
             assert( amin <= amax );
             assert( bmin <= bmax );
@@ -443,6 +468,13 @@ namespace mongo {
         Point center() const {
             return Point( ( _min._x + _max._x ) / 2 ,
                           ( _min._y + _max._y ) / 2 );
+        }
+
+        bool onBoundary( Point p, double fudge = 0 ) {
+            return onBoundary( _min._x, p._x, fudge ) ||
+                   onBoundary( _max._x, p._x, fudge ) ||
+                   onBoundary( _min._y, p._y, fudge ) ||
+                   onBoundary( _max._y, p._y, fudge );
         }
 
         bool inside( Point p , double fudge = 0 ) {
@@ -717,31 +749,65 @@ namespace mongo {
         }
     } geoUnitTest;
 
+    class GeoHopper;
+
     class GeoPoint {
     public:
         GeoPoint() {
         }
 
-        GeoPoint( const KeyNode& node , double distance )
-            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( distance ) {
+        //// Distance not used ////
+
+        GeoPoint( const KeyNode& node )
+            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( -1 ), _exactDistance( -1 ), _hopper( NULL ) {
         }
 
-        GeoPoint( const BSONObj& key , DiskLoc loc , double distance )
-            : _key(key) , _loc(loc) , _o( loc.obj() ) , _distance( distance ) {
+        //// Lazy initialization of exact distance ////
+
+        GeoPoint( const KeyNode& node , double distance, GeoHopper* hopper )
+            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( distance ), _exactDistance( -1 ), _hopper( hopper ) {
         }
 
-        bool operator<( const GeoPoint& other ) const {
-            return _distance < other._distance;
+        GeoPoint( const BSONObj& key , DiskLoc loc , double distance, GeoHopper* hopper )
+            : _key(key) , _loc(loc) , _o( loc.obj() ) , _distance( distance ), _exactDistance( -1 ), _hopper( hopper ) {
         }
+
+        //// Immediate initialization of exact distance ////
+
+        GeoPoint( const KeyNode& node , double distance, double exactDistance, bool exactWithin, GeoHopper* hopper )
+            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( distance ), _exactDistance( exactDistance ), _exactWithin( exactWithin ), _hopper( hopper ) {
+        }
+
+        GeoPoint( const BSONObj& key , DiskLoc loc , double distance, double exactDistance, bool exactWithin, GeoHopper* hopper )
+            : _key(key) , _loc(loc) , _o( loc.obj() ) , _distance( distance ), _exactDistance( exactDistance ), _exactWithin( exactWithin ), _hopper( hopper ) {
+        }
+
+        double exactDistance();
+
+        bool exactWithin();
+
+        bool operator<( const GeoPoint& other ) const;
 
         bool isEmpty() const {
             return _o.isEmpty();
+        }
+
+        string toString() const {
+
+            return str::stream() << "Point from " << _o.toString() << " approx : " << _distance << " exact : " << _exactDistance
+                   << " within ? " << _exactWithin;
+
         }
 
         BSONObj _key;
         DiskLoc _loc;
         BSONObj _o;
         double _distance;
+
+        double _exactDistance;
+        bool _exactWithin;
+        GeoHopper* _hopper;
+
     };
 
     class GeoAccumulator {
@@ -770,7 +836,7 @@ namespace mongo {
 
             // distance check
             double d = 0;
-            if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) ) {
+            if ( ! checkDistance( node , d ) ) {
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
                 return;
             }
@@ -811,7 +877,7 @@ namespace mongo {
         }
 
         virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) = 0;
-        virtual bool checkDistance( const GeoHash& node , double& d ) = 0;
+        virtual bool checkDistance( const KeyNode& node , double& d ) = 0;
 
         long long found() const {
             return _found;
@@ -831,36 +897,143 @@ namespace mongo {
     public:
         typedef multiset<GeoPoint> Holder;
 
-        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN)
-            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _farthest(-1)
+        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool lazyExact = true )
+            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _farthest(-1), _lazyExact( lazyExact )
         {}
 
-        virtual bool checkDistance( const GeoHash& h , double& d ) {
-            switch (_type) {
-            case GEO_PLAIN:
-                d = _near.distance( Point(_g, h) );
-                break;
-            case GEO_SPHERE:
-                d = spheredist_deg(_near, Point(_g, h));
-                break;
-            default:
-                assert(0);
+        virtual bool checkDistance( const KeyNode& node, double& d ) {
+
+            // Always check approximate distance, since it lets us avoid doing
+            // checks of the rest of the object if it succeeds
+            // TODO:  Refactor so that we can check exact distance and within if we are going to
+            // anyway.
+            d = approxDistance( node );
+
+            // If we're in the error range, return true
+            if( d >= _maxDistance - _g->_error && d <= _maxDistance + _g->_error ) {
+                // Should check exact point later in addSpecific()
+                return true;
             }
+
+            // Out of the error range, see how close we are to the furthest points
             bool good = d < _maxDistance && ( _points.size() < _max || d < farthest() );
-            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString() << "\t" << h << "\t" << d
+
+            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
+                      << "\t" << GeoHash( node.key.firstElement() ) << "\t" << d
                       << " ok: " << good << " farthest: " << farthest() );
+
             return good;
         }
 
+        double approxDistance( const KeyNode& node ) {
+            return approxDistance( GeoHash( node.key.firstElement() ) );
+        }
+
+        double approxDistance( const GeoHash& h ) {
+
+            double approxDistance = -1;
+            switch (_type) {
+            case GEO_PLAIN:
+                approxDistance = _near.distance( Point( _g, h ) );
+                break;
+            case GEO_SPHERE:
+                approxDistance = spheredist_deg( _near, Point( _g, h ) );
+                break;
+            default: assert( false );
+            }
+
+            return approxDistance;
+        }
+
+
+        /** Evaluates exact distance for keys and documents, storing which locations were used so far */
+        double exactDistance( const KeyNode& node, bool& exactWithin ) {
+            return exactDistance( node.key, node.recordLoc.obj(), exactWithin );
+        }
+
+        double exactDistance( const BSONObj& key, const BSONObj& doc, bool& exactWithin ) {
+
+            GEODEBUG( "Finding exact distance for " << key.toString() << " and " << doc.toString() );
+
+            // Find all the location objects from the keys
+            vector< BSONObj > locs;
+            _g->getKeys( doc, locs );
+
+            double exactDistance = -1;
+
+            // Find the particular location we want
+            BSONObj loc;
+            GeoHash keyHash( key.firstElement(), _g->_bits );
+            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
+
+                loc = *i;
+
+                // Ignore all locations we've used
+                if( _usedLocs.end() != _usedLocs.find( loc.objdata() ) ) continue;
+                // Ignore all locations not hashed to the key's hash
+                if( _g->_hash( loc ) != keyHash ) continue;
+
+                // Get the appropriate distance for the type
+                switch ( _type ) {
+                case GEO_PLAIN:
+                    exactDistance = _near.distance( Point( loc ) );
+                    exactWithin = _near.distanceWithin( Point( loc ), _maxDistance );
+                    break;
+                case GEO_SPHERE:
+                    exactDistance = spheredist_deg( _near, Point( loc ) );
+                    exactWithin = ( exactDistance <= _maxDistance );
+                    break;
+                default: assert( false );
+                }
+
+                break;
+            }
+
+            assert( exactDistance >= 0 );
+
+            // Remember we used this sub-doc for this query
+            _usedLocs.insert( loc.objdata() );
+
+            return exactDistance;
+        }
+
+        double farthest() const {
+            return _farthest;
+        }
+
         virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
-            _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
+
+            bool inErrorBounds = ( d >= _maxDistance - _g->_error && d <= _maxDistance + _g->_error );
+
+            if( _lazyExact && ! inErrorBounds ) {
+
+                // Haven't yet looked up exact points, will look it up later
+                _points.insert( GeoPoint( node.key , node.recordLoc , d , this ) );
+
+            }
+            else {
+                // Look up exact point now.
+                bool exactWithin;
+                double exactD = exactDistance( node, exactWithin );
+
+                // Don't add the point if it's not actually in the range
+                if( ! exactWithin ) return;
+
+                _points.insert( GeoPoint( node.key , node.recordLoc , d , exactD , exactWithin, this ) );
+            }
+
+            // Recalculate the current furthest point.
             if ( _points.size() > _max ) {
                 _points.erase( --_points.end() );
 
                 Holder::iterator i = _points.end();
                 i--;
-                _farthest = i->_distance;
+
+                // Need to compensate for error both in the center point and in the current
+                // point, hence 2 * error
+                _farthest = i->_distance + 2 * _g->_error;
             }
             else {
                 if (d > _farthest)
@@ -868,18 +1041,63 @@ namespace mongo {
             }
         }
 
-        double farthest() const {
-            return _farthest;
-        }
-
-
         unsigned _max;
         Point _near;
         Holder _points;
         double _maxDistance;
         GeoDistType _type;
         double _farthest;
+
+        bool _lazyExact;
+        set< const char* > _usedLocs;
+
     };
+
+    /** Caches and returns the exact distance of a point from the target location */
+    double GeoPoint::exactDistance() {
+        if( _exactDistance >= 0 ) return _exactDistance;
+
+        assert( _hopper );
+        _exactDistance = _hopper->exactDistance( _key, _o, _exactWithin );
+        assert( _exactDistance >= 0 );
+
+        return _exactDistance;
+    }
+
+
+    /** Caches and returns whether a point was found to be exactly in the bounds */
+    bool GeoPoint::exactWithin() {
+        if( _exactDistance >= 0 ) return _exactWithin;
+
+        // Get exact distance & within
+        exactDistance();
+
+        return _exactWithin;
+    }
+
+    bool GeoPoint::operator<( const GeoPoint& other ) const {
+
+        // We can only compare points when a distance was added!
+        assert( _distance >= 0 );
+
+        // log() << "Comparing " << *this << " and " << other << " result : " << endl;
+
+        // Check if we need to use exact distance.  Our distances may be off by up to 2 * the single-box error
+        if( abs( _distance - other._distance ) <= 2 * _hopper->_g->_error ) {
+
+            // log() << " exact : " << (((GeoPoint*) this)->exactDistance() < ((GeoPoint&) other).exactDistance()) << " diff : " << (((GeoPoint*) this)->exactDistance() - ((GeoPoint&) other).exactDistance()) << endl;
+            // cout << fixed << setprecision(20) << " Comparing " << ((GeoPoint*) this)->exactDistance() << " and " << ((GeoPoint&) other).exactDistance() << " result " << (((GeoPoint*) this)->exactDistance() < ((GeoPoint&) other).exactDistance()) << endl;
+
+            return ((GeoPoint*) this)->exactDistance() < ((GeoPoint&) other).exactDistance();
+        }
+
+        // cout << fixed << setprecision(20) << "Inexact comparing " << _distance << " (" << ((GeoPoint*) this)->exactDistance() << ") and " << other._distance << " (" << ((GeoPoint&) other).exactDistance() << ") result : " << ( _distance < other._distance ) << " error : " << _hopper->_g->_error << endl;
+        // log() << " inexact : " << (_distance < other._distance) << " diff : " << (_distance - other._distance) << endl;
+
+        return _distance < other._distance;
+    }
+
+
 
     struct BtreeLocation {
         int pos;
@@ -961,24 +1179,24 @@ namespace mongo {
 
     class GeoSearch {
     public:
-        GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN)
-            : _spec( g ) ,_startPt(g,n), _start( n ) ,
+        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN, bool lazyExact = true )
+            : _spec( g ) ,_startPt( startPt ), _start( g->hash( startPt._x, startPt._y ) ) ,
               _numWanted( numWanted ) , _filter( filter ) , _maxDistance( maxDistance ) ,
-              _hopper( new GeoHopper( g , numWanted , _startPt , filter , maxDistance, type ) ), _type(type) {
+              _hopper( new GeoHopper( g , numWanted , _startPt , filter , maxDistance, type, lazyExact ) ), _type(type) {
             assert( g->getDetails() );
             _nscanned = 0;
             _found = 0;
 
             if (type == GEO_PLAIN) {
-                _scanDistance = maxDistance;
+                _scanDistance = _maxDistance + _spec->_error;
             }
             else if (type == GEO_SPHERE) {
-                if (maxDistance == numeric_limits<double>::max()) {
-                    _scanDistance = maxDistance;
+                if (_maxDistance == numeric_limits<double>::max()) {
+                    _scanDistance = _maxDistance;
                 }
                 else {
                     //TODO: consider splitting into x and y scan distances
-                    _scanDistance = computeXScanDistance(_startPt._y, rad2deg(maxDistance));
+                    _scanDistance = computeXScanDistance(_startPt._y, rad2deg( _maxDistance + _spec->_error ));
                 }
             }
             else {
@@ -1002,11 +1220,12 @@ namespace mongo {
             GeoHopper * hopper = _hopper.get();
 
             _prefix = _start;
+
             BtreeLocation min,max;
             {
+                // TODO : Refactor this into the other, tested, geohash algorithm
+
                 // 1 regular geo hash algorithm
-
-
                 if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , NULL ) )
                     return;
 
@@ -1041,7 +1260,7 @@ namespace mongo {
                     farthest = std::min(_scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)));
                 }
                 GEODEBUGPRINT(farthest);
-
+                                
                 Box want( _startPt._x - farthest , _startPt._y - farthest , farthest * 2 );
                 GEODEBUGPRINT(want.toString());
 
@@ -1095,8 +1314,8 @@ namespace mongo {
                 GEODEBUGPRINT(testBox.toString());
             }
 
-            if (_alreadyScanned.contains(testBox, _spec->_error)) {
-                GEODEBUG("skipping box: already scanned");
+            if ( _alreadyScanned.area() > 0 && _alreadyScanned.contains( testBox ) ) {
+                GEODEBUG( "skipping box : already scanned box " << _alreadyScanned.toString() );
                 return; // been here, done this
             }
 
@@ -1195,7 +1414,30 @@ namespace mongo {
         virtual ~GeoSearchCursor() {}
 
         virtual bool ok() {
-            return _cur != _end;
+            if( _cur == _end ) return false;
+
+            // If we're near the bounds of our range and did lazy distance loading,
+            // test the exact locations.
+
+            if( _s->_hopper->_lazyExact ) {
+
+                GeoPoint& point = (GeoPoint&) *_cur;
+
+                double distanceLeft = abs( _s->_maxDistance - point._distance );
+                if( abs( distanceLeft ) <= 2 * _s->_spec->_error ) {
+
+                    GEODEBUG( point.toString() );
+
+                    // Must check within, not distance, b/c of double precision errors
+                    if( ! point.exactWithin() ) {
+                        GEODEBUG( "Final point : " ); //<< _cur->_o.toString() << _cur->_distance << " exact : " << ((GeoPoint) _cur).exactDistance() );
+                        _cur = _end;
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         virtual Record* _current() { assert(ok()); return _cur->_loc.rec(); }
@@ -1422,13 +1664,13 @@ namespace mongo {
                     int j = (_neighbor % 3) - 1;
 
                     if ( ( i == 0 && j == 0 ) ||
-                    	 ( i < 0 && _centerBox._min._x <= _g->_min ) ||
-                    	 ( j < 0 && _centerBox._min._y <= _g->_min ) ||
-                    	 ( i > 0 && _centerBox._max._x >= _g->_max ) ||
-                    	 ( j > 0 && _centerBox._max._y >= _g->_max ) ){
-                    	continue; // main box or wrapped edge
-                    	// TODO:  We may want to enable wrapping in future, probably best as layer on top of
-                    	// this search.
+                        ( i < 0 && _centerBox._min._x <= _g->_min ) ||
+                        ( j < 0 && _centerBox._min._y <= _g->_min ) ||
+                        ( i > 0 && _centerBox._max._x >= _g->_max ) ||
+                        ( j > 0 && _centerBox._max._y >= _g->_max ) ) {
+                       continue; // main box or wrapped edge
+                       // TODO:  We may want to enable wrapping in future, probably best as layer on top of
+                       // this search.
                     }
 
                     // Make sure we've got a reasonable center
@@ -1495,9 +1737,9 @@ namespace mongo {
             if( ! newDoc ) return;
 
             if ( _cur.isEmpty() )
-                _cur = GeoPoint( node , d );
+                _cur = GeoPoint( node );
             else
-                _stack.push_back( GeoPoint( node , d ) );
+                _stack.push_back( GeoPoint( node ) );
         }
 
         virtual long long nscanned() {
@@ -1554,13 +1796,12 @@ namespace mongo {
 
             _maxDistance = i.next().numberDouble();
             uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
-            _maxDistance += g->_error;
 
             if (type == "$center") {
                 // Look in box with bounds of maxDistance in either direction
                 _type = GEO_PLAIN;
-                _xScanDistance = _maxDistance;
-                _yScanDistance = _maxDistance;
+                _xScanDistance = _maxDistance + _g->_error;
+                _yScanDistance = _maxDistance + _g->_error;
             }
             else if (type == "$centerSphere") {
                 // Same, but compute maxDistance using spherical transform
@@ -1568,7 +1809,7 @@ namespace mongo {
                 uassert(13461, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
 
                 _type = GEO_SPHERE;
-                _yScanDistance = rad2deg(_maxDistance);
+                _yScanDistance = rad2deg( _maxDistance + _g->_error );
                 _xScanDistance = computeXScanDistance(_startPt._y, _yScanDistance);
 
                 uassert(13462, "Spherical distance would require wrapping, which isn't implemented yet",
@@ -1584,7 +1825,7 @@ namespace mongo {
             _bBox._min = Point( _startPt._x - _xScanDistance, _startPt._y - _yScanDistance );
             _bBox._max = Point( _startPt._x + _xScanDistance, _startPt._y + _yScanDistance );
 
-            GEODEBUG( "Bounding box for circle query : " << _bBox.toString() << " (max distance : " << _maxDistance << ")" );
+            GEODEBUG( "Bounding box for circle query : " << _bBox.toString() << " (max distance : " << _maxDistance << ")" << " starting from " << _startPt.toString() );
 
             ok();
         }
@@ -1601,19 +1842,50 @@ namespace mongo {
             return _bBox.intersects( cur );
         }
 
-        virtual bool checkDistance( const GeoHash& h , double& d ) {
+        virtual bool checkDistance( const KeyNode& node, double& d ) {
 
-            // TODO:  Inexact hash distance checks.
+            GeoHash h( node.key.firstElement(), _g->_bits );
 
+            // Inexact hash distance checks.
             switch (_type) {
             case GEO_PLAIN:
                 d = _g->distance( _start , h );
                 break;
             case GEO_SPHERE:
-                d = spheredist_deg(_startPt, Point(_g, h));
+                d = spheredist_deg( _startPt, Point( _g, h ) );
                 break;
-            default:
-                assert(0);
+            default: assert( false );
+            }
+
+            // If our distance is in the error bounds...
+            if( d >= _maxDistance - _g->_error && d <= _maxDistance + _g->_error ) {
+
+                // Do exact check
+                vector< BSONObj > locs;
+                _g->getKeys( node.recordLoc.obj(), locs );
+
+                for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
+
+                    GEODEBUG( "Inexact distance : " << d << " vs " << _maxDistance << " from " << ( *i ).toString() << " due to error " << _g->_error );
+
+                    // Exact distance checks.
+                    switch (_type) {
+                    case GEO_PLAIN: {
+                        if( _startPt.distanceWithin( Point( *i ), _maxDistance ) ) return true;
+                        break;
+                    }
+                    case GEO_SPHERE:
+                        // Ignore all locations not hashed to the key's hash, since spherical calcs are
+                        // more expensive.
+                        if( _g->_hash( *i ) != h ) break;
+                        if( spheredist_deg( _startPt , Point( *i ) ) <= _maxDistance ) return true;
+                        break;
+                    default: assert( false );
+                    }
+
+                }
+
+                return false;
             }
 
             GEODEBUG( "\t " << h << "\t" << d );
@@ -1693,17 +1965,39 @@ namespace mongo {
             return _want.intersects( cur );
         }
 
-        virtual bool checkDistance( const GeoHash& h , double& d ) {
+        virtual bool checkDistance( const KeyNode& node, double& d ) {
 
-            // Check whether hash of point is inside box.
-            // TODO:  This is only exact up to the fudge factor
-            bool res = _want.inside( Point( _g , h ) , _fudge );
+            GeoHash h( node.key.firstElement() );
+            Point approxPt( _g, h );
+
+            bool approxInside = _want.inside( approxPt, _fudge );
+
+            if( approxInside && _want.onBoundary( approxPt, _fudge ) ) {
+
+                // Do exact check
+                vector< BSONObj > locs;
+                _g->getKeys( node.recordLoc.obj(), locs );
+
+                for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
+                    if( _want.inside( Point( *i ) ) ) {
+
+                        GEODEBUG( "found exact point : " << _want.toString()
+                                  << " exact point : " << Point( *i ).toString()
+                                  << " approx point : " << approxPt.toString()
+                                  << " because of error: " << _fudge );
+
+                        return true;
+                    }
+                }
+
+                return false;
+            }
 
             GEODEBUG( "checking point : " << _want.toString()
-                      << " point: " << Point( _g , h ).toString()
-                      << " in : " << res );
+                      << " point: " << approxPt.toString()
+                      << " in : " << _want.inside( approxPt, _fudge ) );
 
-            return res;
+            return approxInside;
         }
 
         Box _want;
@@ -1762,7 +2056,7 @@ namespace mongo {
                     if ( e.isNumber() )
                         maxDistance = e.numberDouble();
                 }
-                shared_ptr<GeoSearch> s( new GeoSearch( this , _tohash(e) , numWanted , query , maxDistance, type ) );
+                shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type ) );
                 s->exec();
                 shared_ptr<Cursor> c;
                 c.reset( new GeoSearchCursor( s ) );
@@ -1839,8 +2133,8 @@ namespace mongo {
                 numWanted = cmdObj["num"].numberInt();
 
             uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
-            const GeoHash n = g->_tohash( cmdObj["near"] );
-            result.append( "near" , n.toString() );
+            const Point n( cmdObj["near"] );
+            result.append( "near" , g->_tohash( cmdObj["near"] ).toString() );
 
             BSONObj filter;
             if ( cmdObj["query"].type() == Object )
@@ -1854,7 +2148,8 @@ namespace mongo {
             if ( cmdObj["spherical"].trueValue() )
                 type = GEO_SPHERE;
 
-            GeoSearch gs( g , n , numWanted , filter , maxDistance , type);
+            // We're returning exact distances, so don't evaluate lazily.
+            GeoSearch gs( g , n , numWanted , filter , maxDistance , type, false );
 
             if ( cmdObj["start"].type() == String) {
                 GeoHash start ((string) cmdObj["start"].valuestr());
@@ -1873,9 +2168,9 @@ namespace mongo {
             BSONObjBuilder arr( result.subarrayStart( "results" ) );
             int x = 0;
             for ( GeoHopper::Holder::iterator i=gs._hopper->_points.begin(); i!=gs._hopper->_points.end(); i++ ) {
-                const GeoPoint& p = *i;
 
-                double dis = distanceMultiplier * p._distance;
+                const GeoPoint& p = *i;
+                double dis = distanceMultiplier * ((GeoPoint&) p).exactDistance();
                 totalDistance += dis;
 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ) ) );
