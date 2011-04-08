@@ -73,31 +73,38 @@ namespace mongo {
     //void removedKey(const DiskLoc& btreeLoc, int keyPos) {
     //}
 
-    /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
-             works fine as the prefix will end with '.'.  however, when used with drop and
-             dropIndexes, this could take out cursors that belong to something else -- if you
-             drop "foo", currently, this will kill cursors for "foobar".
-    */
-    void ClientCursor::invalidate(const char *nsPrefix) {
-        vector<ClientCursor*> toDelete;
+    // ns is either a full namespace or "dbname." when invalidating for a whole db
+    void ClientCursor::invalidate(const char *ns) {
+        int len = strlen(ns);
+        const char* dot = strchr(ns, '.');
+        assert( len > 0 && dot);
 
-        int len = strlen(nsPrefix);
-        assert( len > 0 && strchr(nsPrefix, '.') );
+        bool isDB = (dot == &ns[len-1]); // first (and only) dot is the last char
 
         {
-            //cout << "\nTEMP invalidate " << nsPrefix << endl;
+            //cout << "\nTEMP invalidate " << ns << endl;
             recursive_scoped_lock lock(ccmutex);
 
             Database *db = cc().database();
             assert(db);
-            assert( str::startsWith(nsPrefix, db->name) );
+            assert( str::startsWith(ns, db->name) );
 
-            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {
+            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); /*++i*/ ) {
                 ClientCursor *cc = i->second;
+
+                ++i; // we may be removing this node
+
                 if( cc->_db != db )
                     continue;
-                if ( strncmp(nsPrefix, cc->_ns.c_str(), len) == 0 ) {
-                    toDelete.push_back(i->second);
+
+                if (isDB) {
+                    // already checked that db matched above
+                    dassert( str::startsWith(cc->_ns.c_str(), ns) );
+                    delete cc; //removes self from ccByID
+                }
+                else {
+                    if ( str::equals(cc->_ns.c_str(), ns) )
+                        delete cc; //removes self from ccByID
                 }
             }
 
@@ -109,14 +116,11 @@ namespace mongo {
             CCByLoc& bl = db->ccByLoc;
             for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); ++i ) {
                 ClientCursor *cc = i->second;
-                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 ) {
+                if ( strncmp(ns, cc->ns.c_str(), len) == 0 ) {
                     assert( cc->_db == db );
                     toDelete.push_back(i->second);
                 }
             }*/
-
-            for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
-                delete (*i);
 
             /*cout << "TEMP after invalidate " << endl;
             for( auto i = clientCursorsById.begin(); i != clientCursorsById.end(); ++i ) {

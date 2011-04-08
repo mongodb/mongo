@@ -1,4 +1,4 @@
-/* queryoptimizer.h */
+// @file queryoptimizer.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -72,11 +72,11 @@ namespace mongo {
         BSONObj originalQuery() const { return _originalQuery; }
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _frs.simplifiedQuery( fields ); }
         const FieldRange &range( const char *fieldName ) const { return _frs.range( fieldName ); }
-        shared_ptr< FieldRangeVector > originalFrv() const { return _originalFrv; }
+        shared_ptr<FieldRangeVector> originalFrv() const { return _originalFrv; }
 
         /** just for testing */
         
-        shared_ptr< FieldRangeVector > frv() const { return _frv; }
+        shared_ptr<FieldRangeVector> frv() const { return _frv; }
         bool isMultiKey() const;
 
     private:
@@ -90,8 +90,8 @@ namespace mongo {
         bool _scanAndOrderRequired;
         bool _exactKeyMatch;
         int _direction;
-        shared_ptr< FieldRangeVector > _frv;
-        shared_ptr< FieldRangeVector > _originalFrv;
+        shared_ptr<FieldRangeVector> _frv;
+        shared_ptr<FieldRangeVector> _originalFrv;
         BSONObj _startKey;
         BSONObj _endKey;
         bool _endKeyInclusive;
@@ -164,7 +164,7 @@ namespace mongo {
             _error = true;
             _exception = e.getInfo();
         }
-        shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
+        shared_ptr<CoveredIndexMatcher> matcher() const { return _matcher; }
         
     protected:
         /** Call if all results have been found. */
@@ -189,9 +189,9 @@ namespace mongo {
         ExceptionInfo _exception;
         const QueryPlan *_qp;
         bool _error;
-        shared_ptr< CoveredIndexMatcher > _matcher;
-        shared_ptr< CoveredIndexMatcher > _oldMatcher;
-        shared_ptr< FieldRangeVector > _orConstraint;
+        shared_ptr<CoveredIndexMatcher> _matcher;
+        shared_ptr<CoveredIndexMatcher> _oldMatcher;
+        shared_ptr<FieldRangeVector> _orConstraint;
     };
 
     /**
@@ -201,12 +201,12 @@ namespace mongo {
     class QueryPlanSet {
     public:
 
-        typedef boost::shared_ptr< QueryPlan > QueryPlanPtr;
-        typedef vector< QueryPlanPtr > PlanSet;
+        typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
+        typedef vector<QueryPlanPtr> PlanSet;
 
         QueryPlanSet( const char *ns,
-                      auto_ptr< FieldRangeSet > frs,
-                      auto_ptr< FieldRangeSet > originalFrs,
+                      auto_ptr<FieldRangeSet> frs,
+                      auto_ptr<FieldRangeSet> originalFrs,
                       const BSONObj &originalQuery,
                       const BSONObj &order,
                       const BSONElement *hint = 0,
@@ -224,10 +224,10 @@ namespace mongo {
          * setComplete() or setStop().
          */
 
-        shared_ptr< QueryOp > runOp( QueryOp &op );
-        template< class T >
-        shared_ptr< T > runOp( T &op ) {
-            return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
+        shared_ptr<QueryOp> runOp( QueryOp &op );
+        template<class T>
+        shared_ptr<T> runOp( T &op ) {
+            return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
         }
 
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
@@ -254,8 +254,8 @@ namespace mongo {
         void addHint( IndexDetails &id );
         struct Runner {
             Runner( QueryPlanSet &plans, QueryOp &op );
-            shared_ptr< QueryOp > run();
-            void mayYield( const vector< shared_ptr< QueryOp > > &ops );
+            shared_ptr<QueryOp> run();
+            void mayYield( const vector<shared_ptr<QueryOp> > &ops );
             QueryOp &_op;
             QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
@@ -266,8 +266,8 @@ namespace mongo {
 
         const char *_ns;
         BSONObj _originalQuery;
-        auto_ptr< FieldRangeSet > _frs;
-        auto_ptr< FieldRangeSet > _originalFrs;
+        auto_ptr<FieldRangeSet> _frs;
+        auto_ptr<FieldRangeSet> _originalFrs;
         PlanSet _plans;
         bool _mayRecordPlan;
         bool _usingPrerecordedPlan;
@@ -301,10 +301,10 @@ namespace mongo {
          * to call setComplete() or setStop().
          */
 
-        shared_ptr< QueryOp > runOpOnce( QueryOp &op );
-        template< class T >
-        shared_ptr< T > runOpOnce( T &op ) {
-            return dynamic_pointer_cast< T >( runOpOnce( static_cast< QueryOp& >( op ) ) );
+        shared_ptr<QueryOp> runOpOnce( QueryOp &op );
+        template<class T>
+        shared_ptr<T> runOpOnce( T &op ) {
+            return dynamic_pointer_cast<T>( runOpOnce( static_cast<QueryOp&>( op ) ) );
         }
 
         /**
@@ -312,10 +312,10 @@ namespace mongo {
          * of the previous $or clause (or from the supplied 'op' for the first $or clause).
          */
 
-        shared_ptr< QueryOp > runOp( QueryOp &op );
-        template< class T >
-        shared_ptr< T > runOp( T &op ) {
-            return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
+        shared_ptr<QueryOp> runOp( QueryOp &op );
+        template<class T>
+        shared_ptr<T> runOp( T &op ) {
+            return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
         }
 
         /** @return true iff more $or clauses need to be scanned. */
@@ -340,7 +340,7 @@ namespace mongo {
         bool _or;
         BSONObj _query;
         FieldRangeOrSet _fros;
-        auto_ptr< QueryPlanSet > _currentQps;
+        auto_ptr<QueryPlanSet> _currentQps;
         int _i;
         bool _honorRecordedPlan;
         bool _bestGuessOnly;
@@ -356,12 +356,12 @@ namespace mongo {
         public:
             CursorOp() {}
             CursorOp( const QueryOp &other ) : QueryOp( other ) {}
-            virtual shared_ptr< Cursor > newCursor() const = 0;
+            virtual shared_ptr<Cursor> newCursor() const = 0;
         };
         /** takes ownership of 'op' */
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op = shared_ptr< CursorOp >(), bool mayYield = false );
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op = shared_ptr<CursorOp>(), bool mayYield = false );
         /** used to handoff a query to a getMore() */
-        MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op );
+        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op );
 
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -396,7 +396,7 @@ namespace mongo {
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
         /** just for testing */
-        shared_ptr< Cursor > sub_c() const { return _c; }
+        shared_ptr<Cursor> sub_c() const { return _c; }
     private:
         class NoOp : public CursorOp {
         public:
@@ -406,14 +406,14 @@ namespace mongo {
             virtual void next() {}
             virtual bool mayRecordPlan() const { return false; }
             virtual QueryOp *_createChild() const { return new NoOp(); }
-            virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+            virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
             virtual long long nscanned() { assert( false ); return 0; }
         };
         void nextClause();
-        shared_ptr< CursorOp > _op;
-        shared_ptr< Cursor > _c;
-        auto_ptr< MultiPlanScanner > _mps;
-        shared_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr<CursorOp> _op;
+        shared_ptr<Cursor> _c;
+        auto_ptr<MultiPlanScanner> _mps;
+        shared_ptr<CoveredIndexMatcher> _matcher;
         long long _nscanned;
     };
 
@@ -429,6 +429,6 @@ namespace mongo {
      * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
      * no suitable indices exist.
      */
-    shared_ptr< Cursor > bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
+    shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
 
 } // namespace mongo

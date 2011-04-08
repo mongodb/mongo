@@ -158,10 +158,10 @@ namespace mongo {
 
         DiskLoc lastLoc() const { return _lastLoc; }
 
-        /* Get rid of cursors for namespaces that begin with nsprefix.
+        /* Get rid of cursors for namespaces 'ns'. When dropping a db, ns is "dbname."
            Used by drop, dropIndexes, dropDatabase.
         */
-        static void invalidate(const char *nsPrefix);
+        static void invalidate(const char *ns);
 
         /**
          * @param microsToSleep -1 : ask client

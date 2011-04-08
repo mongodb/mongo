@@ -364,15 +364,8 @@ namespace mongo {
                         /* todo: too stale capability */
                     }
 
-                    {
-                        const Member *primary = box.getPrimary();
-                        
-                        if( !target->hbinfo().hbstate.readable() ||
-                            // if we are not syncing from the primary, return (if
-                            // it's up) so that we can try accessing it again
-                            (target != primary && primary != 0)) {
-                            return;
-                        }
+                    if( !target->hbinfo().hbstate.readable() ) {
+                        return;
                     }
                 }
                 if( !r.more() )

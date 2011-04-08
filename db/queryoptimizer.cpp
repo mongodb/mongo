@@ -1,4 +1,4 @@
-/* queryoptimizer.cpp */
+// @file queryoptimizer.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -129,7 +129,7 @@ doneCheckOrder:
         int exactIndexedQueryCount = 0;
         int optimalIndexedQueryCount = 0;
         bool stillOptimalIndexedQueryCount = true;
-        set< string > orderFieldsUnindexed;
+        set<string> orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
         while( i.moreWithEOO() ) {
             BSONElement e = i.next();
@@ -276,7 +276,7 @@ doneCheckOrder:
         _init();
     }    
 
-    QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr< FieldRangeSet > frs, auto_ptr< FieldRangeSet > originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr<FieldRangeSet> frs, auto_ptr<FieldRangeSet> originalFrs, const BSONObj &originalQuery, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
         _ns(ns),
         _originalQuery( originalQuery ),
         _frs( frs ),
@@ -511,10 +511,10 @@ doneCheckOrder:
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frs, *_originalFrs, _originalQuery, _order ) ), checkFirst );
     }
 
-    shared_ptr< QueryOp > QueryPlanSet::runOp( QueryOp &op ) {
+    shared_ptr<QueryOp> QueryPlanSet::runOp( QueryOp &op ) {
         if ( _usingPrerecordedPlan ) {
             Runner r( *this, op );
-            shared_ptr< QueryOp > res = r.run();
+            shared_ptr<QueryOp> res = r.run();
             // _plans.size() > 1 if addOtherPlans was called in Runner::run().
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
@@ -529,7 +529,7 @@ doneCheckOrder:
     }
 
     BSONObj QueryPlanSet::explain() const {
-        vector< BSONObj > arr;
+        vector<BSONObj> arr;
         for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
             shared_ptr<Cursor> c = (*i)->newCursor();
             BSONObjBuilder explain;
@@ -574,13 +574,13 @@ doneCheckOrder:
             if ( _plans._yieldSometimesTracker.ping() ) {
                 int micros = ClientCursor::yieldSuggest();
                 if ( micros > 0 ) {
-                    for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
+                    for( vector<shared_ptr<QueryOp> >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
                         if ( !prepareToYield( **i ) ) {
                             return;
                         }
                     }
                     ClientCursor::staticYield( micros , _plans._ns );
-                    for( vector< shared_ptr< QueryOp > >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
+                    for( vector<shared_ptr<QueryOp> >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
                         recoverFromYield( **i );
                     }
                 }
@@ -589,20 +589,20 @@ doneCheckOrder:
     }
 
     struct OpHolder {
-        OpHolder( const shared_ptr< QueryOp > &op ) : _op( op ), _offset() {}
-        shared_ptr< QueryOp > _op;
+        OpHolder( const shared_ptr<QueryOp> &op ) : _op( op ), _offset() {}
+        shared_ptr<QueryOp> _op;
         long long _offset;
         bool operator<( const OpHolder &other ) const {
             return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
         }
     };
 
-    shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
+    shared_ptr<QueryOp> QueryPlanSet::Runner::run() {
         massert( 10369 ,  "no plans", _plans._plans.size() > 0 );
 
-        vector< shared_ptr< QueryOp > > ops;
+        vector<shared_ptr<QueryOp> > ops;
         if ( _plans._bestGuessOnly ) {
-            shared_ptr< QueryOp > op( _op.createChild() );
+            shared_ptr<QueryOp> op( _op.createChild() );
             op->setQueryPlan( _plans.getBestGuess().get() );
             ops.push_back( op );
         }
@@ -610,20 +610,20 @@ doneCheckOrder:
             if ( _plans._plans.size() > 1 )
                 log(1) << "  running multiple plans" << endl;
             for( PlanSet::iterator i = _plans._plans.begin(); i != _plans._plans.end(); ++i ) {
-                shared_ptr< QueryOp > op( _op.createChild() );
+                shared_ptr<QueryOp> op( _op.createChild() );
                 op->setQueryPlan( i->get() );
                 ops.push_back( op );
             }
         }
 
-        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+        for( vector<shared_ptr<QueryOp> >::iterator i = ops.begin(); i != ops.end(); ++i ) {
             initOp( **i );
             if ( (*i)->complete() )
                 return *i;
         }
 
-        std::priority_queue< OpHolder > queue;
-        for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+        std::priority_queue<OpHolder> queue;
+        for( vector<shared_ptr<QueryOp> >::iterator i = ops.begin(); i != ops.end(); ++i ) {
             if ( !(*i)->error() ) {
                 queue.push( *i );
             }
@@ -651,7 +651,7 @@ doneCheckOrder:
                 PlanSet::iterator i = _plans._plans.begin();
                 ++i;
                 for( ; i != _plans._plans.end(); ++i ) {
-                    shared_ptr< QueryOp > op( _op.createChild() );
+                    shared_ptr<QueryOp> op( _op.createChild() );
                     op->setQueryPlan( i->get() );
                     ops.push_back( op );
                     initOp( *op );
@@ -756,8 +756,8 @@ doneCheckOrder:
         }
         // if _or == false, don't use or clauses for index selection
         if ( !_or ) {
-            auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, _query ) );
-            auto_ptr< FieldRangeSet > oldFrs( new FieldRangeSet( *frs ) );
+            auto_ptr<FieldRangeSet> frs( new FieldRangeSet( ns, _query ) );
+            auto_ptr<FieldRangeSet> oldFrs( new FieldRangeSet( *frs ) );
             _currentQps.reset( new QueryPlanSet( ns, frs, oldFrs, _query, order, hint, honorRecordedPlan, min, max, _bestGuessOnly, _mayYield ) );
         }
         else {
@@ -766,18 +766,18 @@ doneCheckOrder:
         }
     }
 
-    shared_ptr< QueryOp > MultiPlanScanner::runOpOnce( QueryOp &op ) {
+    shared_ptr<QueryOp> MultiPlanScanner::runOpOnce( QueryOp &op ) {
         massert( 13271, "can't run more ops", mayRunMore() );
         if ( !_or ) {
             ++_i;
             return _currentQps->runOp( op );
         }
         ++_i;
-        auto_ptr< FieldRangeSet > frs( _fros.topFrs() );
-        auto_ptr< FieldRangeSet > originalFrs( _fros.topFrsOriginal() );
+        auto_ptr<FieldRangeSet> frs( _fros.topFrs() );
+        auto_ptr<FieldRangeSet> originalFrs( _fros.topFrsOriginal() );
         BSONElement hintElt = _hint.firstElement();
         _currentQps.reset( new QueryPlanSet( _ns, frs, originalFrs, _query, BSONObj(), &hintElt, _honorRecordedPlan, BSONObj(), BSONObj(), _bestGuessOnly, _mayYield ) );
-        shared_ptr< QueryOp > ret( _currentQps->runOp( op ) );
+        shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
         if ( ret->qp().willScanTable() ) {
             _tableScanned = true;
         }
@@ -785,8 +785,8 @@ doneCheckOrder:
         return ret;
     }
 
-    shared_ptr< QueryOp > MultiPlanScanner::runOp( QueryOp &op ) {
-        shared_ptr< QueryOp > ret = runOpOnce( op );
+    shared_ptr<QueryOp> MultiPlanScanner::runOp( QueryOp &op ) {
+        shared_ptr<QueryOp> ret = runOpOnce( op );
         while( !ret->stopRequested() && mayRunMore() ) {
             ret = runOpOnce( *ret );
         }
@@ -805,9 +805,9 @@ doneCheckOrder:
                 return true;
             }
         }
-        vector< BSONObj > ret;
+        vector<BSONObj> ret;
         _fros.allClausesSimplified( ret );
-        for( vector< BSONObj >::const_iterator i = ret.begin(); i != ret.end(); ++i ) {
+        for( vector<BSONObj>::const_iterator i = ret.begin(); i != ret.end(); ++i ) {
             if ( id ) {
                 if ( id->getSpec().suitability( *i, BSONObj() ) == USELESS ) {
                     return true;
@@ -831,7 +831,7 @@ doneCheckOrder:
         return false;
     }
     
-    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr< CursorOp > op, bool mayYield )
+    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
     : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
         if ( op.get() ) {
             _op = op;
@@ -850,7 +850,7 @@ doneCheckOrder:
         }
     }    
 
-    MultiCursor::MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, const shared_ptr< CoveredIndexMatcher > &matcher, const QueryOp &op )
+    MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op )
     : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ), _nscanned( -1 ) {
         _mps->setBestGuessOnly();
         _mps->mayYield( false ); // with a NoOp, there's no need to yield in QueryPlanSet
@@ -864,7 +864,7 @@ doneCheckOrder:
         if ( _nscanned >= 0 && _c.get() ) {
             _nscanned += _c->nscanned();
         }
-        shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
+        shared_ptr<CursorOp> best = _mps->runOpOnce( *_op );
         if ( ! best->complete() )
             throw MsgAssertionException( best->exception() );
         _c = best->newCursor();
@@ -915,7 +915,7 @@ doneCheckOrder:
         return b.obj();
     }
 
-    pair< int, int > keyAudit( const BSONObj &min, const BSONObj &max ) {
+    pair<int,int> keyAudit( const BSONObj &min, const BSONObj &max ) {
         int direction = 0;
         int firstSignificantField = 0;
         BSONObjIterator i( min );
@@ -940,7 +940,7 @@ doneCheckOrder:
         return make_pair( direction, firstSignificantField );
     }
 
-    pair< int, int > flexibleKeyAudit( const BSONObj &min, const BSONObj &max ) {
+    pair<int,int> flexibleKeyAudit( const BSONObj &min, const BSONObj &max ) {
         if ( min.isEmpty() || max.isEmpty() ) {
             return make_pair( 1, -1 );
         }
@@ -964,7 +964,7 @@ doneCheckOrder:
             return 0;
         }
 
-        pair< int, int > ret = flexibleKeyAudit( min, max );
+        pair<int,int> ret = flexibleKeyAudit( min, max );
         if ( ret == make_pair( -1, -1 ) ) {
             errmsg = "min and max keys do not share pattern";
             return 0;
@@ -1032,23 +1032,23 @@ doneCheckOrder:
         return e.isSimpleType(); // e.g. not something like { _id : { $gt : ...
     }
 
-    shared_ptr< Cursor > bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
+    shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
         if( !query.getField( "$or" ).eoo() ) {
-            return shared_ptr< Cursor >( new MultiCursor( ns, query, sort ) );
+            return shared_ptr<Cursor>( new MultiCursor( ns, query, sort ) );
         }
         else {
-            auto_ptr< FieldRangeSet > frs( new FieldRangeSet( ns, query ) );
-            auto_ptr< FieldRangeSet > origFrs( new FieldRangeSet( *frs ) );
+            auto_ptr<FieldRangeSet> frs( new FieldRangeSet( ns, query ) );
+            auto_ptr<FieldRangeSet> origFrs( new FieldRangeSet( *frs ) );
 
             QueryPlanSet qps( ns, frs, origFrs, query, sort );
             QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
-            if( ! qpp.get() ) return shared_ptr< Cursor >();
+            if( ! qpp.get() ) return shared_ptr<Cursor>();
 
-            shared_ptr< Cursor > ret = qpp->newCursor();
+            shared_ptr<Cursor> ret = qpp->newCursor();
 
             // If we don't already have a matcher, supply one.
             if ( !query.isEmpty() && ! ret->matcher() ) {
-                shared_ptr< CoveredIndexMatcher > matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
+                shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );
             }
             return ret;
