@@ -33,10 +33,10 @@ __wt_config_def_connection_close =
 
 const char *
 __wt_config_def_create_table =
-    "allocation_size=512B,columns=,colgroup.name=,exclusive=false,huffman_key=,"
-    "huffman_value=,index.name=,intl_node_max=2KB,intl_node_min=2KB,key_format=u"
-    ",leaf_node_max=1MB,leaf_node_min=32KB,runlength_encoding=false,"
-    "value_format=u";
+    "allocation_size=512B,columns=,colgroup.name=,exclusive=false,"
+    "huffman_key=,huffman_value=,index.name=,intl_node_max=2KB,"
+    "intl_node_min=2KB,key_format=u,leaf_node_max=1MB,leaf_node_min=32KB,"
+    "runlength_encoding=false,value_format=u";
 
 const char *
 __wt_config_def_cursor_close =
@@ -73,5 +73,5 @@ __wt_config_def_verify_table =
 const char *
 __wt_config_def_wiredtiger_open =
     "cache_size=20MB,create=false,data_update_min=8KB,data_update_max=32KB,"
-    "exclusive=false,error_prefix=,hazard_size=15,logging=false,session_max=50,"
-    "multiprocess=false,verbose=";
+    "exclusive=false,error_prefix=,hazard_size=15,logging=false,"
+    "session_max=50,multiprocess=false,verbose=";

@@ -59,7 +59,7 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 ''')
 
 # Make a TextWrapper that can wrap at commas.
-w = textwrap.TextWrapper(width=75)
+w = textwrap.TextWrapper(width=72)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
 for name in sorted(config_data.config_types.keys()):
