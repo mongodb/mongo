@@ -96,7 +96,7 @@ __session_create_table(WT_SESSION *wt_session,
 	conn = (CONNECTION *)wt_session->connection;
 
 	SESSION_API_CALL(session, "WT_SESSION->create_table");
-	
+
 	WT_RET(__wt_config_check(session,
 	    __wt_config_def_create_table, config));
 
