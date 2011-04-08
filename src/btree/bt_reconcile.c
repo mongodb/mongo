@@ -1384,7 +1384,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 
 	btree = session->btree;
 	r = &S2C(session)->cache->reclist;
-	stats = btree->stats;
+	stats = btree->fstats;
 
 	/*
 	 * If all entries on the page were deleted, mark the page to be merged
