@@ -257,7 +257,7 @@ done_duplicates:
 
 /*
  * __wt_evict_walk --
- *	Fill in the array by walk the next set of pages.
+ *	Fill in the array by walking the next set of pages.
  */
 static int
 __wt_evict_walk(SESSION *session)
