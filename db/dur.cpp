@@ -664,23 +664,23 @@ namespace mongo {
 
         CodeBlock durThreadMain;
 
+        extern int groupCommitIntervalMs;
+
         void durThread() {
             Client::initThread("journal");
-            const int HowOftenToGroupCommitMs = 90;
             while( !inShutdown() ) {
-                sleepmillis(10);
                 CodeBlock::Within w(durThreadMain);
                 try {
-                    int millis = HowOftenToGroupCommitMs;
+                    int millis = groupCommitIntervalMs;
                     {
                         stats.rotate();
                         {
                             Timer t;
                             journalRotate(); // note we do this part outside of mongomutex
                             millis -= t.millis();
-                            assert( millis <= HowOftenToGroupCommitMs );
-                            if( millis < 5 )
-                                millis = 5;
+                            assert( millis <= groupCommitIntervalMs );
+                            if( millis < 2 )
+                                millis = 2;
                         }
 
                         // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,

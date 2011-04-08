@@ -117,6 +117,11 @@ namespace mongo {
         }
     } cmdGet;
 
+    // dev - experimental. so only in set command for now.  may go away or change
+    namespace dur { 
+        int groupCommitIntervalMs = 100;
+    }
+
     class CmdSet : public Command {
     public:
         CmdSet() : Command( "setParameter" ) { }
@@ -124,39 +129,56 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
-            help << "set administrative option(s)\nexample:\n";
-            help << "{ setParameter:1, notablescan:true }\n";
+            help << "set administrative option(s)\n";
+            help << "{ setParameter:1, <param>:<value> }\n";
             help << "supported so far:\n";
             help << "  notablescan\n";
             help << "  logLevel\n";
             help << "  quiet\n";
+            help << "  syncdelay\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
+            if( cmdObj.hasElement("groupCommitIntervalMs") ) { 
+                if( !cmdLine.dur ) { 
+                    errmsg = "journaling is off";
+                    return false;
+                }
+                int x = (int) cmdObj["groupCommitIntervalMs"].Number();
+                assert( x > 0 && x < 500 );
+                dur::groupCommitIntervalMs = x;
+                log() << "groupCommitIntervalMs " << x << endl;
+                s++;
+            }
             if( cmdObj.hasElement("notablescan") ) {
                 assert( !cmdLine.isMongos() );
-                result.append("was", cmdLine.noTableScan);
+                if( s == 0 )
+                    result.append("was", cmdLine.noTableScan);
                 cmdLine.noTableScan = cmdObj["notablescan"].Bool();
                 s++;
             }
             if( cmdObj.hasElement("quiet") ) {
-                result.append("was", cmdLine.quiet );
+                if( s == 0 )
+                    result.append("was", cmdLine.quiet );
                 cmdLine.quiet = cmdObj["quiet"].Bool();
                 s++;
             }
             if( cmdObj.hasElement("syncdelay") ) {
                 assert( !cmdLine.isMongos() );
-                result.append("was", cmdLine.syncdelay );
+                if( s == 0 )
+                    result.append("was", cmdLine.syncdelay );
                 cmdLine.syncdelay = cmdObj["syncdelay"].Number();
                 s++;
             }
             if( cmdObj.hasElement( "logLevel" ) ) {
-                result.append("was", logLevel );
+                if( s == 0 )
+                    result.append("was", logLevel );
                 logLevel = cmdObj["logLevel"].numberInt();
                 s++;
             }
             if( cmdObj.hasElement( "replApplyBatchSize" ) ) {
-                result.append("was", replApplyBatchSize );
+                if( s == 0 )
+                    result.append("was", replApplyBatchSize );
                 BSONElement e = cmdObj["replApplyBatchSize"];
                 ParameterValidator * v = ParameterValidator::get( e.fieldName() );
                 assert( v );
@@ -167,7 +189,7 @@ namespace mongo {
             }
 
             if( s == 0 ) {
-                errmsg = "no option found to set, use '*' to get all ";
+                errmsg = "no option found to set, use help:true to see options ";
                 return false;
             }
 
