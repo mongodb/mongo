@@ -21,6 +21,8 @@ typedef struct {
 	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
 
+	uint64_t record_total;			/* Total record count */
+
 	WT_PAGE *leaf;				/* Last leaf-page */
 } WT_VSTUFF;
 
@@ -135,7 +137,8 @@ __wt_verify_tree(
 	uint64_t parent_recno,		/* First record in this subtree */
 	WT_VSTUFF *vs)			/* The verify package */
 {
-	WT_COL_REF *cref, *lastcref;
+	WT_COL *cip;
+	WT_COL_REF *cref;
 	WT_REF *ref;
 	WT_ROW_REF *rref;
 	uint64_t recno;
@@ -200,6 +203,20 @@ recno_chk:	if (parent_recno != recno) {
 		break;
 	}
 
+	/* Update the total record count. */
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		vs->record_total += page->indx_count;
+		break;
+	case WT_PAGE_COL_RLE:
+		recno = 0;
+		WT_COL_INDX_FOREACH(page, cip, i)
+			recno += WT_RLE_REPEAT_COUNT(WT_COL_PTR(page, cip));
+		vs->record_total += recno;
+		break;
+	}
+
 	/*
 	 * Check on-page overflow page references.
 	 *
@@ -227,26 +244,31 @@ recno_chk:	if (parent_recno != recno) {
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
-		lastcref = NULL;
 		WT_COL_REF_FOREACH(page, cref, i) {
+			/*
+			 * We're doing a depth-first traversal: this entry's
+			 * starting record number should be 1 more than the
+			 * total records reviewed to this point.
+			 */
+			if (cref->recno != vs->record_total + 1) {
+				__wt_errx(session,
+				    "page at addr %lu has a starting record of "
+				    "%llu where the expected starting record "
+				    "was %llu",
+				    (u_long)page->addr,
+				    (unsigned long long)cref->recno,
+				    (unsigned long long)vs->record_total + 1);
+				goto err;
+			}
+
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
-			if (lastcref != NULL &&
-			    cref->recno <= lastcref->recno) {
-				__wt_errx(session,
-				    "page at addr %lu has out-of-order record "
-				    "numbers: %llu, %llu\n",
-				    (u_long)page->addr,
-				    (unsigned long long)lastcref->recno,
-				    (unsigned long long)cref->recno);
-			}
 			WT_ERR(__wt_page_in(session, page, ref, 1));
 			ret = __wt_verify_tree(
 			    session, NULL, ref->page, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
 				goto err;
-			lastcref = cref;
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -324,7 +346,11 @@ recno_chk:	if (parent_recno != recno) {
 	 * as there aren't any internal pages after it.  So, we get here with
 	 * vs->leaf needing to be released.
 	 */
-err:	if (vs->leaf != NULL) {
+	if (0) {
+err:		if (ret != 0)
+			ret = WT_ERROR;
+	}
+	if (vs->leaf != NULL) {
 		__wt_hazard_clear(session, vs->leaf);
 		vs->leaf = NULL;
 	}
