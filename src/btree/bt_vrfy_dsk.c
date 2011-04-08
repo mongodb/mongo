@@ -269,20 +269,20 @@ cell_len:			__wt_errx(session,
 		case WT_CELL_DATA_OVFL:
 			ovfl = WT_CELL_BYTE_OVFL(cell);
 			if (WT_ADDR_TO_OFF(btree, ovfl->addr) +
-			    WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size) >
+			    (off_t)WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size) >
 			    file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF:
 			off = WT_CELL_BYTE_OFF(cell);
-			if (WT_ADDR_TO_OFF(btree,
-			    off->addr) + off->size > file_size)
+			if (WT_ADDR_TO_OFF(btree, off->addr) +
+			    (off_t)off->size > file_size)
 				goto eof;
 			break;
 		case WT_CELL_OFF_RECORD:
 			off_record = WT_CELL_BYTE_OFF_RECORD(cell);
-			if (WT_ADDR_TO_OFF(btree,
-			    off_record->addr) + off_record->size > file_size)
+			if (WT_ADDR_TO_OFF(btree, off_record->addr) +
+			    (off_t)off_record->size > file_size)
 				goto eof;
 			break;
 		}
@@ -368,8 +368,8 @@ __wt_verify_dsk_col_int(
 			return (__wt_err_eop(session, entry_num, addr));
 
 		/* Check if the reference is past the end-of-file. */
-		if (WT_ADDR_TO_OFF(btree,
-		    off_record->addr) + off_record->size > btree->fh->file_size)
+		if (WT_ADDR_TO_OFF(btree, off_record->addr) +
+		    (off_t)off_record->size > btree->fh->file_size)
 			return (__wt_err_eof(session, entry_num, addr));
 	}
 

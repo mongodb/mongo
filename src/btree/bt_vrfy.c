@@ -354,6 +354,7 @@ __wt_verify_pc(SESSION *session,
 		child_key = first_entry ? child->u.row_leaf.d :
 		    child->u.row_leaf.d + (child->indx_count - 1);
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*

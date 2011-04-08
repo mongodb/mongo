@@ -48,7 +48,7 @@ extern "C" {
  */
 /* Convert a data address to/from a byte offset. */
 #define	WT_ADDR_TO_OFF(btree, addr)					\
-	((off_t)(addr) * (btree)->allocsize)
+	((off_t)(addr) * (off_t)(btree)->allocsize)
 #define	WT_OFF_TO_ADDR(btree, off)					\
 	((uint32_t)((off) / (btree)->allocsize))
 

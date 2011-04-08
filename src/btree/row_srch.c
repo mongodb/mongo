@@ -38,6 +38,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	cmp = -1;
 	btree = session->btree;
 	rip = NULL;
+	rref = NULL;
 
 	WT_DB_FCHK(btree,
 	    "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
@@ -92,6 +93,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		 */
 		if (cmp != 0)
 			rref = page->u.row_int.t + (base - 1);
+
+		WT_ASSERT(session, rref != NULL);
 
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));

@@ -349,7 +349,8 @@ __wt_block_truncate(SESSION *session)
 	 */
 	need_trunc = 0;
 	while ((fe = TAILQ_LAST(&btree->freeqa, __wt_free_qah)) != NULL) {
-		if (WT_ADDR_TO_OFF(btree, fe->addr) + fe->size != fh->file_size)
+		if (WT_ADDR_TO_OFF(btree, fe->addr) + (off_t)fe->size !=
+		    fh->file_size)
 			break;
 		fh->file_size -= fe->size;
 		need_trunc = 1;

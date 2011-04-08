@@ -313,7 +313,8 @@ __slvg_read(SESSION *session, WT_STUFF *ss)
 		size = dsk->size;
 		if (size == 0 ||
 		    size % allocsize != 0 ||
-		    size > WT_BTREE_PAGE_SIZE_MAX || off + size > max)
+		    size > WT_BTREE_PAGE_SIZE_MAX ||
+		    off + (off_t)size > max)
 			goto skip_allocsize;
 
 		/* The page size isn't insane, read the entire page. */

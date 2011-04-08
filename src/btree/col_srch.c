@@ -25,6 +25,10 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	int ret;
 	void *cipdata;
 
+	cipdata = NULL;
+	cref = NULL;
+	start_recno = 0;
+
 	session->srch_page = NULL;			/* Return values. */
 	session->srch_write_gen = 0;
 	session->srch_match = 0;
@@ -68,6 +72,8 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		if (recno != start_recno)
 			cref = page->u.col_int.t + base - 1;
 
+		WT_ASSERT(session, cref != NULL);
+
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, &cref->ref, 0));
 		if (page != btree->root_page.page)
@@ -101,6 +107,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
 		}
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*
@@ -180,6 +187,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata)))
 				goto notfound;
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	session->srch_page = page;

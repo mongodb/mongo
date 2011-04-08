@@ -45,6 +45,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	huffman = btree->huffman_value;
 	session = (SESSION *)cbt->iface.session;
+	upd = NULL;
 
 	if (cbt->walk.tree == NULL)
 		return (__wt_btcur_first(cbt));

@@ -1385,6 +1385,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 	btree = session->btree;
 	r = &S2C(session)->cache->reclist;
 	stats = btree->fstats;
+	new = NULL;
 
 	/*
 	 * If all entries on the page were deleted, mark the page to be merged
@@ -1442,6 +1443,8 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 		WT_RET(__wt_rec_col_split(session, &new, page));
 		break;
 	}
+
+	WT_ASSERT(session, new != NULL);
 
 	/*
 	 * Update the parent to reference the new internal page, and flag the
