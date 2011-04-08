@@ -767,7 +767,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_INSERT *ins;
-	uint64_t cur_recno, recno;
+	uint64_t recno;
 	uint32_t entries, i, len, space_avail;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *first_free, *last_data;
@@ -801,18 +801,15 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 		 * Generate entries for the new page: loop through the repeat
 		 * records, checking for WT_INSERT entries matching the record
 		 * number.
+		 *
+		 * Note the increment of recno in the for loop to update the
+		 * starting record number in case we split.
 		 */
 		ins = WT_COL_INSERT(page, cip),
-
-		/*
-		 * cur_recno is the recno as we're counting through the records;
-		 * nrepeat is the total repeat count for this entry.
-		 */
-		cur_recno = recno;
 		nrepeat = WT_RLE_REPEAT_COUNT(cipdata);
 		for (n = 0;
-		    n < nrepeat; n += repeat_count, cur_recno += repeat_count) {
-			if (ins != NULL && WT_INSERT_RECNO(ins) == cur_recno) {
+		    n < nrepeat; n += repeat_count, recno += repeat_count) {
+			if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
 				/* Use the WT_INSERT's WT_UPDATE field. */
 				if (WT_UPDATE_DELETED_ISSET(ins->upd))
 					data = tmp->mem;
@@ -836,7 +833,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 					repeat_count = nrepeat - n;
 				else
 					repeat_count = (uint16_t)
-					    (WT_INSERT_RECNO(ins) - cur_recno);
+					    (WT_INSERT_RECNO(ins) - recno);
 			}
 
 			/*
@@ -863,9 +860,6 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 			first_free += len + sizeof(uint16_t);
 			space_avail -= len + WT_SIZEOF32(uint16_t);
 			++entries;
-
-			/* Update the starting record number in case we split */
-			recno = cur_recno;
 		}
 	}
 
