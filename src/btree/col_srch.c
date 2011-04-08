@@ -70,6 +70,11 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		 * base.
 		 */
 		if (recno != start_recno) {
+			/*
+			 * We don't have to correct for base == 0 because the
+			 * only way for base to be 0 is if recno is the page's
+			 * starting recno.
+			 */
 			WT_ASSERT(session, base > 0);
 			cref = page->u.col_int.t + base - 1;
 		}
