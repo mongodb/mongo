@@ -16,7 +16,7 @@ static int __wt_verify_dsk_col_int(
     SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 static int __wt_verify_dsk_col_rle(
     SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
-static int __wt_verify_dsk_item(
+static int __wt_verify_dsk_cell(
     SESSION *, WT_PAGE_DISK *, uint32_t, uint32_t);
 
 /*
@@ -72,7 +72,7 @@ __wt_verify_dsk_page(
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_verify_dsk_item(session, dsk, addr, size));
+		WT_RET(__wt_verify_dsk_cell(session, dsk, addr, size));
 		break;
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_verify_dsk_col_int(session, dsk, addr, size));
@@ -94,11 +94,11 @@ __wt_verify_dsk_page(
 }
 
 /*
- * __wt_verify_dsk_item --
+ * __wt_verify_dsk_cell --
  *	Walk a disk page of WT_CELLs, and verify them.
  */
 static int
-__wt_verify_dsk_item(
+__wt_verify_dsk_cell(
     SESSION *session, WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size)
 {
 	enum { IS_FIRST, WAS_KEY, WAS_DATA } last_item_type;
