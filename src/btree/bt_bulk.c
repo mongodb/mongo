@@ -948,10 +948,11 @@ __wt_item_build_key(
 	 */
 	if (btree->huffman_key != NULL) {
 		orig_size = key->size;
-		WT_RET(__wt_huffman_encode(btree->huffman_key,
-		    key->data, orig_size, key));
+		WT_RET(__wt_huffman_encode(
+		    btree->huffman_key, key->data, orig_size, key));
 		if (key->size > orig_size)
-			WT_STAT_INCRV(stats, FILE_HUFFMAN_KEY, key->size - orig_size);
+			WT_STAT_INCRV(
+			    stats, FILE_HUFFMAN_KEY, key->size - orig_size);
 	}
 
 	/* Create an overflow object if the data won't fit. */
