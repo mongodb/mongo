@@ -58,9 +58,11 @@ __wt_connection_destroy(CONNECTION *conn)
 	/* Diagnostic check: check flags against approved list. */
 	WT_CONN_FCHK_RET(conn, "Env.close", conn->flags, WT_APIMASK_CONN, ret);
 
-	(void)__wt_mtx_destroy(session, conn->mtx);
+	if (conn->mtx != NULL)
+		(void)__wt_mtx_destroy(session, conn->mtx);
 
 	/* Free allocated memory. */
+	__wt_free(session, conn->home);
 	__wt_free(session, conn->sessions);
 	__wt_free(session, conn->toc_array);
 	__wt_free(session, conn->hazard);

@@ -16,7 +16,8 @@ void __wt_methods_connection_open_transition(CONNECTION *connection);
 void __wt_methods_connection_init_transition(CONNECTION *connection);
 void __wt_methods_session_lockout(SESSION *session);
 void __wt_methods_session_init_transition(SESSION *session);
-int __wt_config_init(WT_CONFIG *conf, const char *str, size_t len);
+int __wt_config_initn(WT_CONFIG *conf, const char *str, size_t len);
+int __wt_config_init(WT_CONFIG *conf, const char *str);
 int __wt_config_next(WT_CONFIG *conf,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
@@ -27,10 +28,10 @@ int __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value);
  int __wt_config_getone(const char *cfg,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-int __wt_config_check(SESSION *session,
+int __wt_config_checklist(SESSION *session,
     const char **defaults,
     const char *config);
-int __wt_config_checkone(SESSION *session,
+int __wt_config_check(SESSION *session,
     const char *defaults,
     const char *config);
 const char *__wt_config_def_add_collator;
@@ -359,7 +360,8 @@ int __wt_btree_lockout(BTREE *btree);
 int __wt_connection_lockout(CONNECTION *conn);
 void __wt_errv(SESSION *session,
     int error,
-    const char *prefix,
+    const char *prefix1,
+    const char *prefix2,
     const char *fmt,
     va_list ap);
 void __wt_err(SESSION *session, int error, const char *fmt, ...);

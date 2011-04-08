@@ -427,7 +427,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	if (dsk == NULL) {
 		WT_ASSERT(session,
-		    WT_REF_STATE(page->parent_ref->state) == WT_REF_EVICTED);
+		    FLD_ISSET(page->parent_ref->state, WT_REF_MERGE));
 		return (0);
 	}
 

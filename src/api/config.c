@@ -12,7 +12,7 @@
  *	Initialize a config handle, used to iterate through a config string.
  */
 int
-__wt_config_init(WT_CONFIG *conf, const char *str, size_t len)
+__wt_config_initn(WT_CONFIG *conf, const char *str, size_t len)
 {
 	conf->orig = conf->cur = str;
 	conf->end = str + len;
@@ -21,6 +21,20 @@ __wt_config_init(WT_CONFIG *conf, const char *str, size_t len)
 	conf->go = NULL;
 
 	return (0);
+}
+
+/*
+ * __wt_config_init --
+ *	Initialize a config handle, used to iterate through a config string.
+ */
+int
+__wt_config_init(WT_CONFIG *conf, const char *str)
+{
+	size_t len;
+
+	len = (str == NULL) ? 0 : strlen(str);
+
+	return (__wt_config_initn(conf, str, len));
 }
 
 #define	PUSH(i, t) do {							\
@@ -446,7 +460,7 @@ __wt_config_get(const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	int found, ret;
 
 	for (found = 0; *cfg != NULL; cfg++) {
-		WT_RET(__wt_config_init(&cparser, *cfg, strlen(*cfg)));
+		WT_RET(__wt_config_init(&cparser, *cfg));
 		while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 			if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
 			    strncasecmp(key->str, k.str,
@@ -494,19 +508,24 @@ __wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 }
 
 /*
- * __wt_config_check --
+ * __wt_config_checklist --
  *	Given a NULL-terminated list of default configuration strings,
  *	check that all keys in an application-supplied config string appear
  *	somewhere in the defaults.
  */
 int
-__wt_config_check(SESSION *session, const char **defaults, const char *config)
+__wt_config_checklist(SESSION *session,
+    const char **defaults, const char *config)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
 	int ret;
 
-	WT_RET(__wt_config_init(&cparser, config, strlen(config)));
+	/* It is always okay to pass NULL. */
+	if (config == NULL)
+		return (0);
+
+	WT_RET(__wt_config_init(&cparser, config));
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != ITEM_STRING && k.type != ITEM_ID) {
 			__wt_errx(session,
@@ -536,16 +555,16 @@ __wt_config_check(SESSION *session, const char **defaults, const char *config)
 }
 
 /*
- * __wt_config_checkone --
+ * __wt_config_check --
  *	Given a default configuration string, check that all keys in an
  *	application-supplied config string appear somewhere in the defaults.
  */
 int
-__wt_config_checkone(SESSION *session, const char *defaults, const char *config)
+__wt_config_check(SESSION *session, const char *defaults, const char *config)
 {
 	const char *defs[2];
 	defs[0] = defaults;
 	defs[1] = NULL;
 
-	return (__wt_config_check(session, defs, config));
+	return (__wt_config_checklist(session, defs, config));
 }

@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-#define	API_CALL(c, s, n)	do {					\
+#define	CURSOR_API_CALL(c, s, n)	do {				\
 	(s) = (SESSION *)(c)->session;					\
 	(s)->cursor = (c);						\
 	(s)->btree = ((CURSOR_BTREE *)(c))->btree;			\
@@ -23,7 +23,7 @@ __curbtree_first(WT_CURSOR *cursor)
 {
 	SESSION *session;
 
-	API_CALL(cursor, session, "first");
+	CURSOR_API_CALL(cursor, session, "first");
 
 	return (__wt_btcur_first((CURSOR_BTREE *)cursor));
 }
@@ -49,7 +49,7 @@ __curbtree_next(WT_CURSOR *cursor)
 {
 	SESSION *session;
 
-	API_CALL(cursor, session, "next");
+	CURSOR_API_CALL(cursor, session, "next");
 	return (__wt_btcur_next((CURSOR_BTREE *)cursor));
 }
 
@@ -74,7 +74,7 @@ __curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
 	SESSION *session;
 
-	API_CALL(cursor, session, "search_near");
+	CURSOR_API_CALL(cursor, session, "search_near");
 	WT_RET(__wt_btcur_search_near((CURSOR_BTREE *)cursor, lastcmp));
 	return (0);
 }
@@ -89,7 +89,7 @@ __curbtree_insert(WT_CURSOR *cursor)
 	SESSION *session;
 
 	/* Only support exact searches for now */
-	API_CALL(cursor, session, "insert");
+	CURSOR_API_CALL(cursor, session, "insert");
 	return (__wt_btcur_insert((CURSOR_BTREE *)cursor));
 }
 

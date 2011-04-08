@@ -33,7 +33,7 @@ struct __wt_config_item
 									\
 	if (cstr == NULL)						\
 		break;							\
-	WT_RET(__wt_config_init(&__conf, (cstr), strlen(cstr)));	\
+	WT_RET(__wt_config_init(&__conf, (cstr)));	\
 	while ((__cret = 						\
 	    __wt_config_next(&__conf, &__ckey, &(cvalue))) == 0) {	\
 		if (__ckey.type != ITEM_STRING &&			\

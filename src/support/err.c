@@ -245,7 +245,7 @@ __wt_connection_lockout(CONNECTION *conn)
  */
 void
 __wt_errv(SESSION *session, int error,
-    const char *prefix, const char *fmt, va_list ap)
+    const char *prefix1, const char *prefix2, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
 	char *end, *p;
@@ -261,8 +261,13 @@ __wt_errv(SESSION *session, int error,
 	p = s;
 	end = s + sizeof(s);
 
-	if (prefix != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix);
+	if (prefix1 != NULL && prefix2 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p),
+		    "%s [%s]: ", prefix1, prefix2);
+	else if (prefix1 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
+	else if (prefix2 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
 	if (p < end)
 		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
 	if (error != 0 && p < end)
@@ -284,7 +289,9 @@ __wt_err(SESSION *session, int error, const char *fmt, ...)
 
 	va_start(ap, fmt);
 	__wt_errv(session, error,
-	    (session->btree != NULL) ? session->btree->name : NULL, fmt, ap);
+	    (session->btree != NULL) ? session->btree->name : NULL,
+	    session->name,
+	    fmt, ap);
 	va_end(ap);
 }
 
@@ -299,6 +306,8 @@ __wt_errx(SESSION *session, const char *fmt, ...)
 
 	va_start(ap, fmt);
 	__wt_errv(session, 0,
-	    (session->btree != NULL) ? session->btree->name : NULL, fmt, ap);
+	    (session->btree != NULL) ? session->btree->name : NULL,
+	    session->name,
+	    fmt, ap);
 	va_end(ap);
 }
