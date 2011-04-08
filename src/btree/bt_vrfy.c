@@ -425,6 +425,12 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	dsk = page->XXdsk;
 
+	if (dsk == NULL) {
+		WT_ASSERT(session,
+		    WT_REF_STATE(page->parent_ref->state) == WT_REF_EVICTED);
+		return (0);
+	}
+
 	/*
 	 * Overflow items aren't "in-memory", they're on-disk.  Ignore the fact
 	 * they might have been updated, that doesn't mean anything until page
