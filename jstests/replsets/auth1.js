@@ -182,3 +182,15 @@ wait(function() {
         return results.members[3].state == 2;
     });
 
+print("make sure it has the config, too");
+assert.soon(function() {
+        for (var i in rs.nodes) {
+            rs.nodes[i].setSlaveOk();
+            rs.nodes[i].getDB("admin").auth("foo","bar");
+            config = rs.nodes[i].getDB("local").system.replset.findOne();
+            if (config.version != 2) {
+                return false;
+            }
+        }
+        return true;
+    });
