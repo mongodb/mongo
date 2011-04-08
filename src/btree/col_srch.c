@@ -69,8 +69,10 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != start_recno)
+		if (recno != start_recno) {
+			WT_ASSERT(session, base > 0);
 			cref = page->u.col_int.t + base - 1;
+		}
 
 		WT_ASSERT(session, cref != NULL);
 
@@ -91,6 +93,8 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
+		if (recno >= page->u.col_leaf.recno + page->indx_count)
+			goto notfound;
 		cip = page->u.col_leaf.d + (recno - page->u.col_leaf.recno);
 		cipdata = WT_COL_PTR(page, cip);
 		break;
@@ -106,6 +110,8 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 				break;
 			record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
 		}
+		if (i == 0)
+			goto notfound;
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}

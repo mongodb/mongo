@@ -135,7 +135,7 @@ __wt_verify_tree(
 	uint64_t parent_recno,		/* First record in this subtree */
 	WT_VSTUFF *vs)			/* The verify package */
 {
-	WT_COL_REF *cref;
+	WT_COL_REF *cref, *lastcref;
 	WT_REF *ref;
 	WT_ROW_REF *rref;
 	uint64_t recno;
@@ -227,15 +227,26 @@ recno_chk:	if (parent_recno != recno) {
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
+		lastcref = NULL;
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
+			if (lastcref != NULL &&
+			    cref->recno <= lastcref->recno) {
+				__wt_errx(session,
+				    "page at addr %lu has out-of-order record "
+				    "numbers: %llu, %llu\n",
+				    (u_long)page->addr,
+				    (unsigned long long)lastcref->recno,
+				    (unsigned long long)cref->recno);
+			}
 			WT_ERR(__wt_page_in(session, page, ref, 1));
 			ret = __wt_verify_tree(
 			    session, NULL, ref->page, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
 				goto err;
+			lastcref = cref;
 		}
 		break;
 	case WT_PAGE_ROW_INT:

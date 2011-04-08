@@ -636,6 +636,9 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 
 	/* For each entry in the page... */
 	WT_COL_REF_FOREACH(page, cref, i) {
+		/* Update the starting record number in case we split. */
+		recno = cref->recno;
+
 		/*
 		 * If this is a reference to a merge page, check the page type.
 		 * A leaf page must be an empty page, we're done.  An internal
@@ -665,9 +668,6 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 		first_free += sizeof(WT_OFF_RECORD);
 		space_avail -= WT_SIZEOF32(WT_OFF_RECORD);
 		++entries;
-
-		/* Update the starting record number in case we split. */
-		recno += cref->recno;
 	}
 
 	*recnop = recno;
@@ -930,8 +930,8 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 			data_loc = DATA_OFF_PAGE;
 		} else {
 			value->data = cell;
-			len =
-			    value->size = WT_CELL_SPACE_REQ(WT_CELL_LEN(cell));
+			value->size = WT_CELL_LEN(cell);
+			len = WT_CELL_SPACE_REQ(value->size);
 			data_loc = DATA_ON_PAGE;
 		}
 
