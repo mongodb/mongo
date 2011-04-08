@@ -82,11 +82,11 @@ int __wt_bulk_init(CURSOR_BULK *cbulk);
 int __wt_bulk_var_insert(CURSOR_BULK *cbulk);
 int __wt_bulk_end(CURSOR_BULK *cbulk);
 int __wt_item_build_key( SESSION *session,
-    WT_ITEM *item,
+    WT_BUF *key,
     WT_CELL *cell,
     WT_OVFL *ovfl);
 int __wt_item_build_value( SESSION *session,
-    WT_ITEM *item,
+    WT_BUF *value,
     WT_CELL *cell,
     WT_OVFL *ovfl);
 int __wt_cache_create(CONNECTION *conn);

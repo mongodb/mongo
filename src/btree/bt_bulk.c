@@ -233,8 +233,9 @@ __wt_bulk_var(SESSION *session,
     int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
-	WT_ITEM *key, *value, key_copy, value_copy;
-	WT_CELL key_item, value_item;
+	WT_BUF key_buf, value_buf;
+	WT_ITEM *key, *value;
+	WT_CELL key_cell, value_cell;
 	WT_OVFL key_ovfl, value_ovfl;
 	WT_PAGE *page;
 	WT_BUF *tmp;
@@ -252,9 +253,10 @@ __wt_bulk_var(SESSION *session,
 	insert_cnt = 0;
 	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
 
-	WT_CLEAR(key_copy);
-	WT_CLEAR(key_item);
-	WT_CLEAR(value_copy);
+	WT_CLEAR(key_buf);
+	WT_CLEAR(key_cell);
+	WT_CLEAR(value_buf);
+	WT_CLEAR(value_cell);
 
 	/* Get a scratch buffer and make it look like our work page. */
 	page_type = is_column ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
@@ -304,25 +306,25 @@ __wt_bulk_var(SESSION *session,
 		 * and a length.
 		 */
 		if (key != NULL) {
-			key_copy.data = key->data;
-			key_copy.size = key->size;
-			key = &key_copy;
+			key_buf.data = key->data;
+			key_buf.size = key->size;
+			key = (WT_ITEM *)&key_buf;
 		}
 		if (value->size == 0 && !is_column)
 			value = NULL;
 		else {
-			value_copy.data = value->data;
-			value_copy.size = value->size;
-			value = &value_copy;
+			value_buf.data = value->data;
+			value_buf.size = value->size;
+			value = (WT_ITEM *)&value_buf;
 		}
 
 		/* Build the key/value items we'll store on the page. */
 		if (key != NULL)
-			WT_ERR(__wt_item_build_key(session,
-			    (WT_ITEM *)key, &key_item, &key_ovfl));
+			WT_ERR(__wt_item_build_key(session, &key_buf,
+			    &key_cell, &key_ovfl));
 		if (value != NULL)
-			WT_ERR(__wt_item_build_value(session,
-			    (WT_ITEM *)value, &value_item, &value_ovfl));
+			WT_ERR(__wt_item_build_value(session, &value_buf,
+			    &value_cell, &value_ovfl));
 
 		/*
 		 * We now have the key/value items to store on the page.  If
@@ -363,9 +365,9 @@ __wt_bulk_var(SESSION *session,
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
 			++page->XXdsk->u.entries;
-			memcpy(first_free, &key_item, sizeof(key_item));
+			memcpy(first_free, &key_cell, sizeof(key_cell));
 			memcpy(first_free +
-			    sizeof(key_item), key->data, key->size);
+			    sizeof(key_cell), key->data, key->size);
 			space_avail -= WT_CELL_SPACE_REQ(key->size);
 			first_free += WT_CELL_SPACE_REQ(key->size);
 		}
@@ -373,9 +375,9 @@ __wt_bulk_var(SESSION *session,
 		/* Copy the data item onto the page. */
 		if (value != NULL) {
 			++page->XXdsk->u.entries;
-			memcpy(first_free, &value_item, sizeof(value_item));
+			memcpy(first_free, &value_cell, sizeof(value_cell));
 			memcpy(first_free +
-			    sizeof(value_item), value->data, value->size);
+			    sizeof(value_cell), value->data, value->size);
 			space_avail -= WT_CELL_SPACE_REQ(value->size);
 			first_free += WT_CELL_SPACE_REQ(value->size);
 		}
@@ -397,6 +399,10 @@ __wt_bulk_var(SESSION *session,
 		f(session->name, insert_cnt);
 
 err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
+	if (key_buf.mem != NULL)
+		__wt_buf_free(session, &key_buf);
+	if (value_buf.mem != NULL)
+		__wt_buf_free(session, &value_buf);
 	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 
@@ -457,8 +463,8 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	BTREE *btree;
 	SESSION *session;
 	WT_CURSOR *cursor;
-	WT_ITEM *key, *value, key_copy, value_copy;
-	WT_CELL key_item, value_item;
+	WT_BUF *key, *value;
+	WT_CELL key_cell, value_cell;
 	WT_OVFL key_ovfl, value_ovfl;
 	uint32_t space_req;
 	int is_column;
@@ -468,9 +474,8 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	session = (SESSION *)cursor->session;
 	is_column = F_ISSET(btree, WT_COLUMN) ? 1 : 0;
 
-	WT_CLEAR(key_copy);
-	WT_CLEAR(key_item);
-	WT_CLEAR(value_copy);
+	WT_CLEAR(key_cell);
+	WT_CLEAR(value_cell);
 
 #if 0
 	/* XXX move checking to the cursor layer */
@@ -508,23 +513,20 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	 */
 	if (is_column)
 		key = NULL;
-	else {
-		key_copy = *(WT_ITEM *)&cursor->key;
-		key = &key_copy;
-	}
+	else
+		key = &cursor->key;
 	if (cursor->value.size == 0 && !is_column)
 		value = NULL;
-	else {
-		value_copy = *(WT_ITEM *)&cursor->value;
-		value = &value_copy;
-	}
+	else
+		value = &cursor->value;
 
 	/* Build the key/value items we're going to store on the page. */
 	if (key != NULL)
-		WT_RET(__wt_item_build_key(session, key, &key_item, &key_ovfl));
+		WT_RET(__wt_item_build_key(session, key,
+		    &key_cell, &key_ovfl));
 	if (value != NULL)
-		WT_RET(__wt_item_build_value(session,
-		    value, &value_item, &value_ovfl));
+		WT_RET(__wt_item_build_value(session, value,
+		    &value_cell, &value_ovfl));
 
 	/*
 	 * We now have the key/value items to store on the page.  If
@@ -568,9 +570,9 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	/* Copy the key item onto the page. */
 	if (key != NULL) {
 		++cbulk->page->XXdsk->u.entries;
-		memcpy(cbulk->first_free, &key_item, sizeof(key_item));
+		memcpy(cbulk->first_free, &key_cell, sizeof(key_cell));
 		memcpy(cbulk->first_free +
-		    sizeof(key_item), key->data, key->size);
+		    sizeof(key_cell), key->data, key->size);
 		cbulk->space_avail -= WT_CELL_SPACE_REQ(key->size);
 		cbulk->first_free += WT_CELL_SPACE_REQ(key->size);
 	}
@@ -578,9 +580,9 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	/* Copy the data item onto the page. */
 	if (value != NULL) {
 		++cbulk->page->XXdsk->u.entries;
-		memcpy(cbulk->first_free, &value_item, sizeof(value_item));
+		memcpy(cbulk->first_free, &value_cell, sizeof(value_cell));
 		memcpy(cbulk->first_free +
-		    sizeof(value_item), value->data, value->size);
+		    sizeof(value_cell), value->data, value->size);
 		cbulk->space_avail -= WT_CELL_SPACE_REQ(value->size);
 		cbulk->first_free += WT_CELL_SPACE_REQ(value->size);
 	}
@@ -628,7 +630,7 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 {
 	BTREE *btree;
 	WT_ITEM *key, key_build;
-	WT_CELL *key_item, item;
+	WT_CELL *key_cell, cell;
 	WT_OFF off;
 	WT_OFF_RECORD off_record;
 	WT_OVFL tmp_ovfl;
@@ -644,7 +646,7 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 
 	btree = session->btree;
 	dsk = page->XXdsk;
-	WT_CLEAR(item);
+	WT_CLEAR(cell);
 	next_tmp = NULL;
 	next = parent = NULL;
 	ret = 0;
@@ -670,12 +672,12 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 		key = &key_build;
 		WT_CLEAR(key_build);
 
-		key_item = WT_PAGE_DISK_BYTE(page->XXdsk);
-		switch (WT_CELL_TYPE(key_item)) {
+		key_cell = WT_PAGE_DISK_BYTE(page->XXdsk);
+		switch (WT_CELL_TYPE(key_cell)) {
 		case WT_CELL_KEY:
-			key->data = WT_CELL_BYTE(key_item);
-			key->size = WT_CELL_LEN(key_item);
-			WT_CELL_SET(&item, WT_CELL_KEY, key->size);
+			key->data = WT_CELL_BYTE(key_cell);
+			key->size = WT_CELL_LEN(key_cell);
+			WT_CELL_SET(&cell, WT_CELL_KEY, key->size);
 			break;
 		case WT_CELL_KEY_OVFL:
 			/*
@@ -685,10 +687,10 @@ __wt_bulk_promote(SESSION *session, WT_PAGE *page, WT_STACK *stack, u_int level)
 			 */
 			WT_CLEAR(tmp_ovfl);
 			WT_RET(__wt_bulk_ovfl_copy(session,
-			    WT_CELL_BYTE_OVFL(key_item), &tmp_ovfl));
+			    WT_CELL_BYTE_OVFL(key_cell), &tmp_ovfl));
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
-			WT_CELL_SET(&item, WT_CELL_KEY_OVFL, sizeof(WT_OVFL));
+			WT_CELL_SET(&cell, WT_CELL_KEY_OVFL, sizeof(WT_OVFL));
 			break;
 		WT_ILLEGAL_FORMAT(session);
 		}
@@ -880,21 +882,21 @@ split:		switch (dsk->type) {
 
 		/* Store the key. */
 		++parent->XXdsk->u.entries;
-		memcpy(elem->first_free, &item, sizeof(item));
-		memcpy(elem->first_free + sizeof(item), key->data, key->size);
+		memcpy(elem->first_free, &cell, sizeof(cell));
+		memcpy(elem->first_free + sizeof(cell), key->data, key->size);
 		elem->first_free += WT_CELL_SPACE_REQ(key->size);
 		elem->space_avail -= WT_CELL_SPACE_REQ(key->size);
 
 		/* Create the WT_CELL(WT_OFF) reference. */
-		WT_CELL_SET(&item, WT_CELL_OFF, sizeof(WT_OFF));
+		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
 		off.addr = page->addr;
 		off.size = page->size;
 
 		/* Store the data item. */
 		++parent->XXdsk->u.entries;
 		parent_data = elem->first_free;
-		memcpy(elem->first_free, &item, sizeof(item));
-		memcpy(elem->first_free + sizeof(item), &off, sizeof(off));
+		memcpy(elem->first_free, &cell, sizeof(cell));
+		memcpy(elem->first_free + sizeof(cell), &off, sizeof(off));
 		elem->first_free += WT_CELL_SPACE_REQ(sizeof(WT_OFF));
 		elem->space_avail -= WT_CELL_SPACE_REQ(sizeof(WT_OFF));
 
@@ -923,23 +925,21 @@ err:	if (next_tmp != NULL)
  */
 int
 __wt_item_build_key(
-    SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
+    SESSION *session, WT_BUF *key, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
-	WT_CURSOR *cursor;
 	WT_STATS *stats;
+	uint32_t orig_size;
 
 	btree = session->btree;
-	cursor = session->cursor;
 	stats = btree->stats;
 
 	WT_CELL_CLEAR(cell);
 
 	/*
 	 * We're called with a WT_ITEM that references a data/size pair.  We can
-	 * re-point that WT_ITEM's data and size fields to other memory, but we
-	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
-	 * it.
+	 * re-point that WT_ITEM's data and size fields to other memory, and if
+	 * we allocate memory in that WT_ITEM, the caller must free it.
 	 *
 	 * Optionally compress the value using the Huffman engine.  For Huffman-
 	 * encoded key/data cells, we need additional memory; use the SESSION
@@ -947,24 +947,23 @@ __wt_item_build_key(
 	 * and reconciliation, we aren't returning key/data pairs.
 	 */
 	if (btree->huffman_key != NULL) {
+		orig_size = key->size;
 		WT_RET(__wt_huffman_encode(btree->huffman_key,
-		    item->data, item->size, &cursor->key));
-		if (cursor->key.size > item->size)
-			WT_STAT_INCRV(stats, FILE_HUFFMAN_KEY,
-			    cursor->key.size - item->size);
-		*item = *(WT_ITEM *)&cursor->key;
+		    key->data, orig_size, key));
+		if (key->size > orig_size)
+			WT_STAT_INCRV(stats, FILE_HUFFMAN_KEY, key->size - orig_size);
 	}
 
 	/* Create an overflow object if the data won't fit. */
-	if (item->size > btree->leafitemsize) {
-		WT_RET(__wt_bulk_ovfl_write(session, item, ovfl));
+	if (key->size > btree->leafitemsize) {
+		WT_RET(__wt_bulk_ovfl_write(session, (WT_ITEM *)key, ovfl));
 
-		item->data = ovfl;
-		item->size = sizeof(*ovfl);
-		WT_CELL_SET(cell, WT_CELL_KEY_OVFL, item->size);
+		key->data = ovfl;
+		key->size = sizeof(*ovfl);
+		WT_CELL_SET(cell, WT_CELL_KEY_OVFL, key->size);
 		WT_STAT_INCR(stats, FILE_OVERFLOW_KEY);
 	} else
-		WT_CELL_SET(cell, WT_CELL_KEY, item->size);
+		WT_CELL_SET(cell, WT_CELL_KEY, key->size);
 	return (0);
 }
 
@@ -975,23 +974,21 @@ __wt_item_build_key(
  */
 int
 __wt_item_build_value(
-    SESSION *session, WT_ITEM *item, WT_CELL *cell, WT_OVFL *ovfl)
+    SESSION *session, WT_BUF *value, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
-	WT_CURSOR *cursor;
 	WT_STATS *stats;
+	uint32_t orig_size;
 
 	btree = session->btree;
-	cursor = session->cursor;
 	stats = btree->stats;
 
 	WT_CELL_CLEAR(cell);
 
 	/*
 	 * We're called with a WT_ITEM that references a data/size pair.  We can
-	 * re-point that WT_ITEM's data and size fields to other memory, but we
-	 * cannot allocate memory in that WT_ITEM -- all we can do is re-point
-	 * it.
+	 * re-point that WT_ITEM's data and size fields to other memory, and if
+	 * we allocate memory in that WT_ITEM, the caller must free it.
 	 *
 	 * Optionally compress the value using the Huffman engine.  For Huffman-
 	 * encoded key/data cells, we need additional memory; use the SESSION
@@ -1004,32 +1001,32 @@ __wt_item_build_value(
 	 * Handle zero-length cells quickly -- this is a common value, it's
 	 * a deleted column-store variable length cell.
 	 */
-	if (item->size == 0) {
+	if (value->size == 0) {
 		WT_CELL_SET_LEN(cell, 0);
 		return (0);
 	}
 
 	/* Optionally compress the data using the Huffman engine. */
 	if (btree->huffman_value != NULL) {
+		orig_size = value->size;
 		WT_RET(__wt_huffman_encode(btree->huffman_value,
-		    item->data, item->size, &cursor->value));
-		if (cursor->value.size > item->size)
+		    value->data, orig_size, value));
+		if (value->size > orig_size)
 			WT_STAT_INCRV(stats, FILE_HUFFMAN_VALUE,
-			    cursor->value.size - item->size);
-		*item = *(WT_ITEM *)&cursor->value;
+			    value->size - orig_size);
 	}
 
 	/* Create an overflow object if the data won't fit. */
-	if (item->size > btree->leafitemsize) {
-		WT_RET(__wt_bulk_ovfl_write(session, item, ovfl));
+	if (value->size > btree->leafitemsize) {
+		WT_RET(__wt_bulk_ovfl_write(session, (WT_ITEM *)value, ovfl));
 
-		item->data = ovfl;
-		item->size = sizeof(*ovfl);
+		value->data = ovfl;
+		value->size = sizeof(*ovfl);
 		WT_CELL_SET_TYPE(cell, WT_CELL_DATA_OVFL);
 		WT_STAT_INCR(stats, FILE_OVERFLOW_DATA);
 	}
 
-	WT_CELL_SET_LEN(cell, item->size);
+	WT_CELL_SET_LEN(cell, value->size);
 	return (0);
 }
 

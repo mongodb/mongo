@@ -879,7 +879,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	WT_COL *cip;
-	WT_ITEM *value, value_item;
+	WT_BUF *value, value_buf;
 	WT_CELL value_cell, *cell;
 	WT_OVFL value_ovfl;
 	WT_UPDATE *upd;
@@ -888,8 +888,8 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 	uint8_t *first_free;
 
 	WT_CLEAR(value_cell);
-	WT_CLEAR(value_item);
-	value = &value_item;
+	WT_CLEAR(value_buf);
+	value = &value_buf;
 
 	recno = page->u.col_leaf.recno;
 	entries = 0;
@@ -1064,7 +1064,7 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page,
 {
 	WT_CELL cell;
 	WT_OFF off;
-	WT_ITEM key;
+	WT_BUF key;
 	WT_OVFL key_ovfl;
 	WT_PAGE *ref_page;
 	WT_ROW_REF *rref;
@@ -1072,11 +1072,12 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page,
 	uint32_t entries, i, space_avail;
 	uint8_t *first_free;
 
+	WT_CLEAR(key);
+	unused = 0;
+
 	entries = *entriesp;
 	first_free = *first_freep;
 	space_avail = *space_availp;
-
-	unused = 0;
 
 	/*
 	 * For each entry in the in-memory page...
@@ -1129,6 +1130,10 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page,
 	*entriesp = entries;
 	*first_freep = first_free;
 	*space_availp = space_avail;
+
+	if (key.mem != NULL)
+		__wt_buf_free(session, &key);
+
 	return (0);
 }
 
@@ -1141,7 +1146,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE, EMPTY_DATA } data_loc;
 	WT_INSERT *ins;
-	WT_ITEM value_item;
+	WT_BUF value_buf;
 	WT_CELL value_cell, *key_cell;
 	WT_OVFL value_ovfl;
 	WT_ROW *rip;
@@ -1151,10 +1156,10 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 	uint8_t *first_free;
 	void *ripvalue;
 
-	WT_CLEAR(value_item);
-
+	WT_CLEAR(value_buf);
 	unused = 0;
 	entries = 0;
+
 	WT_RET(__wt_split_init(session, page, session->btree->leafmax,
 	    session->btree->leafmin, &unused, &first_free, &space_avail));
 
@@ -1225,11 +1230,11 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			if (upd->size == 0)
 				data_loc = EMPTY_DATA;
 			else {
-				value_item.data = WT_UPDATE_DATA(upd);
-				value_item.size = upd->size;
+				value_buf.data = WT_UPDATE_DATA(upd);
+				value_buf.size = upd->size;
 				WT_RET(__wt_item_build_value(session,
-				    &value_item, &value_cell, &value_ovfl));
-				value_len = WT_CELL_SPACE_REQ(value_item.size);
+				    &value_buf, &value_cell, &value_ovfl));
+				value_len = WT_CELL_SPACE_REQ(value_buf.size);
 				data_loc = DATA_OFF_PAGE;
 			}
 		} else {
@@ -1243,10 +1248,10 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 				data_loc = EMPTY_DATA;
 			else {
 				ripvalue = WT_ROW_PTR(page, rip);
-				value_item.data = ripvalue;
-				value_item.size =
+				value_buf.data = ripvalue;
+				value_buf.size =
 				    WT_CELL_SPACE_REQ(WT_CELL_LEN(ripvalue));
-				value_len = value_item.size;
+				value_len = value_buf.size;
 				data_loc = DATA_ON_PAGE;
 			}
 		}
@@ -1268,15 +1273,15 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 		/* Copy the value onto the page. */
 		switch (data_loc) {
 		case DATA_ON_PAGE:
-			memcpy(first_free, value_item.data, value_item.size);
-			first_free += value_item.size;
-			space_avail -= value_item.size;
+			memcpy(first_free, value_buf.data, value_buf.size);
+			first_free += value_buf.size;
+			space_avail -= value_buf.size;
 			++entries;
 			break;
 		case DATA_OFF_PAGE:
 			memcpy(first_free, &value_cell, sizeof(value_cell));
 			memcpy(first_free +
-			    sizeof(WT_CELL), value_item.data, value_item.size);
+			    sizeof(WT_CELL), value_buf.data, value_buf.size);
 			first_free += value_len;
 			space_avail -= value_len;
 			++entries;
@@ -1290,6 +1295,9 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 			WT_RET(__wt_rec_row_leaf_insert(
 			    session, ins, &entries, &first_free, &space_avail));
 	}
+
+	if (value_buf.mem != NULL)
+		__wt_buf_free(session, &value_buf);
 
 	/* Write the remnant page. */
 	return (__wt_split(
@@ -1305,18 +1313,20 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
     uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
 {
 	WT_CELL key_cell, value_cell;
-	WT_ITEM key_item, value_item;
+	WT_BUF key_buf, value_buf;
 	WT_OVFL key_ovfl, value_ovfl;
 	WT_UPDATE *upd;
 	uint64_t unused;
 	uint32_t entries, key_len, space_avail, value_len;
 	uint8_t *first_free;
 
+	WT_CLEAR(key_buf);
+	WT_CLEAR(value_buf);
+	unused = 0;
+
 	entries = *entriesp;
 	first_free = *first_freep;
 	space_avail = *space_availp;
-
-	unused = 0;
 
 	for (; ins != NULL; ins = ins->next) {
 		/* Build a value to store on the page. */
@@ -1326,19 +1336,19 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
 		if (upd->size == 0)
 			value_len = 0;
 		else {
-			value_item.data = WT_UPDATE_DATA(upd);
-			value_item.size = upd->size;
+			value_buf.data = WT_UPDATE_DATA(upd);
+			value_buf.size = upd->size;
 			WT_RET(__wt_item_build_value(
-			    session, &value_item, &value_cell, &value_ovfl));
-			value_len = WT_CELL_SPACE_REQ(value_item.size);
+			    session, &value_buf, &value_cell, &value_ovfl));
+			value_len = WT_CELL_SPACE_REQ(value_buf.size);
 		}
 
 		/* Build a key to store on the page. */
-		key_item.data = WT_INSERT_KEY(ins);
-		key_item.size = WT_INSERT_KEY_SIZE(ins);
+		key_buf.data = WT_INSERT_KEY(ins);
+		key_buf.size = WT_INSERT_KEY_SIZE(ins);
 		WT_RET(__wt_item_build_key(
-		    session, &key_item, &key_cell, &key_ovfl));
-		key_len = WT_CELL_SPACE_REQ(key_item.size);
+		    session, &key_buf, &key_cell, &key_ovfl));
+		key_len = WT_CELL_SPACE_REQ(key_buf.size);
 
 		/* Boundary: allocate, split or write the page. */
 		if (key_len + value_len > space_avail)
@@ -1348,7 +1358,7 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
 		/* Copy the key cell into place. */
 		memcpy(first_free, &key_cell, sizeof(WT_CELL));
 		memcpy(
-		    first_free + sizeof(WT_CELL), key_item.data, key_item.size);
+		    first_free + sizeof(WT_CELL), key_buf.data, key_buf.size);
 		first_free += key_len;
 		space_avail -= key_len;
 		++entries;
@@ -1358,11 +1368,16 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
 			continue;
 		memcpy(first_free, &value_cell, sizeof(WT_CELL));
 		memcpy(first_free + sizeof(WT_CELL),
-		    value_item.data, value_item.size);
+		    value_buf.data, value_buf.size);
 		first_free += value_len;
 		space_avail -= value_len;
 		++entries;
 	}
+
+	if (key_buf.mem != NULL)
+		__wt_buf_free(session, &key_buf);
+	if (value_buf.mem != NULL)
+		__wt_buf_free(session, &value_buf);
 
 	*entriesp = entries;
 	*first_freep = first_free;
