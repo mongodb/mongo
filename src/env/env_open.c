@@ -32,7 +32,7 @@ __wt_connection_open(CONNECTION *conn, const char *home, mode_t mode)
 	WT_RET(__wt_calloc(session,
 	    conn->session_size, sizeof(SESSION), &conn->toc_array));
 	WT_RET(__wt_calloc(session,
-	   conn->session_size * conn->hazard_size, sizeof(WT_PAGE *),
+	   conn->session_size * conn->hazard_size, sizeof(WT_HAZARD),
 	   &conn->hazard));
 
 	/* Create the cache. */
