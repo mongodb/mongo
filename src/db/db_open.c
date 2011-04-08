@@ -20,7 +20,7 @@ __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 	btree = session->btree;
 	conn = btree->conn;
 
-	WT_STAT_INCR(btree->conn->stats, FILE_OPEN);
+	WT_STAT_INCR(btree->conn->stats, file_open);
 
 	WT_RET(__wt_strdup(session, name, &btree->name));
 	btree->mode = mode;

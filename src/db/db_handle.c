@@ -61,7 +61,7 @@ __wt_btree_config(BTREE *btree)
 	++conn->dbqcnt;
 	__wt_unlock(session, conn->mtx);
 
-	WT_RET(__wt_stat_alloc_btree_handle_stats(session, &btree->stats));
+	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 	WT_RET(__wt_stat_alloc_btree_file_stats(session, &btree->fstats));
 
 	__wt_methods_btree_config_default(btree);

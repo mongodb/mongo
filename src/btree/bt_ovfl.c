@@ -32,8 +32,8 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	WT_VERBOSE(conn, WT_VERB_READ, (session,
 	    "overflow read addr/size %lu/%lu",
 	    (u_long)ovfl->addr, (u_long)ovfl->size));
-	WT_STAT_INCR(btree->stats, FILE_OVERFLOW_READ);
-	WT_STAT_INCR(conn->cache->stats, CACHE_OVERFLOW_READ);
+	WT_STAT_INCR(btree->stats, overflow_read);
+	WT_STAT_INCR(conn->cache->stats, cache_overflow_read);
 
 	/*
 	 * The only caller that wants a copy of the overflow pages (as opposed

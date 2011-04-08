@@ -23,7 +23,7 @@ __wt_workq_srvr(void *arg)
 	/* Walk the SESSION list and execute requests. */
 	while (F_ISSET(conn, WT_WORKQ_RUN)) {
 		++conn->api_gen;
-		WT_STAT_INCR(conn->stats, WORKQ_PASSES);
+		WT_STAT_INCR(conn->stats, workq_passes);
 
 		chk_read = request = 0;
 		for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
@@ -80,7 +80,7 @@ __wt_workq_srvr(void *arg)
 
 		/* If we didn't find work, yield the processor. */
 		if (!request) {
-			WT_STAT_INCR(conn->stats, WORKQ_YIELD);
+			WT_STAT_INCR(conn->stats, workq_yield);
 			__wt_yield();
 		}
 	}

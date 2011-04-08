@@ -29,8 +29,7 @@ __wt_connection_config(CONNECTION *conn)
 	TAILQ_INIT(&conn->fhqh);		/* File list */
 
 	/* Statistics. */
-	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
-	WT_RET(__wt_stat_alloc_method_stats(session, &conn->method_stats));
+	WT_RET(__wt_stat_alloc_conn_stats(session, &conn->stats));
 
 	/* Diagnostic output separator. */
 	conn->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
@@ -67,7 +66,6 @@ __wt_connection_destroy(CONNECTION *conn)
 	__wt_free(session, conn->toc_array);
 	__wt_free(session, conn->hazard);
 	__wt_free(session, conn->stats);
-	__wt_free(session, conn->method_stats);
 
 	__wt_free(NULL, conn);
 	return (ret);

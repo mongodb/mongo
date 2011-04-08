@@ -73,7 +73,7 @@ __wt_workq_evict_server(CONNECTION *conn, int force)
 	 * issue (when closing the environment), run the eviction server.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
+	bytes_max = WT_STAT(cache->stats, cache_bytes_max);
 	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
 		return;
 
@@ -159,7 +159,7 @@ __wt_cache_evict_server(void *arg)
 			 * cache.
 			 */
 			bytes_inuse = __wt_cache_bytes_inuse(cache);
-			bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
+			bytes_max = WT_STAT(cache->stats, cache_bytes_max);
 			if (cache->read_lockout) {
 				if (bytes_inuse <= bytes_max - (bytes_max / 20))
 					break;
@@ -417,12 +417,10 @@ __wt_evict_hazard_check(SESSION *session)
 	WT_HAZARD *hazard, *end_hazard;
 	WT_PAGE *page;
 	WT_REF *ref;
-	WT_STATS *stats;
 	u_int i;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	stats = cache->stats;
 
 	/* Sort the eviction candidates by WT_PAGE address. */
 	qsort(cache->evict, (size_t)WT_EVICT_GROUP,
@@ -460,7 +458,7 @@ __wt_evict_hazard_check(SESSION *session)
 			WT_VERBOSE(conn, WT_VERB_EVICT, (session,
 			    "eviction skipped page addr %lu (hazard reference)",
 			    page->addr));
-			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
+			WT_STAT_INCR(cache->stats, cache_evict_hazard);
 
 			/*
 			 * A page with a low LRU and a hazard reference?
@@ -550,13 +548,11 @@ __wt_evict_page(SESSION *session)
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
 	WT_REF *ref;
-	WT_STATS *stats;
 	u_int i;
 	int ret;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	stats = cache->stats;
 
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
@@ -564,9 +560,9 @@ __wt_evict_page(SESSION *session)
 		page = ref->page;
 
 		if (WT_PAGE_IS_MODIFIED(page))
-			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
+			WT_STAT_INCR(cache->stats, cache_evict_modified);
 		else
-			WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
+			WT_STAT_INCR(cache->stats, cache_evict_unmodified);
 
 #ifdef HAVE_DIAGNOSTIC
 		__wt_evict_hazard_validate(conn, page);
@@ -797,7 +793,7 @@ __wt_evict_tree_dump(SESSION *session, BTREE *btree)
 	    btree->name,
 	    __wt_cache_pages_inuse(cache),
 	    __wt_cache_bytes_inuse(cache),
-	    WT_STAT(cache->stats, CACHE_BYTES_MAX)));
+	    WT_STAT(cache->stats, cache_bytes_max)));
 
 	__wt_mb_init(session, &mb);
 	__wt_mb_add(&mb, "in-memory page list");

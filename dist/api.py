@@ -215,10 +215,6 @@ def func_method_getset(a, f):
 	# getter/setter implies connlock: lock the data structure.
 	f.write('\t__wt_lock(session, connection->mtx);\n')
 
-	# Count the call.
-	s = a.handle + '_' + a.method
-	f.write('\tWT_STAT_INCR(connection->method_stats, ' + s.upper() + ');\n')
-
 	# If the function is hand-coded, just call it.
 	if extfunc:
 		f.write('\tret = __wt_' +
@@ -323,12 +319,6 @@ def func_method(a, f):
 	if locking:
 		f.write('\t__wt_lock(session, connection->mtx);\n')
 
-	# Method call statistics -- we put the update inside the lock just to
-	# make the stat value a little more precise.
-	stat = a.handle + '_' + a.method
-	stat = stat.upper()
-	f.write('\tWT_STAT_INCR(connection->method_stats, ' + stat + ');\n')
-
 	# Call the underlying method function, handling restart as necessary.
 	f.write('\t')
 	if restart:
@@ -347,8 +337,7 @@ def func_method(a, f):
 			f.write(', ' + l.split('/')[0])
 	if restart:
 		f.write(')) == WT_RESTART)\n')
-		f.write('\t\tWT_STAT_INCR(connection->method_stats, ' +
-		    stat + '_RESTART);\n')
+		f.write('\t\t;\n')
 	else:
 		f.write(');\n')
 

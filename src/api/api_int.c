@@ -13,7 +13,6 @@ static int __wt_api_btree_btree_compare_get(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_COMPARE_GET);
 	*btree_compare = btree->btree_compare;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -30,7 +29,6 @@ static int __wt_api_btree_btree_compare_int_get(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_COMPARE_INT_GET);
 	*btree_compare_int = btree->btree_compare_int;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -49,7 +47,6 @@ static int __wt_api_btree_btree_compare_int_set(
 	WT_RET((__wt_btree_btree_compare_int_set_verify(
 	    btree, btree_compare_int)));
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_COMPARE_INT_SET);
 	btree->btree_compare_int = btree_compare_int;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -66,7 +63,6 @@ static int __wt_api_btree_btree_compare_set(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_COMPARE_SET);
 	btree->btree_compare = btree_compare;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -85,7 +81,6 @@ static int __wt_api_btree_btree_itemsize_get(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_ITEMSIZE_GET);
 	*intlitemsize = btree->intlitemsize;
 	*leafitemsize = btree->leafitemsize;
 	__wt_unlock(session, connection->mtx);
@@ -105,7 +100,6 @@ static int __wt_api_btree_btree_itemsize_set(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_ITEMSIZE_SET);
 	btree->intlitemsize = intlitemsize;
 	btree->leafitemsize = leafitemsize;
 	__wt_unlock(session, connection->mtx);
@@ -131,7 +125,6 @@ static int __wt_api_btree_btree_pagesize_get(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_PAGESIZE_GET);
 	*allocsize = btree->allocsize;
 	*intlmin = btree->intlmin;
 	*intlmax = btree->intlmax;
@@ -160,7 +153,6 @@ static int __wt_api_btree_btree_pagesize_set(
 	SESSION *session = &connection->default_session;
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_BTREE_PAGESIZE_SET);
 	btree->allocsize = allocsize;
 	btree->intlmin = intlmin;
 	btree->intlmax = intlmax;
@@ -187,7 +179,6 @@ static int __wt_api_btree_bulk_load(
 
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
-	WT_STAT_INCR(connection->method_stats, BTREE_BULK_LOAD);
 	ret = __wt_btree_bulk_load(session, progress, cb);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -209,7 +200,6 @@ static int __wt_api_btree_close(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_CLOSE);
-	WT_STAT_INCR(connection->method_stats, BTREE_CLOSE);
 	ret = __wt_btree_close(session, flags);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -235,9 +225,8 @@ static int __wt_api_btree_col_del(
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_COL_DEL);
-	WT_STAT_INCR(connection->method_stats, BTREE_COL_DEL);
 	while ((ret = __wt_btree_col_del(session, recno)) == WT_RESTART)
-		WT_STAT_INCR(connection->method_stats, BTREE_COL_DEL_RESTART);
+		;
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -264,9 +253,8 @@ static int __wt_api_btree_col_put(
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_COL_PUT);
-	WT_STAT_INCR(connection->method_stats, BTREE_COL_PUT);
 	while ((ret = __wt_btree_col_put(session, recno, value)) == WT_RESTART)
-		WT_STAT_INCR(connection->method_stats, BTREE_COL_PUT_RESTART);
+		;
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -291,7 +279,6 @@ static int __wt_api_btree_column_set(
 	WT_RET((__wt_btree_column_set_verify(
 	    btree, fixed_len, dictionary, flags)));
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_COLUMN_SET);
 	btree->fixed_len = fixed_len;
 	btree->dictionary = dictionary;
 	F_SET(btree, flags);
@@ -318,7 +305,6 @@ static int __wt_api_btree_dump(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_DUMP);
-	WT_STAT_INCR(connection->method_stats, BTREE_DUMP);
 	ret = __wt_btree_dump(session, stream, progress, flags);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -343,7 +329,6 @@ static int __wt_api_btree_huffman_set(
 	    huffman_flags, WT_APIMASK_BTREE_HUFFMAN_SET);
 
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, BTREE_HUFFMAN_SET);
 	ret = __wt_btree_huffman_set(
 	    btree, huffman_table, huffman_table_size, huffman_flags);
 	__wt_unlock(session, connection->mtx);
@@ -370,7 +355,6 @@ static int __wt_api_btree_open(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_OPEN);
-	WT_STAT_INCR(connection->method_stats, BTREE_OPEN);
 	ret = __wt_btree_open(session, name, mode, flags);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -396,9 +380,8 @@ static int __wt_api_btree_row_del(
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_ROW_DEL);
-	WT_STAT_INCR(connection->method_stats, BTREE_ROW_DEL);
 	while ((ret = __wt_btree_row_del(session, key)) == WT_RESTART)
-		WT_STAT_INCR(connection->method_stats, BTREE_ROW_DEL_RESTART);
+		;
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -425,9 +408,8 @@ static int __wt_api_btree_row_put(
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_ROW_PUT);
-	WT_STAT_INCR(connection->method_stats, BTREE_ROW_PUT);
 	while ((ret = __wt_btree_row_put(session, key, value)) == WT_RESTART)
-		WT_STAT_INCR(connection->method_stats, BTREE_ROW_PUT_RESTART);
+		;
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -450,7 +432,6 @@ static int __wt_api_btree_salvage(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_SALVAGE);
-	WT_STAT_INCR(connection->method_stats, BTREE_SALVAGE);
 	ret = __wt_btree_salvage(session, progress);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -468,7 +449,6 @@ static int __wt_api_btree_stat_clear(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_STAT_CLEAR);
-	WT_STAT_INCR(connection->method_stats, BTREE_STAT_CLEAR);
 	ret = __wt_btree_stat_clear(btree);
 	return (ret);
 }
@@ -490,7 +470,6 @@ static int __wt_api_btree_stat_print(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_STAT_PRINT);
-	WT_STAT_INCR(connection->method_stats, BTREE_STAT_PRINT);
 	ret = __wt_btree_stat_print(session, stream);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -515,7 +494,6 @@ static int __wt_api_btree_sync(
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_SYNC);
-	WT_STAT_INCR(connection->method_stats, BTREE_SYNC);
 	ret = __wt_btree_sync(session, progress, flags);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -539,7 +517,6 @@ static int __wt_api_btree_verify(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_VERIFY);
-	WT_STAT_INCR(connection->method_stats, BTREE_VERIFY);
 	ret = __wt_btree_verify(session, progress);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
@@ -558,7 +535,6 @@ static int __wt_api_connection_btree(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_BTREE);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_BTREE);
 	ret = __wt_connection_btree(connection, btreep);
 	return (ret);
 }
@@ -572,7 +548,6 @@ static int __wt_api_connection_cache_size_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_CACHE_SIZE_GET);
 	*cache_size = connection->cache_size;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -589,7 +564,6 @@ static int __wt_api_connection_cache_size_set(
 	WT_RET((__wt_connection_cache_size_set_verify(
 	    connection, cache_size)));
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_CACHE_SIZE_SET);
 	connection->cache_size = cache_size;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -606,7 +580,6 @@ static int __wt_api_connection_close(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_CLOSE);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_CLOSE);
 	ret = __wt_connection_close(connection);
 	return (ret);
 }
@@ -620,7 +593,6 @@ static int __wt_api_connection_data_update_max_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MAX_GET);
 	*data_update_max = connection->data_update_max;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -635,7 +607,6 @@ static int __wt_api_connection_data_update_max_set(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MAX_SET);
 	connection->data_update_max = data_update_max;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -650,7 +621,6 @@ static int __wt_api_connection_data_update_min_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MIN_GET);
 	*data_update_min = connection->data_update_min;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -665,7 +635,6 @@ static int __wt_api_connection_data_update_min_set(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_DATA_UPDATE_MIN_SET);
 	connection->data_update_min = data_update_min;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -680,7 +649,6 @@ static int __wt_api_connection_hazard_size_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_HAZARD_SIZE_GET);
 	*hazard_size = connection->hazard_size;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -697,7 +665,6 @@ static int __wt_api_connection_hazard_size_set(
 	WT_RET((__wt_connection_hazard_size_set_verify(
 	    connection, hazard_size)));
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_HAZARD_SIZE_SET);
 	connection->hazard_size = hazard_size;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -712,7 +679,6 @@ static int __wt_api_connection_msgcall_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_MSGCALL_GET);
 	*msgcall = connection->msgcall;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -727,7 +693,6 @@ static int __wt_api_connection_msgcall_set(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_MSGCALL_SET);
 	connection->msgcall = msgcall;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -742,7 +707,6 @@ static int __wt_api_connection_msgfile_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_MSGFILE_GET);
 	*msgfile = connection->msgfile;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -757,7 +721,6 @@ static int __wt_api_connection_msgfile_set(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_MSGFILE_SET);
 	connection->msgfile = msgfile;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -778,7 +741,6 @@ static int __wt_api_connection_open(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_OPEN);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_OPEN);
 	ret = __wt_connection_open(connection, home, mode);
 	return (ret);
 }
@@ -798,7 +760,6 @@ static int __wt_api_connection_session(
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_SESSION);
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_SESSION);
 	ret = __wt_connection_session(connection, sessionp);
 	__wt_unlock(session, connection->mtx);
 	return (ret);
@@ -813,7 +774,6 @@ static int __wt_api_connection_session_size_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_SESSION_SIZE_GET);
 	*session_size = connection->session_size;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -830,7 +790,6 @@ static int __wt_api_connection_session_size_set(
 	WT_RET((__wt_connection_session_size_set_verify(
 	    connection, session_size)));
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_SESSION_SIZE_SET);
 	connection->session_size = session_size;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -847,7 +806,6 @@ static int __wt_api_connection_stat_clear(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_STAT_CLEAR);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_STAT_CLEAR);
 	ret = __wt_connection_stat_clear(connection);
 	return (ret);
 }
@@ -865,7 +823,6 @@ static int __wt_api_connection_stat_print(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_STAT_PRINT);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_STAT_PRINT);
 	ret = __wt_connection_stat_print(connection, stream);
 	return (ret);
 }
@@ -883,7 +840,6 @@ static int __wt_api_connection_sync(
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_SYNC);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_SYNC);
 	ret = __wt_connection_sync(connection, progress);
 	return (ret);
 }
@@ -897,7 +853,6 @@ static int __wt_api_connection_verbose_get(
 {
 	SESSION *session = &connection->default_session;
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_VERBOSE_GET);
 	*verbose = connection->verbose;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -914,7 +869,6 @@ static int __wt_api_connection_verbose_set(
 	WT_RET((__wt_connection_verbose_set_verify(
 	    connection, verbose)));
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, CONNECTION_VERBOSE_SET);
 	connection->verbose = verbose;
 	__wt_unlock(session, connection->mtx);
 	return (0);
@@ -933,7 +887,6 @@ static int __wt_api_session_close(
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_SESSION_CLOSE);
 	__wt_lock(session, connection->mtx);
-	WT_STAT_INCR(connection->method_stats, SESSION_CLOSE);
 	ret = __wt_session_close(session);
 	session = &connection->default_session;
 	__wt_unlock(session, connection->mtx);

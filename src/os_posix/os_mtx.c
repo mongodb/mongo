@@ -95,7 +95,7 @@ __wt_lock(SESSION *session, WT_MTX *mtx)
 	}
 
 	mtx->locked = 1;
-	WT_STAT_INCR(S2C(session)->stats, MTX_LOCK);
+	WT_STAT_INCR(S2C(session)->stats, mtx_lock);
 
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;

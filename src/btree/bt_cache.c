@@ -35,7 +35,7 @@ __wt_cache_create(CONNECTION *conn)
 	WT_ERR(__wt_stat_alloc_cache_stats(session, &cache->stats));
 
 	WT_STAT_SET(
-	    cache->stats, CACHE_BYTES_MAX, conn->cache_size * WT_MEGABYTE);
+	    cache->stats, cache_bytes_max, conn->cache_size * WT_MEGABYTE);
 
 	return (0);
 
@@ -44,20 +44,20 @@ err:	(void)__wt_cache_destroy(conn);
 }
 
 /*
- * __wt_cache_stats --
+ * __wt_cache_stats_update --
  *	Update the cache statistics for return to the application.
  */
 void
-__wt_cache_stats(CONNECTION *conn)
+__wt_cache_stats_update(CONNECTION *conn)
 {
 	WT_CACHE *cache;
-	WT_STATS *stats;
 
 	cache = conn->cache;
-	stats = cache->stats;
 
-	WT_STAT_SET(stats, CACHE_BYTES_INUSE, __wt_cache_bytes_inuse(cache));
-	WT_STAT_SET(stats, CACHE_PAGES_INUSE, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(
+	    cache->stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
+	WT_STAT_SET(
+	    cache->stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
 }
 
 /*

@@ -148,7 +148,7 @@ __wt_bulk_fix(SESSION *session,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(session->name, insert_cnt);
-		WT_STAT_INCR(btree->stats, FILE_ITEMS_INSERTED);
+		WT_STAT_INCR(btree->stats, items_inserted);
 
 		/*
 		 * If doing run-length encoding, check to see if this record
@@ -292,7 +292,7 @@ __wt_bulk_var(SESSION *session,
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f(session->name, insert_cnt);
-		WT_STAT_INCR(btree->stats, FILE_ITEMS_INSERTED);
+		WT_STAT_INCR(btree->stats, items_inserted);
 
 		/*
 		 * We don't have a key to store on the page if we're building a
@@ -502,7 +502,7 @@ __wt_bulk_var_insert(CURSOR_BULK *cbulk)
 	}
 #endif
 
-	WT_STAT_INCR(btree->stats, FILE_ITEMS_INSERTED);
+	WT_STAT_INCR(btree->stats, items_inserted);
 
 	/*
 	 * We don't have a key to store on the page if we're building a
@@ -928,11 +928,9 @@ __wt_item_build_key(
     SESSION *session, WT_BUF *key, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
-	WT_STATS *stats;
 	uint32_t orig_size;
 
 	btree = session->btree;
-	stats = btree->stats;
 
 	WT_CELL_CLEAR(cell);
 
@@ -951,8 +949,8 @@ __wt_item_build_key(
 		WT_RET(__wt_huffman_encode(
 		    btree->huffman_key, key->data, orig_size, key));
 		if (key->size > orig_size)
-			WT_STAT_INCRV(
-			    stats, FILE_HUFFMAN_KEY, key->size - orig_size);
+			WT_STAT_INCRV(btree->stats,
+			    huffman_key, key->size - orig_size);
 	}
 
 	/* Create an overflow object if the data won't fit. */
@@ -962,7 +960,7 @@ __wt_item_build_key(
 		key->data = ovfl;
 		key->size = sizeof(*ovfl);
 		WT_CELL_SET(cell, WT_CELL_KEY_OVFL, key->size);
-		WT_STAT_INCR(stats, FILE_OVERFLOW_KEY);
+		WT_STAT_INCR(btree->stats, overflow_key);
 	} else
 		WT_CELL_SET(cell, WT_CELL_KEY, key->size);
 	return (0);
@@ -978,11 +976,9 @@ __wt_item_build_value(
     SESSION *session, WT_BUF *value, WT_CELL *cell, WT_OVFL *ovfl)
 {
 	BTREE *btree;
-	WT_STATS *stats;
 	uint32_t orig_size;
 
 	btree = session->btree;
-	stats = btree->stats;
 
 	WT_CELL_CLEAR(cell);
 
@@ -1013,8 +1009,8 @@ __wt_item_build_value(
 		WT_RET(__wt_huffman_encode(btree->huffman_value,
 		    value->data, orig_size, value));
 		if (value->size > orig_size)
-			WT_STAT_INCRV(stats, FILE_HUFFMAN_VALUE,
-			    value->size - orig_size);
+			WT_STAT_INCRV(btree->stats,
+			    huffman_value, value->size - orig_size);
 	}
 
 	/* Create an overflow object if the data won't fit. */
@@ -1024,7 +1020,7 @@ __wt_item_build_value(
 		value->data = ovfl;
 		value->size = sizeof(*ovfl);
 		WT_CELL_SET_TYPE(cell, WT_CELL_DATA_OVFL);
-		WT_STAT_INCR(stats, FILE_OVERFLOW_DATA);
+		WT_STAT_INCR(btree->stats, overflow_data);
 	}
 
 	WT_CELL_SET_LEN(cell, value->size);

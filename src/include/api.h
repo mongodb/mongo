@@ -85,10 +85,10 @@ struct __btree {
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 
 	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_value;	/* Value huffman encoding */
+	void *huffman_value;		/* Value huffman encoding */
 
-	WT_STATS *stats;		/* Btree handle statistics */
-	WT_STATS *fstats;		/* File statistics */
+	WT_BTREE_STATS *stats;		/* Btree handle statistics */
+	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -347,8 +347,7 @@ struct __connection {
 
 	WT_CACHE  *cache;		/* Page cache */
 
-	WT_STATS  *stats;		/* Environment handle statistics */
-	WT_STATS  *method_stats;	/* Environment method statistics */
+	WT_CONN_STATS *stats;		/* Database statistics */
 
 	WT_FH	  *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */

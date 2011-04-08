@@ -20,12 +20,14 @@ __wt_btree_stat_print(SESSION *session, FILE *stream)
 	btree = session->btree;
 	conn = btree->conn;
 
-	fprintf(stream, "File statistics: %s\n", btree->name);
-	__wt_stat_print(conn, btree->stats, stream);
+	fprintf(stream, "Btree statistics: %s\n", btree->name);
+	__wt_stat_print_btree_stats(btree->stats, stream);
+	fprintf(stream, "%s\n", conn->sep);
 
 	/* Clear the file stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_btree_file_stats(btree->fstats);
-	WT_STAT_SET(btree->fstats, FREELIST_ENTRIES, btree->freelist_entries);
+	WT_STAT_SET(
+	    btree->fstats, file_freelist_entries, btree->freelist_entries);
 	WT_RET(__wt_desc_stat(session));
 
 	/*
@@ -35,14 +37,15 @@ __wt_btree_stat_print(SESSION *session, FILE *stream)
 	 */
 	WT_RET(__wt_tree_walk(session, NULL, 0, __wt_page_stat, NULL));
 
-	fprintf(stream, "File statistics: %s\n", btree->name);
-	__wt_stat_print(conn, btree->fstats, stream);
+	fprintf(stream, "Btree file statistics: %s\n", btree->name);
+	__wt_stat_print_btree_file_stats(btree->fstats, stream);
+	fprintf(stream, "%s\n", conn->sep);
 
 	/* Underlying file handle statistics. */
 	if (btree->fh != NULL) {
-		fprintf(stream,
-		    "Underlying file I/O statistics: %s\n", btree->name);
-		__wt_stat_print(conn, btree->fh->stats, stream);
+		fprintf(stream, "Btree I/O statistics: %s\n", btree->name);
+		__wt_stat_print_file_stats(btree->fh->stats, stream);
+		fprintf(stream, "%s\n", conn->sep);
 	}
 
 	return (0);
@@ -55,10 +58,10 @@ __wt_btree_stat_print(SESSION *session, FILE *stream)
 int
 __wt_btree_stat_clear(BTREE *btree)
 {
-	__wt_stat_clear_btree_handle_stats(btree->stats);
+	__wt_stat_clear_btree_stats(btree->stats);
 	__wt_stat_clear_btree_file_stats(btree->fstats);
 	if (btree->fh != NULL)
-		__wt_stat_clear_fh_stats(btree->fh->stats);
+		__wt_stat_clear_file_stats(btree->fh->stats);
 
 	return (0);
 }

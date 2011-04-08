@@ -17,22 +17,19 @@ int
 __wt_desc_stat(SESSION *session)
 {
 	WT_PAGE_DESC desc;
-	WT_STATS *stats;
-
-	stats = session->btree->fstats;
 
 	WT_RET(__wt_desc_io(session, &desc, 1));
 
-	WT_STAT_SET(stats, MAGIC, desc.magic);
-	WT_STAT_SET(stats, MAJOR, desc.majorv);
-	WT_STAT_SET(stats, MINOR, desc.minorv);
-	WT_STAT_SET(stats, ALLOCSIZE, desc.allocsize);
-	WT_STAT_SET(stats, INTLMAX, desc.intlmax);
-	WT_STAT_SET(stats, INTLMIN, desc.intlmin);
-	WT_STAT_SET(stats, LEAFMAX, desc.leafmax);
-	WT_STAT_SET(stats, LEAFMIN, desc.leafmin);
-	WT_STAT_SET(stats, BASE_RECNO, desc.recno_offset);
-	WT_STAT_SET(stats, FIXED_LEN, desc.fixed_len);
+	WT_STAT_SET(session->btree->fstats, file_magic, desc.magic);
+	WT_STAT_SET(session->btree->fstats, file_major, desc.majorv);
+	WT_STAT_SET(session->btree->fstats, file_minor, desc.minorv);
+	WT_STAT_SET(session->btree->fstats, file_allocsize, desc.allocsize);
+	WT_STAT_SET(session->btree->fstats, file_intlmax, desc.intlmax);
+	WT_STAT_SET(session->btree->fstats, file_intlmin, desc.intlmin);
+	WT_STAT_SET(session->btree->fstats, file_leafmax, desc.leafmax);
+	WT_STAT_SET(session->btree->fstats, file_leafmin, desc.leafmin);
+	WT_STAT_SET(session->btree->fstats, file_base_recno, desc.recno_offset);
+	WT_STAT_SET(session->btree->fstats, file_fixed_len, desc.fixed_len);
 
 	return (0);
 }

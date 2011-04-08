@@ -30,7 +30,7 @@ __wt_workq_read_server(CONNECTION *conn, int force)
 	 * before opening up for more reads.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
+	bytes_max = WT_STAT(cache->stats, cache_bytes_max);
 	if (cache->read_lockout) {
 		if (bytes_inuse <= bytes_max - (bytes_max / 20))
 			cache->read_lockout = 0;
