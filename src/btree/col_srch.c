@@ -94,7 +94,11 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	 */
 	write_gen = page->write_gen;
 
-	/* Search the leaf page. */
+	/*
+	 * Search the leaf page.  We do not check in the search path for a
+	 * record greater than the maximum record in the tree; in that case,
+	 * we arrive here with a record that's impossibly large for the page.
+	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
@@ -111,11 +115,13 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		record_cnt = recno - page->u.col_leaf.recno;
 		WT_COL_INDX_FOREACH(page, cip, i) {
 			cipdata = WT_COL_PTR(page, cip);
-			if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata))
+			if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata)) {
+				record_cnt = 0;
 				break;
+			}
 			record_cnt -= WT_RLE_REPEAT_COUNT(cipdata);
 		}
-		if (i == 0)
+		if (record_cnt != 0)
 			goto notfound;
 		break;
 	WT_ILLEGAL_FORMAT(session);
