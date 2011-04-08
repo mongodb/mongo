@@ -28,6 +28,18 @@
 #include "rs_member.h"
 #include "rs_config.h"
 
+/**
+ * Order of Events
+ *
+ * On startup, if the --replSet option is present, startReplSets is called.
+ * startReplSets forks off a new thread for replica set activities.  It creates
+ * the global theReplSet variable and calls go() on it.
+ *
+ * theReplSet's constructor changes the replica set's state to RS_STARTUP,
+ * starts the replica set manager, and loads the config (if the replica set
+ * has been initialized).
+ */
+
 namespace mongo {
 
     struct HowToFixUp;
