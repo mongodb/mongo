@@ -322,7 +322,7 @@ __wt_huffman_open(SESSION *session,
 	traverse_tree(node, 0, &huffman->max_depth);
 
 	/* Converting the tree to a static array representation. */
-	WT_ERR(__wt_calloc(session, 1 << huffman->max_depth,
+	WT_ERR(__wt_calloc(session, 1U << huffman->max_depth,
 	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
 	fill_static_representation(huffman->nodes, node, 0);
 
@@ -384,7 +384,7 @@ __wt_print_huffman_code(SESSION *session, void *huffman_arg, uint16_t symbol)
 		WT_RET(__wt_calloc(session, huffman->max_depth, 1, &buffer));
 
 		node = NULL;
-		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
+		for (i = 0, n = 1U << huffman->max_depth; i < n; ++i) {
 			node = &huffman->nodes[i];
 			if (node->valid &&
 			    node->symbol == symbol && node->codeword_length > 0)
@@ -461,7 +461,7 @@ __wt_huffman_encode(void *huffman_arg,
 	 * number of bits actually used in the last byte of the encoded value.
 	 */
 	bitpos = 3;
-	n = 1 << huffman->max_depth;
+	n = 1U << huffman->max_depth;
 	for (i = 0; i < from_len; i += huffman->numBytes) {
 		/* Getting the next symbol, either 1 or 2 bytes */
 		if (huffman->numBytes == 1)
@@ -572,7 +572,7 @@ __wt_huffman_decode(void *huffman_arg,
 	 */
 	for (i = 3; i < from_len_bits; i++) {
 		/* Extracting the current bit */
-		mask = (uint8_t)(1 << bitpos);
+		mask = (uint8_t)(1U << bitpos);
 		bit = (*from & mask);
 
 		/*
