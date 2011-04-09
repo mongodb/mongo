@@ -57,7 +57,7 @@ __wt_open(
 	}
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
-	WT_ERR(__wt_stat_alloc_fh_stats(session, &fh->stats));
+	WT_ERR(__wt_stat_alloc_file_stats(session, &fh->stats));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC)

@@ -24,7 +24,7 @@ __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size)
 
 	WT_ASSERT(session, size % btree->allocsize == 0);
 
-	WT_STAT_INCR(btree->stats, FILE_ALLOC);
+	WT_STAT_INCR(btree->stats, alloc);
 
 	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
 		if (fe->size < size)
@@ -91,7 +91,7 @@ __wt_block_extend(SESSION *session, uint32_t *addrp, uint32_t size)
 	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
 
-	WT_STAT_INCR(btree->stats, FILE_EXTEND);
+	WT_STAT_INCR(btree->stats, extend);
 }
 
 /*
@@ -103,15 +103,13 @@ __wt_block_free(SESSION *session, uint32_t addr, uint32_t size)
 {
 	BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
-	WT_STATS *stats;
 
 	btree = session->btree;
-	stats = btree->stats;
 	new = NULL;
 
 	WT_ASSERT(session, size % btree->allocsize == 0);
 
-	WT_STAT_INCR(stats, FILE_FREE);
+	WT_STAT_INCR(btree->stats, free);
 	++btree->freelist_entries;
 
 	/* Allocate memory for the new entry. */

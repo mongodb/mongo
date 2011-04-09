@@ -23,8 +23,8 @@ __wt_disk_read(
 	btree = session->btree;
 	fh = btree->fh;
 
-	WT_STAT_INCR(btree->stats, FILE_PAGE_READ);
-	WT_STAT_INCR(S2C(session)->cache->stats, CACHE_PAGE_READ);
+	WT_STAT_INCR(btree->stats, page_read);
+	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_read);
 
 	offset = WT_ADDR_TO_OFF(btree, addr);
 	WT_RET(__wt_read(session, fh, offset, size, dsk));
@@ -79,8 +79,8 @@ __wt_disk_write(
 
 	WT_ASSERT(session, __wt_verify_dsk_page(session, dsk, addr, size) == 0);
 
-	WT_STAT_INCR(btree->stats, FILE_PAGE_WRITE);
-	WT_STAT_INCR(S2C(session)->cache->stats, CACHE_PAGE_WRITE);
+	WT_STAT_INCR(btree->stats, page_write);
+	WT_STAT_INCR(S2C(session)->cache->stats, cache_page_write);
 
 	return (
 	    __wt_write(session, fh, WT_ADDR_TO_OFF(btree, addr), size, dsk));

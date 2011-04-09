@@ -91,7 +91,7 @@ int __wt_item_build_value( SESSION *session,
     WT_CELL *cell,
     WT_OVFL *ovfl);
 int __wt_cache_create(CONNECTION *conn);
-void __wt_cache_stats(CONNECTION *conn);
+void __wt_cache_stats_update(CONNECTION *conn);
 int __wt_cache_destroy(CONNECTION *conn);
 int __wt_bt_close(SESSION *session);
 int __wt_bt_lex_compare( BTREE *btree,
@@ -273,7 +273,7 @@ int __wt_session_api_clr(SESSION *session, const char *name, int islocal);
 int __wt_session_dump(CONNECTION *conn);
 int __wt_connection_stat_print(CONNECTION *conn, FILE *stream);
 int __wt_connection_stat_clear(CONNECTION *conn);
-void __wt_stat_print(CONNECTION *conn, WT_STATS *s, FILE *stream);
+void __wt_stat_print(WT_STATS *s, FILE *stream);
 int __wt_connection_sync(CONNECTION *conn, void (*f)(const char *, uint64_t));
 void *__wt_workq_srvr(void *arg);
 int __wt_log_put(SESSION *session, WT_LOGREC_DESC *recdesc, ...);
@@ -414,18 +414,22 @@ int __wt_sb_alloc(SESSION *session,
     void *retp,
     SESSION_BUFFER **sbp);
 void __wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb);
-int __wt_stat_alloc_btree_handle_stats(SESSION *session, WT_STATS **statsp);
-void __wt_stat_clear_btree_handle_stats(WT_STATS *stats);
-int __wt_stat_alloc_btree_file_stats(SESSION *session, WT_STATS **statsp);
-void __wt_stat_clear_btree_file_stats(WT_STATS *stats);
-int __wt_stat_alloc_cache_stats(SESSION *session, WT_STATS **statsp);
-void __wt_stat_clear_cache_stats(WT_STATS *stats);
-int __wt_stat_alloc_connection_stats(SESSION *session, WT_STATS **statsp);
-void __wt_stat_clear_connection_stats(WT_STATS *stats);
-int __wt_stat_alloc_fh_stats(SESSION *session, WT_STATS **statsp);
-void __wt_stat_clear_fh_stats(WT_STATS *stats);
-int __wt_stat_alloc_method_stats(SESSION *session, WT_STATS **statsp);
-void __wt_stat_clear_method_stats(WT_STATS *stats);
+int __wt_stat_alloc_btree_stats(SESSION *session, WT_BTREE_STATS **statsp);
+void __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats);
+void __wt_stat_print_btree_stats(WT_BTREE_STATS *stats, FILE *stream);
+int __wt_stat_alloc_btree_file_stats(SESSION *session,
+    WT_BTREE_FILE_STATS **statsp);
+void __wt_stat_clear_btree_file_stats(WT_BTREE_FILE_STATS *stats);
+void __wt_stat_print_btree_file_stats(WT_BTREE_FILE_STATS *stats, FILE *stream);
+int __wt_stat_alloc_cache_stats(SESSION *session, WT_CACHE_STATS **statsp);
+void __wt_stat_clear_cache_stats(WT_CACHE_STATS *stats);
+void __wt_stat_print_cache_stats(WT_CACHE_STATS *stats, FILE *stream);
+int __wt_stat_alloc_conn_stats(SESSION *session, WT_CONN_STATS **statsp);
+void __wt_stat_clear_conn_stats(WT_CONN_STATS *stats);
+void __wt_stat_print_conn_stats(WT_CONN_STATS *stats, FILE *stream);
+int __wt_stat_alloc_file_stats(SESSION *session, WT_FILE_STATS **statsp);
+void __wt_stat_clear_file_stats(WT_FILE_STATS *stats);
+void __wt_stat_print_file_stats(WT_FILE_STATS *stats, FILE *stream);
 
 #ifdef __GNUC__
 #undef	WT_GCC_ATTRIBUTE

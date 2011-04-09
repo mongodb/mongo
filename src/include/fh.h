@@ -19,7 +19,7 @@ struct __wt_fh {
 
 	u_int	refcnt;				/* Reference count */
 
-	WT_STATS *stats;			/* Statistics */
+	WT_FILE_STATS *stats;			/* Statistics */
 };
 
 #if defined(__cplusplus)

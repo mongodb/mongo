@@ -14,8 +14,8 @@
 int
 __wt_read(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
-	WT_STAT_INCR(fh->stats, READ_IO);
-	WT_STAT_INCR(S2C(session)->stats, TOTAL_READ_IO);
+	WT_STAT_INCR(fh->stats, read_io);
+	WT_STAT_INCR(S2C(session)->stats, total_read_io);
 
 	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
 	    (session, "fileops: %s: read %lu bytes at offset %lu",
@@ -37,8 +37,8 @@ __wt_read(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 int
 __wt_write(SESSION *session, WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
-	WT_STAT_INCR(fh->stats, WRITE_IO);
-	WT_STAT_INCR(S2C(session)->stats, TOTAL_WRITE_IO);
+	WT_STAT_INCR(fh->stats, write_io);
+	WT_STAT_INCR(S2C(session)->stats, total_write_io);
 
 	WT_VERBOSE(S2C(session), WT_VERB_FILEOPS,
 	    (session, "fileops: %s: write %lu bytes at offset %lu",

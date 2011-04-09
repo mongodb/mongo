@@ -1398,11 +1398,9 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 	BTREE *btree;
 	WT_PAGE *new;
 	WT_REC_LIST *r;
-	WT_STATS *stats;
 
 	btree = session->btree;
 	r = &S2C(session)->cache->reclist;
-	stats = btree->fstats;
 	new = NULL;
 
 	/*
@@ -1444,11 +1442,11 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 	switch (page->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_COL_INT:
-		WT_STAT_INCR(stats, PAGE_SPLIT_INTL);
+		WT_STAT_INCR(btree->stats, split_intl);
 		break;
 	case WT_PAGE_ROW_LEAF:
 	case WT_PAGE_COL_VAR:
-		WT_STAT_INCR(stats, PAGE_SPLIT_LEAF);
+		WT_STAT_INCR(btree->stats, split_leaf);
 		break;
 	}
 	switch (page->type) {

@@ -16,14 +16,14 @@ __wt_connection_stat_print(CONNECTION *conn, FILE *stream)
 {
 	BTREE *btree;
 
-	fprintf(stream, "Environment handle statistics:\n");
-	__wt_stat_print(conn, conn->stats, stream);
+	fprintf(stream, "Database statistics:\n");
+	__wt_stat_print_conn_stats(conn->stats, stream);
+	fprintf(stream, "%s\n", conn->sep);
 
-	fprintf(stream, "Environment cache statistics:\n");
-	__wt_cache_stats(conn);
-	__wt_stat_print(conn, conn->cache->stats, stream);
-	fprintf(stream, "Environment method statistics:\n");
-	__wt_stat_print(conn, conn->method_stats, stream);
+	fprintf(stream, "Database cache statistics:\n");
+	__wt_cache_stats_update(conn);
+	__wt_stat_print_cache_stats(conn->cache->stats, stream);
+	fprintf(stream, "%s\n", conn->sep);
 
 	TAILQ_FOREACH(btree, &conn->dbqh, q)
 		WT_RET(btree->stat_print(btree, stream, 0));
@@ -45,31 +45,28 @@ __wt_connection_stat_clear(CONNECTION *conn)
 	TAILQ_FOREACH(btree, &conn->dbqh, q)
 		WT_TRET(__wt_btree_stat_clear(btree));
 
-	__wt_stat_clear_connection_stats(conn->stats);
+	__wt_stat_clear_conn_stats(conn->stats);
 	__wt_stat_clear_cache_stats(conn->cache->stats);
-	__wt_stat_clear_method_stats(conn->method_stats);
 
 	return (ret);
 }
 
 /*
  * __wt_stat_print --
- *	Print out a statistics table.
+ *	Print out a statistics table value.
  */
 void
-__wt_stat_print(CONNECTION *conn, WT_STATS *s, FILE *stream)
+__wt_stat_print(WT_STATS *s, FILE *stream)
 {
-	for (; s->desc != NULL; ++s)
-		if (s->v >= WT_BILLION)
-			fprintf(stream, "%lluB\t%s (%llu bytes)\n",
-			    (unsigned long long)s->v / WT_BILLION,
-			    s->desc, (unsigned long long)s->v);
-		else if (s->v >= WT_MILLION)
-			fprintf(stream, "%lluM\t%s (%llu bytes)\n",
-			    (unsigned long long)s->v / WT_MILLION,
-			    s->desc, (unsigned long long)s->v);
-		else
-			fprintf(stream,
-			    "%llu\t%s\n", (unsigned long long)s->v, s->desc);
-	fprintf(stream, "%s\n", conn->sep);
+	if (s->v >= WT_BILLION)
+		fprintf(stream, "%lluB\t%s (%llu bytes)\n",
+		    (unsigned long long)s->v / WT_BILLION,
+		    s->desc, (unsigned long long)s->v);
+	else if (s->v >= WT_MILLION)
+		fprintf(stream, "%lluM\t%s (%llu bytes)\n",
+		    (unsigned long long)s->v / WT_MILLION,
+		    s->desc, (unsigned long long)s->v);
+	else
+		fprintf(stream,
+		    "%llu\t%s\n", (unsigned long long)s->v, s->desc);
 }

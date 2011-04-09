@@ -219,7 +219,7 @@ struct __wt_cache {
 	uint32_t   hazard_elem;		/* Number of entries in the list */
 	uint32_t   hazard_len;		/* Bytes in the list */
 
-	WT_STATS *stats;		/* Cache statistics */
+	WT_CACHE_STATS *stats;		/* Cache statistics */
 };
 #if defined(__cplusplus)
 }
