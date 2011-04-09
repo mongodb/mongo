@@ -82,7 +82,7 @@ typedef struct {
 	_args.key_arg = _key_arg;\
 	_args.item = _item;\
 	(ret) = __wt_session_serialize_func(session,\
-	    WT_WORKQ_FUNC, 0, __wt_key_build_serial_func, &_args);\
+	    WT_WORKQ_FUNC, 1, __wt_key_build_serial_func, &_args);\
 } while (0)
 #define	__wt_key_build_unpack(\
     session, _key_arg, _item) do {\

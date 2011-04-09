@@ -34,7 +34,7 @@ serial['insert'] = Serial(
 
 serial['key_build'] = Serial(
 	'key_build',
-	'WT_WORKQ_FUNC', '0',
+	'WT_WORKQ_FUNC', '1',
 	['void */key_arg',
 	 'WT_ITEM */item'])
 
