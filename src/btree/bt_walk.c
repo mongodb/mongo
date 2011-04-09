@@ -145,6 +145,7 @@ __wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
 void
 __wt_walk_end(SESSION *session, WT_WALK *walk)
 {
+	walk->tree_len = 0;
 	__wt_free(session, walk->tree);
 }
 
