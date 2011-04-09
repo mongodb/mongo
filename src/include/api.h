@@ -85,7 +85,7 @@ struct __btree {
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 
 	void *huffman_key;		/* Key huffman encoding */
-	void *huffman_value;	/* Value huffman encoding */
+	void *huffman_value;		/* Value huffman encoding */
 
 	WT_STATS *stats;		/* Btree handle statistics */
 	WT_STATS *fstats;		/* File statistics */
@@ -209,8 +209,10 @@ struct __btree_session {
 typedef	enum {
 	WT_WORKQ_NONE=0,		/* No request */
 	WT_WORKQ_FUNC=1,		/* Function, then return */
-	WT_WORKQ_READ=2,		/* Function, then schedule read */
-	WT_WORKQ_READ_SCHED=3		/* Waiting on read to complete */
+	WT_WORKQ_EVICT=2,		/* Function, then schedule evict */
+	WT_WORKQ_EVICT_SCHED=3,		/* Waiting on evict to complete */
+	WT_WORKQ_READ=4,		/* Function, then schedule read */
+	WT_WORKQ_READ_SCHED=5		/* Waiting on read to complete */
 } wq_state_t;
 
 struct __wt_hazard {

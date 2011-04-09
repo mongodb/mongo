@@ -114,16 +114,10 @@ __wt_cache_read_server(void *arg)
 		    (&conn->default_session, "cache read server sleeping"));
 		cache->read_sleeping = 1;
 		__wt_lock(&conn->default_session, cache->mtx_read);
-		WT_VERBOSE(conn, WT_VERB_READ,
-		    (&conn->default_session, "cache read server waking"));
-
-		/*
-		 * Check for environment exit; do it here, instead of the top of
-		 * the loop because doing it here keeps us from doing a bunch of
-		 * worked when simply awakened to quit.
-		 */
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
+		WT_VERBOSE(conn, WT_VERB_READ,
+		    (&conn->default_session, "cache read server waking"));
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
@@ -158,6 +152,22 @@ __wt_cache_read_server(void *arg)
 	WT_VERBOSE(conn, WT_VERB_READ,
 	    (&conn->default_session, "cache read server exiting"));
 	return (NULL);
+}
+
+/*
+ * __wt_workq_read_server_exit --
+ *	The exit flag is set, wake the read server to exit.
+ */
+void
+__wt_workq_read_server_exit(CONNECTION *conn)
+{
+	SESSION *session;
+	WT_CACHE *cache;
+
+	session = &conn->default_session;
+	cache = conn->cache;
+
+	__wt_unlock(session, cache->mtx_read);
 }
 
 /*

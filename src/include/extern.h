@@ -129,8 +129,9 @@ int __wt_btree_dump(SESSION *session,
     uint32_t flags);
 void __wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream);
 void __wt_workq_evict_server(CONNECTION *conn, int force);
+int __wt_evict_file_serial_func(SESSION *session);
 void *__wt_cache_evict_server(void *arg);
-void __wt_evict_db_clear(SESSION *session);
+void __wt_workq_evict_server_exit(CONNECTION *conn);
 void __wt_evict_dump(SESSION *session);
 int __wt_evict_cache_dump(SESSION *session);
 int __wt_evict_tree_dump(SESSION *session, BTREE *btree);
@@ -152,6 +153,7 @@ int __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf);
 void __wt_workq_read_server(CONNECTION *conn, int force);
 int __wt_cache_read_serial_func(SESSION *session);
 void *__wt_cache_read_server(void *arg);
+void __wt_workq_read_server_exit(CONNECTION *conn);
 int __wt_page_reconcile( SESSION *session,
     WT_PAGE *page,
     uint32_t slvg_skip,

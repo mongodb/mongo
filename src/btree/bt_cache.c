@@ -29,8 +29,6 @@ __wt_cache_create(CONNECTION *conn)
 	    "cache eviction server", 1, &cache->mtx_evict));
 	WT_ERR(__wt_mtx_alloc(session,
 	    "cache read server", 1, &cache->mtx_read));
-	WT_ERR(__wt_mtx_alloc(session,
-	    "reconciliation", 0, &cache->mtx_reconcile));
 
 	WT_ERR(__wt_stat_alloc_cache_stats(session, &cache->stats));
 
@@ -81,8 +79,6 @@ __wt_cache_destroy(CONNECTION *conn)
 	if (cache == NULL)
 		return (0);
 
-	if (cache->mtx_reconcile != NULL)
-		(void)__wt_mtx_destroy(session, cache->mtx_reconcile);
 	if (cache->mtx_evict != NULL)
 		(void)__wt_mtx_destroy(session, cache->mtx_evict);
 	if (cache->mtx_read != NULL)

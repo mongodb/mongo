@@ -17,6 +17,12 @@ serial['cache_read'] = Serial(
 	 'void */parent_ref',
 	 'int/dsk_verify'])
 
+serial['evict_file'] = Serial(
+	'evict_file',
+	'WT_WORKQ_EVICT', '0',
+	['BTREE */btree',
+	 'int/all_pages'])
+
 serial['insert'] = Serial(
 	'insert',
 	'WT_WORKQ_FUNC', '1',

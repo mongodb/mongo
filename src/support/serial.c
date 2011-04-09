@@ -75,6 +75,8 @@ __wt_session_serialize_func(SESSION *session,
 				done = 1;
 				break;
 			case WT_WORKQ_FUNC:
+			case WT_WORKQ_EVICT:
+			case WT_WORKQ_EVICT_SCHED:
 			case WT_WORKQ_READ:
 			case WT_WORKQ_READ_SCHED:
 				__wt_yield();

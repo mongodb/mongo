@@ -54,6 +54,7 @@ struct __wt_cell; typedef struct __wt_cell WT_CELL;
 struct __wt_col; typedef struct __wt_col WT_COL;
 struct __wt_col_ref; typedef struct __wt_col_ref WT_COL_REF;
 struct __wt_evict_list; typedef struct __wt_evict_list WT_EVICT_LIST;
+struct __wt_evict_req; typedef struct __wt_evict_req WT_EVICT_REQ;
 struct __wt_fh; typedef struct __wt_fh WT_FH;
 struct __wt_free_entry; typedef struct __wt_free_entry WT_FREE_ENTRY;
 struct __wt_hazard; typedef struct __wt_hazard WT_HAZARD;

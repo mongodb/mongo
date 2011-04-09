@@ -16,7 +16,7 @@ __wt_workq_srvr(void *arg)
 {
 	CONNECTION *conn;
 	SESSION **tp, *session;
-	int chk_read, request;
+	int call_evict, call_read, request;
 
 	conn = (CONNECTION *)arg;
 
@@ -25,7 +25,7 @@ __wt_workq_srvr(void *arg)
 		++conn->api_gen;
 		WT_STAT_INCR(conn->stats, WORKQ_PASSES);
 
-		chk_read = request = 0;
+		call_evict = call_read = request = 0;
 		for (tp = conn->sessions; (session = *tp) != NULL; ++tp) {
 			switch (session->wq_state) {
 			case WT_WORKQ_NONE:
@@ -35,8 +35,6 @@ __wt_workq_srvr(void *arg)
 				(void)session->wq_func(session);
 				break;
 			case WT_WORKQ_READ:
-				request = 1;
-
 				/*
 				 * Call a function which makes a request of the
 				 * read server.  There are two read states: READ
@@ -57,26 +55,46 @@ __wt_workq_srvr(void *arg)
 				 */
 				session->wq_state = WT_WORKQ_READ_SCHED;
 
-				/*
-				 * Call the function (which contacts the read
-				 * server).  If that call fails, we're done.
-				 */
+				/* Queue the request for the read server. */
 				if (session->wq_func(session) != 0)
 					break;
-
 				/* FALLTHROUGH */
 			case WT_WORKQ_READ_SCHED:
-				chk_read = 1;
+				call_read = 1;
+				break;
+			case WT_WORKQ_EVICT:
+				/*
+				 * See comment above regarding read scheduling;
+				 * eviction works the same as read, as far as
+				 * the workq is concerned.
+				 *
+				 * We don't have to call a function to contact
+				 * the eviction server, currently the eviction
+				 * server checks the list of open tables each
+				 * time it runs.
+				 */
+				session->wq_state = WT_WORKQ_EVICT_SCHED;
+
+				/* Queue the request for the eviction server. */
+				if (session->wq_func(session) != 0)
+					break;
+				/* FALLTHROUGH */
+			case WT_WORKQ_EVICT_SCHED:
+				call_evict = 1;
 				break;
 			}
 		}
 
 		/* If a read is scheduled, check on the read server. */
-		if (chk_read)
+		if (call_read)
 			__wt_workq_read_server(conn, 0);
 
-		/* Check on the cache eviction server. */
-		__wt_workq_evict_server(conn, 0);
+		/*
+		 * If a read or flush is scheduled, check on the eviction
+		 * server.
+		 */
+		if (call_read || call_evict)
+			__wt_workq_evict_server(conn, call_evict);
 
 		/* If we didn't find work, yield the processor. */
 		if (!request) {

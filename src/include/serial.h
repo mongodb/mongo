@@ -24,6 +24,26 @@ typedef struct {
 } while (0)
 
 typedef struct {
+	BTREE * btree;
+	int all_pages;
+} __wt_evict_file_args;
+#define	__wt_evict_file_serial(\
+    session, _btree, _all_pages, ret) do {\
+	__wt_evict_file_args _args;\
+	_args.btree = _btree;\
+	_args.all_pages = _all_pages;\
+	(ret) = __wt_session_serialize_func(session,\
+	    WT_WORKQ_EVICT, 0, __wt_evict_file_serial_func, &_args);\
+} while (0)
+#define	__wt_evict_file_unpack(\
+    session, _btree, _all_pages) do {\
+	__wt_evict_file_args *_args =\
+	    (__wt_evict_file_args *)(session)->wq_args;\
+	_btree = _args->btree;\
+	_all_pages = _args->all_pages;\
+} while (0)
+
+typedef struct {
 	WT_PAGE * page;
 	uint32_t write_gen;
 	WT_INSERT ** new_ins;

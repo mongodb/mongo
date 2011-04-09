@@ -101,6 +101,29 @@ typedef struct {
 } WT_REC_LIST;
 
 /*
+ * WT_EVICT_REQ --
+ *	Encapsulation of a eviction request.
+ */
+struct __wt_evict_req {
+	SESSION *session;			/* Requesting thread */
+	BTREE	*btree;				/* Btree */
+	int	 all_pages;			/* Flush clean pages */
+};
+#define	WT_EVICT_REQ_ISEMPTY(r)						\
+	((r)->session == NULL)
+#define	WT_EVICT_REQ_SET(r, _session, _btree, _all_pages) do {		\
+	(r)->btree = _btree;						\
+	(r)->all_pages = _all_pages;					\
+	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
+	(r)->session = _session;					\
+	WT_MEMORY_FLUSH;	/* Turn entry on */			\
+} while (0)
+#define	WT_EVICT_REQ_CLR(r) do {					\
+	(r)->session = NULL;						\
+	WT_MEMORY_FLUSH;	/* Turn entry off */			\
+} while (0)
+
+/*
  * WT_READ_REQ --
  *	Encapsulation of a read request.
  */
@@ -130,18 +153,6 @@ struct __wt_read_req {
  */
 struct __wt_cache {
 	/*
-	 * The Db.sync method and cache eviction server both want to reconcile
-	 * pages, and there are two problems: first, reconciliation updates
-	 * parent pages, which means the Db.sync method and the cache eviction
-	 * server might update the same parent page at the same time.  Second,
-	 * the Db.sync method and cache eviction server may attempt to reconcile
-	 * the same page at the same time which implies serialization anyway.
-	 * We could probably handle that, but for now, I'm going to make page
-	 * reconciliation single-threaded.
-	 */
-	WT_MTX *mtx_reconcile;		/* Single-thread page reconciliation */
-
-	/*
 	 * The cache thread sets/clears the evict_sleeping flag when blocked
 	 * on the mtx_evict mutex.  The workQ thread uses the evict_sleeping
 	 * flag to wake the cache eviction thread as necessary.
@@ -158,7 +169,7 @@ struct __wt_cache {
 	 * with the eviction), and so on and so forth.  For that reason, we turn
 	 * off reconciliation of dirty pages while verification is running.
 	 */
-	int only_evict_clean;
+	int volatile only_evict_clean;
 
 	/*
 	 * The I/O thread sets/clears the read_sleeping flag when blocked on the
@@ -170,6 +181,9 @@ struct __wt_cache {
 	u_int volatile read_lockout;	/* No reading until memory drains */
 
 	WT_READ_REQ read_request[40];	/* Read requests:
+					   slot available if session is NULL */
+
+	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
 					   slot available if session is NULL */
 
 	uint32_t   read_gen;		/* Page read generation (LRU) */

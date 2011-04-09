@@ -92,14 +92,10 @@ __wt_connection_close(CONNECTION *conn)
 	F_CLR(conn, WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
 
-	/*
-	 * Force the cache server threads to run and wait for them to exit.
-	 * Wait for the cache eviction server first, it potentially schedules
-	 * work for the read thread.
-	 */
-	__wt_workq_evict_server(conn, 1);
+	/* Force the cache server threads to run and wait for them to exit. */
+	__wt_workq_evict_server_exit(conn);
 	__wt_thread_join(conn->cache_evict_tid);
-	__wt_workq_read_server(conn, 1);
+	__wt_workq_read_server_exit(conn);
 	__wt_thread_join(conn->cache_read_tid);
 
 	/*

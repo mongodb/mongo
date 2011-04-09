@@ -11,9 +11,11 @@
 static int  __wt_evict(SESSION *);
 static int  __wt_evict_compare_lru(const void *, const void *);
 static int  __wt_evict_compare_page(const void *, const void *);
+static int  __wt_evict_file(WT_EVICT_REQ *rr);
 static void __wt_evict_hazard_check(SESSION *);
 static int  __wt_evict_hazard_compare(const void *, const void *);
 static int  __wt_evict_page(SESSION *);
+static int  __wt_evict_request_walk(SESSION *);
 static void __wt_evict_set(SESSION *);
 static void __wt_evict_state_check(SESSION *);
 static int  __wt_evict_subtrees(WT_PAGE *);
@@ -91,6 +93,35 @@ __wt_workq_evict_server(CONNECTION *conn, int force)
 }
 
 /*
+ * __wt_evict_file_serial_func --
+ *	Eviction serialization function called when a tree is being flushed
+ *	or closed.
+ */
+int
+__wt_evict_file_serial_func(SESSION *session)
+{
+	BTREE *btree;
+	WT_CACHE *cache;
+	WT_EVICT_REQ *er, *er_end;
+	int all_pages;
+
+	__wt_evict_file_unpack(session, btree, all_pages);
+
+	cache = S2C(session)->cache;
+
+	/* Find an empty slot and enter the eviction request. */
+	er = cache->evict_request;
+	er_end = er + WT_ELEMENTS(cache->evict_request);
+	for (; er < er_end; ++er)
+		if (WT_EVICT_REQ_ISEMPTY(er)) {
+			WT_EVICT_REQ_SET(er, session, btree, all_pages);
+			return (0);
+		}
+	__wt_err(session, 0, "eviction server request table full");
+	return (WT_RESTART);
+}
+
+/*
  * __wt_cache_evict_server --
  *	Thread to evict pages from the cache.
  */
@@ -133,25 +164,16 @@ __wt_cache_evict_server(void *arg)
 		    WT_VERB_EVICT, (session, "eviction server sleeping"));
 		cache->evict_sleeping = 1;
 		__wt_lock(session, cache->mtx_evict);
+		if (!F_ISSET(conn, WT_SERVER_RUN))
+			break;
 		WT_VERBOSE(conn,
 		    WT_VERB_EVICT, (session, "eviction server waking"));
 
-		/*
-		 * Check for environment exit; do it here, instead of the top of
-		 * the loop because doing it here keeps us from doing a bunch of
-		 * worked when simply awakened to quit.
-		 */
-		if (!F_ISSET(conn, WT_SERVER_RUN))
-			break;
+		/* Walk the eviction-request queue. */
+		WT_ERR(__wt_evict_request_walk(session));
 
+		/* Evict pages from the cache. */
 		for (;;) {
-			/* Single-thread reconciliation. */
-			__wt_lock(session, cache->mtx_reconcile);
-			ret = __wt_evict(session);
-			__wt_unlock(session, cache->mtx_reconcile);
-			if (ret != 0)
-				goto err;
-
 			/*
 			 * If we've locked out reads, keep evicting until we
 			 * get to at least 5% under the maximum cache.  Else,
@@ -165,6 +187,8 @@ __wt_cache_evict_server(void *arg)
 					break;
 			} else if (bytes_inuse < bytes_max)
 				break;
+
+			WT_ERR(__wt_evict(session));
 		}
 	}
 
@@ -183,6 +207,107 @@ err:	if (cache->evict != NULL)
 		WT_TRET(__wt_session_close(session));
 
 	return (NULL);
+}
+
+/*
+ * __wt_workq_evict_server_exit --
+ *	The exit flag is set, wake the eviction server to exit.
+ */
+void
+__wt_workq_evict_server_exit(CONNECTION *conn)
+{
+	SESSION *session;
+	WT_CACHE *cache;
+
+	session = &conn->default_session;
+	cache = conn->cache;
+
+	__wt_unlock(session, cache->mtx_evict);
+}
+
+/*
+ * __wt_evict_request_walk --
+ *	Walk the eviction request queue.
+ */
+static int
+__wt_evict_request_walk(SESSION *session)
+{
+	WT_CACHE *cache;
+	WT_EVICT_REQ *er, *er_end;
+	int ret;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Walk the eviction request queue, looking for sync or close requests
+	 * (defined by a valid SESSION handle).  If we find a request, perform
+	 * it, flush the result and clear the request slot, then wake up the
+	 * requesting thread.
+	 */
+	er = cache->evict_request;
+	er_end = er + WT_ELEMENTS(cache->evict_request);
+	for (; er < er_end; ++er) {
+		if ((session = er->session) == NULL)
+			continue;
+		ret = __wt_evict_file(er);
+
+		/*
+		 * The request slot clear doesn't need to be flushed, but we
+		 * have to flush the read result, might as well include it.
+		 */
+		WT_EVICT_REQ_CLR(er);
+
+		__wt_session_serialize_wrapup(session, NULL, ret);
+	}
+	return (0);
+}
+
+/*
+ * __wt_evict_file --
+ *	Flush pages for a specific file.
+ */
+static int
+__wt_evict_file(WT_EVICT_REQ *er)
+{
+	BTREE *btree;
+	SESSION *session;
+	WT_CACHE *cache;
+	WT_PAGE *page;
+	WT_REF *ref;
+	int all_pages, ret;
+
+	session = er->session;
+	btree = er->btree;
+	all_pages = er->all_pages ? 1 : 0;
+
+	cache = S2C(session)->cache;
+	ret = 0;
+
+	/*
+	 * The eviction queue might references pages we are about to discard;
+	 * clear it.
+	 */
+	memset(cache->evict, 0, cache->evict_len);
+
+	/*
+	 * Walk the tree.  It doesn't matter if we are already walking the
+	 * tree, __wt_walk_begin restarts the process.
+	 */
+	WT_ERR(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
+	for (;;) {
+		WT_ERR(__wt_walk_next(
+		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
+		if (ref == NULL)
+			break;
+
+		page = ref->page;
+		if (all_pages || WT_PAGE_IS_MODIFIED(page))
+			WT_ERR(
+			    __wt_page_reconcile(session, page, 0, all_pages));
+	}
+
+err:	__wt_walk_end(session, &btree->evict_walk);
+	return (ret);
 }
 
 /*
@@ -346,32 +471,6 @@ restart:	WT_RET(__wt_walk_begin(session,
 	} while (++i < WT_EVICT_WALK_PER_TABLE);
 
 	return (0);
-}
-
-/*
- * __wt_evict_db_clear --
- *	Remove any entries for a file from the eviction list.
- */
-void
-__wt_evict_db_clear(SESSION *session)
-{
-	BTREE *btree;
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	u_int i;
-
-	btree = session->btree;
-	cache = S2C(session)->cache;
-
-	/*
-	 * Discard any entries in the eviction list to a file we're closing
-	 * (the caller better have locked out the eviction thread).
-	 */
-	if (cache->evict == NULL)
-		return;
-	WT_EVICT_FOREACH(cache, evict, i)
-		if (evict->ref != NULL && evict->btree == btree)
-			WT_EVICT_CLR(evict);
 }
 
 /*

@@ -230,6 +230,10 @@ static const char *
 __wt_session_print_state(SESSION *session)
 {
 	switch (session->wq_state) {
+	case WT_WORKQ_EVICT:
+		return ("evict");
+	case WT_WORKQ_EVICT_SCHED:
+		return ("evict scheduled");
 	case WT_WORKQ_READ:
 		return ("read");
 	case WT_WORKQ_READ_SCHED:

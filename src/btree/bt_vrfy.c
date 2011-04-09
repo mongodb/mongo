@@ -94,10 +94,13 @@ __wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 	 */
 	bit_nset(vstuff.fragbits, 0, 0);
 
-	/* During eviction, we can only evict clean pages. */
-	__wt_lock(session, cache->mtx_reconcile);
+	/*
+	 * During verification, we can only evict clean pages (otherwise we can
+	 * race and verify pages not at all or more than once).  The variable
+	 * volatile, and the eviction code checks before each eviction, so no
+	 * further serialization is required.
+	 */
 	cache->only_evict_clean = 1;
-	__wt_unlock(session, cache->mtx_reconcile);
 
 	/* Verify the tree, starting at the root. */
 	WT_ERR(__wt_verify_tree(session, NULL,
@@ -107,9 +110,7 @@ __wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 
 	WT_ERR(__wt_verify_checkfrag(session, &vstuff));
 
-	__wt_lock(session, cache->mtx_reconcile);
 	cache->only_evict_clean = 0;
-	__wt_unlock(session, cache->mtx_reconcile);
 
 err:	/* Wrap up reporting. */
 	if (vstuff.f != NULL)
