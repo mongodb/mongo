@@ -25,7 +25,7 @@ static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *, uint32_t);
 static int  __wt_rec_row_merge(
 		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
-static int  __wt_rec_wrapup(SESSION *, WT_PAGE *, int);
+static int  __wt_rec_wrapup(SESSION *, WT_PAGE *, int *);
 
 static int __wt_split(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *, int);
@@ -135,12 +135,12 @@ __wt_page_reconcile(
 	WT_ILLEGAL_FORMAT(session);
 	}
 
-	/* Resolve the WT_REC_LIST information and update the parent. */
-	WT_RET(__wt_rec_wrapup(session, page, discard));
-
-	/* Free any original disk blocks. */
-	if (page->addr != WT_ADDR_INVALID)
-		WT_RET(__wt_block_free(session, page->addr, page->size));
+	/*
+	 * Resolve the WT_REC_LIST information and update the parent -- note,
+	 * the wrapup routine may clear the discard flag, for deleted pages
+	 * that cannot be discarded.
+	 */
+	WT_RET(__wt_rec_wrapup(session, page, &discard));
 
 	/* Optionally discard the in-memory page. */
 	if (discard) {
@@ -152,6 +152,10 @@ __wt_page_reconcile(
 			btree->root_page.page = NULL;
 		__wt_page_discard(session, page);
 	}
+
+	/* Free the original disk blocks. */
+	if (page->addr != WT_ADDR_INVALID)
+		WT_RET(__wt_block_free(session, page->addr, page->size));
 
 	/*
 	 * Newly created internal pages are normally merged into their parents
@@ -1395,15 +1399,17 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
  *	Resolve the WT_REC_LIST information.
  */
 static int
-__wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
+__wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 {
 	BTREE *btree;
 	WT_PAGE *new;
 	WT_REC_LIST *r;
+	int discard;
 
 	btree = session->btree;
-	r = &S2C(session)->cache->reclist;
 	new = NULL;
+	r = &S2C(session)->cache->reclist;
+	discard = *discardp;
 
 	/*
 	 * If all entries on the page were deleted, mark the page to be merged
@@ -1413,6 +1419,13 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: delete page %lu (%luB)",
 		    (u_long)page->addr, (u_long)page->size));
+
+		/*
+		 * Deleted pages cannot be discarded because they're no longer
+		 * backed by file blocks -- clear our callers discard flag, the
+		 * page will be discarded when the parent is reconciled.
+		 */
+		*discardp = 0;
 
 		return (__wt_rec_parent_update_dirty(session, page,
 		    NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED | WT_REF_MERGE));
