@@ -181,6 +181,24 @@ combine:/*
 	if (fe == NULL)
 		TAILQ_INSERT_TAIL(&btree->freeqa, new, qa);
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Check to make sure we haven't inserted overlapping ranges. */
+	if (((fe = TAILQ_PREV(new, __wt_free_qah, qa)) != NULL &&
+	    fe->addr + (fe->size / btree->allocsize) > new->addr) ||
+	    ((fe = TAILQ_NEXT(new, qa)) != NULL &&
+	    new->addr + (new->size / btree->allocsize) > fe->addr)) {
+		__wt_errx(session,
+		    "block free at addr range %lu-%lu overlaps already free "
+		    "block at addr range %lu-%lu",
+		    (u_long)new->addr,
+		    (u_long)new->addr + (new->size / btree->allocsize),
+		    (u_long)fe->addr,
+		    (u_long)fe->addr + (fe->size / btree->allocsize));
+		TAILQ_REMOVE(&btree->freeqa, new, qa);
+		return (WT_ERROR);
+	}
+#endif
+
 	/*
 	 * The variable new now references a WT_FREE_ENTRY structure not linked
 	 * into the size list at all (if it was linked in, we unlinked it while
