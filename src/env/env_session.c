@@ -163,12 +163,15 @@ static const char *__wt_session_print_state(SESSION *);
  * __wt_session_dump --
  *	Dump information about open sessions.
  */
-int
-__wt_session_dump(CONNECTION *conn)
+void
+__wt_session_dump(SESSION *session)
 {
-	SESSION *session, **tp;
+	CONNECTION *conn;
+	SESSION **tp;
 	WT_HAZARD *hp;
 	WT_MBUF mb;
+
+	conn = S2C(session);
 
 	__wt_mb_init(&conn->default_session, &mb);
 
@@ -201,7 +204,6 @@ __wt_session_dump(CONNECTION *conn)
 	}
 
 	__wt_mb_discard(&mb);
-	return (0);
 }
 
 /*
