@@ -73,7 +73,7 @@ __wt_stat_page_col_fix(SESSION *session, WT_PAGE *page)
 	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
-	WT_COL_INDX_FOREACH(page, cip, i)
+	WT_COL_FOREACH(page, cip, i)
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL)
 			if (WT_FIX_DELETE_ISSET(WT_COL_PTR(page, cip)))
 				WT_STAT_INCR(stats, file_item_col_deleted);
@@ -105,7 +105,7 @@ __wt_stat_page_col_rle(SESSION *session, WT_PAGE *page)
 	stats = session->btree->fstats;
 
 	/* Walk the page, counting data items. */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 		if (WT_FIX_DELETE_ISSET(WT_RLE_REPEAT_DATA(cipdata))) {
 			WT_STAT_INCRV(stats,
@@ -162,7 +162,7 @@ __wt_stat_page_col_var(SESSION *session, WT_PAGE *page)
 	 * figure out if it will require the same space or not, especially if
 	 * there's Huffman encoding).
 	 */
-	WT_COL_INDX_FOREACH(page, cip, i)
+	WT_COL_FOREACH(page, cip, i)
 		switch (WT_CELL_TYPE(WT_COL_PTR(page, cip))) {
 		case WT_CELL_DATA:
 		case WT_CELL_DATA_OVFL:
@@ -205,7 +205,7 @@ __wt_stat_page_row_leaf(SESSION *session, WT_PAGE *page, void *arg)
 			++cnt;
 
 	/* Stat the page's K/V pairs. */
-	WT_ROW_INDX_FOREACH(page, rip, i) {
+	WT_ROW_FOREACH(page, rip, i) {
 		upd = WT_ROW_UPDATE(page, rip);
 		if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
 			++cnt;

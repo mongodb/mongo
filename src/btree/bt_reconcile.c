@@ -737,7 +737,7 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	    session->btree->leafmin, &unused, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 
 		/*
@@ -813,7 +813,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	    session->btree->leafmin, &recno, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 		/*
 		 * Generate entries for the new page: loop through the repeat
@@ -918,7 +918,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 	    session->btree->leafmin, &recno, &first_free, &space_avail));
 
 	/* For each entry in the in-memory page... */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		/*
 		 * Get a reference to the value: it's either an update or the
 		 * original on-page item.
@@ -1198,7 +1198,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 	 * We have to walk both the WT_ROW structures and the original page --
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 */
-	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_cell, i) {
+	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i) {
 		/*
 		 * The salvage code, on some rare occasions, wants to reconcile
 		 * a page but skip some leading records on the page.  Because

@@ -158,7 +158,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	 * information, we're done.
 	 */
 	if (cmp == 0) {
-		session->srch_slot = slot = WT_ROW_INDX_SLOT(page, rip);
+		session->srch_slot = slot = WT_ROW_SLOT(page, rip);
 		if (page->u.row_leaf.upd != NULL) {
 			session->srch_upd = &page->u.row_leaf.upd[slot];
 			session->srch_vupdate = page->u.row_leaf.upd[slot];
@@ -194,7 +194,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		session->srch_slot = page->indx_count;
 	} else {
 		ins = WT_ROW_INSERT(page, rip);
-		session->srch_slot = WT_ROW_INDX_SLOT(page, rip);
+		session->srch_slot = WT_ROW_SLOT(page, rip);
 	}
 	if (page->u.row_leaf.ins != NULL)
 		session->srch_ins = &page->u.row_leaf.ins[session->srch_slot];

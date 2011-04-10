@@ -121,7 +121,7 @@ __wt_dump_page_col_fix(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	btree = session->btree;
 
 	/* Walk the page, dumping data items. */
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 		if ((upd = WT_COL_UPDATE(page, cip)) == NULL) {
 			if (!WT_FIX_DELETE_ISSET(cipdata))
@@ -156,7 +156,7 @@ __wt_dump_page_col_rle(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	ret = 0;
 
 	recno = page->u.col_leaf.recno;
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipdata = WT_COL_PTR(page, cip);
 		/*
 		 * Dump the records.   We use the WT_UPDATE entry for records in
@@ -202,7 +202,7 @@ __wt_dump_page_col_var(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		/* Check for update. */
 		if ((upd = WT_COL_UPDATE(page, cip)) != NULL) {
 			if (!WT_UPDATE_DELETED_ISSET(upd))
@@ -276,7 +276,7 @@ __wt_dump_page_row_leaf(SESSION *session, WT_PAGE *page, WT_DSTUFF *dp)
 	}
 
 	/* Dump the page's K/V pairs. */
-	WT_ROW_INDX_FOREACH(page, rip, i) {
+	WT_ROW_FOREACH(page, rip, i) {
 		/* Check for deletion. */
 		upd = WT_ROW_UPDATE(page, rip);
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))

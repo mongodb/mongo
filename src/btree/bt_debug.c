@@ -240,7 +240,7 @@ __wt_debug_page_col_fix(SESSION *session, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipvalue = WT_COL_PTR(page, cip);
 		fprintf(fp, "\tV {");
 		if (WT_FIX_DELETE_ISSET(cipvalue))
@@ -291,7 +291,7 @@ __wt_debug_page_col_rle(SESSION *session, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cipvalue = WT_COL_PTR(page, cip);
 		fprintf(fp,
 		    "\trepeat %lu {", (u_long)WT_RLE_REPEAT_COUNT(cipvalue));
@@ -321,7 +321,7 @@ __wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		fprintf(fp, "\tV {");
 		WT_RET(
 		    __wt_debug_cell_data(session, WT_COL_PTR(page, cip), fp));
@@ -378,7 +378,7 @@ __wt_debug_page_row_leaf(SESSION *session, WT_PAGE *page, FILE *fp)
 		__wt_debug_row_insert(ins, fp);
 
 	/* Dump the page's K/V pairs. */
-	WT_ROW_INDX_FOREACH(page, rip, i) {
+	WT_ROW_FOREACH(page, rip, i) {
 		if (__wt_key_process(rip))
 			fprintf(fp, "\tK: {requires processing}\n");
 		else

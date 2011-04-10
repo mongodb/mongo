@@ -225,7 +225,7 @@ recno_chk:	if (parent_recno != recno) {
 		break;
 	case WT_PAGE_COL_RLE:
 		recno = 0;
-		WT_COL_INDX_FOREACH(page, cip, i)
+		WT_COL_FOREACH(page, cip, i)
 			recno += WT_RLE_REPEAT_COUNT(WT_COL_PTR(page, cip));
 		vs->record_total += recno;
 		break;

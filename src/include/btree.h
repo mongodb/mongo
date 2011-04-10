@@ -563,22 +563,22 @@ struct __wt_row {
 	WT_PAGE_DISK_REF((page)->XXdsk, (rip)->value)
 
 /*
- * WT_ROW_INDX_FOREACH --
+ * WT_ROW_FOREACH --
  *	Walk the entries of an in-memory row-store leaf page.
  */
-#define	WT_ROW_INDX_FOREACH(page, rip, i)				\
+#define	WT_ROW_FOREACH(page, rip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (rip) = (page)->u.row_leaf.d; (i) > 0; ++(rip), --(i))
-#define	WT_ROW_INDX_FOREACH_REVERSE(page, rip, i)			\
+#define	WT_ROW_FOREACH_REVERSE(page, rip, i)				\
 	for ((i) = (page)->indx_count,					\
 	    (rip) = (page)->u.row_leaf.d + ((page)->indx_count - 1);	\
 	    (i) > 0; --(rip), --(i))
 
 /*
- * WT_ROW_INDX_SLOT --
+ * WT_ROW_SLOT --
  *	Return the array offset based on a WT_ROW reference.
  */
-#define	WT_ROW_INDX_SLOT(page, rip)					\
+#define	WT_ROW_SLOT(page, rip)						\
 	((uint32_t)(((WT_ROW *)rip) - (page)->u.row_leaf.d))
 
 /*
@@ -615,18 +615,18 @@ struct __wt_col {
 	WT_PAGE_DISK_REF((page)->XXdsk, (cip)->value)
 
 /*
- * WT_COL_INDX_FOREACH --
+ * WT_COL_FOREACH --
  *	Walk the entries of an in-memory column-store leaf page.
  */
-#define	WT_COL_INDX_FOREACH(page, cip, i)				\
+#define	WT_COL_FOREACH(page, cip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (cip) = (page)->u.col_leaf.d; (i) > 0; ++(cip), --(i))
 
 /*
- * WT_COL_INDX_SLOT --
+ * WT_COL_SLOT --
  *	Return the array offset based on a WT_COL reference.
  */
-#define	WT_COL_INDX_SLOT(page, cip)					\
+#define	WT_COL_SLOT(page, cip)						\
 	((uint32_t)(((WT_COL *)cip) - (page)->u.col_leaf.d))
 
 /*
@@ -719,10 +719,10 @@ struct __wt_insert {
  */
 #define	WT_COL_UPDATE(page, ip)						\
 	((page)->u.col_leaf.upd == NULL ?				\
-	    NULL : (page)->u.col_leaf.upd[WT_COL_INDX_SLOT(page, ip)])
+	    NULL : (page)->u.col_leaf.upd[WT_COL_SLOT(page, ip)])
 #define	WT_COL_INSERT(page, ip)						\
 	((page)->u.col_leaf.ins == NULL ?				\
-	    NULL : (page)->u.col_leaf.ins[WT_COL_INDX_SLOT(page, ip)])
+	    NULL : (page)->u.col_leaf.ins[WT_COL_SLOT(page, ip)])
 /*
  * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
  * the "one per WT_ROW slot" insert array.  That's because the insert array
@@ -734,13 +734,13 @@ struct __wt_insert {
 	    NULL : (page)->u.row_leaf.ins[(page)->indx_count])
 #define	WT_ROW_INSERT(page, ip)						\
 	((page)->u.row_leaf.ins == NULL ?				\
-	    NULL : (page)->u.row_leaf.ins[WT_ROW_INDX_SLOT(page, ip)])
+	    NULL : (page)->u.row_leaf.ins[WT_ROW_SLOT(page, ip)])
 #define	WT_ROW_UPDATE(page, ip)						\
 	((page)->u.row_leaf.upd == NULL ?				\
-	    NULL : (page)->u.row_leaf.upd[WT_ROW_INDX_SLOT(page, ip)])
+	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
 
 /*
- * WT_ROW_{REF,INDX}_AND_KEY_FOREACH --
+ * WT_{ROW,ROW_REF}_AND_KEY_FOREACH --
  *	Walk the indexes of a row-store in-memory page at the same time walking
  * the underlying page's key WT_CELLs.
  *
@@ -770,7 +770,7 @@ struct __wt_insert {
 	    ++(rref),							\
 	    key_cell = --(i) == 0 ?					\
 	    NULL : WT_CELL_NEXT(WT_CELL_NEXT(key_cell)))
-#define	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_cell, i)		\
+#define	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i)			\
 	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->XXdsk),		\
 	    (rip) = (page)->u.row_leaf.d, (i) = (page)->indx_count;	\
 	    (i) > 0;							\

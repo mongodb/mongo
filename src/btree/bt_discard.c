@@ -163,7 +163,7 @@ __wt_discard_page_row_leaf(SESSION *session, WT_PAGE *page)
 	 * points somewhere other than the original page), and if so, free
 	 * the memory.
 	 */
-	WT_ROW_INDX_FOREACH(page, rip, i)
+	WT_ROW_FOREACH(page, rip, i)
 		if (__wt_ref_off_page(page, rip->key))
 			__wt_free(session, rip->key);
 	__wt_free(session, page->u.row_leaf.d);

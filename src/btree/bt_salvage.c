@@ -1034,7 +1034,7 @@ __slvg_build_leaf_col(SESSION *session,
 		/*
 		 * Adjust the page information to "see" only keys we care about.
 		 */
-		WT_COL_INDX_FOREACH(page, cip, i) {
+		WT_COL_FOREACH(page, cip, i) {
 			cipdata = WT_COL_PTR(page, cip);
 			n_repeat = WT_RLE_REPEAT_COUNT(cipdata);
 			if (skip > 0) {
@@ -1070,7 +1070,7 @@ __slvg_build_leaf_col(SESSION *session,
 			WT_RLE_REPEAT_COUNT(cipdata) = take;
 			break;
 		}
-		page->indx_count = WT_COL_INDX_SLOT(page, cip);
+		page->indx_count = WT_COL_SLOT(page, cip);
 		break;
 	}
 
@@ -1117,7 +1117,7 @@ __slvg_ovfl_col_inmem_ref(WT_PAGE *page, WT_STUFF *ss)
 	WT_TRACK **searchp;
 	uint32_t i;
 
-	WT_COL_INDX_FOREACH(page, cip, i) {
+	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
 		if (WT_CELL_TYPE(cell) != WT_CELL_DATA_OVFL)
 			continue;
@@ -1498,7 +1498,7 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	 */
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
-		WT_ROW_INDX_FOREACH(page, rip, i) {
+		WT_ROW_FOREACH(page, rip, i) {
 			if (__wt_key_process(rip)) {
 				WT_ERR(
 				    __wt_cell_process(session, rip->key, key));
@@ -1512,7 +1512,7 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			++skip_start;
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
-		WT_ROW_INDX_FOREACH_REVERSE(page, rip, i) {
+		WT_ROW_FOREACH_REVERSE(page, rip, i) {
 			if (__wt_key_process(rip)) {
 				WT_ERR(
 				    __wt_cell_process(session, rip->key, key));
@@ -1621,7 +1621,7 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 	WT_TRACK **searchp;
 	uint32_t i;
 
-	WT_ROW_INDX_AND_KEY_FOREACH(page, rip, key_cell, i) {
+	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i) {
 		/* Skip any leading keys on the page we're not keeping. */
 		if (skip_start != 0) {
 			--skip_start;

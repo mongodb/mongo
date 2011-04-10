@@ -113,7 +113,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		 * calculation in a funny way to avoid overflow.
 		 */
 		record_cnt = recno - page->u.col_leaf.recno;
-		WT_COL_INDX_FOREACH(page, cip, i) {
+		WT_COL_FOREACH(page, cip, i) {
 			cipdata = WT_COL_PTR(page, cip);
 			if (record_cnt < WT_RLE_REPEAT_COUNT(cipdata)) {
 				record_cnt = 0;
@@ -135,7 +135,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		slot = WT_COL_INDX_SLOT(page, cip);
+		slot = WT_COL_SLOT(page, cip);
 		if (page->u.col_leaf.upd == NULL)
 			session->srch_slot = slot;
 		else {
@@ -170,7 +170,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		 * Do an initial setup of the return information (we'll correct
 		 * it as needed depending on what we find).
 		 */
-		session->srch_slot = WT_COL_INDX_SLOT(page, cip);
+		session->srch_slot = WT_COL_SLOT(page, cip);
 		if (page->u.col_leaf.ins != NULL)
 			session->srch_ins =
 			    &page->u.col_leaf.ins[session->srch_slot];
