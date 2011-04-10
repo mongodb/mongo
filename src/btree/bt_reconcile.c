@@ -91,14 +91,15 @@ __wt_page_reconcile(
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/*
-	 * Clean pages are simple: update the parent's state and optionally
-	 * discard the page.
+	 * Clean pages are simple: update the parent's state and discard the
+	 * page.  (It makes on sense to do reconciliation on a clean page if
+	 * you're not going to discard it.)
 	 */
 	if (!WT_PAGE_IS_MODIFIED(page)) {
-		__wt_rec_parent_update_clean(page);
-
-		if (discard)
+		if (discard) {
+			__wt_rec_parent_update_clean(page);
 			__wt_page_discard(session, page);
+		}
 		return (0);
 	}
 
@@ -552,10 +553,11 @@ __wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 	r_list = &r->list[r->l_next++];
 	r_list->off.addr = addr;
 	r_list->off.size = size;
+	r_list->deleted = 0;
 
 	/* Deletes are easy -- just flag the fact and we're done. */
 	if (deleted) {
-		r_list->deleted = deleted;
+		r_list->deleted = 1;
 		return (0);
 	}
 
@@ -1477,10 +1479,6 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 static void
 __wt_rec_parent_update_clean(WT_PAGE *page)
 {
-	/* If we're reconciling the root page, there's no work to do. */
-	if (WT_PAGE_IS_ROOT(page))
-		return;
-
 	/*
 	 * Update the relevant WT_REF structure; no memory flush is needed,
 	 * the state field is declared volatile.
