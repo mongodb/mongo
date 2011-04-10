@@ -84,6 +84,10 @@ main(int argc, char *argv[])
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 
+		wts_teardown();		/* Close and  re-open */
+		if (wts_startup())
+			goto err;
+
 		if (wts_verify())		/* Verify the file */
 			goto err;
 						/* Loop reading & operations */
@@ -99,9 +103,6 @@ main(int argc, char *argv[])
 				break;
 
 			if (wts_ops())		/* Random operations */
-				goto err;
-
-			if (wts_verify())	/* Verify the file */
 				goto err;
 
 			wts_teardown();		/* Close and  re-open */
@@ -126,9 +127,6 @@ main(int argc, char *argv[])
 		if (wts_salvage())		/* Salvage the file */
 			goto err;
 #endif
-
-		if (wts_verify())		/* Verify the file */
-			goto err;
 
 		track("shutting down WT", 0);
 		wts_teardown();
