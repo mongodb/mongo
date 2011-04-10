@@ -275,7 +275,7 @@ __wt_block_write(SESSION *session)
 	 */
 	total_entries = btree->freelist_entries + 2;
 	size = WT_ALIGN(WT_PAGE_DISK_SIZE +
-	     total_entries * sizeof(WT_FREE_ENTRY), btree->allocsize);
+	     total_entries * 2 * sizeof(uint32_t), btree->allocsize);
 
 	/* Allocate room at the end of the file. */
 	__wt_block_extend(session, &addr, size);
@@ -283,16 +283,10 @@ __wt_block_write(SESSION *session)
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
-	/*
-	 * We don't have to clear the page's data (we do have to clear the
-	 * header), but this only happens when the file shuts down cleanly,
-	 * it doesn't seem like a big deal.
-	 */
-	memset(tmp->mem, 0, size);
-
-	/* Initialize the page's header. */
+	/* Clear the page's header and data, initialize the header. */
 	dsk = tmp->mem;
-	dsk->u.datalen = total_entries * WT_SIZEOF32(WT_FREE_ENTRY);
+	memset(dsk, 0, size);
+	dsk->u.datalen = total_entries * 2 * sizeof(uint32_t);
 	dsk->type = WT_PAGE_FREELIST;
 
 	/*
@@ -307,7 +301,8 @@ __wt_block_write(SESSION *session)
 	}
 	*p++ = addr;			/* The free-list chunk itself. */
 	*p++ = size;
-	*p++ = WT_ADDR_INVALID;		/* The list terminating value. */
+	*p++ = WT_ADDR_INVALID;		/* The list terminating values. */
+	*p = 0;
 
 	/* Write the free list to disk. */
 	WT_ERR(__wt_disk_write(session, dsk, addr, size));
