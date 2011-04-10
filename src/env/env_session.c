@@ -189,13 +189,16 @@ __wt_session_dump(SESSION *session)
 
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = session->hazard;
-		    hp < session->hazard + conn->hazard_size; ++hp)
+		    hp < session->hazard + conn->hazard_size; ++hp) {
+			if (hp->page == NULL)
+				continue;
 #ifdef HAVE_DIAGNOSTIC
-			__wt_mb_add(&mb, "\t\t%p: %s, line %d\n",
-			    hp->page, hp->file, hp->line);
+			__wt_mb_add(&mb, "\t\t%lu: %s, line %d\n",
+			    hp->page->addr, hp->file, hp->line);
 #else
-			__wt_mb_add(&mb, "\t\t%p\n", hp->page);
+			__wt_mb_add(&mb, "\t\t%lu\n", hp->page->addr);
 #endif
+		}
 
 		__wt_mb_add(&mb, "}");
 		if (session->name != NULL)
