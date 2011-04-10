@@ -142,6 +142,17 @@ __wt_page_reconcile(
 	 */
 	WT_RET(__wt_rec_wrapup(session, page, &discard));
 
+	/*
+	 * Free the original disk blocks: we've either written a new disk block
+	 * referenced by the parent, or we're discarding the page entirely, and
+	 * in either case, the page's address has changed.
+	 */
+	if (page->addr != WT_ADDR_INVALID) {
+		WT_RET(__wt_block_free(session, page->addr, page->size));
+		page->addr = WT_ADDR_INVALID;
+		page->size = 0;
+	}
+
 	/* Optionally discard the in-memory page. */
 	if (discard) {
 		/*
@@ -152,10 +163,6 @@ __wt_page_reconcile(
 			btree->root_page.page = NULL;
 		__wt_page_discard(session, page);
 	}
-
-	/* Free the original disk blocks. */
-	if (page->addr != WT_ADDR_INVALID)
-		WT_RET(__wt_block_free(session, page->addr, page->size));
 
 	/*
 	 * Newly created internal pages are normally merged into their parents
