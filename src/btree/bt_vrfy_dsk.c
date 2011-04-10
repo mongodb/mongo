@@ -46,6 +46,32 @@ __wt_verify_dsk_page(
 		return (WT_ERROR);
 	}
 
+	/* Check the page record number. */
+	switch (dsk->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
+		if (dsk->recno == 0) {
+			__wt_errx(session,
+			    "%s page at addr %lu has a record number of zero",
+			    (u_long)addr, __wt_page_type_string(dsk->type));
+			return (WT_ERROR);
+		}
+		break;
+	case WT_PAGE_FREELIST:
+	case WT_PAGE_OVFL:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		if (dsk->recno != 0) {
+			__wt_errx(session,
+			    "%s page at addr %lu has a non-zero record number",
+			    (u_long)addr, __wt_page_type_string(dsk->type));
+			return (WT_ERROR);
+		}
+		break;
+	}
+
 	/*
 	 * FUTURE:
 	 * Check the LSN against the existing log files.
