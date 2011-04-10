@@ -149,8 +149,13 @@ __wt_page_reconcile(
 	 */
 	if (page->addr != WT_ADDR_INVALID) {
 		WT_RET(__wt_block_free(session, page->addr, page->size));
+		/*
+		 * !!!
+		 * DO NOT RESET THE PAGE SIZE!  It's used during page discard
+		 * to figure out if a memory reference is off-page, that is,
+		 * if it needs to be free'd.
+		 */
 		page->addr = WT_ADDR_INVALID;
-		page->size = 0;
 	}
 
 	/* Optionally discard the in-memory page. */
