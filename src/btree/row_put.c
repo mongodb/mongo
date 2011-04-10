@@ -110,9 +110,9 @@ __wt_row_update(SESSION *session, WT_ITEM *key, WT_ITEM *value, int is_write)
 
 	if (ret != 0) {
 err:		if (ins != NULL)
-			__wt_sb_free_error(session, ins->sb);
+			__wt_sb_decrement(session, ins->sb);
 		if (upd != NULL)
-			__wt_sb_free_error(session, upd->sb);
+			__wt_sb_decrement(session, upd->sb);
 	}
 
 	/* Free any insert array unless the workQ used it. */

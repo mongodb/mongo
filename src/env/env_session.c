@@ -67,32 +67,14 @@ __wt_session_close(SESSION *session)
 {
 	CONNECTION *conn;
 	SESSION **tp;
-	SESSION_BUFFER *sb;
 	int ret;
 
 	conn = S2C(session);
 	ret = 0;
 
-	/*
-	 * The "in" reference count is artificially incremented by 1 as
-	 * long as a session buffer is referenced by the session thread;
-	 * we don't want them freed because a page was evicted and their
-	 * count went to 0.  Decrement the reference count on the buffer
-	 * as part of releasing it.  There's a similar reference count
-	 * decrement when the session structure is discarded.
-	 *
-	 * XXX
-	 * There's a race here: if this code, or the session structure
-	 * close code, and the page discard code race, it's possible
-	 * neither will realize the buffer is no longer needed and free
-	 * it.  The fix is to involve the eviction or workQ threads:
-	 * they may need a linked list of buffers they review to ensure
-	 * it never happens.  I'm living with this now: it's unlikely
-	 * and it's a memory leak if it ever happens.
-	 */
-	sb = session->sb;
-	if (sb != NULL && --sb->in == sb->out)
-		__wt_free(session, sb);
+	/* Unpin the current per-SESSION buffer. */
+	if (session->sb != NULL)
+		__wt_sb_decrement(session, session->sb);
 
 	/* Discard scratch buffers. */
 	__wt_scr_free(session);

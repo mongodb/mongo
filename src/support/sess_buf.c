@@ -67,7 +67,7 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	 * We start by allocating 4KB for the thread, then every time we have
 	 * to re-allocate the buffer, we double the allocation size, up to a
 	 * total of 256KB, that way any thread that is doing a lot of updates
-	 * doesn't keep churning through memory.
+	 * doesn't re-allocate new chunks of memory so often.
 	 */
 	if (session->update_alloc_size == 0)
 		session->update_alloc_size = 4 * 1024;
@@ -95,29 +95,19 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	sb->first_free = (uint8_t *)sb + sizeof(SESSION_BUFFER);
 
 	/*
-	 * If it's a single use allocation, ignore any current SESSION buffer.
-	 * Else, release the old SESSION buffer and replace it with the new one.
+	 * If it's a single use allocation, ignore any current SESSION buffer;
+	 * else, release the old SESSION buffer and replace it with the new one.
 	 */
 	if (!single_use) {
 		/*
 		 * The "in" reference count is artificially incremented by 1 as
 		 * long as a SESSION buffer is referenced by the SESSION thread;
-		 * we don't want them freed because a page was evicted and the
-		 * count went to 0.  Decrement the reference count on the buffer
-		 * as part of releasing it.  There's a similar reference count
-		 * decrement when the SESSION structure is discarded.
-		 *
-		 * XXX
-		 * There's a race here: if this code, or the SESSION structure
-		 * close code, and the page discard code race, it's possible
-		 * neither will realize the buffer is no longer needed and free
-		 * it.  The fix is to involve the eviction or workQ threads:
-		 * they may need a linked list of buffers they review to ensure
-		 * it never happens.  I'm living with this now: it's unlikely
-		 * and it's a memory leak if it ever happens.
+		 * we do not want SESSION buffers freed because a page was
+		 * evicted and the count went to 0 while the buffer might still
+		 * be used for future K/V inserts or modifications.
 		 */
 		if (session->sb != NULL)
-			--session->sb->in;
+			__wt_sb_decrement(session, session->sb);
 		session->sb = sb;
 
 		sb->in = 1;
@@ -135,28 +125,64 @@ no_allocation:
 }
 
 /*
- * __wt_sb_free_error --
- *	Free a chunk of data from the SESSION_BUFFER, in an error path.
+ * __wt_sb_free --
+ *	Free a chunk of memory from a per-SESSION buffer.
  */
 void
-__wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb)
+__wt_sb_free(SESSION *session, SESSION_BUFFER *sb)
+{
+	WT_ASSERT(session, sb->out < sb->in);
+
+	if (++sb->out == sb->in)
+		__wt_free(session, sb);
+}
+
+/*
+ * __wt_sb_decrement --
+ *	Decrement the "insert" value of a per-SESSION buffer.
+ */
+void
+__wt_sb_decrement(SESSION *session, SESSION_BUFFER *sb)
 {
 	/*
-	 * It's possible we allocated a WT_UPDATE structure and associated item
-	 * memory from the SESSION buffer, but then an error occurred.  Don't
-	 * try and clean up the SESSION buffer, it's simpler to decrement the
-	 * use count and let the page discard code deal with it during the
-	 * page reconciliation process.  (Note we're still in the allocation
-	 * path, so we decrement the "in" field, instead of incrementing the
-	 * "out" field -- if the eviction thread updates that field, we could
-	 * race.
+	 * This function is used in for two reasons.
+	 *
+	 * #1: it's possible we allocated a WT_UPDATE structure and related K/V
+	 * memory from the SESSION buffer, but then an error occurred.  In this
+	 * case we don't try and clean up the SESSION buffer, it's simpler to
+	 * decrement the counters and pretend the memory is no longer in use.
+	 * We're still in the allocation path, so we decrement the "in" field
+	 * instead of incrementing the "out" field, if the eviction thread were
+	 * to update the "out" field at the same time, we could race.
+	 *
+	 * #2: the "in" reference count is artificially incremented by 1 as
+	 * long as a SESSION buffer is referenced by the SESSION thread; we do
+	 * not want SESSION buffers freed because a page was evicted and the
+	 * count went to 0 while the buffer might still be used for future K/V
+	 * inserts or modifications.
 	 */
 	--sb->in;
 
 	/*
-	 * One other thing: if the SESSION buffer was a one-off, we have to free
-	 * it here, it's not linked to any WT_PAGE in the system.
+	 * In the above case #1, if the SESSION buffer was a one-off (allocated
+	 * for a single use), we have to free it here, it's not linked to any
+	 * WT_PAGE in the system.
+	 *
+	 * In the above case #2, our artificial increment might be the last
+	 * reference, if all of the WT_PAGE's referencing this buffer have been
+	 * reconciled since the K/V inserts or modifications.
+	 *
+	 * In both of these cases, sb->in == sb->out, and we need to free the
+	 * buffer.
+	 *
+	 * XXX
+	 * There's a race here in the above case #2: if this code, and the page
+	 * discard code race, it's possible neither will realize the buffer is
+	 * no longer needed and free it.  The fix is to involve the eviction or
+	 * workQ threads: they may need a linked list of buffers they review to
+	 * ensure it never happens.  I'm living with this now: it's an unlikely
+	 * race, and it's a memory leak if it ever happens.
 	 */
-	if (sb->in == 0)
+	if (sb->in == sb->out)
 		__wt_free(session, sb);
 }

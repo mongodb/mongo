@@ -413,7 +413,8 @@ int __wt_sb_alloc(SESSION *session,
     size_t size,
     void *retp,
     SESSION_BUFFER **sbp);
-void __wt_sb_free_error(SESSION *session, SESSION_BUFFER *sb);
+void __wt_sb_free(SESSION *session, SESSION_BUFFER *sb);
+void __wt_sb_decrement(SESSION *session, SESSION_BUFFER *sb);
 int __wt_stat_alloc_btree_stats(SESSION *session, WT_BTREE_STATS **statsp);
 void __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats);
 void __wt_stat_print_btree_stats(WT_BTREE_STATS *stats, FILE *stream);

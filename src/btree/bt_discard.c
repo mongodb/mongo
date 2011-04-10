@@ -17,7 +17,6 @@ static void __wt_discard_page_row_int(SESSION *, WT_PAGE *);
 static void __wt_discard_page_row_leaf(SESSION *, WT_PAGE *);
 static void __wt_discard_update(SESSION *, WT_UPDATE **, uint32_t);
 static void __wt_discard_update_list(SESSION *, WT_UPDATE *);
-static inline void __wt_sb_free(SESSION *, SESSION_BUFFER *);
 
 /*
  * __wt_page_discard --
@@ -241,16 +240,4 @@ __wt_discard_update_list(SESSION *session, WT_UPDATE *upd)
 		next = upd->next;
 		__wt_sb_free(session, upd->sb);
 	} while ((upd = next) != NULL);
-}
-
-/*
- * __wt_sb_free --
- *	Free a chunk of memory from a per-SESSION buffer.
- */
-static inline void
-__wt_sb_free(SESSION *session, SESSION_BUFFER *sb)
-{
-	WT_ASSERT(session, sb->out < sb->in);
-	if (++sb->out == sb->in)
-		__wt_free(session, sb);
 }
