@@ -291,6 +291,10 @@ namespace mongo {
             return hash( x.number() , y.number() );
         }
 
+        GeoHash hash( const Point& p ) const {
+        	return hash( p._x, p._y );
+        }
+
         GeoHash hash( double x , double y ) const {
             return GeoHash( _convert(x), _convert(y) , _bits );
         }
@@ -465,6 +469,10 @@ namespace mongo {
             return ( _max._x - _min._x ) * ( _max._y - _min._y );
         }
 
+        double maxDim() const {
+        	return max( _max._x - _min._x, _max._y - _min._y );
+        }
+
         Point center() const {
             return Point( ( _min._x + _max._x ) / 2 ,
                           ( _min._y + _max._y ) / 2 );
@@ -530,10 +538,10 @@ namespace mongo {
                     if ( p._y <= std::max( p1._y, p2._y ) ) {
                         if ( p._x <= std::max( p1._x, p2._x ) ) {
                             if ( p1._y != p2._y ) {
-                                 double xinters = (p._y-p1._y)*(p2._x-p1._x)/(p2._y-p1._y)+p1._x;
-                                 if ( p1._x == p2._x || p._x <= xinters ) {
-                                      counter++;
-                                 }
+                                double xinters = (p._y-p1._y)*(p2._x-p1._x)/(p2._y-p1._y)+p1._x;
+                                if ( p1._x == p2._x || p._x <= xinters ) {
+                                    counter++;
+                                }
                             }
                         }
                     }
@@ -543,7 +551,8 @@ namespace mongo {
 
             if ( counter % 2 == 0 ) {
                 return false;
-            } else {
+            }
+            else {
                 return true;
             }
         }
@@ -555,7 +564,7 @@ namespace mongo {
 
             /* Centroid is cached, it won't change betwen points */
             if ( _centroidCalculated ) {
-              return _centroid;
+                return _centroid;
             }
 
             Point cent;
@@ -565,10 +574,10 @@ namespace mongo {
             /// For all vertices except last
             int i = 0;
             for ( i = 0; i < size() - 1; ++i ) {
-              area = _points[i]._x * _points[i+1]._y - _points[i+1]._x * _points[i]._y ;
-              signedArea += area;
-              cent._x += ( _points[i]._x + _points[i+1]._x ) * area;
-              cent._y += ( _points[i]._y + _points[i+1]._y ) * area;
+                area = _points[i]._x * _points[i+1]._y - _points[i+1]._x * _points[i]._y ;
+                signedArea += area;
+                cent._x += ( _points[i]._x + _points[i+1]._x ) * area;
+                cent._y += ( _points[i]._y + _points[i+1]._y ) * area;
             }
 
             // Do last vertex
@@ -586,10 +595,33 @@ namespace mongo {
             return cent;
         }
 
+        Box bounds( void ) {
+
+        	// TODO: Cache this
+
+        	_bounds._max = _points[0];
+        	_bounds._min = _points[0];
+
+            for ( int i = 1; i < size(); i++ ) {
+
+            	_bounds._max._x = max( _bounds._max._x, _points[i]._x );
+            	_bounds._max._y = max( _bounds._max._y, _points[i]._y );
+            	_bounds._min._x = min( _bounds._min._x, _points[i]._x );
+            	_bounds._min._y = min( _bounds._min._y, _points[i]._y );
+
+            }
+
+            return _bounds;
+
+        }
+
     private:
 
         bool _centroidCalculated;
         Point _centroid;
+
+        Box _bounds;
+
         vector<Point> _points;
     };
 
@@ -1356,7 +1388,7 @@ namespace mongo {
                     farthest = std::min(_scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)));
                 }
                 GEODEBUGPRINT(farthest);
-                                
+
                 Box want( _startPt._x - farthest , _startPt._y - farthest , farthest * 2 );
                 GEODEBUGPRINT(want.toString());
 
@@ -1760,13 +1792,13 @@ namespace mongo {
                     int j = (_neighbor % 3) - 1;
 
                     if ( ( i == 0 && j == 0 ) ||
-                        ( i < 0 && _centerBox._min._x <= _g->_min ) ||
-                        ( j < 0 && _centerBox._min._y <= _g->_min ) ||
-                        ( i > 0 && _centerBox._max._x >= _g->_max ) ||
-                        ( j > 0 && _centerBox._max._y >= _g->_max ) ) {
-                       continue; // main box or wrapped edge
-                       // TODO:  We may want to enable wrapping in future, probably best as layer on top of
-                       // this search.
+                            ( i < 0 && _centerBox._min._x <= _g->_min ) ||
+                            ( j < 0 && _centerBox._min._y <= _g->_min ) ||
+                            ( i > 0 && _centerBox._max._x >= _g->_max ) ||
+                            ( j > 0 && _centerBox._max._y >= _g->_max ) ) {
+                        continue; // main box or wrapped edge
+                        // TODO:  We may want to enable wrapping in future, probably best as layer on top of
+                        // this search.
                     }
 
                     // Make sure we've got a reasonable center
@@ -2107,14 +2139,8 @@ namespace mongo {
     class GeoPolygonBrowse : public GeoBrowse {
     public:
 
-        enum State {
-            START ,
-            DOING_EXPAND ,
-            DONE
-        } _state;
-
         GeoPolygonBrowse( const Geo2dType* g , const BSONObj& polyPoints ,
-            BSONObj filter = BSONObj() ) : GeoBrowse( g , "polygon" , filter ) {
+                          BSONObj filter = BSONObj() ) : GeoBrowse( g , "polygon" , filter ) {
 
             GEODEBUG( "In Polygon" )
 
@@ -2126,54 +2152,29 @@ namespace mongo {
                 _poly.add( Point( i.next() ) );
             }
 
-            assert( _poly.size() >= 3 );
-
-            GeoHash _start = g->_tohash( first );
-            _prefix = _start;
-
-            _state = START;
-            _found = 0;
+            uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             ok();
         }
 
-        virtual bool moreToDo( void ) {
-            return _state != DONE;
+        // The initial geo hash box for our first expansion
+        virtual GeoHash expandStartHash() {
+            return _g->hash( _poly.centroid() );
         }
 
-        virtual void fillStack( void ) {
-            if ( _state == START ){
-
-                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max ,
-                                               _prefix , _found , this ) ){
-                    _state = DONE;
-                    return;
-                }
-                _state = DOING_EXPAND;
-            }
-
-            if ( _state == DOING_EXPAND ){
-                GEODEBUG( "polygon prefix [" << _prefix << "]" );
-                PREFIXDEBUG( _prefix , _g );
-
-                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
-                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
-
-                if ( ! _prefix.constrains() ){
-                    GEODEBUG( "\t exhausted the btree" );
-                    _state = DONE;
-                    return;
-                }
-
-                _prefix = _prefix.up();
-
-                return;
-            }
+        // Whether the current box width is big enough for our search area
+        virtual bool fitsInBox( double width ) {
+        	return _poly.bounds().maxDim() <= width;
         }
 
-        virtual bool checkDistance( const GeoHash& h , double& d ) {
+        // Whether the current box overlaps our search area
+        virtual bool intersectsBox( Box& cur ) {
+        	return _poly.bounds().intersects( cur );
+        }
 
-            Point p = Point( _g , h );
+        virtual bool checkDistance( const KeyNode& node, double& d ) {
+
+            Point p = Point( _g , GeoHash( node.key.firstElement() ) );
 
             // Find centroid of the polygon.
             Point centroid = _poly.centroid();
@@ -2186,7 +2187,8 @@ namespace mongo {
             bool in = _poly.contains( p );
             if ( in ) {
                 GEODEBUG( "Point: [" << p._x << ", " << p._y << "] in polygon" );
-            } else {
+            }
+            else {
                 GEODEBUG( "Point: [" << p._x << ", " << p._y << "] not in polygon" );
             }
             return in;
@@ -2195,10 +2197,8 @@ namespace mongo {
     private:
 
         Polygon _poly;
-        int _found;
-        GeoHash _prefix;
-        BtreeLocation _min;
-        BtreeLocation _max;
+        GeoHash _start;
+
     };
 
 
@@ -2269,9 +2269,10 @@ namespace mongo {
                 else if ( type == "$box" ) {
                     uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
                     shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
-                    return c;   
-                } else if ( startsWith( type, "$poly" ) ) {
-                    uassert( 13509 , "$polygon has to take an object or array" , e.isABSONObj() );
+                    return c;
+                }
+                else if ( startsWith( type, "$poly" ) ) {
+                    uassert( 14029 , "$polygon has to take an object or array" , e.isABSONObj() );
                     shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;
                 }
