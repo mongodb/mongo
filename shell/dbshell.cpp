@@ -50,7 +50,7 @@ bool autoKillOp = false;
 jmp_buf jbuf;
 #endif
 
-#if defined(USE_LINENOISE) && !defined(WIN32) && !defined(_WIN32) 
+#if defined(USE_LINENOISE)
 #define USE_TABCOMPLETION
 #endif
 

@@ -1179,10 +1179,7 @@ elif not onlyServer:
 
     coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
 
-    if not windows:
-        coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
-    else:
-        coreShellFiles.append( "third_party/linenoise/linenoise_win32.cpp" )
+    coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
 
     shellEnv.Prepend( LIBPATH=[ "." ] )
         
