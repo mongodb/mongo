@@ -498,9 +498,22 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_is_new,
 		__conn_open_session
 	};
+	static struct {
+		const char *vname;
+		uint32_t vflag;
+	} *vt, verbtypes[] = {
+		{ "fileops", WT_VERB_FILEOPS },
+		{ "hazard", WT_VERB_HAZARD },
+		{ "mutex", WT_VERB_MUTEX },
+		{ "read", WT_VERB_READ },
+		{ "evict", WT_VERB_EVICT }, 
+		{ NULL, 0 }
+	};
 	CONNECTION *conn;
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG vconfig;
+	WT_CONFIG_ITEM cval, vkey, vval;
 	const char *cfg[] = { __wt_config_def_wiredtiger_open, config, NULL };
+	uint32_t verbose;
 	int opened, ret;
 
 	opened = 0;
@@ -518,9 +531,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		library_init = 1;
 	}
 
-	WT_ERR(__wt_config_check(&conn->default_session,
-	    __wt_config_def_wiredtiger_open, config));
-
 	/*
 	 * !!!
 	 * We don't yet have a session handle to pass to the memory allocation
@@ -534,11 +544,31 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->default_session.iface.connection = &conn->iface;
 	conn->default_session.event_handler = event_handler;
 
-	/* XXX conn flags, including WT_MEMORY_CHECK */
 	WT_ERR(__wt_connection_config(conn));
+
+	WT_ERR(__wt_config_check(&conn->default_session,
+	    __wt_config_def_wiredtiger_open, config));
 
 	WT_ERR(__wt_config_gets(cfg, "cache_size", &cval));
 	WT_ERR(conn->cache_size_set(conn, (uint32_t)cval.val));
+
+	verbose = 0;
+	WT_ERR(__wt_config_gets(cfg, "verbose", &cval));
+	for (vt = verbtypes; vt->vname != NULL; vt++) {
+		WT_ERR(__wt_config_initn(&vconfig, cval.str, cval.len));
+		vkey.str = vt->vname;
+		vkey.len = strlen(vt->vname);
+		ret = __wt_config_getraw(&vconfig, &vkey, &vval);
+		if (ret == 0 && vval.val)
+			verbose |= vt->vflag;
+		else if (ret != WT_NOTFOUND)
+			goto err;
+	}
+	if (verbose != 0)
+		WT_ERR(conn->verbose_set(conn, verbose));
+	
+
+	/* XXX conn flags, including WT_MEMORY_CHECK */
 
 	WT_ERR(conn->open(conn, home, 0644, 0));
 	opened = 1;

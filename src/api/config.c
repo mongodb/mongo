@@ -448,6 +448,29 @@ val:		__process_value(value);
 }
 
 /*
+ * __wt_config_getraw --
+ *	Given a config parser, find the final value for a given key.
+ */
+int
+__wt_config_getraw(
+    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG_ITEM k, v;
+	int ret;
+
+	while ((ret = __wt_config_next(cparser, &k, &v)) == 0) {
+		if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
+		    key->len == k.len &&
+		    strncasecmp(key->str, k.str, k.len) == 0) {
+			*value = v;
+			return (0);
+		}
+	}
+
+	return (ret);
+}
+
+/*
  * __wt_config_get --
  *	Given a NULL-terminated list of configuration strings, find
  *	the final value for a given key.
@@ -456,20 +479,13 @@ int
 __wt_config_get(const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG cparser;
-	WT_CONFIG_ITEM k, v;
 	int found, ret;
 
 	for (found = 0; *cfg != NULL; cfg++) {
 		WT_RET(__wt_config_init(&cparser, *cfg));
-		while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
-			if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
-			    strncasecmp(key->str, k.str,
-			    WT_MIN(key->len, k.len)) == 0) {
-				*value = v;
-				found = 1;
-			}
-		}
-		if (ret != WT_NOTFOUND)
+		if ((ret = __wt_config_getraw(&cparser, key, value)) == 0)
+			found = 1;
+		else if (ret != WT_NOTFOUND)
 			return (ret);
 	}
 
@@ -501,10 +517,24 @@ __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 __wt_config_getone(const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	const char *cfgs[2];
+
 	cfgs[0] = cfg;
 	cfgs[1] = NULL;
-
 	return (__wt_config_get(cfgs, key, value));
+}
+
+/*
+ * __wt_config_getones --
+ *	Get the value for a given string key from a single config string.
+ */
+ int
+__wt_config_getones(const char *cfg, const char *key, WT_CONFIG_ITEM *value)
+{
+	const char *cfgs[2];
+
+	cfgs[0] = cfg;
+	cfgs[1] = NULL;
+	return (__wt_config_gets(cfgs, key, value));
 }
 
 /*

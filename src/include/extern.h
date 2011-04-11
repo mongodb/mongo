@@ -21,12 +21,18 @@ int __wt_config_init(WT_CONFIG *conf, const char *str);
 int __wt_config_next(WT_CONFIG *conf,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
+int __wt_config_getraw( WT_CONFIG *cparser,
+    WT_CONFIG_ITEM *key,
+    WT_CONFIG_ITEM *value);
 int __wt_config_get(const char **cfg,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
 int __wt_config_gets(const char **cfg, const char *key, WT_CONFIG_ITEM *value);
  int __wt_config_getone(const char *cfg,
     WT_CONFIG_ITEM *key,
+    WT_CONFIG_ITEM *value);
+ int __wt_config_getones(const char *cfg,
+    const char *key,
     WT_CONFIG_ITEM *value);
 int __wt_config_checklist(SESSION *session,
     const char **defaults,
@@ -255,7 +261,6 @@ int __wt_breakpoint(void);
 void __wt_attach(SESSION *session);
 int __wt_connection_config(CONNECTION *conn);
 int __wt_connection_destroy(CONNECTION *conn);
-void __wt_msg(SESSION *session, const char *fmt, ...);
 void __wt_mb_init(SESSION *session, WT_MBUF *mbp);
 void __wt_mb_discard(WT_MBUF *mbp);
 void __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...);
@@ -322,19 +327,12 @@ int __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg);
 void __wt_thread_join(pthread_t tid);
 void __wt_yield(void);
 uint32_t __wt_cksum(const void *chunk, size_t len);
-void __wt_msg_call(void *cb,
-    void *handle,
-    const char *pfx1,
-    const char *pfx2,
-    int error,
+void __wt_msgv(SESSION *session,
+    const char *prefix1,
+    const char *prefix2,
     const char *fmt,
     va_list ap);
-void __wt_msg_stream(FILE *fp,
-    const char *pfx1,
-    const char *pfx2,
-    int error,
-    const char *fmt,
-    va_list ap);
+void __wt_msg(SESSION *session, const char *fmt, ...);
 void __wt_assert( SESSION *session,
     const char *check,
     const char *file_name,
