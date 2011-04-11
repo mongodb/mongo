@@ -190,7 +190,6 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 	case WT_PAGE_ROW_LEAF:
 		break;
 	WT_ILLEGAL_FORMAT(session);
-		break;
 	}
 
 	fprintf(fp, " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
