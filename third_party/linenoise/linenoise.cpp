@@ -386,7 +386,9 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
                 refreshLine(fd,prompt,buf,*len,*pos,cols);
             }
 
-            c = linenoiseReadChar(fd);
+            do {
+                c = linenoiseReadChar(fd);
+            } while (c == (char)-1);
 
             switch(c) {
                 case 0:
