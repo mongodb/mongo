@@ -90,8 +90,6 @@ __wt_page_reconcile(
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
-	WT_ASSERT(session, page->parent_ref->state == WT_REF_LOCKED);
-
 	/*
 	 * Clean pages are simple: update the parent's state and discard the
 	 * page.  (It makes on sense to do reconciliation on a clean page if
