@@ -75,7 +75,7 @@ namespace mongo {
     private:
         AccumulatorAppend();
 
-        mutable vector<shared_ptr<const Value>> vpValue;
+        mutable vector<shared_ptr<const Value> > vpValue;
     };
 
 

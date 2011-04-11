@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "pch.h"
 
 #include "jsobj.h"
-#include "../util/timer.h"
-#include "../commands.h"
+#include "util/timer.h"
+#include "db/commands.h"
 
 namespace mongo {
     class BSONObj;
@@ -97,7 +97,7 @@ namespace mongo {
         Pipeline();
 
 	string collectionName;
-	typedef list<shared_ptr<DocumentSource>> SourceList;
+	typedef list<shared_ptr<DocumentSource> > SourceList;
 	SourceList sourceList;
 
 	bool debug;

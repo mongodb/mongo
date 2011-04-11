@@ -114,7 +114,7 @@ namespace mongo {
 
         /* these two vectors parallel each other */
         vector<string> vFieldName;
-        vector<shared_ptr<const Value>> vpValue;
+        vector<shared_ptr<const Value> > vpValue;
     };
 
 
@@ -133,7 +133,7 @@ namespace mongo {
 
           @return the next field's <name, Value>
         */
-        pair<string, shared_ptr<const Value>> next();
+        pair<string, shared_ptr<const Value> > next();
 
     private:
         friend class Document;

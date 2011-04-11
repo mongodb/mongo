@@ -107,7 +107,7 @@ namespace mongo {
           @returns a Value with the given value
         */
         static shared_ptr<const Value> createArray(
-            const vector<shared_ptr<const Value>> &vpValue);
+            const vector<shared_ptr<const Value> > &vpValue);
 
         /*
           Get the BSON type of the field.
@@ -220,7 +220,7 @@ namespace mongo {
         Value(long long longValue);
         Value(double doubleValue);
         Value(shared_ptr<Document> pDocument);
-        Value(const vector<shared_ptr<const Value>> &vpValue);
+        Value(const vector<shared_ptr<const Value> > &vpValue);
 
         BSONType type;
 
@@ -237,7 +237,7 @@ namespace mongo {
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol
         shared_ptr<Document> pDocumentValue;
-        vector<shared_ptr<const Value>> vpValue; // for arrays
+        vector<shared_ptr<const Value> > vpValue; // for arrays
 
 
         /*
@@ -274,11 +274,11 @@ namespace mongo {
         private:
             friend class Value;
             vi(shared_ptr<const Value> pSource,
-               const vector<shared_ptr<const Value>> *pvpValue);
+               const vector<shared_ptr<const Value> > *pvpValue);
 
             size_t size;
             size_t nextIndex;
-            const vector<shared_ptr<const Value>> *pvpValue;
+            const vector<shared_ptr<const Value> > *pvpValue;
         };
 
     };

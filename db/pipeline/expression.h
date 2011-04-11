@@ -234,7 +234,7 @@ namespace mongo {
     protected:
         ExpressionNary();
 
-        vector<shared_ptr<Expression>> vpOperand;
+        vector<shared_ptr<Expression> > vpOperand;
 
     private:
 	/*
@@ -692,7 +692,7 @@ namespace mongo {
 
         /* these two vectors are maintained in parallel */
         vector<string> vFieldName;
-        vector<shared_ptr<Expression>> vpExpression;
+        vector<shared_ptr<Expression> > vpExpression;
     };
 
 

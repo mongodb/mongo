@@ -347,7 +347,7 @@ namespace mongo {
         shared_ptr<Expression> pIdExpression;
 
         typedef map<shared_ptr<const Value>,
-                vector<shared_ptr<Accumulator>>, KeyComparator> GroupsType;
+                vector<shared_ptr<Accumulator> >, KeyComparator> GroupsType;
         GroupsType groups;
 
         /*
@@ -364,7 +364,7 @@ namespace mongo {
         */
         vector<string> vFieldName;
         vector<shared_ptr<Accumulator> (*)()> vpAccumulatorFactory;
-        vector<shared_ptr<Expression>> vpExpression;
+        vector<shared_ptr<Expression> > vpExpression;
 
 
         shared_ptr<Document> makeDocument(const GroupsType::iterator &rIter);
@@ -431,7 +431,7 @@ namespace mongo {
 
         // configuration state
         vector<string> vFieldName; // inclusion field names
-        vector<shared_ptr<Expression>> vpExpression; // inclusions
+        vector<shared_ptr<Expression> > vpExpression; // inclusions
         int ravelWhich; // index of raveled field, if any, otherwise -1
 
         // iteration state

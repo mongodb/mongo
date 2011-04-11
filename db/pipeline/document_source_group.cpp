@@ -219,7 +219,7 @@ namespace mongo {
               Look for the _id value in the map; if it's not there, add a
                new entry with a blank accumulator.
             */
-            vector<shared_ptr<Accumulator>> *pGroup;
+            vector<shared_ptr<Accumulator> > *pGroup;
             GroupsType::iterator it(groups.find(pId));
             if (it != groups.end()) {
                 /* point at the existing accumulators */
@@ -229,8 +229,8 @@ namespace mongo {
                 /* insert a new group into the map */
                 groups.insert(it,
                               pair<shared_ptr<const Value>,
-                              vector<shared_ptr<Accumulator>>>(
-                                  pId, vector<shared_ptr<Accumulator>>()));
+                              vector<shared_ptr<Accumulator> > >(
+                                  pId, vector<shared_ptr<Accumulator> >()));
 
                 /* find the accumulator vector (the map value) */
                 it = groups.find(pId);
@@ -265,7 +265,7 @@ namespace mongo {
 
     shared_ptr<Document> DocumentSourceGroup::makeDocument(
         const GroupsType::iterator &rIter) {
-        vector<shared_ptr<Accumulator>> *pGroup = &rIter->second;
+        vector<shared_ptr<Accumulator> > *pGroup = &rIter->second;
         const size_t n = vFieldName.size();
         shared_ptr<Document> pResult(Document::create(1 + n));
 

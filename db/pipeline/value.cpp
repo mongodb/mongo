@@ -188,14 +188,14 @@ namespace mongo {
         return pValue;
     }
 
-    Value::Value(const vector<shared_ptr<const Value>> &thevpValue):
+    Value::Value(const vector<shared_ptr<const Value> > &thevpValue):
         type(Array),
         pDocumentValue(),
         vpValue(thevpValue) {
     }
 
     shared_ptr<const Value> Value::createArray(
-        const vector<shared_ptr<const Value>> &vpValue) {
+        const vector<shared_ptr<const Value> > &vpValue) {
         shared_ptr<const Value> pValue(new Value(vpValue));
         return pValue;
     }
@@ -231,7 +231,7 @@ namespace mongo {
     }
 
     Value::vi::vi(shared_ptr<const Value> pValue,
-                  const vector<shared_ptr<const Value>> *thepvpValue):
+                  const vector<shared_ptr<const Value> > *thepvpValue):
         size(thepvpValue->size()),
         nextIndex(0),
         pvpValue(thepvpValue) {

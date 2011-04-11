@@ -148,9 +148,9 @@ namespace mongo {
         return (index < pDocument->vFieldName.size());
     }
 
-    pair<string, shared_ptr<const Value>> FieldIterator::next() {
+    pair<string, shared_ptr<const Value> > FieldIterator::next() {
         assert(more());
-        pair<string, shared_ptr<const Value>> result(
+        pair<string, shared_ptr<const Value> > result(
             pDocument->vFieldName[index], pDocument->vpValue[index]);
         ++index;
         return result;
