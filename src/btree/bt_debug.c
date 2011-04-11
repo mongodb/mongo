@@ -166,14 +166,15 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
 	if (page->addr == WT_ADDR_INVALID)
-		fprintf(fp, "addr: [not set]: {\n\t%s",
-		    __wt_page_type_string(page->type));
+		fprintf(fp, "addr: [not set] size %lu {\n\t%s",
+		    (u_long)page->size, __wt_page_type_string(page->type));
 	else
-		fprintf(fp, "addr: %lu-%lu {\n\t%s: size %lu",
+		fprintf(fp, "addr: [%lu-%lu] size %lu {\n\t%s",
 		    (u_long)page->addr,
 		    (u_long)page->addr +
 		    (WT_OFF_TO_ADDR(btree, page->size) - 1),
-		    __wt_page_type_string(page->type), (u_long)page->size);
+		    (u_long)page->size,
+		    __wt_page_type_string(page->type));
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		fprintf(fp, ", starting recno %llu",
@@ -185,10 +186,21 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 		fprintf(fp, ", starting recno %llu",
 		    (unsigned long long)page->u.col_leaf.recno);
 		break;
-	default:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		break;
+	WT_ILLEGAL_FORMAT(session);
 		break;
 	}
-	fprintf(fp, "\n");
+
+	fprintf(fp, " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
+	if (WT_PAGE_IS_ROOT(page))
+		fprintf(fp, ", root");
+	if (F_ISSET(page, WT_PAGE_MERGE))
+		fprintf(fp, ", merge");
+	if (F_ISSET(page, WT_PAGE_PINNED))
+		fprintf(fp, ", pinned");
+	fprintf(fp, ")\n");
 
 	/* Dump the WT_{ROW,COL}_INDX array. */
 	switch (page->type) {
