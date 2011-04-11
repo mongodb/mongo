@@ -1606,7 +1606,7 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 
 	/*
 	 * Newly created internal pages are never persistent because we don't
-	 * want the tree to get deeper whenever a leaf page splits.  Flag all 
+	 * want the tree to get deeper whenever a leaf page splits.  Flag all
 	 * created internal pages for an eventual merge.
 	 */
 	F_SET(page, WT_PAGE_MERGE);
@@ -1670,7 +1670,7 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 
 	/*
 	 * Newly created internal pages are never persistent because we don't
-	 * want the tree to get deeper whenever a leaf page splits.  Flag all 
+	 * want the tree to get deeper whenever a leaf page splits.  Flag all
 	 * created internal pages for an eventual merge.
 	 */
 	F_SET(page, WT_PAGE_MERGE);
