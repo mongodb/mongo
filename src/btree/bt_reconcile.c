@@ -104,21 +104,12 @@ __wt_page_reconcile(
 	}
 
 	/*
-	 * Update the disk generation before reading the page.  The workQ will
-	 * update the write generation after it makes a change, and if we have
-	 * different disk and write generation numbers, the page may be dirty.
-	 * We technically require a flush (the eviction server might run on a
-	 * different core before a flush naturally occurred).
-	 */
-	WT_PAGE_DISK_WRITE(page);
-	WT_MEMORY_FLUSH;
-
-	/*
 	 * If an internal page is created as part of a split, it will eventually
 	 * be reconciled.  However, we don't want to write such pages to disk,
 	 * they are always merged into their parents.  Check the merge flag --
 	 * if it's set, logically evict this page by updating the parent, and
-	 * return.
+	 * return.  Do this before we update the pages generational information,
+	 * internally created pages can never be clean.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -134,6 +125,16 @@ __wt_page_reconcile(
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
+
+	/*
+	 * Update the disk generation before reading the page.  The workQ will
+	 * update the write generation after it makes a change, and if we have
+	 * different disk and write generation numbers, the page may be dirty.
+	 * We technically require a flush (the eviction server might run on a
+	 * different core before a flush naturally occurred).
+	 */
+	WT_PAGE_DISK_WRITE(page);
+	WT_MEMORY_FLUSH;
 
 	/* Reconcile the page. */
 	switch (page->type) {
