@@ -433,7 +433,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 
 	/* Might have a trailing key/value without a closing brace */
 	if (conf->go == gobare) {
-		CAP(0);
+		CAP(-1);
 		conf->go = gostruct;
 	}
 
