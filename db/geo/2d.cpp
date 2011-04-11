@@ -723,7 +723,7 @@ namespace mongo {
         }
 
         GeoPoint( const KeyNode& node , double distance )
-            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( distance ) {
+            : _key( node.key.toBson() ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( distance ) {
         }
 
         GeoPoint( const BSONObj& key , DiskLoc loc , double distance )
@@ -761,7 +761,7 @@ namespace mongo {
             GEODEBUG( "\t\t\t\t checking key " << node.key.toString() )
 
             // when looking at other boxes, don't want to look at some key/object pair twice
-            pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.objdata(), node.recordLoc) );
+            pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.data(), node.recordLoc) );
             if ( ! seenBefore.second ) {
                 GEODEBUG( "\t\t\t\t already seen : " << node.key.toString() << " @ " << Point( _g, GeoHash( node.key.firstElement() ) ).toString() << " with " << node.recordLoc.obj()["_id"] );
                 return;
@@ -770,7 +770,7 @@ namespace mongo {
 
             // distance check
             double d = 0;
-            if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) ) {
+            if ( ! checkDistance( GeoHash( node.key._firstElement() ) , d ) ) {
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
                 return;
             }
@@ -784,7 +784,7 @@ namespace mongo {
                 // matcher
                 MatchDetails details;
                 if ( _matcher.get() ) {
-                    bool good = _matcher->matches( node.key , node.recordLoc , &details );
+                    bool good = _matcher->matches( node.key.toBson() , node.recordLoc , &details );
                     if ( details.loadedObject )
                         _objectsLoaded++;
 
@@ -854,7 +854,7 @@ namespace mongo {
 
         virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
-            _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
+            _points.insert( GeoPoint( node.key.toBson() , node.recordLoc , d ) );
             if ( _points.size() > _max ) {
                 _points.erase( --_points.end() );
 
@@ -872,7 +872,6 @@ namespace mongo {
             return _farthest;
         }
 
-
         unsigned _max;
         Point _near;
         Holder _points;
@@ -889,7 +888,7 @@ namespace mongo {
         BSONObj key() {
             if ( bucket.isNull() )
                 return BSONObj();
-            return bucket.btree()->keyNode( pos ).key;
+            return bucket.btree()->keyNode( pos ).key.toBson();
         }
 
         bool hasPrefix( const GeoHash& hash ) {

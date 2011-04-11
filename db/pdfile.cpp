@@ -31,6 +31,7 @@ _ disallow system* manipulations from the database.
 #include "../util/file_allocator.h"
 #include "../util/processinfo.h"
 #include "btree.h"
+#include "btreebuilder.h"
 #include <algorithm>
 #include <list>
 #include "query.h"
@@ -1492,6 +1493,8 @@ namespace mongo {
                 idx.getKeysFromObject(obj, keys);
                 BSONObj order = idx.keyPattern();
                 for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                    // WARNING: findSingle may not be compound index safe.  this may need to change.  see notes in 
+                    // findSingle code.
                     uassert( 12582, "duplicate key insert for unique index of capped collection",
                              idx.head.btree()->findSingle(idx, idx.head, *i ).isNull() );
                 }

@@ -26,8 +26,14 @@
 
 #include "dbtests.h"
 #include "../util/mongoutils/checksum.h"
+#include "../db/key.h"
 
 namespace JsobjTests {
+
+    void keyTest(const BSONObj& o) { 
+        KeyV1Owned k(o);
+    }
+
     class BufBuilderBasic {
     public:
         void run() {
@@ -336,6 +342,7 @@ namespace JsobjTests {
                 b.appendIntOrLL("L6", -16*billion);
 
                 BSONObj o = b.obj();
+                keyTest(o);
 
                 ASSERT(o["i1"].type() == NumberInt);
                 ASSERT(o["i1"].number() == 1);

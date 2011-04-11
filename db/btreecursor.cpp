@@ -119,7 +119,7 @@ namespace mongo {
         if ( !ok() ) {
             return false;
         }
-        int ret = _boundsIterator->advance( currKeyNode().key );
+        int ret = _boundsIterator->advance( currKeyNode().key.toBson() );
         if ( ret == -2 ) {
             bucket = DiskLoc();
             return false;
@@ -129,7 +129,7 @@ namespace mongo {
             return false;
         }
         ++_nscanned;
-        advanceTo( currKeyNode().key, ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
+        advanceTo( currKeyNode().key.toBson(), ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
         return true;
     }
 
@@ -201,7 +201,7 @@ namespace mongo {
 
     void BtreeCursor::noteLocation() {
         if ( !eof() ) {
-            BSONObj o = bucket.btree()->keyAt(keyOfs).copy();
+            BSONObj o = bucket.btree()->keyAt(keyOfs).toBson().getOwned();
             keyAtKeyOfs = o;
             locAtKeyOfs = bucket.btree()->k(keyOfs).recordLoc;
         }
@@ -222,6 +222,8 @@ namespace mongo {
 
         _multikey = d->isMultikey(idxNo);
 
+        KeyOwned _keyAtKeyOfs(keyAtKeyOfs);
+
         if ( keyOfs >= 0 ) {
             const BtreeBucket *b = bucket.btree();
 
@@ -231,7 +233,7 @@ namespace mongo {
             // which is possible as keys may have been deleted.
             int x = 0;
             while( 1 ) {
-                if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
+                if ( b->keyAt(keyOfs).woEqual(_keyAtKeyOfs) &&
                         b->k(keyOfs).recordLoc == locAtKeyOfs ) {
                     if ( !b->k(keyOfs).isUsed() ) {
                         /* we were deleted but still exist as an unused
@@ -258,7 +260,7 @@ namespace mongo {
         bool found;
 
         /* TODO: Switch to keep indexdetails and do idx.head! */
-        bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, _ordering, keyOfs, found, locAtKeyOfs, _direction);
+        bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, _keyAtKeyOfs, _ordering, keyOfs, found, locAtKeyOfs, _direction);
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
         if ( ! bucket.isNull() )
             skipUnusedKeys( false );

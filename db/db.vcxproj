@@ -490,6 +490,7 @@
     <ClCompile Include="dur_writetodatafiles.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
+    <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="projection.cpp" />
@@ -620,6 +621,11 @@
     <None Include="repl\notes.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\bson\bson-inl.h" />
+    <ClInclude Include="..\bson\bson.h" />
+    <ClInclude Include="..\bson\bson_db.h" />
+    <ClInclude Include="..\bson\inline_decls.h" />
+    <ClInclude Include="..\bson\stringdata.h" />
     <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\gridfs.h" />

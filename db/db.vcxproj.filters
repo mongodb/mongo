@@ -155,6 +155,7 @@
     <ClCompile Include="repl\rs_config.cpp" />
     <ClCompile Include="security_key.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
+    <ClCompile Include="key.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -293,6 +294,11 @@
     <ClInclude Include="dur_journalimpl.h" />
     <ClInclude Include="..\util\concurrency\race.h" />
     <ClInclude Include="..\util\alignedbuilder.h" />
+    <ClInclude Include="..\bson\bson.h" />
+    <ClInclude Include="..\bson\bson_db.h" />
+    <ClInclude Include="..\bson\bson-inl.h" />
+    <ClInclude Include="..\bson\inline_decls.h" />
+    <ClInclude Include="..\bson\stringdata.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

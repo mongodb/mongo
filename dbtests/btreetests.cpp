@@ -402,7 +402,7 @@ namespace BtreeTests {
             start.appendMinKey( "a" );
             BSONObjBuilder end;
             end.appendMaxKey( "a" );
-            BSONObj l = bt()->keyNode( 0 ).key;
+            BSONObj l = bt()->keyNode( 0 ).key.toBson();
             string toInsert;
             auto_ptr< BtreeCursor > c( new BtreeCursor( nsdetails( ns() ), 1, id(), start.done(), end.done(), false, 1 ) );
             while( c->ok() ) {
@@ -506,7 +506,7 @@ namespace BtreeTests {
     class ArtificialTree : public BtreeBucket {
     public:
         void push( const BSONObj &key, const DiskLoc &child ) {
-            pushBack( dummyDiskLoc(), key, Ordering::make( BSON( "a" << 1 ) ), child );
+            pushBack( dummyDiskLoc(), Key(key), Ordering::make( BSON( "a" << 1 ) ), child );
         }
         void setNext( const DiskLoc &child ) {
             nextChild = child;
@@ -573,7 +573,7 @@ namespace BtreeTests {
                 string expected = expectedKey( e.fieldName() );
                 ASSERT( present( id, BSON( "" << expected ), 1 ) );
                 ASSERT( present( id, BSON( "" << expected ), -1 ) );
-                ASSERT_EQUALS( expected, kn.key.firstElement().valuestr() );
+                ASSERT_EQUALS( expected, kn.key.toBson().firstElement().valuestr() );
                 if ( kn.prevChildBucket.isNull() ) {
                     ASSERT( e.type() == jstNULL );
                 }
@@ -1262,8 +1262,8 @@ namespace BtreeTests {
 
     class NoMoveAtLowWaterMarkRight : public MergeSizeJustRightRight {
         virtual int rightSize() const { return MergeSizeJustRightRight::rightSize() + 1; }
-        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
-        virtual void validate() { ASSERT_EQUALS( _oldTop, bt()->keyNode( 0 ).key ); }
+        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key.toBson(); }
+        virtual void validate() { ASSERT_EQUALS( _oldTop, bt()->keyNode( 0 ).key.toBson() ); }
         virtual bool merge() const { return false; }
     protected:
         BSONObj _oldTop;
@@ -1273,13 +1273,13 @@ namespace BtreeTests {
         virtual int rightSize() const { return MergeSizeJustRightRight::rightSize(); }
         virtual int leftSize() const { return MergeSizeJustRightRight::leftSize() + 1; }
         // different top means we rebalanced
-        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key ) ); }
+        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key.toBson() ) ); }
     };
 
     class NoMoveAtLowWaterMarkLeft : public MergeSizeJustRightLeft {
         virtual int leftSize() const { return MergeSizeJustRightLeft::leftSize() + 1; }
-        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
-        virtual void validate() { ASSERT_EQUALS( _oldTop, bt()->keyNode( 0 ).key ); }
+        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key.toBson(); }
+        virtual void validate() { ASSERT_EQUALS( _oldTop, bt()->keyNode( 0 ).key.toBson() ); }
         virtual bool merge() const { return false; }
     protected:
         BSONObj _oldTop;
@@ -1289,7 +1289,7 @@ namespace BtreeTests {
         virtual int leftSize() const { return MergeSizeJustRightLeft::leftSize(); }
         virtual int rightSize() const { return MergeSizeJustRightLeft::rightSize() + 1; }
         // different top means we rebalanced
-        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key ) ); }
+        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key.toBson() ) ); }
     };
 
     class PreferBalanceLeft : public Base {
@@ -1383,8 +1383,8 @@ namespace BtreeTests {
     protected:
         virtual int leftSize() const { return BtreeBucket::bodySize() - biggestSize() - sizeof( _KeyNode ) + 1; }
         virtual bool merge() const { return false; }
-        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
-        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key ) ); }
+        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key.toBson(); }
+        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key.toBson() ) ); }
     private:
         BSONObj _oldTop;
     };
@@ -1393,8 +1393,8 @@ namespace BtreeTests {
     protected:
         virtual int rightSize() const { return BtreeBucket::bodySize() - biggestSize() - sizeof( _KeyNode ) + 1; }
         virtual bool merge() const { return false; }
-        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key; }
-        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key ) ); }
+        virtual void initCheck() { _oldTop = bt()->keyNode( 0 ).key.toBson(); }
+        virtual void validate() { ASSERT( !( _oldTop == bt()->keyNode( 0 ).key.toBson() ) ); }
     private:
         BSONObj _oldTop;
     };
