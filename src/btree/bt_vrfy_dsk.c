@@ -55,7 +55,7 @@ __wt_verify_dsk_page(
 		if (dsk->recno == 0) {
 			__wt_errx(session,
 			    "%s page at addr %lu has a record number of zero",
-			    (u_long)addr, __wt_page_type_string(dsk->type));
+			    __wt_page_type_string(dsk->type), (u_long)addr);
 			return (WT_ERROR);
 		}
 		break;
@@ -66,7 +66,7 @@ __wt_verify_dsk_page(
 		if (dsk->recno != 0) {
 			__wt_errx(session,
 			    "%s page at addr %lu has a non-zero record number",
-			    (u_long)addr, __wt_page_type_string(dsk->type));
+			    __wt_page_type_string(dsk->type), (u_long)addr);
 			return (WT_ERROR);
 		}
 		break;
