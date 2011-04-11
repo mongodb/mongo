@@ -284,7 +284,7 @@ __wt_evict_file(WT_EVICT_REQ *er)
 	ret = 0;
 
 	/*
-	 * The eviction queue might references pages we are about to discard;
+	 * The eviction queue might reference pages we are about to discard;
 	 * clear it.
 	 */
 	memset(cache->evict, 0, cache->evict_len);
