@@ -70,15 +70,15 @@ wts_startup(void)
 	char config[200], *end, *p;
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%d,%s,verbose=[%s]",
-	    g.progname, g.c_cache,
+	    "error_prefix=\"%s\",cache_size=%lu,%s,verbose=[%s]",
+	    g.progname, (u_long)g.c_cache,
 	    g.logging ? "logging" : "",
 	    ""
+	    // "evict,"
 	    // "fileops,"
 	    // "hazard,"
 	    // "mutex,"
 	    // "read,"
-	    // "evict,"
 	);
 
 	ret = wiredtiger_open(NULL, &event_handler, config, &conn);
@@ -148,8 +148,8 @@ wts_startup(void)
 	}
 
 	if (g.logging)
-		__wt_log_printf((SESSION *)session, "WT startup: %s",
-		    ctime(&now));
+		__wt_log_printf(
+		    (SESSION *)session, "WT startup: %s", ctime(&now));
 
 	g.wts_conn = conn;
 	g.wts_session = session;
