@@ -94,8 +94,6 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		if (cmp != 0)
 			rref = page->u.row_int.t + (base - 1);
 
-		WT_ASSERT(session, rref != NULL);
-
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
 		if (page != btree->root_page.page)

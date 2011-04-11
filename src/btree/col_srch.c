@@ -79,8 +79,6 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			cref = page->u.col_int.t + base - 1;
 		}
 
-		WT_ASSERT(session, cref != NULL);
-
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, &cref->ref, 0));
 		if (page != btree->root_page.page)
