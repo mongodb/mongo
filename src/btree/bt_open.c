@@ -271,7 +271,7 @@ __wt_root_pin(SESSION *session)
 	/* Get the root page, which had better be there. */
 	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
 
-	WT_PAGE_SET_PIN(btree->root_page.page);
+	F_SET(btree->root_page.page, WT_PAGE_PINNED);
 	__wt_hazard_clear(session, btree->root_page.page);
 
 	return (0);

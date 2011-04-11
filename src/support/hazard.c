@@ -27,15 +27,15 @@ __wt_hazard_set(SESSION *session, WT_REF *ref
 	 * Do the dance:
 	 *
 	 * The memory location which makes a page "real" is the WT_REF's state
-	 * of WT_REF_MEM, in which the WT_REF_EVICT flag can be set at any time
-	 * by the eviction server.
+	 * of WT_REF_MEM, which can be set to WT_REF_LOCKED at any time by the
+	 * page eviction server.
 	 *
 	 * Add the WT_REF reference to the SESSION's hazard list and flush the
 	 * write, then see if the state field is still WT_REF_MEM.  If it's
 	 * still WT_REF_MEM, we can use the page because the page eviction
 	 * server will see our hazard reference before it discards the buffer
-	 * (the eviction server sets the WT_REF_EVICT flag, flushes memory, and
-	 * then checks the hazard references).
+	 * (the eviction server sets the state to WT_REF_LOCKED, then flushes
+	 * memory and checks the hazard references).
 	 */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp) {
@@ -54,10 +54,10 @@ __wt_hazard_set(SESSION *session, WT_REF *ref
 		WT_MEMORY_FLUSH;
 
 		/*
-		 * If the cache entry is set, check to see if it's still valid
-		 * (where valid means a state of WT_REF_MEM).
+		 * Check to see if it's still valid (where valid means a state
+		 * of WT_REF_MEM).
 		 */
-		if (WT_REF_STATE(ref->state) == WT_REF_MEM) {
+		if (ref->state == WT_REF_MEM) {
 			WT_VERBOSE(conn, WT_VERB_HAZARD, (session,
 			    "session %p hazard %p: set", session, ref->page));
 			return (1);

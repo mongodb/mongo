@@ -691,27 +691,29 @@ __wt_debug_pair(const char *tag, const void *data, uint32_t size, FILE *fp)
 static void
 __wt_debug_ref(WT_REF *ref, FILE *fp)
 {
+	const char *s;
+
 	if (fp == NULL)				/* Default to stderr */
 		fp = stderr;
 
-	fprintf(fp, "\tref: addr %lu, size %lu, state:",
-	    (u_long)ref->addr, (u_long)ref->size);
-
-	switch (WT_REF_STATE(ref->state)) {
+	switch (ref->state) {
 	case WT_REF_DISK:
-		fprintf(fp, " disk");
+		s = "disk";
 		break;
 	case WT_REF_EVICTED:
-		fprintf(fp, " evicted");
+		s = "evicted";
+		break;
+	case WT_REF_LOCKED:
+		s = "locked";
 		break;
 	case WT_REF_MEM:
-		fprintf(fp, " mem");
+		s = "memory";
+		break;
+	default:
+		s = "unknown";
 		break;
 	}
-	if (FLD_ISSET(ref->state, WT_REF_EVICT))
-		fprintf(fp, " evict");
-	if (FLD_ISSET(ref->state, WT_REF_MERGE))
-		fprintf(fp, " merge");
-	fprintf(fp, "\n");
+	fprintf(fp, "\tref: addr %lu, size %lu (%s)\n",
+	    (u_long)ref->addr, (u_long)ref->size, s);
 }
 #endif

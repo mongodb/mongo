@@ -203,92 +203,74 @@ struct __wt_page_disk {
  * A single in-memory page and the state information used to determine if it's
  * OK to dereference the pointer to the page.
  *
- * Synchronization is based on the WT_REF->state field, which is divided into
- * two parts, a state and two flags.  The state value is one of the following:
+ * Synchronization is based on the WT_REF->state field, which has 4 states:
  *
- * WT_REF_MEM:
- *	Set by the read server on initial read from disk; the page is in the
- *	cache and the page reference is OK.
  * WT_REF_DISK:
- *      Set by the eviction server after page reconciliation; the page is on
- *	disk, but needs to be read into memory before use.
+ *      The default setting before any pages are brought into memory, and set
+ *	by the eviction server after page reconciliation (when the page has
+ *	been discarded or written to disk, and remains backed by the disk);
+ *	the page is on disk, and needs to be read into memory before use.
  * WT_REF_EVICTED:
- *	Set by the eviction server after page reconciliation; the page was
+ *	Set by the eviction server after page reconciliation (when the page
+ *	was NOT written to disk, and remains in memory); the page has been
  *	logically evicted, but is waiting on its parent to be evicted so it
  *	can be merged into the parent.
- *
- * The flag values are one or more of the following:
- *
- * WT_REF_EVICT:
+ * WT_REF_LOCKED:
  *	Set by the eviction server; the eviction server has selected this page
- *	and is checking hazard references.
- * WT_REF_MERGE:
- *	Set by the eviction server during page reconciliation; the page is
- *	expected to be merged into its parent when the parent is reconciled.
+ *	for eviction and is checking hazard references.
+ * WT_REF_MEM:
+ *	Set by the read server when the page is read from disk; the page is
+ *	in the cache and the page reference is OK.
  *
- * The life cycle of a page goes like this: pages are read into memory from disk
- * and the read server sets the state to WT_REF_MEM.  When the eviction server
- * selects the page for eviction, the server adds the WT_REF_EVICT flag.  (In
- * all cases, the eviction server clears the WT_REF_EVICT flag when finished
- * with the page.)  If eviction was possible, the server sets the page state to
- * WT_REF_DISK.
+ * The life cycle of a typical page goes like this: pages are read into memory
+ * from disk and the read server sets their state to WT_REF_MEM.  When the
+ * eviction server selects the page for eviction, it sets the page state to
+ * WT_REF_LOCKED.  In all cases, the eviction server resets the page's state
+ * when it's finished with the page: if eviction was successful (a clean page
+ * was simply discarded, and a dirty page was written to disk), the server sets
+ * the page state to WT_REF_DISK; if eviction failed because the page was busy,
+ * the page state is reset to WT_REF_MEM.
  *
- * There are more complicated scenarios:
+ * There is a more complicated scenario when a page is being deleted, or a new
+ * page is created in memory as part of a page split.
  *
- * Scenario #1: the page is entirely empty.  In this case the eviction server
- * sets the WT_REF_MERGE and WT_REF_EVICTED flags.  Ideally, when the page's
- * parent is evicted, the empty page will be discarded.  Alternatively, if the
- * page is accessed again, the read server will clear the WT_REF_MERGE and
- * WT_REF_EVICTED flags and set the state to WT_REF_MEM.  This process repeats
- * until the parent of the page is evicted and the page is merged into the
- * parent, or the page is no longer empty and a more normal page reconciliation
- * will occur.
+ * Scenario #1: The eviction server sets the state to WT_REF_EVICTED and finds
+ * the page is entirely empty, and so sets the state to WT_REF_EVICTED.
  *
- * Scenario #2: the page requires a split.  In this case the eviction server
- * creates a new, in-memory internal page to reference the split pages: this new
- * page has a WT_REF_MEM state and the WT_REF_MERGE and WT_REF_EVICTED flags.
- * Ideally, when the parent of the new page is evicted, the page will be merged
- * into the parent.  Alternatively, if the new page is accessed, the read server
- * will clear the WT_REF_EVICTED flag and set the state to WT_REF_MEM.  This
- * process will repeat until the parent of the page is evicted and the page is
- * merged into the parent (internal pages created for the purpose of a split are
- * never written to disk, they are always merged into the parent in order to
- * guarantee tree depth over time).
+ * Scenario #2: The eviction server must split a page during reconciliation.
+ * The eviction server creates a new, in-memory internal page to reference
+ * the split pages: this new page will have its state set to WT_REF_EVICTED.
+ *
+ * In both of these cases, the normal outcome is the parent of the page with a
+ * state of WT_REF_EVICTED is eventually reconciled, and at that time the
+ * contents of the page (if any) are merged into the parent and the page is
+ * discarded.  Alternatively, if the page is accessed again, the read server
+ * will reset the page's state to WT_REF_MEM.  This process repeats until the
+ * parent of the page is evicted and the page can be discarded, or in the case
+ * of a deleted page, the page is no longer empty and normal page reconciliation
+ * of the page occurs.
  *
  * Readers check the state field and if it's WT_REF_MEM, they set a hazard
  * reference to the page, flush memory and re-confirm the page state.  If the
  * page state is unchanged, the reader has a valid reference and can proceed.
  *
  * When the eviction server wants to discard a page from the tree, it sets the
- * WT_REF_EVICT flag, flushes memory, then checks hazard references.  If the
+ * WT_REF_LOCKED flag, flushes memory, then checks hazard references.  If the
  * eviction server finds a hazard reference, it resets the state to WT_REF_MEM,
- * restoring the page to its readers.  If the eviction server does not find a
- * hazard reference, the page is evicted and the state set to WT_REF_DISK.
+ * restoring the page to the readers.  If the eviction server does not find a
+ * hazard reference, the page is evicted.
  */
 struct __wt_ref {
 	/*
 	 * Page state
 	 *
-	 * WT_REF_DISK has a value of 0, we're in the common default state
-	 * after allocating zero'd memory.
+	 * WT_REF_DISK has a value of 0, we're in the default state after
+	 * allocating zero'd memory.
 	 */
-#define	WT_REF_DISK		0x00	/* Page is on disk */
-#define	WT_REF_EVICTED		0x01	/* Page was evicted, not discarded */
-#define	WT_REF_MEM		0x02	/* Page is in cache and valid */
-
-	/*
-	 * Page flags
-	 */
-#define	WT_REF_EVICT		0x80	/* Page being evaluated for eviction */
-#define	WT_REF_MERGE		0x40	/* Page should be merged into parent */
-
-#define	WT_REF_STATE(s)							\
-	((s) & (WT_REF_DISK | WT_REF_EVICTED | WT_REF_MEM))
-#define	WT_REF_SET_STATE(ref, s) do {					\
-	(ref)->state =							\
-	    ((ref)->state & (WT_REF_EVICT | WT_REF_MERGE)) | (s);	\
-} while (0)
-
+#define	WT_REF_DISK		0	/* Page is on disk */
+#define	WT_REF_EVICTED		1	/* Page was evicted, not discarded */
+#define	WT_REF_LOCKED		2	/* Page being evaluated for eviction */
+#define	WT_REF_MEM		3	/* Page is in cache and valid */
 	uint32_t volatile state;
 
 	uint32_t addr;			/* Backing disk address */
@@ -380,13 +362,7 @@ struct __wt_page {
 	 *
 	 * The read generation is a 64-bit value; incremented every time the
 	 * page is searched, a 32-bit value could overflow.
-	 *
-	 * We pin the root page of each tree in memory using an out-of-band LRU
-	 * value.   If we ever add a flags field to this structure, the pinned
-	 * flag could move there.
 	 */
-#define	WT_PAGE_SET_PIN(p)	((p)->read_gen = UINT64_MAX)
-#define	WT_PAGE_IS_PINNED(p)	((p)->read_gen == UINT64_MAX)
 	 uint64_t read_gen;
 
 	/*
@@ -499,6 +475,10 @@ struct __wt_page {
 #define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* Page type */
+
+#define	WT_PAGE_PINNED		0x01	/* Page is pinned */
+#define	WT_PAGE_MERGE		0x02	/* Page should be merged */
+	uint8_t flags;			/* Page flags */
 };
 /*
  * WT_PAGE_SIZE is the expected structure size -- we verify the build to ensure

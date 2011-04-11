@@ -466,8 +466,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	dsk = page->XXdsk;
 
 	if (dsk == NULL) {
-		WT_ASSERT(session,
-		    FLD_ISSET(page->parent_ref->state, WT_REF_MERGE));
+		WT_ASSERT(session, F_ISSET(page, WT_PAGE_MERGE));
 		return (0);
 	}
 

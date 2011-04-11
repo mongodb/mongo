@@ -270,7 +270,7 @@ int __wt_session_api_set(CONNECTION *conn,
     SESSION **sessionp,
     int *islocal);
 int __wt_session_api_clr(SESSION *session, const char *name, int islocal);
-int __wt_session_dump(CONNECTION *conn);
+void __wt_session_dump(SESSION *session);
 int __wt_connection_stat_print(CONNECTION *conn, FILE *stream);
 int __wt_connection_stat_clear(CONNECTION *conn);
 void __wt_stat_print(WT_STATS *s, FILE *stream);

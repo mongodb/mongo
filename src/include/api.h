@@ -71,8 +71,7 @@ struct __btree {
 	 * page has been acquired, there's usually not much work to do.
 	 */
 #define	WT_UNOPENED_FILE(btree)						\
-	(WT_REF_STATE((btree)->root_page.state) == WT_REF_DISK)
-
+	((btree)->root_page.state == WT_REF_DISK)
 	WT_REF		root_page;	/* Root page reference */
 
 	uint32_t free_addr;		/* Free page */

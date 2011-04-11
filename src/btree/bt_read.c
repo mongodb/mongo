@@ -196,21 +196,26 @@ __wt_cache_read(WT_READ_REQ *rr)
 	ret = 0;
 
 	/* Review the possible page states. */
-	switch (WT_REF_STATE(ref->state)) {
-	case WT_REF_DISK:			/* On-disk, read it */
+	switch (ref->state) {
+	case WT_REF_DISK:
+		/* Page is on disk, and that's our problem.  Read it. */
 		break;
-	case WT_REF_MEM:			/* In-memory, already read */
+	case WT_REF_MEM:
+		/* Page is in memory, must have already been read. */
 		return (0);
-	case WT_REF_EVICTED:			/* Logically evicted */
+	case WT_REF_LOCKED:
+		/* Page being considered for eviction: not our problem. */
+		return (0);
+	case WT_REF_EVICTED:
 		/*
 		 * The page was logically evicted, waiting on a merge with its
 		 * parent during the parent's eviction, when it was accessed.
 		 * Re-activate the page.   We could probably do this in the
 		 * page read function, but this shouldn't be a common path and
-		 * I'm hesitant to have multiple threads of control working on
+		 * I'm hesitant to have multiple threads of control updating
 		 * a page's state.
 		 */
-		WT_REF_SET_STATE(ref, WT_REF_MEM);
+		ref->state = WT_REF_MEM;
 		return (0);
 	}
 
@@ -264,7 +269,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 */
 	page->read_gen = ++cache->read_gen;
 	ref->page = page;
-	WT_REF_SET_STATE(ref, WT_REF_MEM);
+	/* No memory flush required, the state variable is volatile. */
+	ref->state = WT_REF_MEM;
 
 	return (0);
 

@@ -367,7 +367,7 @@ done_duplicates:
 
 	/*
 	 * Discarding pages is done in 4 steps:
-	 *	Set the WT_REF_EVICT flag
+	 *	Set the WT_REF_LOCKED flag
 	 *	Check for any hazard references
 	 *	Check the page's state (for example, in-memory children)
 	 *	Reconcile and discard the page
@@ -475,7 +475,7 @@ restart:	WT_RET(__wt_walk_begin(session,
 
 /*
  * __wt_evict_set --
- *	Set the WT_REF_EVICT flag on a set of pages.
+ *	Set the WT_REF_LOCKED flag on a set of pages.
  */
 static void
 __wt_evict_set(SESSION *session)
@@ -498,7 +498,7 @@ __wt_evict_set(SESSION *session)
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
-		FLD_SET(ref->state, WT_REF_EVICT);
+		ref->state = WT_REF_LOCKED;
 	}
 }
 
@@ -567,7 +567,7 @@ __wt_evict_hazard_check(SESSION *session)
 			 * Discard our reference.
 			 */
 			page->read_gen = ++cache->read_gen;
-			FLD_CLR(ref->state, WT_REF_EVICT);
+			ref->state = WT_REF_MEM;
 			WT_EVICT_CLR(evict);
 		}
 	}
@@ -602,12 +602,8 @@ __wt_evict_state_check(SESSION *session)
 		page = ref->page;
 
 		/* Ignore pinned pages. */
-		if (WT_PAGE_IS_PINNED(page)) {
-			WT_VERBOSE(conn, WT_VERB_EVICT, (session,
-			    "eviction skipped page addr %lu (pinned)",
-			    page->addr));
+		if (F_ISSET(page, WT_PAGE_PINNED))
 			goto skip;
-		}
 
 		/* Ignore pages with in-memory subtrees. */
 		switch (page->type) {
@@ -630,7 +626,7 @@ skip:		/*
 		 * Discard our reference.
 		 */
 		page->read_gen = ++cache->read_gen;
-		FLD_CLR(ref->state, WT_REF_EVICT);
+		ref->state = WT_REF_MEM;
 		WT_EVICT_CLR(evict);
 	}
 }
@@ -693,8 +689,8 @@ err:	/*
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
-		if (FLD_ISSET(ref->state, WT_REF_EVICT))
-			FLD_CLR(ref->state, WT_REF_EVICT);
+		if (ref->state == WT_REF_LOCKED)
+			ref->state = WT_REF_MEM;
 	}
 	return (ret);
 }
@@ -719,12 +715,12 @@ __wt_evict_subtrees(WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_REF_STATE(WT_COL_REF_STATE(cref)) == WT_REF_MEM)
+			if (WT_COL_REF_STATE(cref) == WT_REF_MEM)
 				return (1);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_REF_STATE(WT_ROW_REF_STATE(rref)) == WT_REF_MEM)
+			if (WT_ROW_REF_STATE(rref) == WT_REF_MEM)
 				return (1);
 		break;
 	}
@@ -805,7 +801,7 @@ __wt_evict_hazard_compare(const void *a, const void *b)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_evict_hazard_validate --
- *	Return if a page is or isn't on the hazard list.
+ *	Confirm that a page isn't on the hazard list.
  */
 static void
 __wt_evict_hazard_validate(CONNECTION *conn, WT_PAGE *page)
@@ -818,9 +814,9 @@ __wt_evict_hazard_validate(CONNECTION *conn, WT_PAGE *page)
 		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
 			if (hp->page == page) {
 				__wt_err(session, 0,
-				    "hazard eviction check for page %lu "
-				    "failed",
+				    "eviction hazard check for page %lu failed",
 				    (u_long)page->addr);
+				__wt_session_dump(session);
 				__wt_abort(session);
 			}
 }

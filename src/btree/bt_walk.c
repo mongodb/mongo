@@ -62,14 +62,19 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	WT_PAGE *__ref_page;						\
 	int __tret;							\
 	/* ref references the subtree containing the child page. */	\
-	switch (WT_REF_STATE((ref)->state)) {				\
-	case WT_REF_MEM:						\
-		break;							\
+	switch ((ref)->state) {						\
 	case WT_REF_DISK:						\
 	case WT_REF_EVICTED:						\
-		/* Optionally skip pages that aren't in the cache. */	\
+	case WT_REF_LOCKED:						\
+		/*							\
+		 * Optionally skip pages that aren't in the cache.	\
+		 * It's stretching things to say "locked" pages aren't	\
+		 * in the cache, but if we wait a second it won't be.	\
+		 */							\
 		if (LF_ISSET(WT_WALK_CACHE))				\
 			continue;					\
+		break;							\
+	case WT_REF_MEM:						\
 		break;							\
 	}								\
 									\
@@ -156,10 +161,8 @@ __wt_walk_end(SESSION *session, WT_WALK *walk)
 int
 __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 {
-	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_REF *ref;
-	WT_ROW_REF *rref;
 	WT_WALK_ENTRY *e;
 	u_int elem;
 
@@ -198,10 +201,9 @@ eop:		e->visited = 1;
 	case WT_PAGE_COL_INT:
 		/* Find the next subtree present in the cache. */
 		for (;;) {
-			cref = &page->u.col_int.t[e->indx];
-			ref = &cref->ref;
+			ref = &page->u.col_int.t[e->indx].ref;
 
-			if (WT_REF_STATE(ref->state) == WT_REF_MEM)
+			if (ref->state == WT_REF_MEM)
 				break;
 			if (!LF_ISSET(WT_WALK_CACHE)) {
 				WT_RET(__wt_page_in(session, page, ref, 0));
@@ -219,10 +221,9 @@ eop:		e->visited = 1;
 	case WT_PAGE_ROW_INT:
 		/* Find the next subtree present in the cache. */
 		for (;;) {
-			rref = &page->u.row_int.t[e->indx];
-			ref = &rref->ref;
+			ref = &page->u.row_int.t[e->indx].ref;
 
-			if (WT_REF_STATE(ref->state) == WT_REF_MEM)
+			if (ref->state == WT_REF_MEM)
 				break;
 			if (!LF_ISSET(WT_WALK_CACHE)) {
 				WT_RET(__wt_page_in(session, page, ref, 0));

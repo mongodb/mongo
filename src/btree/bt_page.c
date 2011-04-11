@@ -33,7 +33,24 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 	cache = S2C(session)->cache;
 
 	for (;;)
-		switch (WT_REF_STATE(ref->state)) {
+		switch (ref->state) {
+		case WT_REF_DISK:
+			/* The page isn't in memory, request it be read. */
+			/* FALLTHROUGH */
+		case WT_REF_EVICTED:
+			/* The page isn't available, request it. */
+			__wt_cache_read_serial(
+			    session, parent, ref, dsk_verify, ret);
+			if (ret != 0)
+				return (ret);
+			break;
+		case WT_REF_LOCKED:
+			/*
+			 * The page is being considered for eviction -- wait
+			 * for that to be resolved.
+			 */
+			__wt_yield();
+			break;
 		case WT_REF_MEM:
 			/*
 			 * The page is in memory: get a hazard reference, update
@@ -51,16 +68,8 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 			}
 			__wt_yield();
 			break;
-		case WT_REF_DISK:
-		case WT_REF_EVICTED:
-			/* The page isn't in memory, request it be read. */
-			__wt_cache_read_serial(
-			    session, parent, ref, dsk_verify, ret);
-			if (ret != 0)
-				return (ret);
-			break;
 		default:
-			WT_ABORT(session, "WT_REF->state invalid");
+			WT_ABORT(session, "invalid page state");
 			break;
 		}
 	/* NOTREACHED */
