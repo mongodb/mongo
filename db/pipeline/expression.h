@@ -108,10 +108,10 @@ namespace mongo {
 	/*
 	  Utility class for parseObject() below.
 
-	  Only one array can be raveled in a processing pipeline.  If the
-	  RAVEL_OK option is used, ravelOk() will return true, and a field
-	  can be declared as raveled using ravel(), after which ravelUsed()
-	  will return true.  Only specify RAVEL_OK if it is OK to ravel an
+	  Only one array can be unwound in a processing pipeline.  If the
+	  UNWIND_OK option is used, unwindOk() will return true, and a field
+	  can be declared as unwound using unwind(), after which unwindUsed()
+	  will return true.  Only specify UNWIND_OK if it is OK to unwind an
 	  array in the current context.
 
 	  DOCUMENT_OK indicates that it is OK to use a Document in the current
@@ -120,18 +120,18 @@ namespace mongo {
         class ObjectCtx {
         public:
             ObjectCtx(int options);
-            static const int RAVEL_OK = 0x0001;
+            static const int UNWIND_OK = 0x0001;
             static const int DOCUMENT_OK = 0x0002;
 
-            bool ravelOk() const;
-            bool ravelUsed() const;
-            void ravel(string fieldName);
+            bool unwindOk() const;
+            bool unwindUsed() const;
+            void unwind(string fieldName);
 
             bool documentOk() const;
 
         private:
             int options;
-            string raveledField;
+            string unwindField;
         };
 
 	/*
@@ -731,12 +731,12 @@ namespace mongo {
 
 namespace mongo {
 
-    inline bool Expression::ObjectCtx::ravelOk() const {
-        return ((options & RAVEL_OK) != 0);
+    inline bool Expression::ObjectCtx::unwindOk() const {
+        return ((options & UNWIND_OK) != 0);
     }
 
-    inline bool Expression::ObjectCtx::ravelUsed() const {
-        return (raveledField.size() != 0);
+    inline bool Expression::ObjectCtx::unwindUsed() const {
+        return (unwindField.size() != 0);
     }
 
     inline int Expression::signum(int i) {

@@ -32,14 +32,14 @@ namespace mongo {
 
     Expression::ObjectCtx::ObjectCtx(int theOptions):
         options(theOptions),
-        raveledField() {
+        unwindField() {
     }
 
-    void Expression::ObjectCtx::ravel(string fieldName) {
-        assert(ravelOk());
-        assert(!ravelUsed());
+    void Expression::ObjectCtx::unwind(string fieldName) {
+        assert(unwindOk());
+        assert(!unwindUsed());
         assert(fieldName.size());
-        raveledField = fieldName;
+        unwindField = fieldName;
     }
 
     bool Expression::ObjectCtx::documentOk() const {
@@ -53,9 +53,9 @@ namespace mongo {
 
           f0: {f1: ..., f2: ..., f3: ...}
           f0: {$operator:[operand1, operand2, ...]}
-          f0: {$ravel:"fieldpath"}
+          f0: {$unwind:"fieldpath"}
 
-          We handle $ravel as a special case, because this is done by the
+          We handle $unwind as a special case, because this is done by the
           projection source.  For any other expression, we hand over control to
           code that parses the expression and returns an expression.
         */
@@ -79,23 +79,23 @@ namespace mongo {
                 isOp = 1;
                 kind = OPERATOR;
 
-                if (strcmp(pFieldName, "$ravel") != 0) {
+                if (strcmp(pFieldName, "$unwind") != 0) {
                     pExpression = parseExpression(pFieldName, &fieldElement);
                 }
                 else {
-                    assert(pCtx->ravelOk());
-                    // CW TODO error: it's not OK to ravel in this context
+                    assert(pCtx->unwindOk());
+                    // CW TODO error: it's not OK to unwind in this context
 
-                    assert(!pCtx->ravelUsed());
-                    // CW TODO error: this projection already has a ravel
+                    assert(!pCtx->unwindUsed());
+                    // CW TODO error: this projection already has an unwind
 
                     assert(fieldElement.type() == String);
-                    // CW TODO $ravel operand must be single field name
+                    // CW TODO $unwind operand must be single field name
 
                     // TODO should we require leading "$document." here?
                     string fieldPath(fieldElement.String());
                     pExpression = ExpressionFieldPath::create(fieldPath);
-                    pCtx->ravel(fieldPath);
+                    pCtx->unwind(fieldPath);
                 }
             }
             else {

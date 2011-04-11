@@ -402,13 +402,14 @@ namespace mongo {
 
           @param fieldName the name of the field as it will appear
           @param pExpression the expression used to compute the field
-          @param ravelArray if the result of the expression is an array value,
+          @param unwindArray if the result of the expression is an array value,
               the projection will create one Document per value in the array;
               a sequence of documents is generated, with each one containing one
-              value from the array.  Note there can only be one raveled field.
+              value from the array.  Note there can only be one unwound field
+	      per projection.
         */
         void addField(string fieldName, shared_ptr<Expression> pExpression,
-                      bool ravelArray);
+                      bool unwindArray);
 
 	/*
 	  Create a new projection DocumentSource from BSON.
@@ -432,13 +433,14 @@ namespace mongo {
         // configuration state
         vector<string> vFieldName; // inclusion field names
         vector<shared_ptr<Expression> > vpExpression; // inclusions
-        int ravelWhich; // index of raveled field, if any, otherwise -1
+        int unwindWhich; // index of field to unwind, if any, otherwise -1
 
         // iteration state
-        shared_ptr<Document> pNoRavelDocument; // document to return, pre-ravel
-        shared_ptr<const Value> pRavelArray; // field being raveled
-        shared_ptr<ValueIterator> pRavel; // iterator used for raveling
-        shared_ptr<const Value> pRavelValue; // current value
+        shared_ptr<Document> pNoUnwindDocument;
+                                              // document to return, pre-unwind
+        shared_ptr<const Value> pUnwindArray; // field being unwound
+        shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
+        shared_ptr<const Value> pUnwindValue; // current value
     };
 }
 

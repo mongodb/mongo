@@ -29,39 +29,39 @@ namespace mongo {
 
     DocumentSourceProject::DocumentSourceProject():
         vpExpression(),
-        ravelWhich(-1),
-        pNoRavelDocument(),
-        pRavelArray(),
-        pRavel() {
+        unwindWhich(-1),
+        pNoUnwindDocument(),
+        pUnwindArray(),
+        pUnwind() {
     }
 
     bool DocumentSourceProject::eof() {
         /*
-          If we're raveling an array, and there are more elements, then we
+          If we're unwinding an array, and there are more elements, then we
           can return more documents.
         */
-        if (pRavel.get() && pRavel->more())
+        if (pUnwind.get() && pUnwind->more())
             return false;
 
         return pSource->eof();
     }
 
     bool DocumentSourceProject::advance() {
-        if (pRavel.get() && pRavel->more()) {
-            pRavelValue = pRavel->next();
+        if (pUnwind.get() && pUnwind->more()) {
+            pUnwindValue = pUnwind->next();
             return true;
         }
 
         /* release the last document and advance */
-        pRavelValue.reset();
-        pRavel.reset();
-        pRavelArray.reset();
-        pNoRavelDocument.reset();
+        pUnwindValue.reset();
+        pUnwind.reset();
+        pUnwindArray.reset();
+        pNoUnwindDocument.reset();
         return pSource->advance();
     }
 
     shared_ptr<Document> DocumentSourceProject::getCurrent() {
-        if (!pNoRavelDocument.get()) {
+        if (!pNoUnwindDocument.get()) {
             shared_ptr<Document> pInDocument(pSource->getCurrent());
 
             /*
@@ -69,7 +69,7 @@ namespace mongo {
               source Document
             */
             const size_t n = vFieldName.size();
-            pNoRavelDocument = Document::create(n);
+            pNoUnwindDocument = Document::create(n);
             for(size_t i = 0; i < n; ++i) {
                 string outName(vFieldName[i]);
                 shared_ptr<Expression> pExpression(vpExpression[i]);
@@ -79,50 +79,51 @@ namespace mongo {
                     pExpression->evaluate(pInDocument));
 
                 /*
-                  If we're raveling this field, and it's an array, then we're
+                  If we're unwinding this field, and it's an array, then we're
                   going to pick off elements one by one, and make fields of
                   them below.
                 */
-                if (((int)i == ravelWhich) && (pOutValue->getType() == Array)) {
-                    pRavelArray = pOutValue;
-                    pRavel = pRavelArray->getArray();
+                if (((int)i == unwindWhich) &&
+		    (pOutValue->getType() == Array)) {
+                    pUnwindArray = pOutValue;
+                    pUnwind = pUnwindArray->getArray();
 
                     /*
-                      The $ravel of an empty array is a nul value.  If we
-                      encounter this, use the non-ravel path, but replace
+                      The $unwind of an empty array is a NULL value.  If we
+                      encounter this, use the non-unwind path, but replace
                       pOutField with a nul.
                     */
-                    if (pRavel->more())
-                        pRavelValue = pRavel->next();
+                    if (pUnwind->more())
+                        pUnwindValue = pUnwind->next();
                     else {
-                        pRavelArray.reset();
-                        pRavel.reset();
+                        pUnwindArray.reset();
+                        pUnwind.reset();
                         pOutValue = Value::getNull();
                     }
                 }
 
                 /* add the field to the document under construction */
-                pNoRavelDocument->addField(outName, pOutValue);
+                pNoUnwindDocument->addField(outName, pOutValue);
             }
         }
 
         /*
-          If we're raveling a field, create an alternate document.  In the
-          alternate (clone), replace the raveled array field with the element
+          If we're unwinding a field, create an alternate document.  In the
+          alternate (clone), replace the unwound array field with the element
           at the appropriate index.
          */
-        if (pRavelArray.get()) {
-            /* clone the document with an array we're raveling */
-            shared_ptr<Document> pRavelDocument(pNoRavelDocument->clone());
+        if (pUnwindArray.get()) {
+            /* clone the document with an array we're unwinding */
+            shared_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
 
             /* substitute the named field into the prototype document */
-            pRavelDocument->setField(
-                (size_t)ravelWhich, vFieldName[ravelWhich], pRavelValue);
+            pUnwindDocument->setField(
+                (size_t)unwindWhich, vFieldName[unwindWhich], pUnwindValue);
 
-            return pRavelDocument;
+            return pUnwindDocument;
         }
 
-        return pNoRavelDocument;
+        return pNoUnwindDocument;
     }
 
     void DocumentSourceProject::optimize() {
@@ -148,15 +149,16 @@ namespace mongo {
     }
 
     void DocumentSourceProject::addField(
-        string fieldName, shared_ptr<Expression> pExpression, bool ravelArray) {
+        string fieldName, shared_ptr<Expression> pExpression,
+	bool unwindArray) {
         assert(fieldName.length()); // CW TODO must be a non-empty string
         assert(pExpression); // CW TODO must be a non-null expression
-        assert(!ravelArray || (ravelWhich < 0));
-        // CW TODO only one ravel allowed
+        assert(!unwindArray || (unwindWhich < 0));
+                                             // CW TODO only one unwind allowed
 
-        /* if we're raveling, remember which field */
-        if (ravelArray)
-            ravelWhich = vFieldName.size();
+        /* if we're unwinding, remember which field */
+        if (unwindArray)
+            unwindWhich = vFieldName.size();
 
         vFieldName.push_back(fieldName);
         vpExpression.push_back(pExpression);
@@ -179,7 +181,7 @@ namespace mongo {
         BSONObj projectObj(pBsonElement->Obj());
         BSONObjIterator fieldIterator(projectObj);
 	Expression::ObjectCtx objectCtx(
-	    Expression::ObjectCtx::RAVEL_OK |
+	    Expression::ObjectCtx::UNWIND_OK |
 	    Expression::ObjectCtx::DOCUMENT_OK);
         while(fieldIterator.more()) {
             BSONElement outFieldElement(fieldIterator.next());
@@ -231,20 +233,20 @@ AddField:
                 goto AddField;
 
             case Object: {
-                bool hasRaveled = objectCtx.ravelUsed();
+                bool hasUnwound = objectCtx.unwindUsed();
 
                 shared_ptr<Expression> pDocument(
                     Expression::parseObject(&outFieldElement, &objectCtx));
 
                 /*
                   Add The document expression to the projection.  We detect
-                  a raveled field if we haven't raveled a field yet for this
+                  an unwound field if we haven't unwound a field yet for this
                   projection, and after parsing find that we have just gotten a
-                  $ravel specification.
+                  $unwind specification.
                  */
                 pProject->addField(
                     outFieldName, pDocument,
-                    !hasRaveled && objectCtx.ravelUsed());
+                    !hasUnwound && objectCtx.unwindUsed());
                 break;
             }
 
