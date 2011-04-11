@@ -189,12 +189,12 @@ namespace mongo {
         set<string> thisTime;
 
         while ( c->more() ) {
-            BSONObj o = c->next();
+            BSONObj o = c->nextSafe();
 
             BSONElement n = o["_id"];
             BSONElement v = o["value"];
 
-            uassert( 10209 ,  "name has to be a string" , n.type() == String );
+            uassert( 10209 ,  str::stream() << "name has to be a string: " << n  , n.type() == String );
             uassert( 10210 ,  "value has to be set" , v.type() != EOO );
 
             setElement( n.valuestr() , v );
