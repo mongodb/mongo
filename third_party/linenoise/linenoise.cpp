@@ -56,8 +56,8 @@
  * the more compatible.
  *
  * CHA (Cursor Horizontal Absolute)
- *    Sequence: ESC [ n G
- *    Effect: moves cursor to column n
+ *    Sequence: ESC [ 1 G
+ *    Effect: moves cursor to column n (1 based)
  *
  * EL (Erase Line)
  *    Sequence: ESC [ n K
@@ -268,7 +268,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
     {
         char seq[64];
         /* Cursor to left edge */
-        snprintf(seq,64,"\x1b[0G");
+        snprintf(seq,64,"\x1b[1G");
         if (write(fd,seq,strlen(seq)) == -1) return;
         /* Write the prompt and the current buffer content */
         if (write(fd,prompt,strlen(prompt)) == -1) return;
@@ -277,7 +277,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
         snprintf(seq,64,"\x1b[0K");
         if (write(fd,seq,strlen(seq)) == -1) return;
         /* Move cursor to original position. */
-        snprintf(seq,64,"\x1b[0G\x1b[%dC", (int)(pos+plen));
+        snprintf(seq,64,"\x1b[1G\x1b[%dC", (int)(pos+plen));
         if (write(fd,seq,strlen(seq)) == -1) return;
     }
 #endif
