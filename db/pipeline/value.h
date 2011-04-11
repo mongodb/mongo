@@ -39,13 +39,13 @@ namespace mongo {
 
           @returns the next field's <name, Value>
         */
-        virtual shared_ptr<const Value> next() = 0;
+        virtual boost::shared_ptr<const Value> next() = 0;
     };
 
 
     /*
       Values are immutable, so these are passed around as
-      shared_ptr<const Value>.
+      boost::shared_ptr<const Value>.
      */
     class Value :
         public boost::enable_shared_from_this<Value>,
@@ -58,7 +58,7 @@ namespace mongo {
 
           @returns a new Value initialized from the bsonElement
         */
-        static shared_ptr<const Value> createFromBsonElement(
+        static boost::shared_ptr<const Value> createFromBsonElement(
             BSONElement *pBsonElement);
 
         /*
@@ -70,7 +70,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createInt(int value);
+        static boost::shared_ptr<const Value> createInt(int value);
 
         /*
           Construct an long(long)-valued Value.
@@ -81,7 +81,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createLong(long long value);
+        static boost::shared_ptr<const Value> createLong(long long value);
 
         /*
           Construct a double-valued Value.
@@ -89,7 +89,7 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createDouble(double value);
+        static boost::shared_ptr<const Value> createDouble(double value);
 
         /*
           Construct a document-valued Value.
@@ -97,8 +97,8 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createDocument(
-            shared_ptr<Document> pDocument);
+        static boost::shared_ptr<const Value> createDocument(
+            boost::shared_ptr<Document> pDocument);
 
         /*
           Construct an array-valued Value.
@@ -106,8 +106,8 @@ namespace mongo {
           @param value the value
           @returns a Value with the given value
         */
-        static shared_ptr<const Value> createArray(
-            const vector<shared_ptr<const Value> > &vpValue);
+        static boost::shared_ptr<const Value> createArray(
+            const vector<boost::shared_ptr<const Value> > &vpValue);
 
         /*
           Get the BSON type of the field.
@@ -126,8 +126,8 @@ namespace mongo {
         */
         double getDouble() const;
         string getString() const;
-        shared_ptr<Document> getDocument() const;
-        shared_ptr<ValueIterator> getArray() const;
+        boost::shared_ptr<Document> getDocument() const;
+        boost::shared_ptr<ValueIterator> getArray() const;
         OID getOid() const;
         bool getBool() const;
         Date_t getDate() const;
@@ -152,12 +152,12 @@ namespace mongo {
         /*
           Get references to singleton instances of commonly used field values.
          */
-        static shared_ptr<const Value> getNull();
-        static shared_ptr<const Value> getTrue();
-        static shared_ptr<const Value> getFalse();
-        static shared_ptr<const Value> getMinusOne();
-        static shared_ptr<const Value> getZero();
-        static shared_ptr<const Value> getOne();
+        static boost::shared_ptr<const Value> getNull();
+        static boost::shared_ptr<const Value> getTrue();
+        static boost::shared_ptr<const Value> getFalse();
+        static boost::shared_ptr<const Value> getMinusOne();
+        static boost::shared_ptr<const Value> getZero();
+        static boost::shared_ptr<const Value> getOne();
 
         /*
           Coerce (cast) a value to a native bool, using JSON rules.
@@ -171,7 +171,7 @@ namespace mongo {
 
           @returns the Boolean Value value
         */
-        shared_ptr<const Value> coerceToBoolean() const;
+        boost::shared_ptr<const Value> coerceToBoolean() const;
 
         /*
           Coerce (cast) a value to a long long, using JSON rules.
@@ -195,8 +195,8 @@ namespace mongo {
           @returns an integer less than zero, zero, or an integer greater than
             zero, depending on whether rL < rR, rL == rR, or rL > rR
          */
-        static int compare(const shared_ptr<const Value> &rL,
-                           const shared_ptr<const Value> &rR);
+        static int compare(const boost::shared_ptr<const Value> &rL,
+                           const boost::shared_ptr<const Value> &rR);
 
 
         /*
@@ -219,8 +219,8 @@ namespace mongo {
         Value(int intValue);
         Value(long long longValue);
         Value(double doubleValue);
-        Value(shared_ptr<Document> pDocument);
-        Value(const vector<shared_ptr<const Value> > &vpValue);
+        Value(boost::shared_ptr<Document> pDocument);
+        Value(const vector<boost::shared_ptr<const Value> > &vpValue);
 
         BSONType type;
 
@@ -236,14 +236,14 @@ namespace mongo {
         OID oidValue;
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol
-        shared_ptr<Document> pDocumentValue;
-        vector<shared_ptr<const Value> > vpValue; // for arrays
+        boost::shared_ptr<Document> pDocumentValue;
+        vector<boost::shared_ptr<const Value> > vpValue; // for arrays
 
 
         /*
         These are often used as the result of boolean or comparison
         expressions.  Because these are static, and because Values are
-        passed around as shared_ptr<>, returns of these must be wrapped
+        passed around as boost::shared_ptr<>, returns of these must be wrapped
         as per this pattern:
         http://live.boost.org/doc/libs/1_46_0/libs/smart_ptr/sp_techniques.html#static
         Use the null_deleter defined below.
@@ -269,16 +269,16 @@ namespace mongo {
         public:
             // virtuals from ValueIterator
             virtual bool more() const;
-            virtual shared_ptr<const Value> next();
+            virtual boost::shared_ptr<const Value> next();
 
         private:
             friend class Value;
-            vi(shared_ptr<const Value> pSource,
-               const vector<shared_ptr<const Value> > *pvpValue);
+            vi(boost::shared_ptr<const Value> pSource,
+               const vector<boost::shared_ptr<const Value> > *pvpValue);
 
             size_t size;
             size_t nextIndex;
-            const vector<shared_ptr<const Value> > *pvpValue;
+            const vector<boost::shared_ptr<const Value> > *pvpValue;
         };
 
     };
@@ -293,33 +293,33 @@ namespace mongo {
         return type;
     }
 
-    inline shared_ptr<const Value> Value::getNull() {
-        shared_ptr<const Value> pValue(&fieldNull, null_deleter());
+    inline boost::shared_ptr<const Value> Value::getNull() {
+	boost::shared_ptr<const Value> pValue(&fieldNull, null_deleter());
         return pValue;
     }
 
-    inline shared_ptr<const Value> Value::getTrue() {
-        shared_ptr<const Value> pValue(&fieldTrue, null_deleter());
+    inline boost::shared_ptr<const Value> Value::getTrue() {
+	boost::shared_ptr<const Value> pValue(&fieldTrue, null_deleter());
         return pValue;
     }
 
-    inline shared_ptr<const Value> Value::getFalse() {
-        shared_ptr<const Value> pValue(&fieldFalse, null_deleter());
+    inline boost::shared_ptr<const Value> Value::getFalse() {
+	boost::shared_ptr<const Value> pValue(&fieldFalse, null_deleter());
         return pValue;
     }
 
-    inline shared_ptr<const Value> Value::getMinusOne() {
-        shared_ptr<const Value> pValue(&fieldMinusOne, null_deleter());
+    inline boost::shared_ptr<const Value> Value::getMinusOne() {
+	boost::shared_ptr<const Value> pValue(&fieldMinusOne, null_deleter());
         return pValue;
     }
 
-    inline shared_ptr<const Value> Value::getZero() {
-        shared_ptr<const Value> pValue(&fieldZero, null_deleter());
+    inline boost::shared_ptr<const Value> Value::getZero() {
+	boost::shared_ptr<const Value> pValue(&fieldZero, null_deleter());
         return pValue;
     }
 
-    inline shared_ptr<const Value> Value::getOne() {
-        shared_ptr<const Value> pValue(&fieldOne, null_deleter());
+    inline boost::shared_ptr<const Value> Value::getOne() {
+	boost::shared_ptr<const Value> pValue(&fieldOne, null_deleter());
         return pValue;
     }
 };

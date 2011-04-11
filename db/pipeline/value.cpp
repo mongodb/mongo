@@ -47,9 +47,9 @@ namespace mongo {
         simple.boolValue = boolValue;
     }
 
-    shared_ptr<const Value> Value::createFromBsonElement(
+    boost::shared_ptr<const Value> Value::createFromBsonElement(
         BSONElement *pBsonElement) {
-        shared_ptr<const Value> pValue(new Value(pBsonElement));
+        boost::shared_ptr<const Value> pValue(new Value(pBsonElement));
         return pValue;
     }
 
@@ -147,8 +147,8 @@ namespace mongo {
         simple.intValue = intValue;
     }
 
-    shared_ptr<const Value> Value::createInt(int value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    boost::shared_ptr<const Value> Value::createInt(int value) {
+        boost::shared_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -159,8 +159,8 @@ namespace mongo {
         simple.longValue = longValue;
     }
 
-    shared_ptr<const Value> Value::createLong(long long value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    boost::shared_ptr<const Value> Value::createLong(long long value) {
+        boost::shared_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
@@ -171,32 +171,32 @@ namespace mongo {
         simple.doubleValue = value;
     }
 
-    shared_ptr<const Value> Value::createDouble(double value) {
-        shared_ptr<const Value> pValue(new Value(value));
+    boost::shared_ptr<const Value> Value::createDouble(double value) {
+        boost::shared_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
-    Value::Value(shared_ptr<Document> pDocument):
+    Value::Value(boost::shared_ptr<Document> pDocument):
         type(Object),
         pDocumentValue(pDocument),
         vpValue() {
     }
 
-    shared_ptr<const Value> Value::createDocument(
-        shared_ptr<Document> pDocument) {
-        shared_ptr<const Value> pValue(new Value(pDocument));
+    boost::shared_ptr<const Value> Value::createDocument(
+        boost::shared_ptr<Document> pDocument) {
+        boost::shared_ptr<const Value> pValue(new Value(pDocument));
         return pValue;
     }
 
-    Value::Value(const vector<shared_ptr<const Value> > &thevpValue):
+    Value::Value(const vector<boost::shared_ptr<const Value> > &thevpValue):
         type(Array),
         pDocumentValue(),
         vpValue(thevpValue) {
     }
 
-    shared_ptr<const Value> Value::createArray(
-        const vector<shared_ptr<const Value> > &vpValue) {
-        shared_ptr<const Value> pValue(new Value(vpValue));
+    boost::shared_ptr<const Value> Value::createArray(
+        const vector<boost::shared_ptr<const Value> > &vpValue) {
+        boost::shared_ptr<const Value> pValue(new Value(vpValue));
         return pValue;
     }
 
@@ -216,7 +216,7 @@ namespace mongo {
         return stringValue;
     }
 
-    shared_ptr<Document> Value::getDocument() const {
+    boost::shared_ptr<Document> Value::getDocument() const {
         assert(getType() == Object);
         return pDocumentValue;
     }
@@ -225,21 +225,21 @@ namespace mongo {
         return (nextIndex < size);
     }
 
-    shared_ptr<const Value> Value::vi::next() {
+    boost::shared_ptr<const Value> Value::vi::next() {
         assert(more());
         return (*pvpValue)[nextIndex++];
     }
 
-    Value::vi::vi(shared_ptr<const Value> pValue,
-                  const vector<shared_ptr<const Value> > *thepvpValue):
+    Value::vi::vi(boost::shared_ptr<const Value> pValue,
+                  const vector<boost::shared_ptr<const Value> > *thepvpValue):
         size(thepvpValue->size()),
         nextIndex(0),
         pvpValue(thepvpValue) {
     }
 
-    shared_ptr<ValueIterator> Value::getArray() const {
+    boost::shared_ptr<ValueIterator> Value::getArray() const {
         assert(getType() == Array);
-        shared_ptr<ValueIterator> pVI(new vi(shared_from_this(), &vpValue));
+        boost::shared_ptr<ValueIterator> pVI(new vi(shared_from_this(), &vpValue));
         return pVI;
     }
 
@@ -298,7 +298,7 @@ namespace mongo {
             break;
 
         case Object: {
-            shared_ptr<Document> pDocument(getDocument());
+            boost::shared_ptr<Document> pDocument(getDocument());
             BSONObjBuilder subBuilder(pBuilder->subobjStart(fieldName));
             pDocument->toBson(&subBuilder);
             subBuilder.done();
@@ -309,7 +309,7 @@ namespace mongo {
             const size_t n = vpValue.size();
             BSONArrayBuilder arrayBuilder(n);
             for(size_t i = 0; i < n; ++i) {
-                shared_ptr<const Value> pValue(vpValue[i]);
+                boost::shared_ptr<const Value> pValue(vpValue[i]);
                 pValue->addToBsonArray(&arrayBuilder);
             }
 
@@ -386,7 +386,7 @@ namespace mongo {
             break;
 
         case Object: {
-            shared_ptr<Document> pDocument(getDocument());
+            boost::shared_ptr<Document> pDocument(getDocument());
             BSONObjBuilder subBuilder;
             pDocument->toBson(&subBuilder);
             subBuilder.done();
@@ -398,7 +398,7 @@ namespace mongo {
             const size_t n = vpValue.size();
             BSONArrayBuilder arrayBuilder(n);
             for(size_t i = 0; i < n; ++i) {
-                shared_ptr<const Value> pValue(vpValue[i]);
+                boost::shared_ptr<const Value> pValue(vpValue[i]);
                 pValue->addToBsonArray(&arrayBuilder);
             }
 
@@ -517,7 +517,7 @@ namespace mongo {
         return false;
     }
 
-    shared_ptr<const Value> Value::coerceToBoolean() const {
+    boost::shared_ptr<const Value> Value::coerceToBoolean() const {
         bool result = coerceToBool();
 
         /* always normalize to the singletons */
@@ -573,8 +573,8 @@ namespace mongo {
         return (double)0;
     }
 
-    int Value::compare(const shared_ptr<const Value> &rL,
-                       const shared_ptr<const Value> &rR) {
+    int Value::compare(const boost::shared_ptr<const Value> &rL,
+                       const boost::shared_ptr<const Value> &rR) {
         BSONType lType = rL->getType();
         assert(lType == rR->getType());
         // CW TODO for now, only compare like values
@@ -594,8 +594,8 @@ namespace mongo {
             return Document::compare(rL->getDocument(), rR->getDocument());
 
         case Array: {
-            shared_ptr<ValueIterator> pli(rL->getArray());
-            shared_ptr<ValueIterator> pri(rR->getArray());
+            boost::shared_ptr<ValueIterator> pli(rL->getArray());
+            boost::shared_ptr<ValueIterator> pri(rR->getArray());
 
             while(true) {
                 /* have we run out of left array? */
@@ -611,8 +611,8 @@ namespace mongo {
                     return 1; // the right array is shorter
 
                 /* compare the two corresponding elements */
-                shared_ptr<const Value> plv(pli->next());
-                shared_ptr<const Value> prv(pri->next());
+                boost::shared_ptr<const Value> plv(pli->next());
+                boost::shared_ptr<const Value> prv(pri->next());
                 const int cmp = Value::compare(plv, prv);
                 if (cmp)
                     return cmp; // values are unequal

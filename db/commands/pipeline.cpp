@@ -35,9 +35,9 @@ namespace mongo {
         debug(false) {
     }
 
-    shared_ptr<Pipeline> Pipeline::parseCommand(
+    boost::shared_ptr<Pipeline> Pipeline::parseCommand(
 	string &errmsg, BSONObj &cmdObj) {
-	shared_ptr<Pipeline> pPipeline(new Pipeline());
+	boost::shared_ptr<Pipeline> pPipeline(new Pipeline());
         vector<BSONElement> pipeline;
 
         /* gather the specification for the aggregation */
@@ -64,7 +64,7 @@ namespace mongo {
                "Pipeline::parseCommand(): unrecognized field \"" <<
                cmdElement.fieldName();
             errmsg = sb.str();
-	    return shared_ptr<Pipeline>();
+	    return boost::shared_ptr<Pipeline>();
         }
 
         /*
@@ -82,7 +82,7 @@ namespace mongo {
             assert(pipeElement.type() == Object); // CW TODO user error
             BSONObj bsonObj(pipeElement.Obj());
 
-	    shared_ptr<DocumentSource> pSource;
+	    boost::shared_ptr<DocumentSource> pSource;
 
             /* use the object to add a DocumentSource to the processing chain */
             BSONObjIterator bsonIterator(bsonObj);
@@ -95,7 +95,7 @@ namespace mongo {
                     pSource =
 			DocumentSourceProject::createFromBson(&bsonElement);
 		}
-                else if (strcmp(pFieldName, "$filter") == 0) {
+                else if (strcmp(pFieldName, "$query") == 0) {
                     pSource = 
 			DocumentSourceFilter::createFromBson(&bsonElement);
 		}
@@ -108,7 +108,7 @@ namespace mongo {
                        "Pipeline::run(): unrecognized pipeline op \"" <<
                        pFieldName;
                     errmsg = sb.str();
-		    return shared_ptr<Pipeline>();
+		    return boost::shared_ptr<Pipeline>();
                 }
             }
 
@@ -118,7 +118,7 @@ namespace mongo {
 	/*
 	  Move filters up where possible.
 
-	  CW TODO -- move filters past projections where possible, and noting
+	  CW TODO -- move filter past projections where possible, and noting
 	  corresponding field renaming.
 
 	  Then coalesce adjacent filters where possible.  Two adjacent filters
@@ -137,7 +137,7 @@ namespace mongo {
 	tempList.splice(tempList.begin(), *pSourceList);
 
 	/* move the first one to the final list */
-	shared_ptr<DocumentSource> pLastSource(tempList.front());
+	boost::shared_ptr<DocumentSource> pLastSource(tempList.front());
 	pSourceList->push_back(pLastSource);
 	tempList.pop_front();
 
@@ -166,9 +166,9 @@ namespace mongo {
 	return pPipeline;
     }
 
-    shared_ptr<Pipeline> Pipeline::splitForSharded() {
+    boost::shared_ptr<Pipeline> Pipeline::splitForSharded() {
 	/* create an initialize the shard spec we'll return */
-	shared_ptr<Pipeline> pShardPipeline(new Pipeline());
+	boost::shared_ptr<Pipeline> pShardPipeline(new Pipeline());
 	pShardPipeline->collectionName = collectionName;
 
 	/* put the source list aside */
@@ -183,7 +183,7 @@ namespace mongo {
 	SourceList::iterator iter(tempList.begin());
 	SourceList::iterator listEnd(tempList.end());
 	for(; iter != listEnd; ++iter) {
-	    shared_ptr<DocumentSource> pSource(*iter);
+	    boost::shared_ptr<DocumentSource> pSource(*iter);
 
 	    /* copy the operation to the shard pipeline */
 	    pShardPipeline->sourceList.push_back(pSource);
@@ -207,11 +207,11 @@ namespace mongo {
     }
 
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
-		       shared_ptr<DocumentSource> pSource) {
+		       boost::shared_ptr<DocumentSource> pSource) {
 	/* chain together the sources we found */
 	for(SourceList::iterator iter(sourceList.begin()),
 		listEnd(sourceList.end()); iter != listEnd; ++iter) {
-	    shared_ptr<DocumentSource> pTemp(*iter);
+	    boost::shared_ptr<DocumentSource> pTemp(*iter);
 	    pTemp->setSource(pSource);
 	    pSource = pTemp;
 	}
@@ -223,7 +223,7 @@ namespace mongo {
         BSONArrayBuilder resultArray; // where we'll stash the results
         for(bool hasDocument = !pSource->eof(); hasDocument;
                 hasDocument = pSource->advance()) {
-            shared_ptr<Document> pDocument(pSource->getCurrent());
+	    boost::shared_ptr<Document> pDocument(pSource->getCurrent());
 
             /* add the document to the result set */
             BSONObjBuilder documentBuilder;

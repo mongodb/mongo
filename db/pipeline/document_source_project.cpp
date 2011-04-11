@@ -60,9 +60,9 @@ namespace mongo {
         return pSource->advance();
     }
 
-    shared_ptr<Document> DocumentSourceProject::getCurrent() {
+    boost::shared_ptr<Document> DocumentSourceProject::getCurrent() {
         if (!pNoUnwindDocument.get()) {
-            shared_ptr<Document> pInDocument(pSource->getCurrent());
+            boost::shared_ptr<Document> pInDocument(pSource->getCurrent());
 
             /*
               Use the expressions to create a new Document out of the
@@ -72,10 +72,10 @@ namespace mongo {
             pNoUnwindDocument = Document::create(n);
             for(size_t i = 0; i < n; ++i) {
                 string outName(vFieldName[i]);
-                shared_ptr<Expression> pExpression(vpExpression[i]);
+                boost::shared_ptr<Expression> pExpression(vpExpression[i]);
 
                 /* get the value for the field */
-                shared_ptr<const Value> pOutValue(
+                boost::shared_ptr<const Value> pOutValue(
                     pExpression->evaluate(pInDocument));
 
                 /*
@@ -114,7 +114,7 @@ namespace mongo {
          */
         if (pUnwindArray.get()) {
             /* clone the document with an array we're unwinding */
-            shared_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
+            boost::shared_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
 
             /* substitute the named field into the prototype document */
             pUnwindDocument->setField(
@@ -142,14 +142,14 @@ namespace mongo {
 	pBuilder->append("$project", insides.done());
     }
 
-    shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
-        shared_ptr<DocumentSourceProject> pSource(
+    boost::shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
+        boost::shared_ptr<DocumentSourceProject> pSource(
             new DocumentSourceProject());
         return pSource;
     }
 
     void DocumentSourceProject::addField(
-        string fieldName, shared_ptr<Expression> pExpression,
+        string fieldName, boost::shared_ptr<Expression> pExpression,
 	bool unwindArray) {
         assert(fieldName.length()); // CW TODO must be a non-empty string
         assert(pExpression); // CW TODO must be a non-null expression
@@ -164,13 +164,13 @@ namespace mongo {
         vpExpression.push_back(pExpression);
     }
 
-    shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
+    boost::shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
 	BSONElement *pBsonElement) {
         /* validate */
         assert(pBsonElement->type() == Object); // CW TODO user error
 
         /* chain the projection onto the original source */
-        shared_ptr<DocumentSourceProject> pProject(
+        boost::shared_ptr<DocumentSourceProject> pProject(
 	    DocumentSourceProject::create());
 
         /*
@@ -215,7 +215,7 @@ AddField:
                 if (fieldInclusion == 0)
                     assert(false); // CW TODO unimplemented
                 else {
-                    shared_ptr<Expression> pExpression(
+                    boost::shared_ptr<Expression> pExpression(
                         ExpressionFieldPath::create(inFieldName));
                     pProject->addField(outFieldName, pExpression, false);
                 }
@@ -235,7 +235,7 @@ AddField:
             case Object: {
                 bool hasUnwound = objectCtx.unwindUsed();
 
-                shared_ptr<Expression> pDocument(
+                boost::shared_ptr<Expression> pDocument(
                     Expression::parseObject(&outFieldElement, &objectCtx));
 
                 /*

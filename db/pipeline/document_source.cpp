@@ -22,12 +22,14 @@ namespace mongo {
     DocumentSource::~DocumentSource() {
     }
 
-    void DocumentSource::setSource(shared_ptr<DocumentSource> pTheSource) {
+    void DocumentSource::setSource(
+	boost::shared_ptr<DocumentSource> pTheSource) {
 	assert(!pSource.get());
 	pSource = pTheSource;
     }
 
-    bool DocumentSource::coalesce(shared_ptr<DocumentSource> pNextSource) {
+    bool DocumentSource::coalesce(
+	boost::shared_ptr<DocumentSource> pNextSource) {
 	return false;
     }
 

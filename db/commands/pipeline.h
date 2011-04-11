@@ -46,7 +46,7 @@ namespace mongo {
 	  @param cmdObj the command object sent from the client
 	  @returns the pipeline, if created, otherwise a NULL reference
 	 */
-	static shared_ptr<Pipeline> parseCommand(
+	static boost::shared_ptr<Pipeline> parseCommand(
 	    string &errmsg, BSONObj &cmdObj);
 
 	/*
@@ -65,7 +65,7 @@ namespace mongo {
 	  @returns the Spec for the pipeline command that should be sent
 	    to the shards
 	*/
-	shared_ptr<Pipeline> splitForSharded();
+	boost::shared_ptr<Pipeline> splitForSharded();
 
 	/*
 	  Write the Pipeline as a BSONObj command.  This should be the
@@ -89,7 +89,7 @@ namespace mongo {
 	  @returns true on success, false if an error occurs
 	*/
 	bool run(BSONObjBuilder &result, string &errmsg,
-		 shared_ptr<DocumentSource> pSource);
+		 boost::shared_ptr<DocumentSource> pSource);
 
 	bool debugShardedPipeline() const;
 
@@ -97,7 +97,7 @@ namespace mongo {
         Pipeline();
 
 	string collectionName;
-	typedef list<shared_ptr<DocumentSource> > SourceList;
+	typedef list<boost::shared_ptr<DocumentSource> > SourceList;
 	SourceList sourceList;
 
 	bool debug;

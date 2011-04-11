@@ -20,10 +20,10 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<const Value> AccumulatorSum::evaluate(
-        shared_ptr<Document> pDocument) const {
+    boost::shared_ptr<const Value> AccumulatorSum::evaluate(
+        boost::shared_ptr<Document> pDocument) const {
         assert(vpOperand.size() == 1);
-        shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	boost::shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* upgrade to the widest type required to hold the result */
         BSONType rhsType = prhs->getType();
@@ -50,12 +50,12 @@ namespace mongo {
         return Value::getZero();
     }
 
-    shared_ptr<Accumulator> AccumulatorSum::create() {
-        shared_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
+    boost::shared_ptr<Accumulator> AccumulatorSum::create() {
+	boost::shared_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
         return pSummer;
     }
 
-    shared_ptr<const Value> AccumulatorSum::getValue() const {
+    boost::shared_ptr<const Value> AccumulatorSum::getValue() const {
         if (resultType == NumberInt)
             return Value::createInt((int)longResult);
         if (resultType == NumberLong)

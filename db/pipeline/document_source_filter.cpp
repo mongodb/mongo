@@ -34,10 +34,10 @@ namespace mongo {
         }
 
         while(hasNext) {
-            shared_ptr<Document> pDocument(pSource->getCurrent());
+            boost::shared_ptr<Document> pDocument(pSource->getCurrent());
             hasNext = pSource->advance();
 
-            shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
+            boost::shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
             bool pass = pValue->coerceToBool();
             if (pass) {
                 pCurrent = pDocument;
@@ -70,7 +70,7 @@ namespace mongo {
         return (pCurrent.get() != NULL);
     }
 
-    shared_ptr<Document> DocumentSourceFilter::getCurrent() {
+    boost::shared_ptr<Document> DocumentSourceFilter::getCurrent() {
         if (unstarted)
             findNext();
 
@@ -79,7 +79,7 @@ namespace mongo {
     }
 
     bool DocumentSourceFilter::coalesce(
-	shared_ptr<DocumentSource> pNextSource) {
+	boost::shared_ptr<DocumentSource> pNextSource) {
 
 	/* we only know how to coalesce other filters */
 	DocumentSourceFilter *pDocFilter =
@@ -91,7 +91,7 @@ namespace mongo {
 	  Two adjacent filters can be combined by creating a conjunction of
 	  their predicates.
 	 */
-	shared_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
+	boost::shared_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
 	pAnd->addOperand(pFilter);
 	pAnd->addOperand(pDocFilter->pFilter);
 	pFilter = pAnd;
@@ -104,32 +104,32 @@ namespace mongo {
     }
 
     void DocumentSourceFilter::sourceToBson(BSONObjBuilder *pBuilder) const {
-	pFilter->addToBsonObj(pBuilder, "$filter", true);
+	pFilter->addToBsonObj(pBuilder, "$query", true);
     }
 
-    shared_ptr<DocumentSourceFilter> DocumentSourceFilter::createFromBson(
+    boost::shared_ptr<DocumentSourceFilter> DocumentSourceFilter::createFromBson(
 	BSONElement *pBsonElement) {
         assert(pBsonElement->type() == Object);
         // CW TODO error: expression object must be an object
 
-        shared_ptr<Expression> pExpression(
+        boost::shared_ptr<Expression> pExpression(
 	    Expression::parseObject(pBsonElement,
 				    &Expression::ObjectCtx(0)));
-        shared_ptr<DocumentSourceFilter> pFilter(
+        boost::shared_ptr<DocumentSourceFilter> pFilter(
             DocumentSourceFilter::create(pExpression));
 
         return pFilter;
     }
 
-    shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
-        shared_ptr<Expression> pFilter) {
-        shared_ptr<DocumentSourceFilter> pSource(
+    boost::shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
+        boost::shared_ptr<Expression> pFilter) {
+        boost::shared_ptr<DocumentSourceFilter> pSource(
             new DocumentSourceFilter(pFilter));
         return pSource;
     }
 
     DocumentSourceFilter::DocumentSourceFilter(
-        shared_ptr<Expression> pTheFilter):
+        boost::shared_ptr<Expression> pTheFilter):
         pFilter(pTheFilter),
         unstarted(true),
         hasNext(false),

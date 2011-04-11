@@ -21,7 +21,7 @@
 
 namespace mongo {
     void Accumulator::addOperand(
-        shared_ptr<Expression> pExpression) {
+        boost::shared_ptr<Expression> pExpression) {
         assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
         ExpressionNary::addOperand(pExpression);
     }

@@ -53,7 +53,7 @@ namespace mongo {
         return true;
     }
 
-    shared_ptr<Document> DocumentSourceGroup::getCurrent() {
+    boost::shared_ptr<Document> DocumentSourceGroup::getCurrent() {
         if (!populated)
             populate();
 
@@ -69,7 +69,7 @@ namespace mongo {
 	/* add the remaining fields */
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
-	    shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])());
+	    boost::shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])());
 	    pA->addOperand(vpExpression[i]);
 	    pA->addToBsonObj(&insides, vFieldName[i], true);
 	}
@@ -77,8 +77,8 @@ namespace mongo {
 	pBuilder->append("$group", insides.done());
     }
 
-    shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create() {
-        shared_ptr<DocumentSourceGroup> pSource(
+    boost::shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create() {
+        boost::shared_ptr<DocumentSourceGroup> pSource(
             new DocumentSourceGroup());
         return pSource;
     }
@@ -94,8 +94,8 @@ namespace mongo {
 
     void DocumentSourceGroup::addAccumulator(
         string fieldName,
-        shared_ptr<Accumulator> (*pAccumulatorFactory)(),
-        shared_ptr<Expression> pExpression) {
+        boost::shared_ptr<Accumulator> (*pAccumulatorFactory)(),
+        boost::shared_ptr<Expression> pExpression) {
         vFieldName.push_back(fieldName);
         vpAccumulatorFactory.push_back(pAccumulatorFactory);
         vpExpression.push_back(pExpression);
@@ -104,7 +104,7 @@ namespace mongo {
 
     struct GroupOpDesc {
         const char *pName;
-        shared_ptr<Accumulator> (*pFactory)(void);
+        boost::shared_ptr<Accumulator> (*pFactory)(void);
     };
 
     static int GroupOpDescCmp(const void *pL, const void *pR) {
@@ -125,11 +125,11 @@ namespace mongo {
 
     static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);
 
-    shared_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
+    boost::shared_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
 	BSONElement *pBsonElement) {
         assert(pBsonElement->type() == Object); // CW TODO must be an object
 
-        shared_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create());
+        boost::shared_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create());
         bool idSet = false;
 
         BSONObj groupObj(pBsonElement->Obj());
@@ -146,7 +146,7 @@ namespace mongo {
                   Use the projection-like set of field paths to create the
                   group-by key.
                  */
-                shared_ptr<Expression> pId(
+                boost::shared_ptr<Expression> pId(
                     Expression::parseObject(&groupField,
 				 &Expression::ObjectCtx(
 					Expression::ObjectCtx::DOCUMENT_OK)));
@@ -179,7 +179,7 @@ namespace mongo {
 
                     assert(pOp); // CW TODO error: operator not found
 
-                    shared_ptr<Expression> pGroupExpr;
+                    boost::shared_ptr<Expression> pGroupExpr;
 
                     BSONType elementType = subElement.type();
                     if (elementType == Object)
@@ -210,16 +210,16 @@ namespace mongo {
     void DocumentSourceGroup::populate() {
         for(bool hasNext = !pSource->eof(); hasNext;
                 hasNext = pSource->advance()) {
-            shared_ptr<Document> pDocument(pSource->getCurrent());
+            boost::shared_ptr<Document> pDocument(pSource->getCurrent());
 
             /* get the _id document */
-            shared_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
+            boost::shared_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
 
             /*
               Look for the _id value in the map; if it's not there, add a
                new entry with a blank accumulator.
             */
-            vector<shared_ptr<Accumulator> > *pGroup;
+            vector<boost::shared_ptr<Accumulator> > *pGroup;
             GroupsType::iterator it(groups.find(pId));
             if (it != groups.end()) {
                 /* point at the existing accumulators */
@@ -228,9 +228,9 @@ namespace mongo {
             else {
                 /* insert a new group into the map */
                 groups.insert(it,
-                              pair<shared_ptr<const Value>,
-                              vector<shared_ptr<Accumulator> > >(
-                                  pId, vector<shared_ptr<Accumulator> >()));
+                              pair<boost::shared_ptr<const Value>,
+                              vector<boost::shared_ptr<Accumulator> > >(
+                                  pId, vector<boost::shared_ptr<Accumulator> >()));
 
                 /* find the accumulator vector (the map value) */
                 it = groups.find(pId);
@@ -240,7 +240,7 @@ namespace mongo {
                 const size_t n = vpAccumulatorFactory.size();
                 pGroup->reserve(n);
                 for(size_t i = 0; i < n; ++i) {
-                    shared_ptr<Accumulator> pAccumulator(
+                    boost::shared_ptr<Accumulator> pAccumulator(
                         (*vpAccumulatorFactory[i])());
                     pAccumulator->addOperand(vpExpression[i]);
                     pGroup->push_back(pAccumulator);
@@ -263,11 +263,11 @@ namespace mongo {
         populated = true;
     }
 
-    shared_ptr<Document> DocumentSourceGroup::makeDocument(
+    boost::shared_ptr<Document> DocumentSourceGroup::makeDocument(
         const GroupsType::iterator &rIter) {
-        vector<shared_ptr<Accumulator> > *pGroup = &rIter->second;
+        vector<boost::shared_ptr<Accumulator> > *pGroup = &rIter->second;
         const size_t n = vFieldName.size();
-        shared_ptr<Document> pResult(Document::create(1 + n));
+        boost::shared_ptr<Document> pResult(Document::create(1 + n));
 
         /* add the _id field */
         pResult->addField(idName, rIter->first);
@@ -279,8 +279,9 @@ namespace mongo {
         return pResult;
     }
 
-    shared_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
-	shared_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create());
+    boost::shared_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
+	boost::shared_ptr<DocumentSourceGroup> pMerger(
+	    DocumentSourceGroup::create());
 
 	/* the merger will use the same grouping key */
 	pMerger->setIdExpression(pIdExpression);

@@ -69,15 +69,16 @@ namespace mongo {
                        string &errmsg,
                        BSONObjBuilder &result, bool fromRepl) {
 	/* try to parse the command; if this fails, then we didn't run */
-	shared_ptr<Pipeline> pPipeline(Pipeline::parseCommand(errmsg, cmdObj));
+	boost::shared_ptr<Pipeline> pPipeline(
+	    Pipeline::parseCommand(errmsg, cmdObj));
 	if (!pPipeline.get())
 	    return false;
 
 	/* now hook up the pipeline */
         /* connect up a cursor to the specified collection */
-        shared_ptr<Cursor> pCursor(
+	boost::shared_ptr<Cursor> pCursor(
             findTableScan(pPipeline->getCollectionName().c_str(), BSONObj()));
-        shared_ptr<DocumentSource> pSource(
+	boost::shared_ptr<DocumentSource> pSource(
 	    DocumentSourceCursor::create(pCursor));
 
 /*

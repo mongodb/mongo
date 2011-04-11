@@ -20,16 +20,16 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<const Value> AccumulatorAppend::evaluate(
-        shared_ptr<Document> pDocument) const {
+    boost::shared_ptr<const Value> AccumulatorAppend::evaluate(
+        boost::shared_ptr<Document> pDocument) const {
         assert(vpOperand.size() == 1);
-        shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	boost::shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
         vpValue.push_back(prhs);
 
         return Value::getNull();
     }
 
-    shared_ptr<const Value> AccumulatorAppend::getValue() const {
+    boost::shared_ptr<const Value> AccumulatorAppend::getValue() const {
         return Value::createArray(vpValue);
     }
 
@@ -38,8 +38,9 @@ namespace mongo {
         vpValue() {
     }
 
-    shared_ptr<Accumulator> AccumulatorAppend::create() {
-        shared_ptr<AccumulatorAppend> pAccumulator(new AccumulatorAppend());
+    boost::shared_ptr<Accumulator> AccumulatorAppend::create() {
+	boost::shared_ptr<AccumulatorAppend> pAccumulator(
+	    new AccumulatorAppend());
         return pAccumulator;
     }
 

@@ -20,10 +20,10 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    shared_ptr<const Value> AccumulatorMinMax::evaluate(
-        shared_ptr<Document> pDocument) const {
+    boost::shared_ptr<const Value> AccumulatorMinMax::evaluate(
+        boost::shared_ptr<Document> pDocument) const {
         assert(vpOperand.size() == 1);
-        shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	boost::shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* if this is the first value, just use it */
         if (!pValue.get())
@@ -38,23 +38,25 @@ namespace mongo {
         return pValue;
     }
 
-    shared_ptr<const Value> AccumulatorMinMax::getValue() const {
+    boost::shared_ptr<const Value> AccumulatorMinMax::getValue() const {
         return pValue;
     }
 
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
         sense(theSense),
-        pValue(shared_ptr<const Value>()) {
+        pValue(boost::shared_ptr<const Value>()) {
         assert((sense == 1) || (sense == -1)); // CW TODO error
     }
 
-    shared_ptr<Accumulator> AccumulatorMinMax::createMin() {
-        shared_ptr<AccumulatorMinMax> pAccumulator(new AccumulatorMinMax(1));
+    boost::shared_ptr<Accumulator> AccumulatorMinMax::createMin() {
+	boost::shared_ptr<AccumulatorMinMax> pAccumulator(
+	    new AccumulatorMinMax(1));
         return pAccumulator;
     }
 
-    shared_ptr<Accumulator> AccumulatorMinMax::createMax() {
-        shared_ptr<AccumulatorMinMax> pAccumulator(new AccumulatorMinMax(-1));
+    boost::shared_ptr<Accumulator> AccumulatorMinMax::createMax() {
+	boost::shared_ptr<AccumulatorMinMax> pAccumulator(
+	    new AccumulatorMinMax(-1));
         return pAccumulator;
     }
 

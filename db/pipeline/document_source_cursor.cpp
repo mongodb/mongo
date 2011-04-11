@@ -22,13 +22,15 @@
 #include "db/pipeline/document.h"
 
 namespace mongo {
-    DocumentSourceCursor::DocumentSourceCursor(shared_ptr<Cursor> pTheCursor):
+
+    DocumentSourceCursor::DocumentSourceCursor(
+	boost::shared_ptr<Cursor> pTheCursor):
         pCursor(pTheCursor) {
     }
 
-    shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-	shared_ptr<Cursor> pCursor) {
-	shared_ptr<DocumentSourceCursor> pSource(
+    boost::shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
+	boost::shared_ptr<Cursor> pCursor) {
+	boost::shared_ptr<DocumentSourceCursor> pSource(
 	    new DocumentSourceCursor(pCursor));
 	    return pSource;
     }
@@ -41,14 +43,15 @@ namespace mongo {
         return pCursor->advance();
     }
 
-    shared_ptr<Document> DocumentSourceCursor::getCurrent() {
+    boost::shared_ptr<Document> DocumentSourceCursor::getCurrent() {
         BSONObj documentObj(pCursor->current());
-        shared_ptr<Document> pDocument(
+        boost::shared_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
         return pDocument;
     }
 
-    void DocumentSourceCursor::setSource(shared_ptr<DocumentSource> pSource) {
+    void DocumentSourceCursor::setSource(
+	boost::shared_ptr<DocumentSource> pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }

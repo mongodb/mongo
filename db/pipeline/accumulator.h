@@ -26,7 +26,7 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual void addOperand(shared_ptr<Expression> pExpression);
+	virtual void addOperand(boost::shared_ptr<Expression> pExpression);
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
@@ -37,7 +37,7 @@ namespace mongo {
 
           @returns the accumulated value
          */
-        virtual shared_ptr<const Value> getValue() const = 0;
+        virtual boost::shared_ptr<const Value> getValue() const = 0;
 
     protected:
         Accumulator();
@@ -60,9 +60,9 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-        virtual shared_ptr<const Value> evaluate(
-            shared_ptr<Document> pDocument) const;
-        virtual shared_ptr<const Value> getValue() const;
+	virtual boost::shared_ptr<const Value> evaluate(
+            boost::shared_ptr<Document> pDocument) const;
+        virtual boost::shared_ptr<const Value> getValue() const;
 	virtual const char *getName() const;
 
         /*
@@ -70,12 +70,12 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> create();
+        static boost::shared_ptr<Accumulator> create();
 
     private:
         AccumulatorAppend();
 
-        mutable vector<shared_ptr<const Value> > vpValue;
+        mutable vector<boost::shared_ptr<const Value> > vpValue;
     };
 
 
@@ -83,9 +83,9 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-        virtual shared_ptr<const Value> evaluate(
-            shared_ptr<Document> pDocument) const;
-        virtual shared_ptr<const Value> getValue() const;
+	virtual boost::shared_ptr<const Value> evaluate(
+            boost::shared_ptr<Document> pDocument) const;
+        virtual boost::shared_ptr<const Value> getValue() const;
 	virtual const char *getName() const;
 
         /*
@@ -93,15 +93,15 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> createMin();
-        static shared_ptr<Accumulator> createMax();
+        static boost::shared_ptr<Accumulator> createMin();
+        static boost::shared_ptr<Accumulator> createMax();
 
     private:
         AccumulatorMinMax(int theSense);
 
         int sense; /* 1 for min, -1 for max; used to "scale" comparison */
 
-        mutable shared_ptr<const Value> pValue; /* current min/max */
+        mutable boost::shared_ptr<const Value> pValue; /* current min/max */
     };
 
 
@@ -109,9 +109,9 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Accumulator
-        virtual shared_ptr<const Value> evaluate(
-            shared_ptr<Document> pDocument) const;
-        virtual shared_ptr<const Value> getValue() const;
+	virtual boost::shared_ptr<const Value> evaluate(
+            boost::shared_ptr<Document> pDocument) const;
+        virtual boost::shared_ptr<const Value> getValue() const;
 	virtual const char *getName() const;
 
         /*
@@ -119,7 +119,7 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static shared_ptr<Accumulator> create();
+        static boost::shared_ptr<Accumulator> create();
 
     private:
         AccumulatorSum();

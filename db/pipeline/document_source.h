@@ -54,7 +54,7 @@ namespace mongo {
 	  @returns the current Document
           TODO throws an exception if there are no more expressions to return.
         */
-        virtual shared_ptr<Document> getCurrent() = 0;
+        virtual boost::shared_ptr<Document> getCurrent() = 0;
 
 	/*
 	  Set the underlying source this source should use to get Documents
@@ -66,7 +66,7 @@ namespace mongo {
 
 	  @param pSource the underlying source to use
 	 */
-	virtual void setSource(shared_ptr<DocumentSource> pSource);
+	virtual void setSource(boost::shared_ptr<DocumentSource> pSource);
 
 	/*
 	  Attempt to coalesce this DocumentSource with its successor in the
@@ -82,7 +82,7 @@ namespace mongo {
 	  @returns whether or not the attempt to coalesce was successful or not;
 	    if the attempt was not successful, nothing has been changed
 	 */
-	virtual bool coalesce(shared_ptr<DocumentSource> pNextSource);
+	virtual bool coalesce(boost::shared_ptr<DocumentSource> pNextSource);
 
 	/*
 	  Optimize the pipeline operation, if possible.  This is a local
@@ -126,7 +126,7 @@ namespace mongo {
 	  need a source, override that to assert().  The default is to
 	  assert() if this has already been set.
 	*/
-	shared_ptr<DocumentSource> pSource;
+	boost::shared_ptr<DocumentSource> pSource;
     };
 
 
@@ -137,8 +137,8 @@ namespace mongo {
         virtual ~DocumentSourceBsonArray();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
-	virtual void setSource(shared_ptr<DocumentSource> pSource);
+        virtual boost::shared_ptr<Document> getCurrent();
+	virtual void setSource(boost::shared_ptr<DocumentSource> pSource);
 
 	/*
 	  Create a document source based on a BSON array.
@@ -152,7 +152,7 @@ namespace mongo {
 
 	  @param pCursor the cursor to use to fetch data
 	*/
-	static shared_ptr<DocumentSourceBsonArray> create(
+	static boost::shared_ptr<DocumentSourceBsonArray> create(
 	    BSONElement *pBsonElement);
 
     protected:
@@ -175,8 +175,8 @@ namespace mongo {
         virtual ~DocumentSourceCursor();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
-	virtual void setSource(shared_ptr<DocumentSource> pSource);
+        virtual boost::shared_ptr<Document> getCurrent();
+	virtual void setSource(boost::shared_ptr<DocumentSource> pSource);
 
 	/*
 	  Create a document source based on a cursor.
@@ -186,15 +186,15 @@ namespace mongo {
 
 	  @param pCursor the cursor to use to fetch data
 	*/
-	static shared_ptr<DocumentSourceCursor> create(
-	    shared_ptr<Cursor> pCursor);
+	static boost::shared_ptr<DocumentSourceCursor> create(
+	    boost::shared_ptr<Cursor> pCursor);
 
     protected:
 	// virtuals from DocumentSource
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceCursor(shared_ptr<Cursor> pTheCursor);
+        DocumentSourceCursor(boost::shared_ptr<Cursor> pTheCursor);
 
         boost::shared_ptr<Cursor> pCursor;
     };
@@ -207,8 +207,8 @@ namespace mongo {
         virtual ~DocumentSourceFilter();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
-	virtual bool coalesce(shared_ptr<DocumentSource> pNextSource);
+        virtual boost::shared_ptr<Document> getCurrent();
+	virtual bool coalesce(boost::shared_ptr<DocumentSource> pNextSource);
 	virtual void optimize();
 
 	/*
@@ -217,7 +217,7 @@ namespace mongo {
           @param pBsonElement the raw BSON specification for the filter
           @returns the filter
 	 */
-	static shared_ptr<DocumentSourceFilter> createFromBson(
+	static boost::shared_ptr<DocumentSourceFilter> createFromBson(
 	    BSONElement *pBsonElement);
 
         /*
@@ -226,8 +226,8 @@ namespace mongo {
           @param pFilter the expression to use to filter
           @returns the filter
          */
-        static shared_ptr<DocumentSourceFilter> create(
-            shared_ptr<Expression> pFilter);
+        static boost::shared_ptr<DocumentSourceFilter> create(
+            boost::shared_ptr<Expression> pFilter);
 
 	/*
 	  Create a BSONObj suitable for Matcher construction.
@@ -247,15 +247,15 @@ namespace mongo {
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceFilter(shared_ptr<Expression> pFilter);
+        DocumentSourceFilter(boost::shared_ptr<Expression> pFilter);
 
-        shared_ptr<Expression> pFilter;
+        boost::shared_ptr<Expression> pFilter;
 
         void findNext();
 
         bool unstarted;
         bool hasNext;
-        shared_ptr<Document> pCurrent;
+        boost::shared_ptr<Document> pCurrent;
     };
 
     class DocumentSourceGroup :
@@ -265,14 +265,14 @@ namespace mongo {
         virtual ~DocumentSourceGroup();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual boost::shared_ptr<Document> getCurrent();
 
         /*
           Create a new grouping DocumentSource.
 	  
 	  @returns the DocumentSource
          */
-        static shared_ptr<DocumentSourceGroup> create();
+        static boost::shared_ptr<DocumentSourceGroup> create();
 
         /*
           Set the Id Expression.
@@ -283,7 +283,7 @@ namespace mongo {
 
           @param pExpression the group key
          */
-        void setIdExpression(shared_ptr<Expression> pExpression);
+        void setIdExpression(boost::shared_ptr<Expression> pExpression);
 
         /*
           Add an accumulator.
@@ -298,8 +298,8 @@ namespace mongo {
                 group field
          */
         void addAccumulator(string fieldName,
-                            shared_ptr<Accumulator> (*pAccumulatorFactory)(),
-                            shared_ptr<Expression> pExpression);
+                        boost::shared_ptr<Accumulator> (*pAccumulatorFactory)(),
+                            boost::shared_ptr<Expression> pExpression);
 
 	/*
 	  Create a grouping DocumentSource from BSON.
@@ -311,7 +311,7 @@ namespace mongo {
 	  @param pBsonElement the BSONELement that defines the group
 	  @returns the grouping DocumentSource
 	 */
-        static shared_ptr<DocumentSource> createFromBson(
+        static boost::shared_ptr<DocumentSource> createFromBson(
 	    BSONElement *pBsonElement);
 
 
@@ -321,7 +321,7 @@ namespace mongo {
 
 	  @returns the grouping DocumentSource
 	*/
-	shared_ptr<DocumentSource> createMerger();
+	boost::shared_ptr<DocumentSource> createMerger();
 
     protected:
 	// virtuals from DocumentSource
@@ -340,14 +340,14 @@ namespace mongo {
         bool populated;
 
         struct KeyComparator {
-            bool operator()(const shared_ptr<const Value> &rL,
-                            const shared_ptr<const Value> &rR);
+            bool operator()(const boost::shared_ptr<const Value> &rL,
+                            const boost::shared_ptr<const Value> &rR);
         };
 
-        shared_ptr<Expression> pIdExpression;
+        boost::shared_ptr<Expression> pIdExpression;
 
-        typedef map<shared_ptr<const Value>,
-                vector<shared_ptr<Accumulator> >, KeyComparator> GroupsType;
+        typedef map<boost::shared_ptr<const Value>,
+	    vector<boost::shared_ptr<Accumulator> >, KeyComparator> GroupsType;
         GroupsType groups;
 
         /*
@@ -363,14 +363,15 @@ namespace mongo {
           These three vectors parallel each other.
         */
         vector<string> vFieldName;
-        vector<shared_ptr<Accumulator> (*)()> vpAccumulatorFactory;
-        vector<shared_ptr<Expression> > vpExpression;
+        vector<boost::shared_ptr<Accumulator> (*)()> vpAccumulatorFactory;
+        vector<boost::shared_ptr<Expression> > vpExpression;
 
 
-        shared_ptr<Document> makeDocument(const GroupsType::iterator &rIter);
+        boost::shared_ptr<Document> makeDocument(
+	    const GroupsType::iterator &rIter);
 
         GroupsType::iterator groupsIterator;
-        shared_ptr<Document> pCurrent;
+        boost::shared_ptr<Document> pCurrent;
 
         static string idName; // shared _id string
     };
@@ -384,7 +385,7 @@ namespace mongo {
         virtual ~DocumentSourceProject();
         virtual bool eof();
         virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
+        virtual boost::shared_ptr<Document> getCurrent();
 	virtual void optimize();
 
         /*
@@ -392,7 +393,7 @@ namespace mongo {
 
 	  @returns the projection DocumentSource
         */
-        static shared_ptr<DocumentSourceProject> create();
+        static boost::shared_ptr<DocumentSourceProject> create();
 
         /*
           Add an output Expression to the projection.
@@ -408,7 +409,8 @@ namespace mongo {
               value from the array.  Note there can only be one unwound field
 	      per projection.
         */
-        void addField(string fieldName, shared_ptr<Expression> pExpression,
+        void addField(string fieldName,
+		      boost::shared_ptr<Expression> pExpression,
                       bool unwindArray);
 
 	/*
@@ -420,7 +422,7 @@ namespace mongo {
 	  @params pBsonElement the BSONElement with an object named $project
 	  @returns the created projection
 	 */
-        static shared_ptr<DocumentSource> createFromBson(
+        static boost::shared_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement);
 
     protected:
@@ -432,15 +434,15 @@ namespace mongo {
 
         // configuration state
         vector<string> vFieldName; // inclusion field names
-        vector<shared_ptr<Expression> > vpExpression; // inclusions
+        vector<boost::shared_ptr<Expression> > vpExpression; // inclusions
         int unwindWhich; // index of field to unwind, if any, otherwise -1
 
         // iteration state
-        shared_ptr<Document> pNoUnwindDocument;
+        boost::shared_ptr<Document> pNoUnwindDocument;
                                               // document to return, pre-unwind
-        shared_ptr<const Value> pUnwindArray; // field being unwound
-        shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
-        shared_ptr<const Value> pUnwindValue; // current value
+        boost::shared_ptr<const Value> pUnwindArray; // field being unwound
+        boost::shared_ptr<ValueIterator> pUnwind; // iterator used for unwinding
+        boost::shared_ptr<const Value> pUnwindValue; // current value
     };
 }
 
@@ -448,13 +450,13 @@ namespace mongo {
 
 namespace mongo {
     inline bool DocumentSourceGroup::KeyComparator::operator()(
-        const shared_ptr<const Value> &rL,
-        const shared_ptr<const Value> &rR) {
+        const boost::shared_ptr<const Value> &rL,
+        const boost::shared_ptr<const Value> &rR) {
         return (Value::compare(rL, rR) < 0);
     }
 
     inline void DocumentSourceGroup::setIdExpression(
-        shared_ptr<Expression> pExpression) {
+        boost::shared_ptr<Expression> pExpression) {
         pIdExpression = pExpression;
     }
 }
