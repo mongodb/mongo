@@ -15,7 +15,7 @@ am = m.getDB( "foo" );
 function check( note ){
     var start = new Date();
     var x,y;
-    while ( (new Date()).getTime() - start.getTime() < 30000 ){
+    while ( (new Date()).getTime() - start.getTime() < 5 * 60 * 1000 ){
         x = am.runCommand( "dbhash" );
         y = as.runCommand( "dbhash" );
         if ( x.md5 == y.md5 )
