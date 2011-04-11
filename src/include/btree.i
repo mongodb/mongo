@@ -6,6 +6,41 @@
  */
 
 /*
+ * __wt_cache_page_in --
+ *	Read pages into the cache.
+ */
+static inline void
+__wt_cache_page_in(SESSION *session, uint32_t bytes)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
+	++cache->stat_pages_in;
+	cache->stat_bytes_in += bytes;
+}
+
+/*
+ * __wt_cache_page_out --
+ *	Discard pages from the cache.
+ */
+static inline void
+__wt_cache_page_out(SESSION *session, uint32_t bytes)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
+	++cache->stat_pages_out;
+	cache->stat_bytes_out += bytes;
+
+#ifdef HAVE_DIAGNOSTIC
+	WT_ASSERT(session, cache->stat_pages_in >= cache->stat_pages_out);
+	WT_ASSERT(session, cache->stat_bytes_in >= cache->stat_bytes_out);
+#endif
+}
+
+/*
  * __wt_cache_pages_inuse --
  *	Return the number of pages in use.
  */

@@ -236,7 +236,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	    "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
 
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
-	WT_CACHE_PAGE_IN(cache, size);
+	__wt_cache_page_in(session, size);
 
 	/* If the page needs to be verified, that's next. */
 	if (rr->dsk_verify)

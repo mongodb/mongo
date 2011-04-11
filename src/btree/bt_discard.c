@@ -34,7 +34,7 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	 * more space.
 	 */
 	if (!F_ISSET(page, WT_PAGE_SPLIT))
-		WT_CACHE_PAGE_OUT(S2C(session)->cache, page->size);
+		__wt_cache_page_out(session, page->size);
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:

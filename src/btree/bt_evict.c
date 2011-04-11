@@ -203,6 +203,9 @@ err:	if (cache->evict != NULL)
 	WT_VERBOSE(conn, WT_VERB_EVICT,
 	    (session, "cache eviction server exiting"));
 
+	WT_VERBOSE(conn, WT_VERB_EVICT, (session,
+	    "cache server: bytes in use %llu", __wt_cache_bytes_inuse(cache)));
+
 	if (session != &conn->default_session)
 		WT_TRET(__wt_session_close(session));
 

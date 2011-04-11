@@ -198,14 +198,6 @@ struct __wt_cache {
 	 * be garbage -- we track what comes in and what goes out and calculate
 	 * the difference as needed.
 	 */
-#define	WT_CACHE_PAGE_IN(c, bytes) do {					\
-	++(c)->stat_pages_in;						\
-	(c)->stat_bytes_in += bytes;					\
-} while (0)
-#define	WT_CACHE_PAGE_OUT(c, bytes) do {				\
-	++(c)->stat_pages_out;						\
-	(c)->stat_bytes_out += bytes;					\
-} while (0)
 	uint64_t stat_pages_in;
 	uint64_t stat_bytes_in;
 	uint64_t stat_pages_out;
