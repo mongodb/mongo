@@ -29,8 +29,12 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	    (session, "discard addr %lu (type %s)",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
-	/* We've got more space. */
-	WT_CACHE_PAGE_OUT(S2C(session)->cache, page->size);
+	/*
+	 * If this wasn't a page we created during a split, we've got
+	 * more space.
+	 */
+	if (!F_ISSET(page, WT_PAGE_SPLIT))
+		WT_CACHE_PAGE_OUT(S2C(session)->cache, page->size);
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:

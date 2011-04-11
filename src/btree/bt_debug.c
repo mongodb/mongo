@@ -23,10 +23,10 @@ static int  __wt_debug_page_col_var(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
 static int  __wt_debug_page_row_leaf(SESSION *, WT_PAGE *, FILE *);
 static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
-static void __wt_debug_update(WT_UPDATE *, FILE *);
 static void __wt_debug_ref(WT_REF *, FILE *);
 static void __wt_debug_row_insert(WT_INSERT *, FILE *);
 static int  __wt_debug_set_fp(const char *, FILE **, int *);
+static void __wt_debug_update(WT_UPDATE *, FILE *);
 
 /*
  * __wt_debug_set_fp --
@@ -195,10 +195,12 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 	fprintf(fp, " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
 	if (WT_PAGE_IS_ROOT(page))
 		fprintf(fp, ", root");
-	if (F_ISSET(page, WT_PAGE_MERGE))
-		fprintf(fp, ", merge");
+	if (F_ISSET(page, WT_PAGE_DELETED))
+		fprintf(fp, ", deleted");
 	if (F_ISSET(page, WT_PAGE_PINNED))
 		fprintf(fp, ", pinned");
+	if (F_ISSET(page, WT_PAGE_SPLIT))
+		fprintf(fp, ", split");
 	fprintf(fp, ")\n");
 
 	/* Dump the WT_{ROW,COL}_INDX array. */

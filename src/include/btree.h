@@ -476,8 +476,9 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_PINNED		0x01	/* Page is pinned */
-#define	WT_PAGE_MERGE		0x02	/* Page should be merged */
+#define	WT_PAGE_DELETED		0x01	/* Page was empty at reconcilation */
+#define	WT_PAGE_PINNED		0x02	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x04	/* Internal page created in a split */
 	uint8_t flags;			/* Page flags */
 };
 /*

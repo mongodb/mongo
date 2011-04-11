@@ -90,6 +90,8 @@ __wt_page_reconcile(
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
+	WT_ASSERT(session, page->parent_ref->state == WT_REF_LOCKED);
+
 	/*
 	 * Clean pages are simple: update the parent's state and discard the
 	 * page.  (It makes on sense to do reconciliation on a clean page if
@@ -104,27 +106,36 @@ __wt_page_reconcile(
 	}
 
 	/*
-	 * If an internal page is created as part of a split, it will eventually
-	 * be reconciled.  However, we don't want to write such pages to disk,
-	 * they are always merged into their parents.  Check the merge flag --
-	 * if it's set, logically evict this page by updating the parent, and
-	 * return.  Do this before we update the pages generational information,
-	 * internally created pages can never be clean.
+	 * Handle pages marked for deletion.
+	 *
+	 * Both leaf and internal pages have their WT_PAGE_DELETED flags set if
+	 * they're reconciled and are found to have no valid entries.  At that
+	 * time the page's WT_PAGE_DELETED flag is set, and the page's state is
+	 * set to WT_REF_EVICTED.  If these pages are subsequently accessed,
+	 * the state is reset to WT_REF_MEM, and they'll eventually end up here,
+	 * being reconciled again.  Any previously set WT_PAGE_DELETED flag may
+	 * no longer be correct: new material may have been inserted into the
+	 * page.  Clear the WT_PAGE_DELETED flag and reconcile the page again.
+	 * (Yes, it's extra work if the page remains empty, but we're assuming
+	 * pages won't be emptied, re-filled and then emptied again.)
 	 */
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_RLE:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		if (F_ISSET(page, WT_PAGE_MERGE))
-			return (__wt_rec_parent_update_dirty(session,
-			    page, NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
+	if (F_ISSET(page, WT_PAGE_DELETED))
+		F_CLR(page, WT_PAGE_DELETED);
+
+	/*
+	 * Handle internal pages created as part of a split.
+	 *
+	 * We never want to write those pages to disk because we don't want to
+	 * deepen the tree on every split.  Such pages are always merged into
+	 * their parents.  If this is such a page, logically evict the page by
+	 * updating the parent, and return.
+	 *
+	 * Do this BEFORE updating the page's generational information, pages
+	 * being merged into their parents can never be clean.
+	 */
+	if (F_ISSET(page, WT_PAGE_SPLIT))
+		return (__wt_rec_parent_update_dirty(session,
+		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
 
 	/*
 	 * Update the disk generation before reading the page.  The workQ will
@@ -208,8 +219,9 @@ __wt_page_reconcile(
 	 * during a sync or close call, and the new root page won't be visited
 	 * as part of that walk.
 	 */
-	if (F_ISSET(btree->root_page.page, WT_PAGE_MERGE)) {
-		F_CLR(btree->root_page.page, WT_PAGE_MERGE);
+	if (F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
+		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
+		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_RET(__wt_page_reconcile(
 		    session, btree->root_page.page, 0, 0));
 	}
@@ -685,15 +697,14 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
 		recno = cref->recno;
 
 		/*
-		 * If this is a reference to a previously evicted page, check
-		 * the page type.  A leaf page must be an empty page (there's
-		 * no other reason to keep a leaf page in the tree), discard
-		 * it.  An internal page must have resulted from a page split,
-		 * merge the page into the tree, then discard it.
+		 * If this is a reference to a logically evicted page, it's an
+		 * internal page created as part of a page split or a deleted
+		 * page.  Split-created pages are merged into their parents and
+		 * then discarded, empty pages are simply discarded.
 		 */
 		if (WT_COL_REF_STATE(cref) == WT_REF_EVICTED) {
 			ref_page = WT_COL_REF_PAGE(cref);
-			if (ref_page->type == WT_PAGE_COL_INT)
+			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_col_merge(
 				    session, ref_page, &recno,
 				    &entries, &first_free, &space_avail));
@@ -1039,15 +1050,14 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i) {
 		/*
-		 * If this is a reference to a previously evicted page, check
-		 * the page type.  A leaf page must be an empty page (there's
-		 * no other reason to keep a leaf page in the tree), discard
-		 * it.  An internal page must have resulted from a page split,
-		 * merge the page into the tree, then discard it.
+		 * If this is a reference to a logically evicted page, it's an
+		 * internal page created as part of a page split or a deleted
+		 * page.  Split-created pages are merged into their parents and
+		 * then discarded, empty pages are simply discarded.
 		 */
 		if (WT_ROW_REF_STATE(rref) == WT_REF_EVICTED) {
 			ref_page = WT_ROW_REF_PAGE(rref);
-			if (ref_page->type == WT_PAGE_ROW_INT)
+			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_row_merge(session, ref_page,
 				    &entries, &first_free, &space_avail));
 			__wt_page_discard(session, ref_page);
@@ -1118,15 +1128,14 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page,
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i) {
 		/*
-		 * If this is a reference to a previously evicted page, check
-		 * the page type.  A leaf page must be an empty page (there's
-		 * no other reason to keep a leaf page in the tree), discard
-		 * it.  An internal page must have resulted from a page split,
-		 * merge the page into the tree, then discard it.
+		 * If this is a reference to a logically evicted page, it's an
+		 * internal page created as part of a page split or a deleted
+		 * page.  Split-created pages are merged into their parents and
+		 * then discarded, empty pages are simply discarded.
 		 */
 		if (WT_ROW_REF_STATE(rref) == WT_REF_EVICTED) {
 			ref_page = WT_ROW_REF_PAGE(rref);
-			if (ref_page->type == WT_PAGE_ROW_INT)
+			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_row_merge(session, ref_page,
 				    &entries, &first_free, &space_avail));
 			__wt_page_discard(session, ref_page);
@@ -1453,7 +1462,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 		 * discard flag, the page will be discared after it's merged.
 		 */
 		*discardp = 0;
-		F_SET(page, WT_PAGE_MERGE);
+		F_SET(page, WT_PAGE_DELETED);
 
 		return (__wt_rec_parent_update_dirty(session, page,
 		    NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
@@ -1610,7 +1619,7 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	 * want the tree to get deeper whenever a leaf page splits.  Flag all
 	 * created internal pages for an eventual merge.
 	 */
-	F_SET(page, WT_PAGE_MERGE);
+	F_SET(page, WT_PAGE_SPLIT);
 
 	for (rref = page->u.row_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++rref, ++r_list, ++i) {
@@ -1674,7 +1683,7 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	 * want the tree to get deeper whenever a leaf page splits.  Flag all
 	 * created internal pages for an eventual merge.
 	 */
-	F_SET(page, WT_PAGE_MERGE);
+	F_SET(page, WT_PAGE_SPLIT);
 
 	for (cref = page->u.col_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++cref, ++r_list, ++i) {
