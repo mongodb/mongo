@@ -56,7 +56,7 @@
  * the more compatible.
  *
  * CHA (Cursor Horizontal Absolute)
- *    Sequence: ESC [ 1 G
+ *    Sequence: ESC [ n G
  *    Effect: moves cursor to column n (1 based)
  *
  * EL (Erase Line)
