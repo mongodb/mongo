@@ -17,11 +17,11 @@
 #pragma once
 
 #include "pch.h"
-//#include "jsobj.h"
 #include "bson/bsontypes.h"
 
 namespace mongo {
     class BSONElement;
+    class Builder;
     class Document;
     class Value;
 
@@ -221,6 +221,8 @@ namespace mongo {
         Value(double doubleValue);
         Value(boost::shared_ptr<Document> pDocument);
         Value(const vector<boost::shared_ptr<const Value> > &vpValue);
+
+	void addToBson(Builder *pBuilder) const;
 
         BSONType type;
 

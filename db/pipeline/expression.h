@@ -22,6 +22,7 @@ namespace mongo {
     class BSONArrayBuilder;
     class BSONElement;
     class BSONObjBuilder;
+    class Builder;
     class Document;
     class Value;
 
@@ -569,50 +570,14 @@ namespace mongo {
 	scoped_ptr<Range> pRange;
 
 	/*
-	  Here are some helpers for the implementations of addToBsonObj() and
-	  addToBsonArray().  These two methods are really the same, except
-	  for the final addition of the construction object, which must be
-	  given a name for addToBsonObj(), but not for addToBsonArray().
+	  Add to a generic Builder.
 
-	  Therefore, we create a wrapper builder abstraction which will always
-	  take a name, but will drop it on the floor for the array case.
-	  Both of these are then implemented in terms of addToBson(), and call
-	  it with the appropriate builder wrapper.
-
-	  The builder wrapper is kept as minimal as possible to meet the needs
-	  of addToBson().
+	  The methods to append items to an object and an array differ by
+	  their inclusion of a field name.  For more complicated objects,
+	  it makes sense to abstract that out and use a generic builder that
+	  always looks the same, and then implement addToBsonObj() and
+	  addToBsonArray() by using the common method.
 	 */
-	class Builder {
-	public:
-	    virtual void append(bool b) = 0;
-	    virtual void append(BSONObjBuilder *pDone) = 0;
-	};
-
-	class BuilderObj :
-	    public Builder {
-	public:
-	    virtual void append(bool b);
-	    virtual void append(BSONObjBuilder *pDone);
-
-	    BuilderObj(BSONObjBuilder *pBuilder, string fieldName);
-
-	private:
-	    BSONObjBuilder *pBuilder;
-	    string fieldName;
-	};
-
-	class BuilderArray :
-	    public Builder {
-	public:
-	    virtual void append(bool b);
-	    virtual void append(BSONObjBuilder *pDone);
-
-	    BuilderArray(BSONArrayBuilder *pBuilder);
-
-	private:
-	    BSONArrayBuilder *pBuilder;
-	};
-
 	void addToBson(Builder *pBuilder, bool fieldPrefix) const;
     };
 

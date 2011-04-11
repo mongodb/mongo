@@ -18,6 +18,7 @@
 #include "db/pipeline/value.h"
 
 #include "db/jsobj.h"
+#include "db/pipeline/builder.h"
 #include "db/pipeline/document.h"
 
 namespace mongo {
@@ -287,95 +288,7 @@ namespace mongo {
         return simple.longValue;
     }
 
-    void Value::addToBsonObj(BSONObjBuilder *pBuilder, string fieldName) const {
-        switch(getType()) {
-        case NumberDouble:
-            pBuilder->append(fieldName, getDouble());
-            break;
-
-        case String:
-            pBuilder->append(fieldName, getString());
-            break;
-
-        case Object: {
-            boost::shared_ptr<Document> pDocument(getDocument());
-            BSONObjBuilder subBuilder(pBuilder->subobjStart(fieldName));
-            pDocument->toBson(&subBuilder);
-            subBuilder.done();
-            break;
-        }
-
-        case Array: {
-            const size_t n = vpValue.size();
-            BSONArrayBuilder arrayBuilder(n);
-            for(size_t i = 0; i < n; ++i) {
-                boost::shared_ptr<const Value> pValue(vpValue[i]);
-                pValue->addToBsonArray(&arrayBuilder);
-            }
-
-            arrayBuilder.done();
-            pBuilder->append(fieldName, arrayBuilder.arr());
-            break;
-        }
-
-        case BinData:
-            // pBuilder->appendBinData(fieldName, ...);
-            assert(false); // CW TODO unimplemented
-            break;
-
-        case jstOID:
-            pBuilder->append(fieldName, getOid());
-            break;
-
-        case Bool:
-            pBuilder->append(fieldName, getBool());
-            break;
-
-        case Date:
-            pBuilder->append(fieldName, getDate());
-            break;
-
-        case RegEx:
-            pBuilder->appendRegex(fieldName, getRegex());
-            break;
-
-        case Symbol:
-            pBuilder->appendSymbol(fieldName, getSymbol());
-            break;
-
-        case CodeWScope:
-            assert(false); // CW TODO unimplemented
-            break;
-
-        case NumberInt:
-            pBuilder->append(fieldName, getInt());
-            break;
-
-        case Timestamp:
-            pBuilder->appendTimestamp(fieldName, getTimestamp());
-            break;
-
-        case NumberLong:
-            pBuilder->append(fieldName, getLong());
-            break;
-
-        case jstNULL:
-            pBuilder->appendNull(fieldName);
-            break;
-
-            /* these shouldn't happen in this context */
-        case MinKey:
-        case EOO:
-        case Undefined:
-        case DBRef:
-        case Code:
-        case MaxKey:
-            assert(false); // CW TODO better message
-            break;
-        }
-    }
-
-    void Value::addToBsonArray(BSONArrayBuilder *pBuilder) const {
+    void Value::addToBson(Builder *pBuilder) const {
         switch(getType()) {
         case NumberDouble:
             pBuilder->append(getDouble());
@@ -390,7 +303,7 @@ namespace mongo {
             BSONObjBuilder subBuilder;
             pDocument->toBson(&subBuilder);
             subBuilder.done();
-            pBuilder->append(subBuilder.obj());
+            pBuilder->append(&subBuilder);
             break;
         }
 
@@ -398,12 +311,10 @@ namespace mongo {
             const size_t n = vpValue.size();
             BSONArrayBuilder arrayBuilder(n);
             for(size_t i = 0; i < n; ++i) {
-                boost::shared_ptr<const Value> pValue(vpValue[i]);
-                pValue->addToBsonArray(&arrayBuilder);
+                vpValue[i]->addToBsonArray(&arrayBuilder);
             }
 
-            arrayBuilder.done();
-            pBuilder->append(arrayBuilder.arr());
+            pBuilder->append(&arrayBuilder);
             break;
         }
 
@@ -448,17 +359,30 @@ namespace mongo {
             pBuilder->append(getLong());
             break;
 
-            /* these shouldn't happen in this context */
+	case jstNULL:
+	    pBuilder->append();
+	    break;
+
+            /* these shouldn't appear in this context */
         case MinKey:
         case EOO:
         case Undefined:
-        case jstNULL:
         case DBRef:
         case Code:
         case MaxKey:
             assert(false); // CW TODO better message
             break;
         }
+    }
+
+    void Value::addToBsonObj(BSONObjBuilder *pBuilder, string fieldName) const {
+	BuilderObj objBuilder(pBuilder, fieldName);
+	addToBson(&objBuilder);
+    }
+
+    void Value::addToBsonArray(BSONArrayBuilder *pBuilder) const {
+	BuilderArray arrBuilder(pBuilder);
+	addToBson(&arrBuilder);
     }
 
     bool Value::coerceToBool() const {

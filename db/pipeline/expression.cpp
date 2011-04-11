@@ -19,6 +19,7 @@
 
 #include <cstdio>
 #include "db/jsobj.h"
+#include "db/pipeline/builder.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
 
@@ -242,11 +243,11 @@ namespace mongo {
             string value(opCopy.String());
 
             /* check for a field path */
-            if (value.compare(0, 10, "$document.") != 0)
+	    if (value[0] != '$')
                 goto ExpectConstant;  // assume plain string constant
 
             /* if we got here, this is a field path expression */
-            string fieldPath(value.substr(10));
+	    string fieldPath(value.substr(1));
             boost::shared_ptr<Expression> pFieldExpr(
                 ExpressionFieldPath::create(fieldPath));
             return pFieldExpr;
@@ -940,7 +941,8 @@ namespace mongo {
     string ExpressionFieldPath::getFieldPath(bool fieldPrefix) const {
 	stringstream ss;
 	if (fieldPrefix)
-	    ss << "$document.";
+	    //ss << "$document.";
+	    ss << "$";
 
 	ss << vField[0];
 
@@ -1001,33 +1003,6 @@ namespace mongo {
 	    return Value::getTrue();
 
 	return Value::getFalse();
-    }
-
-    void ExpressionFieldRange::BuilderObj::append(bool b) {
-	pBuilder->append(fieldName, b);
-    }
-
-    void ExpressionFieldRange::BuilderObj::append(BSONObjBuilder *pDone) {
-	pBuilder->append(fieldName, pDone->done());
-    }
-
-    ExpressionFieldRange::BuilderObj::BuilderObj(
-	BSONObjBuilder *pObjBuilder, string theFieldName):
-        pBuilder(pObjBuilder),
-        fieldName(theFieldName) {
-    }
-
-    void ExpressionFieldRange::BuilderArray::append(bool b) {
-	pBuilder->append(b);
-    }
-
-    void ExpressionFieldRange::BuilderArray::append(BSONObjBuilder *pDone) {
-	pBuilder->append(pDone->done());
-    }
-
-    ExpressionFieldRange::BuilderArray::BuilderArray(
-	BSONArrayBuilder *pArrayBuilder):
-        pBuilder(pArrayBuilder) {
     }
 
     void ExpressionFieldRange::addToBson(
