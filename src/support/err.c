@@ -12,13 +12,11 @@
  *	Pass a message to a callback function.
  */
 void
-__wt_msg_call(void *cb, void *handle,
-    const char *pfx1, const char *pfx2,
-    int error, const char *fmt, va_list ap)
+__wt_msgv(SESSION *session, const char *prefix1, const char *prefix2,
+    const char *fmt, va_list ap)
 {
-	size_t len;
-	int separator;
-
+	WT_EVENT_HANDLER *handler;
+	char *end, *p;
 	/*
 	 * !!!
 	 * SECURITY:
@@ -26,49 +24,38 @@ __wt_msg_call(void *cb, void *handle,
 	 */
 	char s[2048];
 
-	len = 0;
-	separator = 0;
-	s[0] = '\0';
-	if (pfx1 != NULL) {
-		len += (size_t)snprintf(s + len, sizeof(s) - len, "%s", pfx1);
-		separator = 1;
-	}
-	if (pfx2 != NULL && len < sizeof(s) - 1) {
-		len += (size_t)snprintf(s + len, sizeof(s) - len,
-		    "%s%s", separator ? ": " : "", pfx2);
-		separator = 1;
-	}
-	if (separator && len < sizeof(s) - 1)
-		len += (size_t)snprintf(s + len, sizeof(s) - len, ": ");
-	if (len < sizeof(s) - 1)
-		len += (size_t)vsnprintf(s + len, sizeof(s) - len, fmt, ap);
-	if (error != 0 && len < sizeof(s) - 1)
-		(void)snprintf(s + len,
-		    sizeof(s) - len, ": %s", wiredtiger_strerror(error));
+	p = s;
+	end = s + sizeof(s);
 
-	((void (*)(void *, const char *))cb)(handle, s);
+	if (prefix1 != NULL && prefix2 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p),
+		    "%s [%s]: ", prefix1, prefix2);
+	else if (prefix1 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
+	else if (prefix2 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
+	if (p < end)
+		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
+
+	handler = session->event_handler;
+	handler->handle_message(handler, s);
 }
 
 /*
- * __wt_msg_stream --
- *	Write a message to a FILE stream.
+ * __wt_msg --
+ * 	Report a message.
  */
 void
-__wt_msg_stream(FILE *fp,
-    const char *pfx1, const char *pfx2, int error, const char *fmt, va_list ap)
+__wt_msg(SESSION *session, const char *fmt, ...)
 {
-	if (fp == NULL)
-		fp = stderr;
+	va_list ap;
 
-	if (pfx1 != NULL)
-		(void)fprintf(fp, "%s: ", pfx1);
-	if (pfx2 != NULL)
-		(void)fprintf(fp, "%s: ", pfx2);
-	(void)vfprintf(fp, fmt, ap);
-	if (error != 0)
-		(void)fprintf(fp, ": %s", wiredtiger_strerror(error));
-	(void)fprintf(fp, "\n");
-	(void)fflush(fp);
+	va_start(ap, fmt);
+	__wt_msgv(session,
+	    (session->btree != NULL) ? session->btree->name : NULL,
+	    session->name,
+	    fmt, ap);
+	va_end(ap);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -257,7 +244,6 @@ __wt_errv(SESSION *session, int error,
 	 */
 	char s[2048];
 
-	s[0] = '\0';
 	p = s;
 	end = s + sizeof(s);
 

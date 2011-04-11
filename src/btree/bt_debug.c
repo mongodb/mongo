@@ -73,7 +73,7 @@ __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_verify(session, NULL, fp);
+	ret = __wt_verify(session, fp);
 
 	if (do_close)
 		(void)fclose(fp);

@@ -18,7 +18,6 @@ typedef struct {
 
 	FILE	*stream;			/* Dump file stream */
 
-	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
 
 	uint64_t record_total;			/* Total record count */
@@ -41,9 +40,9 @@ static int __wt_verify_tree(
  *	Verify a Btree.
  */
 int
-__wt_btree_verify(SESSION *session, void (*f)(const char *, uint64_t))
+__wt_btree_verify(SESSION *session)
 {
-	return (__wt_verify(session, f, NULL));
+	return (__wt_verify(session, NULL));
 }
 
 /*
@@ -51,7 +50,7 @@ __wt_btree_verify(SESSION *session, void (*f)(const char *, uint64_t))
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
+__wt_verify(SESSION *session, FILE *stream)
 {
 	BTREE *btree;
 	WT_CACHE *cache;
@@ -86,7 +85,6 @@ __wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 	}
 	WT_ERR(bit_alloc(session, vstuff.frags, &vstuff.fragbits));
 	vstuff.stream = stream;
-	vstuff.f = f;
 
 	/*
 	 * The first sector of the file is the description record -- ignore
@@ -113,8 +111,7 @@ __wt_verify(SESSION *session, void (*f)(const char *, uint64_t), FILE *stream)
 	cache->only_evict_clean = 0;
 
 err:	/* Wrap up reporting. */
-	if (vstuff.f != NULL)
-		vstuff.f(session->name, vstuff.fcnt);
+	__wt_progress(session, NULL, vstuff.fcnt);
 
 	/* Free allocated memory. */
 	if (vstuff.fragbits != NULL)
@@ -171,8 +168,8 @@ __wt_verify_tree(
 	 *
 	 * Report progress every 10 pages.
 	 */
-	if (vs->f != NULL && ++vs->fcnt % 10 == 0)
-		vs->f(session->name, vs->fcnt);
+	if (++vs->fcnt % 10 == 0)
+		__wt_progress(session, NULL, vs->fcnt);
 
 	/*
 	 * Update frags list.

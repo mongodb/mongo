@@ -304,7 +304,7 @@ __wt_block_write(SESSION *session)
 	/* Clear the page's header and data, initialize the header. */
 	dsk = tmp->mem;
 	memset(dsk, 0, size);
-	dsk->u.datalen = total_entries * 2 * sizeof(uint32_t);
+	dsk->u.datalen = total_entries * 2 * WT_SIZEOF32(uint32_t);
 	dsk->type = WT_PAGE_FREELIST;
 
 	/*

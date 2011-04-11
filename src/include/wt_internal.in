@@ -139,6 +139,7 @@ struct __wt_free_entry {
 #include "verify_build.h"
 
 #include "log.i"
+#include "progress.i"
 
 #if defined(__cplusplus)
 }

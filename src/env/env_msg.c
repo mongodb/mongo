@@ -7,52 +7,6 @@
 
 #include "wt_internal.h"
 
-extern FILE *__wt_err_stream;
-
-#define	WT_MSG(session, fmt) {						\
-	va_list __ap;							\
-	/*								\
-	 * Support messages even if we don't yet have a SESSION handle,	\
-	 * using the error stream.
-	 */								\
-	if ((session) == NULL) {					\
-		va_start(__ap, fmt);					\
-		__wt_msg_stream(					\
-		    __wt_err_stream, NULL, NULL, 0, fmt, __ap);		\
-		va_end(__ap);						\
-		return;							\
-	}								\
-									\
-	/* Application-specified callback function. */			\
-	if ((session)->msgcall != NULL) {				\
-		va_start(__ap, fmt);					\
-		__wt_msg_call((void *)((session)->msgcall),		\
-		    (void *)session, NULL, NULL, 0, fmt, __ap);		\
-		va_end(__ap);						\
-	}								\
-									\
-	/*								\
-	 * If the application set an message callback function but not a\
-	 * message stream, we're done.  Otherwise, write the stream.	\
-	 */								\
-	if ((session)->msgcall != NULL && (session)->msgfile == NULL)	\
-			return;						\
-									\
-	va_start(__ap, fmt);						\
-	__wt_msg_stream((session)->msgfile, NULL, NULL, 0, fmt, __ap);	\
-	va_end(__ap);							\
-}
-
-/*
- * __wt_msg --
- *	Write a message.
- */
-void
-__wt_msg(SESSION *session, const char *fmt, ...)
-{
-	WT_MSG(session, fmt);
-}
-
 /*
  * __wt_mb_init --
  *	Initialize a WT_MBUF structure for message aggregation.

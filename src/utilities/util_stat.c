@@ -16,15 +16,19 @@ int
 main(int argc, char *argv[])
 {
 	BTREE *btree;
-	int ch, ret, tret;
+	int ch, ret, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
 
-	while ((ch = getopt(argc, argv, "V")) != EOF)
+	verbose = 0;
+	while ((ch = getopt(argc, argv, "Vv")) != EOF)
 		switch (ch) {
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
+		case 'v':			/* version */
+			verbose = 1;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -36,7 +40,8 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = wiredtiger_simple_setup(progname, NULL, &btree)) == 0) {
+	if ((ret = wiredtiger_simple_setup(progname, verbose ?
+	    __wt_event_handler_verbose : NULL, NULL, &btree)) == 0) {
 		if ((ret = btree->open(btree, NULL, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: db.open(%s): %s\n",
 			    progname, *argv, wiredtiger_strerror(ret));
