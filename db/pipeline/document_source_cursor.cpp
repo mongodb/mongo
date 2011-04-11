@@ -55,4 +55,8 @@ namespace mongo {
 
     DocumentSourceCursor::~DocumentSourceCursor() {
     }
+
+    void DocumentSourceCursor::sourceToBson(BSONObjBuilder *pBuilder) const {
+	assert(false); // this has no analog in the BSON world
+    }
 }

@@ -91,12 +91,16 @@ namespace mongo {
 	bool run(BSONObjBuilder &result, string &errmsg,
 		 shared_ptr<DocumentSource> pSource);
 
+	bool debugShardedPipeline() const;
+
     private:
         Pipeline();
 
 	string collectionName;
 	typedef list<shared_ptr<DocumentSource>> SourceList;
 	SourceList sourceList;
+
+	bool debug;
     };
 
 } // namespace mongo
@@ -108,6 +112,13 @@ namespace mongo {
 
     inline string Pipeline::getCollectionName() const {
 	return collectionName;
+    }
+
+    inline bool Pipeline::debugShardedPipeline() const {
+	if (!DEBUG_BUILD)
+	    return false;
+
+	return debug;
     }
 
 } // namespace mongo

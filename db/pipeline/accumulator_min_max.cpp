@@ -58,8 +58,9 @@ namespace mongo {
         return pAccumulator;
     }
 
-    void AccumulatorMinMax::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	opToBson(pBuilder, name, (sense == 1 ? "$min" : "$max"));
+    const char *AccumulatorMinMax::getName() const {
+	if (sense == 1)
+	    return "$min";
+	return "$max";
     }
 }

@@ -60,17 +60,18 @@ namespace mongo {
         return pCurrent;
     }
 
-    void DocumentSourceGroup::toBson(BSONObjBuilder *pBuilder) const {
-	/* add the _id */
+    void DocumentSourceGroup::sourceToBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
-	pIdExpression->toBson(&insides, "_id", false);
+
+	/* add the _id */
+	pIdExpression->addToBsonObj(&insides, "_id", false);
 
 	/* add the remaining fields */
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
 	    shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])());
 	    pA->addOperand(vpExpression[i]);
-	    pA->toBson(&insides, vFieldName[i], true);
+	    pA->addToBsonObj(&insides, vFieldName[i], true);
 	}
 
 	pBuilder->append("$group", insides.done());

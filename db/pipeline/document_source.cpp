@@ -34,7 +34,9 @@ namespace mongo {
     void DocumentSource::optimize() {
     }
 
-    void DocumentSource::toBson(BSONObjBuilder *pBuilder) const {
-	assert(false);
+    void DocumentSource::addToBsonArray(BSONArrayBuilder *pBuilder) const {
+	BSONObjBuilder insides;
+	sourceToBson(&insides);
+	pBuilder->append(insides.done());
     }
 }

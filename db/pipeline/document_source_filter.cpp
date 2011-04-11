@@ -103,10 +103,8 @@ namespace mongo {
 	pFilter = pFilter->optimize();
     }
 
-    void DocumentSourceFilter::toBson(BSONObjBuilder *pBuilder) const {
-	BSONObjBuilder insides;
-	pFilter->toBson(&insides, "", false);
-	pBuilder->append("$filter", insides.done());
+    void DocumentSourceFilter::sourceToBson(BSONObjBuilder *pBuilder) const {
+	pFilter->addToBsonObj(pBuilder, "$filter", true);
     }
 
     shared_ptr<DocumentSourceFilter> DocumentSourceFilter::createFromBson(

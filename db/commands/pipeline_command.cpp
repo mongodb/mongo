@@ -80,6 +80,11 @@ namespace mongo {
         shared_ptr<DocumentSource> pSource(
 	    DocumentSourceCursor::create(pCursor));
 
+/*
+	if (!DEBUG_BUILD || !pPipeline->debugShardedPipeline())
+	    return pPipeline->run(result, errmsg, pSource);
+*/
+
 	return pPipeline->run(result, errmsg, pSource);
     }
 

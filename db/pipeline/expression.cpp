@@ -61,7 +61,7 @@ namespace mongo {
         */
 
         shared_ptr<Expression> pExpression; // the result
-        shared_ptr<ExpressionDocument> pExpressionDocument; // alt result
+        shared_ptr<ExpressionObject> pExpressionObject; // alt result
         int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
         enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
 
@@ -108,8 +108,8 @@ namespace mongo {
                     assert(pCtx->documentOk());
                     // CW TODO error: document not allowed in this context
 
-                    pExpressionDocument = ExpressionDocument::create();
-                    pExpression = pExpressionDocument;
+                    pExpressionObject = ExpressionObject::create();
+                    pExpression = pExpressionObject;
 
                     /* this "object" is not an operator expression */
                     isOp = 0;
@@ -123,13 +123,13 @@ namespace mongo {
                     shared_ptr<Expression> pNested(
                         parseObject(&fieldElement, &ObjectCtx(
                          (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0))));
-                    pExpressionDocument->addField(fieldName, pNested);
+                    pExpressionObject->addField(fieldName, pNested);
                 }
                 else if (fieldType == String) {
                     /* it's a renamed field */
                     shared_ptr<Expression> pPath(
                         ExpressionFieldPath::create(fieldElement.String()));
-                    pExpressionDocument->addField(fieldName, pPath);
+                    pExpressionObject->addField(fieldName, pPath);
                 }
                 else if (fieldType == NumberDouble) {
                     /* it's an inclusion specification */
@@ -139,7 +139,7 @@ namespace mongo {
 
                     shared_ptr<Expression> pPath(
                         ExpressionFieldPath::create(fieldName));
-                    pExpressionDocument->addField(fieldName, pPath);
+                    pExpressionObject->addField(fieldName, pPath);
                 }
                 else { /* nothing else is allowed */
                     assert(false); // CW TODO error
@@ -315,9 +315,8 @@ namespace mongo {
         return Value::createInt((int)longTotal);
     }
 
-    void ExpressionAdd::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	operandsToBson(pBuilder, "$add", true);
+    const char *ExpressionAdd::getName() const {
+	return "$add";
     }
 
     shared_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
@@ -405,9 +404,8 @@ namespace mongo {
         return Value::getTrue();
     }
 
-    void ExpressionAnd::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	operandsToBson(pBuilder, "$and", docPrefix);
+    const char *ExpressionAnd::getName() const {
+	return "$and";
     }
 
     void ExpressionAnd::toMatcherBson(BSONObjBuilder *pBuilder) const {
@@ -470,13 +468,14 @@ namespace mongo {
         return Value::getFalse();
     }
 
-    void ExpressionCoerceToBool::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	/*
-	  There is no equivalent of this; if we find we need this, we
-	  need to take other steps.
-	*/
-	assert(false && "not possible");
+    void ExpressionCoerceToBool::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	assert(false && "not possible"); // no equivalent of this
+    }
+
+    void ExpressionCoerceToBool::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	assert(false && "not possible"); // no equivalent of this
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -539,15 +538,76 @@ namespace mongo {
     /*
       Lookup table for truth value returns
     */
-    static const bool lookup[6][3] = {
-        /*  -1      0      1   */
-        /* EQ  */ { false, true,  false },
-        /* NE  */ { true,  false, true  },
-        /* GT  */ { false, false, true  },
-        /* GTE */ { false, true,  true  },
-        /* LT  */ { true,  false, false },
-        /* LTE */ { true,  true,  false },
+    struct CmpLookup {
+	bool truthValue[3]; /* truth value for -1, 0, 1 */
+	Expression::CmpOp reverse; /* reverse comparison operator */
+	char name[5]; /* string name (w/trailing '\0') */
     };
+    static const CmpLookup cmpLookup[7] = {
+        /*           -1      0      1       reverse       name   */
+        /* EQ  */ { false, true,  false, Expression::EQ,  "$eq"  },
+        /* NE  */ { true,  false, true,  Expression::NE,  "$ne"  },
+        /* GT  */ { false, false, true,  Expression::LTE, "$gt"  },
+        /* GTE */ { false, true,  true,  Expression::LT,  "$gte" },
+        /* LT  */ { true,  false, false, Expression::GTE, "$lt"  },
+        /* LTE */ { true,  true,  false, Expression::GT,  "$lte" },
+        /* CMP */ { false, false, false, Expression::CMP, "$cmp" },
+    };
+
+    shared_ptr<Expression> ExpressionCompare::optimize() {
+	/* first optimize the comparison operands */
+	shared_ptr<Expression> pE(ExpressionNary::optimize());
+
+	/*
+	  If the result of optimization is no longer a comparison, there's
+	  nothing more we can do.
+	*/
+	ExpressionCompare *pCmp = dynamic_cast<ExpressionCompare *>(pE.get());
+	if (!pCmp)
+	    return pE;
+
+	/* check to see if optimizing comparison operator is supported */
+	CmpOp newOp = pCmp->cmpOp;
+	if (newOp == CMP)
+	    return pE; // not reversible: there's nothing more we can do
+
+	/*
+	  There's one localized optimization we recognize:  a comparison
+	  between a field and a constant.  If we recognize that pattern,
+	  replace it with an ExpressionFieldRange.
+
+	  When looking for this pattern, note that the operands could appear
+	  in any order.  If we need to reverse the sense of the comparison to
+	  put it into the required canonical form, do so.
+	 */
+	shared_ptr<Expression> pLeft(pCmp->vpOperand[0]);
+	shared_ptr<Expression> pRight(pCmp->vpOperand[1]);
+	shared_ptr<ExpressionFieldPath> pFieldPath(
+	    dynamic_pointer_cast<ExpressionFieldPath>(pLeft));
+	shared_ptr<ExpressionConstant> pConstant;
+	if (pFieldPath.get()) {
+	    pConstant = dynamic_pointer_cast<ExpressionConstant>(pRight);
+	    if (!pConstant.get())
+		return pE; // there's nothing more we can do
+	}
+	else {
+	    /* if the first operand wasn't a path, see if it's a constant */
+	    pConstant = dynamic_pointer_cast<ExpressionConstant>(pLeft);
+	    if (!pConstant.get())
+		return pE; // there's nothing more we can do
+
+	    /* the left operand was a constant; see if the right is a path */
+	    pFieldPath = dynamic_pointer_cast<ExpressionFieldPath>(pRight);
+	    if (!pFieldPath.get())
+		return pE; // there's nothing more we can do
+
+	    /* these were not in canonical order, so reverse the sense */
+	    newOp = cmpLookup[newOp].reverse;
+	}
+
+	return ExpressionFieldRange::create(
+	    pFieldPath, newOp, pConstant->getValue());
+    }
 
     shared_ptr<const Value> ExpressionCompare::evaluate(
         shared_ptr<Document> pDocument) const {
@@ -587,12 +647,7 @@ namespace mongo {
         case String: {
             string left(pLeft->getString());
             string right(pRight->getString());
-            cmp = left.compare(right);
-
-            if (cmp < 0)
-                cmp = -1;
-            else if (cmp > 0)
-                cmp = 1;
+            cmp = signum(left.compare(right));
             break;
         }
 
@@ -616,46 +671,14 @@ namespace mongo {
             }
         }
 
-        bool returnValue = lookup[cmpOp][cmp + 1];
+        bool returnValue = cmpLookup[cmpOp].truthValue[cmp + 1];
         if (returnValue)
             return Value::getTrue();
         return Value::getFalse();
     }
 
-    void ExpressionCompare::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	const char *pName = NULL;
-	switch(cmpOp) {
-	case EQ:
-	    pName = "$eq";
-	    break;
-
-	case NE:
-	    pName = "$ne";
-	    break;
-
-	case GT:
-	    pName = "$gt";
-	    break;
-
-	case GTE:
-	    pName = "$gte";
-	    break;
-
-	case LT:
-	    pName = "$lt";
-	    break;
-
-	case LTE:
-	    pName = "$lte";
-	    break;
-
-	case CMP:
-	    pName = "$cmp";
-	    break;
-	}
-
-	operandsToBson(pBuilder, pName, true);
+    const char *ExpressionCompare::getName() const {
+	return cmpLookup[cmpOp].name;
     }
 
     /* ---------------------- ExpressionConstant --------------------------- */
@@ -695,9 +718,19 @@ namespace mongo {
         return pValue;
     }
 
-    void ExpressionConstant::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	pValue->addToBsonObj(pBuilder, name);
+    void ExpressionConstant::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	pValue->addToBsonObj(pBuilder, fieldName);
+    }
+
+    void ExpressionConstant::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	pValue->addToBsonArray(pBuilder);
+    }
+
+    const char *ExpressionConstant::getName() const {
+	assert(false); // this has no name
+	return NULL;
     }
 
     /* ----------------------- ExpressionDivide ---------------------------- */
@@ -756,27 +789,26 @@ namespace mongo {
         return Value::createDouble(left / right);
     }
 
-    void ExpressionDivide::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	operandsToBson(pBuilder, "$divide", true);
+    const char *ExpressionDivide::getName() const {
+	return "$divide";
     }
 
-    /* ---------------------- ExpressionDocument --------------------------- */
+    /* ---------------------- ExpressionObject --------------------------- */
 
-    ExpressionDocument::~ExpressionDocument() {
+    ExpressionObject::~ExpressionObject() {
     }
 
-    shared_ptr<ExpressionDocument> ExpressionDocument::create() {
-        shared_ptr<ExpressionDocument> pExpression(new ExpressionDocument());
+    shared_ptr<ExpressionObject> ExpressionObject::create() {
+        shared_ptr<ExpressionObject> pExpression(new ExpressionObject());
         return pExpression;
     }
 
-    ExpressionDocument::ExpressionDocument():
+    ExpressionObject::ExpressionObject():
         vFieldName(),
         vpExpression() {
     }
 
-    shared_ptr<Expression> ExpressionDocument::optimize() {
+    shared_ptr<Expression> ExpressionObject::optimize() {
 	const size_t n = vpExpression.size();
 	for(size_t i = 0; i < n; ++i) {
 	    shared_ptr<Expression> pE(vpExpression[i]->optimize());
@@ -786,7 +818,7 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    shared_ptr<const Value> ExpressionDocument::evaluate(
+    shared_ptr<const Value> ExpressionObject::evaluate(
         shared_ptr<Document> pDocument) const {
         const size_t n = vFieldName.size();
         shared_ptr<Document> pResult(Document::create(n));
@@ -799,23 +831,34 @@ namespace mongo {
         return pValue;
     }
 
-    void ExpressionDocument::addField(string fieldName,
+    void ExpressionObject::addField(string fieldName,
                                       shared_ptr<Expression> pExpression) {
         vFieldName.push_back(fieldName);
         vpExpression.push_back(pExpression);
     }
 
-    void ExpressionDocument::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-
-	BSONObjBuilder builder;
+    void ExpressionObject::documentToBson(
+	BSONObjBuilder *pBuilder, bool fieldPrefix) const {
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i)
-	    vpExpression[i]->toBson(&builder, vFieldName[i], docPrefix);
-
-	pBuilder->append(name, builder.done());
+	    vpExpression[i]->addToBsonObj(pBuilder, vFieldName[i], fieldPrefix);
     }
 
+    void ExpressionObject::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+
+	BSONObjBuilder objBuilder;
+	documentToBson(&objBuilder, fieldPrefix);
+	pBuilder->append(fieldName, objBuilder.done());
+    }
+
+    void ExpressionObject::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+
+	BSONObjBuilder objBuilder;
+	documentToBson(&objBuilder, fieldPrefix);
+	pBuilder->append(objBuilder.done());
+    }
 
     /* --------------------- ExpressionFieldPath --------------------------- */
 
@@ -829,8 +872,8 @@ namespace mongo {
         return pExpression;
     }
 
-    ExpressionFieldPath::ExpressionFieldPath(string theFieldPath):
-        vFieldPath() {
+    ExpressionFieldPath::ExpressionFieldPath(string fieldPath):
+        vField() {
         /*
           The field path could be using dot notation.
           Break the field path up by peeling off successive pieces.
@@ -838,19 +881,18 @@ namespace mongo {
         size_t startpos = 0;
         while(true) {
             /* find the next dot */
-            const size_t dotpos = theFieldPath.find('.', startpos);
+            const size_t dotpos = fieldPath.find('.', startpos);
 
             /* if there are no more dots, use the remainder of the string */
-            if (dotpos == theFieldPath.npos) {
-                vFieldPath.push_back(theFieldPath.substr(startpos, dotpos));
+            if (dotpos == fieldPath.npos) {
+                vField.push_back(fieldPath.substr(startpos, dotpos));
                 break;
             }
 
             /* use the string up to the dot */
             const size_t length = dotpos - startpos;
             assert(length); // CW TODO user error: no zero-length field names
-            vFieldPath.push_back(
-                theFieldPath.substr(startpos, length));
+            vField.push_back(fieldPath.substr(startpos, length));
 
             /* next time, search starting one spot after that */
             startpos = dotpos + 1;
@@ -865,10 +907,10 @@ namespace mongo {
     shared_ptr<const Value> ExpressionFieldPath::evaluate(
         shared_ptr<Document> pDocument) const {
         shared_ptr<const Value> pValue;
-        const size_t n = vFieldPath.size();
+        const size_t n = vField.size();
         size_t i = 0;
         while(true) {
-            pValue = pDocument->getValue(vFieldPath[i]);
+            pValue = pDocument->getValue(vField[i]);
 
             /* if the field doesn't exist, quit with a null value */
             if (!pValue.get())
@@ -895,19 +937,28 @@ namespace mongo {
         return pValue;
     }
 
-    void ExpressionFieldPath::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
+    string ExpressionFieldPath::getFieldPath(bool fieldPrefix) const {
 	stringstream ss;
-	if (docPrefix)
+	if (fieldPrefix)
 	    ss << "$document.";
 
-	ss << vFieldPath[0];
+	ss << vField[0];
 
-	const size_t n = vFieldPath.size();
+	const size_t n = vField.size();
 	for(size_t i = 1; i < n; ++i)
-	    ss << "." << vFieldPath[i];
+	    ss << "." << vField[i];
 
-	pBuilder->append(name, ss.str());
+	return ss.str();
+    }
+
+    void ExpressionFieldPath::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	pBuilder->append(fieldName, getFieldPath(fieldPrefix));
+    }
+
+    void ExpressionFieldPath::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	pBuilder->append(getFieldPath(fieldPrefix));
     }
 
     /* --------------------- ExpressionFieldPath --------------------------- */
@@ -916,26 +967,338 @@ namespace mongo {
     }
 
     shared_ptr<Expression> ExpressionFieldRange::optimize() {
-	assert(false && "unimplemented"); // CW TODO
-	return shared_ptr<Expression>();
+	/* if there is no range to match, this will never evaluate true */
+	if (!pRange.get())
+	    return ExpressionConstant::create(Value::getFalse());
+
+	/*
+	  If we ended up with a double un-ended range, anything matches.  I
+	  don't know how that can happen, given intersect()'s interface, but
+	  here it is, just in case.
+	*/
+	if (!pRange->pBottom.get() && !pRange->pTop.get())
+	    return ExpressionConstant::create(Value::getTrue());
+
+	/*
+	  In all other cases, we have to test candidate values.  The
+	  intersect() method has already optimized those tests, so there
+	  aren't any more optimizations to look for here.
+	*/
+	return shared_from_this();
     }
 
     shared_ptr<const Value> ExpressionFieldRange::evaluate(
 	shared_ptr<Document> pDocument) const {
-	assert(false && "unimplemented"); // CW TODO
-	return shared_ptr<const Value>();
+	/* if there's no range, there can't be a match */
+	if (!pRange.get())
+	    return Value::getFalse();
+
+	/* get the value of the specified field */
+	shared_ptr<const Value> pValue(pFieldPath->evaluate(pDocument));
+
+	/* see if it fits within any of the ranges */
+	if (pRange->contains(pValue))
+	    return Value::getTrue();
+
+	return Value::getFalse();
     }
 
-    void ExpressionFieldRange::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) {
-	assert(false && "unimplemented"); // CW TODO
+    void ExpressionFieldRange::BuilderObj::append(bool b) {
+	pBuilder->append(fieldName, b);
+    }
+
+    void ExpressionFieldRange::BuilderObj::append(BSONObjBuilder *pDone) {
+	pBuilder->append(fieldName, pDone->done());
+    }
+
+    ExpressionFieldRange::BuilderObj::BuilderObj(
+	BSONObjBuilder *pObjBuilder, string theFieldName):
+        pBuilder(pObjBuilder),
+        fieldName(theFieldName) {
+    }
+
+    void ExpressionFieldRange::BuilderArray::append(bool b) {
+	pBuilder->append(b);
+    }
+
+    void ExpressionFieldRange::BuilderArray::append(BSONObjBuilder *pDone) {
+	pBuilder->append(pDone->done());
+    }
+
+    ExpressionFieldRange::BuilderArray::BuilderArray(
+	BSONArrayBuilder *pArrayBuilder):
+        pBuilder(pArrayBuilder) {
+    }
+
+    void ExpressionFieldRange::addToBson(
+	Builder *pBuilder, bool fieldPrefix) const {
+	if (!pRange.get()) {
+	    /* nothing will satisfy this predicate */
+	    pBuilder->append(false);
+	    return;
+	}
+
+	if (!pRange->pTop.get() && !pRange->pBottom.get()) {
+	    /* any value will satisfy this predicate */
+	    pBuilder->append(true);
+	    return;
+	}
+
+	if (pRange->pTop.get() == pRange->pBottom.get()) {
+	    BSONArrayBuilder operands;
+	    pFieldPath->addToBsonArray(&operands, fieldPrefix);
+	    pRange->pTop->addToBsonArray(&operands);
+	    
+	    BSONObjBuilder equals;
+	    equals.append("$eq", operands.done());
+	    pBuilder->append(&equals);
+	    return;
+	}
+
+	BSONObjBuilder leftOperator;
+	if (pRange->pBottom.get()) {
+	    BSONArrayBuilder leftOperands;
+	    pFieldPath->addToBsonArray(&leftOperands, fieldPrefix);
+	    pRange->pBottom->addToBsonArray(&leftOperands);
+	    leftOperator.append(
+		(pRange->bottomOpen ? "$gt" : "$gte"),
+		leftOperands.done());
+
+	    if (!pRange->pTop.get()) {
+		pBuilder->append(&leftOperator);
+		return;
+	    }
+	}
+
+	BSONObjBuilder rightOperator;
+	if (pRange->pTop.get()) {
+	    BSONArrayBuilder rightOperands;
+	    pFieldPath->addToBsonArray(&rightOperands, fieldPrefix);
+	    pRange->pTop->addToBsonArray(&rightOperands);
+	    rightOperator.append(
+		(pRange->topOpen ? "$lt" : "$lte"),
+		rightOperands.done());
+
+	    if (!pRange->pBottom.get()) {
+		pBuilder->append(&rightOperator);
+		return;
+	    }
+	}
+
+	BSONArrayBuilder andOperands;
+	andOperands.append(leftOperator.done());
+	andOperands.append(rightOperator.done());
+	BSONObjBuilder andOperator;
+	andOperator.append("$and", andOperands.done());
+	pBuilder->append(&andOperator);
+    }
+
+    void ExpressionFieldRange::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	BuilderObj builder(pBuilder, fieldName);
+	addToBson(&builder, fieldPrefix);
+    }
+
+    void ExpressionFieldRange::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	BuilderArray builder(pBuilder);
+	addToBson(&builder, fieldPrefix);
     }
 
     void ExpressionFieldRange::toMatcherBson(
 	BSONObjBuilder *pBuilder) const {
-	assert(false && "unimplemented"); // CW TODO
+	assert(pRange.get()); // otherwise, we can't do anything
+
+	/* if there are no endpoints, then every value is accepted */
+	if (!pRange->pBottom.get() && !pRange->pTop.get())
+	    return; // nothing to add to the predicate
+
+	/* we're going to need the field path */
+	string fieldPath(pFieldPath->getFieldPath(false));
+
+	BSONObjBuilder range;
+	if (pRange->pBottom.get()) {
+	    /* the test for equality doesn't generate a subobject */
+	    if (pRange->pBottom.get() == pRange->pTop.get()) {
+		pRange->pBottom->addToBsonObj(pBuilder, fieldPath);
+		return;
+	    }
+
+	    pRange->pBottom->addToBsonObj(
+		pBuilder, (pRange->bottomOpen ? "$gt" : "$gte"));
+	}
+
+	if (pRange->pTop.get()) {
+	    pRange->pTop->addToBsonObj(
+		pBuilder, (pRange->topOpen ? "$lt" : "$lte"));
+	}
+
+	pBuilder->append(fieldPath, range.done());
+    }
+
+    shared_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
+	shared_ptr<ExpressionFieldPath> pFieldPath, CmpOp cmpOp,
+	shared_ptr<const Value> pValue) {
+	shared_ptr<ExpressionFieldRange> pE(
+	    new ExpressionFieldRange(pFieldPath, cmpOp, pValue));
+	return pE;
+    }
+
+    ExpressionFieldRange::ExpressionFieldRange(
+	shared_ptr<ExpressionFieldPath> pTheFieldPath, CmpOp cmpOp,
+	shared_ptr<const Value> pValue):
+        pFieldPath(pTheFieldPath),
+	pRange(new Range(cmpOp, pValue)) {
+    }
+
+    void ExpressionFieldRange::intersect(
+	CmpOp cmpOp, shared_ptr<const Value> pValue) {
+
+	/* create the new range */
+	scoped_ptr<Range> pNew(new Range(cmpOp, pValue));
+
+	/*
+	  Go through the range list.  For every range, either add the
+	  intersection of that to the range list, or if there is none, the
+	  original range.  This has the effect of restricting overlapping
+	  ranges, but leaving non-overlapping ones as-is.
+	*/
+	pRange.reset(pRange->intersect(pNew.get()));
+    }
+
+    ExpressionFieldRange::Range::Range(
+	CmpOp cmpOp, shared_ptr<const Value> pValue):
+	bottomOpen(false),
+	topOpen(false),
+	pBottom(),
+	pTop() {
+	switch(cmpOp) {
+	case NE:
+	    bottomOpen = topOpen = true;
+	    /* FALLTHROUGH */
+	case EQ:
+	    pBottom = pTop = pValue;
+	    break;
+
+	case GT:
+	    bottomOpen = true;
+	    /* FALLTHROUGH */
+	case GTE:
+	    topOpen = true;
+	    pBottom = pValue;
+	    break;
+
+	case LT:
+	    topOpen = true;
+	    /* FALLTHROUGH */
+	case LTE:
+	    bottomOpen = true;
+	    pTop = pValue;
+	    break;
+
+	case CMP:
+	    assert(false); // not allowed
+	    break;
+	}
+    }
+
+    ExpressionFieldRange::Range::Range(const Range &rRange):
+	bottomOpen(rRange.bottomOpen),
+	topOpen(rRange.topOpen),
+	pBottom(rRange.pBottom),
+	pTop(rRange.pTop) {
+    }
+
+    ExpressionFieldRange::Range::Range(
+	shared_ptr<const Value> pTheBottom, bool theBottomOpen,
+	shared_ptr<const Value> pTheTop, bool theTopOpen):
+	bottomOpen(theBottomOpen),
+	topOpen(theTopOpen),
+	pBottom(pTheBottom),
+	pTop(pTheTop) {
     }
 	
+    ExpressionFieldRange::Range *ExpressionFieldRange::Range::intersect(
+	const Range *pRange) const {
+	/*
+	  Find the max of the bottom end of the ranges.
+
+	  Start by assuming the maximum is from pRange.  Then, if we have
+	  values of our own, see if they're greater.
+	*/
+	shared_ptr<const Value> pMaxBottom(pRange->pBottom);
+	bool maxBottomOpen = pRange->bottomOpen;
+	if (pBottom.get()) {
+	    if (!pRange->pBottom.get()) {
+		pMaxBottom = pBottom;
+		maxBottomOpen = bottomOpen;
+	    }
+	    else {
+		const int cmp = Value::compare(pBottom, pRange->pBottom);
+		if (cmp == 0)
+		    maxBottomOpen = bottomOpen || pRange->bottomOpen;
+		else if (cmp > 0) {
+		    pMaxBottom = pBottom;
+		    maxBottomOpen = bottomOpen;
+		}
+	    }
+	}
+
+	/*
+	  Find the minimum of the tops of the ranges.
+
+	  Start by assuming the minimum is from pRange.  Then, if we have
+	  values of our own, see if they are less.
+	*/
+	shared_ptr<const Value> pMinTop(pRange->pTop);
+	bool minTopOpen = pRange->topOpen;
+	if (pTop.get()) {
+	    if (!pRange->pTop.get()) {
+		pMinTop = pTop;
+		minTopOpen = topOpen;
+	    }
+	    else {
+		const int cmp = Value::compare(pTop, pRange->pTop);
+		if (cmp == 0)
+		    minTopOpen = topOpen || pRange->topOpen;
+		else if (cmp < 0) {
+		    pMinTop = pTop;
+		    minTopOpen = topOpen;
+		}
+	    }
+	}
+
+	/*
+	  If the intersections didn't create a disjoint set, create the
+	  new range.
+	*/
+	if (Value::compare(pMaxBottom, pMinTop) <= 0)
+	    return new Range(pMaxBottom, maxBottomOpen, pMinTop, minTopOpen);
+
+	/* if we got here, the intersection is empty */
+	return NULL;
+    }
+
+    bool ExpressionFieldRange::Range::contains(
+	shared_ptr<const Value> pValue) const {
+	if (pBottom.get()) {
+	    const int cmp = Value::compare(pValue, pBottom);
+	    if (cmp < 0)
+		return false;
+	    if (bottomOpen && (cmp == 0))
+		return false;
+	}
+
+	if (pTop.get()) {
+	    const int cmp = Value::compare(pValue, pTop);
+	    if (cmp > 0)
+		return false;
+	    if (topOpen && (cmp == 0))
+		return false;
+	}
+
+	return true;
+    }
 
     /* ----------------------- ExpressionIfNull ---------------------------- */
 
@@ -968,9 +1331,8 @@ namespace mongo {
         return pRight;
     }
 
-    void ExpressionIfNull::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	operandsToBson(pBuilder, "$ifnull", docPrefix);
+    const char *ExpressionIfNull::getName() const {
+	return "$ifnull";
     }
 
     /* ------------------------ ExpressionNary ----------------------------- */
@@ -1097,30 +1459,47 @@ namespace mongo {
 	return NULL;
     }
 
-    void ExpressionNary::operandsToBson(
-	BSONObjBuilder *pBuilder, string opName, bool docPrefix) const {
+    void ExpressionNary::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
+	expressionToField(pBuilder, getName(), fieldName, fieldPrefix);
+    }
+
+    void ExpressionNary::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
+	expressionToElement(pBuilder, getName(), fieldPrefix);
+    }
+
+    void ExpressionNary::expressionToBson(
+	BSONObjBuilder *pBuilder, const char *pOpName, bool fieldPrefix) const {
 	const size_t nOperand = vpOperand.size();
 	assert(nOperand > 0);
-	if (nOperand == 1)
-	    vpOperand[0]->toBson(pBuilder, opName, docPrefix);
-	else {
-	    /* build up the array */
-	    BSONObjBuilder builder;
-	    char indexBuffer[21];
-                // biggest unsigned long long is 18,446,744,073,709,551,615
-
-	    for(size_t i = 0; i < nOperand; ++i) {
-		// snprintf(indexBuffer, sizeof(indexBuffer), "%lu", i);
-                    // CW TODO llu?  What's a size_t in 64 builds?
-                    // CW TODO Do we care about such large arrays?
-		// CW TODO FEH: snprintf not available until C++0x-blah
-		// but this should be ok given max buffer size above
-		sprintf(indexBuffer, "%lu", i);
-		vpOperand[i]->toBson(&builder, indexBuffer, docPrefix);
-	    }
-
-	    pBuilder->appendArray(opName, builder.done());
+	if (nOperand == 1) {
+	    vpOperand[0]->addToBsonObj(pBuilder, pOpName, fieldPrefix);
+	    return;
 	}
+
+	/* build up the array */
+	BSONArrayBuilder arrBuilder;
+	for(size_t i = 0; i < nOperand; ++i)
+	    vpOperand[i]->addToBsonArray(&arrBuilder, fieldPrefix);
+
+	pBuilder->appendArray(pOpName, arrBuilder.done());
+    }
+
+    void ExpressionNary::expressionToField(
+	BSONObjBuilder *pBuilder, const char *pOpName,
+	string objName, bool fieldPrefix) const {
+	BSONObjBuilder exprBuilder;
+	expressionToBson(&exprBuilder, pOpName, fieldPrefix);
+	pBuilder->append(objName, exprBuilder.done());
+    }
+
+    void ExpressionNary::expressionToElement(
+	BSONArrayBuilder *pBuilder, const char *pOpName,
+	bool fieldPrefix) const {
+	BSONObjBuilder exprBuilder;
+	expressionToBson(&exprBuilder, pOpName, fieldPrefix);
+	pBuilder->append(exprBuilder.done());
     }
 
     /* ------------------------- ExpressionNot ----------------------------- */
@@ -1153,9 +1532,8 @@ namespace mongo {
         return Value::getTrue();
     }
 
-    void ExpressionNot::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	vpOperand[0]->toBson(pBuilder, "$not", docPrefix);
+    const char *ExpressionNot::getName() const {
+	return "$not";
     }
 
     /* -------------------------- ExpressionOr ----------------------------- */
@@ -1182,11 +1560,6 @@ namespace mongo {
         }
 
         return Value::getFalse();
-    }
-
-    void ExpressionOr::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	operandsToBson(pBuilder, "$or", docPrefix);
     }
 
     void ExpressionOr::toMatcherBson(BSONObjBuilder *pBuilder) const {
@@ -1251,5 +1624,9 @@ namespace mongo {
 	*/
 	pOr->vpOperand.resize(n - 1);
 	return pE;
+    }
+
+    const char *ExpressionOr::getName() const {
+	return "$or";
     }
 }

@@ -97,17 +97,27 @@ namespace mongo {
 	virtual void optimize();
 
         /*
-	  Add the pipeline operation to the builder.
+	  Add the DocumentSource to the array builder.
 
-	  There are some operations for which this doesn't make sense; the
-	  default implementation is to assert(), and this can be used for
-	  those.
+	  The default implementation calls sourceToBson() in order to
+	  convert the inner part of the object which will be added to the
+	  array being built here.
 
-	  @params pBuilder the builder to add the operation to.
+	  @params pBuilder the array builder to add the operation to.
          */
-	virtual void toBson(BSONObjBuilder *pBuilder) const;
+	virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
     protected:
+	/*
+	  Create an object that represents the document source.  The object
+	  will have a single field whose name is the source's name.  This
+	  will be used by the default implementation of addToBsonArray()
+	  to add this object to a pipeline being represented in BSON.
+
+	  @params pBuilder a blank object builder to write to
+	 */
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const = 0;
+
 	/*
 	  Most DocumentSources have an underlying source they get their data
 	  from.  This is a convenience for them.
@@ -117,6 +127,44 @@ namespace mongo {
 	  assert() if this has already been set.
 	*/
 	shared_ptr<DocumentSource> pSource;
+    };
+
+
+    class DocumentSourceBsonArray :
+        public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceBsonArray();
+        virtual bool eof();
+        virtual bool advance();
+        virtual shared_ptr<Document> getCurrent();
+	virtual void setSource(shared_ptr<DocumentSource> pSource);
+
+	/*
+	  Create a document source based on a BSON array.
+
+	  This is usually put at the beginning of a chain of document sources
+	  in order to fetch data from the database.
+
+	  CAUTION:  the BSON is not read until the source is used.  Any
+	  elements that appear after these documents must not be read until
+	  this source is exhausted.
+
+	  @param pCursor the cursor to use to fetch data
+	*/
+	static shared_ptr<DocumentSourceBsonArray> create(
+	    BSONElement *pBsonElement);
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+    private:
+        DocumentSourceBsonArray(BSONElement *pBsonElement);
+
+	BSONObj embeddedObject;
+	BSONObjIterator arrayIterator;
+	BSONElement currentElement;
     };
 
 
@@ -141,6 +189,10 @@ namespace mongo {
 	static shared_ptr<DocumentSourceCursor> create(
 	    shared_ptr<Cursor> pCursor);
 
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
     private:
         DocumentSourceCursor(shared_ptr<Cursor> pTheCursor);
 
@@ -158,7 +210,6 @@ namespace mongo {
         virtual shared_ptr<Document> getCurrent();
 	virtual bool coalesce(shared_ptr<DocumentSource> pNextSource);
 	virtual void optimize();
-	virtual void toBson(BSONObjBuilder *pBuilder) const;
 
 	/*
 	  Create a filter.
@@ -191,6 +242,10 @@ namespace mongo {
 	 */
 	void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
     private:
         DocumentSourceFilter(shared_ptr<Expression> pFilter);
 
@@ -211,7 +266,6 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
-	virtual void toBson(BSONObjBuilder *pBuilder) const;
 
         /*
           Create a new grouping DocumentSource.
@@ -268,6 +322,10 @@ namespace mongo {
 	  @returns the grouping DocumentSource
 	*/
 	shared_ptr<DocumentSource> createMerger();
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
         DocumentSourceGroup();
@@ -328,8 +386,6 @@ namespace mongo {
         virtual bool advance();
         virtual shared_ptr<Document> getCurrent();
 	virtual void optimize();
-	virtual void toBson(BSONObjBuilder *pBuilder) const;
-
 
         /*
           Create a new DocumentSource that can implement projection.
@@ -366,6 +422,10 @@ namespace mongo {
         static shared_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement);
 
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
     private:
         DocumentSourceProject();
 
@@ -380,41 +440,7 @@ namespace mongo {
         shared_ptr<ValueIterator> pRavel; // iterator used for raveling
         shared_ptr<const Value> pRavelValue; // current value
     };
-
-    class DocumentSourceBsonArray :
-        public DocumentSource {
-    public:
-        // virtuals from DocumentSource
-        virtual ~DocumentSourceBsonArray();
-        virtual bool eof();
-        virtual bool advance();
-        virtual shared_ptr<Document> getCurrent();
-	virtual void setSource(shared_ptr<DocumentSource> pSource);
-
-	/*
-	  Create a document source based on a BSON array.
-
-	  This is usually put at the beginning of a chain of document sources
-	  in order to fetch data from the database.
-
-	  CAUTION:  the BSON is not read until the source is used.  Any
-	  elements that appear after these documents must not be read until
-	  this source is exhausted.
-
-	  @param pCursor the cursor to use to fetch data
-	*/
-	static shared_ptr<DocumentSourceBsonArray> create(
-	    BSONElement *pBsonElement);
-
-    private:
-        DocumentSourceBsonArray(BSONElement *pBsonElement);
-
-	BSONObj embeddedObject;
-	BSONObjIterator arrayIterator;
-	BSONElement currentElement;
-    };
 }
-
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 

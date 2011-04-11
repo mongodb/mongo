@@ -27,6 +27,10 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual void addOperand(shared_ptr<Expression> pExpression);
+	virtual void addToBsonObj(
+	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
+	virtual void addToBsonArray(
+	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
 
         /*
           Get the accumulated value.
@@ -44,11 +48,11 @@ namespace mongo {
 	  knowing the operator name.
 
 	  @params pBuilder the builder to add to
-	  @params name the projected name
+	  @params fieldName the projected name
 	  @params opName the operator name
 	 */
 	void opToBson(
-	    BSONObjBuilder *pBuilder, string name, string opName) const;
+	    BSONObjBuilder *pBuilder, string fieldName, string opName) const;
     };
 
 
@@ -59,8 +63,7 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
-	virtual void toBson(
-	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
+	virtual const char *getName() const;
 
         /*
           Create an appending accumulator.
@@ -83,8 +86,7 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
-	virtual void toBson(
-	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
+	virtual const char *getName() const;
 
         /*
           Create a summing accumulator.
@@ -110,8 +112,7 @@ namespace mongo {
         virtual shared_ptr<const Value> evaluate(
             shared_ptr<Document> pDocument) const;
         virtual shared_ptr<const Value> getValue() const;
-	virtual void toBson(
-	    BSONObjBuilder *pBuilder, string name, bool docPrefix) const;
+	virtual const char *getName() const;
 
         /*
           Create a summing accumulator.

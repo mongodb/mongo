@@ -131,12 +131,12 @@ namespace mongo {
 	    vpExpression[i] = vpExpression[i]->optimize();
     }
 
-    void DocumentSourceProject::toBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceProject::sourceToBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
 	
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i)
-	    vpExpression[i]->toBson(&insides, vFieldName[i], false);
+	    vpExpression[i]->addToBsonObj(&insides, vFieldName[i], false);
 
 	pBuilder->append("$project", insides.done());
     }

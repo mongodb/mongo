@@ -70,8 +70,7 @@ namespace mongo {
         doubleResult(0) {
     }
 
-    void AccumulatorSum::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	opToBson(pBuilder, name, "$sum");
+    const char *AccumulatorSum::getName() const {
+	return "$sum";
     }
 }

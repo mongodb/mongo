@@ -43,8 +43,7 @@ namespace mongo {
         return pAccumulator;
     }
 
-    void AccumulatorAppend::toBson(
-	BSONObjBuilder *pBuilder, string name, bool docPrefix) const {
-	opToBson(pBuilder, name, "$append");
+    const char *AccumulatorAppend::getName() const {
+	return "$append";
     }
 }

@@ -31,7 +31,8 @@ namespace mongo {
 
     Pipeline::Pipeline():
 	collectionName(),
-	sourceList() {
+	sourceList(),
+        debug(false) {
     }
 
     shared_ptr<Pipeline> Pipeline::parseCommand(
@@ -136,11 +137,9 @@ namespace mongo {
 	tempList.splice(tempList.begin(), *pSourceList);
 
 	/* move the first one to the final list */
-	pSourceList->push_back(tempList.front());
+	shared_ptr<DocumentSource> pLastSource(tempList.front());
+	pSourceList->push_back(pLastSource);
 	tempList.pop_front();
-
-	/* keep track of the last source seen */
-	shared_ptr<DocumentSource> &lastSource = pSourceList->back();
 
 	/* run through the sources, coalescing them or keeping them */
 	for(SourceList::iterator iter(tempList.begin()),
@@ -153,9 +152,9 @@ namespace mongo {
 	      or do anything with the source -- the destruction of tempList
 	      will take care of the rest.)
 	    */
-	    if (!lastSource->coalesce(*iter)) {
-		pSourceList->push_back(*iter);
-		lastSource = pSourceList->back();
+	    if (!pLastSource->coalesce(*iter)) {
+		pLastSource = *iter;
+		pSourceList->push_back(pLastSource);
 	    }
 	}
 

@@ -44,7 +44,8 @@ namespace mongo {
         return pDocument;
     }
 
-    void DocumentSourceBsonArray::setSource(shared_ptr<DocumentSource> pSource) {
+    void DocumentSourceBsonArray::setSource(
+	shared_ptr<DocumentSource> pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -67,4 +68,7 @@ namespace mongo {
 	return pSource;
     }
 
+    void DocumentSourceBsonArray::sourceToBson(BSONObjBuilder *pBuilder) const {
+	assert(false); // this has no analog in the BSON world
+    }
 }
