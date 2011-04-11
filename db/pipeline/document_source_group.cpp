@@ -117,9 +117,9 @@ namespace mongo {
       GroupOpDescCmp() above.
     */
     static const GroupOpDesc GroupOpTable[] = {
-        {"$append", AccumulatorAppend::create},
         {"$max", AccumulatorMinMax::createMax},
         {"$min", AccumulatorMinMax::createMin},
+        {"$push", AccumulatorPush::create},
         {"$sum", AccumulatorSum::create},
     };
 

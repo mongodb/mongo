@@ -56,7 +56,7 @@ namespace mongo {
     };
 
 
-    class AccumulatorAppend :
+    class AccumulatorPush :
         public Accumulator {
     public:
         // virtuals from Expression
@@ -73,7 +73,7 @@ namespace mongo {
         static boost::shared_ptr<Accumulator> create();
 
     private:
-        AccumulatorAppend();
+        AccumulatorPush();
 
         mutable vector<boost::shared_ptr<const Value> > vpValue;
     };
