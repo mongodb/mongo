@@ -38,7 +38,7 @@ __wt_msgv(SESSION *session, const char *prefix1, const char *prefix2,
 		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
 
 	handler = session->event_handler;
-	handler->handle_message(handler, s);
+	(void)handler->handle_message(handler, s);
 }
 
 /*
@@ -53,8 +53,7 @@ __wt_msg(SESSION *session, const char *fmt, ...)
 	va_start(ap, fmt);
 	__wt_msgv(session,
 	    (session->btree != NULL) ? session->btree->name : NULL,
-	    session->name,
-	    fmt, ap);
+	    session->name, fmt, ap);
 	va_end(ap);
 }
 
