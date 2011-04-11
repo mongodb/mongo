@@ -92,7 +92,7 @@ namespace mongo {
                     assert(fieldElement.type() == String);
                     // CW TODO $unwind operand must be single field name
 
-                    // TODO should we require leading "$document." here?
+                    // TODO should we require the leading field prefix here?
                     string fieldPath(fieldElement.String());
                     pExpression = ExpressionFieldPath::create(fieldPath);
                     pCtx->unwind(fieldPath);

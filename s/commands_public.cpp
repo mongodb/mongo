@@ -1077,7 +1077,7 @@ namespace mongo {
 	    //const string shardedOutputCollection = getTmpName( collection );
 
 	    /* parse the pipeline specification */
-	    shared_ptr<Pipeline> pPipeline(
+	    boost::shared_ptr<Pipeline> pPipeline(
 		Pipeline::parseCommand(errmsg, cmdObj));
 	    if (!pPipeline.get())
 		return false; // there was some parsing error
@@ -1093,7 +1093,8 @@ namespace mongo {
 		return passthrough(conf, cmdObj, result);
 
 	    /* split the pipeline into pieces for mongods and this mongos */
-	    shared_ptr<Pipeline> pShardPipeline(pPipeline->splitForSharded());
+	    boost::shared_ptr<Pipeline> pShardPipeline(
+		pPipeline->splitForSharded());
 
 	    /* create the command for the shards */
 	    BSONObjBuilder commandBuilder;
@@ -1113,11 +1114,11 @@ namespace mongo {
 	      so filtering is done correctly for un-owned docs so we allocate
 	      them in our thread and hand off"
 	    */
-	    vector<shared_ptr<ShardConnection>> shardConns;
-	    list<shared_ptr<Future::CommandResult>> futures;
+	    vector<boost::shared_ptr<ShardConnection> > shardConns;
+	    list<boost::shared_ptr<Future::CommandResult> > futures;
 	    for (set<Shard>::iterator i=shards.begin(), end=shards.end();
 		 i != end; i++) {
-		shared_ptr<ShardConnection> temp(
+		boost::shared_ptr<ShardConnection> temp(
 		    new ShardConnection(i->getConnString(), fullns));
 		assert(temp->get());
 		futures.push_back(
@@ -1129,9 +1130,9 @@ namespace mongo {
 	    bool failed = false;
                     
 	    BSONObjBuilder shardresults;
-	    for (list<shared_ptr<Future::CommandResult>>::iterator i =
-		     futures.begin(); i!=futures.end(); ++i) {
-		 shared_ptr<Future::CommandResult> res = *i;
+	    for (list<boost::shared_ptr<Future::CommandResult> >::iterator i(
+		     futures.begin()); i!=futures.end(); ++i) {
+		boost::shared_ptr<Future::CommandResult> res = *i;
 		 if (!res->join()) {
 		     error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
 		     result.append( "cause" , res->result() );
