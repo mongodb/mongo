@@ -12,7 +12,7 @@
  *	Flush the environment's cache.
  */
 int
-__wt_connection_sync(CONNECTION *conn, void (*f)(const char *, uint64_t))
+__wt_connection_sync(CONNECTION *conn)
 {
 	BTREE *btree;
 	int ret;
@@ -20,7 +20,7 @@ __wt_connection_sync(CONNECTION *conn, void (*f)(const char *, uint64_t))
 	ret = 0;
 
 	TAILQ_FOREACH(btree, &conn->dbqh, q)
-		WT_TRET(btree->sync(btree, &conn->default_session, f, 0));
+		WT_TRET(btree->sync(btree, &conn->default_session, 0));
 
 	return (ret);
 }

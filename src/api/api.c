@@ -506,7 +506,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "hazard", WT_VERB_HAZARD },
 		{ "mutex", WT_VERB_MUTEX },
 		{ "read", WT_VERB_READ },
-		{ "evict", WT_VERB_EVICT }, 
+		{ "evict", WT_VERB_EVICT },
 		{ NULL, 0 }
 	};
 	CONNECTION *conn;
@@ -566,7 +566,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	if (verbose != 0)
 		WT_ERR(conn->verbose_set(conn, verbose));
-	
 
 	/* XXX conn flags, including WT_MEMORY_CHECK */
 

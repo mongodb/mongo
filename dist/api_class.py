@@ -185,8 +185,7 @@ methods['connection.stat_print'] = Api(
 methods['connection.sync'] = Api(
 	'connection.sync',
 	'method',
-	['progress/void (*@S)(const char *, uint64_t)',
-	 'flags/uint32_t @S'],
+	['flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -297,8 +296,7 @@ methods['btree.btree_pagesize_set'] = Api(
 methods['btree.bulk_load'] = Api(
 	'btree.bulk_load',
 	'method, rdonly, session',
-	['progress/void (*@S)(const char *, uint64_t)',
-	 'cb/int (*@S)(BTREE *, WT_ITEM **, WT_ITEM **)'],
+	['cb/int (*@S)(BTREE *, WT_ITEM **, WT_ITEM **)'],
 	[],
 	['open'], [])
 
@@ -342,7 +340,6 @@ methods['btree.dump'] = Api(
 	'btree.dump',
 	'method, session',
 	['stream/FILE *@S',
-	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['DEBUG',
 	 'PRINTABLES' ],
@@ -406,7 +403,6 @@ methods['btree.salvage'] = Api(
 	'btree.salvage',
 	'method, session',
 	['session/SESSION *@S',
-	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -415,7 +411,6 @@ methods['btree.sync'] = Api(
 	'btree.sync',
 	'method, rdonly, session',
 	['session/SESSION *@S',
-	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['OSWRITE'],
 	['open'], [])
@@ -424,7 +419,6 @@ methods['btree.verify'] = Api(
 	'btree.verify',
 	'method, session',
 	['session/SESSION *@S',
-	 'progress/void (*@S)(const char *, uint64_t)',
 	 'flags/uint32_t @S'],
 	['__NONE__'],
 	['open'], [])

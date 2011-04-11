@@ -164,11 +164,9 @@ static int __wt_api_btree_btree_pagesize_set(
 
 static int __wt_api_btree_bulk_load(
 	BTREE *btree,
-	void (*progress)(const char *, uint64_t),
 	int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **));
 static int __wt_api_btree_bulk_load(
 	BTREE *btree,
-	void (*progress)(const char *, uint64_t),
 	int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	const char *method_name = "BTREE.bulk_load";
@@ -179,7 +177,7 @@ static int __wt_api_btree_bulk_load(
 
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
-	ret = __wt_btree_bulk_load(session, progress, cb);
+	ret = __wt_btree_bulk_load(session, cb);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -289,12 +287,10 @@ static int __wt_api_btree_column_set(
 static int __wt_api_btree_dump(
 	BTREE *btree,
 	FILE *stream,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags);
 static int __wt_api_btree_dump(
 	BTREE *btree,
 	FILE *stream,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.dump";
@@ -305,7 +301,7 @@ static int __wt_api_btree_dump(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_DUMP);
-	ret = __wt_btree_dump(session, stream, progress, flags);
+	ret = __wt_btree_dump(session, stream, flags);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -417,12 +413,10 @@ static int __wt_api_btree_row_put(
 static int __wt_api_btree_salvage(
 	BTREE *btree,
 	SESSION *session,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags);
 static int __wt_api_btree_salvage(
 	BTREE *btree,
 	SESSION *session,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.salvage";
@@ -432,7 +426,7 @@ static int __wt_api_btree_salvage(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_SALVAGE);
-	ret = __wt_btree_salvage(session, progress);
+	ret = __wt_btree_salvage(session);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -478,12 +472,10 @@ static int __wt_api_btree_stat_print(
 static int __wt_api_btree_sync(
 	BTREE *btree,
 	SESSION *session,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags);
 static int __wt_api_btree_sync(
 	BTREE *btree,
 	SESSION *session,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.sync";
@@ -494,7 +486,7 @@ static int __wt_api_btree_sync(
 	WT_DB_RDONLY(session, btree, method_name);
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_SYNC);
-	ret = __wt_btree_sync(session, progress, flags);
+	ret = __wt_btree_sync(session, flags);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -502,12 +494,10 @@ static int __wt_api_btree_sync(
 static int __wt_api_btree_verify(
 	BTREE *btree,
 	SESSION *session,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags);
 static int __wt_api_btree_verify(
 	BTREE *btree,
 	SESSION *session,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags)
 {
 	const char *method_name = "BTREE.verify";
@@ -517,7 +507,7 @@ static int __wt_api_btree_verify(
 
 	WT_RET(__wt_session_api_set(connection, method_name, btree, &session, &islocal));
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_BTREE_VERIFY);
-	ret = __wt_btree_verify(session, progress);
+	ret = __wt_btree_verify(session);
 	WT_TRET(__wt_session_api_clr(session, method_name, islocal));
 	return (ret);
 }
@@ -829,18 +819,16 @@ static int __wt_api_connection_stat_print(
 
 static int __wt_api_connection_sync(
 	CONNECTION *connection,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags);
 static int __wt_api_connection_sync(
 	CONNECTION *connection,
-	void (*progress)(const char *, uint64_t),
 	uint32_t flags)
 {
 	const char *method_name = "CONNECTION.sync";
 	int ret;
 
 	WT_CONN_FCHK(connection, method_name, flags, WT_APIMASK_CONNECTION_SYNC);
-	ret = __wt_connection_sync(connection, progress);
+	ret = __wt_connection_sync(connection);
 	return (ret);
 }
 
@@ -927,7 +915,7 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t ))
 	    __wt_btree_lockout;
 	btree->bulk_load = (int (*)
-	    (BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **)))
+	    (BTREE *, int (*)(BTREE *, WT_ITEM **, WT_ITEM **)))
 	    __wt_btree_lockout;
 	btree->col_del = (int (*)
 	    (BTREE *, SESSION *, uint64_t , uint32_t ))
@@ -939,7 +927,7 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, uint32_t , const char *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->dump = (int (*)
-	    (BTREE *, FILE *, void (*)(const char *, uint64_t), uint32_t ))
+	    (BTREE *, FILE *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->huffman_set = (int (*)
 	    (BTREE *, uint8_t const *, u_int , uint32_t ))
@@ -954,7 +942,7 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->salvage = (int (*)
-	    (BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t ))
+	    (BTREE *, SESSION *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->stat_clear = (int (*)
 	    (BTREE *, uint32_t ))
@@ -963,10 +951,10 @@ __wt_methods_btree_lockout(BTREE *btree)
 	    (BTREE *, FILE *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->sync = (int (*)
-	    (BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t ))
+	    (BTREE *, SESSION *, uint32_t ))
 	    __wt_btree_lockout;
 	btree->verify = (int (*)
-	    (BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t ))
+	    (BTREE *, SESSION *, uint32_t ))
 	    __wt_btree_lockout;
 }
 
@@ -1092,7 +1080,7 @@ __wt_methods_connection_lockout(CONNECTION *connection)
 	    (CONNECTION *, FILE *, uint32_t ))
 	    __wt_connection_lockout;
 	connection->sync = (int (*)
-	    (CONNECTION *, void (*)(const char *, uint64_t), uint32_t ))
+	    (CONNECTION *, uint32_t ))
 	    __wt_connection_lockout;
 	connection->verbose_get = (int (*)
 	    (CONNECTION *, uint32_t *))

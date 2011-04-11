@@ -143,7 +143,7 @@ struct __btree {
 	    BTREE *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t );
 
 	int (*bulk_load)(
-	    BTREE *, void (*)(const char *, uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
+	    BTREE *, int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
 
 	int (*close)(
 	    BTREE *, SESSION *, uint32_t );
@@ -158,7 +158,7 @@ struct __btree {
 	    BTREE *, uint32_t , const char *, uint32_t );
 
 	int (*dump)(
-	    BTREE *, FILE *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, FILE *, uint32_t );
 
 	int (*huffman_set)(
 	    BTREE *, uint8_t const *, u_int , uint32_t );
@@ -173,7 +173,7 @@ struct __btree {
 	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
 
 	int (*salvage)(
-	    BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, SESSION *, uint32_t );
 
 	int (*stat_clear)(
 	    BTREE *, uint32_t );
@@ -182,10 +182,10 @@ struct __btree {
 	    BTREE *, FILE *, uint32_t );
 
 	int (*sync)(
-	    BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, SESSION *, uint32_t );
 
 	int (*verify)(
-	    BTREE *, SESSION *, void (*)(const char *, uint64_t), uint32_t );
+	    BTREE *, SESSION *, uint32_t );
 	/*
 	 * BTREE methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -445,7 +445,7 @@ struct __connection {
 	    CONNECTION *, FILE *, uint32_t );
 
 	int (*sync)(
-	    CONNECTION *, void (*)(const char *, uint64_t), uint32_t );
+	    CONNECTION *, uint32_t );
 
 	int (*verbose_get)(
 	    CONNECTION *, uint32_t *);
@@ -463,10 +463,12 @@ struct __connection {
  *******************************************/
 int	 wiredtiger_env_init(CONNECTION **, uint32_t);
 void	 wiredtiger_err_stream(FILE *);
-int	 wiredtiger_simple_setup(const char *, const char *, BTREE **);
+int	 wiredtiger_simple_setup(
+    const char *, WT_EVENT_HANDLER *, const char *, BTREE **);
 int	 wiredtiger_simple_teardown(const char *, BTREE *);
 
 extern WT_EVENT_HANDLER *__wt_event_handler_default;
+extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 
 /*
  * DO NOT EDIT: automatically built by dist/api_flags.py.

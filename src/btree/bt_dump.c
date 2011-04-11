@@ -9,12 +9,9 @@
 #include "btree.i"
 
 typedef struct {
-	void (*p)				/* Print function */
-	    (const uint8_t *, uint32_t, FILE *);
-	FILE *stream;				/* Dump stream */
-
-	void (*f)(const char *, uint64_t);	/* Progress callback */
-	uint64_t fcnt;				/* Progress counter */
+	void (*p)(const uint8_t *, uint32_t, FILE *);	/* Print function */
+	FILE *stream;					/* Dump stream */
+	uint64_t fcnt;					/* Progress counter */
 } WT_DSTUFF;
 
 static int  __wt_dump_page(SESSION *, WT_PAGE *, void *);
@@ -30,8 +27,7 @@ static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_btree_dump(SESSION *session,
-    FILE *stream, void (*f)(const char *, uint64_t), uint32_t flags)
+__wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags)
 {
 	WT_DSTUFF dstuff;
 	int ret;
@@ -42,13 +38,12 @@ __wt_btree_dump(SESSION *session,
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before blindly reading it.
 		 */
-		return (__wt_verify(session, f, stream));
+		return (__wt_verify(session, stream));
 	}
 
 	dstuff.p = flags == WT_PRINTABLES ?
 	    __wt_print_byte_string_nl : __wt_print_byte_string_hex;
 	dstuff.stream = stream;
-	dstuff.f = f;
 	dstuff.fcnt = 0;
 
 	/*
@@ -62,8 +57,7 @@ __wt_btree_dump(SESSION *session,
 	fprintf(stream, "DATA=END\n");
 
 	/* Wrap up reporting. */
-	if (f != NULL)
-		f(session->name, dstuff.fcnt);
+	__wt_progress(session, NULL, dstuff.fcnt);
 
 	return (ret);
 }
@@ -99,8 +93,8 @@ __wt_dump_page(SESSION *session, WT_PAGE *page, void *arg)
 	}
 
 	/* Report progress every 10 pages. */
-	if (dp->f != NULL && ++dp->fcnt % 10 == 0)
-		dp->f(session->name, dp->fcnt);
+	if (++dp->fcnt % 10 == 0)
+		__wt_progress(session, NULL, dp->fcnt);
 
 	return (0);
 }

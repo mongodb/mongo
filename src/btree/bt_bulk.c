@@ -7,16 +7,14 @@
 
 #include "wt_internal.h"
 
-static int __wt_bulk_fix(SESSION *, void (*)(const char *,
-		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
+static int __wt_bulk_fix(SESSION *, int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
 static int __wt_bulk_ovfl_copy(SESSION *, WT_OVFL *, WT_OVFL *);
 static int __wt_bulk_ovfl_write(SESSION *, WT_ITEM *, WT_OVFL *);
 static int __wt_bulk_promote(SESSION *, WT_PAGE *, WT_STACK *, u_int);
 static int __wt_bulk_scratch_page(
-		SESSION *, uint32_t, uint32_t, WT_PAGE **, WT_BUF **);
+    SESSION *, uint32_t, uint32_t, WT_PAGE **, WT_BUF **);
 static int __wt_bulk_stack_put(SESSION *, WT_STACK *);
-static int __wt_bulk_var(SESSION *, void (*)(const char *,
-		uint64_t), int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
+static int __wt_bulk_var(SESSION *, int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
 
 /*
  * __wt_init_ff_and_sa --
@@ -49,7 +47,6 @@ __wt_page_write(SESSION *session, WT_PAGE *page)
  */
 int
 __wt_btree_bulk_load(SESSION *session,
-    void (*f)(const char *, uint64_t),
     int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
@@ -71,9 +68,9 @@ __wt_btree_bulk_load(SESSION *session,
 	 * fixed-length pages.
 	 */
 	if (F_ISSET(btree, WT_COLUMN) && btree->fixed_len != 0)
-		WT_RET(__wt_bulk_fix(session, f, cb));
+		WT_RET(__wt_bulk_fix(session, cb));
 	else
-		WT_RET(__wt_bulk_var(session, f, cb));
+		WT_RET(__wt_bulk_var(session, cb));
 
 	/* Get a permanent root page reference. */
 	return (__wt_root_pin(session));
@@ -84,9 +81,7 @@ __wt_btree_bulk_load(SESSION *session,
  *	Db.bulk_load method for column-store, fixed-length file pages.
  */
 static int
-__wt_bulk_fix(SESSION *session,
-    void (*f)(const char *, uint64_t),
-    int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
+__wt_bulk_fix(SESSION *session, int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
 	WT_ITEM *key, *value;
@@ -146,8 +141,8 @@ __wt_bulk_fix(SESSION *session,
 		}
 
 		/* Report on progress every 100 inserts. */
-		if (f != NULL && ++insert_cnt % 100 == 0)
-			f(session->name, insert_cnt);
+		if (++insert_cnt % 100 == 0)
+			__wt_progress(session, NULL, insert_cnt);
 		WT_STAT_INCR(btree->stats, items_inserted);
 
 		/*
@@ -212,8 +207,7 @@ __wt_bulk_fix(SESSION *session,
 	}
 
 	/* Wrap up reporting. */
-	if (f != NULL)
-		f(session->name, insert_cnt);
+	__wt_progress(session, NULL, insert_cnt);
 
 err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
 	if (tmp != NULL)
@@ -229,7 +223,6 @@ err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
  */
 static int
 __wt_bulk_var(SESSION *session,
-    void (*f)(const char *, uint64_t),
     int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 {
 	BTREE *btree;
@@ -290,8 +283,8 @@ __wt_bulk_var(SESSION *session,
 		}
 
 		/* Report on progress every 100 inserts. */
-		if (f != NULL && ++insert_cnt % 100 == 0)
-			f(session->name, insert_cnt);
+		if (++insert_cnt % 100 == 0)
+			__wt_progress(session, NULL, insert_cnt);
 		WT_STAT_INCR(btree->stats, items_inserted);
 
 		/*
@@ -395,8 +388,7 @@ __wt_bulk_var(SESSION *session,
 	}
 
 	/* Wrap up reporting. */
-	if (f != NULL)
-		f(session->name, insert_cnt);
+	__wt_progress(session, NULL, insert_cnt);
 
 err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
 	if (key_buf.mem != NULL)

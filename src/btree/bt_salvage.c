@@ -30,7 +30,6 @@ struct __wt_stuff {
 
 	int	   range_merge;			/* If merged key ranges */
 
-	void (*f)(const char *, uint64_t);	/* Progress callback */
 	uint64_t fcnt;				/* Progress counter */
 };
 
@@ -112,7 +111,7 @@ static void __slvg_trk_dump_row(WT_TRACK *);
  *	Salvage a Btree.
  */
 int
-__wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
+__wt_btree_salvage(SESSION *session)
 {
 	BTREE *btree;
 	WT_STUFF *ss, stuff;
@@ -126,7 +125,6 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	WT_CLEAR(stuff);
 	stuff.btree = btree;
 	stuff.page_type = WT_PAGE_INVALID;
-	stuff.f = f;
 	ss = &stuff;
 
 	/*
@@ -251,8 +249,7 @@ __wt_btree_salvage(SESSION *session, void (*f)(const char *, uint64_t))
 	WT_TRET(__wt_block_write(session));
 
 err:	/* Wrap up reporting. */
-	if (ss->f != NULL)
-		ss->f(session->name, ss->fcnt);
+	__wt_progress(session, NULL, ss->fcnt);
 
 	/* Free allocated memory. */
 	WT_TRET(__slvg_free(session, ss));
@@ -294,8 +291,8 @@ __slvg_read(SESSION *session, WT_STUFF *ss)
 	max = fh->file_size;
 	while (off < max) {
 		/* Report progress every 10 reads. */
-		if (ss->f != NULL && ++ss->fcnt % 10 == 0)
-			ss->f(session->name, ss->fcnt);
+		if (++ss->fcnt % 10 == 0)
+			__wt_progress(session, NULL, ss->fcnt);
 
 		addr = (uint32_t)(off / allocsize);
 

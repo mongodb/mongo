@@ -16,7 +16,8 @@ static WT_CONNECTION *wt_conn;
  *	Standard setup for simple applications.
  */
 int
-wiredtiger_simple_setup(const char *progname, const char *config, BTREE **dbp)
+wiredtiger_simple_setup(const char *progname,
+    WT_EVENT_HANDLER *handler, const char *config, BTREE **dbp)
 {
 	BTREE *btree;
 	CONNECTION *conn;
@@ -25,7 +26,7 @@ wiredtiger_simple_setup(const char *progname, const char *config, BTREE **dbp)
 
 	btree = *dbp = NULL;
 
-	if ((ret = wiredtiger_open(NULL, NULL, config, &wt_conn)) != 0) {
+	if ((ret = wiredtiger_open(NULL, handler, config, &wt_conn)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		return (ret);

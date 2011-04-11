@@ -40,14 +40,15 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = wiredtiger_simple_setup(progname, NULL, &btree)) == 0) {
+	if ((ret = wiredtiger_simple_setup(progname, verbose ?
+	    __wt_event_handler_verbose : NULL, NULL, &btree)) == 0) {
 		if ((ret = btree->open(btree, NULL, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: btree.open(%s): %s\n",
 			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
-		if ((ret = btree->salvage(btree, NULL,
-		    verbose ? __wt_progress : NULL, 0)) != 0) {
+		/* XXX verbose */
+		if ((ret = btree->salvage(btree, NULL, 0)) != 0) {
 			fprintf(stderr, "%s: btree.salvage(%s): %s\n",
 			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;

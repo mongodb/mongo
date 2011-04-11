@@ -12,11 +12,8 @@
  *	Flush pages to the backing file.
  */
 int
-__wt_btree_sync(SESSION *session,
-    void (*f)(const char *, uint64_t),
-    uint32_t flags)
+__wt_btree_sync(SESSION *session, uint32_t flags)
 {
-	WT_UNUSED(f);
 	WT_UNUSED(flags);
 
 	return (__wt_bt_sync(session));

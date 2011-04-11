@@ -184,7 +184,7 @@ wts_bulk_load(void)
 
 	btree = g.wts_btree;
 
-	if ((ret = btree->bulk_load(btree, track, cb_bulk)) != 0) {
+	if ((ret = btree->bulk_load(btree, cb_bulk)) != 0) {
 		fprintf(stderr, "%s: bulk_load: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -210,7 +210,7 @@ wts_dump(void)
 		    g.progname, wiredtiger_strerror(errno));
 		return (1);
 	}
-	if ((ret = btree->dump(btree, fp, track, WT_PRINTABLES)) != 0) {
+	if ((ret = btree->dump(btree, fp, WT_PRINTABLES)) != 0) {
 		fprintf(stderr, "%s: btree.dump: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -247,7 +247,7 @@ wts_salvage(void)
 	session = g.wts_session;
 
 	p = fname("wt");
-	if ((ret = btree->salvage(btree, session, track, 0)) != 0) {
+	if ((ret = btree->salvage(btree, session, 0)) != 0) {
 		fprintf(stderr, "%s: btree.salvage: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -266,7 +266,7 @@ wts_sync(void)
 	btree = g.wts_btree;
 	session = g.wts_session;
 
-	if ((ret = btree->sync(btree, session, track, WT_OSWRITE)) != 0) {
+	if ((ret = btree->sync(btree, session, WT_OSWRITE)) != 0) {
 		fprintf(stderr, "%s: btree.sync: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -284,7 +284,7 @@ wts_verify(void)
 	btree = g.wts_btree;
 	session = g.wts_session;
 
-	if ((ret = btree->verify(btree, session, track, 0)) != 0) {
+	if ((ret = btree->verify(btree, session, 0)) != 0) {
 		fprintf(stderr, "%s: btree.verify: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
