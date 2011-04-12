@@ -718,12 +718,14 @@ __wt_evict_subtrees(WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_COL_REF_STATE(cref) == WT_REF_MEM)
+			if (WT_COL_REF_STATE(cref) != WT_REF_DISK &&
+			    WT_COL_REF_STATE(cref) != WT_REF_EVICTED)
 				return (1);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_ROW_REF_STATE(rref) == WT_REF_MEM)
+			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK &&
+			    WT_ROW_REF_STATE(rref) != WT_REF_EVICTED)
 				return (1);
 		break;
 	}
