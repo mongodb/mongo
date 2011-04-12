@@ -1117,14 +1117,15 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
 		len = WT_PTRDIFF32(WT_CELL_NEXT(value_cell), key_cell);
 
 		/* Boundary: allocate, split or write the page. */
-		if (len + sizeof(WT_OFF) > space_avail)
+		if (len > space_avail)
 			WT_RET(__wt_split(session,
 			    &unused, &entries, &first_free, &space_avail, 0));
 
 		/*
 		 * XXX
-		 * For now, we just punch the new page locations into the old
-		 * on-page information, that will eventually change.
+		 * Overwrite the original on-page information with new page
+		 * locations and then copy the two WT_CELL's from the page;
+		 * that will eventually change.
 		 */
 		from = WT_CELL_BYTE_OFF(value_cell);
 		from->addr = WT_ROW_REF_ADDR(rref);
