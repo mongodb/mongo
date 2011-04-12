@@ -306,18 +306,44 @@ static int8_t goesc[256] = {
 static void
 __process_value(WT_CONFIG_ITEM *value)
 {
-    if (value->type == ITEM_ID && value->len > 0) {
-	if (strncasecmp(value->str, "true", value->len) == 0) {
-	    value->type = ITEM_NUM;
-	    value->val = 1;
-	} else if (strncasecmp(value->str, "false", value->len) == 0) {
-	    value->type = ITEM_NUM;
-	    value->val = 0;
+	char *endptr;
+
+	if (value->type == ITEM_ID && value->len > 0) {
+		if (strncasecmp(value->str, "true", value->len) == 0) {
+			value->type = ITEM_NUM;
+			value->val = 1;
+		} else if (strncasecmp(value->str, "false", value->len) == 0) {
+			value->type = ITEM_NUM;
+			value->val = 0;
+		}
+	} else if (value->type == ITEM_NUM) {
+		value->val = strtol(value->str, &endptr, 10);
+		if (endptr >= value->str + value->len)
+			return;
+
+		switch (*endptr) {
+		case 'k':
+		case 'K':
+			value->val <<= 10;
+			break;
+		case 'm':
+		case 'M':
+			value->val <<= 20;
+			break;
+		case 'g':
+		case 'G':
+			value->val <<= 30;
+			break;
+		case 't':
+		case 'T':
+			value->val <<= 40;
+			break;
+		case 'p':
+		case 'P':
+			value->val <<= 50;
+			break;
+		}
 	}
-    } else if (value->type == ITEM_NUM) {
-	    /* !!! TODO need to add support for "KB", "MB", etc. suffixes. */
-	    value->val = strtol(value->str, NULL, 10);
-    }
 }
 
 /*
