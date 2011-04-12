@@ -309,10 +309,10 @@ __wt_split_init(SESSION *session,
 	} else {
 		/*
 		 * Pre-calculate the bytes available in a split-sized page and
-		 * how many split pages there are in the full-sized page.
+		 * how many split chunks there are in a full-sized page.
 		 */
 		r->split_avail = r->split_page_size - WT_PAGE_DISK_SIZE;
-		r->split_count = (max / r->split_page_size) - 1;
+		r->split_count = max / r->split_avail;
 
 		/*
 		 * We know the maximum number of items we'll have to save, make
@@ -556,11 +556,13 @@ __wt_split_fixup(SESSION *session, uint64_t *recnop,
 	}
 
 	/*
-	 * There is probably a remnant that didn't get written, copy it down to
-	 * the beginning of the working buffer.
+	 * There is probably a remnant in the working buffer that didn't get
+	 * written; copy it down to the the beginning of the working buffer.
+	 * Confirm the remnant is no larger than the available split buffer.
 	 */
 	dsk_start = WT_PAGE_DISK_BYTE(r->dsk_tmp->mem);
 	len = WT_PTRDIFF32(*first_freep, r_save->start);
+	WT_ASSERT(session, len < r->split_avail);
 	(void)memmove(dsk_start, r_save->start, len);
 
 	/*
