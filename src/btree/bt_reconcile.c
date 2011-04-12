@@ -207,21 +207,21 @@ __wt_page_reconcile(
 	 * when said parent is reconciled.  Newly split root pages can't be
 	 * merged (as they have no parent), the new root page must be written.
 	 *
-	 * We detect root splits when the tree's root page is flagged to merge.
-	 * We do the check here because I don't want the reconciliation code to
-	 * handle two pages at once, and we've just finished with the original
-	 * page.
+	 * We detect root splits when the root page is flagged as a split.  We
+	 * do the check at the top level because I'd rather the reconciliation
+	 * code not handle two pages at once, and we've just finished with the
+	 * original page.
 	 *
 	 * Reconcile the new root page explicitly rather than waiting for a
 	 * natural reconcile, because root splits result from walking the tree
-	 * during a sync or close call, and the new root page won't be visited
-	 * as part of that walk.
+	 * during a sync or close call, and the new root page is the one page
+	 * that won't be visited as part of that walk.
 	 */
 	if (F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
 		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_RET(__wt_page_reconcile(
-		    session, btree->root_page.page, 0, 0));
+		    session, btree->root_page.page, 0, discard));
 	}
 
 	return (0);
@@ -1057,6 +1057,20 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
 	    session->btree->intlmin, &unused, &first_free, &space_avail));
 
 	/*
+	 * There are two kinds of row-store internal pages we reconcile: the
+	 * first is a page created entirely in-memory (for example, the result
+	 * of a root split), in which case there's no underlying disk image.
+	 * The second is a page read from disk, in which case we take the keys
+	 * from the underlying disk image.  The first case is handled here.
+	 */
+	if (page->XXdsk == NULL) {
+		WT_RET(__wt_rec_row_merge(session,
+		    page, &entries, &first_free, &space_avail, discard));
+		return (__wt_split(
+		    session, &unused, &entries, &first_free, &space_avail, 1));
+	}
+
+	/*
 	 * We have to walk both the WT_ROW structures and the original page --
 	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
 	 *
@@ -1470,10 +1484,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 	r = &S2C(session)->cache->reclist;
 	discard = *discardp;
 
-	/*
-	 * If all entries on the page were deleted, mark the page to be merged
-	 * into its parent when the parent is evicted.
-	 */
+	/* If the page was emptied, we want to eventually discard it. */
 	if (r->list[0].deleted) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: delete page %lu (%luB)",
@@ -1483,7 +1494,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 		 * Deleted pages cannot be discarded because they're no longer
 		 * backed by file blocks: mark the page to be merged into its
 		 * parent when the parent is reconciled and clear our caller's
-		 * discard flag, the page will be discared after it's merged.
+		 * discard flag, the page will be discarded after it's merged.
 		 */
 		*discardp = 0;
 		F_SET(page, WT_PAGE_DELETED);
@@ -1573,10 +1584,7 @@ __wt_rec_parent_update_dirty(SESSION *session,
 	 * update the state of the parent reference.  No further memory flush
 	 * needed, the state field is declared volatile.
 	 */
-	if (WT_PAGE_IS_ROOT(page))
-		parent_ref = &btree->root_page;
-	else
-		parent_ref = page->parent_ref;
+	parent_ref = page->parent_ref;
 	parent_ref->addr = addr;
 	parent_ref->size = size;
 	if (split != NULL)
@@ -1584,7 +1592,11 @@ __wt_rec_parent_update_dirty(SESSION *session,
 	WT_MEMORY_FLUSH;
 	parent_ref->state = state;
 
-	/* If we're reconciling the root page, update the descriptor record. */
+	/*
+	 * If we're moving the root page, update the descriptor record.  The
+	 * root page's parent WT_REF structure is in the BTREE structure, and
+	 * was just updated.
+	 */
 	if (WT_PAGE_IS_ROOT(page))
 		return (__wt_desc_write(session));
 
