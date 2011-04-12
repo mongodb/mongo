@@ -241,6 +241,25 @@ namespace mongo {
         return f;
     }
 
+    namespace JSFiles {
+        extern const JSFile collection;
+        extern const JSFile db;
+        extern const JSFile mongo;
+        extern const JSFile mr;
+        extern const JSFile query;
+        extern const JSFile utils;
+    }
+
+    void Scope::execCoreFiles() {
+        // keeping same order as in SConstruct
+        execSetup(JSFiles::utils);
+        execSetup(JSFiles::db);
+        execSetup(JSFiles::mongo);
+        execSetup(JSFiles::mr);
+        execSetup(JSFiles::query);
+        execSetup(JSFiles::collection);
+    }
+
     typedef map< string , list<Scope*> > PoolToScopes;
 
     class ScopeCache {
