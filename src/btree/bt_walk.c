@@ -113,8 +113,8 @@ __wt_walk_begin(SESSION *session, WT_PAGE *page, WT_WALK *walk, uint32_t flags)
 	walk->tree_slot = 0;
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
-	if (page == NULL && (page = btree->root_page.page) == NULL)
-		return (WT_ERROR);
+	if (page == NULL)
+		page = btree->root_page.page;
 	walk->tree[0].page = page;
 	walk->tree[0].indx = 0;
 	walk->tree[0].visited = 0;
@@ -187,7 +187,7 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, WT_PAGE **pagep)
 		return (__wt_walk_next(session, walk, pagep));
 	}
 
-	if (e->indx == page->entries) {
+	if (page == NULL || e->indx == page->entries) {
 eop:		e->visited = 1;
 		*pagep = e->page;
 		return (0);

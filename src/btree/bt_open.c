@@ -255,22 +255,28 @@ __wt_root_pin(SESSION *session)
 {
 	BTREE *btree;
 	WT_PAGE *page;
+	int creating;
 
 	btree = session->btree;
+	creating = 0;
 
 	if (btree->root_page.addr == 0 ||
 	    btree->root_page.addr == WT_ADDR_INVALID) {
+		creating = 1;
 		WT_RET(__wt_calloc_def(session, 1, &page));
-		page->type = F_ISSET(btree, WT_COLUMN) ?
-		    WT_PAGE_COL_INT : WT_PAGE_ROW_INT;
 
-		btree->root_page.page = page;
-		btree->root_page.state = WT_REF_MEM;
+		page->type = F_ISSET(btree, WT_COLUMN) ?
+		    (F_ISSET(btree, WT_RLE) ? WT_PAGE_COL_RLE :
+		    (btree->fixed_len != 0) ? WT_PAGE_COL_FIX :
+		    WT_PAGE_COL_VAR) : WT_PAGE_ROW_LEAF;
+
+		page->parent_ref = &btree->root_page;
+		page->parent_ref->page = page;
+		page->parent_ref->state = WT_REF_MEM;
 	}
 
 	/* Get the root page, which had better be there. */
 	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
-
 	F_SET(btree->root_page.page, WT_PAGE_PINNED);
 	__wt_hazard_clear(session, btree->root_page.page);
 

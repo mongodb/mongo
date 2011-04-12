@@ -112,7 +112,7 @@ __wt_bulk_fix(SESSION *session, int (*cb)(BTREE *, WT_ITEM **, WT_ITEM **))
 
 	/* Get a scratch buffer and make it look like our work page. */
 	WT_ERR(__wt_bulk_scratch_page(session, btree->leafmin,
-	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX,&page, &tmp));
+	    rle ? WT_PAGE_COL_RLE : WT_PAGE_COL_FIX, &page, &tmp));
 	dsk = page->XXdsk;
 	dsk->recno = 1;
 	__wt_init_ff_and_sa(page, &first_free, &space_avail);
