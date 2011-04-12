@@ -147,6 +147,8 @@ namespace mongo {
             extents.push_back(L);
         log() << "compact " << extents.size() << " extents" << endl;
 
+        ProgressMeterHolder pm( cc().curop()->setMessage( "compact extent" , extents.size() ) );
+
         // same data, but might perform a little different after compact?
         NamespaceDetailsTransient::get_w(ns).clearQueryCache();
 
@@ -195,6 +197,7 @@ namespace mongo {
         int n = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
             skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
+            pm.hit();
         }
 
         if( skipped ) {
@@ -202,6 +205,9 @@ namespace mongo {
         }
 
         assert( d->firstExtent.ext()->xprev.isNull() );
+
+        // indexes will do their own progress meter?
+        pm.finished();
 
         // build indexes
         NamespaceString s(ns);
