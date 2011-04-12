@@ -463,7 +463,12 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	dsk = page->XXdsk;
 
 	if (dsk == NULL) {
-		WT_ASSERT(session, F_ISSET(page, WT_PAGE_SPLIT));
+		/*
+		 * XXX
+		 * This should all go away -- once we're only verifying "clean"
+		 * trees or files, there will never be a case where we don't
+		 * have a backing disk page.
+		 */
 		return (0);
 	}
 
