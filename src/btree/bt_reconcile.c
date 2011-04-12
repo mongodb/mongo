@@ -554,7 +554,7 @@ __wt_split_fixup(SESSION *session, uint64_t *recnop,
 	 */
 	dsk_start = WT_PAGE_DISK_BYTE(r->dsk_tmp->mem);
 	len = WT_PTRDIFF32(*first_freep, r_save->start);
-	memcpy(dsk_start, r_save->start, len);
+	memmove(dsk_start, r_save->start, len);
 
 	/*
 	 * Fix up our caller's information -- we corrected the entry count as
