@@ -738,7 +738,7 @@ __wt_rec_col_merge(
 		}
 
 		/* Boundary: allocate, split or write the page. */
-		if (sizeof(WT_OFF_RECORD) > space_avail)
+		while (sizeof(WT_OFF_RECORD) > space_avail)
 			WT_RET(__wt_split(session,
 			    &recno, &entries, &first_free, &space_avail, 0));
 
@@ -931,7 +931,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 			}
 
 			/* Boundary: allocate, split or write the page. */
-			if (len > space_avail)
+			while (len > space_avail)
 				WT_ERR(__wt_split(session, &recno,
 				    &entries, &first_free, &space_avail, 0));
 
@@ -1020,7 +1020,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 		}
 
 		/* Boundary: allocate, split or write the page. */
-		if (len > space_avail)
+		while (len > space_avail)
 			WT_RET(__wt_split(session,
 			    &recno, &entries, &first_free, &space_avail, 0));
 
@@ -1117,7 +1117,7 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
 		len = WT_PTRDIFF32(WT_CELL_NEXT(value_cell), key_cell);
 
 		/* Boundary: allocate, split or write the page. */
-		if (len > space_avail)
+		while (len > space_avail)
 			WT_RET(__wt_split(session,
 			    &unused, &entries, &first_free, &space_avail, 0));
 
@@ -1198,7 +1198,7 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page, uint32_t *entriesp,
 		WT_RET(__wt_item_build_key(session, &key, &cell, &key_ovfl));
 
 		/* Boundary: allocate, split or write the page. */
-		if (WT_CELL_SPACE_REQ(key.size) +
+		while (WT_CELL_SPACE_REQ(key.size) +
 		    WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > space_avail)
 			WT_RET(__wt_split(session,
 			    &unused, &entries, &first_free, &space_avail, 0));
@@ -1354,7 +1354,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 		key_len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
 
 		/* Boundary: allocate, split or write the page. */
-		if (key_len + value_len > space_avail)
+		while (key_len + value_len > space_avail)
 			WT_RET(__wt_split(session,
 			    &unused, &entries, &first_free, &space_avail, 0));
 
@@ -1445,7 +1445,7 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins,
 		key_len = WT_CELL_SPACE_REQ(key_buf.size);
 
 		/* Boundary: allocate, split or write the page. */
-		if (key_len + value_len > space_avail)
+		while (key_len + value_len > space_avail)
 			WT_RET(__wt_split(session,
 			    &unused, &entries, &first_free, &space_avail, 0));
 
