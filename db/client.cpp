@@ -131,7 +131,7 @@ namespace mongo {
         assert( lockState );
         
         if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
-            uassert(14029, "Can't take a write lock while out of disk space", false);
+            uassert(14031, "Can't take a write lock while out of disk space", false);
         }
 
         _db = dbHolder.get( _ns , _path );
