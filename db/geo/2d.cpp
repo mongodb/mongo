@@ -2154,6 +2154,9 @@ namespace mongo {
 
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
+            _bounds = _poly.bounds();
+            _maxDim = _bounds.maxDim();
+
             ok();
         }
 
@@ -2164,23 +2167,17 @@ namespace mongo {
 
         // Whether the current box width is big enough for our search area
         virtual bool fitsInBox( double width ) {
-        	return _poly.bounds().maxDim() <= width;
+        	return _maxDim <= width;
         }
 
         // Whether the current box overlaps our search area
         virtual bool intersectsBox( Box& cur ) {
-        	return _poly.bounds().intersects( cur );
+        	return _bounds.intersects( cur );
         }
 
         virtual bool checkDistance( const KeyNode& node, double& d ) {
 
             Point p = Point( _g , GeoHash( node.key.firstElement() ) );
-
-            // Find centroid of the polygon.
-            Point centroid = _poly.centroid();
-
-            // Use the centroid to find the distance to the current point.
-            d = centroid.distance( p );
 
             // Use the point in polygon algorihtm to see if the point
             // is contained in the polygon.
@@ -2197,6 +2194,9 @@ namespace mongo {
     private:
 
         Polygon _poly;
+        Box _bounds;
+        double _maxDim;
+
         GeoHash _start;
 
     };
