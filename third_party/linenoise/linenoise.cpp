@@ -480,10 +480,12 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             errno = EAGAIN;
             return -1;
         case 127:   /* delete */
-            memmove(buf+pos,buf+pos+1,len-pos-1);
-            len--;
-            buf[len] = '\0';
-            refreshLine(fd,prompt,buf,len,pos,cols);
+            if (len > 0 && pos < len) {
+                memmove(buf+pos,buf+pos+1,len-pos-1);
+                len--;
+                buf[len] = '\0';
+                refreshLine(fd,prompt,buf,len,pos,cols);
+            }
             break;
         case 8:     /* backspace or ctrl-h */
             if (pos > 0 && len > 0) {
