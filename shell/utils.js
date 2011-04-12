@@ -1418,6 +1418,17 @@ help = shellHelper.help = function (x) {
         print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
         return;
     }
+    else if (x == "keys") {
+        print("Tab completion and command history is available at the command prompt.\n");
+        print("Some emacs keystrokes are available too:");
+        print("  Ctrl-A start of line");
+        print("  Ctrl-E end of line");
+        print("  Ctrl-K del to end of line");
+        print("\nMulti-line commands");
+        print("You can enter a multi line javascript expression.  If parens, braces, etc. are not closed, you will see a new line ");
+        print("beginning with '...' characters.  Type the rest of your expression.  Press Ctrl-C to abort the data entry if you");
+        print("get stuck.\n");
+    }
     else if (x == "misc") {
         print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
         print("\tb.subtype()                         the BinData subtype (0..255)");
@@ -1464,10 +1475,11 @@ help = shellHelper.help = function (x) {
         print("\t" + "db.help()                    help on db methods");
         print("\t" + "db.mycoll.help()             help on collection methods");
         print("\t" + "rs.help()                    help on replica set methods");
-        print("\t" + "help connect                 connecting to a db help");
         print("\t" + "help admin                   administrative help");
+        print("\t" + "help connect                 connecting to a db help");
+        print("\t" + "help keys                    key shortcuts");
         print("\t" + "help misc                    misc things to know");
-        print("\t" + "help mr                      mapreduce help");
+        print("\t" + "help mr                      mapreduce");
         print();
         print("\t" + "show dbs                     show database names");
         print("\t" + "show collections             show collections in current database");
