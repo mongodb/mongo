@@ -207,10 +207,21 @@ namespace mongo {
         expression; \
     } catch ( const std::exception &e ) { \
         stringstream ss; \
-        ss << "caught boost exception: " << e.what();   \
+        ss << "caught boost exception: " << e.what() << ' ' << __FILE__ << ' ' << __LINE__; \
+        msgasserted( 13294 , ss.str() ); \
+    } catch ( ... ) { \
+        massert( 10437 ,  "unknown boost failed" , false ); \
+    }
+
+#define MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( expression, msg ) \
+    try { \
+        expression; \
+    } catch ( const std::exception &e ) { \
+        stringstream ss; \
+        ss << msg << " caught boost exception: " << e.what();   \
         msgasserted( 13294 , ss.str() );        \
     } catch ( ... ) { \
-        massert( 10437 ,  "unknown boost failed" , false );   \
+        msgasserted( 10437 , string("unknown boost failed ") + msg );   \
     }
 
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD

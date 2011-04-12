@@ -435,7 +435,7 @@ namespace mongo {
 
         FileAllocator::get()->start();
 
-        BOOST_CHECK_EXCEPTION( clearTmpFiles() );
+        MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
 
         _diaglog.init();
 
