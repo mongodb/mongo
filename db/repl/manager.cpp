@@ -19,6 +19,7 @@
 
 #include "pch.h"
 #include "rs.h"
+#include "connections.h"
 #include "../client.h"
 
 namespace mongo {
@@ -81,6 +82,45 @@ namespace mongo {
         }
     }
 
+    void Manager::checkElectableSet() {
+        unsigned otherOp = rs->lastOtherOpTime().getSecs();
+        
+        // make sure the electable set is up-to-date
+        if (rs->elect.aMajoritySeemsToBeUp() &&
+            rs->iAmPotentiallyHot() &&
+            (otherOp == 0 || rs->lastOpTimeWritten.getSecs() >= otherOp - 10)) {
+            theReplSet->addToElectable(rs->selfId());
+        }
+        else {
+            theReplSet->rmFromElectable(rs->selfId());
+        }
+
+        // check if we should ask the primary (possibly ourselves) to step down
+        const Member *highestPriority = theReplSet->getMostElectable();
+        const Member *primary = rs->box.getPrimary();
+        
+        if (primary && highestPriority &&
+            highestPriority->config().priority > primary->config().priority) {
+            log() << "stepping down " << primary->fullName() << endl;
+
+            if (primary->h().isSelf()) {
+                // replSetStepDown tries to acquire the same lock
+                // msgCheckNewState takes, so we can't call replSetStepDown on
+                // ourselves.
+                rs->relinquish();
+            }
+            else {
+                BSONObj cmd = BSON( "replSetStepDown" << 1 );
+                ScopedConn conn(primary->fullName());
+                BSONObj result;
+                if (!conn.runCommand("admin", cmd, result, 0)) {
+                    log() << "stepping down " << primary->fullName()
+                          << " failed: " << result << endl;
+                }
+            }
+        }
+    }
+
     /** called as the health threads get new results */
     void Manager::msgCheckNewState() {
         {
@@ -90,7 +130,9 @@ namespace mongo {
             RSBase::lock lk(rs);
 
             if( busyWithElectSelf ) return;
-
+            
+            checkElectableSet();
+            
             const Member *p = rs->box.getPrimary();
             if( p && p != rs->_self ) {
                 if( !p->hbinfo().up() ||
@@ -154,7 +196,7 @@ namespace mongo {
                 }
 
                 if( rs->elect.shouldRelinquish() ) {
-                    log() << "replSet can't see a majority of the set, relinquishing primary" << rsLog;
+                    log() << "can't see a majority of the set, relinquishing primary" << rsLog;
                     rs->relinquish();
                 }
 
@@ -163,9 +205,7 @@ namespace mongo {
 
             if( !rs->iAmPotentiallyHot() ) // if not we never try to be primary
                 return;
-
-            /* TODO : CHECK PRIORITY HERE.  can't be elected if priority zero. */
-
+            
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !rs->elect.aMajoritySeemsToBeUp() ) {
                 static time_t last;
@@ -175,6 +215,10 @@ namespace mongo {
                 if( last + 60 > time(0 ) ) ll++;
                 log(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
                 last = time(0);
+                return;
+            }
+
+            if( !rs->iAmElectable() ) {
                 return;
             }
 

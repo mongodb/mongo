@@ -69,6 +69,25 @@ namespace mongo {
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
+    Member* ReplSetImpl::getMostElectable() {
+        scoped_lock lk(_elock);
+        
+        Member *max = 0;        
+
+        for (set<unsigned>::iterator it = _electableSet.begin(); it != _electableSet.end(); it++) {
+            const Member *temp = findById(*it);
+            if (!temp) {
+                log() << "couldn't find member: " << *it << endl;
+                continue;
+            }
+            if (!max || max->config().priority < temp->config().priority) {
+                max = (Member*)temp;
+            }
+        }
+
+        return max;
+    }
+
     const bool closeOnRelinquish = true;
 
     void ReplSetImpl::relinquish() {
@@ -264,6 +283,7 @@ namespace mongo {
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
         _currentSyncTarget(0),
+        _elock("Election set lock"),
         _hbmsgTime(0),
         _self(0),
         mgr( new Manager(this) ) {
