@@ -194,8 +194,8 @@ eop:		e->visited = 1;
 	}
 
 	/*
-	 * Check to see if the page has sub-trees associated with it, in which
-	 * case we traverse those pages.
+	 * Walk (or continue to talk) the internal page, returning leaf child
+	 * pages, and traversing internal child pages.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
@@ -238,13 +238,7 @@ eop:		e->visited = 1;
 				goto eop;
 		}
 		break;
-
-	default:
-		/*
-		 * If we hit something that is not an internal page,
-		 * just return it.
-		 */
-		goto eop;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	switch (ref->page->type) {
@@ -267,6 +261,12 @@ eop:		e->visited = 1;
 		e->indx = 0;
 		e->visited = 0;
 		return (__wt_walk_next(session, walk, flags, refp));
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
+		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/* Return the child page, it's not interesting for further traversal. */
