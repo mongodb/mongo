@@ -20,10 +20,16 @@ if ( doIt ) {
     
     port = allocatePorts( 1 )[ 0 ];
     m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-    c = m.getDB( "diskfulltest" ).getCollection( "diskfulltest" )
+    d = m.getDB( "diskfulltest" );
+    c = d.getCollection( "diskfulltest" );
     c.save( { a: 6 } );
+    assert.eq(d.getLastError(), "new file allocation failure"); // first fail
     assert.soon( function() { return rawMongoProgramOutput().match( /file allocation failure/ ); }, "didn't see 'file allocation failure'" );
     assert.isnull( c.findOne() , "shouldn't exist" );
+    c.save( { a: 6 } );
+    assert.eq(d.getLastError(), "Can't take a write lock while out of disk space"); // every following fail
+
+
     sleep( 3000 );
     m2 = new Mongo( m.host );
     printjson( m2.getDBs() );
