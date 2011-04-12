@@ -33,9 +33,9 @@ static int __wt_split_fixup(
 	SESSION *, uint64_t *, uint32_t *, uint8_t **, uint32_t *);
 static int __wt_split_init(SESSION *,
 	WT_PAGE *, uint32_t, uint32_t, uint64_t *, uint8_t **, uint32_t *);
-static int __wt_split_write(SESSION *, int, WT_PAGE_DISK *, void *);
+static int __wt_split_write(SESSION *, int, WT_BUF *, void *);
 
-static inline uint32_t	__wt_allocation_size(SESSION *, void *, uint8_t *);
+static inline uint32_t	__wt_allocation_size(SESSION *, WT_BUF *, uint8_t *);
 static inline int	__wt_block_free_ovfl(SESSION *, WT_OVFL *);
 
 /*
@@ -44,17 +44,26 @@ static inline int	__wt_block_free_ovfl(SESSION *, WT_OVFL *);
  * (the page size can either grow or shrink), and zero out unused bytes.
  */
 static inline uint32_t
-__wt_allocation_size(SESSION *session, void *begin, uint8_t *end)
+__wt_allocation_size(SESSION *session, WT_BUF *buf, uint8_t *end)
 {
 	BTREE *btree;
-	uint32_t len, alloc_len;
+	uint32_t alloc_len, current_len, write_len;
 
 	btree = session->btree;
 
-	len = WT_PTRDIFF32(end, begin);
-	alloc_len = WT_ALIGN(len, btree->allocsize);
-	if (alloc_len > len)
-		memset(end, 0, alloc_len - len);
+	current_len = WT_PTRDIFF32(end, buf->mem);
+	alloc_len = WT_ALIGN(current_len, btree->allocsize);
+	write_len = alloc_len - current_len;
+
+	/*
+	 * There are lots of offset calculations going on in this code, make
+	 * sure we don't overflow the end of the temporary buffer.
+	 */
+	WT_ASSERT(
+	    session, end + write_len <= (uint8_t *)buf->mem + buf->mem_size);
+
+	if (write_len != 0)
+		memset(end, 0, write_len);
 	return (alloc_len);
 }
 
@@ -239,7 +248,6 @@ __wt_split_init(SESSION *session,
 	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
-	uint32_t space_avail;
 
 	btree = session->btree;
 
@@ -296,15 +304,14 @@ __wt_split_init(SESSION *session,
 	 * is no need to maintain split boundaries within a larger page.
 	 */
 	if (max == r->split_page_size) {
-		space_avail = max - WT_PAGE_DISK_SIZE;
+		r->split_avail = max - WT_PAGE_DISK_SIZE;
 		r->split_count = 0;
 	} else {
 		/*
 		 * Pre-calculate the bytes available in a split-sized page and
 		 * how many split pages there are in the full-sized page.
 		 */
-		space_avail =
-		    r->split_avail = r->split_page_size - WT_PAGE_DISK_SIZE;
+		r->split_avail = r->split_page_size - WT_PAGE_DISK_SIZE;
 		r->split_count = (max / r->split_page_size) - 1;
 
 		/*
@@ -339,7 +346,7 @@ __wt_split_init(SESSION *session,
 	 * when approaching the split boundary.
 	 */
 	*first_freep = WT_PAGE_DISK_BYTE(dsk);
-	*space_availp = space_avail;
+	*space_availp = r->split_avail;
 	return (0);
 }
 
@@ -409,7 +416,7 @@ __wt_split(SESSION *session, uint64_t *recnop,
 		/* We're done, write the remaining information. */
 		dsk->u.entries = *entriesp;
 		ret = __wt_split_write(
-		    session, *entriesp == 0 ? 1 : 0, dsk, *first_freep);
+		    session, *entriesp == 0 ? 1 : 0, r->dsk_tmp, *first_freep);
 		break;
 	case 2:
 		/*
@@ -473,7 +480,7 @@ __wt_split(SESSION *session, uint64_t *recnop,
 		 * Write the current disk image.
 		 */
 		dsk->u.entries = *entriesp;
-		WT_RET(__wt_split_write(session, 0, dsk, *first_freep));
+		WT_RET(__wt_split_write(session, 0, r->dsk_tmp, *first_freep));
 
 		/*
 		 * Set the starting record number for the next set of items,
@@ -524,13 +531,13 @@ __wt_split_fixup(SESSION *session, uint64_t *recnop,
 	 * information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->split_page_size, &tmp));
-	dsk = tmp->mem;
-	memcpy(dsk, r->dsk_tmp->mem, WT_PAGE_DISK_SIZE);
+	memcpy(tmp->mem, r->dsk_tmp->mem, WT_PAGE_DISK_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
 	 * it into place.
 	 */
+	dsk = tmp->mem;
 	dsk_start = WT_PAGE_DISK_BYTE(dsk);
 	for (i = 0, r_save = r->save; i < r->s_next; ++i, ++r_save) {
 		/* Copy out the starting record number. */
@@ -545,7 +552,7 @@ __wt_split_fixup(SESSION *session, uint64_t *recnop,
 		/* Copy out the page contents, and write it. */
 		len = WT_PTRDIFF32((r_save + 1)->start, r_save->start);
 		memcpy(dsk_start, r_save->start, len);
-		WT_ERR(__wt_split_write(session, 0, dsk, dsk_start + len));
+		WT_ERR(__wt_split_write(session, 0, tmp, dsk_start + len));
 	}
 
 	/*
@@ -554,7 +561,7 @@ __wt_split_fixup(SESSION *session, uint64_t *recnop,
 	 */
 	dsk_start = WT_PAGE_DISK_BYTE(r->dsk_tmp->mem);
 	len = WT_PTRDIFF32(*first_freep, r_save->start);
-	memmove(dsk_start, r_save->start, len);
+	(void)memmove(dsk_start, r_save->start, len);
 
 	/*
 	 * Fix up our caller's information -- we corrected the entry count as
@@ -575,8 +582,9 @@ err:	if (tmp != NULL)
  *	Write a disk block out for the helper functions.
  */
 static int
-__wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
+__wt_split_write(SESSION *session, int deleted, WT_BUF *buf, void *end)
 {
+	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
 	struct rec_list *r_list;
 	uint32_t addr, size;
@@ -592,9 +600,9 @@ __wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 		 * Allocate file space.
 		 * Write the disk block.
 		 */
-		size = __wt_allocation_size(session, dsk, end);
+		size = __wt_allocation_size(session, buf, end);
 		WT_RET(__wt_block_alloc(session, &addr, size));
-		WT_RET(__wt_disk_write(session, dsk, addr, size));
+		WT_RET(__wt_disk_write(session, buf->mem, addr, size));
 	}
 
 	/* Save the key and addr/size pairs to update the parent. */
@@ -618,6 +626,7 @@ __wt_split_write(SESSION *session, int deleted, WT_PAGE_DISK *dsk, void *end)
 	 * For a column-store, the key is the recno, for a row-store, it's the
 	 * first key on the page, a variable-length byte string.
 	 */
+	dsk = buf->mem;
 	switch (dsk->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -1575,9 +1584,6 @@ __wt_rec_parent_update_dirty(SESSION *session,
     WT_PAGE *page, WT_PAGE *split, uint32_t addr, uint32_t size, uint32_t state)
 {
 	WT_REF *parent_ref;
-	BTREE *btree;
-
-	btree = session->btree;
 
 	/*
 	 * Update the relevant parent WT_REF structure, flush memory, and then
