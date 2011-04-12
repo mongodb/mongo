@@ -45,6 +45,9 @@ var checkPrimaryIs = function(node) {
             }
 
             var str = "goal: "+node.host+"==1 states: ";
+            if (!status.members) {
+                return false;
+            }
             status.members.forEach( function(m) {
                     str += m.name + ": "+m.state +" ";
                     
@@ -107,22 +110,26 @@ for (i=0; i<n; i++) {
     
     print("max is "+max.host+" with priority "+max.priority+", reconfiguring...");
 
-    while (config.version != version) {
+    var count = 0;
+    while (config.version != version && count < 100) {
+        reconnect(master);
+        
         occasionally(function() {
                 print("version is "+version+", trying to update to "+config.version);
             });
         
         try {
             master.adminCommand({replSetReconfig : config});
+            master = rs.getMaster();
+            reconnect(master);
+
+            version = master.getDB("local").system.replset.findOne().version;
         }
         catch (e) {
             print("Caught exception: "+e);
         }
-        
-        master = rs.getMaster();
-        reconnect(master);
 
-        version = master.getDB("local").system.replset.findOne().version;
+        count++;
     }
 
     assert.soon(function() {
@@ -134,6 +141,10 @@ for (i=0; i<n; i++) {
             return versions[0] == config.version && versions[1] == config.version;
         });
 
+    // the reconfiguration needs to be replicated! the hb sends it out
+    // separately from the repl
+    rs.awaitReplication();
+    
     print("reconfigured.  Checking statuses.");
     
     checkPrimaryIs(max);
