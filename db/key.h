@@ -22,6 +22,7 @@ namespace mongo {
         int dataSize() const { return _o.objsize(); }
         const char * data() const { return _o.objdata(); }
         BSONElement _firstElement() const { return _o.firstElement(); }
+        bool isCompactFormat() const { false; }
     private:
         BSONObj _o;
     };
@@ -31,20 +32,31 @@ namespace mongo {
         ~KeyV1() { 
             DEV _keyData = 0; 
         }
-        KeyV1();
-        explicit KeyV1(const char *keyData);
+        KeyV1() { _keyData = 0; }
+        explicit KeyV1(const char *keyData) {
+            const unsigned char *p = (const unsigned char *) keyData;
+            if( *p & 0x80 ) { 
+                _keyData = p;
+            }
+            else { 
+                // traditional bson format
+                _keyData = 0;
+                _o = BSONObj(keyData);
+            }
+        }
         int woCompare(const KeyV1& r, const Ordering &o) const;
         bool woEqual(const KeyV1& r) const;
         BSONObj toBson() const;
-        string toString() const;
+        string toString() const { return toBson().toString(); }
         int dataSize() const;
         const char * data() const;
         BSONElement _firstElement() const { 
             assert( _keyData == 0 );
             return _o.firstElement(); 
         }
+        bool isCompactFormat() const { return _keyData != 0; }
     protected:
-        unsigned char *_keyData;
+        const unsigned char *_keyData;
         BSONObj _o;
     private:
         int compareHybrid(const KeyV1& right, const Ordering& order) const;
@@ -54,7 +66,7 @@ namespace mongo {
         KeyV1Owned(const KeyV1Owned&); //not copyable
     public:
         KeyV1Owned(const BSONObj& obj);
-        ~KeyV1Owned() { delete[] _keyData; }
+        ~KeyV1Owned() { free((void*) _keyData); }
     };
 
     typedef KeyBson Key;

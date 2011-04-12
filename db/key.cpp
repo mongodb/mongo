@@ -23,6 +23,12 @@ namespace mongo {
 
     // [ISKEY][HASMORE][x][y][canontype_4bits]
 
+    /* warning: don't do BinData here unless you are careful with Geo, as geo 
+                uses bindata.  you would want to perf test it on the change as 
+                the geo code doesn't use Key's but rather BSONObj's for its 
+                key manipulation.
+                */
+
     enum CanonicalsEtc { 
         cminkey=1,
         cnull=2,
@@ -35,17 +41,96 @@ namespace mongo {
         cmaxkey=14,
         cCANONTYPEMASK = 0xf,
         cY = 0x10,
+        cint = cY | cdouble,
         cX = 0x20,
+        clong = cX | cdouble,
         cHASMORE = 0x40,
         cISKEY = 0x80
     };
+
+    // fromBSON to Key format
+    KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
+        BufBuilder b(512);
+        BSONObj::iterator i(obj);
+        assert( i.more() );
+        unsigned char bits = cISKEY;
+        while( 1 ) { 
+            BSONElement e = i.next();
+            if( i.more() )
+                bits |= cHASMORE;
+            switch( e.type() ) { 
+            case MinKey:
+                b.appendUChar(cminkey|bits);
+                break;
+            case jstNULL:
+                b.appendUChar(cnull|bits);
+                break;
+            case MaxKey:
+                b.appendUChar(cmaxkey|bits);
+                break;
+            case Bool:
+                b.appendUChar( (e.boolean()?ctrue:cfalse) | bits );
+                break;
+            case jstOID:
+                b.appendUChar(coid|bits);
+                b.appendBuf(&e.__oid(), sizeof(OID));
+                break;
+            case Date:
+                b.appendUChar(cdate|bits);
+                b.appendStruct(e.date());
+                break;
+            case String:
+                b.appendUChar(cstring|bits);
+                b.appendStr(e.valuestr(), true);
+                break;
+            case NumberInt:
+                b.appendUChar(cint|bits);
+                b.appendNum((double) e._numberInt());
+                break;
+            case NumberLong:
+                {
+                    long long n = e._numberLong();
+                    double d = (double) n;
+                    if( d != n ) { 
+                        _o = obj;
+                        return;
+                    }
+                    b.appendUChar(clong|bits);
+                    b.appendNum(d);
+                    break;
+                }
+            case NumberDouble:
+                {
+                    double d = e._numberDouble();
+                    bool nan = !( d <= numeric_limits< double >::max() &&
+                        d >= -numeric_limits< double >::max() );
+                    if( !nan ) { 
+                        b.appendUChar(cdouble|bits);
+                        b.appendNum(d);
+                        break;
+                    }
+                    // else fall through and return a traditional BSON obj so our compressed keys need not check for nan
+                }
+            default:
+                // if other types involved, store as traditional BSON
+                _o = obj;
+                return;
+            }
+            if( !i.more() )
+                break;
+            bits = 0;
+        }
+        _keyData = (const unsigned char *) b.buf();
+        dassert( b.len() == dataSize() ); // check datasize method is correct
+        b.decouple();
+    }
 
     BSONObj KeyV1::toBson() const { 
         if( _keyData == 0 )
             return _o;
 
         BSONObjBuilder b(512);
-        unsigned char *p = _keyData;
+        const unsigned char *p = _keyData;
         while( 1 ) { 
             unsigned bits = *p++;
 
@@ -56,10 +141,12 @@ namespace mongo {
                 case ctrue:   b.appendBool("", true);
                 case cmaxkey: b.appendMaxKey(""); break;
                 case cstring:
-                    int sz = strlen((const char *) p) + 1;
-                    b.append("", (const char *) p, sz);
-                    p += sz;
-                    break;
+                    {
+                        int sz = strlen((const char *) p) + 1;
+                        b.append("", (const char *) p, sz);
+                        p += sz;
+                        break;
+                    }
                 case coid:
                     b.appendOID("", (OID *) p);
                     p += sizeof(OID);
@@ -69,7 +156,19 @@ namespace mongo {
                     p += 8;
                     break;
                 case cdouble:
-
+                    b.append("", (double&) *p);
+                    p += sizeof(double);
+                    break;
+                case cint:
+                    b.append("", (int) ((double&) *p));
+                    p += sizeof(double);
+                    break;
+                case clong:
+                    b.append("", (long long) ((double&) *p));
+                    p += sizeof(double);
+                    break;
+                default:
+                    assert(false);
             }
 
             if( (bits & cHASMORE) == 0 )
@@ -78,7 +177,7 @@ namespace mongo {
         return b.obj();
     }
 
-    static int compare(unsigned char *&l, unsigned char *&r) { 
+    static int compare(const unsigned char *&l, const unsigned char *&r) { 
         int lt = (*l & cCANONTYPEMASK);
         int rt = (*r & cCANONTYPEMASK);
         int x = lt - rt;
@@ -94,9 +193,9 @@ namespace mongo {
                 double L = *((double *) l);
                 double R = *((double *) r);
                 if( L < R )
-                    return 1;
-                if( L > R )
                     return -1;
+                if( L > R )
+                    return 1;
                 l += 8; r += 8;
                 break;
             }
@@ -122,9 +221,9 @@ namespace mongo {
                 long long L = *((long long *) l);
                 long long R = *((long long *) r);
                 if( L < R )
-                    return 1;
-                if( L > R )
                     return -1;
+                if( L > R )
+                    return 1;
                 l += 8; r += 8;
                 break;
             }
@@ -136,15 +235,16 @@ namespace mongo {
         return 0;
     }
 
+    // at least one of this and right are traditional BSON format
     int NOINLINE_DECL KeyV1::compareHybrid(const KeyV1& right, const Ordering& order) const { 
         BSONObj L = _keyData == 0 ? _o : toBson();
         BSONObj R = right._keyData == 0 ? right._o : right.toBson();
-        return L.woCompare(R, order);
+        return L.woCompare(R, order, /*considerfieldname*/false);
     }
 
     int KeyV1::woCompare(const KeyV1& right, const Ordering &order) const {
-        unsigned char *l = _keyData;
-        unsigned char *r = right._keyData;
+        const unsigned char *l = _keyData;
+        const unsigned char *r = right._keyData;
 
         if( l==0 || r== 0 )
             return compareHybrid(right, order);
@@ -174,6 +274,68 @@ namespace mongo {
         }
 
         return 0;
+    }
+
+    bool KeyV1::woEqual(const KeyV1& right) const {
+        const unsigned char *l = _keyData;
+        const unsigned char *r = right._keyData;
+
+        if( l==0 || r==0 ) {
+            BSONObj L = _keyData == 0 ? _o : toBson();
+            BSONObj R = right._keyData == 0 ? right._o : right.toBson();
+            return L.woEqual(R);
+        }
+
+        while( 1 ) { 
+            char lval = *l; 
+            char rval = *r;
+            if( compare(l, r) ) // updates l and r pointers
+                return false;
+            if( (lval&cHASMORE)^(rval&cHASMORE) )
+                return false;
+            if( (lval&cHASMORE) == 0 )
+                break;
+        }
+
+        return true;
+    }
+
+    static unsigned sizes[] = {
+        0,
+        1, //cminkey=1,
+        1, //cnull=2,
+        0,
+        9, //cdouble=4,
+        0,
+        0, //cstring=6,
+        0,
+        13, //coid=8,
+        0,
+        1, //cfalse=10,
+        1, //ctrue=11,
+        9, //cdate=12,
+        0,
+        1, //cmaxkey=14,
+        0
+    };
+
+    int KeyV1::dataSize() const { 
+        const unsigned char *p = _keyData;
+        if( p == 0 )
+            return _o.objsize();
+
+        bool more;
+        do { 
+            unsigned type = *p & cCANONTYPEMASK;
+            unsigned z = sizes[type];
+            if( z == 0 ) {
+                assert( type == cstring );
+                z = strlen(((const char *)p)+1) + 2;
+            }
+            more = (*p & cHASMORE) != 0;
+            p += z;
+        } while( more );
+        return p - _keyData;
     }
 
 }
