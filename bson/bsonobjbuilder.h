@@ -259,14 +259,13 @@ namespace mongo {
             return *this;
         }
 
-
         BSONObjBuilder& appendNumber( const StringData& fieldName , long long l ) {
             static long long maxInt = (int)pow( 2.0 , 30.0 );
             static long long maxDouble = (long long)pow( 2.0 , 40.0 );
-
-            if ( l < maxInt )
+            long long x = l >= 0 ? l : -l;
+            if ( x < maxInt )
                 append( fieldName , (int)l );
-            else if ( l < maxDouble )
+            else if ( x < maxDouble )
                 append( fieldName , (double)l );
             else
                 append( fieldName , l );

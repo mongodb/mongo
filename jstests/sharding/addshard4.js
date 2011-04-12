@@ -10,7 +10,7 @@ config.members[2].priority = 0;
 
 r.initiate(config);
 
-var master = r.getMaster().master;
+var master = r.getMaster();
 
 var members = config.members.map(function(elem) { return elem.host; });
 var shardName = "addshard4/"+members.join(",");
@@ -20,5 +20,21 @@ print("adding shard "+shardName);
 var result = s.adminCommand({"addshard" : shardName});
 
 printjson(result);
+assert.eq(result, true);
 
+r = new ReplSetTest({name : "addshard42", nodes : 3, startPort : 36000});
+r.startSet();
 
+config = r.getReplSetConfig();
+config.members[2].arbiterOnly = true;
+
+r.initiate(config);
+
+master = r.getMaster();
+
+print("adding shard addshard42");
+
+result = s.adminCommand({"addshard" : "addshard42/"+config.members[2].host});
+
+printjson(result);
+assert.eq(result, true);

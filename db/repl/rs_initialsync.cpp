@@ -96,7 +96,6 @@ namespace mongo {
         }
 
         if (!closest) {
-            sethbmsg("couldn't find a member to sync from");
             _currentSyncTarget = NULL;
             return NULL;
         }

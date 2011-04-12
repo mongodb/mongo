@@ -236,6 +236,7 @@ namespace mongo {
             _active = 0;
         }
 
+        // typically you do ProgressMeterHolder
         void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ) {
             _total = total;
             _secondsBetween = secondsBetween;
@@ -257,6 +258,7 @@ namespace mongo {
         }
 
         /**
+         * @param n how far along we are relative to the total # we set in CurOp::setMessage
          * @return if row was printed
          */
         bool hit( int n = 1 ) {
@@ -318,6 +320,10 @@ namespace mongo {
         int _lastTime;
     };
 
+    // e.g.: 
+    // CurOp * op = cc().curop();
+    // ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
+    // loop { pm.hit(); }
     class ProgressMeterHolder : boost::noncopyable {
     public:
         ProgressMeterHolder( ProgressMeter& pm )

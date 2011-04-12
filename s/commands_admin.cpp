@@ -333,6 +333,10 @@ namespace mongo {
                     errmsg = "can't shard the admin db";
                     return false;
                 }
+                if ( dbname == "local" ) {
+                    errmsg = "can't shard the local db";
+                    return false;
+                }
 
                 DBConfigPtr config = grid.getDBConfig( dbname );
                 if ( config->isShardingEnabled() ) {

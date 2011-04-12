@@ -55,16 +55,14 @@ public:
     };
 
     void doCollection( const string coll , ostream &out , ProgressMeter *m ) {
-        Query q;
-        if ( _query.isEmpty() && !hasParam("dbpath"))
-            q.snapshot();
-        else
-            q = _query;
+        Query q = _query;
 
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
-
+        else if ( _query.isEmpty() && !hasParam("dbpath"))
+            q.snapshot();
+        
         DBClientBase& connBase = conn(true);
         Writer writer(out, m);
 

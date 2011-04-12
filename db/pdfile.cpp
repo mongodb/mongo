@@ -158,7 +158,7 @@ namespace mongo {
     void _deleteDataFiles(const char *database) {
         if ( directoryperdb ) {
             FileAllocator::get()->waitUntilFinished();
-            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ) );
+            MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ), "delete data files with a directoryperdb" );
             return;
         }
         class : public FileOp {

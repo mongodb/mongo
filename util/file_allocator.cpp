@@ -278,11 +278,13 @@ namespace mongo {
                           << " took " << ((double)t.millis())/1000.0 << " secs"
                           << endl;
 
-
+                    // no longer in a failed state. allow new writers.
+                    fa->_failed = false;
                 }
                 catch ( ... ) {
                     log() << "error failed to allocate new file: " << name
                           << " size: " << size << ' ' << errnoWithDescription() << endl;
+                    log() << "    will try again in 10 seconds" << endl;
                     try {
                         if ( tmp.size() )
                             BOOST_CHECK_EXCEPTION( boost::filesystem::remove( tmp ) );
@@ -296,9 +298,8 @@ namespace mongo {
                     fa->_pendingUpdated.notify_all();
                     
                     
-                    // TODO: we should sleep and continue rather than stop
-                    //       space might become available
-                    return; // no more allocation
+                    sleepsecs(10);
+                    continue;
                 }
 
                 {

@@ -147,6 +147,8 @@ namespace mongo {
             extents.push_back(L);
         log() << "compact " << extents.size() << " extents" << endl;
 
+        ProgressMeterHolder pm( cc().curop()->setMessage( "compact extent" , extents.size() ) );
+
         // same data, but might perform a little different after compact?
         NamespaceDetailsTransient::get_w(ns).clearQueryCache();
 
@@ -195,6 +197,7 @@ namespace mongo {
         int n = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
             skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
+            pm.hit();
         }
 
         if( skipped ) {
@@ -202,6 +205,9 @@ namespace mongo {
         }
 
         assert( d->firstExtent.ext()->xprev.isNull() );
+
+        // indexes will do their own progress meter?
+        pm.finished();
 
         // build indexes
         NamespaceString s(ns);
@@ -262,7 +268,7 @@ namespace mongo {
                 "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
                 "{ compact : <collection_name>, [force:true], [validate:true] }\n"
                 "  force - allows to run on a replica set primary\n"
-                "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer\n";
+                "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer (default is true in this version)\n";
         }
         virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
@@ -276,12 +282,6 @@ namespace mongo {
 
             if( isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue() ) { 
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
-                return false;
-            }
-
-            // temp
-            if( !cmdObj["dev"].trueValue() ) { 
-                errmsg = "compact is not yet implemented";
                 return false;
             }
 

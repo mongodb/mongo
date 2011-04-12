@@ -89,6 +89,7 @@ namespace mongo {
         const Member* findOtherPrimary(bool& two);
 
         void noteARemoteIsPrimary(const Member *);
+        void checkElectableSet();
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
@@ -290,6 +291,10 @@ namespace mongo {
          */
         const Member* getMemberToSyncTo();
         Member* _currentSyncTarget;
+
+        // set of electable members' _ids
+        set<unsigned> _electableSet;
+        mutable mongo::mutex _elock; // protects _electableSet
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
@@ -297,6 +302,39 @@ namespace mongo {
         time_t _hbmsgTime; // when it was logged
     public:
         void sethbmsg(string s, int logLevel = 0);
+
+        /**
+         * Election with Priorities
+         *
+         * Each node (n) keeps a set of nodes that could be elected primary.
+         * Each node in this set:
+         *
+         *  1. can connect to a majority of the set
+         *  2. has a priority greater than 0
+         *  3. has an optime within 10 seconds of the most up-to-date node
+         *     that n can reach
+         *
+         * If a node fails to meet one or more of these criteria, it is removed
+         * from the list.  This list is updated whenever the node receives a
+         * heartbeat.
+         *
+         * When a node sends an "am I freshest?" query, the node receiving the
+         * query checks their electable list to make sure that no one else is
+         * electable AND higher priority.  If this check passes, the node will
+         * return an "ok" response, if not, it will veto.
+         *
+         * If a node is primary and there is another node with higher priority
+         * on the electable list (i.e., it must be synced to within 10 seconds
+         * of the current primary), the node (or nodes) with connections to both
+         * the primary and the secondary with higher priority will issue
+         * replSetStepDown requests to the primary to allow the higher-priority
+         * node to take over.  
+         */
+        void addToElectable(const unsigned m) { scoped_lock lk(_elock); _electableSet.insert(m); }
+        void rmFromElectable(const unsigned m) { scoped_lock lk(_elock); _electableSet.erase(m); }
+        bool iAmElectable() { scoped_lock lk(_elock); return _electableSet.find(_self->id()) != _electableSet.end(); }
+        bool isElectable(const unsigned id) { scoped_lock lk(_elock); return _electableSet.find(id) != _electableSet.end(); }
+        Member* getMostElectable();
     protected:
         bool initFromConfig(ReplSetConfig& c, bool reconf=false); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);

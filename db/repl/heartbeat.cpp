@@ -105,6 +105,7 @@ namespace mongo {
             }
             result.append("set", theReplSet->name());
             result.append("state", theReplSet->state().s);
+            result.append("e", theReplSet->iAmElectable());
             result.append("hbmsg", theReplSet->hbmsg());
             result.append("time", (long long) time(0));
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
@@ -197,6 +198,30 @@ namespace mongo {
                     if( info.hasElement("opTime") )
                         mem.opTime = info["opTime"].Date();
 
+                    // see if this member is in the electable set
+                    if( info["e"].eoo() ) {
+                        // for backwards compatibility
+                        const Member *member = theReplSet->findById(mem.id());
+                        if (member && member->config().potentiallyHot()) {
+                            theReplSet->addToElectable(mem.id());
+                        }
+                        else {
+                            theReplSet->rmFromElectable(mem.id());
+                        }
+                    }
+                    // add this server to the electable set if it is within 10
+                    // seconds of the latest optime we know of
+                    else if( info["e"].trueValue() &&
+                             mem.opTime >= theReplSet->lastOpTimeWritten.getSecs() - 10) {
+                        unsigned lastOp = theReplSet->lastOtherOpTime().getSecs();
+                        if (lastOp > 0 && mem.opTime >= lastOp - 10) {
+                            theReplSet->addToElectable(mem.id());
+                        }
+                    }
+                    else {
+                        theReplSet->rmFromElectable(mem.id());
+                    }
+                    
                     be cfg = info["config"];
                     if( cfg.ok() ) {
                         // received a new config
@@ -242,6 +267,7 @@ namespace mongo {
                 log() << "replSet info " << h.toString() << " is down (or slow to respond): " << msg << rsLog;
             }
             mem.lastHeartbeatMsg = msg;
+            theReplSet->rmFromElectable(mem.id());
         }
     };
 
