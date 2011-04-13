@@ -9,9 +9,9 @@
 #include "btree.i"
 
 static int  __wt_rec_col_fix(SESSION *, WT_PAGE *);
-static int  __wt_rec_col_int(SESSION *, WT_PAGE *, int);
+static int  __wt_rec_col_int(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_merge(SESSION *,
-		WT_PAGE *, uint64_t *, uint32_t *, uint8_t **, uint32_t *, int);
+		WT_PAGE *, uint64_t *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
@@ -20,10 +20,10 @@ static int  __wt_rec_parent_update_dirty(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static int  __wt_rec_row_leaf_insert(
 		SESSION *, WT_INSERT *, uint32_t *, uint8_t **, uint32_t *);
-static int  __wt_rec_row_int(SESSION *, WT_PAGE *, int);
+static int  __wt_rec_row_int(SESSION *, WT_PAGE *);
 static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *, uint32_t);
 static int  __wt_rec_row_merge(
-		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *, int);
+		SESSION *, WT_PAGE *, uint32_t *, uint8_t **, uint32_t *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_wrapup(SESSION *, WT_PAGE *, int *);
 
@@ -171,10 +171,10 @@ skip_clean_check:
 		WT_RET(__wt_rec_col_var(session, page));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_rec_col_int(session, page, discard));
+		WT_RET(__wt_rec_col_int(session, page));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_rec_row_int(session, page, discard));
+		WT_RET(__wt_rec_row_int(session, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_rec_row_leaf(session, page, slvg_skip));
@@ -656,7 +656,7 @@ __wt_split_write(SESSION *session, int deleted, WT_BUF *buf, void *end)
  *	Reconcile a column-store internal page.
  */
 static int
-__wt_rec_col_int(SESSION *session, WT_PAGE *page, int discard)
+__wt_rec_col_int(SESSION *session, WT_PAGE *page)
 {
 	uint64_t recno;
 	uint32_t entries, space_avail;
@@ -677,8 +677,8 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page, int discard)
 	 * and merge page walks look the same, and we just call the merge page
 	 * function on the top-level page.
 	 */
-	WT_RET(__wt_rec_col_merge(session, page,
-	    &recno, &entries, &first_free, &space_avail, discard));
+	WT_RET(__wt_rec_col_merge(
+	    session, page, &recno, &entries, &first_free, &space_avail));
 
 	/* Write the remnant page. */
 	return (__wt_split(
@@ -690,9 +690,8 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page, int discard)
  *	Recursively walk a column-store internal tree of merge pages.
  */
 static int
-__wt_rec_col_merge(
-    SESSION *session, WT_PAGE *page, uint64_t *recnop, uint32_t *entriesp,
-    uint8_t **first_freep, uint32_t *space_availp, int discard)
+__wt_rec_col_merge(SESSION *session, WT_PAGE *page, uint64_t *recnop,
+    uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
 {
 	WT_COL_REF *cref;
 	WT_OFF_RECORD off;
@@ -722,7 +721,7 @@ __wt_rec_col_merge(
 			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_col_merge(
 				    session, ref_page, &recno, &entries,
-				    &first_free, &space_avail, discard));
+				    &first_free, &space_avail));
 			else {
 				WT_ASSERT(session,
 				    F_ISSET(ref_page, WT_PAGE_DELETED));
@@ -737,8 +736,7 @@ __wt_rec_col_merge(
 				WT_ASSERT(session,
 				    !F_ISSET(ref_page, WT_PAGE_DELETED));
 			}
-			if (discard)
-				__wt_page_discard(session, ref_page);
+			__wt_page_discard(session, ref_page);
 			continue;
 		}
 
@@ -1057,7 +1055,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
  *	Reconcile a row-store internal page.
  */
 static int
-__wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
+__wt_rec_row_int(SESSION *session, WT_PAGE *page)
 {
 	WT_CELL *key_cell, *value_cell;
 	WT_OFF *from;
@@ -1080,8 +1078,8 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
 	 * from the underlying disk image.  The first case is handled here.
 	 */
 	if (page->XXdsk == NULL) {
-		WT_RET(__wt_rec_row_merge(session,
-		    page, &entries, &first_free, &space_avail, discard));
+		WT_RET(__wt_rec_row_merge(
+		    session, page, &entries, &first_free, &space_avail));
 		return (__wt_split(
 		    session, &unused, &entries, &first_free, &space_avail, 1));
 	}
@@ -1102,14 +1100,12 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
 		if (WT_ROW_REF_STATE(rref) == WT_REF_EVICTED) {
 			ref_page = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
-				WT_RET(__wt_rec_row_merge(
-				    session, ref_page, &entries,
-				    &first_free, &space_avail, discard));
+				WT_RET(__wt_rec_row_merge(session, ref_page,
+				    &entries, &first_free, &space_avail));
 			else
 				WT_ASSERT(session,
 				    F_ISSET(ref_page, WT_PAGE_DELETED));
-			if (discard)
-				__wt_page_discard(session, ref_page);
+			__wt_page_discard(session, ref_page);
 
 			/* Delete any underlying overflow key. */
 			if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
@@ -1153,8 +1149,8 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page, int discard)
  *	Recursively walk a row-store internal tree of merge pages.
  */
 static int
-__wt_rec_row_merge(SESSION *session, WT_PAGE *page, uint32_t *entriesp,
-    uint8_t **first_freep, uint32_t *space_availp, int discard)
+__wt_rec_row_merge(SESSION *session, WT_PAGE *page,
+    uint32_t *entriesp, uint8_t **first_freep, uint32_t *space_availp)
 {
 	WT_CELL cell;
 	WT_OFF off;
@@ -1186,14 +1182,12 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page, uint32_t *entriesp,
 		if (WT_ROW_REF_STATE(rref) == WT_REF_EVICTED) {
 			ref_page = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
-				WT_RET(__wt_rec_row_merge(
-				    session, ref_page, &entries,
-				    &first_free, &space_avail, discard));
+				WT_RET(__wt_rec_row_merge(session, ref_page,
+				    &entries, &first_free, &space_avail));
 			else
 				WT_ASSERT(session,
 				    F_ISSET(ref_page, WT_PAGE_DELETED));
-			if (discard)
-				__wt_page_discard(session, ref_page);
+			__wt_page_discard(session, ref_page);
 			continue;
 		}
 
