@@ -85,8 +85,10 @@ __wt_page_reconcile(
     SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int discard)
 {
 	BTREE *btree;
+	int ret;
 
 	btree = session->btree;
+	ret = 0;
 
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile %s page addr %lu (type %s)",
@@ -199,17 +201,6 @@ skip_clean_check:
 		page->addr = WT_ADDR_INVALID;
 	}
 
-	/* Optionally discard the in-memory page. */
-	if (discard) {
-		/*
-		 * If we discard the in-memory root page, kill the reference
-		 * to catch mistakes.
-		 */
-		if (WT_PAGE_IS_ROOT(page))
-			btree->root_page.page = NULL;
-		__wt_page_discard(session, page);
-	}
-
 	/*
 	 * Newly created internal pages are normally merged into their parents
 	 * when said parent is reconciled.  Newly split root pages can't be
@@ -228,11 +219,22 @@ skip_clean_check:
 	if (F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
 		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
-		WT_RET(__wt_page_reconcile(
-		    session, btree->root_page.page, 0, discard));
+		ret = __wt_page_reconcile(
+		    session, btree->root_page.page, 0, discard);
 	}
 
-	return (0);
+	/* Optionally discard the original page. */
+	if (discard) {
+		/*
+		 * If we discard the in-memory root page, kill the reference
+		 * to catch mistakes.
+		 */
+		if (WT_PAGE_IS_ROOT(page))
+			btree->root_page.page = NULL;
+		__wt_page_discard(session, page);
+	}
+
+	return (ret);
 }
 
 /*
@@ -722,6 +724,9 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 		while (sizeof(WT_OFF_RECORD) > r->space_avail)
 			WT_RET(__wt_split(session, 0));
 
+		/* Any off-page reference must be a valid disk address. */
+		WT_ASSERT(session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
+
 		/* Copy a new WT_OFF_RECORD structure into place. */
 		off.addr = WT_COL_REF_ADDR(cref);
 		off.size = WT_COL_REF_SIZE(cref);
@@ -1085,6 +1090,9 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 		while (len > r->space_avail)
 			WT_RET(__wt_split(session, 0));
 
+		/* Any off-page reference must be a valid disk address. */
+		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
+
 		/*
 		 * XXX
 		 * Overwrite the original on-page information with new page
@@ -1161,6 +1169,9 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 		memcpy(r->first_free + sizeof(WT_CELL), key.data, key.size);
 		r->first_free += WT_CELL_SPACE_REQ(key.size);
 		r->space_avail -= WT_CELL_SPACE_REQ(key.size);
+
+		/* Any off-page reference must be a valid disk address. */
+		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
 		/* Copy the off-page reference into place. */
 		off.addr = WT_ROW_REF_ADDR(rref);

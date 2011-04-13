@@ -908,9 +908,12 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
+	WT_REF *root_page;
 	WT_TRACK *trk;
 	uint32_t i;
 	int ret;
+
+	root_page = &session->btree->root_page;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -918,7 +921,7 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 
 	/* Fill it in. */
 	page->parent = NULL;				/* Root page */
-	page->parent_ref = NULL;
+	page->parent_ref = root_page;
 	page->read_gen = 0;
 	page->u.col_int.recno = 1;
 	page->addr = WT_ADDR_INVALID;
@@ -926,6 +929,12 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	page->indx_count = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
 	WT_PAGE_SET_MODIFIED(page);
+
+	/* Reference this page from the root of the tree. */
+	root_page->state = WT_REF_MEM;
+	root_page->addr = WT_ADDR_INVALID;
+	root_page->size = 0;
+	root_page->page = page;
 
 	for (cref = page->u.col_int.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1375,10 +1384,13 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
+	WT_REF *root_page;
 	WT_TRACK *trk;
 
 	uint32_t i;
 	int deleted, ret;
+
+	root_page = &session->btree->root_page;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1386,13 +1398,19 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 
 	/* Fill it in. */
 	page->parent = NULL;				/* Root page */
-	page->parent_ref = NULL;
+	page->parent_ref = root_page;
 	page->read_gen = 0;
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
 	page->indx_count = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
 	WT_PAGE_SET_MODIFIED(page);
+
+	/* Reference this page from the root of the tree. */
+	root_page->state = WT_REF_MEM;
+	root_page->addr = WT_ADDR_INVALID;
+	root_page->size = 0;
+	root_page->page = page;
 
 	for (rref = page->u.row_int.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
