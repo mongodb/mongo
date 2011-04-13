@@ -60,6 +60,10 @@ namespace mongo {
     inline int pipe(int fds[2]) { return _pipe(fds, 4096, _O_TEXT | _O_NOINHERIT); }
 #endif
 
+    namespace JSFiles {
+        extern const JSFile servers;
+    }
+
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 

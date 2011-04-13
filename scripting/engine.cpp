@@ -248,11 +248,13 @@ namespace mongo {
         extern const JSFile mr;
         extern const JSFile query;
         extern const JSFile utils;
+        extern const JSFile utils_sh;
     }
 
     void Scope::execCoreFiles() {
         // keeping same order as in SConstruct
         execSetup(JSFiles::utils);
+        execSetup(JSFiles::utils_sh);
         execSetup(JSFiles::db);
         execSetup(JSFiles::mongo);
         execSetup(JSFiles::mr);

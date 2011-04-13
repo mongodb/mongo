@@ -1503,6 +1503,47 @@ const StringData _jscode_raw_utils =
 ;
 extern const JSFile utils;
 const JSFile utils = { "shell/utils.js" , _jscode_raw_utils };
+const StringData _jscode_raw_utils_sh = 
+"sh = function() { return \"try sh.help();\" }\n" 
+"\n" 
+"\n" 
+"sh._checkMongos = function() {\n" 
+"var x = db.runCommand( \"ismaster\" );\n" 
+"if ( x.msg != \"isdbgrid\" )\n" 
+"throw \"not connected to a mongos\"\n" 
+"}\n" 
+"\n" 
+"sh._adminCommand = function( cmd ) {\n" 
+"sh._checkMongos();\n" 
+"var res = db.getSisterDB( \"admin\" ).runCommand( cmd );\n" 
+"\n" 
+"if ( res == null || ! res.ok ) {\n" 
+"print( \"command failed: \" + tojson( res ) )\n" 
+"}\n" 
+"\n" 
+"return res;\n" 
+"}\n" 
+"\n" 
+"sh.help = function() {\n" 
+"print( \"\\tsh.enableSharding(dbname)                 enables sharding on the database dbname\" )\n" 
+"print( \"\\tsh.status()                               prints a general overview of the cluster\" )\n" 
+"}\n" 
+"\n" 
+"sh.status = function( verbose , configDB ) {\n" 
+"// TODO: move the actual commadn here\n" 
+"printShardingStatus( configDB , verbose );\n" 
+"}\n" 
+"\n" 
+"sh.enableSharding = function( dbname ) {\n" 
+"assert( dbname , \"need a valid dbname\" )\n" 
+"sh._adminCommand( { enableSharding : dbname } )\n" 
+"}\n" 
+"\n" 
+"\n" 
+"\n" 
+;
+extern const JSFile utils_sh;
+const JSFile utils_sh = { "shell/utils_sh.js" , _jscode_raw_utils_sh };
 const StringData _jscode_raw_db = 
 "// db.js\n" 
 "\n" 
