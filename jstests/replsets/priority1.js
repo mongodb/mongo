@@ -45,7 +45,7 @@ var checkPrimaryIs = function(node) {
             }
 
             var str = "goal: "+node.host+"==1 states: ";
-            if (!status.members) {
+            if (!status || !status.members) {
                 return false;
             }
             status.members.forEach( function(m) {
