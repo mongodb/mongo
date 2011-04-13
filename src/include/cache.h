@@ -24,6 +24,18 @@ struct __wt_evict_list {
  */
 typedef struct {
 	/*
+	 * The reconciliation code tracks current information about the starting
+	 * record number, the number of entries copied into the current working
+	 * memory, where it is in the current working memory and how much memory
+	 * remains.  Those items are packaged here rather than passing pointer
+	 * to stack locations through the code.
+	 */
+	uint64_t recno;			/* Current record number */
+	uint8_t *first_free;		/* Current first free byte */
+	uint32_t space_avail;		/* Remaining space in this chunk */
+	uint32_t entries;		/* Current number of entries */
+
+	/*
 	 * Each reconciliation function writes out some number of pages,
 	 * normally one, occasionally more than one, and returns to its
 	 * caller a list of addr/size pairs for the newly-written pages.
