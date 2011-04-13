@@ -129,7 +129,7 @@ __wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
 {
 	/*
 	 * The caller may be restarting a walk, so the structure may already
-	 * be allocated.  Allocate 20 slots: it's always going to be enough.
+	 * be allocated.
 	 */
 	if (walk->tree_len == 0)
 		WT_RET(__wt_realloc(session, &walk->tree_len,
