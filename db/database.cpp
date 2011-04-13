@@ -76,28 +76,47 @@ namespace mongo {
     }
     
     void Database::checkDuplicateUncasedNames() const {
+        string duplicate = duplicateUncasedName( name, path );
+        if ( !duplicate.empty() ) {
+            stringstream ss;
+            ss << "db already exists with different case other: [" << duplicate << "] me [" << name << "]";
+            uasserted( DatabaseDifferCaseCode , ss.str() );
+        }
+    }
+
+    string Database::duplicateUncasedName( const string &name, const string &path, set< string > *duplicates ) {
+        if ( duplicates ) {
+            duplicates->clear();   
+        }
+        
         vector<string> others;
         getDatabaseNames( others , path );
-
+        
         set<string> allShortNames;
         dbHolder.getAllShortNames( allShortNames );
         
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
         
         for ( unsigned i=0; i<others.size(); i++ ) {
-            
+
             if ( strcasecmp( others[i].c_str() , name.c_str() ) )
                 continue;
             
             if ( strcmp( others[i].c_str() , name.c_str() ) == 0 )
                 continue;
-            
-            stringstream ss;
-            ss << "db already exists with different case other: [" << others[i] << "] me [" << name << "]";
-            uasserted( DatabaseDifferCaseCode , ss.str() );
-        }        
-    }
 
+            if ( duplicates ) {
+                duplicates->insert( others[i] );
+            } else {
+                return others[i];
+            }
+        }
+        if ( duplicates ) {
+            return duplicates->empty() ? "" : *duplicates->begin();
+        }
+        return "";
+    }
+    
     boost::filesystem::path Database::fileName( int n ) const {
         stringstream ss;
         ss << name << '.' << n;

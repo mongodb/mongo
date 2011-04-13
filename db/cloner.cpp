@@ -62,7 +62,7 @@ namespace mongo {
                          for example repairDatabase need not use it.
         */
         void setConnection( DBClientWithCommands *c ) { conn.reset( c ); }
-        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted);
+        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode = 0);
 
         bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool mayBeInterrupted, bool copyIndexes = true, bool logForRepl = true );
     };
@@ -272,8 +272,10 @@ namespace mongo {
     extern bool inDBRepair;
     void ensureIdIndexForNewNs(const char *ns);
 
-    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted) {
-
+    bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode) {
+        if ( errCode ) {
+            *errCode = 0;
+        }
         massert( 10289 ,  "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
 
         string todb = cc().database()->name;
@@ -323,6 +325,18 @@ namespace mongo {
             if ( c.get() == 0 ) {
                 errmsg = "query failed " + ns;
                 return false;
+            }
+            
+            if ( c->more() ) {
+                BSONObj first = c->next();
+                if ( first.hasField("$err") ) {
+                    if ( errCode ) {
+                        *errCode = first.getIntField("code");
+                    }
+                    errmsg = "query failed " + ns;
+                    return false;
+                }
+                c->putBack( first );
             }
 
             while ( c->more() ) {
@@ -414,9 +428,9 @@ namespace mongo {
     }
 
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication,
-                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted) {
+                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode) {
         Cloner c;
-        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot, mayYield, mayBeInterrupted);
+        return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot, mayYield, mayBeInterrupted, errCode);
     }
 
     /* Usage:

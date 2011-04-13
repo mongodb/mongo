@@ -112,6 +112,13 @@ namespace mongo {
          */
         void checkDuplicateUncasedNames() const;
 
+        /**
+         * @return name of an existing database with same text name but different
+         * casing, if one exists.  Otherwise the empty string is returned.  If
+         * 'duplicates' is specified, it is filled with all duplicate names.
+         */
+        static string duplicateUncasedName( const string &name, const string &path, set< string > *duplicates = 0 );
+        
     public: // this should be private later
 
         vector<MongoDataFile*> files;

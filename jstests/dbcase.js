@@ -1,6 +1,5 @@
+// Check db name duplication constraint SERVER-2111
 
-/* 
-TODO SERVER-2111
 a = db.getSisterDB( "dbcasetest_dbnamea" )
 b = db.getSisterDB( "dbcasetest_dbnameA" )
 
@@ -15,11 +14,14 @@ b.foo.save( { x : 1 } )
 z = db.getLastErrorObj();
 assert.eq( 13297 , z.code || 0 , "B : " + tojson(z) )
 
+assert.neq( -1, db.getMongo().getDBNames().indexOf( a.getName() ) );
+assert.eq( -1, db.getMongo().getDBNames().indexOf( b.getName() ) );
 printjson( db.getMongo().getDBs().databases );
 
 a.dropDatabase();
 b.dropDatabase();
 
+// 'a' wil be present as a read only db because we issued a command with it in the ns.
+assert.neq( -1, db.getMongo().getDBNames().indexOf( a.getName() ) );
+assert.eq( -1, db.getMongo().getDBNames().indexOf( b.getName() ) );
 printjson( db.getMongo().getDBs().databases );
-*/
-
