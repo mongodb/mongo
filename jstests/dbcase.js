@@ -21,7 +21,9 @@ printjson( db.getMongo().getDBs().databases );
 a.dropDatabase();
 b.dropDatabase();
 
-// 'a' wil be present as a read only db because we issued a command with it in the ns.
-assert.neq( -1, db.getMongo().getDBNames().indexOf( a.getName() ) );
-assert.eq( -1, db.getMongo().getDBNames().indexOf( b.getName() ) );
+ai = db.getMongo().getDBNames().indexOf( a.getName() );
+bi = db.getMongo().getDBNames().indexOf( b.getName() );
+// One of these dbs may exist if there is a slave active, but they must
+// not both exist.
+assert( ai == -1 || bi == -1 );
 printjson( db.getMongo().getDBs().databases );
