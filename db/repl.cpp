@@ -558,7 +558,7 @@ namespace mongo {
 
             BSONObj info;
             bool ok = oplogReader.conn()->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
-            massert( 14029, "Unable to get database list", ok );
+            massert( 14033, "Unable to get database list", ok );
             BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
             while( i.more() ) {
                 BSONElement e = i.next();
@@ -600,7 +600,7 @@ namespace mongo {
             dropDatabase(*i);
         }
         
-        massert( 14030, "Duplicate database names present after attempting to delete duplicates",
+        massert( 14034, "Duplicate database names present after attempting to delete duplicates",
                 Database::duplicateUncasedName( db, dbpath ).empty() );
         return true;
     }
