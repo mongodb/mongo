@@ -36,14 +36,13 @@ typedef struct {
 	uint32_t entries;		/* Current number of entries */
 
 	/*
-	 * Each reconciliation function writes out some number of pages,
-	 * normally one, occasionally more than one, and returns to its
-	 * caller a list of addr/size pairs for the newly-written pages.
-	 * That list is used to update the parent's references.  There's
-	 * something hugely wrong if this list is ever longer than a few
-	 * pages, that would make no sense at all (maybe, in a long-running
-	 * system, an internal page might acquire that many entries!?)
-	 * Dynamically allocated just in case.
+	 * Normally, reconciliation writes out a single replacement page, but
+	 * it may be forced to split a page into multiple pages.  When this
+	 * happens, reconciliation maintains a list of the pages it wrote which
+	 * are incorporated into a newly created internal page that references
+	 * those pages.  There's something wrong if this list is ever longer
+	 * than a few pages, that would make no sense at all, but dynamically
+	 * allocated just in case.
 	 */
 	struct rec_list {
 		WT_OFF_RECORD off;		/* Address, size, recno */
@@ -108,8 +107,6 @@ typedef struct {
 	u_int s_entries;			/* Total save slots */
 
 	WT_BUF *dsk_tmp;			/* Disk-image buffer */
-	WT_BUF *expsort;			/* RLE expansion array buffer */
-
 } WT_REC_LIST;
 
 /*
