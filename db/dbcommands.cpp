@@ -1574,16 +1574,13 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
-            help << "w:true write lock";
+            help << "w:true write lock. secs:<seconds>";
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-
-
             int secs = 100;
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
-
             if( cmdObj.getBoolField("w") ) {
                 writelock lk("");
                 sleepsecs(secs);
@@ -1592,7 +1589,6 @@ namespace mongo {
                 readlock lk("");
                 sleepsecs(secs);
             }
-
             return true;
         }
     } cmdSleep;
