@@ -15,7 +15,7 @@ type ctags > /dev/null 2>&1 || {
 # Use the -d, -t and -w flags to ctags if available.
 flags=""
 echo "f() { int a; }" > $t
-for i in -d -t -w --langauge-force=C; do
+for i in -d -t -w --language-force=C; do
 	if ctags $i $t 2>/dev/null; then
 		flags="$i $flags"
 	fi
