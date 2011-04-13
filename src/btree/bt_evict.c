@@ -307,18 +307,10 @@ __wt_evict_file(WT_EVICT_REQ *er)
 		if (ref == NULL)
 			break;
 
-		page = ref->page;
-
 		/*
 		 * If it's the close method, we're discarding all of the file's
 		 * pages from the cache, and reconciliation is how we do that.
-		 */
-		if (close_method) {
-			WT_ERR(__wt_page_reconcile(session, page, 0, 1));
-			continue;
-		}
-
-		/*
+		 *
 		 * If it's the sync method, dirty pages must be reconciled and
 		 * written to disk, as well as any "logically evicted" pages.
 		 * The latter is tricky: if a page is found to be empty during
@@ -338,18 +330,13 @@ __wt_evict_file(WT_EVICT_REQ *er)
 		 * it), or merge them into their parent (if the page was empty
 		 * at one point and remains empty, or if the page was created
 		 * as part of a split operation).
-		 *
-		 * Finally, note that even if it's the sync method, we discard
-		 * empty and temporary pages from the tree -- there's no reason
-		 * to keep them around, they don't make anything faster.
 		 */
-		if (F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
-			WT_ERR(__wt_page_reconcile(session, page, 0, 1));
-			continue;
-		}
-
-		if (WT_PAGE_IS_MODIFIED(page))
-			WT_ERR(__wt_page_reconcile(session, page, 0, 0));
+		page = ref->page;
+		if (close_method ||
+		    WT_PAGE_IS_MODIFIED(page) ||
+		    F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+			WT_ERR(__wt_page_reconcile(
+			    session, page, 0, close_method));
 	}
 
 err:	__wt_walk_end(session, &btree->evict_walk);
