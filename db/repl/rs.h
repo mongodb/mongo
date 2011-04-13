@@ -367,7 +367,7 @@ namespace mongo {
         list<HostAndPort> memberHostnames() const;
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
-        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
+        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
