@@ -129,11 +129,14 @@ __wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
 {
 	/*
 	 * The caller may be restarting a walk, so the structure may already
-	 * be allocated.
+	 * be allocated.  Check both reference and length, even though they
+	 * should be synchronized.
 	 */
-	if (walk->tree_len == 0)
+	if (walk->tree == NULL || walk->tree_len == 0) {
+		walk->tree_len = 0;
 		WT_RET(__wt_realloc(session, &walk->tree_len,
 		    20 * sizeof(WT_WALK_ENTRY), &walk->tree));
+	}
 	walk->tree_slot = 0;
 
 	walk->tree[0].ref = ref;
@@ -183,11 +186,13 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 		if (walk->tree_slot == 0) {
 			*refp = NULL;
 			return (0);
-		} else {
-			--walk->tree_slot;
-			return (__wt_walk_next(session, walk, flags, refp));
 		}
-	} else if (e->indx == page->indx_count) {
+
+		--walk->tree_slot;
+		return (__wt_walk_next(session, walk, flags, refp));
+	}
+
+	if (e->indx == page->indx_count) {
 eop:		e->visited = 1;
 		*refp = e->ref;
 		return (0);
@@ -252,10 +257,14 @@ eop:		e->visited = 1;
 		 * the child onto the stack and recursively descend the tree.
 		 */
 		elem = (u_int)(walk->tree_len / WT_SIZEOF32(WT_WALK_ENTRY));
-		if (walk->tree_slot >= elem)
+		if (walk->tree_slot + 1 >= elem)
 			WT_RET(__wt_realloc(session, &walk->tree_len,
 			    (elem + 20) * sizeof(WT_WALK_ENTRY), &walk->tree));
-
+		/*
+		 * Don't increment our slot until we have the memory: if the
+		 * allocation fails and our caller doesn't handle the error
+		 * reasonably, we don't want to be pointing off into space.
+		 */
 		e = &walk->tree[++walk->tree_slot];
 		e->ref = ref;
 		e->indx = 0;
