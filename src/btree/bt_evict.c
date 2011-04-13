@@ -443,7 +443,7 @@ __wt_evict_walk_single(SESSION *session, BTREE *btree, u_int slot)
 	 */
 	i = restarted_once = 0;
 
-	/* If we haven't yet opened a tree-walk structure, do so. */
+	/* If we haven't yet started this walk, do so. */
 	if (btree->evict_walk.tree == NULL)
 restart:	WT_RET(__wt_walk_begin(session,
 		    &btree->root_page, &btree->evict_walk));
@@ -455,8 +455,8 @@ restart:	WT_RET(__wt_walk_begin(session,
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
-		 * restart we've already acquired all of the pages, and we
-		 * could loop infinitely on a tree with a single, pinned, page).
+		 * restart we've already visited all of the in-memory pages,
+		 * we could loop infinitely on a tree with too few pages).
 		 */
 		if (ref == NULL) {
 			if (restarted_once++)
