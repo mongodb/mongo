@@ -21,7 +21,7 @@ serial['evict_file'] = Serial(
 	'evict_file',
 	'WT_WORKQ_EVICT', '0',
 	['BTREE */btree',
-	 'int/all_pages'])
+	 'int/close_method'])
 
 serial['insert'] = Serial(
 	'insert',

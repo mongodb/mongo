@@ -107,13 +107,13 @@ typedef struct {
 struct __wt_evict_req {
 	SESSION *session;			/* Requesting thread */
 	BTREE	*btree;				/* Btree */
-	int	 all_pages;			/* Flush clean pages */
+	int	 close_method;			/* Discard pages */
 };
 #define	WT_EVICT_REQ_ISEMPTY(r)						\
 	((r)->session == NULL)
-#define	WT_EVICT_REQ_SET(r, _session, _btree, _all_pages) do {		\
+#define	WT_EVICT_REQ_SET(r, _session, _btree, _close_method) do {	\
 	(r)->btree = _btree;						\
-	(r)->all_pages = _all_pages;					\
+	(r)->close_method = _close_method;				\
 	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
 	(r)->session = _session;					\
 	WT_MEMORY_FLUSH;	/* Turn entry on */			\

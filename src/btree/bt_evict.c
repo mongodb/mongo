@@ -277,11 +277,15 @@ __wt_evict_file(WT_EVICT_REQ *er)
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	WT_REF *ref;
-	int all_pages, ret;
+	int close_method, ret;
 
+	/*
+	 * We're not acquiring hazard references here: it's necessary that no
+	 * other threads of control be in the tree during this operation.
+	 */
 	session = er->session;
 	btree = er->btree;
-	all_pages = er->all_pages ? 1 : 0;
+	close_method = er->close_method ? 1 : 0;
 
 	cache = S2C(session)->cache;
 	ret = 0;
@@ -293,8 +297,8 @@ __wt_evict_file(WT_EVICT_REQ *er)
 	memset(cache->evict, 0, cache->evict_len);
 
 	/*
-	 * Walk the tree.  It doesn't matter if we are already walking the
-	 * tree, __wt_walk_begin restarts the process.
+	 * Walk the tree.  It doesn't matter if we are already walking the tree,
+	 * __wt_walk_begin restarts the process.
 	 */
 	WT_ERR(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
 	for (;;) {
@@ -304,9 +308,48 @@ __wt_evict_file(WT_EVICT_REQ *er)
 			break;
 
 		page = ref->page;
-		if (all_pages || WT_PAGE_IS_MODIFIED(page))
-			WT_ERR(
-			    __wt_page_reconcile(session, page, 0, all_pages));
+
+		/*
+		 * If it's the close method, we're discarding all of the file's
+		 * pages from the cache, and reconciliation is how we do that.
+		 */
+		if (close_method) {
+			WT_ERR(__wt_page_reconcile(session, page, 0, 1));
+			continue;
+		}
+
+		/*
+		 * If it's the sync method, dirty pages must be reconciled and
+		 * written to disk, as well as any "logically evicted" pages.
+		 * The latter is tricky: if a page is found to be empty during
+		 * reconciliation or is created as part of a split operation,
+		 * the page's state is set to WT_REF_EVICTED, and we expect the
+		 * page to eventually be merged into its parent when the parent
+		 * itself is reconciled.
+		 *
+		 * If the page is accessed before that merge happens, the page's
+		 * state is reset to WT_REF_MEM, and the page may or may not be
+		 * dirtied.  We can see such pages in our traversal of the tree,
+		 * and the test for a dirty page may or may not return true.
+		 *
+		 * Part of creating a correct file on disk is to either write
+		 * those pages to the backing store (if the page was empty at
+		 * one point, but new material was subsequently inserted into
+		 * it), or merge them into their parent (if the page was empty
+		 * at one point and remains empty, or if the page was created
+		 * as part of a split operation).
+		 *
+		 * Finally, note that even if it's the sync method, we discard
+		 * empty and temporary pages from the tree -- there's no reason
+		 * to keep them around, they don't make anything faster.
+		 */
+		if (F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+			WT_ERR(__wt_page_reconcile(session, page, 0, 1));
+			continue;
+		}
+
+		if (WT_PAGE_IS_MODIFIED(page))
+			WT_ERR(__wt_page_reconcile(session, page, 0, 0));
 	}
 
 err:	__wt_walk_end(session, &btree->evict_walk);

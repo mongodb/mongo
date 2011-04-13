@@ -215,6 +215,8 @@ __wt_cache_read(WT_READ_REQ *rr)
 		 * I'm hesitant to have multiple threads of control updating
 		 * a page's state.
 		 */
+		WT_ASSERT(session,
+		    F_ISSET(ref->page, WT_PAGE_DELETED | WT_PAGE_SPLIT));
 		ref->state = WT_REF_MEM;
 		return (0);
 	}
