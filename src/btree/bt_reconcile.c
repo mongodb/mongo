@@ -15,7 +15,7 @@ static int  __wt_rec_col_merge(SESSION *,
 static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
-static void __wt_rec_parent_update_clean(WT_PAGE *);
+static void __wt_rec_parent_update_clean(SESSION *, WT_PAGE *);
 static int  __wt_rec_parent_update_dirty(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static int  __wt_rec_row_leaf_insert(
@@ -100,19 +100,6 @@ __wt_page_reconcile(
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/*
-	 * Clean pages are simple: update the parent's state and discard the
-	 * page.  (It makes on sense to do reconciliation on a clean page if
-	 * you're not going to discard it.)
-	 */
-	if (!WT_PAGE_IS_MODIFIED(page)) {
-		if (discard) {
-			__wt_rec_parent_update_clean(page);
-			__wt_page_discard(session, page);
-		}
-		return (0);
-	}
-
-	/*
 	 * Handle pages marked for deletion.
 	 *
 	 * Both leaf and internal pages have their WT_PAGE_DELETED flags set if
@@ -125,9 +112,14 @@ __wt_page_reconcile(
 	 * page.  Clear the WT_PAGE_DELETED flag and reconcile the page again.
 	 * (Yes, it's extra work if the page remains empty, but we're assuming
 	 * pages won't be emptied, re-filled and then emptied again.)
+	 *
+	 * Check deleted pages before checking for clean pages: deleted pages
+	 * can never be clean.
 	 */
-	if (F_ISSET(page, WT_PAGE_DELETED))
+	if (F_ISSET(page, WT_PAGE_DELETED)) {
 		F_CLR(page, WT_PAGE_DELETED);
+		goto skip_clean_check;
+	}
 
 	/*
 	 * Handle internal pages created as part of a split.
@@ -137,13 +129,26 @@ __wt_page_reconcile(
 	 * their parents.  If this is such a page, logically evict the page by
 	 * updating the parent, and return.
 	 *
-	 * Do this BEFORE updating the page's generational information, pages
-	 * being merged into their parents can never be clean.
+	 * Check split pages before checking for clean pages: split pages can
+	 * never be clean.
 	 */
 	if (F_ISSET(page, WT_PAGE_SPLIT))
 		return (__wt_rec_parent_update_dirty(session,
 		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
 
+	/*
+	 * Clean pages are simple: update the parent's state and discard the
+	 * page.  (It makes no sense to do reconciliation on a clean page if
+	 * you're not going to discard it.)
+	 */
+	if (!WT_PAGE_IS_MODIFIED(page)) {
+		WT_ASSERT(session, discard != 0);
+		__wt_rec_parent_update_clean(session, page);
+		__wt_page_discard(session, page);
+		return (0);
+	}
+
+skip_clean_check:
 	/*
 	 * Update the disk generation before reading the page.  The workQ will
 	 * update the write generation after it makes a change, and if we have
@@ -1569,8 +1574,11 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
  *	Update a parent page's reference for a discarded, clean page.
  */
 static void
-__wt_rec_parent_update_clean(WT_PAGE *page)
+__wt_rec_parent_update_clean(SESSION *session, WT_PAGE *page)
 {
+	/* If a page is on disk, it must have a valid disk address. */
+	WT_ASSERT(session, page->parent_ref->addr != WT_ADDR_INVALID);
+
 	/*
 	 * Update the relevant WT_REF structure; no memory flush is needed,
 	 * the state field is declared volatile.
