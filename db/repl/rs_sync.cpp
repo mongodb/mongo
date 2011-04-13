@@ -316,14 +316,6 @@ namespace mongo {
                     sleepsecs(2);
                 }
                 return;
-                /*
-                log() << "replSet syncTail error querying oplog >= " << lastOpTimeWritten.toString() << " from " << hn << rsLog;
-                try {
-                    log() << "replSet " << hn << " last op: " << r.getLastOp(rsoplog).toString() << rsLog;
-                }
-                catch(...) { }
-                sleepsecs(1);
-                return;*/
             }
 
             BSONObj o = r.nextSafe();
