@@ -356,8 +356,8 @@ build(int key, int value, int cnt)
 	gcnt = cnt;
 
 	slvg_open(LOAD, &btree, &session, &conn);
-	assert(btree->bulk_load(btree, NULL, bulk) == 0);
-	assert(btree->sync(btree, session, NULL, 0) == 0);
+	assert(btree->bulk_load(btree, bulk) == 0);
+	assert(btree->sync(btree, session, 0) == 0);
 	slvg_close(conn);
 }
 
@@ -422,16 +422,16 @@ process(void)
 	WT_CONNECTION *conn;
 
 	slvg_open(SLVG, &btree, &session, &conn);
-	assert(btree->salvage(btree, session, NULL, 0) == 0);
+	assert(btree->salvage(btree, session, 0) == 0);
 	slvg_close(conn);
 
 	slvg_open(SLVG, &btree, &session, &conn);
-	assert(btree->verify(btree, session, NULL, 0) == 0);
+	assert(btree->verify(btree, session, 0) == 0);
 	slvg_close(conn);
 
 	slvg_open(SLVG, &btree, &session, &conn);
 	assert((fp = fopen(DUMP, "w")) != NULL);
-	assert(btree->dump(btree, fp, NULL, WT_PRINTABLES) == 0);
+	assert(btree->dump(btree, fp, WT_PRINTABLES) == 0);
 	assert(fclose(fp) == 0);
 	slvg_close(conn);
 }
