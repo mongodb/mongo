@@ -37,7 +37,7 @@ __wt_cache_create(CONNECTION *conn)
 
 	return (0);
 
-err:	(void)__wt_cache_destroy(conn);
+err:	__wt_cache_destroy(conn);
 	return (ret);
 }
 
@@ -62,39 +62,25 @@ __wt_cache_stats_update(CONNECTION *conn)
  * __wt_cache_destroy --
  *	Discard the underlying cache.
  */
-int
+void
 __wt_cache_destroy(CONNECTION *conn)
 {
 	SESSION *session;
 	WT_CACHE *cache;
-	WT_REC_LIST *reclist;
-	struct rec_list *r_list;
-	uint32_t i;
-	int ret;
 
 	session = &conn->default_session;
 	cache = conn->cache;
-	ret = 0;
 
 	if (cache == NULL)
-		return (0);
+		return;
 
 	if (cache->mtx_evict != NULL)
 		(void)__wt_mtx_destroy(session, cache->mtx_evict);
 	if (cache->mtx_read != NULL)
 		(void)__wt_mtx_destroy(session, cache->mtx_read);
 
-	reclist = &cache->reclist;
-	if (reclist->list != NULL) {
-		for (r_list = reclist->list,
-		    i = 0; i < reclist->l_entries; ++r_list, ++i)
-			__wt_buf_free(session, &r_list->key);
-		__wt_free(session, reclist->list);
-	}
-	if (reclist->save != NULL)
-		__wt_free(session, reclist->save);
+	__wt_rec_destroy(session);
+
 	__wt_free(session, cache->stats);
 	__wt_free(session, conn->cache);
-
-	return (ret);
 }

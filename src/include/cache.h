@@ -36,6 +36,19 @@ typedef struct {
 	uint32_t entries;		/* Current number of entries */
 
 	/*
+	 * As pages are reconciled, inactive pages are merged into their parents
+	 * and discarded.  If an inactive page is discarded, but the parent page
+	 * write fails or for other reason cannot be discarded, the in-memory
+	 * tree would be incorrect, with the parent referencing an unavailable
+	 * page.  To keep the tree "correct" as this happens, we keep a list of
+	 * pages to discard -- when the parent is discarded, so are the merged
+	 * inactive pages.
+	 */
+	WT_PAGE **inactive;		/* List of inactive pages */
+	u_int     inactive_next;	/* Next list slot */
+	u_int	  inactive_entries;	/* Total list slots */
+
+	/*
 	 * Normally, reconciliation writes out a single replacement page, but
 	 * it may be forced to split a page into multiple pages.  When this
 	 * happens, reconciliation maintains a list of the pages it wrote which

@@ -96,7 +96,7 @@ int __wt_item_build_value( SESSION *session,
     WT_OVFL *ovfl);
 int __wt_cache_create(CONNECTION *conn);
 void __wt_cache_stats_update(CONNECTION *conn);
-int __wt_cache_destroy(CONNECTION *conn);
+void __wt_cache_destroy(CONNECTION *conn);
 int __wt_bt_close(SESSION *session);
 int __wt_bt_lex_compare( BTREE *btree,
     const WT_ITEM *user_item,
@@ -158,6 +158,7 @@ int __wt_page_reconcile( SESSION *session,
     WT_PAGE *page,
     uint32_t slvg_skip,
     int discard);
+void __wt_rec_destroy(SESSION *session);
 int __wt_return_data(SESSION *session,
     WT_ITEM *key,
     WT_ITEM *value,

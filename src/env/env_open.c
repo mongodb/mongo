@@ -108,7 +108,7 @@ __wt_connection_close(CONNECTION *conn)
 	__wt_thread_join(conn->workq_tid);
 
 	/* Discard the cache. */
-	WT_TRET(__wt_cache_destroy(conn));
+	__wt_cache_destroy(conn);
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));
