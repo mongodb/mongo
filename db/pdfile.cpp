@@ -485,7 +485,10 @@ namespace mongo {
                 low = (int) (approxSize * 0.8);
                 high = (int) (approxSize * 1.4);
             }
-            if( high < 0 ) high = approxSize;
+            if( high < 0 ) {
+                // overflowed
+                high = max(approxSize, Extent::maxSize());
+            }
             int n = 0;
             Extent *best = 0;
             int bestDiff = 0x7fffffff;
