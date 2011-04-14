@@ -365,7 +365,9 @@ namespace mongo {
          * if the config doesn't include a this node.  Throws an exception if
          * something goes very wrong.
          */
+    protected:
         bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
+    private:
         /**
          * Finds the configuration with the highest version number and attempts
          * load it.
