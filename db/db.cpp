@@ -869,8 +869,13 @@ int main(int argc, char* argv[]) {
             if( params.count("configsvr") ) {
                 cmdLine.port = CmdLine::ConfigServerPort;
             }
-            if( params.count("shardsvr") )
+            if( params.count("shardsvr") ) {
+                if( params.count("configsvr") ) {
+                    log() << "can't do --shardsvr and --configsvr at the same time" << endl;
+                    dbexit( EXIT_BADOPTIONS );
+                }
                 cmdLine.port = CmdLine::ShardServerPort;
+            }
         }
         else {
             if ( cmdLine.port <= 0 || cmdLine.port > 65535 ) {
@@ -879,6 +884,7 @@ int main(int argc, char* argv[]) {
             }
         }
         if ( params.count("configsvr" ) ) {
+            cmdLine.configsvr = true;
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);
