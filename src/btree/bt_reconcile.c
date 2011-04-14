@@ -224,19 +224,8 @@ skip_clean_check:
 	}
 
 	/* Optionally discard the original page. */
-	if (discard) {
-		/*
-		 * If we discard the in-memory root page, kill the reference
-		 * to catch mistakes.
-		 */
-		if (WT_PAGE_IS_ROOT(page)) {
-			btree->root_page.state = 0;
-			btree->root_page.addr = WT_ADDR_INVALID;
-			btree->root_page.size = 0;
-			btree->root_page.page = NULL;
-		}
+	if (discard)
 		__wt_page_discard(session, page);
-	}
 
 	return (ret);
 }

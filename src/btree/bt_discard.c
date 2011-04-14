@@ -25,9 +25,22 @@ static void __wt_discard_update_list(SESSION *, WT_UPDATE *);
 void
 __wt_page_discard(SESSION *session, WT_PAGE *page)
 {
+	WT_REF *parent_ref;
+
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "discard addr %lu (type %s)",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
+
+	/*
+	 * The parent's page reference state should have already been updated
+	 * and nobody should be depending on the parent's page reference, but
+	 * I'd like to catch any mistakes.
+	 */
+	parent_ref = page->parent_ref;
+#ifdef ONCE_WE_NO_LONGER_DISCARD_EVICTED_PAGES
+	WT_ASSERT(session, parent_ref->state == WT_REF_DISK);
+#endif
+	parent_ref->page = NULL;
 
 	/*
 	 * If this wasn't a page we created during a split, we've got
