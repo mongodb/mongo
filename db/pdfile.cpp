@@ -1557,6 +1557,13 @@ namespace mongo {
             lenWHdr = len + Record::HeaderSize;
         }
 
+        // If the collection is not capped then allocate the length to the next
+        // bucket size
+        if (!d->capped)
+        {
+        	lenWHdr = bucketSizes[d->bucket(lenWHdr)];
+        }
+
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
         if ( d->nIndexes && d->capped && !god ) {
