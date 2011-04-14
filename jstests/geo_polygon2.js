@@ -5,18 +5,43 @@
 // Create a polygon of some shape (no holes)
 // using turtle graphics.  Basically, will look like a very contorted octopus (quad-pus?) shape.
 // There are no holes, but some edges will probably touch.
-// TODO:  Rotate as well, to check?
 
-var numTests = 5
+var numTests = 10
 
 for ( var test = 0; test < numTests; test++ ) {
-
+	
+	Random.srand( 1337 + test );	
+	
 	var numTurtles = 4;
-	var gridSize = [ 8, 8 ];
-	var turtleSteps = 30;
-
-	Random.srand( 1337 + test );
-
+	var gridSize = [ 40, 40 ];
+	var turtleSteps = 500;
+	var bounds = [ Random.rand() * -1000000 + 0.00001, Random.rand() * 1000000 + 0.00001 ]
+	var rotation = Math.PI * Random.rand();
+	var bits = Math.floor( Random.rand() * 32 );
+	
+	printjson( { test : test, rotation : rotation, bits : bits })
+	
+	var rotatePoint = function( x, y ) {
+				
+		if( y == undefined ){
+			y = x[1]
+			x = x[0]
+		}
+		
+		xp = x * Math.cos( rotation ) - y * Math.sin( rotation )
+		yp = y * Math.cos( rotation ) + x * Math.sin( rotation )
+		
+		var scaleX = (bounds[1] - bounds[0]) / 360
+		var scaleY = (bounds[1] - bounds[0]) / 360
+		
+		x *= scaleX
+		y *= scaleY
+		
+		return [xp, yp]
+		
+	}
+	
+	
 	var grid = []
 	for ( var i = 0; i < gridSize[0]; i++ ) {
 		grid.push( new Array( gridSize[1] ) )
@@ -28,11 +53,11 @@ for ( var test = 0; test < numTests; test++ ) {
 		for ( var j = grid[0].length - 1; j >= -1; j-- ) {
 			for ( var i = 0; i < grid.length; i++ ) {
 				if ( i == 0 )
-					gridStr += ( j == -1 ? " " : j ) + ": "
+					gridStr += ( j == -1 ? " " : ( j % 10) ) + ": "
 				if ( j != -1 )
 					gridStr += "[" + ( grid[i][j] != undefined ? grid[i][j] : " " ) + "]"
 				else
-					gridStr += " " + i + " "
+					gridStr += " " + ( i % 10 ) + " "
 			}
 			gridStr += "\n"
 		}
@@ -184,38 +209,58 @@ for ( var test = 0; test < numTests; test++ ) {
 
 	}
 
-	print( grid.toString() )
+	// Uncomment to print polygon shape
+	// print( grid.toString() )
 
 	var polygon = []
 	for ( var t = 0; t < turtlePaths.length; t++ ) {
 		for ( var s = 0; s < turtlePaths[t].length; s++ ) {
-			polygon.push( turtlePaths[t][s] )
+			polygon.push( rotatePoint( turtlePaths[t][s] ) )
 		}
 	}
 
-	printjson( polygon )
+	// Uncomment to print out polygon
+	// printjson( polygon )
 
 	t = db.polytest2
 	t.drop()
 
+	// Test single and multi-location documents	
 	var pointsIn = 0
 	var pointsOut = 0
+	var allPointsIn = []
+	var allPointsOut = []
+	
 	for ( var j = grid[0].length - 1; j >= 0; j-- ) {
 		for ( var i = 0; i < grid.length; i++ ) {
-			t.insert( { loc : [ i + 0.5, j + 0.5 ] } )
-			if ( grid[i][j] != undefined )
+			
+			var point = rotatePoint( [ i + 0.5, j + 0.5 ] )
+			
+			t.insert( { loc : point } )
+			if ( grid[i][j] != undefined ){
+				allPointsIn.push( point )
 				pointsIn++
-			else
+			}
+			else{
+				allPointsOut.push( point )
 				pointsOut++
+			}
 		}
-	}
-
-	t.ensureIndex( { loc : "2d" } )
-
-	print( "Points in : " )
-	print( t.find( { loc : { "$within" : { "$polygon" : polygon } } } ).count() )
+	}	
 	
-	assert.eq( gridSize[0] * gridSize[1], t.find().count() )
-	assert.eq( pointsIn, t.find( { loc : { "$within" : { "$polygon" : polygon } } } ).count() );
-
+	t.ensureIndex( { loc : "2d" }, { bits : 1 + bits, max : bounds[1], min : bounds[0] } )
+	assert.isnull( db.getLastError() )
+		
+	t.insert( { loc : allPointsIn } )
+	t.insert( { loc : allPointsOut } )
+	allPoints = allPointsIn.concat( allPointsOut )
+	t.insert( { loc : allPoints } )
+	
+	print( "Points : " )
+	printjson( { pointsIn : pointsIn, pointsOut : pointsOut } )
+	//print( t.find( { loc : { "$within" : { "$polygon" : polygon } } } ).count() )
+	
+	assert.eq( gridSize[0] * gridSize[1] + 3, t.find().count() )
+	assert.eq( 2 + pointsIn, t.find( { loc : { "$within" : { "$polygon" : polygon } } } ).count() );
+	
 }
