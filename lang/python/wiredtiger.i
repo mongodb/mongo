@@ -48,30 +48,20 @@
  *    int method(wt_xxx *self, WT_XXX *, ...otherargs...);
  * and we use consecutive argument matching of typemaps to convert two args to one.
  */
-%typemap(in) (struct wt_connection *self, WT_CONNECTION *) (void *argp = 0, int res = 0) %{
+%define SELFHELPER(type)
+%typemap(in) (type *self, type *) (void *argp = 0, int res = 0) %{
         res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
         if (!SWIG_IsOK(res)) { 
                 SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
         }
         $2 = $1 = ($ltype)(argp);
 %}
+%enddef
 
-%typemap(in) (struct wt_session *self, WT_SESSION *) (void *argp = 0, int res = 0) %{
-        res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
-        if (!SWIG_IsOK(res)) { 
-                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
-        }
-        $2 = $1 = ($ltype)(argp);
-%}
-
-%typemap(in) (struct wt_cursor *self, WT_CURSOR *) (void *argp = 0, int res = 0) %{
-        res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
-        if (!SWIG_IsOK(res)) { 
-                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
-        }
-        $2 = $1 = ($ltype)(argp);
-%}
-
+SELFHELPER(struct wt_connection)
+SELFHELPER(struct wt_session)
+SELFHELPER(struct wt_cursor)
+     
 /* WT_CURSOR customization.
  * We want our own 'next' function for wt_cursor, so we can
  * implement iterable.  Since nobody but use will use

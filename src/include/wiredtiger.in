@@ -835,7 +835,7 @@ struct wt_connection {
 	 * @errors
 	 */
 	int __F(open_session)(WT_CONNECTION *connection,
-	    WT_ERROR_HANDLER *errhandler, const char *config,
+	    WT_EVENT_HANDLER *errhandler, const char *config,
 	    WT_SESSION **sessionp);
 };
 
