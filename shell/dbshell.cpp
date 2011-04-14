@@ -465,6 +465,9 @@ string sayReplSetMemberState() {
                 ss << stateToString(ms);
                 return ss.str();
             }
+            else if( str::equals(info.getStringField("info"), "mongos") ) { 
+                return "mongos";
+            }
         }
     }
     catch( std::exception& e ) {

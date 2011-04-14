@@ -78,7 +78,7 @@ namespace mongo {
     }
 
 
-    vector<SockAddr> ipToAddrs(const char* ips, int port) {
+    vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
         vector<SockAddr> out;
         if (*ips == '\0') {
             out.push_back(SockAddr("0.0.0.0", port)); // IPv4 all
@@ -86,7 +86,7 @@ namespace mongo {
             if (IPv6Enabled())
                 out.push_back(SockAddr("::", port)); // IPv6 all
 #ifndef _WIN32
-            if (!noUnixSocket)
+            if (useUnixSockets)
                 out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port)); // Unix socket
 #endif
             return out;
@@ -108,7 +108,7 @@ namespace mongo {
             out.push_back(sa);
 
 #ifndef _WIN32
-            if (!noUnixSocket && (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
+            if (useUnixSockets && (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
                 out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));
 #endif
         }
@@ -120,7 +120,7 @@ namespace mongo {
 
     void Listener::initAndListen() {
         checkTicketNumbers();
-        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port);
+        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port, (!noUnixSocket && useUnixSockets()));
         vector<int> socks;
         SOCKET maxfd = 0; // needed for select()
 

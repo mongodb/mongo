@@ -30,6 +30,7 @@ _ disallow system* manipulations from the database.
 #include "../util/hashtab.h"
 #include "../util/file_allocator.h"
 #include "../util/processinfo.h"
+#include "../util/file.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>
@@ -485,11 +486,15 @@ namespace mongo {
                 low = (int) (approxSize * 0.8);
                 high = (int) (approxSize * 1.4);
             }
-            if( high < 0 ) high = approxSize;
+            if( high <= 0 ) {
+                // overflowed
+                high = max(approxSize, Extent::maxSize());
+            }
             int n = 0;
             Extent *best = 0;
             int bestDiff = 0x7fffffff;
             {
+                Timer t;
                 DiskLoc L = f->firstExtent;
                 while( !L.isNull() ) {
                     Extent * e = L.ext();
@@ -498,13 +503,30 @@ namespace mongo {
                         if( diff < bestDiff ) {
                             bestDiff = diff;
                             best = e;
-                            if( diff == 0 )
+                            if( ((double) diff) / approxSize < 0.1 ) { 
+                                // close enough
                                 break;
+                            }
+                            if( t.seconds() >= 2 ) { 
+                                // have spent lots of time in write lock, and we are in [low,high], so close enough
+                                // could come into play if extent freelist is very long
+                                break;
+                            }
+                        }
+                        else { 
+                            OCCASIONALLY {
+                                if( high < 64 * 1024 && t.seconds() >= 2 ) {
+                                    // be less picky if it is taking a long time
+                                    high = 64 * 1024;
+                                }
+                            }
                         }
                     }
                     L = e->xnext;
                     ++n;
-
+                }
+                if( t.seconds() >= 10 ) {
+                    log() << "warning: slow scan in allocFromFreeList (in write lock)" << endl;
                 }
             }
             OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
@@ -1932,21 +1954,6 @@ namespace mongo {
         return sa.size();
     }
 
-#if !defined(_WIN32)
-} // namespace mongo
-#include <sys/statvfs.h>
-namespace mongo {
-#endif
-    boost::intmax_t freeSpace ( const string &path ) {
-#if !defined(_WIN32)
-        struct statvfs info;
-        assert( !statvfs( path.c_str() , &info ) );
-        return boost::intmax_t( info.f_bavail ) * info.f_frsize;
-#else
-        return -1;
-#endif
-    }
-
     bool repairDatabase( string dbNameS , string &errmsg,
                          bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
         doingRepair dr;
@@ -1966,7 +1973,7 @@ namespace mongo {
         getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
         boost::intmax_t totalSize = dbSize( dbName );
-        boost::intmax_t freeSize = freeSpace( repairpath );
+        boost::intmax_t freeSize = File::freeSpace(repairpath);
         if ( freeSize > -1 && freeSize < totalSize ) {
             stringstream ss;
             ss << "Cannot repair database " << dbName << " having size: " << totalSize

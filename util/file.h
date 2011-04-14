@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/statvfs.h>
 #else
 #include <windows.h>
 #endif
@@ -46,6 +47,9 @@ namespace mongo {
         bool is_open() {return false;}
         fileofs len() { return 0; }
         void fsync() { assert(false); }
+
+        /** @return  -1 if error or unavailable */
+        static boost::intmax_t freeSpace(const string &path) { assert(false); return -1; }
     };
 
 #if defined(_WIN32)
@@ -80,6 +84,15 @@ namespace mongo {
             }
             else
                 _bad = false;
+        }
+        static boost::intmax_t freeSpace(const string &path) {
+            ULARGE_INTEGER avail;
+            if( GetDiskFreeSpaceEx(toNativeString(path.c_str()).c_str(), &avail, NULL, NULL) ) { 
+                return avail.QuadPart;
+            }
+            DWORD e = GetLastError();
+            log() << "GetDiskFreeSpaceEx fails errno: " << e << endl;
+            return -1;
         }
         void write(fileofs o, const char *data, unsigned len) {
             LARGE_INTEGER li;
@@ -166,6 +179,11 @@ namespace mongo {
             return lseek(fd, 0, SEEK_END);
         }
         void fsync() { ::fsync(fd); }
+        static boost::intmax_t freeSpace ( const string &path ) {
+            struct statvfs info;
+            assert( !statvfs( path.c_str() , &info ) );
+            return boost::intmax_t( info.f_bavail ) * info.f_frsize;
+        }
     };
 
 

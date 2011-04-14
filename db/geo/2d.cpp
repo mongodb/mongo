@@ -292,7 +292,7 @@ namespace mongo {
         }
 
         GeoHash hash( const Point& p ) const {
-        	return hash( p._x, p._y );
+            return hash( p._x, p._y );
         }
 
         GeoHash hash( double x , double y ) const {
@@ -470,7 +470,7 @@ namespace mongo {
         }
 
         double maxDim() const {
-        	return max( _max._x - _min._x, _max._y - _min._y );
+            return max( _max._x - _min._x, _max._y - _min._y );
         }
 
         Point center() const {
@@ -519,7 +519,7 @@ namespace mongo {
             _points.push_back( p );
         }
 
-        int size( void ) {
+        int size( void ) const {
             return _points.size();
         }
 
@@ -528,12 +528,86 @@ namespace mongo {
          *
          * The algorithm uses a ray casting method.
          */
-        bool contains( Point &p ) {
+        bool contains( const Point& p ) const {
+            return contains( p, 0 ) > 0;
+        }
+
+        int contains( const Point &p, double fudge ) const {
+
+            Box fudgeBox( Point( p._x - fudge, p._y - fudge ), Point( p._x + fudge, p._y + fudge ) );
 
             int counter = 0;
             Point p1 = _points[0];
             for ( int i = 1; i <= size(); i++ ) {
                 Point p2 = _points[i % size()];
+
+                GEODEBUG( "Doing intersection check of " << fudgeBox << " with seg " << p1 << " to " << p2 );
+
+                // We need to check whether or not this segment intersects our error box
+                if( fudge > 0 &&
+                        // Points not too far below box
+                        fudgeBox._min._y <= std::max( p1._y, p2._y ) &&
+                        // Points not too far above box
+                        fudgeBox._max._y >= std::min( p1._y, p2._y ) &&
+                        // Points not too far to left of box
+                        fudgeBox._min._x <= std::max( p1._x, p2._x ) &&
+                        // Points not too far to right of box
+                        fudgeBox._max._x >= std::min( p1._x, p2._x ) ) {
+
+                    GEODEBUG( "Doing detailed check" );
+
+                    // If our box contains one or more of these points, we need to do an exact check.
+                    if( fudgeBox.inside(p1) ) {
+                        GEODEBUG( "Point 1 inside" );
+                        return 0;
+                    }
+                    if( fudgeBox.inside(p2) ) {
+                        GEODEBUG( "Point 2 inside" );
+                        return 0;
+                    }
+
+                    // Do intersection check for vertical sides
+                    if ( p1._y != p2._y ) {
+
+                        double invSlope = ( p2._x - p1._x ) / ( p2._y - p1._y );
+
+                        double xintersT = ( fudgeBox._max._y - p1._y ) * invSlope + p1._x;
+                        if( fudgeBox._min._x <= xintersT && fudgeBox._max._x >= xintersT ) {
+                            GEODEBUG( "Top intersection @ " << xintersT );
+                            return 0;
+                        }
+
+                        double xintersB = ( fudgeBox._min._y - p1._y ) * invSlope + p1._x;
+                        if( fudgeBox._min._x <= xintersB && fudgeBox._max._x >= xintersB ) {
+                            GEODEBUG( "Bottom intersection @ " << xintersB );
+                            return 0;
+                        }
+
+                    }
+
+                    // Do intersection check for horizontal sides
+                    if( p1._x != p2._x ) {
+
+                        double slope = ( p2._y - p1._y ) / ( p2._x - p1._x );
+
+                        double yintersR = ( p1._x - fudgeBox._max._x ) * slope + p1._y;
+                        if( fudgeBox._min._y <= yintersR && fudgeBox._max._y >= yintersR ) {
+                            GEODEBUG( "Right intersection @ " << yintersR );
+                            return 0;
+                        }
+
+                        double yintersL = ( p1._x - fudgeBox._min._x ) * slope + p1._y;
+                        if( fudgeBox._min._y <= yintersL && fudgeBox._max._y >= yintersL ) {
+                            GEODEBUG( "Left intersection @ " << yintersL );
+                            return 0;
+                        }
+
+                    }
+
+                }
+
+                // Normal intersection test.
+                // TODO: Invert these for clearer logic?
                 if ( p._y > std::min( p1._y, p2._y ) ) {
                     if ( p._y <= std::max( p1._y, p2._y ) ) {
                         if ( p._x <= std::max( p1._x, p2._x ) ) {
@@ -546,14 +620,15 @@ namespace mongo {
                         }
                     }
                 }
+
                 p1 = p2;
             }
 
             if ( counter % 2 == 0 ) {
-                return false;
+                return -1;
             }
             else {
-                return true;
+                return 1;
             }
         }
 
@@ -597,17 +672,17 @@ namespace mongo {
 
         Box bounds( void ) {
 
-        	// TODO: Cache this
+            // TODO: Cache this
 
-        	_bounds._max = _points[0];
-        	_bounds._min = _points[0];
+            _bounds._max = _points[0];
+            _bounds._min = _points[0];
 
             for ( int i = 1; i < size(); i++ ) {
 
-            	_bounds._max._x = max( _bounds._max._x, _points[i]._x );
-            	_bounds._max._y = max( _bounds._max._y, _points[i]._y );
-            	_bounds._min._x = min( _bounds._min._x, _points[i]._x );
-            	_bounds._min._y = min( _bounds._min._y, _points[i]._y );
+                _bounds._max._x = max( _bounds._max._x, _points[i]._x );
+                _bounds._max._y = max( _bounds._max._y, _points[i]._y );
+                _bounds._min._x = min( _bounds._min._x, _points[i]._x );
+                _bounds._min._y = min( _bounds._min._y, _points[i]._y );
 
             }
 
@@ -2167,28 +2242,53 @@ namespace mongo {
 
         // Whether the current box width is big enough for our search area
         virtual bool fitsInBox( double width ) {
-        	return _maxDim <= width;
+            return _maxDim <= width;
         }
 
         // Whether the current box overlaps our search area
         virtual bool intersectsBox( Box& cur ) {
-        	return _bounds.intersects( cur );
+            return _bounds.intersects( cur );
         }
 
         virtual bool checkDistance( const KeyNode& node, double& d ) {
 
-            Point p = Point( _g , GeoHash( node.key.firstElement() ) );
+            Point p( _g, GeoHash( node.key.firstElement() ) );
 
-            // Use the point in polygon algorihtm to see if the point
-            // is contained in the polygon.
-            bool in = _poly.contains( p );
-            if ( in ) {
-                GEODEBUG( "Point: [" << p._x << ", " << p._y << "] in polygon" );
+            int in = _poly.contains( p, _g->_error );
+            if( in != 0 ) {
+
+                if ( in > 0 ) {
+                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] approx in polygon" );
+                }
+                else {
+                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] approx not in polygon" );
+                }
+
+                if( in != 0 ) return in > 0;
             }
-            else {
-                GEODEBUG( "Point: [" << p._x << ", " << p._y << "] not in polygon" );
+
+            // Do exact check, since to approximate check was inconclusive
+            vector< BSONObj > locs;
+            _g->getKeys( node.recordLoc.obj(), locs );
+
+            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
+
+                Point p( *i );
+
+                // Use the point in polygon algorithm to see if the point
+                // is contained in the polygon.
+                bool in = _poly.contains( p );
+                if ( in ) {
+                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] exactly in polygon" );
+                }
+                else {
+                    GEODEBUG( "Point: [" << p._x << ", " << p._y << "] exactly not in polygon" );
+                }
+                if( in ) return in;
+
             }
-            return in;
+
+            return false;
         }
 
     private:

@@ -93,8 +93,8 @@ namespace mongo {
 
 namespace mongo {
 
-    /** @return true if a client can modify this namespace
-        things like *.system.users
+    /** @return true if a client can modify this namespace even though it is under ".system."
+        For example <dbname>.system.users is ok for regular clients to update.
         @param write used when .system.js
     */
     bool legalClientSystemNS( const string& ns , bool write );

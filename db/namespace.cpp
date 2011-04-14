@@ -620,7 +620,7 @@ namespace mongo {
        options: { capped : ..., size : ... }
     */
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0) {
-        log(1) << "New namespace: " << ns << '\n';
+        LOG(1) << "New namespace: " << ns << endl;
         if ( strstr(ns, "system.namespaces") ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
             // TODO: fix above should not be strstr!
@@ -636,6 +636,9 @@ namespace mongo {
             char database[256];
             nsToDatabase(ns, database);
             string s = database;
+            if( cmdLine.configsvr && (s != "config" && s != "admin") ) { 
+                uasserted(14036, "can't create user databases on a --configsvr instance");
+            }
             s += ".system.namespaces";
             theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
         }

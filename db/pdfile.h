@@ -52,9 +52,6 @@ namespace mongo {
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
     shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
-    // -1 if library unavailable.
-    boost::intmax_t freeSpace( const string &path = dbpath );
-
     bool isValidNS( const StringData& ns );
 
     /*---------------------------------------------------------------------*/
@@ -245,6 +242,12 @@ namespace mongo {
         bool validates() {
             return !(firstRecord.isNull() ^ lastRecord.isNull()) &&
                    length >= 0 && !myLoc.isNull();
+        }
+
+        BSONObj dump() {
+            return BSON( "loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev" << xprev.toString()
+                      << "nsdiag" << nsDiagnostic.toString()
+                      << "size" << length << "firstRecord" << firstRecord.toString() << "lastRecord" << lastRecord.toString());
         }
 
         void dump(iostream& s) {
