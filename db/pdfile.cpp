@@ -493,6 +493,7 @@ namespace mongo {
             Extent *best = 0;
             int bestDiff = 0x7fffffff;
             {
+                Timer t;
                 DiskLoc L = f->firstExtent;
                 while( !L.isNull() ) {
                     Extent * e = L.ext();
@@ -501,13 +502,30 @@ namespace mongo {
                         if( diff < bestDiff ) {
                             bestDiff = diff;
                             best = e;
-                            if( diff == 0 )
+                            if( ((double) diff) / approxSize < 0.1 ) { 
+                                // close enough
                                 break;
+                            }
+                            if( t.seconds() >= 2 ) { 
+                                // have spent lots of time in write lock, and we are in [low,high], so close enough
+                                // could come into play if extent freelist is very long
+                                break;
+                            }
+                        }
+                        else { 
+                            OCCASIONALLY {
+                                if( high < 64 * 1024 && t.seconds() >= 2 ) {
+                                    // be less picky if it is taking a long time
+                                    high = 64 * 1024;
+                                }
+                            }
                         }
                     }
                     L = e->xnext;
                     ++n;
-
+                }
+                if( t.seconds() >= 10 ) {
+                    log() << "warning: slow scan in allocFromFreeList (in write lock)" << endl;
                 }
             }
             OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
