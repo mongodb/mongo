@@ -102,14 +102,12 @@ __wt_page_reconcile(
 	 *
 	 * Both leaf and internal pages have their WT_PAGE_DELETED flags set if
 	 * they're reconciled and are found to have no valid entries.  At that
-	 * time the page's WT_PAGE_DELETED flag is set, and the page's state is
-	 * set to WT_REF_EVICTED.  If these pages are subsequently accessed,
-	 * the state is reset to WT_REF_MEM, and they'll eventually end up here,
-	 * being reconciled again.  Any previously set WT_PAGE_DELETED flag may
-	 * no longer be correct: new material may have been inserted into the
-	 * page.  Clear the WT_PAGE_DELETED flag and reconcile the page again.
-	 * (Yes, it's extra work if the page remains empty, but we're assuming
-	 * pages won't be emptied, re-filled and then emptied again.)
+	 * time the the page's state is set to WT_REF_INACTIVE.  If these pages
+	 * are subsequently accessed, the state is reset to WT_REF_MEM, and they
+	 * will eventually end up here, being reconciled again.  Any previously
+	 * set WT_PAGE_DELETED flag may no longer be correct: new material may
+	 * have been inserted into the page.  Clear the WT_PAGE_DELETED flag and
+	 * reconcile the page again.
 	 *
 	 * Check deleted pages before checking for clean pages: deleted pages
 	 * can never be clean.
@@ -122,17 +120,16 @@ __wt_page_reconcile(
 	/*
 	 * Handle internal pages created as part of a split.
 	 *
-	 * We never want to write those pages to disk because we don't want to
-	 * deepen the tree on every split.  Such pages are always merged into
-	 * their parents.  If this is such a page, logically evict the page by
-	 * updating the parent, and return.
+	 * We never write such pages to disk because we don't want to deepen the
+	 * tree on every split, they're always merged into their parents.  Mark
+	 * the page as inactive, and return.
 	 *
 	 * Check split pages before checking for clean pages: split pages can
 	 * never be clean.
 	 */
 	if (F_ISSET(page, WT_PAGE_SPLIT))
 		return (__wt_rec_parent_update_dirty(session,
-		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
+		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
 
 	/*
 	 * Clean pages are simple: update the parent's state and discard the
@@ -699,12 +696,12 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 		r->recno = cref->recno;
 
 		/*
-		 * If this is a reference to a logically evicted page, it's an
-		 * internal page created as part of a page split or a deleted
-		 * page.  Split-created pages are merged into their parents and
-		 * then discarded, empty pages are simply discarded.
+		 * If this is a reference to an inactive page, it's an internal
+		 * page created as part of a split or a deleted page.  Internal
+		 * pages are merged into their parents, both internal and empty
+		 * pages are added to the discard list.
 		 */
-		if (WT_COL_REF_STATE(cref) == WT_REF_EVICTED) {
+		if (WT_COL_REF_STATE(cref) == WT_REF_INACTIVE) {
 			ref_page = WT_COL_REF_PAGE(cref);
 			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_col_merge(session, ref_page));
@@ -1068,12 +1065,12 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i) {
 		/*
-		 * If this is a reference to a logically evicted page, it's an
-		 * internal page created as part of a page split or a deleted
-		 * page.  Split-created pages are merged into their parents and
-		 * then discarded, empty pages are simply discarded.
+		 * If this is a reference to an inactive page, it's an internal
+		 * page created as part of a split or a deleted page.  Internal
+		 * pages are merged into their parents, both internal and empty
+		 * pages are added to the discard list.
 		 */
-		if (WT_ROW_REF_STATE(rref) == WT_REF_EVICTED) {
+		if (WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE) {
 			ref_page = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_row_merge(session, ref_page));
@@ -1144,12 +1141,12 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i) {
 		/*
-		 * If this is a reference to a logically evicted page, it's an
-		 * internal page created as part of a page split or a deleted
-		 * page.  Split-created pages are merged into their parents and
-		 * then discarded, empty pages are simply discarded.
+		 * If this is a reference to an inactive page, it's an internal
+		 * page created as part of a split or a deleted page.  Internal
+		 * pages are merged into their parents, both internal and empty
+		 * pages are added to the discard list.
 		 */
-		if (WT_ROW_REF_STATE(rref) == WT_REF_EVICTED) {
+		if (WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE) {
 			ref_page = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_row_merge(session, ref_page));
@@ -1462,7 +1459,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 		F_SET(page, WT_PAGE_DELETED);
 
 		return (__wt_rec_parent_update_dirty(session, page,
-		    NULL, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
+		    NULL, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
 	}
 
 	/*
@@ -1511,7 +1508,7 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 
 	/* Update the parent to reference the new internal page. */
 	return (__wt_rec_parent_update_dirty(session,
-	    page, new, WT_ADDR_INVALID, 0, WT_REF_EVICTED));
+	    page, new, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
 }
 
 /*

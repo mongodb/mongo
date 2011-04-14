@@ -312,12 +312,11 @@ __wt_evict_file(WT_EVICT_REQ *er)
 		 * pages from the cache, and reconciliation is how we do that.
 		 *
 		 * If it's the sync method, dirty pages must be reconciled and
-		 * written to disk, as well as any "logically evicted" pages.
-		 * The latter is tricky: if a page is found to be empty during
-		 * reconciliation or is created as part of a split operation,
-		 * the page's state is set to WT_REF_EVICTED, and we expect the
-		 * page to eventually be merged into its parent when the parent
-		 * itself is reconciled.
+		 * written to disk, as well as any inactive pages. The latter
+		 * are tricky: if a page is found to be empty at reconciliation
+		 * or is created as part of a split operation, the page's state
+		 * is set to WT_REF_INACTIVE, and we expect the page to merge
+		 * into its parent when the parent itself is reconciled.
 		 *
 		 * If the page is accessed before that merge happens, the page's
 		 * state is reset to WT_REF_MEM, and the page may or may not be
@@ -749,13 +748,13 @@ __wt_evict_subtrees(WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
 			if (WT_COL_REF_STATE(cref) != WT_REF_DISK &&
-			    WT_COL_REF_STATE(cref) != WT_REF_EVICTED)
+			    WT_COL_REF_STATE(cref) != WT_REF_INACTIVE)
 				return (1);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
 			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK &&
-			    WT_ROW_REF_STATE(rref) != WT_REF_EVICTED)
+			    WT_ROW_REF_STATE(rref) != WT_REF_INACTIVE)
 				return (1);
 		break;
 	}

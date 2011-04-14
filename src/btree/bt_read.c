@@ -206,10 +206,10 @@ __wt_cache_read(WT_READ_REQ *rr)
 	case WT_REF_LOCKED:
 		/* Page being considered for eviction: not our problem. */
 		return (0);
-	case WT_REF_EVICTED:
+	case WT_REF_INACTIVE:
 		/*
-		 * The page was logically evicted, waiting on a merge with its
-		 * parent during the parent's eviction, when it was accessed.
+		 * The page was inactive, waiting to be merged into its parent
+		 * during the parent's reconciliation, when it was accessed.
 		 * Re-activate the page.   We could probably do this in the
 		 * page read function, but this shouldn't be a common path and
 		 * I'm hesitant to have multiple threads of control updating

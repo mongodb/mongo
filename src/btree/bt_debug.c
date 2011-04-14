@@ -713,8 +713,8 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 	case WT_REF_DISK:
 		s = "disk";
 		break;
-	case WT_REF_EVICTED:
-		s = "evicted";
+	case WT_REF_INACTIVE:
+		s = "inactive";
 		break;
 	case WT_REF_LOCKED:
 		s = "locked";

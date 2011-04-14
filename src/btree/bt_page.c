@@ -37,7 +37,7 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 		case WT_REF_DISK:
 			/* The page isn't in memory, request it be read. */
 			/* FALLTHROUGH */
-		case WT_REF_EVICTED:
+		case WT_REF_INACTIVE:
 			/* The page isn't available, request it. */
 			__wt_cache_read_serial(
 			    session, parent, ref, dsk_verify, ret);

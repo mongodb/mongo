@@ -64,7 +64,7 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	/* ref references the subtree containing the child page. */	\
 	switch ((ref)->state) {						\
 	case WT_REF_DISK:						\
-	case WT_REF_EVICTED:						\
+	case WT_REF_INACTIVE:						\
 	case WT_REF_LOCKED:						\
 		/*							\
 		 * Optionally skip pages that aren't in the cache.	\
