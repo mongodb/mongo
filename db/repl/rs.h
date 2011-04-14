@@ -336,7 +336,6 @@ namespace mongo {
         bool isElectable(const unsigned id) { scoped_lock lk(_elock); return _electableSet.find(id) != _electableSet.end(); }
         Member* getMostElectable();
     protected:
-        bool initFromConfig(ReplSetConfig& c, bool reconf=false); // true if ok; throws if config really bad; false if config doesn't include self
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
@@ -358,10 +357,25 @@ namespace mongo {
         const vector<HostAndPort> *_seeds;
         ReplSetConfig *_cfg;
 
-        /** load our configuration from admin.replset.  try seed machines too.
-            @return true if ok; throws if config really bad; false if config doesn't include self
-        */
+        /**
+         * Load a new config as the replica set's main config.
+         *
+         * If there is a "simple" change (just adding a node), this shortcuts
+         * the config. Returns true if the config was changed.  Returns false
+         * if the config doesn't include a this node.  Throws an exception if
+         * something goes very wrong.
+         */
+        bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
+        /**
+         * Finds the configuration with the highest version number and attempts
+         * load it.
+         */
         bool _loadConfigFinish(vector<ReplSetConfig>& v);
+        /**
+         * Gather all possible configs (from command line seeds, our own config
+         * doc, and any hosts listed therein) and try to initiate from the most
+         * recent config we find.
+         */
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;

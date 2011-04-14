@@ -31,9 +31,17 @@ namespace mongo {
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
     public:
-        /* if something is misconfigured, throws an exception.
-        if couldn't be queried or is just blank, ok() will be false.
-        */
+        /**
+         * This contacts the given host and tries to get a config from them.
+         *
+         * This sends a test heartbeat to the host and, if all goes well and the
+         * host has a more recent config, fetches the config and loads it (see
+         * from().
+         *
+         * If it's contacting itself, it skips the heartbeat (for obvious
+         * reasons.) If something is misconfigured, throws an exception. If the
+         * host couldn't be queried or is just blank, ok() will be false.
+         */
         ReplSetConfig(const HostAndPort& h);
 
         ReplSetConfig(BSONObj cfg);
