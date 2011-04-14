@@ -128,11 +128,13 @@ namespace mongo {
             simple.longValue = pBsonElement->numberLong();
             break;
 
+        case jstNULL:
+	    break;
+
             /* these shouldn't happen in this context */
         case MinKey:
         case EOO:
         case Undefined:
-        case jstNULL:
         case DBRef:
         case Code:
         case MaxKey:
@@ -605,11 +607,13 @@ namespace mongo {
                 return 1;
             return 0;
 
+        case jstNULL:
+	    return 0; // treat two NULL values as equal
+
             /* these shouldn't happen in this context */
         case MinKey:
         case EOO:
         case Undefined:
-        case jstNULL:
         case DBRef:
         case Code:
         case MaxKey:

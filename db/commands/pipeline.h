@@ -91,7 +91,7 @@ namespace mongo {
 	bool run(BSONObjBuilder &result, string &errmsg,
 		 boost::shared_ptr<DocumentSource> pSource);
 
-	bool debugShardedPipeline() const;
+	bool getSplitMongodPipeline() const;
 
     private:
         Pipeline();
@@ -100,7 +100,7 @@ namespace mongo {
 	typedef list<boost::shared_ptr<DocumentSource> > SourceList;
 	SourceList sourceList;
 
-	bool debug;
+	bool splitMongodPipeline;
     };
 
 } // namespace mongo
@@ -114,11 +114,11 @@ namespace mongo {
 	return collectionName;
     }
 
-    inline bool Pipeline::debugShardedPipeline() const {
+    inline bool Pipeline::getSplitMongodPipeline() const {
 	if (!DEBUG_BUILD)
 	    return false;
 
-	return debug;
+	return splitMongodPipeline;
     }
 
 } // namespace mongo

@@ -81,12 +81,64 @@ namespace mongo {
 	boost::shared_ptr<DocumentSource> pSource(
 	    DocumentSourceCursor::create(pCursor));
 
-/*
-	if (!DEBUG_BUILD || !pPipeline->debugShardedPipeline())
+	/* this is the normal non-debug path */
+	if (!pPipeline->getSplitMongodPipeline())
 	    return pPipeline->run(result, errmsg, pSource);
-*/
 
-	return pPipeline->run(result, errmsg, pSource);
+	/*
+	  Here, we'll split the pipeline in the same way we would for sharding,
+	  for testing purposes.
+
+	  Run the shard pipeline first, then feed the results into the remains
+	  of the existing pipeline.
+
+	  Start by splitting the pipeline.
+	 */
+	boost::shared_ptr<Pipeline> pShardSplit(
+	    pPipeline->splitForSharded());
+
+	/*
+	  Write the split pipeline as we would in order to transmit it to
+	  the shard servers.
+	*/
+	BSONObjBuilder shardBuilder;
+	pShardSplit->toBson(&shardBuilder);
+	BSONObj shardBson(shardBuilder.done());
+
+	/* on the shard servers, create the local pipeline */
+	boost::shared_ptr<Pipeline> pShardPipeline(
+	    Pipeline::parseCommand(errmsg, shardBson));
+	if (!pShardPipeline.get()) {
+	    return false;
+	}
+
+	/* run the shard pipeline */
+	BSONObjBuilder shardResultBuilder;
+	string shardErrmsg;
+	pShardPipeline->run(shardResultBuilder, shardErrmsg, pSource);
+	BSONObj shardResult(shardResultBuilder.done());
+
+	/* pick out the shard result, and prepare to read it */
+	boost::shared_ptr<DocumentSourceBsonArray> pShardSource;
+	BSONObjIterator shardIter(shardResult);
+	while(shardIter.more()) {
+	    BSONElement shardElement(shardIter.next());
+	    const char *pFieldName = shardElement.fieldName();
+
+	    if (strcmp(pFieldName, "result") == 0) {
+		pShardSource = DocumentSourceBsonArray::create(&shardElement);
+
+	        /*
+		  Connect the output of the shard pipeline with the mongos
+		  pipeline that will merge the results.
+		*/
+		return pPipeline->run(result, errmsg, pShardSource);
+	    }
+	}
+
+	/* NOTREACHED */
+	assert(false);
+	return false;
     }
 
 } // namespace mongo

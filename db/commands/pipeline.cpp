@@ -32,7 +32,7 @@ namespace mongo {
     Pipeline::Pipeline():
 	collectionName(),
 	sourceList(),
-        debug(false) {
+        splitMongodPipeline(false) {
     }
 
     boost::shared_ptr<Pipeline> Pipeline::parseCommand(
@@ -57,6 +57,12 @@ namespace mongo {
                 pPipeline->collectionName = cmdElement.String();
                 continue;
             }
+
+	    /* check for debug options */
+	    if (!strcmp(pFieldName, "splitMongodPipeline")) {
+		pPipeline->splitMongodPipeline = true;
+		continue;
+	    }
 
             /* we didn't recognize a field in the command */
             ostringstream sb;
@@ -179,22 +185,20 @@ namespace mongo {
 	  Run through the operations, putting them onto the shard pipeline
 	  until we get to a group that indicates a split point.
 	 */
-	/* look for a grouping operation */
-	SourceList::iterator iter(tempList.begin());
-	SourceList::iterator listEnd(tempList.end());
-	for(; iter != listEnd; ++iter) {
-	    boost::shared_ptr<DocumentSource> pSource(*iter);
-
-	    /* copy the operation to the shard pipeline */
-	    pShardPipeline->sourceList.push_back(pSource);
-
-	    /* remove it from the temporary list */
-	    iter = tempList.erase(iter);
-
+	while(!tempList.empty()) {
+	    boost::shared_ptr<DocumentSource> &pSource = tempList.front();
 	    DocumentSourceGroup *pGroup =
 		dynamic_cast<DocumentSourceGroup *>(pSource.get());
+
+	    pShardPipeline->sourceList.push_back(pSource);
+	    tempList.pop_front();
+
 	    if (pGroup) {
+		/* start this pipeline with the group merger */
 		sourceList.push_back(pGroup->createMerger());
+
+		/* and then add everything that remains */
+		sourceList.splice(sourceList.end(), tempList);
 		break;
 	    }
 	}
@@ -203,7 +207,22 @@ namespace mongo {
     }
 
     void Pipeline::toBson(BSONObjBuilder *pBuilder) const {
-	assert(false && "unimplemented");
+	/* create an array out of the pipeline operations */
+	BSONArrayBuilder arrayBuilder;
+	for(SourceList::const_iterator iter(sourceList.begin()),
+		listEnd(sourceList.end()); iter != listEnd; ++iter) {
+	    boost::shared_ptr<DocumentSource> pSource(*iter);
+	    pSource->addToBsonArray(&arrayBuilder);
+	}
+
+	/* add the top-level items to the command */
+	pBuilder->append("pipeline", arrayBuilder.arr());
+	pBuilder->append("collection", getCollectionName());
+
+	bool btemp;
+	if (btemp = getSplitMongodPipeline()) {
+	    pBuilder->append("splitMongodPipeline", btemp);
+	}
     }
 
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
