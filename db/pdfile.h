@@ -244,6 +244,12 @@ namespace mongo {
                    length >= 0 && !myLoc.isNull();
         }
 
+        BSONObj dump() {
+            return BSON( "loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev" << xprev.toString()
+                      << "nsdiag" << nsDiagnostic.toString()
+                      << "size" << length << "firstRecord" << firstRecord.toString() << "lastRecord" << lastRecord.toString());
+        }
+
         void dump(iostream& s) {
             s << "    loc:" << myLoc.toString() << " xnext:" << xnext.toString() << " xprev:" << xprev.toString() << '\n';
             s << "    nsdiag:" << nsDiagnostic.toString() << '\n';

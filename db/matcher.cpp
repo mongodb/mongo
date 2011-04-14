@@ -40,6 +40,8 @@ namespace {
                 options.set_multiline(true);
             else if ( *flags == 'x' )
                 options.set_extended(true);
+            else if ( *flags == 's' )
+                options.set_dotall(true);
             flags++;
         }
         return options;
