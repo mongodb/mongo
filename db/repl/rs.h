@@ -336,6 +336,15 @@ namespace mongo {
         bool isElectable(const unsigned id) { scoped_lock lk(_elock); return _electableSet.find(id) != _electableSet.end(); }
         Member* getMostElectable();
     protected:
+        /**
+         * Load a new config as the replica set's main config.
+         *
+         * If there is a "simple" change (just adding a node), this shortcuts
+         * the config. Returns true if the config was changed.  Returns false
+         * if the config doesn't include a this node.  Throws an exception if
+         * something goes very wrong.
+         */
+        bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
@@ -357,15 +366,6 @@ namespace mongo {
         const vector<HostAndPort> *_seeds;
         ReplSetConfig *_cfg;
 
-        /**
-         * Load a new config as the replica set's main config.
-         *
-         * If there is a "simple" change (just adding a node), this shortcuts
-         * the config. Returns true if the config was changed.  Returns false
-         * if the config doesn't include a this node.  Throws an exception if
-         * something goes very wrong.
-         */
-        bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
         /**
          * Finds the configuration with the highest version number and attempts
          * load it.
