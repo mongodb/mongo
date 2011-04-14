@@ -23,6 +23,7 @@
 #include "commands.h"
 #include "repl/rs.h"
 #include "stats/counters.h"
+#include "../util/file.h"
 
 namespace mongo {
 
@@ -361,7 +362,7 @@ namespace mongo {
                 sz = (256-64) * 1000 * 1000;
 #else
                 sz = 990.0 * 1000 * 1000;
-                boost::intmax_t free = freeSpace(); //-1 if call not supported.
+                boost::intmax_t free = File::freeSpace(dbpath); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )
                     sz = fivePct;

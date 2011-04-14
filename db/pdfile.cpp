@@ -30,6 +30,7 @@ _ disallow system* manipulations from the database.
 #include "../util/hashtab.h"
 #include "../util/file_allocator.h"
 #include "../util/processinfo.h"
+#include "../util/file.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>
@@ -1953,21 +1954,6 @@ namespace mongo {
         return sa.size();
     }
 
-#if !defined(_WIN32)
-} // namespace mongo
-#include <sys/statvfs.h>
-namespace mongo {
-#endif
-    boost::intmax_t freeSpace ( const string &path ) {
-#if !defined(_WIN32)
-        struct statvfs info;
-        assert( !statvfs( path.c_str() , &info ) );
-        return boost::intmax_t( info.f_bavail ) * info.f_frsize;
-#else
-        return -1;
-#endif
-    }
-
     bool repairDatabase( string dbNameS , string &errmsg,
                          bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
         doingRepair dr;
@@ -1987,7 +1973,7 @@ namespace mongo {
         getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
         boost::intmax_t totalSize = dbSize( dbName );
-        boost::intmax_t freeSize = freeSpace( repairpath );
+        boost::intmax_t freeSize = File::freeSpace(repairpath);
         if ( freeSize > -1 && freeSize < totalSize ) {
             stringstream ss;
             ss << "Cannot repair database " << dbName << " having size: " << totalSize
