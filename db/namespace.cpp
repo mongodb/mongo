@@ -637,7 +637,7 @@ namespace mongo {
             nsToDatabase(ns, database);
             string s = database;
             if( cmdLine.configsvr && (s != "config" && s != "admin") ) { 
-                uasserted(14036, "can't create user databases on a --configsvr instance");
+                uasserted(14037, "can't create user databases on a --configsvr instance");
             }
             s += ".system.namespaces";
             theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
