@@ -485,7 +485,7 @@ namespace mongo {
                 low = (int) (approxSize * 0.8);
                 high = (int) (approxSize * 1.4);
             }
-            if( high < 0 ) {
+            if( high <= 0 ) {
                 // overflowed
                 high = max(approxSize, Extent::maxSize());
             }
