@@ -158,13 +158,14 @@ namespace mongo {
 
         /** Retrieve a java style date value from the element.
             Ensure element is of type Date before calling.
+            @see Bool(), trueValue()
         */
         Date_t date() const {
             return *reinterpret_cast< const Date_t* >( value() );
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
-            (i.e., treat zero and null as false).
+            (i.e., treats zero and null and eoo as false).
         */
         bool trueValue() const;
 

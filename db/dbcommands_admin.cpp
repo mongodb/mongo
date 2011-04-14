@@ -177,7 +177,7 @@ namespace mongo {
         // For historical reasons, all info is available both in a string field (returned) as well as normal fields
         string validateNS(const char *ns, NamespaceDetails *d, const BSONObj& cmdObj, BSONObjBuilder& result) {
             bool scanData = true;
-            if( cmdObj.hasElement("scandata") && !cmdObj.getBoolField("scandata") )
+            if( !cmdObj["scandata"].trueValue() )
                 scanData = false;
 
             bool full = cmdObj["full"].trueValue();
