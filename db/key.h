@@ -49,7 +49,11 @@ namespace mongo {
         BSONObj toBson() const;
         string toString() const { return toBson().toString(); }
         int dataSize() const;
-        const char * data() const;
+        const char * data() const { 
+            return _keyData != 0 ? (const char *) _keyData : _o.objdata();
+        }
+
+        /** only used by geo, which always has bson keys */
         BSONElement _firstElement() const { 
             assert( _keyData == 0 );
             return _o.firstElement(); 
@@ -69,9 +73,9 @@ namespace mongo {
         ~KeyV1Owned() { free((void*) _keyData); }
     };
 
-    typedef KeyBson Key;
-    typedef KeyBson KeyOwned;
-    //typedef KeyV1 Key;
-    //typedef KeyV1Owned KeyOwned;
+    //typedef KeyBson Key;
+    //typedef KeyBson KeyOwned;
+    typedef KeyV1 Key;
+    typedef KeyV1Owned KeyOwned;
 
 };

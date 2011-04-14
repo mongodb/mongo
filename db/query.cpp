@@ -469,7 +469,7 @@ namespace mongo {
             if ( _bc ) {
                 if ( _firstMatch.isEmpty() ) {
                     _firstMatch = _bc->currKeyNode().key.toBson().getOwned();
-                    _firstMatchKey = Key(_firstMatch);
+                    _firstMatchKey = Key(_firstMatch.objdata());
                     // if not match
                     if ( _query.woCompare( _firstMatch, BSONObj(), false ) ) {
                         setComplete();
