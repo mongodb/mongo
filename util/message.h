@@ -74,6 +74,8 @@ namespace mongo {
         long long _elapsedTime;
 
         static const Listener* _timeTracker;
+
+        virtual bool useUnixSockets() const { return false; }
     };
 
     class AbstractMessagingPort : boost::noncopyable {

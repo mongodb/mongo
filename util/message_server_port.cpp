@@ -147,6 +147,7 @@ namespace mongo {
             initAndListen();
         }
 
+        virtual bool useUnixSockets() const { return true; }
     };
 
 
