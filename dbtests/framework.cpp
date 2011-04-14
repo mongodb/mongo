@@ -26,6 +26,7 @@
 #include "framework.h"
 #include "../util/file_allocator.h"
 #include "../db/dur.h"
+#include "../util/background.h"
 
 #ifndef _WIN32
 #include <cxxabi.h>
@@ -78,6 +79,10 @@ namespace mongo {
 
         Result * Result::cur = 0;
 
+        int minutesRunning = 0; // reset to 0 each time a new test starts
+        mutex minutesRunningMutex("minutesRunningMutex");
+        string currentTestName;
+
         Result * Suite::run( const string& filter ) {
             tlogLevel = -1;
 
@@ -106,6 +111,12 @@ namespace mongo {
 
                 stringstream err;
                 err << tc->getName() << "\t";
+
+                {
+                    scoped_lock lk(minutesRunningMutex);
+                    minutesRunning = 0;
+                    currentTestName = tc->getName();
+                }
 
                 try {
                     tc->run();
@@ -145,6 +156,28 @@ namespace mongo {
             cout << "usage: " << name << " [options] [suite]..." << endl
                  << options << "suite: run the specified test suite(s) only" << endl;
         }
+
+        class TestWatchDog : public BackgroundJob {
+        public:
+            virtual string name() const { return "TestWatchDog"; }
+            virtual void run(){
+
+                while (true) {
+                    sleepsecs(60);
+
+                    scoped_lock lk(minutesRunningMutex);
+                    minutesRunning++; //reset to 0 when new test starts
+
+                    if (minutesRunning > 30){
+                        log() << currentTestName << " has been running for more than 30 minutes. aborting." << endl;
+                        abort();
+                    }
+                    else if (minutesRunning > 1){
+                        warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
+                    }
+                }
+            }
+        };
 
         int Suite::run( int argc , char** argv , string default_dbpath ) {
             unsigned long long seed = time( 0 );
@@ -275,6 +308,9 @@ namespace mongo {
                 cout << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
 //                cmdLine.durOptions |= 8;
             }
+
+            TestWatchDog twd;
+            twd.go();
 
             int ret = run(suites,filter);
 
