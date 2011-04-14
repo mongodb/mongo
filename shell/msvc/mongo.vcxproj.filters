@@ -228,7 +228,7 @@
     <ClCompile Include="..\..\client\dbclient_rs.cpp">
       <Filter>client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\linenoise\linenoise_win32.cpp">
+    <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
       <Filter>thirdparty</Filter>
     </ClCompile>
   </ItemGroup>
