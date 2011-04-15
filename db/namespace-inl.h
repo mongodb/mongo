@@ -77,7 +77,7 @@ namespace mongo {
         if ( ! e ) {
             if ( missingExpected )
                 throw MsgAssertionException( 13283 , "Missing Extra" );
-            massert(13282, "missing Extra", e);
+            massert(14045, "missing Extra", e);
         }
         int i = idxNo - NIndexesBase;
         if( i >= NIndexesExtra ) {

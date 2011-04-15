@@ -136,14 +136,16 @@ namespace mongo {
             return true;
         }
 
-        if ( tryNumber < 4 ) {
-            LOG(1) << "going to retry checkShardVersion" << endl;
-            sleepmillis( 10 );
-            checkShardVersion( conn , ns , 1 , tryNumber + 1 );
+        const int maxNumTries = 7;
+        if ( tryNumber < maxNumTries ) {
+            LOG( tryNumber < ( maxNumTries / 2 ) ) 
+                << "going to retry checkShardVersion host: " << conn.getServerAddress() << " " << result << endl;
+            sleepmillis( 10 * tryNumber );
+            checkShardVersion( conn , ns , true , tryNumber + 1 );
             return true;
         }
         
-        string errmsg = str::stream() << "setShardVersion failed host[" << conn.getServerAddress() << "] " << result;
+        string errmsg = str::stream() << "setShardVersion failed host: " << conn.getServerAddress() << " " << result;
         log() << "     " << errmsg << endl;
         massert( 10429 , errmsg , 0 );
         return true;

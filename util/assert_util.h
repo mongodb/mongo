@@ -219,9 +219,9 @@ namespace mongo {
     } catch ( const std::exception &e ) { \
         stringstream ss; \
         ss << msg << " caught boost exception: " << e.what();   \
-        msgasserted( 13294 , ss.str() );        \
+        msgasserted( 14043 , ss.str() );        \
     } catch ( ... ) { \
-        msgasserted( 10437 , string("unknown boost failed ") + msg );   \
+        msgasserted( 14044 , string("unknown boost failed ") + msg );   \
     }
 
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD

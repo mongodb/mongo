@@ -126,7 +126,7 @@ namespace mongo {
                 return;
             }
             default: {
-                massert( 12600, "invalid _findingStartMode", false );
+                massert( 14038, "invalid _findingStartMode", false );
             }
             }
         }
