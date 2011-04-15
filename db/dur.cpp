@@ -678,7 +678,7 @@ namespace mongo {
                             Timer t;
                             journalRotate(); // note we do this part outside of mongomutex
                             millis -= t.millis();
-                            assert( millis <= groupCommitIntervalMs );
+                            wassert( millis <= groupCommitIntervalMs ); // race if groupCommitIntervalMs was changing by another thread so wassert
                             if( millis < 2 )
                                 millis = 2;
                         }
