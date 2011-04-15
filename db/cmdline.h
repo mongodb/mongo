@@ -113,12 +113,25 @@ namespace mongo {
                            boost::program_options::variables_map &output );
     };
 
+    inline CmdLine::CmdLine() :
+        port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
+        configsvr(false),
+        quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
+        syncdelay(60), socket("/tmp") 
+    {
+        // default may change for this later.
+#if defined(_DURABLEDEFAULTON)
+        dur = true;
+#else
+        dur = false;
+#endif
+    }
+            
     extern CmdLine cmdLine;
 
     void setupCoreSignals();
 
     string prettyHostName();
-
 
     /**
      * used for setParameter
