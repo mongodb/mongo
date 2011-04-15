@@ -540,7 +540,7 @@ namespace mongo {
                 {
                     stringstream ss;
                     ss << "couldn't start process " << argv_[0];
-                    uassert(13294, ss.str(), success);
+                    uassert(14042, ss.str(), success);
                 }
 
                 CloseHandle(pi.hThread);
