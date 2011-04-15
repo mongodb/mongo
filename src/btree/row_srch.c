@@ -23,7 +23,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
 	uint32_t base, indx, limit, slot, write_gen;
-	int cmp, ret;
+	int cmp, ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	session->srch_page = NULL;			/* Return values. */
 	session->srch_write_gen = 0;
@@ -34,14 +34,16 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	session->srch_upd = NULL;
 	session->srch_slot = UINT32_MAX;
 
-	/* Assume we don't match in case we're searching an empty tree. */
-	cmp = -1;
 	btree = session->btree;
+	func = btree->btree_compare;
 	rip = NULL;
 	rref = NULL;
 
 	WT_DB_FCHK(btree,
 	    "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
+
+	/* Assume we don't match in case we're searching an empty tree. */
+	cmp = -1;
 
 	/* Search the tree. */
 	for (page = btree->root_page.page; page->type == WT_PAGE_ROW_INT;) {
@@ -65,15 +67,9 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 			 * sorts less than any application key.  This test is so
 			 * we don't have to update internal pages if the
 			 * application stores a new, "smallest" key in the tree.
-			 *
-			 * For the record, we still maintain the key at the 0th
-			 * location because it means tree verification and other
-			 * code that processes a level of the tree doesn't need
-			 * to know about this hack.
 			 */
 			if (indx != 0) {
-				cmp = btree->btree_compare(
-				    btree, key, (WT_ITEM *)rref);
+				cmp = func(btree, key, (WT_ITEM *)rref);
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -141,7 +137,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		if (__wt_key_process(rip))
 			WT_ERR(__wt_key_build(session, page, rip, NULL));
 
-		cmp = btree->btree_compare(btree, key, (WT_ITEM *)rip);
+		cmp = func(btree, key, (WT_ITEM *)rip);
 		if (cmp == 0)
 			break;
 		if (cmp < 0)
@@ -257,9 +253,10 @@ __wt_ins_search(SESSION *session, WT_INSERT *ins, WT_ITEM *key)
 {
 	WT_ITEM insert_key;
 	BTREE *btree;
-	int cmp;
+	int cmp, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
+	func = btree->btree_compare;
 
 	/*
 	 * The insert list is a sorted, forward-linked list -- on average, we
@@ -268,7 +265,7 @@ __wt_ins_search(SESSION *session, WT_INSERT *ins, WT_ITEM *key)
 	for (; ins != NULL; ins = ins->next) {
 		insert_key.data = WT_INSERT_KEY(ins);
 		insert_key.size = WT_INSERT_KEY_SIZE(ins);
-		cmp = btree->btree_compare(btree, key, &insert_key);
+		cmp = func(btree, key, &insert_key);
 		if (cmp == 0) {
 			session->srch_ins = NULL;
 			session->srch_vupdate = ins->upd;
