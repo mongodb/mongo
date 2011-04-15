@@ -138,7 +138,7 @@ namespace mongo {
 
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
-            LOG( tryNumber < ( maxNumTries / 2 ) ) 
+            LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
                 << "going to retry checkShardVersion host: " << conn.getServerAddress() << " " << result << endl;
             sleepmillis( 10 * tryNumber );
             checkShardVersion( conn , ns , true , tryNumber + 1 );
