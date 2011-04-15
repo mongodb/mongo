@@ -68,44 +68,9 @@ namespace mongo {
             bool ok = VirtualProtect((void*)protectStart, protectSize, PAGE_WRITECOPY, &old);
             if( !ok ) {
                 DWORD e = GetLastError();
-                log() << "VirtualProtect failed " << chunkno << hex << protectStart << ' ' << protectSize << ' ' << errnoWithDescription(e) << endl;
+                log() << "VirtualProtect failed (mcw) " << mmf->filename() << ' ' << chunkno << hex << protectStart << ' ' << protectSize << ' ' << errnoWithDescription(e) << endl;
                 assert(false);
             }
-        }
-
-        writable.set(chunkno);
-    }
-
-    __declspec(noinline) void makeChunkWritableOld(size_t chunkno) { 
-        scoped_lock lk(mapViewMutex);
-
-        if( writable.get(chunkno) )
-            return;
-
-        size_t loc = chunkno * MemoryMappedFile::ChunkSize;
-        void *Loc = (void*) loc;
-        size_t ofs;
-        MongoMMF *mmf = privateViews.find( (void *) (loc), ofs );
-        MemoryMappedFile *f = (MemoryMappedFile*) mmf;
-        assert(f);
-
-        size_t len = MemoryMappedFile::ChunkSize;
-        assert( mmf->getView() <= Loc );
-        if( ofs + len > f->length() ) {
-            // at the very end of the map
-            len = (size_t) (f->length() - ofs);
-        }
-        else { 
-            ;
-        }
-
-        // todo: check this goes away on remap
-        DWORD old;
-        bool ok = VirtualProtect(Loc, len, PAGE_WRITECOPY, &old);
-        if( !ok ) {
-            DWORD e = GetLastError();
-            log() << "VirtualProtect failed " << Loc << ' ' << len << ' ' << errnoWithDescription(e) << endl;
-            assert(false);
         }
 
         writable.set(chunkno);
@@ -133,7 +98,17 @@ namespace mongo {
         scoped_lock lk(mapViewMutex);
 
         clearWritableBits(oldPrivateAddr);
-
+#if 1
+        // https://jira.mongodb.org/browse/SERVER-2942
+        DWORD old;
+        bool ok = VirtualProtect(oldPrivateAddr, len, PAGE_READONLY, &old);
+        if( !ok ) {
+            DWORD e = GetLastError();
+            log() << "VirtualProtect failed in remapPrivateView " << filename() << hex << oldPrivateAddr << ' ' << len << ' ' << errnoWithDescription(e) << endl;
+            assert(false);
+        }
+        return oldPrivateAddr;
+#else
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD e = GetLastError();
             log() << "UnMapViewOfFile failed " << filename() << ' ' << errnoWithDescription(e) << endl;
@@ -151,8 +126,8 @@ namespace mongo {
             assert(p);
         }
         assert(p == oldPrivateAddr);
-
         return p;
+#endif
     }
 #endif
 
