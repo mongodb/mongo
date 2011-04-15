@@ -2051,7 +2051,7 @@ namespace mongo {
         bool ok = false;
         BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
         if ( ok )
-            log(2) << fo.op() << " file " << q.string() << '\n';
+            log(2) << fo.op() << " file " << q.string() << endl;
         int i = 0;
         int extra = 10; // should not be necessary, this is defensive in case there are missing files
         while ( 1 ) {
