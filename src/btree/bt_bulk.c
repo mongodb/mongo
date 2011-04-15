@@ -927,9 +927,9 @@ __wt_item_build_key(
 	WT_CELL_CLEAR(cell);
 
 	/*
-	 * We're called with a WT_ITEM that references a data/size pair.  We can
-	 * re-point that WT_ITEM's data and size fields to other memory, and if
-	 * we allocate memory in that WT_ITEM, the caller must free it.
+	 * We're called with a WT_BUF that references a data/size pair.  We can
+	 * re-point that WT_BUF's data and size fields to other memory, and if
+	 * we allocate memory in that WT_BUF, the caller must free it.
 	 *
 	 * Optionally compress the value using the Huffman engine.  For Huffman-
 	 * encoded key/data cells, we need additional memory; use the SESSION
@@ -975,9 +975,9 @@ __wt_item_build_value(
 	WT_CELL_CLEAR(cell);
 
 	/*
-	 * We're called with a WT_ITEM that references a data/size pair.  We can
-	 * re-point that WT_ITEM's data and size fields to other memory, and if
-	 * we allocate memory in that WT_ITEM, the caller must free it.
+	 * We're called with a WT_BUF that references a data/size pair.  We can
+	 * re-point that WT_BUF's data and size fields to other memory, and if
+	 * we allocate memory in that WT_BUF, the caller must free it.
 	 *
 	 * Optionally compress the value using the Huffman engine.  For Huffman-
 	 * encoded key/data cells, we need additional memory; use the SESSION
