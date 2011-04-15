@@ -723,8 +723,10 @@ int linenoiseHistorySave(const char *filename) {
     int j;
     
     if (fp == NULL) return -1;
-    for (j = 0; j < history_len; j++)
-        fprintf(fp,"%s\n",history[j]);
+    for (j = 0; j < history_len; j++){
+        if (history[j][0] != '\0')
+            fprintf(fp,"%s\n",history[j]);
+    }
     fclose(fp);
     return 0;
 }
@@ -746,7 +748,8 @@ int linenoiseHistoryLoad(const char *filename) {
         p = strchr(buf,'\r');
         if (!p) p = strchr(buf,'\n');
         if (p) *p = '\0';
-        linenoiseHistoryAdd(buf);
+        if (p != buf)
+            linenoiseHistoryAdd(buf);
     }
     fclose(fp);
     return 0;
