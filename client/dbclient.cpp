@@ -294,7 +294,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
+    const BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
 
     BSONObj DBClientWithCommands::getLastErrorDetailed() {
         BSONObj info;
@@ -314,7 +314,7 @@ namespace mongo {
         return e.str();
     }
 
-    BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
+    const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
 
     BSONObj DBClientWithCommands::getPrevError() {
         BSONObj info;

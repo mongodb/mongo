@@ -459,6 +459,9 @@ namespace mongo {
         */
         virtual BSONObj getLastErrorDetailed();
 
+        /** Can be called with the returned value from getLastErrorDetailed to extract an error string. 
+            If all you need is the string, just call getLastError() instead.
+        */
         static string getLastErrorString( const BSONObj& res );
 
         /** Return the last error which has occurred, even if not the very last operation.
