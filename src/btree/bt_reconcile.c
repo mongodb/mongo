@@ -1051,10 +1051,24 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 
 	/*
 	 * There are two kinds of row-store internal pages we reconcile: the
-	 * first is a page created entirely in-memory (for example, the result
-	 * of a root split), in which case there's no underlying disk image.
-	 * The second is a page read from disk, in which case we take the keys
-	 * from the underlying disk image.  The first case is handled here.
+	 * first is a page created entirely in-memory, in which case there's
+	 * no underlying disk image.  The second is a page read from disk,
+	 * in which case we can take the keys from the underlying disk image.
+	 *
+	 * Internal pages created in-memory are always merged into their parent
+	 * in order to keep the tree from growing deeper on every split.  For
+	 * that reason, reconciliation of those pages consists of updating the
+	 * page state and returning, as none of the real work of reconciliation
+	 * is done until the parent page into which the created pages will be
+	 * merged is itself reconciled.  In other words, we ignore internally
+	 * created pages until that parent is reconciled, at which time we walk
+	 * the subtree rooted in that parent and consolidate the merged pages.
+	 *
+	 * There is a special case: if the root splits, there's no parent into
+	 * which it can be merged, so the reconciliation code turns off the
+	 * merge flag, and reconciles the page anyway.  In that case we end up
+	 * here, with no disk image.  This code is here to handle that specific
+	 * case.
 	 */
 	if (page->XXdsk == NULL) {
 		WT_RET(__wt_rec_row_merge(session, page));
