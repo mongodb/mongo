@@ -852,6 +852,10 @@ int main(int argc, char* argv[]) {
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
         }
+        if (params.count("allocateFixedSizes"))
+        {
+        	cmdLine.allocateFixedSizes = true;
+        }
         if (params.count("diaglog")) {
             int x = params["diaglog"].as<int>();
             if ( x < 0 || x > 7 ) {

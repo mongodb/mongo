@@ -29,7 +29,7 @@ namespace mongo {
         CmdLine() :
             port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
             quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
-            syncdelay(60), socket("/tmp") {
+            syncdelay(60), socket("/tmp"), allocateFixedSizes(false) {
             // default may change for this later.
 #if defined(_DURABLEDEFAULTON)
             dur = true;
@@ -71,7 +71,7 @@ namespace mongo {
         bool noTableScan;      // --notablescan no table scans allowed
         bool prealloc;         // --noprealloc no preallocation of data files
         bool smallfiles;       // --smallfiles allocate smaller data files
-
+        bool allocateFixedSizes; // --allocateFixedSizes allocate records of fixed sizes
         bool quota;            // --quota
         int quotaFiles;        // --quotaFiles
         bool cpu;              // --cpu show cpu time periodically

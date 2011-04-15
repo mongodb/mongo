@@ -1559,7 +1559,7 @@ namespace mongo {
 
         // If the collection is not capped then allocate the length to the next
         // bucket size
-        if (!d->capped)
+        if (cmdLine.allocateFixedSizes && !d->capped)
         {
         	lenWHdr = bucketSizes[d->bucket(lenWHdr)];
         }
