@@ -529,7 +529,9 @@ namespace mongo {
                     log() << "warning: slow scan in allocFromFreeList (in write lock)" << endl;
                 }
             }
-            OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
+
+            if( n > 128 ) log( n < 512 ) << "warning: newExtent " << n << " scanned\n";
+
             if( best ) {
                 Extent *e = best;
                 // remove from the free list

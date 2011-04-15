@@ -467,16 +467,16 @@ printShardingStatus = function( configDB , verbose ){
     output( "  sharding version: " + tojson( configDB.getCollection( "version" ).findOne() ) );
     
     output( "  shards:" );
-    configDB.shards.find().forEach( 
+    configDB.shards.find().sort( { _id : 1 } ).forEach( 
         function(z){
-            output( "      " + tojson(z) );
+            output( "\t" + tojsononeline( z ) );
         }
     );
 
     output( "  databases:" );
     configDB.databases.find().sort( { name : 1 } ).forEach( 
         function(db){
-            output( "\t" + tojson(db,"",true) );
+            output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
                 configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(

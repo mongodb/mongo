@@ -1154,7 +1154,8 @@ if darwin or clientEnv["_HAVEPCAP"]:
 
 # --- shell ---
 
-env.JSHeader( "shell/mongo.cpp"  , ["shell/utils.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
+# note, if you add a file here, need to add in engine.cpp currently
+env.JSHeader( "shell/mongo.cpp"  , Glob( "shell/utils*.js" ) + [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
 env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
 
