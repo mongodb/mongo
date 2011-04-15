@@ -945,7 +945,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 {
 	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	WT_COL *cip;
-	WT_BUF *value, value_buf;
+	WT_BUF *value, _value;
 	WT_CELL value_cell, *cell;
 	WT_OVFL value_ovfl;
 	WT_REC_LIST *r;
@@ -955,8 +955,8 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 	r = &S2C(session)->cache->reclist;
 
 	WT_CLEAR(value_cell);
-	WT_CLEAR(value_buf);
-	value = &value_buf;
+	WT_CLEAR(_value);
+	value = &_value;
 
 	WT_RET(__wt_split_init(session, page,
 	    page->u.col_leaf.recno,
@@ -1021,6 +1021,10 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 		/* Update the starting record number in case we split. */
 		++r->recno;
 	}
+
+	/* Free any allocated memory. */
+	if (value->mem != NULL)
+		__wt_buf_free(session, value);
 
 	/* Write the remnant page. */
 	return (__wt_split(session, 1));
@@ -1188,6 +1192,7 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 		r->entries += 2;
 	}
 
+	/* Free any allocated memory. */
 	if (key.mem != NULL)
 		__wt_buf_free(session, &key);
 
@@ -1348,6 +1353,7 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 			WT_RET(__wt_rec_row_leaf_insert(session, ins));
 	}
 
+	/* Free any allocated memory. */
 	if (value_buf.mem != NULL)
 		__wt_buf_free(session, &value_buf);
 
@@ -1418,6 +1424,7 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		++r->entries;
 	}
 
+	/* Free any allocated memory. */
 	if (key_buf.mem != NULL)
 		__wt_buf_free(session, &key_buf);
 	if (value_buf.mem != NULL)
