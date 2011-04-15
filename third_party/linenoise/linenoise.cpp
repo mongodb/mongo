@@ -127,6 +127,7 @@ static int rawmode = 0; /* for atexit() function to check if restore is needed*/
 static int atexit_registered = 0; /* register atexit just 1 time */
 static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
 static int history_len = 0;
+static int history_index = 0;
 char **history = NULL;
 
 static void linenoiseAtExit(void);
@@ -444,13 +445,13 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     size_t pos = 0;
     size_t len = 0;
     size_t cols = getColumns();
-    int history_index = 0;
 
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
 
     /* The latest history entry is always our current buffer, that
      * initially is just an empty string. */
+    history_index = history_len; /* about to point to "" */
     linenoiseHistoryAdd("");
     
     if (write(1,prompt,plen) == -1) return -1;
@@ -536,10 +537,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             if (history_len > 1) {
                 /* Update the current history entry before to
                  * overwrite it with tne next one. */
-                free(history[history_len-1-history_index]);
-                history[history_len-1-history_index] = strdup(buf);
+                free(history[history_index]);
+                history[history_index] = strdup(buf);
                 /* Show the new entry */
-                history_index += (c == 16) ? 1 : -1;
+                history_index += (c == 16) ? -1 : 1;
                 if (history_index < 0) {
                     history_index = 0;
                     break;
@@ -547,7 +548,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                     history_index = history_len-1;
                     break;
                 }
-                strncpy(buf,history[history_len-1-history_index],buflen);
+                strncpy(buf,history[history_index],buflen);
                 buf[buflen] = '\0';
                 len = pos = strlen(buf);
                 refreshLine(fd,prompt,buf,len,pos,cols);
