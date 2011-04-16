@@ -35,6 +35,8 @@ typedef struct {
 	uint32_t space_avail;		/* Remaining space in this chunk */
 	uint32_t entries;		/* Current number of entries */
 
+	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
+
 	/*
 	 * As pages are reconciled, inactive pages are merged into their parents
 	 * and discarded.  If an inactive page is discarded, but the parent page
