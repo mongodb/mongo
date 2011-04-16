@@ -194,19 +194,24 @@ __wt_cache_evict_server(void *arg)
 		}
 	}
 
-err:	if (cache->evict != NULL)
-		__wt_free(session, cache->evict);
-	if (cache->hazard != NULL)
-		__wt_free(session, cache->hazard);
+	if (ret == 0) {
+		if (__wt_cache_bytes_inuse(cache) != 0)
+			__wt_errx(session,
+			    "cache server: exiting with %llu pages, %llu bytes "
+			    "in use",
+			    (unsigned long long)__wt_cache_pages_inuse(cache),
+			    (unsigned long long)__wt_cache_bytes_inuse(cache));
+	} else
+err:		__wt_err(session, ret, "cache eviction server error");
 
-	if (ret != 0)
-		__wt_err(session, ret, "cache eviction server error");
 
 	WT_VERBOSE(conn, WT_VERB_EVICT,
 	    (session, "cache eviction server exiting"));
 
-	WT_VERBOSE(conn, WT_VERB_EVICT, (session,
-	    "cache server: bytes in use %llu", __wt_cache_bytes_inuse(cache)));
+	if (cache->evict != NULL)
+		__wt_free(session, cache->evict);
+	if (cache->hazard != NULL)
+		__wt_free(session, cache->hazard);
 
 	if (session != &conn->default_session)
 		WT_TRET(__wt_session_close(session));
