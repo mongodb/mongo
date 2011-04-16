@@ -462,7 +462,7 @@ namespace PerfTests {
             BSONObj q = BSON("x" << x);
             client().update(ns(), q, I);
 
-            static string s = name()+" inc";
+            static string s = name()+"-inc";
             return s.c_str();
         }
 
