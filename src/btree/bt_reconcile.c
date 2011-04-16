@@ -1087,12 +1087,42 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 		 * page created as part of a split or a deleted page.  Internal
 		 * pages are merged into their parents, both internal and empty
 		 * pages are added to the discard list.
+		 *
+		 * There's one special case we have to handle here: the internal
+		 * page being merged has a potentially incorrect first key and
+		 * we need to replace it with the one we have.  The problem is
+		 * caused by the fact that the page search algorithm coerces the
+		 * 0th key on any internal page to be smaller than any search
+		 * key.  We do that because we don't want to have to update the
+		 * internal pages every time a new "smallest" key is inserted
+		 * into the tree.  But, if a new "smallest" key is inserted into
+		 * our split-created subtree, and we don't update the internal
+		 * page, when we merge that internal page into its parent page,
+		 * the key may be incorrect.  Imagine the following tree:
+		 *
+		 *	2	5	40	internal page
+		 *		|
+		 * 	    10  | 20		split-created internal page
+		 *	    |
+		 *	    6			inserted smallest key
+		 *
+		 * after a simple merge, we'd have corruption:
+		 *
+		 *	2    10    20	40	merged internal page
+		 *	     |
+		 *	     6			key sorts before parent's key
+		 *
+		 * To fix this problem, we take the original page's key as our
+		 * first key, because we know that key sorts before any possible
+		 * key inserted into the subtree, and discard whatever 0th key
+		 * is on the split-created internal page.
 		 */
 		if (WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE) {
 			ref_page = WT_ROW_REF_PAGE(rref);
-			if (F_ISSET(ref_page, WT_PAGE_SPLIT))
+			if (F_ISSET(ref_page, WT_PAGE_SPLIT)) {
+				r->merge_ref = rref;
 				WT_RET(__wt_rec_row_merge(session, ref_page));
-			else
+			} else
 				WT_ASSERT(session,
 				    F_ISSET(ref_page, WT_PAGE_DELETED));
 			WT_RET(__wt_rec_inactive_append(session, ref_page));
@@ -1175,9 +1205,20 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 			continue;
 		}
 
-		/* Build a key to store on the page. */
-		key.data = rref->key;
-		key.size = rref->size;
+		/*
+		 * Build a key to store on the page.  If this is the 0th key in
+		 * a "to be merged" subtree, use merge correction key that was
+		 * saved off before this function was called from the top-level
+		 * parent page.
+		 */
+		if (r->merge_ref == NULL) {
+			key.data = rref->key;
+			key.size = rref->size;
+		} else {
+			key.data = r->merge_ref->key;
+			key.size = r->merge_ref->size;
+			r->merge_ref = NULL;
+		}
 		WT_RET(__wt_item_build_key(session, &key, &cell, &key_ovfl));
 
 		/* Boundary: allocate, split or write the page. */
