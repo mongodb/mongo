@@ -202,6 +202,15 @@ skip_clean_check:
 	}
 
 	/*
+	 * Optionally discard the original page and any inactive pages merged
+	 * during reconciliation.
+	 */
+	if (discard) {
+		__wt_page_discard(session, page);
+		__wt_rec_inactive_discard(session);
+	}
+
+	/*
 	 * Newly created internal pages are normally merged into their parents
 	 * when said parent is reconciled.  Newly split root pages can't be
 	 * merged (as they have no parent), the new root page must be written.
@@ -221,15 +230,6 @@ skip_clean_check:
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		ret = __wt_page_reconcile(
 		    session, btree->root_page.page, 0, discard);
-	}
-
-	/*
-	 * Optionally discard the original page and any inactive pages merged
-	 * during reconciliation.
-	 */
-	if (discard) {
-		__wt_page_discard(session, page);
-		__wt_rec_inactive_discard(session);
 	}
 
 	return (ret);
