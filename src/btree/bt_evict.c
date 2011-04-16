@@ -23,6 +23,7 @@ static void __wt_evict_state_check(SESSION *);
 static int  __wt_evict_subtrees(WT_PAGE *);
 static int  __wt_evict_walk(SESSION *);
 static int  __wt_evict_walk_file(SESSION *, BTREE *, u_int);
+static int  __wt_evict_worker(SESSION *);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_evict_hazard_validate(CONNECTION *, WT_PAGE *);
@@ -133,7 +134,6 @@ __wt_cache_evict_server(void *arg)
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CACHE *cache;
-	uint64_t bytes_inuse, bytes_max;
 	int ret;
 
 	conn = arg;
@@ -174,24 +174,8 @@ __wt_cache_evict_server(void *arg)
 		/* Walk the eviction-request queue. */
 		WT_ERR(__wt_evict_request_walk(session));
 
-		/* Evict pages from the cache. */
-		for (;;) {
-			/*
-			 * If we've locked out reads, keep evicting until we
-			 * get to at least 5% under the maximum cache.  Else,
-			 * quit evicting as soon as we get under the maximum
-			 * cache.
-			 */
-			bytes_inuse = __wt_cache_bytes_inuse(cache);
-			bytes_max = WT_STAT(cache->stats, cache_bytes_max);
-			if (cache->read_lockout) {
-				if (bytes_inuse <= bytes_max - (bytes_max / 20))
-					break;
-			} else if (bytes_inuse < bytes_max)
-				break;
-
-			WT_ERR(__wt_evict(session));
-		}
+		/* Evict pages from the cache as needed. */
+		WT_ERR(__wt_evict_worker(session));
 	}
 
 	if (ret == 0) {
@@ -268,6 +252,53 @@ __wt_evict_request_walk(SESSION *session)
 		WT_EVICT_REQ_CLR(er);
 
 		__wt_session_serialize_wrapup(session, NULL, ret);
+	}
+	return (0);
+}
+
+/*
+ * __wt_evict_worker --
+ *	Evict pages from memory.
+ */
+static int
+__wt_evict_worker(SESSION *session)
+{
+	WT_CACHE *cache;
+	uint64_t bytes_start, bytes_inuse, bytes_max;
+	int loop;
+
+	cache = S2C(session)->cache;
+
+	/* Evict pages from the cache. */
+	for (loop = 0;;) {
+		/*
+		 * If we've locked out reads, keep evicting until we get to at
+		 * least 5% under the maximum cache.  Else, quit evicting as
+		 * soon as we get under the maximum cache.
+		 */
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		bytes_max = WT_STAT(cache->stats, cache_bytes_max);
+		if (cache->read_lockout) {
+			if (bytes_inuse <= bytes_max - (bytes_max / 20))
+				break;
+		} else if (bytes_inuse < bytes_max)
+			break;
+
+		bytes_start = bytes_inuse;
+		WT_RET(__wt_evict(session));
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+
+		/*
+		 * If we're making progress, keep going; if we're not making
+		 * any progress at all, go back to sleep, it's not something
+		 * we can fix.
+		 */
+		if (bytes_start == bytes_inuse && ++loop == 10) {
+			__wt_errx(session,
+			    "cache server: unable to evict pages from the "
+			    "cache");
+			break;
+		}
 	}
 	return (0);
 }
