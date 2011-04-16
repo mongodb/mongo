@@ -1,6 +1,6 @@
 // tests sharding with replica sets
 
-s = new ShardingTest( "rs1" , 3 , 1 , 2 , { rs : true , chunksize : 1 } )
+s = new ShardingTest( "rs1" , 3 /* numShards */, 1 /* verboseLevel */, 2 /* numMongos */, { rs : true , chunksize : 1 } )
 
 s.adminCommand( { enablesharding : "test" } );
 
