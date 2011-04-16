@@ -180,7 +180,8 @@ skip_clean_check:
 	/*
 	 * Resolve the WT_REC_LIST information and update the parent -- note,
 	 * the wrapup routine may clear the discard flag, for deleted pages
-	 * that shouldn't be discarded.
+	 * that shouldn't be discarded, or set the discard flag for pages that
+	 * are no longer useful because they've been replaced by a split page.
 	 */
 	WT_RET(__wt_rec_wrapup(session, page, &discard));
 
@@ -1570,9 +1571,22 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int *discardp)
 		break;
 	}
 
-	/* Update the parent to reference the new internal page. */
-	return (__wt_rec_parent_update_dirty(session,
-	    page, new, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
+	/*
+	 * Split pages are no longer useful, they've been replaced by a new
+	 * internal page.
+	 */
+	*discardp = 1;
+
+	/*
+	 * Update the parent to reference the new internal page.   Note that
+	 * newly created internal pages are always marked as inactive.  This
+	 * is reasonable (if we're flushing the page, how useful could it have
+	 * been?), and necessary (if we're walking the tree to flush all of
+	 * the dirty pages then we need to know this new page can simply be
+	 * merged into its parent without additional work.
+	 */
+	return (__wt_rec_parent_update_dirty(
+	    session, page, new, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
 }
 
 /*
