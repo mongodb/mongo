@@ -1707,6 +1707,10 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 		__wt_buf_clear(&r_list->key);
 		WT_ROW_REF_ADDR(rref) = r_list->off.addr;
 		WT_ROW_REF_SIZE(rref) = r_list->off.size;
+
+		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
+		    "split: %lu (%luB)",
+		    (u_long)r_list->off.addr, (u_long)r_list->off.size));
 	}
 
 	*splitp = page;
