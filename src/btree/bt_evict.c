@@ -188,7 +188,6 @@ __wt_cache_evict_server(void *arg)
 	} else
 err:		__wt_err(session, ret, "cache eviction server error");
 
-
 	WT_VERBOSE(conn, WT_VERB_EVICT,
 	    (session, "cache eviction server exiting"));
 
