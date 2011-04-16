@@ -285,7 +285,6 @@ __wt_split_init(
 	 * to go back and split the page up when we eventually overflow the
 	 * maximum page size.
 	 */
-	r->page_size = max;
 	r->split_page_size = WT_ALIGN((max / 4) * 3, btree->allocsize);
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -303,6 +302,7 @@ __wt_split_init(
 	if (max == r->split_page_size) {
 		r->split_avail = max - WT_PAGE_DISK_SIZE;
 		r->split_count = 0;
+		r->split_remain = 0;
 	} else {
 		/*
 		 * Pre-calculate the bytes available in a split-sized page and
@@ -310,6 +310,7 @@ __wt_split_init(
 		 */
 		r->split_avail = r->split_page_size - WT_PAGE_DISK_SIZE;
 		r->split_count = max / r->split_avail;
+		r->split_remain = max - (r->split_count * r->split_avail);
 
 		/*
 		 * We know the maximum number of items we'll have to save, make
@@ -348,8 +349,8 @@ __wt_split_init(
 	 * Set the caller's information and configure so the loop calls us
 	 * when approaching the split boundary.
 	 */
-	r->entries = 0;
 	r->recno = recno;
+	r->entries = 0;
 	r->first_free = WT_PAGE_DISK_BYTE(dsk);
 	r->space_avail = r->split_avail;
 	return (0);
@@ -366,9 +367,7 @@ __wt_split(SESSION *session, int done)
 	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
 	struct rec_save *r_save;
-	int ret, which;
-
-	ret = 0;
+	int which;
 
 	/*
 	 * Handle page-buffer size tracking; we have to do this work in every
@@ -419,41 +418,44 @@ __wt_split(SESSION *session, int done)
 	case 1:
 		/* We're done, write the remaining information. */
 		dsk->u.entries = r->entries;
-		ret = __wt_split_write(session,
-		    r->entries == 0 ? 1 : 0, r->dsk_tmp, r->first_free);
+		WT_RET(__wt_split_write(session,
+		    r->entries == 0 ? 1 : 0, r->dsk_tmp, r->first_free));
 		break;
 	case 2:
 		/*
 		 * Save the information about where we are when the split would
 		 * have happened.
+		 *
+		 * The first time through, set the starting record number and
+		 * buffer address for the first slot from well-known values.
 		 */
-		r_save = &r->save[r->s_next];
 		if (r->s_next == 0) {
-			r_save->recno = dsk->recno;
-			r_save->start = WT_PAGE_DISK_BYTE(dsk);
+			r->save[0].recno = dsk->recno;
+			r->save[0].start = WT_PAGE_DISK_BYTE(dsk);
 		}
+
+		/* Set the number of entries for the just finished chunk. */
+		r_save = &r->save[r->s_next++];
 		r_save->entries = r->entries - r->total_split_entries;
 		r->total_split_entries = r->entries;
+
+		/*
+		 * Set the starting record number and buffer address for the
+		 * next chunk.
+		 */
 		++r_save;
 		r_save->recno = r->recno;
 		r_save->start = r->first_free;
 
-		++r->s_next;
-
 		/*
-		 * Give our caller more space, hopefully it will all fit!
-		 *
-		 * Notice we're not increasing the space our caller has, instead
-		 * setting it to a maximum, that's because we want our caller to
-		 * call again when it approaches another split-size boundary.
-		 *
-		 * However, the maximum page size may not be a multiple of the
-		 * split page size -- on the last part of the page, whatever
-		 * space left is what we have.
+		 * Set the space available to another split-size chunk, if we
+		 * have one.  As the page size may not be a multiple of the
+		 * split chunk size, whatever space we have left when we reach
+		 * the end of the page is what we have, add the remainder to
+		 * whatever we still have at this point.
 		 */
 		if (--r->split_count == 0)
-			r->space_avail =
-			    r->page_size - WT_PTRDIFF32(r->first_free, dsk);
+			r->space_avail += r->split_remain;
 		else
 			r->space_avail = r->split_avail;
 		break;
@@ -465,7 +467,7 @@ __wt_split(SESSION *session, int done)
 		 * split page pieces we have tracked, and reset our caller's
 		 * information with any remnant we don't write.
 		 */
-		ret = __wt_split_fixup(session);
+		WT_RET(__wt_split_fixup(session));
 
 		/* Set the starting record number for the next set of items. */
 		dsk->recno = r->recno;
@@ -486,9 +488,9 @@ __wt_split(SESSION *session, int done)
 		WT_RET(__wt_split_write(session, 0, r->dsk_tmp, r->first_free));
 
 		/*
-		 * Set the starting record number for the next set of items,
-		 * reset the caller's information -- we only get here if we
-		 * had to split, so we're using split-size chunks.
+		 * Set the starting record number and buffer address for the
+		 * next chunk; we only get here if we had to split, so we're
+		 * using split-size chunks from here on out.
 		 */
 		dsk->recno = r->recno;
 		r->entries = 0;
@@ -497,7 +499,7 @@ __wt_split(SESSION *session, int done)
 		break;
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*

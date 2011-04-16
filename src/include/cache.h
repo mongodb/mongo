@@ -79,10 +79,8 @@ typedef struct {
 	 * Reconciliation splits to a smaller-than-maximum page size when a
 	 * split is required so that we don't repeatedly split a packed page.
 	 *
-	 * page_size is the number of bytes in the maximum page size.
 	 * split_page_size is the page size of the split chunk.
 	 */
-	uint32_t page_size;			/* Maximum page size */
 	uint32_t split_page_size;		/* Split page size */
 
 	/*
@@ -90,11 +88,13 @@ typedef struct {
 	 * times we'll approach a split boundary before we've gone to the end
 	 * of the maximum page size.
 	 *
-	 * split_avail is the number of bytes available for each split chunk.
-	 * split_count: count down to split
+	 * split_avail:  number of bytes available for each split chunk
+	 * split_count:  count down to split
+	 * split_remain: number of bytes remaining after split_count chunks
 	 */
 	uint32_t split_avail;			/* Split bytes available */
 	uint32_t split_count;			/* Number of boundaries */
+	uint32_t split_remain;			/* Remainder */
 
 	/*
 	 * We track the total number of entries in split chunks so we can
