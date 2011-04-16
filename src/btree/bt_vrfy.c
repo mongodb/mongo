@@ -22,18 +22,20 @@ typedef struct {
 
 	uint64_t record_total;			/* Total record count */
 
-	WT_PAGE *leaf;				/* Last leaf-page */
+	WT_BUF  *max_key;			/* Largest key */
+	uint32_t max_addr;			/* Largest key page */
 } WT_VSTUFF;
 
 static int __wt_verify_addfrag(SESSION *, uint32_t, uint32_t, WT_VSTUFF *);
 static int __wt_verify_checkfrag(SESSION *, WT_VSTUFF *);
 static int __wt_verify_freelist(SESSION *, WT_VSTUFF *);
-static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_overflow(
 		SESSION *, WT_OVFL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __wt_verify_pc(SESSION *, WT_ROW_REF *, WT_PAGE *, int);
-static int __wt_verify_tree(
-		SESSION *, WT_ROW_REF *, WT_PAGE *, uint64_t, WT_VSTUFF *);
+static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_row_int_key_order(
+		SESSION *, WT_PAGE *, void *, WT_VSTUFF *);
+static int __wt_verify_row_leaf_key_order(SESSION *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_verify_tree(SESSION *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_btree_verify --
@@ -85,6 +87,8 @@ __wt_verify(SESSION *session, FILE *stream)
 	}
 	WT_ERR(bit_alloc(session, vstuff.frags, &vstuff.fragbits));
 	vstuff.stream = stream;
+	WT_ERR(__wt_scr_alloc(session, 0, &vstuff.max_key));
+	vstuff.max_addr = WT_ADDR_INVALID;
 
 	/*
 	 * The first sector of the file is the description record -- ignore
@@ -101,8 +105,8 @@ __wt_verify(SESSION *session, FILE *stream)
 	cache->only_evict_clean = 1;
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(session, NULL,
-	    btree->root_page.page, (uint64_t)1, &vstuff));
+	WT_ERR(__wt_verify_tree(
+	    session, btree->root_page.page, (uint64_t)1, &vstuff));
 
 	WT_ERR(__wt_verify_freelist(session, &vstuff));
 
@@ -116,6 +120,8 @@ err:	/* Wrap up reporting. */
 	/* Free allocated memory. */
 	if (vstuff.fragbits != NULL)
 		__wt_free(session, vstuff.fragbits);
+	if (vstuff.max_key != NULL)
+		__wt_scr_release(&vstuff.max_key);
 
 	return (ret);
 }
@@ -130,7 +136,6 @@ err:	/* Wrap up reporting. */
 static int
 __wt_verify_tree(
 	SESSION *session,		/* Thread of control */
-	WT_ROW_REF *parent_rref,	/* Parent key for this page, if any */
 	WT_PAGE *page,			/* Page to verify */
 	uint64_t parent_recno,		/* First record in this subtree */
 	WT_VSTUFF *vs)			/* The verify package */
@@ -185,15 +190,18 @@ __wt_verify_tree(
 	 * us.)
 	 */
 	WT_ASSERT(session, page->addr != WT_ADDR_INVALID);
-	WT_ERR(__wt_verify_addfrag(session, page->addr, page->size, vs));
+	WT_RET(__wt_verify_addfrag(session, page->addr, page->size, vs));
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (vs->stream != NULL)
-		WT_ERR(__wt_debug_page(session, page, NULL, vs->stream));
+		WT_RET(__wt_debug_page(session, page, NULL, vs->stream));
 #endif
 
-	/* Check the starting record number. */
+	/*
+	 * Column-store key order checks: check the starting record number,
+	 * then update the total record count.
+	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = page->u.col_int.recno;
@@ -209,12 +217,10 @@ recno_chk:	if (parent_recno != recno) {
 			    (u_long)page->addr,
 			    (unsigned long long)recno,
 			    (unsigned long long)parent_recno);
-			goto err;
+			return (WT_ERROR);
 		}
 		break;
 	}
-
-	/* Update the total record count. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
@@ -225,6 +231,17 @@ recno_chk:	if (parent_recno != recno) {
 		WT_COL_FOREACH(page, cip, i)
 			recno += WT_RLE_REPEAT_COUNT(WT_COL_PTR(page, cip));
 		vs->record_total += recno;
+		break;
+	}
+
+	/*
+	 * Row-store leaf page key order check: it's a depth-first traversal,
+	 * the first key on this page should be larger than any key previously
+	 * seen.
+	 */
+	switch (page->type) {
+	case WT_PAGE_ROW_LEAF:
+		WT_RET(__wt_verify_row_leaf_key_order(session, page, vs));
 		break;
 	}
 
@@ -257,9 +274,9 @@ recno_chk:	if (parent_recno != recno) {
 		/* For each entry in an internal page, verify the subtree. */
 		WT_COL_REF_FOREACH(page, cref, i) {
 			/*
-			 * We're doing a depth-first traversal: this entry's
-			 * starting record number should be 1 more than the
-			 * total records reviewed to this point.
+			 * It's a depth-first traversal: this entry's starting
+			 * record number should be 1 more than the total records
+			 * reviewed to this point.
 			 */
 			if (cref->recno != vs->record_total + 1) {
 				__wt_errx(session,
@@ -269,184 +286,181 @@ recno_chk:	if (parent_recno != recno) {
 				    (u_long)page->addr,
 				    (unsigned long long)cref->recno,
 				    (unsigned long long)vs->record_total + 1);
-				goto err;
+				return (WT_ERROR);
 			}
 
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
-			WT_ERR(__wt_page_in(session, page, ref, 1));
+			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __wt_verify_tree(
-			    session, NULL, ref->page, cref->recno, vs);
+			    session, ref->page, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
-				goto err;
+				return (ret);
 		}
 		break;
 	case WT_PAGE_ROW_INT:
-		/*
-		 * There are two row-store, logical connection checks:
-		 *
-		 * First, compare the internal node key leading to the current
-		 * page against the first entry on the current page.  The
-		 * internal node key must compare less than or equal to the
-		 * first entry on the current page.
-		 *
-		 * Second, compare the largest key we've seen on any leaf page
-		 * against the next internal node key we find.  This check is
-		 * a little tricky: every time we find a leaf page, we save a
-		 * reference in the vs->leaf field.  The next time we're about
-		 * to indirect through an entry on an internal node, we compare
-		 * the last entry on that saved page against the internal node
-		 * entry's key.  In that comparison, the leaf page's key must
-		 * be less than the internal node entry's key.
-		 */
-		if (parent_rref != NULL)
-			WT_ERR(__wt_verify_pc(session, parent_rref, page, 1));
-
 		/* For each entry in an internal page, verify the subtree. */
 		WT_ROW_REF_FOREACH(page, rref, i) {
 			/*
-			 * At each off-page entry, we compare the current entry
-			 * against the largest key in the subtree rooted to the
-			 * immediate left of the current item; this key must
-			 * compare less than or equal to the current item.  The
-			 * trick here is we need the last leaf key, not the last
-			 * internal node key.  It's returned to us in the leaf
-			 * field of the vs structure, whenever we verify a leaf
-			 * page.  Discard the leaf node as soon as we've used it
-			 * in a comparison.
+			 * It's a depth-first traversal: this entry's starting
+			 * key should be larger than the largest key previously
+			 * reviewed.
+			 *
+			 * The 0th key of any internal page is magic, and we
+			 * can't test against it.
 			 */
-			if (vs->leaf != NULL) {
-				WT_ERR(
-				    __wt_verify_pc(session, rref, vs->leaf, 0));
-				__wt_hazard_clear(session, vs->leaf);
-				vs->leaf = NULL;
-			}
+			if (WT_ROW_REF_SLOT(page, rref) != 0)
+				WT_RET(__wt_verify_row_int_key_order(
+				    session, page, rref, vs));
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
-			WT_ERR(__wt_page_in(session, page, ref, 1));
+			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __wt_verify_tree(
-			    session, rref, ref->page, (uint64_t)0, vs);
-
-			/*
-			 * Remaining special handling of the last verified leaf
-			 * page: if we kept a reference to that page, don't
-			 * release the hazard reference until after comparing
-			 * the last key on that page against the next key in the
-			 * tree.
-			 */
-			if (vs->leaf != ref->page)
-				__wt_hazard_clear(session, ref->page);
+			    session, ref->page, (uint64_t)0, vs);
+			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
-				goto err;
+				return (ret);
 		}
 		break;
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * See comments above in WT_PAGE_ROW_INT: on leaf pages, perform
-		 * the first connection check, and set up for the second.
-		 */
-		WT_ERR(__wt_verify_pc(session, parent_rref, page, 1));
-		vs->leaf = page;
-		return (0);
 	}
+	return (0);
+}
+
+/*
+ * __wt_verify_row_int_key_order --
+ *	Compare a key on an internal page to the largest key we've seen so
+ * far; update the largest key we've seen so far to that key.
+ */
+static int
+__wt_verify_row_int_key_order(
+    SESSION *session, WT_PAGE *page, void *rref, WT_VSTUFF *vs)
+{
+	BTREE *btree;
+	WT_BUF *scratch;
+	uint32_t size;
+	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+
+	btree = session->btree;
+	scratch = 0;
+	func = btree->btree_compare;
+	ret = 0;
 
 	/*
-	 * The largest key on the last leaf page in the tree is never needed
-	 * as there aren't any internal pages after it.  So, we get here with
-	 * vs->leaf needing to be released.
+	 * The maximum key must have been set, we updated it from a leaf page
+	 * first.
 	 */
-	if (0) {
-err:		if (ret != 0)
-			ret = WT_ERROR;
+	WT_ASSERT(session, vs->max_addr != WT_ADDR_INVALID);
+
+	/* The key may require processing. */
+	if (__wt_key_process(rref)) {
+		WT_RET(__wt_scr_alloc(session, 0, &scratch));
+		WT_RET(__wt_key_build(session, page, rref, scratch));
+		rref = scratch;
 	}
-	if (vs->leaf != NULL) {
-		__wt_hazard_clear(session, vs->leaf);
-		vs->leaf = NULL;
+
+	/* Compare the key against the largest key we've seen so far. */
+	if (func(btree, rref, (WT_ITEM *)vs->max_key) <= 0) {
+		__wt_errx(session,
+		    "the internal key in entry %lu on the page at addr %lu "
+		    "sorts before a key appearing on page %lu",
+		    (u_long)WT_ROW_REF_SLOT(page, rref),
+		    (u_long)page->addr, (u_long)vs->max_addr);
+		ret = WT_ERROR;
+		WT_ASSERT(session, ret == 0);
+	} else {
+		/* Update the largest key we've seen to the key just checked. */
+		vs->max_addr = page->addr;
+
+		size = ((WT_ROW_REF *)rref)->size;
+		if (size > vs->max_key->mem_size)
+			WT_RET(__wt_buf_setsize(
+			    session, vs->max_key, (size_t)size));
+		memcpy(vs->max_key->mem, ((WT_ROW_REF *)rref)->key, size);
+		vs->max_key->size = size;
 	}
+
+	if (rref == scratch)
+		__wt_scr_release(&scratch);
 
 	return (ret);
 }
 
 /*
- * __wt_verify_pc --
- *	Compare a key on a parent page to a designated entry on a child page.
+ * __wt_verify_row_leaf_key_order --
+ *	Compare the first key on a leaf page to the largest key we've seen so
+ * far; update the largest key we've seen so far to the last key on the page.
  */
 static int
-__wt_verify_pc(SESSION *session,
-    WT_ROW_REF *parent_rref, WT_PAGE *child, int first_entry)
+__wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	BTREE *btree;
-	WT_ROW *child_key;
-	WT_BUF *scratch1, *scratch2;
-	int cmp, ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
-	void *cd_ref, *pd_ref;
+	WT_BUF *scratch;
+	uint32_t size;
+	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
+	void *key;
 
 	btree = session->btree;
-	scratch1 = scratch2 = NULL;
+	scratch = NULL;
 	func = btree->btree_compare;
 	ret = 0;
 
 	/*
-	 * We're passed both row-store internal and leaf pages -- find the
-	 * right WT_ROW_REF or WT_ROW structure; the first two fields of the
-	 * structures are a void *data/uint32_t size pair.
+	 * We visit our first leaf page before setting the maximum key (the 0th
+	 * keys on the internal pages leading to the smallest leaf in the tree
+	 * are all empty entries).
 	 */
-	switch (child->type) {
-	case WT_PAGE_ROW_INT:
-		child_key = (WT_ROW *)(first_entry ? child->u.row_int.t :
-		    child->u.row_int.t + (child->indx_count - 1));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		child_key = first_entry ? child->u.row_leaf.d :
-		    child->u.row_leaf.d + (child->indx_count - 1);
-		break;
-	WT_ILLEGAL_FORMAT(session);
+	if (vs->max_addr != WT_ADDR_INVALID) {
+		/* The key may require processing. */
+		key = page->u.row_leaf.d;
+		if (__wt_key_process(key)) {
+			WT_RET(__wt_scr_alloc(session, 0, &scratch));
+			WT_RET(__wt_key_build(session, page, key, scratch));
+			key = scratch;
+		}
+
+		/*
+		 * Compare the key against the largest key we've seen so far.
+		 *
+		 * If we're comparing against a key taken from an internal page,
+		 * we can compare equal (which is an expected path, the internal
+		 * page key is often a copy of the leaf page's first key).  But,
+		 * in the case of the 0th slot on an internal page, the last key
+		 * we've seen was a key from a previous leaf page, and it's not
+		 * OK to compare equally in that case.
+		 */
+		if (func(btree, key, (WT_ITEM *)vs->max_key) < 0) {
+			__wt_errx(session,
+			    "the first key on the page at addr %lu sorts "
+			    "equal or less than a key appearing on page %lu",
+			    (u_long)page->addr, (u_long)vs->max_addr);
+			ret = WT_ERROR;
+			WT_ASSERT(session, ret == 0);
+		}
+
+		if (key == scratch)
+			__wt_scr_release(&scratch);
+		if (ret != 0)
+			return (ret);
 	}
 
 	/*
-	 * The two keys we're going to compare may be overflow keys -- don't
-	 * bother instantiating the keys in the tree, there's no reason to
-	 * believe we're going to be doing real operations in this file.
+	 * Update the largest key we've seen to the last key on this page; the
+	 * key may require processing.
 	 */
-	if (__wt_key_process(child_key)) {
-		WT_ERR(__wt_scr_alloc(session, 0, &scratch1));
-		WT_ERR(__wt_cell_process(session, child_key->key, scratch1));
-		cd_ref = scratch1;
-	} else
-		cd_ref = child_key;
-	if (__wt_key_process(parent_rref)) {
-		WT_ERR(__wt_scr_alloc(session, 0, &scratch2));
-		WT_RET(__wt_cell_process(session, parent_rref->key, scratch2));
-		pd_ref = scratch2;
-	} else
-		pd_ref = parent_rref;
+	vs->max_addr = page->addr;
 
-	/* Compare the parent's key against the child's key. */
-	cmp = func(btree, cd_ref, pd_ref);
+	key = page->u.row_leaf.d + (page->indx_count - 1);
+	if (__wt_key_process(key))
+		return (__wt_key_build(session, page, key, vs->max_key));
 
-	if (first_entry && cmp < 0) {
-		__wt_errx(session,
-		    "the first key on page at addr %lu sorts before its "
-		    "reference key on its parent's page",
-		    (u_long)child->addr);
-		ret = WT_ERROR;
-	}
-	if (!first_entry && cmp >= 0) {
-		__wt_errx(session,
-		    "the last key on the page at addr %lu sorts after a parent "
-		    "page's key for the subsequent page",
-		    (u_long)child->addr);
-		ret = WT_ERROR;
-	}
-
-err:	if (scratch1 != NULL)
-		__wt_scr_release(&scratch1);
-	if (scratch2 != NULL)
-		__wt_scr_release(&scratch2);
-
-	return (ret);
+	size = ((WT_ROW *)key)->size;
+	if (size > vs->max_key->mem_size)
+		WT_RET(__wt_buf_setsize(session, vs->max_key, (size_t)size));
+	memcpy(vs->max_key->mem, ((WT_ROW *)key)->key, size);
+	vs->max_key->size = size;
+	return (0);
 }
 
 /*
@@ -503,22 +517,22 @@ __wt_verify_overflow(SESSION *session,
 {
 	BTREE *btree;
 	WT_PAGE_DISK *dsk;
-	WT_BUF *scratch1;
+	WT_BUF *scratch;
 	uint32_t addr, size;
 	int ret;
 
 	btree = session->btree;
-	scratch1 = NULL;
+	scratch = NULL;
 	ret = 0;
 
 	addr = ovfl->addr;
 	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
 
 	/* Allocate enough memory to hold the overflow pages. */
-	WT_RET(__wt_scr_alloc(session, size, &scratch1));
+	WT_RET(__wt_scr_alloc(session, size, &scratch));
 
 	/* Read the page. */
-	dsk = scratch1->mem;
+	dsk = scratch->mem;
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/*
@@ -545,7 +559,7 @@ __wt_verify_overflow(SESSION *session,
 		ret = WT_ERROR;
 	}
 
-err:	__wt_scr_release(&scratch1);
+err:	__wt_scr_release(&scratch);
 
 	return (ret);
 }
