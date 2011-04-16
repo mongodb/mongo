@@ -26,7 +26,8 @@ static int  __wt_rec_row_merge(SESSION *, WT_PAGE *);
 static int  __wt_rec_row_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_wrapup(SESSION *, WT_PAGE *, int *);
 
-static int __wt_split(SESSION *, int);
+static int __wt_split(SESSION *);
+static int __wt_split_finish(SESSION *);
 static int __wt_split_fixup(SESSION *);
 static int __wt_split_init(SESSION *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
 static int __wt_split_write(SESSION *, int, WT_BUF *, void *);
@@ -363,12 +364,11 @@ __wt_split_init(
  * has 3 doubled letters in a row?  Sweet-tooth does, too.)
  */
 static int
-__wt_split(SESSION *session, int done)
+__wt_split(SESSION *session)
 {
 	WT_PAGE_DISK *dsk;
 	WT_REC_LIST *r;
 	struct rec_save *r_save;
-	int which;
 
 	/*
 	 * Handle page-buffer size tracking; we have to do this work in every
@@ -379,50 +379,29 @@ __wt_split(SESSION *session, int done)
 	dsk = r->dsk_tmp->mem;
 
 	/*
-	 * There are 4 cases we have to handle.
+	 * There are 3 cases we have to handle.
 	 *
 	 * #1
-	 * We're done reconciling a page, in which case we can ignore any split
-	 * information we've accumulated to that point and write whatever we
-	 * have in the current buffer.
-	 *
-	 * #2
 	 * Not done, and about to cross a split boundary, in which case we save
 	 * away the current boundary information and return.
 	 *
-	 * #3
+	 * #2
 	 * Not done, and about to cross the max boundary, in which case we have
 	 * to physically split the page -- use the saved split information to
 	 * write all the split pages.
 	 *
-	 * #4
+	 * #3
 	 * Not done, and about to cross the split boundary, but we've already
 	 * done the split thing when we approached the max boundary, in which
 	 * case we write the page and keep going.
 	 *
-	 * Cases #2 and #3 are the hard ones: we're called when we're about to
+	 * Cases #1 and #2 are the hard ones: we're called when we're about to
 	 * cross each split boundary, and we save information away so we can
 	 * split if we have to.  We're also called when we're about to cross
 	 * the maximum page boundary: in that case, we do the actual split,
 	 * clean things up, then keep going.
 	 */
-	if (done)					/* Case #1 */
-		which = 1;
-	else if (r->split_count > 0)			/* Case #2 */
-		which = 2;
-	else if (r->s_next != 0)			/* Case #3 */
-		which = 3;
-	else						/* Case #4 */
-		which = 4;
-
-	switch (which) {
-	case 1:
-		/* We're done, write the remaining information. */
-		dsk->u.entries = r->entries;
-		WT_RET(__wt_split_write(session,
-		    r->entries == 0 ? 1 : 0, r->dsk_tmp, r->first_free));
-		break;
-	case 2:
+	if (r->split_count > 0) {			/* Case #1 */
 		/*
 		 * Save the information about where we are when the split would
 		 * have happened.
@@ -459,8 +438,7 @@ __wt_split(SESSION *session, int done)
 			r->space_avail += r->split_remain;
 		else
 			r->space_avail = r->split_avail;
-		break;
-	case 3:
+	} else if (r->s_next != 0) {			/* Case #2 */
 		/*
 		 * It didn't all fit, but we just noticed that.
 		 *
@@ -475,8 +453,7 @@ __wt_split(SESSION *session, int done)
 
 		/* We're done saving split-points. */
 		r->s_next = 0;
-		break;
-	case 4:
+	} else {					/* Case #3 */
 		/*
 		 * It didn't all fit, but either we've already noticed it and
 		 * are now processing the rest of the page at the split-size
@@ -497,10 +474,31 @@ __wt_split(SESSION *session, int done)
 		r->entries = 0;
 		r->first_free = WT_PAGE_DISK_BYTE(dsk);
 		r->space_avail = r->split_avail;
-		break;
 	}
-
 	return (0);
+}
+
+/*
+ * __wt_split_finish --
+ *	Wrap up reconciliation.
+ */
+static int
+__wt_split_finish(SESSION *session)
+{
+	WT_PAGE_DISK *dsk;
+	WT_REC_LIST *r;
+
+	r = &S2C(session)->cache->reclist;
+	dsk = r->dsk_tmp->mem;
+
+	/*
+	 * We're done reconciling a page, in which case we can ignore any split
+	 * information we've accumulated to that point and write whatever we
+	 * have in the current buffer.
+	 */
+	dsk->u.entries = r->entries;
+	return (__wt_split_write(session,
+	    r->entries == 0 ? 1 : 0, r->dsk_tmp, r->first_free));
 }
 
 /*
@@ -675,7 +673,7 @@ __wt_rec_col_int(SESSION *session, WT_PAGE *page)
 	WT_RET(__wt_rec_col_merge(session, page));
 
 	/* Write the remnant page. */
-	return (__wt_split(session, 1));
+	return (__wt_split_finish(session));
 }
 
 /*
@@ -728,7 +726,7 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 
 		/* Boundary: allocate, split or write the page. */
 		while (sizeof(WT_OFF_RECORD) > r->space_avail)
-			WT_RET(__wt_split(session, 0));
+			WT_RET(__wt_split(session));
 
 		/* Any off-page reference must be a valid disk address. */
 		WT_ASSERT(session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
@@ -817,7 +815,7 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	}
 
 	/* Write the remnant page. */
-	ret = __wt_split(session, 1);
+	ret = __wt_split_finish(session);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -918,7 +916,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 			/* Boundary: allocate, split or write the page. */
 			while (len > r->space_avail)
-				WT_ERR(__wt_split(session, 0));
+				WT_ERR(__wt_split(session));
 
 			last_data = r->first_free;
 			WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
@@ -931,7 +929,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	}
 
 	/* Write the remnant page. */
-	ret = __wt_split(session, 1);
+	ret = __wt_split_finish(session);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
@@ -1005,7 +1003,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 
 		/* Boundary: allocate, split or write the page. */
 		while (len > r->space_avail)
-			WT_RET(__wt_split(session, 0));
+			WT_RET(__wt_split(session));
 
 		switch (data_loc) {
 		case DATA_ON_PAGE:
@@ -1030,7 +1028,7 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 		__wt_buf_free(session, value);
 
 	/* Write the remnant page. */
-	return (__wt_split(session, 1));
+	return (__wt_split_finish(session));
 }
 
 /*
@@ -1075,7 +1073,7 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	 */
 	if (page->XXdsk == NULL) {
 		WT_RET(__wt_rec_row_merge(session, page));
-		return (__wt_split(session, 1));
+		return (__wt_split_finish(session));
 	}
 
 	/*
@@ -1142,7 +1140,7 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 
 		/* Boundary: allocate, split or write the page. */
 		while (len > r->space_avail)
-			WT_RET(__wt_split(session, 0));
+			WT_RET(__wt_split(session));
 
 		/* Any off-page reference must be a valid disk address. */
 		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
@@ -1165,7 +1163,7 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	}
 
 	/* Write the remnant page. */
-	return (__wt_split(session, 1));
+	return (__wt_split_finish(session));
 }
 
 /*
@@ -1227,7 +1225,7 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 		/* Boundary: allocate, split or write the page. */
 		while (WT_CELL_SPACE_REQ(key.size) +
 		    WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > r->space_avail)
-			WT_RET(__wt_split(session, 0));
+			WT_RET(__wt_split(session));
 
 		/* Copy the key into place. */
 		memcpy(r->first_free, &cell, sizeof(WT_CELL));
@@ -1378,7 +1376,7 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 
 		/* Boundary: allocate, split or write the page. */
 		while (key_len + value_len > r->space_avail)
-			WT_RET(__wt_split(session, 0));
+			WT_RET(__wt_split(session));
 
 		/* Copy the key onto the page. */
 		memcpy(r->first_free, key_cell, key_len);
@@ -1416,7 +1414,7 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 		__wt_buf_free(session, &value_buf);
 
 	/* Write the remnant page. */
-	return (__wt_split(session, 1));
+	return (__wt_split_finish(session));
 }
 
 /*
@@ -1461,7 +1459,7 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 
 		/* Boundary: allocate, split or write the page. */
 		while (key_len + value_len > r->space_avail)
-			WT_RET(__wt_split(session, 0));
+			WT_RET(__wt_split(session));
 
 		/* Copy the key cell into place. */
 		memcpy(r->first_free, &key_cell, sizeof(WT_CELL));
