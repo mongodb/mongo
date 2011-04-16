@@ -11,6 +11,7 @@
 static int  __wt_evict(SESSION *);
 static int  __wt_evict_compare_lru(const void *, const void *);
 static int  __wt_evict_compare_page(const void *, const void *);
+static void __wt_evict_dup_remove(SESSION *);
 static int  __wt_evict_file(WT_EVICT_REQ *rr);
 static void __wt_evict_hazard_check(SESSION *);
 static int  __wt_evict_hazard_compare(const void *, const void *);
@@ -20,7 +21,7 @@ static void __wt_evict_set(SESSION *);
 static void __wt_evict_state_check(SESSION *);
 static int  __wt_evict_subtrees(WT_PAGE *);
 static int  __wt_evict_walk(SESSION *);
-static int  __wt_evict_walk_single(SESSION *, BTREE *, u_int);
+static int  __wt_evict_walk_file(SESSION *, BTREE *, u_int);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_evict_hazard_validate(CONNECTION *, WT_PAGE *);
@@ -350,63 +351,29 @@ static int
 __wt_evict(SESSION *session)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	u_int elem, i, j;
 
 	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
 	WT_RET(__wt_evict_walk(session));
 
-	/*
-	 * We have an array of page eviction references that may contain NULLs,
-	 * as well as duplicate entries.
-	 *
-	 * First, sort the array by WT_REF address, then delete any duplicates.
-	 * The reason is because we might evict the page but leave a duplicate
-	 * entry in the "saved" area of the array, and that would be a NULL
-	 * dereference on the next run.  (If someone ever tries to remove this
-	 * duplicate cleanup for better performance, you can't fix it just by
-	 * checking the WT_REF state -- that only works if you are discarding
-	 * a page from a single level of the tree; if you are discarding a
-	 * page and its parent, the duplicate of the page's WT_REF might have
-	 * been free'd before a subsequent review of the eviction array.)
-	 */
-	evict = cache->evict;
-	elem = cache->evict_elem;
-	qsort(evict,
-	    (size_t)elem, sizeof(WT_EVICT_LIST), __wt_evict_compare_page);
-	for (i = 0; i < elem; i = j)
-		for (j = i + 1; j < elem; ++j) {
-			/*
-			 * If the leading pointer hits a NULL, we're done, the
-			 * NULLs all sorted to the top of the array.
-			 */
-			if (evict[j].ref == NULL)
-				goto done_duplicates;
+	/* Remove duplicates from the list. */
+	__wt_evict_dup_remove(session);
 
-			/* Delete the second and any subsequent duplicates. */
-			if (evict[i].ref == evict[j].ref)
-				WT_EVICT_CLR(&evict[j]);
-			else
-				break;
-		}
-done_duplicates:
+	/* Sort the array by LRU. */
+	qsort(cache->evict, (size_t)cache->evict_elem,
+	    sizeof(WT_EVICT_LIST), __wt_evict_compare_lru);
 
-	/* Second, sort the array by LRU. */
-	qsort(evict,
-	    (size_t)elem, sizeof(WT_EVICT_LIST), __wt_evict_compare_lru);
-
-	/*
-	 * Discarding pages is done in 4 steps:
-	 *	Set the WT_REF_LOCKED flag
-	 *	Check for any hazard references
-	 *	Check the page's state (for example, in-memory children)
-	 *	Reconcile and discard the page
-	 */
+	/* Set the WT_REF_LOCKED flag. */
 	__wt_evict_set(session);
+
+	/* Check for any hazard references. */
 	__wt_evict_hazard_check(session);
+
+	/* Check the page's state (for example, in-memory children). */
 	__wt_evict_state_check(session);
+
+	/* Reconcile and discard the page. */
 	WT_RET(__wt_evict_page(session));
 
 	return (0);
@@ -445,7 +412,7 @@ __wt_evict_walk(SESSION *session)
 
 		i = WT_EVICT_WALK_BASE;
 		TAILQ_FOREACH(btree, &conn->dbqh, q) {
-			WT_ERR(__wt_evict_walk_single(session, btree, i));
+			WT_ERR(__wt_evict_walk_file(session, btree, i));
 			i += WT_EVICT_WALK_PER_TABLE;
 		}
 	}
@@ -454,11 +421,11 @@ err:	__wt_unlock(session, conn->mtx);
 }
 
 /*
- * __wt_evict_walk_single --
+ * __wt_evict_walk_file --
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__wt_evict_walk_single(SESSION *session, BTREE *btree, u_int slot)
+__wt_evict_walk_file(SESSION *session, BTREE *btree, u_int slot)
 {
 	WT_CACHE *cache;
 	WT_REF *ref;
@@ -503,6 +470,54 @@ restart:	WT_RET(__wt_walk_begin(session,
 	} while (++i < WT_EVICT_WALK_PER_TABLE);
 
 	return (0);
+}
+
+/*
+ * __wt_evict_dup_remove --
+ *	Discard duplicates from the list of pages we collected.
+ */
+static void
+__wt_evict_dup_remove(SESSION *session)
+{
+	WT_CACHE *cache;
+	WT_EVICT_LIST *evict;
+	u_int elem, i, j;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * We have an array of page eviction references that may contain NULLs,
+	 * as well as duplicate entries.
+	 *
+	 * First, sort the array by WT_REF address, then delete any duplicates.
+	 * The reason is because we might evict the page but leave a duplicate
+	 * entry in the "saved" area of the array, and that would be a NULL
+	 * dereference on the next run.  (If someone ever tries to remove this
+	 * duplicate cleanup for better performance, you can't fix it just by
+	 * checking the WT_REF state -- that only works if you are discarding
+	 * a page from a single level of the tree; if you are discarding a
+	 * page and its parent, the duplicate of the page's WT_REF might have
+	 * been free'd before a subsequent review of the eviction array.)
+	 */
+	evict = cache->evict;
+	elem = cache->evict_elem;
+	qsort(evict,
+	    (size_t)elem, sizeof(WT_EVICT_LIST), __wt_evict_compare_page);
+	for (i = 0; i < elem; i = j)
+		for (j = i + 1; j < elem; ++j) {
+			/*
+			 * If the leading pointer hits a NULL, we're done, the
+			 * NULLs all sorted to the top of the array.
+			 */
+			if (evict[j].ref == NULL)
+				return;
+
+			/* Delete the second and any subsequent duplicates. */
+			if (evict[i].ref == evict[j].ref)
+				WT_EVICT_CLR(&evict[j]);
+			else
+				break;
+		}
 }
 
 /*
