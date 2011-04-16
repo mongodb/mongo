@@ -268,12 +268,50 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
 #else
     {
         char seq[64];
+        int highlight = -1;
+
+        if (pos < len) {
+            /* this scans for a brace matching buf[pos] to highlight */
+            int scanDirection = 0;
+            if (strchr("}])", buf[pos]))
+                scanDirection = -1; /* backwards */
+            else if (strchr("{[(", buf[pos]))
+                scanDirection = 1; /* forwards */
+
+            if (scanDirection) {
+                int unmatched = scanDirection;
+                int i;
+                for(i = pos + scanDirection; i >= 0 && buf[i]; i += scanDirection){
+                    /* TODO: the right thing when inside a string */
+                    if (strchr("}])", buf[i]))
+                        unmatched--;
+                    else if (strchr("{[(", buf[i]))
+                        unmatched++;
+
+                    if (unmatched == 0) {
+                        highlight = i;
+                        break;
+                    }
+                }
+            }
+        }
+
         /* Cursor to left edge */
         snprintf(seq,64,"\x1b[1G");
         if (write(fd,seq,strlen(seq)) == -1) return;
         /* Write the prompt and the current buffer content */
         if (write(fd,prompt,strlen(prompt)) == -1) return;
-        if (write(fd,buf,len) == -1) return;
+
+        if (highlight == -1) {
+            if (write(fd,buf,len) == -1) return;
+        } else {
+            if (write(fd,buf,highlight) == -1) return;
+            if (write(fd,"\x1b[1;34m",7) == -1) return; /* bright blue (visible with both B&W bg) */
+            if (write(fd,&buf[highlight],1) == -1) return;
+            if (write(fd,"\x1b[0m",4) == -1) return; /* reset */
+            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
+        }
+
         /* Erase to right */
         snprintf(seq,64,"\x1b[0K");
         if (write(fd,seq,strlen(seq)) == -1) return;
