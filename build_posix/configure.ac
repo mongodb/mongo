@@ -32,7 +32,10 @@ if test "$GCC" = "yes"; then
 	# 
 	# If we're using gcc, change the optimization to -O3, unless we're
 	# doing a small build, in which case we use -Os.
-	if test "$db_cv_enable_smallbuild" = "yes"; then
+	if test "$db_cv_enable_debug" = "yes"; then
+		# don't touch for debugging
+		:
+	elif test "$db_cv_enable_smallbuild" = "yes"; then
 		CFLAGS=`echo "$CFLAGS" | sed 's/-O./-Os /g'`
 	else
 		CFLAGS=`echo "$CFLAGS" | sed 's/-O./-O3 /g'`
@@ -61,6 +64,7 @@ if test "$db_cv_enable_debug" = "yes"; then
 	CFLAGS=`echo "$CFLAGS" | sed 's/-g//g'`
 	CFLAGS="$CFLAGS -g"
 fi
+AM_CONDITIONAL(DEBUG, test "$db_cv_enable_debug" = "yes")
 
 # Python API
 if test "$db_cv_enable_python" = "yes"; then
