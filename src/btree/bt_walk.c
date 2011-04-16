@@ -67,9 +67,8 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	case WT_REF_INACTIVE:						\
 	case WT_REF_LOCKED:						\
 		/*							\
-		 * Optionally skip pages that aren't in the cache.	\
-		 * It's stretching things to say "locked" pages aren't	\
-		 * in the cache, but if we wait a second it won't be.	\
+		 * Optionally skip pages not in the cache (note that	\
+		 * inactive pages are treated as "not in the cache").	\
 		 */							\
 		if (LF_ISSET(WT_WALK_CACHE))				\
 			continue;					\
