@@ -459,8 +459,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
 
     /* The latest history entry is always our current buffer, that
      * initially is just an empty string. */
-    history_index = history_len; /* about to point to "" */
     linenoiseHistoryAdd("");
+    history_index = history_len-1;
     
     if (write(1,prompt,plen) == -1) return -1;
     while(1) {
