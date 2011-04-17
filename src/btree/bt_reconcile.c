@@ -1792,8 +1792,9 @@ __wt_rec_inactive_append(SESSION *session, WT_PAGE *page)
 	r = &S2C(session)->cache->reclist;
 
 	if (r->inactive_next == r->inactive_entries) {
-		WT_RET(__wt_calloc_def(
-		    session, r->inactive_entries + 20, &r->inactive));
+		WT_RET(__wt_realloc(session, &r->inactive_allocated,
+		    (r->inactive_entries + 20) * sizeof(*r->inactive),
+		    &r->inactive));
 		r->inactive_entries += 20;
 	}
 	r->inactive[r->inactive_next++] = page;

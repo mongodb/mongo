@@ -49,6 +49,7 @@ typedef struct {
 	WT_PAGE **inactive;		/* List of inactive pages */
 	u_int     inactive_next;	/* Next list slot */
 	u_int	  inactive_entries;	/* Total list slots */
+	uint32_t  inactive_allocated;	/* Bytes allocated */
 
 	/*
 	 * Normally, reconciliation writes out a single replacement page, but
