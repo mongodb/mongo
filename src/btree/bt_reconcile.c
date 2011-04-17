@@ -10,16 +10,19 @@
 
 static int  __wt_rec_col_fix(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_int(SESSION *, WT_PAGE *);
+static int  __wt_rec_col_int_clean(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_merge(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
 static int  __wt_rec_inactive_append(SESSION *, WT_PAGE *);
 static void __wt_rec_inactive_discard(SESSION *);
+static void __wt_rec_inactive_init(SESSION *);
 static void __wt_rec_parent_update_clean(SESSION *, WT_PAGE *);
 static int  __wt_rec_parent_update_dirty(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static int  __wt_rec_row_int(SESSION *, WT_PAGE *);
+static int  __wt_rec_row_int_clean(SESSION *, WT_PAGE *);
 static int  __wt_rec_row_leaf(SESSION *, WT_PAGE *, uint32_t);
 static int  __wt_rec_row_leaf_insert(SESSION *, WT_INSERT *);
 static int  __wt_rec_row_merge(SESSION *, WT_PAGE *);
@@ -99,6 +102,13 @@ __wt_page_reconcile(
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/*
+	 * During internal page reconcilition we track inactive pages we find
+	 * in the page.  That tracking is per-reconciliation run, so clean up
+	 * before anything else.
+	 */
+	__wt_rec_inactive_init(session);
+
+	/*
 	 * Handle pages marked for deletion.
 	 *
 	 * Both leaf and internal pages have their WT_PAGE_DELETED flags set if
@@ -133,14 +143,29 @@ __wt_page_reconcile(
 		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
 
 	/*
-	 * Clean pages are simple: update the parent's state and discard the
-	 * page.  (It makes no sense to do reconciliation on a clean page if
-	 * you're not going to discard it.)
+	 * Clean pages are generally simple: if the page is an internal page,
+	 * search the page's subtree for any inactive pages that need to be
+	 * discarded along with the page; for both internal and leaf pages,
+	 * update the page parent's state, and discard the page.  (Assert the
+	 * page being discarded -- there's no reason to reconcile a clean page
+	 * if not to discard it.)
 	 */
 	if (!WT_PAGE_IS_MODIFIED(page)) {
 		WT_ASSERT(session, discard != 0);
+
+		switch (page->type) {
+		case WT_PAGE_COL_INT:
+			WT_RET(__wt_rec_col_int_clean(session, page));
+			break;
+		case WT_PAGE_ROW_INT:
+			WT_RET(__wt_rec_row_int_clean(session, page));
+			break;
+		}
+
 		__wt_rec_parent_update_clean(session, page);
+
 		__wt_page_discard(session, page);
+		__wt_rec_inactive_discard(session);
 		return (0);
 	}
 
@@ -340,12 +365,6 @@ __wt_split_init(
 	 * the first slot.
 	 */
 	r->l_next = r->s_next = 0;
-
-	/*
-	 * Initialize the array of inactive pages to discard to reference the
-	 * first slot.
-	 */
-	r->inactive_next = 0;
 
 	/*
 	 * Set the caller's information and configure so the loop calls us
@@ -741,6 +760,29 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 		++r->entries;
 	}
 
+	return (0);
+}
+
+/*
+ * __wt_rec_col_int_clean --
+ *	Check a clean column-store internal page for inactive pages.
+ */
+static int
+__wt_rec_col_int_clean(SESSION *session, WT_PAGE *page)
+{
+	WT_COL_REF *cref;
+	WT_PAGE *ref_page;
+	uint32_t i;
+
+	/* For each entry in the page... */
+	WT_COL_REF_FOREACH(page, cref, i) {
+		if (WT_COL_REF_STATE(cref) != WT_REF_INACTIVE)
+			continue;
+		ref_page = WT_COL_REF_PAGE(cref);
+		if (F_ISSET(ref_page, WT_PAGE_SPLIT))
+			WT_RET(__wt_rec_col_int_clean(session, ref_page));
+		WT_RET(__wt_rec_inactive_append(session, ref_page));
+	}
 	return (0);
 }
 
@@ -1252,6 +1294,29 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 	if (key.mem != NULL)
 		__wt_buf_free(session, &key);
 
+	return (0);
+}
+
+/*
+ * __wt_rec_row_int_clean --
+ *	Check a clean row-store internal page for inactive pages.
+ */
+static int
+__wt_rec_row_int_clean(SESSION *session, WT_PAGE *page)
+{
+	WT_PAGE *ref_page;
+	WT_ROW_REF *rref;
+	uint32_t i;
+
+	/* For each entry in the in-memory page... */
+	WT_ROW_REF_FOREACH(page, rref, i) {
+		if (WT_ROW_REF_STATE(rref) != WT_REF_INACTIVE)
+			continue;
+		ref_page = WT_ROW_REF_PAGE(rref);
+		if (F_ISSET(ref_page, WT_PAGE_SPLIT))
+			WT_RET(__wt_rec_row_int_clean(session, ref_page));
+		WT_RET(__wt_rec_inactive_append(session, ref_page));
+	}
 	return (0);
 }
 
@@ -1778,6 +1843,19 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 
 err:	__wt_free(session, page);
 	return (ret);
+}
+
+/*
+ * __wt_rec_inactive_init --
+ *	Initialize the list of inactive pages.
+ */
+static void
+__wt_rec_inactive_init(SESSION *session)
+{
+	WT_REC_LIST *r;
+
+	r = &S2C(session)->cache->reclist;
+	r->inactive_next = 0;
 }
 
 /*
