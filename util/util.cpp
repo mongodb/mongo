@@ -184,7 +184,8 @@ namespace mongo {
 
     /* note: can't use malloc herein - may be in signal handler.
              logLockless() likely does not comply and should still be fixed todo
-             */
+             likewise class string?
+    */
     void rawOut( const string &s ) {
         if( s.empty() ) return;
 
