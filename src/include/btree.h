@@ -485,8 +485,9 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_DELETED		0x01	/* Page was empty at reconcilation */
-#define	WT_PAGE_PINNED		0x02	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x04	/* Internal page created in a split */
+#define	WT_PAGE_DSK_FREE	0x02	/* Page blocks freed */
+#define	WT_PAGE_PINNED		0x04	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x08	/* Internal page created in a split */
 	uint8_t flags;			/* Page flags */
 };
 /*

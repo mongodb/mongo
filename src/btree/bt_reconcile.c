@@ -237,15 +237,9 @@ skip_clean_check:
 	 * referenced by the parent, or we're discarding the page entirely, and
 	 * in either case, the page's address has changed.
 	 */
-	if (page->addr != WT_ADDR_INVALID) {
+	if (!F_ISSET(page, WT_PAGE_DSK_FREE)) {
 		WT_RET(__wt_block_free(session, page->addr, page->size));
-		/*
-		 * !!!
-		 * DO NOT RESET THE PAGE SIZE!  It's used during page discard
-		 * to figure out if a memory reference is off-page, that is,
-		 * if it needs to be free'd.
-		 */
-		page->addr = WT_ADDR_INVALID;
+		F_SET(page, WT_PAGE_DSK_FREE);
 	}
 
 	/*
@@ -1684,8 +1678,15 @@ __wt_rec_parent_update_dirty(SESSION *session,
 	 * needed, the state field is declared volatile.
 	 */
 	parent_ref = page->parent_ref;
-	parent_ref->addr = addr;
-	parent_ref->size = size;
+
+	/*
+	 * We don't update the old address even though it's no longer valid;
+	 * it's useful to know where a page came from for debugging.
+	 */
+	if (addr != WT_ADDR_INVALID) {
+		parent_ref->addr = addr;
+		parent_ref->size = size;
+	}
 	if (split != NULL)
 		parent_ref->page = split;
 	WT_MEMORY_FLUSH;
