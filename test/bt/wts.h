@@ -41,7 +41,7 @@
 typedef struct {
 	char *progname;				/* Program name */
 
-	void *bdb_db;				/* Berkeley DB handle */
+	void *bdb;				/* BDB comparison handle */
 
 	void *wts_btree;			/* WT BTREE handle */
 	void *wts_conn;				/* WT CONNECTION handle */

@@ -30,7 +30,7 @@ bdb_startup(void)
 	p = fname("bdb");
 	assert(db->open(db, NULL, p, NULL, DB_BTREE, DB_CREATE, 0) == 0);
 
-	g.bdb_db = db;
+	g.bdb = db;
 }
 
 void
@@ -39,9 +39,8 @@ bdb_teardown(void)
 	DB *db;
 	DB_ENV *dbenv;
 
-	db = g.bdb_db;
+	db = g.bdb;
 	dbenv = db->dbenv;
-
 	assert(db->close(db, 0) == 0);
 	assert(dbenv->close(dbenv, 0) == 0);
 }
@@ -59,7 +58,7 @@ bdb_insert(
 	value.data = (void *)value_data;
 	value.size = value_size;
 
-	db = g.bdb_db;
+	db = g.bdb;
 
 	assert(db->put(db, NULL, &key, &value, 0) == 0);
 }
@@ -71,7 +70,7 @@ bdb_read(uint64_t keyno, void *valuep, uint32_t *sizep, int *notfoundp)
 	DB *db;
 	int ret;
 
-	db = g.bdb_db;
+	db = g.bdb;
 	*notfoundp = 0;
 
 	key_gen(&key.data, &key.size, keyno, 0);
@@ -98,7 +97,7 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 	DB *db;
 	int ret;
 
-	db = g.bdb_db;
+	db = g.bdb;
 	*notfoundp = 0;
 
 	key.data = (void *)arg_key;
@@ -126,7 +125,7 @@ bdb_del(uint64_t keyno, int *notfoundp)
 	DB *db;
 	int ret;
 
-	db = g.bdb_db;
+	db = g.bdb;
 	*notfoundp = 0;
 
 	key_gen(&key.data, &key.size, keyno, 0);
