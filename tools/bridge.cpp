@@ -108,7 +108,7 @@ void cleanup( int sig ) {
 void myterminate() {
     rawOut( "bridge terminate() called, printing stack:" );
     printStackTrace();
-    abort();
+    ::abort();
 }
 
 void setupSignals() {
