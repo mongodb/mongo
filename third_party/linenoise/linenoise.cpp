@@ -127,6 +127,7 @@ static int rawmode = 0; /* for atexit() function to check if restore is needed*/
 static int atexit_registered = 0; /* register atexit just 1 time */
 static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
 static int history_len = 0;
+static int history_index = 0;
 char **history = NULL;
 
 static void linenoiseAtExit(void);
@@ -267,12 +268,50 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
 #else
     {
         char seq[64];
+        int highlight = -1;
+
+        if (pos < len) {
+            /* this scans for a brace matching buf[pos] to highlight */
+            int scanDirection = 0;
+            if (strchr("}])", buf[pos]))
+                scanDirection = -1; /* backwards */
+            else if (strchr("{[(", buf[pos]))
+                scanDirection = 1; /* forwards */
+
+            if (scanDirection) {
+                int unmatched = scanDirection;
+                int i;
+                for(i = pos + scanDirection; i >= 0 && buf[i]; i += scanDirection){
+                    /* TODO: the right thing when inside a string */
+                    if (strchr("}])", buf[i]))
+                        unmatched--;
+                    else if (strchr("{[(", buf[i]))
+                        unmatched++;
+
+                    if (unmatched == 0) {
+                        highlight = i;
+                        break;
+                    }
+                }
+            }
+        }
+
         /* Cursor to left edge */
         snprintf(seq,64,"\x1b[1G");
         if (write(fd,seq,strlen(seq)) == -1) return;
         /* Write the prompt and the current buffer content */
         if (write(fd,prompt,strlen(prompt)) == -1) return;
-        if (write(fd,buf,len) == -1) return;
+
+        if (highlight == -1) {
+            if (write(fd,buf,len) == -1) return;
+        } else {
+            if (write(fd,buf,highlight) == -1) return;
+            if (write(fd,"\x1b[1;34m",7) == -1) return; /* bright blue (visible with both B&W bg) */
+            if (write(fd,&buf[highlight],1) == -1) return;
+            if (write(fd,"\x1b[0m",4) == -1) return; /* reset */
+            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
+        }
+
         /* Erase to right */
         snprintf(seq,64,"\x1b[0K");
         if (write(fd,seq,strlen(seq)) == -1) return;
@@ -335,6 +374,14 @@ static char linenoiseReadChar(int fd){
                 } else {
                     return -1;
                 }
+            } else {
+                return -1;
+            }
+        } else if (seq[0] == 79){
+            if (seq[1] == 72) { /* home */
+                return 1; /* ctrl-a */
+            } else if (seq[1] == 70) { /* end */
+                return 5; /* ctrl-e */
             } else {
                 return -1;
             }
@@ -444,7 +491,6 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     size_t pos = 0;
     size_t len = 0;
     size_t cols = getColumns();
-    int history_index = 0;
 
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
@@ -452,6 +498,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     /* The latest history entry is always our current buffer, that
      * initially is just an empty string. */
     linenoiseHistoryAdd("");
+    history_index = history_len-1;
     
     if (write(1,prompt,plen) == -1) return -1;
     while(1) {
@@ -536,10 +583,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             if (history_len > 1) {
                 /* Update the current history entry before to
                  * overwrite it with tne next one. */
-                free(history[history_len-1-history_index]);
-                history[history_len-1-history_index] = strdup(buf);
+                free(history[history_index]);
+                history[history_index] = strdup(buf);
                 /* Show the new entry */
-                history_index += (c == 16) ? 1 : -1;
+                history_index += (c == 16) ? -1 : 1;
                 if (history_index < 0) {
                     history_index = 0;
                     break;
@@ -547,7 +594,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                     history_index = history_len-1;
                     break;
                 }
-                strncpy(buf,history[history_len-1-history_index],buflen);
+                strncpy(buf,history[history_index],buflen);
                 buf[buflen] = '\0';
                 len = pos = strlen(buf);
                 refreshLine(fd,prompt,buf,len,pos,cols);
@@ -714,8 +761,10 @@ int linenoiseHistorySave(const char *filename) {
     int j;
     
     if (fp == NULL) return -1;
-    for (j = 0; j < history_len; j++)
-        fprintf(fp,"%s\n",history[j]);
+    for (j = 0; j < history_len; j++){
+        if (history[j][0] != '\0')
+            fprintf(fp,"%s\n",history[j]);
+    }
     fclose(fp);
     return 0;
 }
@@ -737,7 +786,8 @@ int linenoiseHistoryLoad(const char *filename) {
         p = strchr(buf,'\r');
         if (!p) p = strchr(buf,'\n');
         if (p) *p = '\0';
-        linenoiseHistoryAdd(buf);
+        if (p != buf)
+            linenoiseHistoryAdd(buf);
     }
     fclose(fp);
     return 0;

@@ -226,7 +226,7 @@ namespace mongo {
                 secsToSleep = 0;
                 continue;
             }
-            catch ( std::exception e ) {
+            catch ( std::exception& e ) {
 
                 if ( inShutdown() ) {
                     // we're shutting down, so just clean up

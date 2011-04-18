@@ -883,7 +883,7 @@ namespace mongo {
                             shardingState.undoDonateChunk( ns , min , max , currVersion );
                         }
 
-                        log() << "movChunk migrate commit not accepted by TO-shard: " << res
+                        log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                               << " resetting shard version to: " << currVersion << endl;
 
                         errmsg = "_recvChunkCommit failed!";
@@ -1379,8 +1379,8 @@ namespace mongo {
             //      for now, we try to replicate to a sensible number of secondaries
             const int slaveCount = getSlaveCount() / 2 + 1;
             if ( ! opReplicatedEnough( lastOpApplied , slaveCount ) ) {
-                log( LL_WARNING ) << "migrate commit attempt timed out contacting " << slaveCount
-                                  << " slaves for '" << ns << "' " << min << " -> " << max << endl;
+                warning() << "migrate commit attempt timed out contacting " << slaveCount
+                          << " slaves for '" << ns << "' " << min << " -> " << max << endl;
                 return false;
             }
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << endl;
@@ -1416,8 +1416,9 @@ namespace mongo {
             if ( state != STEADY )
                 return false;
             state = COMMIT_START;
-
-            for ( int i=0; i<86400; i++ ) {
+            
+            // we wait 5 minutes for the commit to succeed before giving up
+            for ( int i=0; i<5*60*1000; i++ ) {
                 sleepmillis(1);
                 if ( state == DONE )
                     return true;

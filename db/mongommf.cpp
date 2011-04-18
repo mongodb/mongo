@@ -101,7 +101,7 @@ namespace mongo {
 #if 1
         // https://jira.mongodb.org/browse/SERVER-2942
         DWORD old;
-        bool ok = VirtualProtect(oldPrivateAddr, len, PAGE_READONLY, &old);
+        bool ok = VirtualProtect(oldPrivateAddr, (SIZE_T) len, PAGE_READONLY, &old);
         if( !ok ) {
             DWORD e = GetLastError();
             log() << "VirtualProtect failed in remapPrivateView " << filename() << hex << oldPrivateAddr << ' ' << len << ' ' << errnoWithDescription(e) << endl;
