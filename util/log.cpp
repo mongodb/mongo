@@ -20,6 +20,7 @@
 #include "assert_util.h"
 #include "assert.h"
 #include <cmath>
+#include "time_support.h"
 using namespace std;
 
 #ifndef _WIN32
