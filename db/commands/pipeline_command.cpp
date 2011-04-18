@@ -76,8 +76,9 @@ namespace mongo {
 
 	/* now hook up the pipeline */
         /* connect up a cursor to the specified collection */
+	string fullName(db + "." + pPipeline->getCollectionName());
 	boost::shared_ptr<Cursor> pCursor(
-            findTableScan(pPipeline->getCollectionName().c_str(), BSONObj()));
+            findTableScan(fullName.c_str(), BSONObj()));
 	boost::shared_ptr<DocumentSource> pSource(
 	    DocumentSourceCursor::create(pCursor));
 
