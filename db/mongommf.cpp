@@ -82,7 +82,10 @@ namespace mongo {
         void *p = MapViewOfFile(maphandle, FILE_MAP_READ, 0, 0, 0);
         if ( p == 0 ) {
             DWORD e = GetLastError();
-            log() << "createPrivateMap failed " << filename() << " " << errnoWithDescription(e) << endl;
+            log() << "createPrivateMap failed " << filename() << " " << 
+                errnoWithDescription(e) << " filelen:" << len <<
+                ((sizeof(void*) == 4 ) ? " (32 bit build)" : "") <<
+                endl;
         }
         else {
             clearWritableBits(p);
@@ -280,7 +283,7 @@ namespace mongo {
             if( cmdLine.dur ) {
                 _view_private = createPrivateMap();
                 if( _view_private == 0 ) {
-                    massert( 13636 , "createPrivateMap failed (look in log for error)" , false );
+                    msgasserted(13636, str::stream() << "file " << filename() << " open/create failed in createPrivateMap (look in log for more information)");
                 }
                 privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
