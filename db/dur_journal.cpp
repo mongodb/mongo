@@ -42,6 +42,17 @@ namespace mongo {
     class AlignedBuilder;
 
     namespace dur {
+        // Rotate after reaching this data size in a journal (j._<n>) file
+        // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
+        // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
+        // work.  (and should as-is)
+        // --smallfiles makes the limit small.
+#if defined(_DEBUG)
+        unsigned long long DataLimitPerJournalFile = 128 * 1024 * 1024;
+#else
+        unsigned long long DataLimitPerJournalFile = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
+#endif
+
         BOOST_STATIC_ASSERT( sizeof(Checksum) == 16 );
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 20 );
@@ -289,7 +300,7 @@ namespace mongo {
                 string fn = str::stream() << "prealloc." << i;
                 filesystem::path filepath = getJournalDir() / fn;
 
-                unsigned long long limit = Journal::DataLimit;
+                unsigned long long limit = DataLimitPerJournalFile;
                 if( debug && i == 1 ) { 
                     // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
                     // case, so we force exercising here when _DEBUG is set by arbitrarily stopping prealloc at a low 
@@ -582,13 +593,11 @@ namespace mongo {
 
             j.updateLSNFile();
 
-            if( _curLogFile && _written < DataLimit )
+            if( _curLogFile && _written < DataLimitPerJournalFile )
                 return;
 
             if( _curLogFile ) {
-
                 closeCurrentJournalFile();
-
                 removeUnneededJournalFiles();
             }
 

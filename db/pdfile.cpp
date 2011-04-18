@@ -341,17 +341,13 @@ namespace mongo {
 
     int MongoDataFile::defaultSize( const char *filename ) const {
         int size;
-
         if ( fileNo <= 4 )
             size = (64*1024*1024) << fileNo;
         else
             size = 0x7ff00000;
-
         if ( cmdLine.smallfiles ) {
             size = size >> 2;
         }
-
-
         return size;
     }
 

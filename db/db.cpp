@@ -52,6 +52,10 @@
 
 namespace mongo {
 
+    namespace dur { 
+        extern unsigned long long DataLimitPerJournalFile;
+    }
+
     /* only off if --nocursors which is for debugging. */
     extern bool useCursors;
 
@@ -775,6 +779,8 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
+            assert( dur::DataLimitPerJournalFile >= 128 * 1024 * 1024 );
+            dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
         }
         if (params.count("diaglog")) {
             int x = params["diaglog"].as<int>();
