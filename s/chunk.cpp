@@ -707,7 +707,7 @@ namespace mongo {
         }
 
         log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
-        _reload_inlock();
+        _reload();
         return findChunk( obj , true );
     }
 
