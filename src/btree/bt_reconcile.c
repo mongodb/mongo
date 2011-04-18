@@ -461,7 +461,7 @@ __wt_split(SESSION *session)
 		 */
 		current_len = WT_PTRDIFF32(r->first_free, dsk);
 		if (current_len + r->split_size <= r->page_size) {
-			r->space_avail = r->split_size;
+			r->space_avail = r->split_size - WT_PAGE_DISK_SIZE;
 			break;
 		}
 
@@ -471,7 +471,8 @@ __wt_split(SESSION *session)
 		 * be enough.
 		 */
 		r->state = SPLIT_MAX;
-		r->space_avail = r->page_size - current_len;
+		r->space_avail =
+		    (r->page_size - WT_PAGE_DISK_SIZE) - current_len;
 		break;
 	case SPLIT_MAX:					/* Case #2 */
 		/*
