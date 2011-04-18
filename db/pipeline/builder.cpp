@@ -59,7 +59,6 @@ namespace mongo {
     }
 
     void BuilderObj::append(BSONArrayBuilder *pDone) {
-	pDone->done();
 	pBuilder->append(fieldName, pDone->arr());
     }
 
@@ -107,7 +106,6 @@ namespace mongo {
     }
 
     void BuilderArray::append(BSONArrayBuilder *pDone) {
-	pDone->done();
 	pBuilder->append(pDone->arr());
     }
 

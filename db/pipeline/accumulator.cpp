@@ -40,7 +40,7 @@ namespace mongo {
 
     void Accumulator::addToBsonObj(
 	BSONObjBuilder *pBuilder, string fieldName, bool docPrefix) const {
-	opToBson(pBuilder, getName(), fieldName);
+	opToBson(pBuilder, getOpName(), fieldName);
     }
 
     void Accumulator::addToBsonArray(

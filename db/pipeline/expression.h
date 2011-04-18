@@ -231,7 +231,7 @@ namespace mongo {
 	    implementation, and should not be deleted
 	    and should not
 	*/
-	virtual const char *getName() const = 0;
+	virtual const char *getOpName() const = 0;
 
     protected:
         ExpressionNary();
@@ -239,32 +239,6 @@ namespace mongo {
         vector<boost::shared_ptr<Expression> > vpOperand;
 
     private:
-	/*
-	  Add this expression as a field to the object under construction.
-
-	  @params pBuilder the builder for the object under construction
-	  @params pOpName the name of the expression's operator
-	  @params fieldName the name to give this field in the object under
-	    construction
-	  @params fieldPrefix whether or not to add the field indicator prefix
-	    to descendant field paths
-	 */
-	void expressionToField(
-	    BSONObjBuilder *pBuilder, const char *pOpName,
-	    string fieldName, bool fieldPrefix) const;
-
-	/*
-	  Add this expression as an element to the array under construction.
-
-	  @params pBuilder the builder for the array under construction
-	  @params pOpName the name of the expression's operator
-	  @params fieldPrefix whether or not to add the field indicator prefix
-	    to descendant field paths
-	 */
-	void expressionToElement(
-	    BSONArrayBuilder *pBuilder, const char *pOpName,
-	    bool fieldPrefix) const;
-
 	/*
 	  Add the expression to the builder.
 
@@ -277,9 +251,9 @@ namespace mongo {
 	  @params fieldPrefix whether or not to add the field indicator prefix
 	    to field paths
 	 */
-	void expressionToBson(
-	    BSONObjBuilder *pBuilder, const char *pOpName, bool fieldPrefix) const;
-
+	void toBson(
+	    BSONObjBuilder *pBuilder, const char *pOpName,
+	    bool fieldPrefix) const;
     };
 
 
@@ -290,7 +264,7 @@ namespace mongo {
         virtual ~ExpressionAdd();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 
 	// virtuals from ExpressionNary
 	virtual boost::shared_ptr<ExpressionNary> (*getFactory() const)();
@@ -315,7 +289,7 @@ namespace mongo {
 	virtual boost::shared_ptr<Expression> optimize();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
 	// virtuals from ExpressionNary
@@ -369,7 +343,7 @@ namespace mongo {
 	virtual boost::shared_ptr<Expression> optimize();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
         virtual void addOperand(boost::shared_ptr<Expression> pExpression);
 
         /*
@@ -404,7 +378,7 @@ namespace mongo {
 	virtual boost::shared_ptr<Expression> optimize();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
@@ -437,7 +411,7 @@ namespace mongo {
         virtual ~ExpressionDivide();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
         virtual void addOperand(boost::shared_ptr<Expression> pExpression);
 
         static boost::shared_ptr<ExpressionNary> create();
@@ -589,7 +563,7 @@ namespace mongo {
         virtual ~ExpressionIfNull();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
         virtual void addOperand(boost::shared_ptr<Expression> pExpression);
 
         static boost::shared_ptr<ExpressionNary> create();
@@ -606,7 +580,7 @@ namespace mongo {
         virtual ~ExpressionNot();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
         virtual void addOperand(boost::shared_ptr<Expression> pExpression);
 
         static boost::shared_ptr<ExpressionNary> create();
@@ -666,7 +640,7 @@ namespace mongo {
 	virtual boost::shared_ptr<Expression> optimize();
         virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
 	// virtuals from ExpressionNary

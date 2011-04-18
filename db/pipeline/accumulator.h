@@ -63,7 +63,7 @@ namespace mongo {
 	virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
         virtual boost::shared_ptr<const Value> getValue() const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 
         /*
           Create an appending accumulator.
@@ -86,7 +86,7 @@ namespace mongo {
 	virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
         virtual boost::shared_ptr<const Value> getValue() const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 
         /*
           Create a summing accumulator.
@@ -112,7 +112,7 @@ namespace mongo {
 	virtual boost::shared_ptr<const Value> evaluate(
             boost::shared_ptr<Document> pDocument) const;
         virtual boost::shared_ptr<const Value> getValue() const;
-	virtual const char *getName() const;
+	virtual const char *getOpName() const;
 
         /*
           Create a summing accumulator.

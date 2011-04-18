@@ -15,8 +15,8 @@
  */
 
 #include "pch.h"
-#include "db/commands/pipeline.h"
 
+#include "db/commands/pipeline.h"
 #include "db/cursor.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"
@@ -47,7 +47,7 @@ namespace mongo {
     static PipelineCommand pipelineCommand;
 
     PipelineCommand::PipelineCommand():
-        Command("pipeline") {
+        Command("aggregate") {
     }
 
     Command::LockType PipelineCommand::locktype() const {
@@ -104,6 +104,9 @@ namespace mongo {
 	BSONObjBuilder shardBuilder;
 	pShardSplit->toBson(&shardBuilder);
 	BSONObj shardBson(shardBuilder.done());
+
+	DEV (log() << "\n---- shardBson\n" <<
+	     shardBson.jsonString(Strict, 1) << "\n----\n").flush();
 
 	/* on the shard servers, create the local pipeline */
 	boost::shared_ptr<Pipeline> pShardPipeline(

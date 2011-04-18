@@ -47,7 +47,7 @@ namespace mongo {
             const char *pFieldName = cmdElement.fieldName();
 
             /* look for the aggregation command */
-            if (!strcmp(pFieldName, "pipeline")) {
+            if (!strcmp(pFieldName, "aggregate")) {
                 pipeline = cmdElement.Array();
                 continue;
             }
@@ -216,7 +216,7 @@ namespace mongo {
 	}
 
 	/* add the top-level items to the command */
-	pBuilder->append("pipeline", arrayBuilder.arr());
+	pBuilder->append("aggregate", arrayBuilder.arr());
 	pBuilder->append("collection", getCollectionName());
 
 	bool btemp;
@@ -250,7 +250,7 @@ namespace mongo {
             resultArray.append(documentBuilder.done());
         }
 
-        result.appendArray("result", resultArray.done());
+        result.appendArray("result", resultArray.arr());
 
         return true;
     }

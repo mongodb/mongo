@@ -44,7 +44,7 @@ namespace mongo {
         return pAccumulator;
     }
 
-    const char *AccumulatorPush::getName() const {
-	return "$append";
+    const char *AccumulatorPush::getOpName() const {
+	return "$push";
     }
 }

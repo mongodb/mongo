@@ -60,7 +60,7 @@ namespace mongo {
         return pAccumulator;
     }
 
-    const char *AccumulatorMinMax::getName() const {
+    const char *AccumulatorMinMax::getOpName() const {
 	if (sense == 1)
 	    return "$min";
 	return "$max";

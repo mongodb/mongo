@@ -316,7 +316,7 @@ namespace mongo {
         return Value::createInt((int)longTotal);
     }
 
-    const char *ExpressionAdd::getName() const {
+    const char *ExpressionAdd::getOpName() const {
 	return "$add";
     }
 
@@ -405,7 +405,7 @@ namespace mongo {
         return Value::getTrue();
     }
 
-    const char *ExpressionAnd::getName() const {
+    const char *ExpressionAnd::getOpName() const {
 	return "$and";
     }
 
@@ -531,7 +531,8 @@ namespace mongo {
         cmpOp(theCmpOp) {
     }
 
-    void ExpressionCompare::addOperand(boost::shared_ptr<Expression> pExpression) {
+    void ExpressionCompare::addOperand(
+	boost::shared_ptr<Expression> pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -678,7 +679,7 @@ namespace mongo {
         return Value::getFalse();
     }
 
-    const char *ExpressionCompare::getName() const {
+    const char *ExpressionCompare::getOpName() const {
 	return cmpLookup[cmpOp].name;
     }
 
@@ -729,7 +730,7 @@ namespace mongo {
 	pValue->addToBsonArray(pBuilder);
     }
 
-    const char *ExpressionConstant::getName() const {
+    const char *ExpressionConstant::getOpName() const {
 	assert(false); // this has no name
 	return NULL;
     }
@@ -790,7 +791,7 @@ namespace mongo {
         return Value::createDouble(left / right);
     }
 
-    const char *ExpressionDivide::getName() const {
+    const char *ExpressionDivide::getOpName() const {
 	return "$divide";
     }
 
@@ -1021,11 +1022,11 @@ namespace mongo {
 
 	if (pRange->pTop.get() == pRange->pBottom.get()) {
 	    BSONArrayBuilder operands;
-	    pFieldPath->addToBsonArray(&operands, fieldPrefix);
+	    pFieldPath->addToBsonArray(&operands, true);
 	    pRange->pTop->addToBsonArray(&operands);
 	    
 	    BSONObjBuilder equals;
-	    equals.append("$eq", operands.done());
+	    equals.append("$eq", operands.arr());
 	    pBuilder->append(&equals);
 	    return;
 	}
@@ -1033,11 +1034,11 @@ namespace mongo {
 	BSONObjBuilder leftOperator;
 	if (pRange->pBottom.get()) {
 	    BSONArrayBuilder leftOperands;
-	    pFieldPath->addToBsonArray(&leftOperands, fieldPrefix);
+	    pFieldPath->addToBsonArray(&leftOperands, true);
 	    pRange->pBottom->addToBsonArray(&leftOperands);
 	    leftOperator.append(
 		(pRange->bottomOpen ? "$gt" : "$gte"),
-		leftOperands.done());
+		leftOperands.arr());
 
 	    if (!pRange->pTop.get()) {
 		pBuilder->append(&leftOperator);
@@ -1048,11 +1049,11 @@ namespace mongo {
 	BSONObjBuilder rightOperator;
 	if (pRange->pTop.get()) {
 	    BSONArrayBuilder rightOperands;
-	    pFieldPath->addToBsonArray(&rightOperands, fieldPrefix);
+	    pFieldPath->addToBsonArray(&rightOperands, true);
 	    pRange->pTop->addToBsonArray(&rightOperands);
 	    rightOperator.append(
 		(pRange->topOpen ? "$lt" : "$lte"),
-		rightOperands.done());
+		rightOperands.arr());
 
 	    if (!pRange->pBottom.get()) {
 		pBuilder->append(&rightOperator);
@@ -1064,7 +1065,7 @@ namespace mongo {
 	andOperands.append(leftOperator.done());
 	andOperands.append(rightOperator.done());
 	BSONObjBuilder andOperator;
-	andOperator.append("$and", andOperands.done());
+	andOperator.append("$and", andOperands.arr());
 	pBuilder->append(&andOperator);
     }
 
@@ -1306,7 +1307,7 @@ namespace mongo {
         return pRight;
     }
 
-    const char *ExpressionIfNull::getName() const {
+    const char *ExpressionIfNull::getOpName() const {
 	return "$ifnull";
     }
 
@@ -1337,7 +1338,8 @@ namespace mongo {
 	  ExpressionConstant never refers to the argument Document.
 	*/
 	if (nConst == n) {
-	    boost::shared_ptr<const Value> pResult(evaluate(boost::shared_ptr<Document>()));
+	    boost::shared_ptr<const Value> pResult(
+		evaluate(boost::shared_ptr<Document>()));
 	    boost::shared_ptr<Expression> pReplacement(
 		ExpressionConstant::create(pResult));
 	    return pReplacement;
@@ -1434,17 +1436,7 @@ namespace mongo {
 	return NULL;
     }
 
-    void ExpressionNary::addToBsonObj(
-	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
-	expressionToField(pBuilder, getName(), fieldName, fieldPrefix);
-    }
-
-    void ExpressionNary::addToBsonArray(
-	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
-	expressionToElement(pBuilder, getName(), fieldPrefix);
-    }
-
-    void ExpressionNary::expressionToBson(
+    void ExpressionNary::toBson(
 	BSONObjBuilder *pBuilder, const char *pOpName, bool fieldPrefix) const {
 	const size_t nOperand = vpOperand.size();
 	assert(nOperand > 0);
@@ -1456,24 +1448,22 @@ namespace mongo {
 	/* build up the array */
 	BSONArrayBuilder arrBuilder;
 	for(size_t i = 0; i < nOperand; ++i)
-	    vpOperand[i]->addToBsonArray(&arrBuilder, fieldPrefix);
+	    vpOperand[i]->addToBsonArray(&arrBuilder, true);
 
-	pBuilder->appendArray(pOpName, arrBuilder.done());
+	pBuilder->append(pOpName, arrBuilder.arr());
     }
 
-    void ExpressionNary::expressionToField(
-	BSONObjBuilder *pBuilder, const char *pOpName,
-	string objName, bool fieldPrefix) const {
+    void ExpressionNary::addToBsonObj(
+	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
 	BSONObjBuilder exprBuilder;
-	expressionToBson(&exprBuilder, pOpName, fieldPrefix);
-	pBuilder->append(objName, exprBuilder.done());
+	toBson(&exprBuilder, getOpName(), fieldPrefix);
+	pBuilder->append(fieldName, exprBuilder.done());
     }
 
-    void ExpressionNary::expressionToElement(
-	BSONArrayBuilder *pBuilder, const char *pOpName,
-	bool fieldPrefix) const {
+    void ExpressionNary::addToBsonArray(
+	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
 	BSONObjBuilder exprBuilder;
-	expressionToBson(&exprBuilder, pOpName, fieldPrefix);
+	toBson(&exprBuilder, getOpName(), fieldPrefix);
 	pBuilder->append(exprBuilder.done());
     }
 
@@ -1507,7 +1497,7 @@ namespace mongo {
         return Value::getTrue();
     }
 
-    const char *ExpressionNot::getName() const {
+    const char *ExpressionNot::getOpName() const {
 	return "$not";
     }
 
@@ -1601,7 +1591,7 @@ namespace mongo {
 	return pE;
     }
 
-    const char *ExpressionOr::getName() const {
+    const char *ExpressionOr::getOpName() const {
 	return "$or";
     }
 }

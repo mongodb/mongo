@@ -70,7 +70,7 @@ namespace mongo {
         doubleResult(0) {
     }
 
-    const char *AccumulatorSum::getName() const {
+    const char *AccumulatorSum::getOpName() const {
 	return "$sum";
     }
 }
