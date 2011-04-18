@@ -215,10 +215,10 @@ struct __wt_cache {
 	 * be garbage -- we track what comes in and what goes out and calculate
 	 * the difference as needed.
 	 */
-	uint64_t stat_pages_in;
-	uint64_t stat_bytes_in;
-	uint64_t stat_pages_out;
-	uint64_t stat_bytes_out;
+	uint64_t pages_in;
+	uint64_t bytes_in;
+	uint64_t pages_out;
+	uint64_t bytes_out;
 
 	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
 	uint32_t evict_elem;		/* Number of elements in the array */

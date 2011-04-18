@@ -10,14 +10,15 @@
  *	Read pages into the cache.
  */
 static inline void
-__wt_cache_page_in(SESSION *session, uint32_t bytes)
+__wt_cache_page_in(SESSION *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
-	++cache->stat_pages_in;
-	cache->stat_bytes_in += bytes;
+	++cache->pages_in;
+	cache->bytes_in += page->size;
+	F_SET(page, WT_PAGE_CACHE_COUNTED);
 }
 
 /*
@@ -25,19 +26,20 @@ __wt_cache_page_in(SESSION *session, uint32_t bytes)
  *	Discard pages from the cache.
  */
 static inline void
-__wt_cache_page_out(SESSION *session, uint32_t bytes)
+__wt_cache_page_out(SESSION *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
-	++cache->stat_pages_out;
-	cache->stat_bytes_out += bytes;
+	++cache->pages_out;
+	cache->bytes_out += page->size;
 
-#ifdef HAVE_DIAGNOSTIC
-	WT_ASSERT(session, cache->stat_pages_in >= cache->stat_pages_out);
-	WT_ASSERT(session, cache->stat_bytes_in >= cache->stat_bytes_out);
-#endif
+	WT_ASSERT(session, cache->pages_in >= cache->pages_out);
+	WT_ASSERT(session, cache->bytes_in >= cache->bytes_out);
+
+	WT_ASSERT(session, F_ISSET(page, WT_PAGE_CACHE_COUNTED));
+	F_CLR(page, WT_PAGE_CACHE_COUNTED);
 }
 
 /*
@@ -55,8 +57,8 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	pages_in = cache->stat_pages_in;
-	pages_out = cache->stat_pages_out;
+	pages_in = cache->pages_in;
+	pages_out = cache->pages_out;
 	return (pages_in > pages_out ? pages_in - pages_out : 0);
 }
 
@@ -75,8 +77,8 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	bytes_in = cache->stat_bytes_in;
-	bytes_out = cache->stat_bytes_out;
+	bytes_in = cache->bytes_in;
+	bytes_out = cache->bytes_out;
 	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }
 

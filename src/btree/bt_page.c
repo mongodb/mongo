@@ -89,8 +89,6 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 	WT_ASSERT(session, dsk->u.entries > 0);
 	WT_ASSERT(session, page->indx_count == 0);
 
-	page->type = dsk->type;
-
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_leaf.recno = dsk->recno;

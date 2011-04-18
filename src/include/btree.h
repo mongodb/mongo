@@ -484,10 +484,11 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_DELETED		0x01	/* Page was empty at reconcilation */
-#define	WT_PAGE_DSK_FREE	0x02	/* Page blocks freed */
-#define	WT_PAGE_PINNED		0x04	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x08	/* Internal page created in a split */
+#define	WT_PAGE_CACHE_COUNTED	0x01	/* Page counted in cache stats */
+#define	WT_PAGE_DELETED		0x02	/* Page was empty at reconcilation */
+#define	WT_PAGE_DISK_BLOCKS	0x04	/* Page has backing disk blocks */
+#define	WT_PAGE_PINNED		0x08	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x80	/* Internal page created in a split */
 	uint8_t flags;			/* Page flags */
 };
 /*

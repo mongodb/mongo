@@ -233,13 +233,13 @@ skip_clean_check:
 	WT_RET(__wt_rec_wrapup(session, page, &discard));
 
 	/*
-	 * Free the original disk blocks: we've either written a new disk block
+	 * Free any original disk blocks: we've either written a new disk block
 	 * referenced by the parent, or we're discarding the page entirely, and
 	 * in either case, the page's address has changed.
 	 */
-	if (!F_ISSET(page, WT_PAGE_DSK_FREE)) {
+	if (F_ISSET(page, WT_PAGE_DISK_BLOCKS)) {
+		F_CLR(page, WT_PAGE_DISK_BLOCKS);
 		WT_RET(__wt_block_free(session, page->addr, page->size));
-		F_SET(page, WT_PAGE_DSK_FREE);
 	}
 
 	/*

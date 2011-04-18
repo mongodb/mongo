@@ -238,36 +238,40 @@ __wt_cache_read(WT_READ_REQ *rr)
 	    "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
 
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
-	__wt_cache_page_in(session, size);
 
 	/* If the page needs to be verified, that's next. */
 	if (rr->dsk_verify)
 		WT_ERR(__wt_verify_dsk_page(session, dsk, addr, size));
 
 	/*
-	 * Fill in the WT_PAGE addr, size.
-	 * Reference the parent's WT_PAGE and WT_{COL,ROW}_REF structures.
-	 * Reference the underlying disk page.
+	 * Fill in the WT_PAGE information;
+	 * reference the parent's WT_PAGE and WT_{COL,ROW}_REF structures;
+	 * reference the underlying disk page.
+	 * If this page is ever modified, we'll need to free its disk blocks.
 	 */
 	page->addr = addr;
 	page->size = size;
+	page->type = dsk->type;
 	page->parent = rr->parent;
 	page->parent_ref = ref;
 	page->XXdsk = dsk;
+	F_SET(page, WT_PAGE_DISK_BLOCKS);
 
 	/*
-	 * Build the in-memory version of the page -- just return on error,
-	 * the called function cleaned up everything, including the physical
-	 * page.
+	 * Build the in-memory version of the page -- if this fails, do a real
+	 * discard of the page and its contents.
 	 */
 	if ((ret = __wt_page_inmem(session, page)) != 0) {
 		__wt_page_discard(session, page);
-		goto err;
+		return (ret);
 	}
 
+	/* Count this page in our cache statistics. */
+	__wt_cache_page_in(session, page);
+
 	/*
-	 * The page is now available -- set the LRU so the page is not selected
-	 * for eviction.
+	 * Set the LRU so the page is not immediately selected for eviction,
+	 * then go live.
 	 */
 	page->read_gen = ++cache->read_gen;
 	ref->page = page;

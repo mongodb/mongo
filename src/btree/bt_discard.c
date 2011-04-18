@@ -30,11 +30,12 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/*
-	 * If this wasn't a page we created during a split, we've got
-	 * more space.
+	 * Pages created in memory aren't counted against our cache limit; if
+	 * this was originally a disk-backed page read by the read server, we
+	 * have more space.
 	 */
-	if (!F_ISSET(page, WT_PAGE_SPLIT))
-		__wt_cache_page_out(session, page->size);
+	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
+		__wt_cache_page_out(session, page);
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
