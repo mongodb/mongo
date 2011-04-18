@@ -47,7 +47,7 @@ namespace mongo {
     static PipelineCommand pipelineCommand;
 
     PipelineCommand::PipelineCommand():
-        Command("aggregate") {
+        Command(Pipeline::commandName) {
     }
 
     Command::LockType PipelineCommand::locktype() const {

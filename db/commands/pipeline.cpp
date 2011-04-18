@@ -26,6 +26,9 @@
 
 namespace mongo {
 
+    const char Pipeline::commandName[] = "aggregate";
+    const char Pipeline::pipelineName[] = "pipeline";
+
     Pipeline::~Pipeline() {
     }
 
@@ -47,14 +50,14 @@ namespace mongo {
             const char *pFieldName = cmdElement.fieldName();
 
             /* look for the aggregation command */
-            if (!strcmp(pFieldName, "aggregate")) {
-                pipeline = cmdElement.Array();
+            if (!strcmp(pFieldName, commandName)) {
+                pPipeline->collectionName = cmdElement.String();
                 continue;
             }
 
             /* check for the collection name */
-            if (!strcmp(pFieldName, "collection")) {
-                pPipeline->collectionName = cmdElement.String();
+            if (!strcmp(pFieldName, pipelineName)) {
+                pipeline = cmdElement.Array();
                 continue;
             }
 
@@ -216,8 +219,8 @@ namespace mongo {
 	}
 
 	/* add the top-level items to the command */
-	pBuilder->append("aggregate", arrayBuilder.arr());
-	pBuilder->append("collection", getCollectionName());
+	pBuilder->append(commandName, getCollectionName());
+	pBuilder->append(pipelineName, arrayBuilder.arr());
 
 	bool btemp;
 	if (btemp = getSplitMongodPipeline()) {

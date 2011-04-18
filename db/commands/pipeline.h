@@ -91,9 +91,27 @@ namespace mongo {
 	bool run(BSONObjBuilder &result, string &errmsg,
 		 boost::shared_ptr<DocumentSource> pSource);
 
+	/*
+	  Debugging:  should the processing pipeline be split within
+	  mongod, simulating the real mongos/mongod split?  This is determined
+	  by setting the splitMongodPipeline field in an "aggregate"
+	  command.
+
+	  The split itself is handled by the caller, which is currently
+	  pipeline_command.cpp.
+
+	  @returns true if the pipeline is to be split
+	 */
 	bool getSplitMongodPipeline() const;
 
+	/*
+	  The aggregation command name.
+	 */
+	static const char commandName[];
+
     private:
+	static const char pipelineName[];
+
         Pipeline();
 
 	string collectionName;
