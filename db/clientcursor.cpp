@@ -29,6 +29,7 @@
 #include "db.h"
 #include "commands.h"
 #include "repl_block.h"
+#include "../util/processinfo.h"
 
 namespace mongo {
 
@@ -523,17 +524,61 @@ namespace mongo {
         }
     } cmdCursorInfo;
 
+    struct Mem { 
+        Mem() { res = virt = mapped = 0; }
+        int res;
+        int virt;
+        int mapped;
+        bool grew(const Mem& r) { 
+            return (r.res && (((double)res)/r.res)>1.1 ) ||
+              (r.virt && (((double)virt)/r.virt)>1.1 ) ||
+              (r.mapped && (((double)mapped)/r.mapped)>1.1 );
+        }
+    };
+
+    /** called once a minute from killcursors thread */
+    void sayMemoryStatus() { 
+        static time_t last;
+        static Mem mlast;
+        try {
+            ProcessInfo p;
+            if ( p.supported() ) {
+                Mem m;
+                m.res = p.getResidentSize();
+                m.virt = p.getVirtualMemorySize();
+                m.mapped = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
+                if( time(0)-last >= 300 || m.grew(mlast) ) { 
+                    log() << "mem (MB) res:" << m.res << " virt:" << m.virt << " mapped:" << m.mapped << endl;
+                    if( m.virt - (cmdLine.dur?2:1)*m.mapped > 5000 ) { 
+                        ONCE log() << "warning virtual/mapped memory differential is large. journaling:" << cmdLine.dur << endl;
+                    }
+                    last = time(0);
+                    mlast = m;
+                }
+            }
+        }
+        catch(...) {
+            log() << "ProcessInfo exception" << endl;
+        }
+    }
+
+    /** thread for timing out old cursors */
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
 
         unsigned old = curTimeMillis();
 
+        const int Secs = 4;
+        unsigned n = 0;
         while ( ! inShutdown() ) {
             unsigned now = curTimeMillis();
             ClientCursor::idleTimeReport( now - old );
             old = now;
-            sleepsecs(4);
+            sleepsecs(Secs);
+            if( ++n % (60/4) == 0 /*once a minute*/ ) { 
+                sayMemoryStatus();
+            }
         }
 
         client.shutdown();
