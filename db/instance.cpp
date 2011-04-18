@@ -220,6 +220,15 @@ namespace mongo {
         return ok;
     }
 
+    void (*reportEventToSystem)(const char *msg) = 0;
+
+    void mongoAbort(const char *msg) { 
+        if( reportEventToSystem ) 
+            reportEventToSystem(msg);
+        rawOut(msg);
+        ::abort();
+    }
+
     // Returns false when request includes 'end'
     void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
@@ -755,7 +764,7 @@ namespace mongo {
                     }
                     if( --n <= 0 ) {
                         log() << "shutdown: couldn't acquire write lock, aborting" << endl;
-                        abort();
+                        mongoAbort("couldn't acquire write lock");
                     }
                     log() << "shutdown: waiting for write lock..." << endl;
                 }

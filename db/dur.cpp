@@ -516,19 +516,19 @@ namespace mongo {
            }
            catch(DBException& e ) {
                log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
-               abort();
+               mongoAbort("dur1");
            }
            catch(std::ios_base::failure& e) {
                log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               abort();
+               mongoAbort("dur2");
            }
            catch(std::bad_alloc& e) {
                log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               abort();
+               mongoAbort("dur3");
            }
            catch(std::exception& e) {
                log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               abort();
+               mongoAbort("dur4");
            }
            return false;
        }
@@ -602,19 +602,19 @@ namespace mongo {
             }
             catch(DBException& e ) { 
                 log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
-                abort();
+                mongoAbort("gc1");
             }
             catch(std::ios_base::failure& e) { 
                 log() << "ios_base exception in groupCommit causing immediate shutdown: " << e.what() << endl;
-                abort();
+                mongoAbort("gc2");
             }
             catch(std::bad_alloc& e) { 
                 log() << "bad_alloc exception in groupCommit causing immediate shutdown: " << e.what() << endl;
-                abort();
+                mongoAbort("gc3");
             }
             catch(std::exception& e) {
                 log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
-                abort(); // based on myTerminate()
+                mongoAbort("gc4");
             }
         }
 
@@ -695,7 +695,7 @@ namespace mongo {
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
-                    abort(); // based on myTerminate()
+                    mongoAbort("exception in durThread");
                 }
             }
             cc().shutdown();

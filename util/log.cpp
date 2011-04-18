@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "assert_util.h"
 #include "assert.h"
-//#include "file.h"
 #include <cmath>
 using namespace std;
 
@@ -28,7 +27,7 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
-#include "../db/jsobj.h"
+//#include "../db/jsobj.h"
 
 namespace mongo {
 
@@ -84,7 +83,7 @@ namespace mongo {
 
             if ( _file ) {
 #ifdef _WIN32
-                cout << "log rotation doesn't work on windows" << endl;
+                cout << "log rotation net yet supported on windows" << endl;
                 return;
 #else
                 struct tm t;
@@ -135,4 +134,3 @@ namespace mongo {
     FILE* Logstream::logfile = stdout;
 
 }
-

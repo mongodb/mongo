@@ -9,6 +9,9 @@ namespace mongo {
 
     class NamespaceDetails;
 
+    void mongoAbort(const char *msg);
+    void abort(); // not defined -- use mongoAbort() instead
+
     namespace dur {
 
         // a smaller limit is likely better on 32 bit

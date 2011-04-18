@@ -431,7 +431,6 @@ namespace mongo {
     string errnoWithPrefix( const char * prefix );
 
     void Logstream::logLockless( const StringData& s ) {
-
         if ( s.size() == 0 )
             return;
 

@@ -24,6 +24,7 @@
 #include "../util/unittest.h"
 #include "../util/file_allocator.h"
 #include "../util/background.h"
+#include "../util/text.h"
 #include "dbmessage.h"
 #include "instance.h"
 #include "clientcursor.h"
@@ -1045,7 +1046,7 @@ namespace mongo {
     void myterminate() {
         rawOut( "terminate() called, printing stack:" );
         printStackTrace();
-        abort();
+        ::abort();
     }
 
     void setupSignals_ignoreHelper( int signal ) {}
@@ -1114,19 +1115,67 @@ namespace mongo {
         }
     }
 
+    LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
+    ::HANDLE standardOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS *ExceptionInfo) { 
+        {
+            // given the severity of the event we write to console in addition to the --logFile
+            // (rawOut writes to the logfile, if a special one were specified)
+            DWORD written;
+            WriteFile(standardOut, "unhandled exception\n", 20, &written, 0);
+            FlushFileBuffers(standardOut);
+        }
+
+        DWORD ec = ExceptionInfo->ExceptionRecord->ExceptionCode;
+        if( ec == EXCEPTION_ACCESS_VIOLATION ) {
+            rawOut("access violation");
+        } 
+        else {
+            rawOut("unhandled exception");
+            char buf[64];
+            strcpy(buf, "ec=0x");
+            _ui64toa(ec, buf+5, 16);
+            rawOut(buf);
+        }
+        if( filtLast ) 
+            return filtLast(ExceptionInfo);
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // called by mongoAbort()
+    extern void (*reportEventToSystem)(const char *msg);
+    void reportEventToSystemImpl(const char *msg) { 
+        static ::HANDLE hEventLog = RegisterEventSource( NULL, TEXT("mongod") );
+        if( hEventLog ) { 
+            std::wstring s = toNativeString(msg);
+            LPCTSTR txt = s.c_str();
+            BOOL ok = ReportEvent(
+              hEventLog, EVENTLOG_ERROR_TYPE, 
+              0, 0, NULL,
+              1, 
+              0, 
+              &txt,
+              0);
+            wassert(ok);
+        }
+    }
+
     void myPurecallHandler() {
-        rawOut( "pure virtual method called, printing stack:" );
         printStackTrace();
-        abort();
+        mongoAbort("pure virtual");
     }
 
     void setupSignals( bool inFork ) {
+        reportEventToSystem = reportEventToSystemImpl;
+        filtLast = SetUnhandledExceptionFilter(exceptionFilter);
+
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
             ;
         else
-            massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
+            msgasserted( 10297 , "Couldn't register Windows Ctrl-C handler" );
         _set_purecall_handler( myPurecallHandler );
     }
+
 #endif
 
 } // namespace mongo
