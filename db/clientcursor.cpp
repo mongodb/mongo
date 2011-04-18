@@ -549,8 +549,8 @@ namespace mongo {
                 m.mapped = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
                 if( time(0)-last >= 5000 || m.grew(mlast) ) { 
                     log() << "mem (MB) res:" << m.res << " virt:" << m.virt << " mapped:" << m.mapped << endl;
-                    if( m.virt - m.mapped > 5000 ) { 
-                        ONCE log() << "warning mapped-virtual memory is large. You must have significantly more physical ram than the mapped-virtual value.  Large values could indicate a large number of open client connections or possibly a memory leak." << endl;
+                    if( m.virt - (cmdLine.dur?2:1)*m.mapped > 5000 ) { 
+                        ONCE log() << "warning virtual/mapped memory differential is large. journaling:" << cmdLine.dur << endl;
                     }
                     last = time(0);
                     mlast = m;
