@@ -540,7 +540,6 @@ namespace mongo {
     void sayMemoryStatus() { 
         static time_t last;
         static Mem mlast;
-        static int x;
         try {
             ProcessInfo p;
             if ( p.supported() ) {
