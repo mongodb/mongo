@@ -37,6 +37,8 @@ typedef struct {
 
 	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
 
+	WT_BUF *dsk;			/* Disk-image buffer */
+
 	/*
 	 * As pages are reconciled, inactive pages are merged into their parents
 	 * and discarded.  If an inactive page is discarded, but the parent page
@@ -78,30 +80,10 @@ typedef struct {
 
 	/*
 	 * Reconciliation splits to a smaller-than-maximum page size when a
-	 * split is required so that we don't repeatedly split a packed page.
-	 *
-	 * split_page_size is the page size of the split chunk.
+	 * split is required so we don't repeatedly split a packed page.
 	 */
-	uint32_t split_page_size;		/* Split page size */
-
-	/*
-	 * Instead of checking sizes all the time, we count down the number of
-	 * times we'll approach a split boundary before we've gone to the end
-	 * of the maximum page size.
-	 *
-	 * split_avail:  number of bytes available for each split chunk
-	 * split_count:  count down to split
-	 * split_remain: number of bytes remaining after split_count chunks
-	 */
-	uint32_t split_avail;			/* Split bytes available */
-	uint32_t split_count;			/* Number of boundaries */
-	uint32_t split_remain;			/* Remainder */
-
-	/*
-	 * We track the total number of entries in split chunks so we can
-	 * easily figure out how many entries in the newest split chunk.
-	 */
-	uint32_t total_split_entries;		/* Total entries in splits */
+	uint32_t page_size;			/* Maximum page size */
+	uint32_t split_size;			/* Split page size */
 
 	/*
 	 * To keep from having to start building the page over when we reach
@@ -119,10 +101,20 @@ typedef struct {
 		 */
 		uint8_t *start;			/* Split's first byte */
 	} *save;
-	u_int s_next;				/* Next save slot */
-	u_int s_entries;			/* Total save slots */
+	u_int	 s_next;			/* Next save slot */
+	u_int	 s_entries;			/* Total save slots */
+	uint32_t s_allocated;			/* Bytes allocated */
 
-	WT_BUF *dsk_tmp;			/* Disk-image buffer */
+	/*
+	 * We track the total number of entries in split chunks so we can
+	 * easily figure out how many entries in the current split chunk.
+	 */
+	uint32_t total_entries;			/* Total entries in splits */
+
+						/* Split processing state */
+	enum {	SPLIT_BOUNDARY=0,		/* Split page boundary */
+		SPLIT_MAX=1,			/* Maximum page boundary */
+		SPLIT_TURNED_OFF=2 } state;	/* No more splits */
 } WT_REC_LIST;
 
 /*
