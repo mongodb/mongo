@@ -547,7 +547,7 @@ namespace mongo {
                 m.res = p.getResidentSize();
                 m.virt = p.getVirtualMemorySize();
                 m.mapped = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
-                if( time(0)-last >= 5000 || m.grew(mlast) ) { 
+                if( time(0)-last >= 300 || m.grew(mlast) ) { 
                     log() << "mem (MB) res:" << m.res << " virt:" << m.virt << " mapped:" << m.mapped << endl;
                     if( m.virt - (cmdLine.dur?2:1)*m.mapped > 5000 ) { 
                         ONCE log() << "warning virtual/mapped memory differential is large. journaling:" << cmdLine.dur << endl;
