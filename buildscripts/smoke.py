@@ -240,7 +240,7 @@ def check_db_hashes(master, slave):
 # Blech.
 def skipTest(path):
     if small_oplog:
-        if os.path.basename(path) in ["cursor8.js", "indexh.js"]:
+        if os.path.basename(path) in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
     return False
 
