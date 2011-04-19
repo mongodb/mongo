@@ -730,8 +730,11 @@ namespace mongo {
                 vector<HostAndPort> serverAddrs = servers.getServers();
                 for ( size_t i = 0 ; i < serverAddrs.size() ; i++ ) {
                     if ( serverAddrs[i].isLocalHost() != grid.allowLocalHost() ) {
-                        errmsg = "can't use localhost as a shard since all shards need to communicate. "
-                                 "either use all shards and configdbs in localhost or all in actual IPs " ;
+                        errmsg = str::stream() << 
+                            "can't use localhost as a shard since all shards need to communicate. " <<
+                            "either use all shards and configdbs in localhost or all in actual IPs " << 
+                            " host: " << serverAddrs[i].toString() << " isLocalHost:" << serverAddrs[i].isLocalHost();
+                        
                         log() << "addshard request " << cmdObj << " failed: attempt to mix localhosts and IPs" << endl;
                         return false;
                     }
