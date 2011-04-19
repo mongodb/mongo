@@ -1231,6 +1231,8 @@ namespace mongo {
                     /* we could queue these on disk, but normally there are very few dups, so instead we
                        keep in ram and have a limit.
                     */
+                    // so we get error # script checking: uasserted(14046, "asdf");
+                    raiseError(14046, "dups were encountered and dropped");
                     dupsToDrop.push_back(d.second);
                     uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                 }
