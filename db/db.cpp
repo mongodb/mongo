@@ -1174,11 +1174,7 @@ namespace mongo {
     void setupSignals( bool inFork ) {
         reportEventToSystem = reportEventToSystemImpl;
         filtLast = SetUnhandledExceptionFilter(exceptionFilter);
-
-        if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
-            ;
-        else
-            msgasserted( 10297 , "Couldn't register Windows Ctrl-C handler" );
+        massert(10297 , "Couldn't register Windows Ctrl-C handler", SetConsoleCtrlHandler((PHANDLER_ROUTINE) CtrlHandler, TRUE));
         _set_purecall_handler( myPurecallHandler );
     }
 
