@@ -12,8 +12,8 @@ sh._checkFullName = function( fullName ) {
     assert( fullName.indexOf( "." ) > 0 , "name needs to be fully qualified <db>.<collection>'" )
 }
 
-sh._adminCommand = function( cmd ) {
-    sh._checkMongos();
+sh._adminCommand = function( cmd , skipCheck ) {
+    if ( ! skipCheck ) sh._checkMongos();
     var res = db.getSisterDB( "admin" ).runCommand( cmd );
 
     if ( res == null || ! res.ok ) {
@@ -24,6 +24,7 @@ sh._adminCommand = function( cmd ) {
 }
 
 sh.help = function() {
+    print( "\tsh.addShard( host )                       server:port OR setname/server:port" )
     print( "\tsh.enableSharding(dbname)                 enables sharding on the database dbname" )
     print( "\tsh.shardCollection(fullName,key,unique)   shards the collection" );
     print( "\tsh.splitFind(fullName,find)               splits the chunk that find is in at the median" );
@@ -35,6 +36,10 @@ sh.help = function() {
 sh.status = function( verbose , configDB ) { 
     // TODO: move the actual commadn here
     printShardingStatus( configDB , verbose );
+}
+
+sh.addShard = function( url ){
+    sh._adminCommand( { addShard : url } , true )
 }
 
 sh.enableSharding = function( dbname ) { 
