@@ -96,7 +96,7 @@ namespace mongo {
 
             long long id = r.d().getInt64( 4 );
 
-            ShardConnection conn( cursorCache.getRef( id ) , ns );
+            ScopedDbConnection conn( cursorCache.getRef( id ) );
 
             Message response;
             bool ok = conn->callRead( r.m() , response);
