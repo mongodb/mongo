@@ -328,7 +328,12 @@ namespace mongo {
         if ( bytesNeeded > emptySize )
             return false;
         assert( bytesNeeded <= emptySize );
-        assert( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 );
+        if( !( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 ) ) { 
+            cout << keyNode(n-1).key.toString() << endl;
+            cout << key.toString() << endl;
+            cout << keyNode(n-1).key.woCompare(key, order) << endl;
+            assert(false);
+        }
         emptySize -= sizeof(_KeyNode);
         _KeyNode& kn = k(n++);
         kn.prevChildBucket = prevChild;

@@ -506,6 +506,7 @@ namespace BtreeTests {
     class ArtificialTree : public BtreeBucket {
     public:
         void push( const BSONObj &key, const DiskLoc &child ) {
+            cout << key.toString() << endl;
             pushBack( dummyDiskLoc(), KeyOwned(key), Ordering::make( BSON( "a" << 1 ) ), child );
         }
         void setNext( const DiskLoc &child ) {

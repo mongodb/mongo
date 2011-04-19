@@ -33,6 +33,10 @@ namespace mongo {
             DEV _keyData = 0; 
         }
         KeyV1() { _keyData = 0; }
+
+        /** @param keyData can be a buffer containing data in either BSON format, OR in KeyV1 format. 
+                   when BSON, we are just a wrapper
+        */
         explicit KeyV1(const char *keyData) {
             const unsigned char *p = (const unsigned char *) keyData;
             if( *p & 0x80 ) { 
@@ -69,6 +73,10 @@ namespace mongo {
     class KeyV1Owned : public KeyV1 { 
         KeyV1Owned(const KeyV1Owned&); //not copyable
     public:
+        /** @obj a BSON object to be translated to KeyV1 format.  If the object isn't 
+                 representable in KeyV1 format (which happens, intentionally, at times)
+                 it will stay as bson herein.
+        */
         KeyV1Owned(const BSONObj& obj);
         ~KeyV1Owned() { free((void*) _keyData); }
     };

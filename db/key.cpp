@@ -80,9 +80,18 @@ namespace mongo {
                 b.appendStruct(e.date());
                 break;
             case String:
-                b.appendUChar(cstring|bits);
-                b.appendStr(e.valuestr(), true);
-                break;
+                {
+                    b.appendUChar(cstring|bits);
+                    // should we do e.valuestrsize()-1?  last char currently will always be null.
+                    unsigned x = (unsigned) e.valuestrsize();
+                    if( x > 255 ) { 
+                        _o = obj;
+                        return;
+                    }
+                    b.appendUChar(x);
+                    b.appendBuf(e.valuestr(), x);
+                    break;
+                }
             case NumberInt:
                 b.appendUChar(cint|bits);
                 b.appendNum((double) e._numberInt());
@@ -137,12 +146,12 @@ namespace mongo {
             switch( bits & 0x3f ) {
                 case cminkey: b.appendMinKey(""); break;
                 case cnull:   b.appendNull(""); break;
-                case cfalse:  b.appendBool("", false);
-                case ctrue:   b.appendBool("", true);
+                case cfalse:  b.appendBool("", false); break;
+                case ctrue:   b.appendBool("", true); break;
                 case cmaxkey: b.appendMaxKey(""); break;
                 case cstring:
                     {
-                        int sz = strlen((const char *) p) + 1;
+                        unsigned sz = *p++;
                         b.append("", (const char *) p, sz);
                         p += sz;
                         break;
@@ -201,11 +210,13 @@ namespace mongo {
             }
         case cstring:
             {
+                l++; r++; // skip the size byte
+                // todo: see https://jira.mongodb.org/browse/SERVER-1300
                 int res = strcmp((const char *) l, (const char *) r);
                 if( res ) 
                     return res;
-                int len = strlen((const char *) l) + 1;
-                l += len; r += len;
+                unsigned sz = l[-1];
+                l += sz; r += sz;
                 break;
             }
         case coid:
@@ -330,7 +341,7 @@ namespace mongo {
             unsigned z = sizes[type];
             if( z == 0 ) {
                 assert( type == cstring );
-                z = strlen(((const char *)p)+1) + 2;
+                z = ((unsigned) p[1]) + 2;
             }
             more = (*p & cHASMORE) != 0;
             p += z;

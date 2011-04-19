@@ -431,7 +431,19 @@ namespace JsobjTests {
             void run() {
                 string spec = "{ a: [ \"a\", \"b\" ] }";
                 ASSERT_EQUALS( spec, fromjson( spec ).toString() );
-            }
+
+                BSONObj x = BSON( "a" << "astring" << "b" << "str" );
+                keyTest(x);
+                keyTest(x);
+                BSONObj y = BSON( "a" << "astring" << "b" << "stra" );
+                keyTest(y);
+                y = BSON( "a" << "" );
+                keyTest(y);
+
+                keyTest( BSON("abc" << true ) );
+                keyTest( BSON("abc" << false ) );
+                keyTest( BSON("abc" << false << "b" << true ) );
+          }
         };
 
         class ToStringNumber {
