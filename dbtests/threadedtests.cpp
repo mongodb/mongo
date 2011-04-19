@@ -68,6 +68,14 @@ namespace ThreadedTests {
     public:
         MongoMutexTest() : pm(N * nthreads) {}
         void run() {
+            DEV {
+                // in _DEBUG builds on linux we mprotect each time a writelock
+                // is taken. That can greatly slow down this test if there are
+                // many open files
+                DBDirectClient db;
+                db.simpleCommand("admin", NULL, "closeAllDatabases");
+            }
+
             Timer t;
             cout << "MongoMutexTest N:" << N << endl;
             ThreadedTest<135>::run();
