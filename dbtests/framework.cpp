@@ -170,7 +170,7 @@ namespace mongo {
 
                     if (minutesRunning > 30){
                         log() << currentTestName << " has been running for more than 30 minutes. aborting." << endl;
-                        abort();
+                        ::abort();
                     }
                     else if (minutesRunning > 1){
                         warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
@@ -422,4 +422,5 @@ namespace mongo {
     }
 
     void setupSignals( bool inFork ) {}
+
 }

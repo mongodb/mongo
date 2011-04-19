@@ -64,7 +64,9 @@ namespace ThreadedTests {
         enum { N = 40000 };
 #endif
         MongoMutex *mm;
+        ProgressMeter pm;
     public:
+        MongoMutexTest() : pm(N * nthreads) {}
         void run() {
             Timer t;
             cout << "MongoMutexTest N:" << N << endl;
@@ -121,6 +123,7 @@ namespace ThreadedTests {
                     mm->lock_shared();
                     mm->unlock_shared();
                 }
+                pm.hit();
             }
             cc().shutdown();
         }

@@ -257,7 +257,7 @@ public:
                 cerr << "Error creating index " << o["ns"].String();
                 cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
                 cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
-                abort();
+                ::abort();
             }
         }
         else {

@@ -49,16 +49,6 @@ namespace mongo {
             unsigned long long lastFlushTime() const { return _lastFlushTime; }
             void cleanup(bool log);
 
-            // Rotate after reaching this data size in a journal (j._<n>) file
-            // We use a smaller size for 32 bit as the journal is mmapped during recovery (only)
-            // Note if you take a set of datafiles, including journal files, from 32->64 or vice-versa, it must 
-            // work.  (and should as-is)
-#if defined(_DEBUG)
-            static const unsigned long long DataLimit = 128 * 1024 * 1024;
-#else
-            static const unsigned long long DataLimit = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
-#endif
-
             unsigned long long curFileId() const { return _curFileId; }
 
             void assureLogFileOpen() {
