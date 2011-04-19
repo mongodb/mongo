@@ -551,8 +551,9 @@ namespace mongo {
         void makeLongObj( long long n, JSObject * o ) {
             boost::uint64_t val = (boost::uint64_t)n;
             CHECKNEWOBJECT(o,_context,"NumberLong1");
-            setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );
-            if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
+            double floatApprox = (double)(boost::int64_t)val;
+            setProperty( o , "floatApprox" , toval( floatApprox ) );
+            if ( (boost::int64_t)val != (boost::int64_t)floatApprox ) {
                 // using 2 doubles here instead of a single double because certain double
                 // bit patterns represent undefined values and sm might trash them
                 setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );

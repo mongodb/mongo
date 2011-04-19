@@ -217,14 +217,15 @@ namespace mongo {
                 Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
                 unsigned long long val = f.numberLong();
                 v8::Function* numberLong = getNamedCons( "NumberLong" );
-                if ( (long long)val == (long long)(double)(long long)(val) ) {
+                double floatApprox = (double)(long long)val;
+                if ( (long long)val == (long long)floatApprox ) {
                     v8::Handle<v8::Value> argv[1];
-                    argv[0] = v8::Number::New( (double)(long long)( val ) );
+                    argv[0] = v8::Number::New( floatApprox );
                     o->Set( v8::String::New( f.fieldName() ), numberLong->NewInstance( 1, argv ) );
                 }
                 else {
                     v8::Handle<v8::Value> argv[3];
-                    argv[0] = v8::Number::New( (double)(long long)(val) );
+                    argv[0] = v8::Number::New( floatApprox );
                     argv[1] = v8::Integer::New( val >> 32 );
                     argv[2] = v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) );
                     o->Set( v8::String::New( f.fieldName() ), numberLong->NewInstance(3, argv) );
