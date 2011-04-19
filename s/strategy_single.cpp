@@ -95,7 +95,10 @@ namespace mongo {
             LOG(3) << "single getmore: " << ns << endl;
 
             long long id = r.d().getInt64( 4 );
-
+            
+            // we used ScopedDbConnection because we don't get about config versions
+            // not deleting data is handled elsewhere
+            // and we don't want to call setShardVersion
             ScopedDbConnection conn( cursorCache.getRef( id ) );
 
             Message response;
