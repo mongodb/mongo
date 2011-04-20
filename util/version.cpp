@@ -171,7 +171,7 @@ namespace mongo {
 
             if (!startsWith(space+1, "interleave")){
                 cout << endl;
-                cout << "** WARNING: You are running in on a NUMA machine." << endl;
+                cout << "** WARNING: You are running on a NUMA machine." << endl;
                 cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
                 cout << "**              numactl --interleave=all mongod [other options]" << endl;
                 warned = true;
