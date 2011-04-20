@@ -206,7 +206,6 @@ namespace mongo {
 #endif
                 continue;
             }
-            _elapsedTime += ret; // assume 1ms to grab connection. very rough
 
             if (ret < 0) {
                 int x = errno;
@@ -220,6 +219,12 @@ namespace mongo {
                     log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
                 return;
             }
+
+#if defined(__linux__)
+            _elapsedTime += max(ret, (int)(( 10000 - maxSelectTime.tv_usec ) / 1000));
+#else
+            _elapsedTime += ret; // assume 1ms to grab connection. very rough
+#endif
 
             for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 if (! (FD_ISSET(*it, fds)))
