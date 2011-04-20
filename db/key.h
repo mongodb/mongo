@@ -30,7 +30,7 @@ namespace mongo {
     class KeyV1 { 
     public:
         ~KeyV1() { 
-            DEV _keyData = 0; 
+            DEV _keyData = (const unsigned char *) 1;
         }
         KeyV1() { _keyData = 0; }
 
