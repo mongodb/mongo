@@ -105,9 +105,9 @@ __wt_evict_file_serial_func(SESSION *session)
 	BTREE *btree;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
-	int all_pages;
+	int close_method;
 
-	__wt_evict_file_unpack(session, btree, all_pages);
+	__wt_evict_file_unpack(session, btree, close_method);
 
 	cache = S2C(session)->cache;
 
@@ -116,7 +116,7 @@ __wt_evict_file_serial_func(SESSION *session)
 	er_end = er + WT_ELEMENTS(cache->evict_request);
 	for (; er < er_end; ++er)
 		if (WT_EVICT_REQ_ISEMPTY(er)) {
-			WT_EVICT_REQ_SET(er, session, btree, all_pages);
+			WT_EVICT_REQ_SET(er, session, btree, close_method);
 			return (0);
 		}
 	__wt_err(session, 0, "eviction server request table full");
