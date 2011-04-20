@@ -279,6 +279,7 @@ namespace mongo {
     inline int BucketBasics::_alloc(int bytes) {
         topSize += bytes;
         emptySize -= bytes;
+        dassert( emptySize >= 0 );
         int ofs = totalDataSize() - topSize;
         assert( ofs > 0 );
         return ofs;
@@ -328,19 +329,24 @@ namespace mongo {
         if ( bytesNeeded > emptySize )
             return false;
         assert( bytesNeeded <= emptySize );
-        if( !( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 ) ) { 
-            cout << keyNode(n-1).key.toString() << endl;
-            cout << key.toString() << endl;
-            cout << keyNode(n-1).key.woCompare(key, order) << endl;
-            assert(false);
+        if( n ) {
+            const KeyNode klast = keyNode(n-1);
+            if(  klast.key.woCompare(key, order) > 0 ) { 
+                log() << "btree bucket corrupt? consider reindexing or running validate command" << endl;
+                //cout << keyNode(n-1).key.toString() << endl;
+                //cout << key.toString() << endl;
+                assert(false);
+            }
         }
         emptySize -= sizeof(_KeyNode);
         _KeyNode& kn = k(n++);
         kn.prevChildBucket = prevChild;
         kn.recordLoc = recordLoc;
         kn.setKeyDataOfs( (short) _alloc(key.dataSize()) );
-        char *p = dataAt(kn.keyDataOfs());
+        short ofs = kn.keyDataOfs();
+        char *p = dataAt(ofs);
         memcpy(p, key.data(), key.dataSize());
+
         return true;
     }
 
