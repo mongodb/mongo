@@ -397,8 +397,10 @@ namespace mongo {
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
-                uassert( 10076 ,  "rename failed" ,
-                         _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) );
+                if ( ! _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) ) {
+                    uasserted( 10076 ,  str::stream() << "rename failed: " << info );
+                }
+                         
                 _db.dropCollection( _config.tempLong );
             }
             else if ( _config.outType == Config::MERGE ) {
