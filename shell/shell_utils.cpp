@@ -90,17 +90,6 @@ namespace mongo {
 
         // real methods
 
-        mongo::BSONObj JSSleep(const mongo::BSONObj &args) {
-            assert( args.nFields() == 1 );
-            assert( args.firstElement().isNumber() );
-            int ms = int( args.firstElement().number() );
-            {
-                auto_ptr< ScriptEngine::Unlocker > u = globalScriptEngine->newThreadUnlocker();
-                sleepmillis( ms );
-            }
-            return undefined_;
-        }
-
         void goingAwaySoon();
         BSONObj Quit(const BSONObj& args) {
             // If not arguments are given first element will be EOO, which
@@ -896,7 +885,6 @@ namespace mongo {
 
         void installShellUtils( Scope& scope ) {
             theScope = &scope;
-            scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
