@@ -761,12 +761,12 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 			continue;
 		}
 
+		/* Any off-page reference must be a valid disk address. */
+		WT_ASSERT(session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
+
 		/* Boundary: allocate, split or write the page. */
 		while (sizeof(WT_OFF_RECORD) > r->space_avail)
 			WT_RET(__wt_split(session));
-
-		/* Any off-page reference must be a valid disk address. */
-		WT_ASSERT(session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
 
 		/* Copy a new WT_OFF_RECORD structure into place. */
 		off.addr = WT_COL_REF_ADDR(cref);
@@ -1186,15 +1186,15 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 			continue;
 		}
 
+		/* Any off-page reference must be a valid disk address. */
+		WT_ASSERT(session, WT_COL_REF_ADDR(rref) != WT_ADDR_INVALID);
+
 		value_cell = WT_CELL_NEXT(key_cell);
 		len = WT_PTRDIFF32(WT_CELL_NEXT(value_cell), key_cell);
 
 		/* Boundary: allocate, split or write the page. */
 		while (len > r->space_avail)
 			WT_RET(__wt_split(session));
-
-		/* Any off-page reference must be a valid disk address. */
-		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
 		/*
 		 * XXX
@@ -1255,6 +1255,9 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 			continue;
 		}
 
+		/* Any off-page reference must be a valid disk address. */
+		WT_ASSERT(session, WT_COL_REF_ADDR(rref) != WT_ADDR_INVALID);
+
 		/*
 		 * Build a key to store on the page.  If this is the 0th key in
 		 * a "to be merged" subtree, use merge correction key that was
@@ -1280,9 +1283,6 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 		memcpy(r->first_free, &cell, sizeof(WT_CELL));
 		memcpy(r->first_free + sizeof(WT_CELL), key.data, key.size);
 		__wt_incr(session, r, WT_CELL_SPACE_REQ(key.size), 1);
-
-		/* Any off-page reference must be a valid disk address. */
-		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
 		/* Copy the off-page reference into place. */
 		off.addr = WT_ROW_REF_ADDR(rref);
