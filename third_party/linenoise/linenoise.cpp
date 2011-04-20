@@ -355,6 +355,29 @@ static char linenoiseReadChar(int fd){
     nread = read(fd,&c,1);
     if (nread <= 0) return 0;
 
+#if defined(_DEBUG)
+    if (c == 28) { /* ctrl-\ */
+        /* special debug mode. prints all keys hit. ctrl-c to get out */
+        printf("\x1b[1G\n"); /* go to first column of new line */
+        while (true) {
+            char keys[10];
+            int ret = read(fd, keys, 10);
+            int i;
+
+            if (ret <= 0) {
+                printf("\nret: %d\n", ret);
+            }
+
+            for (i=0; i < ret; i++)
+                printf("%d ", (int)keys[i]);
+            printf("\x1b[1G\n"); /* go to first column of new line */
+
+            if (keys[0] == 3) /* ctrl-c. may cause signal instead */
+                return -1;
+        }
+    }
+#endif
+
     if (c == 27) { /* escape */
         if (read(fd,seq,2) == -1) return 0;
         if (seq[0] == 91){
@@ -505,7 +528,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         char c = linenoiseReadChar(fd);
 
         if (c == 0) return len;
-        if (c == (char)-1) continue;
+        if (c == (char)-1) {
+            refreshLine(fd,prompt,buf,len,pos,cols);
+            continue;
+        }
 
         /* Only autocomplete when the callback is set. It returns < 0 when
          * there was an error reading from fd. Otherwise it will return the
