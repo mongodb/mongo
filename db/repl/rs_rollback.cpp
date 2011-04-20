@@ -227,9 +227,9 @@ namespace mongo {
             log() << "replSet info rollback our last optime:   " << ourTime.toStringPretty() << rsLog;
             log() << "replSet info rollback their last optime: " << theirTime.toStringPretty() << rsLog;
             log() << "replSet info rollback diff in end of log times: " << diff << " seconds" << rsLog;
-            if( diff > 3600 ) {
+            if( diff > 1800 ) {
                 log() << "replSet rollback too long a time period for a rollback." << rsLog;
-                throw "error not willing to roll back more than one hour of data";
+                throw "error not willing to roll back more than 30 minutes of data";
             }
         }
 
