@@ -92,6 +92,12 @@ namespace mongo {
         auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 );
         BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
 
+        /**
+         * checks the cursor for any errors
+         * will throw an exceptionif an error is encountered
+         */
+        void _checkCursor( DBClientCursor * cursor );
+
         static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
 
         virtual void _explain( map< string,list<BSONObj> >& out ) = 0;

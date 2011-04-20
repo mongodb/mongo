@@ -63,6 +63,19 @@ namespace mongo {
         _init();
     }
 
+    void ClusteredCursor::_checkCursor( DBClientCursor * cursor ) {
+        assert( cursor );
+        
+        if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
+            throw StaleConfigException( _ns , "ClusteredCursor::query" );
+        }
+        
+        if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
+            BSONObj o = cursor->next();
+            throw UserException( o["code"].numberInt() , o["$err"].String() );
+        }
+    }
+
     auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft ) {
         uassert( 10017 ,  "cursor already done" , ! _done );
         assert( _didInit );
@@ -81,7 +94,7 @@ namespace mongo {
             }
             
             if ( logLevel >= 5 ) {
-                log(5) << "ClusteredCursor::query (" << type() << ") server:" << server
+                LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
                        << " ns:" << _ns << " query:" << q << " num:" << num
                        << " _fields:" << _fields << " options: " << _options << endl;
             }
@@ -97,21 +110,9 @@ namespace mongo {
             
             massert( 13633 , str::stream() << "error querying server: " << server  , cursor.get() );
             
-            if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-                conn.done();
-                throw StaleConfigException( _ns , "ClusteredCursor::query" );
-            }
-            
-            if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
-                conn.done();
-                BSONObj o = cursor->next();
-                throw UserException( o["code"].numberInt() , o["$err"].String() );
-            }
-            
-            
-            cursor->attach( &conn );
-            
-            conn.done();
+            cursor->attach( &conn ); // this calls done on conn
+            assert( ! conn.ok() );
+            _checkCursor( cursor.get() );
             return cursor;
         }
         catch ( SocketException& e ) {
