@@ -1,5 +1,3 @@
-
-
 _parsePath = function() {
     var dbpath = "";
     for( var i = 0; i < arguments.length; ++i )
@@ -135,7 +133,7 @@ startMongoProgram = function(){
         } catch( e ) {
         }
         return false;
-    }, "unable to connect to mongo program on port " + port, 300 * 1000 );
+    }, "unable to connect to mongo program on port " + port, 600 * 1000 );
 
     return m;
 }
