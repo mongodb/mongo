@@ -73,7 +73,10 @@ namespace mongo {
             }
         }
 
-        void reset( int maxSize = 0 ) {
+        void reset() {
+            l = 0;
+        }
+        void reset( int maxSize ) {
             l = 0;
             if ( maxSize && size > maxSize ) {
                 free(data);

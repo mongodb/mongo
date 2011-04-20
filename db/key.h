@@ -29,56 +29,50 @@ namespace mongo {
 
     class KeyV1 { 
     public:
-        ~KeyV1() { 
-            DEV _keyData = (const unsigned char *) 1;
-        }
         KeyV1() { _keyData = 0; }
+        ~KeyV1() { DEV _keyData = (const unsigned char *) 1; }
 
         /** @param keyData can be a buffer containing data in either BSON format, OR in KeyV1 format. 
                    when BSON, we are just a wrapper
         */
-        explicit KeyV1(const char *keyData) {
-            const unsigned char *p = (const unsigned char *) keyData;
-            if( *p & 0x80 ) { 
-                _keyData = p;
-            }
-            else { 
-                // traditional bson format
-                _keyData = 0;
-                _o = BSONObj(keyData);
-            }
-        }
+        explicit KeyV1(const char *keyData) : _keyData((unsigned char *) keyData) { }
         int woCompare(const KeyV1& r, const Ordering &o) const;
         bool woEqual(const KeyV1& r) const;
         BSONObj toBson() const;
         string toString() const { return toBson().toString(); }
+
+        /** get the key data we want to store in the btree bucket */
+        const char * data() const { return (const char *) _keyData; }
+
+        /** @return size of data() */
         int dataSize() const;
-        const char * data() const { 
-            return _keyData != 0 ? (const char *) _keyData : _o.objdata();
-        }
 
         /** only used by geo, which always has bson keys */
-        BSONElement _firstElement() const { 
-            assert( _keyData == 0 );
-            return _o.firstElement(); 
-        }
-        bool isCompactFormat() const { return _keyData != 0; }
+        BSONElement _firstElement() const { return bson().firstElement(); }
+        bool isCompactFormat() const { return *_keyData != IsBSON; }
     protected:
+        enum { IsBSON = 0xff };
         const unsigned char *_keyData;
-        BSONObj _o;
+        BSONObj bson() const {
+            dassert( !isCompactFormat() );
+            return BSONObj((const char *) _keyData+1);
+        }
     private:
         int compareHybrid(const KeyV1& right, const Ordering& order) const;
     };
 
     class KeyV1Owned : public KeyV1 { 
-        KeyV1Owned(const KeyV1Owned&); //not copyable
     public:
         /** @obj a BSON object to be translated to KeyV1 format.  If the object isn't 
                  representable in KeyV1 format (which happens, intentionally, at times)
                  it will stay as bson herein.
         */
         KeyV1Owned(const BSONObj& obj);
-        ~KeyV1Owned() { free((void*) _keyData); }
+        ~KeyV1Owned() { free((void*) _toFree); }
+    private:
+        KeyV1Owned(const KeyV1Owned&); //not copyable
+        const char *_toFree;
+        void traditional(BufBuilder& b, const BSONObj& obj); // store as traditional bson not as compact format
     };
 
     //typedef KeyBson Key;

@@ -45,15 +45,30 @@ namespace mongo {
         cX = 0x20,
         clong = cX | cdouble,
         cHASMORE = 0x40,
-        cISKEY = 0x80
+        cNOTUSED = 0x80
     };
+
+    /** object cannot be represented in compact format.  so store in traditional bson format 
+        with a leading sentinel byte IsBSON to indicate it's in that format.
+
+        Given that the KeyV1Owned constructor already grabbed a bufbuilder, we reuse it here 
+        so that we don't have to do an extra malloc.
+    */
+    void KeyV1Owned::traditional(BufBuilder& b, const BSONObj& obj) { 
+        b.reset();
+        b.appendUChar(IsBSON);
+        b.appendBuf(obj.objdata(), obj.objsize());
+        _toFree = b.buf();
+        _keyData = (const unsigned char *) _toFree;
+        b.decouple();
+    }
 
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
         BufBuilder b(512);
         BSONObj::iterator i(obj);
         assert( i.more() );
-        unsigned char bits = cISKEY;
+        unsigned char bits = 0;
         while( 1 ) { 
             BSONElement e = i.next();
             if( i.more() )
@@ -85,7 +100,7 @@ namespace mongo {
                     // should we do e.valuestrsize()-1?  last char currently will always be null.
                     unsigned x = (unsigned) e.valuestrsize();
                     if( x > 255 ) { 
-                        _o = obj;
+                        traditional(b, obj);
                         return;
                     }
                     b.appendUChar(x);
@@ -101,7 +116,7 @@ namespace mongo {
                     long long n = e._numberLong();
                     double d = (double) n;
                     if( d != n ) { 
-                        _o = obj;
+                        traditional(b, obj);
                         return;
                     }
                     b.appendUChar(clong|bits);
@@ -122,21 +137,23 @@ namespace mongo {
                 }
             default:
                 // if other types involved, store as traditional BSON
-                _o = obj;
+                traditional(b, obj);
                 return;
             }
             if( !i.more() )
                 break;
             bits = 0;
         }
-        _keyData = (const unsigned char *) b.buf();
+        _toFree = b.buf();
+        _keyData = (const unsigned char *) _toFree;
         dassert( b.len() == dataSize() ); // check datasize method is correct
+        dassert( (*_keyData & cNOTUSED) == 0 );
         b.decouple();
     }
 
     BSONObj KeyV1::toBson() const { 
-        if( _keyData == 0 )
-            return _o;
+        if( !isCompactFormat() )
+            return bson();
 
         BSONObjBuilder b(512);
         const unsigned char *p = _keyData;
@@ -250,8 +267,8 @@ namespace mongo {
 
     // at least one of this and right are traditional BSON format
     int NOINLINE_DECL KeyV1::compareHybrid(const KeyV1& right, const Ordering& order) const { 
-        BSONObj L = _keyData == 0 ? _o : toBson();
-        BSONObj R = right._keyData == 0 ? right._o : right.toBson();
+        BSONObj L = toBson();
+        BSONObj R = right.toBson();
         return L.woCompare(R, order, /*considerfieldname*/false);
     }
 
@@ -259,7 +276,7 @@ namespace mongo {
         const unsigned char *l = _keyData;
         const unsigned char *r = right._keyData;
 
-        if( l==0 || r== 0 )
+        if( (*l|*r) == IsBSON ) // only can do this if cNOTUSED maintained
             return compareHybrid(right, order);
 
         unsigned mask = 1;
@@ -293,10 +310,8 @@ namespace mongo {
         const unsigned char *l = _keyData;
         const unsigned char *r = right._keyData;
 
-        if( l==0 || r==0 ) {
-            BSONObj L = _keyData == 0 ? _o : toBson();
-            BSONObj R = right._keyData == 0 ? right._o : right.toBson();
-            return L.woEqual(R);
+        if( (*l|*r) == IsBSON ) {
+            return toBson().woEqual(right.toBson());
         }
 
         while( 1 ) { 
@@ -334,8 +349,9 @@ namespace mongo {
 
     int KeyV1::dataSize() const { 
         const unsigned char *p = _keyData;
-        if( p == 0 )
-            return _o.objsize();
+        if( !isCompactFormat() ) {
+            return bson().objsize() + 1;
+        }
 
         bool more;
         do { 

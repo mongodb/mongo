@@ -37,7 +37,14 @@ namespace JsobjTests {
         KeyV1Owned *key = new KeyV1Owned(o);
         KeyV1Owned& k = *key;
         BSONObj x = k.toBson();
-        ASSERT( o.woCompare(x, BSONObj(), /*considerfieldname*/false) == 0 );
+        int res = o.woCompare(x, BSONObj(), /*considerfieldname*/false);
+        if( res ) {
+            cout << o.toString() << endl;
+            k.toBson();
+            cout << x.toString() << endl;
+            o.woCompare(x, BSONObj(), /*considerfieldname*/false);
+            ASSERT( res == 0 );
+        }
         ASSERT( k.woEqual(k) );
         ASSERT( !k.isCompactFormat() || k.dataSize() < o.objsize() );
 
@@ -46,11 +53,11 @@ namespace JsobjTests {
             int r2 = k.woCompare(*kLast, Ordering::make(BSONObj()));
             bool ok = (r1<0 && r2<0) || (r1>0&&r2>0) || r1==r2;
             if( !ok ) { 
-                cout << r1 << ' ' << r2 << endl;
-                cout << o.toString() << endl;
-                cout << last.toString() << endl;
-                cout << k.toString() << endl;
-                cout << kLast->toString() << endl;
+                cout << "r1r2 " << r1 << ' ' << r2 << endl;
+                cout << "o:" << o.toString() << endl;
+                cout << "last:" << last.toString() << endl;
+                cout << "k:" << k.toString() << endl;
+                cout << "kLast:" << kLast->toString() << endl;
                 int r3 = k.woCompare(*kLast, Ordering::make(BSONObj()));
                 cout << r3 << endl;
             }
@@ -215,7 +222,6 @@ namespace JsobjTests {
                     ASSERT( BSON( "" << "b" << "" << "h" ).woSortOrder( o , key ) < 0 );
 
                 }
-
 
                 ASSERT( BSON( "" << "a" ).woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 );
                 {
