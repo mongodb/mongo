@@ -387,11 +387,24 @@ static char linenoiseReadChar(int fd){
                 return 6; /* ctrl-f */
             } else if (seq[1] == 65) { /* up arrow */
                 return 16; /* ctrl-p */
-            } else if (seq[1] == 66) { /* up arrow */
+            } else if (seq[1] == 66) { /* down arrow */
                 return 14; /* ctrl-n */
-            } else if (seq[1] > 48 && seq[1] < 55) {
+            } else if (seq[1] > 48 && seq[1] < 57) {
                 /* extended escape */
                 if (read(fd,seq2,2) == -1) return 0;
+                if (seq2[0] == 126) {
+                    if (seq[1] == 49 || seq[1] == 55) { /* home (linux console and rxvt based) */
+                        return 1; /* ctrl-a */
+                    } else if (seq[1] == 52 || seq[1] == 56 ) { /* end (linux console and rxvt based) */
+                        return 5; /* ctrl-e */
+                    } else if (seq[1] == 51) { /* delete */
+                        return 127; /* ascii DEL byte */
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    return -1;
+                }
                 if (seq[1] == 51 && seq2[0] == 126) { /* delete */
                     return 127; /* ascii DEL byte */
                 } else {
@@ -401,9 +414,9 @@ static char linenoiseReadChar(int fd){
                 return -1;
             }
         } else if (seq[0] == 79){
-            if (seq[1] == 72) { /* home */
+            if (seq[1] == 72) { /* home (xterm based) */
                 return 1; /* ctrl-a */
-            } else if (seq[1] == 70) { /* end */
+            } else if (seq[1] == 70) { /* end (xterm based) */
                 return 5; /* ctrl-e */
             } else {
                 return -1;
