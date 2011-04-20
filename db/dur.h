@@ -155,7 +155,7 @@ namespace mongo {
              */
             Record* writing(Record* r);
             /** Intentionally unimplemented method. BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
-            BtreeBucket* writing( BtreeBucket* );
+//            BtreeBucket* writing( BtreeBucket* );
             /** Intentionally unimplemented method. NamespaceDetails may be based on references to 'Extra' objects. */
             NamespaceDetails* writing( NamespaceDetails* );
 

@@ -29,8 +29,9 @@ namespace mongo {
     class Record;
     class DeletedRecord;
     class Extent;
-    class BtreeBucket;
     class MongoDataFile;
+
+    template< class Version > class BtreeBucket;
 
 #pragma pack(1)
     /** represents a disk location/offset on disk in a database.  64 bits.
@@ -139,9 +140,13 @@ namespace mongo {
         Record* rec() const;
         DeletedRecord* drec() const;
         Extent* ext() const;
-        const BtreeBucket* btree() const;
+
+        template< class V >
+        const BtreeBucket<V> * btree() const;
+
         // Explicitly signals we are writing and casts away const
-        BtreeBucket* btreemod() const;
+        template< class V >
+        BtreeBucket<V> * btreemod() const;
 
         /*MongoDataFile& pdf() const;*/
     };

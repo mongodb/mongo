@@ -156,6 +156,7 @@
     <ClCompile Include="security_key.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="key.cpp" />
+    <ClCompile Include="btreebuilder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

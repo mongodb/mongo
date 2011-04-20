@@ -474,6 +474,7 @@
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\group.cpp" />

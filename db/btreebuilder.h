@@ -7,20 +7,21 @@ namespace mongo {
     /**
      * build btree from the bottom up
      */
+    template< class V >
     class BtreeBuilder {
         bool dupsAllowed;
         IndexDetails& idx;
         /** Number of keys added to btree. */
         unsigned long long n;
         /** Last key passed to addKey(). */
-        Key keyLast;
+        typename V::Key keyLast;
         BSONObj order;
         Ordering ordering;
         /** true iff commit() completed successfully. */
         bool committed;
 
         DiskLoc cur, first;
-        BtreeBucket *b;
+        BtreeBucket<V> *b;
 
         void newBucket();
         void buildNextLevel(DiskLoc);

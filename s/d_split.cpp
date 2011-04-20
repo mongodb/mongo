@@ -77,7 +77,7 @@ namespace mongo {
             // only yielding on firt half for now
             // after this it should be in ram, so 2nd should be fast
             {
-                shared_ptr<Cursor> c( new BtreeCursor( d, idxNo, *id, min, max, false, 1 ) );
+                shared_ptr<Cursor> c( BtreeCursor::make( d, idxNo, *id, min, max, false, 1 ) );
                 scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 while ( c->ok() ) {
                     num++;
@@ -89,7 +89,8 @@ namespace mongo {
 
             num /= 2;
 
-            BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
+            auto_ptr<BtreeCursor> _c( BtreeCursor::make( d, idxNo, *id, min, max, false, 1 ) );
+            BtreeCursor& c = *_c;
             for( ; num; c.advance(), --num );
 
             ostringstream os;
@@ -169,7 +170,7 @@ namespace mongo {
                 return false;
             }
 
-            BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+            BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
             if ( ! cc->ok() ) {
@@ -360,7 +361,7 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                BtreeCursor * bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
                 shared_ptr<Cursor> c( bc );
                 scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 if ( ! cc->ok() ) {
@@ -425,7 +426,7 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
                     
-                    bc = new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
+                    bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
                     c.reset( bc );
                     cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 }

@@ -63,9 +63,13 @@ namespace mongo {
      * below as legacy btrees.
      */
     
-    const int BucketSize = 8192;
+    const int OldBucketSize = 8192;
 
 #pragma pack(1)
+    class BtreeData_V0;
+    class BtreeData_V1;
+    template< class Version > class BucketBasics;
+
     /**
      * This is the fixed width data component for storage of a key within a
      * bucket.  It contains an offset pointer to the variable width bson
@@ -120,26 +124,7 @@ namespace mongo {
             return !isUnused();
         }
     };
-#pragma pack()
 
-    class BucketBasics;
-
-    /**
-     * This is an in memory wrapper for a _KeyNode, and not itself part of btree
-     * storage.  This object and its BSONObj 'key' will become invalid if the
-     * _KeyNode data that generated it is moved within the btree.  In general,
-     * a KeyNode should not be expected to be valid after a write.
-     */
-    class KeyNode {
-    public:
-        KeyNode(const BucketBasics& bb, const _KeyNode &k);
-        const DiskLoc& prevChildBucket;
-        const DiskLoc& recordLoc;
-        /* Points to the bson key storage for a _KeyNode */
-        Key key;
-    };
-
-#pragma pack(1)
     /**
      * This structure represents header data for a btree bucket.  An object of
      * this type is typically allocated inside of a buffer of size BucketSize,
@@ -157,7 +142,7 @@ namespace mongo {
      * b = bson key data
      * u = unused (old) bson key data, that may be garbage collected
      */
-    class BtreeData {
+    class BtreeData_V0 {
     protected:
         /** Parent bucket of this bucket, which isNull() for the root bucket. */
         DiskLoc parent;
@@ -181,6 +166,40 @@ namespace mongo {
         int reserved;
         /* Beginning of the bucket's body */
         char data[4];
+
+    public:
+        typedef KeyBson Key;
+        enum { BucketSize = 8192 };
+    };
+
+    class BtreeData_V1 {
+    protected:
+        /** Parent bucket of this bucket, which isNull() for the root bucket. */
+        DiskLoc parent;
+        /** Given that there are n keys, this is the n index child. */
+        DiskLoc nextChild;
+        /** can be reused, value is 8192 in current pdfile version Apr2010 */
+        unsigned short _wasSize;
+        /** zero */
+        // unsigned short _reserved1;
+        int flags;
+
+        /** basicInsert() assumes the next three members are consecutive and in this order: */
+
+        /** Size of the empty region. */
+        int emptySize;
+        /** Size used for bson storage, including storage of old keys. */
+        int topSize;
+        /* Number of keys in the bucket. */
+        int n;
+
+        int reserved;
+        /* Beginning of the bucket's body */
+        char data[4];
+
+    public:
+        typedef KeyV1 Key;
+        enum { BucketSize = 8192-16 }; // leave room for Record header
     };
 
     /**
@@ -210,10 +229,28 @@ namespace mongo {
      * A number of functions below require a thisLoc argument, which must be the
      * disk location of the bucket mapped to 'this'.
      */
-    class BucketBasics : public BtreeData {
-        friend class BtreeBuilder;
-        friend class KeyNode;
+    template< class Version >
+    class BucketBasics : public Version {
     public:
+        //friend class BtreeBuilder< Version >;
+        typedef typename Version::Key Key;
+
+        /**
+         * This is an in memory wrapper for a _KeyNode, and not itself part of btree
+         * storage.  This object and its BSONObj 'key' will become invalid if the
+         * _KeyNode data that generated it is moved within the btree.  In general,
+         * a KeyNode should not be expected to be valid after a write.
+         */
+        class KeyNode {
+        public:
+            KeyNode(const BucketBasics<Version>& bb, const _KeyNode &k);
+            const DiskLoc& prevChildBucket;
+            const DiskLoc& recordLoc;
+            /* Points to the bson key storage for a _KeyNode */
+            Key key;
+        };
+        friend class KeyNode;
+
         /** Assert write intent declared for this bucket already. */
         void assertWritable();
 
@@ -237,6 +274,7 @@ namespace mongo {
             return (char*)&(d->data) - (char*)&(d->parent);
         }
         static int bodySize() { return BucketSize - headerSize(); }
+        static int lowWaterMark() { return bodySize() / 2 - KeyMax - sizeof( _KeyNode ) + 1; } // see comment in btree.cpp
 
         // for testing
         int nKeys() const { return n; }
@@ -407,7 +445,9 @@ namespace mongo {
         int Size() const;
         
         /** @return i-indexed _KeyNode, without bounds checking */
+    public:
         const _KeyNode& k(int i) const { return ((const _KeyNode*)data)[i]; }
+    protected:        
         _KeyNode& k(int i) { return ((_KeyNode*)data)[i]; }
 
         /**
@@ -469,7 +509,8 @@ namespace mongo {
      * behave correctly if the 'this' pointer is suddenly invalidated by a
      * callee.
      */
-    class BtreeBucket : public BucketBasics {
+    template< class V >
+    class BtreeBucket : public BucketBasics<V> {
         friend class BtreeCursor;
     public:
         bool isHead() const { return parent.isNull(); }
@@ -674,8 +715,8 @@ namespace mongo {
          *    indexes greater than split in lchild are moved to rchild.
          */
         void doBalanceLeftToRight( const DiskLoc thisLoc, int leftIndex, int split,
-                                   BtreeBucket *l, const DiskLoc lchild,
-                                   BtreeBucket *r, const DiskLoc rchild,
+                                   BtreeBucket<V> *l, const DiskLoc lchild,
+                                   BtreeBucket<V> *r, const DiskLoc rchild,
                                    IndexDetails &id, const Ordering &order );
         /**
          * Preconditions:
@@ -691,8 +732,8 @@ namespace mongo {
          *    lchild.
          */        
         void doBalanceRightToLeft( const DiskLoc thisLoc, int leftIndex, int split,
-                                   BtreeBucket *l, const DiskLoc lchild,
-                                   BtreeBucket *r, const DiskLoc rchild,
+                                   BtreeBucket<V> *l, const DiskLoc lchild,
+                                   BtreeBucket<V> *r, const DiskLoc rchild,
                                    IndexDetails &id, const Ordering &order );
 
         /**
@@ -749,7 +790,7 @@ namespace mongo {
          * Allocate a temporary btree bucket in ram rather than in memory mapped
          * storage.  The caller must release this bucket with free().
          */
-        static BtreeBucket* allocTemp();
+        static BtreeBucket<V> * allocTemp();
 
         /**
          * Preconditions:
@@ -840,9 +881,14 @@ namespace mongo {
 #pragma pack()
 
     class BtreeCursor : public Cursor {
-    public:
+    protected:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+    public:
+        /** makes an appropriate subclass depending on the index version */
+        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
+        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+
         virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();
         virtual void noteLocation(); // updates keyAtKeyOfs...
@@ -868,18 +914,20 @@ namespace mongo {
         virtual bool modifiedKeys() const { return _multikey; }
         virtual bool isMultiKey() const { return _multikey; }
 
-        const _KeyNode& _currKeyNode() const {
+        /*const _KeyNode& _currKeyNode() const {
             assert( !bucket.isNull() );
             const _KeyNode& kn = bucket.btree()->k(keyOfs);
             assert( kn.isUsed() );
             return kn;
-        }
-        const KeyNode currKeyNode() const {
+        }*/
+
+//        const BSONObj currKey() const;
+        /*const KeyNode currKeyNode() const {
             assert( !bucket.isNull() );
             return bucket.btree()->keyNode(keyOfs);
-        }
+        }*/
 
-        virtual BSONObj currKey() const { return currKeyNode().key.toBson(); }
+        virtual BSONObj currKey() const = 0; // { return currKeyNode().key.toBson(); }
         virtual BSONObj indexKeyPattern() { return indexDetails.keyPattern(); }
 
         virtual void aboutToDeleteBucket(const DiskLoc& b) {
@@ -887,7 +935,7 @@ namespace mongo {
                 keyOfs = -1;
         }
 
-        virtual DiskLoc currLoc()  { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc();  }
+        virtual DiskLoc currLoc() = 0; //  { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc();  }
         virtual DiskLoc refLoc()   { return currLoc(); }
         virtual Record* _current() { return currLoc().rec(); }
         virtual BSONObj current()  { return BSONObj(_current()); }
@@ -922,7 +970,7 @@ namespace mongo {
         /** for debugging only */
         const DiskLoc getBucket() const { return bucket; }
 
-    private:
+    protected:
         /**
          * Our btrees may (rarely) have "unused" keys when items are deleted.
          * Skip past them.
@@ -935,13 +983,17 @@ namespace mongo {
         /** selective audits on construction */
         void audit();
 
+        virtual void _audit() = 0;
+        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) = 0;
+        virtual const _KeyNode& keyNode(int keyOfs) = 0;
+        virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
+        virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) = 0;
+
         /** set initial bucket */
         void init();
 
         /** if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin */
         void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
-
-        friend class BtreeBucket;
 
         set<DiskLoc> _dups;
         NamespaceDetails * const d;
@@ -972,8 +1024,8 @@ namespace mongo {
     }*/
 
     /** @param self location of our own record.  self doesn't count as a dup. */
-    inline bool IndexDetails::wouldCreateDup(const BSONObj& key, DiskLoc self) {
+    /*inline bool IndexDetails::wouldCreateDup(const BSONObj& key, DiskLoc self) {
         return head.btree()->wouldCreateDup(*this, head, KeyOwned(key), Ordering::make(keyPattern()), self);
-    }
+    }*/
 
 } // namespace mongo;

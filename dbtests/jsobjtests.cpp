@@ -23,10 +23,10 @@
 #include "../db/json.h"
 #include "../db/repl.h"
 #include "../db/extsort.h"
-
 #include "dbtests.h"
 #include "../util/mongoutils/checksum.h"
 #include "../db/key.h"
+#include "../db/btree.h"
 
 namespace JsobjTests {
 

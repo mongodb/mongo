@@ -776,6 +776,9 @@
     <ClCompile Include="..\db\key.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\btreebuilder.cpp">
+      <Filter>btree</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

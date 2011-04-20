@@ -433,9 +433,12 @@ namespace mongo {
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
     }
-    inline const BtreeBucket* DiskLoc::btree() const {
+
+    template< class V >
+    inline 
+    const BtreeBucket<V> * DiskLoc::btree() const {
         assert( _a != -1 );
-        return (const BtreeBucket *) rec()->data;
+        return (const BtreeBucket<V> *) rec()->data;
     }
 
 } // namespace mongo

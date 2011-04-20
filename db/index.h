@@ -45,7 +45,7 @@ namespace mongo {
         /* Location of index info object. Format:
 
              { name:"nameofindex", ns:"parentnsname", key: {keypattobject}
-               [, unique: <bool>, background: <bool>]
+               [, unique: <bool>, background: <bool>, v:<version>]
              }
 
            This object is in the system.indexes collection.  Note that since we
@@ -124,6 +124,10 @@ namespace mongo {
         string parentNS() const {
             BSONObj io = info.obj();
             return io.getStringField("ns");
+        }
+
+        double version() const {
+            return info.obj()["v"].number();
         }
 
         bool unique() const {
