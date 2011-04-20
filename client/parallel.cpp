@@ -93,12 +93,10 @@ namespace mongo {
                 throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
             }
             
-            if ( logLevel >= 5 ) {
-                LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
-                       << " ns:" << _ns << " query:" << q << " num:" << num
-                       << " _fields:" << _fields << " options: " << _options << endl;
-            }
-            
+            LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
+                   << " ns:" << _ns << " query:" << q << " num:" << num
+                   << " _fields:" << _fields << " options: " << _options << endl;
+        
             auto_ptr<DBClientCursor> cursor =
                 conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options , _batchSize == 0 ? 0 : _batchSize + skipLeft );
             
