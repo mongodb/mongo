@@ -82,9 +82,6 @@ namespace mongo {
     const Member* ReplSetImpl::getMemberToSyncTo() {
         Member *closest = 0;
         
-        StateBox::SP sp = box.get();
-        assert( !sp.state.primary() ); // wouldn't make sense if we were.
-
         // find the member with the lowest ping time that has more data than me
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->hbinfo().up() &&
@@ -111,6 +108,12 @@ namespace mongo {
     void ReplSetImpl::_syncDoInitialSync() {
         sethbmsg("initial sync pending",0);
 
+        // if this is the first node, it may have already become primary
+        if ( box.getState().primary() ) {
+            sethbmsg("I'm already primary, no need for initial sync",0);
+            return;
+        }
+        
         const Member *source = getMemberToSyncTo();
         if (!source) {
             sethbmsg("initial sync need a member to be primary or secondary to do our initial sync", 0);
