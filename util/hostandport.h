@@ -155,7 +155,12 @@ namespace mongo {
     }
 
     inline bool HostAndPort::isLocalHost() const {
-        return _host == "localhost" || startsWith(_host.c_str(), "127.") || _host == "::1";
+        return (  _host == "localhost"
+               || startsWith(_host.c_str(), "127.")
+               || _host == "::1"
+               || _host == "anonymous unix socket"
+               || _host.c_str()[0] == '/' // unix socket
+               );
     }
 
     inline HostAndPort::HostAndPort(string s) {
