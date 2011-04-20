@@ -158,9 +158,15 @@ namespace mongo {
     public:
         AScopedConnection() { _numConnections++; }
         virtual ~AScopedConnection() { _numConnections--; }
+        
         virtual DBClientBase* get() = 0;
         virtual void done() = 0;
         virtual string getHost() const = 0;
+        
+        /** 
+         * @return true iff this has a connection to the db
+         */
+        virtual bool ok() const = 0;
 
         /**
          * @return total number of current instances of AScopedConnection
@@ -213,6 +219,8 @@ namespace mongo {
             uassert( 13102 ,  "connection was returned to the pool already" , _conn );
             return _conn;
         }
+
+        bool ok() const { return _conn > 0; }
 
         string getHost() const { return _host; }
 
