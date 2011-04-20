@@ -148,7 +148,9 @@ namespace mongo {
                 case cnull:   b.appendNull(""); break;
                 case cfalse:  b.appendBool("", false); break;
                 case ctrue:   b.appendBool("", true); break;
-                case cmaxkey: b.appendMaxKey(""); break;
+                case cmaxkey: 
+                    b.appendMaxKey(""); 
+                    break;
                 case cstring:
                     {
                         unsigned sz = *p++;
