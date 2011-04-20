@@ -443,6 +443,11 @@ namespace JsobjTests {
                 keyTest( BSON("abc" << true ) );
                 keyTest( BSON("abc" << false ) );
                 keyTest( BSON("abc" << false << "b" << true ) );
+
+                Date_t now = jsTime();
+                keyTest( BSON("" << now << "" << 3 << "" << jstNULL << "" << true) );
+                keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
+
           }
         };
 
