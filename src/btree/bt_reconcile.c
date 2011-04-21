@@ -1770,6 +1770,8 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 		__wt_buf_clear(&r_list->key);
 		WT_ROW_REF_ADDR(rref) = r_list->off.addr;
 		WT_ROW_REF_SIZE(rref) = r_list->off.size;
+		WT_ROW_REF_PAGE(rref) = NULL;
+		WT_ROW_REF_STATE(rref) = WT_REF_DISK;
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "split: %lu (%luB)",
@@ -1828,9 +1830,11 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	for (cref = page->u.col_int.t,
 	    r_list = r->list, i = 0; i < r->l_next; ++cref, ++r_list, ++i) {
 		off = &r_list->off;
+		cref->recno = WT_RECNO(off);
 		WT_COL_REF_ADDR(cref) = off->addr;
 		WT_COL_REF_SIZE(cref) = off->size;
-		cref->recno = WT_RECNO(off);
+		WT_COL_REF_PAGE(cref) = NULL;
+		WT_COL_REF_STATE(cref) = WT_REF_DISK;
 
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "split: %lu (%luB), starting record %llu",
