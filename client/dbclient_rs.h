@@ -232,6 +232,7 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
+        virtual DBClientBase* callLazy( Message& toSend );
 
 
     protected:

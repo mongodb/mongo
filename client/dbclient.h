@@ -337,7 +337,7 @@ namespace mongo {
         virtual void checkResponse( const char* data, int nReturned ) {}
 
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-        virtual void recv( Message& m ) { assert(false); }
+        virtual bool recv( Message& m ) { assert(false); }
     };
 
     /**
@@ -779,6 +779,14 @@ namespace mongo {
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
         virtual void say( Message& toSend  ) = 0;
 
+        /**
+         * this sends the request but does not wait for the response
+         * we return a DBClientBase in case this connection points to many servers
+         * so we can call recv() on the right socket
+         * @return the actual connection to call recv on
+         */
+        virtual DBClientBase* callLazy( Message& toSend );
+        
         virtual ConnectionString::ConnectionType type() const = 0;
 
     }; // DBClientBase
@@ -907,7 +915,7 @@ namespace mongo {
 
     protected:
         friend class SyncClusterConnection;
-        virtual void recv( Message& m );
+        virtual bool recv( Message& m );
         virtual void sayPiggyBack( Message &toSend );
 
         DBClientReplicaSet *clientSet;

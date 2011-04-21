@@ -750,8 +750,16 @@ namespace mongo {
         toSend.setData( dbUpdate , b.buf() , b.len() );
 
         say( toSend );
+
+
     }
 
+
+    DBClientBase* DBClientBase::callLazy( Message& toSend ) {
+        say( toSend );
+        return this;
+    }
+    
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
     }
@@ -892,8 +900,8 @@ namespace mongo {
         port().piggyBack( toSend );
     }
 
-    void DBClientConnection::recv( Message &m ) {
-        port().recv(m);
+    bool DBClientConnection::recv( Message &m ) {
+        return port().recv(m);
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {

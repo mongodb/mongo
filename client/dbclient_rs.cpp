@@ -575,6 +575,26 @@ namespace mongo {
         _master.reset(); 
     }
 
+    DBClientBase* DBClientReplicaSet::callLazy( Message& toSend ) {
+        if ( toSend.operation() == dbQuery ) {
+            // TODO: might be possible to do this faster by changing api
+            DbMessage dm( toSend );
+            QueryMessage qm( dm );
+            if ( qm.queryOptions & QueryOption_SlaveOk ) {
+                for ( int i=0; i<2; i++ ) {
+                    try {
+                        return checkSlave()->callLazy( toSend );
+                    }
+                    catch ( DBException & ) {
+                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    }
+                }
+            }
+        }
+
+        return checkMaster()->callLazy( toSend );
+    }
+
     bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( toSend.operation() == dbQuery ) {
             // TODO: might be possible to do this faster by changing api
