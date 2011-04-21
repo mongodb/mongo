@@ -104,6 +104,7 @@ namespace mongo {
     }
 
     DBClientBase* DBConnectionPool::_get(const string& ident) {
+        assert( ! inShutdown() );
         scoped_lock L(_mutex);
         PoolForHost& p = _pools[ident];
         return p.get();
