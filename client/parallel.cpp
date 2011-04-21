@@ -76,7 +76,7 @@ namespace mongo {
         }
     }
 
-    auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft ) {
+    auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft , bool lazy ) {
         uassert( 10017 ,  "cursor already done" , ! _done );
         assert( _didInit );
 
@@ -227,6 +227,11 @@ namespace mongo {
         : _matcher( filter ) , _cursor( cursor ) , _done( cursor.get() == 0 ) {
     }
 
+    FilteringClientCursor::FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter )
+        : _matcher( filter ) , _cursor( cursor ) , _done( cursor == 0 ) {
+    }
+
+
     FilteringClientCursor::~FilteringClientCursor() {
     }
 
@@ -235,6 +240,13 @@ namespace mongo {
         _next = BSONObj();
         _done = _cursor.get() == 0;
     }
+
+    void FilteringClientCursor::reset( DBClientCursor* cursor ) {
+        _cursor.reset( cursor );
+        _next = BSONObj();
+        _done = cursor == 0;
+    }
+
 
     bool FilteringClientCursor::more() {
         if ( ! _next.isEmpty() )
@@ -399,16 +411,74 @@ namespace mongo {
     }
 
     void ParallelSortClusteredCursor::_init() {
+        // make sure we're not already initialized
         assert( ! _cursors );
+
         _cursors = new FilteringClientCursor[_numServers];
 
-        // TODO: parellize
-        int num = 0;
+
+        size_t num = 0;
+        vector<shared_ptr<ShardConnection> > conns;
+        vector<string> servers;
+        
         for ( set<ServerAndQuery>::iterator i = _servers.begin(); i!=_servers.end(); ++i ) {
+            size_t me = num++;
             const ServerAndQuery& sq = *i;
-            _cursors[num++].reset( query( sq._server , 0 , sq._extra , _needToSkip ) );
+
+
+            BSONObj q = _query;
+            if ( ! sq._extra.isEmpty() ) {
+                q = concatQuery( q , sq._extra );
+            }
+
+            conns.push_back( shared_ptr<ShardConnection>( new ShardConnection( sq._server , _ns ) ) );
+            servers.push_back( sq._server );
+            
+            if ( conns[me]->setVersion() ) {
+                // we can't cleanly release other sockets
+                // because there is data waiting on the sockets
+                // TODO: should we read from them?
+                // we can close this one because we know the state
+                conns[me]->done();
+                throw StaleConfigException( _ns , "ClusteredCursor::query ShardConnection had to change" , true );
+            }
+
+            LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns 
+                   << " query:" << q << " _fields:" << _fields << " options: " << _options  << endl;
+            
+            _cursors[me].reset( new DBClientCursor( conns[me]->get() , _ns , q , 
+                                                    0 , // nToReturn
+                                                    0 , // nToSkip
+                                                    _fields.isEmpty() ? 0 : &_fields , // fieldsToReturn
+                                                    _options , 
+                                                    _batchSize == 0 ? 0 : _batchSize + _needToSkip // batchSize
+                                                    ) );
+            
+            // note: this may throw a scoket exception
+            // if it does, we lose our other connections as well
+            _cursors[me].raw()->initLazy();
+            
         }
 
+        for ( size_t i=0; i<num; i++ ) {
+            try {
+                if ( ! _cursors[i].raw()->initLazyFinish() ) {
+                    // some sort of error
+                    // drop connection
+                    _cursors[i].reset( 0 );
+                    
+                    massert( 14047 , str::stream() << "error querying server: " << servers[i] , _options & QueryOption_PartialResults );
+                }
+            }
+            catch ( SocketException& e ) {
+                if ( ! ( _options & QueryOption_PartialResults ) )
+                    throw e;
+            }
+            
+            _cursors[i].raw()->attach( conns[i].get() ); // this calls done on conn
+            _checkCursor( _cursors[i].raw() );
+        }
+        
     }
 
     ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {

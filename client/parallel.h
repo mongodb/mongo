@@ -89,7 +89,7 @@ namespace mongo {
 
         virtual void _init() = 0;
 
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 );
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 , bool lazy=false );
         BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
 
         /**
@@ -117,15 +117,20 @@ namespace mongo {
     class FilteringClientCursor {
     public:
         FilteringClientCursor( const BSONObj filter = BSONObj() );
+        FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter = BSONObj() );
         FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter = BSONObj() );
         ~FilteringClientCursor();
 
         void reset( auto_ptr<DBClientCursor> cursor );
+        void reset( DBClientCursor* cursor );
 
         bool more();
         BSONObj next();
 
         BSONObj peek();
+
+        DBClientCursor* raw() { return _cursor.get(); }
+
     private:
         void _advance();
 
