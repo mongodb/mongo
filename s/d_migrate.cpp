@@ -1150,6 +1150,8 @@ namespace mongo {
             assert( state == READY );
             assert( ! min.isEmpty() );
             assert( ! max.isEmpty() );
+            
+            slaveCount = ( getSlaveCount() / 2 ) + 1;
 
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ );
 
@@ -1245,11 +1247,32 @@ namespace mongo {
                         break;
 
                     apply( res , &lastOpApplied );
+                    
+                    const int maxIterations = 3600*50;
+                    int i;
+                    for ( i=0;i<maxIterations; i++) {
+                        if ( state == ABORT ) {
+                            timing.note( "aborted" );
+                            return;
+                        }
+                        
+                        if ( opReplicatedEnough( lastOpApplied ) )
+                            break;
+                        
+                        if ( i > 100 ) {
+                            warning() << "secondaries having hard time keeping up with migrate" << endl;
+                        }
 
-                    if ( state == ABORT ) {
-                        timing.note( "aborted" );
-                        return;
+                        sleepmillis( 20 );
                     }
+
+                    if ( i == maxIterations ) {
+                        errmsg = "secondary can't keep up with migrate";
+                        error() << errmsg << endl;
+                        conn.done();
+                        state = FAIL;
+                        return;
+                    } 
                 }
 
                 timing.done(4);
@@ -1373,12 +1396,15 @@ namespace mongo {
             return didAnything;
         }
 
-        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+        bool opReplicatedEnough( const ReplTime& lastOpApplied ) {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            const int slaveCount = getSlaveCount() / 2 + 1;
-            if ( ! opReplicatedEnough( lastOpApplied , slaveCount ) ) {
+            return mongo::opReplicatedEnough( lastOpApplied , slaveCount );
+        }
+
+        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+            if ( ! opReplicatedEnough( lastOpApplied ) ) {
                 warning() << "migrate commit attempt timed out contacting " << slaveCount
                           << " slaves for '" << ns << "' " << min << " -> " << max << endl;
                 return false;
@@ -1448,6 +1474,8 @@ namespace mongo {
         long long clonedBytes;
         long long numCatchup;
         long long numSteady;
+        
+        int slaveCount;
 
         enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL , ABORT } state;
         string errmsg;
