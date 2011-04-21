@@ -60,10 +60,10 @@ replTest.stop(1);
 replTest.stop(2);
 
 print("Bring slave1 back up");
-replTest.start(1);
+replTest.restart(1, {"fastsync":null});
 
 print("Bring slave2 back up");
-replTest.start(2);
+replTest.restart(2, {"fastsync":null});
 
 print("Add them back as slaves");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});

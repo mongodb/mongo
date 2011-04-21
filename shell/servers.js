@@ -1208,13 +1208,14 @@ ReplSetTest.prototype.reInitiate = function() {
     this.initiate( config , 'replSetReconfig' );
 }
 
-ReplSetTest.prototype.awaitReplication = function() {
+ReplSetTest.prototype.awaitReplication = function(timeout) {
    this.getMaster();
+   timeout = timeout || 30000;
 
    latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']
    print(latest);
 
-   this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
+   this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
        function() {
            var synced = true;
            for(var i=0; i<this.liveNodes.slaves.length; i++) {
