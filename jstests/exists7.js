@@ -1,10 +1,11 @@
+
 // Test that non boolean value types are allowed with $explain spec. SERVER-2322
 
 t = db.jstests_explain7;
 t.drop();
 
 function testIntegerExistsSpec() {
-    t.drop();
+    t.remove();
     t.save( {} );
     t.save( {a:1} );
 
