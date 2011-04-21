@@ -838,16 +838,17 @@ namespace mongo {
     static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
         BSONObjSetDefaultOrder keys;
         id.getKeysFromObject(obj, keys);
+        IndexInterface& ii = id.idxInterface();
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
             if ( otherTraceLevel >= 5 ) {
-                out() << "_unindexRecord() " << obj.toString();
-                out() << "\n  unindex:" << j.toString() << endl;
+                out() << "_unindexRecord() " << obj.toString() << endl;
+                out() << "  unindex:" << j.toString() << endl;
             }
 
             bool ok = false;
             try {
-                ok = id.head.btree()->unindex(id.head, id, j, dl);
+                ok = ii.unindex(id.head, id, j, dl);
             }
             catch (AssertionException& e) {
                 problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
@@ -1009,9 +1010,10 @@ namespace mongo {
             int z = d->nIndexesBeingBuilt();
             for ( int x = 0; x < z; x++ ) {
                 IndexDetails& idx = d->idx(x);
+                IndexInterface& ii = idx.idxInterface();
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
-                        bool found = idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
+                        bool found = ii.unindex(idx.head, idx, *changes[x].removed[i], dl);
                         if ( ! found ) {
                             RARELY warning() << "ns: " << ns << " couldn't unindex key: " << *changes[x].removed[i] 
                                              << " for doc: " << objOld["_id"] << endl;
@@ -1029,7 +1031,7 @@ namespace mongo {
                 for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
                     try {
                         /* we did the dupCheck() above.  so we don't have to worry about it here. */
-                        idx.head.btree()->bt_insert(
+                        ii.bt_insert(
                             idx.head,
                             dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
                     }
@@ -1320,7 +1322,7 @@ namespace mongo {
             prep(ns.c_str(), d);
             assert( idxNo == d->nIndexes );
             try {
-                idx.head.writing() = BtreeBucket::addBucket(idx);
+                idx.head.writing() = idx.idxInterface().addBucket(idx);
                 n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
             }
             catch(...) {
@@ -1492,11 +1494,12 @@ namespace mongo {
                 BSONObjSetDefaultOrder keys;
                 idx.getKeysFromObject(obj, keys);
                 BSONObj order = idx.keyPattern();
+                IndexInterface& ii = idx.idxInterface();
                 for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
                     // WARNING: findSingle may not be compound index safe.  this may need to change.  see notes in 
                     // findSingle code.
                     uassert( 12582, "duplicate key insert for unique index of capped collection",
-                             idx.head.btree()->findSingle(idx, idx.head, *i ).isNull() );
+                             ii.findSingle(idx, idx.head, *i ).isNull() );
                 }
             }
         }

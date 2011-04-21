@@ -1421,8 +1421,7 @@ namespace mongo {
         return loc;
     }
 
-    template< class V >
-    void BtreeBucket<V>::renameIndexNamespace(const char *oldNs, const char *newNs) {
+    void renameIndexNamespace(const char *oldNs, const char *newNs) {
         renameNamespace( oldNs, newNs );
     }
 

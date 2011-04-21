@@ -25,6 +25,17 @@
 
 namespace mongo {
 
+    class IndexInterface { 
+    public:
+        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
+        virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
+        virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
+        virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
+                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
+                      IndexDetails& idx, bool toplevel = true) const = 0;
+        virtual DiskLoc addBucket(const IndexDetails&) = 0;
+    };
+
     /* Details about a particular index. There is one of these effectively for each object in
        system.namespaces (although this also includes the head pointer, which is not in that
        collection).
@@ -52,6 +63,8 @@ namespace mongo {
            have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
         */
         DiskLoc info;
+
+        IndexInterface& idxInterface();
 
         /* extract key value from the query object
            e.g., if key() == { x : 1 },

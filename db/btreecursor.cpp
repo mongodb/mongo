@@ -26,9 +26,6 @@ namespace mongo {
 
     extern int otherTraceLevel;
 
-    typedef BtreeData_V0 V0;
-    typedef BtreeData_V1 V1;
-
     class BtreeCursorV0 : public BtreeCursor { 
     public:
         typedef BucketBasics<V0>::KeyNode KeyNode;

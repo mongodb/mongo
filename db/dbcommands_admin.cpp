@@ -387,7 +387,7 @@ namespace mongo {
                     NamespaceDetails::IndexIterator i = d->ii();
                     while( i.more() ) {
                         IndexDetails& id = i.next();
-                        long long keys = id.head.btree()->fullValidate(id.head, id.keyPattern());
+                        long long keys = id.idxInterface().fullValidate(id.head, id.keyPattern());
                         ss << "    " << id.indexNamespace() << " keys:" << keys << endl;
                         indexes.appendNumber(id.indexNamespace(), keys);
                     }

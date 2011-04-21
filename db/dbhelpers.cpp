@@ -148,7 +148,7 @@ namespace mongo {
 
         BSONObj key = i.getKeyFromQuery( query );
 
-        DiskLoc loc = i.head.btree()->findSingle( i , i.head , key );
+        DiskLoc loc = i.idxInterface().findSingle(i , i.head , key);
         if ( loc.isNull() )
             return false;
         result = loc.obj();
@@ -160,7 +160,7 @@ namespace mongo {
         uassert(13430, "no _id index", idxNo>=0);
         IndexDetails& i = d->idx( idxNo );
         BSONObj key = i.getKeyFromQuery( idquery );
-        return i.head.btree()->findSingle( i , i.head , key );
+        return i.idxInterface().findSingle(i , i.head , key);
     }
 
     bool Helpers::isEmpty(const char *ns, bool doAuth) {
@@ -253,7 +253,7 @@ namespace mongo {
 
         IndexDetails& i = nsd->idx( ii );
 
-        shared_ptr<Cursor> c( new BtreeCursor( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
+        shared_ptr<Cursor> c( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
         auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
         cc->setDoingDeletes( true );
 

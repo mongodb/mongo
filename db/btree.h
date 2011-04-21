@@ -68,6 +68,8 @@ namespace mongo {
 #pragma pack(1)
     class BtreeData_V0;
     class BtreeData_V1;
+    typedef BtreeData_V0 V0;
+    typedef BtreeData_V1 V1;
     template< class Version > class BucketBasics;
 
     /**
@@ -558,9 +560,6 @@ namespace mongo {
          */
         void deallocBucket(const DiskLoc thisLoc, const IndexDetails &id);
 
-        /** Renames the index namespace for this btree's index. */
-        static void renameIndexNamespace(const char *oldNs, const char *newNs);
-
         /**
          * Preconditions:
          *  - 'key' has a valid schema for this index.
@@ -1018,6 +1017,8 @@ namespace mongo {
         long long _nscanned;
     };
 
+    /** Renames the index namespace for this btree's index. */
+    void renameIndexNamespace(const char *oldNs, const char *newNs);
 
     /*inline bool IndexDetails::hasKey(const BSONObj& key) {
         return head.btree()->exists(*this, head, key, Ordering::make(keyPattern()));

@@ -26,6 +26,38 @@
 
 namespace mongo {
 
+    template< class V >
+    class IndexInterfaceImpl : public IndexInterface { 
+    public:
+        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
+            return thisLoc.btree<V>()->fullValidate(thisLoc, order);
+        }
+        virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const { 
+            return thisLoc.btree<V>()->findSingle(indexdetails,thisLoc,key);
+        } 
+        virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const {
+            return thisLoc.btree<V>()->unindex(thisLoc, id, key, recordLoc);
+        }
+        virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
+                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
+                      IndexDetails& idx, bool toplevel = true) const {
+            return thisLoc.btree<V>()->bt_insert(thisLoc, recordLoc, key, order, dupsAllowed, idx, toplevel);
+        }
+        virtual DiskLoc addBucket(const IndexDetails& id) { 
+            return BtreeBucket<V>::addBucket(id);
+        }
+    };
+
+    IndexInterfaceImpl<V0> iii_v0;
+    IndexInterfaceImpl<V1> iii_v1;
+
+    IndexInterface& IndexDetails::idxInterface() { 
+        double v = version();
+        if( v == 0 )
+            return iii_v0;
+        return iii_v1;
+    }
+
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";
         BSONObjBuilder b;

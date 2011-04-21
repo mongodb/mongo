@@ -31,9 +31,6 @@
 
 namespace mongo {
 
-    typedef BtreeData_V0 V0;
-    typedef BtreeData_V1 V1;
-
     // just use old indexes for geo for now. todo.
     typedef BtreeBucket<V0> GeoBtreeBucket;
     typedef GeoBtreeBucket::KeyNode GeoKeyNode;
