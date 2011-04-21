@@ -188,7 +188,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var rs = this._rs[i].test;
             rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
             rs.awaitReplication();
-            this._connections.push( new Mongo( rs.getURL() ) );
+	    var xxx = new Mongo( rs.getURL() );
+	    xxx.name = rs.getURL();
+            this._connections.push( xxx );
         }
         
         this._configServers = []
@@ -298,12 +300,18 @@ ShardingTest.prototype.getServer = function( dbname ){
     if ( x )
         name = x.host;
 
+    var rsName = null;
+    if ( name.indexOf( "/" ) > 0 )
+	rsName = name.substring( 0 , name.indexOf( "/" ) );
+    
     for ( var i=0; i<this._connections.length; i++ ){
         var c = this._connections[i];
         if ( name == c.name )
             return c;
+	if ( rsName && c.name.startsWith( rsName ) )
+	    return c;
     }
-
+    
     throw "can't find server for: " + dbname + " name:" + name;
 
 }
