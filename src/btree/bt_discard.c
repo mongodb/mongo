@@ -30,6 +30,13 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
 	/*
+	 * The page must either be clean, or an internal split page, which
+	 * is created dirty and can never be "clean".
+	 */
+	WT_ASSERT(session,
+	    F_ISSET(page, WT_PAGE_SPLIT) || !WT_PAGE_IS_MODIFIED(page));
+
+	/*
 	 * Pages created in memory aren't counted against our cache limit; if
 	 * this was originally a disk-backed page read by the read server, we
 	 * have more space.
