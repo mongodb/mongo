@@ -977,7 +977,7 @@ err:	if (tmp != NULL)
 static int
 __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 {
-	enum { DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
+	enum { DATA_DELETED, DATA_ON_PAGE, DATA_OFF_PAGE } data_loc;
 	WT_COL *cip;
 	WT_BUF *value, _value;
 	WT_CELL value_cell, *cell;
@@ -1019,14 +1019,15 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				WT_CELL_SET(&value_cell, WT_CELL_DEL, 0);
 				len = WT_CELL_SPACE_REQ(0);
+				data_loc = DATA_DELETED;
 			} else {
 				value->data = WT_UPDATE_DATA(upd);
 				value->size = upd->size;
 				WT_RET(__wt_item_build_value(
 				    session, value, &value_cell, &value_ovfl));
 				len = WT_CELL_SPACE_REQ(value->size);
+				data_loc = DATA_OFF_PAGE;
 			}
-			data_loc = DATA_OFF_PAGE;
 		} else {
 			value->data = cell;
 			value->size = WT_CELL_LEN(cell);
@@ -1039,6 +1040,9 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 			WT_RET(__wt_split(session));
 
 		switch (data_loc) {
+		case DATA_DELETED:
+			memcpy(r->first_free, &value_cell, sizeof(value_cell));
+			break;
 		case DATA_ON_PAGE:
 			memcpy(r->first_free, value->data, len);
 			break;
