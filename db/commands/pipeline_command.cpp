@@ -109,6 +109,15 @@ namespace mongo {
 	DEV (log() << "\n---- shardBson\n" <<
 	     shardBson.jsonString(Strict, 1) << "\n----\n").flush();
 
+	/* for debugging purposes, show what the pipeline now looks like */
+	{
+	    BSONObjBuilder pipelineBuilder;
+	    pPipeline->toBson(&pipelineBuilder);
+	    BSONObj pipelineBson(pipelineBuilder.done());
+	    DEV (log() << "\n---- pipelineBson\n" <<
+		 pipelineBson.jsonString(Strict, 1) << "\n----\n").flush();
+	}
+
 	/* on the shard servers, create the local pipeline */
 	boost::shared_ptr<Pipeline> pShardPipeline(
 	    Pipeline::parseCommand(errmsg, shardBson));

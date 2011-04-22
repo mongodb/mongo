@@ -284,7 +284,7 @@ namespace mongo {
 	    DocumentSourceGroup::create());
 
 	/* the merger will use the same grouping key */
-	pMerger->setIdExpression(pIdExpression);
+	pMerger->setIdExpression(ExpressionFieldPath::create("_id"));
 
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
