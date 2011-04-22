@@ -146,6 +146,8 @@ namespace mongo {
         static boost::shared_ptr<Expression> parseObject(
             BSONElement *pBsonElement, ObjectCtx *pCtx);
 
+	static const char unwindName[];
+
         /*
 	  Parse a BSONElement Object which has already been determined to be
 	  functional expression.

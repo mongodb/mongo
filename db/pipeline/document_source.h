@@ -165,6 +165,7 @@ namespace mongo {
 	BSONObj embeddedObject;
 	BSONObjIterator arrayIterator;
 	BSONElement currentElement;
+	bool haveCurrent;
     };
 
 

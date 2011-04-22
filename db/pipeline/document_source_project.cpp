@@ -136,8 +136,17 @@ namespace mongo {
 	BSONObjBuilder insides;
 	
 	const size_t n = vFieldName.size();
-	for(size_t i = 0; i < n; ++i)
+	for(size_t i = 0; i < n; ++i) {
+	    if (i == unwindWhich) {
+		BSONObjBuilder unwind;
+		vpExpression[i]->addToBsonObj(
+		    &unwind, Expression::unwindName, false);
+		insides.append(vFieldName[i], unwind.done());
+		continue;
+	    }
+
 	    vpExpression[i]->addToBsonObj(&insides, vFieldName[i], false);
+	}
 
 	pBuilder->append("$project", insides.done());
     }

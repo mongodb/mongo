@@ -35,7 +35,8 @@ namespace mongo {
     Pipeline::Pipeline():
 	collectionName(),
 	sourceList(),
-        splitMongodPipeline(false) {
+        //splitMongodPipeline(false) {
+        splitMongodPipeline(true) {
     }
 
     boost::shared_ptr<Pipeline> Pipeline::parseCommand(

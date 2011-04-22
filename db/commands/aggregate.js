@@ -81,11 +81,14 @@ var p7 = db.runCommand(
     }}
 ]});
 
+// simple filtering
+// note use of the '$' prefix to distinguish between field names and literals
 var f1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $query : { $eq:["$author", "dave"] } }
 ]});
 
+// combining filtering with a projection
 var f2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
@@ -98,6 +101,7 @@ var f2 = db.runCommand(
     { $query : { $eq:["$tag", "nasty"] } }
 ]});
 
+// group by tag
 var g1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {

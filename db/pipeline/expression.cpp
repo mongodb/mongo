@@ -47,6 +47,8 @@ namespace mongo {
         return ((options & DOCUMENT_OK) != 0);
     }
 
+    const char Expression::unwindName[] = "$unwind";
+
     boost::shared_ptr<Expression> Expression::parseObject(
         BSONElement *pBsonElement, ObjectCtx *pCtx) {
         /*
@@ -80,7 +82,7 @@ namespace mongo {
                 isOp = 1;
                 kind = OPERATOR;
 
-                if (strcmp(pFieldName, "$unwind") != 0) {
+                if (strcmp(pFieldName, unwindName) != 0) {
                     pExpression = parseExpression(pFieldName, &fieldElement);
                 }
                 else {

@@ -26,18 +26,24 @@ namespace mongo {
     }
 
     bool DocumentSourceBsonArray::eof() {
-	return !arrayIterator.more();
+	return !haveCurrent;
     }
 
     bool DocumentSourceBsonArray::advance() {
 	if (eof())
 	    return false;
 
+	if (!arrayIterator.more()) {
+	    haveCurrent = false;
+	    return false;
+	}
+
 	currentElement = arrayIterator.next();
 	return true;
     }
 
     boost::shared_ptr<Document> DocumentSourceBsonArray::getCurrent() {
+	assert(haveCurrent);
         BSONObj documentObj(currentElement.Obj());
         boost::shared_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
@@ -53,9 +59,12 @@ namespace mongo {
     DocumentSourceBsonArray::DocumentSourceBsonArray(
 	BSONElement *pBsonElement):
         embeddedObject(pBsonElement->embeddedObject()),
-        arrayIterator(embeddedObject) {
-	if (arrayIterator.more())
+        arrayIterator(embeddedObject),
+        haveCurrent(false) {
+	if (arrayIterator.more()) {
 	    currentElement = arrayIterator.next();
+	    haveCurrent = true;
+	}
     }
 
     boost::shared_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
