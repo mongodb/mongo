@@ -68,7 +68,6 @@ __wt_page_discard(SESSION *session, WT_PAGE *page)
 	if (page->XXdsk != NULL)
 		__wt_free(session, page->XXdsk);
 	__wt_free(session, page);
-
 }
 
 /*
