@@ -65,11 +65,10 @@ namespace mongo {
     
     const int OldBucketSize = 8192;
 
+    // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
+    const int KeyMax = OldBucketSize / 10;\
+
 #pragma pack(1)
-    class BtreeData_V0;
-    class BtreeData_V1;
-    typedef BtreeData_V0 V0;
-    typedef BtreeData_V1 V1;
     template< class Version > class BucketBasics;
 
     /**
@@ -156,6 +155,12 @@ namespace mongo {
         unsigned short _reserved1;
         int flags;
 
+        void _init() {
+            _reserved1 = 0;
+            _wasSize = BucketSize;
+            reserved = 0;
+        }
+
         /** basicInsert() assumes the next three members are consecutive and in this order: */
 
         /** Size of the empty region. */
@@ -171,6 +176,7 @@ namespace mongo {
 
     public:
         typedef KeyBson Key;
+        typedef KeyBson KeyOwned;
         enum { BucketSize = 8192 };
     };
 
@@ -180,29 +186,31 @@ namespace mongo {
         DiskLoc parent;
         /** Given that there are n keys, this is the n index child. */
         DiskLoc nextChild;
-        /** can be reused, value is 8192 in current pdfile version Apr2010 */
-        unsigned short _wasSize;
-        /** zero */
-        // unsigned short _reserved1;
-        int flags;
+
+        unsigned short flags;
 
         /** basicInsert() assumes the next three members are consecutive and in this order: */
 
         /** Size of the empty region. */
-        int emptySize;
+        unsigned short emptySize;
         /** Size used for bson storage, including storage of old keys. */
-        int topSize;
+        unsigned short topSize;
         /* Number of keys in the bucket. */
-        int n;
+        unsigned short n;
 
-        int reserved;
         /* Beginning of the bucket's body */
         char data[4];
 
+        void _init() { }
+
     public:
         typedef KeyV1 Key;
+        typedef KeyV1Owned KeyOwned;
         enum { BucketSize = 8192-16 }; // leave room for Record header
     };
+
+    typedef BtreeData_V0 V0;
+    typedef BtreeData_V1 V1;
 
     /**
      * This class adds functionality to BtreeData for managing a single bucket.
@@ -234,7 +242,7 @@ namespace mongo {
     template< class Version >
     class BucketBasics : public Version {
     public:
-        //friend class BtreeBuilder< Version >;
+        template <class U> friend class BtreeBuilder;
         typedef typename Version::Key Key;
 
         /**
@@ -630,7 +638,6 @@ namespace mongo {
 
         static void a_test(IndexDetails&);
 
-        static int getLowWaterMark();
         static int getKeyMax();
 
     protected:

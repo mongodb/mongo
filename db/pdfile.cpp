@@ -1077,7 +1077,10 @@ namespace mongo {
         IndexDetails& idx = d->idx(idxNo);
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
+        if( keys.empty() ) 
+            return;
         BSONObj order = idx.keyPattern();
+        IndexInterface& ii = idx.idxInterface();
         Ordering ordering = Ordering::make(order);
         int n = 0;
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
@@ -1086,8 +1089,7 @@ namespace mongo {
             }
             assert( !recordLoc.isNull() );
             try {
-                idx.head.btree()->bt_insert(idx.head, recordLoc,
-                                            *i, ordering, dupsAllowed, idx);
+                ii.bt_insert(idx.head, recordLoc, *i, ordering, dupsAllowed, idx);
             }
             catch (AssertionException& e) {
                 if( e.getCode() == 10287 && idxNo == d->nIndexes ) {
@@ -1128,6 +1130,52 @@ namespace mongo {
     }
 
     SortPhaseOne *precalced = 0;
+
+    template< class V >
+    void buildBottomUpPhases2And3(bool dupsAllowed, IndexDetails& idx, BSONObjExternalSorter& sorter, 
+        bool dropDups, list<DiskLoc> &dupsToDrop, CurOp * op, SortPhaseOne *phase1, ProgressMeterHolder &pm,
+        Timer& t
+        )
+    {
+        BtreeBuilder<V> btBuilder(dupsAllowed, idx);
+        BSONObj keyLast;
+        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+        assert( pm == op->setMessage( "index: (2/3) btree bottom up" , phase1->nkeys , 10 ) );
+        while( i->more() ) {
+            RARELY killCurrentOp.checkForInterrupt();
+            BSONObjExternalSorter::Data d = i->next();
+
+            try {
+                btBuilder.addKey(d.first, d.second);
+            }
+            catch( AssertionException& e ) {
+                if ( dupsAllowed ) {
+                    // unknow exception??
+                    throw;
+                }
+
+                if( e.interrupted() )
+                    throw;
+
+                if ( ! dropDups )
+                    throw;
+
+                /* we could queue these on disk, but normally there are very few dups, so instead we
+                    keep in ram and have a limit.
+                */
+                dupsToDrop.push_back(d.second);
+                uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
+            }
+            pm.hit();
+        }
+        pm.finished();
+        op->setMessage( "index: (3/3) btree-middle" );
+        log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
+        btBuilder.commit();
+        if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
+            warning() << "not all entries were added to the index, probably some keys were too large" << endl;
+        }
+    }
 
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
@@ -1183,46 +1231,12 @@ namespace mongo {
         list<DiskLoc> dupsToDrop;
 
         /* build index --- */
-        {
-            BtreeBuilder btBuilder(dupsAllowed, idx);
-            BSONObj keyLast;
-            auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            assert( pm == op->setMessage( "index: (2/3) btree bottom up" , phase1->nkeys , 10 ) );
-            while( i->more() ) {
-                RARELY killCurrentOp.checkForInterrupt();
-                BSONObjExternalSorter::Data d = i->next();
-
-                try {
-                    btBuilder.addKey(d.first, d.second);
-                }
-                catch( AssertionException& e ) {
-                    if ( dupsAllowed ) {
-                        // unknow exception??
-                        throw;
-                    }
-
-                    if( e.interrupted() )
-                        throw;
-
-                    if ( ! dropDups )
-                        throw;
-
-                    /* we could queue these on disk, but normally there are very few dups, so instead we
-                       keep in ram and have a limit.
-                    */
-                    dupsToDrop.push_back(d.second);
-                    uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
-                }
-                pm.hit();
-            }
-            pm.finished();
-            op->setMessage( "index: (3/3) btree-middle" );
-            log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
-            btBuilder.commit();
-            if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
-                warning() << "not all entries were added to the index, probably some keys were too large" << endl;
-            }
-        }
+        if( idx.version() == 0 )
+            buildBottomUpPhases2And3<V0>(dupsAllowed, idx, sorter, dropDups, dupsToDrop, op, phase1, pm, t);
+        else if( idx.version() == 1 ) 
+            buildBottomUpPhases2And3<V1>(dupsAllowed, idx, sorter, dropDups, dupsToDrop, op, phase1, pm, t);
+        else
+            assert(false);
 
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
@@ -1598,8 +1612,11 @@ namespace mongo {
         if ( addIndex ) {
             assert( obuf );
             BSONObj io((const char *) obuf);
-            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex, fixedIndexObject ) )
+            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex, fixedIndexObject ) ) {
+                // prepare creates _id itself, or this indicates to fail the build silently (such 
+                // as if index already exists)
                 return DiskLoc();
+            }
 
             if ( ! fixedIndexObject.isEmpty() ) {
                 obuf = fixedIndexObject.objdata();

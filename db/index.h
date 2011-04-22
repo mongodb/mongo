@@ -34,6 +34,7 @@ namespace mongo {
                       const BSONObj& key, const Ordering &order, bool dupsAllowed,
                       IndexDetails& idx, bool toplevel = true) const = 0;
         virtual DiskLoc addBucket(const IndexDetails&) = 0;
+        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) = 0;
     };
 
     /* Details about a particular index. There is one of these effectively for each object in
@@ -63,8 +64,6 @@ namespace mongo {
            have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
         */
         DiskLoc info;
-
-        IndexInterface& idxInterface();
 
         /* extract key value from the query object
            e.g., if key() == { x : 1 },
@@ -99,7 +98,6 @@ namespace mongo {
 
         /* true if the specified key is in the index */
         bool hasKey(const BSONObj& key);
-        bool wouldCreateDup(const BSONObj& key, DiskLoc self);
 
         // returns name of this index's storage area
         // database.table.$index
@@ -139,8 +137,12 @@ namespace mongo {
             return io.getStringField("ns");
         }
 
-        double version() const {
-            return info.obj()["v"].number();
+        int version() const {
+            BSONElement e = info.obj()["v"];
+            if( e.type() == NumberInt ) 
+                return e._numberInt();
+            uassert(10000, "index v field should be Integer type", e.eoo());
+            return 0;
         }
 
         bool unique() const {
@@ -165,6 +167,21 @@ namespace mongo {
         string toString() const {
             return info.obj().toString();
         }
+
+        /** @return true if supported.  supported means we can use the index, including adding new keys.
+                    it may not mean we can build the index version in question: we may not maintain building 
+                    of indexes in old formats in the future.
+        */
+        static bool isASupportedIndexVersionNumber(int v) { return v == 0 || v == 1; }
+
+        IndexInterface& idxInterface() { 
+            int v = version();
+            dassert( isASupportedIndexVersionNumber(v) );
+            return *iis[v&1];
+        }
+
+    private:
+        static IndexInterface *iis[];
     };
 
     struct IndexChanges { /*on an update*/
@@ -179,10 +196,8 @@ namespace mongo {
         void dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
             if( added.empty() || !idx.unique() )
                 return;
-            for( vector<BSONObj*>::iterator i = added.begin(); i != added.end(); i++ ) {
-                bool dup = idx.wouldCreateDup(**i, curObjLoc);
-                uassert( 11001 , "E11001 duplicate key on update", !dup);
-            }
+            const Ordering ordering = Ordering::make(idx.keyPattern());
+            idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering); // "E11001 duplicate key on update"
         }
     };
 

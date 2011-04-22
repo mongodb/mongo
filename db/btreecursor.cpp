@@ -26,18 +26,19 @@ namespace mongo {
 
     extern int otherTraceLevel;
 
-    class BtreeCursorV0 : public BtreeCursor { 
+    template< class V >
+    class BtreeCursorImpl : public BtreeCursor { 
     public:
-        typedef BucketBasics<V0>::KeyNode KeyNode;
-        typedef V0::Key Key;
+        typename typedef BucketBasics<V>::KeyNode KeyNode;
+        typename typedef V::Key Key;
 
-        BtreeCursorV0(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
+        BtreeCursorImpl(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
           BtreeCursor(a,b,c,d,e,f,g) { }
-        BtreeCursorV0(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction) : 
+        BtreeCursorImpl(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction) : 
           BtreeCursor(_d,_idxNo,_id,_bounds,_direction) 
         { 
             pair< DiskLoc, int > noBestParent;
-            indexDetails.head.btree<V0>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
+            indexDetails.head.btree<V>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
             skipAndCheck();
             dassert( _dups.size() == 0 );
         }
@@ -49,39 +50,48 @@ namespace mongo {
 
         virtual BSONObj currKey() const { 
             assert( !bucket.isNull() );
-            return bucket.btree<V0>()->keyNode(keyOfs).key.toBson();
+            return bucket.btree<V>()->keyNode(keyOfs).key.toBson();
         }
 
     protected:
         virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
-            thisLoc.btree<V0>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
+            thisLoc.btree<V>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
         }
         virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
-            return thisLoc.btree<V0>()->advance(thisLoc, keyOfs, direction, caller);
+            return thisLoc.btree<V>()->advance(thisLoc, keyOfs, direction, caller);
         }
         virtual void _audit() {
             if ( otherTraceLevel >= 200 ) {
                 out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree<V0>()->fullValidate(indexDetails.head, _order);
+                indexDetails.head.btree<V>()->fullValidate(indexDetails.head, _order);
             }
             else {
                 out() << "BtreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree<V0>()->dump();
+                indexDetails.head.btree<V>()->dump();
             }
         }
-        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc);
+        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) {
+            bool found;
+            return indexDetails.head.btree<V0>()->
+                     locate(indexDetails, indexDetails.head, key, _ordering, keyOfs, found, loc, _direction);
+        }
+
         const _KeyNode& keyNode(int keyOfs) { 
-            return bucket.btree<V0>()->k(keyOfs);
+            return bucket.btree<V>()->k(keyOfs);
         }
 
     private:
         const KeyNode currKeyNode() const {
             assert( !bucket.isNull() );
-            const BtreeBucket<V0> *b = bucket.btree<V0>();
+            const BtreeBucket<V> *b = bucket.btree<V>();
             return b->keyNode(keyOfs);
         }
     };
 
+    template class BtreeCursorImpl<V0>;
+    template class BtreeCursorImpl<V1>;
+
+    /*
     class BtreeCursorV1 : public BtreeCursor { 
     public:
         typedef BucketBasics<V1>::KeyNode KeyNode;
@@ -136,17 +146,17 @@ namespace mongo {
             const BtreeBucket<V1> *b = bucket.btree<V1>();
             return b->keyNode(keyOfs);
         }
-    };
+    };*/
 
     BtreeCursor* BtreeCursor::make(
         NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
         const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction) 
     { 
-        double v = _id.version();
+        int v = _id.version();
+        if( v == 1 )
+            return new BtreeCursorImpl<V1>(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
         if( v == 0 )
-            return new BtreeCursorV0(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
-        if( v == 0.5 )
-            return new BtreeCursorV1(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
+            return new BtreeCursorImpl<V0>(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
         uasserted(14800, str::stream() << "unsupported index version " << v);
         return 0;
     }
@@ -155,11 +165,11 @@ namespace mongo {
         NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
         const shared_ptr< FieldRangeVector > &_bounds, int _direction )
     {
-        double v = _id.version();
+        int v = _id.version();
+        if( v == 1 )
+            return new BtreeCursorImpl<V1>(_d,_idxNo,_id,_bounds,_direction);
         if( v == 0 )
-            return new BtreeCursorV0(_d,_idxNo,_id,_bounds,_direction);
-        if( v == 0.5 )
-            return new BtreeCursorV1(_d,_idxNo,_id,_bounds,_direction);
+            return new BtreeCursorImpl<V0>(_d,_idxNo,_id,_bounds,_direction);
         uasserted(14801, str::stream() << "unsupported index version " << v);
         return 0;
     }
@@ -211,17 +221,6 @@ namespace mongo {
         if ( otherTraceLevel >= 12 ) {
             _audit();
         }
-    }
-
-    DiskLoc BtreeCursorV0::_locate(const BSONObj& key, const DiskLoc& loc) { 
-        bool found;
-        return indexDetails.head.btree<V0>()->
-                 locate(indexDetails, indexDetails.head, key, _ordering, keyOfs, found, loc, _direction);
-    }
-    DiskLoc BtreeCursorV1::_locate(const BSONObj& key, const DiskLoc& loc) { 
-        bool found;
-        return indexDetails.head.btree<V1>()->
-                 locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, loc, _direction);
     }
 
     void BtreeCursor::init() {

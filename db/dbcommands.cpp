@@ -15,6 +15,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* SHARDING: 
+   I believe this file is for mongod only.
+   See s/commnands_public.cpp for mongos.
+*/
+
 #include "pch.h"
 #include "query.h"
 #include "pdfile.h"
@@ -1180,7 +1185,8 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024";
+            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
+                    "    avgObjSize - in bytes";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();

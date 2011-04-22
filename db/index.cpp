@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+    const int DefaultindexVersionNumber = 0;
+
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
     public:
@@ -46,17 +48,18 @@ namespace mongo {
         virtual DiskLoc addBucket(const IndexDetails& id) { 
             return BtreeBucket<V>::addBucket(id);
         }
+        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) { 
+            const BtreeBucket<V> *h = head.btree<V>();
+            for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
+                bool dup = h->wouldCreateDup(idx, head, V::KeyOwned(**i), ordering, self);
+                uassert( 11001 , "E11001 duplicate key on update", !dup);
+            }
+        }
     };
 
     IndexInterfaceImpl<V0> iii_v0;
     IndexInterfaceImpl<V1> iii_v1;
-
-    IndexInterface& IndexDetails::idxInterface() { 
-        double v = version();
-        if( v == 0 )
-            return iii_v0;
-        return iii_v1;
-    }
+    IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";
@@ -295,14 +298,22 @@ namespace mongo {
         if ( plugin ) {
             fixedIndexObject = plugin->adjustIndexSpec( io );
         }
-        else if ( io["v"].eoo() ) {
+
+        if ( io["v"].eoo() ) {
             // add "v" if it doesn't exist
             // if it does - leave whatever value was there
             // this is for testing and replication
-            BSONObjBuilder b( io.objsize() + 32 );
+            BSONObjBuilder b;
             b.appendElements( io );
-            b.append( "v" , 0 );
+            b.append( "v" , DefaultindexVersionNumber );
             fixedIndexObject = b.obj();
+        }
+        else { 
+            int v = io["v"].Int();
+            // note (one day) we may be able to fresh build less versions than we can use
+            // isASupportedIndexVersionNumber() is what we can use
+            uassert(10000, str::stream() << "this version of mongod cannot build new indexes of version number " << v, 
+                v == 0 || v == 1);
         }
 
         return true;

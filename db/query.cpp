@@ -468,8 +468,7 @@ namespace mongo {
             _nscanned = _c->nscanned();
             if ( _bc ) {
                 if ( _firstMatch.isEmpty() ) {
-                    _firstMatch = _bc->currKeyNode().key.toBson().getOwned();
-                    _firstMatchKey = Key(_firstMatch.objdata());
+                    _firstMatch = _bc->currKey().getOwned();
                     // if not match
                     if ( _query.woCompare( _firstMatch, BSONObj(), false ) ) {
                         setComplete();
@@ -478,7 +477,7 @@ namespace mongo {
                     _gotOne();
                 }
                 else {
-                    if ( ! _firstMatchKey.woEqual( _bc->currKeyNode().key ) ) {
+                    if ( ! _firstMatch.woEqual( _bc->currKey() ) ) {
                         setComplete();
                         return;
                     }
@@ -534,7 +533,6 @@ namespace mongo {
         BSONObj _query;
         BtreeCursor * _bc;
         BSONObj _firstMatch;
-        Key _firstMatchKey;
 
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;

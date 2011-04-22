@@ -33,6 +33,9 @@ namespace mongo {
 
     /* --- BtreeBuilder --- */
 
+    template class BtreeBuilder<V0>;
+    template class BtreeBuilder<V1>;
+
     template<class V>
     BtreeBuilder<V>::BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx) :
         dupsAllowed(_dupsAllowed),
@@ -41,7 +44,7 @@ namespace mongo {
         order( idx.keyPattern() ),
         ordering( Ordering::make(idx.keyPattern()) ) {
         first = cur = BtreeBucket<V>::addBucket(idx);
-        b = cur.btreemod();
+        b = cur.btreemod<V>();
         committed = false;
     }
 
@@ -50,19 +53,19 @@ namespace mongo {
         DiskLoc L = BtreeBucket<V>::addBucket(idx);
         b->tempNext() = L;
         cur = L;
-        b = cur.btreemod();
+        b = cur.btreemod<V>();
     }
 
     template<class V>
     void BtreeBuilder<V>::mayCommitProgressDurably() {
         if ( getDur().commitIfNeeded() ) {
-            b = cur.btreemod();
+            b = cur.btreemod<V>();
         }
     }
 
     template<class V>
     void BtreeBuilder<V>::addKey(BSONObj& _key, DiskLoc loc) {
-        KeyOwned key(_key);
+        V::KeyOwned key(_key);
 
         if ( key.dataSize() > KeyMax ) {
             problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
@@ -76,7 +79,7 @@ namespace mongo {
                 massert( 10288 ,  "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
                 if( cmp == 0 ) {
                     //if( !dupsAllowed )
-                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket::dupKeyError( idx , keyLast ) );
+                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket<V>::dupKeyError( idx , keyLast ) );
                 }
             }
             keyLast = key;
@@ -95,26 +98,26 @@ namespace mongo {
     void BtreeBuilder<V>::buildNextLevel(DiskLoc loc) {
         int levels = 1;
         while( 1 ) {
-            if( loc.btree()->tempNext().isNull() ) {
+            if( loc.btree<V>()->tempNext().isNull() ) {
                 // only 1 bucket at this level. we are done.
                 getDur().writingDiskLoc(idx.head) = loc;
                 break;
             }
             levels++;
 
-            DiskLoc upLoc = BtreeBucket::addBucket(idx);
+            DiskLoc upLoc = BtreeBucket<V>::addBucket(idx);
             DiskLoc upStart = upLoc;
-            BtreeBucket *up = upLoc.btreemod();
+            BtreeBucket<V> *up = upLoc.btreemod<V>();
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
                 if ( getDur().commitIfNeeded() ) {
-                    b = cur.btreemod();
-                    up = upLoc.btreemod();
+                    b = cur.btreemod<V>();
+                    up = upLoc.btreemod<V>();
                 }
 
-                BtreeBucket *x = xloc.btreemod();
-                Key k;
+                BtreeBucket<V> *x = xloc.btreemod<V>();
+                V::Key k;
                 DiskLoc r;
                 x->popBack(r,k);
                 bool keepX = ( x->n != 0 );
@@ -122,10 +125,10 @@ namespace mongo {
 
                 if ( ! up->_pushBack(r, k, ordering, keepLoc) ) {
                     // current bucket full
-                    DiskLoc n = BtreeBucket::addBucket(idx);
+                    DiskLoc n = BtreeBucket<V>::addBucket(idx);
                     up->tempNext() = n;
                     upLoc = n;
-                    up = upLoc.btreemod();
+                    up = upLoc.btreemod<V>();
                     up->pushBack(r, k, ordering, keepLoc);
                 }
 
@@ -135,7 +138,7 @@ namespace mongo {
                 }
                 else {
                     if ( !x->nextChild.isNull() )
-                        x->nextChild.btreemod()->parent = upLoc;
+                        x->nextChild.btreemod<V>()->parent = upLoc;
                     x->deallocBucket( xloc, idx );
                 }
                 xloc = nextLoc;
@@ -163,7 +166,7 @@ namespace mongo {
                 log(2) << "Rolling back partially built index space" << endl;
                 DiskLoc x = first;
                 while( !x.isNull() ) {
-                    DiskLoc next = x.btree()->tempNext();
+                    DiskLoc next = x.btree<V>()->tempNext();
                     string ns = idx.indexNamespace();
                     theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
                     x = next;
