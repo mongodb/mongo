@@ -105,7 +105,8 @@ namespace mongo {
                     pSource =
 			DocumentSourceProject::createFromBson(&bsonElement);
 		}
-                else if (strcmp(pFieldName, "$query") == 0) {
+                else if (strcmp(pFieldName,
+				DocumentSourceFilter::filterName) == 0) {
                     pSource = 
 			DocumentSourceFilter::createFromBson(&bsonElement);
 		}

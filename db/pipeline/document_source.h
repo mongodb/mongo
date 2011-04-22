@@ -243,6 +243,8 @@ namespace mongo {
 	 */
 	void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
+	static const char filterName[];
+
     protected:
 	// virtuals from DocumentSource
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;

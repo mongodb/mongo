@@ -23,6 +23,9 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+
+    const char DocumentSourceFilter::filterName[] = "$filter";
+
     DocumentSourceFilter::~DocumentSourceFilter() {
     }
 
@@ -104,7 +107,7 @@ namespace mongo {
     }
 
     void DocumentSourceFilter::sourceToBson(BSONObjBuilder *pBuilder) const {
-	pFilter->addToBsonObj(pBuilder, "$query", true);
+	pFilter->addToBsonObj(pBuilder, filterName, true);
     }
 
     boost::shared_ptr<DocumentSourceFilter> DocumentSourceFilter::createFromBson(
