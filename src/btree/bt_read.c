@@ -255,7 +255,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 	page->parent = rr->parent;
 	page->parent_ref = ref;
 	page->XXdsk = dsk;
-	F_SET(page, WT_PAGE_DISK_BLOCKS);
 
 	/*
 	 * Build the in-memory version of the page -- if this fails, do a real
