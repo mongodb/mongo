@@ -248,6 +248,7 @@ skip_clean_check:
 	if (F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
 		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
+		WT_PAGE_SET_MODIFIED(btree->root_page.page);
 		ret = __wt_page_reconcile(
 		    session, btree->root_page.page, 0, discard);
 	}
