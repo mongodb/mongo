@@ -245,7 +245,9 @@ skip_clean_check:
 	 * during a sync or close call, and the new root page is the one page
 	 * that won't be visited as part of that walk.
 	 */
-	if (F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
+	if ((btree->root_page.state == WT_REF_MEM ||
+	    btree->root_page.state == WT_REF_INACTIVE) &&
+	    F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
 		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_PAGE_SET_MODIFIED(btree->root_page.page);
