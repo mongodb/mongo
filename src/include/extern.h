@@ -117,6 +117,14 @@ int __wt_debug_disk( SESSION *session,
     WT_PAGE_DISK *dsk,
     const char *ofile,
     FILE *fp);
+int __wt_debug_tree_all( SESSION *session,
+    WT_PAGE *page,
+    const char *ofile,
+    FILE *fp);
+int __wt_debug_tree(SESSION *session,
+    WT_PAGE *page,
+    const char *ofile,
+    FILE *fp);
 int __wt_debug_page(SESSION *session,
     WT_PAGE *page,
     const char *ofile,
@@ -133,10 +141,6 @@ int __wt_evict_file_serial_func(SESSION *session);
 void *__wt_cache_evict_server(void *arg);
 void __wt_workq_evict_server_exit(CONNECTION *conn);
 void __wt_evict_dump(SESSION *session);
-int __wt_evict_cache_dump(SESSION *session);
-int __wt_evict_tree_dump(SESSION *session, BTREE *btree);
-int __wt_evict_cache_count(SESSION *session, uint64_t *nodesp);
-int __wt_evict_tree_count(SESSION *session, BTREE *btree, uint64_t *nodesp);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
 int __wt_bt_open(SESSION *session, int ok_create);

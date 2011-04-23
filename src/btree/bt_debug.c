@@ -17,11 +17,12 @@ static void __wt_debug_dsk_col_int(WT_PAGE_DISK *, FILE *);
 static void __wt_debug_dsk_col_rle(BTREE *, WT_PAGE_DISK *, FILE *);
 static int  __wt_debug_dsk_item(SESSION *, WT_PAGE_DISK *, FILE *);
 static void __wt_debug_page_col_fix(SESSION *, WT_PAGE *, FILE *);
-static void __wt_debug_page_col_int(WT_PAGE *, FILE *);
+static int  __wt_debug_page_col_int(SESSION *, WT_PAGE *, FILE *, uint32_t);
 static void __wt_debug_page_col_rle(SESSION *, WT_PAGE *, FILE *);
 static int  __wt_debug_page_col_var(SESSION *, WT_PAGE *, FILE *);
-static void __wt_debug_page_row_int(WT_PAGE *, FILE *);
+static int  __wt_debug_page_row_int(SESSION *, WT_PAGE *, FILE *, uint32_t);
 static int  __wt_debug_page_row_leaf(SESSION *, WT_PAGE *, FILE *);
+static int  __wt_debug_page_work(SESSION *, WT_PAGE *, FILE *, uint32_t);
 static void __wt_debug_pair(const char *, const void *, uint32_t, FILE *);
 static void __wt_debug_ref(WT_REF *, FILE *);
 static void __wt_debug_row_insert(WT_INSERT *, FILE *);
@@ -151,6 +152,57 @@ __wt_debug_disk(
 	return (ret);
 }
 
+#define	WT_DEBUG_TREE_LEAF	0x01			/* Debug leaf pages */
+#define	WT_DEBUG_TREE_WALK	0x02			/* Descend the tree */
+
+/*
+ * __wt_debug_tree_all --
+ *	Dump the in-memory information for a tree, including leaf pages.
+ */
+int
+__wt_debug_tree_all(
+    SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
+{
+	int do_close, ret;
+
+	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
+
+	/* A NULL page starts at the top of the tree -- it's a convenience. */
+	if (page == NULL)
+		page = session->btree->root_page.page;
+
+	ret = __wt_debug_page_work(
+	    session, page, fp, WT_DEBUG_TREE_LEAF | WT_DEBUG_TREE_WALK);
+
+	if (do_close)
+		(void)fclose(fp);
+
+	return (ret);
+}
+
+/*
+ * __wt_debug_tree --
+ *	Dump the in-memory information for a tree, not including leaf pages.
+ */
+int
+__wt_debug_tree(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
+{
+	int do_close, ret;
+
+	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
+
+	/* A NULL page starts at the top of the tree -- it's a convenience. */
+	if (page == NULL)
+		page = session->btree->root_page.page;
+
+	ret = __wt_debug_page_work(session, page, fp, WT_DEBUG_TREE_WALK);
+
+	if (do_close)
+		(void)fclose(fp);
+
+	return (ret);
+}
+
 /*
  * __wt_debug_page --
  *	Dump the in-memory information for a page.
@@ -158,32 +210,48 @@ __wt_debug_disk(
 int
 __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 {
-	BTREE *btree;
-	int do_close;
-
-	btree = session->btree;
+	int do_close, ret;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
+	ret = __wt_debug_page_work(session, page, fp, WT_DEBUG_TREE_LEAF);
+
+	if (do_close)
+		(void)fclose(fp);
+
+	return (ret);
+}
+
+/*
+ * __wt_debug_page_work --
+ *	Dump the in-memory information for an in-memory page.
+ */
+static int
+__wt_debug_page_work(SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
+{
+	BTREE *btree;
+
+	btree = session->btree;
+
 	if (page->addr == WT_ADDR_INVALID)
-		fprintf(fp, "addr: [not set] size %lu {\n\t%s",
-		    (u_long)page->size, __wt_page_type_string(page->type));
+		fprintf(fp, "[not set]");
 	else
-		fprintf(fp, "addr: [%lu-%lu] size %lu {\n\t%s",
+		fprintf(fp, "[%lu-%lu]",
 		    (u_long)page->addr,
 		    (u_long)page->addr +
-		    (WT_OFF_TO_ADDR(btree, page->size) - 1),
-		    (u_long)page->size,
-		    __wt_page_type_string(page->type));
+		    (WT_OFF_TO_ADDR(btree, page->size) - 1));
+	fprintf(fp, "/%lu %s",
+	    (u_long)page->size, __wt_page_type_string(page->type));
+
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		fprintf(fp, ", starting recno %llu",
+		fprintf(fp, " recno %llu",
 		    (unsigned long long)page->u.col_int.recno);
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
-		fprintf(fp, ", starting recno %llu",
+		fprintf(fp, " recno %llu",
 		    (unsigned long long)page->u.col_leaf.recno);
 		break;
 	case WT_PAGE_ROW_INT:
@@ -195,6 +263,8 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 	fprintf(fp, " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
 	if (WT_PAGE_IS_ROOT(page))
 		fprintf(fp, ", root");
+	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
+		fprintf(fp, ", cache-counted");
 	if (F_ISSET(page, WT_PAGE_DELETED))
 		fprintf(fp, ", deleted");
 	if (F_ISSET(page, WT_PAGE_PINNED))
@@ -203,35 +273,32 @@ __wt_debug_page(SESSION *session, WT_PAGE *page, const char *ofile, FILE *fp)
 		fprintf(fp, ", split");
 	fprintf(fp, ")\n");
 
-	/* Dump the WT_{ROW,COL}_INDX array. */
+	/* Dump the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		__wt_debug_page_col_fix(session, page, fp);
+		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
+			__wt_debug_page_col_fix(session, page, fp);
 		break;
 	case WT_PAGE_COL_INT:
-		__wt_debug_page_col_int(page, fp);
+		WT_RET(__wt_debug_page_col_int(session, page, fp, flags));
 		break;
 	case WT_PAGE_COL_RLE:
-		__wt_debug_page_col_rle(session, page, fp);
+		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
+			__wt_debug_page_col_rle(session, page, fp);
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_debug_page_col_var(session, page, fp));
+		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
+			WT_RET(__wt_debug_page_col_var(session, page, fp));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_debug_page_row_leaf(session, page, fp));
+		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
+			WT_RET(__wt_debug_page_row_leaf(session, page, fp));
 		break;
 	case WT_PAGE_ROW_INT:
-		__wt_debug_page_row_int(page, fp);
-		break;
-	case WT_PAGE_OVFL:
+		WT_RET(__wt_debug_page_row_int(session, page, fp, flags));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
-
-	fprintf(fp, "}\n");
-
-	if (do_close)
-		(void)fclose(fp);
 
 	return (0);
 }
@@ -271,8 +338,9 @@ __wt_debug_page_col_fix(SESSION *session, WT_PAGE *page, FILE *fp)
  * __wt_debug_page_col_int --
  *	Dump an in-memory WT_PAGE_COL_INT page.
  */
-static void
-__wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
+static int
+__wt_debug_page_col_int(
+    SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
 {
 	WT_COL_REF *cref;
 	uint32_t i;
@@ -282,9 +350,20 @@ __wt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 
 	WT_COL_REF_FOREACH(page, cref, i) {
 		fprintf(fp,
-		    "\tstarting recno %llu\n", (unsigned long long)cref->recno);
+		    "recno %llu, ", (unsigned long long)cref->recno);
 		__wt_debug_ref(&cref->ref, fp);
+		fprintf(fp, "\n");
 	}
+
+	if (!LF_ISSET(WT_DEBUG_TREE_WALK))
+		return (0);
+
+	WT_COL_REF_FOREACH(page, cref, i)
+		if (WT_COL_REF_STATE(cref) == WT_REF_MEM ||
+		    WT_COL_REF_STATE(cref) == WT_REF_INACTIVE)
+			WT_RET(__wt_debug_page_work(
+			    session, WT_COL_REF_PAGE(cref), fp, flags));
+	return (0);
 }
 
 /*
@@ -350,8 +429,9 @@ __wt_debug_page_col_var(SESSION *session, WT_PAGE *page, FILE *fp)
  * __wt_debug_page_row_int --
  *	Dump an in-memory WT_PAGE_ROW_INT page.
  */
-static void
-__wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
+static int
+__wt_debug_page_row_int(
+    SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
 {
 	WT_ROW_REF *rref;
 	uint32_t i;
@@ -366,6 +446,16 @@ __wt_debug_page_row_int(WT_PAGE *page, FILE *fp)
 			__wt_debug_item("\tK", rref, fp);
 		__wt_debug_ref(&rref->ref, fp);
 	}
+
+	if (!LF_ISSET(WT_DEBUG_TREE_WALK))
+		return (0);
+
+	WT_ROW_REF_FOREACH(page, rref, i)
+		if (WT_ROW_REF_STATE(rref) == WT_REF_MEM ||
+		    WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE)
+			WT_RET(__wt_debug_page_work(
+			    session, WT_ROW_REF_PAGE(rref), fp, flags));
+	return (0);
 }
 
 /*
@@ -723,10 +813,14 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 		s = "memory";
 		break;
 	default:
-		s = "unknown";
+		s = "UNKNOWN";
 		break;
 	}
-	fprintf(fp, "\tref: addr %lu, size %lu (%s)\n",
-	    (u_long)ref->addr, (u_long)ref->size, s);
+	if (ref->addr == WT_ADDR_INVALID)
+		fprintf(fp, "\tnot-set");
+	else
+		fprintf(fp, "\t%lu", (u_long)ref->addr);
+
+	fprintf(fp, "/%lu: %s\n", (u_long)ref->size, s);
 }
 #endif
