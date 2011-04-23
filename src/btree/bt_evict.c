@@ -178,12 +178,14 @@ __wt_cache_evict_server(void *arg)
 	}
 
 	if (ret == 0) {
-		if (__wt_cache_bytes_inuse(cache) != 0)
+		if (__wt_cache_bytes_inuse(cache) != 0) {
 			__wt_errx(session,
 			    "cache server: exiting with %llu pages, %llu bytes "
 			    "in use",
 			    (unsigned long long)__wt_cache_pages_inuse(cache),
 			    (unsigned long long)__wt_cache_bytes_inuse(cache));
+			WT_ASSERT(session, 1);
+		}
 	} else
 err:		__wt_err(session, ret, "cache eviction server error");
 
