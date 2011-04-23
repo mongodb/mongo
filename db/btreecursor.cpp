@@ -76,7 +76,7 @@ namespace mongo {
                      locate(indexDetails, indexDetails.head, key, _ordering, keyOfs, found, loc, _direction);
         }
 
-        const _KeyNode& keyNode(int keyOfs) { 
+        const _KeyNode& keyNode(int keyOfs) const { 
             return bucket.btree<V>()->k(keyOfs);
         }
 

@@ -920,12 +920,12 @@ namespace mongo {
         virtual bool modifiedKeys() const { return _multikey; }
         virtual bool isMultiKey() const { return _multikey; }
 
-        /*const _KeyNode& _currKeyNode() const {
+        const _KeyNode& _currKeyNode() const {
             assert( !bucket.isNull() );
-            const _KeyNode& kn = bucket.btree()->k(keyOfs);
+            const _KeyNode& kn = keyNode(keyOfs);
             assert( kn.isUsed() );
             return kn;
-        }*/
+        }
 
 //        const BSONObj currKey() const;
         /*const KeyNode currKeyNode() const {
@@ -991,7 +991,7 @@ namespace mongo {
 
         virtual void _audit() = 0;
         virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) = 0;
-        virtual const _KeyNode& keyNode(int keyOfs) = 0;
+        virtual const _KeyNode& keyNode(int keyOfs) const = 0;
         virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
         virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) = 0;
 
