@@ -16,7 +16,7 @@ static int  __wt_rec_col_rle(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
 static int  __wt_rec_inactive_add(SESSION *, WT_PAGE *);
-static void __wt_rec_inactive_discard(SESSION *);
+static void __wt_rec_inactive_evict(SESSION *);
 static void __wt_rec_inactive_init(SESSION *);
 static int  __wt_rec_parent_update(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
@@ -34,6 +34,10 @@ static int __wt_split_finish(SESSION *);
 static int __wt_split_fixup(SESSION *);
 static int __wt_split_init(SESSION *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
 static int __wt_split_write(SESSION *, int, WT_BUF *, void *);
+
+#ifdef HAVE_DIAGNOSTIC
+static void __wt_rec_inactive_chk(SESSION *, WT_PAGE *);
+#endif
 
 static inline uint32_t	__wt_allocation_size(SESSION *, WT_BUF *, uint8_t *);
 static inline int	__wt_block_free_ovfl(SESSION *, WT_OVFL *);
@@ -109,7 +113,7 @@ __wt_block_free_ovfl(SESSION *session, WT_OVFL *ovfl)
  */
 int
 __wt_page_reconcile(
-    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int discard)
+    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int evict)
 {
 	BTREE *btree;
 	int ret;
@@ -122,6 +126,19 @@ __wt_page_reconcile(
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * The evict flag implies there's nothing below us in the tree: if we
+	 * are reconciling/evicting pages as part of file close, the tree walk
+	 * is depth-first, and we evict as we go.  If reconciling/evicting
+	 * pages as part of normal eviction, we only reconcile a page after we
+	 * verify there are no active subtrees below the page.  In diagnostic
+	 * mode, verify that fact.
+	 */
+	if (evict)
+		__wt_rec_inactive_chk(session, page);
+#endif
+
 	/*
 	 * During internal page reconcilition we track inactive pages we find
 	 * in the page.  That tracking is per-reconciliation run, so clean up
@@ -130,49 +147,66 @@ __wt_page_reconcile(
 	__wt_rec_inactive_init(session);
 
 	/*
-	 * Handle pages marked for deletion.
+	 * Handle pages marked for deletion or split.
 	 *
-	 * Both leaf and internal pages have their WT_PAGE_DELETED flags set if
-	 * they're reconciled and are found to have no valid entries.  At that
-	 * time the parent state is set to WT_REF_INACTIVE.  If these pages are
-	 * subsequently accessed, the state is reset to WT_REF_MEM, and they
-	 * will eventually end up here, being reconciled again.  Any previously
-	 * set WT_PAGE_DELETED flag may no longer be correct: new material may
-	 * have been inserted into the page.  Clear the WT_PAGE_DELETED flag and
-	 * reconcile the page again.
+	 * Check both before checking for clean pages: deleted and split pages
+	 * operate outside the rules for normal pages.
 	 *
-	 * Check deleted pages before checking for clean pages: deleted pages
-	 * can never be clean.
+	 * Check deleted pages before checking for split pages: we don't much
+	 * care if a page was originally a split page, if it's empty now.
+	 *
+	 * Pages have their WT_PAGE_DELETED flag set if they're reconciled and
+	 * are found to have no valid entries.  At that time the parent state is
+	 * set to WT_REF_INACTIVE because we know there's no subtree underneath
+	 * the page -- there's nothing underneath the page.  If these pages are
+	 * subsequently accessed, the state is reset to WT_REF_MEM, and they end
+	 * up here, being reconciled again.
+	 *
+	 * If the page is dirty, any previously set WT_PAGE_DELETED flag may no
+	 * longer be correct: new material may have been inserted in the page,
+	 * and we need to reconcile the page again.  (We could clear the page
+	 * deleted flag when workQ serialization marks the page dirty, but it's
+	 * as simple to do the check here.)
+	 *
+	 * If the page is clean, we opportunistically mark it inactive, even
+	 * though we may not have been called to evict the page.  This is safe
+	 * because we know there are no pages below us in the tree -- there's
+	 * nothing below us in the tree -- and it lets our parent be reconciled
+	 * without further consideration.
 	 */
 	if (F_ISSET(page, WT_PAGE_DELETED)) {
+		if (!WT_PAGE_IS_MODIFIED(page))
+			return (__wt_rec_parent_update(session,
+			    page, NULL, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
 		F_CLR(page, WT_PAGE_DELETED);
-		goto skip_clean_check;
 	}
 
 	/*
-	 * Handle internal pages created as part of a split.
+	 * Pages have their WT_PAGE_SPLIT flag set if they're created as part
+	 * of an internal split.  At that time, the parent state is set to
+	 * WT_REF_INACTIVE (if the evict flag is set because we know there's
+	 * nothing below us in the tree), or WT_REF_MEM (if the evict flag
+	 * is not set and there may well be active pages below us in the tree).
 	 *
-	 * We never write such pages to disk because we don't want to deepen the
-	 * tree on every split, they're always merged into their parents.  Mark
-	 * the page as inactive, and return.
-	 *
-	 * Check split pages before checking for clean pages: split pages can
-	 * never be clean.
+	 * If we are evicting the page, we know there's nothing below us in the
+	 * tree, update the parent state to WT_REF_INACTIVE; otherwise, there
+	 * is nothing to be done, this page will be written when its parent is
+	 * written.
 	 */
 	if (F_ISSET(page, WT_PAGE_SPLIT))
-		return (__wt_rec_parent_update(session,
-		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_INACTIVE));
+		return (evict ? __wt_rec_parent_update(session,
+		    page, NULL, WT_ADDR_INVALID, 0, WT_REF_INACTIVE) : 0);
 
 	/*
 	 * Clean pages are generally simple: if the page is an internal page,
 	 * search the page's subtree for any inactive pages that need to be
-	 * discarded along with the page; for both internal and leaf pages,
-	 * update the page parent's state, and discard the page.  (Assert the
-	 * page is being discarded -- there's no reason to reconcile a clean
-	 * page if not to discard it.)
+	 * evicted along with the page; for both internal and leaf pages,
+	 * update the page parent's state, and evict the page.  (Assert the
+	 * page is being evicted -- there's no reason to reconcile a clean
+	 * page if not to evict it.)
 	 */
 	if (!WT_PAGE_IS_MODIFIED(page)) {
-		WT_ASSERT(session, discard != 0);
+		WT_ASSERT(session, evict != 0);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
@@ -185,12 +219,11 @@ __wt_page_reconcile(
 
 		__wt_rec_parent_update_clean(session, page);
 
-		__wt_page_discard(session, page);
-		__wt_rec_inactive_discard(session);
+		__wt_page_free(session, page);
+		__wt_rec_inactive_evict(session);
 		return (0);
 	}
 
-skip_clean_check:
 	/*
 	 * Update the disk generation before reading the page.  The workQ will
 	 * update the write generation after it makes a change, and if we have
@@ -225,10 +258,10 @@ skip_clean_check:
 	}
 
 	/*
-	 * Resolve the WT_REC_LIST information, update the parent, and discard
+	 * Resolve the WT_REC_LIST information, update the parent, and evict
 	 * the page if requested and possible.
 	 */
-	WT_RET(__wt_rec_wrapup(session, page, discard));
+	WT_RET(__wt_rec_wrapup(session, page, evict));
 
 	/*
 	 * Newly created internal pages are normally merged into their parents
@@ -252,7 +285,7 @@ skip_clean_check:
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_PAGE_SET_MODIFIED(btree->root_page.page);
 		ret = __wt_page_reconcile(
-		    session, btree->root_page.page, 0, discard);
+		    session, btree->root_page.page, 0, evict);
 	}
 
 	return (ret);
@@ -717,8 +750,14 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 
 		/*
 		 * The page may be deleted or internally created during a split.
-		 * Deleted pages are discarded, split pages are merged into the
-		 * parent, and then discarded.
+		 * Deleted pages are evicted, split pages are merged into the
+		 * parent, and then evicted.
+		 *
+		 * !!!
+		 * Column-store formats don't support deleted pages; they can
+		 * shrink, but deleting a page would remove part of the record
+		 * count name space.  This code is here for if/when they support
+		 * deletes, but for now it's not OK.
 		 */
 		if (WT_COL_REF_STATE(cref) == WT_REF_MEM ||
 		    WT_COL_REF_STATE(cref) == WT_REF_INACTIVE) {
@@ -726,14 +765,6 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_SPLIT))
 				WT_RET(__wt_rec_col_merge(session, rp));
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
-				/*
-				 * !!!
-				 * Column-store formats don't support deleted
-				 * pages; they can shrink, but deleting a page
-				 * would remove part of the record-count name
-				 * space.  This code is here for if/when they
-				 * do support deletes, but for now it's not OK.
-				 */
 				WT_ASSERT(
 				    session, !F_ISSET(rp, WT_PAGE_DELETED));
 				WT_RET(__wt_rec_inactive_add(session, rp));
@@ -772,14 +803,14 @@ __wt_rec_col_int_clean(SESSION *session, WT_PAGE *page)
 
 	/* For each entry in the page... */
 	WT_COL_REF_FOREACH(page, cref, i) {
-		if (WT_COL_REF_STATE(cref) != WT_REF_MEM &&
-		    WT_COL_REF_STATE(cref) != WT_REF_INACTIVE)
-			continue;
-		rp = WT_COL_REF_PAGE(cref);
-		if (F_ISSET(rp, WT_PAGE_SPLIT))
-			WT_RET(__wt_rec_col_int_clean(session, rp));
-		if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT))
-			WT_RET(__wt_rec_inactive_add(session, rp));
+		WT_ASSERT(session, WT_COL_REF_STATE(cref) != WT_REF_MEM);
+		if (WT_COL_REF_STATE(cref) == WT_REF_INACTIVE) {
+			rp = WT_COL_REF_PAGE(cref);
+			if (F_ISSET(rp, WT_PAGE_SPLIT))
+				WT_RET(__wt_rec_col_int_clean(session, rp));
+			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+				WT_RET(__wt_rec_inactive_add(session, rp));
+		}
 	}
 	return (0);
 }
@@ -1122,8 +1153,8 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i) {
 		/*
 		 * The page may be deleted or internally created during a split.
-		 * Deleted pages are discarded, split pages are merged into the
-		 * parent, and then discarded.
+		 * Deleted pages are evicted, split pages are merged into the
+		 * parent, and then evicted.
 		 *
 		 * There's one special case we have to handle here: the internal
 		 * page being merged has a potentially incorrect first key and
@@ -1226,8 +1257,8 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 	WT_ROW_REF_FOREACH(page, rref, i) {
 		/*
 		 * The page may be deleted or internally created during a split.
-		 * Deleted pages are discarded, split pages are merged into the
-		 * parent, and then discarded.
+		 * Deleted pages are evicted, split pages are merged into the
+		 * parent, and then evicted.
 		 */
 		if (WT_ROW_REF_STATE(rref) == WT_REF_MEM ||
 		    WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE) {
@@ -1298,14 +1329,14 @@ __wt_rec_row_int_clean(SESSION *session, WT_PAGE *page)
 
 	/* For each entry in the in-memory page... */
 	WT_ROW_REF_FOREACH(page, rref, i) {
-		if (WT_ROW_REF_STATE(rref) != WT_REF_MEM &&
-		    WT_ROW_REF_STATE(rref) != WT_REF_INACTIVE)
-			continue;
-		rp = WT_ROW_REF_PAGE(rref);
-		if (F_ISSET(rp, WT_PAGE_SPLIT))
-			WT_RET(__wt_rec_row_int_clean(session, rp));
-		if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT))
-			WT_RET(__wt_rec_inactive_add(session, rp));
+		WT_ASSERT(session, WT_ROW_REF_STATE(rref) != WT_REF_MEM);
+		if (WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE) {
+			rp = WT_ROW_REF_PAGE(rref);
+			if (F_ISSET(rp, WT_PAGE_SPLIT))
+				WT_RET(__wt_rec_row_int_clean(session, rp));
+			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+				WT_RET(__wt_rec_inactive_add(session, rp));
+		}
 	}
 	return (0);
 }
@@ -1539,7 +1570,7 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
  *	Resolve the WT_REC_LIST information.
  */
 static int
-__wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
+__wt_rec_wrapup(SESSION *session, WT_PAGE *page, int evict)
 {
 	BTREE *btree;
 	WT_PAGE *new;
@@ -1558,12 +1589,12 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 		    (u_long)page->addr, (u_long)page->size));
 
 		/*
-		 * Deleted pages cannot be evicted; we're going to discard the
+		 * Deleted pages cannot be evicted; we're going to evict the
 		 * file blocks and it's possible for a thread to traverse into
 		 * them before we reconcile their parent.  That's a big problem
 		 * we don't want to solve, so keep the page around, and if it is
-		 * re-used before parent merge, that's OK, we just reconcile it
-		 * again
+		 * re-used before parent merge, that's OK, we will reconcile it
+		 * again.
 		 *
 		 * We opportunistically mark the page's reference as in-active,
 		 * even though we may not have been called to evict the page.
@@ -1587,21 +1618,21 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 		    (u_long)page->size, r->list[0].off.size));
 
 		/*
-		 * Update the parent's reference -- if we're discarding this
-		 * page, the new state is "on-disk", else in-memory.
+		 * Update the parent's reference -- if we're evicting this page,
+		 * the new state is "on-disk", else in-memory.
 		 */
 		WT_RET (__wt_rec_parent_update(
 		    session, page, NULL,
 		    r->list[0].off.addr, r->list[0].off.size,
-		    discard ? WT_REF_DISK : WT_REF_MEM));
+		    evict ? WT_REF_DISK : WT_REF_MEM));
 
 		/*
-		 * Optionally discard the page from memory, as well as pages
+		 * Optionally evict the page from memory, as well as pages
 		 * merged during its reconciliation.
 		 */
-		if (discard) {
-			__wt_page_discard(session, page);
-			__wt_rec_inactive_discard(session);
+		if (evict) {
+			__wt_page_free(session, page);
+			__wt_rec_inactive_evict(session);
 		}
 		return (0);
 	}
@@ -1640,27 +1671,29 @@ __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int discard)
 	/*
 	 * Update the parent to reference the newly created internal page.
 	 *
-	 * The discard flag is only set if there's nothing below us in the tree
-	 * (it's not possible to discard a page that has anything other than
+	 * The evict flag is only set if there's nothing below us in the tree
+	 * (it's not possible to evict a page that has anything other than
 	 * on-disk or inactive children).  If the subtree rooted at this node
-	 * has been discarded, the new page can be marked inactive, it no longer
+	 * has been evicted, the new page can be marked inactive, it no longer
 	 * references any in-memory pages.
 	 */
 	WT_RET(__wt_rec_parent_update(session, page,
-	    new, WT_ADDR_INVALID, 0, discard ? WT_REF_INACTIVE : WT_REF_MEM));
+	    new, WT_ADDR_INVALID, 0, evict ? WT_REF_INACTIVE : WT_REF_MEM));
 
 	/*
-	 * Always discard the old page -- it's been replaced by a new physical
-	 * page.
+	 * Always evict the old subtree, it's been replaced by a new physical
+	 * page that references a set of on-disk pages.  This is regardless
+	 * of the eviction flag, the old tree is no longer interesting in any
+	 * case.
 	 */
-	__wt_page_discard(session, page);
-	__wt_rec_inactive_discard(session);
+	__wt_page_free(session, page);
+	__wt_rec_inactive_evict(session);
 	return (0);
 }
 
 /*
  * __wt_rec_parent_update_clean  --
- *	Update a parent page's reference for a discarded, clean page.
+ *	Update a parent page's reference for an evicted, clean page.
  */
 static void
 __wt_rec_parent_update_clean(SESSION *session, WT_PAGE *page)
@@ -1711,6 +1744,11 @@ __wt_rec_parent_update(SESSION *session,
 
 	WT_MEMORY_FLUSH;
 	parent_ref->state = state;
+
+#ifdef HAVE_DIAGNOSTIC
+	if (state == WT_REF_INACTIVE)
+		__wt_rec_inactive_chk(session, page);
+#endif
 
 	/*
 	 * If we re-wrote the root page, update the descriptor record.  The
@@ -1900,11 +1938,11 @@ __wt_rec_inactive_add(SESSION *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_inactive_discard --
- *	Discard the list of inactive pages.
+ * __wt_rec_inactive_evict --
+ *	Evict the list of inactive pages.
  */
 static void
-__wt_rec_inactive_discard(SESSION *session)
+__wt_rec_inactive_evict(SESSION *session)
 {
 	WT_REC_LIST *r;
 	uint32_t i;
@@ -1912,7 +1950,7 @@ __wt_rec_inactive_discard(SESSION *session)
 	r = &S2C(session)->cache->reclist;
 
 	for (i = 0; i < r->inactive_next; ++i)
-		__wt_page_discard(session, r->inactive[i]);
+		__wt_page_free(session, r->inactive[i]);
 }
 
 /*
@@ -1940,3 +1978,41 @@ __wt_rec_destroy(SESSION *session)
 	if (r->save != NULL)
 		__wt_free(session, r->save);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_rec_inactive_chk --
+ *	We're about to mark a page reference inactive -- confirm there are
+ * no in-memory pages in the subtree.
+ */
+static void
+__wt_rec_inactive_chk(SESSION *session, WT_PAGE *page)
+{
+	WT_COL_REF *cref;
+	WT_ROW_REF *rref;
+	uint32_t i;
+
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+		WT_COL_REF_FOREACH(page, cref, i) {
+			WT_ASSERT(
+			    session, WT_COL_REF_STATE(cref) != WT_REF_MEM);
+			if (WT_COL_REF_STATE(cref) == WT_REF_INACTIVE)
+				__wt_rec_inactive_chk(
+				    session, WT_COL_REF_PAGE(cref));
+		}
+		break;
+	case WT_PAGE_ROW_INT:
+		WT_ROW_REF_FOREACH(page, rref, i) {
+			WT_ASSERT(
+			    session, WT_ROW_REF_STATE(rref) != WT_REF_MEM);
+			if (WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE)
+				__wt_rec_inactive_chk(
+				    session, WT_ROW_REF_PAGE(rref));
+		}
+		break;
+	default:
+		break;
+	}
+}
+#endif

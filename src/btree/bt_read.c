@@ -261,7 +261,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	 * discard of the page and its contents.
 	 */
 	if ((ret = __wt_page_inmem(session, page)) != 0) {
-		__wt_page_discard(session, page);
+		__wt_page_free(session, page);
 		return (ret);
 	}
 

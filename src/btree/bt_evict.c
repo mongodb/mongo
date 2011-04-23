@@ -339,32 +339,12 @@ __wt_evict_file(WT_EVICT_REQ *er)
 			break;
 
 		/*
+		 * If it's the sync method, only dirty pages need be reconciled.
 		 * If it's the close method, we're discarding all of the file's
 		 * pages from the cache, and reconciliation is how we do that.
-		 *
-		 * If it's the sync method, dirty pages must be reconciled and
-		 * written to disk, as well as any inactive pages. The latter
-		 * are tricky: if a page is found to be empty at reconciliation
-		 * or is created as part of a split operation, the page's state
-		 * is set to WT_REF_INACTIVE, the page's WT_PAGE_DELETED or
-		 * WT_PAGE_SPLIT flag set, and we expect the page to merge into
-		 * its parent when the parent itself is reconciled.
-		 *
-		 * If the page is accessed before that merge happens, the page's
-		 * state is reset to WT_REF_MEM, and the page may or may not be
-		 * dirtied.  We can see such pages in our traversal of the tree,
-		 * and the test for a dirty page may or may not return true.
-		 *
-		 * Creating a correct disk image requires either writing those
-		 * pages to the backing store (the page was empty at one time,
-		 * but new material was subsequently inserted and now it needs
-		 * to be written), or merge them into their parent (if the page
-		 * was empty at one time and remains empty, or if the page was
-		 * created as part of a split operation).
 		 */
 		page = ref->page;
-		if (close_method || WT_PAGE_IS_MODIFIED(page) ||
-		    F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+		if (close_method || WT_PAGE_IS_MODIFIED(page))
 			WT_RET(__wt_page_reconcile(
 			    session, page, 0, close_method ? 1 : 0));
 	}

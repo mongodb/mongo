@@ -133,7 +133,7 @@ void __wt_debug_item(const char *tag, void *arg_item, FILE *fp);
 int __wt_desc_stat(SESSION *session);
 int __wt_desc_read(SESSION *session);
 int __wt_desc_write(SESSION *session);
-void __wt_page_discard(SESSION *session, WT_PAGE *page);
+void __wt_page_free(SESSION *session, WT_PAGE *page);
 int __wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags);
 void __wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream);
 void __wt_workq_evict_server(CONNECTION *conn, int force);
@@ -161,7 +161,7 @@ void __wt_workq_read_server_exit(CONNECTION *conn);
 int __wt_page_reconcile( SESSION *session,
     WT_PAGE *page,
     uint32_t slvg_skip,
-    int discard);
+    int evict);
 void __wt_rec_destroy(SESSION *session);
 int __wt_return_data(SESSION *session,
     WT_ITEM *key,

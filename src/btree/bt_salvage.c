@@ -1104,7 +1104,7 @@ __slvg_build_leaf_col(SESSION *session,
 	page->indx_count = save_indx_count;
 
 	/* Discard the page and our hazard reference. */
-	__wt_page_discard(session, page);
+	__wt_page_free(session, page);
 	__wt_hazard_clear(session, page);
 
 	return (ret);
@@ -1615,7 +1615,7 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	}
 
 	/* Discard the page and our hazard reference. */
-	__wt_page_discard(session, page);
+	__wt_page_free(session, page);
 	__wt_hazard_clear(session, page);
 
 err:	__wt_scr_release(&key);
