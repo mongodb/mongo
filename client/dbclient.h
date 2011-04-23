@@ -337,7 +337,7 @@ namespace mongo {
         virtual void checkResponse( const char* data, int nReturned ) {}
 
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-        virtual bool recv( Message& m ) { assert(false); }
+        virtual bool recv( Message& m ) { assert(false); return false; }
     };
 
     /**
