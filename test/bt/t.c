@@ -7,6 +7,11 @@
 
 #include "wts.h"
 
+#if defined(DOING_NDBM_LOGGING) || 0
+#include <ndbm.h>
+extern DBM *dbm;
+#endif
+
 GLOBAL g;
 
 static void restart(void);
@@ -71,6 +76,10 @@ main(int argc, char *argv[])
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		restart();			/* Clean up previous runs */
+
+#if defined(DOING_NDBM_LOGGING) || 0
+		xxreset();
+#endif
 
 		config_setup();
 		key_gen_setup();
