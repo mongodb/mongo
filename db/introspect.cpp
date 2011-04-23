@@ -49,9 +49,18 @@ namespace mongo {
         Database *db = c.database();
         const char *ns = db->profileName.c_str();
         NamespaceDetails *d = db->namespaceIndex.details(ns);
-        int len = p.objsize();
-        Record *r = theDataFileMgr.fast_oplog_insert(d, ns, len);
-        memcpy(getDur().writingPtr(r->data, len), p.objdata(), len);
+        if( d ) {
+            int len = p.objsize();
+            Record *r = theDataFileMgr.fast_oplog_insert(d, ns, len);
+            memcpy(getDur().writingPtr(r->data, len), p.objdata(), len);
+        }
+        else { 
+            static time_t last;
+            if( time(0) > last+10 ) {
+                log() << "profile: warning ns " << ns << " does not exist" << endl;
+                last = time(0);
+            }
+        }
     }
 
 } // namespace mongo

@@ -147,8 +147,7 @@ namespace mongo {
         void enter( Client::Context * context ) {
             ensureStarted();
             setNS( context->ns() );
-            if ( context->_db && context->_db->profile > _dbprofile )
-                _dbprofile = context->_db->profile;
+            _dbprofile = context->_db ? context->_db->profile : 0;
         }
 
         void leave( Client::Context * context ) {

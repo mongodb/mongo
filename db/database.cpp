@@ -248,7 +248,7 @@ namespace mongo {
         assert( cc().database() == this );
 
         if ( ! namespaceIndex.details( profileName.c_str() ) ) {
-            log(1) << "creating profile ns: " << profileName << endl;
+            log() << "creating profile collection: " << profileName << endl;
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", 131072.0 );
