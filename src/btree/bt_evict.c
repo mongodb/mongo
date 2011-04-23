@@ -184,7 +184,7 @@ __wt_cache_evict_server(void *arg)
 			    "in use",
 			    (unsigned long long)__wt_cache_pages_inuse(cache),
 			    (unsigned long long)__wt_cache_bytes_inuse(cache));
-			WT_ASSERT(session, 1);
+			WT_ASSERT(session, 0);
 		}
 	} else
 err:		__wt_err(session, ret, "cache eviction server error");
