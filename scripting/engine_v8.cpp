@@ -72,22 +72,22 @@ namespace mongo {
         _global = Persistent< v8::Object >::New( _context->Global() );
         _this = Persistent< v8::Object >::New( v8::Object::New() );
 
-        V8STR_CONN = Persistent<v8::String>::New(v8::String::New( "_conn" ));
-        V8STR_ID = Persistent<v8::String>::New(v8::String::New( "_id" ));
-        V8STR_LENGTH = Persistent<v8::String>::New(v8::String::New( "length" ));
-        V8STR_ISOBJECTID = Persistent<v8::String>::New(v8::String::New( "isObjectId" ));
-        V8STR_RETURN = Persistent<v8::String>::New(v8::String::New( "return" ));
-        V8STR_ARGS = Persistent<v8::String>::New(v8::String::New( "args" ));
-        V8STR_T = Persistent<v8::String>::New(v8::String::New( "t" ));
-        V8STR_I = Persistent<v8::String>::New(v8::String::New( "i" ));
-        V8STR_EMPTY = Persistent<v8::String>::New(v8::String::New( "" ));
-        V8STR_MINKEY = Persistent<v8::String>::New(v8::String::New( "$MinKey" ));
-        V8STR_MAXKEY = Persistent<v8::String>::New(v8::String::New( "$MaxKey" ));
-        V8STR_NUMBERLONG = Persistent<v8::String>::New(v8::String::New( "__NumberLong" ));
-        V8STR_DBPTR = Persistent<v8::String>::New(v8::String::New( "__DBPointer" ));
-        V8STR_BINDATA = Persistent<v8::String>::New(v8::String::New( "__BinData" ));
-        V8STR_NATIVE_FUNC = Persistent<v8::String>::New(v8::String::New( "_native_function" ));
-        V8STR_V8_FUNC = Persistent<v8::String>::New(v8::String::New( "_v8_function" ));
+        V8STR_CONN = getV8Str( "_conn" );
+        V8STR_ID = getV8Str( "_id" );
+        V8STR_LENGTH = getV8Str( "length" );
+        V8STR_ISOBJECTID = getV8Str( "isObjectId" );
+        V8STR_RETURN = getV8Str( "return" );
+        V8STR_ARGS = getV8Str( "args" );
+        V8STR_T = getV8Str( "t" );
+        V8STR_I = getV8Str( "i" );
+        V8STR_EMPTY = getV8Str( "" );
+        V8STR_MINKEY = getV8Str( "$MinKey" );
+        V8STR_MAXKEY = getV8Str( "$MaxKey" );
+        V8STR_NUMBERLONG = getV8Str( "__NumberLong" );
+        V8STR_DBPTR = getV8Str( "__DBPointer" );
+        V8STR_BINDATA = getV8Str( "__BinData" );
+        V8STR_NATIVE_FUNC = getV8Str( "_native_function" );
+        V8STR_V8_FUNC = getV8Str( "_v8_function" );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -110,6 +110,12 @@ namespace mongo {
         _funcs.clear();
         _global.Dispose();
         _context.Dispose();
+        std::map <string, v8::Persistent <v8::String> >::iterator it = _strCache.begin();
+        std::map <string, v8::Persistent <v8::String> >::iterator end = _strCache.end();
+        while (it != end) {
+            it->second.Dispose();
+            ++it;
+        }
     }
 
     /**
@@ -513,26 +519,24 @@ namespace mongo {
         obj->Set( v8::String::New( field ), ft->GetFunction() );
     }
 
-    Handle<v8::Function> V8Scope::injectV8Function( const char *field, v8Function func ) {
-        return injectV8Function(field, func, _global);
+    void V8Scope::injectV8Function( const char *field, v8Function func ) {
+        injectV8Function(field, func, _global);
     }
 
-    Handle<v8::Function> V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj ) {
+    void V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj ) {
         V8_SIMPLE_HEADER
 
         Handle< FunctionTemplate > ft = createV8Function(func);
         Handle<v8::Function> f = ft->GetFunction();
         obj->Set( v8::String::New( field ), f );
-        return f;
     }
 
-    Handle<v8::Function> V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t ) {
+    void V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t ) {
         V8_SIMPLE_HEADER
 
         Handle< FunctionTemplate > ft = createV8Function(func);
         Handle<v8::Function> f = ft->GetFunction();
         t->Set( v8::String::New( field ), f );
-        return f;
     }
 
     Handle<FunctionTemplate> V8Scope::createV8Function( v8Function func ) {
@@ -1159,6 +1163,20 @@ namespace mongo {
         V8Lock l;
         while( !V8::IdleNotification() );
         return v8::Undefined();
+    }
+
+    /**
+     * Gets a V8 strings from the scope's cache, creating one if needed
+     */
+    v8::Persistent<v8::String> V8Scope::getV8Str(string str) {
+        Persistent<v8::String> ptr = _strCache[str];
+        if (ptr.IsEmpty()) {
+            ptr = Persistent<v8::String>::New(v8::String::New(str.c_str()));
+            _strCache[str] = ptr;
+//          cout << "Adding str " + str << endl;
+        }
+//      cout << "Returning str " + str << endl;
+        return ptr;
     }
 
 } // namespace mongo

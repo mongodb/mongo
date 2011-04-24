@@ -97,9 +97,9 @@ namespace mongo {
 
         virtual void injectNative( const char *field, NativeFunction func );
         void injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj );
-        Handle<v8::Function> injectV8Function( const char *field, v8Function func );
-        Handle<v8::Function> injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj );
-        Handle<v8::Function> injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t );
+        void injectV8Function( const char *field, v8Function func );
+        void injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj );
+        void injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t );
         Handle<v8::FunctionTemplate> createV8Function( v8Function func );
 
         void gc();
@@ -116,6 +116,8 @@ namespace mongo {
         v8::Function * getNamedCons( const char * name );
         v8::Function * getObjectIdCons();
         Local< v8::Value > newId( const OID &id );
+
+        v8::Persistent<v8::String> getV8Str(string str);
 
         Persistent<v8::String> V8STR_CONN;
         Persistent<v8::String> V8STR_ID;
@@ -159,6 +161,8 @@ namespace mongo {
 
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
+
+        std::map <string, v8::Persistent <v8::String> > _strCache;
     };
 
     class V8ScriptEngine : public ScriptEngine {
