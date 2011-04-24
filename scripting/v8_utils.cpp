@@ -33,23 +33,6 @@ using namespace v8;
 
 namespace mongo {
 
-    Handle<v8::Value> Print(const Arguments& args) {
-        bool first = true;
-        for (int i = 0; i < args.Length(); i++) {
-            HandleScope handle_scope;
-            if (first) {
-                first = false;
-            }
-            else {
-                printf(" ");
-            }
-            v8::String::Utf8Value str(args[i]);
-            printf("%s", *str);
-        }
-        printf("\n");
-        return v8::Undefined();
-    }
-
     std::string toSTLString( const Handle<v8::Value> & o ) {
         v8::String::Utf8Value str(o);
         const char * foo = *str;
@@ -134,12 +117,6 @@ namespace mongo {
         //    s << try_catch->next_;
 
         return s;
-    }
-
-
-    Handle<v8::Value> Version(const Arguments& args) {
-        HandleScope handle_scope;
-        return handle_scope.Close( v8::String::New(v8::V8::GetVersion()) );
     }
 
     void ReportException(v8::TryCatch* try_catch) {
@@ -233,7 +210,7 @@ namespace mongo {
         Persistent< Value > returnData_;
     };
 
-    Handle< Value > ThreadInit( const Arguments &args ) {
+    Handle< Value > ThreadInit( V8Scope* scope, const Arguments &args ) {
         Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
@@ -242,7 +219,7 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    Handle< Value > ScopedThreadInit( const Arguments &args ) {
+    Handle< Value > ScopedThreadInit( V8Scope* scope, const Arguments &args ) {
         Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
@@ -251,65 +228,58 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    JSThreadConfig *thisConfig( const Arguments &args ) {
+    JSThreadConfig *thisConfig( V8Scope* scope, const Arguments &args ) {
         Local< External > c = External::Cast( *(args.This()->GetHiddenValue( v8::String::New( "_JSThreadConfig" ) ) ) );
         JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
         return config;
     }
 
-    Handle< Value > ThreadStart( const Arguments &args ) {
-        thisConfig( args )->start();
+    Handle< Value > ThreadStart( V8Scope* scope, const Arguments &args ) {
+        thisConfig( scope, args )->start();
         return v8::Undefined();
     }
 
-    Handle< Value > ThreadJoin( const Arguments &args ) {
-        thisConfig( args )->join();
+    Handle< Value > ThreadJoin( V8Scope* scope, const Arguments &args ) {
+        thisConfig( scope, args )->join();
         return v8::Undefined();
     }
 
-    Handle< Value > ThreadReturnData( const Arguments &args ) {
+    Handle< Value > ThreadReturnData( V8Scope* scope, const Arguments &args ) {
         HandleScope handle_scope;
-        return handle_scope.Close( thisConfig( args )->returnData() );
+        return handle_scope.Close( thisConfig( scope, args )->returnData() );
     }
 
-    Handle< Value > ThreadInject( const Arguments &args ) {
+    Handle< Value > ThreadInject( V8Scope* scope, const Arguments &args ) {
         jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
         jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
 
         Local<v8::Object> o = args[0]->ToObject();
 
-        o->Set( v8::String::New( "init" ) , newV8Function< ThreadInit >()->GetFunction() );
-        o->Set( v8::String::New( "start" ) , newV8Function< ThreadStart >()->GetFunction() );
-        o->Set( v8::String::New( "join" ) , newV8Function< ThreadJoin >()->GetFunction() );
-        o->Set( v8::String::New( "returnData" ) , newV8Function< ThreadReturnData >()->GetFunction() );
+        scope->injectV8Function("init", ThreadInit, o);
+        scope->injectV8Function("start", ThreadStart, o);
+        scope->injectV8Function("join", ThreadJoin, o);
+        scope->injectV8Function("returnData", ThreadReturnData, o);
 
         return v8::Undefined();
     }
 
-    Handle< Value > ScopedThreadInject( const Arguments &args ) {
+    Handle< Value > ScopedThreadInject( V8Scope* scope, const Arguments &args ) {
         jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
         jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
 
         Local<v8::Object> o = args[0]->ToObject();
 
-        o->Set( v8::String::New( "init" ) , newV8Function< ScopedThreadInit >()->GetFunction() );
+        scope->injectV8Function("init", ScopedThreadInit, o);
         // inheritance takes care of other member functions
 
         return v8::Undefined();
     }
 
-    void installFork( v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
+    void installFork( V8Scope* scope, v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
         if ( baseContext_.IsEmpty() ) // if this is the shell, first call will be with shell context, otherwise don't expect to use fork() anyway
             baseContext_ = context;
-        global->Set( v8::String::New( "_threadInject" ), newV8Function< ThreadInject >()->GetFunction() );
-        global->Set( v8::String::New( "_scopedThreadInject" ), newV8Function< ScopedThreadInject >()->GetFunction() );
+        scope->injectV8Function("_threadInject", ThreadInject, global);
+        scope->injectV8Function("_scopedThreadInject", ScopedThreadInject, global);
     }
-
-    Handle<v8::Value> GCV8(const Arguments& args) {
-        V8Lock l;
-        while( !V8::IdleNotification() );
-        return v8::Undefined();
-    }
-
 
 }
