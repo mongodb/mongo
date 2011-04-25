@@ -9,6 +9,7 @@
 #include "btree.i"
 
 struct __rec_boundary;		typedef struct __rec_boundary WT_BOUNDARY;
+struct __rec_discard;		typedef struct __rec_discard WT_DISCARD;
 struct __rec_split;		typedef struct __rec_split WT_SPLIT;
 
 /*
@@ -26,17 +27,24 @@ typedef struct {
 
 	/*
 	 * As pages are reconciled, inactive pages are merged into their parents
-	 * and discarded.  If an inactive page is discarded, but the parent page
-	 * write fails or for other reason cannot be discarded, the in-memory
-	 * tree would be incorrect, with the parent referencing an unavailable
-	 * page.  To keep the tree "correct" as this happens, we keep a list of
-	 * pages to discard -- when the parent is discarded, so are the merged
-	 * inactive pages.
+	 * and discarded, deleted pages are discarded, and overflow keys which
+	 * reference deleted pages are discarded.  If an page or overflow key is
+	 * discarded, but page reconciliation cannot complete for any reason,
+	 * the in-memory tree would be incorrect if the objects were discarded,
+	 * with the page referencing unavailable pages or overflow keys.
+	 *
+	 * To keep the tree "correct" as this happens, we keep a list of objects
+	 * to discard when the reconciled page is discarded.
 	 */
-	WT_PAGE **inactive;		/* List of inactive pages */
-	uint32_t inactive_next;		/* Next list slot */
-	uint32_t inactive_entries;	/* Total list slots */
-	uint32_t inactive_allocated;	/* Bytes allocated */
+	struct __rec_discard {
+		void *object;		/* Inactive page or overflow key */
+#define	WT_DISCARD_ALWAYS	0x01	/* Free even if page not evicted */
+#define	WT_DISCARD_OVFL		0x02	/* Overflow key */
+		 uint32_t flags;
+	} *discard;			/* List of discard objects */
+	uint32_t discard_next;		/* Next discard slot */
+	uint32_t discard_entries;	/* Total discard slots */
+	uint32_t discard_allocated;	/* Bytes allocated */
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
@@ -158,7 +166,6 @@ typedef struct {
 #define	SI	static inline
 
 SI uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
-SI int	    __rec_block_free_ovfl(SESSION *, WT_OVFL *);
 static int  __rec_col_fix(SESSION *, WT_PAGE *);
 static int  __rec_col_int(SESSION *, WT_PAGE *);
 static int  __rec_col_int_clean(SESSION *, WT_PAGE *);
@@ -166,15 +173,15 @@ static int  __rec_col_merge(SESSION *, WT_PAGE *);
 static int  __rec_col_rle(SESSION *, WT_PAGE *);
 static int  __rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __rec_col_var(SESSION *, WT_PAGE *);
+static int  __rec_discard_add(SESSION *, void *object, uint32_t);
+static int  __rec_discard_evict(SESSION *, int);
+static void __rec_discard_init(SESSION *);
 static int  __rec_imref_add(SESSION *, WT_REF *);
 static int  __rec_imref_bsearch_cmp(const void *, const void *);
 static int  __rec_imref_fixup(SESSION *, WT_PAGE *, WT_SPLIT *);
 static void __rec_imref_init(SESSION *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
 static void __rec_imref_steal(SESSION *, WT_SPLIT *);
-static int  __rec_inactive_add(SESSION *, WT_PAGE *);
-static void __rec_inactive_evict(SESSION *);
-static void __rec_inactive_init(SESSION *);
 SI void	    __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
 static int  __rec_init(SESSION *);
 static int  __rec_parent_update(
@@ -214,16 +221,16 @@ __rec_init(SESSION *session)
 	}
 
 	/*
-	 * During internal page reconcilition we track inactive pages we find
-	 * in the page.  That tracking is per-reconciliation run, so clean up
-	 * before anything else.
+	 * During internal page reconcilition we track referenced objects that
+	 * are discarded when the page is discarded.  That tracking is done per
+	 * reconciliation run, initialize it before anything else.
 	 */
-	__rec_inactive_init(session);
+	__rec_discard_init(session);
 
 	/*
-	 * During internal page reconcilition we track in-memory pages we find
-	 * in the page.  That tracking is per-reconciliation run, so clean up
-	 * before anything else.
+	 * During internal page reconcilition we track in-memory subtrees we
+	 * find in the page.  That tracking is done per reconciliation run,
+	 * initialize it before anything else.
 	 */
 	__rec_imref_init(session);
 
@@ -243,8 +250,8 @@ __wt_rec_destroy(SESSION *session)
 
 	r = S2C(session)->cache->rec;
 
-	if (r->inactive != NULL)
-		__wt_free(session, r->inactive);
+	if (r->discard != NULL)
+		__wt_free(session, r->discard);
 
 	if (r->split != NULL) {
 		for (spl = r->split, i = 0; i < r->split_entries; ++spl, ++i) {
@@ -307,21 +314,6 @@ __rec_allocation_size(SESSION *session, WT_BUF *buf, uint8_t *end)
 	if (write_len != 0)
 		memset(end, 0, write_len);
 	return (alloc_len);
-}
-
-/*
- * __rec_block_free_ovfl --
- *	Free an chunk of space, referenced by an overflow structure, to the
- *	underlying file.
- */
-static inline int
-__rec_block_free_ovfl(SESSION *session, WT_OVFL *ovfl)
-{
-	BTREE *btree;
-
-	btree = session->btree;
-	return (__wt_block_free(
-	    session, ovfl->addr, WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size)));
 }
 
 /*
@@ -430,9 +422,8 @@ __wt_page_reconcile(
 		}
 
 		__rec_parent_update_clean(session, page);
-
 		__wt_page_free(session, page);
-		__rec_inactive_evict(session);
+		WT_RET(__rec_discard_evict(session, 1));
 		return (0);
 	}
 
@@ -999,7 +990,7 @@ __rec_col_merge(SESSION *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
 				WT_ASSERT(
 				    session, !F_ISSET(rp, WT_PAGE_DELETED));
-				WT_RET(__rec_inactive_add(session, rp));
+				WT_RET(__rec_discard_add(session, rp, 0));
 				continue;
 			}
 			WT_ASSERT(
@@ -1047,7 +1038,7 @@ __rec_col_int_clean(SESSION *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_SPLIT))
 				WT_RET(__rec_col_int_clean(session, rp));
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT))
-				WT_RET(__rec_inactive_add(session, rp));
+				WT_RET(__rec_discard_add(session, rp, 0));
 		}
 	}
 	return (0);
@@ -1280,8 +1271,9 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 			 * file space.
 			 */
 			if (WT_CELL_TYPE(cell) == WT_CELL_DATA_OVFL)
-				WT_RET(__rec_block_free_ovfl(
-				    session, WT_CELL_BYTE_OVFL(cell)));
+				WT_RET(__rec_discard_add(session,
+				    WT_CELL_BYTE_OVFL(cell),
+				    WT_DISCARD_ALWAYS | WT_DISCARD_OVFL));
 
 			/*
 			 * Check for deletion, else build the value's WT_CELL
@@ -1430,13 +1422,16 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 				r->merge_ref = rref;
 				WT_RET(__rec_row_merge(session, rp));
 			}
-			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
-				/* Delete any underlying overflow key. */
-				if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-					WT_RET(__rec_block_free_ovfl(session,
-					    WT_CELL_BYTE_OVFL(key_cell)));
 
-				WT_RET(__rec_inactive_add(session, rp));
+			/* Delete overflow keys referencing deleted pages. */
+			if (F_ISSET(rp, WT_PAGE_DELETED) &&
+			    WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
+				WT_RET(__rec_discard_add(session,
+				    WT_CELL_BYTE_OVFL(key_cell),
+				    WT_DISCARD_OVFL));
+
+			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+				WT_RET(__rec_discard_add(session, rp, 0));
 				continue;
 			}
 			WT_ASSERT(
@@ -1510,7 +1505,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_SPLIT))
 				WT_RET(__rec_row_merge(session, rp));
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
-				WT_RET(__rec_inactive_add(session, rp));
+				WT_RET(__rec_discard_add(session, rp, 0));
 				continue;
 			}
 			WT_ASSERT(
@@ -1585,7 +1580,7 @@ __rec_row_int_clean(SESSION *session, WT_PAGE *page)
 			if (F_ISSET(rp, WT_PAGE_SPLIT))
 				WT_RET(__rec_row_int_clean(session, rp));
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT))
-				WT_RET(__rec_inactive_add(session, rp));
+				WT_RET(__rec_discard_add(session, rp, 0));
 		}
 	}
 	return (0);
@@ -1656,9 +1651,10 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			if (!WT_ROW_EMPTY_ISSET(rip)) {
 				ripvalue = WT_ROW_PTR(page, rip);
 				if (WT_CELL_TYPE(ripvalue) == WT_CELL_DATA_OVFL)
-					WT_RET(__rec_block_free_ovfl(
-					    session,
-					    WT_CELL_BYTE_OVFL(ripvalue)));
+					WT_RET(__rec_discard_add(session,
+					    WT_CELL_BYTE_OVFL(ripvalue),
+					    WT_DISCARD_ALWAYS |
+					    WT_DISCARD_OVFL));
 			}
 
 			/*
@@ -1668,8 +1664,10 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-					WT_RET(__rec_block_free_ovfl(session,
-					    WT_CELL_BYTE_OVFL(key_cell)));
+					WT_RET(__rec_discard_add(session,
+					    WT_CELL_BYTE_OVFL(key_cell),
+					    WT_DISCARD_ALWAYS |
+					    WT_DISCARD_OVFL));
 				goto leaf_insert;
 			}
 
@@ -1881,10 +1879,9 @@ __rec_wrapup(SESSION *session, WT_PAGE *page, int evict)
 		 * Optionally evict the page from memory, as well as pages
 		 * merged during its reconciliation.
 		 */
-		if (evict) {
+		if (evict)
 			__wt_page_free(session, page);
-			__rec_inactive_evict(session);
-		}
+		WT_RET(__rec_discard_evict(session, evict));
 		return (0);
 	}
 
@@ -1938,7 +1935,7 @@ __rec_wrapup(SESSION *session, WT_PAGE *page, int evict)
 	 * case.
 	 */
 	__wt_page_free(session, page);
-	__rec_inactive_evict(session);
+	WT_RET(__rec_discard_evict(session, 1));
 	return (0);
 }
 
@@ -2332,54 +2329,72 @@ __rec_imref_add(SESSION *session, WT_REF *ref)
 }
 
 /*
- * __rec_inactive_init --
- *	Initialize the list of inactive pages.
+ * __rec_discard_init --
+ *	Initialize the list of discard objects.
  */
 static void
-__rec_inactive_init(SESSION *session)
+__rec_discard_init(SESSION *session)
 {
 	WT_RECONCILE *r;
 
 	r = S2C(session)->cache->rec;
 
-	r->inactive_next = 0;
+	r->discard_next = 0;
 }
 
 /*
- * __rec_inactive_add --
- *	Append a new inactive page to the list of inactive pages.
+ * __rec_discard_add --
+ *	Append an object to the list of discard objects.
  */
 static int
-__rec_inactive_add(SESSION *session, WT_PAGE *page)
+__rec_discard_add(SESSION *session, void *object, uint32_t flags)
 {
 	WT_RECONCILE *r;
 
 	r = S2C(session)->cache->rec;
 
-	if (r->inactive_next == r->inactive_entries) {
-		WT_RET(__wt_realloc(session, &r->inactive_allocated,
-		    (r->inactive_entries + 20) * sizeof(*r->inactive),
-		    &r->inactive));
-		r->inactive_entries += 20;
+	if (r->discard_next == r->discard_entries) {
+		WT_RET(__wt_realloc(session, &r->discard_allocated,
+		    (r->discard_entries + 20) * sizeof(*r->discard),
+		    &r->discard));
+		r->discard_entries += 20;
 	}
-	r->inactive[r->inactive_next++] = page;
+	r->discard[r->discard_next].object = object;
+	r->discard[r->discard_next].flags = flags;
+	++r->discard_next;
 	return (0);
 }
 
 /*
- * __rec_inactive_evict --
- *	Evict the list of inactive pages.
+ * __rec_discard_evict --
+ *	Discard the list of discard objects.
  */
-static void
-__rec_inactive_evict(SESSION *session)
+static int
+__rec_discard_evict(SESSION *session, int evict)
 {
+	BTREE *btree;
+	WT_DISCARD *discard;
+	WT_OVFL *ovfl;
 	WT_RECONCILE *r;
 	uint32_t i;
 
+	btree = session->btree;
+
 	r = S2C(session)->cache->rec;
 
-	for (i = 0; i < r->inactive_next; ++i)
-		__wt_page_free(session, r->inactive[i]);
+	for (discard = r->discard, i = 0; i < r->discard_next; ++discard, ++i) {
+		if (!evict && !F_ISSET(discard, WT_DISCARD_ALWAYS))
+			continue;
+		if (F_ISSET(discard, WT_DISCARD_OVFL)) {
+			ovfl = r->discard[i].object;
+			WT_RET(__wt_block_free(session, ovfl->addr,
+			    WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size)));
+		} else
+			__wt_page_free(session, r->discard[i].object);
+	}
+
+	__rec_discard_init(session);
+	return (0);
 }
 
 #ifdef HAVE_DIAGNOSTIC
