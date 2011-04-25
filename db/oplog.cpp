@@ -24,6 +24,7 @@
 #include "repl/rs.h"
 #include "stats/counters.h"
 #include "../util/file.h"
+#include "queryoptimizer.h"
 
 namespace mongo {
 
@@ -388,6 +389,121 @@ namespace mongo {
         log() << "******" << endl;
     }
 
+    // -------------------------------------
+
+    FindingStartCursor::FindingStartCursor( const QueryPlan & qp ) :
+    _qp( qp ),
+    _findingStart( true ),
+    _findingStartMode(),
+    _findingStartTimer( 0 )
+    { init(); }
+    
+    void FindingStartCursor::next() {
+        if ( !_findingStartCursor || !_findingStartCursor->ok() ) {
+            _findingStart = false;
+            _c = _qp.newCursor(); // on error, start from beginning
+            destroyClientCursor();
+            return;
+        }
+        switch( _findingStartMode ) {
+            case Initial: {
+                if ( !_matcher->matches( _findingStartCursor->currKey(), _findingStartCursor->currLoc() ) ) {
+                    _findingStart = false; // found first record out of query range, so scan normally
+                    _c = _qp.newCursor( _findingStartCursor->currLoc() );
+                    destroyClientCursor();
+                    return;
+                }
+                _findingStartCursor->advance();
+                RARELY {
+                    if ( _findingStartTimer.seconds() >= __findingStartInitialTimeout ) {
+                        createClientCursor( startLoc( _findingStartCursor->currLoc() ) );
+                        _findingStartMode = FindExtent;
+                        return;
+                    }
+                }
+                return;
+            }
+            case FindExtent: {
+                if ( !_matcher->matches( _findingStartCursor->currKey(), _findingStartCursor->currLoc() ) ) {
+                    _findingStartMode = InExtent;
+                    return;
+                }
+                DiskLoc prev = prevLoc( _findingStartCursor->currLoc() );
+                if ( prev.isNull() ) { // hit beginning, so start scanning from here
+                    createClientCursor();
+                    _findingStartMode = InExtent;
+                    return;
+                }
+                // There might be a more efficient implementation than creating new cursor & client cursor each time,
+                // not worrying about that for now
+                createClientCursor( prev );
+                return;
+            }
+            case InExtent: {
+                if ( _matcher->matches( _findingStartCursor->currKey(), _findingStartCursor->currLoc() ) ) {
+                    _findingStart = false; // found first record in query range, so scan normally
+                    _c = _qp.newCursor( _findingStartCursor->currLoc() );
+                    destroyClientCursor();
+                    return;
+                }
+                _findingStartCursor->advance();
+                return;
+            }
+            default: {
+                massert( 14038, "invalid _findingStartMode", false );
+            }
+        }
+    }
+    
+    DiskLoc FindingStartCursor::startLoc( const DiskLoc &rec ) {
+        Extent *e = rec.rec()->myExtent( rec );
+        if ( !_qp.nsd()->capLooped() || ( e->myLoc != _qp.nsd()->capExtent ) )
+            return e->firstRecord;
+        // Likely we are on the fresh side of capExtent, so return first fresh record.
+        // If we are on the stale side of capExtent, then the collection is small and it
+        // doesn't matter if we start the extent scan with capFirstNewRecord.
+        return _qp.nsd()->capFirstNewRecord;
+    }
+    
+    DiskLoc FindingStartCursor::prevLoc( const DiskLoc &rec ) {
+        Extent *e = rec.rec()->myExtent( rec );
+        if ( _qp.nsd()->capLooped() ) {
+            if ( e->xprev.isNull() )
+                e = _qp.nsd()->lastExtent.ext();
+            else
+                e = e->xprev.ext();
+            if ( e->myLoc != _qp.nsd()->capExtent )
+                return e->firstRecord;
+        }
+        else {
+            if ( !e->xprev.isNull() ) {
+                e = e->xprev.ext();
+                return e->firstRecord;
+            }
+        }
+        return DiskLoc(); // reached beginning of collection
+    }
+    
+    void FindingStartCursor::createClientCursor( const DiskLoc &startLoc ) {
+        shared_ptr<Cursor> c = _qp.newCursor( startLoc );
+        _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns()) );
+    }
+    
+    void FindingStartCursor::init() {
+        // Use a ClientCursor here so we can release db mutex while scanning
+        // oplog (can take quite a while with large oplogs).
+        shared_ptr<Cursor> c = _qp.newReverseCursor();
+        _findingStartCursor.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns(), BSONObj()) );
+        _findingStartTimer.reset();
+        _findingStartMode = Initial;
+        BSONElement tsElt = _qp.originalQuery()[ "ts" ];
+        massert( 13044, "no ts field in query", !tsElt.eoo() );
+        BSONObjBuilder b;
+        b.append( tsElt );
+        BSONObj tsQuery = b.obj();
+        _matcher.reset(new CoveredIndexMatcher(tsQuery, _qp.indexKey()));
+    }
+    
     // -------------------------------------
 
     struct TestOpTime {

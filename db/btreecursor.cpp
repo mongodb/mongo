@@ -21,6 +21,7 @@
 #include "pdfile.h"
 #include "jsobj.h"
 #include "curop-inl.h"
+#include "queryutil.h"
 
 namespace mongo {
 
@@ -55,7 +56,7 @@ namespace mongo {
         _ordering( Ordering::make( _order ) ),
         _direction( _direction ),
         _bounds( ( assert( _bounds.get() ), _bounds ) ),
-        _boundsIterator( new FieldRangeVector::Iterator( *_bounds  ) ),
+        _boundsIterator( new FieldRangeVectorIterator( *_bounds  ) ),
         _spec( _id.getSpec() ),
         _independentFieldRanges( true ),
         _nscanned( 0 ) {
@@ -72,6 +73,9 @@ namespace mongo {
         dassert( _dups.size() == 0 );
     }
 
+    /** Properly destroy forward declared class members. */
+    BtreeCursor::~BtreeCursor() {}
+    
     void BtreeCursor::audit() {
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
 
@@ -264,6 +268,22 @@ namespace mongo {
             skipUnusedKeys( false );
 
     }
+    
+    string BtreeCursor::toString() {
+        string s = string("BtreeCursor ") + indexDetails.indexName();
+        if ( _direction < 0 ) s += " reverse";
+        if ( _bounds.get() && _bounds->size() > 1 ) s += " multi";
+        return s;
+    }
+    
+    BSONObj BtreeCursor::prettyIndexBounds() const {
+        if ( !_independentFieldRanges ) {
+            return BSON( "start" << prettyKey( startKey ) << "end" << prettyKey( endKey ) );
+        }
+        else {
+            return _bounds->obj();
+        }
+    }    
 
     /* ----------------------------------------------------------------------------- */
 

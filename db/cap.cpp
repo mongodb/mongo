@@ -27,7 +27,6 @@
 #include <algorithm>
 #include <list>
 #include "query.h"
-#include "queryutil.h"
 #include "json.h"
 
 /*

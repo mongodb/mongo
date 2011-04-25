@@ -833,10 +833,14 @@ namespace mongo {
     };
 #pragma pack()
 
+    class FieldRangeVector;
+    class FieldRangeVectorIterator;
+    
     class BtreeCursor : public Cursor {
     public:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+        virtual ~BtreeCursor();
         virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();
         virtual void noteLocation(); // updates keyAtKeyOfs...
@@ -885,25 +889,13 @@ namespace mongo {
         virtual DiskLoc refLoc()   { return currLoc(); }
         virtual Record* _current() { return currLoc().rec(); }
         virtual BSONObj current()  { return BSONObj(_current()); }
-        virtual string toString() {
-            string s = string("BtreeCursor ") + indexDetails.indexName();
-            if ( _direction < 0 ) s += " reverse";
-            if ( _bounds.get() && _bounds->size() > 1 ) s += " multi";
-            return s;
-        }
+        virtual string toString();
 
         BSONObj prettyKey( const BSONObj &key ) const {
             return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
 
-        virtual BSONObj prettyIndexBounds() const {
-            if ( !_independentFieldRanges ) {
-                return BSON( "start" << prettyKey( startKey ) << "end" << prettyKey( endKey ) );
-            }
-            else {
-                return _bounds->obj();
-            }
-        }
+        virtual BSONObj prettyIndexBounds() const;
 
         void forgetEndKey() { endKey = BSONObj(); }
 
@@ -953,7 +945,7 @@ namespace mongo {
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
         const shared_ptr< FieldRangeVector > _bounds;
-        auto_ptr< FieldRangeVector::Iterator > _boundsIterator;
+        auto_ptr< FieldRangeVectorIterator > _boundsIterator;
         const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;

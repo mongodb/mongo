@@ -20,7 +20,7 @@
 
 #include "../pch.h"
 #include "jsobj.h"
-#include "queryutil.h"
+#include "querypattern.h"
 #include "diskloc.h"
 #include "../util/hashtab.h"
 #include "mongommf.h"
