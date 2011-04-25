@@ -158,11 +158,11 @@ void __wt_workq_read_server(CONNECTION *conn, int force);
 int __wt_cache_read_serial_func(SESSION *session);
 void *__wt_cache_read_server(void *arg);
 void __wt_workq_read_server_exit(CONNECTION *conn);
+void __wt_rec_destroy(SESSION *session);
 int __wt_page_reconcile( SESSION *session,
     WT_PAGE *page,
     uint32_t slvg_skip,
     int evict);
-void __wt_rec_destroy(SESSION *session);
 int __wt_return_data(SESSION *session,
     WT_ITEM *key,
     WT_ITEM *value,
