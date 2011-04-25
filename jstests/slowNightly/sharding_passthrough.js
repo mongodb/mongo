@@ -88,6 +88,9 @@ files.forEach(
 );
 
 
+s.stop()
+
 var runnerEnd = new Date()
 
 print( "total runner time: " + ( ( runnerEnd.getTime() - runnerStart.getTime() ) / 1000 ) + "secs" )
+
