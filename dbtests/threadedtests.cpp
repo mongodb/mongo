@@ -268,7 +268,8 @@ namespace ThreadedTests {
              */
             
             RWLock lk( "eliot2" , 120 * 1000 );
-            
+            cout << "RWLock impl: " << lk.implType() << endl;
+
             auto_ptr<rwlock> a( new rwlock( lk , false ) );
             
             AtomicUInt x1 = 0;
@@ -300,6 +301,106 @@ namespace ThreadedTests {
     };
 
 
+
+    /** test of shared lock */
+    class RWLockTest3 { 
+    public:
+        
+        static void worker2( RWLock * lk , AtomicUInt * x ) {
+    	    assert( ! lk->lock_try(0) );
+            cout << "lock c try" << endl;
+            rwlock c( *lk , false );
+            (*x)++;
+            cout << "lock c got" << endl;
+        }
+
+        void run() { 
+            /**
+             * note: this test will deadlock if the code breaks
+             */
+            
+            RWLock lk( "eliot2" , 120 * 1000 );
+            
+            auto_ptr<rwlock> a( new rwlock( lk , false ) );
+            
+            AtomicUInt x2 = 0;
+
+            boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
+            t2.join();
+            assert( x2 == 1 );
+
+            a.reset();
+            
+        }
+    };
+
+    class RWLockTest4 { 
+    public:
+        
+#if defined(__linux__) || defined(__APPLE__)
+        static void worker1( pthread_rwlock_t * lk , AtomicUInt * x ) {
+            (*x)++; // 1
+            cout << "lock b try" << endl;
+            while ( 1 ) {
+                if ( pthread_rwlock_trywrlock( lk ) == 0 )
+                    break;
+                sleepmillis(10);
+            }
+            cout << "lock b got" << endl;
+            (*x)++; // 2
+            pthread_rwlock_unlock( lk );
+        }
+
+        static void worker2( pthread_rwlock_t * lk , AtomicUInt * x ) {
+            cout << "lock c try" << endl;
+            pthread_rwlock_rdlock( lk );
+            (*x)++;
+            cout << "lock c got" << endl;
+            pthread_rwlock_unlock( lk );
+        }
+#endif
+        void run() { 
+            /**
+             * note: this test will deadlock if the code breaks
+             */
+      
+#if defined(__linux__) || defined(__APPLE__)      
+            
+            // create
+            pthread_rwlock_t lk;
+            assert( pthread_rwlock_init( &lk , 0 ) == 0 );
+            
+            // read lock
+            assert( pthread_rwlock_rdlock( &lk ) == 0 );
+            
+            AtomicUInt x1 = 0;
+            boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
+            while ( ! x1 );
+            assert( x1 == 1 );
+            sleepmillis( 500 );
+            assert( x1 == 1 );
+            
+            AtomicUInt x2 = 0;
+
+            boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
+            t2.join();
+            assert( x2 == 1 );
+
+            pthread_rwlock_unlock( &lk );
+
+            for ( int i=0; i<2000; i++ ) {
+                if ( x1 == 2 )
+                    break;
+                sleepmillis(1);
+            }
+
+            assert( x1 == 2 );
+            t1.join();
+#endif            
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ) {
@@ -312,6 +413,8 @@ namespace ThreadedTests {
             add< LockTest >();
             add< RWLockTest1 >();
             add< RWLockTest2 >();
+            add< RWLockTest3 >();
+            add< RWLockTest4 >();
             add< MongoMutexTest >();
         }
     } myall;

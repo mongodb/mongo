@@ -62,6 +62,7 @@ namespace mongo {
         RWLock(const char *, int lowPriorityWaitMS=0 ) : _lowPriorityWaitMS(lowPriorityWaitMS)
           { InitializeSRWLock(&_lock); }
         ~RWLock() { }
+        const char * implType() const { return "WINSRW"; }
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         void lock()          { AcquireSRWLockExclusive(&_lock); }
         void unlock()        { ReleaseSRWLockExclusive(&_lock); }
@@ -111,6 +112,8 @@ namespace mongo {
 #else
         RWLock(const char *, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) { }
 #endif
+
+        const char * implType() const { return "boost"; }
 
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
 
@@ -184,6 +187,8 @@ namespace mongo {
                 check( pthread_rwlock_destroy( &_lock ) );
             }
         }
+
+        const char * implType() const { return "posix"; }
 
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
 
@@ -292,7 +297,7 @@ namespace mongo {
                     
                     if ( lowPriorityWaitMS ) { 
                         bool got = false;
-                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {  // we divide by 2 since we sleep a bit
+                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {
                             if ( _lock.lock_try(0) ) {
                                 got = true;
                                 break;
