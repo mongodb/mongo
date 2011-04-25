@@ -26,7 +26,7 @@
 
 namespace mongo {
 
-    const int DefaultindexVersionNumber = 0;
+    const int DefaultIndexVersionNumber = 0;
 
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
@@ -224,7 +224,6 @@ namespace mongo {
         uassert(10097, "bad table to index name on add index attempt",
                 cc().database()->name == nsToDatabase(sourceNS.c_str()));
 
-
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);
         if( !validKeyPattern(key) ) {
@@ -295,25 +294,32 @@ namespace mongo {
         string pluginName = IndexPlugin::findPluginName( key );
         IndexPlugin * plugin = pluginName.size() ? IndexPlugin::get( pluginName ) : 0;
 
-        if ( plugin ) {
-            fixedIndexObject = plugin->adjustIndexSpec( io );
-        }
 
-        if ( io["v"].eoo() ) {
-            // add "v" if it doesn't exist
-            // if it does - leave whatever value was there
-            // this is for testing and replication
+        { 
+            BSONObj o = io;
+            if ( plugin ) {
+                o = plugin->adjustIndexSpec(o);
+            }
             BSONObjBuilder b;
-            b.appendElements( io );
-            b.append( "v" , DefaultindexVersionNumber );
+            int v = DefaultIndexVersionNumber;
+            if( o.hasElement("_id") ) 
+                b.append( o["_id"] );
+            if( !o["v"].eoo() ) {
+                double vv = o["v"].Number();
+                // note (one day) we may be able to fresh build less versions than we can use
+                // isASupportedIndexVersionNumber() is what we can use
+                uassert(10000, str::stream() << "this version of mongod cannot build new indexes of version number " << vv, 
+                    vv == 0 || vv == 1);
+                v = (int) vv;
+            }
+            // idea is to put things we use a lot earlier
+            b.append("v", v);
+            b.append(o["key"]);
+            if( o["unique"].trueValue() )
+                b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
+            b.append(o["ns"]);
+            b.appendElementsUnique(o);
             fixedIndexObject = b.obj();
-        }
-        else { 
-            int v = io["v"].Int();
-            // note (one day) we may be able to fresh build less versions than we can use
-            // isASupportedIndexVersionNumber() is what we can use
-            uassert(10000, str::stream() << "this version of mongod cannot build new indexes of version number " << v, 
-                v == 0 || v == 1);
         }
 
         return true;
