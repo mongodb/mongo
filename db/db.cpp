@@ -748,12 +748,9 @@ int main(int argc, char* argv[]) {
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
             if (!repairpath.size()) {
-                out() << "repairpath has to be non-zero" << endl;
+                out() << "repairpath is empty" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-        }
-        else {
-            repairpath = dbpath;
         }
         if (params.count("nocursors")) {
             useCursors = false;
@@ -932,6 +929,10 @@ int main(int argc, char* argv[]) {
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );
         }
+
+        // needs to be after things like --configsvr parsing, thus here.
+        if( repairpath.empty() )
+            repairpath = dbpath;
 
         Module::configAll( params );
         dataFileSync.go();
