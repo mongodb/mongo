@@ -125,9 +125,10 @@ void *
 __wt_cache_read_server(void *arg)
 {
 	CONNECTION *conn;
+	SESSION *session, *request_session;
 	WT_CACHE *cache;
 	WT_READ_REQ *rr, *rr_end;
-	SESSION *session, *request_session;
+	WT_SESSION *wt_session;
 	int didwork, ret;
 
 	conn = arg;
@@ -145,10 +146,12 @@ __wt_cache_read_server(void *arg)
 	 * handles are closed.
 	 */
 	session = &conn->default_session;
-	if ((ret = conn->session(conn, 0, &session)) != 0) {
+	if ((ret = conn->iface.open_session(&conn->iface,
+	    NULL, NULL, &wt_session)) != 0) {
 		__wt_err(session, ret, "cache read server error");
 		return (NULL);
 	}
+	session = (SESSION *)wt_session;
 
 	for (;;) {
 		WT_VERBOSE(conn,

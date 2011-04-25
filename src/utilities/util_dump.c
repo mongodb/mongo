@@ -9,6 +9,7 @@
 #include "util.h"
 
 const char *progname;
+extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 
 int	usage(void);
 
@@ -19,17 +20,17 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
-	const char *tablename, *home;
+	const char *home, *tablename;
 	char cursor_config[100], datasrc[100];
-	int ch, debug, printable, ret, tret;
+	int ch, debug, printable, ret, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
 
 	conn = NULL;
 	home = NULL;
-	debug = printable = 0;
+	debug = printable = verbose = 0;
 
-	while ((ch = getopt(argc, argv, "df:h:p")) != EOF)
+	while ((ch = getopt(argc, argv, "df:h:pVv")) != EOF)
 		switch (ch) {
 		case 'd':
 			debug = 1;
@@ -50,6 +51,9 @@ main(int argc, char *argv[])
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
+		case 'v':			/* version */
+			verbose = 1;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -62,7 +66,8 @@ main(int argc, char *argv[])
 		return (usage());
 	tablename = *argv;
 
-	if ((ret = wiredtiger_open(home, NULL, NULL, &conn)) != 0 ||
+	if ((ret = wiredtiger_open(home, verbose ?
+	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 

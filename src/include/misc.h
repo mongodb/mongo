@@ -89,12 +89,18 @@ extern "C" {
  * about implicit conversions of integers.  Using the largest unsigned type,
  * there's no defined bit mask type or maximum value.
  */
-#define	WT_CONN_FCHK_RET(conn, name, f, mask, ret)			\
-	if ((f) & ~((uintmax_t)(mask)))					\
-		ret = __wt_api_args(&(conn)->default_session, (name));
-#define	WT_CONN_FCHK(conn, name, f, mask)				\
-	if ((f) & ~((uintmax_t)(mask)))					\
-		return (__wt_api_args(&(conn)->default_session, (name)));
+#define	WT_CONN_FCHK_RET(conn, n, f, mask, ret) do {			\
+	if ((f) & ~((uintmax_t)(mask))) {				\
+		(conn)->default_session.name = (n);			\
+		ret = __wt_api_args(&(conn)->default_session);		\
+	}								\
+} while (0)
+#define	WT_CONN_FCHK(conn, n, f, mask)	do {				\
+	if ((f) & ~((uintmax_t)(mask))) {				\
+		(conn)->default_session.name = (n);			\
+		return (__wt_api_args(&(conn)->default_session));	\
+	}								\
+} while (0)
 #define	WT_DB_FCHK(btree, name, f, mask)				\
 	WT_CONN_FCHK((btree)->conn, (name), (f), (mask))
 
@@ -137,7 +143,7 @@ extern "C" {
 /* Output a verbose message. */
 #ifdef HAVE_VERBOSE
 #define	WT_VERBOSE(conn, f, msg) do {					\
-	if (FLD_ISSET((conn)->verbose, WT_VERB_ALL | (f)))		\
+	if (FLD_ISSET((conn)->verbose, (f)))				\
 		__wt_msg msg;						\
 } while (0)
 #else

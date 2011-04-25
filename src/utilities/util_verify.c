@@ -15,14 +15,23 @@ int	usage(void);
 int
 main(int argc, char *argv[])
 {
-	BTREE *btree;
-	int ch, ret, tret, verbose;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	const char *home, *tablename;
+	int ch, debug, ret, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
 
-	verbose = 0;
-	while ((ch = getopt(argc, argv, "Vv")) != EOF)
+	home = NULL;
+	debug = verbose = 0;
+	while ((ch = getopt(argc, argv, "dh:Vv")) != EOF)
 		switch (ch) {
+		case 'd':
+			debug = 1;
+			break;
+		case 'h':			/* home directory */
+			home = optarg;
+			break;
 		case 'v':			/* verbose */
 			verbose = 1;
 			break;
@@ -39,28 +48,25 @@ main(int argc, char *argv[])
 	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
+	tablename = *argv;
 
-	if ((ret = wiredtiger_simple_setup(progname, verbose ?
-	    __wt_event_handler_verbose : NULL, NULL, &btree)) == 0) {
-		if ((ret = btree->open(btree, NULL, *argv, 0, 0)) != 0) {
-			fprintf(stderr, "%s: btree.open(%s): %s\n",
-			    progname, *argv, wiredtiger_strerror(ret));
-			goto err;
-		}
-		/* XXX verbose */
-		if ((ret = btree->verify(btree, NULL, 0)) != 0) {
-			fprintf(stderr, "%s: btree.verify(%s): %s\n",
-			    progname, *argv, wiredtiger_strerror(ret));
-			goto err;
-		}
-		if (verbose)
-			printf("\n");
+	if ((ret = wiredtiger_open(home, verbose ?
+	    __wt_event_handler_verbose : NULL, NULL, &conn)) != 0 ||
+	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		goto err;
+
+	if ((ret = session->verify_table(session, tablename, NULL)) != 0) {
+		fprintf(stderr, "%s: salvage(%s): %s\n",
+		    progname, tablename, wiredtiger_strerror(ret));
+		goto err;
 	}
+	if (verbose)
+		printf("\n");
 
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = wiredtiger_simple_teardown(progname, btree)) != 0 && ret == 0)
+	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

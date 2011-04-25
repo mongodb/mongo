@@ -43,9 +43,6 @@ __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 	/* Open the underlying Btree. */
 	WT_RET(__wt_bt_open(session, LF_ISSET(WT_CREATE) ? 1 : 0));
 
-	/* Turn on the methods that require open. */
-	__wt_methods_btree_open_transition(btree);
-
 	return (0);
 }
 
@@ -54,19 +51,20 @@ __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
  *	Db.close method (BTREE close & handle destructor).
  */
 int
-__wt_btree_close(SESSION *session, uint32_t flags)
+__wt_btree_close(SESSION *session)
 {
 	BTREE *btree;
 	int ret;
 
-	WT_UNUSED(flags);
-
 	btree = session->btree;
 	ret = 0;
 
+	WT_ASSERT(session, btree->refcnt > 0);
+	if (--btree->refcnt > 0)
+		return (0);
+
 	/* Close the underlying Btree. */
 	ret = __wt_bt_close(session);
-
 	WT_TRET(__wt_btree_destroy(btree));
 
 	return (ret);

@@ -7,12 +7,6 @@
 
 #include "wt_internal.h"
 
-#define	SESSION_API_CALL(s, n)	do {					\
-	(s)->cursor = NULL;						\
-	(s)->btree = NULL;						\
-	(s)->name = (n);						\
-} while (0)
-
 /*
  * __session_close --
  *	WT_SESSION->close method.
@@ -31,20 +25,26 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	session = (SESSION *)wt_session;
 	ret = 0;
 
-	SESSION_API_CALL(session, "WT_SESSION->close");
+	SESSION_API_CALL(session, close, config);
 
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
 
+	__wt_lock(session, conn->mtx);
+
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
 		TAILQ_REMOVE(&session->btrees, btree_session, q);
 		btree = btree_session->btree;
-		WT_TRET(btree->close(btree, session, 0));
 		__wt_free(session, btree_session);
+		session->btree = btree;
+		WT_TRET(__wt_btree_close(session));
 	}
 
 	TAILQ_REMOVE(&conn->sessions_head, session, q);
-	WT_TRET(session->close(session, 0));
+	WT_TRET(__wt_session_close(session));
+	__wt_unlock(session, conn->mtx);
+
+	API_END();
 
 	return (0);
 }
@@ -62,7 +62,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_UNUSED(to_dup);
 
 	session = (SESSION *)wt_session;
-	SESSION_API_CALL(session, "WT_SESSION->open_cursor");
+	SESSION_API_CALL(session, open_cursor, config);
 
 	if (strncmp(uri, "config:", 6) == 0)
 		return (__wt_curconfig_open(session, uri, config, cursorp));
@@ -70,6 +70,8 @@ __session_open_cursor(WT_SESSION *wt_session,
 		return (__wt_cursor_open(session, uri, config, cursorp));
 
 	__wt_err(session, 0, "Unknown cursor type '%s'\n", uri);
+
+	API_END();
 	return (EINVAL);
 }
 
@@ -86,19 +88,14 @@ __session_create_table(WT_SESSION *wt_session,
 	SESSION *session;
 	WT_CONFIG_ITEM cval;
 	const char *key_format, *value_format;
-	uint32_t alloc_size, column_flags, fixed_len, huffman_flags;
-	uint32_t intl_node_max, intl_node_min, leaf_node_max, leaf_node_min;
-	const char *cfg[] = { __wt_config_def_create_table, config, NULL };
-
-	WT_UNUSED(config);
+	uint32_t column_flags, fixed_len, huffman_flags;
 
 	session = (SESSION *)wt_session;
 	conn = (CONNECTION *)wt_session->connection;
 
-	SESSION_API_CALL(session, "WT_SESSION->create_table");
+	SESSION_API_CALL(session, create_table, config);
 
-	WT_RET(__wt_config_check(session,
-	    __wt_config_def_create_table, config));
+	/* XXX need check whether the table already exists. */
 
 	/*
 	 * Key / value formats.
@@ -109,7 +106,7 @@ __session_create_table(WT_SESSION *wt_session,
 	 */
 	fixed_len = 0;
 
-	WT_RET(__wt_config_gets(cfg, "key_format", &cval));
+	WT_RET(__wt_config_gets(__cfg, "key_format", &cval));
 	if (strncmp(cval.str, "r", cval.len) == 0)
 		key_format = "r";
 	else if (strncmp(cval.str, "S", cval.len) == 0)
@@ -122,7 +119,7 @@ __session_create_table(WT_SESSION *wt_session,
 		return (EINVAL);
 	}
 
-	WT_RET(__wt_config_gets(cfg, "value_format", &cval));
+	WT_RET(__wt_config_gets(__cfg, "value_format", &cval));
 	if (strncmp(cval.str, "S", cval.len) == 0)
 		value_format = "S";
 	else if (strncmp(cval.str, "u", cval.len) == 0)
@@ -137,41 +134,54 @@ __session_create_table(WT_SESSION *wt_session,
 	}
 
 	column_flags = 0;
-	WT_RET(__wt_config_gets(cfg, "runlength_encoding", &cval));
+	WT_RET(__wt_config_gets(__cfg, "runlength_encoding", &cval));
 	if (cval.val != 0)
 		column_flags |= WT_RLE;
 
 	huffman_flags = 0;
-	WT_RET(__wt_config_gets(cfg, "huffman_key", &cval));
+	WT_RET(__wt_config_gets(__cfg, "huffman_key", &cval));
 	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
 		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_KEY;
-	WT_RET(__wt_config_gets(cfg, "huffman_value", &cval));
+	WT_RET(__wt_config_gets(__cfg, "huffman_value", &cval));
 	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
 		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_VALUE;
 
-	WT_RET(__wt_config_gets(cfg, "allocation_size", &cval));
-	alloc_size = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(cfg, "intl_node_max", &cval));
-	intl_node_max = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(cfg, "intl_node_min", &cval));
-	intl_node_min = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(cfg, "leaf_node_max", &cval));
-	leaf_node_max = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(cfg, "leaf_node_min", &cval));
-	leaf_node_min = (uint32_t)cval.val;
+	/* Allocate a BTREE handle. */
+	WT_RET(__wt_connection_btree(conn, &btree));
 
-	WT_RET(conn->btree(conn, 0, &btree));
-	WT_RET(btree->btree_pagesize_set(btree, alloc_size,
-	    intl_node_min, intl_node_max, leaf_node_min, leaf_node_max));
-	if (key_format[0] == 'r')
-		WT_RET(btree->column_set(btree, fixed_len, NULL, column_flags));
+	WT_RET(__wt_config_gets(__cfg, "allocation_size", &cval));
+	btree->allocsize = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(__cfg, "intl_node_max", &cval));
+	btree->intlmax = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(__cfg, "intl_node_min", &cval));
+	btree->intlmin = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(__cfg, "leaf_node_max", &cval));
+	btree->leafmax = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(__cfg, "leaf_node_min", &cval));
+	btree->leafmin = (uint32_t)cval.val;
+
+	if (key_format[0] == 'r') {
+		/* Run-length encoding required fixed-length records. */
+		if (fixed_len == 0 && FLD_ISSET(column_flags, WT_RLE)) {
+			__wt_errx(session,
+			    "Run-length encoding is incompatible with "
+			    "variable length column-store records");
+			return (WT_ERROR);
+		}
+
+		btree->fixed_len = fixed_len;
+		F_SET(btree, WT_COLUMN | column_flags);
+	}
 	if (huffman_flags != 0)
-		WT_RET(btree->huffman_set(btree, NULL, 0, huffman_flags));
-	WT_RET(btree->open(btree, session, name, 0666, WT_CREATE));
+		WT_RET(__wt_btree_huffman_set(btree, NULL, 0, huffman_flags));
+
+	session->btree = btree;
+	WT_RET(__wt_btree_open(session, name, 0666, WT_CREATE));
 
 	WT_RET(__wt_session_add_btree(session,
 	    btree, key_format, value_format));
 
+	API_END();
 	return (0);
 }
 
@@ -312,9 +322,14 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 static int
 __conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *config)
 {
-	WT_UNUSED(wt_conn);
+	CONNECTION *conn;
+	SESSION *session;
+
 	WT_UNUSED(path);
-	WT_UNUSED(config);
+
+	conn = (CONNECTION *)wt_conn;
+	CONNECTION_API_CALL(conn, session, load_extension, config);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -327,10 +342,15 @@ static int
 __conn_add_cursor_type(WT_CONNECTION *wt_conn,
     const char *prefix, WT_CURSOR_TYPE *ctype, const char *config)
 {
-	WT_UNUSED(wt_conn);
+	CONNECTION *conn;
+	SESSION *session;
+
 	WT_UNUSED(prefix);
 	WT_UNUSED(ctype);
-	WT_UNUSED(config);
+
+	conn = (CONNECTION *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_cursor_type, config);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -343,10 +363,15 @@ static int
 __conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
 {
-	WT_UNUSED(wt_conn);
+	CONNECTION *conn;
+	SESSION *session;
+
 	WT_UNUSED(name);
 	WT_UNUSED(collator);
-	WT_UNUSED(config);
+
+	conn = (CONNECTION *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_collator, config);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -359,10 +384,15 @@ static int
 __conn_add_extractor(WT_CONNECTION *wt_conn,
     const char *name, WT_EXTRACTOR *extractor, const char *config)
 {
-	WT_UNUSED(wt_conn);
+	CONNECTION *conn;
+	SESSION *session;
+
 	WT_UNUSED(name);
 	WT_UNUSED(extractor);
-	WT_UNUSED(config);
+
+	conn = (CONNECTION *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_collator, config);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -399,9 +429,8 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	ret = 0;
 	conn = (CONNECTION *)wt_conn;
-	session = &conn->default_session;
 
-	SESSION_API_CALL(session, "WT_CONNECTION->close");
+	CONNECTION_API_CALL(conn, session, close, config);
 
 	while ((s = TAILQ_FIRST(&conn->sessions_head)) != NULL) {
 		wt_session = &s->iface;
@@ -412,7 +441,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		WT_TRET(__wt_close(session, conn->log_fh));
 		conn->log_fh = NULL;
 	}
-	WT_TRET(conn->close(conn, 0));
+	WT_TRET(__wt_connection_close(conn));
+	API_END();
+
 	return (ret);
 }
 
@@ -443,13 +474,12 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	SESSION *session, *session_ret;
 	int ret;
 
-	WT_UNUSED(config);
-
 	conn = (CONNECTION *)wt_conn;
-	session = &conn->default_session;
-	SESSION_API_CALL(session, "WT_CONNECTION->open_session");
+	CONNECTION_API_CALL(conn, session, open_session, config);
 
-	WT_ERR(conn->session(conn, 0, &session_ret));
+	__wt_lock(session, conn->mtx);
+	WT_ERR(__wt_connection_session(conn, &session_ret));
+
 	/*
 	 * XXX
 	 * Kludge while there is a separate __wt_conection_session method.
@@ -465,6 +495,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 		session_ret->event_handler = event_handler;
 
 	TAILQ_INSERT_HEAD(&conn->sessions_head, session_ret, q);
+	__wt_unlock(session, conn->mtx);
 
 	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
 	*wt_sessionp = &session_ret->iface;
@@ -472,8 +503,10 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	if (0) {
 err:		if (session_ret != NULL)
 			(void)__wt_session_close(session_ret);
+		__wt_unlock(session, conn->mtx);
 		__wt_free(session, session_ret);
 	}
+	API_END();
 
 	return (0);
 }
@@ -510,10 +543,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ NULL, 0 }
 	};
 	CONNECTION *conn;
+	SESSION *session;
 	WT_CONFIG vconfig;
 	WT_CONFIG_ITEM cval, vkey, vval;
-	const char *cfg[] = { __wt_config_def_wiredtiger_open, config, NULL };
-	uint32_t verbose;
+	const char *__cfg[] = { __wt_confdfl_wiredtiger_open, config, NULL };
 	int opened, ret;
 
 	opened = 0;
@@ -541,48 +574,48 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_strdup(NULL, home, &conn->home));
 	TAILQ_INIT(&conn->sessions_head);
 
-	conn->default_session.iface.connection = &conn->iface;
-	conn->default_session.event_handler = event_handler;
+	session = &conn->default_session;
+	session->iface.connection = &conn->iface;
+	session->event_handler = event_handler;
+	session->name = "wiredtiger_open";
 
 	WT_ERR(__wt_connection_config(conn));
 
-	WT_ERR(__wt_config_check(&conn->default_session,
-	    __wt_config_def_wiredtiger_open, config));
+	WT_ERR(__wt_config_check(session, __cfg[0], config));
 
-	WT_ERR(__wt_config_gets(cfg, "cache_size", &cval));
-	WT_ERR(conn->cache_size_set(conn, (uint32_t)cval.val));
+	WT_ERR(__wt_config_gets(__cfg, "cache_size", &cval));
+	WT_ERR(__wt_api_arg_min(session, "cache size", cval.val,
+	    1 * WT_MEGABYTE));
+	conn->cache_size = cval.val;
 
-	verbose = 0;
-	WT_ERR(__wt_config_gets(cfg, "verbose", &cval));
+	conn->verbose = 0;
+#ifdef HAVE_VERBOSE
+	WT_ERR(__wt_config_gets(__cfg, "verbose", &cval));
 	for (vt = verbtypes; vt->vname != NULL; vt++) {
 		WT_ERR(__wt_config_initn(&vconfig, cval.str, cval.len));
 		vkey.str = vt->vname;
 		vkey.len = strlen(vt->vname);
 		ret = __wt_config_getraw(&vconfig, &vkey, &vval);
 		if (ret == 0 && vval.val)
-			verbose |= vt->vflag;
+			FLD_SET(conn->verbose, vt->vflag);
 		else if (ret != WT_NOTFOUND)
 			goto err;
 	}
-	if (verbose != 0)
-		WT_ERR(conn->verbose_set(conn, verbose));
+#endif
 
-	/* XXX conn flags, including WT_MEMORY_CHECK */
-
-	WT_ERR(conn->open(conn, home, 0644, 0));
+	WT_ERR(__wt_connection_open(conn, home, 0644));
 	opened = 1;
 
-	WT_ERR(__wt_config_gets(cfg, "logging", &cval));
+	WT_ERR(__wt_config_gets(__cfg, "logging", &cval));
 	if (cval.val != 0)
-		WT_ERR(__wt_open(&conn->default_session,
-		    "__wt.log", 0666, 1, &conn->log_fh));
+		WT_ERR(__wt_open(session, "__wt.log", 0666, 1, &conn->log_fh));
 
 	STATIC_ASSERT(offsetof(CONNECTION, iface) == 0);
 	*wt_connp = &conn->iface;
 
 	if (0) {
 err:		if (opened)
-			conn->close(conn, 0);
+			__wt_connection_close(conn);
 		else
 			__wt_connection_destroy(conn);
 	}

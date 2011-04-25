@@ -193,7 +193,7 @@ __wt_btree_huffman_set(BTREE *btree,
 		huffman_table_size = sizeof(phone);
 		break;
 	default:
-err:		return (__wt_api_args(session, "Db.huffman_set"));
+err:		return (__wt_api_args(session));
 	}
 
 	/*

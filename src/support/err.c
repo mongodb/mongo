@@ -80,10 +80,9 @@ __wt_assert(
  *	arguments.
  */
 int
-__wt_api_args(SESSION *session, const char *name)
+__wt_api_args(SESSION *session)
 {
-	__wt_errx(session,
-	    "%s: illegal API arguments or flag values specified", name);
+	__wt_errx(session, "illegal API arguments or flag values specified");
 	return (WT_ERROR);
 }
 
@@ -93,15 +92,14 @@ __wt_api_args(SESSION *session, const char *name)
  *	too-small argument.
  */
 int
-__wt_api_arg_min(SESSION *session,
-    const char *name, const char *arg_name, uint32_t v, uint32_t min)
+__wt_api_arg_min(SESSION *session, const char *arg_name,
+     uint64_t v, uint64_t min)
 {
 	if (v >= min)
 		return (0);
 
-	__wt_errx(session,
-	    "%s: %s argument less than minimum value of %lu",
-	    name, arg_name, (u_long)min);
+	__wt_errx(session, "%s argument %llu less than minimum value of %llu",
+	    arg_name, (unsigned long long)v, (unsigned long long)min);
 	return (WT_ERROR);
 }
 
@@ -111,15 +109,14 @@ __wt_api_arg_min(SESSION *session,
  *	too-large argument.
  */
 int
-__wt_api_arg_max(SESSION *session,
-    const char *name, const char *arg_name, uint32_t v, uint32_t max)
+__wt_api_arg_max(SESSION *session, const char *arg_name,
+     uint64_t v, uint64_t max)
 {
 	if (v <= max)
 		return (0);
 
-	__wt_errx(session,
-	    "%s: %s argument larger than maximum value of %lu",
-	    name, arg_name, (u_long)max);
+	__wt_errx(session, "%s argument %llu larger than maximum value of %llu",
+	    arg_name, (unsigned long long)v, (unsigned long long)max);
 	return (WT_ERROR);
 }
 
@@ -129,11 +126,11 @@ __wt_api_arg_max(SESSION *session,
  *	for a file type.
  */
 int
-__wt_file_method_type(SESSION *session, const char *name, int column_err)
+__wt_file_method_type(SESSION *session, int column_err)
 {
 	__wt_errx(session,
-	    "%s: this method is not supported for a %s file",
-	    name, column_err ? "column-store" : "row-store");
+	    "this method is not supported for a %s file",
+	    column_err ? "column-store" : "row-store");
 	return (WT_ERROR);
 }
 
@@ -157,10 +154,10 @@ __wt_file_wrong_fixed_size(SESSION *session, uint32_t len, uint32_t config_len)
  *	Print a standard error message on attempts to modify a read-only file.
  */
 int
-__wt_file_readonly(SESSION *session, const char *name)
+__wt_file_readonly(SESSION *session)
 {
 	__wt_errx(session,
-	    "%s: the file was opened read-only and may not be modified", name);
+	    "the file was opened read-only and may not be modified");
 	return (WT_READONLY);
 }
 

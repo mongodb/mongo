@@ -10,11 +10,16 @@
 /*
  * __wt_connection_stat_print --
  *	Print CONNECTION handle statistics to a stream.
+ *
+ * XXX this will become a statistics cursor.
  */
 int
 __wt_connection_stat_print(CONNECTION *conn, FILE *stream)
 {
 	BTREE *btree;
+	SESSION *session;
+
+	session = &conn->default_session;
 
 	fprintf(stream, "Database statistics:\n");
 	__wt_stat_print_conn_stats(conn->stats, stream);
@@ -25,8 +30,10 @@ __wt_connection_stat_print(CONNECTION *conn, FILE *stream)
 	__wt_stat_print_cache_stats(conn->cache->stats, stream);
 	fprintf(stream, "%s\n", conn->sep);
 
-	TAILQ_FOREACH(btree, &conn->dbqh, q)
-		WT_RET(btree->stat_print(btree, stream, 0));
+	TAILQ_FOREACH(btree, &conn->dbqh, q) {
+		session->btree = btree;
+		WT_RET(__wt_btree_stat_print(session, stream));
+	}
 	return (0);
 }
 

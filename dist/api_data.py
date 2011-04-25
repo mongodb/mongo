@@ -1,4 +1,33 @@
-# Data for config.py, describes all configuration key / value pairs
+# This file is a python script that describes the WiredTiger API.
+# This data is used by the scripts api.py, api_err.py, config.py
+#
+#	2: a string of comma-separated configuration key words
+#		extfunc  -- call an external function to do the work
+#		getter	 -- getter method
+#		connlock -- locks the connection mutex (implied by getter/setter)
+#		method	 -- method returns an int
+#		methodV  -- method returns void
+#		noauto	 -- don't auto-generate a stub at all
+#		rdonly	 -- not allowed if the database is read-only
+#		restart	 -- handle WT_RESTART in the API call
+#		rowonly	 -- row databases only
+#		session	 -- function takes a SESSION/BTREE argument pair
+#		setter	 -- setter method
+#		verify	 -- setter methods call validation function
+
+errors = [
+	('WT_DEADLOCK', 'conflict with concurrent operation'),
+	('WT_ERROR', 'non-specific WiredTiger error'),
+	('WT_NOTFOUND', 'item not found'),
+	('WT_READONLY', 'attempt to modify a read-only value'),
+	('WT_RESTART', 'restart the operation (internal)'),
+	('WT_TOOSMALL', 'buffer too small'),
+]
+
+class Method:
+	def __init__(self, config, **flags):
+		self.config = config
+		self.flags = flags
 
 class Config:
 	def __init__(self, name, default, desc):
@@ -6,15 +35,15 @@ class Config:
 		self.default = default
 		self.desc = desc
 
-config_types = {
-'cursor_close' : [],
-'truncate_table' : [],
-'verify_table' : [],
-'commit_transaction' : [],
-'rollback_transaction' : [],
-'session_close' : [],
+methods = {
+'cursor.close' : Method([]),
+'session.truncate_table' : Method([]),
+'session.verify_table' : Method([]),
+'session.commit_transaction' : Method([]),
+'session.rollback_transaction' : Method([]),
+'session.close' : Method([]),
 
-'open_cursor' : [
+'session.open_cursor' : Method([
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this cursor, one of "snapshot" or
 		"read-committed" or "read-uncommitted".  Ignored for transactional
@@ -24,9 +53,9 @@ config_types = {
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if the
 		formats were \c "u"'''),
-],
+]),
 
-'create_table' : [
+'session.create_table' : Method([
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes'''),
 	Config('columns', '', r'''
@@ -69,11 +98,11 @@ config_types = {
 		the format of the data packed into value items.  See @ref packing
 		for details.  If not set, a default value of \c "u" is assumed, and
 		applications use the WT_ITEM struct to manipulate raw byte arrays.'''),
-],
+]),
 
-'rename_table' : [],
+'session.rename_table' : Method([]),
 
-'begin_transaction' : [
+'session.begin_transaction' : Method([
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this transaction, one of "serializable",
 		"snapshot", "read-committed" or "read-uncommitted"; default
@@ -87,9 +116,9 @@ config_types = {
 		priority of the transaction for resolving conflicts, an integer
 		between -100 and 100.  Transactions with higher values are less likely
 		to abort'''),
-],
+]),
 
-'checkpoint' : [
+'session.checkpoint' : Method([
 	Config('archive', 'false', r'''
 		remove log files no longer required for transactional durabilty'''),
 	Config('force', 'false', r'''
@@ -105,22 +134,24 @@ config_types = {
 	Config('timeout', '0', r'''
 		only proceed if more than the specified number of milliseconds have
 		elapsed since the last checkpoint'''),
-],
+]),
 
-'add_cursor_type' : [],
-'add_collator' : [],
-'add_extractor' : [],
-'connection_close' : [],
+'connection.add_cursor_type' : Method([]),
+'connection.add_collator' : Method([]),
+'connection.add_extractor' : Method([]),
+'connection.close' : Method([]),
 
-'load_extension' : [
+'connection.load_extension' : Method([
 	Config('entry', 'wiredtiger_extension_init', r'''
 		the entry point of the extension'''),
 	Config('prefix', '', r'''
 		a prefix for all names registered by this extension (e.g., to make
 		namespaces distinct or during upgrades'''),
-],
+]),
 
-'wiredtiger_open' : [
+'connection.open_session' : Method([]),
+
+'wiredtiger_open' : Method([
 	Config('cache_size', '20MB', r'''
 		maximum heap memory to allocate for the cache'''),
 	Config('create', 'false', r'''
@@ -146,5 +177,25 @@ config_types = {
 		enable messages for various events.  One or more of "all", "evict",
 		"fileops", "hazard", "mutex", "read".  Multiple options are given as
 		a list such as \c "verbose=[evict,read]"'''),
-],
+]),
+}
+
+flags = {
+###################################################
+# Internal routine flag declarations
+###################################################
+	'bt_dump' : [ 'DEBUG', 'PRINTABLES' ],
+	'bt_open' : [ 'CREATE' ],
+	'bt_search_col' : [ 'WRITE' ],
+	'bt_search_key_row' : [ 'WRITE' ],
+	'bt_tree_walk' : [ 'WALK_CACHE' ],
+	'huffman_set' : [ 'ASCII_ENGLISH', 'HUFFMAN_KEY', 'HUFFMAN_VALUE', 'TELEPHONE' ],
+	'verbose' : [ 'VERB_EVICT', 'VERB_FILEOPS', 'VERB_HAZARD', 'VERB_MUTEX', 'VERB_READ' ],
+
+###################################################
+# Structure flag declarations
+###################################################
+	'conn' : [ 'MEMORY_CHECK', 'SERVER_RUN', 'WORKQ_RUN' ],
+	'btree' : [ 'COLUMN', 'RDONLY', 'RLE' ],
+	'buf' : [ 'BUF_INUSE' ],
 }

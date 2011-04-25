@@ -169,6 +169,7 @@ __wt_cache_evict_server(void *arg)
 {
 	CONNECTION *conn;
 	SESSION *session;
+	WT_SESSION *wt_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
 	int ret;
@@ -188,7 +189,8 @@ __wt_cache_evict_server(void *arg)
 	 * handles are closed.
 	 */
 	session = &conn->default_session;
-	WT_ERR(conn->session(conn, 0, &session));
+	wt_session = NULL;
+	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
 
 	for (;;) {
 		WT_VERBOSE(conn,
@@ -226,7 +228,7 @@ err:		__wt_err(session, ret, "cache eviction server error");
 			__wt_free(session, er->retry);
 
 	if (session != &conn->default_session)
-		(void)__wt_session_close(session);
+		(void)wt_session->close(wt_session, NULL);
 
 	return (NULL);
 }

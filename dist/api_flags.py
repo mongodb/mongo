@@ -9,8 +9,8 @@ import os, re, sys
 from dist import compare_srcfile
 
 # Load the flags dictionary.
-import api_class
-flags = api_class.flags
+import api_data
+flags = api_data.flags
 
 flag_cnt = {}		# Dictionary [flag] : [reference count]
 flag_name = {}		# Dictionary [flag] : [name ...]

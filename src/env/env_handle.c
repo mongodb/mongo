@@ -18,10 +18,6 @@ __wt_connection_config(CONNECTION *conn)
 
 	session = &conn->default_session;
 
-	__wt_methods_connection_config_default(conn);
-	__wt_methods_connection_lockout(conn);
-	__wt_methods_connection_init_transition(conn);
-
 						/* Global mutex */
 	WT_RET(__wt_mtx_alloc(session, "CONNECTION", 0, &conn->mtx));
 

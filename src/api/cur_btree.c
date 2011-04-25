@@ -7,13 +7,6 @@
 
 #include "wt_internal.h"
 
-#define	CURSOR_API_CALL(c, s, n)	do {				\
-	(s) = (SESSION *)(c)->session;					\
-	(s)->cursor = (c);						\
-	(s)->btree = ((CURSOR_BTREE *)(c))->btree;			\
-	(s)->name = (n);						\
-} while (0)
-
 /*
  * __curbtree_first --
  *	WT_CURSOR->first method for the btree cursor type.
@@ -22,10 +15,13 @@ static int
 __curbtree_first(WT_CURSOR *cursor)
 {
 	SESSION *session;
+	int ret;
 
-	CURSOR_API_CALL(cursor, session, "first");
+	CURSOR_API_CALL(cursor, session, first);
+	ret = __wt_btcur_first((CURSOR_BTREE *)cursor);
+	API_END();
 
-	return (__wt_btcur_first((CURSOR_BTREE *)cursor));
+	return (ret);
 }
 
 /*
@@ -35,7 +31,10 @@ __curbtree_first(WT_CURSOR *cursor)
 static int
 __curbtree_last(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	SESSION *session;
+
+	CURSOR_API_CALL(cursor, session, last);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -48,9 +47,13 @@ static int
 __curbtree_next(WT_CURSOR *cursor)
 {
 	SESSION *session;
+	int ret;
 
-	CURSOR_API_CALL(cursor, session, "next");
-	return (__wt_btcur_next((CURSOR_BTREE *)cursor));
+	CURSOR_API_CALL(cursor, session, next);
+	ret = __wt_btcur_next((CURSOR_BTREE *)cursor);
+	API_END();
+
+	return (ret);
 }
 
 /*
@@ -60,7 +63,10 @@ __curbtree_next(WT_CURSOR *cursor)
 static int
 __curbtree_prev(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	SESSION *session;
+
+	CURSOR_API_CALL(cursor, session, prev);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -73,10 +79,13 @@ static int
 __curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
 	SESSION *session;
+	int ret;
 
-	CURSOR_API_CALL(cursor, session, "search_near");
-	WT_RET(__wt_btcur_search_near((CURSOR_BTREE *)cursor, lastcmp));
-	return (0);
+	CURSOR_API_CALL(cursor, session, search_near);
+	ret = __wt_btcur_search_near((CURSOR_BTREE *)cursor, lastcmp);
+	API_END();
+
+	return (ret);
 }
 
 /*
@@ -87,10 +96,13 @@ static int
 __curbtree_insert(WT_CURSOR *cursor)
 {
 	SESSION *session;
+	int ret;
 
-	/* Only support exact searches for now */
-	CURSOR_API_CALL(cursor, session, "insert");
-	return (__wt_btcur_insert((CURSOR_BTREE *)cursor));
+	CURSOR_API_CALL(cursor, session, insert);
+	ret = __wt_btcur_insert((CURSOR_BTREE *)cursor);
+	API_END();
+
+	return (ret);
 }
 
 /*
@@ -100,7 +112,10 @@ __curbtree_insert(WT_CURSOR *cursor)
 static int
 __curbtree_update(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	SESSION *session;
+
+	CURSOR_API_CALL(cursor, session, insert);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -112,7 +127,10 @@ __curbtree_update(WT_CURSOR *cursor)
 static int
 __curbtree_remove(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	SESSION *session;
+
+	CURSOR_API_CALL(cursor, session, insert);
+	API_END();
 
 	return (ENOTSUP);
 }
@@ -124,11 +142,15 @@ __curbtree_remove(WT_CURSOR *cursor)
 static int
 __curbtree_close(WT_CURSOR *cursor, const char *config)
 {
+	SESSION *session;
 	int ret;
 
+	CURSOR_API_CALL(cursor, session, close);
 	ret = 0;
 	WT_TRET(__wt_btcur_close((CURSOR_BTREE *)cursor, config));
 	WT_TRET(__wt_cursor_close(cursor, config));
+	API_END();
+
 	return (ret);
 }
 
@@ -228,8 +250,9 @@ __wt_cursor_open(SESSION *session,
 	    tablename, strlen(tablename), &btree_session);
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
-		WT_RET(conn->btree(conn, 0, &btree));
-		WT_RET(btree->open(btree, session, tablename, 0666, 0));
+		WT_RET(__wt_connection_btree(conn, &btree));
+		session->btree = btree;
+		WT_RET(__wt_btree_open(session, tablename, 0666, 0));
 
 		/*
 		 * !!! TODO read key / value formats from a table-of-tables.

@@ -54,6 +54,7 @@ typedef struct {
 
 struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
+	uint32_t refcnt;		/* Sessions with this tree open. */
 
 	TAILQ_ENTRY(__btree) q;		/* Linked list of databases */
 
@@ -110,83 +111,6 @@ struct __btree {
 	const char *dictionary;
 	/*
 	 * BTREE getter/setter variables: END
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 */
-
-	/*
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * BTREE methods: BEGIN
-	 */
-	int (*btree_compare_get)(
-	    BTREE *, int (**)(BTREE *, const WT_ITEM *, const WT_ITEM *));
-
-	int (*btree_compare_int_get)(
-	    BTREE *, int *);
-
-	int (*btree_compare_int_set)(
-	    BTREE *, int );
-
-	int (*btree_compare_set)(
-	    BTREE *, int (*)(BTREE *, const WT_ITEM *, const WT_ITEM *));
-
-	int (*btree_itemsize_get)(
-	    BTREE *, uint32_t *, uint32_t *);
-
-	int (*btree_itemsize_set)(
-	    BTREE *, uint32_t , uint32_t );
-
-	int (*btree_pagesize_get)(
-	    BTREE *, uint32_t *, uint32_t *, uint32_t *, uint32_t *, uint32_t *);
-
-	int (*btree_pagesize_set)(
-	    BTREE *, uint32_t , uint32_t , uint32_t , uint32_t , uint32_t );
-
-	int (*bulk_load)(
-	    BTREE *, int (*)(BTREE *, WT_ITEM **, WT_ITEM **));
-
-	int (*close)(
-	    BTREE *, SESSION *, uint32_t );
-
-	int (*col_del)(
-	    BTREE *, SESSION *, uint64_t , uint32_t );
-
-	int (*col_put)(
-	    BTREE *, SESSION *, uint64_t , WT_ITEM *, uint32_t );
-
-	int (*column_set)(
-	    BTREE *, uint32_t , const char *, uint32_t );
-
-	int (*dump)(
-	    BTREE *, FILE *, uint32_t );
-
-	int (*huffman_set)(
-	    BTREE *, uint8_t const *, u_int , uint32_t );
-
-	int (*open)(
-	    BTREE *, SESSION *, const char *, mode_t , uint32_t );
-
-	int (*row_del)(
-	    BTREE *, SESSION *, WT_ITEM *, uint32_t );
-
-	int (*row_put)(
-	    BTREE *, SESSION *, WT_ITEM *, WT_ITEM *, uint32_t );
-
-	int (*salvage)(
-	    BTREE *, SESSION *, uint32_t );
-
-	int (*stat_clear)(
-	    BTREE *, uint32_t );
-
-	int (*stat_print)(
-	    BTREE *, FILE *, uint32_t );
-
-	int (*sync)(
-	    BTREE *, SESSION *, uint32_t );
-
-	int (*verify)(
-	    BTREE *, SESSION *, uint32_t );
-	/*
-	 * BTREE methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
@@ -270,23 +194,6 @@ struct __session {
 	void (*msgcall)(const CONNECTION *, const char *);
 
 	FILE *msgfile;
-
-	/*
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * SESSION getter/setter variables: BEGIN
-	 */	/*
-	 * SESSION getter/setter variables: END
-	 */
-	/*
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * SESSION methods: BEGIN
-	 */
-	int (*close)(
-	    SESSION *, uint32_t );
-	/*
-	 * SESSION methods: END
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 */
 };
 
 /*******************************************
@@ -353,13 +260,11 @@ struct __connection {
 	WT_FH	  *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
-	uint32_t flags;
-
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * CONNECTION getter/setter variables: BEGIN
 	 */
-	uint32_t cache_size;
+	uint64_t cache_size;
 
 	uint32_t data_update_max;
 
@@ -379,83 +284,44 @@ struct __connection {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
-	/*
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * CONNECTION methods: BEGIN
-	 */
-	int (*btree)(
-	    CONNECTION *, uint32_t , BTREE **);
-
-	int (*cache_size_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*cache_size_set)(
-	    CONNECTION *, uint32_t );
-
-	int (*close)(
-	    CONNECTION *, uint32_t );
-
-	int (*data_update_max_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*data_update_max_set)(
-	    CONNECTION *, uint32_t );
-
-	int (*data_update_min_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*data_update_min_set)(
-	    CONNECTION *, uint32_t );
-
-	int (*hazard_size_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*hazard_size_set)(
-	    CONNECTION *, uint32_t );
-
-	int (*msgcall_get)(
-	    CONNECTION *, void (**)(const CONNECTION *, const char *));
-
-	int (*msgcall_set)(
-	    CONNECTION *, void (*)(const CONNECTION *, const char *));
-
-	int (*msgfile_get)(
-	    CONNECTION *, FILE **);
-
-	int (*msgfile_set)(
-	    CONNECTION *, FILE *);
-
-	int (*open)(
-	    CONNECTION *, const char *, mode_t , uint32_t );
-
-	int (*session)(
-	    CONNECTION *, uint32_t , SESSION **);
-
-	int (*session_size_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*session_size_set)(
-	    CONNECTION *, uint32_t );
-
-	int (*stat_clear)(
-	    CONNECTION *, uint32_t );
-
-	int (*stat_print)(
-	    CONNECTION *, FILE *, uint32_t );
-
-	int (*sync)(
-	    CONNECTION *, uint32_t );
-
-	int (*verbose_get)(
-	    CONNECTION *, uint32_t *);
-
-	int (*verbose_set)(
-	    CONNECTION *, uint32_t );
-	/*
-	 * CONNECTION methods: END
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 */
+	uint32_t flags;
 };
+
+#define	API_CONF_INIT(h, n, cfg)	const char *__cfg[] =	\
+	{ __wt_confdfl_##h##_##n, (cfg), NULL }
+
+#define	API_SESSION_INIT(s, h, n, cur, bt)				\
+	(s)->cursor = (cur);						\
+	(s)->btree = (bt);						\
+	(s)->name = #h "." #n;					\
+
+#define	API_CALL_NOCONF(s, h, n, cur, bt)	do {			\
+	API_SESSION_INIT(s, h, n, cur, bt)
+
+#define	API_CALL(s, h, n, cur, bt, cfg)	do {				\
+	API_CONF_INIT(h, n, cfg);					\
+	API_SESSION_INIT(s, h, n, cur, bt);				\
+	if (cfg != NULL)						\
+		WT_RET(__wt_config_check((s), __cfg[0], (cfg)))
+
+#define	API_END()	} while (0)
+
+#define	SESSION_API_CALL(s, n, cfg)					\
+	API_CALL(s, session, n, NULL, NULL, cfg);
+
+#define	CONNECTION_API_CALL(conn, s, n, cfg)				\
+	s = &conn->default_session;					\
+	API_CALL(s, connection, n, NULL, NULL, cfg);			\
+
+#define	CURSOR_API_CALL(cur, s, n)					\
+	(s) = (SESSION *)(cur)->session;				\
+	API_CALL_NOCONF(s, cursor, n, (cur),				\
+	    ((CURSOR_BTREE *)(cur))->btree);				\
+
+#define	CURSOR_API_CALL_CONF(cur, s, n, cfg)				\
+	(s) = (SESSION *)(c)->session;					\
+	API_CALL(s, cursor, n, cur,					\
+	    ((CURSOR_BTREE *)cursor)->btree, cfg);			\
 
 /*******************************************
  * Prototypes.
@@ -480,53 +346,31 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_DEBUG					0x00000002
 #define	WT_HUFFMAN_KEY					0x00000004
 #define	WT_HUFFMAN_VALUE				0x00000002
-#define	WT_MEMORY_CHECK					0x00000001
-#define	WT_OSWRITE					0x00000001
+#define	WT_MEMORY_CHECK					0x00000004
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
 #define	WT_RLE						0x00000001
-#define	WT_SERVER_RUN					0x00000004
+#define	WT_SERVER_RUN					0x00000002
 #define	WT_TELEPHONE					0x00000001
-#define	WT_VERB_ALL					0x00000020
 #define	WT_VERB_EVICT					0x00000010
 #define	WT_VERB_FILEOPS					0x00000008
 #define	WT_VERB_HAZARD					0x00000004
 #define	WT_VERB_MUTEX					0x00000002
 #define	WT_VERB_READ					0x00000001
 #define	WT_WALK_CACHE					0x00000001
-#define	WT_WORKQ_RUN					0x00000002
+#define	WT_WORKQ_RUN					0x00000001
 #define	WT_WRITE					0x00000001
 
+#define	WT_APIMASK_BT_DUMP				0x00000003
+#define	WT_APIMASK_BT_OPEN				0x00000001
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_BT_TREE_WALK				0x00000001
 #define	WT_APIMASK_BTREE				0x00000007
-#define	WT_APIMASK_BTREE_CLOSE				0x00000001
-#define	WT_APIMASK_BTREE_COL_DEL			0x00000000
-#define	WT_APIMASK_BTREE_COL_PUT			0x00000000
-#define	WT_APIMASK_BTREE_COLUMN_SET			0x00000001
-#define	WT_APIMASK_BTREE_DUMP				0x00000003
-#define	WT_APIMASK_BTREE_HUFFMAN_SET			0x0000000f
-#define	WT_APIMASK_BTREE_OPEN				0x00000003
-#define	WT_APIMASK_BTREE_ROW_DEL			0x00000000
-#define	WT_APIMASK_BTREE_ROW_PUT			0x00000000
-#define	WT_APIMASK_BTREE_SALVAGE			0x00000000
-#define	WT_APIMASK_BTREE_STAT_CLEAR			0x00000000
-#define	WT_APIMASK_BTREE_STAT_PRINT			0x00000000
-#define	WT_APIMASK_BTREE_SYNC				0x00000001
-#define	WT_APIMASK_BTREE_VERIFY				0x00000000
 #define	WT_APIMASK_BUF					0x00000001
 #define	WT_APIMASK_CONN					0x00000007
-#define	WT_APIMASK_CONNECTION_BTREE			0x00000000
-#define	WT_APIMASK_CONNECTION_CLOSE			0x00000000
-#define	WT_APIMASK_CONNECTION_OPEN			0x00000000
-#define	WT_APIMASK_CONNECTION_SESSION			0x00000000
-#define	WT_APIMASK_CONNECTION_STAT_CLEAR		0x00000000
-#define	WT_APIMASK_CONNECTION_STAT_PRINT		0x00000000
-#define	WT_APIMASK_CONNECTION_SYNC			0x00000000
-#define	WT_APIMASK_CONNECTION_VERBOSE_SET		0x0000003f
-#define	WT_APIMASK_SESSION_CLOSE			0x00000000
-#define	WT_APIMASK_WIREDTIGER_CONN_INIT			0x00000001
+#define	WT_APIMASK_HUFFMAN_SET				0x0000000f
+#define	WT_APIMASK_VERBOSE				0x0000001f
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api_flags.py.

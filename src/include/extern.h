@@ -6,16 +6,6 @@
 #define	WT_GCC_ATTRIBUTE(x)
 #endif
 
-void __wt_methods_btree_config_default(BTREE *btree);
-void __wt_methods_btree_lockout(BTREE *btree);
-void __wt_methods_btree_init_transition(BTREE *btree);
-void __wt_methods_btree_open_transition(BTREE *btree);
-void __wt_methods_connection_config_default(CONNECTION *connection);
-void __wt_methods_connection_lockout(CONNECTION *connection);
-void __wt_methods_connection_open_transition(CONNECTION *connection);
-void __wt_methods_connection_init_transition(CONNECTION *connection);
-void __wt_methods_session_lockout(SESSION *session);
-void __wt_methods_session_init_transition(SESSION *session);
 int __wt_config_initn(WT_CONFIG *conf, const char *str, size_t len);
 int __wt_config_init(WT_CONFIG *conf, const char *str);
 int __wt_config_next(WT_CONFIG *conf,
@@ -40,23 +30,24 @@ int __wt_config_checklist(SESSION *session,
 int __wt_config_check(SESSION *session,
     const char *defaults,
     const char *config);
-const char *__wt_config_def_add_collator;
-const char *__wt_config_def_add_cursor_type;
-const char *__wt_config_def_add_extractor;
-const char *__wt_config_def_begin_transaction;
-const char *__wt_config_def_checkpoint;
-const char *__wt_config_def_commit_transaction;
-const char *__wt_config_def_connection_close;
-const char *__wt_config_def_create_table;
-const char *__wt_config_def_cursor_close;
-const char *__wt_config_def_load_extension;
-const char *__wt_config_def_open_cursor;
-const char *__wt_config_def_rename_table;
-const char *__wt_config_def_rollback_transaction;
-const char *__wt_config_def_session_close;
-const char *__wt_config_def_truncate_table;
-const char *__wt_config_def_verify_table;
-const char *__wt_config_def_wiredtiger_open;
+const char *__wt_confdfl_connection_add_collator;
+const char *__wt_confdfl_connection_add_cursor_type;
+const char *__wt_confdfl_connection_add_extractor;
+const char *__wt_confdfl_connection_close;
+const char *__wt_confdfl_connection_load_extension;
+const char *__wt_confdfl_connection_open_session;
+const char *__wt_confdfl_cursor_close;
+const char *__wt_confdfl_session_begin_transaction;
+const char *__wt_confdfl_session_checkpoint;
+const char *__wt_confdfl_session_close;
+const char *__wt_confdfl_session_commit_transaction;
+const char *__wt_confdfl_session_create_table;
+const char *__wt_confdfl_session_open_cursor;
+const char *__wt_confdfl_session_rename_table;
+const char *__wt_confdfl_session_rollback_transaction;
+const char *__wt_confdfl_session_truncate_table;
+const char *__wt_confdfl_session_verify_table;
+const char *__wt_confdfl_wiredtiger_open;
 int __wt_session_add_btree(SESSION *session,
     BTREE *btree,
     const char *key_format,
@@ -224,12 +215,6 @@ int __wt_insert_serial_func(SESSION *session);
 int __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
 int __wt_update_serial_func(SESSION *session);
 int __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
-int __wt_btree_btree_compare_int_set_verify(BTREE *btree,
-    int btree_compare_int);
-int __wt_btree_column_set_verify( BTREE *btree,
-    uint32_t fixed_len,
-    const char *dictionary,
-    uint32_t flags);
 int __wt_connection_btree(CONNECTION *conn, BTREE **btreep);
 int __wt_btree_destroy(BTREE *btree);
 int __wt_btree_lockout_err(BTREE *btree);
@@ -242,19 +227,9 @@ int __wt_btree_open(SESSION *session,
     const char *name,
     mode_t mode,
     uint32_t flags);
-int __wt_btree_close(SESSION *session, uint32_t flags);
+int __wt_btree_close(SESSION *session);
 int __wt_btree_stat_print(SESSION *session, FILE *stream);
 int __wt_btree_stat_clear(BTREE *btree);
-int __wt_btree_sync(SESSION *session, uint32_t flags);
-int __wt_connection_cache_size_set_verify(CONNECTION *conn,
-    uint32_t cache_size);
-int __wt_connection_cache_hash_size_set_verify(CONNECTION *conn,
-    uint32_t hash_size);
-int __wt_connection_hazard_size_set_verify(CONNECTION *conn,
-    uint32_t hazard_size);
-int __wt_connection_session_size_set_verify(CONNECTION *conn,
-    uint32_t toc_size);
-int __wt_connection_verbose_set_verify(CONNECTION *conn, uint32_t verbose);
 int __wt_library_init(void);
 int __wt_breakpoint(void);
 void __wt_attach(SESSION *session);
@@ -268,17 +243,10 @@ int __wt_connection_open(CONNECTION *conn, const char *home, mode_t mode);
 int __wt_connection_close(CONNECTION *conn);
 int __wt_connection_session(CONNECTION *conn, SESSION **sessionp);
 int __wt_session_close(SESSION *session);
-int __wt_session_api_set(CONNECTION *conn,
-    const char *name,
-    BTREE *btree,
-    SESSION **sessionp,
-    int *islocal);
-int __wt_session_api_clr(SESSION *session, const char *name, int islocal);
 void __wt_session_dump(SESSION *session);
 int __wt_connection_stat_print(CONNECTION *conn, FILE *stream);
 int __wt_connection_stat_clear(CONNECTION *conn);
 void __wt_stat_print(WT_STATS *s, FILE *stream);
-int __wt_connection_sync(CONNECTION *conn);
 void *__wt_workq_srvr(void *arg);
 int __wt_log_put(SESSION *session, WT_LOGREC_DESC *recdesc, ...);
 int __wt_log_printf(SESSION *session,
@@ -336,22 +304,20 @@ void __wt_assert( SESSION *session,
     const char *check,
     const char *file_name,
     int line_number);
-int __wt_api_args(SESSION *session, const char *name);
+int __wt_api_args(SESSION *session);
 int __wt_api_arg_min(SESSION *session,
-    const char *name,
     const char *arg_name,
-    uint32_t v,
-    uint32_t min);
+    uint64_t v,
+    uint64_t min);
 int __wt_api_arg_max(SESSION *session,
-    const char *name,
     const char *arg_name,
-    uint32_t v,
-    uint32_t max);
-int __wt_file_method_type(SESSION *session, const char *name, int column_err);
+    uint64_t v,
+    uint64_t max);
+int __wt_file_method_type(SESSION *session, int column_err);
 int __wt_file_wrong_fixed_size(SESSION *session,
     uint32_t len,
     uint32_t config_len);
-int __wt_file_readonly(SESSION *session, const char *name);
+int __wt_file_readonly(SESSION *session);
 int __wt_file_format(SESSION *session);
 int __wt_file_item_too_big(SESSION *session);
 int __wt_session_lockout(SESSION *session);

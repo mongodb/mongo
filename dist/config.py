@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os, re, sys, textwrap
-import config_data
+import api_data
 from dist import compare_srcfile
 
 # Temporary file.
@@ -29,12 +29,12 @@ for line in open(f, 'r'):
 		continue
 
 	prefix, config_name = m.groups()
-	if config_name not in config_data.config_types:
+	if config_name not in api_data.methods:
 		print >>sys.stderr, "Missing configuration for " + config_name
 		continue
 
 	width = 80 - len(prefix.expandtabs())
-	for c in config_data.config_types[config_name]:
+	for c in api_data.methods[config_name].config:
 		desc = textwrap.dedent(c.desc).replace(',', '\\,')
 		name = c.name
 		if '.' in name:
@@ -62,11 +62,12 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 w = textwrap.TextWrapper(width=72)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
-for name in sorted(config_data.config_types.keys()):
-	ctype = config_data.config_types[name]
+for name in sorted(api_data.methods.keys()):
+	ctype = api_data.methods[name].config
+	name = name.replace('.', '_')
 	tfile.write('''
 const char *
-__wt_config_def_%(name)s =
+__wt_confdfl_%(name)s =
 %(config)s;
 ''' % {
 	'name' : name,

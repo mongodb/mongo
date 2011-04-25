@@ -47,9 +47,6 @@ __wt_connection_session(CONNECTION *conn, SESSION **sessionp)
 	WT_RET(__wt_mtx_alloc(
 	    &conn->default_session, "session", 1, &session->mtx));
 
-	__wt_methods_session_lockout(session);
-	__wt_methods_session_init_transition(session);
-
 	/* Make the entry visible to the workQ. */
 	conn->sessions[conn->toc_cnt++] = session;
 	WT_MEMORY_FLUSH;
@@ -102,58 +99,6 @@ __wt_session_close(SESSION *session)
 	WT_MEMORY_FLUSH;
 
 	return (ret);
-}
-
-/*
- * __wt_session_api_set --
- *	Pair SESSION and BTREE handle, allocating the SESSION as necessary.
- */
-int
-__wt_session_api_set(CONNECTION *conn, const char *name, BTREE *btree,
-    SESSION **sessionp, int *islocal)
-{
-	SESSION *session;
-
-	/*
-	 * We pass around sessions internally in the Btree, (rather than a
-	 * BTREE), because the BTREE's are free-threaded, and the sessions are
-	 * per-thread.  Lots of the API calls don't require the application to
-	 * allocate and manage the session, which means we have to do it for
-	 * them.
-	 *
-	 * SESSIONs always reference a BTREE handle, and we do that here, as
-	 * well.
-	 */
-	if ((session = *sessionp) == NULL) {
-		WT_RET(conn->session(conn, 0, sessionp));
-		session = *sessionp;
-		*islocal = 1;
-	} else
-		*islocal = 0;
-	session->btree = btree;
-	session->name = name;
-	return (0);
-}
-
-/*
- * __wt_session_api_clr --
- *	Clear the SESSION, freeing it if it was allocated by the library.
- */
-int
-__wt_session_api_clr(SESSION *session, const char *name, int islocal)
-{
-	/*
-	 * The session should hold no more hazard references; this is a
-	 * diagnostic check, but it's cheap so we do it all the time.
-	 */
-	__wt_hazard_empty(session, name);
-
-	if (islocal)
-		return (session->close(session, 0));
-
-	session->btree = NULL;
-	session->name = NULL;
-	return (0);
 }
 
 #ifdef HAVE_DIAGNOSTIC

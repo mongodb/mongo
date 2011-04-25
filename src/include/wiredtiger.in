@@ -124,6 +124,7 @@ typedef struct {
 	uint32_t mem_size;
 	void *mem;
 
+#define	WT_BUF_INUSE					0x00000001
 	uint32_t flags;
 } WT_BUF;
 /*!
@@ -344,7 +345,7 @@ struct wt_cursor {
 	 * @skipline cursor->close
 	 *
 	 * @param cursor the cursor handle
-	 * @configstart{cursor_close, maintained in dist/config_data.py}
+	 * @configstart{cursor.close, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -401,7 +402,7 @@ struct wt_session {
 	 * @skipline session->close
 	 *
 	 * @param session the session handle
-	 * @configstart{session_close, maintained in dist/config_data.py}
+	 * @configstart{session.close, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -454,7 +455,7 @@ struct wt_session {
 	 * @param uri the data source on which the cursor operates
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
-	 * @configstart{open_cursor, maintained in dist/config_data.py}
+	 * @configstart{session.open_cursor, maintained in dist/config_data.py}
 	 * @config{isolation, the isolation level for this cursor\, one of
 	 * "snapshot" or "read-committed" or "read-uncommitted".  Ignored for
 	 * transactional cursors}
@@ -483,7 +484,7 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
-	 * @configstart{create_table, maintained in dist/config_data.py}
+	 * @configstart{session.create_table, maintained in dist/config_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  The number of entries must
@@ -531,7 +532,7 @@ struct wt_session {
 	 * @param session the session handle
 	 * @param oldname the current name of the table
 	 * @param newname the new name of the table
-	 * @configstart{rename_table, maintained in dist/config_data.py}
+	 * @configstart{session.rename_table, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -545,7 +546,7 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
-	 * @configstart{rename_table, maintained in dist/config_data.py}
+	 * @configstart{session.rename_table, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -566,7 +567,7 @@ struct wt_session {
 	 * operation.  If <code>NULL</code>, the truncate continues to the end
 	 * of the table
 	 * @param name the name of the table
-	 * @configstart{truncate_table, maintained in dist/config_data.py}
+	 * @configstart{session.truncate_table, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -582,7 +583,7 @@ struct wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the name of the table
-	 * @configstart{verify_table, maintained in dist/config_data.py}
+	 * @configstart{session.verify_table, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -608,7 +609,7 @@ struct wt_session {
 	 * @skipline ->begin_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart{begin_transaction, maintained in dist/config_data.py}
+	 * @configstart{session.begin_transaction, maintained in dist/config_data.py}
 	 * @config{isolation, the isolation level for this transaction\, one of
 	 * "serializable"\, "snapshot"\, "read-committed" or "read-uncommitted";
 	 * default "serializable"}
@@ -634,7 +635,7 @@ struct wt_session {
 	 * @skipline ->commit_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart{commit_transaction, maintained in dist/config_data.py}
+	 * @configstart{session.commit_transaction, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -651,7 +652,7 @@ struct wt_session {
 	 * @skipline ->rollback_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart{rollback_transaction, maintained in dist/config_data.py}
+	 * @configstart{session.rollback_transaction, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -663,7 +664,7 @@ struct wt_session {
 	 * @skipline ->checkpoint
 	 *
 	 * @param session the session handle
-	 * @configstart{checkpoint, maintained in dist/config_data.py}
+	 * @configstart{session.checkpoint, maintained in dist/config_data.py}
 	 * @config{archive, remove log files no longer required for
 	 * transactional durabilty}
 	 * @config{force, write a new checkpoint even if nothing has changed
@@ -699,7 +700,7 @@ struct wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
-	 * @configstart{load_extension, maintained in dist/config_data.py}
+	 * @configstart{connection.load_extension, maintained in dist/config_data.py}
 	 * @config{entry, the entry point of the extension}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades}
@@ -727,7 +728,7 @@ struct wt_connection {
 	 * WT_SESSION::open_cursor
 	 * @param ctype the application-supplied code to manage cursors of
 	 * this type
-	 * @configstart{add_cursor_type, maintained in dist/config_data.py}
+	 * @configstart{connection.add_cursor_type, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -751,7 +752,7 @@ struct wt_connection {
 	 * @param name the name of the collation to be used in calls to
 	 * 	WT_SESSION::create_table
 	 * @param collator the application-supplied collation handler
-	 * @configstart{add_collator, maintained in dist/config_data.py}
+	 * @configstart{connection.add_collator, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -775,7 +776,7 @@ struct wt_connection {
 	 * @param name the name of the extractor to be used in calls to
 	 * 	WT_SESSION::create_table
 	 * @param extractor the application-supplied extractor
-	 * @configstart{add_extractor, maintained in dist/config_data.py}
+	 * @configstart{connection.add_extractor, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -790,7 +791,7 @@ struct wt_connection {
 	 * @skipline conn->close
 	 *
 	 * @param connection the connection handle
-	 * @configstart{connection_close, maintained in dist/config_data.py}
+	 * @configstart{connection.close, maintained in dist/config_data.py}
 	 * @configend
 	 * @errors
 	 */

@@ -38,9 +38,6 @@ __wt_connection_open(CONNECTION *conn, const char *home, mode_t mode)
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(conn));
 
-	/* Transition to the open state. */
-	__wt_methods_connection_open_transition(conn);
-
 	/* Start worker threads. */
 	F_SET(conn, WT_WORKQ_RUN | WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
@@ -65,18 +62,21 @@ int
 __wt_connection_close(CONNECTION *conn)
 {
 	BTREE *btree;
+	SESSION *session;
 	WT_FH *fh;
 	int ret, secondary_err;
 
 	WT_CONN_FCHK_RET(conn, "Env.close", conn->flags, WT_APIMASK_CONN, ret);
 
+	session = &conn->default_session;
 	ret = secondary_err = 0;
 
 	/* Complain if BTREE handles weren't closed. */
 	while ((btree = TAILQ_FIRST(&conn->dbqh)) != NULL) {
-		__wt_errx(&conn->default_session,
-		    "Env handle has open Db handles: %s", btree->name);
-		WT_TRET(btree->close(btree, &conn->default_session, 0));
+		__wt_errx(session,
+		    "Connection has open btree handles: %s", btree->name);
+		session->btree = btree;
+		WT_TRET(__wt_btree_close(session));
 		secondary_err = WT_ERROR;
 	}
 

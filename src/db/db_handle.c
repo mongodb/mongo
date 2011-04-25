@@ -64,10 +64,6 @@ __wt_btree_config(BTREE *btree)
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 	WT_RET(__wt_stat_alloc_btree_file_stats(session, &btree->fstats));
 
-	__wt_methods_btree_config_default(btree);
-	__wt_methods_btree_lockout(btree);
-	__wt_methods_btree_init_transition(btree);
-
 	return (0);
 }
 

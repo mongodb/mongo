@@ -1,18 +1,10 @@
-# Read the api_err file and output C #defines and associated error code.
+# Output C #defines for errors into wiredtiger.in and the associated error
+# message code in strerror.c.
 
 import re
+
+import api_data
 from dist import compare_srcfile
-
-# Read the source file and build a list of items.
-def err_build():
-	l = []
-	err_re = re.compile(r'\b(WT_(?:[A-Z]|_)+)\t(.*)')
-	for match in err_re.finditer(open('api_err', 'r').read()):
-		l.append(match.groups())
-	return l
-
-# Read the source file and build a list of items.
-list = err_build()
 
 # Update the #defines in the wiredtiger.in file.
 tmp_file = '__tmp'
@@ -32,7 +24,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 		# package, so use an uncommon range, specifically, -31,800 to
 		# -31,999.
 		v = -31800
-		for name, msg in list:
+		for name, msg in api_data.errors:
 			tfile.write('/*! %s. */\n' % (msg[0].upper() + msg[1:]))
 			tfile.write('#define\t%s\t%d\n' % (name, v))
 			v -= 1
@@ -63,7 +55,7 @@ wiredtiger_strerror(int error)
 	switch (error) {
 ''')
 
-for l in list:
+for l in api_data.errors:
 	tfile.write('\tcase ' + l[0] + ':\n')
 	tfile.write('\t\treturn ("' + l[0] + ': ' + l[1] + '");\n')
 
