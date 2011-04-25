@@ -823,8 +823,9 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 	else
 		fprintf(fp, "\t%lu", (u_long)ref->addr);
 
-	fprintf(fp, "/%lu: %s\n", (u_long)ref->size, s);
+	fprintf(fp, "/%lu: %s", (u_long)ref->size, s);
 	if (ref->state == WT_REF_MEM)
 		fprintf(fp, "(%p)", ref->page);
+	fprintf(fp, "\n");
 }
 #endif
