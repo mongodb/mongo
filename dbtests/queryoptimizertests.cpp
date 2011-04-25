@@ -879,12 +879,12 @@ namespace QueryOptimizerTests {
                 IndexBase::client_.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) << "b" << 1 ) );
                 // Valid ranges match possible for both indexes.
                 FieldRangeSetPair frsp1( ns(), BSON( "a" << GT << 1 << LT << 4 << "b" << GT << 1 << LT << 4 ) );
-                ASSERT( frsp1.matchPossibleForIndex( nsd(), a ) );
-                ASSERT( frsp1.matchPossibleForIndex( nsd(), b ) );
+                ASSERT( frsp1.matchPossibleForIndex( nsd(), a, BSON( "a" << 1 ) ) );
+                ASSERT( frsp1.matchPossibleForIndex( nsd(), b, BSON( "b" << 1 ) ) );
                 // Single key invalid range means match impossible for single key index.
                 FieldRangeSetPair frsp2( ns(), BSON( "a" << GT << 4 << LT << 1 << "b" << GT << 4 << LT << 1 ) );
-                ASSERT( frsp2.matchPossibleForIndex( nsd(), a ) );
-                ASSERT( !frsp2.matchPossibleForIndex( nsd(), b ) );
+                ASSERT( frsp2.matchPossibleForIndex( nsd(), a, BSON( "a" << 1 ) ) );
+                ASSERT( !frsp2.matchPossibleForIndex( nsd(), b, BSON( "b" << 1 ) ) );
             }
         };
         
@@ -1538,7 +1538,7 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
                 s.runOp( op );
-                pair< BSONObj, long long > best = s.frsp().bestIndexForPatterns( BSON( "b" << 1 ) );
+                pair< BSONObj, long long > best = QueryUtilIndexed::bestIndexForPatterns( s.frsp(), BSON( "b" << 1 ) );
                 ASSERT( fromjson( "{$natural:1}" ).woCompare( best.first ) == 0 );
                 ASSERT_EQUALS( 1, best.second );
 

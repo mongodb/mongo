@@ -248,16 +248,9 @@ namespace mongo {
          * @return false if a match is impossible on the specified index.
          * @param idxNo -1 for non index scan.
          */
-        bool matchPossibleForIndex( NamespaceDetails *d, int idxNo ) const;
-        /** @return true if the index may be useful according to its KeySpec. */
-        bool indexUseful( NamespaceDetails *d, int idxNo, const BSONObj &order ) const;
+        bool matchPossibleForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const;
         
         const char *ns() const { return _singleKey.ns(); }
-
-        /** Clear any indexes recorded as the best for either the single or multi key pattern. */
-        void clearIndexesForPatterns( const BSONObj &order ) const;
-        /** Return a recorded best index for the single or multi key pattern. */
-        pair< BSONObj, long long > bestIndexForPatterns( const BSONObj &order ) const;
 
         string getSpecial() const { return _singleKey.getSpecial(); }
 
@@ -281,10 +274,11 @@ namespace mongo {
         void assertValidIndex( const NamespaceDetails *d, int idxNo ) const;
         void assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const;
         /** matchPossibleForIndex() must be true. */
-        BSONObj simplifiedQueryForIndex( NamespaceDetails *d, int idxNo ) const;        
+        BSONObj simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const;        
         FieldRangeSet _singleKey;
         FieldRangeSet _multiKey;
         friend class FieldRangeOrSet;
+        friend class QueryUtilIndexed;
     };
     
     class IndexSpec;
@@ -389,7 +383,7 @@ namespace mongo {
          */
         bool orFinished() const { return _orFound && _orSets.empty(); }
         /** Iterates to the next $or clause by removing the current $or clause. */
-        void popOrClause( NamespaceDetails *nsd, int idxNo );
+        void popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern );
         void popOrClauseSingleKey();
         /** @return FieldRangeSetPair for the current $or clause. */
         FieldRangeSetPair *topFrsp() const;
@@ -404,17 +398,16 @@ namespace mongo {
         string getSpecial() const { return _baseSet.getSpecial(); }
 
         bool moreOrClauses() const { return !_orSets.empty(); }
-        
-        bool uselessOr( NamespaceDetails *d, int hintIdx ) const;
     private:
         void assertMayPopOrClause();
-        void popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d = 0, int idxNo = -1 );
+        void popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d = 0, int idxNo = -1, const BSONObj &keyPattern = BSONObj() );
         FieldRangeSetPair _baseSet;
         list<FieldRangeSetPair> _orSets;
         list<FieldRangeSetPair> _originalOrSets;
         // ensure memory is owned
         list<FieldRangeSetPair> _oldOrSets;
         bool _orFound;
+        friend class QueryUtilIndexed;
     };
 
     /** returns a string that when used as a matcher, would match a super set of regex()

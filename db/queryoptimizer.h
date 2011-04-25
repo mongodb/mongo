@@ -433,4 +433,21 @@ namespace mongo {
      */
     shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
 
+    /**
+     * Add-on functionality for queryutil classes requiring access to indexing
+     * functionality not currently linked to mongos.
+     * TODO Clean this up a bit, possibly with separate sharded and non sharded
+     * implementations for the appropriate queryutil classes or by pulling index
+     * related functionality into separate wrapper classes.
+     */
+    struct QueryUtilIndexed {
+        /** @return true if the index may be useful according to its KeySpec. */
+        static bool indexUseful( const FieldRangeSetPair &frsp, NamespaceDetails *d, int idxNo, const BSONObj &order );
+        /** Clear any indexes recorded as the best for either the single or multi key pattern. */
+        static void clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );
+        /** Return a recorded best index for the single or multi key pattern. */
+        static pair< BSONObj, long long > bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );        
+        static bool uselessOr( const FieldRangeOrSet& fros, NamespaceDetails *d, int hintIdx );
+    };
+    
 } // namespace mongo

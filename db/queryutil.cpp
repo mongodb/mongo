@@ -1034,7 +1034,7 @@ namespace mongo {
                  _multiKey.matchPossible() && _multiKey.nNontrivialRanges() == 0;
     }
     
-    bool FieldRangeSetPair::matchPossibleForIndex( NamespaceDetails *d, int idxNo ) const {
+    bool FieldRangeSetPair::matchPossibleForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
         assertValidIndexOrNoIndex( d, idxNo );
         if ( !matchPossible() ) {
             return false;
@@ -1043,47 +1043,7 @@ namespace mongo {
             // multi key matchPossible() is true, so return true.
             return true;   
         }
-        return frsForIndex( d, idxNo ).matchPossibleForIndex( d->idx( idxNo ).keyPattern() );
-    }
-    
-    bool FieldRangeSetPair::indexUseful( NamespaceDetails *d, int idxNo, const BSONObj &order ) const {
-        assertValidIndex( d, idxNo );
-        if ( !matchPossibleForIndex( d, idxNo ) ) {
-            // No matches are possible in the index so the index may be useful.
-            return true;   
-        }
-        return d->idx( idxNo ).getSpec().suitability( simplifiedQueryForIndex( d, idxNo ), order ) != USELESS;
-    }
-    
-    void FieldRangeSetPair::clearIndexesForPatterns( const BSONObj &order ) const {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns() );
-        nsd.registerIndexForPattern( _singleKey.pattern( order ), BSONObj(), 0 );
-        nsd.registerIndexForPattern( _multiKey.pattern( order ), BSONObj(), 0 );
-    }
-    
-    pair< BSONObj, long long > FieldRangeSetPair::bestIndexForPatterns( const BSONObj &order ) const {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns() );
-        // TODO Maybe it would make sense to return the index with the lowest
-        // nscanned if there are two possibilities.
-        if ( _singleKey.matchPossible() ) {
-            QueryPattern pattern = _singleKey.pattern( order );
-            BSONObj oldIdx = nsd.indexForPattern( pattern );
-            if ( !oldIdx.isEmpty() ) {
-                long long oldNScanned = nsd.nScannedForPattern( pattern );
-                return make_pair( oldIdx, oldNScanned );
-            }
-        }
-        if ( _multiKey.matchPossible() ) {
-            QueryPattern pattern = _multiKey.pattern( order );
-            BSONObj oldIdx = nsd.indexForPattern( pattern );
-            if ( !oldIdx.isEmpty() ) {
-                long long oldNScanned = nsd.nScannedForPattern( pattern );
-                return make_pair( oldIdx, oldNScanned );
-            }
-        }
-        return make_pair( BSONObj(), 0 );
+        return frsForIndex( d, idxNo ).matchPossibleForIndex( keyPattern );
     }
     
     FieldRangeSetPair &FieldRangeSetPair::operator&=( const FieldRangeSetPair &other ) {
@@ -1099,18 +1059,18 @@ namespace mongo {
     }    
     
     void FieldRangeSetPair::assertValidIndex( const NamespaceDetails *d, int idxNo ) const {
-        massert( 14029, "FieldRangeSetPair invalid index specified", idxNo >= 0 && idxNo < d->nIndexes );   
+        massert( 14048, "FieldRangeSetPair invalid index specified", idxNo >= 0 && idxNo < d->nIndexes );   
     }
     
     void FieldRangeSetPair::assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const {
-        massert( 14030, "FieldRangeSetPair invalid index specified", idxNo >= -1 );
+        massert( 14049, "FieldRangeSetPair invalid index specified", idxNo >= -1 );
         if ( idxNo >= 0 ) {
             assertValidIndex( d, idxNo );   
         }
     }    
     
-    BSONObj FieldRangeSetPair::simplifiedQueryForIndex( NamespaceDetails *d, int idxNo ) const {
-        return frsForIndex( d, idxNo ).simplifiedQuery( d->idx( idxNo ).keyPattern() );
+    BSONObj FieldRangeSetPair::simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
+        return frsForIndex( d, idxNo ).simplifiedQuery( keyPattern );
     }    
     
     bool FieldRangeVector::matchesElement( const BSONElement &e, int i, bool forward ) const {
@@ -1389,16 +1349,16 @@ namespace mongo {
         massert( 13274, "no or clause to pop", !orFinished() );        
     }
     
-    void FieldRangeOrSet::popOrClause( NamespaceDetails *nsd, int idxNo ) {
+    void FieldRangeOrSet::popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern ) {
         assertMayPopOrClause();
         auto_ptr<FieldRangeSet> holder;
         const FieldRangeSet *toDiff = &_originalOrSets.front().frsForIndex( nsd, idxNo );
-        BSONObj indexSpec = ( idxNo >= 0 ) ? nsd->idx( idxNo ).keyPattern() : BSONObj();
+        BSONObj indexSpec = keyPattern;
         if ( !indexSpec.isEmpty() && toDiff->matchPossibleForIndex( indexSpec ) ) {
             holder.reset( toDiff->subset( indexSpec ) );
             toDiff = holder.get();
         }
-        popOrClause( toDiff, nsd, idxNo );
+        popOrClause( toDiff, nsd, idxNo, keyPattern );
     }
     
     void FieldRangeOrSet::popOrClauseSingleKey() {
@@ -1417,7 +1377,7 @@ namespace mongo {
      * empty we do not constrain the previous clause's ranges using index keys,
      * which may reduce opportunities for range elimination.
      */
-    void FieldRangeOrSet::popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo ) {
+    void FieldRangeOrSet::popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) {
         list<FieldRangeSetPair>::iterator i = _orSets.begin();
         list<FieldRangeSetPair>::iterator j = _originalOrSets.begin();
         ++i;
@@ -1425,7 +1385,7 @@ namespace mongo {
         while( i != _orSets.end() ) {
             *i -= *toDiff;
             // Check if match is possible at all, and if it is possible for the recently scanned index.
-            if( !i->matchPossible() || ( d && !i->matchPossibleForIndex( d, idxNo ) ) ) {
+            if( !i->matchPossible() || ( d && !i->matchPossibleForIndex( d, idxNo, keyPattern ) ) ) {
                 i = _orSets.erase( i );
                 j = _originalOrSets.erase( j );
             }
@@ -1437,29 +1397,6 @@ namespace mongo {
         _oldOrSets.push_front( _orSets.front() );
         _orSets.pop_front();
         _originalOrSets.pop_front();
-    }
-    
-    bool FieldRangeOrSet::uselessOr( NamespaceDetails *d, int hintIdx ) const {
-        for( list<FieldRangeSetPair>::const_iterator i = _originalOrSets.begin(); i != _originalOrSets.end(); ++i ) {
-            if ( hintIdx != -1 ) {
-                if ( !i->indexUseful( d, hintIdx, BSONObj() ) ) {
-                    return true;   
-                }
-            }
-            else {
-                bool useful = false;
-                for( int j = 0; j < d->nIndexes; ++j ) {
-                    if ( i->indexUseful( d, j, BSONObj() ) ) {
-                        useful = true;
-                        break;
-                    }
-                }
-                if ( !useful ) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
     
     struct SimpleRegexUnitTest : UnitTest {

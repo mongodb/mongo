@@ -407,7 +407,7 @@ namespace mongo {
         }
         switch( _findingStartMode ) {
             case Initial: {
-                if ( !_matcher->matches( _findingStartCursor->currKey(), _findingStartCursor->currLoc() ) ) {
+                if ( !_matcher->matchesCurrent( _findingStartCursor->c() ) ) {
                     _findingStart = false; // found first record out of query range, so scan normally
                     _c = _qp.newCursor( _findingStartCursor->currLoc() );
                     destroyClientCursor();
@@ -424,7 +424,7 @@ namespace mongo {
                 return;
             }
             case FindExtent: {
-                if ( !_matcher->matches( _findingStartCursor->currKey(), _findingStartCursor->currLoc() ) ) {
+                if ( !_matcher->matchesCurrent( _findingStartCursor->c() ) ) {
                     _findingStartMode = InExtent;
                     return;
                 }
@@ -440,7 +440,7 @@ namespace mongo {
                 return;
             }
             case InExtent: {
-                if ( _matcher->matches( _findingStartCursor->currKey(), _findingStartCursor->currLoc() ) ) {
+                if ( _matcher->matchesCurrent( _findingStartCursor->c() ) ) {
                     _findingStart = false; // found first record in query range, so scan normally
                     _c = _qp.newCursor( _findingStartCursor->currLoc() );
                     destroyClientCursor();

@@ -24,6 +24,7 @@
 #include "../client/parallel.h"
 #include "../db/commands.h"
 #include "../db/query.h"
+#include "../db/queryutil.h"
 
 #include "config.h"
 #include "chunk.h"

@@ -430,7 +430,7 @@ doneCheckOrder:
         }
 
         if ( _honorRecordedPlan ) {
-            pair< BSONObj, long long > best = _frsp->bestIndexForPatterns( _order );
+            pair< BSONObj, long long > best = QueryUtilIndexed::bestIndexForPatterns( *_frsp, _order );
             BSONObj bestIndex = best.first;
             long long oldNScanned = best.second;
             if ( !bestIndex.isEmpty() ) {
@@ -483,14 +483,14 @@ doneCheckOrder:
         QueryPlanPtr optimalPlan;
         for( int i = 0; i < d->nIndexes; ++i ) {
             if ( normalQuery ) {
-                if ( !_frsp->matchPossibleForIndex( d, i ) ) {
+                if ( !_frsp->matchPossibleForIndex( d, i, d->idx( i ).keyPattern() ) ) {
                     // If no match is possible, only generate a trival plan that won't
                     // scan any documents.
                     QueryPlanPtr p( new QueryPlan( d, i, *_frsp, *_originalFrsp, _originalQuery, _order ) );
                     addPlan( p, checkFirst );
                     return;
                 }
-                if ( !_frsp->indexUseful( d, i, _order ) ) {
+                if ( !QueryUtilIndexed::indexUseful( *_frsp, d, i, _order ) ) {
                     continue;
                 }
             }
@@ -523,7 +523,7 @@ doneCheckOrder:
             // _plans.size() > 1 if addOtherPlans was called in Runner::run().
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
-            _frsp->clearIndexesForPatterns( _order );
+            QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
         Runner r( *this, op );
@@ -783,7 +783,7 @@ doneCheckOrder:
         if ( ret->qp().willScanTable() ) {
             _tableScanned = true;
         }
-        _fros.popOrClause( ret->qp().nsd(), ret->qp().idxNo() );
+        _fros.popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
         return ret;
     }
 
@@ -805,9 +805,9 @@ doneCheckOrder:
             if ( !id ) {
                 return true;
             }
-            return _fros.uselessOr( nsd, nsd->idxNo( *id ) );
+            return QueryUtilIndexed::uselessOr( _fros, nsd, nsd->idxNo( *id ) );
         }
-        return _fros.uselessOr( nsd, -1 );        
+        return QueryUtilIndexed::uselessOr( _fros, nsd, -1 );
     }
     
     MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
@@ -1034,4 +1034,67 @@ doneCheckOrder:
         }
     }
 
+    bool QueryUtilIndexed::indexUseful( const FieldRangeSetPair &frsp, NamespaceDetails *d, int idxNo, const BSONObj &order ) {
+        frsp.assertValidIndex( d, idxNo );
+        if ( !frsp.matchPossibleForIndex( d, idxNo, d->idx( idxNo ).keyPattern() ) ) {
+            // No matches are possible in the index so the index may be useful.
+            return true;   
+        }
+        return d->idx( idxNo ).getSpec().suitability( frsp.simplifiedQueryForIndex( d, idxNo, d->idx( idxNo ).keyPattern() ), order ) != USELESS;
+    }
+    
+    void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
+        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+        nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
+        nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
+    }
+    
+    pair< BSONObj, long long > QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
+        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+        // TODO Maybe it would make sense to return the index with the lowest
+        // nscanned if there are two possibilities.
+        if ( frsp._singleKey.matchPossible() ) {
+            QueryPattern pattern = frsp._singleKey.pattern( order );
+            BSONObj oldIdx = nsd.indexForPattern( pattern );
+            if ( !oldIdx.isEmpty() ) {
+                long long oldNScanned = nsd.nScannedForPattern( pattern );
+                return make_pair( oldIdx, oldNScanned );
+            }
+        }
+        if ( frsp._multiKey.matchPossible() ) {
+            QueryPattern pattern = frsp._multiKey.pattern( order );
+            BSONObj oldIdx = nsd.indexForPattern( pattern );
+            if ( !oldIdx.isEmpty() ) {
+                long long oldNScanned = nsd.nScannedForPattern( pattern );
+                return make_pair( oldIdx, oldNScanned );
+            }
+        }
+        return make_pair( BSONObj(), 0 );
+    }    
+    
+    bool QueryUtilIndexed::uselessOr( const FieldRangeOrSet &fros, NamespaceDetails *d, int hintIdx ) {
+        for( list<FieldRangeSetPair>::const_iterator i = fros._originalOrSets.begin(); i != fros._originalOrSets.end(); ++i ) {
+            if ( hintIdx != -1 ) {
+                if ( !indexUseful( *i, d, hintIdx, BSONObj() ) ) {
+                    return true;   
+                }
+            }
+            else {
+                bool useful = false;
+                for( int j = 0; j < d->nIndexes; ++j ) {
+                    if ( indexUseful( *i, d, j, BSONObj() ) ) {
+                        useful = true;
+                        break;
+                    }
+                }
+                if ( !useful ) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
 } // namespace mongo
