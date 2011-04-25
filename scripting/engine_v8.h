@@ -107,11 +107,12 @@ namespace mongo {
         Handle< Context > context() const { return _context; }
 
         v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
+        v8::Local<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
         void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
                                const string sname , v8::Handle<v8::Value> value , int depth = 0 );
-        v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f );
+        v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool lazy = true );
 
         v8::Function * getNamedCons( const char * name );
         v8::Function * getObjectIdCons();
@@ -163,6 +164,9 @@ namespace mongo {
         ConnectState _connectState;
 
         std::map <string, v8::Persistent <v8::String> > _strCache;
+
+        Persistent<v8::ObjectTemplate> lzObjectTemplate;
+        Persistent<v8::ObjectTemplate> lzArrayTemplate;
     };
 
     class V8ScriptEngine : public ScriptEngine {
