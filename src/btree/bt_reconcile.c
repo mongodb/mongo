@@ -895,12 +895,13 @@ __rec_split_write(SESSION *session, WT_BUF *buf, void *end)
 
 	/*
 	 * If we are eventually going to need an in-memory version of the page:
-	 * (1) steal the accumulated list of in-memory references and reset the
-	 * list information, (2) create the in-memory page and stash it away for
-	 * later.
+	 * (1) steal the accumulated list of in-memory references, (2) create
+	 * the in-memory page and save it away for later.
 	 */
-	if (r->imref_next == 0)
+	if (r->imref_next == 0) {
+		spl->imp = NULL;
 		return (0);
+	}
 	__rec_imref_steal(session, spl);
 
 	/* Allocate memory for the in-memory page, and copy the disk image. */
