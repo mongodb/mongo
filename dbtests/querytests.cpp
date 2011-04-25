@@ -20,7 +20,6 @@
 #include "pch.h"
 #include "../db/query.h"
 
-#include "../db/db.h"
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
