@@ -431,9 +431,13 @@ namespace mongo {
                     BSONObjBuilder b;
                     b.append( "ns" , ns );
 
+                    BSONArrayBuilder allIndexes;
+
                     auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
                     while ( cursor->more() ) {
                         BSONObj idx = cursor->next();
+
+                        allIndexes.append( idx );
 
                         bool idIndex = ! idx["name"].eoo() && idx["name"].String() == "_id_";
                         bool uniqueIndex = ( ! idx["unique"].eoo() && idx["unique"].trueValue() ) ||
@@ -458,7 +462,7 @@ namespace mongo {
                         conn.done();
                         return false;
                     }
-
+                    
                     if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
                         errmsg = (string)"can't shard collection " + ns + ", index not unique";
                         conn.done();
@@ -487,6 +491,8 @@ namespace mongo {
 
                     if ( ! hasShardIndex && ( conn->count( ns ) != 0 ) ) {
                         errmsg = "please create an index over the sharding key before sharding.";
+                        result.append( "proposedKey" , key );
+                        result.appendArray( "curIndexes" , allIndexes.done() );
                         conn.done();
                         return false;
                     }
