@@ -18,6 +18,7 @@ __wt_stat_alloc_btree_stats(SESSION *session, WT_BTREE_STATS **statsp)
 	stats->overflow_data.desc = "file: overflow values inserted";
 	stats->overflow_key.desc = "file: overflow key items inserted";
 	stats->overflow_read.desc = "file: overflow pages read from the file";
+	stats->page_delete.desc = "file: pages deleted";
 	stats->page_read.desc = "file: pages read from a file";
 	stats->page_write.desc = "file: pages written to a file";
 	stats->split_intl.desc = "split internal pages";
@@ -39,6 +40,7 @@ __wt_stat_clear_btree_stats(WT_BTREE_STATS *stats)
 	stats->overflow_data.v = 0;
 	stats->overflow_key.v = 0;
 	stats->overflow_read.v = 0;
+	stats->page_delete.v = 0;
 	stats->page_read.v = 0;
 	stats->page_write.v = 0;
 	stats->split_intl.v = 0;
@@ -57,6 +59,7 @@ __wt_stat_print_btree_stats(WT_BTREE_STATS *stats, FILE *stream)
 	__wt_stat_print(&stats->overflow_data, stream);
 	__wt_stat_print(&stats->overflow_key, stream);
 	__wt_stat_print(&stats->overflow_read, stream);
+	__wt_stat_print(&stats->page_delete, stream);
 	__wt_stat_print(&stats->page_read, stream);
 	__wt_stat_print(&stats->page_write, stream);
 	__wt_stat_print(&stats->split_intl, stream);

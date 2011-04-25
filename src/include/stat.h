@@ -50,6 +50,7 @@ struct __wt_btree_stats {
 	struct __wt_stats overflow_data;
 	struct __wt_stats overflow_key;
 	struct __wt_stats overflow_read;
+	struct __wt_stats page_delete;
 	struct __wt_stats page_read;
 	struct __wt_stats page_write;
 	struct __wt_stats split_intl;

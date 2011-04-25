@@ -19,105 +19,6 @@ struct __wt_evict_list {
 };
 
 /*
- * WT_REC_LIST --
- *	Information tracking a single page reconciliation.
- */
-typedef struct {
-	/*
-	 * The reconciliation code tracks current information about the starting
-	 * record number, the number of entries copied into the current working
-	 * memory, where it is in the current working memory and how much memory
-	 * remains.  Those items are packaged here rather than passing pointer
-	 * to stack locations through the code.
-	 */
-	uint64_t recno;			/* Current record number */
-	uint8_t *first_free;		/* Current first free byte */
-	uint32_t space_avail;		/* Remaining space in this chunk */
-	uint32_t entries;		/* Current number of entries */
-
-	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
-
-	WT_BUF *dsk;			/* Disk-image buffer */
-
-	/*
-	 * As pages are reconciled, inactive pages are merged into their parents
-	 * and discarded.  If an inactive page is discarded, but the parent page
-	 * write fails or for other reason cannot be discarded, the in-memory
-	 * tree would be incorrect, with the parent referencing an unavailable
-	 * page.  To keep the tree "correct" as this happens, we keep a list of
-	 * pages to discard -- when the parent is discarded, so are the merged
-	 * inactive pages.
-	 */
-	WT_PAGE **inactive;		/* List of inactive pages */
-	u_int     inactive_next;	/* Next list slot */
-	u_int	  inactive_entries;	/* Total list slots */
-	uint32_t  inactive_allocated;	/* Bytes allocated */
-
-	/*
-	 * Normally, reconciliation writes out a single replacement page, but
-	 * it may be forced to split a page into multiple pages.  When this
-	 * happens, reconciliation maintains a list of the pages it wrote which
-	 * are incorporated into a newly created internal page that references
-	 * those pages.  There's something wrong if this list is ever longer
-	 * than a few pages, that would make no sense at all, but dynamically
-	 * allocated just in case.
-	 */
-	struct rec_list {
-		WT_OFF_RECORD off;		/* Address, size, recno */
-
-		/*
-		 * The key for a row-store page; no column-store key is needed
-		 * because the page's recno, stored in the WT_OFF_RECORD, is
-		 * the column-store key.
-		 */
-		WT_BUF key;			/* Row key */
-
-		int	 deleted;		/* Page deleted */
-	} *list;
-	u_int	 l_next;			/* Next list slot */
-	u_int	 l_entries;			/* Total list slots */
-	uint32_t l_allocated;			/* Bytes allocated */
-
-	/*
-	 * Reconciliation splits to a smaller-than-maximum page size when a
-	 * split is required so we don't repeatedly split a packed page.
-	 */
-	uint32_t page_size;			/* Maximum page size */
-	uint32_t split_size;			/* Split page size */
-
-	/*
-	 * To keep from having to start building the page over when we reach
-	 * the maximum page size, track the page information when we approach
-	 * each split boundary.
-	 */
-	struct rec_save {
-		uint64_t recno;			/* Split's starting record */
-		uint32_t entries;		/* Split's entries */
-
-		/*
-		 * Start is the first byte in the split chunk; the difference
-		 * between the next slot's first byte and this slot's first
-		 * byte is the length of the split chunk.
-		 */
-		uint8_t *start;			/* Split's first byte */
-	} *save;
-	u_int	 s_next;			/* Next save slot */
-	u_int	 s_entries;			/* Total save slots */
-	uint32_t s_allocated;			/* Bytes allocated */
-
-	/*
-	 * We track the total number of entries in split chunks so we can
-	 * easily figure out how many entries in the current split chunk.
-	 */
-	uint32_t total_entries;			/* Total entries in splits */
-
-						/* Split processing state */
-	enum {	SPLIT_BOUNDARY=0,		/* Split page boundary */
-		SPLIT_MAX=1,			/* Maximum page boundary */
-		SPLIT_TURNED_OFF=2 } state;	/* No more splits */
-} WT_REC_LIST;
-
-/*
  * WT_EVICT_REQ --
  *	Encapsulation of a eviction request.
  */
@@ -205,8 +106,7 @@ struct __wt_cache {
 
 	uint32_t   read_gen;		/* Page read generation (LRU) */
 
-	/* List of pages created from a single page reconciliation. */
-	WT_REC_LIST reclist;
+	void	  *rec;			/* Page reconciliation structure */
 
 	/*
 	 * Different threads read/write pages to/from the cache, so we cannot

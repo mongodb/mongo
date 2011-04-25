@@ -52,6 +52,7 @@ btree_stats = {
 	'overflow_data' : Stat('file: overflow values inserted'),
 	'overflow_key' : Stat('file: overflow key items inserted'),
 	'overflow_read' : Stat('file: overflow pages read from the file'),
+	'page_delete' : Stat('file: pages deleted'),
 	'page_read' : Stat('file: pages read from a file'),
 	'page_write' : Stat('file: pages written to a file'),
 	'split_intl' : Stat('split internal pages'),

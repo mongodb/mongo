@@ -8,6 +8,111 @@
 #include "wt_internal.h"
 #include "btree.i"
 
+/*
+ * WT_RECONCILE --
+ *	Information tracking a single page reconciliation.
+ */
+typedef struct {
+	/*
+	 * The reconciliation code tracks current information about the starting
+	 * record number, the number of entries copied into the current working
+	 * memory, where it is in the current working memory and how much memory
+	 * remains.  Those items are packaged here rather than passing pointer
+	 * to stack locations through the code.
+	 */
+	uint64_t recno;			/* Current record number */
+	uint8_t *first_free;		/* Current first free byte */
+	uint32_t space_avail;		/* Remaining space in this chunk */
+	uint32_t entries;		/* Current number of entries */
+
+	/*
+	 * If we need an in-memory page after split: if reconciling an in-memory
+	 * page we're not evicting from memory, we may split a page referencing
+	 * an in-memory subtree.  In which case we create an in-memory page of
+	 * our own to reference that subtree.
+	 */
+	int need_imp;
+
+	WT_BUF *dsk;			/* Disk-image buffer */
+
+	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
+
+	/*
+	 * As pages are reconciled, inactive pages are merged into their parents
+	 * and discarded.  If an inactive page is discarded, but the parent page
+	 * write fails or for other reason cannot be discarded, the in-memory
+	 * tree would be incorrect, with the parent referencing an unavailable
+	 * page.  To keep the tree "correct" as this happens, we keep a list of
+	 * pages to discard -- when the parent is discarded, so are the merged
+	 * inactive pages.
+	 */
+	WT_PAGE **inactive;			/* List of inactive pages */
+	u_int     inactive_next;		/* Next list slot */
+	u_int	  inactive_entries;		/* Total list slots */
+	uint32_t  inactive_allocated;		/* Bytes allocated */
+
+	/*
+	 * Reconciliation splits to a smaller-than-maximum page size when a
+	 * split is required so we don't repeatedly split a packed page.
+	 */
+	uint32_t page_size;			/* Maximum page size */
+	uint32_t split_size;			/* Split page size */
+
+	/*
+	 * Normally, reconciliation writes out a single replacement page, but
+	 * it may be forced to split a page into multiple pages.  When this
+	 * happens, reconciliation maintains a list of the pages it wrote which
+	 * are incorporated into a newly created internal page that references
+	 * those pages.  There's something wrong if this list is ever longer
+	 * than a few pages, that would make no sense at all, but dynamically
+	 * allocated just in case.
+	 */
+	struct rec_list {
+		WT_OFF_RECORD off;		/* Address, size, recno */
+
+		/*
+		 * The key for a row-store page; no column-store key is needed
+		 * because the page's recno, stored in the WT_OFF_RECORD, is
+		 * the column-store key.
+		 */
+		WT_BUF key;			/* Row key */
+	} *list;
+	u_int	 l_next;			/* Next list slot */
+	u_int	 l_entries;			/* Total list slots */
+	uint32_t l_allocated;			/* Bytes allocated */
+
+	/*
+	 * To keep from having to start building the page over when we reach
+	 * the maximum page size, track the page information when we approach
+	 * each split boundary.
+	 */
+	struct rec_save {
+		uint64_t recno;			/* Split's starting record */
+		uint32_t entries;		/* Split's entries */
+
+		/*
+		 * The first byte in the split chunk; the difference between
+		 * the next slot's first byte and this slot's first byte is
+		 * the length of the split chunk.
+		 */
+		uint8_t *start;			/* Split's first byte */
+	} *save;
+	u_int	 s_next;			/* Next save slot */
+	u_int	 s_entries;			/* Total save slots */
+	uint32_t s_allocated;			/* Bytes allocated */
+
+	/*
+	 * We track the total number of entries in split chunks so we can
+	 * easily figure out how many entries in the current split chunk.
+	 */
+	uint32_t total_entries;			/* Total entries in splits */
+
+						/* Split processing state */
+	enum {	SPLIT_BOUNDARY=0,		/* Split page boundary */
+		SPLIT_MAX=1,			/* Maximum page boundary */
+		SPLIT_TURNED_OFF=2 } state;	/* No more splits */
+} WT_RECONCILE;
+
 static int  __wt_rec_col_fix(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_int(SESSION *, WT_PAGE *);
 static int  __wt_rec_col_int_clean(SESSION *, WT_PAGE *);
@@ -17,7 +122,7 @@ static int  __wt_rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __wt_rec_col_var(SESSION *, WT_PAGE *);
 static int  __wt_rec_inactive_add(SESSION *, WT_PAGE *);
 static void __wt_rec_inactive_evict(SESSION *);
-static void __wt_rec_inactive_init(SESSION *);
+static int  __wt_rec_init(SESSION *);
 static int  __wt_rec_parent_update(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static void __wt_rec_parent_update_clean(SESSION *, WT_PAGE *);
@@ -33,22 +138,22 @@ static int __wt_split(SESSION *);
 static int __wt_split_finish(SESSION *);
 static int __wt_split_fixup(SESSION *);
 static int __wt_split_init(SESSION *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
-static int __wt_split_write(SESSION *, int, WT_BUF *, void *);
+static int __wt_split_write(SESSION *, WT_BUF *, void *);
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_rec_inactive_chk(SESSION *, WT_PAGE *);
+static void __wt_rec_inmemory_chk(SESSION *, WT_PAGE *);
 #endif
 
 static inline uint32_t	__wt_allocation_size(SESSION *, WT_BUF *, uint8_t *);
 static inline int	__wt_block_free_ovfl(SESSION *, WT_OVFL *);
-static inline void	__wt_incr(SESSION *, WT_REC_LIST *, uint32_t, int);
+static inline void	__wt_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
 
 /*
  * __wt_incr --
  *	Update the memory tracking structure for a new entry.
  */
 static inline void
-__wt_incr(SESSION *session, WT_REC_LIST *r, uint32_t size, int entries)
+__wt_incr(SESSION *session, WT_RECONCILE *r, uint32_t size, int entries)
 {
 	/*
 	 * The buffer code is fragile and prone to off-by-one errors --
@@ -126,6 +231,8 @@ __wt_page_reconcile(
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
+	WT_RET(__wt_rec_init(session));
+
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * The evict flag implies there's nothing below us in the tree: if we
@@ -136,15 +243,8 @@ __wt_page_reconcile(
 	 * mode, verify that fact.
 	 */
 	if (evict)
-		__wt_rec_inactive_chk(session, page);
+		__wt_rec_inmemory_chk(session, page);
 #endif
-
-	/*
-	 * During internal page reconcilition we track inactive pages we find
-	 * in the page.  That tracking is per-reconciliation run, so clean up
-	 * before anything else.
-	 */
-	__wt_rec_inactive_init(session);
 
 	/*
 	 * Handle pages marked for deletion or split.
@@ -258,7 +358,7 @@ __wt_page_reconcile(
 	}
 
 	/*
-	 * Resolve the WT_REC_LIST information, update the parent, and evict
+	 * Resolve the WT_RECONCILE information, update the parent, and evict
 	 * the page if requested and possible.
 	 */
 	WT_RET(__wt_rec_wrapup(session, page, evict));
@@ -301,11 +401,11 @@ __wt_split_init(
 {
 	BTREE *btree;
 	WT_PAGE_DISK *dsk;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 
 	btree = session->btree;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	/* Allocate a scratch buffer to hold the new disk image. */
 	WT_RET(__wt_scr_alloc(session, max, &r->dsk));
@@ -389,7 +489,7 @@ static int
 __wt_split(SESSION *session)
 {
 	WT_PAGE_DISK *dsk;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	struct rec_save *r_save;
 	uint32_t current_len;
 
@@ -398,7 +498,7 @@ __wt_split(SESSION *session)
 	 * reconciliation loop, and I don't want to repeat the code that many
 	 * times.
 	 */
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 	dsk = r->dsk->mem;
 
 	/*
@@ -458,11 +558,12 @@ __wt_split(SESSION *session)
 
 		/*
 		 * Set the starting record number and buffer address for the
-		 * next chunk.
+		 * next chunk, clear the entries.
 		 */
 		++r_save;
 		r_save->recno = r->recno;
 		r_save->start = r->first_free;
+		r_save->entries = 0;
 
 		/*
 		 * Set the space available to another split-size chunk, if we
@@ -512,7 +613,7 @@ __wt_split(SESSION *session)
 		 * Write the current disk image.
 		 */
 		dsk->u.entries = r->entries;
-		WT_RET(__wt_split_write(session, 0, r->dsk, r->first_free));
+		WT_RET(__wt_split_write(session, r->dsk, r->first_free));
 
 		/*
 		 * Set the starting record number and buffer information for the
@@ -537,19 +638,20 @@ static int
 __wt_split_finish(SESSION *session)
 {
 	WT_PAGE_DISK *dsk;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 
-	r = &S2C(session)->cache->reclist;
-	dsk = r->dsk->mem;
+	r = S2C(session)->cache->rec;
 
 	/*
-	 * We're done reconciling a page, in which case we can ignore any split
-	 * information we've accumulated to that point and write whatever we
-	 * have in the current buffer.
+	 * We're done reconciling a page; write anything we have accumulated
+	 * in the buffer at this point.
 	 */
+	if (r->entries == 0)
+		return (0);
+
+	dsk = r->dsk->mem;
 	dsk->u.entries = r->entries;
-	return (__wt_split_write(session,
-	    r->entries == 0 ? 1 : 0, r->dsk, r->first_free));
+	return (__wt_split_write(session, r->dsk, r->first_free));
 }
 
 /*
@@ -561,7 +663,7 @@ __wt_split_fixup(SESSION *session)
 {
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	struct rec_save *r_save;
 	uint32_t i, len;
 	uint8_t *dsk_start;
@@ -574,7 +676,7 @@ __wt_split_fixup(SESSION *session)
 	 * split chunks we've created and write those pages out, then update
 	 * the caller's information.
 	 */
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	/*
 	 * The data isn't laid out on page-boundaries or nul-byte padded; copy
@@ -606,7 +708,7 @@ __wt_split_fixup(SESSION *session)
 		/* Copy out the page contents, and write it. */
 		len = WT_PTRDIFF32((r_save + 1)->start, r_save->start);
 		memcpy(dsk_start, r_save->start, len);
-		WT_ERR(__wt_split_write(session, 0, tmp, dsk_start + len));
+		WT_ERR(__wt_split_write(session, tmp, dsk_start + len));
 	}
 
 	/*
@@ -639,28 +741,23 @@ err:	if (tmp != NULL)
  *	Write a disk block out for the helper functions.
  */
 static int
-__wt_split_write(SESSION *session, int deleted, WT_BUF *buf, void *end)
+__wt_split_write(SESSION *session, WT_BUF *buf, void *end)
 {
 	WT_PAGE_DISK *dsk;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	struct rec_list *r_list;
 	uint32_t addr, size;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
-	if (deleted) {
-		size = 0;
-		addr = WT_ADDR_INVALID;
-	} else {
-		/*
-		 * Set the disk block size and clear trailing bytes.
-		 * Allocate file space.
-		 * Write the disk block.
-		 */
-		size = __wt_allocation_size(session, buf, end);
-		WT_RET(__wt_block_alloc(session, &addr, size));
-		WT_RET(__wt_disk_write(session, buf->mem, addr, size));
-	}
+	/*
+	 * Set the disk block size and clear trailing bytes.
+	 * Allocate file space.
+	 * Write the disk block.
+	 */
+	size = __wt_allocation_size(session, buf, end);
+	WT_RET(__wt_block_alloc(session, &addr, size));
+	WT_RET(__wt_disk_write(session, buf->mem, addr, size));
 
 	/* Save the key and addr/size pairs to update the parent. */
 	if (r->l_next == r->l_entries) {
@@ -671,13 +768,6 @@ __wt_split_write(SESSION *session, int deleted, WT_BUF *buf, void *end)
 	r_list = &r->list[r->l_next++];
 	r_list->off.addr = addr;
 	r_list->off.size = size;
-	r_list->deleted = 0;
-
-	/* Deletes are easy -- just flag the fact and we're done. */
-	if (deleted) {
-		r_list->deleted = 1;
-		return (0);
-	}
 
 	/*
 	 * For a column-store, the key is the recno, for a row-store, it's the
@@ -738,10 +828,10 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 	WT_COL_REF *cref;
 	WT_OFF_RECORD off;
 	WT_PAGE *rp;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	uint32_t i;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	/* For each entry in the page... */
 	WT_COL_REF_FOREACH(page, cref, i) {
@@ -770,6 +860,9 @@ __wt_rec_col_merge(SESSION *session, WT_PAGE *page)
 				WT_RET(__wt_rec_inactive_add(session, rp));
 				continue;
 			}
+
+			/* In-memory subtree. */
+			++r->need_imp;
 		}
 
 		/* Any off-page reference must be a valid disk address. */
@@ -826,7 +919,7 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 	BTREE *btree;
 	WT_BUF *tmp;
 	WT_COL *cip;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint32_t i, len;
 	uint8_t *data;
@@ -835,7 +928,7 @@ __wt_rec_col_fix(SESSION *session, WT_PAGE *page)
 
 	btree = session->btree;
 	tmp = NULL;
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 	ret = 0;
 
 	/*
@@ -902,7 +995,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 	WT_BUF *tmp;
 	WT_COL *cip;
 	WT_INSERT *ins;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	uint32_t i, len;
 	uint16_t n, nrepeat, repeat_count;
 	uint8_t *data, *last_data;
@@ -911,7 +1004,7 @@ __wt_rec_col_rle(SESSION *session, WT_PAGE *page)
 
 	btree = session->btree;
 	tmp = NULL;
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 	last_data = NULL;
 	ret = 0;
 
@@ -1015,11 +1108,11 @@ __wt_rec_col_var(SESSION *session, WT_PAGE *page)
 	WT_BUF *value, _value;
 	WT_CELL value_cell, *cell;
 	WT_OVFL value_ovfl;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint32_t i, len;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	WT_CLEAR(value_cell);
 	WT_CLEAR(_value);
@@ -1109,11 +1202,11 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 	WT_CELL *key_cell, *value_cell;
 	WT_OFF *from;
 	WT_PAGE *rp;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
 	uint32_t i, len;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	WT_RET(__wt_split_init(session,
 	    page, 0ULL, session->btree->intlmax, session->btree->intlmin));
@@ -1201,6 +1294,9 @@ __wt_rec_row_int(SESSION *session, WT_PAGE *page)
 				WT_RET(__wt_rec_inactive_add(session, rp));
 				continue;
 			}
+
+			/* In-memory subtree. */
+			++r->need_imp;
 		}
 
 		/* Any off-page reference must be a valid disk address. */
@@ -1244,12 +1340,12 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 	WT_BUF key;
 	WT_OVFL key_ovfl;
 	WT_PAGE *rp;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
 	uint32_t i;
 
 	WT_CLEAR(key);
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	/*
 	 * For each entry in the in-memory page...
@@ -1269,6 +1365,9 @@ __wt_rec_row_merge(SESSION *session, WT_PAGE *page)
 				WT_RET(__wt_rec_inactive_add(session, rp));
 				continue;
 			}
+
+			/* In-memory subtree. */
+			++r->need_imp;
 		}
 
 		/* Any off-page reference must be a valid disk address. */
@@ -1353,14 +1452,14 @@ __wt_rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 	WT_BUF value_buf;
 	WT_CELL value_cell, *key_cell;
 	WT_OVFL value_ovfl;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i, key_len, value_len;
 	void *ripvalue;
 
 	WT_CLEAR(value_buf);
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	WT_RET(__wt_split_init(session,
 	    page, 0ULL, session->btree->leafmax, session->btree->leafmin));
@@ -1507,13 +1606,13 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 	WT_CELL key_cell, value_cell;
 	WT_BUF key_buf, value_buf;
 	WT_OVFL key_ovfl, value_ovfl;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint32_t key_len, value_len;
 
 	WT_CLEAR(key_buf);
 	WT_CLEAR(value_buf);
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	for (; ins != NULL; ins = ins->next) {
 		/* Build a value to store on the page. */
@@ -1567,26 +1666,27 @@ __wt_rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 
 /*
  * __wt_rec_wrapup  --
- *	Resolve the WT_REC_LIST information.
+ *	Resolve the WT_RECONCILE information.
  */
 static int
 __wt_rec_wrapup(SESSION *session, WT_PAGE *page, int evict)
 {
 	BTREE *btree;
 	WT_PAGE *new;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 
 	btree = session->btree;
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	/*
-	 * If the page was emptied, we want to eventually discard it from the
+	 * If the page was empty, we want to eventually discard it from the
 	 * tree by merging it into its parent, not just evict it from memory.
 	 */
-	if (r->list[0].deleted) {
+	if (r->l_next == 0) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: delete page %lu (%luB)",
 		    (u_long)page->addr, (u_long)page->size));
+		WT_STAT_INCR(btree->stats, page_delete);
 
 		/*
 		 * Deleted pages cannot be evicted; we're going to evict the
@@ -1747,7 +1847,7 @@ __wt_rec_parent_update(SESSION *session,
 
 #ifdef HAVE_DIAGNOSTIC
 	if (state == WT_REF_INACTIVE)
-		__wt_rec_inactive_chk(session, page);
+		__wt_rec_inmemory_chk(session, page);
 #endif
 
 	/*
@@ -1784,14 +1884,14 @@ __wt_rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 {
 	WT_CACHE *cache;
 	WT_PAGE *page;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
 	struct rec_list *r_list;
 	uint32_t i;
 	int ret;
 
 	cache = S2C(session)->cache;
-	r = &cache->reclist;
+	r = cache->rec;
 	ret = 0;
 
 	/* Allocate a row-store internal page. */
@@ -1852,13 +1952,13 @@ __wt_rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	WT_COL_REF *cref;
 	WT_OFF_RECORD *off;
 	WT_PAGE *page;
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	struct rec_list *r_list;
 	uint32_t i;
 	int ret;
 
 	cache = S2C(session)->cache;
-	r = &cache->reclist;
+	r = cache->rec;
 	ret = 0;
 
 	/* Allocate a column-store internal page. */
@@ -1904,28 +2004,15 @@ err:	__wt_free(session, page);
 }
 
 /*
- * __wt_rec_inactive_init --
- *	Initialize the list of inactive pages.
- */
-static void
-__wt_rec_inactive_init(SESSION *session)
-{
-	WT_REC_LIST *r;
-
-	r = &S2C(session)->cache->reclist;
-	r->inactive_next = 0;
-}
-
-/*
  * __wt_rec_inactive_add --
  *	Append a new inactive page to the list of inactive pages.
  */
 static int
 __wt_rec_inactive_add(SESSION *session, WT_PAGE *page)
 {
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	if (r->inactive_next == r->inactive_entries) {
 		WT_RET(__wt_realloc(session, &r->inactive_allocated,
@@ -1944,13 +2031,38 @@ __wt_rec_inactive_add(SESSION *session, WT_PAGE *page)
 static void
 __wt_rec_inactive_evict(SESSION *session)
 {
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	uint32_t i;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	for (i = 0; i < r->inactive_next; ++i)
 		__wt_page_free(session, r->inactive[i]);
+}
+
+/*
+ * __wt_rec_init --
+ *	Initialize the reconciliation structure.
+ */
+static int
+__wt_rec_init(SESSION *session)
+{
+	WT_RECONCILE *r;
+
+	/* Allocate a reconciliation structure if we don't already have one. */
+	if ((r = S2C(session)->cache->rec) == NULL) {
+		WT_RET(__wt_calloc_def(session, 1, &r));
+		S2C(session)->cache->rec = r;
+	}
+
+	/*
+	 * During internal page reconcilition we track inactive pages we find
+	 * in the page.  That tracking is per-reconciliation run, so clean up
+	 * before anything else.
+	 */
+	r->inactive_next = 0;
+
+	return (0);
 }
 
 /*
@@ -1960,11 +2072,11 @@ __wt_rec_inactive_evict(SESSION *session)
 void
 __wt_rec_destroy(SESSION *session)
 {
-	WT_REC_LIST *r;
+	WT_RECONCILE *r;
 	struct rec_list *r_list;
 	uint32_t i;
 
-	r = &S2C(session)->cache->reclist;
+	r = S2C(session)->cache->rec;
 
 	if (r->inactive != NULL)
 		__wt_free(session, r->inactive);
@@ -1981,12 +2093,12 @@ __wt_rec_destroy(SESSION *session)
 
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __wt_rec_inactive_chk --
+ * __wt_rec_inmemory_chk --
  *	We're about to mark a page reference inactive -- confirm there are
  * no in-memory pages in the subtree.
  */
 static void
-__wt_rec_inactive_chk(SESSION *session, WT_PAGE *page)
+__wt_rec_inmemory_chk(SESSION *session, WT_PAGE *page)
 {
 	WT_COL_REF *cref;
 	WT_ROW_REF *rref;
@@ -1998,7 +2110,7 @@ __wt_rec_inactive_chk(SESSION *session, WT_PAGE *page)
 			WT_ASSERT(
 			    session, WT_COL_REF_STATE(cref) != WT_REF_MEM);
 			if (WT_COL_REF_STATE(cref) == WT_REF_INACTIVE)
-				__wt_rec_inactive_chk(
+				__wt_rec_inmemory_chk(
 				    session, WT_COL_REF_PAGE(cref));
 		}
 		break;
@@ -2007,7 +2119,7 @@ __wt_rec_inactive_chk(SESSION *session, WT_PAGE *page)
 			WT_ASSERT(
 			    session, WT_ROW_REF_STATE(rref) != WT_REF_MEM);
 			if (WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE)
-				__wt_rec_inactive_chk(
+				__wt_rec_inmemory_chk(
 				    session, WT_ROW_REF_PAGE(rref));
 		}
 		break;
