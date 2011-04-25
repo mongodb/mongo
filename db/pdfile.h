@@ -286,8 +286,8 @@ namespace mongo {
          */
         static int followupSize(int len, int lastExtentLen);
 
-        /**
-         * @param len lengt of record we need
+        /** get a suggested size for the first extent in a namespace
+         *  @param len length of record we need to insert
          */
         static int initialSize(int len);
 
@@ -328,7 +328,7 @@ namespace mongo {
         int unusedLength;
         char reserved[8192 - 4*4 - 8];
 
-        char data[4];
+        char data[4]; // first extent starts here
 
         enum { HeaderSize = 8192 };
 

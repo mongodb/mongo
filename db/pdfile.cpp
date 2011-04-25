@@ -46,6 +46,9 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
+    BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
+    BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
+
     bool inDBRepair = false;
     struct doingRepair {
         doingRepair() {
@@ -1598,7 +1601,13 @@ namespace mongo {
                also if this is an addIndex, those checks should happen before this!
             */
             // This may create first file in the database.
-            cc().database()->allocExtent(ns, Extent::initialSize(len), false);
+            int ies = Extent::initialSize(len);
+            if( str::contains(ns, '$') && len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 && len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) { 
+                // probably an index.  so we pick a value here for the first extent instead of using initialExtentSize() which is more 
+                // for user collections.  TODO: we could look at the # of records in the parent collection to be smarter here.
+                ies = 64 * 1024;
+            }
+            cc().database()->allocExtent(ns, ies, false);
             d = nsdetails(ns);
             if ( !god )
                 ensureIdIndexForNewNs(ns);
