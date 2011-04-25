@@ -782,8 +782,10 @@ doneCheckOrder:
         shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
         if ( ret->qp().willScanTable() ) {
             _tableScanned = true;
+        } else {
+            // If the full table was scanned, don't bother popping the last or clause.
+	        _fros.popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
         }
-        _fros.popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
         return ret;
     }
 
