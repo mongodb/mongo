@@ -232,6 +232,10 @@ namespace mongo {
         bool matchesWithSingleKeyIndex(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 ) {
             return matches( key, recLoc, details, true );   
         }
+        /**
+         * This is the preferred method for matching against a cursor, as it
+         * can handle both multi and single key cursors.
+         */
         bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
         bool needRecord() { return _needRecord; }
 
