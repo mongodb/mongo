@@ -1,5 +1,5 @@
-s = new ShardingTest( "sharding_passthrough" , 2 , 1 , 1 );
-s.adminCommand( { enablesharding : "test" } );
+myShardingTest = new ShardingTest( "sharding_passthrough" , 2 , 1 , 1 );
+myShardingTest.adminCommand( { enablesharding : "test" } );
 db=s.getDB("test");
 
 var files = listFiles("jstests");
@@ -88,7 +88,7 @@ files.forEach(
 );
 
 
-s.stop()
+myShardingTest.stop()
 
 var runnerEnd = new Date()
 
