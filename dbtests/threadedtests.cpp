@@ -412,7 +412,7 @@ namespace ThreadedTests {
             add< ThreadPoolTest >();
             add< LockTest >();
             add< RWLockTest1 >();
-            add< RWLockTest2 >();
+            //add< RWLockTest2 >(); // SERVER-2996
             add< RWLockTest3 >();
             add< RWLockTest4 >();
             add< MongoMutexTest >();
