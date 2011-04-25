@@ -233,6 +233,7 @@ __wt_debug_page_work(SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
 
 	btree = session->btree;
 
+	fprintf(fp, "%p: ", page);
 	if (page->addr == WT_ADDR_INVALID)
 		fprintf(fp, "[not set]");
 	else
@@ -816,11 +817,14 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 		s = "UNKNOWN";
 		break;
 	}
+
 	if (ref->addr == WT_ADDR_INVALID)
 		fprintf(fp, "\tnot-set");
 	else
 		fprintf(fp, "\t%lu", (u_long)ref->addr);
 
 	fprintf(fp, "/%lu: %s\n", (u_long)ref->size, s);
+	if (ref->state == WT_REF_MEM)
+		fprintf(fp, "(%p)", ref->page);
 }
 #endif
