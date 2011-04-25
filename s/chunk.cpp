@@ -728,9 +728,9 @@ namespace mongo {
         rwlock lk( _lock , false );
 
         //TODO look into FieldRangeSetOr
-        FieldRangeOrSet fros(_ns.c_str(), query, false);
+        OrRangeGenerator org(_ns.c_str(), query, false);
 
-        const string special = fros.getSpecial();
+        const string special = org.getSpecial();
         if (special == "2d") {
             BSONForEach(field, query) {
                 if (getGtLtOp(field) == BSONObj::opNEAR) {
@@ -745,7 +745,7 @@ namespace mongo {
         }
 
         do {
-            boost::scoped_ptr<FieldRangeSetPair> frsp (fros.topFrsp());
+            boost::scoped_ptr<FieldRangeSetPair> frsp (org.topFrsp());
             {
                 // special case if most-significant field isn't in query
                 FieldRange range = frsp->singleKeyRange(_key.key().firstElement().fieldName());
@@ -780,11 +780,11 @@ namespace mongo {
                 //return;
             }
 
-            if (fros.moreOrClauses())
-                fros.popOrClauseSingleKey();
+            if (org.moreOrClauses())
+                org.popOrClauseSingleKey();
 
         }
-        while (fros.moreOrClauses());
+        while (org.moreOrClauses());
     }
 
     void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max) {

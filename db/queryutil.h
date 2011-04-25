@@ -130,7 +130,7 @@ namespace mongo {
      */
     class FieldRangeSet {
     public:
-        friend class FieldRangeOrSet;
+        friend class OrRangeGenerator;
         friend class FieldRangeVector;
         FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize=true );
         
@@ -277,7 +277,7 @@ namespace mongo {
         BSONObj simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const;        
         FieldRangeSet _singleKey;
         FieldRangeSet _multiKey;
-        friend class FieldRangeOrSet;
+        friend class OrRangeGenerator;
         friend struct QueryUtilIndexed;
     };
     
@@ -373,9 +373,9 @@ namespace mongo {
      * for the current $or clause, in some cases by excluding ranges that were
      * included in a previous clause.
      */
-    class FieldRangeOrSet {
+    class OrRangeGenerator {
     public:
-        FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
+        OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize=true );
 
         /**
          * @return true iff we are done scanning $or clauses.  if there's a

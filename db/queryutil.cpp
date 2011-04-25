@@ -1322,7 +1322,7 @@ namespace mongo {
         return b.obj();
     }
     
-    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
+    OrRangeGenerator::OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize )
     : _baseSet( ns, query, optimize ), _orFound() {
         
         BSONObjIterator i( _baseSet.originalQuery() );
@@ -1345,11 +1345,11 @@ namespace mongo {
         }
     }
 
-    void FieldRangeOrSet::assertMayPopOrClause() {
+    void OrRangeGenerator::assertMayPopOrClause() {
         massert( 13274, "no or clause to pop", !orFinished() );        
     }
     
-    void FieldRangeOrSet::popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern ) {
+    void OrRangeGenerator::popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern ) {
         assertMayPopOrClause();
         auto_ptr<FieldRangeSet> holder;
         const FieldRangeSet *toDiff = &_originalOrSets.front().frsForIndex( nsd, idxNo );
@@ -1361,7 +1361,7 @@ namespace mongo {
         popOrClause( toDiff, nsd, idxNo, keyPattern );
     }
     
-    void FieldRangeOrSet::popOrClauseSingleKey() {
+    void OrRangeGenerator::popOrClauseSingleKey() {
         assertMayPopOrClause();
         FieldRangeSet *toDiff = &_originalOrSets.front()._singleKey;
         popOrClause( toDiff );
@@ -1377,7 +1377,7 @@ namespace mongo {
      * empty we do not constrain the previous clause's ranges using index keys,
      * which may reduce opportunities for range elimination.
      */
-    void FieldRangeOrSet::popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) {
+    void OrRangeGenerator::popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) {
         list<FieldRangeSetPair>::iterator i = _orSets.begin();
         list<FieldRangeSetPair>::iterator j = _originalOrSets.begin();
         ++i;

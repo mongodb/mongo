@@ -115,7 +115,7 @@ namespace mongo {
         return ret;
     }
 
-    inline FieldRangeSetPair *FieldRangeOrSet::topFrsp() const {
+    inline FieldRangeSetPair *OrRangeGenerator::topFrsp() const {
         FieldRangeSetPair *ret = new FieldRangeSetPair( _baseSet );
         if (_orSets.size()) {
             *ret &= _orSets.front();
@@ -123,7 +123,7 @@ namespace mongo {
         return ret;
     }
 
-    inline FieldRangeSetPair *FieldRangeOrSet::topFrspOriginal() const {
+    inline FieldRangeSetPair *OrRangeGenerator::topFrspOriginal() const {
         FieldRangeSetPair *ret = new FieldRangeSetPair( _baseSet );
         if (_originalOrSets.size()) {
             *ret &= _originalOrSets.front();

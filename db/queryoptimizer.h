@@ -321,7 +321,7 @@ namespace mongo {
         }
 
         /** @return true iff more $or clauses need to be scanned. */
-        bool mayRunMore() const { return _or ? ( !_tableScanned && !_fros.orFinished() ) : _i == 0; }
+        bool mayRunMore() const { return _or ? ( !_tableScanned && !_org.orFinished() ) : _i == 0; }
         /** @return non-$or version of explain output. */
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
@@ -341,7 +341,7 @@ namespace mongo {
         const char * _ns;
         bool _or;
         BSONObj _query;
-        FieldRangeOrSet _fros;
+        OrRangeGenerator _org;
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;
         bool _honorRecordedPlan;
@@ -447,7 +447,7 @@ namespace mongo {
         static void clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );
         /** Return a recorded best index for the single or multi key pattern. */
         static pair< BSONObj, long long > bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );        
-        static bool uselessOr( const FieldRangeOrSet& fros, NamespaceDetails *d, int hintIdx );
+        static bool uselessOr( const OrRangeGenerator& org, NamespaceDetails *d, int hintIdx );
     };
     
 } // namespace mongo

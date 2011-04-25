@@ -743,14 +743,14 @@ doneCheckOrder:
         _ns( ns ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
-        _fros( ns, _query ),
+        _org( ns, _query ),
         _i(),
         _honorRecordedPlan( honorRecordedPlan ),
         _bestGuessOnly( bestGuessOnly ),
         _hint( ( hint && !hint->eoo() ) ? hint->wrap() : BSONObj() ),
         _mayYield( mayYield ),
         _tableScanned() {
-        if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() || !_fros.getSpecial().empty() ) {
+        if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() || !_org.getSpecial().empty() ) {
             _or = false;
         }
         if ( _or && uselessOr( _hint.firstElement() ) ) {
@@ -775,8 +775,8 @@ doneCheckOrder:
             return _currentQps->runOp( op );
         }
         ++_i;
-        auto_ptr<FieldRangeSetPair> frsp( _fros.topFrsp() );
-        auto_ptr<FieldRangeSetPair> originalFrsp( _fros.topFrspOriginal() );
+        auto_ptr<FieldRangeSetPair> frsp( _org.topFrsp() );
+        auto_ptr<FieldRangeSetPair> originalFrsp( _org.topFrspOriginal() );
         BSONElement hintElt = _hint.firstElement();
         _currentQps.reset( new QueryPlanSet( _ns, frsp, originalFrsp, _query, BSONObj(), &hintElt, _honorRecordedPlan, BSONObj(), BSONObj(), _bestGuessOnly, _mayYield ) );
         shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
@@ -784,7 +784,7 @@ doneCheckOrder:
             _tableScanned = true;
         } else {
             // If the full table was scanned, don't bother popping the last or clause.
-	        _fros.popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
+	        _org.popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
         }
         return ret;
     }
@@ -807,9 +807,9 @@ doneCheckOrder:
             if ( !id ) {
                 return true;
             }
-            return QueryUtilIndexed::uselessOr( _fros, nsd, nsd->idxNo( *id ) );
+            return QueryUtilIndexed::uselessOr( _org, nsd, nsd->idxNo( *id ) );
         }
-        return QueryUtilIndexed::uselessOr( _fros, nsd, -1 );
+        return QueryUtilIndexed::uselessOr( _org, nsd, -1 );
     }
     
     MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
@@ -1090,8 +1090,8 @@ doneCheckOrder:
         return make_pair( BSONObj(), 0 );
     }    
     
-    bool QueryUtilIndexed::uselessOr( const FieldRangeOrSet &fros, NamespaceDetails *d, int hintIdx ) {
-        for( list<FieldRangeSetPair>::const_iterator i = fros._originalOrSets.begin(); i != fros._originalOrSets.end(); ++i ) {
+    bool QueryUtilIndexed::uselessOr( const OrRangeGenerator &org, NamespaceDetails *d, int hintIdx ) {
+        for( list<FieldRangeSetPair>::const_iterator i = org._originalOrSets.begin(); i != org._originalOrSets.end(); ++i ) {
             if ( hintIdx != -1 ) {
                 if ( !indexUseful( *i, d, hintIdx, BSONObj() ) ) {
                     return true;   
