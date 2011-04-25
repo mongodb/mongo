@@ -220,6 +220,8 @@ namespace mongo {
             it->second.Dispose();
             ++it;
         }
+        lzObjectTemplate.Dispose();
+        lzArrayTemplate.Dispose();
     }
 
     /**
@@ -342,7 +344,7 @@ namespace mongo {
         V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
-        _global->Set( getV8Str( field ) , mongoToV8( obj, false, readOnly) );
+        _global->Set( getV8Str( field ) , mongoToLZV8( obj, false, readOnly) );
     }
 
     int V8Scope::type( const char *field ) {
