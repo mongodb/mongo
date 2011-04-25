@@ -75,7 +75,7 @@ namespace mongo {
                 setComplete();
                 return;
             }
-            if ( matcher()->matches( c_->currKey(), c_->currLoc() ) ) {
+            if ( matcher()->matchesCurrent( c_.get() ) ) {
                 one_ = c_->current();
                 loc_ = c_->currLoc();
                 setStop();

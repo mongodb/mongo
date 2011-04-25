@@ -86,7 +86,7 @@ namespace mongo {
 
             DiskLoc rloc = c_->currLoc();
 
-            if ( matcher()->matches(c_->currKey(), rloc ) ) {
+            if ( matcher()->matchesCurrent(c_.get()) ) {
                 if ( !c_->getsetdup(rloc) )
                     ++count_;
             }
@@ -181,7 +181,7 @@ namespace mongo {
 
             // NOTE Calling advance() may change the matcher, so it's important
             // to try to match first.
-            bool match = creal->matcher()->matches( key , rloc );
+            bool match = creal->matcher()->matchesCurrent(creal.get());
 
             if ( ! cc->advance() )
                 justOne = true;
@@ -347,7 +347,7 @@ namespace mongo {
                     break;
                 }
                 // in some cases (clone collection) there won't be a matcher
-                if ( c->matcher() && !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
+                if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
                 }
                 /*
                   TODO
@@ -485,7 +485,7 @@ namespace mongo {
                 }
             }
             else {
-                if ( !matcher()->matches(_c->currKey(), _c->currLoc() ) ) {
+                if ( !matcher()->matchesCurrent( _c.get() ) ) {
                 }
                 else if( !_c->getsetdup(_c->currLoc()) ) {
                     _gotOne();
@@ -775,7 +775,7 @@ namespace mongo {
             }
 
             _nscanned = _c->nscanned();
-            if ( !matcher()->matches(_c->currKey(), _c->currLoc() , &_details ) ) {
+            if ( !matcher()->matchesCurrent(_c.get() , &_details ) ) {
                 // not a match, continue onward
                 if ( _details.loadedObject )
                     _nscannedObjects++;

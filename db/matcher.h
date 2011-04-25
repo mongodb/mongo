@@ -167,6 +167,14 @@ namespace mongo {
         }
 
         bool sameCriteriaCount( const Matcher &other ) const;
+        
+        bool singleSimpleCriterion() const {
+            return false; // TODO SERVER-958
+//            // TODO Really check, especially if all basics are ok.
+//            // $all, etc
+//            // _orConstraints?
+//            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
+        }
 
     private:
         // Only specify constrainIndexKey if matches() will be called with
@@ -221,7 +229,9 @@ namespace mongo {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
         bool matches(const BSONObj &o) { return _docMatcher->matches( o ); }
-        bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
+        bool matchesWithSingleKeyIndex(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 ) {
+            return matches( key, recLoc, details, true );   
+        }
         bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
         bool needRecord() { return _needRecord; }
 
@@ -240,6 +250,7 @@ namespace mongo {
             return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
         }
     private:
+        bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
         CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
         void init( bool alwaysUseRecord );
         shared_ptr< Matcher > _docMatcher;

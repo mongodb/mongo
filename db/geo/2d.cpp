@@ -1037,7 +1037,7 @@ namespace mongo {
                 // matcher
                 MatchDetails details;
                 if ( _matcher.get() ) {
-                    bool good = _matcher->matches( node.key , node.recordLoc , &details );
+                    bool good = _matcher->matchesWithSingleKeyIndex( node.key , node.recordLoc , &details );
                     if ( details.loadedObject )
                         _objectsLoaded++;
 

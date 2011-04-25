@@ -25,6 +25,7 @@
 #include "diskloc.h"
 #include "../scripting/engine.h"
 #include "db.h"
+#include "queryutil.h"
 #include "client.h"
 
 #include "pdfile.h"
