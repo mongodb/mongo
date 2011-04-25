@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "../client/connpool.h"
+#include "../db/querypattern.h"
 #include "../db/queryutil.h"
 #include "../util/unittest.h"
 
@@ -745,10 +746,10 @@ namespace mongo {
         }
 
         do {
-            boost::scoped_ptr<FieldRangeSet> frs (fros.topFrs());
+            boost::scoped_ptr<FieldRangeSetPair> frsp (fros.topFrsp());
             {
                 // special case if most-significant field isn't in query
-                FieldRange range = frs->range(_key.key().firstElement().fieldName());
+                FieldRange range = frsp->singleKeyRange(_key.key().firstElement().fieldName());
                 if ( !range.nontrivial() ) {
                     DEV PRINT(range.nontrivial());
                     getAllShards(shards);
@@ -756,7 +757,7 @@ namespace mongo {
                 }
             }
 
-            BoundList ranges = frs->indexBounds(_key.key(), 1);
+            BoundList ranges = frsp->singleKeyIndexBounds(_key.key(), 1);
             for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it) {
                 BSONObj minObj = it->first.replaceFieldNames(_key.key());
                 BSONObj maxObj = it->second.replaceFieldNames(_key.key());
@@ -784,7 +785,7 @@ namespace mongo {
             }
 
             if (fros.moreOrClauses())
-                fros.popOrClause();
+                fros.popOrClauseSingleKey();
 
         }
         while (fros.moreOrClauses());

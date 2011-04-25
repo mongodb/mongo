@@ -22,6 +22,7 @@
 #include "../db/clientcursor.h"
 #include "../db/instance.h"
 #include "../db/btree.h"
+#include "../db/queryutil.h"
 #include "dbtests.h"
 
 namespace CursorTests {
@@ -34,10 +35,10 @@ namespace CursorTests {
         class Base {
         protected:
             FieldRangeVector *vec( int *vals, int len, int direction = 1 ) {
-                FieldRangeSet s( "", BSON( "a" << 1 ) );
+                FieldRangeSet s( "", BSON( "a" << 1 ), true );
                 for( int i = 0; i < len; i += 2 ) {
                     _objs.push_back( BSON( "a" << BSON( "$gte" << vals[ i ] << "$lte" << vals[ i + 1 ] ) ) );
-                    FieldRangeSet s2( "", _objs.back() );
+                    FieldRangeSet s2( "", _objs.back(), true );
                     if ( i == 0 ) {
                         s.range( "a" ) = s2.range( "a" );
                     }
@@ -148,7 +149,7 @@ namespace CursorTests {
             void check( const BSONObj &spec ) {
                 _c.ensureIndex( ns(), idx() );
                 Client::Context ctx( ns() );
-                FieldRangeSet frs( ns(), spec );
+                FieldRangeSet frs( ns(), spec, true );
                 // orphan spec for this test.
                 IndexSpec *idxSpec = new IndexSpec( idx() );
                 boost::shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, *idxSpec, direction() ) );

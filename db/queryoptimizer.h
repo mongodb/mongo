@@ -35,8 +35,8 @@ namespace mongo {
 
         QueryPlan(NamespaceDetails *d,
                   int idxNo, // -1 = no index
-                  const FieldRangeSet &frs,
-                  const FieldRangeSet &originalFrs,
+                  const FieldRangeSetPair &frsp,
+                  const FieldRangeSetPair &originalFrsp,
                   const BSONObj &originalQuery,
                   const BSONObj &order,
                   const BSONObj &startKey = BSONObj(),
@@ -55,7 +55,7 @@ namespace mongo {
          */
         bool exactKeyMatch() const { return _exactKeyMatch; }
         /** @return true iff this QueryPlan would perform an unindexed scan. */
-        bool willScanTable() const { return _idxNo < 0; }
+        bool willScanTable() const { return _idxNo < 0 && !_impossible; }
 
         /** @return a new cursor based on this QueryPlan's index and FieldRangeSet. */
         shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
@@ -67,6 +67,7 @@ namespace mongo {
         int direction() const { return _direction; }
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
+        int idxNo() const { return _idxNo; }
         const char *ns() const { return _frs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
@@ -96,6 +97,7 @@ namespace mongo {
         BSONObj _endKey;
         bool _endKeyInclusive;
         bool _unhelpful;
+        bool _impossible;
         string _special;
         IndexType * _type;
         bool _startOrEndSpec;
@@ -205,8 +207,8 @@ namespace mongo {
         typedef vector<QueryPlanPtr> PlanSet;
 
         QueryPlanSet( const char *ns,
-                      auto_ptr<FieldRangeSet> frs,
-                      auto_ptr<FieldRangeSet> originalFrs,
+                      auto_ptr<FieldRangeSetPair> frsp,
+                      auto_ptr<FieldRangeSetPair> originalFrsp,
                       const BSONObj &originalQuery,
                       const BSONObj &order,
                       const BSONElement *hint = 0,
@@ -238,8 +240,8 @@ namespace mongo {
         QueryPlanPtr getBestGuess() const;
 
         //for testing
-        const FieldRangeSet &frs() const { return *_frs; }
-        const FieldRangeSet &originalFrs() const { return *_originalFrs; }
+        const FieldRangeSetPair &frsp() const { return *_frsp; }
+        const FieldRangeSetPair &originalFrsp() const { return *_originalFrsp; }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
 
@@ -266,8 +268,8 @@ namespace mongo {
 
         const char *_ns;
         BSONObj _originalQuery;
-        auto_ptr<FieldRangeSet> _frs;
-        auto_ptr<FieldRangeSet> _originalFrs;
+        auto_ptr<FieldRangeSetPair> _frsp;
+        auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
         bool _mayRecordPlan;
         bool _usingPrerecordedPlan;

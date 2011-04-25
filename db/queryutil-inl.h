@@ -56,28 +56,6 @@ namespace mongo {
               maxKey.firstElement().woCompare( max(), false ) != 0 );
     }
 
-    inline bool QueryPattern::operator<( const QueryPattern &other ) const {
-        map<string,Type>::const_iterator i = _fieldTypes.begin();
-        map<string,Type>::const_iterator j = other._fieldTypes.begin();
-        while( i != _fieldTypes.end() ) {
-            if ( j == other._fieldTypes.end() )
-                return false;
-            if ( i->first < j->first )
-                return true;
-            else if ( i->first > j->first )
-                return false;
-            if ( i->second < j->second )
-                return true;
-            else if ( i->second > j->second )
-                return false;
-            ++i;
-            ++j;
-        }
-        if ( j != other._fieldTypes.end() )
-            return true;
-        return _sort.woCompare( other._sort ) < 0;
-    }
-
     inline const FieldRange &FieldRangeSet::range( const char *fieldName ) const {
         map<string,FieldRange>::const_iterator f = _ranges.find( fieldName );
         if ( f == _ranges.end() )
@@ -87,8 +65,10 @@ namespace mongo {
 
     inline FieldRange &FieldRangeSet::range( const char *fieldName ) {
         map<string,FieldRange>::iterator f = _ranges.find( fieldName );
-        if ( f == _ranges.end() )
-            return trivialRange();
+        if ( f == _ranges.end() ) {
+            _ranges.insert( make_pair( string( fieldName ), trivialRange() ) );
+            return _ranges.find( fieldName )->second;
+        }
         return f->second;
     }
 
@@ -102,9 +82,28 @@ namespace mongo {
     }
 
     inline bool FieldRangeSet::matchPossible() const {
-        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i )
-            if ( i->second.empty() )
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            if ( i->second.empty() ) {
                 return false;
+            }
+        }
+        return true;
+    }
+    
+    inline bool FieldRangeSet::matchPossibleForIndex( const BSONObj &keyPattern ) const {
+        if ( !_singleKey ) {
+            return matchPossible();   
+        }
+        BSONObjIterator i( keyPattern );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.fieldName() == string( "$natural" ) ) {
+                return true;
+            }
+            if ( range( e.fieldName() ).empty() ) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -116,16 +115,16 @@ namespace mongo {
         return ret;
     }
 
-    inline FieldRangeSet *FieldRangeOrSet::topFrs() const {
-        FieldRangeSet *ret = new FieldRangeSet( _baseSet );
+    inline FieldRangeSetPair *FieldRangeOrSet::topFrsp() const {
+        FieldRangeSetPair *ret = new FieldRangeSetPair( _baseSet );
         if (_orSets.size()) {
             *ret &= _orSets.front();
         }
         return ret;
     }
 
-    inline FieldRangeSet *FieldRangeOrSet::topFrsOriginal() const {
-        FieldRangeSet *ret = new FieldRangeSet( _baseSet );
+    inline FieldRangeSetPair *FieldRangeOrSet::topFrspOriginal() const {
+        FieldRangeSetPair *ret = new FieldRangeSetPair( _baseSet );
         if (_originalOrSets.size()) {
             *ret &= _originalOrSets.front();
         }
