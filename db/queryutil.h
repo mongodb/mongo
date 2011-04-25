@@ -207,7 +207,7 @@ namespace mongo {
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
         static FieldRange *__singleKeyTrivialRange;
         static FieldRange *__multiKeyTrivialRange;
-        FieldRange &trivialRange() const;
+        const FieldRange &trivialRange() const;
         map<string,FieldRange> _ranges;
         const char *_ns;
         // Owns memory for FieldRange BSONElements.

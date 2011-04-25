@@ -878,7 +878,7 @@ namespace mongo {
     
     FieldRange *FieldRangeSet::__singleKeyTrivialRange = 0;
     FieldRange *FieldRangeSet::__multiKeyTrivialRange = 0;
-    FieldRange &FieldRangeSet::trivialRange() const {
+    const FieldRange &FieldRangeSet::trivialRange() const {
         FieldRange *&ret = _singleKey ? __singleKeyTrivialRange : __multiKeyTrivialRange;
         if ( ret == 0 ) {
             ret = new FieldRange( BSONObj().firstElement(), _singleKey, false, true );
