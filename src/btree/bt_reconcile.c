@@ -1424,14 +1424,16 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 				WT_RET(__rec_row_merge(session, rp));
 			}
 
-			/* Delete overflow keys referencing deleted pages. */
-			if (F_ISSET(rp, WT_PAGE_DELETED) &&
-			    WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
-				WT_RET(__rec_discard_add(session,
-				    WT_CELL_BYTE_OVFL(key_cell),
-				    WT_DISCARD_OVFL));
-
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
+				/*
+				 * Delete overflow keys referencing pages
+				 * being discarded.
+				 */
+				if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
+					WT_RET(__rec_discard_add(session,
+					    WT_CELL_BYTE_OVFL(key_cell),
+					    WT_DISCARD_OVFL));
+
 				WT_RET(__rec_discard_add(session, rp, 0));
 				continue;
 			}
@@ -1491,9 +1493,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 	WT_CLEAR(key);
 	r = S2C(session)->cache->rec;
 
-	/*
-	 * For each entry in the in-memory page...
-	 */
+	/* For each entry in the in-memory page... */
 	WT_ROW_REF_FOREACH(page, rref, i) {
 		/*
 		 * The page may be deleted or internally created during a split.
@@ -2401,8 +2401,7 @@ __rec_discard_evict(SESSION *session, int evict)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __rec_inmemory_chk --
- *	We're about to mark a page reference inactive -- confirm there are
- * no in-memory pages in the subtree.
+ *	Confirm there are no in-memory pages in the subtree.
  */
 static void
 __rec_inmemory_chk(SESSION *session, WT_PAGE *page)
