@@ -138,6 +138,11 @@ namespace mongo {
             const char* ns = jsobj.getStringField( "checkShardingIndex" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            if ( keyPattern.nFields() == 1 && str::equals( "_id" , keyPattern.firstElement().fieldName() ) ) {
+                result.appendBool( "idskip" , true );
+                return true;
+            }
+
             // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
@@ -211,6 +216,9 @@ namespace mongo {
                     return false;
                 }
                 cc->advance();
+
+                if ( ! cc->yieldSometimes() ) 
+                    break;
             }
 
             return true;
