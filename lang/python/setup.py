@@ -8,8 +8,7 @@ if not 'ARCHFLAGS' in os.environ:
 dir = os.path.dirname(sys.argv[0])
 
 setup(name='wiredtiger', version='1.0',
-    ext_modules=[Extension('_wiredtiger', ['wiredtiger.i'],
-	    swig_opts=['-I.', '-I' + dir],
+    ext_modules=[Extension('_wiredtiger', [os.path.join(dir, 'wiredtiger.i')],
 	    include_dirs=['.'],
 	    library_dirs=['.'],
 	    libraries=['wiredtiger'],

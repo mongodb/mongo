@@ -28,7 +28,6 @@ prototype.chk: $(libwiredtiger_a_SOURCES)
 if PYTHON
 if DEBUG
 PY_SETUP_DEBUG = -g
-wiredtiger_wrap_o_CFLAGS = -g
 endif
 all-local: _wiredtiger.so
 endif

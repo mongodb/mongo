@@ -16,14 +16,14 @@ import unittest
 # Set paths
 suitedir = sys.path[0]
 wt_disttop = os.path.dirname(os.path.dirname(suitedir))
-wt_builddir = wt_disttop + os.sep + 'build_posix'
+wt_builddir = os.path.join(wt_disttop, 'build_posix')
 
 # Cannot import wiredtiger until we set up paths
 sys.path.append(wt_builddir)
+sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
 
-# May be needed on some systems?
-#os.environ['LD_LIBRARY_PATH'] = builddir
-#os.environ['DYLD_LIBRARY_PATH'] = builddir   # for OS/X
+# These may be needed on some systems
+#os.environ['LD_LIBRARY_PATH'] = os.environ['DYLD_LIBRARY_PATH'] = wt_builddir
 
 import wiredtiger
 import wttest

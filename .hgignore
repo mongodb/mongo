@@ -4,8 +4,7 @@
 \.class$
 ^build.*/(\.deps|COPYING|ChangeLog|INSTALL|Makefile.*|NEWS|README)
 ^build.*/(aclocal\.m4|config\..*|configure|stamp-h1|prototype.chk|w.*\.h)
-^build.*/(ex_.*|lib.*|wt_.*)
-^build.*/(_wiredtiger.so|wiredtiger.py|wiredtiger_wrap.c)
+^build.*/(ex_.*|lib.*|wt_.*|_wiredtiger.so)
 ^build_posix/gnu-support/(depcomp|install-sh|missing)
 ^build_posix/autom4te.cache
 ^docs/(doxygen.log|installdox|search)
@@ -13,6 +12,7 @@
 ^docs/java
 ^docs/latex
 ^docs/python
+^lang/python/(wiredtiger.py|wiredtiger_wrap.c)
 ^src/server
 ^test/bt/(CONFIG|__rand|__wt.bdb|__wt.run|__wt.wt|db|t|vgout\..*)
 /tags$
