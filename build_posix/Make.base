@@ -30,6 +30,9 @@ if DEBUG
 PY_SETUP_DEBUG = -g
 endif
 all-local: _wiredtiger.so
+../lang/python/wiredtiger_wrap.c: wiredtiger.h ../lang/python/wiredtiger.i
+	@(cd ../lang/python && swig -python -I../../build_posix wiredtiger.i)
+
+_wiredtiger.so: libwiredtiger.a ../lang/python/wiredtiger_wrap.c
+	@(python ../lang/python/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG))
 endif
-_wiredtiger.so: libwiredtiger.a ../lang/python/wiredtiger.i
-	@(python ../lang/python/setup.py build_ext -f -i $(PY_SETUP_DEBUG))
