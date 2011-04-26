@@ -13,7 +13,7 @@ t: ${OBJS} ${LIB}
 	cc ${CFLAGS} -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB} -lpthread
 
 clean:
-	rm -f t ${OBJS} dbm.db *.core vgout.* vgcore*
+	rm -f t ${OBJS} *.core dbm.db dbm.dump vgcore* vgout.* xx.log
 
 distclean realclean: clean
 	rm -f __* tags
