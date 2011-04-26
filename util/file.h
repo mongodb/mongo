@@ -171,7 +171,14 @@ namespace mongo {
             err( ::pwrite(fd, data, len, o) == (int) len );
         }
         void read(fileofs o, char *data, unsigned len) {
-            err( ::pread(fd, data, len, o) == (int) len );
+            ssize_t s = ::pread(fd, data, len, o);
+            if( s == -1 ) {
+                err(false);
+            }
+            else if( s != (int) len ) { 
+                _bad = true;
+                log() << "File error read:" << s << " bytes, wanted:" << len << " ofs:" << o << endl;
+            }
         }
         bool bad() { return _bad; }
         bool is_open() { return fd > 0; }
