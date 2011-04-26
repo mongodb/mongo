@@ -10,6 +10,7 @@
 #include "wt_internal.h"
 
 static WT_CONNECTION *wt_conn;
+static WT_SESSION *wt_session;
 
 /*
  * wiredtiger_simple_setup --
@@ -21,18 +22,18 @@ wiredtiger_simple_setup(const char *progname,
 {
 	BTREE *btree;
 	CONNECTION *conn;
-	SESSION *session;
 	int ret;
 
 	btree = *dbp = NULL;
 
-	if ((ret = wiredtiger_open(NULL, handler, config, &wt_conn)) != 0) {
+	if ((ret = wiredtiger_open(NULL, handler, config, &wt_conn)) != 0 ||
+	    (ret = wt_conn->open_session(wt_conn,
+	    NULL, NULL, &wt_session)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_open: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		return (ret);
 	}
 	conn = (CONNECTION *)wt_conn;
-	session = &conn->default_session;
 
 	if ((ret = conn->btree(conn, 0, &btree)) != 0) {
 		fprintf(stderr, "%s: conn.btree: %s\n",
@@ -57,8 +58,8 @@ wiredtiger_simple_teardown(const char *progname, BTREE *btree)
 	int ret, tret;
 
 	ret = 0;
-	if (btree != NULL && (tret = btree->close(btree,
-	    &((CONNECTION *)wt_conn)->default_session, 0)) != 0) {
+	if (btree != NULL &&
+	    (tret = btree->close(btree, (SESSION *)wt_session, 0)) != 0) {
 		fprintf(stderr, "%s: Db.close: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		if (ret == 0)
