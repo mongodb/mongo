@@ -726,7 +726,6 @@ namespace mongo {
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) {
         rwlock lk( _lock , false );
-        DEV PRINT(query);
 
         //TODO look into FieldRangeSetOr
         FieldRangeOrSet fros(_ns.c_str(), query, false);
@@ -761,9 +760,6 @@ namespace mongo {
             for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it) {
                 BSONObj minObj = it->first.replaceFieldNames(_key.key());
                 BSONObj maxObj = it->second.replaceFieldNames(_key.key());
-
-                DEV PRINT(minObj);
-                DEV PRINT(maxObj);
 
                 ChunkRangeMap::const_iterator min, max;
                 min = _chunkRanges.upper_bound(minObj);
