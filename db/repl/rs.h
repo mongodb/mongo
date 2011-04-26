@@ -505,6 +505,7 @@ namespace mongo {
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
         _config(*c), _h(h), _hbinfo(ord) {
+        assert(c);
         if( self )
             _hbinfo.health = 1.0;
     }
