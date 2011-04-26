@@ -7,6 +7,7 @@ baseName = "jstests_dropdb";
 ddb = db.getSisterDB( baseName );
 
 ddb.c.save( {} );
+ddb.getLastError();
 assert.neq( -1, m.getDBNames().indexOf( baseName ) );
 
 ddb.dropDatabase();
