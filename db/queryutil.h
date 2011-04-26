@@ -278,7 +278,7 @@ namespace mongo {
         FieldRangeSet _singleKey;
         FieldRangeSet _multiKey;
         friend class FieldRangeOrSet;
-        friend class QueryUtilIndexed;
+        friend struct QueryUtilIndexed;
     };
     
     class IndexSpec;
@@ -407,7 +407,7 @@ namespace mongo {
         // ensure memory is owned
         list<FieldRangeSetPair> _oldOrSets;
         bool _orFound;
-        friend class QueryUtilIndexed;
+        friend struct QueryUtilIndexed;
     };
 
     /** returns a string that when used as a matcher, would match a super set of regex()
