@@ -43,8 +43,8 @@ class test001(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.cursor_s(self.table_name1, 'somekey')
         self.pr('search')
-        ####ret = cursor.search()
-        ####self.assertTrue(ret == wiredtiger.WT_NOTFOUND)
+        ret = cursor.search()
+        self.assertTrue(ret == wiredtiger.WT_NOTFOUND)
         self.pr('closing cursor')
         cursor.close(None)
 
@@ -56,14 +56,14 @@ class test001(wttest.WiredTigerTestCase):
 
         self.pr('insert')
         inscursor = self.cursor_ss(self.table_name2, 'key1', 'value1')
-        ####inscursor.insert()
+        inscursor.insert()
         inscursor.close
 
         self.pr('search')
         getcursor = self.cursor_s(self.table_name2, 'key1')
-        ####ret = getcursor.search()
-        ####self.assertTrue(ret == 0)
-        ####self.assertTrue(getcursor.get_value(), 'value1')
+        ret = getcursor.search()
+        self.assertTrue(ret == 0)
+        self.assertTrue(getcursor.get_value(), 'value1')
         self.pr('closing cursor')
         getcursor.close(None)
 
