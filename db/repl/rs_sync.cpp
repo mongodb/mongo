@@ -488,7 +488,11 @@ namespace mongo {
                are no heartbeat threads, so we do it here to be sure.  this is relevant if the singleton
                member has done a stepDown() and needs to come back up.
                */
-            OCCASIONALLY mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+            OCCASIONALLY {
+            	log() << "default rs heartbeat starting..." << endl;
+            	mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+            	log() << "rs heartbeat finished" << endl;
+            }
         }
     }
 
