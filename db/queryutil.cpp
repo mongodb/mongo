@@ -448,6 +448,9 @@ namespace mongo {
 
     const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
         if ( !_singleKey && nontrivial() ) {
+            if ( other <= *this ) {
+             	*this = other;
+            }
             return *this;
         }
         vector<FieldInterval> newIntervals;
@@ -586,7 +589,7 @@ namespace mongo {
     }
 
     // TODO write a proper implementation that doesn't do a full copy
-    bool FieldRange::operator<=( const FieldRange &other ) {
+    bool FieldRange::operator<=( const FieldRange &other ) const {
         FieldRange temp = *this;
         temp -= other;
         return temp.empty();

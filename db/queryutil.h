@@ -70,7 +70,7 @@ namespace mongo {
         /** @return Range of elements elements included in 'this' but not 'other'. */
         const FieldRange &operator-=( const FieldRange &other );
         /** @return true iff this range is a subset of 'other'. */
-        bool operator<=( const FieldRange &other );
+        bool operator<=( const FieldRange &other ) const;
 
         /**
          * If there are any valid values for this range, the extreme values can
@@ -100,7 +100,7 @@ namespace mongo {
         /**
          * Constructs a range where all FieldIntervals and FieldBounds are in
          * the opposite order of the current range.
-         * NOTE the resulting intervals may not be strictValid().
+         * NOTE the resulting intervals might not be strictValid().
          */
         void reverse( FieldRange &ret ) const;
     private:

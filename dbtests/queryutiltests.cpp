@@ -706,7 +706,11 @@ namespace QueryUtilTests {
             virtual BSONObj obj() const { return BSONObj(); }
         };
 
-        class SetIntersect {
+    } // namespace FieldRangeTests
+
+    namespace FieldRangeSetTests {
+
+        class Intersect {
         public:
             void run() {
                 FieldRangeSet frs1( "", fromjson( "{b:{$in:[5,6]},c:7,d:{$in:[8,9]}}" ), true );
@@ -715,11 +719,7 @@ namespace QueryUtilTests {
                 ASSERT_EQUALS( fromjson( "{a:1,b:5,c:7,d:{$gte:8,$lte:9},e:10}" ), frs1.simplifiedQuery( BSONObj() ) );
             }
         };
-
-    } // namespace FieldRangeTests
-
-    namespace FieldRangeSetTests {
-
+        
         class MultiKeyIntersect {
         public:
             void run() {
@@ -733,6 +733,10 @@ namespace QueryUtilTests {
                 // multikey match.
                 frs1 &= frs3;
                 ASSERT_EQUALS( frs2.simplifiedQuery( BSONObj() ), frs1.simplifiedQuery( BSONObj() ) );
+                // Now intersect with a fully contained range.
+                FieldRangeSet frs4( "", BSON( "a" << GT << 6 ), false );
+                frs1 &= frs4;
+                ASSERT_EQUALS( frs4.simplifiedQuery( BSONObj() ), frs1.simplifiedQuery( BSONObj() ) );                
             }
         };
         
@@ -969,7 +973,7 @@ namespace QueryUtilTests {
             add< FieldRangeTests::Diff64 >();
             add< FieldRangeTests::DiffMulti1 >();
             add< FieldRangeTests::DiffMulti2 >();
-            add< FieldRangeTests::SetIntersect >();
+            add< FieldRangeSetTests::Intersect >();
             add< FieldRangeSetTests::MultiKeyIntersect >();
             add< FieldRangeSetTests::MultiKeyDiff >();
             add< FieldRangeSetTests::MatchPossible >();
