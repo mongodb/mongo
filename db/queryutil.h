@@ -222,7 +222,7 @@ namespace mongo {
      * indexes and the other representing constraints for multi key indexes and
      * unindexed scans.  In several member functions the caller is asked to
      * supply an index so that the implementation may utilize the proper
-     * FieldRangeSet and return results that are appropriate with respect to the
+     * FieldRangeSet and return results that are appropriate with respect to that
      * supplied index.
      */
     class FieldRangeSetPair {
