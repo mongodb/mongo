@@ -216,7 +216,7 @@ __wt_cursor_open(SESSION *session,
 	WT_CONFIG_ITEM cvalue;
 	WT_CURSOR *cursor;
 	const char *key_format, *value_format;
-	int bulk, dump, ret;
+	int bulk, dump, raw, ret;
 	size_t csize;
 
 	conn = S2C(session);
@@ -245,12 +245,14 @@ __wt_cursor_open(SESSION *session,
 		value_format = btree_session->value_format;
 	}
 
-	bulk = dump = 0;
+	bulk = dump = raw = 0;
 	CONFIG_LOOP(session, config, cvalue)
-		CONFIG_ITEM("dump")
-			dump = (cvalue.val != 0);
 		CONFIG_ITEM("bulk")
 			bulk = (cvalue.val != 0);
+		CONFIG_ITEM("dump")
+			dump = (cvalue.val != 0);
+		CONFIG_ITEM("raw")
+			raw = (cvalue.val != 0);
 	CONFIG_END(session);
 
 	csize = bulk ? sizeof(CURSOR_BULK) : sizeof(CURSOR_BTREE);
@@ -268,6 +270,8 @@ __wt_cursor_open(SESSION *session,
 		WT_ERR(__wt_curbulk_init((CURSOR_BULK *)cbt));
 	if (dump)
 		__wt_curdump_init(cursor);
+	if (raw)
+		F_SET(cursor, WT_CURSTD_RAW);
 
 	STATIC_ASSERT(offsetof(CURSOR_BTREE, iface) == 0);
 	TAILQ_INSERT_HEAD(&session->cursors, cursor, q);

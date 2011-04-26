@@ -83,7 +83,6 @@ struct wt_extractor;	    typedef struct wt_extractor WT_EXTRACTOR;
 struct wt_item;		    typedef struct wt_item WT_ITEM;
 struct wt_session;	    typedef struct wt_session WT_SESSION;
 
-#ifndef SWIG
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
  * a length (limited to 4GB for items stored in tables).  Records consist of a
@@ -130,7 +129,6 @@ typedef struct {
 /*!
  * @endinternal
  */
-#endif
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
@@ -371,12 +369,12 @@ struct wt_cursor {
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
-#define	WT_CURSTD_KEY_SET	0x01
-#define	WT_CURSTD_KEY_RAW	0x02
-#define	WT_CURSTD_VALUE_RAW	0x04
-#define	WT_CURSTD_VALUE_SET	0x08
-#define	WT_CURSTD_POSITIONED	0x10
-#define	WT_CURSTD_RAW		0x20
+#define	WT_CURSTD_KEY_RAW	0x01
+#define	WT_CURSTD_KEY_SET	0x02
+#define	WT_CURSTD_POSITIONED	0x04
+#define	WT_CURSTD_RAW		0x08
+#define	WT_CURSTD_VALUE_RAW	0x10
+#define	WT_CURSTD_VALUE_SET	0x20
 	uint32_t flags;
 #endif
 };
@@ -926,7 +924,6 @@ struct wt_event_handler {
  */
 int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
 
-#ifndef SWIG
 /*! Pack a structure into a buffer.
  *
  * stdarg version of ::wiredtiger_struct_pack.
@@ -939,7 +936,6 @@ int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
  */
 int wiredtiger_struct_packv(void *buffer, size_t size,
     const char *format, va_list ap);
-#endif
 
 /*! Calculate the size required to pack a structure.
  *
@@ -957,7 +953,6 @@ int wiredtiger_struct_packv(void *buffer, size_t size,
  */
 size_t wiredtiger_struct_size(const char *format, ...);
 
-#ifndef SWIG
 /*! Calculate the size required to pack a structure.
  *
  * stdarg version of ::wiredtiger_struct_size.
@@ -968,7 +963,6 @@ size_t wiredtiger_struct_size(const char *format, ...);
  * ::wiredtiger_struct_pack
  */
 size_t wiredtiger_struct_sizev(const char *format, va_list ap);
-#endif
 
 /*! Unpack a structure from a buffer.
  *
@@ -986,7 +980,6 @@ size_t wiredtiger_struct_sizev(const char *format, va_list ap);
 int wiredtiger_struct_unpack(const void *buffer, size_t size,
     const char *format, ...);
 
-#ifndef SWIG
 /*! Unpack a structure from a buffer.
  *
  * stdarg version of ::wiredtiger_struct_unpack.
@@ -999,7 +992,6 @@ int wiredtiger_struct_unpack(const void *buffer, size_t size,
  */
 int wiredtiger_struct_unpackv(const void *buffer, size_t size,
     const char *format, va_list ap);
-#endif
 
 /*! Get version information.
  *
@@ -1047,7 +1039,6 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * @{
  */
 
-#ifndef SWIG
 /*!
  * The interface implemented by applications to provide custom ordering of
  * records.  Applications register their implementation with WiredTiger by
@@ -1117,7 +1108,6 @@ struct wt_extractor {
  */
 extern int wiredtiger_extension_init(WT_CONNECTION *connection,
     const char *config);
-#endif
 
 #ifdef __cplusplus
 }
