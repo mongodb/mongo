@@ -162,10 +162,7 @@ typedef struct {
 	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
 } WT_RECONCILE;
 
-#undef	SI
-#define	SI	static inline
-
-SI uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
+static uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
 static int  __rec_col_fix(SESSION *, WT_PAGE *);
 static int  __rec_col_int(SESSION *, WT_PAGE *);
 static int  __rec_col_int_clean(SESSION *, WT_PAGE *);
@@ -182,7 +179,7 @@ static int  __rec_imref_fixup(SESSION *, WT_PAGE *, WT_SPLIT *);
 static void __rec_imref_init(SESSION *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
 static void __rec_imref_steal(SESSION *, WT_SPLIT *);
-SI void	    __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
+static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
 static int  __rec_init(SESSION *);
 static int  __rec_parent_update(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
