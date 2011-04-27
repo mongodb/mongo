@@ -1374,7 +1374,7 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 
 	/*
 	 * We have to walk both the WT_ROW structures and the original page --
-	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
+	 * see the comment at WT_ROW_REF_AND_KEY_FOREACH for details.
 	 *
 	 * For each entry in the in-memory page...
 	 */
@@ -1619,7 +1619,7 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 	 * Walk the page, writing key/value pairs.
 	 *
 	 * We have to walk both the WT_ROW structures and the original page --
-	 * see the comment at WT_INDX_AND_KEY_FOREACH for details.
+	 * see the comment at WT_ROW_AND_KEY_FOREACH for details.
 	 */
 	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i) {
 		/*
