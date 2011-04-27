@@ -34,11 +34,11 @@ namespace mongo {
     public:
         // virtuals from Command
         virtual ~PipelineCommand();
-        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg,
-                         BSONObjBuilder& result, bool fromRepl);
+        virtual bool run(const string &db, BSONObj &cmdObj, string &errmsg,
+                         BSONObjBuilder &result, bool fromRepl);
         virtual LockType locktype() const;
         virtual bool slaveOk() const;
-        virtual void help(stringstream& help) const;
+        virtual void help(stringstream &help) const;
 
         PipelineCommand();
     };
@@ -110,12 +110,12 @@ namespace mongo {
 	     shardBson.jsonString(Strict, 1) << "\n----\n").flush();
 
 	/* for debugging purposes, show what the pipeline now looks like */
-	{
+	DEV {
 	    BSONObjBuilder pipelineBuilder;
 	    pPipeline->toBson(&pipelineBuilder);
 	    BSONObj pipelineBson(pipelineBuilder.done());
-	    DEV (log() << "\n---- pipelineBson\n" <<
-		 pipelineBson.jsonString(Strict, 1) << "\n----\n").flush();
+	    (log() << "\n---- pipelineBson\n" <<
+	     pipelineBson.jsonString(Strict, 1) << "\n----\n").flush();
 	}
 
 	/* on the shard servers, create the local pipeline */

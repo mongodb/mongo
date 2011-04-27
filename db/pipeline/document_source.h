@@ -18,6 +18,7 @@
 
 #include "pch.h"
 
+#include "client/parallel.h"
 #include "db/jsobj.h"
 #include "db/pipeline/value.h"
 
@@ -166,6 +167,54 @@ namespace mongo {
 	BSONObjIterator arrayIterator;
 	BSONElement currentElement;
 	bool haveCurrent;
+    };
+
+    
+    class DocumentSourceCommandFutures :
+	public DocumentSource {
+    public:
+	// virtuals from DocumentSource
+	virtual ~DocumentSourceCommandFutures();
+        virtual bool eof();
+        virtual bool advance();
+        virtual boost::shared_ptr<Document> getCurrent();
+	virtual void setSource(boost::shared_ptr<DocumentSource> pSource);
+
+	/* convenient shorthand for a commonly used type */
+	typedef list<boost::shared_ptr<Future::CommandResult> > FuturesList;
+
+	/*
+	  Create a DocumentSource that wraps a list of Command::Futures.
+
+	  @param errmsg place to write error messages to; must exist for the
+	    lifetime of the created DocumentSourceCommandFutures
+	  @param pList the list of futures
+	 */
+	static boost::shared_ptr<DocumentSourceCommandFutures> create(
+	    string &errmsg, FuturesList *pList);
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+    private:
+	DocumentSourceCommandFutures(string &errmsg, FuturesList *pList);
+
+	/*
+	  Advance to the next document, setting pCurrent appropriately.
+
+	  Adjusts pCurrent, pBsonSource, and iterator, as needed.  On exit,
+	  pCurrent is the Document to return, or NULL.  If NULL, this
+	  indicates there is nothing more to return.
+	 */
+	void getNextDocument();
+
+	bool newSource; // set to true for the first item of a new source
+	boost::shared_ptr<DocumentSourceBsonArray> pBsonSource;
+	boost::shared_ptr<Document> pCurrent;
+	FuturesList::iterator iterator;
+	FuturesList::iterator listEnd;
+	string &errmsg;
     };
 
 

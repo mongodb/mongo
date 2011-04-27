@@ -18,7 +18,7 @@
 
 #include "pch.h"
 
-#include "jsobj.h"
+#include "db/jsobj.h"
 #include "util/timer.h"
 #include "db/commands.h"
 

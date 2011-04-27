@@ -224,6 +224,12 @@ namespace mongo {
         return pDocumentValue;
     }
 
+    ValueIterator::~ValueIterator() {
+    }
+
+    Value::vi::~vi() {
+    }
+
     bool Value::vi::more() const {
         return (nextIndex < size);
     }

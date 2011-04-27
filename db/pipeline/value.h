@@ -27,6 +27,8 @@ namespace mongo {
 
     class ValueIterator {
     public:
+        ~ValueIterator();
+
         /*
           Ask if there are more fields to return.
 
@@ -270,6 +272,7 @@ namespace mongo {
                 boost::noncopyable {
         public:
             // virtuals from ValueIterator
+	    virtual ~vi();
             virtual bool more() const;
             virtual boost::shared_ptr<const Value> next();
 

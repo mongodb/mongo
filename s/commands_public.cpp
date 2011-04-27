@@ -25,6 +25,7 @@
 #include "../db/commands.h"
 #include "../db/query.h"
 #include "../db/commands/pipeline.h"
+#include "../db/pipeline/document_source.h"
 
 #include "config.h"
 #include "chunk.h"
@@ -1088,7 +1089,7 @@ namespace mongo {
 	      If the system isn't running sharded, or the target collection
 	      isn't sharded, pass this on to a mongod.
 	    */
-	    DBConfigPtr conf = grid.getDBConfig( dbName , false );
+	    DBConfigPtr conf = grid.getDBConfig(dbName , false);
 	    if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
 		return passthrough(conf, cmdObj, result);
 
@@ -1101,9 +1102,10 @@ namespace mongo {
 	    pShardPipeline->toBson(&commandBuilder);
 	    BSONObj shardedCommand(commandBuilder.done());
 
-	    BSONObj shardQuery;
+	    BSONObjBuilder shardQueryBuilder;
 	        // CW TODO need to extract this from pShardPipeline!!
-	    assert(false && "unimplemented");
+	        // left empty like this, the predicate is "{}"
+	    BSONObj shardQuery(shardQueryBuilder.done());
 
 	    ChunkManagerPtr cm(conf->getChunkManager(fullns));
 	    set<Shard> shards;
@@ -1127,32 +1129,40 @@ namespace mongo {
 		shardConns.push_back(temp);
 	    }
                     
-	    bool failed = false;
-                    
+	    /* wrap the list of futures with a source */
+	    shared_ptr<DocumentSourceCommandFutures> pSource(
+		DocumentSourceCommandFutures::create(errmsg, &futures));
+
+	    /* run the pipeline */
+	    bool failed = pPipeline->run(result, errmsg, pSource);
+
+/*
 	    BSONObjBuilder shardresults;
 	    for (list<boost::shared_ptr<Future::CommandResult> >::iterator i(
 		     futures.begin()); i!=futures.end(); ++i) {
-		boost::shared_ptr<Future::CommandResult> res = *i;
-		 if (!res->join()) {
-		     error() << "sharded m/r failed on shard: " << res->getServer() << " error: " << res->result() << endl;
-		     result.append( "cause" , res->result() );
-		     errmsg = "mongod mr failed: ";
-		     errmsg += res->result().toString();
-		     failed = true;
-		     continue;
-		 }
-		 shardresults.append( res->getServer() , res->result() );
-		 }
+		boost::shared_ptr<Future::CommandResult> res(*i);
+		if (!res->join()) {
+		    error() << "sharded pipeline failed on shard: " <<
+			res->getServer() << " error: " << res->result() << endl;
+		    result.append( "cause" , res->result() );
+		    errmsg = "mongod pipeline failed: ";
+		    errmsg += res->result().toString();
+		    failed = true;
+		    continue;
+		}
 
-	    for ( unsigned i=0; i<shardConns.size(); i++ )
+		shardresults.append( res->getServer() , res->result() );
+	    }
+*/
+
+	    for(unsigned i = 0; i < shardConns.size(); ++i)
 		shardConns[i]->done();
 
-	    if (failed)
+	    if (failed && (errmsg.length() > 0))
 		return false;
 
 	    return true;
 	}
-
 
     } // namespace pub_grid_cmds
 } // namespace mongo

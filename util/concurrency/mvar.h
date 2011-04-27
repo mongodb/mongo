@@ -15,6 +15,8 @@
  *    limitations under the License.
  */
 
+#pragma once
+
 namespace mongo {
 
     /* This is based on haskell's MVar synchronization primitive:
