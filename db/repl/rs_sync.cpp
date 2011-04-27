@@ -467,7 +467,10 @@ namespace mongo {
         */
 
         while( 1 ) {
-            if( myConfig().arbiterOnly )
+            // After a reconfig, we may not be in the replica set anymore, so
+            // check that we are in the set (and not an arbiter) before
+            // trying to sync with other replicas.
+            if( ! _self || myConfig().arbiterOnly )
                 return;
 
             try {
