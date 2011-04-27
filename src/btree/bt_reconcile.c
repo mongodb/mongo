@@ -172,11 +172,11 @@ static int  __rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __rec_col_var(SESSION *, WT_PAGE *);
 static int  __rec_discard_add(SESSION *, void *object, uint32_t);
 static int  __rec_discard_evict(SESSION *, int);
-static void __rec_discard_init(SESSION *);
+static void __rec_discard_init(WT_RECONCILE *);
 static int  __rec_imref_add(SESSION *, WT_REF *);
 static int  __rec_imref_bsearch_cmp(const void *, const void *);
 static int  __rec_imref_fixup(SESSION *, WT_PAGE *, WT_SPLIT *);
-static void __rec_imref_init(SESSION *);
+static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
 static void __rec_imref_steal(SESSION *, WT_SPLIT *);
 static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
@@ -215,6 +215,9 @@ __rec_init(SESSION *session)
 	if ((r = S2C(session)->cache->rec) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
 		S2C(session)->cache->rec = r;
+
+		/* Allocate a scratch buffer to hold new disk images. */
+		WT_RET(__wt_scr_alloc(session, 0, &r->dsk));
 	}
 
 	/*
@@ -222,14 +225,14 @@ __rec_init(SESSION *session)
 	 * are discarded when the page is discarded.  That tracking is done per
 	 * reconciliation run, initialize it before anything else.
 	 */
-	__rec_discard_init(session);
+	__rec_discard_init(r);
 
 	/*
 	 * During internal page reconcilition we track in-memory subtrees we
 	 * find in the page.  That tracking is done per reconciliation run,
 	 * initialize it before anything else.
 	 */
-	__rec_imref_init(session);
+	__rec_imref_init(r);
 
 	return (0);
 }
@@ -245,10 +248,17 @@ __wt_rec_destroy(SESSION *session)
 	WT_SPLIT *spl;
 	uint32_t i;
 
-	r = S2C(session)->cache->rec;
+	if ((r = S2C(session)->cache->rec) == NULL)
+		return;
+
+	__wt_scr_release(&r->dsk);
 
 	if (r->discard != NULL)
 		__wt_free(session, r->discard);
+	if (r->bnd != NULL)
+		__wt_free(session, r->bnd);
+	if (r->imref != NULL)
+		__wt_free(session, r->imref);
 
 	if (r->split != NULL) {
 		for (spl = r->split, i = 0; i < r->split_entries; ++spl, ++i) {
@@ -260,8 +270,8 @@ __wt_rec_destroy(SESSION *session)
 		}
 		__wt_free(session, r->split);
 	}
-	if (r->bnd != NULL)
-		__wt_free(session, r->bnd);
+
+	__wt_free(session, r);
 }
 
 /*
@@ -507,8 +517,8 @@ __rec_split_init(
 
 	r = S2C(session)->cache->rec;
 
-	/* Allocate a scratch buffer to hold the new disk image. */
-	WT_RET(__wt_scr_alloc(session, max, &r->dsk));
+	/* Ensure the scratch buffer is large enough. */
+	WT_RET(__wt_buf_setsize(session, r->dsk, (size_t)max));
 
 	/*
 	 * Some fields of the disk image are fixed based on the original page,
@@ -2278,12 +2288,8 @@ __rec_imref_fixup(SESSION *session, WT_PAGE *page, WT_SPLIT *spl)
  *	Initialize the list of in-memory subtree references.
  */
 static void
-__rec_imref_init(SESSION *session)
+__rec_imref_init(WT_RECONCILE *r)
 {
-	WT_RECONCILE *r;
-
-	r = S2C(session)->cache->rec;
-
 	r->imref_next = 0;
 }
 
@@ -2331,12 +2337,8 @@ __rec_imref_add(SESSION *session, WT_REF *ref)
  *	Initialize the list of discard objects.
  */
 static void
-__rec_discard_init(SESSION *session)
+__rec_discard_init(WT_RECONCILE *r)
 {
-	WT_RECONCILE *r;
-
-	r = S2C(session)->cache->rec;
-
 	r->discard_next = 0;
 }
 
@@ -2391,7 +2393,7 @@ __rec_discard_evict(SESSION *session, int evict)
 			__wt_page_free(session, r->discard[i].object);
 	}
 
-	__rec_discard_init(session);
+	__rec_discard_init(r);
 	return (0);
 }
 
