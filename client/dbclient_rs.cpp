@@ -530,7 +530,7 @@ namespace mongo {
             // we're ok sending to a slave
             // we'll try 2 slaves before just using master
             // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<2; i++ ) {
+            for ( int i=0; i<3; i++ ) {
                 try {
                     return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
                 }
@@ -548,7 +548,7 @@ namespace mongo {
             // we're ok sending to a slave
             // we'll try 2 slaves before just using master
             // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<2; i++ ) {
+            for ( int i=0; i<3; i++ ) {
                 try {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
@@ -581,7 +581,7 @@ namespace mongo {
             DbMessage dm( toSend );
             QueryMessage qm( dm );
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<2; i++ ) {
+                for ( int i=0; i<3; i++ ) {
                     try {
                         return checkSlave()->callLazy( toSend );
                     }
@@ -601,7 +601,7 @@ namespace mongo {
             DbMessage dm( toSend );
             QueryMessage qm( dm );
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<2; i++ ) {
+                for ( int i=0; i<3; i++ ) {
                     try {
                         DBClientConnection* s = checkSlave();
                         if ( actualServer )
