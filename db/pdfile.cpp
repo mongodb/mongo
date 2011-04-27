@@ -443,13 +443,20 @@ namespace mongo {
     }
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
+        {
+            // make sizes align with VM page size
+            int newSize = (approxSize + 0xfff) & 0xfffff000;
+            assert( newSize >= 0 );
+            if( newSize < Extent::maxSize() )
+                approxSize = newSize;
+        }
         massert( 10357 ,  "shutdown in progress", ! inShutdown() );
         massert( 10358 ,  "bad new extent size", approxSize >= Extent::minSize() && approxSize <= Extent::maxSize() );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
-        int ExtentSize = approxSize <= header()->unusedLength ? approxSize : header()->unusedLength;
+        int ExtentSize = min(header()->unusedLength, approxSize);
         DiskLoc loc;
         if ( ExtentSize < Extent::minSize() ) {
-            /* not there could be a lot of looping here is db just started and
+            /* note there could be a lot of looping here is db just started and
                no files are open yet.  we might want to do something about that. */
             if ( loops > 8 ) {
                 assert( loops < 10000 );
@@ -460,9 +467,9 @@ namespace mongo {
         }
         int offset = header()->unused.getOfs();
 
-        DataFileHeader *h = getDur().writing(header());
-        h->unused.set( fileNo, offset + ExtentSize );
-        h->unusedLength -= ExtentSize;
+        DataFileHeader *h = header();
+        h->unused.writing().set( fileNo, offset + ExtentSize );
+        getDur().writingInt(h->unusedLength) = h->unusedLength - ExtentSize;
         loc.set(fileNo, offset);
         Extent *e = _getExtent(loc);
         DiskLoc emptyLoc = getDur().writing(e)->init(ns, ExtentSize, fileNo, offset);
@@ -559,6 +566,14 @@ namespace mongo {
 
         int delRecLength = length - (_extentData - (char *) this);
 
+        if( length >= 32*1024 && str::contains(nsname, '$') ) { 
+            // probably an index. so skip forward to keep its records page aligned 
+            if( !nsdetails(nsname)->capped ) { 
+                emptyLoc.GETOFS() = 4096;
+                delRecLength = length - 4096;
+            }
+        }
+
         DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength);//(DeletedRecord *) getRecord(emptyLoc);
         empty = getDur().writing(empty);
         empty->lengthWithHeaders = delRecLength;
@@ -581,8 +596,16 @@ namespace mongo {
 
         DiskLoc emptyLoc = myLoc;
         emptyLoc.inc( (int) (_extentData-(char*)this) );
-
         int l = _length - (_extentData - (char *) this);
+
+        if( _length >= 32*1024 && str::contains(nsname, '$') ) { 
+            // probably an index. so skip forward to keep its records page aligned 
+            if( !nsdetails(nsname)->capped ) { 
+                emptyLoc.GETOFS() = 4096;
+                l = _length - 4096;
+            }
+        }
+
         DeletedRecord *empty = getDur().writing( DataFileMgr::makeDeletedRecord(emptyLoc, l) );
         empty->lengthWithHeaders = l;
         empty->extentOfs = myLoc.getOfs();
@@ -1605,7 +1628,7 @@ namespace mongo {
             if( str::contains(ns, '$') && len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 && len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) { 
                 // probably an index.  so we pick a value here for the first extent instead of using initialExtentSize() which is more 
                 // for user collections.  TODO: we could look at the # of records in the parent collection to be smarter here.
-                ies = 64 * 1024;
+                ies = (32+4) * 1024;
             }
             cc().database()->allocExtent(ns, ies, false);
             d = nsdetails(ns);
