@@ -113,6 +113,7 @@ namespace mongo {
         void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
                                const string sname , v8::Handle<v8::Value> value , int depth = 0 );
         v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f );
+        virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
         v8::Function * getNamedCons( const char * name );
         v8::Function * getObjectIdCons();

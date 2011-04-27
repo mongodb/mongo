@@ -436,6 +436,10 @@ namespace mongo {
             _real->gc();
         }
 
+        void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName ) {
+            _real->append(builder, fieldName, scopeName);
+        }
+
     private:
         string _pool;
         Scope * _real;

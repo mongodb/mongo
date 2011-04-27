@@ -47,7 +47,6 @@ namespace mongo {
         BSONObj* obj = unwrapBSONObj(v8::Persistent<v8::Object>::Cast(p));
         delete obj;
         p.Dispose();
-        cout << "deleted obj" << endl;
     }
 
     static Handle<v8::Value> namedGet(Local<v8::String> name, const v8::AccessorInfo &info) {
@@ -1023,7 +1022,6 @@ namespace mongo {
 
         Persistent<v8::Object> p = Persistent<v8::Object>::New(o);
         p.MakeWeak(this, weakRefCallback);
-        cout << "created obj" << endl;
         return p;
     }
 
@@ -1153,6 +1151,13 @@ namespace mongo {
         }
 
         return v8::Undefined();
+    }
+
+    void V8Scope::append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName ) {
+        V8_SIMPLE_HEADER
+        Handle<v8::String> v8name = getV8Str(scopeName);
+        Handle<Value> value = _global->Get( v8name );
+        v8ToMongoElement(builder, v8name, fieldName, value);
     }
 
     void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth ) {
