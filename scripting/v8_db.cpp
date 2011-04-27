@@ -403,7 +403,7 @@ namespace mongo {
             V8Unlock u;
             o = cursor->next();
         }
-        return scope->mongoToV8( o );
+        return scope->mongoToLZV8( o );
     }
 
     v8::Handle<v8::Value> internalCursorHasNext(V8Scope* scope, const v8::Arguments& args) {

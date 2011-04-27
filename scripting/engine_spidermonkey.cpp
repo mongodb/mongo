@@ -1463,13 +1463,13 @@ namespace mongo {
             return worked;
         }
 
-        int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ) {
+        int invoke( JSFunction * func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
             smlock;
             precall();
 
             assert( JS_EnterLocalRootScope( _context ) );
 
-            int nargs = args.nFields();
+            int nargs = args ? args->nFields() : 0;
             scoped_array<jsval> smargsPtr( new jsval[nargs] );
             if ( nargs ) {
                 BSONObjIterator it( args );
@@ -1478,18 +1478,20 @@ namespace mongo {
                 }
             }
 
-            if ( args.isEmpty() ) {
+            if ( !args ) {
                 _convertor->setProperty( _global , "args" , JSVAL_NULL );
             }
             else {
-                setObject( "args" , args , true ); // this is for backwards compatability
+                setObject( "args" , *args , true ); // this is for backwards compatability
             }
 
             JS_LeaveLocalRootScope( _context );
 
             installInterrupt( timeoutMs );
             jsval rval;
+            setThis(recv);
             JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargsPtr.get() , &rval );
+            setThis(0);
             uninstallInterrupt( timeoutMs );
 
             if ( !ret ) {
@@ -1503,7 +1505,7 @@ namespace mongo {
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = 0 ) {
+        int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0 ) {
             return invoke( (JSFunction*)funcAddr , args , timeoutMs , ignoreReturn );
         }
 

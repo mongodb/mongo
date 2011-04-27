@@ -66,7 +66,8 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
     if ( prefix.find( '"' ) != string::npos )
         return;
 
-    shellMainScope->invokeSafe("function(x) {shellAutocomplete(x)}", BSON("0" << prefix), 1000);
+    BSONObj args = BSON("0" << prefix);
+    shellMainScope->invokeSafe("function(x) {shellAutocomplete(x)}", &args, 0, 1000);
     BSONObjBuilder b;
     shellMainScope->append( b , "" , "__autocomplete__" );
     BSONObj res = b.obj();

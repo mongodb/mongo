@@ -85,10 +85,10 @@ namespace mongo {
 
     }
 
-    int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ) {
+    int Scope::invoke( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs ) {
         ScriptingFunction func = createFunction( code );
         uassert( 10207 ,  "compile failed" , func );
-        return invoke( func , args, timeoutMs );
+        return invoke( func , args, recv, timeoutMs );
     }
 
     bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ) {
@@ -394,9 +394,9 @@ namespace mongo {
         void setBoolean( const char *field , bool val ) {
             _real->setBoolean( field , val );
         }
-        void setThis( const BSONObj * obj ) {
-            _real->setThis( obj );
-        }
+//        void setThis( const BSONObj * obj ) {
+//            _real->setThis( obj );
+//        }
 
         ScriptingFunction createFunction( const char * code ) {
             return _real->createFunction( code );
@@ -413,8 +413,8 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs , bool ignoreReturn ) {
-            return _real->invoke( func , args , timeoutMs , ignoreReturn );
+        int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+            return _real->invoke( func , args , recv, timeoutMs , ignoreReturn );
         }
 
         string getError() {

@@ -76,7 +76,7 @@ namespace mongo {
         virtual void setString( const char *field , const char * val ) = 0;
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) = 0;
         virtual void setBoolean( const char *field , bool val ) = 0;
-        virtual void setThis( const BSONObj * obj ) = 0;
+//        virtual void setThis( const BSONObj * obj ) = 0;
 
         virtual ScriptingFunction createFunction( const char * code );
 
@@ -84,18 +84,18 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false ) = 0;
-        void invokeSafe( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 ) {
-            int res = invoke( func , args , timeoutMs );
+        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false ) = 0;
+        void invokeSafe( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 ) {
+            int res = invoke( func , args , recv, timeoutMs );
             if ( res == 0 )
                 return;
             throw UserException( 9004 , (string)"invoke failed: " + getError() );
         }
         virtual string getError() = 0;
 
-        int invoke( const char* code , const BSONObj& args, int timeoutMs = 0 );
-        void invokeSafe( const char* code , const BSONObj& args, int timeoutMs = 0 ) {
-            if ( invoke( code , args , timeoutMs ) == 0 )
+        int invoke( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 );
+        void invokeSafe( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 ) {
+            if ( invoke( code , args , recv, timeoutMs ) == 0 )
                 return;
             throw UserException( 9005 , (string)"invoke failed: " + getError() );
         }

@@ -143,8 +143,7 @@ namespace JSTests {
             s->invoke( "return blah.y;" , BSONObj() );
             ASSERT_EQUALS( "eliot" , s->getString( "return" ) );
 
-            s->setThis( & o );
-            s->invoke( "return this.z;" , BSONObj() );
+            s->invoke( "return this.z;" , 0, &o );
             ASSERT_EQUALS( "sara" , s->getString( "return" ) );
 
             s->invoke( "return this.z == 'sara';" , BSONObj() );
@@ -715,9 +714,8 @@ namespace JSTests {
             }
 
             //cout << "ELIOT: " << b.jsonString() << endl;
-            s->setThis( &b );
             // its ok  if this is handled by js, just can't create a c++ exception
-            s->invoke( "x=this.x.length;" , BSONObj() );
+            s->invoke( "x=this.x.length;" , 0, &b );
         }
     };
 
@@ -903,12 +901,11 @@ namespace JSTests {
             s.reset( globalScriptEngine->newScope() );
 
             ScriptingFunction f = s->createFunction( "return this.x + 6;" );
-            s->setThis( &start );
 
             Timer t;
             double n = 0;
             for ( ; n < 100000; n++ ) {
-                s->invoke( f , empty );
+                s->invoke( f , &empty, &start );
                 ASSERT_EQUALS( 11 , s->getNumber( "return" ) );
             }
             //cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << endl;
@@ -934,10 +931,9 @@ namespace JSTests {
                 BSONObjBuilder b;
                 s->append( b , "z" , "x" );
                 temp = b.obj();
-                s->setThis( &temp );
             }
 
-            s->invokeSafe( "foo = this.z();" , BSONObj() );
+            s->invokeSafe( "foo = this.z();" , 0, &temp );
             ASSERT_EQUALS( 17 , s->getNumber( "foo" ) );
         }
     };

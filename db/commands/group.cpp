@@ -36,7 +36,8 @@ namespace mongo {
             if ( func ) {
                 BSONObjBuilder b( obj.objsize() + 32 );
                 b.append( "0" , obj );
-                int res = s->invoke( func , b.obj() );
+                const BSONObj& key = b.obj();
+                int res = s->invoke( func , &key, 0 );
                 uassert( 10041 ,  (string)"invoke failed in $keyf: " + s->getError() , res == 0 );
                 int type = s->type("return");
                 uassert( 10042 ,  "return of $key has to be an object" , type == Object );
@@ -110,7 +111,7 @@ namespace mongo {
 
                 s->setObject( "obj" , obj , true );
                 s->setNumber( "n" , n - 1 );
-                if ( s->invoke( f , BSONObj() , 0 , true ) ) {
+                if ( s->invoke( f , 0, 0 , 0 , true ) ) {
                     throw UserException( 9010 , (string)"reduce invoke failed: " + s->getError() );
                 }
             }
@@ -125,7 +126,7 @@ namespace mongo {
                                           "    $arr[i] = ret; "
                                           "  } "
                                           "}" );
-                s->invoke( g , BSONObj() , 0 , true );
+                s->invoke( g , 0, 0 , 0 , true );
             }
 
             result.appendArray( "retval" , s->getObject( "$arr" ) );

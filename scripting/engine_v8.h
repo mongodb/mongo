@@ -85,13 +85,13 @@ namespace mongo {
         virtual void setBoolean( const char *field , bool val );
         virtual void setElement( const char *field , const BSONElement& e );
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly);
-        virtual void setThis( const BSONObj * obj );
+//        virtual void setThis( const BSONObj * obj );
 
         virtual void rename( const char * from , const char * to );
 
         virtual ScriptingFunction _createFunction( const char * code );
         Local< v8::Function > __createFunction( const char * code );
-        virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false );
+        virtual int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = false );
         virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError() { return _error; }
 
@@ -107,12 +107,12 @@ namespace mongo {
         Handle< Context > context() const { return _context; }
 
         v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
-        v8::Local<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
+        v8::Handle<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
         void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
                                const string sname , v8::Handle<v8::Value> value , int depth = 0 );
-        v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool lazy = true );
+        v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f );
 
         v8::Function * getNamedCons( const char * name );
         v8::Function * getObjectIdCons();
@@ -156,7 +156,7 @@ namespace mongo {
 
         string _error;
         vector< Persistent<Value> > _funcs;
-        v8::Persistent<v8::Object> _this;
+        v8::Persistent<v8::Object> _emptyObj;
 
         v8::Persistent<v8::Function> _wrapper;
 

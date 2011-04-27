@@ -892,12 +892,10 @@ namespace mongo {
             if ( where->jsScope ) {
                 where->scope->init( where->jsScope );
             }
-            where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
             where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
             where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
 
-            int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 , false );
-            where->scope->setThis( 0 );
+            int err = where->scope->invoke( where->func , 0, &jsobj , 1000 * 60 , false );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n"
