@@ -2,7 +2,7 @@
 var count = 0;
 var w = 0;
 
-var wait = function(f) {
+var wait = function(f,msg) {
     w++;
     var n = 0;
     while (!f()) {
@@ -11,7 +11,7 @@ var wait = function(f) {
         if (++n == 4) {
             print("" + f);
         }
-        assert(n < 200, 'tried 200 times, giving up');
+        assert(n < 200, 'tried 200 times, giving up on ' + msg );
         sleep(1000);
     }
 };
