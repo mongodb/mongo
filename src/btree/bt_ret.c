@@ -50,9 +50,9 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 	 *
 	 * If the key/value item are uninstantiated overflow and/or compressed
 	 * items, they require processing before being copied into the
-	 * WT_DATAITEMs.  Don't allocate WT_INDX memory for key/value items
-	 * here.  (We never allocate WT_INDX memory for data items.   We do
-	 * allocate WT_INDX memory for keys, but if we are looking at a key
+	 * WT_DATAITEMs.  Don't allocate WT_ROW/COL memory for key/value items
+	 * here.  (We never allocate WT_ROW/COL memory for data items.   We do
+	 * allocate WT_ROW/COL memory for keys, but if we are looking at a key
 	 * only to return it, it's not that likely to be accessed again (think
 	 * of a cursor moving through the tree).  Use memory in the
 	 * application's WT_ITEM instead, it is discarded when the SESSION is
