@@ -105,7 +105,7 @@ struct sniff_ip {
 
 /* TCP header */
 #ifdef _WIN32
-typedef __int32 uint32_t;
+typedef unsigned __int32 uint32_t;
 #endif
 typedef uint32_t tcp_seq;
 
