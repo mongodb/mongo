@@ -884,7 +884,7 @@ namespace mongo {
          */
         bool isFailed() const { return _failed; }
 
-        MessagingPort& port() { return *p; }
+        MessagingPort& port() { assert(p); return *p; }
 
         string toStringLong() const {
             stringstream ss;
