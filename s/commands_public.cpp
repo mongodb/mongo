@@ -1069,7 +1069,7 @@ namespace mongo {
 	static const PipelineCommand pipelineCommand;
 
 	PipelineCommand::PipelineCommand():
-	    PublicGridCommand("pipeline") {
+	    PublicGridCommand(Pipeline::commandName) {
 	}
 
 	bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,

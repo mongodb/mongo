@@ -2,7 +2,7 @@
 // make sure we're using the right db; this is the same as "use mydb;" in shell
 db = db.getSisterDB("mydb");
 
-// renaming a field and keeping an array intact
+// just passing through fields
 var p1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
