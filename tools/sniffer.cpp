@@ -104,6 +104,9 @@ struct sniff_ip {
 #define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
 /* TCP header */
+#ifdef _WIN32
+typedef __int32 uint32_t;
+#endif
 typedef uint32_t tcp_seq;
 
 struct sniff_tcp {
