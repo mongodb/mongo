@@ -206,19 +206,6 @@ __wt_cache_read(WT_READ_REQ *rr)
 	case WT_REF_LOCKED:
 		/* Page being considered for eviction: not our problem. */
 		return (0);
-	case WT_REF_INACTIVE:
-		/*
-		 * The page was inactive, waiting to be merged into its parent
-		 * during the parent's reconciliation, when it was accessed.
-		 * Re-activate the page.   We could probably do this in the
-		 * page read function, but this shouldn't be a common path and
-		 * I'm hesitant to have multiple threads of control updating
-		 * a page's state.
-		 */
-		WT_ASSERT(session,
-		    F_ISSET(ref->page, WT_PAGE_DELETED | WT_PAGE_SPLIT));
-		ref->state = WT_REF_MEM;
-		return (0);
 	}
 
 	/*

@@ -210,11 +210,6 @@ struct __wt_page_disk {
  *	by the eviction server after page reconciliation (when the page has
  *	been discarded or written to disk, and remains backed by the disk);
  *	the page is on disk, and needs to be read into memory before use.
- * WT_REF_INACTIVE:
- *	Set by the eviction server after page reconciliation if the page was
- *	NOT written to disk, and remains in memory; the page has been marked
- *	inactive, but is waiting on its parent to be evicted so it can merge
- *	into the parent.
  * WT_REF_LOCKED:
  *	Set by the eviction server; the eviction server has selected this page
  *	for eviction and is checking hazard references.
@@ -231,27 +226,6 @@ struct __wt_page_disk {
  * the page state to WT_REF_DISK; if eviction failed because the page was busy,
  * the page state is reset to WT_REF_MEM.
  *
- * There is a more complicated scenario when a page is being deleted, or a new
- * page is created in memory as part of a page split.
- *
- * Scenario #1: The eviction server sets the state to WT_REF_LOCKED, and during
- * reconciliation finds the page is entirely empty, and so sets the page's flag
- * to WT_PAGE_DELETED, and the page's state to WT_REF_INACTIVE.
- *
- * Scenario #2: The eviction server must split a page during reconciliation.
- * The eviction server creates a new, in-memory internal page to reference
- * the split pages: this new page will have a flag of WT_PAGE_SPLIT, and its
- * state set to WT_REF_INACTIVE.
- *
- * In both of these cases, the normal outcome is the parent of the page with a
- * state of WT_REF_INACTIVE is eventually reconciled, and at that time the
- * contents of the page (if any) are merged into the parent and the page is
- * discarded.  Alternatively, if the page is accessed again, the read server
- * will reset the page's state to WT_REF_MEM.  This process repeats until the
- * parent of the page is evicted and the page can be discarded, or in the case
- * of a deleted page, the page is no longer empty and normal page reconciliation
- * of the page occurs.
- *
  * Readers check the state field and if it's WT_REF_MEM, they set a hazard
  * reference to the page, flush memory and re-confirm the page state.  If the
  * page state is unchanged, the reader has a valid reference and can proceed.
@@ -264,15 +238,14 @@ struct __wt_page_disk {
  */
 struct __wt_ref {
 	/*
-	 * Page state
+	 * Page state.
 	 *
-	 * WT_REF_DISK has a value of 0, we're in the default state after
-	 * allocating zero'd memory.
+	 * WT_REF_DISK has a value of 0, the default state after allocating
+	 * cleared memory.
 	 */
 #define	WT_REF_DISK		0	/* Page is on disk */
-#define	WT_REF_INACTIVE		1	/* Page is inactive, not discarded */
-#define	WT_REF_LOCKED		2	/* Page being evaluated for eviction */
-#define	WT_REF_MEM		3	/* Page is in cache and valid */
+#define	WT_REF_LOCKED		1	/* Page being evaluated for eviction */
+#define	WT_REF_MEM		2	/* Page is in cache and valid */
 	uint32_t volatile state;
 
 	uint32_t addr;			/* Backing disk address */
@@ -419,7 +392,10 @@ struct __wt_page {
 	 */
 #define	WT_PAGE_DISK_WRITE(p)		((p)->disk_gen = (p)->write_gen)
 #define	WT_PAGE_IS_MODIFIED(p)		((p)->disk_gen != (p)->write_gen)
-#define	WT_PAGE_SET_MODIFIED(p)		(++(p)->write_gen)
+#define	WT_PAGE_SET_MODIFIED(p) do {					\
+	++(p)->write_gen;						\
+	F_CLR(p, WT_PAGE_DELETED);					\
+} while (0)
 	uint32_t disk_gen;
 	uint32_t write_gen;
 

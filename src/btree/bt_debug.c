@@ -360,8 +360,7 @@ __wt_debug_page_col_int(
 		return (0);
 
 	WT_COL_REF_FOREACH(page, cref, i)
-		if (WT_COL_REF_STATE(cref) == WT_REF_MEM ||
-		    WT_COL_REF_STATE(cref) == WT_REF_INACTIVE)
+		if (WT_COL_REF_STATE(cref) == WT_REF_MEM)
 			WT_RET(__wt_debug_page_work(
 			    session, WT_COL_REF_PAGE(cref), fp, flags));
 	return (0);
@@ -452,8 +451,7 @@ __wt_debug_page_row_int(
 		return (0);
 
 	WT_ROW_REF_FOREACH(page, rref, i)
-		if (WT_ROW_REF_STATE(rref) == WT_REF_MEM ||
-		    WT_ROW_REF_STATE(rref) == WT_REF_INACTIVE)
+		if (WT_ROW_REF_STATE(rref) == WT_REF_MEM)
 			WT_RET(__wt_debug_page_work(
 			    session, WT_ROW_REF_PAGE(rref), fp, flags));
 	return (0);
@@ -803,9 +801,6 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 	switch (ref->state) {
 	case WT_REF_DISK:
 		s = "disk";
-		break;
-	case WT_REF_INACTIVE:
-		s = "inactive";
 		break;
 	case WT_REF_LOCKED:
 		s = "locked";

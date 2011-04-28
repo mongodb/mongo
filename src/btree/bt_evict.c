@@ -662,8 +662,14 @@ __wt_evict_state_check(SESSION *session)
 			continue;
 		page = ref->page;
 
-		/* Ignore pinned pages. */
-		if (F_ISSET(page, WT_PAGE_PINNED))
+		/*
+		 * Ignore deleted, pinned and split pages: pinned pages can't
+		 * ever leave memory, and deleted and split pages can only be
+		 * evicted as their parents are evicted, they can't be evicted
+		 * on their own.
+		 */
+		if (F_ISSET(
+		    page, WT_PAGE_DELETED | WT_PAGE_PINNED | WT_PAGE_SPLIT))
 			goto skip;
 
 		/* Ignore pages with in-memory subtrees. */
@@ -776,14 +782,12 @@ __wt_evict_subtrees(WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_COL_REF_STATE(cref) != WT_REF_DISK &&
-			    WT_COL_REF_STATE(cref) != WT_REF_INACTIVE)
+			if (WT_COL_REF_STATE(cref) != WT_REF_DISK)
 				return (1);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK &&
-			    WT_ROW_REF_STATE(rref) != WT_REF_INACTIVE)
+			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK)
 				return (1);
 		break;
 	}
