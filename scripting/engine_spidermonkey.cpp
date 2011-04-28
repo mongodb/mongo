@@ -1472,7 +1472,7 @@ namespace mongo {
             int nargs = args ? args->nFields() : 0;
             scoped_array<jsval> smargsPtr( new jsval[nargs] );
             if ( nargs ) {
-                BSONObjIterator it( args );
+                BSONObjIterator it( *args );
                 for ( int i=0; i<nargs; i++ ) {
                     smargsPtr[i] = _convertor->toval( it.next() );
                 }
@@ -1506,7 +1506,7 @@ namespace mongo {
         }
 
         int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0 ) {
-            return invoke( (JSFunction*)funcAddr , args , timeoutMs , ignoreReturn );
+            return invoke( (JSFunction*)funcAddr , args , recv, timeoutMs , ignoreReturn );
         }
 
         void gotError( string s ) {
