@@ -68,7 +68,7 @@ namespace mongo {
 
             cx.db()->flushFiles(true);
         }
-        DEV log() << "replSet saveConfigLocally done" << rsLog;
+        log() << "replSet saveConfigLocally done" << rsLog;
     }
 
     bo ReplSetConfig::MemberCfg::asBson() const {

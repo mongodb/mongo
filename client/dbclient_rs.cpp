@@ -74,7 +74,7 @@ namespace mongo {
 
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
+        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1), _nextSlave(0) {
         
         uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
 
@@ -221,19 +221,19 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
-        int x = rand() % _nodes.size();
+
         {
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
-                int p = ( i + x ) % _nodes.size();
-                if ( p == _master )
+                _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+                if ( _nextSlave == _master )
                     continue;
-                if ( _nodes[p].ok )
-                    return _nodes[p].addr;
+                if ( _nodes[ _nextSlave ].ok )
+                    return _nodes[ _nextSlave ].addr;
             }
         }
 
-        return _nodes[0].addr;
+        return _nodes[ 0 ].addr;
     }
 
     /**
@@ -309,7 +309,7 @@ namespace mongo {
             BSONObj o;
             c->isMaster(isMaster, &o);
 
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << '\n';
+            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << endl;
 
             // add other nodes
             string maybePrimary;
@@ -530,12 +530,12 @@ namespace mongo {
             // we're ok sending to a slave
             // we'll try 2 slaves before just using master
             // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<2; i++ ) {
+            for ( int i=0; i<3; i++ ) {
                 try {
                     return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                 }
             }
         }
@@ -548,12 +548,12 @@ namespace mongo {
             // we're ok sending to a slave
             // we'll try 2 slaves before just using master
             // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<2; i++ ) {
+            for ( int i=0; i<3; i++ ) {
                 try {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                 }
             }
         }
@@ -581,12 +581,12 @@ namespace mongo {
             DbMessage dm( toSend );
             QueryMessage qm( dm );
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<2; i++ ) {
+                for ( int i=0; i<3; i++ ) {
                     try {
                         return checkSlave()->callLazy( toSend );
                     }
-                    catch ( DBException & ) {
-                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    catch ( DBException &e ) {
+                    	LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                     }
                 }
             }
@@ -601,15 +601,15 @@ namespace mongo {
             DbMessage dm( toSend );
             QueryMessage qm( dm );
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<2; i++ ) {
+                for ( int i=0; i<3; i++ ) {
                     try {
                         DBClientConnection* s = checkSlave();
                         if ( actualServer )
                             *actualServer = s->getServerAddress();
                         return s->call( toSend , response , assertOk );
                     }
-                    catch ( DBException & ) {
-                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    catch ( DBException &e ) {
+                    	LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                         if ( actualServer )
                             *actualServer = "";
                     }

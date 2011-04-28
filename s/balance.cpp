@@ -275,20 +275,21 @@ namespace mongo {
 
             try {
                 
-                // first make sure we should even be running
+                ScopedDbConnection conn( config );
+                
+                // ping has to be first so we keep things in the config server in sync
+                _ping( conn.conn() );
+
+                // now make sure we should even be running
                 if ( ! grid.shouldBalance() ) {
                     log(1) << "skipping balancing round because balancing is disabled" << endl;
+                    conn.done();
+                    
                     sleepsecs( 30 );
                     continue;
                 }
                 
-
-                ScopedDbConnection conn( config );
-
-                _ping( conn.conn() );
-                if ( ! _checkOIDs() ) {
-                    uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
-                }
+                uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 // use fresh shard state
                 Shard::reloadShardInfo();

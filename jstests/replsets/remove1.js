@@ -82,8 +82,9 @@ wait(function() {
     printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
     master.setSlaveOk();
     var newConfig = master.getDB("local").system.replset.findOne();
+    print( "newConfig: " + tojson(newConfig) );
     return newConfig.version == 4;
-  });
+} , "wait1" );
 
 
 print("Make sure everyone's secondary");
@@ -103,7 +104,7 @@ wait(function() {
       }
     }
     return true;
-  });
+} , "wait2" );
 
 replTest.stopSet();
 

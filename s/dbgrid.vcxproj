@@ -193,6 +193,10 @@
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
+    <ClCompile Include="..\db\querypattern.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\db\security_key.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp">

@@ -493,6 +493,10 @@
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="querypattern.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
@@ -658,6 +662,7 @@
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
     <ClInclude Include="projection.h" />
+    <ClInclude Include="queryutil.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
     <ClInclude Include="repl\connections.h" />

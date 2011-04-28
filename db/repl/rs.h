@@ -379,7 +379,7 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
+        const ReplSetConfig::MemberCfg& myConfig() const { assert( _self ); return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
     protected:
@@ -505,6 +505,7 @@ namespace mongo {
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
         _config(*c), _h(h), _hbinfo(ord) {
+        assert(c);
         if( self )
             _hbinfo.health = 1.0;
     }

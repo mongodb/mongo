@@ -457,7 +457,7 @@ namespace mongo {
             if something highly surprising, throws to abort
         */
         unsigned long long LSNFile::get() {
-            uassert(13614, "unexpected version number of lsn file in journal/ directory", ver == 0);
+            uassert(13614, str::stream() << "unexpected version number of lsn file in journal/ directory got: " << ver , ver == 0);
             if( ~lsn != checkbytes ) {
                 log() << "lsnfile not valid. recovery will be from log start. lsn: " << hex << lsn << " checkbytes: " << hex << checkbytes << endl;
                 return 0;
@@ -486,6 +486,11 @@ namespace mongo {
                 File f;
                 f.open(lsnPath().string().c_str());
                 assert(f.is_open());
+                if( f.len() == 0 ) { 
+                    // this could be 'normal' if we crashed at the right moment
+                    log() << "info lsn file is zero bytes long" << endl;
+                    return 0;
+                }
                 f.read(0,(char*)&L, sizeof(L));
                 unsigned long long lsn = L.get();
                 return lsn;

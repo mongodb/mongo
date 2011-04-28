@@ -1008,6 +1008,7 @@ namespace mongo {
                     conn.done();
                 }
                 catch ( DBException& e ) {
+                    warning() << e << endl;
                     ok = false;
                     BSONObjBuilder b;
                     e.getInfo().append( b );

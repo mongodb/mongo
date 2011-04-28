@@ -246,5 +246,34 @@ int main( int argc, const char **argv ) {
         //MONGO_PRINT(out);
     }
 
+    { 
+        // test timeouts
+
+        DBClientConnection conn( true , 0 , 2 );
+        if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
+            cout << "couldn't connect : " << errmsg << endl;
+            throw -11;
+        }
+        conn.insert( "test.totest" , BSON( "x" << 1 ) );
+        BSONObj res;
+        
+        bool gotError = false;
+        assert( conn.eval( "test" , "return db.totest.findOne().x" , res ) );
+        try {
+            conn.eval( "test" , "sleep(5000); return db.totest.findOne().x" , res );
+        }
+        catch ( std::exception& e ) {
+            gotError = true;
+            log() << e.what() << endl;
+        }
+        assert( gotError );
+        // sleep so the server isn't locked anymore
+        sleepsecs( 4 );
+        
+        assert( conn.eval( "test" , "return db.totest.findOne().x" , res ) );
+        
+        
+    }
+
     cout << "client test finished!" << endl;
 }
