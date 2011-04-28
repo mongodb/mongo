@@ -34,7 +34,7 @@ namespace mongo {
         if ( *ns == '.' || *ns == 0 ) {
             if( *o.getStringField("op") == 'n' )
                 return;
-            log() << "replSet skipping bad op in oplog: " << o.toString() << endl;
+            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
             return;
         }
 
@@ -141,7 +141,7 @@ namespace mongo {
                     time_t now = time(0);
                     if (now - start > 10) {
                         // simple progress metering
-                        log() << "initialSyncOplogApplication applied " << n << " operations, synced to "
+                        log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "
                               << ts.toStringPretty() << rsLog;
                         start = now;
                     }
@@ -322,8 +322,8 @@ namespace mongo {
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) {
-                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
-                log() << "replset source's GTE: " << ts.toStringPretty() << endl;
+                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << rsLog;
+                log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
                 syncRollback(r);
                 return;
             }
@@ -471,8 +471,8 @@ namespace mongo {
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
             if( ! _self || myConfig().arbiterOnly ){
-            	if( ! _self ) warning() << "did not detect own host and port in replica set, not syncing, config " << theReplSet->config() << endl;
-            	return;
+            	if( ! _self ) log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
+                return;
             }
 
             try {
@@ -494,9 +494,9 @@ namespace mongo {
                member has done a stepDown() and needs to come back up.
                */
             OCCASIONALLY {
-            	log() << "default rs heartbeat starting..." << endl;
+            	log() << "replSet default heartbeat starting..." << rsLog;
             	mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
-            	log() << "rs heartbeat finished" << endl;
+            	log() << "replSet heartbeat finished" << rsLog;
             }
         }
     }
