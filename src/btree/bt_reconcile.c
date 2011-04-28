@@ -1569,6 +1569,7 @@ __rec_row_int_del(SESSION *session, WT_PAGE *page)
 		WT_RET(__rec_discard_add(
 		    session, NULL, parent_ref->addr, parent_ref->size));
 
+	WT_UNUSED(rref);			/* Set but not read. */
 	return (0);
 }
 
