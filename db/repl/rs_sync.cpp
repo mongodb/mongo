@@ -470,8 +470,10 @@ namespace mongo {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
-            if( ! _self || myConfig().arbiterOnly )
-                return;
+            if( ! _self || myConfig().arbiterOnly ){
+            	if( ! _self ) warning() << "did not detect own host and port in replica set, not syncing, config " << theReplSet->config() << endl;
+            	return;
+            }
 
             try {
                 _syncThread();
