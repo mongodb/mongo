@@ -35,6 +35,17 @@ class test001(wttest.WiredTigerTestCase):
         cursor.set_value(val)
         return cursor
 
+    def test_error(self):
+        gotException = False
+        try:
+            self.pr('expect an error message...')
+            self.session.create('table:' + self.table_name1, 'expect_this_error,okay?')
+        except wiredtiger.WiredTigerError as e:
+            gotException = True
+            self.pr('got expected exception: ' + str(e))
+            self.assertTrue(str(e).find('nvalid argument') >= 0)
+        self.assertTrue(gotException, 'expected exception')
+
     def test_empty(self):
         """
         Create a table, look for a nonexistent key

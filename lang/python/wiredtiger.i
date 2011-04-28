@@ -1,3 +1,14 @@
+/*
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2011 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * wiredtiger.i
+ * 	The SWIG interface file defining the wiredtiger python API.
+ *
+ */
+
 %module wiredtiger
 
 %pythoncode %{
@@ -34,15 +45,40 @@ from packing import pack, unpack
 }
 
 
-/* Checking for error returns - any error is an exception.
- * TODO: need to create a wiredtiger exception, probably language specific
+/* 
+ * Error returns other than WT_NOTFOUND generate an exception.
+ * Use our own exception type, in future tailored to the kind
+ * of error.
  */
+%header %{
+static PyObject *wtError;
+%}
+
+%init %{
+        /*
+         * Create an exception type and put it into the _wiredtiger module.
+         * First increment the reference count because PyModule_AddObject
+         * decrements it.  Then note that "m" is the local variable for the
+         * module in the SWIG generated code.  If there is a SWIG variable for
+         * this, I haven't found it.
+         */
+        wtError =
+            PyErr_NewException("_wiredtiger.WiredTigerError", NULL, NULL);
+        Py_INCREF(wtError);
+        PyModule_AddObject(m, "WiredTigerError", wtError);
+%}
+
+%pythoncode %{
+WiredTigerError = _wiredtiger.WiredTigerError
+%}
+
 %typemap(out) int {
-        $result = SWIG_From_int((int)(result));
         if ($1 != 0 && $1 != WT_NOTFOUND) {
-                SWIG_exception_fail(SWIG_RuntimeError, wiredtiger_strerror($1));
-                return NULL;
+                /* We could use PyErr_SetObject for more complex reporting. */
+                PyErr_SetString(wtError, wiredtiger_strerror($1));
+                SWIG_fail;
         }
+        $result = SWIG_From_int((int)($1));
 }
 
 /*
@@ -53,13 +89,16 @@ from packing import pack, unpack
  * };
  * To SWIG, that is equivalent to:
  *    int method(wt_xxx *self, WT_XXX *, ...otherargs...);
- * and we use consecutive argument matching of typemaps to convert two args to one.
+ * and we use consecutive argument matching of typemaps to convert two args to
+ * one.
  */
 %define SELFHELPER(type)
 %typemap(in) (type *self, type *) (void *argp = 0, int res = 0) %{
         res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
         if (!SWIG_IsOK(res)) { 
-                SWIG_exception_fail(SWIG_ArgError(res), "in method '" "$symname" "', argument " "$argnum" " of type '" "$type" "'");
+                SWIG_exception_fail(SWIG_ArgError(res),
+                    "in method '" "$symname" "', argument " "$argnum"
+                    " of type '" "$type" "'");
         }
         $2 = $1 = ($ltype)(argp);
 %}
