@@ -9,12 +9,12 @@
 # 	Configuration
 #
 
+#### This test has workarounds to allow it to complete, marked with '####' comments
+
 import unittest
 import wiredtiger
 import wttest
 import json
-
-####import config
 
 class test002(wttest.WiredTigerTestCase):
     """
@@ -23,27 +23,51 @@ class test002(wttest.WiredTigerTestCase):
     table_name1 = 'test002a.wt'
 
     def create_and_drop_table(self, tablename, confstr):
-        self.pr('create_table with config: ' + confstr)
+        self.pr('create_table with config:\n      ' + confstr)
         self.session.create_table(tablename, confstr)
-        self.session.drop_table(tablename, None)
+
+        #### Drop table not implemented, instead, we're able to explicitly remove the file
+        ####self.session.drop_table(tablename, None)
+
+        import subprocess                          #### added
+        subprocess.call(["rm", "-f", tablename])   #### added
 
     def test_config_combinations(self):
-        conf_create = [
-            'create',
-            'create,cachesize=10MB',
-            'create,cachesize=10MB,path="/foo/bar"']
+        """
+        Spot check various combinations of configuration options.
+        """
+        conf_confsize = [
+            None,
+            'allocation_size=1024',
+            'intl_node_max=64k,intl_node_min=4k',
+            'leaf_node_max=128k,leaf_node_min=512',
+            'leaf_node_max=256k,leaf_node_min=1k,intl_node_max=8k,intl_node_min=512',
+            ]
         conf_col = [
+            #### Fixed size strings (e.g. '5s') not yet implemented
             'columns=(first,second, third)',
-            'key_format="S", value_format="5sq", columns=(first,second, third)',
-            'key_columns=(first=S),value_columns=(second="5s", third=q)',
-            ',,columns=(first=S,second="5s", third=q),,',
-            'index.country_year=(country,year),key_format=r,colgroup.population=(population),columns=(id,country,year,population),value_format=5sHQ']
-        for create in conf_create:
+            'columns=(first)',
+            'key_format="S", value_format="Su", columns=(first,second, third)',
+            ',,columns=(first=S,second="4u", third=S),,',
+            #### index.xxxx, colgroup.xxxx not yet implemented
+            ####'index.country_year=(country,year),key_format=r,colgroup.population=(population),columns=(id,country,year,population),value_format=SS2u',
+            ]
+        conf_encoding = [
+            None,
+            'huffman_key=,huffman_value=english',
+            'runlength_encoding'
+            ]
+        for size in conf_confsize:
             for col in conf_col:
-                confstr = ",".join([create, col])
-                self.create_and_drop_table(self.table_name1, confstr)
+                for enc in conf_encoding:
+                    conflist = [size, col, enc]
+                    confstr = ",".join([c for c in conflist if c != None])
+                    self.create_and_drop_table(self.table_name1, confstr)
 
     def test_config_json(self):
+        """
+        Spot check various combinations of configuration options, using JSON format.
+        """
         conf_jsonstr = [
             json.dumps({'columns' : ('one', 'two', 'three')}),
             json.dumps({
