@@ -38,6 +38,8 @@ namespace mongo {
     typedef boost::uint64_t fileofs;
 #endif
 
+    /* NOTE: not thread-safe. (at least the windows implementation isn't. */
+
     class FileInterface {
     public:
         void open(const char *fn) {}
