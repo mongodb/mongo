@@ -80,12 +80,17 @@ doTest = function (signal) {
 
     assert(count < 300);
     
+    // Need to be careful here, allocating datafiles for the slaves can take a *long* time on slow systems
+    sleep(7000);
+
     print("\nsync1.js ********************************************************************** part 6");
     dbs[0].getSisterDB("admin").runCommand({ replSetTest: 1, blind: true });
 
     print("\nsync1.js ********************************************************************** part 7");
 
     sleep(5000);
+    // If we start getting error hasNext: false with done alloc datafile msgs - may need to up the sleep again in part 5
+
 
     var max1;
     var max2;
