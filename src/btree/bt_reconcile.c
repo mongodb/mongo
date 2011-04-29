@@ -184,7 +184,7 @@ static int  __rec_imref_fixup(SESSION *, WT_PAGE *);
 static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
 static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
-static int  __rec_init(SESSION *);
+static int  __rec_init(SESSION *, int);
 static int  __rec_parent_update(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static void __rec_parent_update_clean(SESSION *, WT_PAGE *);
@@ -212,7 +212,7 @@ static void __rec_evict_chk(SESSION *, WT_PAGE *);
  *	Initialize the reconciliation structure.
  */
 static int
-__rec_init(SESSION *session)
+__rec_init(SESSION *session, int evict)
 {
 	WT_RECONCILE *r;
 
@@ -224,6 +224,8 @@ __rec_init(SESSION *session)
 		/* Allocate a scratch buffer to hold new disk images. */
 		WT_RET(__wt_scr_alloc(session, 0, &r->dsk));
 	}
+
+	r->evict = evict;
 
 	/*
 	 * During internal page reconcilition we track referenced objects that
@@ -335,7 +337,6 @@ __wt_page_reconcile(
     SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int evict)
 {
 	BTREE *btree;
-	WT_RECONCILE *r;
 	int ret;
 
 	btree = session->btree;
@@ -378,9 +379,7 @@ __wt_page_reconcile(
 		return (0);
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_init(session));
-	r = S2C(session)->cache->rec;
-	r->evict = evict;
+	WT_RET(__rec_init(session, evict));
 
 	/*
 	 * Clean pages are simple: update the page parent's state and discard
