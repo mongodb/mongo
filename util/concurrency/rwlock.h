@@ -57,7 +57,7 @@ namespace mongo {
 
 #if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
-    class RWLock {
+    class RWLock : boost::noncopyable {
     public:
         RWLock(const char *, int lowPriorityWaitMS=0 ) : _lowPriorityWaitMS(lowPriorityWaitMS)
           { InitializeSRWLock(&_lock); }
@@ -102,7 +102,7 @@ namespace mongo {
     };
 
 #elif defined(BOOST_RWLOCK)
-    class RWLock {
+    class RWLock : boost::noncopyable {
         shared_mutex _m;
         int _lowPriorityWaitMS;
     public:
@@ -158,11 +158,10 @@ namespace mongo {
 
     };
 #else
-    class RWLock {
+    class RWLock : boost::noncopyable {
         pthread_rwlock_t _lock;
-        int _lowPriorityWaitMS;
-        
-        inline void check( int x ) {
+        int _lowPriorityWaitMS;    
+        inline static void check( int x ) {
             if( x == 0 )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
@@ -172,19 +171,17 @@ namespace mongo {
     public:
 #if defined(_DEBUG)
         const char *_name;
-        RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name) {
-            check( pthread_rwlock_init( &_lock , 0 ) );
-        }
+        RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name)
 #else
-        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS ) {
+        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS )
+#endif
+        {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
-#endif
         
-
         ~RWLock() {
             if ( ! StaticObserver::_destroyingStatics ) {
-                check( pthread_rwlock_destroy( &_lock ) );
+                wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
             }
         }
 
@@ -255,7 +252,7 @@ namespace mongo {
 #endif
 
     /** throws on failure to acquire in the specified time period. */
-    class rwlock_try_write {
+    class rwlock_try_write : boost::noncopyable {
     public:
         struct exception { };
         rwlock_try_write(RWLock& l, int millis = 0) : _l(l) {
@@ -276,7 +273,7 @@ namespace mongo {
     };
 
     /* scoped lock for RWLock */
-    class rwlock {
+    class rwlock : boost::noncopyable {
     public:
         /**
          * @param write acquire write lock if true sharable if false
