@@ -336,34 +336,52 @@ namespace mongo {
     };
 
     /** recursive on shared locks is ok for this implementation */
-    class RWLockRecursive {
+    class RWLockRecursive : boost::noncopyable {
         ThreadLocalValue<int> _state;
         RWLock _lk;
         friend class Exclusive;
     public:
         RWLockRecursive(const char *name, int lpwait) : _lk(name, lpwait) { }
 
-        class Exclusive { 
-            rwlock _scopedLock;
+        void assertExclusivelyLocked() {
+            dassert( _state.get() < 0 );
+        }
+
+        class Exclusive : boost::noncopyable { 
+            RWLockRecursive& _r;
+            rwlock *_scopedLock;
         public:
-            Exclusive(RWLockRecursive& r) : _scopedLock(r._lk, true) { }
+            Exclusive(RWLockRecursive& r) : _r(r), _scopedLock(0) {
+                int s = _r._state.get();
+                dassert( s <= 0 );
+                if( s == 0 )
+                    _scopedLock = new rwlock(_r._lk, true);
+                _r._state.set(s-1);
+            }
+            ~Exclusive() {
+                int s = _r._state.get();
+                DEV wassert( s < 0 ); // wassert: don't throw from destructors
+                _r._state.set(s+1);
+                delete _scopedLock;
+            }
         };
 
-        class Shared { 
+        class Shared : boost::noncopyable { 
             RWLockRecursive& _r;
         public:
             Shared(RWLockRecursive& r) : _r(r) {
                 int s = _r._state.get();
+                dassert( s >= 0 ); // -1 would mean exclusive
                 if( s == 0 )
                     _r._lk.lock_shared(); 
-                _r._state.set(++s);
+                _r._state.set(s+1);
             }
             ~Shared() {
                 int s = _r._state.get() - 1;
                 if( s == 0 ) 
                     _r._lk.unlock_shared();
                 _r._state.set(s);
-                dassert( s >= 0 );
+                DEV wassert( s >= 0 );
             }
         };
     };
