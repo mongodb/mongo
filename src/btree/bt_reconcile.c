@@ -2032,8 +2032,10 @@ __rec_parent_update(SESSION *session, WT_PAGE *page,
 	 */
 	parent_ref = page->parent_ref;
 	parent_ref->page = replace;
-	WT_ASSERT(session, parent_ref == replace->parent_ref);
-	WT_ASSERT(session, page->parent == replace->parent);
+	if (replace != NULL) {
+		WT_ASSERT(session, page->parent == replace->parent);
+		WT_ASSERT(session, page->parent_ref == replace->parent_ref);
+	}
 	if (parent_ref->addr != WT_ADDR_INVALID)
 		WT_RET(__wt_block_free(
 		    session, parent_ref->addr, parent_ref->size));
