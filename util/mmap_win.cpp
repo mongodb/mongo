@@ -47,6 +47,7 @@ namespace mongo {
     }
 
     void MemoryMappedFile::close() {
+        mmmutex.assertExclusivelyLocked();
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             clearWritableBits(*i);
             UnmapViewOfFile(*i);
@@ -58,6 +59,7 @@ namespace mongo {
         if ( fd )
             CloseHandle(fd);
         fd = 0;
+        destroyed(); // cleans up from the master list of mmaps
     }
 
     unsigned long long mapped = 0;

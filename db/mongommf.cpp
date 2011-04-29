@@ -308,12 +308,12 @@ namespace mongo {
     }
 
     /*virtual*/ void MongoMMF::close() {
-        {
-            if( cmdLine.dur && _view_write/*actually was opened*/ ) {
-                dur::closingFileNotification();
-            }
-            privateViews.remove(_view_private);
+        if( cmdLine.dur && _view_write/*actually was opened*/ ) {
+            dur::closingFileNotification();
         }
+
+        RWLockRecursive::Exclusive lk(mmmutex);
+        privateViews.remove(_view_private);
         _view_write = _view_private = 0;
         MemoryMappedFile::close();
     }

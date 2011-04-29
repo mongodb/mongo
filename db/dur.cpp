@@ -589,7 +589,7 @@ namespace mongo {
             }
         }
 
-        /** locking in read lock when called
+        /** locking: in read lock when called
             @see MongoMMF::close()
         */
         static void groupCommit() {

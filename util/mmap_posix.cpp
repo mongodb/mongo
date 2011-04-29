@@ -38,6 +38,7 @@ namespace mongo {
     }
 
     void MemoryMappedFile::close() {
+        mmmutex.assertExclusivelyLocked();
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             munmap(*i,len);
         }
@@ -46,6 +47,7 @@ namespace mongo {
         if ( fd )
             ::close(fd);
         fd = 0;
+        destroyed(); // cleans up from the master list of mmaps
     }
 
 #ifndef O_NOATIME
