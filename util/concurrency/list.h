@@ -43,10 +43,21 @@ namespace mongo {
             T *_next;
         public:
             Base() : _next(0){}
-            ~Base(){ assert(0); /* we never want this to happen */ }
+            ~Base() { assert(false); } // we never want this to happen
             T* next() const { return _next; }
         };
 
+        /** note this is safe: 
+
+              T* p = mylist.head();
+              if( p ) 
+                use(p);
+
+            and this is not:
+
+              if( mylist.head() )
+                use( mylist.head() ); // could become 0
+        */
         T* head() const { return _head; }
 
         void push(T* t) {
@@ -56,8 +67,9 @@ namespace mongo {
             _head = t;
         }
 
-        // intentionally leak.
+        // intentionally leaks.
         void orphanAll() {
+            scoped_lock lk(_m);
             _head = 0;
         }
 
@@ -67,13 +79,13 @@ namespace mongo {
             T *&prev = _head;
             T *n = prev;
             while( n != t ) {
+                uassert( 14050 , "List1: item to orphan not in list", n );
                 prev = n->_next;
                 n = prev;
-                uassert( 14050 , "item not in list" , n );
             }
             prev = t->_next;
             if( ++_orphans > 500 )
-                log() << "warning orphans=" << _orphans << '\n';
+                log() << "warning List1 orphans=" << _orphans << '\n';
         }
 
     private:
