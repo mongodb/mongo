@@ -284,7 +284,9 @@ namespace mongo {
             if ( !h->isCurrentVersion() || forceRepair ) {
 
                 if( h->version <= 0 ) {
-                    uasserted(14026, str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version << " info: " << h->versionMinor << ' ' << h->fileLength);
+                    uasserted(14026, 
+                      str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version 
+							        << " info: " << h->versionMinor << ' ' << h->fileLength);
                 }
 
                 log() << "****" << endl;
@@ -416,7 +418,7 @@ namespace mongo {
             l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
-            l << ( is32bit ? " 32" : " 64" ) << "-bit " << endl;
+            l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log() << "_DEBUG build (which is slower)" << endl;
         show_warnings();

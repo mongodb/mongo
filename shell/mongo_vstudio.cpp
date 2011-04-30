@@ -1537,7 +1537,7 @@ const StringData _jscode_raw_utils_sh =
 "print( \"\\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle\" );\n" 
 "\n" 
 "print( \"\\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off\" );\n" 
-"print( \"\\tsh.getBalancerState( <bool on or not> )   return true if on, off if not\" );\n" 
+"print( \"\\tsh.getBalancerState()   return true if on, off if not\" );\n" 
 "\n" 
 "print( \"\\tsh.status()                               prints a general overview of the cluster\" )\n" 
 "}\n" 
