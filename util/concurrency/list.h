@@ -58,12 +58,12 @@ namespace mongo {
               if( mylist.head() )
                 use( mylist.head() ); // could become 0
         */
-        T* head() const { return _head; }
+        T* head() const { return (T*) _head; }
 
         void push(T* t) {
             assert( t->_next == 0 );
             scoped_lock lk(_m);
-            t->_next = _head;
+            t->_next = (T*) _head;
             _head = t;
         }
 
@@ -76,7 +76,7 @@ namespace mongo {
         /* t is not deleted, but is removed from the list. (orphaned) */
         void orphan(T* t) {
             scoped_lock lk(_m);
-            T *&prev = _head;
+            T *&prev = (T*&) _head;
             T *n = prev;
             while( n != t ) {
                 uassert( 14050 , "List1: item to orphan not in list", n );
@@ -89,7 +89,7 @@ namespace mongo {
         }
 
     private:
-        T *_head;
+        volatile T *_head;
         mongo::mutex _m;
         int _orphans;
     };
