@@ -31,7 +31,8 @@ namespace mongo {
      * (Wrong here in the sense that the target chunk moved before this mongos had a chance to
      * learn so.) It is responsible for reapplying these writes to the correct shard.
      *
-     * Currently, there is one listener per shard.
+     * Runs (instantiated) on mongos.
+     * Currently, there is one writebacklistener per shard.
      */
     class WriteBackListener : public BackgroundJob {
     public:

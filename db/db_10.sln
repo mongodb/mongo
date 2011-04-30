@@ -9,7 +9,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59-9DC7-4BF1-A431-1BD4966899A5}"
 	ProjectSection(SolutionItems) = preProject
 		..\tools\export.cpp = ..\tools\export.cpp
-		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", "{2F760952-C71B-4865-998F-AABAE96D1373}"
