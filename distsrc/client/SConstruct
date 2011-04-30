@@ -1,3 +1,4 @@
+# scons file for MongoDB c++ client library and examples
 
 import os
 
@@ -50,7 +51,7 @@ if nix:
 if linux:
     env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
-boostLibs = [ "thread" , "filesystem" , "system" ]
+boostLibs = [ "thread" , "filesystem" , "system", "thread" ]
 conf = Configure(env)
 for lib in boostLibs:
     if not conf.CheckLib("boost_%s-mt" % lib):
@@ -93,6 +94,7 @@ clientEnv.Prepend( LIBS=["libmongoclient.a"])
 clientEnv.Prepend( LIBPATH=["."] )
 
 # examples
+
 clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
@@ -100,3 +102,4 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 clientEnv.Alias("clientTests", clientTests, [])
+
