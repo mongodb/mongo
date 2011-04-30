@@ -456,9 +456,6 @@ namespace mongo {
     }
 
     bool ConfigServer::checkConfigServersConsistent( string& errmsg , int tries ) const {
-        if ( _config.size() == 1 )
-            return true;
-
         if ( tries <= 0 )
             return false;
 
@@ -484,6 +481,9 @@ namespace mongo {
             }
             res.push_back(x);
         }
+
+        if ( _config.size() == 1 )
+            return true;
 
         if ( up == 0 ) {
             errmsg = "no config servers reachable";

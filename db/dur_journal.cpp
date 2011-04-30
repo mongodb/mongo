@@ -486,6 +486,11 @@ namespace mongo {
                 File f;
                 f.open(lsnPath().string().c_str());
                 assert(f.is_open());
+                if( f.len() == 0 ) { 
+                    // this could be 'normal' if we crashed at the right moment
+                    log() << "info lsn file is zero bytes long" << endl;
+                    return 0;
+                }
                 f.read(0,(char*)&L, sizeof(L));
                 unsigned long long lsn = L.get();
                 return lsn;

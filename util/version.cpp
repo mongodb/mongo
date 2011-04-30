@@ -110,7 +110,7 @@ namespace mongo {
 #endif
 
     void printSysInfo() {
-        log() << "build sys info: " << sysInfo() << endl;
+        log() << "build info: " << sysInfo() << endl;
     }
 
     //

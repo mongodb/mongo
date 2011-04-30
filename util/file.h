@@ -38,6 +38,8 @@ namespace mongo {
     typedef boost::uint64_t fileofs;
 #endif
 
+    /* NOTE: not thread-safe. (at least the windows implementation isn't. */
+
     class FileInterface {
     public:
         void open(const char *fn) {}
@@ -183,7 +185,11 @@ namespace mongo {
         bool bad() { return _bad; }
         bool is_open() { return fd > 0; }
         fileofs len() {
-            return lseek(fd, 0, SEEK_END);
+            off_t o = lseek(fd, 0, SEEK_END);
+            if( o != (off_t) -1 )
+                return o;
+            err(false);
+            return 0;
         }
         void fsync() { ::fsync(fd); }
         static boost::intmax_t freeSpace ( const string &path ) {

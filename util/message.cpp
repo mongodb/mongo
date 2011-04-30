@@ -364,7 +364,7 @@ namespace mongo {
         ConnectBG(int sock, SockAddr farEnd) : _sock(sock), _farEnd(farEnd) { }
 
         void run() { _res = ::connect(_sock, _farEnd.raw(), _farEnd.addressSize); }
-        string name() const { return ""; /* too short lived to need to name */ }
+        string name() const { return "ConnectBG"; }
         int inError() const { return _res; }
 
     private:
@@ -634,12 +634,20 @@ again:
         unsigned retries = 0;
         while( len > 0 ) {
             int ret = ::recv( sock , buf , len , portRecvFlags );
-            if ( ret == 0 ) {
+            if ( ret > 0 ) {
+                if ( len <= 4 && ret != len )
+                    log(_logLevel) << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
+                assert( ret <= len );
+                len -= ret;
+                buf += ret;
+            }
+            else if ( ret == 0 ) {
                 log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
                 throw SocketException( SocketException::CLOSED );
             }
-            if ( ret < 0 ) {
+            else { /* ret < 0  */
                 int e = errno;
+                
 #if defined(EINTR) && !defined(_WIN32)
                 if( e == EINTR ) {
                     if( ++retries == 1 ) {
@@ -648,29 +656,18 @@ again:
                     }
                 }
 #endif
-                if ( e != EAGAIN || _timeout == 0 ) {
-                    SocketException::Type t = SocketException::RECV_ERROR;
-#if defined(_WINDOWS)
-                    if( e == WSAETIMEDOUT ) t = SocketException::RECV_TIMEOUT;
-#else
-                    /* todo: what is the error code on an SO_RCVTIMEO on linux? EGAIN? EWOULDBLOCK? */
+                if ( ( e == EAGAIN 
+#ifdef _WINDOWS
+                       || e == WSAETIMEDOUT
 #endif
-                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
-                    throw SocketException(t);
+                       ) && _timeout > 0 ) {
+                    // this is a timeout
+                    log(_logLevel) << "MessagingPort recv() timeout  " << farEnd.toString() <<endl;
+                    throw SocketException(SocketException::RECV_TIMEOUT);                    
                 }
-                else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort recv() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::RECV_ERROR );
-                    }
-                }
-            }
-            else {
-                if ( len <= 4 && ret != len )
-                    log(_logLevel) << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
-                assert( ret <= len );
-                len -= ret;
-                buf += ret;
+
+                log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
+                throw SocketException(SocketException::RECV_ERROR);
             }
         }
     }

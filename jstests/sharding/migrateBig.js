@@ -40,6 +40,6 @@ for ( i=0; i<20; i+= 2 )
 
 db.printShardingStatus()
 
-assert.soon( function(){ var x = s.chunkDiff( "foo" , "test" ); print( "chunk diff: " + x ); return x < 2; } , "no balance happened" , 120 * 1000 , 2000 ) 
+assert.soon( function(){ var x = s.chunkDiff( "foo" , "test" ); print( "chunk diff: " + x ); return x < 2; } , "no balance happened" , 8 * 60 * 1000 , 2000 ) 
 
 s.stop()
