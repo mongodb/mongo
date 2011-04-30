@@ -294,29 +294,32 @@ namespace mongo {
                 // use fresh shard state
                 Shard::reloadShardInfo();
 
-                dist_lock_try lk( &balanceLock , "doing balance round" );
-                if ( ! lk.got() ) {
-                    log(1) << "skipping balancing round because another balancer is active" << endl;
-                    conn.done();
-
-                    sleepsecs( 30 ); // no need to wake up soon
-                    continue;
+                {
+                    dist_lock_try lk( &balanceLock , "doing balance round" );
+                    if ( ! lk.got() ) {
+                        log(1) << "skipping balancing round because another balancer is active" << endl;
+                        conn.done();
+                        
+                        sleepsecs( 30 ); // no need to wake up soon
+                        continue;
+                    }
+                    
+                    log(1) << "*** start balancing round" << endl;
+                    
+                    vector<CandidateChunkPtr> candidateChunks;
+                    _doBalanceRound( conn.conn() , &candidateChunks );
+                    if ( candidateChunks.size() == 0 ) {
+                        log(1) << "no need to move any chunk" << endl;
+                    }
+                    else {
+                        _balancedLastTime = _moveChunks( &candidateChunks );
+                    }
+                    
+                    log(1) << "*** end of balancing round" << endl;
                 }
-
-                log(1) << "*** start balancing round" << endl;
-
-                vector<CandidateChunkPtr> candidateChunks;
-                _doBalanceRound( conn.conn() , &candidateChunks );
-                if ( candidateChunks.size() == 0 ) {
-                    log(1) << "no need to move any chunk" << endl;
-                }
-                else {
-                    _balancedLastTime = _moveChunks( &candidateChunks );
-                }
-
-                log(1) << "*** end of balancing round" << endl;
+                
                 conn.done();
-
+                    
                 sleepsecs( _balancedLastTime ? 5 : 10 );
             }
             catch ( std::exception& e ) {

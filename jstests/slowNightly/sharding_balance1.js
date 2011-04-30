@@ -41,7 +41,8 @@ print( diff() )
 assert.soon( function(){
     var d = diff();
     return d < 5;
-} , "balance didn't happen" , 1000 * 60 * 3 , 5000 );
+// Make sure there's enough time here, since balancing can sleep for 15s or so between balances.
+} , "balance didn't happen" , 1000 * 60 * 5 , 5000 );
     
 var chunkCount = sum();
 s.adminCommand( { removeshard: "shard0000" } );
