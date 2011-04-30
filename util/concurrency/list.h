@@ -42,12 +42,15 @@ namespace mongo {
             friend class List1;
             T *_next;
         public:
+            Base() : _next(0){}
+            ~Base(){ assert(0); /* we never want this to happen */ }
             T* next() const { return _next; }
         };
 
         T* head() const { return _head; }
 
         void push(T* t) {
+            assert( t->_next == 0 );
             scoped_lock lk(_m);
             t->_next = _head;
             _head = t;
@@ -66,6 +69,7 @@ namespace mongo {
             while( n != t ) {
                 prev = n->_next;
                 n = prev;
+                uassert( 14050 , "item not in list" , n );
             }
             prev = t->_next;
             if( ++_orphans > 500 )

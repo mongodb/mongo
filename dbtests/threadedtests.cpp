@@ -21,6 +21,7 @@
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/mvar.h"
 #include "../util/concurrency/thread_pool.h"
+#include "../util/concurrency/list.h"
 #include "../util/timer.h"
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
@@ -400,6 +401,34 @@ namespace ThreadedTests {
         }
     };
 
+    class List1Test {
+    public:
+        
+        class M : public List1<M>::Base {
+            ~M();
+        public:
+            M( int x ) {
+                num = x;
+            }
+
+            int num;
+        };
+
+        void run(){
+            List1<M> l;
+            
+            vector<M*> ms;
+            for ( int i=0; i<5; i++ ) {
+                M * m = new M(i);
+                ms.push_back( m );
+                l.push( m );
+            }
+            
+            ASSERT_EXCEPTION( l.orphan( new M( -3 ) ) , UserException );
+
+        }
+    };
+
 
     class All : public Suite {
     public:
@@ -411,11 +440,15 @@ namespace ThreadedTests {
             add< MVarTest >();
             add< ThreadPoolTest >();
             add< LockTest >();
+
             add< RWLockTest1 >();
             //add< RWLockTest2 >(); // SERVER-2996
             add< RWLockTest3 >();
             add< RWLockTest4 >();
+
             add< MongoMutexTest >();
+
+            add< List1Test >();
         }
     } myall;
 }
