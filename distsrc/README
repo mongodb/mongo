@@ -1,34 +1,52 @@
-
-MongoDB
-=======
+MongoDB README
 
 Welcome to MongoDB!
 
-Package Contents
-----------------
+COMPONENTS
 
-  bin/mongod            - MongoDB server
-  bin/mongo             - MongoDB client
+  bin/mongod - The database process.
+  bin/mongos - Sharding controller.
+  bin/mongo  - The database shell (uses interactive javascript).
+
+UTILITIES
 
   bin/mongodump         - MongoDB dump tool - for backups, snapshots, etc..
   bin/mongorestore      - MongoDB restore a dump
-  bin/mongoexport       - Export a single collection to test (json,csv)
-  bin/mongoimportjson   - Import a json file into a collection
+  bin/mongoexport       - Export a single collection to test (JSON, CSV)
+  bin/mongoimport       - Import from JSON or CSV
+  bin/mongofiles        - Utility for putting and getting files from MongoDB GridFS
+  bin/mongostat         - Show performance statistics
 
-  bin/mongofiles        - Utility for putting and getting files from MongoDB gridfs
-  
+RUNNING
 
-Useful Resources
-----------------
+  For command line options invoke:
 
- MongoDB Website
+    $ ./mongod --help
 
- * http://www.mongodb.org/
+  To run a single server database:
 
-Documentation
+    $ mkdir /data/db
+    $ ./mongod
+    $
+    $ # The mongo javascript shell connects to localhost and test database by default:
+    $ ./mongo 
+    > help
 
- * http://www.mongodb.org/display/DOCS/Documentation
+DRIVERS
 
- MongoDB Maillists & IRC
+  Client drivers for most programming languages are available at mongodb.org.  Use the 
+  shell ("mongo") for administrative tasks.
 
- * http://www.mongodb.org/display/DOCS/Community
+DOCUMENTATION
+
+  http://www.mongodb.org/
+
+MAIL LISTS AND IRC
+
+  http://www.mongodb.org/display/DOCS/Community
+
+32 BIT BUILD NOTES
+
+  MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
+  not be able to work with large (multi-gigabyte) databases.  However, 32 bit
+  builds work fine with small development databases.
