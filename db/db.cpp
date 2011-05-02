@@ -37,6 +37,7 @@
 #include "stats/snapshots.h"
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
 #include "../util/message_server.h"
 #include "client.h"
 #include "restapi.h"
@@ -405,6 +406,8 @@ namespace mongo {
     void _initAndListen(int listenPort ) {
 
         Client::initThread("initandlisten");
+
+        Logstream::get().addGlobalTee( new RamLog("global") );
 
         bool is32bit = sizeof(int*) == 4;
 

@@ -1079,6 +1079,10 @@ shellHelper.it = function(){
 shellHelper.show = function (what) {
     assert(typeof what == "string");
 
+    var args = what.split( /\s+/ );
+    what = args[0]
+    args = args.splice(1)
+
     if (what == "profile") {
         if (db.system.profile.count() == 0) {
             print("db.system.profile is empty");
@@ -1117,6 +1121,27 @@ shellHelper.show = function (what) {
         //db.getMongo().getDBNames().sort().forEach(function (x) { print(x) });
         return "";
     }
+    
+    if (what == "log" ) {
+        var n = "global";
+        if ( args.length > 0 )
+            n = args[0]
+        
+        var res = db.adminCommand( { getLog : n } )
+        for ( var i=0; i<res.log.length; i++){
+            print( res.log[i] )
+        }
+        return ""
+    }
+
+    if (what == "logs" ) {
+        var res = db.adminCommand( { getLog : "*" } )
+        for ( var i=0; i<res.names.length; i++){
+            print( res.names[i] )
+        }
+        return ""
+    }
+
 
     throw "don't know how to show [" + what + "]";
 
@@ -1485,6 +1510,8 @@ help = shellHelper.help = function (x) {
         print("\t" + "show collections             show collections in current database");
         print("\t" + "show users                   show users in current database");
         print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+        print("\t" + "show logs                    show the accessible logger names");
+        print("\t" + "show log [name]              prints out the last segment of log in memory, 'global' is default");
         print("\t" + "use <db_name>                set current database");
         print("\t" + "db.foo.find()                list objects in collection foo");
         print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");

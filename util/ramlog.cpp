@@ -176,7 +176,8 @@ namespace mongo {
 
         scoped_lock lk( *_namedLock );
         for ( RM::iterator i=_named->begin(); i!=_named->end(); ++i ) {
-            names.push_back( i->first );
+            if ( i->second->n )
+                names.push_back( i->first );
         }
     }
 
