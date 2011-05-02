@@ -27,6 +27,7 @@ namespace mongo {
     class Cursor;
     class Document;
     class Expression;
+    class ExpressionContext;
 
     class DocumentSource :
             boost::noncopyable {
@@ -322,9 +323,11 @@ namespace mongo {
         /*
           Create a new grouping DocumentSource.
 	  
+	  @param pCtx the expression context
 	  @returns the DocumentSource
          */
-        static boost::shared_ptr<DocumentSourceGroup> create();
+        static boost::shared_ptr<DocumentSourceGroup> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
         /*
           Set the Id Expression.
@@ -350,7 +353,8 @@ namespace mongo {
                 group field
          */
         void addAccumulator(string fieldName,
-                        boost::shared_ptr<Accumulator> (*pAccumulatorFactory)(),
+                        boost::shared_ptr<Accumulator> (*pAccumulatorFactory)(
+			    const intrusive_ptr<ExpressionContext> &),
                             boost::shared_ptr<Expression> pExpression);
 
 	/*
@@ -361,10 +365,12 @@ namespace mongo {
 	  element named $group.
 
 	  @param pBsonElement the BSONELement that defines the group
+	  @param pCtx the expression context
 	  @returns the grouping DocumentSource
 	 */
         static boost::shared_ptr<DocumentSource> createFromBson(
-	    BSONElement *pBsonElement);
+	    BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
 
 	/*
@@ -380,7 +386,7 @@ namespace mongo {
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceGroup();
+        DocumentSourceGroup(const intrusive_ptr<ExpressionContext> &pCtx);
 
 	/*
 	  Before returning anything, this source must fetch everything from
@@ -415,7 +421,8 @@ namespace mongo {
           These three vectors parallel each other.
         */
         vector<string> vFieldName;
-        vector<boost::shared_ptr<Accumulator> (*)()> vpAccumulatorFactory;
+        vector<boost::shared_ptr<Accumulator> (*)(
+	    const intrusive_ptr<ExpressionContext> &)> vpAccumulatorFactory;
         vector<boost::shared_ptr<Expression> > vpExpression;
 
 
@@ -426,6 +433,8 @@ namespace mongo {
         boost::shared_ptr<Document> pCurrent;
 
         static string idName; // shared _id string
+
+	intrusive_ptr<ExpressionContext> pCtx;
     };
 
 

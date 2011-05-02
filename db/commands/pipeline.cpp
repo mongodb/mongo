@@ -40,7 +40,8 @@ namespace mongo {
     }
 
     boost::shared_ptr<Pipeline> Pipeline::parseCommand(
-	string &errmsg, BSONObj &cmdObj) {
+	string &errmsg, BSONObj &cmdObj,
+	const intrusive_ptr<ExpressionContext> &pCtx) {
 	boost::shared_ptr<Pipeline> pPipeline(new Pipeline());
         vector<BSONElement> pipeline;
 
@@ -111,7 +112,8 @@ namespace mongo {
 			DocumentSourceFilter::createFromBson(&bsonElement);
 		}
                 else if (strcmp(pFieldName, "$group") == 0) {
-                    pSource = DocumentSourceGroup::createFromBson(&bsonElement);
+                    pSource = DocumentSourceGroup::createFromBson(
+			&bsonElement, pCtx);
 		}
                 else {
                     ostringstream sb;

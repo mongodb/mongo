@@ -22,6 +22,7 @@
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
+#include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
@@ -69,7 +70,7 @@ namespace mongo {
 	/* add the remaining fields */
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
-	    boost::shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])());
+	    boost::shared_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pCtx));
 	    pA->addOperand(vpExpression[i]);
 	    pA->addToBsonObj(&insides, vFieldName[i], true);
 	}
@@ -77,24 +78,28 @@ namespace mongo {
 	pBuilder->append("$group", insides.done());
     }
 
-    boost::shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create() {
+    boost::shared_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
+	const intrusive_ptr<ExpressionContext> &pCtx) {
         boost::shared_ptr<DocumentSourceGroup> pSource(
-            new DocumentSourceGroup());
+            new DocumentSourceGroup(pCtx));
         return pSource;
     }
 
-    DocumentSourceGroup::DocumentSourceGroup():
+    DocumentSourceGroup::DocumentSourceGroup(
+	const intrusive_ptr<ExpressionContext> &pTheCtx):
         populated(false),
         pIdExpression(),
         groups(),
         vFieldName(),
         vpAccumulatorFactory(),
-        vpExpression() {
+        vpExpression(),
+        pCtx(pTheCtx) {
     }
 
     void DocumentSourceGroup::addAccumulator(
         string fieldName,
-        boost::shared_ptr<Accumulator> (*pAccumulatorFactory)(),
+        boost::shared_ptr<Accumulator> (*pAccumulatorFactory)(
+	    const intrusive_ptr<ExpressionContext> &),
         boost::shared_ptr<Expression> pExpression) {
         vFieldName.push_back(fieldName);
         vpAccumulatorFactory.push_back(pAccumulatorFactory);
@@ -104,7 +109,8 @@ namespace mongo {
 
     struct GroupOpDesc {
         const char *pName;
-        boost::shared_ptr<Accumulator> (*pFactory)(void);
+        boost::shared_ptr<Accumulator> (*pFactory)(
+	    const intrusive_ptr<ExpressionContext> &);
     };
 
     static int GroupOpDescCmp(const void *pL, const void *pR) {
@@ -126,10 +132,12 @@ namespace mongo {
     static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);
 
     boost::shared_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
-	BSONElement *pBsonElement) {
+	BSONElement *pBsonElement,
+	const intrusive_ptr<ExpressionContext> &pCtx) {
         assert(pBsonElement->type() == Object); // CW TODO must be an object
 
-        boost::shared_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create());
+        boost::shared_ptr<DocumentSourceGroup> pGroup(
+	    DocumentSourceGroup::create(pCtx));
         bool idSet = false;
 
         BSONObj groupObj(pBsonElement->Obj());
@@ -241,7 +249,7 @@ namespace mongo {
                 pGroup->reserve(n);
                 for(size_t i = 0; i < n; ++i) {
                     boost::shared_ptr<Accumulator> pAccumulator(
-                        (*vpAccumulatorFactory[i])());
+                        (*vpAccumulatorFactory[i])(pCtx));
                     pAccumulator->addOperand(vpExpression[i]);
                     pGroup->push_back(pAccumulator);
                 }
@@ -281,7 +289,7 @@ namespace mongo {
 
     boost::shared_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
 	boost::shared_ptr<DocumentSourceGroup> pMerger(
-	    DocumentSourceGroup::create());
+	    DocumentSourceGroup::create(pCtx));
 
 	/* the merger will use the same grouping key */
 	pMerger->setIdExpression(ExpressionFieldPath::create("_id"));

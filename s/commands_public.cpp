@@ -1077,9 +1077,12 @@ namespace mongo {
 				  bool fromRepl) {
 	    //const string shardedOutputCollection = getTmpName( collection );
 
+	    intrusive_ptr<ExpressionContext> pCtx(
+		ExpressionContext::create(true, false));
+
 	    /* parse the pipeline specification */
 	    boost::shared_ptr<Pipeline> pPipeline(
-		Pipeline::parseCommand(errmsg, cmdObj));
+		Pipeline::parseCommand(errmsg, cmdObj, pCtx));
 	    if (!pPipeline.get())
 		return false; // there was some parsing error
 
@@ -1134,7 +1137,7 @@ namespace mongo {
 		DocumentSourceCommandFutures::create(errmsg, &futures));
 
 	    /* run the pipeline */
-	    bool failed = pPipeline->run(result, errmsg, pSource);
+	    bool failed = pPipeline->run(result, errmsg, pSource, &ectx);
 
 /*
 	    BSONObjBuilder shardresults;

@@ -28,6 +28,7 @@ namespace mongo {
     class DocumentSource;
     class DocumentSourceProject;
     class Expression;
+    class ExpressionContext;
     class ExpressionNary;
     struct OpDesc; // local private struct
 
@@ -47,7 +48,8 @@ namespace mongo {
 	  @returns the pipeline, if created, otherwise a NULL reference
 	 */
 	static boost::shared_ptr<Pipeline> parseCommand(
-	    string &errmsg, BSONObj &cmdObj);
+	    string &errmsg, BSONObj &cmdObj,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
 	/*
 	  Get the collection name from the command.

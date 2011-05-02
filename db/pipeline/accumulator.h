@@ -22,6 +22,8 @@
 #include "bson/bsontypes.h"
 
 namespace mongo {
+    class ExpressionContext;
+
     class Accumulator :
         public ExpressionNary {
     public:
@@ -70,12 +72,14 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> create();
+        static boost::shared_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
-        AccumulatorPush();
+        AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
 
         mutable vector<boost::shared_ptr<const Value> > vpValue;
+	intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
@@ -93,8 +97,10 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> createMin();
-        static boost::shared_ptr<Accumulator> createMax();
+        static boost::shared_ptr<Accumulator> createMin(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+        static boost::shared_ptr<Accumulator> createMax(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorMinMax(int theSense);
@@ -119,7 +125,8 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> create();
+        static boost::shared_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorSum();

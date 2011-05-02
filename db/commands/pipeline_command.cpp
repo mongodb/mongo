@@ -22,6 +22,7 @@
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
+#include "db/pipeline/expression_context.h"
 #include "db/pdfile.h"
 
 namespace mongo {
@@ -68,9 +69,12 @@ namespace mongo {
     bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
                        string &errmsg,
                        BSONObjBuilder &result, bool fromRepl) {
+
+	intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
+
 	/* try to parse the command; if this fails, then we didn't run */
 	boost::shared_ptr<Pipeline> pPipeline(
-	    Pipeline::parseCommand(errmsg, cmdObj));
+	    Pipeline::parseCommand(errmsg, cmdObj, pCtx));
 	if (!pPipeline.get())
 	    return false;
 
@@ -85,6 +89,9 @@ namespace mongo {
 	/* this is the normal non-debug path */
 	if (!pPipeline->getSplitMongodPipeline())
 	    return pPipeline->run(result, errmsg, pSource);
+
+	/* setup as if we're in the router */
+	pCtx->setInRouter(true);
 
 	/*
 	  Here, we'll split the pipeline in the same way we would for sharding,
@@ -119,8 +126,9 @@ namespace mongo {
 	}
 
 	/* on the shard servers, create the local pipeline */
+	intrusive_ptr<ExpressionContext> pShardCtx(ExpressionContext::create());
 	boost::shared_ptr<Pipeline> pShardPipeline(
-	    Pipeline::parseCommand(errmsg, shardBson));
+	    Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
 	if (!pShardPipeline.get()) {
 	    return false;
 	}

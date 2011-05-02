@@ -17,6 +17,7 @@
 #include "pch.h"
 #include "accumulator.h"
 
+#include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
 
 namespace mongo {
@@ -24,7 +25,24 @@ namespace mongo {
         boost::shared_ptr<Document> pDocument) const {
         assert(vpOperand.size() == 1);
 	boost::shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
-        vpValue.push_back(prhs);
+
+	if (!pCtx->getInRouter())
+	    vpValue.push_back(prhs);
+	else {
+	    /*
+	      If we're in the router, we need to take apart the arrays we
+	      receive and put their elements into the array we are collecting.
+	      If we didn't, then we'd get an array of arrays, with one array
+	      from each shard that responds.
+	     */
+	    assert(prhs->getType() == Array);
+	    
+	    shared_ptr<ValueIterator> pvi(prhs->getArray());
+	    while(pvi->more()) {
+		shared_ptr<const Value> pElement(pvi->next());
+		vpValue.push_back(pElement);
+	    }
+	}
 
         return Value::getNull();
     }
@@ -33,14 +51,17 @@ namespace mongo {
         return Value::createArray(vpValue);
     }
 
-    AccumulatorPush::AccumulatorPush():
+    AccumulatorPush::AccumulatorPush(
+	const intrusive_ptr<ExpressionContext> &pTheCtx):
         Accumulator(),
-        vpValue() {
+        vpValue(),
+        pCtx(pTheCtx) {
     }
 
-    boost::shared_ptr<Accumulator> AccumulatorPush::create() {
+    boost::shared_ptr<Accumulator> AccumulatorPush::create(
+	const intrusive_ptr<ExpressionContext> &pCtx) {
 	boost::shared_ptr<AccumulatorPush> pAccumulator(
-	    new AccumulatorPush());
+	    new AccumulatorPush(pCtx));
         return pAccumulator;
     }
 

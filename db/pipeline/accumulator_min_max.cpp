@@ -48,13 +48,15 @@ namespace mongo {
         assert((sense == 1) || (sense == -1)); // CW TODO error
     }
 
-    boost::shared_ptr<Accumulator> AccumulatorMinMax::createMin() {
+    boost::shared_ptr<Accumulator> AccumulatorMinMax::createMin(
+	const intrusive_ptr<ExpressionContext> &pCtx) {
 	boost::shared_ptr<AccumulatorMinMax> pAccumulator(
 	    new AccumulatorMinMax(1));
         return pAccumulator;
     }
 
-    boost::shared_ptr<Accumulator> AccumulatorMinMax::createMax() {
+    boost::shared_ptr<Accumulator> AccumulatorMinMax::createMax(
+	const intrusive_ptr<ExpressionContext> &pCtx) {
 	boost::shared_ptr<AccumulatorMinMax> pAccumulator(
 	    new AccumulatorMinMax(-1));
         return pAccumulator;

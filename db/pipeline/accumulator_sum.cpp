@@ -50,7 +50,8 @@ namespace mongo {
         return Value::getZero();
     }
 
-    boost::shared_ptr<Accumulator> AccumulatorSum::create() {
+    boost::shared_ptr<Accumulator> AccumulatorSum::create(
+	const intrusive_ptr<ExpressionContext> &pCtx) {
 	boost::shared_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
         return pSummer;
     }
