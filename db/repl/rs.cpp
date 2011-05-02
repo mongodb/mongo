@@ -464,7 +464,8 @@ namespace mongo {
         }
         forgetPrimary();
 
-        setSelfTo(0);
+        // not setting _self to 0 as other threads use _self w/o locking
+        int me = 0;
 
         // For logging
         string members = "";
@@ -474,7 +475,7 @@ namespace mongo {
             Member *mi;
             members += ( members == "" ? "" : ", " ) + m.h.toString();
             if( m.h.isSelf() ) {
-                assert( _self == 0 );
+                assert( me++ == 0 );
                 mi = new Member(m.h, m._id, &m, true);
                 setSelfTo(mi);
 
@@ -490,7 +491,7 @@ namespace mongo {
             }
         }
 
-        if( ! _self ){
+        if( me == 0 ){
             log() << "replSet warning did not detect own host in full reconfig, members " << members << " config: " << c << rsLog;
         }
 
