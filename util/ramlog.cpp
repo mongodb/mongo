@@ -30,7 +30,7 @@ namespace mongo {
         for( int i = 0; i < N; i++ )
             lines[i][C-1] = 0;
     }
-    
+
     void RamLog::write(LogLevel ll, const string& str) {
         char *p = lines[(h+n)%N];
         if( str.size() < C )
@@ -97,7 +97,7 @@ namespace mongo {
         ss << string(s, h-s) << "<a href=\"" << url << "\">" << url << "</a>" << sp;
         return ss.str();
     }
-    
+
     void RamLog::toHTML(stringstream& s) {
         vector<const char*> v;
         get( v );
