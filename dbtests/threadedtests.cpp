@@ -21,6 +21,7 @@
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/mvar.h"
 #include "../util/concurrency/thread_pool.h"
+#include "../util/concurrency/list.h"
 #include "../util/timer.h"
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
@@ -400,6 +401,69 @@ namespace ThreadedTests {
         }
     };
 
+    class List1Test2 : public ThreadedTest<> {
+        static const int iterations = 1000; // note: a lot of iterations will use a lot of memory as List1 leaks on purpose
+        class M : public List1<M>::Base {
+        public:
+            M(int x) : _x(x) { }
+            const int _x;
+        };
+        List1<M> l;
+    public:
+        void validate() { }
+        void subthread(int) {
+            for(int i=0; i < iterations; i++) {
+                int r = std::rand() % 256;
+                if( r == 0 ) {
+                    l.orphanAll();
+                }
+                else if( r < 4 ) { 
+                    l.push(new M(r));
+                }
+                else {
+                    M *orph = 0;
+                    for( M *m = l.head(); m; m=m->next() ) { 
+                        ASSERT( m->_x > 0 && m->_x < 4 );
+                        if( r > 192 && std::rand() % 8 == 0 )
+                            orph = m;
+                    }
+                    if( orph ) {
+                        try { 
+                            l.orphan(orph);
+                        }
+                        catch(...) { }
+                    }
+                }
+            }
+        }
+    };
+
+    class List1Test {
+    public:
+        class M : public List1<M>::Base {
+            ~M();
+        public:
+            M( int x ) {
+                num = x;
+            }
+            int num;
+        };
+
+        void run(){
+            List1<M> l;
+            
+            vector<M*> ms;
+            for ( int i=0; i<5; i++ ) {
+                M * m = new M(i);
+                ms.push_back( m );
+                l.push( m );
+            }
+            
+            // must assert as the item is missing
+            ASSERT_EXCEPTION( l.orphan( new M( -3 ) ) , UserException );
+        }
+    };
+
 
     class All : public Suite {
     public:
@@ -407,14 +471,19 @@ namespace ThreadedTests {
         }
 
         void setupTests() {
+            add< List1Test >();
+            add< List1Test2 >();
+
             add< IsAtomicUIntAtomic >();
             add< MVarTest >();
             add< ThreadPoolTest >();
             add< LockTest >();
+
             add< RWLockTest1 >();
             //add< RWLockTest2 >(); // SERVER-2996
             add< RWLockTest3 >();
             add< RWLockTest4 >();
+
             add< MongoMutexTest >();
         }
     } myall;

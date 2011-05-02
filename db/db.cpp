@@ -284,7 +284,9 @@ namespace mongo {
             if ( !h->isCurrentVersion() || forceRepair ) {
 
                 if( h->version <= 0 ) {
-                    uasserted(14026, str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version << " info: " << h->versionMinor << ' ' << h->fileLength);
+                    uasserted(14026, 
+                      str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version 
+							        << " info: " << h->versionMinor << ' ' << h->fileLength);
                 }
 
                 log() << "****" << endl;
@@ -416,7 +418,7 @@ namespace mongo {
             l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
-            l << ( is32bit ? " 32" : " 64" ) << "-bit " << endl;
+            l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log() << "_DEBUG build (which is slower)" << endl;
         show_warnings();
@@ -748,12 +750,9 @@ int main(int argc, char* argv[]) {
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
             if (!repairpath.size()) {
-                out() << "repairpath has to be non-zero" << endl;
+                out() << "repairpath is empty" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-        }
-        else {
-            repairpath = dbpath;
         }
         if (params.count("nocursors")) {
             useCursors = false;
@@ -932,6 +931,10 @@ int main(int argc, char* argv[]) {
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );
         }
+
+        // needs to be after things like --configsvr parsing, thus here.
+        if( repairpath.empty() )
+            repairpath = dbpath;
 
         Module::configAll( params );
         dataFileSync.go();

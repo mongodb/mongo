@@ -196,6 +196,8 @@
     <ClCompile Include="..\db\querypattern.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\db\security_key.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
@@ -539,11 +541,24 @@
     <ClInclude Include="..\util\processinfo.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\version.h" />
+    <ClInclude Include="balance.h" />
     <ClInclude Include="balancer_policy.h" />
+    <ClInclude Include="chunk.h" />
+    <ClInclude Include="client.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="cursors.h" />
+    <ClInclude Include="d_chunk_manager.h" />
+    <ClInclude Include="d_logic.h" />
+    <ClInclude Include="d_writeback.h" />
     <ClInclude Include="grid.h" />
     <ClInclude Include="gridconfig.h" />
     <ClInclude Include="griddatabase.h" />
+    <ClInclude Include="request.h" />
+    <ClInclude Include="server.h" />
     <ClInclude Include="shard.h" />
+    <ClInclude Include="shardkey.h" />
+    <ClInclude Include="shard_version.h" />
+    <ClInclude Include="stats.h" />
     <ClInclude Include="strategy.h" />
     <ClInclude Include="..\util\background.h" />
     <ClInclude Include="..\db\commands.h" />
@@ -559,6 +574,8 @@
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
     <ClInclude Include="..\client\model.h" />
+    <ClInclude Include="util.h" />
+    <ClInclude Include="writeback_listener.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js32d.lib">

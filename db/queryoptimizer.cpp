@@ -1004,11 +1004,25 @@ doneCheckOrder:
     
     bool isSimpleIdQuery( const BSONObj& query ) {
         BSONObjIterator i(query);
-        if( !i.more() ) return false;
+        
+        if( !i.more() ) 
+            return false;
+
         BSONElement e = i.next();
-        if( i.more() ) return false;
-        if( strcmp("_id", e.fieldName()) != 0 ) return false;
-        return e.isSimpleType(); // e.g. not something like { _id : { $gt : ...
+
+        if( i.more() ) 
+            return false;
+
+        if( strcmp("_id", e.fieldName()) != 0 ) 
+            return false;
+        
+        if ( e.isSimpleType() ) // e.g. not something like { _id : { $gt : ...
+            return true;
+
+        if ( e.type() == Object )
+            return e.Obj().firstElement().fieldName()[0] != '$';
+
+        return false;
     }
 
     shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {

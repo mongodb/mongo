@@ -397,6 +397,51 @@
     <ClInclude Include="..\util\signal_handlers.h">
       <Filter>Shared Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="writeback_listener.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="balance.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="chunk.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cursors.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d_chunk_manager.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d_logic.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d_writeback.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="request.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="server.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shard_version.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shardkey.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stats.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js32d.lib" />
