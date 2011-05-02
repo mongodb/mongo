@@ -32,4 +32,5 @@ assert.eq( {"a.x":[[3,3]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } },
 
 t.ensureIndex( { "a.x":1,"a.y":-1 } );
 
-assert.eq( {"a.x":[[3,3]],"a.y":[[1.7976931348623157e+308,4]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3, y : { $gt: 4 } } } ] } } ).explain().indexBounds );
+// TODO Index bounds below for elemMatch could be improved.
+assert.eq( {"a.x":[[3,3]],"a.y":[[{$maxElement:1},{$minElement:1}]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3, y : { $gt: 4 } } } ] } } ).explain().indexBounds );

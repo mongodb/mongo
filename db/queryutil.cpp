@@ -24,6 +24,7 @@
 #include "../util/unittest.h"
 #include "dbmessage.h"
 #include "indexkey.h"
+#include "../util/mongoutils/str.h"
 
 namespace mongo {
     extern BSONObj staticNull;
@@ -693,19 +694,23 @@ namespace mongo {
         while( i != _ranges.end() && j != other._ranges.end() ) {
             int cmp = i->first.compare( j->first );
             if ( cmp == 0 ) {
+                // Same field name, so find range intersection.
                 i->second &= j->second;
                 ++i;
                 ++j;
             }
             else if ( cmp < 0 ) {
+                // Field present in *this.
                 ++i;
             }
             else {
+                // Field not present in *this, so add it.
                 range( j->first.c_str() ) = j->second;
                 ++j;
             }
         }
         while( j != other._ranges.end() ) {
+            // Field not present in *this, add it.
             range( j->first.c_str() ) = j->second;
             ++j;
         }
@@ -831,16 +836,31 @@ namespace mongo {
     :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
         _queries = frs._queries;
         BSONObjIterator i( _indexSpec.keyPattern );
+        set< string > baseObjectNontrivialPrefixes;
         while( i.more() ) {
             BSONElement e = i.next();
+            const FieldRange *range = &frs.range( e.fieldName() );
+            if ( !frs.singleKey() ) {
+                string prefix = str::before( e.fieldName(), '.' );
+                if ( baseObjectNontrivialPrefixes.count( prefix ) > 0 ) {
+                    // A field with the same parent field has already been
+                    // constrainted, and with a multikey index we cannot
+                    // constrain this field.
+                    range = &frs.trivialRange();
+                } else {
+                    if ( range->nontrivial() ) {
+                        baseObjectNontrivialPrefixes.insert( prefix );
+                    }
+                }
+            }
             int number = (int) e.number(); // returns 0.0 if not numeric
             bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
             if ( forward ) {
-                _ranges.push_back( frs.range( e.fieldName() ) );
+                _ranges.push_back( *range );
             }
             else {
                 _ranges.push_back( FieldRange( BSONObj().firstElement(), frs.singleKey(), false, true ) );
-                frs.range( e.fieldName() ).reverse( _ranges.back() );
+                range->reverse( _ranges.back() );
             }
             assert( !_ranges.back().empty() );
         }
