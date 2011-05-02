@@ -44,6 +44,7 @@
 #include "stats/counters.h"
 #include "background.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
 
 namespace mongo {
 
@@ -343,5 +344,51 @@ namespace mongo {
         }
     } availableQueryOptionsCmd;
 
+
+    class GetLogCmd : public Command {
+    public:
+        GetLogCmd() : Command( "getLog" ){}
+
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool requiresAuth() { return false; }
+        virtual bool adminOnly() const { return true; }
+
+        virtual void help( stringstream& help ) const {
+            help << "{ getLog : '*' }  OR { getLog : 'global' }";
+        }
+
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            string p = cmdObj.firstElement().String();
+            if ( p == "*" ) {
+                vector<string> names;
+                RamLog::getNames( names );
+
+                BSONArrayBuilder arr;
+                for ( unsigned i=0; i<names.size(); i++ ) {
+                    arr.append( names[i] );
+                }
+                
+                result.appendArray( "names" , arr.arr() );
+            }
+            else {
+                RamLog* rl = RamLog::get( p );
+                if ( ! rl ) {
+                    errmsg = str::stream() << "no RamLog named: " << p;
+                    return false;
+                }
+                
+                vector<const char*> lines;
+                rl->get( lines );
+                
+                BSONArrayBuilder arr( result.subarrayStart( "log" ) );
+                for ( unsigned i=0; i<lines.size(); i++ )
+                    arr.append( lines[i] );
+                arr.done();
+            }
+            return true;
+        }
+
+    } getLogCmd;
 
 }

@@ -43,8 +43,8 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
-    static RamLog _rsLog;
-    Tee *rsLog = &_rsLog;
+    static RamLog * _rsLog = new RamLog( "rs" );
+    Tee *rsLog = _rsLog;
     extern bool replSetBlind;
 
     string ago(time_t t) {
@@ -340,7 +340,7 @@ namespace mongo {
 
 
     void fillRsLog(stringstream& s) {
-        _rsLog.toHTML( s );
+        _rsLog->toHTML( s );
     }
 
     const Member* ReplSetImpl::findById(unsigned id) const {

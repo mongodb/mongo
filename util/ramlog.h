@@ -23,7 +23,7 @@ namespace mongo {
 
     class RamLog : public Tee {
     public:
-        RamLog();
+        RamLog( string name );
 
         virtual void write(LogLevel ll, const string& str);
 
@@ -31,6 +31,10 @@ namespace mongo {
 
         void toHTML(stringstream& s);
 
+        static RamLog* get( string name );
+        static void getNames( vector<string>& names );
+
+    protected:
         static int repeats(const vector<const char *>& v, int i);
         static string clean(const vector<const char *>& v, int i, string line="");
         static string color(string line);
@@ -38,8 +42,9 @@ namespace mongo {
         /* turn http:... into an anchor */
         static string linkify(const char *s);
 
-
     private:
+        ~RamLog(); // want this private as we want to leak so we can use them till the very end
+
         enum {
             N = 128, // number of links
             C = 256 // max size of line
@@ -47,6 +52,11 @@ namespace mongo {
         char lines[N][C];
         unsigned h; // current position
         unsigned n; // numer of lines stores 0 o N
+        string _name;
+
+        typedef map<string,RamLog*> RM;
+        static mongo::mutex* _namedLock;
+        static RM*  _named;
     };
 
 }

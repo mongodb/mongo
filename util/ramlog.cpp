@@ -25,10 +25,26 @@ namespace mongo {
 
     using namespace mongoutils;
 
-    RamLog::RamLog() {
+    RamLog::RamLog( string name ) : _name(name) {
         h = 0; n = 0;
         for( int i = 0; i < N; i++ )
             lines[i][C-1] = 0;
+
+        if ( name.size() ) {
+            
+            if ( ! _namedLock )
+                _namedLock = new mongo::mutex("RamLog::_namedLock");
+
+            scoped_lock lk( *_namedLock );
+            if ( ! _named )
+                _named = new RM();
+            (*_named)[name] = this;
+        }
+        
+    }
+
+    RamLog::~RamLog() {
+        
     }
 
     void RamLog::write(LogLevel ll, const string& str) {
@@ -129,5 +145,31 @@ namespace mongo {
         s << "</pre>\n";
     }
 
+    // ---------------
+    // static things
+    // ---------------
 
+    RamLog* RamLog::get( string name ) {
+        if ( ! _named )
+            return 0;
+
+        scoped_lock lk( *_namedLock );
+        RM::iterator i = _named->find( name );
+        if ( i == _named->end() )
+            return 0;
+        return i->second;
+    }
+    
+    void RamLog::getNames( vector<string>& names ) {
+        if ( ! _named )
+            return;
+
+        scoped_lock lk( *_namedLock );
+        for ( RM::iterator i=_named->begin(); i!=_named->end(); ++i ) {
+            names.push_back( i->first );
+        }
+    }
+
+    mongo::mutex* RamLog::_namedLock;
+    RamLog::RM*  RamLog::_named = 0;
 }
