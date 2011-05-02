@@ -141,8 +141,10 @@ namespace mongo {
             BSONElement e = info.obj()["v"];
             if( e.type() == NumberInt ) 
                 return e._numberInt();
-            uassert(10000, "index v field should be Integer type", e.eoo());
-            return 0;
+            // should normally be an int.  this is for backward compatibility
+            int v = e.numberInt();
+            uassert(14802, "index v field should be Integer type", v == 0);
+            return v;
         }
 
         bool unique() const {
