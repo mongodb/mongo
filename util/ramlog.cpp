@@ -49,10 +49,20 @@ namespace mongo {
 
     void RamLog::write(LogLevel ll, const string& str) {
         char *p = lines[(h+n)%N];
-        if( str.size() < C )
-            strcpy(p, str.c_str());
-        else
+        
+        unsigned sz = str.size();
+        if( sz < C ) {
+            if ( str.c_str()[sz-1] == '\n' ) {
+                memcpy(p, str.c_str(), sz-1);
+                p[sz-1] = 0;
+            }
+            else 
+                strcpy(p, str.c_str());
+        }
+        else {
             memcpy(p, str.c_str(), C-1);
+        }
+
         if( n < N ) n++;
         else h = (h+1) % N;
     }
