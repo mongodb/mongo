@@ -1051,7 +1051,7 @@ const StringData _jscode_raw_utils =
 "\n" 
 "shellHelper = function( command , rest , shouldPrint ){\n" 
 "command = command.trim();\n" 
-"var args = rest.trim().replace(/;$/,\"\").split( \"\\s+\" );\n" 
+"var args = rest.trim().replace(/\\s+;$/,\"\").split( \"\\s+\" );\n" 
 "\n" 
 "if ( ! shellHelper[command] )\n" 
 "throw \"no command [\" + command + \"]\";\n" 

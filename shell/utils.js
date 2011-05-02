@@ -1046,7 +1046,7 @@ shellAutocomplete.showPrivate = false; // toggle to show (useful when working on
 
 shellHelper = function( command , rest , shouldPrint ){
     command = command.trim();
-    var args = rest.trim().replace(/;$/,"").split( "\s+" );
+    var args = rest.trim().replace(/\s+;$/,"").split( "\s+" );
     
     if ( ! shellHelper[command] )
         throw "no command [" + command + "]";
