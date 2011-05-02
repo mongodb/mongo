@@ -343,6 +343,11 @@ namespace mongo {
          * the config. Returns true if the config was changed.  Returns false
          * if the config doesn't include a this node.  Throws an exception if
          * something goes very wrong.
+         *
+         * Behavior to note:
+         *  - locks this
+         *  - intentionally leaks the old _cfg and any old _members (if the
+         *    change isn't strictly additive)
          */
         bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
         void _fillIsMaster(BSONObjBuilder&);
