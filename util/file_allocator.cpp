@@ -241,6 +241,7 @@ namespace mongo {
                 }
 
                 string tmp;
+                long fd = 0;
                 try {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
                     
@@ -248,7 +249,7 @@ namespace mongo {
                     tmp = makeTempFileName( parent );
                     ensureParentDirCreated(tmp);
 
-                    long fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
+                    fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                     if ( fd <= 0 ) {
                         log() << "FileAllocator: couldn't create " << name << " (" << tmp << ") " << errnoWithDescription() << endl;
                         uasserted(10439, "");
@@ -266,6 +267,7 @@ namespace mongo {
                     ensureLength( fd , size );
 
                     close( fd );
+                    fd = 0;
 
                     if( rename(tmp.c_str(), name.c_str()) ) { 
                         log() << "error: couldn't rename " << tmp << " to " << name << ' ' << errnoWithDescription() << endl;
@@ -282,6 +284,8 @@ namespace mongo {
                     fa->_failed = false;
                 }
                 catch ( ... ) {
+                    if ( fd > 0 )
+                        close( fd );
                     log() << "error failed to allocate new file: " << name
                           << " size: " << size << ' ' << errnoWithDescription() << endl;
                     log() << "    will try again in 10 seconds" << endl;
