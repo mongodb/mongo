@@ -607,26 +607,20 @@ namespace mongo {
             return 2;
         }
 
-        if( box.getState().secondary() ) {
+        if( state().secondary() ) {
             /* by doing this, we will not service reads (return an error as we aren't in secondary staate.
                that perhaps is moot becasue of the write lock above, but that write lock probably gets deferred
                or removed or yielded later anyway.
 
                also, this is better for status reporting - we know what is happening.
                */
-            box.change(MemberState::RS_ROLLBACK, _self);
+            changeState(MemberState::RS_ROLLBACK);
         }
 
         HowToFixUp how;
         sethbmsg("rollback 1");
         {
             r.resetCursor();
-            /*DBClientConnection us(false, 0, 0);
-            string errmsg;
-            if( !us.connect(HostAndPort::me().toString(),errmsg) ) {
-                sethbmsg("rollback connect to self failure" + errmsg);
-                return;
-            }*/
 
             sethbmsg("rollback 2 FindCommonPoint");
             try {
@@ -668,7 +662,7 @@ namespace mongo {
             /* success - leave "ROLLBACK" state
                can go to SECONDARY once minvalid is achieved
             */
-            box.change(MemberState::RS_RECOVERING, _self);
+            changeState(MemberState::RS_RECOVERING);
         }
 
         return 0;

@@ -63,8 +63,7 @@ namespace mongo {
     void ReplSetImpl::assumePrimary() {
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
-        box.setSelfPrimary(_self);
-        //log() << "replSet PRIMARY" << rsLog; // self (" << _self->id() << ") is now primary" << rsLog;
+        changeState(MemberState::RS_PRIMARY);
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
@@ -404,10 +403,6 @@ namespace mongo {
                         newOnes.push_back(&m);
                     }
                 }
-
-                // change timeout settings, if necessary
-                ScopedConn conn(m.h.toString());
-                conn.setTimeout(c.ho.heartbeatTimeoutMillis/1000.0);
             }
             if( me == 0 ) {
                 // initial startup with fastsync

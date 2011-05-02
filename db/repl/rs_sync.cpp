@@ -449,23 +449,6 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncThread() {
-        /* test here was to force a receive timeout
-        ScopedConn c("localhost");
-        bo info;
-        try {
-            log() << "this is temp" << endl;
-            c.runCommand("admin", BSON("sleep"<<120), info);
-            log() << info.toString() << endl;
-            c.runCommand("admin", BSON("sleep"<<120), info);
-            log() << "temp" << endl;
-        }
-        catch( DBException& e ) {
-            log() << e.toString() << endl;
-            c.runCommand("admin", BSON("sleep"<<120), info);
-            log() << "temp" << endl;
-        }
-        */
-
         while( 1 ) {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before
@@ -494,9 +477,9 @@ namespace mongo {
                member has done a stepDown() and needs to come back up.
                */
             OCCASIONALLY {
-            	log() << "replSet default heartbeat starting..." << rsLog;
+            	log() << "replSet running manager" << rsLog;
             	mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
-            	log() << "replSet heartbeat finished" << rsLog;
+            	log() << "replSet manager finished" << rsLog;
             }
         }
     }
