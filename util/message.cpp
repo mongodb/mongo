@@ -550,11 +550,8 @@ again:
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {
                 if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::SEND_ERROR );
-                    }
-                    // should just retry
+                    log(_logLevel) << "MessagingPort " << context << " send() timed out " << farEnd.toString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT );
                 }
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
@@ -605,10 +602,8 @@ again:
                     throw SocketException( SocketException::SEND_ERROR );
                 }
                 else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::SEND_ERROR );
-                    }
+                    log(_logLevel) << "MessagingPort " << context << " send() remote timeout " << farEnd.toString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT );
                 }
             }
             else {
