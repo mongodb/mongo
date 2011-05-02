@@ -72,7 +72,7 @@ namespace mongo {
                 configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
             }
             catch ( const std::exception& e ) {
-                log( LL_WARNING ) << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << endl;
+                warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << endl;
             }
         }
 
@@ -88,7 +88,7 @@ namespace mongo {
             if ( op )
                 op->setMessage( s.c_str() );
             else
-                log( LL_WARNING ) << "op is null in MoveTimingHelper::done" << endl;
+                warning() << "op is null in MoveTimingHelper::done" << endl;
 
             _b.appendNumber( s , _t.millis() );
             _t.reset();
@@ -304,7 +304,7 @@ namespace mongo {
                 ide = obj["_id"];
 
             if ( ide.eoo() ) {
-                log( LL_WARNING ) << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << endl;
+                warning() << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << endl;
                 return;
             }
 
@@ -333,7 +333,7 @@ namespace mongo {
 
             case 'u':
                 if ( ! Helpers::findById( cc() , _ns.c_str() , ide.wrap() , it ) ) {
-                    log( LL_WARNING ) << "logOpForSharding couldn't find: " << ide << " even though should have" << endl;
+                    warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << endl;
                     return;
                 }
                 break;
@@ -739,7 +739,7 @@ namespace mongo {
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
 
-                    log( LL_WARNING ) << "aborted moveChunk because" <<  errmsg << ": " << min << "->" << max
+                    warning() << "aborted moveChunk because" <<  errmsg << ": " << min << "->" << max
                                       << " is now " << currMin << "->" << currMax << endl;
                     return false;
                 }
@@ -749,7 +749,7 @@ namespace mongo {
                     result.append( "from" , fromShard.getName() );
                     result.append( "official" , myOldShard );
 
-                    log( LL_WARNING ) << "aborted moveChunk because " << errmsg << ": chunk is at " << myOldShard
+                    warning() << "aborted moveChunk because " << errmsg << ": chunk is at " << myOldShard
                                       << " and not at " << fromShard.getName() << endl;
                     return false;
                 }
@@ -759,7 +759,7 @@ namespace mongo {
                     result.appendTimestamp( "officialVersion" , maxVersion );
                     result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
 
-                    log( LL_WARNING ) << "aborted moveChunk because " << errmsg << ": official " << maxVersion
+                    warning() << "aborted moveChunk because " << errmsg << ": official " << maxVersion
                                       << " mine: " << shardingState.getVersion(ns) << endl;
                     return false;
                 }
@@ -817,7 +817,7 @@ namespace mongo {
                 log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << endl;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
-                    log( LL_WARNING ) << "moveChunk error transfering data caused migration abort: " << res << endl;
+                    warning() << "moveChunk error transfering data caused migration abort: " << res << endl;
                     errmsg = "data transfer error";
                     result.append( "cause" , res );
                     return false;
@@ -1136,12 +1136,12 @@ namespace mongo {
             catch ( std::exception& e ) {
                 state = FAIL;
                 errmsg = e.what();
-                log( LL_ERROR ) << "migrate failed: " << e.what() << endl;
+                error() << "migrate failed: " << e.what() << endl;
             }
             catch ( ... ) {
                 state = FAIL;
                 errmsg = "UNKNOWN ERROR";
-                log( LL_ERROR ) << "migrate failed with unknown exception" << endl;
+                error() << "migrate failed with unknown exception" << endl;
             }
             setActive( false );
         }
@@ -1185,7 +1185,7 @@ namespace mongo {
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
                 long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
                 if ( num )
-                    log( LL_WARNING ) << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
+                    warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << endl;
 
                 timing.done(2);
             }
@@ -1240,7 +1240,7 @@ namespace mongo {
                         state = FAIL;
                         errmsg = "_transferMods failed: ";
                         errmsg += res.toString();
-                        log( LL_ERROR ) << "_transferMods failed: " << res << endl;
+                        error() << "_transferMods failed: " << res << endl;
                         conn.done();
                         return;
                     }
