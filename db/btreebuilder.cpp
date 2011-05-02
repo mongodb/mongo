@@ -33,9 +33,6 @@ namespace mongo {
 
     /* --- BtreeBuilder --- */
 
-    template class BtreeBuilder<V0>;
-    template class BtreeBuilder<V1>;
-
     template<class V>
     BtreeBuilder<V>::BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx) :
         dupsAllowed(_dupsAllowed),
@@ -65,7 +62,7 @@ namespace mongo {
 
     template<class V>
     void BtreeBuilder<V>::addKey(BSONObj& _key, DiskLoc loc) {
-        V::KeyOwned key(_key);
+        KeyOwned key(_key);
 
         if ( key.dataSize() > KeyMax ) {
             problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
@@ -117,7 +114,7 @@ namespace mongo {
                 }
 
                 BtreeBucket<V> *x = xloc.btreemod<V>();
-                V::Key k;
+                Key k;
                 DiskLoc r;
                 x->popBack(r,k);
                 bool keepX = ( x->n != 0 );
@@ -137,9 +134,12 @@ namespace mongo {
                     x->parent = upLoc;
                 }
                 else {
-                    if ( !x->nextChild.isNull() )
-                        x->nextChild.btreemod<V>()->parent = upLoc;
-                    x->deallocBucket( xloc, idx );
+		  if ( !x->nextChild.isNull() ) {
+		    DiskLoc ll = x->nextChild;
+		    ll.btreemod<V>()->parent = upLoc;
+		    //(x->nextChild.btreemod<V>())->parent = upLoc;
+		  }
+		  x->deallocBucket( xloc, idx );
                 }
                 xloc = nextLoc;
             }
@@ -177,5 +177,8 @@ namespace mongo {
             }
         )
     }
+
+    template class BtreeBuilder<V0>;
+    template class BtreeBuilder<V1>;
 
 }

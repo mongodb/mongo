@@ -9,6 +9,9 @@ namespace mongo {
      */
     template< class V >
     class BtreeBuilder {
+        typedef typename V::KeyOwned KeyOwned;
+        typedef typename V::Key Key;
+        
         bool dupsAllowed;
         IndexDetails& idx;
         /** Number of keys added to btree. */

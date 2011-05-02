@@ -29,8 +29,8 @@ namespace mongo {
     template< class V >
     class BtreeCursorImpl : public BtreeCursor { 
     public:
-        typename typedef BucketBasics<V>::KeyNode KeyNode;
-        typename typedef V::Key Key;
+        typedef typename BucketBasics<V>::KeyNode KeyNode;
+        typedef typename V::Key Key;
 
         BtreeCursorImpl(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
           BtreeCursor(a,b,c,d,e,f,g) { }

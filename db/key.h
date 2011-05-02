@@ -40,7 +40,7 @@ namespace mongo {
         int dataSize() const { return _o.objsize(); }
         const char * data() const { return _o.objdata(); }
         BSONElement _firstElement() const { return _o.firstElement(); }
-        bool isCompactFormat() const { false; }
+        bool isCompactFormat() const { return false; }
     private:
         BSONObj _o;
     };

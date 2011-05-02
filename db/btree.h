@@ -273,8 +273,8 @@ namespace mongo {
          * a KeyNode should not be expected to be valid after a write.
          */
         const KeyNode keyNode(int i) const {
-            if ( i >= n ) {
-                massert( 13000 , (string)"invalid keyNode: " +  BSON( "i" << i << "n" << n ).jsonString() , i < n );
+            if ( i >= this->n ) {
+                massert( 13000 , (string)"invalid keyNode: " +  BSON( "i" << i << "n" << this->n ).jsonString() , i < this->n );
             }
             return KeyNode(*this, k(i));
         }
@@ -283,15 +283,15 @@ namespace mongo {
             const BucketBasics *d = 0;
             return (char*)&(d->data) - (char*)&(d->parent);
         }
-        static int bodySize() { return BucketSize - headerSize(); }
+        static int bodySize() { return Version::BucketSize - headerSize(); }
         static int lowWaterMark() { return bodySize() / 2 - KeyMax - sizeof( _KeyNode ) + 1; } // see comment in btree.cpp
 
         // for testing
-        int nKeys() const { return n; }
-        const DiskLoc getNextChild() const { return nextChild; }
+        int nKeys() const { return this->n; }
+        const DiskLoc getNextChild() const { return this->nextChild; }
 
     protected:
-        char * dataAt(short ofs) { return data + ofs; }
+        char * dataAt(short ofs) { return this->data + ofs; }
 
         /** Initialize the header for a new node. */
         void init();
@@ -373,8 +373,8 @@ namespace mongo {
         enum Flags { Packed=1 };
 
         /** n == 0 is ok */
-        const DiskLoc& childForPos(int p) const { return p == n ? nextChild : k(p).prevChildBucket; }
-        DiskLoc& childForPos(int p) { return p == n ? nextChild : k(p).prevChildBucket; }
+        const DiskLoc& childForPos(int p) const { return p == this->n ? this->nextChild : k(p).prevChildBucket; }
+        DiskLoc& childForPos(int p) { return p == this->n ? this->nextChild : k(p).prevChildBucket; }
 
         /** Same as bodySize(). */
         int totalDataSize() const;
@@ -405,8 +405,8 @@ namespace mongo {
 
         /** @return the size the bucket's body would have if we were to call pack() */
         int packedDataSize( int refPos ) const;
-        void setNotPacked() { flags &= ~Packed; }
-        void setPacked() { flags |= Packed; }
+        void setNotPacked() { this->flags &= ~Packed; }
+        void setPacked() { this->flags |= Packed; }
         /**
          * Preconditions: 'bytes' is <= emptySize
          * Postconditions: A buffer of size 'bytes' is allocated on the top side,
@@ -448,17 +448,18 @@ namespace mongo {
          * BtreeBuilder uses the parent var as a temp place to maintain a linked list chain.
          *   we use tempNext() when we do that to be less confusing. (one might have written a union in C)
          */
-        const DiskLoc& tempNext() const { return parent; }
-        DiskLoc& tempNext() { return parent; }
+        const DiskLoc& tempNext() const { return this->parent; }
+        DiskLoc& tempNext() { return this->parent; }
 
         void _shape(int level, stringstream&) const;
         int Size() const;
         
         /** @return i-indexed _KeyNode, without bounds checking */
     public:
-        const _KeyNode& k(int i) const { return ((const _KeyNode*)data)[i]; }
+        const _KeyNode& k(int i) const { return ((const _KeyNode*)this->data)[i]; }
+        _KeyNode& _k(int i) { return ((_KeyNode*)this->data)[i]; }
     protected:        
-        _KeyNode& k(int i) { return ((_KeyNode*)data)[i]; }
+        _KeyNode& k(int i) { return ((_KeyNode*)this->data)[i]; }
 
         /**
          * Preconditions: 'this' is packed
@@ -488,7 +489,7 @@ namespace mongo {
          *  - The specified key is set at index i, replacing the existing
          *    _KeyNode data and without shifting any other _KeyNode objects.
          */
-        void setKey( int i, const DiskLoc recordLoc, const Key &key, const DiskLoc prevChildBucket );
+        void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
     };
 
     /**
@@ -523,11 +524,21 @@ namespace mongo {
     class BtreeBucket : public BucketBasics<V> {
         friend class BtreeCursor;
     public:
-        bool isHead() const { return parent.isNull(); }
+	// make compiler happy:
+        typedef typename V::Key Key;
+        typedef typename V::KeyOwned KeyOwned;
+	typedef typename BucketBasics<V>::KeyNode KeyNode;
+        const _KeyNode& k(int i) const     { return static_cast< const BucketBasics<V> * >(this)->k(i); }
+    protected:
+        _KeyNode& k(int i)                 { return static_cast< BucketBasics<V> * >(this)->_k(i); }
+    public:
+        const KeyNode keyNode(int i) const { return static_cast< const BucketBasics<V> * >(this)->keyNode(i); }
+
+        bool isHead() const { return this->parent.isNull(); }
         void dumpTree(const DiskLoc &thisLoc, const BSONObj &order) const;
         long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount = 0, bool strict = false) const; /* traverses everything */
 
-        bool isUsed( int i ) const { return k(i).isUsed(); }
+        bool isUsed( int i ) const { return this->k(i).isUsed(); }
         string bucketSummary() const;
         void dump() const;
 
@@ -789,7 +800,7 @@ namespace mongo {
         int indexInParent( const DiskLoc &thisLoc ) const;
         
         Key keyAt(int keyOfs) const {
-            return keyOfs >= n ? Key() : keyNode(keyOfs).key;
+            return keyOfs >= this->n ? Key() : this->keyNode(keyOfs).key;
         }
 
         /**

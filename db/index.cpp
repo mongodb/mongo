@@ -31,6 +31,7 @@ namespace mongo {
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
     public:
+        typedef typename V::KeyOwned KeyOwned;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -51,7 +52,7 @@ namespace mongo {
         virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) { 
             const BtreeBucket<V> *h = head.btree<V>();
             for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
-                bool dup = h->wouldCreateDup(idx, head, V::KeyOwned(**i), ordering, self);
+                bool dup = h->wouldCreateDup(idx, head, KeyOwned(**i), ordering, self);
                 uassert( 11001 , "E11001 duplicate key on update", !dup);
             }
         }

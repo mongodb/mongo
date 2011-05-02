@@ -25,7 +25,9 @@
 
 namespace mongo {
 
-    class IndexInterface { 
+    class IndexInterface {
+    protected:
+        virtual ~IndexInterface() { }
     public:
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
         virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
@@ -34,7 +36,8 @@ namespace mongo {
                       const BSONObj& key, const Ordering &order, bool dupsAllowed,
                       IndexDetails& idx, bool toplevel = true) const = 0;
         virtual DiskLoc addBucket(const IndexDetails&) = 0;
-        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) = 0;
+        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, 
+                                   DiskLoc self, const Ordering& ordering) = 0;
     };
 
     /* Details about a particular index. There is one of these effectively for each object in
