@@ -27,7 +27,7 @@ namespace mongo {
         void fail() { 
             log() << "synchronization (race condition) failure" << endl;
             printStackTrace();
-            abort();
+            ::abort();
         }
         void enter() { 
             if( ++n != 1 ) fail();

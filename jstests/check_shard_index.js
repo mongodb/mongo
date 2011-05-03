@@ -42,4 +42,9 @@ assert.eq( 3 , f.count() , "2. count after initial insert should be 3" );
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1} , force: true });
 assert.eq( false , res.ok , "2b " + tojson(res) );
 
+// 
+res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {_id:1} , force: true });
+assert.eq( true , res.ok , "3a " + tojson(res) );
+assert( res.idskip , "3b " + tojson(res) )
+
 print("PASSED");

@@ -15,6 +15,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* SHARDING: 
+   I believe this file is for mongod only.
+   See s/commnands_public.cpp for mongos.
+*/
+
 #include "pch.h"
 #include "query.h"
 #include "pdfile.h"
@@ -139,7 +144,7 @@ namespace mongo {
             else if ( cmdObj["fsync"].trueValue() ) {
                 Timer t;
                 if( !getDur().awaitCommit() ) {
-                    // if get here, not running with --dur
+                    // if get here, not running with --journal
                     log() << "fsync from getlasterror" << endl;
                     result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
                 }
@@ -1105,7 +1110,7 @@ namespace mongo {
                 if ( idx == 0 )
                     return false;
 
-                c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
+                c.reset( BtreeCursor::make( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
 
             long long avgObjSize = d->stats.datasize / d->stats.nrecords;
@@ -1180,7 +1185,8 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024";
+            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
+                    "    avgObjSize - in bytes";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
@@ -1201,7 +1207,6 @@ namespace mongo {
                     errmsg = "scale has to be > 0";
                     return false;
                 }
-
             }
             else if ( jsobj["scale"].trueValue() ) {
                 errmsg = "scale has to be a number > 0";
@@ -1250,9 +1255,22 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << 
                 "Get stats on a database. Not instantaneous. Slower for databases with large .ns files.\n" << 
-                "Example: { dbStats:1 }";
+                "Example: { dbStats:1, scale:1 }";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            int scale = 1;
+            if ( jsobj["scale"].isNumber() ) {
+                scale = jsobj["scale"].numberInt();
+                if ( scale <= 0 ) {
+                    errmsg = "scale has to be > 0";
+                    return false;
+                }
+            }
+            else if ( jsobj["scale"].trueValue() ) {
+                errmsg = "scale has to be a number > 0";
+                return false;
+            }
+
             list<string> collections;
             Database* d = cc().database();
             if ( d )
@@ -1292,12 +1310,12 @@ namespace mongo {
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
             result.append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
-            result.appendNumber( "dataSize" , size );
-            result.appendNumber( "storageSize" , storageSize);
+            result.appendNumber( "dataSize" , size / scale );
+            result.appendNumber( "storageSize" , storageSize / scale);
             result.appendNumber( "numExtents" , numExtents );
             result.appendNumber( "indexes" , indexes );
-            result.appendNumber( "indexSize" , indexSize );
-            result.appendNumber( "fileSize" , d->fileSize() );
+            result.appendNumber( "indexSize" , indexSize / scale );
+            result.appendNumber( "fileSize" , d->fileSize() / scale );
             if( d )
                 result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
 
@@ -1356,6 +1374,7 @@ namespace mongo {
             while( c->more() ) {
                 BSONObj obj = c->next();
                 theDataFileMgr.insertAndLog( toNs.c_str(), obj, true );
+                getDur().commitIfNeeded();
             }
 
             return true;
@@ -1460,7 +1479,7 @@ namespace mongo {
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
-            DiskLoc loc = theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
             return true;
         }
     } cmdGodInsert;
@@ -1507,7 +1526,7 @@ namespace mongo {
 
                 int idNum = nsd->findIdIndex();
                 if ( idNum >= 0 ) {
-                    cursor.reset( new BtreeCursor( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );
+                    cursor.reset( BtreeCursor::make( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );
                 }
                 else if ( c.find( ".system." ) != string::npos ) {
                     continue;
@@ -1561,16 +1580,13 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
-            help << "w:true write lock";
+            help << "w:true write lock. secs:<seconds>";
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-
-
             int secs = 100;
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
-
             if( cmdObj.getBoolField("w") ) {
                 writelock lk("");
                 sleepsecs(secs);
@@ -1579,7 +1595,6 @@ namespace mongo {
                 readlock lk("");
                 sleepsecs(secs);
             }
-
             return true;
         }
     } cmdSleep;
@@ -1744,7 +1759,10 @@ namespace mongo {
         BSONObj jsobj;
         {
             BSONElement e = _cmdobj.firstElement();
-            if ( e.type() == Object && string("query") == e.fieldName() ) {
+            if ( e.type() == Object && (e.fieldName()[0] == '$'
+                                         ? str::equals("query", e.fieldName()+1)
+                                         : str::equals("query", e.fieldName())))
+            {
                 jsobj = e.embeddedObject();
             }
             else {

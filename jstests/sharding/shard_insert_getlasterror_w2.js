@@ -75,7 +75,8 @@ function go() {
                 return false;
             }
             return true;
-        });
+        }, "Queries took too long to complete correctly.",
+        2 * 60 * 1000 );
     
     // Done
     routerSpec.end()

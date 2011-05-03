@@ -43,11 +43,30 @@ namespace mongo {
                 result.append("info", "config version stale");
                 weAreFresher = true;
             }
-            else if( opTime < theReplSet->lastOpTimeWritten )  {
+            // check not only our own optime, but any other member we can reach
+            else if( opTime < theReplSet->lastOpTimeWritten ||
+                     opTime < theReplSet->lastOtherOpTime())  {
                 weAreFresher = true;
             }
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             result.append("fresher", weAreFresher);
+            
+            // don't veto older versions
+            if (cmdObj["id"].eoo()) {
+                // they won't be looking for the priorityVeto field
+                return true;
+            }
+            
+            unsigned id = cmdObj["id"].Int();
+            const Member* hopeful = theReplSet->findById(id);
+            const Member *highestPriority = theReplSet->getMostElectable();
+            bool veto = false;
+            if (!hopeful || !theReplSet->isElectable(id) ||
+                (highestPriority && highestPriority->config().priority > hopeful->config().priority)) {
+                veto = true;
+            }
+
+            result.append("priorityVeto", veto);
             return true;
         }
     } cmdReplSetFresh;
@@ -91,6 +110,10 @@ namespace mongo {
             if( dt < T )
                 vUp += m->config().votes;
         }
+
+        // the manager will handle calling stepdown if another node should be
+        // primary due to priority
+
         return !( vUp * 2 > totalVotes() );
     }
 
@@ -138,22 +161,22 @@ namespace mongo {
 
         const Member* primary = rs.box.getPrimary();
         const Member* hopeful = rs.findById(whoid);
+        const Member* highestPriority = rs.getMostElectable();
 
         int vote = 0;
         if( set != rs.name() ) {
             log() << "replSet error received an elect request for '" << set << "' but our set name is '" << rs.name() << "'" << rsLog;
-
         }
         else if( myver < cfgver ) {
             // we are stale.  don't vote
         }
         else if( myver > cfgver ) {
             // they are stale!
-            log() << "replSet info got stale version # during election" << rsLog;
+            log() << "replSet electCmdReceived info got stale version # during election" << rsLog;
             vote = -10000;
         }
         else if( !hopeful ) {
-            log() << "couldn't find member with id " << whoid << rsLog;
+            log() << "replSet electCmdReceived couldn't find member with id " << whoid << rsLog;
             vote = -10000;
         }
         else if( primary && primary == rs._self && rs.lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
@@ -168,14 +191,19 @@ namespace mongo {
                   primary->fullName() << " is already primary and more up-to-date" << rsLog;
             vote = -10000;
         }
+        else if( highestPriority && highestPriority->config().priority > hopeful->config().priority) {
+            log() << hopeful->fullName() << " has lower priority than " << highestPriority->fullName();
+            vote = -10000;
+        }
         else {
             try {
                 vote = yea(whoid);
+                dassert( hopeful->id() == whoid );
                 rs.relinquish();
-                log() << "replSet info voting yea for " << whoid << rsLog;
+                log() << "replSet info voting yea for " <<  hopeful->fullName() << " (" << whoid << ')' << rsLog;
             }
             catch(VoteException&) {
-                log() << "replSet voting no already voted for another" << rsLog;
+                log() << "replSet voting no for " << hopeful->fullName() << " already voted for another" << rsLog;
             }
         }
 
@@ -214,7 +242,8 @@ namespace mongo {
                           "set" << rs.name() <<
                           "opTime" << Date_t(ord.asDate()) <<
                           "who" << rs._self->fullName() <<
-                          "cfgver" << rs._cfg->version );
+                          "cfgver" << rs._cfg->version <<
+                          "id" << rs._self->id());
         list<Target> L;
         int ver;
         /* the following queries arbiters, even though they are never fresh.  wonder if that makes sense.
@@ -230,12 +259,19 @@ namespace mongo {
         for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             if( i->ok ) {
                 nok++;
-                if( i->result["fresher"].trueValue() )
+                if( i->result["fresher"].trueValue() ) {
+                    log() << "not electing self, we are not freshest" << rsLog;
                     return false;
+                }
                 OpTime remoteOrd( i->result["opTime"].Date() );
                 if( remoteOrd == ord )
                     nTies++;
                 assert( remoteOrd <= ord );
+
+                if( i->result["priorityVeto"].trueValue() ) {
+                    log() << "not electing self, another member has majority and higher priority" << rsLog;
+                    return false;
+                }
             }
             else {
                 DEV log() << "replSet freshest returns " << i->result.toString() << rsLog;
@@ -269,7 +305,6 @@ namespace mongo {
         bool allUp;
         int nTies;
         if( !weAreFreshest(allUp, nTies) ) {
-            log() << "replSet info not electing self, we are not freshest" << rsLog;
             return;
         }
 

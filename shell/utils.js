@@ -1017,7 +1017,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
             var p = possibilities[i];
             if (typeof(curObj[p]) == "undefined" && curObj != global) continue; // extraGlobals aren't in the global object
             if (p.length == 0 || p.length < lastPrefix.length) continue;
-            if (isPrivate(p)) continue;
+            if (lastPrefix[0] != '_' && isPrivate(p)) continue;
             if (p.match(/^[0-9]+$/)) continue; // don't array number indexes
             if (p.substr(0, lastPrefix.length) != lastPrefix) continue;
 
@@ -1046,7 +1046,7 @@ shellAutocomplete.showPrivate = false; // toggle to show (useful when working on
 
 shellHelper = function( command , rest , shouldPrint ){
     command = command.trim();
-    var args = rest.trim().replace(/;$/,"").split( "\s+" );
+    var args = rest.trim().replace(/\s+;$/,"").split( "\s+" );
     
     if ( ! shellHelper[command] )
         throw "no command [" + command + "]";
@@ -1078,6 +1078,10 @@ shellHelper.it = function(){
 
 shellHelper.show = function (what) {
     assert(typeof what == "string");
+
+    var args = what.split( /\s+/ );
+    what = args[0]
+    args = args.splice(1)
 
     if (what == "profile") {
         if (db.system.profile.count() == 0) {
@@ -1117,6 +1121,27 @@ shellHelper.show = function (what) {
         //db.getMongo().getDBNames().sort().forEach(function (x) { print(x) });
         return "";
     }
+    
+    if (what == "log" ) {
+        var n = "global";
+        if ( args.length > 0 )
+            n = args[0]
+        
+        var res = db.adminCommand( { getLog : n } )
+        for ( var i=0; i<res.log.length; i++){
+            print( res.log[i] )
+        }
+        return ""
+    }
+
+    if (what == "logs" ) {
+        var res = db.adminCommand( { getLog : "*" } )
+        for ( var i=0; i<res.names.length; i++){
+            print( res.names[i] )
+        }
+        return ""
+    }
+
 
     throw "don't know how to show [" + what + "]";
 
@@ -1314,17 +1339,35 @@ rs.slaveOk = function () { return db.getMongo().setSlaveOk(); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
-rs.reconfig = function (cfg) {
-    cfg.version = rs.conf().version + 1;
+rs._runCmd = function (c) {
+    // after the command, catch the disconnect and reconnect if necessary
     var res = null;
     try {
-        res = db.adminCommand({ replSetReconfig: cfg });
+        res = db.adminCommand(c);
     }
     catch (e) {
-        print("shell got exception during reconfig: " + e);
-        print("in some circumstances, the primary steps down and closes connections on a reconfig");
+        if (("" + e).indexOf("error doing query") >= 0) {
+            // closed connection.  reconnect.
+            db.getLastErrorObj();
+            var o = db.getLastErrorObj();
+            if (o.ok) {
+                print("reconnected to server after rs command (which is normal)");
+            }
+            else {
+                printjson(o);
+            }
+        }
+        else {
+            print("shell got exception during repl set operation: " + e);
+            print("in some circumstances, the primary steps down and closes connections on a reconfig");
+        }
+        return "";
     }
     return res;
+}
+rs.reconfig = function (cfg) {
+    cfg.version = rs.conf().version + 1;
+    return this._runCmd({ replSetReconfig: cfg });
 }
 rs.add = function (hostport, arb) {
     var cfg = hostport;
@@ -1345,17 +1388,9 @@ rs.add = function (hostport, arb) {
             cfg.arbiterOnly = true;
     }
     c.members.push(cfg);
-    var res = null;
-    try { 
-        res = db.adminCommand({ replSetReconfig: c });
-    }
-    catch (e) {
-        print("shell got exception during reconfig: " + e);
-        print("in some circumstances, the primary steps down and closes connections on a reconfig");
-    }
-    return res;
+    return this._runCmd({ replSetReconfig: c });
 }
-rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:secs||60}); }
+rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs === undefined) ? 60:secs}); }
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
 rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
@@ -1408,6 +1443,17 @@ help = shellHelper.help = function (x) {
         print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
         return;
     }
+    else if (x == "keys") {
+        print("Tab completion and command history is available at the command prompt.\n");
+        print("Some emacs keystrokes are available too:");
+        print("  Ctrl-A start of line");
+        print("  Ctrl-E end of line");
+        print("  Ctrl-K del to end of line");
+        print("\nMulti-line commands");
+        print("You can enter a multi line javascript expression.  If parens, braces, etc. are not closed, you will see a new line ");
+        print("beginning with '...' characters.  Type the rest of your expression.  Press Ctrl-C to abort the data entry if you");
+        print("get stuck.\n");
+    }
     else if (x == "misc") {
         print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
         print("\tb.subtype()                         the BinData subtype (0..255)");
@@ -1454,15 +1500,18 @@ help = shellHelper.help = function (x) {
         print("\t" + "db.help()                    help on db methods");
         print("\t" + "db.mycoll.help()             help on collection methods");
         print("\t" + "rs.help()                    help on replica set methods");
-        print("\t" + "help connect                 connecting to a db help");
         print("\t" + "help admin                   administrative help");
+        print("\t" + "help connect                 connecting to a db help");
+        print("\t" + "help keys                    key shortcuts");
         print("\t" + "help misc                    misc things to know");
-        print("\t" + "help mr                      mapreduce help");
+        print("\t" + "help mr                      mapreduce");
         print();
         print("\t" + "show dbs                     show database names");
         print("\t" + "show collections             show collections in current database");
         print("\t" + "show users                   show users in current database");
         print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+        print("\t" + "show logs                    show the accessible logger names");
+        print("\t" + "show log [name]              prints out the last segment of log in memory, 'global' is default");
         print("\t" + "use <db_name>                set current database");
         print("\t" + "db.foo.find()                list objects in collection foo");
         print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");

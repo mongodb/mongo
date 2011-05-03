@@ -33,6 +33,10 @@ namespace mongo {
     ReplSet *theReplSet = 0;
     extern string *discoveredSeed;
 
+    bool isCurrentlyAReplSetPrimary() { 
+        return theReplSet && theReplSet->isPrimary();
+    }
+
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
         static time_t lastLogged;
         _hbmsgTime = time(0);
@@ -59,11 +63,29 @@ namespace mongo {
     void ReplSetImpl::assumePrimary() {
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
-        box.setSelfPrimary(_self);
-        //log() << "replSet PRIMARY" << rsLog; // self (" << _self->id() << ") is now primary" << rsLog;
+        changeState(MemberState::RS_PRIMARY);
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
+
+    Member* ReplSetImpl::getMostElectable() {
+        scoped_lock lk(_elock);
+        
+        Member *max = 0;        
+
+        for (set<unsigned>::iterator it = _electableSet.begin(); it != _electableSet.end(); it++) {
+            const Member *temp = findById(*it);
+            if (!temp) {
+                log() << "couldn't find member: " << *it << endl;
+                continue;
+            }
+            if (!max || max->config().priority < temp->config().priority) {
+                max = (Member*)temp;
+            }
+        }
+
+        return max;
+    }
 
     const bool closeOnRelinquish = true;
 
@@ -259,6 +281,8 @@ namespace mongo {
     }
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
+        _currentSyncTarget(0),
+        _elock("Election set lock"),
         _hbmsgTime(0),
         _self(0),
         mgr( new Manager(this) ) {
@@ -379,10 +403,6 @@ namespace mongo {
                         newOnes.push_back(&m);
                     }
                 }
-
-                // change timeout settings, if necessary
-                ScopedConn conn(m.h.toString());
-                conn.setTimeout(c.ho.heartbeatTimeoutMillis/1000.0);
             }
             if( me == 0 ) {
                 // initial startup with fastsync
@@ -439,12 +459,18 @@ namespace mongo {
         }
         forgetPrimary();
 
-        setSelfTo(0);
+        // not setting _self to 0 as other threads use _self w/o locking
+        int me = 0;
+
+        // For logging
+        string members = "";
+
         for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) {
             const ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
+            members += ( members == "" ? "" : ", " ) + m.h.toString();
             if( m.h.isSelf() ) {
-                assert( _self == 0 );
+                assert( me++ == 0 );
                 mi = new Member(m.h, m._id, &m, true);
                 setSelfTo(mi);
 
@@ -459,6 +485,11 @@ namespace mongo {
                     box.setOtherPrimary(mi);
             }
         }
+
+        if( me == 0 ){
+            log() << "replSet warning did not detect own host in full reconfig, members " << members << " config: " << c << rsLog;
+        }
+
         return true;
     }
 

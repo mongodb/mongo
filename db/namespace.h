@@ -20,7 +20,7 @@
 
 #include "../pch.h"
 #include "jsobj.h"
-#include "queryutil.h"
+#include "querypattern.h"
 #include "diskloc.h"
 #include "../util/hashtab.h"
 #include "mongommf.h"
@@ -93,8 +93,8 @@ namespace mongo {
 
 namespace mongo {
 
-    /** @return true if a client can modify this namespace
-        things like *.system.users
+    /** @return true if a client can modify this namespace even though it is under ".system."
+        For example <dbname>.system.users is ok for regular clients to update.
         @param write used when .system.js
     */
     bool legalClientSystemNS( const string& ns , bool write );
@@ -154,7 +154,7 @@ namespace mongo {
         unsigned long long reservedA;
         long long extraOffset;                // where the $extra info is located (bytes relative to this)
     public:
-        int indexBuildInProgress;   // 1 if in prog
+        int indexBuildInProgress;             // 1 if in prog
         unsigned reservedB;
         // ofs 424 (8)
         struct Capped2 {

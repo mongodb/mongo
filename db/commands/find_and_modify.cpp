@@ -35,12 +35,8 @@ namespace mongo {
         }
 
         CmdFindAndModify() : Command("findAndModify", false, "findandmodify") { }
-        virtual bool logTheOp() {
-            return false; // the modification will be logged directly
-        }
-        virtual bool slaveOk() const {
-            return false;
-        }
+        virtual bool logTheOp() { return false; } // the modifications will be logged directly
+        virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             static DBDirectClient db;
@@ -61,8 +57,8 @@ namespace mongo {
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {
                 if (!upsert) {
-                    errmsg = "No matching object found";
-                    return false;
+                    result.appendNull("value");
+                    return true;
                 }
 
                 BSONElement update = cmdObj["update"];
@@ -71,6 +67,7 @@ namespace mongo {
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
                 BSONObj gle = db.getLastErrorDetailed();
+                result.append("lastErrorObject", gle);
                 if (gle["err"].type() == String) {
                     errmsg = gle["err"].String();
                     return false;
@@ -90,6 +87,13 @@ namespace mongo {
                 if (cmdObj["remove"].trueValue()) {
                     uassert(12515, "can't remove and update", cmdObj["update"].eoo());
                     db.remove(ns, QUERY("_id" << out["_id"]), 1);
+
+                    BSONObj gle = db.getLastErrorDetailed();
+                    result.append("lastErrorObject", gle);
+                    if (gle["err"].type() == String) {
+                        errmsg = gle["err"].String();
+                        return false;
+                    }
 
                 }
                 else {   // update
@@ -117,6 +121,7 @@ namespace mongo {
                     db.update(ns, q, update.embeddedObjectUserCheck());
 
                     BSONObj gle = db.getLastErrorDetailed();
+                    result.append("lastErrorObject", gle);
                     if (gle["err"].type() == String) {
                         errmsg = gle["err"].String();
                         return false;

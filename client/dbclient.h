@@ -337,7 +337,7 @@ namespace mongo {
         virtual void checkResponse( const char* data, int nReturned ) {}
 
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-        virtual void recv( Message& m ) { assert(false); }
+        virtual bool recv( Message& m ) { assert(false); return false; }
     };
 
     /**
@@ -459,6 +459,9 @@ namespace mongo {
         */
         virtual BSONObj getLastErrorDetailed();
 
+        /** Can be called with the returned value from getLastErrorDetailed to extract an error string. 
+            If all you need is the string, just call getLastError() instead.
+        */
         static string getLastErrorString( const BSONObj& res );
 
         /** Return the last error which has occurred, even if not the very last operation.
@@ -529,6 +532,19 @@ namespace mongo {
         bool setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info = 0);
 
+
+        /** This implicitly converts from char*, string, and BSONObj to be an argument to mapreduce
+            You shouldn't need to explicitly construct this
+         */
+        struct MROutput {
+            MROutput(const char* collection) : out(BSON("replace" << collection)) {}
+            MROutput(const string& collection) : out(BSON("replace" << collection)) {}
+            MROutput(const BSONObj& obj) : out(obj) {}
+
+            BSONObj out;
+        };
+        static MROutput MRInline;
+
         /** Run a map/reduce job on the server.
 
             See http://www.mongodb.org/display/DOCS/MapReduce
@@ -537,8 +553,8 @@ namespace mongo {
             jsmapf    javascript map function code
             jsreducef javascript reduce function code.
             query     optional query filter for the input
-            output    optional permanent output collection name.  if not specified server will
-                      generate a temporary collection and return its name.
+            output    either a string collection name or an object representing output type
+                      if not specified uses inline output type
 
             returns a result object which contains:
              { result : <collection_name>,
@@ -552,7 +568,7 @@ namespace mongo {
                result.getField("ok").trueValue()
              on the result to check if ok.
         */
-        BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), const string& output = "");
+        BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), MROutput output = MRInline);
 
         /** Run javascript code on the database server.
            dbname    database SavedContext in which the code runs. The javascript variable 'db' will be assigned
@@ -631,11 +647,12 @@ namespace mongo {
            @param name if not specified, it will be created from the keys automatically (which is recommended)
            @param cache if set to false, the index cache for the connection won't remember this call
            @param background build index in the background (see mongodb docs/wiki for details)
+           @param v index version. leave at default value. (unit tests set this parameter.)
            @return whether or not sent message to db.
              should be true on first call, false on subsequent unless resetIndexCache was called
          */
         virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "",
-                                  bool cache = true, bool background = false );
+                                  bool cache = true, bool background = false, int v = -1 );
 
         /**
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
@@ -763,6 +780,14 @@ namespace mongo {
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
         virtual void say( Message& toSend  ) = 0;
 
+        /**
+         * this sends the request but does not wait for the response
+         * we return a DBClientBase in case this connection points to many servers
+         * so we can call recv() on the right socket
+         * @return the actual connection to call recv on
+         */
+        virtual DBClientBase* callLazy( Message& toSend );
+        
         virtual ConnectionString::ConnectionType type() const = 0;
 
     }; // DBClientBase
@@ -860,7 +885,7 @@ namespace mongo {
          */
         bool isFailed() const { return _failed; }
 
-        MessagingPort& port() { return *p; }
+        MessagingPort& port() { assert(p); return *p; }
 
         string toStringLong() const {
             stringstream ss;
@@ -891,7 +916,7 @@ namespace mongo {
 
     protected:
         friend class SyncClusterConnection;
-        virtual void recv( Message& m );
+        virtual bool recv( Message& m );
         virtual void sayPiggyBack( Message &toSend );
 
         DBClientReplicaSet *clientSet;

@@ -34,7 +34,7 @@ namespace mongo {
         if ( *ns == '.' || *ns == 0 ) {
             if( *o.getStringField("op") == 'n' )
                 return;
-            log() << "replSet skipping bad op in oplog: " << o.toString() << endl;
+            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
             return;
         }
 
@@ -141,7 +141,7 @@ namespace mongo {
                     time_t now = time(0);
                     if (now - start > 10) {
                         // simple progress metering
-                        log() << "initialSyncOplogApplication applied " << n << " operations, synced to "
+                        log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "
                               << ts.toStringPretty() << rsLog;
                         start = now;
                     }
@@ -264,8 +264,11 @@ namespace mongo {
         // todo : locking vis a vis the mgr...
         OplogReader r;
         string hn;
+        const Member *target = 0;
 
-        const Member *target = box.getPrimary();
+        // if we cannot reach the master but someone else is more up-to-date
+        // than we are, sync from them.
+        target = getMemberToSyncTo();
         if (target != 0) {
             hn = target->h().toString();
             if (!_getOplogReader(r, hn)) {
@@ -274,30 +277,15 @@ namespace mongo {
                 target = 0;
             }
         }
-
-        // if we cannot reach the master but someone else is more up-to-date
-        // than we are, sync from them.
-        if( target == 0 ) {
-            for(Member *m = head(); m; m=m->next()) {
-                hn = m->h().toString();
-                if (m->hbinfo().up() && m->state().readable() &&
-                        (m->hbinfo().opTime > lastOpTimeWritten) &&
-                        m->config().slaveDelay == 0 &&
-                        _getOplogReader(r, hn)) {
-                    target = m;
-                    break;
-                }
-            }
-
-            // no server found
-            if (target == 0) {
-                // if there is no one to sync from
-                OpTime minvalid;
-                tryToGoLiveAsASecondary(minvalid);
-                return;
-            }
+            
+        // no server found
+        if (target == 0) {
+            // if there is no one to sync from
+            OpTime minvalid;
+            tryToGoLiveAsASecondary(minvalid);
+            return;
         }
-
+        
         r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
         assert( r.haveCursor() );
 
@@ -328,22 +316,14 @@ namespace mongo {
                     sleepsecs(2);
                 }
                 return;
-                /*
-                log() << "replSet syncTail error querying oplog >= " << lastOpTimeWritten.toString() << " from " << hn << rsLog;
-                try {
-                    log() << "replSet " << hn << " last op: " << r.getLastOp(rsoplog).toString() << rsLog;
-                }
-                catch(...) { }
-                sleepsecs(1);
-                return;*/
             }
 
             BSONObj o = r.nextSafe();
             OpTime ts = o["ts"]._opTime();
             long long h = o["h"].numberLong();
             if( ts != lastOpTimeWritten || h != lastH ) {
-                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << endl;
-                log() << "replset source's GTE: " << ts.toStringPretty() << endl;
+                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << rsLog;
+                log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
                 syncRollback(r);
                 return;
             }
@@ -376,15 +356,8 @@ namespace mongo {
                         /* todo: too stale capability */
                     }
 
-                    {
-                        const Member *primary = box.getPrimary();
-                        
-                        if( !target->hbinfo().hbstate.readable() ||
-                            // if we are not syncing from the primary, return (if
-                            // it's up) so that we can try accessing it again
-                            (target != primary && primary != 0)) {
-                            return;
-                        }
+                    if( !target->hbinfo().hbstate.readable() ) {
+                        return;
                     }
                 }
                 if( !r.more() )
@@ -476,32 +449,20 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncThread() {
-        /* test here was to force a receive timeout
-        ScopedConn c("localhost");
-        bo info;
-        try {
-            log() << "this is temp" << endl;
-            c.runCommand("admin", BSON("sleep"<<120), info);
-            log() << info.toString() << endl;
-            c.runCommand("admin", BSON("sleep"<<120), info);
-            log() << "temp" << endl;
-        }
-        catch( DBException& e ) {
-            log() << e.toString() << endl;
-            c.runCommand("admin", BSON("sleep"<<120), info);
-            log() << "temp" << endl;
-        }
-        */
-
         while( 1 ) {
-            if( myConfig().arbiterOnly )
+            // After a reconfig, we may not be in the replica set anymore, so
+            // check that we are in the set (and not an arbiter) before
+            // trying to sync with other replicas.
+            if( ! _self || myConfig().arbiterOnly ){
+            	if( ! _self ) log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
                 return;
+            }
 
             try {
                 _syncThread();
             }
             catch(DBException& e) {
-                sethbmsg("syncThread: " + e.toString());
+                sethbmsg("syncThread: " + e.toString() + ", last op: " + lastOpTimeWritten.toString());
                 sleepsecs(10);
             }
             catch(...) {
@@ -515,7 +476,11 @@ namespace mongo {
                are no heartbeat threads, so we do it here to be sure.  this is relevant if the singleton
                member has done a stepDown() and needs to come back up.
                */
-            OCCASIONALLY mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+            OCCASIONALLY {
+            	log() << "replSet running manager" << rsLog;
+            	mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+            	log() << "replSet manager finished" << rsLog;
+            }
         }
     }
 

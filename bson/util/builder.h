@@ -73,7 +73,10 @@ namespace mongo {
             }
         }
 
-        void reset( int maxSize = 0 ) {
+        void reset() {
+            l = 0;
+        }
+        void reset( int maxSize ) {
             l = 0;
             if ( maxSize && size > maxSize ) {
                 free(data);
@@ -94,6 +97,9 @@ namespace mongo {
         /* assume ownership of the buffer - you must then free() it */
         void decouple() { data = 0; }
 
+        void appendUChar(unsigned char j) {
+            *((unsigned char*)grow(sizeof(unsigned char))) = j;
+        }
         void appendChar(char j) {
             *((char*)grow(sizeof(char))) = j;
         }

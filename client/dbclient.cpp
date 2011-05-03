@@ -294,7 +294,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
+    const BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
 
     BSONObj DBClientWithCommands::getLastErrorDetailed() {
         BSONObj info;
@@ -314,7 +314,7 @@ namespace mongo {
         return e.str();
     }
 
-    BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
+    const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
 
     BSONObj DBClientWithCommands::getPrevError() {
         BSONObj info;
@@ -442,15 +442,16 @@ namespace mongo {
         return false;
     }
 
-    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) {
+    DBClientWithCommands::MROutput DBClientWithCommands::MRInline (BSON("inline" << 1));
+
+    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, MROutput output) {
         BSONObjBuilder b;
         b.append("mapreduce", nsGetCollection(ns));
         b.appendCode("map", jsmapf);
         b.appendCode("reduce", jsreducef);
         if( !query.isEmpty() )
             b.append("query", query);
-        if( !outputcolname.empty() )
-            b.append("out", outputcolname);
+        b.append("out", output.out);
         BSONObj info;
         runCommand(nsGetDB(ns), b.done(), info);
         return info;
@@ -749,8 +750,16 @@ namespace mongo {
         toSend.setData( dbUpdate , b.buf() , b.len() );
 
         say( toSend );
+
+
     }
 
+
+    DBClientBase* DBClientBase::callLazy( Message& toSend ) {
+        say( toSend );
+        return this;
+    }
+    
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
     }
@@ -815,7 +824,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache, bool background ) {
+    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache, bool background, int version ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -832,6 +841,9 @@ namespace mongo {
             toSave.append( "name" , nn );
             cacheKey += nn;
         }
+
+        if( version >= 0 ) 
+            toSave.append("v", version);
 
         if ( unique )
             toSave.appendBool( "unique", unique );
@@ -891,8 +903,8 @@ namespace mongo {
         port().piggyBack( toSend );
     }
 
-    void DBClientConnection::recv( Message &m ) {
-        port().recv(m);
+    bool DBClientConnection::recv( Message &m ) {
+        return port().recv(m);
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {

@@ -27,6 +27,9 @@ namespace mongo {
     mutex mapViewMutex("mapView");
     ourbitset writable;
 
+    MAdvise::MAdvise(void *,unsigned, Advice) { }
+    MAdvise::~MAdvise() { }
+
     /** notification on unmapping so we can clear writable bits */
     void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
@@ -44,6 +47,7 @@ namespace mongo {
     }
 
     void MemoryMappedFile::close() {
+        mmmutex.assertExclusivelyLocked();
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             clearWritableBits(*i);
             UnmapViewOfFile(*i);
@@ -55,6 +59,7 @@ namespace mongo {
         if ( fd )
             CloseHandle(fd);
         fd = 0;
+        destroyed(); // cleans up from the master list of mmaps
     }
 
     unsigned long long mapped = 0;
@@ -138,7 +143,8 @@ namespace mongo {
         }
         if ( view == 0 ) {
             DWORD e = GetLastError();
-            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << endl;
+            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << 
+                ((sizeof(void*)==4)?" (32 bit build)":"") << endl;
             close();
         }
         else {

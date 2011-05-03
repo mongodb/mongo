@@ -165,11 +165,20 @@ namespace mongo {
 
         void attach( AScopedConnection * conn );
 
+        /**
+         * actually does the query
+         */
+        bool init();
+
+        void initLazy();
+        bool initLazyFinish();
+
     private:
         friend class DBClientBase;
         friend class DBClientConnection;
-        bool init();
+
         int nextBatchSize();
+        
         DBClientBase* _client;
         string ns;
         BSONObj query;
@@ -198,6 +207,12 @@ namespace mongo {
         // non-copyable , non-assignable
         DBClientCursor( const DBClientCursor& );
         DBClientCursor& operator=( const DBClientCursor& );
+
+        // init pieces
+        void _assembleInit( Message& toSend );
+
+        DBClientBase* _lazy; // only for lazy init
+        
     };
 
     /** iterate over objects in current batch only - will not cause a network call

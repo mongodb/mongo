@@ -409,7 +409,7 @@ namespace PerfTests {
             b.appendBinData("bin", 200000, (BinDataType) 129, buf);
             x = b.obj();
         }
-        string name() { return "insert big"; }
+        string name() { return "insert-big"; }
         void timed() {
             client().insert( ns(), x );
         }
@@ -462,7 +462,7 @@ namespace PerfTests {
             BSONObj q = BSON("x" << x);
             client().update(ns(), q, I);
 
-            static string s = name()+" inc";
+            static string s = name()+"-inc";
             return s.c_str();
         }
 

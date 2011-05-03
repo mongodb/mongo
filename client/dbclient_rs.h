@@ -147,7 +147,7 @@ namespace mongo {
         vector<Node> _nodes;
 
         int _master; // which node is the current master.  -1 means no master is known
-
+        int _nextSlave; // which node is the current slave
 
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
@@ -232,6 +232,7 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual void say( Message &toSend ) { checkMaster()->say( toSend ); }
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
+        virtual DBClientBase* callLazy( Message& toSend );
 
 
     protected:

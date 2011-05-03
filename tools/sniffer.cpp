@@ -104,6 +104,9 @@ struct sniff_ip {
 #define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
 /* TCP header */
+#ifdef _WIN32
+typedef unsigned __int32 uint32_t;
+#endif
 typedef uint32_t tcp_seq;
 
 struct sniff_tcp {
@@ -284,7 +287,7 @@ void processMessage( Connection& c , Message& m ) {
             mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
             out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
             if ( r->nReturned ) {
-                mongo::BSONObj o( r->data() , 0 );
+                mongo::BSONObj o( r->data() );
                 out() << "\t" << o << endl;
             }
             break;

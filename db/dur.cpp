@@ -240,6 +240,11 @@ namespace mongo {
             return p;
         }
 
+        bool DurableImpl::aCommitIsNeeded() const {
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
+            return commitJob.bytes() > UncommittedBytesLimit;
+        }
+
         bool DurableImpl::commitIfNeeded() {
             DEV commitJob._nSinceCommitIfNeededCall = 0;
             if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
@@ -288,7 +293,7 @@ namespace mongo {
                         return;
                     }
                 }
-                log() << "dur data after write area " << i.start() << " does not agree" << endl;
+                log() << "journal data after write area " << i.start() << " does not agree" << endl;
                 log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
                 log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
                 log() << " n:    " << n << endl;
@@ -355,7 +360,7 @@ namespace mongo {
                     }
                     if( low != 0xffffffff ) {
                         std::stringstream ss;
-                        ss << "dur error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
+                        ss << "journal error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << ' ' << endl;
                         set<WriteIntent>& b = commitJob.writes();
@@ -511,19 +516,19 @@ namespace mongo {
            }
            catch(DBException& e ) {
                log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
-               abort();
+               mongoAbort("dur1");
            }
            catch(std::ios_base::failure& e) {
                log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               abort();
+               mongoAbort("dur2");
            }
            catch(std::bad_alloc& e) {
                log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               abort();
+               mongoAbort("dur3");
            }
            catch(std::exception& e) {
                log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               abort();
+               mongoAbort("dur4");
            }
            return false;
        }
@@ -584,7 +589,7 @@ namespace mongo {
             }
         }
 
-        /** locking in read lock when called
+        /** locking: in read lock when called
             @see MongoMMF::close()
         */
         static void groupCommit() {
@@ -597,19 +602,19 @@ namespace mongo {
             }
             catch(DBException& e ) { 
                 log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
-                abort();
+                mongoAbort("gc1");
             }
             catch(std::ios_base::failure& e) { 
                 log() << "ios_base exception in groupCommit causing immediate shutdown: " << e.what() << endl;
-                abort();
+                mongoAbort("gc2");
             }
             catch(std::bad_alloc& e) { 
                 log() << "bad_alloc exception in groupCommit causing immediate shutdown: " << e.what() << endl;
-                abort();
+                mongoAbort("gc3");
             }
             catch(std::exception& e) {
                 log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
-                abort(); // based on myTerminate()
+                mongoAbort("gc4");
             }
         }
 
@@ -652,30 +657,30 @@ namespace mongo {
             else {
                 assert( inShutdown() );
                 if( commitJob.hasWritten() ) {
-                    log() << "dur warning files are closing outside locks with writes pending" << endl;
+                    log() << "journal warning files are closing outside locks with writes pending" << endl;
                 }
             }
         }
 
         CodeBlock durThreadMain;
 
+        extern int groupCommitIntervalMs;
+
         void durThread() {
-            Client::initThread("dur");
-            const int HowOftenToGroupCommitMs = 90;
+            Client::initThread("journal");
             while( !inShutdown() ) {
-                sleepmillis(10);
                 CodeBlock::Within w(durThreadMain);
                 try {
-                    int millis = HowOftenToGroupCommitMs;
+                    int millis = groupCommitIntervalMs;
                     {
                         stats.rotate();
                         {
                             Timer t;
                             journalRotate(); // note we do this part outside of mongomutex
                             millis -= t.millis();
-                            assert( millis <= HowOftenToGroupCommitMs );
-                            if( millis < 5 )
-                                millis = 5;
+                            wassert( millis <= groupCommitIntervalMs ); // race if groupCommitIntervalMs was changing by another thread so wassert
+                            if( millis < 2 )
+                                millis = 2;
                         }
 
                         // we do this in a couple blocks, which makes it a tiny bit faster (only a little) on throughput,
@@ -690,7 +695,7 @@ namespace mongo {
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
-                    abort(); // based on myTerminate()
+                    mongoAbort("exception in durThread");
                 }
             }
             cc().shutdown();

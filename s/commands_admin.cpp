@@ -88,6 +88,20 @@ namespace mongo {
             }
         } netstat;
 
+        class FlushRouterConfigCmd : public GridAdminCmd {
+        public:
+            FlushRouterConfigCmd() : GridAdminCmd("flushRouterConfig") { }
+            virtual void help( stringstream& help ) const {
+                help << "flush all router config";
+            }
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                grid.flushConfig();
+                result.appendBool( "flushed" , true );
+                return true;
+            }
+        } flushRouterConfigCmd;
+
+
         class ServerStatusCmd : public Command {
         public:
             ServerStatusCmd() : Command( "serverStatus" , true ) {
@@ -319,6 +333,10 @@ namespace mongo {
                     errmsg = "can't shard the admin db";
                     return false;
                 }
+                if ( dbname == "local" ) {
+                    errmsg = "can't shard the local db";
+                    return false;
+                }
 
                 DBConfigPtr config = grid.getDBConfig( dbname );
                 if ( config->isShardingEnabled() ) {
@@ -413,9 +431,13 @@ namespace mongo {
                     BSONObjBuilder b;
                     b.append( "ns" , ns );
 
+                    BSONArrayBuilder allIndexes;
+
                     auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
                     while ( cursor->more() ) {
                         BSONObj idx = cursor->next();
+
+                        allIndexes.append( idx );
 
                         bool idIndex = ! idx["name"].eoo() && idx["name"].String() == "_id_";
                         bool uniqueIndex = ( ! idx["unique"].eoo() && idx["unique"].trueValue() ) ||
@@ -440,7 +462,7 @@ namespace mongo {
                         conn.done();
                         return false;
                     }
-
+                    
                     if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
                         errmsg = (string)"can't shard collection " + ns + ", index not unique";
                         conn.done();
@@ -469,6 +491,8 @@ namespace mongo {
 
                     if ( ! hasShardIndex && ( conn->count( ns ) != 0 ) ) {
                         errmsg = "please create an index over the sharding key before sharding.";
+                        result.append( "proposedKey" , key );
+                        result.appendArray( "curIndexes" , allIndexes.done() );
                         conn.done();
                         return false;
                     }
@@ -712,8 +736,11 @@ namespace mongo {
                 vector<HostAndPort> serverAddrs = servers.getServers();
                 for ( size_t i = 0 ; i < serverAddrs.size() ; i++ ) {
                     if ( serverAddrs[i].isLocalHost() != grid.allowLocalHost() ) {
-                        errmsg = "can't use localhost as a shard since all shards need to communicate. "
-                                 "either use all shards and configdbs in localhost or all in actual IPs " ;
+                        errmsg = str::stream() << 
+                            "can't use localhost as a shard since all shards need to communicate. " <<
+                            "either use all shards and configdbs in localhost or all in actual IPs " << 
+                            " host: " << serverAddrs[i].toString() << " isLocalHost:" << serverAddrs[i].isLocalHost();
+                        
                         log() << "addshard request " << cmdObj << " failed: attempt to mix localhosts and IPs" << endl;
                         return false;
                     }
@@ -1092,11 +1119,12 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
 
-        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {        
+        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {        
             if ( jsobj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
             errmsg = "replSetGetStatus is not supported through mongos";
+            result.append("info", "mongos"); // see sayReplSetMemberState
             return false;
         }
     } cmdReplSetGetStatus;

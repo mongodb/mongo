@@ -43,8 +43,8 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
-    static RamLog _rsLog;
-    Tee *rsLog = &_rsLog;
+    static RamLog * _rsLog = new RamLog( "rs" );
+    Tee *rsLog = _rsLog;
     extern bool replSetBlind;
 
     string ago(time_t t) {
@@ -340,7 +340,7 @@ namespace mongo {
 
 
     void fillRsLog(stringstream& s) {
-        _rsLog.toHTML( s );
+        _rsLog->toHTML( s );
     }
 
     const Member* ReplSetImpl::findById(unsigned id) const {
@@ -349,6 +349,22 @@ namespace mongo {
             if( m->id() == id )
                 return m;
         return 0;
+    }
+    
+    const OpTime ReplSetImpl::lastOtherOpTime() const {
+        OpTime closest(0,0);
+        
+        for( Member *m = _members.head(); m; m=m->next() ) {                
+            if (!m->hbinfo().up()) {
+                continue;
+            }
+
+            if (m->hbinfo().opTime > closest) {
+                closest = m->hbinfo().opTime;
+            }
+        }
+
+        return closest;
     }
 
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
@@ -390,6 +406,7 @@ namespace mongo {
             bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
             bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
+            bb.append("ping", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
                 bb.append("errmsg", s);
@@ -400,6 +417,9 @@ namespace mongo {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", box.getState().s);
+        if (_currentSyncTarget) {
+            b.append("syncingTo", _currentSyncTarget->fullName());
+        }
         b.append("members", v);
         if( replSetBlind )
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.

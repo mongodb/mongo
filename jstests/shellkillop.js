@@ -5,11 +5,7 @@ retry = false;
 
 function testShellAutokillop() {
 
-if (_isWindows()) {
-    print("shellkillop.js not testing on windows, as functionality is missing there");
-    print("shellkillop.js see http://jira.mongodb.org/browse/SERVER-1451");
-}
-else {
+if (true) { // toggle to disable test
     db[baseName].drop();
 
     print("shellkillop.js insert data");

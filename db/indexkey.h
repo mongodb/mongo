@@ -135,7 +135,8 @@ namespace mongo {
             reset( loc );
         }
 
-        void reset( const DiskLoc& loc );
+        void reset( const BSONObj& info );
+        void reset( const DiskLoc& infoLoc ) { reset(infoLoc.obj()); }
         void reset( const IndexDetails * details );
 
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;

@@ -17,8 +17,8 @@
 
 #include "v8_wrapper.h"
 #include "v8_utils.h"
-#include "v8_db.h"
 #include "engine_v8.h"
+#include "v8_db.h"
 #include "util/base64.h"
 #include "util/text.h"
 #include "../client/syncclusterconnection.h"
@@ -32,127 +32,114 @@ namespace mongo {
 
 #define DDD(x)
 
-    v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local ) {
-        v8::Local<v8::FunctionTemplate> mongo;
+    v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( V8Scope* scope, bool local ) {
+        v8::Handle<v8::FunctionTemplate> mongo;
         if ( local ) {
-            mongo = newV8Function< mongoConsLocal >();
+            mongo = scope->createV8Function(mongoConsLocal);
         }
         else {
-            mongo = newV8Function< mongoConsExternal >();
+            mongo = scope->createV8Function(mongoConsExternal);
         }
         mongo->InstanceTemplate()->SetInternalFieldCount( 1 );
+        v8::Handle<v8::Template> proto = mongo->PrototypeTemplate();
+        scope->injectV8Function("find", mongoFind, proto);
+        scope->injectV8Function("insert", mongoInsert, proto);
+        scope->injectV8Function("remove", mongoRemove, proto);
+        scope->injectV8Function("update", mongoUpdate, proto);
 
-        v8::Local<v8::Template> proto = mongo->PrototypeTemplate();
-
-        proto->Set( v8::String::New( "find" ) , newV8Function< mongoFind >() );
-        proto->Set( v8::String::New( "insert" ) , newV8Function< mongoInsert >() );
-        proto->Set( v8::String::New( "remove" ) , newV8Function< mongoRemove >() );
-        proto->Set( v8::String::New( "update" ) , newV8Function< mongoUpdate >() );
-
-        Local<FunctionTemplate> ic = newV8Function< internalCursorCons >();
+        v8::Handle<FunctionTemplate> ic = scope->createV8Function(internalCursorCons);
         ic->InstanceTemplate()->SetInternalFieldCount( 1 );
-        ic->PrototypeTemplate()->Set( v8::String::New("next") , newV8Function< internalCursorNext >() );
-        ic->PrototypeTemplate()->Set( v8::String::New("hasNext") , newV8Function< internalCursorHasNext >() );
-        ic->PrototypeTemplate()->Set( v8::String::New("objsLeftInBatch") , newV8Function< internalCursorObjsLeftInBatch >() );
-        proto->Set( v8::String::New( "internalCursor" ) , ic );
-
-
+        v8::Handle<v8::Template> icproto = ic->PrototypeTemplate();
+        scope->injectV8Function("next", internalCursorNext, icproto);
+        scope->injectV8Function("hasNext", internalCursorHasNext, icproto);
+        scope->injectV8Function("objsLeftInBatch", internalCursorObjsLeftInBatch, icproto);
+        proto->Set( scope->getV8Str( "internalCursor" ) , ic );
 
         return mongo;
     }
 
-    v8::Handle<v8::FunctionTemplate> getNumberLongFunctionTemplate() {
-        v8::Local<v8::FunctionTemplate> numberLong = newV8Function< numberLongInit >();
+    v8::Handle<v8::FunctionTemplate> getNumberLongFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> numberLong = scope->createV8Function(numberLongInit);
         v8::Local<v8::Template> proto = numberLong->PrototypeTemplate();
-
-        proto->Set( v8::String::New( "valueOf" ) , newV8Function< numberLongValueOf >() );
-        proto->Set( v8::String::New( "toNumber" ) , newV8Function< numberLongToNumber >() );
-        proto->Set( v8::String::New( "toString" ) , newV8Function< numberLongToString >() );
+        scope->injectV8Function("valueOf", numberLongValueOf, proto);
+        scope->injectV8Function("toNumber", numberLongToNumber, proto);
+        scope->injectV8Function("toString", numberLongToString, proto);
 
         return numberLong;
     }
 
-    v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate() {
-        v8::Local<v8::FunctionTemplate> binData = newV8Function< binDataInit >();
+    v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> binData = scope->createV8Function(binDataInit);
         v8::Local<v8::Template> proto = binData->PrototypeTemplate();
-
-        proto->Set( v8::String::New( "toString" ) , newV8Function< binDataToString >() );
-
+        scope->injectV8Function("toString", binDataToString, proto);
         return binData;
     }
 
-    v8::Handle<v8::FunctionTemplate> getTimestampFunctionTemplate() {
-        v8::Local<v8::FunctionTemplate> ts = newV8Function< dbTimestampInit >();
+    v8::Handle<v8::FunctionTemplate> getTimestampFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> ts = scope->createV8Function(dbTimestampInit);
         v8::Local<v8::Template> proto = ts->PrototypeTemplate();
-
         ts->InstanceTemplate()->SetInternalFieldCount( 1 );
 
         return ts;
     }
 
+//    void installDBTypes( V8Scope* scope, Handle<ObjectTemplate>& global ) {
+//        v8::Handle<v8::FunctionTemplate> db = scope->createV8Function(dbInit);
+//        db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+//        global->Set(v8::String::New("DB") , db );
+//
+//        v8::Handle<v8::FunctionTemplate> dbCollection = scope->createV8Function(collectionInit);
+//        dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+//        global->Set(v8::String::New("DBCollection") , dbCollection );
+//
+//
+//        v8::Handle<v8::FunctionTemplate> dbQuery = scope->createV8Function(dbQueryInit);
+//        dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
+//        global->Set(v8::String::New("DBQuery") , dbQuery );
+//
+//        global->Set( v8::String::New("ObjectId") , newV8Function< objectIdInit >(scope) );
+//
+//        global->Set( v8::String::New("DBRef") , newV8Function< dbRefInit >(scope) );
+//
+//        global->Set( v8::String::New("DBPointer") , newV8Function< dbPointerInit >(scope) );
+//
+//        global->Set( v8::String::New("BinData") , getBinDataFunctionTemplate(scope) );
+//
+//        global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate(scope) );
+//
+//        global->Set( v8::String::New("Timestamp") , getTimestampFunctionTemplate(scope) );
+//    }
 
-    void installDBTypes( Handle<ObjectTemplate>& global ) {
-        v8::Local<v8::FunctionTemplate> db = newV8Function< dbInit >();
+    void installDBTypes( V8Scope* scope, v8::Handle<v8::Object>& global ) {
+        v8::Handle<v8::FunctionTemplate> db = scope->createV8Function(dbInit);
         db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
-        global->Set(v8::String::New("DB") , db );
-
-        v8::Local<v8::FunctionTemplate> dbCollection = newV8Function< collectionInit >();
+        global->Set(scope->getV8Str("DB") , db->GetFunction() );
+        v8::Handle<v8::FunctionTemplate> dbCollection = scope->createV8Function(collectionInit);
         dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
-        global->Set(v8::String::New("DBCollection") , dbCollection );
+        global->Set(scope->getV8Str("DBCollection") , dbCollection->GetFunction() );
 
 
-        v8::Local<v8::FunctionTemplate> dbQuery = newV8Function< dbQueryInit >();
+        v8::Handle<v8::FunctionTemplate> dbQuery = scope->createV8Function(dbQueryInit);
         dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
-        global->Set(v8::String::New("DBQuery") , dbQuery );
+        global->Set(scope->getV8Str("DBQuery") , dbQuery->GetFunction() );
 
-        global->Set( v8::String::New("ObjectId") , newV8Function< objectIdInit >() );
+        scope->injectV8Function("ObjectId", objectIdInit, global);
+        scope->injectV8Function("DBRef", dbRefInit, global);
+        scope->injectV8Function("DBPointer", dbPointerInit, global);
 
-        global->Set( v8::String::New("DBRef") , newV8Function< dbRefInit >() );
-
-        global->Set( v8::String::New("DBPointer") , newV8Function< dbPointerInit >() );
-
-        global->Set( v8::String::New("BinData") , getBinDataFunctionTemplate() );
-
-        global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate() );
-
-        global->Set( v8::String::New("Timestamp") , getTimestampFunctionTemplate() );
-    }
-
-    void installDBTypes( Handle<v8::Object>& global ) {
-        v8::Local<v8::FunctionTemplate> db = newV8Function< dbInit >();
-        db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
-        global->Set(v8::String::New("DB") , db->GetFunction() );
-
-        v8::Local<v8::FunctionTemplate> dbCollection = newV8Function< collectionInit >();
-        dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
-        global->Set(v8::String::New("DBCollection") , dbCollection->GetFunction() );
-
-
-        v8::Local<v8::FunctionTemplate> dbQuery = newV8Function< dbQueryInit >();
-        dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
-        global->Set(v8::String::New("DBQuery") , dbQuery->GetFunction() );
-
-        global->Set( v8::String::New("ObjectId") , newV8Function< objectIdInit >()->GetFunction() );
-
-        global->Set( v8::String::New("DBRef") , newV8Function< dbRefInit >()->GetFunction() );
-
-        global->Set( v8::String::New("DBPointer") , newV8Function< dbPointerInit >()->GetFunction() );
-
-        global->Set( v8::String::New("BinData") , getBinDataFunctionTemplate()->GetFunction() );
-
-        global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate()->GetFunction() );
-
-        global->Set( v8::String::New("Timestamp") , getTimestampFunctionTemplate()->GetFunction() );
+        global->Set( scope->getV8Str("BinData") , getBinDataFunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("NumberLong") , getNumberLongFunctionTemplate(scope)->GetFunction() );
+        global->Set( scope->getV8Str("Timestamp") , getTimestampFunctionTemplate(scope)->GetFunction() );
 
         BSONObjBuilder b;
         b.appendMaxKey( "" );
         b.appendMinKey( "" );
         BSONObj o = b.obj();
         BSONObjIterator i( o );
-        global->Set( v8::String::New("MaxKey"), mongoToV8Element( i.next() ) );
-        global->Set( v8::String::New("MinKey"), mongoToV8Element( i.next() ) );
+        global->Set( scope->getV8Str("MaxKey"), scope->mongoToV8Element( i.next() ) );
+        global->Set( scope->getV8Str("MinKey"), scope->mongoToV8Element( i.next() ) );
 
-        global->Get( v8::String::New( "Object" ) )->ToObject()->Set( v8::String::New("bsonsize") , newV8Function< bsonsize >()->GetFunction() );
+        global->Get( scope->getV8Str( "Object" ) )->ToObject()->Set( scope->getV8Str("bsonsize") , scope->createV8Function(bsonsize)->GetFunction() );
     }
 
     void destroyConnection( Persistent<Value> self, void* parameter) {
@@ -161,7 +148,7 @@ namespace mongo {
         self.Clear();
     }
 
-    Handle<Value> mongoConsExternal(const Arguments& args) {
+    Handle<Value> mongoConsExternal(V8Scope* scope, const Arguments& args) {
 
         char host[255];
 
@@ -196,13 +183,13 @@ namespace mongo {
         }
 
         args.This()->SetInternalField( 0 , External::New( conn ) );
-        args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
-        args.This()->Set( v8::String::New( "host" ) , v8::String::New( host ) );
+        args.This()->Set( scope->getV8Str( "slaveOk" ) , Boolean::New( false ) );
+        args.This()->Set( scope->getV8Str( "host" ) , scope->getV8Str( host ) );
 
         return v8::Undefined();
     }
 
-    Handle<Value> mongoConsLocal(const Arguments& args) {
+    Handle<Value> mongoConsLocal(V8Scope* scope, const Arguments& args) {
 
         if ( args.Length() > 0 )
             return v8::ThrowException( v8::String::New( "local Mongo constructor takes no args" ) );
@@ -218,8 +205,8 @@ namespace mongo {
 
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->SetInternalField( 0 , External::New( conn ) );
-        args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
-        args.This()->Set( v8::String::New( "host" ) , v8::String::New( "EMBEDDED" ) );
+        args.This()->Set( scope->getV8Str( "slaveOk" ) , Boolean::New( false ) );
+        args.This()->Set( scope->getV8Str( "host" ) , scope->getV8Str( "EMBEDDED" ) );
 
         return v8::Undefined();
     }
@@ -255,7 +242,7 @@ namespace mongo {
        3 - limit
        4 - skip
     */
-    Handle<Value> mongoFind(const Arguments& args) {
+    Handle<Value> mongoFind(V8Scope* scope, const Arguments& args) {
         HandleScope handle_scope;
 
         jsassert( args.Length() == 7 , "find needs 7 args" );
@@ -263,16 +250,16 @@ namespace mongo {
         DBClientBase * conn = getConnection( args );
         GETNS;
 
-        BSONObj q = v8ToMongo( args[1]->ToObject() );
+        BSONObj q = scope->v8ToMongo( args[1]->ToObject() );
         DDD( "query:" << q  );
 
         BSONObj fields;
         bool haveFields = args[2]->IsObject() && args[2]->ToObject()->GetPropertyNames()->Length() > 0;
         if ( haveFields )
-            fields = v8ToMongo( args[2]->ToObject() );
+            fields = scope->v8ToMongo( args[2]->ToObject() );
 
         Local<v8::Object> mongo = args.This();
-        Local<v8::Value> slaveOkVal = mongo->Get( v8::String::New( "slaveOk" ) );
+        Local<v8::Value> slaveOkVal = mongo->Get( scope->getV8Str( "slaveOk" ) );
         jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
         bool slaveOk = slaveOkVal->BooleanValue();
 
@@ -286,7 +273,7 @@ namespace mongo {
                 V8Unlock u;
                 cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options | ( slaveOk ? QueryOption_SlaveOk : 0 ) , batchSize );
             }
-            v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
+            v8::Function * cons = (v8::Function*)( *( mongo->Get( scope->getV8Str( "internalCursor" ) ) ) );
             assert( cons );
 
             Persistent<v8::Object> c = Persistent<v8::Object>::New( cons->NewInstance() );
@@ -300,11 +287,11 @@ namespace mongo {
         }
     }
 
-    v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args) {
+    v8::Handle<v8::Value> mongoInsert(V8Scope* scope, const v8::Arguments& args) {
         jsassert( args.Length() == 2 , "insert needs 2 args" );
         jsassert( args[1]->IsObject() , "have to insert an object" );
 
-        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+        if ( args.This()->Get( scope->getV8Str( "readOnly" ) )->BooleanValue() )
             return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
 
         DBClientBase * conn = getConnection( args );
@@ -312,12 +299,12 @@ namespace mongo {
 
         v8::Handle<v8::Object> in = args[1]->ToObject();
 
-        if ( ! in->Has( v8::String::New( "_id" ) ) ) {
+        if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
             v8::Handle<v8::Value> argv[1];
-            in->Set( v8::String::New( "_id" ) , getObjectIdCons()->NewInstance( 0 , argv ) );
+            in->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
         }
 
-        BSONObj o = v8ToMongo( in );
+        BSONObj o = scope->v8ToMongo( in );
 
         DDD( "want to save : " << o.jsonString() );
         try {
@@ -331,18 +318,18 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    v8::Handle<v8::Value> mongoRemove(const v8::Arguments& args) {
+    v8::Handle<v8::Value> mongoRemove(V8Scope* scope, const v8::Arguments& args) {
         jsassert( args.Length() == 2 || args.Length() == 3 , "remove needs 2 args" );
         jsassert( args[1]->IsObject() , "have to remove an object template" );
 
-        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+        if ( args.This()->Get( scope->getV8Str( "readOnly" ) )->BooleanValue() )
             return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
 
         DBClientBase * conn = getConnection( args );
         GETNS;
 
         v8::Handle<v8::Object> in = args[1]->ToObject();
-        BSONObj o = v8ToMongo( in );
+        BSONObj o = scope->v8ToMongo( in );
 
         bool justOne = false;
         if ( args.Length() > 2 ) {
@@ -361,12 +348,12 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    v8::Handle<v8::Value> mongoUpdate(const v8::Arguments& args) {
+    v8::Handle<v8::Value> mongoUpdate(V8Scope* scope, const v8::Arguments& args) {
         jsassert( args.Length() >= 3 , "update needs at least 3 args" );
         jsassert( args[1]->IsObject() , "1st param to update has to be an object" );
         jsassert( args[2]->IsObject() , "2nd param to update has to be an object" );
         
-        if ( args.This()->Get( v8::String::New( "readOnly" ) )->BooleanValue() )
+        if ( args.This()->Get( scope->getV8Str( "readOnly" ) )->BooleanValue() )
             return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
 
         DBClientBase * conn = getConnection( args );
@@ -379,8 +366,8 @@ namespace mongo {
         bool multi = args.Length() > 4 && args[4]->IsBoolean() && args[4]->ToBoolean()->Value();
 
         try {
-            BSONObj q1 = v8ToMongo( q );
-            BSONObj o1 = v8ToMongo( o );
+            BSONObj q1 = scope->v8ToMongo( q );
+            BSONObj o1 = scope->v8ToMongo( o );
             V8Unlock u;
             conn->update( ns , q1 , o1 , upsert, multi );
         }
@@ -403,11 +390,11 @@ namespace mongo {
         return cursor;
     }
 
-    v8::Handle<v8::Value> internalCursorCons(const v8::Arguments& args) {
+    v8::Handle<v8::Value> internalCursorCons(V8Scope* scope, const v8::Arguments& args) {
         return v8::Undefined();
     }
 
-    v8::Handle<v8::Value> internalCursorNext(const v8::Arguments& args) {
+    v8::Handle<v8::Value> internalCursorNext(V8Scope* scope, const v8::Arguments& args) {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return v8::Undefined();
@@ -416,10 +403,10 @@ namespace mongo {
             V8Unlock u;
             o = cursor->next();
         }
-        return mongoToV8( o );
+        return scope->mongoToLZV8( o );
     }
 
-    v8::Handle<v8::Value> internalCursorHasNext(const v8::Arguments& args) {
+    v8::Handle<v8::Value> internalCursorHasNext(V8Scope* scope, const v8::Arguments& args) {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return Boolean::New( false );
@@ -431,7 +418,7 @@ namespace mongo {
         return Boolean::New( ret );
     }
 
-    v8::Handle<v8::Value> internalCursorObjsLeftInBatch(const v8::Arguments& args) {
+    v8::Handle<v8::Value> internalCursorObjsLeftInBatch(V8Scope* scope, const v8::Arguments& args) {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return v8::Number::New( (double) 0 );
@@ -446,11 +433,11 @@ namespace mongo {
 
     // --- DB ----
 
-    v8::Handle<v8::Value> dbInit(const v8::Arguments& args) {
+    v8::Handle<v8::Value> dbInit(V8Scope* scope, const v8::Arguments& args) {
         assert( args.Length() == 2 );
 
-        args.This()->Set( v8::String::New( "_mongo" ) , args[0] );
-        args.This()->Set( v8::String::New( "_name" ) , args[1] );
+        args.This()->Set( scope->getV8Str( "_mongo" ) , args[0] );
+        args.This()->Set( scope->getV8Str( "_name" ) , args[1] );
 
         for ( int i=0; i<args.Length(); i++ )
             assert( ! args[i]->IsUndefined() );
@@ -458,13 +445,13 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    v8::Handle<v8::Value> collectionInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> collectionInit( V8Scope* scope, const v8::Arguments& args ) {
         assert( args.Length() == 4 );
 
-        args.This()->Set( v8::String::New( "_mongo" ) , args[0] );
-        args.This()->Set( v8::String::New( "_db" ) , args[1] );
-        args.This()->Set( v8::String::New( "_shortName" ) , args[2] );
-        args.This()->Set( v8::String::New( "_fullName" ) , args[3] );
+        args.This()->Set( scope->getV8Str( "_mongo" ) , args[0] );
+        args.This()->Set( scope->getV8Str( "_db" ) , args[1] );
+        args.This()->Set( scope->getV8Str( "_shortName" ) , args[2] );
+        args.This()->Set( scope->getV8Str( "_fullName" ) , args[3] );
         
         if ( haveLocalShardingInfo( toSTLString( args[3] ) ) )
             return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
@@ -475,52 +462,52 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    v8::Handle<v8::Value> dbQueryInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> dbQueryInit( V8Scope* scope, const v8::Arguments& args ) {
 
         v8::Handle<v8::Object> t = args.This();
 
         assert( args.Length() >= 4 );
 
-        t->Set( v8::String::New( "_mongo" ) , args[0] );
-        t->Set( v8::String::New( "_db" ) , args[1] );
-        t->Set( v8::String::New( "_collection" ) , args[2] );
-        t->Set( v8::String::New( "_ns" ) , args[3] );
+        t->Set( scope->getV8Str( "_mongo" ) , args[0] );
+        t->Set( scope->getV8Str( "_db" ) , args[1] );
+        t->Set( scope->getV8Str( "_collection" ) , args[2] );
+        t->Set( scope->getV8Str( "_ns" ) , args[3] );
 
         if ( args.Length() > 4 && args[4]->IsObject() )
-            t->Set( v8::String::New( "_query" ) , args[4] );
+            t->Set( scope->getV8Str( "_query" ) , args[4] );
         else
-            t->Set( v8::String::New( "_query" ) , v8::Object::New() );
+            t->Set( scope->getV8Str( "_query" ) , v8::Object::New() );
 
         if ( args.Length() > 5 && args[5]->IsObject() )
-            t->Set( v8::String::New( "_fields" ) , args[5] );
+            t->Set( scope->getV8Str( "_fields" ) , args[5] );
         else
-            t->Set( v8::String::New( "_fields" ) , v8::Null() );
+            t->Set( scope->getV8Str( "_fields" ) , v8::Null() );
 
 
         if ( args.Length() > 6 && args[6]->IsNumber() )
-            t->Set( v8::String::New( "_limit" ) , args[6] );
+            t->Set( scope->getV8Str( "_limit" ) , args[6] );
         else
-            t->Set( v8::String::New( "_limit" ) , Number::New( 0 ) );
+            t->Set( scope->getV8Str( "_limit" ) , Number::New( 0 ) );
 
         if ( args.Length() > 7 && args[7]->IsNumber() )
-            t->Set( v8::String::New( "_skip" ) , args[7] );
+            t->Set( scope->getV8Str( "_skip" ) , args[7] );
         else
-            t->Set( v8::String::New( "_skip" ) , Number::New( 0 ) );
+            t->Set( scope->getV8Str( "_skip" ) , Number::New( 0 ) );
 
         if ( args.Length() > 8 && args[8]->IsNumber() )
-            t->Set( v8::String::New( "_batchSize" ) , args[8] );
+            t->Set( scope->getV8Str( "_batchSize" ) , args[8] );
         else
-            t->Set( v8::String::New( "_batchSize" ) , Number::New( 0 ) );
+            t->Set( scope->getV8Str( "_batchSize" ) , Number::New( 0 ) );
 
         if ( args.Length() > 9 && args[9]->IsNumber() )
-            t->Set( v8::String::New( "_options" ) , args[9] );
+            t->Set( scope->getV8Str( "_options" ) , args[9] );
         else
-            t->Set( v8::String::New( "_options" ) , Number::New( 0 ) );
+            t->Set( scope->getV8Str( "_options" ) , Number::New( 0 ) );
 
         
-        t->Set( v8::String::New( "_cursor" ) , v8::Null() );
-        t->Set( v8::String::New( "_numReturned" ) , v8::Number::New(0) );
-        t->Set( v8::String::New( "_special" ) , Boolean::New(false) );
+        t->Set( scope->getV8Str( "_cursor" ) , v8::Null() );
+        t->Set( scope->getV8Str( "_numReturned" ) , v8::Number::New(0) );
+        t->Set( scope->getV8Str( "_special" ) , Boolean::New(false) );
 
         return v8::Undefined();
     }
@@ -560,11 +547,11 @@ namespace mongo {
         return f->Call( info.This() , 1 , argv );
     }
 
-    v8::Handle<v8::Value> objectIdInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> objectIdInit( V8Scope* scope, const v8::Arguments& args ) {
         v8::Handle<v8::Object> it = args.This();
 
         if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function * f = getObjectIdCons();
+            v8::Function * f = scope->getObjectIdCons();
             it = f->NewInstance();
         }
 
@@ -585,12 +572,12 @@ namespace mongo {
             oid.init( s );
         }
 
-        it->Set( v8::String::New( "str" ) , v8::String::New( oid.str().c_str() ) );
+        it->Set( scope->getV8Str( "str" ) , v8::String::New( oid.str().c_str() ) );
 
         return it;
     }
 
-    v8::Handle<v8::Value> dbRefInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> dbRefInit( V8Scope* scope, const v8::Arguments& args ) {
 
         if (args.Length() != 2 && args.Length() != 0) {
             return v8::ThrowException( v8::String::New( "DBRef needs 2 arguments" ) );
@@ -599,19 +586,19 @@ namespace mongo {
         v8::Handle<v8::Object> it = args.This();
 
         if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = getNamedCons( "DBRef" );
+            v8::Function* f = scope->getNamedCons( "DBRef" );
             it = f->NewInstance();
         }
 
         if ( args.Length() == 2 ) {
-            it->Set( v8::String::New( "$ref" ) , args[0] );
-            it->Set( v8::String::New( "$id" ) , args[1] );
+            it->Set( scope->getV8Str( "$ref" ) , args[0] );
+            it->Set( scope->getV8Str( "$id" ) , args[1] );
         }
 
         return it;
     }
 
-    v8::Handle<v8::Value> dbPointerInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> dbPointerInit( V8Scope* scope, const v8::Arguments& args ) {
 
         if (args.Length() != 2) {
             return v8::ThrowException( v8::String::New( "DBPointer needs 2 arguments" ) );
@@ -620,28 +607,28 @@ namespace mongo {
         v8::Handle<v8::Object> it = args.This();
 
         if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = getNamedCons( "DBPointer" );
+            v8::Function* f = scope->getNamedCons( "DBPointer" );
             it = f->NewInstance();
         }
 
-        it->Set( v8::String::New( "ns" ) , args[0] );
-        it->Set( v8::String::New( "id" ) , args[1] );
-        it->SetHiddenValue( v8::String::New( "__DBPointer" ), v8::Number::New( 1 ) );
+        it->Set( scope->getV8Str( "ns" ) , args[0] );
+        it->Set( scope->getV8Str( "id" ) , args[1] );
+        it->SetHiddenValue( scope->getV8Str( "__DBPointer" ), v8::Number::New( 1 ) );
 
         return it;
     }
 
-    v8::Handle<v8::Value> dbTimestampInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> dbTimestampInit( V8Scope* scope, const v8::Arguments& args ) {
 
         v8::Handle<v8::Object> it = args.This();
 
         if ( args.Length() == 0 ) {
-            it->Set( v8::String::New( "t" ) , v8::Number::New( 0 ) );
-            it->Set( v8::String::New( "i" ) , v8::Number::New( 0 ) );
+            it->Set( scope->getV8Str( "t" ) , v8::Number::New( 0 ) );
+            it->Set( scope->getV8Str( "i" ) , v8::Number::New( 0 ) );
         }
         else if ( args.Length() == 2 ) {
-            it->Set( v8::String::New( "t" ) , args[0] );
-            it->Set( v8::String::New( "i" ) , args[1] );
+            it->Set( scope->getV8Str( "t" ) , args[0] );
+            it->Set( scope->getV8Str( "i" ) , args[1] );
         }
         else {
             return v8::ThrowException( v8::String::New( "Timestamp needs 0 or 2 arguments" ) );
@@ -653,37 +640,37 @@ namespace mongo {
     }
 
 
-    v8::Handle<v8::Value> binDataInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> binDataInit( V8Scope* scope, const v8::Arguments& args ) {
         v8::Handle<v8::Object> it = args.This();
 
         // 3 args: len, type, data
         if (args.Length() == 3) {
 
             if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-                v8::Function* f = getNamedCons( "BinData" );
+                v8::Function* f = scope->getNamedCons( "BinData" );
                 it = f->NewInstance();
             }
 
-            it->Set( v8::String::New( "len" ) , args[0] );
-            it->Set( v8::String::New( "type" ) , args[1] );
-            it->Set( v8::String::New( "data" ), args[2] );
-            it->SetHiddenValue( v8::String::New( "__BinData" ), v8::Number::New( 1 ) );
+            it->Set( scope->getV8Str( "len" ) , args[0] );
+            it->Set( scope->getV8Str( "type" ) , args[1] );
+            it->Set( scope->getV8Str( "data" ), args[2] );
+            it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
 
             // 2 args: type, base64 string
         }
         else if ( args.Length() == 2 ) {
 
             if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-                v8::Function* f = getNamedCons( "BinData" );
+                v8::Function* f = scope->getNamedCons( "BinData" );
                 it = f->NewInstance();
             }
 
             v8::String::Utf8Value data( args[ 1 ] );
             string decoded = base64::decode( *data );
-            it->Set( v8::String::New( "len" ) , v8::Number::New( decoded.length() ) );
-            it->Set( v8::String::New( "type" ) , args[ 0 ] );
-            it->Set( v8::String::New( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
-            it->SetHiddenValue( v8::String::New( "__BinData" ), v8::Number::New( 1 ) );
+            it->Set( scope->getV8Str( "len" ) , v8::Number::New( decoded.length() ) );
+            it->Set( scope->getV8Str( "type" ) , args[ 0 ] );
+            it->Set( scope->getV8Str( "data" ), v8::String::New( decoded.data(), decoded.length() ) );
+            it->SetHiddenValue( scope->getV8Str( "__BinData" ), v8::Number::New( 1 ) );
 
         }
         else {
@@ -693,16 +680,16 @@ namespace mongo {
         return it;
     }
 
-    v8::Handle<v8::Value> binDataToString( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> binDataToString( V8Scope* scope, const v8::Arguments& args ) {
 
         if (args.Length() != 0) {
             return v8::ThrowException( v8::String::New( "toString needs 0 arguments" ) );
         }
 
         v8::Handle<v8::Object> it = args.This();
-        int len = it->Get( v8::String::New( "len" ) )->ToInt32()->Value();
-        int type = it->Get( v8::String::New( "type" ) )->ToInt32()->Value();
-        v8::String::Utf8Value data( it->Get( v8::String::New( "data" ) ) );
+        int len = it->Get( scope->getV8Str( "len" ) )->ToInt32()->Value();
+        int type = it->Get( scope->getV8Str( "type" ) )->ToInt32()->Value();
+        v8::String::Utf8Value data( it->Get( scope->getV8Str( "data" ) ) );
 
         stringstream ss;
         ss << "BinData(" << type << ",\"";
@@ -712,7 +699,7 @@ namespace mongo {
         return v8::String::New( ret.c_str() );
     }
 
-    v8::Handle<v8::Value> numberLongInit( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> numberLongInit( V8Scope* scope, const v8::Arguments& args ) {
 
         if (args.Length() != 0 && args.Length() != 1 && args.Length() != 3) {
             return v8::ThrowException( v8::String::New( "NumberLong needs 0, 1 or 3 arguments" ) );
@@ -721,16 +708,16 @@ namespace mongo {
         v8::Handle<v8::Object> it = args.This();
 
         if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ) {
-            v8::Function* f = getNamedCons( "NumberLong" );
+            v8::Function* f = scope->getNamedCons( "NumberLong" );
             it = f->NewInstance();
         }
 
         if ( args.Length() == 0 ) {
-            it->Set( v8::String::New( "floatApprox" ), v8::Number::New( 0 ) );
+            it->Set( scope->getV8Str( "floatApprox" ), v8::Number::New( 0 ) );
         }
         else if ( args.Length() == 1 ) {
             if ( args[ 0 ]->IsNumber() ) {
-                it->Set( v8::String::New( "floatApprox" ), args[ 0 ] );
+                it->Set( scope->getV8Str( "floatApprox" ), args[ 0 ] );
             }
             else {
                 v8::String::Utf8Value data( args[ 0 ] );
@@ -745,21 +732,21 @@ namespace mongo {
                 }
                 unsigned long long val = n;
                 if ( (long long)val == (long long)(double)(long long)(val) ) {
-                    it->Set( v8::String::New( "floatApprox" ), v8::Number::New( (double)(long long)( val ) ) );
+                    it->Set( scope->getV8Str( "floatApprox" ), v8::Number::New( (double)(long long)( val ) ) );
                 }
                 else {
-                    it->Set( v8::String::New( "floatApprox" ), v8::Number::New( (double)(long long)( val ) ) );
-                    it->Set( v8::String::New( "top" ), v8::Integer::New( val >> 32 ) );
-                    it->Set( v8::String::New( "bottom" ), v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) ) );
+                    it->Set( scope->getV8Str( "floatApprox" ), v8::Number::New( (double)(long long)( val ) ) );
+                    it->Set( scope->getV8Str( "top" ), v8::Integer::New( val >> 32 ) );
+                    it->Set( scope->getV8Str( "bottom" ), v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) ) );
                 }
             }
         }
         else {
-            it->Set( v8::String::New( "floatApprox" ) , args[0] );
-            it->Set( v8::String::New( "top" ) , args[1] );
-            it->Set( v8::String::New( "bottom" ) , args[2] );
+            it->Set( scope->getV8Str( "floatApprox" ) , args[0] );
+            it->Set( scope->getV8Str( "top" ) , args[1] );
+            it->Set( scope->getV8Str( "bottom" ) , args[2] );
         }
-        it->SetHiddenValue( v8::String::New( "__NumberLong" ), v8::Number::New( 1 ) );
+        it->SetHiddenValue( scope->getV8Str( "__NumberLong" ), v8::Number::New( 1 ) );
 
         return it;
     }
@@ -773,7 +760,7 @@ namespace mongo {
             (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );
     }
 
-    v8::Handle<v8::Value> numberLongValueOf( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> numberLongValueOf( V8Scope* scope, const v8::Arguments& args ) {
 
         if (args.Length() != 0) {
             return v8::ThrowException( v8::String::New( "toNumber needs 0 arguments" ) );
@@ -786,11 +773,11 @@ namespace mongo {
         return v8::Number::New( double( val ) );
     }
 
-    v8::Handle<v8::Value> numberLongToNumber( const v8::Arguments& args ) {
-        return numberLongValueOf( args );
+    v8::Handle<v8::Value> numberLongToNumber( V8Scope* scope, const v8::Arguments& args ) {
+        return numberLongValueOf( scope, args );
     }
 
-    v8::Handle<v8::Value> numberLongToString( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> numberLongToString( V8Scope* scope, const v8::Arguments& args ) {
 
         if (args.Length() != 0) {
             return v8::ThrowException( v8::String::New( "toString needs 0 arguments" ) );
@@ -811,18 +798,18 @@ namespace mongo {
         return v8::String::New( ret.c_str() );
     }
 
-    v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
+    v8::Handle<v8::Value> bsonsize( V8Scope* scope, const v8::Arguments& args ) {
 
         if ( args.Length() != 1 )
-            return v8::ThrowException( v8::String::New( "bonsisze needs 1 argument" ) );
+            return v8::ThrowException( v8::String::New( "bsonsize needs 1 argument" ) );
 
         if ( args[0]->IsNull() )
             return v8::Number::New(0);
 
         if ( ! args[ 0 ]->IsObject() )
-            return v8::ThrowException( v8::String::New( "argument to bonsisze has to be an object" ) );
+            return v8::ThrowException( v8::String::New( "argument to bsonsize has to be an object" ) );
 
-        return v8::Number::New( v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
+        return v8::Number::New( scope->v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
     }
 
     // to be called with v8 mutex

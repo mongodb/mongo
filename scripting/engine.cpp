@@ -85,10 +85,10 @@ namespace mongo {
 
     }
 
-    int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ) {
+    int Scope::invoke( const char* code , const BSONObj* args, const BSONObj* recv, int timeoutMs ) {
         ScriptingFunction func = createFunction( code );
         uassert( 10207 ,  "compile failed" , func );
-        return invoke( func , args, timeoutMs );
+        return invoke( func , args, recv, timeoutMs );
     }
 
     bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ) {
@@ -189,12 +189,12 @@ namespace mongo {
         set<string> thisTime;
 
         while ( c->more() ) {
-            BSONObj o = c->next();
+            BSONObj o = c->nextSafe();
 
             BSONElement n = o["_id"];
             BSONElement v = o["value"];
 
-            uassert( 10209 ,  "name has to be a string" , n.type() == String );
+            uassert( 10209 ,  str::stream() << "name has to be a string: " << n  , n.type() == String );
             uassert( 10210 ,  "value has to be set" , v.type() != EOO );
 
             setElement( n.valuestr() , v );
@@ -239,6 +239,27 @@ namespace mongo {
         ScriptingFunction f = _createFunction( code );
         _cachedFunctions[code] = f;
         return f;
+    }
+
+    namespace JSFiles {
+        extern const JSFile collection;
+        extern const JSFile db;
+        extern const JSFile mongo;
+        extern const JSFile mr;
+        extern const JSFile query;
+        extern const JSFile utils;
+        extern const JSFile utils_sh;
+    }
+
+    void Scope::execCoreFiles() {
+        // keeping same order as in SConstruct
+        execSetup(JSFiles::utils);
+        execSetup(JSFiles::utils_sh);
+        execSetup(JSFiles::db);
+        execSetup(JSFiles::mongo);
+        execSetup(JSFiles::mr);
+        execSetup(JSFiles::query);
+        execSetup(JSFiles::collection);
     }
 
     typedef map< string , list<Scope*> > PoolToScopes;
@@ -373,9 +394,9 @@ namespace mongo {
         void setBoolean( const char *field , bool val ) {
             _real->setBoolean( field , val );
         }
-        void setThis( const BSONObj * obj ) {
-            _real->setThis( obj );
-        }
+//        void setThis( const BSONObj * obj ) {
+//            _real->setThis( obj );
+//        }
 
         ScriptingFunction createFunction( const char * code ) {
             return _real->createFunction( code );
@@ -392,8 +413,8 @@ namespace mongo {
         /**
          * @return 0 on success
          */
-        int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs , bool ignoreReturn ) {
-            return _real->invoke( func , args , timeoutMs , ignoreReturn );
+        int invoke( ScriptingFunction func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn ) {
+            return _real->invoke( func , args , recv, timeoutMs , ignoreReturn );
         }
 
         string getError() {
@@ -413,6 +434,10 @@ namespace mongo {
 
         void gc() {
             _real->gc();
+        }
+
+        void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName ) {
+            _real->append(builder, fieldName, scopeName);
         }
 
     private:

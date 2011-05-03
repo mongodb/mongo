@@ -197,6 +197,12 @@ namespace mongo {
                         hostSet.insert( piter.next().String() ); // host:port
                     }
                 }
+                if ( resIsMaster["arbiters"].isABSONObj() ) {
+                    BSONObjIterator piter( resIsMaster["arbiters"].Obj() );
+                    while ( piter.more() ) {
+                        hostSet.insert( piter.next().String() ); // host:port
+                    }
+                }
 
                 vector<HostAndPort> hosts = servers.getServers();
                 for ( size_t i = 0 ; i < hosts.size() ; i++ ) {
@@ -213,7 +219,7 @@ namespace mongo {
             }
             if ( ! foundAll ) {
                 ostringstream ss;
-                ss << "host " << offendingHost << " does not belong to replica set as a non-passive member" << setName;;
+                ss << "host " << offendingHost << " does not belong to replica set" << setName;;
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;
@@ -440,7 +446,13 @@ namespace mongo {
         return ( dbName == "local" ) || ( dbName == "admin" ) || ( dbName == "config" );
     }
 
+    void Grid::flushConfig() {
+        scoped_lock lk( _lock );
+        _databases.clear();
+    }
+
     Grid grid;
+
 
     // unit tests
 

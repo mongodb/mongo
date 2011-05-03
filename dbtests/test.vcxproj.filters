@@ -773,10 +773,25 @@
     <ClCompile Include="..\db\dbcommands_admin.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\querypattern.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\ramlog.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\key.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\btreebuilder.cpp">
+      <Filter>btree</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
       <Filter>misc and third party</Filter>
+    </None>
+    <None Include="btreetests.inl">
+      <Filter>dbtests</Filter>
     </None>
   </ItemGroup>
 </Project>

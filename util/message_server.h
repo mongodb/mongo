@@ -29,9 +29,21 @@ namespace mongo {
     class MessageHandler {
     public:
         virtual ~MessageHandler() {}
-
+        
+        /**
+         * called once when a socket is connected
+         */
         virtual void connected( AbstractMessagingPort* p ) = 0;
+
+        /**
+         * called every time a message comes in
+         * handler is responsible for responding to client
+         */
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * err ) = 0;
+
+        /**
+         * called once when a socket is disconnected
+         */
         virtual void disconnected( AbstractMessagingPort* p ) = 0;
     };
 

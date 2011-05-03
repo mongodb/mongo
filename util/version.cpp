@@ -24,6 +24,7 @@
 #include "unittest.h"
 #include "version.h"
 #include "../db/jsobj.h"
+#include "file.h"
 
 namespace mongo {
 
@@ -32,9 +33,9 @@ namespace mongo {
      *      1.2.3-pre-
      *      1.2.3-rc4 (up to rc9)
      *      1.2.3-rc4-pre-
-     * If you really need to do something else you'll need to fix versionArray()
+     * If you really need to do something else you'll need to fix _versionArray()
      */
-    const char versionString[] = "1.9.0-pre-";
+    const char versionString[] = "1.9.1-pre-";
 
     // See unit test for example outputs
     static BSONArray _versionArray(const char* version){
@@ -74,15 +75,8 @@ namespace mongo {
         b.append(finalPart);
         return b.arr();
     }
-    BSONArray versionArray(){
-        static BSONArray out;
-        if (out.isEmpty()) {
-            BSONArray tmp = _versionArray(versionString);
-            out = tmp;
-            return tmp;
-        }
-        return out;
-    }
+
+    const BSONArray versionArray = _versionArray(versionString);
 
     string mongodVersion() {
         stringstream ss;
@@ -116,7 +110,7 @@ namespace mongo {
 #endif
 
     void printSysInfo() {
-        log() << "build sys info: " << sysInfo() << endl;
+        log() << "build info: " << sysInfo() << endl;
     }
 
     //
@@ -149,6 +143,39 @@ namespace mongo {
             cout << endl;
             cout << "** WARNING: You are running in OpenVZ. This is known to be broken!!!" << endl;
             warned = true;
+        }
+
+        if (boost::filesystem::exists("/sys/devices/system/node/node1")){
+            // We are on a box with a NUMA enabled kernel and more than 1 numa node (they start at node0)
+            // Now we look at the first line of /proc/self/numa_maps
+            //
+            // Bad example:
+            // $ cat /proc/self/numa_maps
+            // 00400000 default file=/bin/cat mapped=6 N4=6
+            //
+            // Good example:
+            // $ numactl --interleave=all cat /proc/self/numa_maps
+            // 00400000 interleave:0-7 file=/bin/cat mapped=6 N4=6
+
+            File f;
+            f.open("/proc/self/numa_maps", /*read_only*/true);
+            char line[100]; //we only need the first line
+            f.read(0, line, sizeof(line));
+
+            // just in case...
+            line[98] = ' ';
+            line[99] = '\0';
+
+            // skip over pointer
+            const char* space = strchr(line, ' ');
+
+            if (!startsWith(space+1, "interleave")){
+                cout << endl;
+                cout << "** WARNING: You are running on a NUMA machine." << endl;
+                cout << "**          We suggest launching mongod like this to avoid performance problems:" << endl;
+                cout << "**              numactl --interleave=all mongod [other options]" << endl;
+                warned = true;
+            }
         }
 #endif
 
@@ -210,8 +237,6 @@ namespace mongo {
             assert( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
             assert( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
             assert( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
-
-            versionArray(); // make sure we work on current versionString
 
             log(1) << "versionArrayTest passed" << endl;
         }

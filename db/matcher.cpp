@@ -25,6 +25,7 @@
 #include "diskloc.h"
 #include "../scripting/engine.h"
 #include "db.h"
+#include "queryutil.h"
 #include "client.h"
 
 #include "pdfile.h"
@@ -40,6 +41,8 @@ namespace {
                 options.set_multiline(true);
             else if ( *flags == 'x' )
                 options.set_extended(true);
+            else if ( *flags == 's' )
+                options.set_dotall(true);
             flags++;
         }
         return options;
@@ -331,7 +334,7 @@ namespace mongo {
 
                 if ( e.type() == CodeWScope ) {
                     where->setFunc( e.codeWScopeCode() );
-                    where->jsScope = new BSONObj( e.codeWScopeScopeData() , 0 );
+                    where->jsScope = new BSONObj( e.codeWScopeScopeData() );
                 }
                 else {
                     const char *code = e.valuestr();
@@ -427,6 +430,7 @@ namespace mongo {
                 case BSONObj::opALL:
                 case BSONObj::NE:
                 case BSONObj::NIN:
+                case BSONObj::opEXISTS: // Not part of keyMatch() determination, but we can't match on index in this case.
                     break;
                 case BSONObj::opIN: {
                     bool inContainsArray = false;
@@ -540,10 +544,8 @@ namespace mongo {
             return -ret;
     }
 
-    int retMissing( const ElementMatcher &bm ) {
-        if ( bm.compareOp != BSONObj::opEXISTS )
-            return 0;
-        return bm.toMatch.boolean() ? -1 : 1;
+    int retExistsFound( const ElementMatcher &bm ) {
+        return bm.toMatch.trueValue() ? 1 : -1;
     }
 
     /* Check if a particular field matches.
@@ -677,6 +679,7 @@ namespace mongo {
                 }
             }
 
+            // An array was encountered while scanning for components of the field name.
             if ( isArr ) {
                 DEBUGMATCHER( "\t\t isArr 1 : obj : " << obj );
                 BSONObjIterator ai(obj);
@@ -684,11 +687,16 @@ namespace mongo {
                 while ( ai.moreWithEOO() ) {
                     BSONElement z = ai.next();
 
-                    if( strcmp(z.fieldName(),fieldName) == 0 && valuesMatch(z, toMatch, compareOp, em) ) {
-                        // "field.<n>" array notation was used
-                        if ( details )
-                            details->elemMatchKey = z.fieldName();
-                        return 1;
+                    if( strcmp(z.fieldName(),fieldName) == 0 ) {
+                        if ( compareOp == BSONObj::opEXISTS ) {
+                         	return retExistsFound( em );
+                        }
+                        if (valuesMatch(z, toMatch, compareOp, em) ) {
+	                        // "field.<n>" array notation was used
+    	                    if ( details )
+        	                    details->elemMatchKey = z.fieldName();
+            	            return 1;
+                        }
                     }
 
                     if ( z.type() == Object ) {
@@ -704,11 +712,12 @@ namespace mongo {
                         }
                     }
                 }
-                return found ? -1 : retMissing( em );
+                return found ? -1 : 0;
             }
 
             if( p ) {
-                return retMissing( em );
+                // Left portion of field name was not found or wrong type.
+                return 0;
             }
             else {
                 e = obj.getField(fieldName);
@@ -716,7 +725,11 @@ namespace mongo {
         }
 
         if ( compareOp == BSONObj::opEXISTS ) {
-            return ( e.eoo() ^ ( toMatch.boolean() ^ em.isNot ) ) ? 1 : -1;
+            if( e.eoo() ) {
+             	return 0;
+            } else {
+             	return retExistsFound( em );   
+            }
         }
         else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
                   valuesMatch(e, toMatch, compareOp, em ) ) {
@@ -763,7 +776,6 @@ namespace mongo {
             }
         }
         else if ( e.eoo() ) {
-            // 0 indicates "missing element"
             return 0;
         }
         return -1;
@@ -783,7 +795,11 @@ namespace mongo {
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm , false , details );
-            if ( bm.compareOp != BSONObj::opEXISTS && bm.isNot )
+            if ( cmp == 0 && bm.compareOp == BSONObj::opEXISTS ) {
+                // If missing, match cmp is opposite of $exists spec.
+                cmp = -retExistsFound(bm);
+            }
+            if ( bm.isNot )
                 cmp = -cmp;
             if ( cmp < 0 )
                 return false;
@@ -807,8 +823,18 @@ namespace mongo {
             BSONElementSet s;
             if ( !constrainIndexKey_.isEmpty() ) {
                 BSONElement e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);
-                if ( !e.eoo() )
+
+                // Should only have keys nested one deep here, for geo-indices
+                // TODO: future indices may nest deeper?
+                if( e.type() == Array ){
+                	BSONObjIterator i( e.Obj() );
+                	while( i.more() ){
+                		s.insert( i.next() );
+                	}
+                }
+                else if ( !e.eoo() )
                     s.insert( e );
+
             }
             else {
                 jsobj.getFieldsDotted( rm.fieldName, s );
@@ -866,12 +892,10 @@ namespace mongo {
             if ( where->jsScope ) {
                 where->scope->init( where->jsScope );
             }
-            where->scope->setThis( const_cast< BSONObj * >( &jsobj ) );
             where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
             where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
 
-            int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 , false );
-            where->scope->setThis( 0 );
+            int err = where->scope->invoke( where->func , 0, &jsobj , 1000 * 60 , false );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
                 ss << "error on invocation of $where function:\n"

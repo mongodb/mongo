@@ -151,8 +151,10 @@ namespace mongo {
                 // Many operations benefit from having the shard key early in the object
                 o = manager->getShardKey().moveToFront(o);
 
+                const int maxTries = 10;
+
                 bool gotThrough = false;
-                for ( int i=0; i<10; i++ ) {
+                for ( int i=0; i<maxTries; i++ ) {
                     try {
                         ChunkPtr c = manager->findChunk( o );
                         log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
@@ -164,8 +166,8 @@ namespace mongo {
                         gotThrough = true;
                         break;
                     }
-                    catch ( StaleConfigException& ) {
-                        log(1) << "retrying insert because of StaleConfigException: " << o << endl;
+                    catch ( StaleConfigException& e ) {
+                        log( i < ( maxTries / 2 ) ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
                         r.reset();
                         manager = r.getChunkManager();
                     }

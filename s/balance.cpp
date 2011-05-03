@@ -275,47 +275,51 @@ namespace mongo {
 
             try {
                 
-                // first make sure we should even be running
+                ScopedDbConnection conn( config );
+                
+                // ping has to be first so we keep things in the config server in sync
+                _ping( conn.conn() );
+
+                // now make sure we should even be running
                 if ( ! grid.shouldBalance() ) {
                     log(1) << "skipping balancing round because balancing is disabled" << endl;
+                    conn.done();
+                    
                     sleepsecs( 30 );
                     continue;
                 }
                 
-
-                ScopedDbConnection conn( config );
-
-                _ping( conn.conn() );
-                if ( ! _checkOIDs() ) {
-                    uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
-                }
+                uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 // use fresh shard state
                 Shard::reloadShardInfo();
 
-                dist_lock_try lk( &balanceLock , "doing balance round" );
-                if ( ! lk.got() ) {
-                    log(1) << "skipping balancing round because another balancer is active" << endl;
-                    conn.done();
-
-                    sleepsecs( 30 ); // no need to wake up soon
-                    continue;
+                {
+                    dist_lock_try lk( &balanceLock , "doing balance round" );
+                    if ( ! lk.got() ) {
+                        log(1) << "skipping balancing round because another balancer is active" << endl;
+                        conn.done();
+                        
+                        sleepsecs( 30 ); // no need to wake up soon
+                        continue;
+                    }
+                    
+                    log(1) << "*** start balancing round" << endl;
+                    
+                    vector<CandidateChunkPtr> candidateChunks;
+                    _doBalanceRound( conn.conn() , &candidateChunks );
+                    if ( candidateChunks.size() == 0 ) {
+                        log(1) << "no need to move any chunk" << endl;
+                    }
+                    else {
+                        _balancedLastTime = _moveChunks( &candidateChunks );
+                    }
+                    
+                    log(1) << "*** end of balancing round" << endl;
                 }
-
-                log(1) << "*** start balancing round" << endl;
-
-                vector<CandidateChunkPtr> candidateChunks;
-                _doBalanceRound( conn.conn() , &candidateChunks );
-                if ( candidateChunks.size() == 0 ) {
-                    log(1) << "no need to move any chunk" << endl;
-                }
-                else {
-                    _balancedLastTime = _moveChunks( &candidateChunks );
-                }
-
-                log(1) << "*** end of balancing round" << endl;
+                
                 conn.done();
-
+                    
                 sleepsecs( _balancedLastTime ? 5 : 10 );
             }
             catch ( std::exception& e ) {

@@ -78,7 +78,7 @@ namespace mongo {
 
                     if ( idx.inKeyPattern( key ) ) {
                         cursor = bestGuessCursor( ns.c_str() , BSONObj() , idx.keyPattern() );
-                        break;
+                        if( cursor.get() ) break;
                     }
 
                 }
@@ -111,7 +111,7 @@ namespace mongo {
 
                         int now = bb.len();
 
-                        uassert(10044,  "distinct too big, 4mb cap", ( now + e.size() + 1024 ) < bufSize );
+                        uassert(10044,  "distinct too big, 16mb cap", ( now + e.size() + 1024 ) < bufSize );
 
                         arr.append( e );
                         BSONElement x( start + now );

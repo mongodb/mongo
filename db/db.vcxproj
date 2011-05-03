@@ -471,9 +471,11 @@
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
+    <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\group.cpp" />
@@ -490,9 +492,16 @@
     <ClCompile Include="dur_writetodatafiles.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
+    <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="querypattern.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
@@ -620,6 +629,11 @@
     <None Include="repl\notes.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\bson\bson-inl.h" />
+    <ClInclude Include="..\bson\bson.h" />
+    <ClInclude Include="..\bson\bson_db.h" />
+    <ClInclude Include="..\bson\inline_decls.h" />
+    <ClInclude Include="..\bson\stringdata.h" />
     <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\gridfs.h" />
@@ -658,6 +672,7 @@
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="oplogreader.h" />
     <ClInclude Include="projection.h" />
+    <ClInclude Include="queryutil.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
     <ClInclude Include="repl\connections.h" />

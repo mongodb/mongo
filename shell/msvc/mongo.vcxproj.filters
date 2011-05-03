@@ -39,6 +39,9 @@
     <Filter Include="shell\generated_from_js">
       <UniqueIdentifier>{96e4c411-7ab4-4bcd-b7c6-a33059f5d492}</UniqueIdentifier>
     </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{5eca87ab-5987-4fb0-97be-e80cc721e328}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\dbshell.cpp">
@@ -224,6 +227,9 @@
     </ClCompile>
     <ClCompile Include="..\..\client\dbclient_rs.cpp">
       <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
+      <Filter>thirdparty</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

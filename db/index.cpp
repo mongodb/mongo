@@ -26,6 +26,46 @@
 
 namespace mongo {
 
+    /** old (<= v1.8) : 0
+        1 is temp new version but might move it to 2 for the real release TBD
+    */
+    const int DefaultIndexVersionNumber = 0;
+
+    template< class V >
+    class IndexInterfaceImpl : public IndexInterface { 
+    public:
+        typedef typename V::KeyOwned KeyOwned;
+        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
+            return thisLoc.btree<V>()->fullValidate(thisLoc, order);
+        }
+        virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const { 
+            return thisLoc.btree<V>()->findSingle(indexdetails,thisLoc,key);
+        } 
+        virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const {
+            return thisLoc.btree<V>()->unindex(thisLoc, id, key, recordLoc);
+        }
+        virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
+                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
+                      IndexDetails& idx, bool toplevel = true) const {
+            return thisLoc.btree<V>()->bt_insert(thisLoc, recordLoc, key, order, dupsAllowed, idx, toplevel);
+        }
+        virtual DiskLoc addBucket(const IndexDetails& id) { 
+            return BtreeBucket<V>::addBucket(id);
+        }
+        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) { 
+            const BtreeBucket<V> *h = head.btree<V>();
+            for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
+                KeyOwned k(**i);
+                bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
+                uassert( 11001 , "E11001 duplicate key on update", !dup);
+            }
+        }
+    };
+
+    IndexInterfaceImpl<V0> iii_v0;
+    IndexInterfaceImpl<V1> iii_v1;
+    IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
+
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";
         BSONObjBuilder b;
@@ -127,7 +167,6 @@ namespace mongo {
     void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj, bool &changedId) {
         int z = d.nIndexesBeingBuilt();
         v.resize(z);
-        NamespaceDetails::IndexIterator i = d.ii();
         for( int i = 0; i < z; i++ ) {
             IndexDetails& idx = d.idx(i);
             BSONObj idxKey = idx.info.obj().getObjectField("key"); // eg { ts : 1 }
@@ -189,7 +228,6 @@ namespace mongo {
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
         uassert(10097, "bad table to index name on add index attempt",
                 cc().database()->name == nsToDatabase(sourceNS.c_str()));
-
 
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);
@@ -261,30 +299,44 @@ namespace mongo {
         string pluginName = IndexPlugin::findPluginName( key );
         IndexPlugin * plugin = pluginName.size() ? IndexPlugin::get( pluginName ) : 0;
 
-        if ( plugin ) {
-            fixedIndexObject = plugin->adjustIndexSpec( io );
-        }
-        else if ( io["v"].eoo() ) {
-            // add "v" if it doesn't exist
-            // if it does - leave whatever value was there
-            // this is for testing and replication
-            BSONObjBuilder b( io.objsize() + 32 );
-            b.appendElements( io );
-            b.append( "v" , 0 );
+
+        { 
+            BSONObj o = io;
+            if ( plugin ) {
+                o = plugin->adjustIndexSpec(o);
+            }
+            BSONObjBuilder b;
+            int v = DefaultIndexVersionNumber;
+            if( o.hasElement("_id") ) 
+                b.append( o["_id"] );
+            if( !o["v"].eoo() ) {
+                double vv = o["v"].Number();
+                // note (one day) we may be able to fresh build less versions than we can use
+                // isASupportedIndexVersionNumber() is what we can use
+                uassert(14803, str::stream() << "this version of mongod cannot build new indexes of version number " << vv, 
+                    vv == 0 || vv == 1);
+                v = (int) vv;
+            }
+            // idea is to put things we use a lot earlier
+            b.append("v", v);
+            b.append(o["key"]);
+            if( o["unique"].trueValue() )
+                b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
+            b.append(o["ns"]);
+            b.appendElementsUnique(o);
             fixedIndexObject = b.obj();
         }
 
         return true;
     }
 
-
     void IndexSpec::reset( const IndexDetails * details ) {
         _details = details;
         reset( details->info );
     }
 
-    void IndexSpec::reset( const DiskLoc& loc ) {
-        info = loc.obj();
+    void IndexSpec::reset( const BSONObj& _info ) {
+        info = _info;
         keyPattern = info["key"].embeddedObjectUserCheck();
         if ( keyPattern.objsize() == 0 ) {
             out() << info.toString() << endl;

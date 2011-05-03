@@ -32,7 +32,7 @@ def assignErrorCodes():
 codes = []
 
 def readErrorCodes( callback ):
-    ps = [ re.compile( "([um]asser(t|ted)) *\( *(\d+)" ) ,
+    ps = [ re.compile( "([umsg]asser(t|ted)) *\( *(\d+)" ) ,
            re.compile( "(User|Msg)Exceptio(n)\( *(\d+)" )
            ]
     for x in utils.getAllSourceFiles():

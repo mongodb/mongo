@@ -37,8 +37,7 @@ namespace mongo {
         return batchSize < nToReturn ? batchSize : nToReturn;
     }
 
-    bool DBClientCursor::init() {
-        Message toSend;
+    void DBClientCursor::_assembleInit( Message& toSend ) {
         if ( !cursorId ) {
             assembleRequest( ns, query, nextBatchSize() , nToSkip, fieldsToReturn, opts, toSend );
         }
@@ -50,9 +49,37 @@ namespace mongo {
             b.appendNum( cursorId );
             toSend.setData( dbGetMore, b.buf(), b.len() );
         }
+    }
+
+    bool DBClientCursor::init() {
+        Message toSend;
+        _assembleInit( toSend );
+
         if ( !_client->call( toSend, *m, false ) ) {
             // log msg temp?
             log() << "DBClientCursor::init call() failed" << endl;
+            return false;
+        }
+        if ( m->empty() ) {
+            // log msg temp?
+            log() << "DBClientCursor::init message from call() was empty" << endl;
+            return false;
+        }
+        dataReceived();
+        return true;
+    }
+    
+    void DBClientCursor::initLazy() {
+        Message toSend;
+        _assembleInit( toSend );
+        _lazy = _client->callLazy( toSend );
+        assert( _lazy );
+    }
+
+    bool DBClientCursor::initLazyFinish() {
+        assert( _lazy );
+        if ( ! _lazy->recv( *m ) ) {
+            log() << "DBClientCursor::init lazy call() failed" << endl;
             return false;
         }
         if ( m->empty() ) {
@@ -221,12 +248,12 @@ namespace mongo {
 
         DESTRUCTOR_GUARD (
 
-        if ( cursorId && _ownCursor ) {
-        BufBuilder b;
-        b.appendNum( (int)0 ); // reserved
+        if ( cursorId && _ownCursor && ! inShutdown() ) {
+            BufBuilder b;
+            b.appendNum( (int)0 ); // reserved
             b.appendNum( (int)1 ); // number
             b.appendNum( cursorId );
-
+            
             Message m;
             m.setData( dbKillCursors , b.buf() , b.len() );
 

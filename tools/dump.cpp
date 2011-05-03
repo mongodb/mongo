@@ -27,6 +27,14 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 class Dump : public Tool {
+    class FilePtr : boost::noncopyable {
+    public:
+        /*implicit*/ FilePtr(FILE* f) : _f(f) {}
+        ~FilePtr() { fclose(_f); }
+        operator FILE*() { return _f; }
+    private:
+        FILE* _f;
+    };
 public:
     Dump() : Tool( "dump" , ALL , "*" , "*" , false ) {
         add_options()
@@ -39,10 +47,18 @@ public:
 
     // This is a functor that writes a BSONObj to a file
     struct Writer {
-        Writer(ostream& out, ProgressMeter* m) :_out(out), _m(m) {}
+        Writer(FILE* out, ProgressMeter* m) :_out(out), _m(m) {}
 
         void operator () (const BSONObj& obj) {
-            _out.write( obj.objdata() , obj.objsize() );
+            size_t toWrite = obj.objsize();
+            size_t written = 0;
+
+            while (toWrite) {
+                size_t ret = fwrite( obj.objdata()+written, 1, toWrite, _out );
+                uassert(14035, errnoWithPrefix("couldn't write to file"), ret);
+                toWrite -= ret;
+                written += ret;
+            }
 
             // if there's a progress bar, hit it
             if (_m) {
@@ -50,21 +66,19 @@ public:
             }
         }
 
-        ostream& _out;
+        FILE* _out;
         ProgressMeter* _m;
     };
 
-    void doCollection( const string coll , ostream &out , ProgressMeter *m ) {
-        Query q;
-        if ( _query.isEmpty() && !hasParam("dbpath"))
-            q.snapshot();
-        else
-            q = _query;
+    void doCollection( const string coll , FILE* out , ProgressMeter *m ) {
+        Query q = _query;
 
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
-
+        else if ( _query.isEmpty() && !hasParam("dbpath"))
+            q.snapshot();
+        
         DBClientBase& connBase = conn(true);
         Writer writer(out, m);
 
@@ -86,21 +100,18 @@ public:
     void writeCollectionFile( const string coll , path outputFile ) {
         cout << "\t" << coll << " to " << outputFile.string() << endl;
 
-        ofstream out;
-        out.open( outputFile.string().c_str() , ios_base::out | ios_base::binary  );
-        assertStreamGood( 10262 ,  "couldn't open file" , out );
+        FilePtr f (fopen(outputFile.string().c_str(), "wb"));
+        uassert(10262, errnoWithPrefix("couldn't open file"), f);
 
         ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
 
-        doCollection(coll, out, &m);
+        doCollection(coll, f, &m);
 
         cout << "\t\t " << m.done() << " objects" << endl;
-
-        out.close();
     }
 
     void writeCollectionStdout( const string coll ) {
-        doCollection(coll, cout, NULL);
+        doCollection(coll, stdout, NULL);
     }
 
     void go( const string db , const path outdir ) {
@@ -201,7 +212,7 @@ public:
                         ss << "first element: " << e;
                         log() << ss.str();
                     }
-                    catch ( std::exception& ee ) {
+                    catch ( std::exception& ) {
                     }
                 }
             }
@@ -231,12 +242,11 @@ public:
         outfile /= ( ns.substr( ns.find( "." ) + 1 ) + ".bson" );
         log() << "writing to: " << outfile.string() << endl;
         
-        ofstream out;
-        out.open( outfile.string().c_str() , ios_base::out | ios_base::binary  );
+        FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
         ProgressMeter m( nsd->stats.nrecords * 2 );
         
-        Writer w( out , &m );
+        Writer w( f , &m );
 
         try {
             log() << "forward extent pass" << endl;
@@ -263,8 +273,6 @@ public:
         catch ( DBException& e ){
             error() << "ERROR: backwards extent pass failed:" << e.toString() << endl;
         }
-
-        out.close();
 
         log() << "\t\t " << m.done() << " objects" << endl;
     }
@@ -343,6 +351,8 @@ public:
                     return -1;
                 }
             }
+
+            auth("local");
 
             BSONObj op = conn(true).findOne(opLogName, Query().sort("$natural", -1), 0, QueryOption_SlaveOk);
             if (op.isEmpty()) {

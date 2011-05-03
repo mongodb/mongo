@@ -1,5 +1,3 @@
-
-
 _parsePath = function() {
     var dbpath = "";
     for( var i = 0; i < arguments.length; ++i )
@@ -135,7 +133,7 @@ startMongoProgram = function(){
         } catch( e ) {
         }
         return false;
-    }, "unable to connect to mongo program on port " + port, 300 * 1000 );
+    }, "unable to connect to mongo program on port " + port, 600 * 1000 );
 
     return m;
 }
@@ -190,7 +188,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var rs = this._rs[i].test;
             rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
             rs.awaitReplication();
-            this._connections.push( new Mongo( rs.getURL() ) );
+	    var xxx = new Mongo( rs.getURL() );
+	    xxx.name = rs.getURL();
+            this._connections.push( xxx );
         }
         
         this._configServers = []
@@ -300,12 +300,18 @@ ShardingTest.prototype.getServer = function( dbname ){
     if ( x )
         name = x.host;
 
+    var rsName = null;
+    if ( name.indexOf( "/" ) > 0 )
+	rsName = name.substring( 0 , name.indexOf( "/" ) );
+    
     for ( var i=0; i<this._connections.length; i++ ){
         var c = this._connections[i];
         if ( name == c.name )
             return c;
+	if ( rsName && c.name.startsWith( rsName ) )
+	    return c;
     }
-
+    
     throw "can't find server for: " + dbname + " name:" + name;
 
 }
@@ -467,16 +473,16 @@ printShardingStatus = function( configDB , verbose ){
     output( "  sharding version: " + tojson( configDB.getCollection( "version" ).findOne() ) );
     
     output( "  shards:" );
-    configDB.shards.find().forEach( 
+    configDB.shards.find().sort( { _id : 1 } ).forEach( 
         function(z){
-            output( "      " + tojson(z) );
+            output( "\t" + tojsononeline( z ) );
         }
     );
 
     output( "  databases:" );
     configDB.databases.find().sort( { name : 1 } ).forEach( 
         function(db){
-            output( "\t" + tojson(db,"",true) );
+            output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
                 configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
@@ -1210,13 +1216,14 @@ ReplSetTest.prototype.reInitiate = function() {
     this.initiate( config , 'replSetReconfig' );
 }
 
-ReplSetTest.prototype.awaitReplication = function() {
+ReplSetTest.prototype.awaitReplication = function(timeout) {
    this.getMaster();
+   timeout = timeout || 30000;
 
    latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts']
    print(latest);
 
-   this.attempt({context: this, timeout: 30000, desc: "awaiting replication"},
+   this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
        function() {
            var synced = true;
            for(var i=0; i<this.liveNodes.slaves.length; i++) {

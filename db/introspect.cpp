@@ -27,14 +27,15 @@
 
 namespace mongo {
 
+    BufBuilder profileBufBuilder; // reused, instead of allocated every time - avoids a malloc/free cycle
+
     void profile( const Client& c , CurOp& currentOp, int millis) {
         assertInWriteLock();
         
         string info = currentOp.debug().str.str();
-        int initSize = info.size() + 64;
 
-        BSONObjBuilder b( initSize );
-
+        profileBufBuilder.reset();
+        BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
         b.append("info", info);
         b.append("millis", (double) millis);
@@ -42,14 +43,24 @@ namespace mongo {
             b.append( "ns" , currentOp.getNS() );
         b.append("client", c.clientAddress() );
 
-
         BSONObj p = b.done();
-        
-        if ( p.objsize() > initSize ) {
-            RARELY warning() << "profile had to increase size of BSONObj : " << p << endl;
-        }
 
-        theDataFileMgr.insert(c.database()->profileName.c_str(), p.objdata(), p.objsize(), true);
+        // write: not replicated
+        Database *db = c.database();
+        const char *ns = db->profileName.c_str();
+        NamespaceDetails *d = db->namespaceIndex.details(ns);
+        if( d ) {
+            int len = p.objsize();
+            Record *r = theDataFileMgr.fast_oplog_insert(d, ns, len);
+            memcpy(getDur().writingPtr(r->data, len), p.objdata(), len);
+        }
+        else { 
+            static time_t last;
+            if( time(0) > last+10 ) {
+                log() << "profile: warning ns " << ns << " does not exist" << endl;
+                last = time(0);
+            }
+        }
     }
 
 } // namespace mongo

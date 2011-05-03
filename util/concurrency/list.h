@@ -42,38 +42,54 @@ namespace mongo {
             friend class List1;
             T *_next;
         public:
+            Base() : _next(0){}
+            ~Base() { assert(false); } // we never want this to happen
             T* next() const { return _next; }
         };
 
-        T* head() const { return _head; }
+        /** note this is safe: 
+
+              T* p = mylist.head();
+              if( p ) 
+                use(p);
+
+            and this is not:
+
+              if( mylist.head() )
+                use( mylist.head() ); // could become 0
+        */
+        T* head() const { return (T*) _head; }
 
         void push(T* t) {
+            assert( t->_next == 0 );
             scoped_lock lk(_m);
-            t->_next = _head;
+            t->_next = (T*) _head;
             _head = t;
         }
 
-        // intentionally leak.
+        // intentionally leaks.
         void orphanAll() {
+            scoped_lock lk(_m);
             _head = 0;
         }
 
         /* t is not deleted, but is removed from the list. (orphaned) */
         void orphan(T* t) {
             scoped_lock lk(_m);
-            T *&prev = _head;
+            T *&prev = (T*&) _head;
             T *n = prev;
             while( n != t ) {
+                uassert( 14050 , "List1: item to orphan not in list", n );
                 prev = n->_next;
                 n = prev;
             }
             prev = t->_next;
             if( ++_orphans > 500 )
-                log() << "warning orphans=" << _orphans << '\n';
+                log() << "warning List1 orphans=" << _orphans << '\n';
         }
 
     private:
-        T *_head;
+        volatile T *_head;
         mongo::mutex _m;
         int _orphans;
     };

@@ -66,8 +66,7 @@ namespace mongo {
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
             assert( s );
-            s->setThis( &o );
-            if ( s->invoke( _func.func() , _params , 0 , true ) )
+            if ( s->invoke( _func.func() , &_params, &o , 0 , true ) )
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
 
@@ -79,7 +78,7 @@ namespace mongo {
             Scope * s = _func.scope();
 
             Scope::NoDBAccess no = s->disableDBAccess( "can't access db inside finalize" );
-            s->invokeSafe( _func.func() , o );
+            s->invokeSafe( _func.func() , &o, 0 );
 
             // don't want to use o.objsize() to size b
             // since there are many cases where the point of finalize
@@ -183,7 +182,7 @@ namespace mongo {
 
             Scope * s = _func.scope();
 
-            s->invokeSafe( _func.func() , args );
+            s->invokeSafe( _func.func() , &args, 0 );
 
             if ( s->type( "return" ) == Array ) {
                 uasserted( 10075 , "reduce -> multiple not supported yet");
@@ -397,8 +396,10 @@ namespace mongo {
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
-                uassert( 10076 ,  "rename failed" ,
-                         _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) );
+                if ( ! _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) ) {
+                    uasserted( 10076 ,  str::stream() << "rename failed: " << info );
+                }
+                         
                 _db.dropCollection( _config.tempLong );
             }
             else if ( _config.outType == Config::MERGE ) {

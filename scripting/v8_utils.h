@@ -27,10 +27,6 @@
 
 namespace mongo {
 
-    v8::Handle<v8::Value> Print(const v8::Arguments& args);
-    v8::Handle<v8::Value> Version(const v8::Arguments& args);
-    v8::Handle<v8::Value> GCV8(const v8::Arguments& args);
-
     void ReportException(v8::TryCatch* handler);
 
 #define jsassert(x,msg) assert(x)
@@ -42,6 +38,6 @@ namespace mongo {
     std::string toSTLString( const v8::TryCatch * try_catch );
 
     class V8Scope;
-    void installFork( v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context );
+    void installFork( V8Scope* scope, v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context );
 }
 

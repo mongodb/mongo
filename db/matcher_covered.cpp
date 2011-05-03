@@ -48,20 +48,18 @@ namespace mongo {
             alwaysUseRecord ||
             ! ( _docMatcher->keyMatch() &&
                 _keyMatcher.sameCriteriaCount( *_docMatcher ) );
-
-        _needRecordReject = _keyMatcher.hasType( BSONObj::opEXISTS );
     }
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
         // bool keyUsable = ! cursor->isMultiKey() && check for $orish like conditions in matcher SERVER-1264
-        return matches( cursor->currKey() , cursor->currLoc() , details  );
+        return matches( cursor->currKey() , cursor->currLoc() , details , !cursor->isMultiKey() || ( _keyMatcher.singleSimpleCriterion() && _docMatcher->singleSimpleCriterion() ) );
     }
 
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
         if ( details )
             details->reset();
 
-        if ( _needRecordReject == false && keyUsable ) {
+        if ( keyUsable ) {
 
             if ( !_keyMatcher.matches(key, details ) ) {
                 return false;

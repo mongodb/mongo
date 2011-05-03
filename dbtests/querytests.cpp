@@ -20,7 +20,6 @@
 #include "pch.h"
 #include "../db/query.h"
 
-#include "../db/db.h"
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
@@ -850,10 +849,12 @@ namespace QueryTests {
             writelock lk("");
             Client::Context ctx( "unittests" );
 
+            // note that extents are always at least 4KB now - so this will get rounded up a bit.
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
-            for ( int i=0; i<100; i++ ) {
+            for ( int i=0; i<200; i++ ) {
                 insertNext();
-                ASSERT( count() < 45 );
+                cout << count() << endl;
+                ASSERT( count() < 90 );
             }
 
             int a = count();
@@ -870,7 +871,7 @@ namespace QueryTests {
             insertNext();
             ASSERT( c->more() );
 
-            for ( int i=0; i<50; i++ ) {
+            for ( int i=0; i<90; i++ ) {
                 insertNext();
             }
 

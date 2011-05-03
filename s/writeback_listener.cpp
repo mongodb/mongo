@@ -96,7 +96,7 @@ namespace mongo {
                     // this means we're waiting for a GLE that already passed.
                     // it should be impossible becauseonce we call GLE, no other
                     // writebacks should happen with that connection id
-                    msgasserted( 13633 , str::stream() << "got writeback waitfor for older id " <<
+                    msgasserted( 14041 , str::stream() << "got writeback waitfor for older id " <<
                                  " oid: " << oid << " s.id: " << s.id << " connectionId: " << connectionId );
                 }
                 else if ( oid == s.id ) {
@@ -226,7 +226,7 @@ namespace mongo {
                 secsToSleep = 0;
                 continue;
             }
-            catch ( std::exception e ) {
+            catch ( std::exception& e ) {
 
                 if ( inShutdown() ) {
                     // we're shutting down, so just clean up

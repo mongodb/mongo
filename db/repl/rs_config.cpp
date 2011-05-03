@@ -68,21 +68,8 @@ namespace mongo {
 
             cx.db()->flushFiles(true);
         }
-        DEV log() << "replSet saveConfigLocally done" << rsLog;
+        log() << "replSet saveConfigLocally done" << rsLog;
     }
-
-    /*static*/
-    /*void ReplSetConfig::receivedNewConfig(BSONObj cfg) {
-        if( theReplSet )
-            return; // this is for initial setup only, so far. todo
-
-        ReplSetConfig c(cfg);
-
-        writelock lk("admin.");
-        if( theReplSet )
-            return;
-        c.saveConfigLocally(bo());
-    }*/
 
     bo ReplSetConfig::MemberCfg::asBson() const {
         bob b;
@@ -99,9 +86,6 @@ namespace mongo {
             for( set<string>::const_iterator i = tags.begin(); i != tags.end(); i++ )
                 a.append(*i);
             b.appendArray("tags", a.done());
-        }
-        if( !initialSync.isEmpty() ) {
-            b << "initialSync" << initialSync;
         }
         return b.obj();
     }
@@ -136,37 +120,11 @@ namespace mongo {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes <= 100); // votes >= 0 because it is unsigned
-        uassert(13419, "this version of mongod only supports priorities 0 and 1", priority == 0 || priority == 1);
+        uassert(13419, "priorities must be between 0.0 and 100.0", priority >= 0.0 && priority <= 100.0);
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
-
-        if (!initialSync.isEmpty()) {
-            static const string legal[] = {"state", "name", "_id","optime"};
-            static const set<string> legals(legal, legal + 4);
-            assertOnlyHas(initialSync, legals);
-
-            if (initialSync.hasElement("state")) {
-                uassert(13525, "initialSync source state must be 1 or 2",
-                        initialSync["state"].isNumber() &&
-                        (initialSync["state"].Number() == 1 ||
-                         initialSync["state"].Number() == 2));
-            }
-            if (initialSync.hasElement("name")) {
-                uassert(13526, "initialSync source name must be a string",
-                        initialSync["name"].type() == mongo::String);
-            }
-            if (initialSync.hasElement("_id")) {
-                uassert(13527, "initialSync source _id must be a number",
-                        initialSync["_id"].isNumber());
-            }
-            if (initialSync.hasElement("optime")) {
-                uassert(13528, "initialSync source optime must be a timestamp",
-                        initialSync["optime"].type() == mongo::Timestamp ||
-                        initialSync["optime"].type() == mongo::Date);
-            }
-        }
     }
 
     /** @param o old config
@@ -300,7 +258,7 @@ namespace mongo {
             try {
                 static const string legal[] = {
                     "_id","votes","priority","host", "hidden","slaveDelay",
-                    "arbiterOnly","buildIndexes","tags","initialSync"
+                    "arbiterOnly","buildIndexes","tags","initialSync" // deprecated
                 };
                 static const set<string> legals(legal, legal + 10);
                 assertOnlyHas(mobj, legals);
@@ -336,9 +294,6 @@ namespace mongo {
                     vector<BSONElement> v = mobj["tags"].Array();
                     for( unsigned i = 0; i < v.size(); i++ )
                         m.tags.insert( v[i].String() );
-                }
-                if( mobj.hasElement("initialSync")) {
-                    m.initialSync = mobj["initialSync"].Obj().getOwned();
                 }
                 m.check();
             }

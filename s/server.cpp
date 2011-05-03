@@ -23,6 +23,7 @@
 #include "../util/message_server.h"
 #include "../util/stringutils.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
 #include "../util/signal_handlers.h"
 #include "../util/admin_access.h"
 #include "../db/dbwebserver.h"
@@ -147,6 +148,7 @@ namespace mongo {
         setupSIGTRAPforGDB();
         setupCoreSignals();
         setupSignals( false );
+        Logstream::get().addGlobalTee( new RamLog("global") );
     }
 
     void start( const MessageServer::Options& opts ) {
@@ -352,6 +354,12 @@ int main(int argc, char* argv[]) {
 }
 
 #undef exit
+
+void mongo::exitCleanly( ExitCode code ) {
+    // TODO: do we need to add anything?
+    mongo::dbexit( code );
+}
+
 void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
     dbexitCalled = true;
     log() << "dbexit: " << why

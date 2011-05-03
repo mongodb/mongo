@@ -77,6 +77,7 @@ namespace mongo {
         string lastHeartbeatMsg;
         OpTime opTime;
         int skew;
+        unsigned int ping; // microseconds
 
         bool up() const { return health > 0; }
 

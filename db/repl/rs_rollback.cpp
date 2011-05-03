@@ -227,9 +227,9 @@ namespace mongo {
             log() << "replSet info rollback our last optime:   " << ourTime.toStringPretty() << rsLog;
             log() << "replSet info rollback their last optime: " << theirTime.toStringPretty() << rsLog;
             log() << "replSet info rollback diff in end of log times: " << diff << " seconds" << rsLog;
-            if( diff > 3600 ) {
+            if( diff > 1800 ) {
                 log() << "replSet rollback too long a time period for a rollback." << rsLog;
-                throw "error not willing to roll back more than one hour of data";
+                throw "error not willing to roll back more than 30 minutes of data";
             }
         }
 
@@ -393,7 +393,7 @@ namespace mongo {
                     dropCollection(ns, errmsg, res);
                     {
                         dbtemprelease r;
-                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false, true);
+                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false, true, false);
                         if( !ok ) {
                             log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
                             throw "rollback error resyncing rollection [1]";
@@ -607,26 +607,20 @@ namespace mongo {
             return 2;
         }
 
-        if( box.getState().secondary() ) {
+        if( state().secondary() ) {
             /* by doing this, we will not service reads (return an error as we aren't in secondary staate.
                that perhaps is moot becasue of the write lock above, but that write lock probably gets deferred
                or removed or yielded later anyway.
 
                also, this is better for status reporting - we know what is happening.
                */
-            box.change(MemberState::RS_ROLLBACK, _self);
+            changeState(MemberState::RS_ROLLBACK);
         }
 
         HowToFixUp how;
         sethbmsg("rollback 1");
         {
             r.resetCursor();
-            /*DBClientConnection us(false, 0, 0);
-            string errmsg;
-            if( !us.connect(HostAndPort::me().toString(),errmsg) ) {
-                sethbmsg("rollback connect to self failure" + errmsg);
-                return;
-            }*/
 
             sethbmsg("rollback 2 FindCommonPoint");
             try {
@@ -668,7 +662,7 @@ namespace mongo {
             /* success - leave "ROLLBACK" state
                can go to SECONDARY once minvalid is achieved
             */
-            box.change(MemberState::RS_RECOVERING, _self);
+            changeState(MemberState::RS_RECOVERING);
         }
 
         return 0;

@@ -436,6 +436,7 @@ namespace mongo {
         SourceVector sources;
         ReplSource::loadAll(sources);
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
+            log() << requester << " forcing resync from "  << (*i)->hostName << endl;
             (*i)->forceResync( requester );
         }
         replAllDead = 0;
@@ -445,7 +446,9 @@ namespace mongo {
         BSONObj info;
         {
             dbtemprelease t;
-            oplogReader.connect(hostName);
+            if (!oplogReader.connect(hostName)) {
+                msgassertedNoTrace( 14051 , "unable to connect to resync");
+            }
             /* todo use getDatabaseNames() method here */
             bool ok = oplogReader.conn()->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
             massert( 10385 ,  "Unable to get database list", ok );
@@ -477,22 +480,131 @@ namespace mongo {
     }
 
     /* grab initial copy of a database from the master */
-    bool ReplSource::resync(string db) {
+    void ReplSource::resync(string db) {
         string dummyNs = resyncDrop( db.c_str(), "internal" );
         Client::Context ctx( dummyNs );
         {
             log() << "resync: cloning database " << db << " to get an initial copy" << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true);
+            int errCode = 0;
+            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
             if ( !ok ) {
-                problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
-                throw SyncException();
+                if ( errCode == DatabaseDifferCaseCode ) {
+                    resyncDrop( db.c_str(), "internal" );
+                    log() << "resync: database " << db << " not valid on the master due to a name conflict, dropping." << endl;
+                    return;
+                }
+                else {
+                    problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
+                    throw SyncException();
+                }
             }
         }
 
         log() << "resync: done with initial clone for db: " << db << endl;
 
+        return;
+    }
+    
+    DatabaseIgnorer ___databaseIgnorer;
+    
+    void DatabaseIgnorer::doIgnoreUntilAfter( const string &db, const OpTime &futureOplogTime ) {
+        if ( futureOplogTime > _ignores[ db ] ) {
+            _ignores[ db ] = futureOplogTime;   
+        }
+    }
+
+    bool DatabaseIgnorer::ignoreAt( const string &db, const OpTime &currentOplogTime ) {
+        if ( _ignores[ db ].isNull() ) {
+            return false;
+        }
+        if ( _ignores[ db ] >= currentOplogTime ) {
+            return true;
+        } else {
+            // The ignore state has expired, so clear it.
+            _ignores.erase( db );
+            return false;
+        }
+    }
+
+    bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
+        if ( dbHolder.isLoaded( ns, dbpath ) ) {
+            // Database is already present.
+            return true;   
+        }
+        if ( ___databaseIgnorer.ignoreAt( db, op.getField( "ts" ).date() ) ) {
+            // Database is ignored due to a previous indication that it is
+            // missing from master after optime "ts".
+            return false;   
+        }
+        if ( Database::duplicateUncasedName( db, dbpath ).empty() ) {
+            // No duplicate database names are present.
+            return true;
+        }
+        
+        OpTime lastTime;
+        bool dbOk = false;
+        {
+            dbtemprelease release;
+        
+            // We always log an operation after executing it (never before), so
+            // a database list will always be valid as of an oplog entry generated
+            // before it was retrieved.
+            
+            BSONObj last = oplogReader.findOne( this->ns().c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
+            if ( !last.isEmpty() ) {
+	            BSONElement ts = last.getField( "ts" );
+	            massert( 14032, "Invalid 'ts' in remote log", ts.type() == Date || ts.type() == Timestamp );
+	            lastTime = OpTime( ts.date() );
+            }
+
+            BSONObj info;
+            bool ok = oplogReader.conn()->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+            massert( 14033, "Unable to get database list", ok );
+            BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+            
+                const char * name = e.embeddedObject().getField( "name" ).valuestr();
+                if ( strcasecmp( name, db ) != 0 )
+                    continue;
+                
+                if ( strcmp( name, db ) == 0 ) {
+                    // The db exists on master, still need to check that no conflicts exist there.
+                    dbOk = true;
+                    continue;
+                }
+                
+                // The master has a db name that conflicts with the requested name.
+                dbOk = false;
+                break;
+            }
+        }
+        
+        if ( !dbOk ) {
+            ___databaseIgnorer.doIgnoreUntilAfter( db, lastTime );
+            incompleteCloneDbs.erase(db);
+            addDbNextPass.erase(db);
+            return false;   
+        }
+        
+        // Check for duplicates again, since we released the lock above.
+        set< string > duplicates;
+        Database::duplicateUncasedName( db, dbpath, &duplicates );
+        
+        // The database is present on the master and no conflicting databases
+        // are present on the master.  Drop any local conflicts.
+        for( set< string >::const_iterator i = duplicates.begin(); i != duplicates.end(); ++i ) {
+            ___databaseIgnorer.doIgnoreUntilAfter( *i, lastTime );
+            incompleteCloneDbs.erase(*i);
+            addDbNextPass.erase(*i);
+            Client::Context ctx(*i);
+            dropDatabase(*i);
+        }
+        
+        massert( 14034, "Duplicate database names present after attempting to delete duplicates",
+                Database::duplicateUncasedName( db, dbpath ).empty() );
         return true;
     }
 
@@ -589,6 +701,10 @@ namespace mongo {
             throw SyncException();
         }
 
+        if ( !handleDuplicateDbName( op, ns, clientName ) ) {
+            return;   
+        }
+                
         Client::Context ctx( ns );
         ctx.getClient()->curop()->reset();
 
@@ -1123,8 +1239,11 @@ namespace mongo {
             {
                 dblock lk;
                 if ( replAllDead ) {
-                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
+                    // throttledForceResyncDead can throw
+                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) ) {
+                        log() << "all sources dead: " << replAllDead << ", sleeping for 5 seconds" << endl;
                         break;
+                    }
                 }
                 assert( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
                 syncing++;
@@ -1158,7 +1277,7 @@ namespace mongo {
 
             if ( s ) {
                 stringstream ss;
-                ss << "repl: sleep " << s << "sec before next pass";
+                ss << "repl: sleep " << s << " sec before next pass";
                 string msg = ss.str();
                 if ( ! cmdLine.quiet )
                     log() << msg << endl;
@@ -1167,8 +1286,6 @@ namespace mongo {
             }
         }
     }
-
-    int debug_stop_repl = 0;
 
     static void replMasterThread() {
         sleepsecs(4);
@@ -1218,13 +1335,20 @@ namespace mongo {
         while ( 1 ) {
             try {
                 replMain();
-                if ( debug_stop_repl )
-                    break;
                 sleepsecs(5);
             }
             catch ( AssertionException& ) {
                 ReplInfo r("Assertion in replSlaveThread(): sleeping 5 minutes before retry");
                 problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
+                sleepsecs(300);
+            }
+            catch ( DBException& e ) {
+                problem() << "exception in replSlaveThread(): " << e.what()
+                          << ", sleeping 5 minutes before retry" << endl;
+                sleepsecs(300);
+            }
+            catch ( ... ) {
+                problem() << "error in replSlaveThread(): sleeping 5 minutes before retry" << endl;
                 sleepsecs(300);
             }
         }

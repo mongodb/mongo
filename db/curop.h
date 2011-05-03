@@ -147,8 +147,7 @@ namespace mongo {
         void enter( Client::Context * context ) {
             ensureStarted();
             setNS( context->ns() );
-            if ( context->_db && context->_db->profile > _dbprofile )
-                _dbprofile = context->_db->profile;
+            _dbprofile = context->_db ? context->_db->profile : 0;
         }
 
         void leave( Client::Context * context ) {
@@ -167,7 +166,7 @@ namespace mongo {
             _query.reset();
         }
 
-        void reset( const SockAddr & remote, int op ) {
+        void reset( const HostAndPort& remote, int op ) {
             reset();
             _remote = remote;
             _op = op;
@@ -288,7 +287,7 @@ namespace mongo {
         int _dbprofile; // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
-        struct SockAddr _remote;
+        HostAndPort _remote;
         CachedBSONObj _query;
         OpDebug _debug;
         ThreadSafeString _message;

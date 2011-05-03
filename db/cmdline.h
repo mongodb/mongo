@@ -26,20 +26,13 @@ namespace mongo {
     /* concurrency: OK/READ */
     struct CmdLine {
 
-        CmdLine() :
-            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
-            quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
-            syncdelay(60), socket("/tmp") {
-            // default may change for this later.
-#if defined(_DURABLEDEFAULTON)
-            dur = true;
-#else
-            dur = false;
-#endif
-        }
+        CmdLine();
 
         string binaryName;     // mongod or mongos
         string cwd;            // cwd of when process started
+
+        // this is suboptimal as someone could rename a binary.  todo...
+        bool isMongos() const { return binaryName == "mongos"; }
 
         int port;              // --port
         enum {
@@ -72,11 +65,13 @@ namespace mongo {
         bool prealloc;         // --noprealloc no preallocation of data files
         bool smallfiles;       // --smallfiles allocate smaller data files
 
+        bool configsvr;        // --configsvr
+
         bool quota;            // --quota
         int quotaFiles;        // --quotaFiles
         bool cpu;              // --cpu show cpu time periodically
 
-        bool dur;              // --dur durability
+        bool dur;              // --dur durability (now --journal)
 
         /** --durOptions 7      dump journal and terminate without doing anything further
             --durOptions 4      recover and terminate without listening
@@ -118,12 +113,25 @@ namespace mongo {
                            boost::program_options::variables_map &output );
     };
 
+    inline CmdLine::CmdLine() :
+        port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
+        configsvr(false),
+        quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
+        syncdelay(60), socket("/tmp") 
+    {
+        // default may change for this later.
+#if defined(_DURABLEDEFAULTON)
+        dur = true;
+#else
+        dur = false;
+#endif
+    }
+            
     extern CmdLine cmdLine;
 
     void setupCoreSignals();
 
     string prettyHostName();
-
 
     /**
      * used for setParameter

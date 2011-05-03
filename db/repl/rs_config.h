@@ -31,9 +31,17 @@ namespace mongo {
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
     public:
-        /* if something is misconfigured, throws an exception.
-        if couldn't be queried or is just blank, ok() will be false.
-        */
+        /**
+         * This contacts the given host and tries to get a config from them.
+         *
+         * This sends a test heartbeat to the host and, if all goes well and the
+         * host has a more recent config, fetches the config and loads it (see
+         * from().
+         *
+         * If it's contacting itself, it skips the heartbeat (for obvious
+         * reasons.) If something is misconfigured, throws an exception. If the
+         * host couldn't be queried or is just blank, ok() will be false.
+         */
         ReplSetConfig(const HostAndPort& h);
 
         ReplSetConfig(BSONObj cfg);
@@ -51,7 +59,6 @@ namespace mongo {
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
             set<string> tags;     /* tagging for data center, rack, etc. */
-            BSONObj initialSync;  /* directions for initial sync source */
 
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;

@@ -21,10 +21,166 @@
 #include "pdfile.h"
 #include "jsobj.h"
 #include "curop-inl.h"
+#include "queryutil.h"
 
 namespace mongo {
 
     extern int otherTraceLevel;
+
+    template< class V >
+    class BtreeCursorImpl : public BtreeCursor { 
+    public:
+        typedef typename BucketBasics<V>::KeyNode KeyNode;
+        typedef typename V::Key Key;
+
+        BtreeCursorImpl(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
+          BtreeCursor(a,b,c,d,e,f,g) { }
+        BtreeCursorImpl(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction) : 
+          BtreeCursor(_d,_idxNo,_id,_bounds,_direction) 
+        { 
+            pair< DiskLoc, int > noBestParent;
+            indexDetails.head.btree<V>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
+            skipAndCheck();
+            dassert( _dups.size() == 0 );
+        }
+
+        virtual DiskLoc currLoc() { 
+            if( bucket.isNull() ) return DiskLoc();
+            return currKeyNode().recordLoc;
+        }
+
+        virtual BSONObj currKey() const { 
+            assert( !bucket.isNull() );
+            return bucket.btree<V>()->keyNode(keyOfs).key.toBson();
+        }
+
+    protected:
+        virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
+            thisLoc.btree<V>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
+        }
+        virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
+            return thisLoc.btree<V>()->advance(thisLoc, keyOfs, direction, caller);
+        }
+        virtual void _audit() {
+            if ( otherTraceLevel >= 200 ) {
+                out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
+                indexDetails.head.btree<V>()->fullValidate(indexDetails.head, _order);
+            }
+            else {
+                out() << "BtreeCursor(). dumping head bucket" << endl;
+                indexDetails.head.btree<V>()->dump();
+            }
+        }
+        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) {
+            bool found;
+            return indexDetails.head.btree<V>()->
+                     locate(indexDetails, indexDetails.head, key, _ordering, keyOfs, found, loc, _direction);
+        }
+
+        const _KeyNode& keyNode(int keyOfs) const { 
+            return bucket.btree<V>()->k(keyOfs);
+        }
+
+    private:
+        const KeyNode currKeyNode() const {
+            assert( !bucket.isNull() );
+            const BtreeBucket<V> *b = bucket.btree<V>();
+            return b->keyNode(keyOfs);
+        }
+    };
+
+    template class BtreeCursorImpl<V0>;
+    template class BtreeCursorImpl<V1>;
+
+    /*
+    class BtreeCursorV1 : public BtreeCursor { 
+    public:
+        typedef BucketBasics<V1>::KeyNode KeyNode;
+        typedef V1::Key Key;
+
+        BtreeCursorV1(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
+          BtreeCursor(a,b,c,d,e,f,g) { }
+        BtreeCursorV1(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction) : 
+          BtreeCursor(_d,_idxNo,_id,_bounds,_direction) 
+        { 
+            pair< DiskLoc, int > noBestParent;
+            indexDetails.head.btree<V1>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
+            skipAndCheck();
+            dassert( _dups.size() == 0 );
+        }
+
+        virtual DiskLoc currLoc() { 
+            if( bucket.isNull() ) return DiskLoc();
+            return currKeyNode().recordLoc;
+        }
+
+        virtual BSONObj currKey() const { 
+            assert( !bucket.isNull() );
+            return bucket.btree<V1>()->keyNode(keyOfs).key.toBson();
+        }
+
+    protected:
+        virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
+            thisLoc.btree<V1>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
+        }
+        virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
+            return thisLoc.btree<V1>()->advance(thisLoc, keyOfs, direction, caller);
+        }
+        virtual void _audit() {
+            if ( otherTraceLevel >= 200 ) {
+                out() << "BtreeCursor() qtl>200.  validating entire index." << endl;
+                indexDetails.head.btree<V1>()->fullValidate(indexDetails.head, _order);
+            }
+            else {
+                out() << "BtreeCursor(). dumping head bucket" << endl;
+                indexDetails.head.btree<V1>()->dump();
+            }
+        }
+        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc);
+        virtual const _KeyNode& keyNode(int keyOfs) { 
+            return bucket.btree<V1>()->k(keyOfs);
+        }
+
+    private:
+        const KeyNode currKeyNode() const {
+            assert( !bucket.isNull() );
+            const BtreeBucket<V1> *b = bucket.btree<V1>();
+            return b->keyNode(keyOfs);
+        }
+    };*/
+
+    BtreeCursor* BtreeCursor::make(
+        NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
+        const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction) 
+    { 
+        int v = _id.version();
+        BtreeCursor *c = 0;
+        if( v == 1 ) {
+            c = new BtreeCursorImpl<V1>(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
+        }
+        else if( v == 0 ) {
+            c = new BtreeCursorImpl<V0>(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
+        }
+        else {
+            uasserted(14800, str::stream() << "unsupported index version " << v);
+        }
+        c->init();
+        dassert( c->_dups.size() == 0 );
+        return c;
+    }
+
+    BtreeCursor* BtreeCursor::make(
+        NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
+        const shared_ptr< FieldRangeVector > &_bounds, int _direction )
+    {
+        int v = _id.version();
+        if( v == 1 )
+            return new BtreeCursorImpl<V1>(_d,_idxNo,_id,_bounds,_direction);
+        if( v == 0 )
+            return new BtreeCursorImpl<V0>(_d,_idxNo,_id,_bounds,_direction);
+        uasserted(14801, str::stream() << "unsupported index version " << v);
+        return 0;
+    }
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id,
                               const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
@@ -41,8 +197,6 @@ namespace mongo {
         _independentFieldRanges( false ),
         _nscanned( 0 ) {
         audit();
-        init();
-        dassert( _dups.size() == 0 );
     }
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction )
@@ -55,7 +209,7 @@ namespace mongo {
         _ordering( Ordering::make( _order ) ),
         _direction( _direction ),
         _bounds( ( assert( _bounds.get() ), _bounds ) ),
-        _boundsIterator( new FieldRangeVector::Iterator( *_bounds  ) ),
+        _boundsIterator( new FieldRangeVectorIterator( *_bounds  ) ),
         _spec( _id.getSpec() ),
         _independentFieldRanges( true ),
         _nscanned( 0 ) {
@@ -64,26 +218,17 @@ namespace mongo {
         startKey = _bounds->startKey();
         _boundsIterator->advance( startKey ); // handles initialization
         _boundsIterator->prepDive();
-        pair< DiskLoc, int > noBestParent;
         bucket = indexDetails.head;
         keyOfs = 0;
-        indexDetails.head.btree()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
-        skipAndCheck();
-        dassert( _dups.size() == 0 );
     }
 
+    /** Properly destroy forward declared class members. */
+    BtreeCursor::~BtreeCursor() {}
+    
     void BtreeCursor::audit() {
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
-
         if ( otherTraceLevel >= 12 ) {
-            if ( otherTraceLevel >= 200 ) {
-                out() << "::BtreeCursor() qtl>200.  validating entire index." << endl;
-                indexDetails.head.btree()->fullValidate(indexDetails.head, _order);
-            }
-            else {
-                out() << "BTreeCursor(). dumping head bucket" << endl;
-                indexDetails.head.btree()->dump();
-            }
+            _audit();
         }
     }
 
@@ -92,9 +237,7 @@ namespace mongo {
             startKey = _spec.getType()->fixKey( startKey );
             endKey = _spec.getType()->fixKey( endKey );
         }
-        bool found;
-        bucket = indexDetails.head.btree()->
-                 locate(indexDetails, indexDetails.head, startKey, _ordering, keyOfs, found, _direction > 0 ? minDiskLoc : maxDiskLoc, _direction);
+        bucket = _locate(startKey, _direction > 0 ? minDiskLoc : maxDiskLoc);
         if ( ok() ) {
             _nscanned = 1;
         }
@@ -119,7 +262,7 @@ namespace mongo {
         if ( !ok() ) {
             return false;
         }
-        int ret = _boundsIterator->advance( currKeyNode().key );
+        int ret = _boundsIterator->advance( currKey() );
         if ( ret == -2 ) {
             bucket = DiskLoc();
             return false;
@@ -129,7 +272,7 @@ namespace mongo {
             return false;
         }
         ++_nscanned;
-        advanceTo( currKeyNode().key, ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
+        advanceTo( currKey(), ret, _boundsIterator->after(), _boundsIterator->cmp(), _boundsIterator->inc() );
         return true;
     }
 
@@ -139,11 +282,10 @@ namespace mongo {
         while ( 1 ) {
             if ( !ok() )
                 break;
-            const BtreeBucket *b = bucket.btree();
-            const _KeyNode& kn = b->k(keyOfs);
+            const _KeyNode& kn = keyNode(keyOfs);
             if ( kn.isUsed() )
                 break;
-            bucket = b->advance(bucket, keyOfs, _direction, "skipUnusedKeys");
+            bucket = _advance(bucket, keyOfs, _direction, "skipUnusedKeys");
             u++;
             //don't include unused keys in nscanned
             //++_nscanned;
@@ -176,7 +318,7 @@ namespace mongo {
     }
 
     void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive) {
-        bucket.btree()->advanceTo( bucket, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, _ordering, _direction );
+        _advanceTo( bucket, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, _ordering, _direction );
     }
 
     bool BtreeCursor::advance() {
@@ -184,7 +326,7 @@ namespace mongo {
         if ( bucket.isNull() )
             return false;
 
-        bucket = bucket.btree()->advance(bucket, keyOfs, _direction, "BtreeCursor::advance");
+        bucket = _advance(bucket, keyOfs, _direction, "BtreeCursor::advance");
 
         if ( !_independentFieldRanges ) {
             skipUnusedKeys( false );
@@ -201,9 +343,9 @@ namespace mongo {
 
     void BtreeCursor::noteLocation() {
         if ( !eof() ) {
-            BSONObj o = bucket.btree()->keyAt(keyOfs).copy();
+            BSONObj o = currKey().getOwned();
             keyAtKeyOfs = o;
-            locAtKeyOfs = bucket.btree()->k(keyOfs).recordLoc;
+            locAtKeyOfs = currLoc();
         }
     }
 
@@ -222,18 +364,18 @@ namespace mongo {
 
         _multikey = d->isMultikey(idxNo);
 
-        if ( keyOfs >= 0 ) {
-            const BtreeBucket *b = bucket.btree();
+        BSONObj _keyAtKeyOfs(keyAtKeyOfs);
 
+        if ( keyOfs >= 0 ) {
             assert( !keyAtKeyOfs.isEmpty() );
 
             // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
             // which is possible as keys may have been deleted.
             int x = 0;
             while( 1 ) {
-                if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-                        b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                    if ( !b->k(keyOfs).isUsed() ) {
+                if( currKey().woEqual(keyAtKeyOfs) && currLoc() == locAtKeyOfs ) {
+
+                    if ( keyNode(keyOfs).isUsed() ) {
                         /* we were deleted but still exist as an unused
                         marker key. advance.
                         */
@@ -255,15 +397,29 @@ namespace mongo {
             valid and we must refind where we left off (which is expensive)
         */
 
-        bool found;
-
         /* TODO: Switch to keep indexdetails and do idx.head! */
-        bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, _ordering, keyOfs, found, locAtKeyOfs, _direction);
-        RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
+        bucket = _locate(_keyAtKeyOfs, locAtKeyOfs);
+        RARELY log() << "key seems to have moved in the index, refinding. " << bucket.toString() << endl;
         if ( ! bucket.isNull() )
             skipUnusedKeys( false );
 
     }
+    
+    string BtreeCursor::toString() {
+        string s = string("BtreeCursor ") + indexDetails.indexName();
+        if ( _direction < 0 ) s += " reverse";
+        if ( _bounds.get() && _bounds->size() > 1 ) s += " multi";
+        return s;
+    }
+    
+    BSONObj BtreeCursor::prettyIndexBounds() const {
+        if ( !_independentFieldRanges ) {
+            return BSON( "start" << prettyKey( startKey ) << "end" << prettyKey( endKey ) );
+        }
+        else {
+            return _bounds->obj();
+        }
+    }    
 
     /* ----------------------------------------------------------------------------- */
 

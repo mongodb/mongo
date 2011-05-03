@@ -21,9 +21,11 @@
 #include "mutex.h"
 #include "../time_support.h"
 
-// this requires Vista+ to work
+// this requires newer windows versions
 // it works better than sharable_mutex under high contention
+#if defined(_WIN64)
 //#define MONGO_USE_SRW_ON_WINDOWS 1
+#endif
 
 #if !defined(MONGO_USE_SRW_ON_WINDOWS)
 
@@ -55,44 +57,52 @@ namespace mongo {
 
 #if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
-    class RWLock {
+    class RWLock : boost::noncopyable {
     public:
-        RWLock(const char *, int lowPriorityWaitMS=0 ) { _lowPriorityWaitMS=lowPriorityWaitMS; InitializeSRWLock(&_lock); }
+        RWLock(const char *, int lowPriorityWaitMS=0 ) : _lowPriorityWaitMS(lowPriorityWaitMS)
+          { InitializeSRWLock(&_lock); }
         ~RWLock() { }
+        const char * implType() const { return "WINSRW"; }
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         void lock()          { AcquireSRWLockExclusive(&_lock); }
         void unlock()        { ReleaseSRWLockExclusive(&_lock); }
         void lock_shared()   { AcquireSRWLockShared(&_lock); }
         void unlock_shared() { ReleaseSRWLockShared(&_lock); }
         bool lock_shared_try( int millis ) {
+            if( TryAcquireSRWLockShared(&_lock) )
+                return true;
+            if( millis == 0 )
+                return false;
             unsigned long long end = curTimeMicros64() + millis*1000;
             while( 1 ) {
+                Sleep(1);
                 if( TryAcquireSRWLockShared(&_lock) )
                     return true;
                 if( curTimeMicros64() >= end )
                     break;
-                Sleep(1);
             }
             return false;
         }
         bool lock_try( int millis = 0 ) {
+            if( TryAcquireSRWLockExclusive(&_lock) ) // quick check to optimistically avoid calling curTimeMicros64
+                return true;
+            if( millis == 0 )
+                return false;
             unsigned long long end = curTimeMicros64() + millis*1000;
-            while( 1 ) {
+            do {
+                Sleep(1);
                 if( TryAcquireSRWLockExclusive(&_lock) )
                     return true;
-                if( curTimeMicros64() >= end )
-                    break;
-                Sleep(1);
-            }
+            } while( curTimeMicros64() < end );
             return false;
         }
     private:
         SRWLOCK _lock;
-        int _lowPriorityWaitMS();
+        const int _lowPriorityWaitMS;
     };
 
 #elif defined(BOOST_RWLOCK)
-    class RWLock {
+    class RWLock : boost::noncopyable {
         shared_mutex _m;
         int _lowPriorityWaitMS;
     public:
@@ -102,6 +112,8 @@ namespace mongo {
 #else
         RWLock(const char *, int lowPriorityWait=0) : _lowPriorityWaitMS(lowPriorityWait) { }
 #endif
+
+        const char * implType() const { return "boost"; }
 
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
 
@@ -146,11 +158,10 @@ namespace mongo {
 
     };
 #else
-    class RWLock {
+    class RWLock : boost::noncopyable {
         pthread_rwlock_t _lock;
-        int _lowPriorityWaitMS;
-        
-        inline void check( int x ) {
+        int _lowPriorityWaitMS;    
+        inline static void check( int x ) {
             if( x == 0 )
                 return;
             log() << "pthread rwlock failed: " << x << endl;
@@ -160,21 +171,21 @@ namespace mongo {
     public:
 #if defined(_DEBUG)
         const char *_name;
-        RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name) {
-            check( pthread_rwlock_init( &_lock , 0 ) );
-        }
+        RWLock(const char *name, int lowPriorityWaitMS=0) : _lowPriorityWaitMS(lowPriorityWaitMS), _name(name)
 #else
-        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS ) {
+        RWLock(const char *, int lowPriorityWaitMS=0) : _lowPriorityWaitMS( lowPriorityWaitMS )
+#endif
+        {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
-#endif
         
-
         ~RWLock() {
             if ( ! StaticObserver::_destroyingStatics ) {
-                check( pthread_rwlock_destroy( &_lock ) );
+                wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
             }
         }
+
+        const char * implType() const { return "posix"; }
 
         int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
 
@@ -241,7 +252,7 @@ namespace mongo {
 #endif
 
     /** throws on failure to acquire in the specified time period. */
-    class rwlock_try_write {
+    class rwlock_try_write : boost::noncopyable {
     public:
         struct exception { };
         rwlock_try_write(RWLock& l, int millis = 0) : _l(l) {
@@ -262,7 +273,7 @@ namespace mongo {
     };
 
     /* scoped lock for RWLock */
-    class rwlock {
+    class rwlock : boost::noncopyable {
     public:
         /**
          * @param write acquire write lock if true sharable if false
@@ -283,12 +294,17 @@ namespace mongo {
                     
                     if ( lowPriorityWaitMS ) { 
                         bool got = false;
-                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {  // we divide by 2 since we sleep a bit
+                        for ( int i=0; i<lowPriorityWaitMS; i++ ) {
                             if ( _lock.lock_try(0) ) {
                                 got = true;
                                 break;
                             }
-                            sleepmillis(1);
+                            
+                            int sleep = 1;
+                            if ( i > ( lowPriorityWaitMS / 20 ) )
+                                sleep = 10;
+                            sleepmillis(sleep);
+                            i += ( sleep - 1 );
                         }
                         if ( ! got ) {
                             log() << "couldn't get lazy rwlock" << endl;
@@ -317,34 +333,61 @@ namespace mongo {
     };
 
     /** recursive on shared locks is ok for this implementation */
-    class RWLockRecursive {
+    class RWLockRecursive : boost::noncopyable {
         ThreadLocalValue<int> _state;
         RWLock _lk;
         friend class Exclusive;
     public:
         RWLockRecursive(const char *name, int lpwait) : _lk(name, lpwait) { }
 
-        class Exclusive { 
-            rwlock _scopedLock;
+        void assertExclusivelyLocked() {
+            dassert( _state.get() < 0 );
+        }
+
+        class Exclusive : boost::noncopyable { 
+            RWLockRecursive& _r;
+            rwlock *_scopedLock;
         public:
-            Exclusive(RWLockRecursive& r) : _scopedLock(r._lk, true) { }
+            Exclusive(RWLockRecursive& r) : _r(r), _scopedLock(0) {
+                int s = _r._state.get();
+                dassert( s <= 0 );
+                if( s == 0 )
+                    _scopedLock = new rwlock(_r._lk, true);
+                _r._state.set(s-1);
+            }
+            ~Exclusive() {
+                int s = _r._state.get();
+                DEV wassert( s < 0 ); // wassert: don't throw from destructors
+                _r._state.set(s+1);
+                delete _scopedLock;
+            }
         };
 
-        class Shared { 
+        class Shared : boost::noncopyable { 
             RWLockRecursive& _r;
+            bool _alreadyExclusive;
         public:
             Shared(RWLockRecursive& r) : _r(r) {
                 int s = _r._state.get();
-                if( s == 0 )
-                    _r._lk.lock_shared(); 
-                _r._state.set(++s);
+                _alreadyExclusive = s < 0;
+                if( !_alreadyExclusive ) {
+                    dassert( s >= 0 ); // -1 would mean exclusive
+                    if( s == 0 )
+                        _r._lk.lock_shared(); 
+                    _r._state.set(s+1);
+                }
             }
             ~Shared() {
-                int s = _r._state.get() - 1;
-                if( s == 0 ) 
-                    _r._lk.unlock_shared();
-                _r._state.set(s);
-                dassert( s >= 0 );
+                if( _alreadyExclusive ) {
+                    DEV wassert( _r._state.get() < 0 );
+                }
+                else {
+                    int s = _r._state.get() - 1;
+                    if( s == 0 ) 
+                        _r._lk.unlock_shared();
+                    _r._state.set(s);
+                    DEV wassert( s >= 0 );
+                }
             }
         };
     };

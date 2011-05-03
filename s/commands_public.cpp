@@ -1,6 +1,5 @@
 // s/commands_public.cpp
 
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -23,10 +22,12 @@
 #include "../client/connpool.h"
 #include "../client/parallel.h"
 #include "../db/commands.h"
-#include "../db/query.h"
 #include "../db/commands/pipeline.h"
 #include "../db/pipeline/document_source.h"
 #include "../db/pipeline/expression_context.h"
+#include "../db/query.h"
+#include "../db/queryutil.h"
+
 
 #include "config.h"
 #include "chunk.h"
@@ -1037,13 +1038,21 @@ namespace mongo {
         class ApplyOpsCmd : public PublicGridCommand {
         public:
             ApplyOpsCmd() : PublicGridCommand( "applyOps" ) {}
-
             virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
                 return false;
             }
-
         } applyOpsCmd;
+
+
+        class CompactCmd : public PublicGridCommand {
+        public:
+            CompactCmd() : PublicGridCommand( "compact" ) {}
+            virtual bool run(const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                errmsg = "compact not allowed through mongos";
+                return false;
+            }
+        } compactCmd;
 
 
 	/*

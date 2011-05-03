@@ -19,8 +19,8 @@
 #include "pch.h"
 #include "assert_util.h"
 #include "assert.h"
-//#include "file.h"
 #include <cmath>
+#include "time_support.h"
 using namespace std;
 
 #ifndef _WIN32
@@ -28,7 +28,7 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
-#include "../db/jsobj.h"
+//#include "../db/jsobj.h"
 
 namespace mongo {
 
@@ -47,6 +47,8 @@ namespace mongo {
             uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
             _append = append;
 
+            bool exists = boost::filesystem::exists(lp);
+
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
             if ( ! test ) {
@@ -59,6 +61,14 @@ namespace mongo {
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }
+
+            if (append && exists){
+                // two blank lines before and after
+                const string msg = "\n\n***** SERVER RESTARTED *****\n\n\n";
+                massert(14036, errnoWithPrefix("couldn't write to log file"),
+                        fwrite(msg.data(), 1, msg.size(), test) == msg.size());
+            }
+
             fclose( test );
 
             _path = lp;
@@ -74,7 +84,7 @@ namespace mongo {
 
             if ( _file ) {
 #ifdef _WIN32
-                cout << "log rotation doesn't work on windows" << endl;
+                cout << "log rotation net yet supported on windows" << endl;
                 return;
 #else
                 struct tm t;
@@ -125,4 +135,3 @@ namespace mongo {
     FILE* Logstream::logfile = stdout;
 
 }
-

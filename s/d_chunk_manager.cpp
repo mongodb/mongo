@@ -282,14 +282,14 @@ namespace mongo {
         //
         // TODO drop the uniqueness constraint and tigthen the check below so that only the minor portion of version changes
         if ( version <= _version ) {
-            uasserted( 13592 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
+            uasserted( 14039 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
         }
 
         // check that we have the exact chunk that'll be split and that the split point is valid
         _assertChunkExists( min , max );
         for ( vector<BSONObj>::const_iterator it = splitKeys.begin() ; it != splitKeys.end() ; ++it ) {
             if ( ! contains( min , max , *it ) ) {
-                uasserted( 13593 , str::stream() << "can split " << min << " -> " << max << " on " << *it );
+                uasserted( 14040 , str::stream() << "can split " << min << " -> " << max << " on " << *it );
             }
         }
 

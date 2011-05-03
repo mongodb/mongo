@@ -1,14 +1,21 @@
 MongoDB README
 
-DOCUMENTATION
-
-  http://www.mongodb.org/
+Welcome to MongoDB!
 
 COMPONENTS
 
   mongod - The database process.
   mongos - Sharding controller.
   mongo  - The database shell (uses interactive javascript).
+
+UTILITIES
+
+  mongodump         - MongoDB dump tool - for backups, snapshots, etc..
+  mongorestore      - MongoDB restore a dump
+  mongoexport       - Export a single collection to test (JSON, CSV)
+  mongoimport       - Import from JSON or CSV
+  mongofiles        - Utility for putting and getting files from MongoDB GridFS
+  mongostat         - Show performance statistics
 
 BUILDING
       
@@ -31,11 +38,20 @@ RUNNING
 
 DRIVERS
 
-  Client drivers for most programming languages are available at mongodb.org.
+  Client drivers for most programming languages are available at mongodb.org.  Use the 
+  shell ("mongo") for administrative tasks.
 
-NOTES
+DOCUMENTATION
 
-  Mongo uses memory mapped files.  If built as a 32 bit executable, you will
+  http://www.mongodb.org/
+
+MAIL LISTS AND IRC
+
+  http://www.mongodb.org/display/DOCS/Community
+
+32 BIT BUILD NOTES
+
+  MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
   not be able to work with large (multi-gigabyte) databases.  However, 32 bit
   builds work fine with small development databases.
 
@@ -48,4 +64,3 @@ LICENSE
   As an exception, the files in the client/, debian/, rpm/,
   utils/mongoutils, and all subdirectories thereof are made available under
   the terms of the Apache License, version 2.0.
-

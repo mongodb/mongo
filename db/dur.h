@@ -9,6 +9,9 @@ namespace mongo {
 
     class NamespaceDetails;
 
+    void mongoAbort(const char *msg);
+    void abort(); // not defined -- use mongoAbort() instead
+
     namespace dur {
 
         // a smaller limit is likely better on 32 bit
@@ -100,6 +103,9 @@ namespace mongo {
             */
             virtual bool commitIfNeeded() = 0;
 
+            /** @return true if time to commit but does NOT do a commit */
+            virtual bool aCommitIsNeeded() const = 0;
+
             /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
@@ -152,7 +158,7 @@ namespace mongo {
              */
             Record* writing(Record* r);
             /** Intentionally unimplemented method. BtreeBuckets are allocated in buffers larger than sizeof( BtreeBucket ). */
-            BtreeBucket* writing( BtreeBucket* );
+//            BtreeBucket* writing( BtreeBucket* );
             /** Intentionally unimplemented method. NamespaceDetails may be based on references to 'Extra' objects. */
             NamespaceDetails* writing( NamespaceDetails* );
 
@@ -174,6 +180,7 @@ namespace mongo {
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
             bool commitIfNeeded() { return false; }
+            bool aCommitIsNeeded() const { return false; }
             void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal() {}
         };
@@ -186,6 +193,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len);
             bool awaitCommit();
             bool commitNow();
+            bool aCommitIsNeeded() const;
             bool commitIfNeeded();
             void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal();

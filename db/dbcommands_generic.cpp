@@ -44,6 +44,7 @@
 #include "stats/counters.h"
 #include "background.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
 
 namespace mongo {
 
@@ -59,7 +60,7 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
-            result << "versionArray" << versionArray();
+            result << "versionArray" << versionArray;
             result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             result.appendBool( "debug" , debug );
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
@@ -117,6 +118,11 @@ namespace mongo {
         }
     } cmdGet;
 
+    // dev - experimental. so only in set command for now.  may go away or change
+    namespace dur { 
+        int groupCommitIntervalMs = 100;
+    }
+
     class CmdSet : public Command {
     public:
         CmdSet() : Command( "setParameter" ) { }
@@ -124,37 +130,56 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
-            help << "set administrative option(s)\nexample:\n";
-            help << "{ setParameter:1, notablescan:true }\n";
+            help << "set administrative option(s)\n";
+            help << "{ setParameter:1, <param>:<value> }\n";
             help << "supported so far:\n";
             help << "  notablescan\n";
             help << "  logLevel\n";
             help << "  quiet\n";
+            help << "  syncdelay\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
+            if( cmdObj.hasElement("groupCommitIntervalMs") ) { 
+                if( !cmdLine.dur ) { 
+                    errmsg = "journaling is off";
+                    return false;
+                }
+                int x = (int) cmdObj["groupCommitIntervalMs"].Number();
+                assert( x > 0 && x < 500 );
+                dur::groupCommitIntervalMs = x;
+                log() << "groupCommitIntervalMs " << x << endl;
+                s++;
+            }
             if( cmdObj.hasElement("notablescan") ) {
-                result.append("was", cmdLine.noTableScan);
+                assert( !cmdLine.isMongos() );
+                if( s == 0 )
+                    result.append("was", cmdLine.noTableScan);
                 cmdLine.noTableScan = cmdObj["notablescan"].Bool();
                 s++;
             }
             if( cmdObj.hasElement("quiet") ) {
-                result.append("was", cmdLine.quiet );
+                if( s == 0 )
+                    result.append("was", cmdLine.quiet );
                 cmdLine.quiet = cmdObj["quiet"].Bool();
                 s++;
             }
             if( cmdObj.hasElement("syncdelay") ) {
-                result.append("was", cmdLine.syncdelay );
+                assert( !cmdLine.isMongos() );
+                if( s == 0 )
+                    result.append("was", cmdLine.syncdelay );
                 cmdLine.syncdelay = cmdObj["syncdelay"].Number();
                 s++;
             }
             if( cmdObj.hasElement( "logLevel" ) ) {
-                result.append("was", logLevel );
+                if( s == 0 )
+                    result.append("was", logLevel );
                 logLevel = cmdObj["logLevel"].numberInt();
                 s++;
             }
             if( cmdObj.hasElement( "replApplyBatchSize" ) ) {
-                result.append("was", replApplyBatchSize );
+                if( s == 0 )
+                    result.append("was", replApplyBatchSize );
                 BSONElement e = cmdObj["replApplyBatchSize"];
                 ParameterValidator * v = ParameterValidator::get( e.fieldName() );
                 assert( v );
@@ -165,7 +190,7 @@ namespace mongo {
             }
 
             if( s == 0 ) {
-                errmsg = "no option found to set, use '*' to get all ";
+                errmsg = "no option found to set, use help:true to see options ";
                 return false;
             }
 
@@ -319,5 +344,51 @@ namespace mongo {
         }
     } availableQueryOptionsCmd;
 
+
+    class GetLogCmd : public Command {
+    public:
+        GetLogCmd() : Command( "getLog" ){}
+
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool requiresAuth() { return false; }
+        virtual bool adminOnly() const { return true; }
+
+        virtual void help( stringstream& help ) const {
+            help << "{ getLog : '*' }  OR { getLog : 'global' }";
+        }
+
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            string p = cmdObj.firstElement().String();
+            if ( p == "*" ) {
+                vector<string> names;
+                RamLog::getNames( names );
+
+                BSONArrayBuilder arr;
+                for ( unsigned i=0; i<names.size(); i++ ) {
+                    arr.append( names[i] );
+                }
+                
+                result.appendArray( "names" , arr.arr() );
+            }
+            else {
+                RamLog* rl = RamLog::get( p );
+                if ( ! rl ) {
+                    errmsg = str::stream() << "no RamLog named: " << p;
+                    return false;
+                }
+                
+                vector<const char*> lines;
+                rl->get( lines );
+                
+                BSONArrayBuilder arr( result.subarrayStart( "log" ) );
+                for ( unsigned i=0; i<lines.size(); i++ )
+                    arr.append( lines[i] );
+                arr.done();
+            }
+            return true;
+        }
+
+    } getLogCmd;
 
 }

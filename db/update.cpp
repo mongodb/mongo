@@ -926,7 +926,7 @@ namespace mongo {
                 return;
             }
             _nscanned = _c->nscanned();
-            if ( matcher()->matches(_c->currKey(), _c->currLoc(), &_details ) ) {
+            if ( matcher()->matchesCurrent(_c.get(), &_details ) ) {
                 setComplete();
                 return;
             }
@@ -966,8 +966,8 @@ namespace mongo {
         DiskLoc loc;
         {
             IndexDetails& i = d->idx(idIdxNo);
-            BSONObj key = i.getKeyFromQuery( patternOrig );
-            loc = i.head.btree()->findSingle(i, i.head, key);
+            BSONObj key = i.getKeyFromQuery( patternOrig );            
+            loc = i.idxInterface().findSingle(i, i.head, key);
             if( loc.isNull() ) {
                 // no upsert support in _updateById yet, so we are done.
                 return UpdateResult(0, 0, 0);
@@ -992,7 +992,7 @@ namespace mongo {
                 BSONObj newObj = mss->createNewFromMods();
                 checkTooLarge(newObj);
                 assert(nsdt);
-                DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
             }
 
             if ( logop ) {
@@ -1082,7 +1082,7 @@ namespace mongo {
             bool atomic = c->matcher()->docMatcher().atomic();
 
             // May have already matched in UpdateOp, but do again to get details set correctly
-            if ( ! c->matcher()->matches( c->currKey(), c->currLoc(), &details ) ) {
+            if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
                 c->advance();
 
                 if ( nscanned % 256 == 0 && ! atomic ) {

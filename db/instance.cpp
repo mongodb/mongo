@@ -220,8 +220,17 @@ namespace mongo {
         return ok;
     }
 
+    void (*reportEventToSystem)(const char *msg) = 0;
+
+    void mongoAbort(const char *msg) { 
+        if( reportEventToSystem ) 
+            reportEventToSystem(msg);
+        rawOut(msg);
+        ::abort();
+    }
+
     // Returns false when request includes 'end'
-    void assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -268,7 +277,7 @@ namespace mongo {
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
-        currentOp.reset(client,op);
+        currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
@@ -652,7 +661,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , _clientHost );
         assert( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
@@ -664,7 +673,7 @@ namespace mongo {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse );
+        assembleResponse( toSend, dbResponse , _clientHost );
         getDur().commitIfNeeded();
     }
 
@@ -681,6 +690,8 @@ namespace mongo {
     void DBDirectClient::killCursor( long long id ) {
         ClientCursor::erase( id );
     }
+
+    HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
 
     unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
         readlock lk( ns );
@@ -753,7 +764,7 @@ namespace mongo {
                     }
                     if( --n <= 0 ) {
                         log() << "shutdown: couldn't acquire write lock, aborting" << endl;
-                        abort();
+                        mongoAbort("couldn't acquire write lock");
                     }
                     log() << "shutdown: waiting for write lock..." << endl;
                 }
@@ -764,7 +775,7 @@ namespace mongo {
         log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
-        rawOut( ss3.str() );
+        log() << ss3.str() << endl;
 
         if( cmdLine.dur ) {
             dur::journalCleanup(true);
@@ -787,6 +798,15 @@ namespace mongo {
 #endif
         }
 #endif
+    }
+
+    void exitCleanly( ExitCode code ) {
+        killCurrentOp.killAll();
+        {
+            dblock lk;
+            log() << "now exiting" << endl;
+            dbexit( code );
+        }
     }
 
     /* not using log() herein in case we are already locked */
@@ -850,7 +870,7 @@ namespace mongo {
 #endif
     }
 
-    void acquirePathLock() {
+    void acquirePathLock(bool doingRepair) {
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
         bool oldFile = false;
@@ -870,13 +890,15 @@ namespace mongo {
             FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
                 NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
                 (LPSTR)&msg, 0, NULL);
-            uasserted( 13627 , msg );
+            string m = msg;
+            str::stripTrailing(m, "\r\n");
+            uasserted( 13627 , str::stream() << "Unable to create/open lock file: " << name << ' ' << m << " Is a mongod instance already running?" );
         }
         lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
 #else
         lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
         if( lockFile <= 0 ) {
-            uasserted( 10309 , str::stream() << "Unable to create / open lock file for lockfilepath: " << name << ' ' << errnoWithDescription());
+            uasserted( 10309 , str::stream() << "Unable to create/open lock file: " << name << ' ' << errnoWithDescription() << " Is a mongod instance already running?" );
         }
         if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
             close ( lockFile );
@@ -916,7 +938,7 @@ namespace mongo {
                 }
             }
             else {
-                if (!dur::haveJournalFiles()) {
+                if (!dur::haveJournalFiles() && !doingRepair) {
                     errmsg = str::stream()
                              << "************** \n"
                              << "old lock file: " << name << ".  probably means unclean shutdown\n"
@@ -959,17 +981,17 @@ namespace mongo {
 #endif
     }
 #else
-    void acquirePathLock() {
+    void acquirePathLock(bool) {
         // TODO - this is very bad that the code above not running here.
 
         // Not related to lock file, but this is where we handle unclean shutdown
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
-            cout << "Error: journal files are present in journal directory, yet starting without --dur enabled." << endl;
+            cout << "Error: journal files are present in journal directory, yet starting without --journal enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
             cout << "Alternatively (not recommended), you can backup everything, then delete the journal files, and run --repair" << endl;
             cout << "**************" << endl;
-            uasserted(13618, "can't start without --dur enabled when journal/ files are present");
+            uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
 #endif

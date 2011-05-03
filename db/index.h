@@ -25,6 +25,21 @@
 
 namespace mongo {
 
+    class IndexInterface {
+    protected:
+        virtual ~IndexInterface() { }
+    public:
+        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
+        virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
+        virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
+        virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
+                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
+                      IndexDetails& idx, bool toplevel = true) const = 0;
+        virtual DiskLoc addBucket(const IndexDetails&) = 0;
+        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, 
+                                   DiskLoc self, const Ordering& ordering) = 0;
+    };
+
     /* Details about a particular index. There is one of these effectively for each object in
        system.namespaces (although this also includes the head pointer, which is not in that
        collection).
@@ -45,7 +60,7 @@ namespace mongo {
         /* Location of index info object. Format:
 
              { name:"nameofindex", ns:"parentnsname", key: {keypattobject}
-               [, unique: <bool>, background: <bool>]
+               [, unique: <bool>, background: <bool>, v:<version>]
              }
 
            This object is in the system.indexes collection.  Note that since we
@@ -86,7 +101,6 @@ namespace mongo {
 
         /* true if the specified key is in the index */
         bool hasKey(const BSONObj& key);
-        bool wouldCreateDup(const BSONObj& key, DiskLoc self);
 
         // returns name of this index's storage area
         // database.table.$index
@@ -126,6 +140,16 @@ namespace mongo {
             return io.getStringField("ns");
         }
 
+        int version() const {
+            BSONElement e = info.obj()["v"];
+            if( e.type() == NumberInt ) 
+                return e._numberInt();
+            // should normally be an int.  this is for backward compatibility
+            int v = e.numberInt();
+            uassert(14802, "index v field should be Integer type", v == 0);
+            return v;
+        }
+
         bool unique() const {
             BSONObj io = info.obj();
             return io["unique"].trueValue() ||
@@ -148,6 +172,21 @@ namespace mongo {
         string toString() const {
             return info.obj().toString();
         }
+
+        /** @return true if supported.  supported means we can use the index, including adding new keys.
+                    it may not mean we can build the index version in question: we may not maintain building 
+                    of indexes in old formats in the future.
+        */
+        static bool isASupportedIndexVersionNumber(int v) { return v == 0 || v == 1; }
+
+        IndexInterface& idxInterface() { 
+            int v = version();
+            dassert( isASupportedIndexVersionNumber(v) );
+            return *iis[v&1];
+        }
+
+    private:
+        static IndexInterface *iis[];
     };
 
     struct IndexChanges { /*on an update*/
@@ -162,10 +201,8 @@ namespace mongo {
         void dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
             if( added.empty() || !idx.unique() )
                 return;
-            for( vector<BSONObj*>::iterator i = added.begin(); i != added.end(); i++ ) {
-                bool dup = idx.wouldCreateDup(**i, curObjLoc);
-                uassert( 11001 , "E11001 duplicate key on update", !dup);
-            }
+            const Ordering ordering = Ordering::make(idx.keyPattern());
+            idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering); // "E11001 duplicate key on update"
         }
     };
 

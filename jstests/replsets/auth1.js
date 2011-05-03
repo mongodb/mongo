@@ -129,7 +129,7 @@ master.runCommand({getlasterror:1, w:3, wtimeout:60000});
 
 
 print("resync");
-rs.restart(0);
+rs.restart(0, {"keyFile" : path+"key1"});
 
 
 print("add some more data 2");
@@ -159,7 +159,7 @@ master.getSisterDB("admin").auth("foo", "bar");
 
 
 print("shouldn't ever sync");
-for (var i = 0; i<30; i++) {
+for (var i = 0; i<10; i++) {
     print("iteration: " +i);
     var results = master.adminCommand({replSetGetStatus:1});
     printjson(results);
@@ -182,3 +182,15 @@ wait(function() {
         return results.members[3].state == 2;
     });
 
+print("make sure it has the config, too");
+assert.soon(function() {
+        for (var i in rs.nodes) {
+            rs.nodes[i].setSlaveOk();
+            rs.nodes[i].getDB("admin").auth("foo","bar");
+            config = rs.nodes[i].getDB("local").system.replset.findOne();
+            if (config.version != 2) {
+                return false;
+            }
+        }
+        return true;
+    });

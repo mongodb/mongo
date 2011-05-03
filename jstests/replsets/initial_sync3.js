@@ -75,13 +75,6 @@ catch(e) {
     print("trying to reconfigure: "+e);
 }
 
-master = rs2.getMaster();
-config = master.getDB("local").system.replset.findOne();
-
-assert(typeof(config.members[0].initialSync) == "object");
-assert.eq(config.members[0].initialSync.state, 2);
-assert.eq(config.members[1].initialSync.state, 1);
-
 rs2.stopSet();
 
 print("initialSync3 success!");

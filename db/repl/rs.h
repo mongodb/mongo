@@ -28,6 +28,18 @@
 #include "rs_member.h"
 #include "rs_config.h"
 
+/**
+ * Order of Events
+ *
+ * On startup, if the --replSet option is present, startReplSets is called.
+ * startReplSets forks off a new thread for replica set activities.  It creates
+ * the global theReplSet variable and calls go() on it.
+ *
+ * theReplSet's constructor changes the replica set's state to RS_STARTUP,
+ * starts the replica set manager, and loads the config (if the replica set
+ * has been initialized).
+ */
+
 namespace mongo {
 
     struct HowToFixUp;
@@ -77,6 +89,7 @@ namespace mongo {
         const Member* findOtherPrimary(bool& two);
 
         void noteARemoteIsPrimary(const Member *);
+        void checkElectableSet();
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);
@@ -272,7 +285,16 @@ namespace mongo {
         void assumePrimary();
         void loadLastOpTimeWritten();
         void changeState(MemberState s);
+        
+        /**
+         * Find the closest member (using ping time) with a higher latest optime.
+         */
         const Member* getMemberToSyncTo();
+        Member* _currentSyncTarget;
+
+        // set of electable members' _ids
+        set<unsigned> _electableSet;
+        mutable mongo::mutex _elock; // protects _electableSet
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
@@ -280,8 +302,54 @@ namespace mongo {
         time_t _hbmsgTime; // when it was logged
     public:
         void sethbmsg(string s, int logLevel = 0);
+
+        /**
+         * Election with Priorities
+         *
+         * Each node (n) keeps a set of nodes that could be elected primary.
+         * Each node in this set:
+         *
+         *  1. can connect to a majority of the set
+         *  2. has a priority greater than 0
+         *  3. has an optime within 10 seconds of the most up-to-date node
+         *     that n can reach
+         *
+         * If a node fails to meet one or more of these criteria, it is removed
+         * from the list.  This list is updated whenever the node receives a
+         * heartbeat.
+         *
+         * When a node sends an "am I freshest?" query, the node receiving the
+         * query checks their electable list to make sure that no one else is
+         * electable AND higher priority.  If this check passes, the node will
+         * return an "ok" response, if not, it will veto.
+         *
+         * If a node is primary and there is another node with higher priority
+         * on the electable list (i.e., it must be synced to within 10 seconds
+         * of the current primary), the node (or nodes) with connections to both
+         * the primary and the secondary with higher priority will issue
+         * replSetStepDown requests to the primary to allow the higher-priority
+         * node to take over.  
+         */
+        void addToElectable(const unsigned m) { scoped_lock lk(_elock); _electableSet.insert(m); }
+        void rmFromElectable(const unsigned m) { scoped_lock lk(_elock); _electableSet.erase(m); }
+        bool iAmElectable() { scoped_lock lk(_elock); return _electableSet.find(_self->id()) != _electableSet.end(); }
+        bool isElectable(const unsigned id) { scoped_lock lk(_elock); return _electableSet.find(id) != _electableSet.end(); }
+        Member* getMostElectable();
     protected:
-        bool initFromConfig(ReplSetConfig& c, bool reconf=false); // true if ok; throws if config really bad; false if config doesn't include self
+        /**
+         * Load a new config as the replica set's main config.
+         *
+         * If there is a "simple" change (just adding a node), this shortcuts
+         * the config. Returns true if the config was changed.  Returns false
+         * if the config doesn't include a this node.  Throws an exception if
+         * something goes very wrong.
+         *
+         * Behavior to note:
+         *  - locks this
+         *  - intentionally leaks the old _cfg and any old _members (if the
+         *    change isn't strictly additive)
+         */
+        bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
@@ -303,16 +371,22 @@ namespace mongo {
         const vector<HostAndPort> *_seeds;
         ReplSetConfig *_cfg;
 
-        /** load our configuration from admin.replset.  try seed machines too.
-            @return true if ok; throws if config really bad; false if config doesn't include self
-        */
+        /**
+         * Finds the configuration with the highest version number and attempts
+         * load it.
+         */
         bool _loadConfigFinish(vector<ReplSetConfig>& v);
+        /**
+         * Gather all possible configs (from command line seeds, our own config
+         * doc, and any hosts listed therein) and try to initiate from the most
+         * recent config we find.
+         */
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
+        const ReplSetConfig::MemberCfg& myConfig() const { assert( _self ); return _self->config(); }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
-        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot(); }
+        bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
@@ -354,6 +428,7 @@ namespace mongo {
         bool _isStale(OplogReader& r, const string& hn);
     public:
         void syncThread();
+        const OpTime lastOtherOpTime() const;
     };
 
     class ReplSet : public ReplSetImpl {
@@ -435,6 +510,7 @@ namespace mongo {
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
         _config(*c), _h(h), _hbinfo(ord) {
+        assert(c);
         if( self )
             _hbinfo.health = 1.0;
     }

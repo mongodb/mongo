@@ -24,6 +24,7 @@
 #include "../util/unittest.h"
 #include "../util/file_allocator.h"
 #include "../util/background.h"
+#include "../util/text.h"
 #include "dbmessage.h"
 #include "instance.h"
 #include "clientcursor.h"
@@ -36,6 +37,8 @@
 #include "stats/snapshots.h"
 #include "../util/concurrency/task.h"
 #include "../util/version.h"
+#include "../util/ramlog.h"
+#include "../util/message_server.h"
 #include "client.h"
 #include "restapi.h"
 #include "dbwebserver.h"
@@ -49,6 +52,10 @@
 #endif
 
 namespace mongo {
+
+    namespace dur { 
+        extern unsigned long long DataLimitPerJournalFile;
+    }
 
     /* only off if --nocursors which is for debugging. */
     extern bool useCursors;
@@ -90,38 +97,6 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
-    void connThread( MessagingPort * p );
-
-    class OurListener : public Listener {
-    public:
-        OurListener(const string &ip, int p) : Listener(ip, p) { }
-        virtual void accepted(MessagingPort *mp) {
-
-            if ( ! connTicketHolder.tryAcquire() ) {
-                log() << "connection refused because too many open connections: " << connTicketHolder.used() << " of " << connTicketHolder.outof() << endl;
-                // TODO: would be nice if we notified them...
-                mp->shutdown();
-                delete mp;
-                return;
-            }
-
-            try {
-                boost::thread thr(boost::bind(&connThread,mp));
-            }
-            catch ( boost::thread_resource_error& ) {
-                connTicketHolder.release();
-                log() << "can't create new thread, closing connection" << endl;
-                mp->shutdown();
-                delete mp;
-            }
-            catch ( ... ) {
-                connTicketHolder.release();
-                log() << "unkonwn exception starting connThread" << endl;
-                mp->shutdown();
-                delete mp;
-            }
-        }
-    };
 
     /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
 // QueryOption_Exhaust
@@ -163,21 +138,6 @@ namespace mongo {
     };
 #endif
 
-    void listen(int port) {
-        //testTheDb();
-        log() << "waiting for connections on port " << port << endl;
-        OurListener l(cmdLine.bind_ip, port);
-        l.setAsTimeTracker();
-        startReplication();
-        if ( !noHttpInterface )
-            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
-
-#if(TESTEXHAUST)
-        boost::thread thr(testExhaust);
-#endif
-        l.initAndListen();
-    }
-
     void sysRuntimeInfo() {
         out() << "sysinfo:\n";
 #if defined(_SC_PAGE_SIZE)
@@ -196,36 +156,15 @@ namespace mongo {
         sleepmicros( Client::recommendedYieldMicros() );
     }
 
-    /* we create one thread for each connection from an app server database.
-       app server will open a pool of threads.
-       todo: one day, asio...
-    */
-    void connThread( MessagingPort * inPort ) {
-        TicketHolderReleaser connTicketReleaser( &connTicketHolder );
+    class MyMessageHandler : public MessageHandler {
+    public:
+        virtual void connected( AbstractMessagingPort* p ) {
+            Client& c = Client::initThread("conn", p);
+            c.getAuthenticationInfo()->isLocalHost = p->remote().isLocalHost();
+        }
 
-        /* todo: move to Client object */
-        LastError *le = new LastError();
-        lastError.reset(le);
-
-        inPort->_logLevel = 1;
-        auto_ptr<MessagingPort> dbMsgPort( inPort );
-        Client& c = Client::initThread("conn", inPort);
-
-        try {
-
-            c.getAuthenticationInfo()->isLocalHost = dbMsgPort->farEnd.isLocalHost();
-
-            Message m;
-            while ( 1 ) {
-                inPort->clearCounters();
-
-                if ( !dbMsgPort->recv(m) ) {
-                    if( !cmdLine.quiet )
-                        log() << "end connection " << dbMsgPort->farEnd.toString() << endl;
-                    dbMsgPort->shutdown();
-                    break;
-                }
-sendmore:
+        virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
+            while ( true ) {
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
                     break;
@@ -234,10 +173,10 @@ sendmore:
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                assembleResponse( m, dbresponse, dbMsgPort->farEnd );
+                assembleResponse( m, dbresponse, port->remote() );
 
                 if ( dbresponse.response ) {
-                    dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
+                    port->reply(m, *dbresponse.response, dbresponse.responseTo);
                     if( dbresponse.exhaust ) {
                         MsgData *header = dbresponse.response->header();
                         QueryResult *qr = (QueryResult *) header;
@@ -259,45 +198,43 @@ sendmore:
                             b.decouple();
                             DEV log() << "exhaust=true sending more" << endl;
                             beNice();
-                            goto sendmore;
+                            continue; // this goes back to top loop
                         }
                     }
                 }
-
-                networkCounter.hit( inPort->getBytesIn() , inPort->getBytesOut() );
-
-                m.reset();
+                break;
             }
+        }
 
-        }
-        catch ( AssertionException& e ) {
-            log() << "AssertionException in connThread, closing client connection" << endl;
-            log() << ' ' << e.what() << endl;
-            dbMsgPort->shutdown();
-        }
-        catch ( SocketException& ) {
-            log() << "SocketException in connThread, closing client connection" << endl;
-            dbMsgPort->shutdown();
-        }
-        catch ( const ClockSkewException & ) {
-            exitCleanly( EXIT_CLOCK_SKEW );
-        }
-        catch ( std::exception &e ) {
-            error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
-        }
-        catch ( ... ) {
-            error() << "Uncaught exception, terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
-        }
-        
-        // thread ending...
-        {
+        virtual void disconnected( AbstractMessagingPort* p ) {
             Client * c = currentClient.get();
             if( c ) c->shutdown();
+            globalScriptEngine->threadDone();
         }
-        globalScriptEngine->threadDone();
+
+    };
+
+    void listen(int port) {
+        //testTheDb();
+        log() << "waiting for connections on port " << port << endl;
+
+        MessageServer::Options options;
+        options.port = port;
+        options.ipList = cmdLine.bind_ip;
+
+        MessageServer * server = createServer( options , new MyMessageHandler() );
+        server->setAsTimeTracker();
+
+        startReplication();
+        if ( !noHttpInterface )
+            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
+
+#if(TESTEXHAUST)
+        boost::thread thr(testExhaust);
+#endif
+        server->run();
     }
+
 
     bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
         static DBDirectClient db;
@@ -348,7 +285,9 @@ sendmore:
             if ( !h->isCurrentVersion() || forceRepair ) {
 
                 if( h->version <= 0 ) {
-                    uasserted(10000, str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version << " info: " << h->versionMinor << ' ' << h->fileLength);
+                    uasserted(14026, 
+                      str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version 
+							        << " info: " << h->versionMinor << ' ' << h->fileLength);
                 }
 
                 log() << "****" << endl;
@@ -468,6 +407,8 @@ sendmore:
 
         Client::initThread("initandlisten");
 
+        Logstream::get().addGlobalTee( new RamLog("global") );
+
         bool is32bit = sizeof(int*) == 4;
 
         {
@@ -480,7 +421,7 @@ sendmore:
             l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
-            l << ( is32bit ? " 32" : " 64" ) << "-bit " << endl;
+            l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log() << "_DEBUG build (which is slower)" << endl;
         show_warnings();
@@ -499,12 +440,12 @@ sendmore:
             uassert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
         }
 
-        acquirePathLock();
+        acquirePathLock(forceRepair);
         remove_all( dbpath + "/_tmp/" );
 
         FileAllocator::get()->start();
 
-        BOOST_CHECK_EXCEPTION( clearTmpFiles() );
+        MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
 
         _diaglog.init();
 
@@ -526,7 +467,7 @@ sendmore:
 
         repairDatabasesAndCheckVersion();
 
-        /* we didn't want to pre-open all fiels for the repair check above. for regular
+        /* we didn't want to pre-open all files for the repair check above. for regular
            operation we do for read/write lock concurrency reasons.
         */
         Database::_openAllFiles = true;
@@ -557,6 +498,10 @@ sendmore:
     void initAndListen(int listenPort) {
         try { 
             _initAndListen(listenPort); 
+        }
+        catch ( DBException &e ) {
+            log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
+            dbexit( EXIT_UNCAUGHT );
         }
         catch ( std::exception &e ) {
             log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
@@ -808,12 +753,9 @@ int main(int argc, char* argv[]) {
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
             if (!repairpath.size()) {
-                out() << "repairpath has to be non-zero" << endl;
+                out() << "repairpath is empty" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-        }
-        else {
-            repairpath = dbpath;
         }
         if (params.count("nocursors")) {
             useCursors = false;
@@ -839,6 +781,8 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
+            assert( dur::DataLimitPerJournalFile >= 128 * 1024 * 1024 );
+            dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
         }
         if (params.count("diaglog")) {
             int x = params["diaglog"].as<int>();
@@ -934,8 +878,13 @@ int main(int argc, char* argv[]) {
             if( params.count("configsvr") ) {
                 cmdLine.port = CmdLine::ConfigServerPort;
             }
-            if( params.count("shardsvr") )
+            if( params.count("shardsvr") ) {
+                if( params.count("configsvr") ) {
+                    log() << "can't do --shardsvr and --configsvr at the same time" << endl;
+                    dbexit( EXIT_BADOPTIONS );
+                }
                 cmdLine.port = CmdLine::ShardServerPort;
+            }
         }
         else {
             if ( cmdLine.port <= 0 || cmdLine.port > 65535 ) {
@@ -944,6 +893,7 @@ int main(int argc, char* argv[]) {
             }
         }
         if ( params.count("configsvr" ) ) {
+            cmdLine.configsvr = true;
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);
@@ -984,6 +934,10 @@ int main(int argc, char* argv[]) {
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );
         }
+
+        // needs to be after things like --configsvr parsing, thus here.
+        if( repairpath.empty() )
+            repairpath = dbpath;
 
         Module::configAll( params );
         dataFileSync.go();
@@ -1034,14 +988,6 @@ namespace mongo {
 
 #undef out
 
-    void exitCleanly( ExitCode code ) {
-        killCurrentOp.killAll();
-        {
-            dblock lk;
-            log() << "now exiting" << endl;
-            dbexit( code );
-        }
-    }
 
 #if !defined(_WIN32)
 
@@ -1112,7 +1058,7 @@ namespace mongo {
     void myterminate() {
         rawOut( "terminate() called, printing stack:" );
         printStackTrace();
-        abort();
+        ::abort();
     }
 
     void setupSignals_ignoreHelper( int signal ) {}
@@ -1181,19 +1127,63 @@ namespace mongo {
         }
     }
 
+    LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
+    ::HANDLE standardOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS *ExceptionInfo) { 
+        {
+            // given the severity of the event we write to console in addition to the --logFile
+            // (rawOut writes to the logfile, if a special one were specified)
+            DWORD written;
+            WriteFile(standardOut, "unhandled exception\n", 20, &written, 0);
+            FlushFileBuffers(standardOut);
+        }
+
+        DWORD ec = ExceptionInfo->ExceptionRecord->ExceptionCode;
+        if( ec == EXCEPTION_ACCESS_VIOLATION ) {
+            rawOut("access violation");
+        } 
+        else {
+            rawOut("unhandled exception");
+            char buf[64];
+            strcpy(buf, "ec=0x");
+            _ui64toa(ec, buf+5, 16);
+            rawOut(buf);
+        }
+        if( filtLast ) 
+            return filtLast(ExceptionInfo);
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // called by mongoAbort()
+    extern void (*reportEventToSystem)(const char *msg);
+    void reportEventToSystemImpl(const char *msg) { 
+        static ::HANDLE hEventLog = RegisterEventSource( NULL, TEXT("mongod") );
+        if( hEventLog ) { 
+            std::wstring s = toNativeString(msg);
+            LPCTSTR txt = s.c_str();
+            BOOL ok = ReportEvent(
+              hEventLog, EVENTLOG_ERROR_TYPE, 
+              0, 0, NULL,
+              1, 
+              0, 
+              &txt,
+              0);
+            wassert(ok);
+        }
+    }
+
     void myPurecallHandler() {
-        rawOut( "pure virtual method called, printing stack:" );
         printStackTrace();
-        abort();
+        mongoAbort("pure virtual");
     }
 
     void setupSignals( bool inFork ) {
-        if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
-            ;
-        else
-            massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
+        reportEventToSystem = reportEventToSystemImpl;
+        filtLast = SetUnhandledExceptionFilter(exceptionFilter);
+        massert(10297 , "Couldn't register Windows Ctrl-C handler", SetConsoleCtrlHandler((PHANDLER_ROUTINE) CtrlHandler, TRUE));
         _set_purecall_handler( myPurecallHandler );
     }
+
 #endif
 
 } // namespace mongo

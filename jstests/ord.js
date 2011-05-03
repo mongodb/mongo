@@ -28,6 +28,7 @@ for( i = 0; i < 90; ++i ) {
 // the index key {a:1}
 
 t.dropIndex( {a:1} );
+db.getLastError();
 
 // Dropping an index kills all cursors on the indexed namespace, not just those 
 // cursors using the dropped index.

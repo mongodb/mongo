@@ -74,10 +74,13 @@ namespace mongo {
         long long _elapsedTime;
 
         static const Listener* _timeTracker;
+
+        virtual bool useUnixSockets() const { return false; }
     };
 
     class AbstractMessagingPort : boost::noncopyable {
     public:
+        AbstractMessagingPort() : tag(0) {}
         virtual ~AbstractMessagingPort() { }
         virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
         virtual void reply(Message& received, Message& response) = 0;
@@ -86,7 +89,13 @@ namespace mongo {
         virtual unsigned remotePort() const = 0;
 
     private:
-        int _clientId;
+
+    public:
+        // TODO make this private with some helpers
+
+        /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
+        unsigned tag;
+
     };
 
     class MessagingPort : public AbstractMessagingPort {
@@ -159,9 +168,6 @@ namespace mongo {
         int _logLevel; // passed to log() when logging errors
 
         static void closeAllSockets(unsigned tagMask = 0xffffffff);
-
-        /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
-        unsigned tag;
 
         friend class PiggyBackData;
     };

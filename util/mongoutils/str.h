@@ -104,13 +104,13 @@ namespace mongoutils {
             return strchr(s.c_str(), x) != 0;
         }
 
-        /** @return everything befor the character x, else entire string */
+        /** @return everything before the character x, else entire string */
         inline string before(const string& s, char x) {
             const char *p = strchr(s.c_str(), x);
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
         }
 
-        /** @return everything befor the string x, else entire string */
+        /** @return everything before the string x, else entire string */
         inline string before(const string& s, const string& x) {
             const char *p = strstr(s.c_str(), x.c_str());
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;

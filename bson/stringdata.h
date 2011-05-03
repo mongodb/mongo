@@ -30,7 +30,7 @@ namespace mongo {
     // takes any of the two forms of strings above. Fundamentally, this class tries
     // go around the fact that string literals in C++ are char[N]'s.
     //
-    // Note that the object StringData wraps around must be alive while the StringDAta
+    // Note that the object StringData wraps around must be alive while the StringData
     // is.
 
     class StringData {

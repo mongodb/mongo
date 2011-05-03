@@ -118,7 +118,7 @@ namespace mongo {
 
 
     void IndexSpec::getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-        if ( _indexType.get() ) {
+        if ( _indexType.get() ) { //plugin (eg geo)
             _indexType->getKeys( obj , keys );
             return;
         }

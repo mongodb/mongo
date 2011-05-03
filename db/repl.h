@@ -31,7 +31,6 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "query.h"
-#include "queryoptimizer.h"
 #include "../client/dbclient.h"
 #include "../util/optime.h"
 #include "oplog.h"
@@ -86,7 +85,7 @@ namespace mongo {
     class ReplSource {
         auto_ptr<ThreadPool> tp;
 
-        bool resync(string db);
+        void resync(string db);
 
         /** @param alreadyLocked caller already put us in write lock if true */
         void sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked);
@@ -114,6 +113,14 @@ namespace mongo {
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
         unsigned _sleepAdviceTime;
 
+        /**
+         * If 'db' is a new database and its name would conflict with that of
+         * an existing database, synchronize these database names with the
+         * master.
+         * @return true iff an op with the specified ns may be applied.
+         */
+        bool handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db );
+        
     public:
         OplogReader oplogReader;
 
@@ -162,5 +169,21 @@ namespace mongo {
     bool anyReplEnabled();
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level = 0 );
 
+    /**
+     * Helper class used to set and query an ignore state for a named database.
+     * The ignore state will expire after a specified OpTime.
+     */
+    class DatabaseIgnorer {
+    public:
+        /** Indicate that operations for 'db' should be ignored until after 'futureOplogTime' */
+        void doIgnoreUntilAfter( const string &db, const OpTime &futureOplogTime );
+        /**
+         * Query ignore state of 'db'; if 'currentOplogTime' is after the ignore
+         * limit, the ignore state will be cleared.
+         */
+        bool ignoreAt( const string &db, const OpTime &currentOplogTime );
+    private:
+        map< string, OpTime > _ignores;
+    };
 
 } // namespace mongo

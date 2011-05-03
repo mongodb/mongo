@@ -128,7 +128,7 @@ namespace mongo {
     void wasserted(const char *msg, const char *file, unsigned line);
 
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
-       could cause, such as dupliate key, disk full, etc.
+        could cause, such as duplicate key, disk full, etc.
     */
     void uasserted(int msgid, const char *msg) MONGO_NORETURN;
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
@@ -207,10 +207,21 @@ namespace mongo {
         expression; \
     } catch ( const std::exception &e ) { \
         stringstream ss; \
-        ss << "caught boost exception: " << e.what();   \
-        msgasserted( 13294 , ss.str() );        \
+        ss << "caught boost exception: " << e.what() << ' ' << __FILE__ << ' ' << __LINE__; \
+        msgasserted( 13294 , ss.str() ); \
     } catch ( ... ) { \
-        massert( 10437 ,  "unknown boost failed" , false );   \
+        massert( 10437 ,  "unknown boost failed" , false ); \
+    }
+
+#define MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( expression, msg ) \
+    try { \
+        expression; \
+    } catch ( const std::exception &e ) { \
+        stringstream ss; \
+        ss << msg << " caught boost exception: " << e.what();   \
+        msgasserted( 14043 , ss.str() );        \
+    } catch ( ... ) { \
+        msgasserted( 14044 , string("unknown boost failed ") + msg );   \
     }
 
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD

@@ -70,7 +70,7 @@ namespace mongo {
         ideal to call close to the close, if the close is well before object destruction
     */
     void MongoFile::destroyed() {
-        RWLockRecursive::Exclusive lk(mmmutex);
+        mmmutex.assertExclusivelyLocked();
         mmfiles.erase(this);
         pathToFile.erase( filename() );
     }
@@ -87,8 +87,9 @@ namespace mongo {
         RWLockRecursive::Exclusive lk(mmmutex);
 
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-            (*i)->close();
+        set<MongoFile*> temp = mmfiles;
+        for ( set<MongoFile*>::iterator i = temp.begin(); i != temp.end(); i++ ) {
+            (*i)->close(); // close() now removes from mmfiles
             pm.hit();
         }
         message << "closeAllFiles() finished";

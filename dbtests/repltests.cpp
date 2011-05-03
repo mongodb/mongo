@@ -1012,7 +1012,43 @@ namespace ReplTests {
             ASSERT( !one( BSON( "_id" << 2 ) ).isEmpty() );
         }
     };
+    
+    class DatabaseIgnorerBasic {
+    public:
+        void run() {
+            DatabaseIgnorer d;
+            ASSERT( !d.ignoreAt( "a", OpTime( 4, 0 ) ) );
+            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 4, 0 ) ) );
+            ASSERT( !d.ignoreAt( "b", OpTime( 4, 0 ) ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 4, 10 ) ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 5, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", OpTime( 5, 1 ) ) );
+            // Ignore state is expired.
+            ASSERT( !d.ignoreAt( "a", OpTime( 4, 0 ) ) );
+        }
+    };
 
+    class DatabaseIgnorerUpdate {
+    public:
+        void run() {
+            DatabaseIgnorer d;
+            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
+            d.doIgnoreUntilAfter( "a", OpTime( 6, 0 ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 5, 5 ) ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 6, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", OpTime( 6, 1 ) ) );
+
+            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
+            d.doIgnoreUntilAfter( "a", OpTime( 6, 0 ) );
+            d.doIgnoreUntilAfter( "a", OpTime( 6, 0 ) );
+            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 5, 5 ) ) );
+            ASSERT( d.ignoreAt( "a", OpTime( 6, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", OpTime( 6, 1 ) ) );            
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "repl" ) {
@@ -1065,6 +1101,8 @@ namespace ReplTests {
             add< Idempotence::RenameOverwrite >();
             add< Idempotence::NoRename >();
             add< DeleteOpIsIdBased >();
+            add< DatabaseIgnorerBasic >();
+            add< DatabaseIgnorerUpdate >();
         }
     } myall;
 

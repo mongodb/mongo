@@ -78,7 +78,7 @@ namespace mongo {
     }
 
 
-    vector<SockAddr> ipToAddrs(const char* ips, int port) {
+    vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
         vector<SockAddr> out;
         if (*ips == '\0') {
             out.push_back(SockAddr("0.0.0.0", port)); // IPv4 all
@@ -86,7 +86,7 @@ namespace mongo {
             if (IPv6Enabled())
                 out.push_back(SockAddr("::", port)); // IPv6 all
 #ifndef _WIN32
-            if (!noUnixSocket)
+            if (useUnixSockets)
                 out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port)); // Unix socket
 #endif
             return out;
@@ -108,7 +108,7 @@ namespace mongo {
             out.push_back(sa);
 
 #ifndef _WIN32
-            if (!noUnixSocket && (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
+            if (useUnixSockets && (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
                 out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));
 #endif
         }
@@ -120,7 +120,7 @@ namespace mongo {
 
     void Listener::initAndListen() {
         checkTicketNumbers();
-        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port);
+        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port, (!noUnixSocket && useUnixSockets()));
         vector<int> socks;
         SOCKET maxfd = 0; // needed for select()
 
@@ -206,7 +206,6 @@ namespace mongo {
 #endif
                 continue;
             }
-            _elapsedTime += ret; // assume 1ms to grab connection. very rough
 
             if (ret < 0) {
                 int x = errno;
@@ -220,6 +219,12 @@ namespace mongo {
                     log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
                 return;
             }
+
+#if defined(__linux__)
+            _elapsedTime += max(ret, (int)(( 10000 - maxSelectTime.tv_usec ) / 1000));
+#else
+            _elapsedTime += ret; // assume 1ms to grab connection. very rough
+#endif
 
             for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 if (! (FD_ISSET(*it, fds)))
@@ -327,12 +332,12 @@ namespace mongo {
         ports.closeAll(mask);
     }
 
-    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), _bytesIn(0), _bytesOut(0), farEnd(_far), _timeout(), tag(0) {
+    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), _bytesIn(0), _bytesOut(0), farEnd(_far), _timeout() {
         _logLevel = 0;
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( double timeout, int ll ) : _bytesIn(0), _bytesOut(0), tag(0) {
+    MessagingPort::MessagingPort( double timeout, int ll ) : _bytesIn(0), _bytesOut(0) {
         _logLevel = ll;
         ports.insert(this);
         sock = -1;
@@ -359,7 +364,7 @@ namespace mongo {
         ConnectBG(int sock, SockAddr farEnd) : _sock(sock), _farEnd(farEnd) { }
 
         void run() { _res = ::connect(_sock, _farEnd.raw(), _farEnd.addressSize); }
-        string name() const { return ""; /* too short lived to need to name */ }
+        string name() const { return "ConnectBG"; }
         int inError() const { return _res; }
 
     private:
@@ -545,11 +550,8 @@ again:
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {
                 if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::SEND_ERROR );
-                    }
-                    // should just retry
+                    log(_logLevel) << "MessagingPort " << context << " send() timed out " << farEnd.toString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT );
                 }
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
@@ -600,10 +602,8 @@ again:
                     throw SocketException( SocketException::SEND_ERROR );
                 }
                 else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::SEND_ERROR );
-                    }
+                    log(_logLevel) << "MessagingPort " << context << " send() remote timeout " << farEnd.toString() << endl;
+                    throw SocketException( SocketException::SEND_TIMEOUT );
                 }
             }
             else {
@@ -629,12 +629,20 @@ again:
         unsigned retries = 0;
         while( len > 0 ) {
             int ret = ::recv( sock , buf , len , portRecvFlags );
-            if ( ret == 0 ) {
+            if ( ret > 0 ) {
+                if ( len <= 4 && ret != len )
+                    log(_logLevel) << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
+                assert( ret <= len );
+                len -= ret;
+                buf += ret;
+            }
+            else if ( ret == 0 ) {
                 log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
                 throw SocketException( SocketException::CLOSED );
             }
-            if ( ret < 0 ) {
+            else { /* ret < 0  */
                 int e = errno;
+                
 #if defined(EINTR) && !defined(_WIN32)
                 if( e == EINTR ) {
                     if( ++retries == 1 ) {
@@ -643,29 +651,18 @@ again:
                     }
                 }
 #endif
-                if ( e != EAGAIN || _timeout == 0 ) {
-                    SocketException::Type t = SocketException::RECV_ERROR;
-#if defined(_WINDOWS)
-                    if( e == WSAETIMEDOUT ) t = SocketException::RECV_TIMEOUT;
-#else
-                    /* todo: what is the error code on an SO_RCVTIMEO on linux? EGAIN? EWOULDBLOCK? */
+                if ( ( e == EAGAIN 
+#ifdef _WINDOWS
+                       || e == WSAETIMEDOUT
 #endif
-                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
-                    throw SocketException(t);
+                       ) && _timeout > 0 ) {
+                    // this is a timeout
+                    log(_logLevel) << "MessagingPort recv() timeout  " << farEnd.toString() <<endl;
+                    throw SocketException(SocketException::RECV_TIMEOUT);                    
                 }
-                else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort recv() remote dead " << farEnd.toString() << endl;
-                        throw SocketException( SocketException::RECV_ERROR );
-                    }
-                }
-            }
-            else {
-                if ( len <= 4 && ret != len )
-                    log(_logLevel) << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
-                assert( ret <= len );
-                len -= ret;
-                buf += ret;
+
+                log(_logLevel) << "MessagingPort recv() " << errnoWithDescription(e) << " " << farEnd.toString() <<endl;
+                throw SocketException(SocketException::RECV_ERROR);
             }
         }
     }
@@ -697,7 +694,7 @@ again:
     }
 
     HostAndPort MessagingPort::remote() const {
-        if ( _farEndParsed.port() == -1 )
+        if ( ! _farEndParsed.hasPort() )
             _farEndParsed = HostAndPort( farEnd );
         return _farEndParsed;
     }

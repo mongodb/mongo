@@ -53,47 +53,23 @@ catch(e) {
 }
 reconnect(master);
 
-print("sleeping 1");
-sleep(10000);
+print("clear slave ports");
 // these are already down, but this clears their ports from memory so that they
 // can be restarted later
-stopMongod(replTest.getPort(1));
-stopMongod(replTest.getPort(2));
-
+replTest.stop(1);
+replTest.stop(2);
 
 print("Bring slave1 back up");
-var paths = [ replTest.getPath(1), replTest.getPath(2) ];
-var ports = allocatePorts(2, replTest.getPort(2)+1);
-var args = ["mongod", "--port", ports[0], "--dbpath", paths[0], "--noprealloc", "--smallfiles", "--rest"];
-var conn = startMongoProgram.apply( null, args );
-conn.getDB("local").system.replset.remove();
-printjson(conn.getDB("local").runCommand({getlasterror:1}));
-print(conn);
-print("sleeping 2");
-sleep(10000);
-stopMongod(ports[0]);
-
-replTest.restart(1);
-
+replTest.restart(1, {"fastsync":null});
 
 print("Bring slave2 back up");
-args[2] = ports[1];
-args[4] = paths[1];
-conn = startMongoProgram.apply( null, args );
-conn.getDB("local").system.replset.remove();
-print("path: "+paths[1]);
-print("sleeping 3");
-sleep(10000);
-stopMongod(ports[1]);
-
-replTest.restart(2);
-sleep(10000);
-
+replTest.restart(2, {"fastsync":null});
 
 print("Add them back as slaves");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
 config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
 config.version = 4;
+printjson(config);
 wait(function() {
     try {
       master.getDB("admin").runCommand({replSetReconfig:config});
@@ -103,10 +79,12 @@ wait(function() {
     }
     reconnect(master);
 
+    printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
     master.setSlaveOk();
     var newConfig = master.getDB("local").system.replset.findOne();
+    print( "newConfig: " + tojson(newConfig) );
     return newConfig.version == 4;
-  });
+} , "wait1" );
 
 
 print("Make sure everyone's secondary");
@@ -126,7 +104,7 @@ wait(function() {
       }
     }
     return true;
-  });
+} , "wait2" );
 
 replTest.stopSet();
 

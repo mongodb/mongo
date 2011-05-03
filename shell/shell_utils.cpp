@@ -60,6 +60,10 @@ namespace mongo {
     inline int pipe(int fds[2]) { return _pipe(fds, 4096, _O_TEXT | _O_NOINHERIT); }
 #endif
 
+    namespace JSFiles {
+        extern const JSFile servers;
+    }
+
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
@@ -85,17 +89,6 @@ namespace mongo {
         }
 
         // real methods
-
-        mongo::BSONObj JSSleep(const mongo::BSONObj &args) {
-            assert( args.nFields() == 1 );
-            assert( args.firstElement().isNumber() );
-            int ms = int( args.firstElement().number() );
-            {
-                auto_ptr< ScriptEngine::Unlocker > u = globalScriptEngine->newThreadUnlocker();
-                sleepmillis( ms );
-            }
-            return undefined_;
-        }
 
         void goingAwaySoon();
         BSONObj Quit(const BSONObj& args) {
@@ -260,7 +253,7 @@ namespace mongo {
             BSONElement e = oneArg(args);
             bool found = false;
 
-            path root( args.firstElement().valuestrsafe() );
+            path root( e.valuestrsafe() );
             if ( boost::filesystem::exists( root ) ) {
                 found = true;
                 boost::filesystem::remove_all( root );
@@ -536,7 +529,7 @@ namespace mongo {
                 {
                     stringstream ss;
                     ss << "couldn't start process " << argv_[0];
-                    uassert(13294, ss.str(), success);
+                    uassert(14042, ss.str(), success);
                 }
 
                 CloseHandle(pi.hThread);
@@ -892,7 +885,6 @@ namespace mongo {
 
         void installShellUtils( Scope& scope ) {
             theScope = &scope;
-            scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );

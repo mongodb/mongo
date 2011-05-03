@@ -60,3 +60,11 @@ assert.eq( 1 , t.find( { a : {$regex: a} } ).count() , "obj C D" );
 assert.eq( 1 , t.find( { a : {$regex: b} } ).count() , "obj C E" );
 assert.eq( 2 , t.find( { a : {$regex: a , $options: "i" } } ).count() , "obj C F is spidermonkey built with UTF-8 support?" );
 
+// Test s (DOT_ALL) option. Not supported with /regex/opts syntax
+t.drop();
+t.save({a:'1  2'})
+t.save({a:'1\n2'})
+assert.eq( 1 , t.find( { a : {$regex: '1.*2'} } ).count() );
+assert.eq( 2 , t.find( { a : {$regex: '1.*2', $options: 's'} } ).count() );
+
+

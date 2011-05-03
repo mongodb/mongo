@@ -312,9 +312,11 @@ namespace mongo {
         }
 
         virtual void init() {
-            assert( ! _log );
-            _log = new RamLog();
-            Logstream::get().addGlobalTee( _log );
+            _log = RamLog::get( "global" );
+            if ( ! _log ) {
+                _log = new RamLog("global");
+                Logstream::get().addGlobalTee( _log );
+            }
         }
 
         virtual void run( stringstream& ss ) {

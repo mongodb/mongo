@@ -4,8 +4,17 @@ s = new ShardingTest( "shard3" , 2 , 1 , 2 );
 
 s2 = s._mongos[1];
 
+db = s.getDB( "test" )
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
+
+assert( sh.getBalancerState() , "A1" )
+sh.setBalancerState( false ) 
+assert( ! sh.getBalancerState() , "A2" )
+sh.setBalancerState( true ) 
+assert( sh.getBalancerState() , "A3" )
+sh.setBalancerState( false )
+assert( ! sh.getBalancerState() , "A4" )
 
 s.config.databases.find().forEach( printjson )
 
