@@ -88,7 +88,7 @@ __wt_free_page_col_fix(SESSION *session, WT_PAGE *page)
 	/* Free the update array. */
 	if (page->u.col_leaf.upd != NULL)
 		__wt_free_update(session,
-		    page->u.col_leaf.upd, page->indx_count);
+		    page->u.col_leaf.upd, page->entries);
 }
 
 /*
@@ -117,7 +117,7 @@ __wt_free_page_col_rle(SESSION *session, WT_PAGE *page)
 	/* Free the insert array. */
 	if (page->u.col_leaf.ins != NULL)
 		__wt_free_insert(
-		    session, page->u.col_leaf.ins, page->indx_count);
+		    session, page->u.col_leaf.ins, page->entries);
 }
 
 /*
@@ -134,7 +134,7 @@ __wt_free_page_col_var(SESSION *session, WT_PAGE *page)
 	/* Free the update array. */
 	if (page->u.col_leaf.upd != NULL)
 		__wt_free_update(session,
-		    page->u.col_leaf.upd, page->indx_count);
+		    page->u.col_leaf.upd, page->entries);
 }
 
 /*
@@ -185,12 +185,12 @@ __wt_free_page_row_leaf(SESSION *session, WT_PAGE *page)
 	/* Free the insert array. */
 	if (page->u.row_leaf.ins != NULL)
 		__wt_free_insert(
-		    session, page->u.row_leaf.ins, page->indx_count);
+		    session, page->u.row_leaf.ins, page->entries);
 
 	/* Free the update array. */
 	if (page->u.row_leaf.upd != NULL)
 		__wt_free_update(
-		    session, page->u.row_leaf.upd, page->indx_count);
+		    session, page->u.row_leaf.upd, page->entries);
 }
 
 /*
@@ -199,7 +199,7 @@ __wt_free_page_row_leaf(SESSION *session, WT_PAGE *page)
  */
 static void
 __wt_free_insert(
-    SESSION *session, WT_INSERT **insert_head, uint32_t indx_count)
+    SESSION *session, WT_INSERT **insert_head, uint32_t entries)
 {
 	WT_INSERT **insp, *ins, *next;
 
@@ -207,7 +207,7 @@ __wt_free_insert(
 	 * For each non-NULL slot in the page's array of inserts, free the
 	 * linked list anchored in that slot.
 	 */
-	for (insp = insert_head; indx_count > 0; --indx_count, ++insp)
+	for (insp = insert_head; entries > 0; --entries, ++insp)
 		for (ins = *insp; ins != NULL; ins = next) {
 			__wt_free_update_list(session, ins->upd);
 
@@ -225,7 +225,7 @@ __wt_free_insert(
  */
 static void
 __wt_free_update(
-    SESSION *session, WT_UPDATE **update_head, uint32_t indx_count)
+    SESSION *session, WT_UPDATE **update_head, uint32_t entries)
 {
 	WT_UPDATE **updp;
 
@@ -233,7 +233,7 @@ __wt_free_update(
 	 * For each non-NULL slot in the page's array of updates, free the
 	 * linked list anchored in that slot.
 	 */
-	for (updp = update_head; indx_count > 0; --indx_count, ++updp)
+	for (updp = update_head; entries > 0; --entries, ++updp)
 		if (*updp != NULL)
 			__wt_free_update_list(session, *updp);
 

@@ -49,7 +49,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	for (page = btree->root_page.page; page->type == WT_PAGE_ROW_INT;) {
 		/* Binary search of internal pages. */
 		for (base = 0,
-		    limit = page->indx_count; limit != 0; limit >>= 1) {
+		    limit = page->entries; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rref = page->u.row_int.t + indx;
 
@@ -126,7 +126,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	 *
 	 * Do a binary search of the leaf page.
 	 */
-	for (base = 0, limit = page->indx_count; limit != 0; limit >>= 1) {
+	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 		rip = page->u.row_leaf.d + indx;
 
@@ -185,7 +185,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	 */
 	if (base == 0) {
 		ins = WT_ROW_INSERT_SMALLEST(page);
-		session->srch_slot = page->indx_count;
+		session->srch_slot = page->entries;
 	} else {
 		ins = WT_ROW_INSERT(page, rip);
 		session->srch_slot = WT_ROW_SLOT(page, rip);

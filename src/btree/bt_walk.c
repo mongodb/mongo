@@ -187,7 +187,7 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 	}
 
 	page = e->ref->page;
-	if (e->indx == page->indx_count) {
+	if (e->indx == page->entries) {
 eop:		e->visited = 1;
 		*refp = e->ref;
 		return (0);
@@ -214,7 +214,7 @@ eop:		e->visited = 1;
 			 * If we don't find another WT_REF entry, do the
 			 * post-order visit.
 			 */
-			if (++e->indx == page->indx_count)
+			if (++e->indx == page->entries)
 				goto eop;
 		}
 		break;
@@ -234,7 +234,7 @@ eop:		e->visited = 1;
 			 * If we don't find another WT_REF entry, do the
 			 * post-order visit.
 			 */
-			if (++e->indx == page->indx_count)
+			if (++e->indx == page->entries)
 				goto eop;
 		}
 		break;

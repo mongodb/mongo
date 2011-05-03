@@ -926,7 +926,7 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	page->u.col_int.recno = 1;
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
-	page->indx_count = leaf_cnt;
+	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
 	WT_PAGE_SET_MODIFIED(page);
 
@@ -996,14 +996,14 @@ __slvg_build_leaf_col(SESSION *session,
 	WT_COL *cip, *save_col_leaf;
 	WT_PAGE *page;
 	int ret;
-	uint32_t i, n_repeat, skip, take, save_indx_count;
+	uint32_t i, n_repeat, skip, take, save_entries;
 	void *cipdata;
 
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
 	page = WT_COL_REF_PAGE(cref);
 	save_col_leaf = page->u.col_leaf.d;
-	save_indx_count = page->indx_count;
+	save_entries = page->entries;
 
 	/*
 	 * Calculate the number of K/V entries we are going to skip, and
@@ -1024,7 +1024,7 @@ __slvg_build_leaf_col(SESSION *session,
 		 * to reference only the K/V pairs we care about.
 		 */
 		page->u.col_leaf.d += skip;
-		page->indx_count = take;
+		page->entries = take;
 
 		/*
 		 * If we have to merge pages, the list of referenced overflow
@@ -1076,7 +1076,7 @@ __slvg_build_leaf_col(SESSION *session,
 			WT_RLE_REPEAT_COUNT(cipdata) = take;
 			break;
 		}
-		page->indx_count = WT_COL_SLOT(page, cip);
+		page->entries = WT_COL_SLOT(page, cip);
 		break;
 	}
 
@@ -1101,7 +1101,7 @@ __slvg_build_leaf_col(SESSION *session,
 	 * doesn't matter at the moment.)
 	 */
 	page->u.col_leaf.d = save_col_leaf;
-	page->indx_count = save_indx_count;
+	page->entries = save_entries;
 
 	/* Discard the page and our hazard reference. */
 	__wt_page_free(session, page);
@@ -1402,7 +1402,7 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	page->read_gen = 0;
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
-	page->indx_count = leaf_cnt;
+	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
 	WT_PAGE_SET_MODIFIED(page);
 
@@ -1548,15 +1548,15 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	 * If we take none of the keys, all we have to do is tell our caller to
 	 * not include this leaf page in the internal page it's building.
 	 */
-	if (skip_start + skip_stop >= page->indx_count)
+	if (skip_start + skip_stop >= page->entries)
 		*deletedp = 1;
 	else {
 		/*
-		 * Change the page to reflect the new record count -- there is
-		 * no need to copy anything on the page itself, the indx_count
-		 * field limits the number of items on the page.
+		 * Change the page to reflect the new record count: there is no
+		 * need to copy anything on the page itself, the entries value
+		 * limits the number of items on the page.
 		 */
-		page->indx_count -= skip_stop;
+		page->entries -= skip_stop;
 
 		/*
 		 * If we have to merge pages, the list of referenced overflow
@@ -1594,7 +1594,7 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			page->addr = WT_ADDR_INVALID;
 			WT_PAGE_SET_MODIFIED(page);
 			ret = __wt_page_reconcile(session, page, skip_start, 0);
-			page->indx_count += skip_stop;
+			page->entries += skip_stop;
 		}
 
 		/*

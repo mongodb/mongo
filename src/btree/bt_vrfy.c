@@ -224,7 +224,7 @@ recno_chk:	if (parent_recno != recno) {
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		vs->record_total += page->indx_count;
+		vs->record_total += page->entries;
 		break;
 	case WT_PAGE_COL_RLE:
 		recno = 0;
@@ -451,7 +451,7 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 */
 	vs->max_addr = page->addr;
 
-	key = page->u.row_leaf.d + (page->indx_count - 1);
+	key = page->u.row_leaf.d + (page->entries - 1);
 	if (__wt_key_process(key))
 		return (__wt_key_build(session, page, key, vs->max_key));
 

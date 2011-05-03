@@ -2390,7 +2390,7 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->read_gen = ++cache->read_gen;
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
-	page->indx_count = r->split_next;
+	page->entries = r->split_next;
 	page->type = WT_PAGE_ROW_INT;
 	WT_PAGE_SET_MODIFIED(page);
 	/*
@@ -2492,7 +2492,7 @@ __rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->u.col_int.recno = WT_RECNO(&r->split->off);
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
-	page->indx_count = r->split_next;
+	page->entries = r->split_next;
 	page->type = WT_PAGE_COL_INT;
 	WT_PAGE_SET_MODIFIED(page);
 	/*

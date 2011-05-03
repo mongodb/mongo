@@ -72,7 +72,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 				continue;
 			}
 
-			cbt->nitems = cbt->ref->page->indx_count;
+			cbt->nitems = cbt->ref->page->entries;
 		}
 
 		for (; cbt->nitems > 0;

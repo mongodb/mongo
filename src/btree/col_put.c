@@ -87,7 +87,7 @@ __wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
 		/* Allocate an update array as necessary. */
 		if (session->srch_upd == NULL) {
 			WT_ERR(__wt_calloc_def(
-			    session, page->indx_count, &new_upd));
+			    session, page->entries, &new_upd));
 			/*
 			 * If there was no update array, the search function
 			 * could not have set the WT_UPDATE location.
@@ -110,7 +110,7 @@ simple_update:		WT_ERR(__wt_update_alloc(session, value, &upd));
 		/* Allocate an insert array as necessary. */
 		if (session->srch_ins == NULL) {
 			WT_ERR(__wt_calloc_def(
-			    session, page->indx_count, &new_ins));
+			    session, page->entries, &new_ins));
 			/*
 			 * If there was no insert array, the search function
 			 * could not have set the WT_INSERT location.

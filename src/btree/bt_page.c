@@ -84,7 +84,7 @@ __wt_page_inmem(SESSION *session, WT_PAGE *page)
 	dsk = page->XXdsk;
 
 	WT_ASSERT(session, dsk->u.entries > 0);
-	WT_ASSERT(session, page->indx_count == 0);
+	WT_ASSERT(session, page->entries == 0);
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -144,7 +144,7 @@ __wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
 	WT_FIX_FOREACH(btree, dsk, p, i)
 		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, p);
 
-	page->indx_count = dsk->u.entries;
+	page->entries = dsk->u.entries;
 	return (0);
 }
 
@@ -181,7 +181,7 @@ __wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
 		++cref;
 	}
 
-	page->indx_count = dsk->u.entries;
+	page->entries = dsk->u.entries;
 	return (0);
 }
 
@@ -217,7 +217,7 @@ __wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
 	WT_RLE_REPEAT_FOREACH(btree, dsk, p, i)
 		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, p);
 
-	page->indx_count = dsk->u.entries;
+	page->entries = dsk->u.entries;
 	return (0);
 }
 
@@ -252,7 +252,7 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 	WT_CELL_FOREACH(dsk, cell, i)
 		(cip++)->value = WT_PAGE_DISK_OFFSET(dsk, cell);
 
-	page->indx_count = dsk->u.entries;
+	page->entries = dsk->u.entries;
 	return (0);
 }
 
@@ -310,7 +310,7 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 			break;
 		}
 
-	page->indx_count = nindx;
+	page->entries = nindx;
 	return (0);
 }
 
@@ -375,7 +375,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 			break;
 		}
 
-	page->indx_count = nindx;
+	page->entries = nindx;
 	return (0);
 }
 

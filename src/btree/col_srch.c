@@ -49,7 +49,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		 * starting record.
 		 */
 		for (base = 0,
-		    limit = page->indx_count; limit != 0; limit >>= 1) {
+		    limit = page->entries; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			cref = page->u.col_int.t + indx;
 
@@ -100,7 +100,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		if (recno >= page->u.col_leaf.recno + page->indx_count)
+		if (recno >= page->u.col_leaf.recno + page->entries)
 			goto notfound;
 		cip = page->u.col_leaf.d + (recno - page->u.col_leaf.recno);
 		cipdata = WT_COL_PTR(page, cip);
