@@ -41,7 +41,7 @@ __wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags)
 		return (__wt_verify(session, stream));
 	}
 
-	dstuff.p = flags == WT_PRINTABLES ?
+	dstuff.p = flags == WT_DUMP_PRINT ?
 	    __wt_print_byte_string_nl : __wt_print_byte_string_hex;
 	dstuff.stream = stream;
 	dstuff.fcnt = 0;

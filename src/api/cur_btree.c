@@ -113,11 +113,13 @@ static int
 __curbtree_update(WT_CURSOR *cursor)
 {
 	SESSION *session;
+	int ret;
 
-	CURSOR_API_CALL(cursor, session, insert);
+	CURSOR_API_CALL(cursor, session, update);
+	ret = __wt_btcur_update((CURSOR_BTREE *)cursor);
 	API_END();
 
-	return (ENOTSUP);
+	return (ret);
 }
 
 /*
@@ -128,11 +130,13 @@ static int
 __curbtree_remove(WT_CURSOR *cursor)
 {
 	SESSION *session;
+	int ret;
 
 	CURSOR_API_CALL(cursor, session, insert);
+	ret = __wt_btcur_remove((CURSOR_BTREE *)cursor);
 	API_END();
 
-	return (ENOTSUP);
+	return (ret);
 }
 
 /*
@@ -170,6 +174,7 @@ __wt_session_add_btree(SESSION *session, BTREE *btree,
 	btree_session->value_format = value_format;
 
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
+	++btree->refcnt;
 
 	return (0);
 }
@@ -235,11 +240,13 @@ __wt_cursor_open(SESSION *session,
 	BTREE_SESSION *btree_session;
 	CONNECTION *conn;
 	CURSOR_BTREE *cbt;
-	WT_CONFIG_ITEM cvalue;
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	const char *key_format, *value_format;
-	int bulk, dump, raw, ret;
+	int bulk, raw, ret;
+	uint32_t dump;
 	size_t csize;
+	API_CONF_INIT(session, open_cursor, config);
 
 	conn = S2C(session);
 
@@ -268,15 +275,18 @@ __wt_cursor_open(SESSION *session,
 		value_format = btree_session->value_format;
 	}
 
-	bulk = dump = raw = 0;
-	CONFIG_LOOP(session, config, cvalue)
-		CONFIG_ITEM("bulk")
-			bulk = (cvalue.val != 0);
-		CONFIG_ITEM("dump")
-			dump = (cvalue.val != 0);
-		CONFIG_ITEM("raw")
-			raw = (cvalue.val != 0);
-	CONFIG_END(session);
+	WT_ERR(__wt_config_gets(__cfg, "bulk", &cval));
+	bulk = (cval.val != 0);
+	WT_ERR(__wt_config_gets(__cfg, "dump", &cval));
+	if ((cval.type == ITEM_STRING || cval.type == ITEM_ID) &&
+	    cval.len > 0) {
+		if (strncasecmp("printable", cval.str, cval.len) == 0)
+			dump = WT_DUMP_PRINT;
+		else if (strncasecmp("raw", cval.str, cval.len) == 0)
+			dump = WT_DUMP_RAW;
+	}
+	WT_ERR(__wt_config_gets(__cfg, "raw", &cval));
+	raw = (cval.val != 0);
 
 	csize = bulk ? sizeof(CURSOR_BULK) : sizeof(CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -291,8 +301,8 @@ __wt_cursor_open(SESSION *session,
 	cbt->btree = btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((CURSOR_BULK *)cbt));
-	if (dump)
-		__wt_curdump_init(cursor);
+	if (dump != 0)
+		__wt_curdump_init(cursor, dump);
 	if (raw)
 		F_SET(cursor, WT_CURSTD_RAW);
 

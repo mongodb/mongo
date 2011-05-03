@@ -23,7 +23,7 @@ class test001(wttest.WiredTigerTestCase):
     def create_table(self, tablename):
         extra_params = ',intl_node_min=512,intl_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
         self.pr('create_table')
-        self.session.create_table(tablename, 'key_format=S,value_format=S' + extra_params)
+        self.session.create('table:' + tablename, 'key_format=S,value_format=S' + extra_params)
 
     def cursor_s(self, tablename, key):
         cursor = self.session.open_cursor('table:' + tablename, None, None)

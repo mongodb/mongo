@@ -139,7 +139,7 @@ typedef struct {
  *
  * Raw data is represented by key/value pairs of WT_ITEM structures, but
  * cursors can also provide access to fields within the key and value if the
- * formats are described in the WT_SESSION::create_table method.
+ * formats are described in the WT_SESSION::create method.
  *
  * A cursor can be positioned in a collection of data.  Cursors are opened in
  * the context of a session (which may have an associated transaction), and can
@@ -345,7 +345,7 @@ struct wt_cursor {
 	 * @skipline cursor->close
 	 *
 	 * @param cursor the cursor handle
-	 * @configstart{cursor.close, maintained in dist/config_data.py}
+	 * @configstart{cursor.close, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -373,9 +373,10 @@ struct wt_cursor {
 #define	WT_CURSTD_KEY_RAW	0x01
 #define	WT_CURSTD_KEY_SET	0x02
 #define	WT_CURSTD_POSITIONED	0x04
-#define	WT_CURSTD_RAW		0x08
-#define	WT_CURSTD_VALUE_RAW	0x10
-#define	WT_CURSTD_VALUE_SET	0x20
+#define	WT_CURSTD_PRINT		0x08
+#define	WT_CURSTD_RAW		0x10
+#define	WT_CURSTD_VALUE_RAW	0x20
+#define	WT_CURSTD_VALUE_SET	0x40
 	uint32_t flags;
 #endif
 };
@@ -402,7 +403,7 @@ struct wt_session {
 	 * @skipline session->close
 	 *
 	 * @param session the session handle
-	 * @configstart{session.close, maintained in dist/config_data.py}
+	 * @configstart{session.close, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -455,10 +456,13 @@ struct wt_session {
 	 * @param uri the data source on which the cursor operates
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
-	 * @configstart{session.open_cursor, maintained in dist/config_data.py}
-	 * @config{isolation, the isolation level for this cursor\, one of
-	 * "snapshot" or "read-committed" or "read-uncommitted".  Ignored for
-	 * transactional cursors}
+	 * @configstart{session.open_cursor, see dist/api_data.py}
+	 * @config{bulk, configure the cursor for bulk loads}
+	 * @config{dump, configure the cursor for dump format inputs and
+	 * outputs. One of \c false\, \c "printable" or \c "raw"}
+	 * @config{isolation, the isolation level for this cursor\, one of \c
+	 * "snapshot" or \c "read-committed" or \c "read-uncommitted". Ignored
+	 * for transactional cursors}
 	 * @config{overwrite, if an existing key is inserted\, overwrite the
 	 * existing value}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
@@ -480,11 +484,11 @@ struct wt_session {
 	 * @todo Allow both sets of syntax for describing schemas.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->create_table
+	 * @skipline ->create
 	 *
 	 * @param session the session handle
-	 * @param name the name of the table
-	 * @configstart{session.create_table, maintained in dist/config_data.py}
+	 * @param name the uri of the object to create, such as \c "table:stock"
+	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, file unit allocation size\, in bytes}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  The number of entries must
@@ -521,45 +525,77 @@ struct wt_session {
 	 * @configend
 	 * @errors
 	 */
-	int __F(create_table)(WT_SESSION *session, const char *name,
-	    const char *config);
-
-	/*! Rename a table.
-	 *
-	 * @dontinclude ex_all.c
-	 * @skipline ->rename_table
-	 *
-	 * @param session the session handle
-	 * @param oldname the current name of the table
-	 * @param newname the new name of the table
-	 * @configstart{session.rename_table, maintained in dist/config_data.py}
-	 * @configend
-	 * @errors
-	 */
-	int __F(rename_table)(WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *config);
+	int __F(create)(WT_SESSION *session,
+	    const char *name, const char *config);
 
 	/*! Drop (delete) a table.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->drop_table
+	 * @skipline ->drop
 	 *
 	 * @param session the session handle
-	 * @param name the name of the table
-	 * @configstart{session.rename_table, maintained in dist/config_data.py}
+	 * @param name the uri of the table to drop, such as \c "table:stock"
+	 * @configstart{session.drop, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
-	int __F(drop_table)(WT_SESSION *session,
-	     const char *name, const char *config);
+	int __F(drop)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Rename a table.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->rename
+	 *
+	 * @param session the session handle
+	 * @param oldname the current uri of the table, such as \c "table:old"
+	 * @param newname the new name of the table, e.g., \c "table:new"
+	 * @configstart{session.rename, see dist/api_data.py}
+	 * @configend
+	 * @errors
+	 */
+	int __F(rename)(WT_SESSION *session,
+	    const char *oldname, const char *newname, const char *config);
+
+	/*! Salvage a table.
+	 *
+	 * @todo describe salvage
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->salvage
+	 *
+	 * @param session the session handle
+	 * @param name the uri of the table to salvage
+	 * @configstart{session.salvage, see dist/api_data.py}
+	 * @configend
+	 * @errors
+	 */
+	int __F(salvage)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Sync a table.
+	 *
+	 * @todo describe sync
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->sync
+	 *
+	 * @param session the session handle
+	 * @param name the uri of the table to sync
+	 * @configstart{session.sync, see dist/api_data.py}
+	 * @configend
+	 * @errors
+	 */
+	int __F(sync)(WT_SESSION *session,
+	    const char *name, const char *config);
 
 	/*! Truncate a table.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->truncate_table
+	 * @skipline ->truncate
 	 *
 	 * @param session the session handle
-	 * @param name the name of the table
+	 * @param name the uri of the table to truncate
 	 * @param start optional cursor marking the start of the truncate
 	 * operation.  If <code>NULL</code>, the truncate starts from the
 	 * beginning of the table
@@ -567,11 +603,12 @@ struct wt_session {
 	 * operation.  If <code>NULL</code>, the truncate continues to the end
 	 * of the table
 	 * @param name the name of the table
-	 * @configstart{session.truncate_table, maintained in dist/config_data.py}
+	 * @configstart{session.truncate, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
-	int __F(truncate_table)(WT_SESSION *session, const char *name,
+	int __F(truncate)(WT_SESSION *session,
+	    const char *name,
 	    WT_CURSOR *start, WT_CURSOR *end, const char *config);
 
 	/*! Verify a table.
@@ -579,16 +616,16 @@ struct wt_session {
 	 * @todo describe salvage
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->verify_table
+	 * @skipline ->verify
 	 *
 	 * @param session the session handle
-	 * @param name the name of the table
-	 * @configstart{session.verify_table, maintained in dist/config_data.py}
+	 * @param name the uri of the table to verify
+	 * @configstart{session.verify, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
-	int __F(verify_table)(WT_SESSION *session, const char *name,
-	    const char *config);
+	int __F(verify)(WT_SESSION *session,
+	    const char *name, const char *config);
 	/*! @} */
 
 	/*! @name Transactions
@@ -609,7 +646,7 @@ struct wt_session {
 	 * @skipline ->begin_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart{session.begin_transaction, maintained in dist/config_data.py}
+	 * @configstart{session.begin_transaction, see dist/api_data.py}
 	 * @config{isolation, the isolation level for this transaction\, one of
 	 * "serializable"\, "snapshot"\, "read-committed" or "read-uncommitted";
 	 * default "serializable"}
@@ -635,7 +672,7 @@ struct wt_session {
 	 * @skipline ->commit_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart{session.commit_transaction, maintained in dist/config_data.py}
+	 * @configstart{session.commit_transaction, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -652,7 +689,7 @@ struct wt_session {
 	 * @skipline ->rollback_transaction
 	 *
 	 * @param session the session handle
-	 * @configstart{session.rollback_transaction, maintained in dist/config_data.py}
+	 * @configstart{session.rollback_transaction, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -664,7 +701,7 @@ struct wt_session {
 	 * @skipline ->checkpoint
 	 *
 	 * @param session the session handle
-	 * @configstart{session.checkpoint, maintained in dist/config_data.py}
+	 * @configstart{session.checkpoint, see dist/api_data.py}
 	 * @config{archive, remove log files no longer required for
 	 * transactional durabilty}
 	 * @config{force, write a new checkpoint even if nothing has changed
@@ -679,6 +716,17 @@ struct wt_session {
 	 * @errors
 	 */
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
+
+	/*! Put a string into the log for debugging.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->log_printf
+	 *
+	 * @param session the session handle
+	 * @param fmt a printf-like format specification
+	 * @errors
+	 */
+	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
 	/*! @} */
 };
 
@@ -700,7 +748,7 @@ struct wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
-	 * @configstart{connection.load_extension, maintained in dist/config_data.py}
+	 * @configstart{connection.load_extension, see dist/api_data.py}
 	 * @config{entry, the entry point of the extension}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades}
@@ -728,7 +776,7 @@ struct wt_connection {
 	 * WT_SESSION::open_cursor
 	 * @param ctype the application-supplied code to manage cursors of
 	 * this type
-	 * @configstart{connection.add_cursor_type, maintained in dist/config_data.py}
+	 * @configstart{connection.add_cursor_type, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -750,9 +798,9 @@ struct wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the collation to be used in calls to
-	 * 	WT_SESSION::create_table
+	 * 	WT_SESSION::create
 	 * @param collator the application-supplied collation handler
-	 * @configstart{connection.add_collator, maintained in dist/config_data.py}
+	 * @configstart{connection.add_collator, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -774,9 +822,9 @@ struct wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the extractor to be used in calls to
-	 * 	WT_SESSION::create_table
+	 * 	WT_SESSION::create
 	 * @param extractor the application-supplied extractor
-	 * @configstart{connection.add_extractor, maintained in dist/config_data.py}
+	 * @configstart{connection.add_extractor, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -791,7 +839,7 @@ struct wt_connection {
 	 * @skipline conn->close
 	 *
 	 * @param connection the connection handle
-	 * @configstart{connection.close, maintained in dist/config_data.py}
+	 * @configstart{connection.close, see dist/api_data.py}
 	 * @configend
 	 * @errors
 	 */
@@ -847,14 +895,14 @@ struct wt_connection {
  * @param home The path to the database home directory
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
  * handler is installed that writes error messages to stderr
- * @configstart{wiredtiger_open, maintained in dist/config_data.py}
+ * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{cache_size, maximum heap memory to allocate for the cache}
  * @config{create, create the database if it does not exist}
- * @config{data_update_min, minimum update buffer size for a session}
  * @config{data_update_max, maximum update buffer size for a session}
+ * @config{data_update_min, minimum update buffer size for a session}
  * @config{exclusive, fail if the database already exists}
  * @config{error_prefix, Prefix string for error messages}
- * @config{hazard_size, number of hazard references per session}
+ * @config{hazard_max, number of hazard references per session}
  * @config{logging, enable logging}
  * @config{session_max, maximum expected number of sessions (including server
  * threads)}

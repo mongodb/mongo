@@ -24,10 +24,10 @@ class test002(wttest.WiredTigerTestCase):
 
     def create_and_drop_table(self, tablename, confstr):
         self.pr('create_table with config:\n      ' + confstr)
-        self.session.create_table(tablename, confstr)
+        self.session.create('table:' + tablename, confstr)
 
         #### Drop table not implemented, instead, we're able to explicitly remove the file
-        ####self.session.drop_table(tablename, None)
+        ####self.session.drop('table:' + tablename, None)
 
         import subprocess                          #### added
         subprocess.call(["rm", "-f", tablename])   #### added

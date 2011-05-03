@@ -41,12 +41,16 @@ const char *__wt_confdfl_session_begin_transaction;
 const char *__wt_confdfl_session_checkpoint;
 const char *__wt_confdfl_session_close;
 const char *__wt_confdfl_session_commit_transaction;
-const char *__wt_confdfl_session_create_table;
+const char *__wt_confdfl_session_create;
+const char *__wt_confdfl_session_drop;
+const char *__wt_confdfl_session_log_printf;
 const char *__wt_confdfl_session_open_cursor;
-const char *__wt_confdfl_session_rename_table;
+const char *__wt_confdfl_session_rename;
 const char *__wt_confdfl_session_rollback_transaction;
-const char *__wt_confdfl_session_truncate_table;
-const char *__wt_confdfl_session_verify_table;
+const char *__wt_confdfl_session_salvage;
+const char *__wt_confdfl_session_sync;
+const char *__wt_confdfl_session_truncate;
+const char *__wt_confdfl_session_verify;
 const char *__wt_confdfl_wiredtiger_open;
 int __wt_session_add_btree(SESSION *session,
     BTREE *btree,
@@ -61,7 +65,11 @@ int __wt_curconfig_open(SESSION *session,
     const char *uri,
     const char *config,
     WT_CURSOR **cursorp);
-void __wt_curdump_init(WT_CURSOR *cursor);
+void __wt_curdump_init(WT_CURSOR *cursor, uint32_t flags);
+int __wt_curstat_open(SESSION *session,
+    const char *uri,
+    const char *config,
+    WT_CURSOR **cursorp);
 int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
 void __wt_cursor_init(WT_CURSOR *cursor, const char *config);
 int __wt_block_alloc(SESSION *session, uint32_t *addrp, uint32_t size);
@@ -249,6 +257,7 @@ int __wt_connection_stat_clear(CONNECTION *conn);
 void __wt_stat_print(WT_STATS *s, FILE *stream);
 void *__wt_workq_srvr(void *arg);
 int __wt_log_put(SESSION *session, WT_LOGREC_DESC *recdesc, ...);
+int __wt_log_vprintf(SESSION *session, const char *fmt, va_list ap);
 int __wt_log_printf(SESSION *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE ((format (printf,

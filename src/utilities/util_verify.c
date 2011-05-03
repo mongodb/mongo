@@ -55,7 +55,7 @@ main(int argc, char *argv[])
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	if ((ret = session->verify_table(session, tablename, NULL)) != 0) {
+	if ((ret = session->verify(session, tablename, NULL)) != 0) {
 		fprintf(stderr, "%s: salvage(%s): %s\n",
 		    progname, tablename, wiredtiger_strerror(ret));
 		goto err;

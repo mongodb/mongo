@@ -81,7 +81,7 @@ __wt_connection_close(CONNECTION *conn)
 	}
 
 	/* Complain if files weren't closed. */
-	while ((fh = TAILQ_FIRST(&conn->fhqh)) != NULL) {
+	while ((fh = TAILQ_FIRST(&conn->fhqh)) != NULL && fh != conn->log_fh) {
 		__wt_errx(&conn->default_session,
 		    "Env handle has open file handles: %s", fh->name);
 		WT_TRET(__wt_close(&conn->default_session, fh));
@@ -109,6 +109,11 @@ __wt_connection_close(CONNECTION *conn)
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);
+
+	if (conn->log_fh != NULL) {
+		WT_TRET(__wt_close(session, conn->log_fh));
+		conn->log_fh = NULL;
+	}
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));

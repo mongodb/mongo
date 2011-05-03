@@ -55,7 +55,7 @@ int main(void)
 	/* Note: further error checking omitted for clarity. */
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->create_table(session, "access",
+	ret = session->create(session, "table:access",
 	    "key_format=S,value_format=S");
 	ret = session->open_cursor(session, "table:access", NULL,
 	    "overwrite", &cursor);

@@ -7,7 +7,7 @@
 
 #include "wts.h"
 
-static int cb_bulk(BTREE *, WT_ITEM **, WT_ITEM **);
+static int cb_bulk(WT_ITEM **, WT_ITEM **);
 static int wts_del_col(u_int64_t);
 static int wts_del_row(u_int64_t);
 static int wts_notfound_chk(const char *, int, int, u_int64_t);
@@ -28,10 +28,13 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
-	WT_UNUSED(handler);
+	WT_SESSION *session;
 
-	if (g.logging && g.wts_session != NULL)
-		return (__wt_log_printf(g.wts_session, "%s", message));
+	WT_UNUSED(handler);
+	session = g.wts_session;
+
+	if (g.logging && session != NULL)
+		return (session->log_printf(session, "%s", message));
 	else
 		(void)printf("%s\n", message);
 	return (0);
@@ -70,7 +73,7 @@ wts_startup(void)
 	char config[200], *end, *p;
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%lu,%s,verbose=[%s]",
+	    "error_prefix=\"%s\",cache_size=%luMB,%s,verbose=[%s]",
 	    g.progname, (u_long)g.c_cache,
 	    g.logging ? "logging" : "",
 	    ""
@@ -134,27 +137,25 @@ wts_startup(void)
 
 	WT_ASSERT((SESSION *)session, p < end);
 
-	if ((ret = session->create_table(session, "__wt.wt", config)) != 0) {
-		fprintf(stderr, "%s: session.create_table: %s\n",
+	if ((ret = session->create(session, WT_TABLENAME, config)) != 0) {
+		fprintf(stderr, "%s: create table: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	if ((ret = session->open_cursor(session, "table:__wt.wt",
+	if ((ret = session->open_cursor(session, WT_TABLENAME,
 	    NULL, NULL, &cursor)) != 0) {
-		fprintf(stderr, "%s: session.open_cursor: %s\n",
+		fprintf(stderr, "%s: open_cursor: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
 	if (g.logging)
-		__wt_log_printf(
-		    (SESSION *)session, "WT startup: %s", ctime(&now));
+		session->log_printf(session, "WT startup: %s", ctime(&now));
 
 	g.wts_conn = conn;
 	g.wts_session = session;
 	g.wts_cursor = cursor;
-	g.wts_btree = ((CURSOR_BTREE *)cursor)->btree;
 	return (0);
 }
 
@@ -162,14 +163,14 @@ void
 wts_teardown(void)
 {
 	WT_CONNECTION *conn;
-	SESSION *session;
+	WT_SESSION *session;
 	time_t now;
 
 	conn = g.wts_conn;
 	session = g.wts_session;
 
 	if (g.logging)
-		__wt_log_printf(session, "WT teardown: %s", ctime(&now));
+		session->log_printf(session, "WT teardown: %s", ctime(&now));
 
 	assert(wts_sync() == 0);
 	g.wts_session = NULL;
@@ -179,30 +180,61 @@ wts_teardown(void)
 int
 wts_bulk_load(void)
 {
-	BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	WT_ITEM *key, *value;
+	uint64_t insert_count;
 	int ret;
 
-	btree = g.wts_btree;
+	session = g.wts_session;
 
-	if ((ret = btree->bulk_load(btree, cb_bulk)) != 0) {
-		fprintf(stderr, "%s: bulk_load: %s\n",
+	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
+	    "bulk", &cursor)) != 0) {
+		fprintf(stderr, "%s: cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	return (0);
+
+	insert_count = 0;
+	while (cb_bulk(&key, &value) == 0) {
+                /* Report on progress every 100 inserts. */
+                if (++insert_count % 100 == 0)
+                        track("bulk load", insert_count);
+	
+		cursor->set_key(cursor, key);
+		cursor->set_value(cursor, value);
+		if ((ret = cursor->insert(cursor)) != 0) {
+			fprintf(stderr, "%s: cursor insert failed: %s\n",
+			    g.progname, wiredtiger_strerror(ret));
+			ret = 1;
+			goto err;
+		}
+	}
+
+err:	(void)cursor->close(cursor, NULL);
+	return (ret);
 }
 
 int
 wts_dump(void)
 {
-	BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_ITEM key, value;
+	WT_SESSION *session;
 	FILE *fp;
 	int ret;
+	uint64_t row_count;
 	const char *p;
 
-	btree = g.wts_btree;
-
 	/* Dump the WiredTiger file. */
+	session = g.wts_session;
+	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
+	    "dump=print", &cursor)) != 0) {
+		fprintf(stderr, "%s: cursor open failed: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
+
 	track("dump", 0);
 	p = fname("wt_dump");
 	if ((fp = fopen(p, "w")) == NULL) {
@@ -210,12 +242,26 @@ wts_dump(void)
 		    g.progname, wiredtiger_strerror(errno));
 		return (1);
 	}
-	if ((ret = btree->dump(btree, fp, WT_PRINTABLES)) != 0) {
-		fprintf(stderr, "%s: btree.dump: %s\n",
+
+	row_count = 0;
+	while ((ret = cursor->next(cursor)) == 0) {
+		if (++row_count % 100 == 0)
+			track("dump", row_count);
+		cursor->get_key(cursor, &key);
+		fwrite(key.data, key.size, 1, fp);
+		fwrite("\n", 1, 1, fp);
+		cursor->get_value(cursor, &value);
+		fwrite(value.data, value.size, 1, fp);
+		fwrite("\n", 1, 1, fp);
+	}
+	(void)fclose(fp);
+	WT_TRET(cursor->close(cursor, NULL));
+
+	if (ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: dump failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	(void)fclose(fp);
 
 	track("dump comparison", 0);
 	switch (g.c_file_type) {
@@ -238,17 +284,13 @@ wts_dump(void)
 int
 wts_salvage(void)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_SESSION *session;
 	int ret;
-	char *p;
 
-	btree = g.wts_btree;
 	session = g.wts_session;
 
-	p = fname("wt");
-	if ((ret = btree->salvage(btree, session, 0)) != 0) {
-		fprintf(stderr, "%s: btree.salvage: %s\n",
+	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0) {
+		fprintf(stderr, "%s: salvage: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -259,15 +301,13 @@ wts_salvage(void)
 static int
 wts_sync(void)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_SESSION *session;
 	int ret;
 
-	btree = g.wts_btree;
 	session = g.wts_session;
 
-	if ((ret = btree->sync(btree, session, WT_OSWRITE)) != 0) {
-		fprintf(stderr, "%s: btree.sync: %s\n",
+	if ((ret = session->sync(session, WT_TABLENAME, NULL)) != 0) {
+		fprintf(stderr, "%s: sync: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -277,15 +317,13 @@ wts_sync(void)
 int
 wts_verify(void)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_SESSION *session;
 	int ret;
 
-	btree = g.wts_btree;
 	session = g.wts_session;
 
-	if ((ret = btree->verify(btree, session, 0)) != 0) {
-		fprintf(stderr, "%s: btree.verify: %s\n",
+	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0) {
+		fprintf(stderr, "%s: verify: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -299,14 +337,14 @@ wts_verify(void)
 int
 wts_stats(void)
 {
-	CONNECTION *conn;
-	BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_ITEM key, value;
+	WT_SESSION *session;
 	FILE *fp;
 	char *p;
 	int ret;
 
-	btree = g.wts_btree;
-	conn = btree->conn;
+	session = g.wts_session;
 
 	track("stat", 0);
 	p = fname("stats");
@@ -315,12 +353,30 @@ wts_stats(void)
 		    g.progname, wiredtiger_strerror(errno));
 		return (1);
 	}
-	if ((ret = conn->stat_print(conn, fp, 0)) != 0) {
-		fprintf(stderr, "%s: conn.stat_print: %s\n",
+	
+	if ((ret = session->open_cursor(session, "stat:" WT_TABLENAME, NULL,
+	    "dump=print", &cursor)) != 0) {
+		fprintf(stderr, "%s: stat cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		cursor->get_key(cursor, &key);
+		fwrite(key.data, key.size, 1, stdout);
+		fwrite("\n", 1, 1, stdout);
+		cursor->get_value(cursor, &value);
+		fwrite(value.data, value.size, 1, stdout);
+		fwrite("\n", 1, 1, stdout);
+	}
 	(void)fclose(fp);
+	(void)cursor->close(cursor, NULL);
+
+	if (ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: stat cursor next: %s\n",
+		    g.progname, wiredtiger_strerror(ret));
+		return (1);
+	}
 
 	return (0);
 }
@@ -330,11 +386,12 @@ wts_stats(void)
  *	WiredTiger bulk load callback routine. 
  */
 static int
-cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
+cb_bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 {
 	static WT_ITEM key, value;
+	WT_SESSION *session;
 
-	btree = NULL;					/* Lint */
+	session = g.wts_session;
 	++g.key_cnt;
 
 	if (g.key_cnt > g.c_rows) {
@@ -353,13 +410,13 @@ cb_bulk(BTREE *btree, WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			__wt_log_printf(g.wts_session, "%-10s{%.*s}",
+			session->log_printf(session, "%-10s{%.*s}",
 			    "bulk key", (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		__wt_log_printf(g.wts_session, "%-10s{%.*s}",
+		session->log_printf(session, "%-10s{%.*s}",
 		    "bulk value", (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
@@ -474,18 +531,16 @@ static int
 wts_read(uint64_t keyno)
 {
 	static WT_ITEM key, value, bdb_value;
-	BTREE *btree;
-	SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int notfound, ret;
 
-	btree = g.wts_cursor;
 	cursor = g.wts_cursor;
 	session = g.wts_session;
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s%llu", "read",
+		session->log_printf(session, "%-10s%llu", "read",
 		    (unsigned long long)keyno);
 
 	/* Retrieve the BDB value. */
@@ -537,11 +592,11 @@ static int
 wts_put_row(uint64_t keyno, int insert)
 {
 	static WT_ITEM key, value;
-	BTREE *btree;
-	SESSION *session;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int notfound, ret;
 
-	btree = g.wts_btree;
+	cursor = g.wts_cursor;
 	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, insert);
@@ -549,15 +604,16 @@ wts_put_row(uint64_t keyno, int insert)
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
+		session->log_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
 		    "put key", (int)key.size, (char *)key.data,
 		    "put data", (int)value.size, (char *)value.data);
 
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
 
-	if ((ret = btree->row_put(
-	    btree, session, &key, &value, 0)) != 0 && ret != WT_NOTFOUND) {
+	cursor->set_key(cursor, &key);
+	cursor->set_value(cursor, &value);
+	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_put_row: put row %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
@@ -574,18 +630,18 @@ static int
 wts_put_col(uint64_t keyno)
 {
 	static WT_ITEM key, value;
-	BTREE *btree;
-	SESSION *session;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int notfound, ret;
 
-	btree = g.wts_btree;
+	cursor = g.wts_cursor;
 	session = g.wts_session;
 
 	value_gen(&value.data, &value.size, 0);
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s%llu {%.*s}",
+		session->log_printf(session, "%-10s%llu {%.*s}",
 		    "put", (unsigned long long)keyno,
 		    (int)value.size, (char *)value.data);
 
@@ -593,8 +649,9 @@ wts_put_col(uint64_t keyno)
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
 	
-	if ((ret = btree->col_put(
-	    btree, session, keyno, &value, 0)) != 0 && ret != WT_NOTFOUND) {
+	cursor->set_key(cursor, (wiredtiger_recno_t)keyno);
+	cursor->set_value(cursor, &value);
+	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_put_col: put col %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
@@ -611,31 +668,40 @@ static int
 wts_del_row(uint64_t keyno)
 {
 	static WT_ITEM key;
-	BTREE *btree;
-	SESSION *session;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int notfound, ret;
 
-	btree = g.wts_btree;
+	cursor = g.wts_cursor;
 	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, 0);
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s%llu",
+		session->log_printf(session, "%-10s%llu",
 		    "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
-	if ((ret = btree->row_del(btree, session, &key, 0)) != 0 &&
-	    ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_del_row: delete row %llu by key: %s\n",
+	cursor->set_key(cursor, &key);
+	if ((ret = cursor->search(cursor)) == WT_NOTFOUND) {
+		NTF_CHK(wts_notfound_chk("wts_del_row", ret, notfound, keyno));
+		return (0);
+	}
+	if (ret != 0) {
+		fprintf(stderr, "%s: wts_del_row: find row %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
 	}
-	NTF_CHK(wts_notfound_chk("wts_del_row", ret, notfound, keyno));
+	if ((ret = cursor->remove(cursor)) != 0) {
+		fprintf(stderr, "%s: wts_del_row: remove %llu by key: %s\n",
+		    g.progname, (unsigned long long)keyno,
+		    wiredtiger_strerror(ret));
+		return (1);
+	}
 	return (0);
 }
 
@@ -646,24 +712,25 @@ wts_del_row(uint64_t keyno)
 static int
 wts_del_col(uint64_t keyno)
 {
-	BTREE *btree;
-	SESSION *session;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int notfound, ret;
 
-	btree = g.wts_btree;
+	cursor = g.wts_cursor;
 	session = g.wts_session;
 
 	/* Log the operation */
 	if (g.logging)
-		__wt_log_printf(session, "%-10s%llu",
+		session->log_printf(session, "%-10s%llu",
 		    "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
-	if ((ret = btree->col_del(btree, session, keyno, 0)) != 0 &&
-	    ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_del_col: delete col %llu by key: %s\n",
+	cursor->set_key(cursor, keyno);
+	if (((ret = cursor->search(cursor)) != 0 ||
+	    (ret = cursor->remove(cursor)) != 0) && ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: wts_del_col: delete %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);

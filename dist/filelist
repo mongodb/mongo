@@ -8,6 +8,7 @@ src/api/cur_btree.c
 src/api/cur_bulk.c
 src/api/cur_config.c
 src/api/cur_dump.c
+src/api/cur_stat.c
 src/api/cur_std.c
 src/api/err_file.c
 src/api/pack.c

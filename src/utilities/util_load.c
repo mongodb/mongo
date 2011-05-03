@@ -99,14 +99,14 @@ main(int argc, char *argv[])
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
-	if ((ret = session->drop_table(session, tablename, "force")) != 0)
-		goto err;
-
-	if ((ret = session->create_table(session,
-	    tablename, table_config)) != 0)
-		goto err;
-
 	snprintf(datasink, sizeof(datasink), "table:%s", tablename);
+
+	if ((ret = session->drop(session, datasink, "force")) != 0)
+		goto err;
+
+	if ((ret = session->create(session, datasink, table_config)) != 0)
+		goto err;
+
 	snprintf(cursor_config, sizeof(cursor_config), "bulk,dump=%s%s",
 	    text_input ? "print" : "raw", debug ? ",debug" : "");
 
@@ -147,14 +147,6 @@ err:		ret = 1;
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
-
-/* XXX supported config options (all uint32_t:
-	if (strcmp(opt, "allocsize") == 0) {
-	if (strcmp(opt, "intlmin") == 0) {
-	if (strcmp(opt, "intlmax") == 0) {
-	if (strcmp(opt, "leafmin") == 0) {
-	if (strcmp(opt, "leafmax") == 0) {
-*/
 
 /*
  * bulk_read --

@@ -48,18 +48,26 @@ __wt_confdfl_session_commit_transaction =
     "";
 
 const char *
-__wt_confdfl_session_create_table =
+__wt_confdfl_session_create =
     "allocation_size=512B,columns=,colgroup.name=,exclusive=false,"
     "huffman_key=,huffman_value=,index.name=,intl_node_max=2KB,"
     "intl_node_min=2KB,key_format=u,leaf_node_max=1MB,leaf_node_min=32KB,"
     "runlength_encoding=false,value_format=u";
 
 const char *
-__wt_confdfl_session_open_cursor =
-    "isolation=read-committed,overwrite=false,raw=false";
+__wt_confdfl_session_drop =
+    "";
 
 const char *
-__wt_confdfl_session_rename_table =
+__wt_confdfl_session_log_printf =
+    "";
+
+const char *
+__wt_confdfl_session_open_cursor =
+    "bulk=false,dump=false,isolation=read-committed,overwrite=false,raw=false";
+
+const char *
+__wt_confdfl_session_rename =
     "";
 
 const char *
@@ -67,15 +75,23 @@ __wt_confdfl_session_rollback_transaction =
     "";
 
 const char *
-__wt_confdfl_session_truncate_table =
+__wt_confdfl_session_salvage =
     "";
 
 const char *
-__wt_confdfl_session_verify_table =
+__wt_confdfl_session_sync =
+    "";
+
+const char *
+__wt_confdfl_session_truncate =
+    "";
+
+const char *
+__wt_confdfl_session_verify =
     "";
 
 const char *
 __wt_confdfl_wiredtiger_open =
-    "cache_size=20MB,create=false,data_update_min=8KB,data_update_max=32KB,"
-    "exclusive=false,error_prefix=,hazard_size=15,logging=false,"
-    "session_max=50,multiprocess=false,verbose=";
+    "cache_size=20MB,create=false,data_update_max=32KB,data_update_min=8KB,"
+    "exclusive=false,error_prefix=,hazard_max=15,logging=false,session_max=50"
+    ",multiprocess=false,verbose=";

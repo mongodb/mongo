@@ -81,15 +81,15 @@ session_ops(WT_SESSION *session)
 
 	cursor_ops(cursor);
 
-	ret = session->create_table(session, "mytable", "key_format=S,value_format=S");
+	ret = session->create(session, "table:mytable", "key_format=S,value_format=S");
 
-	ret = session->rename_table(session, "oldtable", "newtable", NULL);
+	ret = session->rename(session, "table:old", "table:new", NULL);
 
-	ret = session->drop_table(session, "mytable", NULL);
+	ret = session->drop(session, "table:mytable", NULL);
 
-	ret = session->truncate_table(session, "mytable", NULL, NULL, NULL);
+	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);
 
-	ret = session->verify_table(session, "mytable", NULL);
+	ret = session->verify(session, "table:mytable", NULL);
 
 	ret = session->begin_transaction(session, NULL);
 

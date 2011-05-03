@@ -32,7 +32,7 @@ int main(void)
 		fprintf(stderr, "Error opening a session on %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 
-	ret = session->create_table(session, "map",
+	ret = session->create(session, "table:map",
 	    "key_format=r,value_format=5sii,"
 	    "columns=(id,country,population,area)");
 

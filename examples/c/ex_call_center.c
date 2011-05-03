@@ -67,14 +67,14 @@ int main(void)
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	ret = session->create_table(session, "customers",
+	ret = session->create(session, "table:customers",
 	    "key_format=r,"
 	    "value_format=SSS,"
 	    "columns=(id,name,address,phone),"
 	    "colgroup.cust_address=(address),"
 	    "index.cust_phone=(phone)");
 
-	ret = session->create_table(session, "calls",
+	ret = session->create(session, "table:calls",
 	    "key_format=r,"
 	    "value_format=qrrSS,"
 	    "columns=(id,call_date,cust_id,emp_id,call_type,notes),"

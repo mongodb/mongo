@@ -54,13 +54,18 @@ int
 __wt_btree_close(SESSION *session)
 {
 	BTREE *btree;
-	int ret;
+	CONNECTION *conn;
+	int inuse, ret;
 
 	btree = session->btree;
-	ret = 0;
+	conn = S2C(session);
 
+	__wt_lock(session, conn->mtx);
 	WT_ASSERT(session, btree->refcnt > 0);
-	if (--btree->refcnt > 0)
+	inuse = (--btree->refcnt > 0);
+	__wt_unlock(session, conn->mtx);
+
+	if (inuse)
 		return (0);
 
 	/* Close the underlying Btree. */

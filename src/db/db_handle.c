@@ -50,6 +50,7 @@ __wt_btree_config(BTREE *btree)
 	conn = btree->conn;
 	session = &conn->default_session;
 
+	btree->btree_compare = __wt_bt_lex_compare;
 	btree->root_page.addr = btree->free_addr = WT_ADDR_INVALID;
 
 	TAILQ_INIT(&btree->freeqa);		/* Free queues */

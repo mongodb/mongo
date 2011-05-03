@@ -191,6 +191,12 @@ __wt_cache_evict_server(void *arg)
 	session = &conn->default_session;
 	wt_session = NULL;
 	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
+	session = (SESSION *)wt_session;
+	/*
+	 * Don't close this session during WT_CONNECTION->close: we do it
+	 * before the thread completes.
+	 */
+	F_SET(session, WT_SESSION_INTERNAL);
 
 	for (;;) {
 		WT_VERBOSE(conn,

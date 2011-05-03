@@ -30,8 +30,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor, config));
 
-	__wt_lock(session, conn->mtx);
-
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
 		TAILQ_REMOVE(&session->btrees, btree_session, q);
 		btree = btree_session->btree;
@@ -40,8 +38,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		WT_TRET(__wt_btree_close(session));
 	}
 
-	TAILQ_REMOVE(&conn->sessions_head, session, q);
+	__wt_lock(session, conn->mtx);
+	if (!F_ISSET(session, WT_SESSION_INTERNAL))
+		TAILQ_REMOVE(&conn->sessions_head, session, q);
 	WT_TRET(__wt_session_close(session));
+
+	session = &conn->default_session;
 	__wt_unlock(session, conn->mtx);
 
 	API_END();
@@ -64,23 +66,25 @@ __session_open_cursor(WT_SESSION *wt_session,
 	session = (SESSION *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config);
 
-	if (strncmp(uri, "config:", 6) == 0)
+	if (strncmp(uri, "config:", 7) == 0)
 		return (__wt_curconfig_open(session, uri, config, cursorp));
+	if (strncmp(uri, "stat:", 5) == 0)
+		return (__wt_curstat_open(session, uri, config, cursorp));
 	if (strncmp(uri, "table:", 6) == 0)
 		return (__wt_cursor_open(session, uri, config, cursorp));
 
-	__wt_err(session, 0, "Unknown cursor type '%s'\n", uri);
+	__wt_errx(session, "Unknown cursor type '%s'", uri);
 
 	API_END();
 	return (EINVAL);
 }
 
 /*
- * __session_create_table --
- *	WT_SESSION->create_table method.
+ * __session_create --
+ *	WT_SESSION->create method.
  */
 static int
-__session_create_table(WT_SESSION *wt_session,
+__session_create(WT_SESSION *wt_session,
     const char *name, const char *config)
 {
 	BTREE *btree;
@@ -93,7 +97,13 @@ __session_create_table(WT_SESSION *wt_session,
 	session = (SESSION *)wt_session;
 	conn = (CONNECTION *)wt_session->connection;
 
-	SESSION_API_CALL(session, create_table, config);
+	SESSION_API_CALL(session, create, config);
+
+	if (strncmp(name, "table:", 6) != 0) {
+		__wt_errx(session, "Unknown object type: %s", name);
+		return (EINVAL);
+	}
+	name += 6;
 
 	/* XXX need check whether the table already exists. */
 
@@ -114,7 +124,7 @@ __session_create_table(WT_SESSION *wt_session,
 	else if (strncmp(cval.str, "u", cval.len) == 0)
 		key_format = "u";
 	else {
-		__wt_err(session, 0, "Unknown key_format '%.*s'\n",
+		__wt_errx(session, "Unknown key_format '%.*s'",
 		    cval.len, cval.str);
 		return (EINVAL);
 	}
@@ -128,7 +138,7 @@ __session_create_table(WT_SESSION *wt_session,
 		fixed_len = (uint32_t)strtol(cval.str, NULL, 10);
 		value_format = "u";
 	} else {
-		__wt_err(session, 0, "Unknown value_format '%.*s'\n",
+		__wt_errx(session, "Unknown value_format '%.*s'",
 		    cval.len, cval.str);
 		return (EINVAL);
 	}
@@ -186,11 +196,11 @@ __session_create_table(WT_SESSION *wt_session,
 }
 
 /*
- * __session_rename_table --
- *	WT_SESSION->rename_table method.
+ * __session_rename --
+ *	WT_SESSION->rename method.
  */
 static int
-__session_rename_table(WT_SESSION *wt_session,
+__session_rename(WT_SESSION *wt_session,
     const char *oldname, const char *newname, const char *config)
 {
 	WT_UNUSED(wt_session);
@@ -202,42 +212,72 @@ __session_rename_table(WT_SESSION *wt_session,
 }
 
 /*
- * __session_drop_table --
- *	WT_SESSION->drop_table method.
+ * __session_drop --
+ *	WT_SESSION->drop method.
  */
 static int
-__session_drop_table(
+__session_drop(
     WT_SESSION *wt_session, const char *name, const char *config)
 {
 	SESSION *session;
-	WT_CONFIG_ITEM cvalue;
+	WT_CONFIG_ITEM cval;
 	int force, ret;
 
-	WT_UNUSED(wt_session);
-	WT_UNUSED(name);
-	WT_UNUSED(config);
-
 	session = (SESSION *)wt_session;
-	force = 0;
 
-	CONFIG_LOOP(session, config, cvalue)
-		CONFIG_ITEM("force")
-			force = (cvalue.val != 0);
-	CONFIG_END(session);
+	SESSION_API_CALL(session, create, config);
+	if (strncmp(name, "table:", 6) != 0) {
+		__wt_errx(session, "Unknown object type: %s", name);
+		return (EINVAL);
+	}
+	name += strlen("table:");
+
+	WT_RET(__wt_config_gets(__cfg, "force", &cval));
+	force = (cval.val != 0);
 
 	/* TODO: Combine the table name with the conn home to make a filename. */
 
 	ret = remove(name);
 
+	API_END();
+
 	return (force ? 0 : ret);
 }
 
 /*
- * __session_truncate_table --
- *	WT_SESSION->truncate_table method.
+ * __session_salvage --
+ *	WT_SESSION->salvage method.
  */
 static int
-__session_truncate_table(WT_SESSION *wt_session,
+__session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
+{
+	WT_UNUSED(wt_session);
+	WT_UNUSED(name);
+	WT_UNUSED(config);
+
+	return (0);
+}
+
+/*
+ * __session_sync --
+ *	WT_SESSION->sync method.
+ */
+static int
+__session_sync(WT_SESSION *wt_session, const char *name, const char *config)
+{
+	WT_UNUSED(wt_session);
+	WT_UNUSED(name);
+	WT_UNUSED(config);
+
+	return (0);
+}
+
+/*
+ * __session_truncate --
+ *	WT_SESSION->truncate method.
+ */
+static int
+__session_truncate(WT_SESSION *wt_session,
     const char *name, WT_CURSOR *start, WT_CURSOR *end, const char *config)
 {
 	WT_UNUSED(wt_session);
@@ -250,11 +290,11 @@ __session_truncate_table(WT_SESSION *wt_session,
 }
 
 /*
- * __session_verify_table --
- *	WT_SESSION->verify_table method.
+ * __session_verify --
+ *	WT_SESSION->verify method.
  */
 static int
-__session_verify_table(WT_SESSION *wt_session, const char *name, const char *config)
+__session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_UNUSED(wt_session);
 	WT_UNUSED(name);
@@ -313,6 +353,23 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_UNUSED(config);
 
 	return (ENOTSUP);
+}
+
+/*
+ * __session_log_printf --
+ *	WT_SESSION->log_printf method.
+ */
+static int
+__session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = __wt_log_vprintf((SESSION *)wt_session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
 }
 
 /*
@@ -424,7 +481,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
 	int ret;
 	CONNECTION *conn;
-	SESSION *session, *s;
+	SESSION *s, *session;
 	WT_SESSION *wt_session;
 
 	ret = 0;
@@ -432,15 +489,16 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	CONNECTION_API_CALL(conn, session, close, config);
 
+	/* Close open sessions. */
 	while ((s = TAILQ_FIRST(&conn->sessions_head)) != NULL) {
-		wt_session = &s->iface;
-		WT_TRET(wt_session->close(wt_session, config));
+		if (F_ISSET(s, WT_SESSION_INTERNAL))
+			TAILQ_REMOVE(&conn->sessions_head, s, q);
+		else {
+			wt_session = &s->iface;
+			WT_TRET(wt_session->close(wt_session, config));
+		}
 	}
 
-	if (conn->log_fh != NULL) {
-		WT_TRET(__wt_close(session, conn->log_fh));
-		conn->log_fh = NULL;
-	}
 	WT_TRET(__wt_connection_close(conn));
 	API_END();
 
@@ -460,21 +518,25 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 		NULL,
 		__session_close,
 		__session_open_cursor,
-		__session_create_table,
-		__session_rename_table,
-		__session_drop_table,
-		__session_truncate_table,
-		__session_verify_table,
+		__session_create,
+		__session_drop,
+		__session_rename,
+		__session_salvage,
+		__session_sync,
+		__session_truncate,
+		__session_verify,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
+		__session_log_printf,
 	};
 	CONNECTION *conn;
 	SESSION *session, *session_ret;
 	int ret;
 
 	conn = (CONNECTION *)wt_conn;
+	session_ret = NULL;
 	CONNECTION_API_CALL(conn, session, open_session, config);
 
 	__wt_lock(session, conn->mtx);
@@ -587,6 +649,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_api_arg_min(session, "cache size", cval.val,
 	    1 * WT_MEGABYTE));
 	conn->cache_size = cval.val;
+
+	WT_ERR(__wt_config_gets(__cfg, "data_update_max", &cval));
+	conn->data_update_max = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(__cfg, "data_update_min", &cval));
+	conn->data_update_min = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(__cfg, "hazard_max", &cval));
+	conn->hazard_size = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(__cfg, "session_max", &cval));
+	conn->session_size = (uint32_t)cval.val;
 
 	conn->verbose = 0;
 #ifdef HAVE_VERBOSE

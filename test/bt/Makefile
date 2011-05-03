@@ -3,14 +3,14 @@ SRC=	../../src
 WT=	../../build_posix
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a
 
-CFLAGS=-g -Wall -Wuninitialized -O ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include
+CFLAGS=-g -Wall ${__GCC_WARN} -I${BDB} -I${WT} -I${SRC}/include
 
 HDRS=	config.h wts.h
 SRCS=	bdb.c config.c t.c util.c wts.c
 OBJS=	bdb.o config.o t.o util.o wts.o 
 
 t: ${OBJS} ${LIB}
-	cc ${CFLAGS} -o $@ ${OBJS} ${WT}/simple_setup.o ${LIB} -lpthread
+	cc ${CFLAGS} -o $@ ${OBJS} ${LIB} -lpthread
 
 clean:
 	rm -f t ${OBJS} *.core dbm.db dbm.dump vgcore* vgout.* xx.log

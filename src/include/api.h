@@ -52,6 +52,10 @@ typedef struct {
 	WT_CURSOR iface;
 } CURSOR_CONFIG;
 
+typedef struct {
+	WT_CURSOR iface;
+} CURSOR_STAT;
+
 struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
 	uint32_t refcnt;		/* Sessions with this tree open. */
@@ -194,6 +198,8 @@ struct __session {
 	void (*msgcall)(const CONNECTION *, const char *);
 
 	FILE *msgfile;
+
+	uint32_t flags;
 };
 
 /*******************************************
@@ -343,14 +349,15 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
-#define	WT_DEBUG					0x00000002
+#define	WT_DEBUG					0x00000004
+#define	WT_DUMP_PRINT					0x00000002
+#define	WT_DUMP_RAW					0x00000001
 #define	WT_HUFFMAN_KEY					0x00000004
 #define	WT_HUFFMAN_VALUE				0x00000002
-#define	WT_MEMORY_CHECK					0x00000004
-#define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
 #define	WT_RLE						0x00000001
 #define	WT_SERVER_RUN					0x00000002
+#define	WT_SESSION_INTERNAL				0x00000001
 #define	WT_TELEPHONE					0x00000001
 #define	WT_VERB_EVICT					0x00000010
 #define	WT_VERB_FILEOPS					0x00000008
@@ -361,15 +368,16 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_WORKQ_RUN					0x00000001
 #define	WT_WRITE					0x00000001
 
-#define	WT_APIMASK_BT_DUMP				0x00000003
+#define	WT_APIMASK_BT_DUMP				0x00000007
 #define	WT_APIMASK_BT_OPEN				0x00000001
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_BT_TREE_WALK				0x00000001
 #define	WT_APIMASK_BTREE				0x00000007
 #define	WT_APIMASK_BUF					0x00000001
-#define	WT_APIMASK_CONN					0x00000007
+#define	WT_APIMASK_CONN					0x00000003
 #define	WT_APIMASK_HUFFMAN_SET				0x0000000f
+#define	WT_APIMASK_SESSION				0x00000001
 #define	WT_APIMASK_VERBOSE				0x0000001f
 /*
  * API flags section: END

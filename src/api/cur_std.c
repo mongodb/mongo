@@ -127,10 +127,10 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 		sz = wiredtiger_struct_sizev(fmt, ap);
 		if ((ret = __wt_buf_setsize(session, buf, sz)) == 0 &&
 		    (ret = wiredtiger_struct_packv(buf->mem, sz, fmt, ap)) == 0)
-			F_SET(cursor, WT_CURSTD_KEY_SET);
+			F_SET(cursor, WT_CURSTD_VALUE_SET);
 		else {
 			cursor->saved_err = ret;
-			F_CLR(cursor, WT_CURSTD_KEY_SET);
+			F_CLR(cursor, WT_CURSTD_VALUE_SET);
 			return;
 		}
 		cursor->value.data = buf->mem;

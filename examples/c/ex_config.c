@@ -32,7 +32,7 @@ int main(void)
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	ret = session->create_table(session, "access",
+	ret = session->create(session, "table:access",
 	    "key_format=S,value_format=S");
 
 	ret = session->begin_transaction(session, "priority=100,name=mytxn");

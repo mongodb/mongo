@@ -37,25 +37,10 @@ class Config:
 
 methods = {
 'cursor.close' : Method([]),
-'session.truncate_table' : Method([]),
-'session.verify_table' : Method([]),
-'session.commit_transaction' : Method([]),
-'session.rollback_transaction' : Method([]),
+
 'session.close' : Method([]),
 
-'session.open_cursor' : Method([
-	Config('isolation', 'read-committed', r'''
-		the isolation level for this cursor, one of "snapshot" or
-		"read-committed" or "read-uncommitted".  Ignored for transactional
-		cursors'''),
-	Config('overwrite', 'false', r'''
-		if an existing key is inserted, overwrite the existing value'''),
-	Config('raw', 'false', r'''
-		ignore the encodings for the key and value, manage data as if the
-		formats were \c "u"'''),
-]),
-
-'session.create_table' : Method([
+'session.create' : Method([
 	Config('allocation_size', '512B', r'''
 		file unit allocation size, in bytes'''),
 	Config('columns', '', r'''
@@ -100,7 +85,32 @@ methods = {
 		applications use the WT_ITEM struct to manipulate raw byte arrays.'''),
 ]),
 
-'session.rename_table' : Method([]),
+'session.drop' : Method([]),
+
+'session.log_printf' : Method([]),
+
+'session.open_cursor' : Method([
+	Config('bulk', 'false', r'''
+		configure the cursor for bulk loads'''),
+	Config('dump', 'false', r'''
+		configure the cursor for dump format inputs and outputs.
+		One of \c false, \c "printable" or \c "raw"'''),
+	Config('isolation', 'read-committed', r'''
+		the isolation level for this cursor, one of \c "snapshot" or
+		\c "read-committed" or \c "read-uncommitted".
+		Ignored for transactional cursors'''),
+	Config('overwrite', 'false', r'''
+		if an existing key is inserted, overwrite the existing value'''),
+	Config('raw', 'false', r'''
+		ignore the encodings for the key and value, manage data as if the
+		formats were \c "u"'''),
+]),
+
+'session.rename' : Method([]),
+'session.salvage' : Method([]),
+'session.sync' : Method([]),
+'session.truncate' : Method([]),
+'session.verify' : Method([]),
 
 'session.begin_transaction' : Method([
 	Config('isolation', 'read-committed', r'''
@@ -117,6 +127,9 @@ methods = {
 		between -100 and 100.  Transactions with higher values are less likely
 		to abort'''),
 ]),
+
+'session.commit_transaction' : Method([]),
+'session.rollback_transaction' : Method([]),
 
 'session.checkpoint' : Method([
 	Config('archive', 'false', r'''
@@ -156,15 +169,15 @@ methods = {
 		maximum heap memory to allocate for the cache'''),
 	Config('create', 'false', r'''
 		create the database if it does not exist'''),
-	Config('data_update_min', '8KB', r'''
-		minimum update buffer size for a session'''),
 	Config('data_update_max', '32KB', r'''
 		maximum update buffer size for a session'''),
+	Config('data_update_min', '8KB', r'''
+		minimum update buffer size for a session'''),
 	Config('exclusive', 'false', r'''
 		fail if the database already exists'''),
 	Config('error_prefix', '', r'''
 		Prefix string for error messages'''),
-	Config('hazard_size', '15', r'''
+	Config('hazard_max', '15', r'''
 		number of hazard references per session'''),
 	Config('logging', 'false', r'''
 		enable logging'''),
@@ -184,7 +197,7 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'bt_dump' : [ 'DEBUG', 'PRINTABLES' ],
+	'bt_dump' : [ 'DEBUG', 'DUMP_PRINT', 'DUMP_RAW' ],
 	'bt_open' : [ 'CREATE' ],
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],
@@ -195,7 +208,8 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'MEMORY_CHECK', 'SERVER_RUN', 'WORKQ_RUN' ],
+	'conn' : [ 'SERVER_RUN', 'WORKQ_RUN' ],
 	'btree' : [ 'COLUMN', 'RDONLY', 'RLE' ],
 	'buf' : [ 'BUF_INUSE' ],
+	'session' : [ 'SESSION_INTERNAL' ],
 }

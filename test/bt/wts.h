@@ -36,17 +36,18 @@
 #define	VAR		3
 
 #define	WT_PREFIX	"wt"			/* Output file prefix */
+#define	WT_TABLENAME	"table:__wt"
 #define	BDB_PREFIX	"bdb"
+
 
 typedef struct {
 	char *progname;				/* Program name */
 
 	void *bdb;				/* BDB comparison handle */
 
-	void *wts_btree;			/* WT BTREE handle */
-	void *wts_conn;				/* WT CONNECTION handle */
-	void *wts_cursor;			/* WT CURSOR handle */
-	void *wts_session;			/* WT SESSION handle */
+	void *wts_conn;				/* WT_CONNECTION handle */
+	void *wts_cursor;			/* WT_CURSOR handle */
+	void *wts_session;			/* WT_SESSION handle */
 
 	FILE *rand_log;				/* Random number log */
 

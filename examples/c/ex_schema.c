@@ -61,7 +61,7 @@ int main(void)
 	 * that case, but is a safety check that the schema matches what the
 	 * program expects.
 	 */
-	ret = session->create_table(session, "population",
+	ret = session->create(session, "table:population",
 	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population),"

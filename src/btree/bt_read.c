@@ -152,6 +152,11 @@ __wt_cache_read_server(void *arg)
 		return (NULL);
 	}
 	session = (SESSION *)wt_session;
+	/*
+	 * Don't close this session during WT_CONNECTION->close: we do it
+	 * before the thread completes.
+	 */
+	F_SET(session, WT_SESSION_INTERNAL);
 
 	for (;;) {
 		WT_VERBOSE(conn,
@@ -198,9 +203,7 @@ __wt_cache_read_server(void *arg)
 	}
 
 	WT_VERBOSE(conn, WT_VERB_READ, (session, "cache read server exiting"));
-
-	if (session != &conn->default_session)
-		(void)__wt_session_close(session);
+	(void)wt_session->close(wt_session, NULL);
 
 	return (NULL);
 }

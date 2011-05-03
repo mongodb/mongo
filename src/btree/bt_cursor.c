@@ -170,6 +170,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			++cbt->rip;
 			++cbt->cip;
 		}
+		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		return (0);
 	}
 	/* NOTREACHED */
@@ -197,6 +198,7 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 	BTREE *btree;
 	SESSION *session;
 	WT_CURSOR *cursor;
+	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -204,11 +206,16 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 
 	*exact = 0;
 	if (F_ISSET(btree, WT_COLUMN))
-		return (__wt_btree_col_get(session,
-		    cursor->recno, (WT_ITEM *)&cursor->value));
+		ret = __wt_btree_col_get(session,
+		    cursor->recno, (WT_ITEM *)&cursor->value);
 	else
-		return (__wt_btree_row_get(session,
-		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+		ret = __wt_btree_row_get(session,
+		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value);
+
+	if (ret == 0)
+		F_SET(cursor, WT_CURSTD_VALUE_SET);
+
+	return (ret);
 }
 
 /*

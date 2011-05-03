@@ -41,12 +41,11 @@ err:	va_end(ap);
 }
 
 int
-__wt_log_printf(SESSION *session, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
+__wt_log_vprintf(SESSION *session, const char *fmt, va_list ap)
 {
 	CONNECTION *conn;
 	WT_BUF *buf;
-	va_list ap;
+	va_list ap_copy;
 	size_t len;
 
 	conn = S2C(session);
@@ -56,15 +55,13 @@ __wt_log_printf(SESSION *session, const char *fmt, ...)
 
 	buf = &session->logprint_buf;
 
-	va_start(ap, fmt);
-	len = vsnprintf(NULL, 0, fmt, ap) + 2;
-	va_end(ap);
+	va_copy(ap_copy, ap);
+	len = vsnprintf(NULL, 0, fmt, ap_copy) + 2;
+	va_end(ap_copy);
 
 	WT_RET(__wt_buf_setsize(session, buf, len));
 
-	va_start(ap, fmt);
 	(void)vsnprintf(buf->mem, len, fmt, ap);
-	va_end(ap);
 
 	/*
 	 * For now, just dump the text into the file.  Later, we will use
@@ -77,4 +74,18 @@ __wt_log_printf(SESSION *session, const char *fmt, ...)
 #else
 	return (__wt_logput_debug(session, (char *)buf->mem));
 #endif
+}
+
+int
+__wt_log_printf(SESSION *session, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = __wt_log_vprintf(session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
 }

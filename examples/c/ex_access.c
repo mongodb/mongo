@@ -28,7 +28,7 @@ int main(void)
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
-	ret = session->create_table(session, "access",
+	ret = session->create(session, "table:access",
 	    "key_format=S,value_format=S");
 
 	ret = session->open_cursor(session, "table:access",
