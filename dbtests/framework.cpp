@@ -85,7 +85,7 @@ namespace mongo {
 
         Result * Suite::run( const string& filter ) {
             // set tlogLevel to -1 to suppress tlog() output in a test program
-            // TEMP tlogLevel = -1;
+            tlogLevel = -1;
 
             log(1) << "\t about to setupTests" << endl;
             setupTests();

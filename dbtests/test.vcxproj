@@ -690,6 +690,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct" />
+    <None Include="btreetests.inl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js32d.lib">

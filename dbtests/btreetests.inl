@@ -309,7 +309,6 @@
             for ( long long i = 0; i < 1000000; i += 1000 ) {
                 insert( i );
             }
-//            dump();
             string orig, after;
             {
                 NamespaceDetails *nsd = nsdetails( ns() );
@@ -317,7 +316,6 @@
                 stringstream ss;
                 bt()->shape( ss );
                 orig = ss.str();
-                cout << orig << endl;
             }
             vector< string > toDel;
             vector< string > other;
