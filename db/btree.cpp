@@ -204,9 +204,13 @@ namespace mongo {
     void BucketBasics<V>::assertValid(const Ordering &order, bool force) const {
         if ( !debug && !force )
             return;
-        wassert( this->n >= 0 && this->n < Size() );
-        wassert( this->emptySize >= 0 && this->emptySize < V::BucketSize );
-        wassert( this->topSize >= this->n && this->topSize <= V::BucketSize );
+        {
+            int foo = this->n;
+            wassert( foo >= 0 && this->n < Size() );
+            foo = this->emptySize;
+            wassert( foo >= 0 && this->emptySize < V::BucketSize );
+            wassert( this->topSize >= this->n && this->topSize <= V::BucketSize );
+        }
 
         // this is very slow so don't do often
         {
@@ -506,7 +510,10 @@ namespace mongo {
         // TEMP TEST getDur().declareWriteIntent(this, sizeof(*this));
 
         this->emptySize = tdz - dataUsed - this->n * sizeof(_KeyNode);
-        assert( this->emptySize >= 0 );
+        {
+            int foo = this->emptySize;
+            assert( foo >= 0 );
+        }
 
         setPacked();
 
