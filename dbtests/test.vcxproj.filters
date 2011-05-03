@@ -776,6 +776,9 @@
     <ClCompile Include="..\db\querypattern.cpp">
       <Filter>db</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\ramlog.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

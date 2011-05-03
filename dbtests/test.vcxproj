@@ -636,6 +636,7 @@
     <ClCompile Include="..\util\miniwebserver.cpp" />
     <ClCompile Include="..\util\mmap.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
+    <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\sock.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
