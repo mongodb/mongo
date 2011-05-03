@@ -22,27 +22,30 @@
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
+#include "db/pipeline/expression_context.h"
 #include "db/pdfile.h"
 
 namespace mongo {
 
     const char Pipeline::commandName[] = "aggregate";
     const char Pipeline::pipelineName[] = "pipeline";
+    const char Pipeline::fromRouterName[] = "fromRouter";
+    const char Pipeline::splitMongodPipelineName[] = "splitMongodPipeline";
 
     Pipeline::~Pipeline() {
     }
 
-    Pipeline::Pipeline():
+    Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
 	collectionName(),
 	sourceList(),
-        //splitMongodPipeline(false) {
-        splitMongodPipeline(true) {
+        splitMongodPipeline(DEBUG_BUILD == 1), /* always split for DEV */
+        pCtx(pTheCtx) {
     }
 
     boost::shared_ptr<Pipeline> Pipeline::parseCommand(
 	string &errmsg, BSONObj &cmdObj,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-	boost::shared_ptr<Pipeline> pPipeline(new Pipeline());
+	boost::shared_ptr<Pipeline> pPipeline(new Pipeline(pCtx));
         vector<BSONElement> pipeline;
 
         /* gather the specification for the aggregation */
@@ -63,8 +66,14 @@ namespace mongo {
                 continue;
             }
 
+	    /* if the request came from the router, we're in a shard */
+	    if (!strcmp(pFieldName, fromRouterName)) {
+		pCtx->setInShard(cmdElement.Bool());
+		continue;
+	    }
+
 	    /* check for debug options */
-	    if (!strcmp(pFieldName, "splitMongodPipeline")) {
+	    if (!strcmp(pFieldName, splitMongodPipelineName)) {
 		pPipeline->splitMongodPipeline = true;
 		continue;
 	    }
@@ -181,7 +190,7 @@ namespace mongo {
 
     boost::shared_ptr<Pipeline> Pipeline::splitForSharded() {
 	/* create an initialize the shard spec we'll return */
-	boost::shared_ptr<Pipeline> pShardPipeline(new Pipeline());
+	boost::shared_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
 	pShardPipeline->collectionName = collectionName;
 
 	/* put the source list aside */
@@ -228,7 +237,10 @@ namespace mongo {
 
 	bool btemp;
 	if (btemp = getSplitMongodPipeline()) {
-	    pBuilder->append("splitMongodPipeline", btemp);
+	    pBuilder->append(splitMongodPipelineName, btemp);
+	}
+	if (btemp = pCtx->getInRouter()) {
+	    pBuilder->append(fromRouterName, btemp);
 	}
     }
 

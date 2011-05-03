@@ -58,31 +58,6 @@ namespace mongo {
     };
 
 
-    class AccumulatorPush :
-        public Accumulator {
-    public:
-        // virtuals from Expression
-	virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
-        virtual boost::shared_ptr<const Value> getValue() const;
-	virtual const char *getOpName() const;
-
-        /*
-          Create an appending accumulator.
-
-          @returns the created accumulator
-         */
-        static boost::shared_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
-
-    private:
-        AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
-
-        mutable vector<boost::shared_ptr<const Value> > vpValue;
-	intrusive_ptr<ExpressionContext> pCtx;
-    };
-
-
     class AccumulatorMinMax :
         public Accumulator {
     public:
@@ -111,6 +86,32 @@ namespace mongo {
     };
 
 
+    class AccumulatorPush :
+        public Accumulator {
+    public:
+        // virtuals from Expression
+	virtual boost::shared_ptr<const Value> evaluate(
+            boost::shared_ptr<Document> pDocument) const;
+        virtual boost::shared_ptr<const Value> getValue() const;
+	virtual const char *getOpName() const;
+
+        /*
+          Create an appending accumulator.
+
+	  @param pCtx the expression context
+          @returns the created accumulator
+         */
+        static boost::shared_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+    private:
+        AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
+
+        mutable vector<boost::shared_ptr<const Value> > vpValue;
+	intrusive_ptr<ExpressionContext> pCtx;
+    };
+
+
     class AccumulatorSum :
         public Accumulator {
     public:
@@ -123,16 +124,48 @@ namespace mongo {
         /*
           Create a summing accumulator.
 
+	  @param pCtx the expression context
+          @returns the created accumulator
+         */
+        static boost::shared_ptr<Accumulator> create(
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+    protected: /* reused by AccumulatorAvg */
+        AccumulatorSum();
+
+        mutable BSONType totalType;
+        mutable long long longTotal;
+        mutable double doubleTotal;
+    };
+
+
+    class AccumulatorAvg :
+	public AccumulatorSum {
+        typedef AccumulatorSum Super;
+    public:
+        // virtuals from Accumulator
+	virtual boost::shared_ptr<const Value> evaluate(
+            boost::shared_ptr<Document> pDocument) const;
+        virtual boost::shared_ptr<const Value> getValue() const;
+	virtual const char *getOpName() const;
+
+        /*
+          Create an averaging accumulator.
+
+	  @param pCtx the expression context
           @returns the created accumulator
          */
         static boost::shared_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
-        AccumulatorSum();
+	static const char subTotalName[];
+	static const char countName[];
 
-        mutable BSONType resultType;
-        mutable long long longResult;
-        mutable double doubleResult;
+        AccumulatorAvg(const intrusive_ptr<ExpressionContext> &pCtx);
+
+	mutable long long count;
+	intrusive_ptr<ExpressionContext> pCtx;
     };
+
 }

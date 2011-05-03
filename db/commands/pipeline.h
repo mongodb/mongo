@@ -113,14 +113,17 @@ namespace mongo {
 
     private:
 	static const char pipelineName[];
+	static const char fromRouterName[];
+	static const char splitMongodPipelineName[];
 
-        Pipeline();
+        Pipeline(const intrusive_ptr<ExpressionContext> &pCtx);
 
 	string collectionName;
 	typedef list<boost::shared_ptr<DocumentSource> > SourceList;
 	SourceList sourceList;
 
 	bool splitMongodPipeline;
+	intrusive_ptr<ExpressionContext> pCtx;
     };
 
 } // namespace mongo

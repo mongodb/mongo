@@ -26,6 +26,7 @@
 #include "../db/query.h"
 #include "../db/commands/pipeline.h"
 #include "../db/pipeline/document_source.h"
+#include "../db/pipeline/expression_context.h"
 
 #include "config.h"
 #include "chunk.h"
@@ -1078,7 +1079,8 @@ namespace mongo {
 	    //const string shardedOutputCollection = getTmpName( collection );
 
 	    intrusive_ptr<ExpressionContext> pCtx(
-		ExpressionContext::create(true, false));
+		ExpressionContext::create());
+	    pCtx->setInRouter(true);
 
 	    /* parse the pipeline specification */
 	    boost::shared_ptr<Pipeline> pPipeline(
@@ -1137,7 +1139,7 @@ namespace mongo {
 		DocumentSourceCommandFutures::create(errmsg, &futures));
 
 	    /* run the pipeline */
-	    bool failed = pPipeline->run(result, errmsg, pSource, &ectx);
+	    bool failed = pPipeline->run(result, errmsg, pSource);
 
 /*
 	    BSONObjBuilder shardresults;

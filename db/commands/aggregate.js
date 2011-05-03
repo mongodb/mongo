@@ -151,3 +151,19 @@ var g3 = db.runCommand(
 	authors : { $push : "$author" }
     }}
 ]});
+
+// $avg, and averaging in a final projection
+var g4 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	author : 1,
+	tag : { $unwind : "tags" },
+	pageViews : 1
+    }},
+    { $group : {
+	_id: { tag : 1 },
+	docsByTag : { $sum : 1 },
+	viewsByTag : { $sum : "$pageViews" },
+	avgByTag : { $avg : "$pageViews" },
+    }}
+]});

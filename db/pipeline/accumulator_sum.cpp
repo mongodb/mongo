@@ -20,6 +20,7 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+
     boost::shared_ptr<const Value> AccumulatorSum::evaluate(
         boost::shared_ptr<Document> pDocument) const {
         assert(vpOperand.size() == 1);
@@ -27,24 +28,24 @@ namespace mongo {
 
         /* upgrade to the widest type required to hold the result */
         BSONType rhsType = prhs->getType();
-        if ((resultType == NumberLong) || (rhsType == NumberLong))
-            resultType = NumberLong;
-        if ((resultType == NumberDouble) || (rhsType == NumberDouble))
-            resultType = NumberDouble;
+        if ((totalType == NumberLong) || (rhsType == NumberLong))
+            totalType = NumberLong;
+        if ((totalType == NumberDouble) || (rhsType == NumberDouble))
+            totalType = NumberDouble;
 
-        if (resultType == NumberInt) {
+        if (totalType == NumberInt) {
             int v = prhs->getInt();
-            longResult += v;
-            doubleResult += v;
+            longTotal += v;
+            doubleTotal += v;
         }
-        else if (resultType == NumberLong) {
+        else if (totalType == NumberLong) {
             long long v = prhs->getLong();
-            longResult += v;
-            doubleResult += v;
+            longTotal += v;
+            doubleTotal += v;
         }
-        else { /* (resultType == NumberDouble) */
+        else { /* (totalType == NumberDouble) */
             double v = prhs->getDouble();
-            doubleResult += v;
+            doubleTotal += v;
         }
 
         return Value::getZero();
@@ -57,18 +58,18 @@ namespace mongo {
     }
 
     boost::shared_ptr<const Value> AccumulatorSum::getValue() const {
-        if (resultType == NumberInt)
-            return Value::createInt((int)longResult);
-        if (resultType == NumberLong)
-            return Value::createLong(longResult);
-        return Value::createDouble(doubleResult);
+        if (totalType == NumberInt)
+            return Value::createInt((int)longTotal);
+        if (totalType == NumberLong)
+            return Value::createLong(longTotal);
+        return Value::createDouble(doubleTotal);
     }
 
     AccumulatorSum::AccumulatorSum():
         Accumulator(),
-        resultType(NumberInt),
-        longResult(0),
-        doubleResult(0) {
+        totalType(NumberInt),
+        longTotal(0),
+        doubleTotal(0) {
     }
 
     const char *AccumulatorSum::getOpName() const {

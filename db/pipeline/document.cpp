@@ -89,7 +89,7 @@ namespace mongo {
         */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
-            if (strcmp(vFieldName[i].c_str(), fieldName.c_str()) == 0)
+	    if (fieldName.compare(vFieldName[i]) == 0)
                 return vpValue[i];
         }
 
