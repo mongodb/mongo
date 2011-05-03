@@ -147,40 +147,40 @@ namespace JSTests {
             s->invoke( "return this.z;" , 0, &o );
             ASSERT_EQUALS( "sara" , s->getString( "return" ) );
 
-            s->invoke( "return this.z == 'sara';" , 0, 0 );
+            s->invoke( "return this.z == 'sara';" , 0, &o );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "this.z == 'sara';" , 0, 0 );
+            s->invoke( "this.z == 'sara';" , 0, &o );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "this.z == 'asara';" , 0, 0 );
+            s->invoke( "this.z == 'asara';" , 0, &o );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "return this.x == 17;" , 0, 0 );
+            s->invoke( "return this.x == 17;" , 0, &o );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "return this.x == 18;" , 0, 0 );
+            s->invoke( "return this.x == 18;" , 0, &o );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function(){ return this.x == 17; }" , 0, 0 );
+            s->invoke( "function(){ return this.x == 17; }" , 0, &o );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "function(){ return this.x == 18; }" , 0, 0 );
+            s->invoke( "function(){ return this.x == 18; }" , 0, &o );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function (){ return this.x == 17; }" , 0, 0 );
+            s->invoke( "function (){ return this.x == 17; }" , 0, &o );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "function z(){ return this.x == 18; }" , 0, 0 );
+            s->invoke( "function z(){ return this.x == 18; }" , 0, &o );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function (){ this.x == 17; }" , 0, 0 );
+            s->invoke( "function (){ this.x == 17; }" , 0, &o );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function z(){ this.x == 18; }" , 0, 0 );
+            s->invoke( "function z(){ this.x == 18; }" , 0, &o );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , 0, 0 );
+            s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , 0, &o );
             ASSERT_EQUALS( 10 , s->getNumber( "x" ) );
 
             delete s;
