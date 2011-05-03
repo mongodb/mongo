@@ -106,24 +106,25 @@ namespace JSTests {
         void run() {
             Scope * s = globalScriptEngine->newScope();
 
-            s->invoke( "x=5;" , BSONObj() );
+            s->invoke( "x=5;" , 0, 0 );
             ASSERT( 5 == s->getNumber( "x" ) );
 
-            s->invoke( "return 17;" , BSONObj() );
+            s->invoke( "return 17;" , 0, 0 );
             ASSERT( 17 == s->getNumber( "return" ) );
 
-            s->invoke( "function(){ return 17; }" , BSONObj() );
+            s->invoke( "function(){ return 17; }" , 0, 0 );
             ASSERT( 17 == s->getNumber( "return" ) );
 
             s->setNumber( "x" , 1.76 );
-            s->invoke( "return x == 1.76; " , BSONObj() );
+            s->invoke( "return x == 1.76; " , 0, 0 );
             ASSERT( s->getBoolean( "return" ) );
 
             s->setNumber( "x" , 1.76 );
-            s->invoke( "return x == 1.79; " , BSONObj() );
+            s->invoke( "return x == 1.79; " , 0, 0 );
             ASSERT( ! s->getBoolean( "return" ) );
 
-            s->invoke( "function( z ){ return 5 + z; }" , BSON( "" << 11 ) );
+            BSONObj obj = BSON( "" << 11 );
+            s->invoke( "function( z ){ return 5 + z; }" , &obj, 0 );
             ASSERT_EQUALS( 16 , s->getNumber( "return" ) );
 
             delete s;
@@ -138,48 +139,48 @@ namespace JSTests {
             BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
             s->setObject( "blah" , o );
 
-            s->invoke( "return blah.x;" , BSONObj() );
+            s->invoke( "return blah.x;" , 0, 0 );
             ASSERT_EQUALS( 17 , s->getNumber( "return" ) );
-            s->invoke( "return blah.y;" , BSONObj() );
+            s->invoke( "return blah.y;" , 0, 0 );
             ASSERT_EQUALS( "eliot" , s->getString( "return" ) );
 
             s->invoke( "return this.z;" , 0, &o );
             ASSERT_EQUALS( "sara" , s->getString( "return" ) );
 
-            s->invoke( "return this.z == 'sara';" , BSONObj() );
+            s->invoke( "return this.z == 'sara';" , 0, 0 );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "this.z == 'sara';" , BSONObj() );
+            s->invoke( "this.z == 'sara';" , 0, 0 );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "this.z == 'asara';" , BSONObj() );
+            s->invoke( "this.z == 'asara';" , 0, 0 );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "return this.x == 17;" , BSONObj() );
+            s->invoke( "return this.x == 17;" , 0, 0 );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "return this.x == 18;" , BSONObj() );
+            s->invoke( "return this.x == 18;" , 0, 0 );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function(){ return this.x == 17; }" , BSONObj() );
+            s->invoke( "function(){ return this.x == 17; }" , 0, 0 );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "function(){ return this.x == 18; }" , BSONObj() );
+            s->invoke( "function(){ return this.x == 18; }" , 0, 0 );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function (){ return this.x == 17; }" , BSONObj() );
+            s->invoke( "function (){ return this.x == 17; }" , 0, 0 );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
-            s->invoke( "function z(){ return this.x == 18; }" , BSONObj() );
+            s->invoke( "function z(){ return this.x == 18; }" , 0, 0 );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function (){ this.x == 17; }" , BSONObj() );
+            s->invoke( "function (){ this.x == 17; }" , 0, 0 );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "function z(){ this.x == 18; }" , BSONObj() );
+            s->invoke( "function z(){ this.x == 18; }" , 0, 0 );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
-            s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , BSONObj() );
+            s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , 0, 0 );
             ASSERT_EQUALS( 10 , s->getNumber( "x" ) );
 
             delete s;
@@ -191,12 +192,12 @@ namespace JSTests {
         void run() {
             Scope * s = globalScriptEngine->newScope();
 
-            s->invoke( "z = { num : 1 };" , BSONObj() );
+            s->invoke( "z = { num : 1 };" , 0, 0 );
             BSONObj out = s->getObject( "z" );
             ASSERT_EQUALS( 1 , out["num"].number() );
             ASSERT_EQUALS( 1 , out.nFields() );
 
-            s->invoke( "z = { x : 'eliot' };" , BSONObj() );
+            s->invoke( "z = { x : 'eliot' };" , 0, 0 );
             out = s->getObject( "z" );
             ASSERT_EQUALS( (string)"eliot" , out["x"].valuestr() );
             ASSERT_EQUALS( 1 , out.nFields() );
@@ -218,7 +219,7 @@ namespace JSTests {
 
             s->localConnect( "blah" );
 
-            s->invoke( "z = { _id : new ObjectId() , a : 123 };" , BSONObj() );
+            s->invoke( "z = { _id : new ObjectId() , a : 123 };" , 0, 0 );
             BSONObj out = s->getObject( "z" );
             ASSERT_EQUALS( 123 , out["a"].number() );
             ASSERT_EQUALS( jstOID , out["_id"].type() );
@@ -227,13 +228,13 @@ namespace JSTests {
 
             s->setObject( "a" , out );
 
-            s->invoke( "y = { _id : a._id , a : 124 };" , BSONObj() );
+            s->invoke( "y = { _id : a._id , a : 124 };" , 0, 0 );
             out = s->getObject( "y" );
             ASSERT_EQUALS( 124 , out["a"].number() );
             ASSERT_EQUALS( jstOID , out["_id"].type() );
             ASSERT_EQUALS( out["_id"].__oid().str() , save.str() );
 
-            s->invoke( "y = { _id : new ObjectId( a._id ) , a : 125 };" , BSONObj() );
+            s->invoke( "y = { _id : new ObjectId( a._id ) , a : 125 };" , 0, 0 );
             out = s->getObject( "y" );
             ASSERT_EQUALS( 125 , out["a"].number() );
             ASSERT_EQUALS( jstOID , out["_id"].type() );
@@ -273,15 +274,15 @@ namespace JSTests {
             BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" << "zz" << BSONObj() );
             s->setObject( "blah" , o , true );
 
-            s->invoke( "blah.y = 'e'", BSONObj() );
+            s->invoke( "blah.y = 'e'", 0, 0 );
             BSONObj out = s->getObject( "blah" );
             ASSERT( strlen( out["y"].valuestr() ) > 1 );
 
-            s->invoke( "blah.a = 19;" , BSONObj() );
+            s->invoke( "blah.a = 19;" , 0, 0 );
             out = s->getObject( "blah" );
             ASSERT( out["a"].eoo() );
 
-            s->invoke( "blah.zz.a = 19;" , BSONObj() );
+            s->invoke( "blah.zz.a = 19;" , 0, 0 );
             out = s->getObject( "blah" );
             ASSERT( out["zz"].embeddedObject()["a"].eoo() );
 
@@ -289,12 +290,12 @@ namespace JSTests {
             out = s->getObject( "blah" );
             ASSERT( out["zz"].embeddedObject()["a"].eoo() );
 
-            s->invoke( "delete blah['x']" , BSONObj() );
+            s->invoke( "delete blah['x']" , 0, 0 );
             out = s->getObject( "blah" );
             ASSERT( !out["x"].eoo() );
 
             // read-only object itself can be overwritten
-            s->invoke( "blah = {}", BSONObj() );
+            s->invoke( "blah = {}", 0, 0 );
             out = s->getObject( "blah" );
             ASSERT( out.isEmpty() );
 
@@ -327,13 +328,13 @@ namespace JSTests {
                 }
                 s->setObject( "x" , o );
 
-                s->invoke( "return x.d.getTime() != 12;" , BSONObj() );
+                s->invoke( "return x.d.getTime() != 12;" , 0, 0 );
                 ASSERT_EQUALS( true, s->getBoolean( "return" ) );
 
-                s->invoke( "z = x.d.getTime();" , BSONObj() );
+                s->invoke( "z = x.d.getTime();" , 0, 0 );
                 ASSERT_EQUALS( 123456789 , s->getNumber( "z" ) );
 
-                s->invoke( "z = { z : x.d }" , BSONObj() );
+                s->invoke( "z = { z : x.d }" , 0, 0 );
                 BSONObj out = s->getObject( "z" );
                 ASSERT( out["z"].type() == Date );
             }
@@ -348,16 +349,16 @@ namespace JSTests {
                 }
                 s->setObject( "x" , o );
 
-                s->invoke( "z = x.r.test( 'b' );" , BSONObj() );
+                s->invoke( "z = x.r.test( 'b' );" , 0, 0 );
                 ASSERT_EQUALS( false , s->getBoolean( "z" ) );
 
-                s->invoke( "z = x.r.test( 'a' );" , BSONObj() );
+                s->invoke( "z = x.r.test( 'a' );" , 0, 0 );
                 ASSERT_EQUALS( true , s->getBoolean( "z" ) );
 
-                s->invoke( "z = x.r.test( 'ba' );" , BSONObj() );
+                s->invoke( "z = x.r.test( 'ba' );" , 0, 0 );
                 ASSERT_EQUALS( false , s->getBoolean( "z" ) );
 
-                s->invoke( "z = { a : x.r };" , BSONObj() );
+                s->invoke( "z = { a : x.r };" , 0, 0 );
 
                 BSONObj out = s->getObject("z");
                 ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
@@ -401,7 +402,7 @@ namespace JSTests {
 
             s->setObject( "z" , b.obj() );
 
-            ASSERT( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , BSONObj() ) == 0 );
+            ASSERT( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , 0, 0 ) == 0 );
 
             BSONObj out = s->getObject( "y" );
             ASSERT_EQUALS( Timestamp , out["a"].type() );
@@ -435,7 +436,7 @@ namespace JSTests {
             ASSERT_EQUALS( NumberDouble , o["b"].type() );
 
             s->setObject( "z" , o );
-            s->invoke( "return z" , BSONObj() );
+            s->invoke( "return z" , 0, 0 );
             BSONObj out = s->getObject( "return" );
             ASSERT_EQUALS( 5 , out["a"].number() );
             ASSERT_EQUALS( 5.6 , out["b"].number() );
@@ -453,7 +454,7 @@ namespace JSTests {
             }
 
             s->setObject( "z" , o , false );
-            s->invoke( "return z" , BSONObj() );
+            s->invoke( "return z" , 0, 0 );
             out = s->getObject( "return" );
             ASSERT_EQUALS( 5 , out["a"].number() );
             ASSERT_EQUALS( 5.6 , out["b"].number() );
@@ -486,7 +487,7 @@ namespace JSTests {
             ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["0"].type() );
             ASSERT_EQUALS( NumberInt , out["a"].embeddedObjectUserCheck()["1"].type() );
 
-            s->invokeSafe( "z.z = 5;" , BSONObj() );
+            s->invokeSafe( "z.z = 5;" , 0, 0 );
             out = s->getObject( "z" );
             ASSERT_EQUALS( 5 , out["z"].number() );
             ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["0"].type() );
@@ -624,10 +625,10 @@ namespace JSTests {
 
             for ( int i=5; i<100 ; i += 10 ) {
                 s->setObject( "a" , build(i) , false );
-                s->invokeSafe( "tojson( a )" , BSONObj() );
+                s->invokeSafe( "tojson( a )" , 0, 0 );
 
                 s->setObject( "a" , build(5) , true );
-                s->invokeSafe( "tojson( a )" , BSONObj() );
+                s->invokeSafe( "tojson( a )" , 0, 0 );
             }
 
             delete s;
@@ -733,7 +734,7 @@ namespace JSTests {
                 s->setObject( "foo" , b.obj() );
             }
 
-            s->invokeSafe( "out = {}; out.a = foo.a; foo.b(); foo.c();" , BSONObj() );
+            s->invokeSafe( "out = {}; out.a = foo.a; foo.b(); foo.c();" , 0, 0 );
             BSONObj out = s->getObject( "out" );
 
             ASSERT_EQUALS( 1 , out["a"].number() );
@@ -843,8 +844,8 @@ namespace JSTests {
                 s->setObject( "x" , in );
             }
 
-            s->invokeSafe( "myb = x.b; print( myb ); printjson( myb );" , BSONObj() );
-            s->invokeSafe( "y = { c : myb };" , BSONObj() );
+            s->invokeSafe( "myb = x.b; print( myb ); printjson( myb );" , 0, 0 );
+            s->invokeSafe( "y = { c : myb };" , 0, 0 );
 
             BSONObj out = s->getObject( "y" );
             ASSERT_EQUALS( BinData , out["c"].type() );
@@ -853,7 +854,7 @@ namespace JSTests {
             ASSERT_EQUALS( 0 , in["b"].woCompare( out["c"] , false ) );
 
             // check that BinData js class is utilized
-            s->invokeSafe( "q = x.b.toString();", BSONObj() );
+            s->invokeSafe( "q = x.b.toString();", 0, 0 );
             stringstream expected;
             expected << "BinData(" << BinDataGeneral << ",\"" << base64 << "\")";
             ASSERT_EQUALS( expected.str(), s->getString( "q" ) );
@@ -861,12 +862,12 @@ namespace JSTests {
             stringstream scriptBuilder;
             scriptBuilder << "z = { c : new BinData( " << BinDataGeneral << ", \"" << base64 << "\" ) };";
             string script = scriptBuilder.str();
-            s->invokeSafe( script.c_str(), BSONObj() );
+            s->invokeSafe( script.c_str(), 0, 0 );
             out = s->getObject( "z" );
 //            pp( "out" , out["c"] );
             ASSERT_EQUALS( 0 , in["b"].woCompare( out["c"] , false ) );
 
-            s->invokeSafe( "a = { f: new BinData( 128, \"\" ) };", BSONObj() );
+            s->invokeSafe( "a = { f: new BinData( 128, \"\" ) };", 0, 0 );
             out = s->getObject( "a" );
             int len = -1;
             out[ "f" ].binData( len );
@@ -918,14 +919,14 @@ namespace JSTests {
             auto_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
-            s->invokeSafe( "x = 5;" , BSONObj() );
+            s->invokeSafe( "x = 5;" , 0, 0 );
             {
                 BSONObjBuilder b;
                 s->append( b , "z" , "x" );
                 ASSERT_EQUALS( BSON( "z" << 5 ) , b.obj() );
             }
 
-            s->invokeSafe( "x = function(){ return 17; }" , BSONObj() );
+            s->invokeSafe( "x = function(){ return 17; }" , 0, 0 );
             BSONObj temp;
             {
                 BSONObjBuilder b;
