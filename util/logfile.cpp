@@ -77,24 +77,34 @@ namespace mongo {
             CloseHandle(_fd);
     }
 
-    void LogFile::synchronousAppend(const void *buf, size_t len) {
+    void LogFile::synchronousAppend(const void *_buf, size_t _len) {
+        const size_t BlockSize = 8 * 1024 * 1024;
         assert(_fd);
-        DWORD written;
-        if( !WriteFile(_fd, buf, len, &written, NULL) ) {
-            DWORD e = GetLastError();
-            if( e == 87 )
-                massert(13519, "error appending to file - misaligned direct write?", false);
-            else
-                uasserted(13517, str::stream() << "error appending to file " << errnoWithDescription(e));
-        }
-        else {
-            dassert( written == len );
+        const char *buf = (const char *) _buf;
+        size_t left = _len;
+        while( left ) {
+            size_t toWrite = min(left, BlockSize);
+            DWORD written;
+            if( !WriteFile(_fd, buf, toWrite, &written, NULL) ) {
+                DWORD e = GetLastError();
+                if( e == 87 )
+                    msgasserted(13519, "error 87 appending to file - misaligned direct write?");
+                else
+                    uasserted(13517, str::stream() << "error appending to file " << _name << ' ' << _len << ' ' << toWrite << ' ' << errnoWithDescription(e));
+            }
+            else {
+                dassert( written == toWrite );
+            }
+            left -= written;
+            buf += written;
         }
     }
 
 }
 
 #else
+
+// posix
 
 #include <sys/types.h>
 #include <sys/stat.h>
