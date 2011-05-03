@@ -343,6 +343,9 @@ struct __wt_page {
 	 *
 	 * The read generation is a 64-bit value; incremented every time the
 	 * page is searched, a 32-bit value could overflow.
+	 *
+	 * The read-generation is not declared volatile: read-generation is set
+	 * a lot (on every access), and we don't want to write it that much.
 	 */
 	 uint64_t read_gen;
 
@@ -366,19 +369,9 @@ struct __wt_page {
 	 *	The write-generation value could be stored on a per-entry basis
 	 * if there's sufficient contention for the page as a whole.
 	 *
-	 * The disk generation is set to the current write generation before a
-	 * page is reconciled and written to disk.  If the disk generation
-	 * matches the write generation, the page must be clean; otherwise, the
-	 * page was potentially modified after the last write, and must be
-	 * re-written to disk before being discarded.
-	 *
-	 * XXX
-	 * These aren't declared volatile: (1) disk-generation is read/written
-	 * only when the page is reconciled -- it could be volatile but we
-	 * explicitly flush it there instead; (2) read-generation gets set a
-	 * lot (on every access), and we don't want to bother flushing it; (3)
-	 * write-generation is written by the workQ when modifying a page, and
-	 * must be flushed in a specific order as the workQ flushes its changes.
+	 * The write-generation is not declared volatile: write-generation is
+	 * written by the workQ when modifying a page, and must be flushed in
+	 * a specific order as the workQ flushes its changes.
 	 *
 	 * XXX
 	 * 32-bit values are probably more than is needed: at some point we may
@@ -390,13 +383,12 @@ struct __wt_page {
 	 * of the data).   I've used 32-bit types instead of 16-bit types as I
 	 * am not positive a 16-bit write to memory will always be atomic.
 	 */
-#define	WT_PAGE_DISK_WRITE(p)		((p)->disk_gen = (p)->write_gen)
-#define	WT_PAGE_IS_MODIFIED(p)		((p)->disk_gen != (p)->write_gen)
 #define	WT_PAGE_SET_MODIFIED(p) do {					\
 	++(p)->write_gen;						\
 	F_CLR(p, WT_PAGE_DELETED);					\
+	F_SET(p, WT_PAGE_MODIFIED);					\
 } while (0)
-	uint32_t disk_gen;
+#define	WT_PAGE_IS_MODIFIED(p)	(F_ISSET(p, WT_PAGE_MODIFIED))
 	uint32_t write_gen;
 
 	/* But the entries are wildly different, based on the page type. */
@@ -460,10 +452,11 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_CACHE_COUNTED	0x01	/* Page counted in cache stats */
-#define	WT_PAGE_DELETED		0x02	/* Page was empty at reconcilation */
-#define	WT_PAGE_PINNED		0x04	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x08	/* Internal page created in a split */
+#define	WT_PAGE_CACHE_COUNTED	0x001	/* Page counted in cache stats */
+#define	WT_PAGE_DELETED		0x002	/* Page was empty at reconcilation */
+#define	WT_PAGE_MODIFIED	0x004	/* Page is modified */
+#define	WT_PAGE_PINNED		0x008	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x010	/* Internal page created in a split */
 	uint8_t flags;			/* Page flags */
 };
 /*
@@ -477,7 +470,7 @@ struct __wt_page {
  */
 #define	WT_PAGE_SIZE							\
 	WT_ALIGN(6 * sizeof(void *) + 2 * sizeof(uint64_t) +		\
-	    5 * sizeof(uint32_t) + sizeof(uint8_t), sizeof(void *))
+	    4 * sizeof(uint32_t) + sizeof(uint8_t), sizeof(void *))
 
 /*
  * WT_ROW --

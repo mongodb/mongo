@@ -417,15 +417,10 @@ __wt_page_reconcile(
 	}
 
 	/*
-	 * Update the disk generation before reading the page.  The workQ will
-	 * update the write generation after it makes a change, and if we have
-	 * different disk and write generation numbers, the page may be dirty.
-	 * We technically require a flush (the eviction server might run on a
-	 * different core before a flush naturally occurred).
+	 * Mark the page clean -- we have exclusive access to any page we're
+	 * reconciling, so it doesn't matter when we do it.
 	 */
-	WT_PAGE_DISK_WRITE(page);
-	WT_MEMORY_FLUSH;
-
+	F_CLR(page, WT_PAGE_MODIFIED);
 	WT_STAT_INCR(cache->stats, cache_evict_modified);
 
 	/* Reconcile the page. */
