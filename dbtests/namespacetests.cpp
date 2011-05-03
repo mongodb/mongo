@@ -750,7 +750,6 @@ namespace NamespaceTests {
                     ASSERT( first != last ) ;
                 }
 
-                long long n = nsd->stats.nrecords;
                 nsd->cappedTruncateAfter(ns(), truncAt, false);
                 ASSERT_EQUALS( nsd->stats.nrecords , 28 );
 
