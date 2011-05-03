@@ -1580,8 +1580,16 @@ namespace mongo {
                 // later:check for dba-type permissions here if have that at some point separate
                 if ( strstr(ns, ".system.indexes" ) )
                     wouldAddIndex = true;
-                else if ( legalClientSystemNS( ns , true ) )
-                    ;
+                else if ( legalClientSystemNS( ns , true ) ) {
+                    if ( obuf && strstr( ns , ".system.users" ) ) {
+                        BSONObj t( reinterpret_cast<const char *>( obuf ) );
+                        uassert( 14051 , "system.user entry needs 'user' field to be a string" , t["user"].type() == String );
+                        uassert( 14052 , "system.user entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
+
+                        uassert( 14053 , "system.user entry needs 'user' field to be non-empty" , t["user"].String().size() );
+                        uassert( 14054 , "system.user entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
+                    }
+                }
                 else if ( !god ) {
                     out() << "ERROR: attempt to insert in system namespace " << ns << endl;
                     return DiskLoc();

@@ -60,15 +60,22 @@ DB.prototype.adminCommand = function( obj ){
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
 DB.prototype.addUser = function( username , pass, readOnly ){
+    if ( pass == null || pass.length == 0 )
+        throw "password can't be empty";
+
     readOnly = readOnly || false;
     var c = this.getCollection( "system.users" );
     
     var u = c.findOne( { user : username } ) || { user : username };
     u.readOnly = readOnly;
     u.pwd = hex_md5( username + ":mongo:" + pass );
-    print( tojson( u ) );
 
     c.save( u );
+    var le = this.getLastErrorObj();
+    printjson( le )
+    if ( le.err )
+        throw "couldn't add user: " + le.err
+    print( tojson( u ) );
 }
 
 DB.prototype.removeUser = function( username ){
