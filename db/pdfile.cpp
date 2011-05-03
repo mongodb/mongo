@@ -472,7 +472,7 @@ namespace mongo {
         getDur().writingInt(h->unusedLength) = h->unusedLength - ExtentSize;
         loc.set(fileNo, offset);
         Extent *e = _getExtent(loc);
-        DiskLoc emptyLoc = getDur().writing(e)->init(ns, ExtentSize, fileNo, offset);
+        DiskLoc emptyLoc = getDur().writing(e)->init(ns, ExtentSize, fileNo, offset, newCapped);
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
@@ -584,7 +584,7 @@ namespace mongo {
     }
 
     /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
-    DiskLoc Extent::init(const char *nsname, int _length, int _fileNo, int _offset) {
+    DiskLoc Extent::init(const char *nsname, int _length, int _fileNo, int _offset, bool capped) {
         magic = 0x41424344;
         myLoc.set(_fileNo, _offset);
         xnext.Null();
@@ -600,9 +600,11 @@ namespace mongo {
 
         if( _length >= 32*1024 && str::contains(nsname, '$') ) { 
             // probably an index. so skip forward to keep its records page aligned 
-            if( !nsdetails(nsname)->capped ) { 
-                emptyLoc.GETOFS() = 4096;
-                l = _length - 4096;
+            if( !capped ) {
+                int& ofs = emptyLoc.GETOFS();
+                int newOfs = (ofs + 0xfff) & ~0xfff; 
+                l -= (newOfs-ofs);
+                ofs = newOfs;
             }
         }
 

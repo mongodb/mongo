@@ -257,7 +257,7 @@ namespace mongo {
         Returns a DeletedRecord location which is the data in the extent ready for us.
         Caller will need to add that to the freelist structure in namespacedetail.
         */
-        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset);
+        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset, bool capped);
 
         /* like init(), but for a reuse case */
         DiskLoc reuse(const char *nsname);
