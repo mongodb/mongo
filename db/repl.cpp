@@ -436,6 +436,7 @@ namespace mongo {
         SourceVector sources;
         ReplSource::loadAll(sources);
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
+            log() << requester << " forcing resync from "  << (*i)->hostName << endl;
             (*i)->forceResync( requester );
         }
         replAllDead = 0;
@@ -445,7 +446,9 @@ namespace mongo {
         BSONObj info;
         {
             dbtemprelease t;
-            oplogReader.connect(hostName);
+            if (!oplogReader.connect(hostName)) {
+                msgassertedNoTrace( 14051 , "unable to connect to resync");
+            }
             /* todo use getDatabaseNames() method here */
             bool ok = oplogReader.conn()->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
             massert( 10385 ,  "Unable to get database list", ok );
@@ -1236,8 +1239,11 @@ namespace mongo {
             {
                 dblock lk;
                 if ( replAllDead ) {
-                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
+                    // throttledForceResyncDead can throw
+                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) ) {
+                        log() << "all sources dead: " << replAllDead << ", sleeping for 5 seconds" << endl;
                         break;
+                    }
                 }
                 assert( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
                 syncing++;
@@ -1271,7 +1277,7 @@ namespace mongo {
 
             if ( s ) {
                 stringstream ss;
-                ss << "repl: sleep " << s << "sec before next pass";
+                ss << "repl: sleep " << s << " sec before next pass";
                 string msg = ss.str();
                 if ( ! cmdLine.quiet )
                     log() << msg << endl;
@@ -1280,8 +1286,6 @@ namespace mongo {
             }
         }
     }
-
-    int debug_stop_repl = 0;
 
     static void replMasterThread() {
         sleepsecs(4);
@@ -1331,13 +1335,20 @@ namespace mongo {
         while ( 1 ) {
             try {
                 replMain();
-                if ( debug_stop_repl )
-                    break;
                 sleepsecs(5);
             }
             catch ( AssertionException& ) {
                 ReplInfo r("Assertion in replSlaveThread(): sleeping 5 minutes before retry");
                 problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
+                sleepsecs(300);
+            }
+            catch ( DBException& e ) {
+                problem() << "exception in replSlaveThread(): " << e.what()
+                          << ", sleeping 5 minutes before retry" << endl;
+                sleepsecs(300);
+            }
+            catch ( ... ) {
+                problem() << "error in replSlaveThread(): sleeping 5 minutes before retry" << endl;
                 sleepsecs(300);
             }
         }

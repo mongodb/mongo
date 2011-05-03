@@ -462,7 +462,7 @@ namespace mongo {
                 _syncThread();
             }
             catch(DBException& e) {
-                sethbmsg("syncThread: " + e.toString());
+                sethbmsg("syncThread: " + e.toString() + ", last op: " + lastOpTimeWritten.toString());
                 sleepsecs(10);
             }
             catch(...) {
