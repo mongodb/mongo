@@ -107,6 +107,7 @@ __wt_block_free(SESSION *session, uint32_t addr, uint32_t size)
 	btree = session->btree;
 	new = NULL;
 
+	WT_ASSERT(session, addr != WT_ADDR_INVALID);
 	WT_ASSERT(session, size % btree->allocsize == 0);
 
 	WT_STAT_INCR(btree->stats, free);
