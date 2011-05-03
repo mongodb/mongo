@@ -1847,6 +1847,11 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
 
+        dbMutex.assertWriteLocked();
+
+        // WRITETODATAFILES etc. is in this lock only -- so we need it.
+        RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
+
         getDur().syncDataAndTruncateJournal();
 
         Database::closeDatabase( d->name.c_str(), d->path );

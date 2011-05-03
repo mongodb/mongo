@@ -365,20 +365,29 @@ namespace mongo {
 
         class Shared : boost::noncopyable { 
             RWLockRecursive& _r;
+            bool _alreadyExclusive;
         public:
             Shared(RWLockRecursive& r) : _r(r) {
                 int s = _r._state.get();
-                dassert( s >= 0 ); // -1 would mean exclusive
-                if( s == 0 )
-                    _r._lk.lock_shared(); 
-                _r._state.set(s+1);
+                _alreadyExclusive = s < 0;
+                if( !_alreadyExclusive ) {
+                    dassert( s >= 0 ); // -1 would mean exclusive
+                    if( s == 0 )
+                        _r._lk.lock_shared(); 
+                    _r._state.set(s+1);
+                }
             }
             ~Shared() {
-                int s = _r._state.get() - 1;
-                if( s == 0 ) 
-                    _r._lk.unlock_shared();
-                _r._state.set(s);
-                DEV wassert( s >= 0 );
+                if( _alreadyExclusive ) {
+                    DEV wassert( _r._state.get() < 0 );
+                }
+                else {
+                    int s = _r._state.get() - 1;
+                    if( s == 0 ) 
+                        _r._lk.unlock_shared();
+                    _r._state.set(s);
+                    DEV wassert( s >= 0 );
+                }
             }
         };
     };
