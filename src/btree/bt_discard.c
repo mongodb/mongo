@@ -29,6 +29,10 @@ __wt_page_free(SESSION *session, WT_PAGE *page)
 	    (session, "discard addr %lu (type %s)",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
 
+#ifdef DIAGNOSTIC
+	__wt_hazard_validate(session, page);
+#endif
+
 	/*
 	 * The page must either be clean, or an internal split page, which
 	 * is created dirty and can never be "clean".

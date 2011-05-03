@@ -23,9 +23,10 @@ typedef struct {
 	 * a temporary buffer that represents that information, and write that
 	 * buffer to disk.
 	 */
-	WT_BUF *dsk;			/* Temporary disk-image buffer */
+	WT_BUF dsk;			/* Temporary disk-image buffer */
 
 	int evict;			/* The page is being discarded */
+	int single_use;			/* The tree is locked down */
 
 	/*
 	 * As pages are reconciled, split pages are merged into their parent
@@ -201,18 +202,19 @@ static int  __rec_split_fixup(SESSION *);
 static int  __rec_split_init(
 		SESSION *, WT_PAGE *, uint64_t, uint32_t, uint32_t);
 static int  __rec_split_write(SESSION *, WT_BUF *, void *);
+static int  __rec_subtree(SESSION *, WT_PAGE *);
+static int  __rec_subtree_col(SESSION *, WT_PAGE *);
+static void __rec_subtree_col_clear(SESSION *, WT_PAGE *);
+static int  __rec_subtree_row(SESSION *, WT_PAGE *);
+static void __rec_subtree_row_clear(SESSION *, WT_PAGE *);
 static int  __rec_wrapup(SESSION *, WT_PAGE *);
-
-#ifdef HAVE_DIAGNOSTIC
-static void __rec_evict_chk(SESSION *, WT_PAGE *);
-#endif
 
 /*
  * __rec_init --
  *	Initialize the reconciliation structure.
  */
 static int
-__rec_init(SESSION *session, int evict)
+__rec_init(SESSION *session, int caller)
 {
 	WT_RECONCILE *r;
 
@@ -220,12 +222,13 @@ __rec_init(SESSION *session, int evict)
 	if ((r = S2C(session)->cache->rec) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
 		S2C(session)->cache->rec = r;
-
-		/* Allocate a scratch buffer to hold new disk images. */
-		WT_RET(__wt_scr_alloc(session, 0, &r->dsk));
 	}
 
-	r->evict = evict;
+	/* Set the eviction flag for close and evict callers. */
+	r->evict = caller == WT_REC_CLOSE || caller == WT_REC_EVICT ? 1 : 0;
+
+	/* Set the single-use flag for the close caller. */
+	r->single_use = caller == WT_REC_CLOSE ? 1 : 0;
 
 	/*
 	 * During internal page reconcilition we track referenced objects that
@@ -258,7 +261,7 @@ __wt_rec_destroy(SESSION *session)
 	if ((r = S2C(session)->cache->rec) == NULL)
 		return;
 
-	__wt_scr_release(&r->dsk);
+	__wt_buf_free(session, &r->dsk);
 
 	if (r->discard != NULL)
 		__wt_free(session, r->discard);
@@ -292,7 +295,7 @@ __rec_incr(SESSION *session, WT_RECONCILE *r, uint32_t size, int entries)
 	 */
 	WT_ASSERT(session, r->space_avail >= size);
 	WT_ASSERT(session, WT_PTRDIFF32(
-	    r->first_free + size, r->dsk->mem) <= r->page_size);
+	    r->first_free + size, r->dsk.mem) <= r->page_size);
 
 	r->space_avail -= size;
 	r->first_free += size;
@@ -334,31 +337,20 @@ __rec_allocation_size(SESSION *session, WT_BUF *buf, uint8_t *end)
  */
 int
 __wt_page_reconcile(
-    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int evict)
+    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int caller)
 {
 	BTREE *btree;
+	WT_CACHE *cache;
 	int ret;
 
 	btree = session->btree;
+	cache = S2C(session)->cache;
 	ret = 0;
 
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile %s page addr %lu (type %s)",
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
 	    (u_long)page->addr, __wt_page_type_string(page->type)));
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * The evict flag implies there's nothing below us in the tree: if we
-	 * are reconciling/evicting pages as part of file close, the tree walk
-	 * is depth-first, and we evict as we go.  If reconciling/evicting
-	 * pages as part of normal eviction, we only reconcile a page after we
-	 * verify there are no active subtrees below the page.  In diagnostic
-	 * mode, verify that fact.
-	 */
-	if (evict)
-		__rec_evict_chk(session, page);
-#endif
 
 	/*
 	 * Handle pages marked for deletion or split.
@@ -379,15 +371,37 @@ __wt_page_reconcile(
 		return (0);
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_init(session, evict));
+	WT_RET(__rec_init(session, caller));
+
+	/*
+	 * Get exclusive access to the page and review the page's subtree: if
+	 * evicting, confirm the page is a page we can evict, and get exclusive
+	 * access to pages being merged into the reconciled page as part of
+	 * reconciliation.
+	 *
+	 * If the check fails (for example, we find an in-memory page and it's
+	 * an eviction attempt), we're done.  The only caller that cares if we
+	 * succeed or not is close, because close is trying to flush the entire
+	 * tree and expects that to succeed.  (Sync doesn't care if we succeed,
+	 * because sync's failure mode is when a thread of control is modifying
+	 * the tree at the same time sync is running -- there's nothing we can
+	 * do about that, sync isn't an atomic operation.)
+	 */
+	if ((ret = __rec_subtree(session, page)) != 0)
+		return (caller == WT_REC_CLOSE ? ret : 0);
 
 	/*
 	 * Clean pages are simple: update the page parent's state and discard
-	 * the page.  (Assert the page is being evicted -- there's no reason
-	 * to reconcile a clean page if not to evict it.)
+	 * the page.
+	 *
+	 * Assert the page is being evicted: there's no reason to reconcile a
+	 * clean page if not to evict it.)
 	 */
 	if (!WT_PAGE_IS_MODIFIED(page)) {
-		WT_ASSERT(session, evict != 0);
+		WT_ASSERT(session,
+		    caller == WT_REC_CLOSE || caller == WT_REC_EVICT);
+
+		WT_STAT_INCR(cache->stats, cache_evict_unmodified);
 
 		__rec_parent_update_clean(session, page);
 		__wt_page_free(session, page);
@@ -403,6 +417,8 @@ __wt_page_reconcile(
 	 */
 	WT_PAGE_DISK_WRITE(page);
 	WT_MEMORY_FLUSH;
+
+	WT_STAT_INCR(cache->stats, cache_evict_modified);
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -454,10 +470,275 @@ __wt_page_reconcile(
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_PAGE_SET_MODIFIED(btree->root_page.page);
 		ret = __wt_page_reconcile(
-		    session, btree->root_page.page, 0, evict);
+		    session, btree->root_page.page, 0, caller);
 	}
 
 	return (ret);
+}
+
+/*
+ * __rec_subtree --
+ *	Get exclusive access to a subtree for reconciliation.
+ */
+static int
+__rec_subtree(SESSION *session, WT_PAGE *page)
+{
+	WT_RECONCILE *r;
+	int ret;
+
+	r = S2C(session)->cache->rec;
+	ret = 0;
+
+	/*
+	 * Wait for exclusive access to the page if our caller doesn't have the
+	 * tree locked down.
+	 */
+	if (!r->single_use)
+		__wt_hazard_wait(session, page->parent_ref);
+
+	/*
+	 * We could skip the subtree traversal, if called by the close method:
+	 * close does a depth-first traversal, discarding all of the pages and
+	 * it's a serious bug if we find, for example, an in-memory child page
+	 * in the tree during a close reconciliation.   However, it's not that
+	 * expensive to do this work, it's a useful diagnostic check, and close
+	 * is not a common operation: skip the hazard reference calls, but do
+	 * traversal and consistency checks anyway.
+	 *
+	 * Walk the page's subtree, and make sure we can reconcile this page.
+	 *
+	 * When reconciling a page, it may reference deleted or split pages
+	 * which will be merged into the reconciled page.
+	 *
+	 * If we find an in-memory page, check if we're trying to evict the
+	 * page; that's not OK, you can't evict a page that references other
+	 * in-memory pages, those pages have to be evicted first.  While the
+	 * test is necessary, it shouldn't happen a lot: every reference to
+	 * an internal page increments its read generation and so internal
+	 * pages shouldn't be selected for eviction until their children have
+	 * been evicted.
+	 *
+	 * If we find a split page, get exclusive access to the page and then
+	 * continue, the split page will be merged into our page.
+	 *
+	 * If we find a deleted page, get exclusive access to the page and then
+	 * check its status.  If still deleted, we can continue, the page will
+	 * be merged into our page.  However, another thread of control might
+	 * have inserted new material and the page is no longer deleted, which
+	 * means the reconciliation fails.  (We could allow sync to proceed,
+	 * but the sync is going to be inconsistent by definition, why bother?)
+	 *
+	 * If reconciliation isn't going to be possible, we have to clear any
+	 * pages we locked while we were looking.  (I'm re-walking the tree
+	 * rather than keeping track of the locked pages on purpose -- the
+	 * only time this should ever fail is if eviction's LRU-based choice
+	 * is very unlucky.
+	 */
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+		if ((ret = __rec_subtree_col(session, page)) != 0)
+			__rec_subtree_col_clear(session, page);
+		break;
+	case WT_PAGE_ROW_INT:
+		if ((ret = __rec_subtree_row(session, page)) != 0)
+			__rec_subtree_row_clear(session, page);
+		break;
+	default:
+		break;
+	}
+
+	/*
+	 * If we're not going to reconcile this page, release our exclusive
+	 * reference.
+	 */
+	if (ret != 0 && !r->single_use)
+		page->parent_ref->state = WT_REF_MEM;
+
+	return (ret);
+}
+
+/*
+ * __rec_subtree_col --
+ *	Walk a column-store internal page's subtree, getting exclusive access
+ *	to deleted and split pages.
+ */
+static int
+__rec_subtree_col(SESSION *session, WT_PAGE *parent)
+{
+	WT_COL_REF *cref;
+	WT_PAGE *page;
+	WT_RECONCILE *r;
+	uint32_t i;
+
+	r = S2C(session)->cache->rec;
+
+	/* For each entry in the page... */
+	WT_COL_REF_FOREACH(parent, cref, i) {
+		switch (WT_COL_REF_STATE(cref)) {
+		case WT_REF_DISK:			/* On-disk */
+			continue;
+		case WT_REF_LOCKED:			/* Eviction candidate */
+			return (1);
+		case WT_REF_MEM:			/* In-memory */
+			break;
+		}
+
+		/*
+		 * We found an in-memory page.  Quit if planning to evict the
+		 * parent page, it's not possible.
+		 */
+		if (r->evict)
+			return (1);
+
+		/*
+		 * If the page isn't deleted or split, it won't be merged into
+		 * its parent during reconciliation, we can ignore it.
+		 */
+		page = WT_COL_REF_PAGE(cref);
+		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+			continue;
+
+		/* Wait for exclusive access to the page. */
+		if (!r->single_use)
+			__wt_hazard_wait(session, &cref->ref);
+
+		/*
+		 * If the page is a split page, it will be merged no matter if
+		 * it's deleted or not, continue.
+		 */
+		if (F_ISSET(page, WT_PAGE_SPLIT)) {
+			WT_RET(__rec_subtree_col(session, page));
+			continue;
+		}
+
+		/*
+		 * If the page is a deleted page, it will be merged, continue.
+		 * If the page is no longer deleted, a thread of control has
+		 * inserted new material while we waited for exclusive access.
+		 * Reconciliation must fail, there's now an in-memory page in
+		 * the subtree.
+		 */
+		if (F_ISSET(page, WT_PAGE_DELETED))
+			continue;
+
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * __rec_subtree_col_clear --
+ *	Clear any pages for which we have exclusive access -- reconciliation
+ *	isn't possible.
+ */
+static void
+__rec_subtree_col_clear(SESSION *session, WT_PAGE *parent)
+{
+	WT_COL_REF *cref;
+	WT_PAGE *page;
+	uint32_t i;
+
+	/* For each entry in the page... */
+	WT_COL_REF_FOREACH(parent, cref, i)
+		if (WT_COL_REF_STATE(cref) == WT_REF_LOCKED) {
+			WT_COL_REF_STATE(cref) = WT_REF_MEM;
+
+			page = WT_COL_REF_PAGE(cref);
+			if (F_ISSET(page, WT_PAGE_SPLIT))
+				__rec_subtree_col_clear(session, page);
+		}
+}
+
+/*
+ * __rec_subtree_row --
+ *	Walk a row-store internal page's subtree, getting exclusive access to
+ *	deleted and split pages.
+ */
+static int
+__rec_subtree_row(SESSION *session, WT_PAGE *parent)
+{
+	WT_PAGE *page;
+	WT_RECONCILE *r;
+	WT_ROW_REF *rref;
+	uint32_t i;
+
+	r = S2C(session)->cache->rec;
+
+	/* For each entry in the page... */
+	WT_ROW_REF_FOREACH(parent, rref, i) {
+		switch (WT_ROW_REF_STATE(rref)) {
+		case WT_REF_DISK:			/* On-disk */
+			continue;
+		case WT_REF_LOCKED:			/* Eviction candidate */
+			return (1);
+		case WT_REF_MEM:			/* In-memory */
+			break;
+		}
+
+		/*
+		 * We found an in-memory page.  Quit if planning to evict the
+		 * parent page, it's not possible.
+		 */
+		if (r->evict)
+			return (1);
+
+		/*
+		 * If the page isn't deleted or split, it won't be merged into
+		 * its parent during reconciliation, we can ignore it.
+		 */
+		page = WT_ROW_REF_PAGE(rref);
+		if (!F_ISSET(page, WT_PAGE_DELETED | WT_PAGE_SPLIT))
+			continue;
+
+		/* Wait for exclusive access to the page. */
+		if (!r->single_use)
+			__wt_hazard_wait(session, &rref->ref);
+
+		/*
+		 * If the page is a split page, it will be merged no matter if
+		 * it's deleted or not, continue.
+		 */
+		if (F_ISSET(page, WT_PAGE_SPLIT)) {
+			WT_RET(__rec_subtree_row(session, page));
+			continue;
+		}
+
+		/*
+		 * If the page is a deleted page, it will be merged, continue.
+		 * If the page is no longer deleted, a thread of control has
+		 * inserted new material while we waited for exclusive access.
+		 * Reconciliation must fail, there's now an in-memory page in
+		 * the subtree.
+		 */
+		if (F_ISSET(page, WT_PAGE_DELETED))
+			continue;
+
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * __rec_subtree_row_clear --
+ *	Clear any pages for which we have exclusive access -- reconciliation
+ *	isn't possible.
+ */
+static void
+__rec_subtree_row_clear(SESSION *session, WT_PAGE *parent)
+{
+	WT_ROW_REF *rref;
+	WT_PAGE *page;
+	uint32_t i;
+
+	/* For each entry in the page... */
+	WT_ROW_REF_FOREACH(parent, rref, i)
+		if (WT_ROW_REF_STATE(rref) == WT_REF_LOCKED) {
+			WT_ROW_REF_STATE(rref) = WT_REF_MEM;
+
+			page = WT_ROW_REF_PAGE(rref);
+			if (F_ISSET(page, WT_PAGE_SPLIT))
+				__rec_subtree_row_clear(session, page);
+		}
 }
 
 /*
@@ -507,13 +788,13 @@ __rec_split_init(
 	r = S2C(session)->cache->rec;
 
 	/* Ensure the scratch buffer is large enough. */
-	WT_RET(__wt_buf_setsize(session, r->dsk, (size_t)max));
+	WT_RET(__wt_buf_setsize(session, &r->dsk, (size_t)max));
 
 	/*
 	 * Some fields of the disk image are fixed based on the original page,
 	 * set them.
 	 */
-	dsk = r->dsk->mem;
+	dsk = r->dsk.mem;
 	WT_CLEAR(*dsk);
 	dsk->type = page->type;
 	dsk->recno = recno;
@@ -598,7 +879,7 @@ __rec_split(SESSION *session)
 	 * times.
 	 */
 	r = S2C(session)->cache->rec;
-	dsk = r->dsk->mem;
+	dsk = r->dsk.mem;
 
 	/*
 	 * There are 3 cases we have to handle.
@@ -712,7 +993,7 @@ __rec_split(SESSION *session)
 		 * Write the current disk image.
 		 */
 		dsk->u.entries = r->entries;
-		WT_RET(__rec_split_write(session, r->dsk, r->first_free));
+		WT_RET(__rec_split_write(session, &r->dsk, r->first_free));
 
 		/*
 		 * Set the starting record number and buffer information for the
@@ -748,9 +1029,9 @@ __rec_split_finish(SESSION *session)
 	if (r->entries == 0)
 		return (0);
 
-	dsk = r->dsk->mem;
+	dsk = r->dsk.mem;
 	dsk->u.entries = r->entries;
-	return (__rec_split_write(session, r->dsk, r->first_free));
+	return (__rec_split_write(session, &r->dsk, r->first_free));
 }
 
 /*
@@ -786,7 +1067,7 @@ __rec_split_fixup(SESSION *session)
 	 * information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->split_size, &tmp));
-	memcpy(tmp->mem, r->dsk->mem, WT_PAGE_DISK_SIZE);
+	memcpy(tmp->mem, r->dsk.mem, WT_PAGE_DISK_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
@@ -818,7 +1099,7 @@ __rec_split_fixup(SESSION *session)
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
 	WT_ASSERT(session, len < r->split_size - WT_PAGE_DISK_SIZE);
 
-	dsk_start = WT_PAGE_DISK_BYTE(r->dsk->mem);
+	dsk_start = WT_PAGE_DISK_BYTE(r->dsk.mem);
 	(void)memmove(dsk_start, bnd->start, len);
 
 	/*
@@ -978,7 +1259,7 @@ __rec_col_merge(SESSION *session, WT_PAGE *page)
 		 * count name space.  This code is here for if/when they support
 		 * deletes, but for now it's not OK.
 		 */
-		if (WT_COL_REF_STATE(cref) == WT_REF_MEM) {
+		if (WT_COL_REF_STATE(cref) != WT_REF_DISK) {
 			rp = WT_COL_REF_PAGE(cref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
 				WT_ASSERT(
@@ -1383,7 +1664,7 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		 * key inserted into the subtree, and discard whatever 0th key
 		 * is on the split-created internal page.
 		 */
-		if (WT_ROW_REF_STATE(rref) == WT_REF_MEM) {
+		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
 			rp = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
 				/* Delete overflow keys for merged pages */
@@ -1467,7 +1748,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		 * Deleted pages are evicted, split pages are merged into the
 		 * parent, and then evicted.
 		 */
-		if (WT_ROW_REF_STATE(rref) == WT_REF_MEM) {
+		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
 			rp = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
 				/* Delete overflow items on deleted pages */
@@ -1891,6 +2172,10 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 
 		/* The parent is dirty, but otherwise there's no change. */
 		WT_PAGE_SET_MODIFIED(page->parent);
+
+		/* Release exclusive use of this page. */
+		if (!r->single_use)
+			page->parent_ref->state = WT_REF_MEM;
 
 		return (0);
 	}
@@ -2437,55 +2722,3 @@ __rec_discard_evict(SESSION *session)
 			__wt_page_free(session, discard->page);
 	return (0);
 }
-
-#ifdef HAVE_DIAGNOSTIC
-/*
- * __rec_evict_chk --
- *	Check the subtree when a page is evicted.
- */
-static void
-__rec_evict_chk(SESSION *session, WT_PAGE *page)
-{
-	WT_COL_REF *cref;
-	WT_PAGE *child;
-	WT_ROW_REF *rref;
-	uint32_t i;
-
-	/*
-	 * At eviction, there shouldn't be pages in the subtree that won't be
-	 * merged into the page as part of reconciliation.
-	 */
-	switch (page->type) {
-	case WT_PAGE_COL_INT:
-		WT_COL_REF_FOREACH(page, cref, i) {
-			if (WT_COL_REF_STATE(cref) != WT_REF_MEM)
-				continue;
-
-			WT_ASSERT(session, WT_PAGE_IS_MODIFIED(page));
-
-			child = WT_COL_REF_PAGE(cref);
-			WT_ASSERT(session,
-			    F_ISSET(child, WT_PAGE_DELETED | WT_PAGE_SPLIT));
-			if (F_ISSET(child, WT_PAGE_SPLIT))
-				__rec_evict_chk(session, child);
-		}
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ROW_REF_FOREACH(page, rref, i) {
-			if (WT_ROW_REF_STATE(rref) != WT_REF_MEM)
-				continue;
-
-			WT_ASSERT(session, WT_PAGE_IS_MODIFIED(page));
-
-			child = WT_ROW_REF_PAGE(rref);
-			WT_ASSERT(session,
-			    F_ISSET(child, WT_PAGE_DELETED | WT_PAGE_SPLIT));
-			if (F_ISSET(child, WT_PAGE_SPLIT))
-				__rec_evict_chk(session, child);
-		}
-		break;
-	default:
-		break;
-	}
-}
-#endif

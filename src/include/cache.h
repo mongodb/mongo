@@ -9,6 +9,10 @@
 extern "C" {
 #endif
 
+#define	WT_REC_CLOSE	1			/* Reconcile callers */
+#define	WT_REC_EVICT	2
+#define	WT_REC_SYNC	3
+
 /*
  * WT_EVICT_LIST --
  *	Encapsulation of an eviction choice.
@@ -126,7 +130,6 @@ struct __wt_cache {
 
 	WT_HAZARD *hazard;		/* Copy of the hazard references */
 	uint32_t   hazard_elem;		/* Number of entries in the list */
-	uint32_t   hazard_len;		/* Bytes in the list */
 
 	WT_CACHE_STATS *stats;		/* Cache statistics */
 };

@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int __wt_cache_read(WT_READ_REQ *);
+static int __wt_cache_read(SESSION *, WT_PAGE *, WT_REF *, int);
 
 /*
  * __wt_workq_read_server --
@@ -99,25 +99,41 @@ __wt_cache_read_server(void *arg)
 	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_READ_REQ *rr, *rr_end;
-	SESSION *session;
+	SESSION *session, *request_session;
 	int didwork, ret;
 
 	conn = arg;
 	cache = conn->cache;
 	ret = 0;
 
+	/*
+	 * We need a thread of control because we're reading/writing pages.
+	 * Start with the default session to keep error handling simple.
+	 *
+	 * There is some complexity involved in using the public API, because
+	 * public sessions are implicitly closed during WT_CONNECTION->close.
+	 * If the eviction thread's session were to go on the public list, the
+	 * eviction thread would have to be shut down before the public session
+	 * handles are closed.
+	 */
+	session = &conn->default_session;
+	if ((ret = conn->session(conn, 0, &session)) != 0) {
+		__wt_err(session, ret, "cache read server error");
+		return (NULL);
+	}
+
 	rr = cache->read_request;
 	rr_end = rr + WT_ELEMENTS(cache->read_request);
 
 	for (;;) {
-		WT_VERBOSE(conn, WT_VERB_READ,
-		    (&conn->default_session, "cache read server sleeping"));
+		WT_VERBOSE(conn,
+		    WT_VERB_READ, (session, "cache read server sleeping"));
 		cache->read_sleeping = 1;
-		__wt_lock(&conn->default_session, cache->mtx_read);
+		__wt_lock(session, cache->mtx_read);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE(conn, WT_VERB_READ,
-		    (&conn->default_session, "cache read server waking"));
+		WT_VERBOSE(conn,
+		    WT_VERB_READ, (session, "cache read server waking"));
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
@@ -128,13 +144,18 @@ __wt_cache_read_server(void *arg)
 		do {
 			didwork = 0;
 			for (rr = cache->read_request; rr < rr_end; ++rr) {
-				if ((session = rr->session) == NULL)
+				if ((request_session = rr->session) == NULL)
 					continue;
 				if (cache->read_lockout)
 					continue;
 				didwork = 1;
 
-				ret = __wt_cache_read(rr);
+				/* Reference the correct BTREE handle. */
+				WT_SET_BTREE_IN_SESSION(
+				    session, request_session->btree);
+
+				ret = __wt_cache_read(session,
+				    rr->parent, rr->ref, rr->dsk_verify);
 
 				/*
 				 * The request slot clear doesn't need to be
@@ -144,13 +165,12 @@ __wt_cache_read_server(void *arg)
 				WT_READ_REQ_CLR(rr);
 
 				__wt_session_serialize_wrapup(
-				    session, NULL, ret);
+				    request_session, NULL, ret);
 			}
 		} while (didwork);
 	}
 
-	WT_VERBOSE(conn, WT_VERB_READ,
-	    (&conn->default_session, "cache read server exiting"));
+	WT_VERBOSE(conn, WT_VERB_READ, (session, "cache read server exiting"));
 	return (NULL);
 }
 
@@ -175,18 +195,14 @@ __wt_workq_read_server_exit(CONNECTION *conn)
  *	Read a page from the file.
  */
 static int
-__wt_cache_read(WT_READ_REQ *rr)
+__wt_cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
-	WT_REF *ref;
-	SESSION *session;
 	uint32_t addr, size;
 	int ret;
 
-	session = rr->session;
-	ref = rr->ref;
 	addr = ref->addr;
 	size = ref->size;
 
@@ -227,7 +243,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
 	/* If the page needs to be verified, that's next. */
-	if (rr->dsk_verify)
+	if (dsk_verify)
 		WT_ERR(__wt_verify_dsk_page(session, dsk, addr, size));
 
 	/*
@@ -239,7 +255,7 @@ __wt_cache_read(WT_READ_REQ *rr)
 	page->addr = addr;
 	page->size = size;
 	page->type = dsk->type;
-	page->parent = rr->parent;
+	page->parent = parent;
 	page->parent_ref = ref;
 	page->XXdsk = dsk;
 

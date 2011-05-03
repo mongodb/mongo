@@ -9,24 +9,16 @@
 #include "btree.i"
 
 static int  __evict(SESSION *);
-static int  __evict_compare_lru(const void *, const void *);
-static int  __evict_compare_page(const void *, const void *);
 static void __evict_dup_remove(SESSION *);
-static int  __evict_file(WT_EVICT_REQ *rr);
-static void __evict_hazard_check(SESSION *);
-static int  __evict_hazard_compare(const void *, const void *);
+static int  __evict_file_close(SESSION *);
+static int  __evict_file_sync(SESSION *);
+static int  __evict_lru_cmp(const void *, const void *);
 static int  __evict_page(SESSION *);
+static int  __evict_page_cmp(const void *, const void *);
 static int  __evict_request_walk(SESSION *);
-static void __evict_set(SESSION *);
-static void __evict_state_check(SESSION *);
-static int  __evict_subtrees(WT_PAGE *);
 static int  __evict_walk(SESSION *);
 static int  __evict_walk_file(SESSION *, BTREE *, u_int);
 static int  __evict_worker(SESSION *);
-
-#ifdef HAVE_DIAGNOSTIC
-static void __evict_hazard_validate(CONNECTION *, WT_PAGE *);
-#endif
 
 /*
  * Tuning constants -- I hesitate to call this tuning, but we should review some
@@ -156,9 +148,8 @@ __wt_cache_evict_server(void *arg)
 	 * Allocate memory for a copy of the hazard references -- it's a fixed
 	 * size so doesn't need run-time adjustments.
 	 */
-	cache->hazard_elem = conn->session_size * conn->hazard_size;
-	WT_ERR(__wt_calloc_def(session, cache->hazard_elem, &cache->hazard));
-	cache->hazard_len = cache->hazard_elem * WT_SIZEOF32(WT_HAZARD);
+	WT_ERR(__wt_calloc_def(session,
+	    conn->session_size * conn->hazard_size, &cache->hazard));
 
 	for (;;) {
 		WT_VERBOSE(conn,
@@ -226,6 +217,7 @@ __wt_workq_evict_server_exit(CONNECTION *conn)
 static int
 __evict_request_walk(SESSION *session)
 {
+	SESSION *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
 	int ret;
@@ -241,17 +233,23 @@ __evict_request_walk(SESSION *session)
 	er = cache->evict_request;
 	er_end = er + WT_ELEMENTS(cache->evict_request);
 	for (; er < er_end; ++er) {
-		if ((session = er->session) == NULL)
+		if ((request_session = er->session) == NULL)
 			continue;
-		ret = __evict_file(er);
 
 		/*
-		 * The request slot clear doesn't need to be flushed, but we
-		 * have to flush the read result, might as well include it.
+		 * The eviction queue might reference pages we are about to
+		 * discard; clear it.
 		 */
+		memset(cache->evict, 0, cache->evict_len);
+
+		/* Reference the correct BTREE handle. */
+		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
+
+		ret = er->close_method ?
+		    __evict_file_close(session) : __evict_file_sync(session);
 		WT_EVICT_REQ_CLR(er);
 
-		__wt_session_serialize_wrapup(session, NULL, ret);
+		__wt_session_serialize_wrapup(request_session, NULL, ret);
 	}
 	return (0);
 }
@@ -304,36 +302,25 @@ __evict_worker(SESSION *session)
 }
 
 /*
- * __evict_file --
- *	Flush pages for a specific file.
+ * __evict_file_close --
+ *	Flush pages for a specific file as part of a close operation.
  */
 static int
-__evict_file(WT_EVICT_REQ *er)
+__evict_file_close(SESSION *session)
 {
 	BTREE *btree;
-	SESSION *session;
-	WT_CACHE *cache;
-	WT_PAGE *page;
 	WT_REF *ref;
-	int close_method, ret;
+	int ret;
 
-	session = er->session;
-	btree = er->btree;
-	cache = S2C(session)->cache;
-	close_method = er->close_method ? 1 : 0;
+	btree = session->btree;
 	ret = 0;
-
-	/*
-	 * The eviction queue might reference pages we are about to discard;
-	 * clear it.
-	 */
-	memset(cache->evict, 0, cache->evict_len);
 
 	/*
 	 * Walk the tree.  It doesn't matter if we are already walking the tree,
 	 * __wt_walk_begin restarts the process.
 	 */
 	WT_RET(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
+
 	for (;;) {
 		WT_ERR(__wt_walk_next(
 		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
@@ -341,14 +328,49 @@ __evict_file(WT_EVICT_REQ *er)
 			break;
 
 		/*
-		 * If it's the sync method, only dirty pages need be reconciled.
-		 * If it's the close method, we're discarding all of the file's
-		 * pages from the cache, and reconciliation is how we do that.
+		 * We're discarding all of the file's pages from the cache and
+		 * reconciliation is how we do that.
 		 */
-		page = ref->page;
-		if (close_method || WT_PAGE_IS_MODIFIED(page))
-			WT_RET(__wt_page_reconcile(
-			    session, page, 0, close_method ? 1 : 0));
+		WT_ERR(
+		    __wt_page_reconcile(session, ref->page, 0, WT_REC_CLOSE));
+	}
+
+err:	/* End the walk cleanly. */
+	__wt_walk_end(session, &btree->evict_walk);
+
+	return (ret);
+}
+
+/*
+ * __evict_file_sync --
+ *	Flush pages for a specific file as part of a sync operation.
+ */
+static int
+__evict_file_sync(SESSION *session)
+{
+	BTREE *btree;
+	WT_REF *ref;
+	int ret;
+
+	btree = session->btree;
+	ret = 0;
+
+	/*
+	 * Walk the tree.  It doesn't matter if we are already walking the tree,
+	 * __wt_walk_begin restarts the process.
+	 */
+	WT_RET(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
+
+	for (;;) {
+		WT_ERR(__wt_walk_next(
+		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
+		if (ref == NULL)
+			break;
+
+		/* Only dirty pages need be reconciled. */
+		if (WT_PAGE_IS_MODIFIED(ref->page))
+			WT_ERR(__wt_page_reconcile(
+			    session, ref->page, 0, WT_REC_SYNC));
 	}
 
 err:	/* End the walk cleanly. */
@@ -376,18 +398,9 @@ __evict(SESSION *session)
 
 	/* Sort the array by LRU. */
 	qsort(cache->evict, (size_t)cache->evict_elem,
-	    sizeof(WT_EVICT_LIST), __evict_compare_lru);
+	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 
-	/* Set the WT_REF_LOCKED flag. */
-	__evict_set(session);
-
-	/* Check for any hazard references. */
-	__evict_hazard_check(session);
-
-	/* Check the page's state (for example, in-memory children). */
-	__evict_state_check(session);
-
-	/* Reconcile and discard the page. */
+	/* Reconcile and discard the pages. */
 	WT_RET(__evict_page(session));
 
 	return (0);
@@ -442,6 +455,7 @@ static int
 __evict_walk_file(SESSION *session, BTREE *btree, u_int slot)
 {
 	WT_CACHE *cache;
+	WT_PAGE *page;
 	WT_REF *ref;
 	int i, restarted_once;
 
@@ -459,7 +473,7 @@ restart:	WT_RET(__wt_walk_begin(session,
 		    &btree->root_page, &btree->evict_walk));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
-	do {
+	while (i < WT_EVICT_WALK_PER_TABLE) {
 		WT_RET(__wt_walk_next(session,
 		    &btree->evict_walk, WT_WALK_CACHE, &ref));
 
@@ -473,15 +487,21 @@ restart:	WT_RET(__wt_walk_begin(session,
 				break;
 			goto restart;
 		}
+		page = ref->page;
+
+		/* Pinned pages can't be evicted. */
+		if (F_ISSET(page, WT_PAGE_PINNED))
+			continue;
 
 		/* During verification, we can only evict clean pages. */
-		if (cache->only_evict_clean && WT_PAGE_IS_MODIFIED(ref->page))
+		if (cache->only_evict_clean && WT_PAGE_IS_MODIFIED(page))
 			continue;
 
 		cache->evict[slot].ref = ref;
 		cache->evict[slot].btree = btree;
 		++slot;
-	} while (++i < WT_EVICT_WALK_PER_TABLE);
+		++i;
+	}
 
 	return (0);
 }
@@ -516,7 +536,7 @@ __evict_dup_remove(SESSION *session)
 	evict = cache->evict;
 	elem = cache->evict_elem;
 	qsort(evict,
-	    (size_t)elem, sizeof(WT_EVICT_LIST), __evict_compare_page);
+	    (size_t)elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
 	for (i = 0; i < elem; i = j)
 		for (j = i + 1; j < elem; ++j) {
 			/*
@@ -535,170 +555,6 @@ __evict_dup_remove(SESSION *session)
 }
 
 /*
- * __evict_set --
- *	Set the WT_REF_LOCKED flag on a set of pages.
- */
-static void
-__evict_set(SESSION *session)
-{
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	WT_REF *ref;
-	u_int i;
-
-	cache = S2C(session)->cache;
-
-	/*
-	 * Set the entry state so readers don't try and use the pages.   Once
-	 * that's done, any thread searching for a page will either see our
-	 * state value, or will have already set a hazard reference to the page.
-	 * We don't evict a page with a hazard reference set, so we can't race.
-	 *
-	 * No memory flush needed, the state field is declared volatile.
-	 */
-	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
-			continue;
-		ref->state = WT_REF_LOCKED;
-	}
-}
-
-/*
- * __evict_hazard_check --
- *	Compare the list of hazard references to the list of pages to be
- *	discarded.
- */
-static void
-__evict_hazard_check(SESSION *session)
-{
-	CONNECTION *conn;
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	WT_HAZARD *hazard, *end_hazard;
-	WT_PAGE *page;
-	WT_REF *ref;
-	u_int i;
-
-	conn = S2C(session);
-	cache = conn->cache;
-
-	/* Sort the eviction candidates by WT_PAGE address. */
-	qsort(cache->evict, (size_t)WT_EVICT_GROUP,
-	    sizeof(WT_EVICT_LIST), __evict_compare_page);
-
-	/* Copy the hazard reference array and sort it by WT_PAGE address. */
-	hazard = cache->hazard;
-	end_hazard = hazard + cache->hazard_elem;
-	memcpy(hazard, conn->hazard, cache->hazard_elem * sizeof(WT_HAZARD));
-	qsort(hazard, (size_t)cache->hazard_elem,
-	    sizeof(WT_HAZARD), __evict_hazard_compare);
-
-	/* Walk the lists in parallel and look for matches. */
-	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
-			continue;
-
-		/*
-		 * Look for the page in the hazard list until we reach the end
-		 * of the list or find a hazard pointer larger than the page.
-		 */
-		for (page = ref->page;
-		    hazard < end_hazard && hazard->page < page; ++hazard)
-			;
-		if (hazard == end_hazard)
-			break;
-
-		/*
-		 * If we find a matching hazard reference, the page is in use:
-		 * remove it from the eviction list.
-		 *
-		 * No memory flush needed, the state field is declared volatile.
-		 */
-		if (hazard->page == page) {
-			WT_VERBOSE(conn, WT_VERB_EVICT, (session,
-			    "eviction skipped page addr %lu (hazard reference)",
-			    page->addr));
-			WT_STAT_INCR(cache->stats, cache_evict_hazard);
-
-			/*
-			 * A page with a low LRU and a hazard reference?
-			 *
-			 * Set the page's LRU so we don't select it again.
-			 * Return the page to service.
-			 * Discard our reference.
-			 */
-			page->read_gen = ++cache->read_gen;
-			ref->state = WT_REF_MEM;
-			WT_EVICT_CLR(evict);
-		}
-	}
-}
-
-/*
- * __evict_state_check --
- *	Confirm these are pages we want to evict.
- */
-static void
-__evict_state_check(SESSION *session)
-{
-	CONNECTION *conn;
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	WT_PAGE *page;
-	WT_REF *ref;
-	u_int i;
-
-	conn = S2C(session);
-	cache = conn->cache;
-
-	/*
-	 * We "own" the pages (we've flagged them for eviction, and there were
-	 * no hazard references).   Now do checks to see if these are pages we
-	 * can evict -- we have to wait until after we own the page because the
-	 * page might be updated and race with us.
-	 */
-	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
-			continue;
-		page = ref->page;
-
-		/*
-		 * Ignore deleted, pinned and split pages: pinned pages can't
-		 * ever leave memory, and deleted and split pages can only be
-		 * evicted as their parents are evicted, they can't be evicted
-		 * on their own.
-		 */
-		if (F_ISSET(
-		    page, WT_PAGE_DELETED | WT_PAGE_PINNED | WT_PAGE_SPLIT))
-			goto skip;
-
-		/* Ignore pages with in-memory subtrees. */
-		switch (page->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_ROW_INT:
-			if (__evict_subtrees(page)) {
-				WT_VERBOSE(conn, WT_VERB_EVICT, (session,
-				    "eviction skipped page addr %lu (subtrees)",
-				    page->addr));
-				goto skip;
-			}
-			break;
-		}
-
-		continue;
-
-skip:		/*
-		 * Set the page's LRU so we don't select it again.
-		 * Return the page to service.
-		 * Discard our reference.
-		 */
-		page->read_gen = ++cache->read_gen;
-		ref->state = WT_REF_MEM;
-		WT_EVICT_CLR(evict);
-	}
-}
-
-/*
  * __evict_page --
  *	Reconcile and discard cache pages.
  */
@@ -711,7 +567,6 @@ __evict_page(SESSION *session)
 	WT_PAGE *page;
 	WT_REF *ref;
 	u_int i;
-	int ret;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -721,86 +576,26 @@ __evict_page(SESSION *session)
 			continue;
 		page = ref->page;
 
-		if (WT_PAGE_IS_MODIFIED(page))
-			WT_STAT_INCR(cache->stats, cache_evict_modified);
-		else
-			WT_STAT_INCR(cache->stats, cache_evict_unmodified);
-
-#ifdef HAVE_DIAGNOSTIC
-		__evict_hazard_validate(conn, page);
-#endif
-		WT_VERBOSE(conn, WT_VERB_EVICT, (session,
-		    "cache evicting page addr %lu", page->addr));
+		/* Reference the correct BTREE handle. */
+		WT_SET_BTREE_IN_SESSION(session, evict->btree);
 
 		/*
-		 * We're using our session handle, it needs to reference the
-		 * correct btree handle.
-		 *
-		 * XXX
-		 * This is pretty sleazy, but I'm hesitant to try and drive
-		 * a separate btree handle down through the reconciliation
-		 * code.
+		 * Paranoia: remove the entry so we never try and reconcile
+		 * the same page on reconciliation error.
 		 */
-		session->btree = evict->btree;
-		WT_ERR(__wt_page_reconcile(session, page, 0, 1));
-
-		/* Remove the entry from the eviction list. */
 		WT_EVICT_CLR(evict);
+
+		WT_RET(__wt_page_reconcile(session, page, 0, WT_REC_EVICT));
 	}
-	return (0);
-
-err:	/*
-	 * Writes to the file are likely failing -- quit trying to reconcile
-	 * pages, and clear any remaining eviction flags.
-	 */
-	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
-			continue;
-		if (ref->state == WT_REF_LOCKED)
-			ref->state = WT_REF_MEM;
-	}
-	return (ret);
-}
-
-/*
- * __evict_subtrees --
- *	Return if a page has an in-memory subtree.
- */
-static int
-__evict_subtrees(WT_PAGE *page)
-{
-	WT_ROW_REF *rref;
-	WT_COL_REF *cref;
-	uint32_t i;
-
-	/*
-	 * Return if a page has an in-memory subtree -- this array search could
-	 * be replaced by reference counts in the page, but the eviction thread
-	 * isn't where I expect performance problems and internal pages are not
-	 * evicted that often (hopefully!)
-	 */
-	switch (page->type) {
-	case WT_PAGE_COL_INT:
-		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_COL_REF_STATE(cref) != WT_REF_DISK)
-				return (1);
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_ROW_REF_STATE(rref) != WT_REF_DISK)
-				return (1);
-		break;
-	}
-
 	return (0);
 }
 
 /*
- * __evict_compare_page --
+ * __evict_page_cmp --
  *	Qsort function: sort WT_EVICT_LIST array based on the page's address.
  */
 static int
-__evict_compare_page(const void *a, const void *b)
+__evict_page_cmp(const void *a, const void *b)
 {
 	WT_REF *a_ref, *b_ref;
 	WT_PAGE *a_page, *b_page;
@@ -823,12 +618,12 @@ __evict_compare_page(const void *a, const void *b)
 }
 
 /*
- * __evict_compare_lru --
+ * __evict_lru_cmp --
  *	Qsort function: sort WT_EVICT_LIST array based on the page's read
  *	generation.
  */
 static int
-__evict_compare_lru(const void *a, const void *b)
+__evict_lru_cmp(const void *a, const void *b)
 {
 	WT_REF *a_ref, *b_ref;
 	uint64_t a_lru, b_lru;
@@ -850,44 +645,7 @@ __evict_compare_lru(const void *a, const void *b)
 	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
 
-/*
- * __evict_hazard_compare --
- *	Qsort function: sort hazard list based on the page's address.
- */
-static int
-__evict_hazard_compare(const void *a, const void *b)
-{
-	WT_PAGE *a_page, *b_page;
-
-	a_page = ((WT_HAZARD *)a)->page;
-	b_page = ((WT_HAZARD *)b)->page;
-
-	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
-}
-
 #ifdef HAVE_DIAGNOSTIC
-/*
- * __evict_hazard_validate --
- *	Confirm that a page isn't on the hazard list.
- */
-static void
-__evict_hazard_validate(CONNECTION *conn, WT_PAGE *page)
-{
-	WT_HAZARD *hp;
-	SESSION **tp, *session;
-
-	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
-		for (hp = session->hazard;
-		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
-			if (hp->page == page) {
-				__wt_err(session, 0,
-				    "eviction hazard check for page %lu failed",
-				    (u_long)page->addr);
-				__wt_session_dump(session);
-				__wt_abort(session);
-			}
-}
-
 /*
  * __evict_dump --
  *	Display the eviction list.

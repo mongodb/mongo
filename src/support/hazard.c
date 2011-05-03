@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __hazard_qsort_cmp(const void *, const void *);
+
 /*
  * __wt_hazard_set --
  *	Set a hazard reference.
@@ -160,3 +162,124 @@ __wt_hazard_empty(SESSION *session, const char *name)
 			WT_MEMORY_FLUSH;
 		}
 }
+
+/*
+ * __hazard_qsort_cmp --
+ *	Qsort function: sort hazard list based on the page's address.
+ */
+static int
+__hazard_qsort_cmp(const void *a, const void *b)
+{
+	WT_PAGE *a_page, *b_page;
+
+	a_page = ((WT_HAZARD *)a)->page;
+	b_page = ((WT_HAZARD *)b)->page;
+
+	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
+}
+
+/*
+ * __wt_hazard_bsearch_cmp --
+ *	Bsearch function: search sorted hazard list.
+ */
+int
+__wt_hazard_bsearch_cmp(const void *search, const void *b)
+{
+	void *entry;
+
+	entry = ((WT_HAZARD *)b)->page;
+
+	return (search > entry ? 1 : ((search < entry) ? -1 : 0));
+}
+
+/*
+ * __wt_hazard_copy --
+ *	Copy the hazard array and prepare it for searching.
+ */
+void
+__wt_hazard_copy(SESSION *session)
+{
+	CONNECTION *conn;
+	WT_CACHE *cache;
+	uint32_t elem, i, j;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	/* Copy the list of hazard references, compacting it as we go. */
+	elem = conn->session_size * conn->hazard_size;
+	for (i = j = 0; j < elem; ++j)
+		if ((cache->hazard[i].page = conn->hazard[j].page) != NULL)
+			++i;
+	elem = i;
+
+	/* Sort the list by page address. */
+	qsort(cache->hazard,
+	    (size_t)elem, sizeof(WT_HAZARD), __hazard_qsort_cmp);
+
+	cache->hazard_elem = elem;
+}
+
+/*
+ * __wt_hazard_wait --
+ *	Wait for the hazard references on a page to clear.
+ */
+void
+__wt_hazard_wait(SESSION *session, WT_REF *ref)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Request exclusive access to the page; no memory flush needed, the
+	 * state field is declared volatile.
+	 */
+	ref->state = WT_REF_LOCKED;
+
+	/*
+	 * Hazard references are acquired down the tree, which means we can't
+	 * deadlock -- wait until exclusive access is available..
+	 */
+	for (;;) {
+		/* Get a fresh copy of the hazard reference array. */
+		__wt_hazard_copy(session);
+
+		/*
+		 * If we find a matching hazard reference, the page is still
+		 * in use.
+		 */
+		if (bsearch(ref->page, cache->hazard, cache->hazard_elem,
+		    sizeof(WT_HAZARD), __wt_hazard_bsearch_cmp) == NULL)
+			break;
+
+		__wt_yield();
+	}
+}
+
+#ifdef DIAGNOSTIC
+/*
+ * __wt_hazard_validate --
+ *	Confirm that a page isn't on the hazard list.
+ */
+void
+__wt_hazard_validate(SESSION *session, WT_PAGE *page)
+{
+	CONNECTION *conn;
+	WT_HAZARD *hp;
+	SESSION **tp;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
+		for (hp = session->hazard;
+		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
+			if (hp->page == page) {
+				__wt_err(session, 0,
+				    "eviction hazard check for page %lu failed",
+				    (u_long)page->addr);
+				WT_ASSERT(session, 0);
+			}
+}
+#endif
