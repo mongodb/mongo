@@ -156,7 +156,6 @@ namespace CursorTests {
                 }
 
                 Client::Context ctx( ns() );
-                NamespaceDetails *d = nsdetails( ns() );
                 FieldRangeSet frs( ns(), spec, true );
                 // orphan spec for this test.
                 IndexSpec *idxSpec = new IndexSpec( idx() );

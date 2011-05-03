@@ -311,8 +311,6 @@
             }
             string orig, after;
             {
-                NamespaceDetails *nsd = nsdetails( ns() );
-
                 stringstream ss;
                 bt()->shape( ss );
                 orig = ss.str();
