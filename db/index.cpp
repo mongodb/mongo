@@ -55,7 +55,8 @@ namespace mongo {
         virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) { 
             const BtreeBucket<V> *h = head.btree<V>();
             for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
-                bool dup = h->wouldCreateDup(idx, head, KeyOwned(**i), ordering, self);
+                KeyOwned k(**i);
+                bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
                 uassert( 11001 , "E11001 duplicate key on update", !dup);
             }
         }

@@ -1502,7 +1502,8 @@ namespace mongo {
 
     template< class V >
     DiskLoc BtreeBucket<V>::locate(const IndexDetails& idx, const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order, int& pos, bool& found, const DiskLoc &recordLoc, int direction) const {
-        return locate(idx, thisLoc, KeyOwned(key), order, pos, found, recordLoc, direction);
+        KeyOwned k(key);
+        return locate(idx, thisLoc, k, order, pos, found, recordLoc, direction);
     }
 
     template< class V >
