@@ -203,7 +203,7 @@ cell_vs_page:			__wt_errx(session,
 				    (u_long)cell_num, (u_long)addr,
 				    __wt_cell_type_string(cell),
 				    __wt_page_type_string(dsk->type));
-				return (WT_ERROR);
+				goto err;
 			}
 			break;
 		default:
@@ -211,7 +211,7 @@ cell_vs_page:			__wt_errx(session,
 			    "cell %lu on page at addr %lu has an illegal type "
 			    "of %lu",
 			    (u_long)cell_num, (u_long)addr, (u_long)cell_type);
-			return (WT_ERROR);
+			goto err;
 		}
 
 		/*
@@ -239,13 +239,13 @@ cell_vs_page:			__wt_errx(session,
 					    "page at addr %lu begins with a "
 					    "value",
 					    (u_long)addr);
-					return (WT_ERROR);
+					goto err;
 				case WAS_DATA:
 					__wt_errx(session,
 					    "cell %lu on page at addr %lu is "
 					    "the first of two adjacent values",
 					    (u_long)cell_num - 1, (u_long)addr);
-					return (WT_ERROR);
+					goto err;
 				case WAS_KEY:
 					last_item_type = WAS_DATA;
 					break;
@@ -278,7 +278,7 @@ cell_len:			__wt_errx(session,
 				    "cell %lu on page at addr %lu has an "
 				    "incorrect length",
 				    (u_long)cell_num, (u_long)addr);
-				return (WT_ERROR);
+				goto err;
 			}
 			break;
 		default:
@@ -362,7 +362,11 @@ eof:		ret = __wt_err_eof(session, cell_num, addr);
 eop:		ret = __wt_err_eop(session, cell_num, addr);
 	}
 
-err:	if (_a.scratch != NULL)
+	if (0) {
+err:		if (ret == 0)
+			ret = WT_ERROR;
+	}
+	if (_a.scratch != NULL)
 		__wt_scr_release(&_a.scratch);
 	if (_b.scratch != NULL)
 		__wt_scr_release(&_b.scratch);
