@@ -8,7 +8,7 @@ function debug( x ) {
 
 var val = new Array( 2000 );
 var c = "";
-for( i = 0; i < 2000; ++i, c += "-" ) {
+for( i = 0; i < 2000; ++i, c += "---" ) {
     val[ i ] = { a: c };
 }
 
@@ -49,8 +49,8 @@ for( i = 0 ;; ++i ) {
     debug( "capped 2: " + i );
     tzz.save( val[ i ] );
     if ( tzz.count() == 0 ) {
-	assert( i > 100, "K" );
-	break;
+    	assert( i > 100, "K" );
+        break;
     }
     checkIncreasing( i );
 }
