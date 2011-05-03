@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "../pch.h"
+#include "pch.h"
 #include "log.h"
 #include "ramlog.h"
 #include "mongoutils/html.h"

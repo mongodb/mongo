@@ -211,6 +211,7 @@
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\miniwebserver.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
+    <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />

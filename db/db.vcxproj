@@ -471,6 +471,7 @@
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
+    <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
