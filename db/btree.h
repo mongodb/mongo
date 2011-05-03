@@ -1030,13 +1030,15 @@ namespace mongo {
     /** Renames the index namespace for this btree's index. */
     void renameIndexNamespace(const char *oldNs, const char *newNs);
 
-    /*inline bool IndexDetails::hasKey(const BSONObj& key) {
-        return head.btree()->exists(*this, head, key, Ordering::make(keyPattern()));
-    }*/
-
-    /** @param self location of our own record.  self doesn't count as a dup. */
-    /*inline bool IndexDetails::wouldCreateDup(const BSONObj& key, DiskLoc self) {
-        return head.btree()->wouldCreateDup(*this, head, KeyOwned(key), Ordering::make(keyPattern()), self);
-    }*/
+    /**
+     * give us a writable version of the btree bucket (declares write intent).
+     * note it is likely more efficient to declare write intent on something smaller when you can.
+     */
+    template< class V >
+    BtreeBucket<V> * DiskLoc::btreemod() const {
+        assert( _a != -1 );
+        BtreeBucket<V> *b = const_cast< BtreeBucket<V> * >( btree<V>() );
+        return static_cast< BtreeBucket<V>* >( getDur().writingPtr( b, V::BucketSize ) );
+    }
 
 } // namespace mongo;
