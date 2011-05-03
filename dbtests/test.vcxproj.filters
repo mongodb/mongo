@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="misc and third party">
@@ -778,6 +778,12 @@
     </ClCompile>
     <ClCompile Include="..\util\ramlog.cpp">
       <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\key.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\btreebuilder.cpp">
+      <Filter>btree</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

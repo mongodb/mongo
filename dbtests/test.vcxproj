@@ -269,6 +269,7 @@
     <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
+    <ClCompile Include="..\db\btreebuilder.cpp" />
     <ClCompile Include="..\db\cap.cpp" />
     <ClCompile Include="..\db\commands\isself.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
@@ -283,6 +284,7 @@
     <ClCompile Include="..\db\dur_writetodatafiles.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
+    <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">

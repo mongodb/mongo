@@ -207,15 +207,15 @@ namespace mongo {
                     GEOQUADDEBUG( "KEY: " << key );
 
                     set<DiskLoc> thisPass;
-                    BtreeCursor cursor( nsd , idxNo , *getDetails() , key , key , true , 1 );
-                    while ( cursor.ok() ) {
-                        pair<set<DiskLoc>::iterator, bool> p = thisPass.insert( cursor.currLoc() );
+                    scoped_ptr<BtreeCursor> cursor( BtreeCursor::make( nsd , idxNo , *getDetails() , key , key , true , 1 ) );
+                    while ( cursor->ok() ) {
+                        pair<set<DiskLoc>::iterator, bool> p = thisPass.insert( cursor->currLoc() );
                         if ( p.second ) {
-                            hopper.got( cursor.currLoc() );
-                            GEOQUADDEBUG( "\t" << cursor.current() );
+                            hopper.got( cursor->currLoc() );
+                            GEOQUADDEBUG( "\t" << cursor->current() );
                             btreeMatches++;
                         }
-                        cursor.advance();
+                        cursor->advance();
                     }
                 }
 

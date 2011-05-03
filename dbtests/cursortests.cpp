@@ -67,7 +67,8 @@ namespace CursorTests {
                 int v[] = { 1, 2, 4, 6 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 4 ) );
                 Client::Context ctx( ns );
-                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 );
+                scoped_ptr<BtreeCursor> _c( BtreeCursor::make( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 ) );
+                BtreeCursor &c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
                 double expected[] = { 1, 2, 4, 5, 6 };
                 for( int i = 0; i < 5; ++i ) {
@@ -95,7 +96,8 @@ namespace CursorTests {
                 int v[] = { -50, 2, 40, 60, 109, 200 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 6 ) );
                 Client::Context ctx( ns );
-                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 );
+                scoped_ptr<BtreeCursor> _c( BtreeCursor::make(nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, 1 ) );
+                BtreeCursor &c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
                 double expected[] = { 0, 1, 2, 109 };
                 for( int i = 0; i < 4; ++i ) {
@@ -121,7 +123,8 @@ namespace CursorTests {
                 int v[] = { 1, 2, 4, 6 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 4, -1 ) );
                 Client::Context ctx( ns );
-                BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, -1 );
+                scoped_ptr<BtreeCursor> _c( BtreeCursor::make( nsdetails( ns ), 1, nsdetails( ns )->idx(1), frv, -1 ) );
+                BtreeCursor& c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 reverse multi", c.toString() );
                 double expected[] = { 6, 5, 4, 2, 1 };
                 for( int i = 0; i < 5; ++i ) {
@@ -146,18 +149,24 @@ namespace CursorTests {
                 _c.insert( ns(), o );
             }
             void check( const BSONObj &spec ) {
-                _c.ensureIndex( ns(), idx() );
+                {
+                    BSONObj keypat = idx();
+                    cout << keypat.toString() << endl;
+                    _c.ensureIndex( ns(), idx() );
+                }
+
                 Client::Context ctx( ns() );
+                NamespaceDetails *d = nsdetails( ns() );
                 FieldRangeSet frs( ns(), spec, true );
                 // orphan spec for this test.
                 IndexSpec *idxSpec = new IndexSpec( idx() );
                 boost::shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, *idxSpec, direction() ) );
-                BtreeCursor c( nsdetails( ns() ), 1, nsdetails( ns() )->idx( 1 ), frv, direction() );
+                scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), 1, nsdetails( ns() )->idx( 1 ), frv, direction() ) );
                 Matcher m( spec );
                 int count = 0;
-                while( c.ok() ) {
-                    ASSERT( m.matches( c.current() ) );
-                    c.advance();
+                while( c->ok() ) {
+                    ASSERT( m.matches( c->current() ) );
+                    c->advance();
                     ++count;
                 }
                 int expectedCount = 0;

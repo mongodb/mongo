@@ -966,8 +966,8 @@ namespace mongo {
         DiskLoc loc;
         {
             IndexDetails& i = d->idx(idIdxNo);
-            BSONObj key = i.getKeyFromQuery( patternOrig );
-            loc = i.head.btree()->findSingle(i, i.head, key);
+            BSONObj key = i.getKeyFromQuery( patternOrig );            
+            loc = i.idxInterface().findSingle(i, i.head, key);
             if( loc.isNull() ) {
                 // no upsert support in _updateById yet, so we are done.
                 return UpdateResult(0, 0, 0);

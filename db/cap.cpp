@@ -442,7 +442,7 @@ namespace mongo {
         for( DiskLoc ext = firstExtent; !ext.isNull(); ext = ext.ext()->xnext ) {
             DiskLoc prev = ext.ext()->xprev;
             DiskLoc next = ext.ext()->xnext;
-            DiskLoc empty = ext.ext()->reuse( ns );
+            DiskLoc empty = ext.ext()->reuse( ns, true );
             ext.ext()->xprev.writing() = prev;
             ext.ext()->xnext.writing() = next;
             addDeletedRec( empty.drec(), empty );

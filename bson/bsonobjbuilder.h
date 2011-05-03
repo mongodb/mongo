@@ -377,12 +377,13 @@ namespace mongo {
             return *this;
         }
 
-        /** Append a string element. len DOES include terminating nul */
-        BSONObjBuilder& append(const StringData& fieldName, const char *str, int len) {
+        /** Append a string element. 
+            @param sz size includes terminating null character */
+        BSONObjBuilder& append(const StringData& fieldName, const char *str, int sz) {
             _b.appendNum((char) String);
             _b.appendStr(fieldName);
-            _b.appendNum((int)len);
-            _b.appendBuf(str, len);
+            _b.appendNum((int)sz);
+            _b.appendBuf(str, sz);
             return *this;
         }
         /** Append a string element */

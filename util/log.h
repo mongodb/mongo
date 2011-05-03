@@ -137,6 +137,9 @@ namespace mongo {
         virtual Nullstream& operator<<(unsigned) {
             return *this;
         }
+        virtual Nullstream& operator<<(unsigned short) {
+            return *this;
+        }
         virtual Nullstream& operator<<(double) {
             return *this;
         }
@@ -242,6 +245,7 @@ namespace mongo {
         Logstream& operator<<(long x)          { ss << x; return *this; }
         Logstream& operator<<(unsigned long x) { ss << x; return *this; }
         Logstream& operator<<(unsigned x)      { ss << x; return *this; }
+        Logstream& operator<<(unsigned short x){ ss << x; return *this; }
         Logstream& operator<<(double x)        { ss << x; return *this; }
         Logstream& operator<<(void *x)         { ss << x; return *this; }
         Logstream& operator<<(const void *x)   { ss << x; return *this; }

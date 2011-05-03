@@ -15,6 +15,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* SHARDING: 
+   I believe this file is for mongod only.
+   See s/commnands_public.cpp for mongos.
+*/
+
 #include "pch.h"
 #include "query.h"
 #include "pdfile.h"
@@ -1105,7 +1110,7 @@ namespace mongo {
                 if ( idx == 0 )
                     return false;
 
-                c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
+                c.reset( BtreeCursor::make( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
 
             long long avgObjSize = d->stats.datasize / d->stats.nrecords;
@@ -1180,7 +1185,8 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void help( stringstream &help ) const {
-            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024";
+            help << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
+                    "    avgObjSize - in bytes";
         }
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
@@ -1520,7 +1526,7 @@ namespace mongo {
 
                 int idNum = nsd->findIdIndex();
                 if ( idNum >= 0 ) {
-                    cursor.reset( new BtreeCursor( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );
+                    cursor.reset( BtreeCursor::make( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );
                 }
                 else if ( c.find( ".system." ) != string::npos ) {
                     continue;
@@ -1574,16 +1580,13 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
-            help << "w:true write lock";
+            help << "w:true write lock. secs:<seconds>";
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-
-
             int secs = 100;
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
-
             if( cmdObj.getBoolField("w") ) {
                 writelock lk("");
                 sleepsecs(secs);
@@ -1592,7 +1595,6 @@ namespace mongo {
                 readlock lk("");
                 sleepsecs(secs);
             }
-
             return true;
         }
     } cmdSleep;

@@ -260,10 +260,10 @@ namespace mongo {
         Returns a DeletedRecord location which is the data in the extent ready for us.
         Caller will need to add that to the freelist structure in namespacedetail.
         */
-        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset);
+        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset, bool capped);
 
         /* like init(), but for a reuse case */
-        DiskLoc reuse(const char *nsname);
+        DiskLoc reuse(const char *nsname, bool newUseIsAsCapped);
 
         bool isOk() const { return magic == 0x41424344; }
         void assertOk() const { assert(isOk()); }
@@ -289,8 +289,8 @@ namespace mongo {
          */
         static int followupSize(int len, int lastExtentLen);
 
-        /**
-         * @param len lengt of record we need
+        /** get a suggested size for the first extent in a namespace
+         *  @param len length of record we need to insert
          */
         static int initialSize(int len);
 
@@ -306,7 +306,7 @@ namespace mongo {
         /** caller must declare write intent first */
         void markEmpty();
     private:
-        DiskLoc _reuse(const char *nsname); // recycle an extent and reuse it for a different ns
+        DiskLoc _reuse(const char *nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
     };
 
     /*  a datafile - i.e. the "dbname.<#>" files :
@@ -331,7 +331,7 @@ namespace mongo {
         int unusedLength;
         char reserved[8192 - 4*4 - 8];
 
-        char data[4];
+        char data[4]; // first extent starts here
 
         enum { HeaderSize = 8192 };
 
@@ -436,9 +436,12 @@ namespace mongo {
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
     }
-    inline const BtreeBucket* DiskLoc::btree() const {
+
+    template< class V >
+    inline 
+    const BtreeBucket<V> * DiskLoc::btree() const {
         assert( _a != -1 );
-        return (const BtreeBucket *) rec()->data;
+        return (const BtreeBucket<V> *) rec()->data;
     }
 
 } // namespace mongo

@@ -31,6 +31,12 @@
 
 namespace mongo {
 
+    // just use old indexes for geo for now. todo.
+    typedef BtreeBucket<V0> GeoBtreeBucket;
+    typedef GeoBtreeBucket::KeyNode GeoKeyNode;
+
+#define BTREE btree<V0>
+
 #if 0
 # define GEODEBUGGING
 # define GEODEBUG(x) cout << x << endl;
@@ -966,14 +972,14 @@ namespace mongo {
 
         //// Distance not used ////
 
-        GeoPoint( const KeyNode& node )
-            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _exactDistance( -1 ), _exactWithin( false ) {
+        GeoPoint( const GeoKeyNode& node )
+            : _key( node.key.toBson() ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _exactDistance( -1 ), _exactWithin( false ) {
         }
 
         //// Immediate initialization of exact distance ////
 
-        GeoPoint( const KeyNode& node , double exactDistance, bool exactWithin )
-            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _exactDistance( exactDistance ), _exactWithin( exactWithin ) {
+        GeoPoint( const GeoKeyNode& node , double exactDistance, bool exactWithin )
+            : _key( node.key.toBson() ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ), _exactDistance( exactDistance ), _exactWithin( exactWithin ) {
         }
 
         bool operator<( const GeoPoint& other ) const {
@@ -995,7 +1001,7 @@ namespace mongo {
         double _exactDistance;
         bool _exactWithin;
 
-    };
+     };
 
     class GeoAccumulator {
     public:
@@ -1009,12 +1015,12 @@ namespace mongo {
         virtual ~GeoAccumulator() {
         }
 
-        virtual void add( const KeyNode& node ) {
+        virtual void add( const GeoKeyNode& node ) {
 
             GEODEBUG( "\t\t\t\t checking key " << node.key.toString() )
 
             // when looking at other boxes, don't want to look at some key/object pair twice
-            pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.objdata(), node.recordLoc) );
+            pair<set<pair<const char*, DiskLoc> >::iterator,bool> seenBefore = _seen.insert( make_pair(node.key.data(), node.recordLoc) );
             if ( ! seenBefore.second ) {
                 GEODEBUG( "\t\t\t\t already seen : " << node.key.toString() << " @ " << Point( _g, GeoHash( node.key.firstElement() ) ).toString() << " with " << node.recordLoc.obj()["_id"] );
                 return;
@@ -1037,7 +1043,7 @@ namespace mongo {
                 // matcher
                 MatchDetails details;
                 if ( _matcher.get() ) {
-                    bool good = _matcher->matchesWithSingleKeyIndex( node.key , node.recordLoc , &details );
+                    bool good = _matcher->matchesWithSingleKeyIndex( node.key.toBson() , node.recordLoc , &details );
                     if ( details.loadedObject )
                         _objectsLoaded++;
 
@@ -1063,8 +1069,8 @@ namespace mongo {
             _found++;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) = 0;
-        virtual bool checkDistance( const KeyNode& node , double& d ) = 0;
+        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) = 0;
+        virtual bool checkDistance( const GeoKeyNode& node , double& d ) = 0;
 
         long long found() const {
             return _found;
@@ -1088,7 +1094,7 @@ namespace mongo {
             : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
         {}
 
-        virtual bool checkDistance( const KeyNode& node, double& d ) {
+        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
 
             // Always check approximate distance, since it lets us avoid doing
             // checks of the rest of the object if it succeeds
@@ -1109,8 +1115,8 @@ namespace mongo {
             return good;
         }
 
-        double approxDistance( const KeyNode& node ) {
-            return approxDistance( GeoHash( node.key.firstElement() ) );
+        double approxDistance( const GeoKeyNode& node ) {
+            return approxDistance( GeoHash( node.key._firstElement() ) );
         }
 
         double approxDistance( const GeoHash& h ) {
@@ -1129,7 +1135,7 @@ namespace mongo {
             return approxDistance;
         }
 
-        double exactDistances( const KeyNode& node ) {
+        double exactDistances( const GeoKeyNode& node ) {
 
             GEODEBUG( "Finding exact distance for " << node.key.toString() << " and " << node.recordLoc.obj().toString() );
 
@@ -1141,7 +1147,7 @@ namespace mongo {
 
             // Find the particular location we want
             BSONObj loc;
-            GeoHash keyHash( node.key.firstElement(), _g->_bits );
+            GeoHash keyHash( node.key._firstElement(), _g->_bits );
             for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
 
                 loc = *i;
@@ -1190,7 +1196,7 @@ namespace mongo {
             return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
 
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
 
@@ -1227,7 +1233,7 @@ namespace mongo {
         BSONObj key() {
             if ( bucket.isNull() )
                 return BSONObj();
-            return bucket.btree()->keyNode( pos ).key;
+            return bucket.BTREE()->keyNode( pos ).key.toBson();
         }
 
         bool hasPrefix( const GeoHash& hash ) {
@@ -1241,7 +1247,7 @@ namespace mongo {
 
             if ( bucket.isNull() )
                 return false;
-            bucket = bucket.btree()->advance( bucket , pos , direction , "btreelocation" );
+            bucket = bucket.BTREE()->advance( bucket , pos , direction , "btreelocation" );
 
             if ( all )
                 return checkCur( totalFound , all );
@@ -1253,9 +1259,9 @@ namespace mongo {
             if ( bucket.isNull() )
                 return false;
 
-            if ( bucket.btree()->isUsed(pos) ) {
+            if ( bucket.BTREE()->isUsed(pos) ) {
                 totalFound++;
-                all->add( bucket.btree()->keyNode( pos ) );
+                all->add( bucket.BTREE()->keyNode( pos ) );
             }
             else {
                 GEODEBUG( "\t\t\t\t not used: " << key() );
@@ -1278,9 +1284,11 @@ namespace mongo {
                              GeoHash start ,
                              int & found , GeoAccumulator * hopper ) {
 
+            assert( id.version() == 0 ); // see note at top of this file
+
             Ordering ordering = Ordering::make(spec->_order);
 
-            min.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
+            min.bucket = id.head.BTREE()->locate( id , id.head , start.wrap() ,
                                                   ordering , min.pos , min.found , minDiskLoc, -1 );
 
             if (hopper) min.checkCur( found , hopper );
@@ -1288,7 +1296,7 @@ namespace mongo {
             // TODO: Might be able to avoid doing a full lookup in some cases here,
             // but would add complexity and we're hitting pretty much the exact same data.
             // Cannot set this = min in general, however.
-            max.bucket = id.head.btree()->locate( id , id.head , start.wrap() ,
+            max.bucket = id.head.BTREE()->locate( id , id.head , start.wrap() ,
                                                   ordering , max.pos , max.found , minDiskLoc, 1 );
 
             if (hopper) max.checkCur( found , hopper );
@@ -1327,7 +1335,7 @@ namespace mongo {
         void exec() {
             const IndexDetails& id = *_spec->getDetails();
 
-            const BtreeBucket * head = id.head.btree();
+            const GeoBtreeBucket * head = id.head.BTREE();
             assert( head );
             /*
              * Search algorithm
@@ -1455,7 +1463,7 @@ namespace mongo {
             long long myscanned = 0;
 
             BtreeLocation loc;
-            loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , Ordering::make(_spec->_order) ,
+            loc.bucket = id.head.BTREE()->locate( id , id.head , toscan.wrap() , Ordering::make(_spec->_order) ,
                                                   loc.pos , loc.found , minDiskLoc );
             loc.checkCur( _found , _hopper.get() );
             while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) ) {
@@ -1833,7 +1841,7 @@ namespace mongo {
         // Whether the current box overlaps our search area
         virtual bool intersectsBox( Box& cur ) = 0;
 
-        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
 
             if( ! newDoc ) return;
 
@@ -1943,9 +1951,9 @@ namespace mongo {
             return _bBox.intersects( cur );
         }
 
-        virtual bool checkDistance( const KeyNode& node, double& d ) {
+        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
 
-            GeoHash h( node.key.firstElement(), _g->_bits );
+            GeoHash h( node.key._firstElement(), _g->_bits );
 
             // Inexact hash distance checks.
             double error = 0;
@@ -2069,9 +2077,9 @@ namespace mongo {
             return _want.intersects( cur );
         }
 
-        virtual bool checkDistance( const KeyNode& node, double& d ) {
+        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
 
-            GeoHash h( node.key.firstElement() );
+            GeoHash h( node.key._firstElement() );
             Point approxPt( _g, h );
 
             bool approxInside = _want.inside( approxPt, _fudge );
@@ -2151,9 +2159,9 @@ namespace mongo {
             return _bounds.intersects( cur );
         }
 
-        virtual bool checkDistance( const KeyNode& node, double& d ) {
+        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
 
-            GeoHash h( node.key.firstElement(), _g->_bits );
+            GeoHash h( node.key._firstElement(), _g->_bits );
             Point p( _g, h );
 
             int in = _poly.contains( p, _g->_error );
@@ -2442,7 +2450,8 @@ namespace mongo {
 
             int max = 100000;
 
-            BtreeCursor c( d , geoIdx , id , BSONObj() , BSONObj() , true , 1 );
+            auto_ptr<BtreeCursor> bc( BtreeCursor::make( d , geoIdx , id , BSONObj() , BSONObj() , true , 1 ) );
+            BtreeCursor &c = *bc;
             while ( c.ok() && max-- ) {
                 GeoHash h( c.currKey().firstElement() );
                 int len;

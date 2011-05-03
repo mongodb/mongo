@@ -27,6 +27,9 @@
 #include "dbtests.h"
 
 namespace NamespaceTests {
+
+    const int MinExtentSize = 4096;
+
     namespace IndexDetailsTests {
         class Base {
             dblock lk;
@@ -659,13 +662,16 @@ namespace NamespaceTests {
                 create();
                 BSONObj b = bigObj();
 
-                DiskLoc l[ 6 ];
-                for ( int i = 0; i < 6; ++i ) {
+                const int N = 20;
+                const int Q = 16; // these constants depend on the size of the bson object, the extent size allocated by the system too
+                DiskLoc l[ N ];
+                for ( int i = 0; i < N; ++i ) {
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
-                    ASSERT_EQUALS( 1 + i % 2, nRecords() );
-                    if ( i > 1 )
-                        ASSERT( l[ i ] == l[ i - 2 ] );
+                    ASSERT( nRecords() <= Q );
+                    //ASSERT_EQUALS( 1 + i % 2, nRecords() );
+                    if ( i >= 16 )
+                        ASSERT( l[ i ] == l[ i - Q] );
                 }
             }
         };
@@ -682,14 +688,15 @@ namespace NamespaceTests {
                 for ( int i = 0; i < 8; ++i ) {
                     l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
                     ASSERT( !l[ i ].isNull() );
-                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
-                    if ( i > 3 )
-                        ASSERT( l[ i ] == l[ i - 4 ] );
+                    //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                    //if ( i > 3 )
+                    //    ASSERT( l[ i ] == l[ i - 4 ] );
                 }
+                ASSERT( nRecords() == 8 );
 
                 // Too big
                 BSONObjBuilder bob;
-                bob.append( "a", string( 787, 'a' ) );
+                bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
                 BSONObj bigger = bob.done();
                 ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );
@@ -712,14 +719,21 @@ namespace NamespaceTests {
 
                 BSONObj b = bigObj();
 
-                DiskLoc l[ 8 ];
-                for ( int i = 0; i < 8; ++i ) {
-                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
-                    ASSERT( !l[ i ].isNull() );
-                    ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                int N = MinExtentSize / b.objsize() * nExtents() + 5;
+                int T = N - 4;
+
+                DiskLoc truncAt;
+                //DiskLoc l[ 8 ];
+                for ( int i = 0; i < N; ++i ) {
+                    DiskLoc a = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+                    if( T == i )
+                        truncAt = a;
+                    ASSERT( !a.isNull() );
+                    /*ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     if ( i > 3 )
-                        ASSERT( l[ i ] == l[ i - 4 ] );
+                        ASSERT( l[ i ] == l[ i - 4 ] );*/
                 }
+                ASSERT( nRecords() < N );
 
                 NamespaceDetails *nsd = nsdetails(ns());
 
@@ -736,10 +750,9 @@ namespace NamespaceTests {
                     ASSERT( first != last ) ;
                 }
 
-                DiskLoc d = l[6];
                 long long n = nsd->stats.nrecords;
-                nsd->cappedTruncateAfter(ns(), d, false);
-                ASSERT_EQUALS( nsd->stats.nrecords , n-1 );
+                nsd->cappedTruncateAfter(ns(), truncAt, false);
+                ASSERT_EQUALS( nsd->stats.nrecords , 28 );
 
                 {
                     ForwardCappedCursor c(nsd);
@@ -753,7 +766,7 @@ namespace NamespaceTests {
 
                 // Too big
                 BSONObjBuilder bob;
-                bob.append( "a", string( 787, 'a' ) );
+                bob.append( "a", string( MinExtentSize + 300, 'a' ) );
                 BSONObj bigger = bob.done();
                 ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
                 ASSERT_EQUALS( 0, nRecords() );

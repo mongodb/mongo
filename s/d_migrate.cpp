@@ -431,7 +431,7 @@ namespace mongo {
             }
 
             scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
-                                         shared_ptr<Cursor>( new BtreeCursor( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
+                                         shared_ptr<Cursor>( BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
                                          _ns ) );
 
             // use the average object size to estimate how many objects a full chunk would carry

@@ -71,8 +71,10 @@ namespace mongo {
     }
 
     inline IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected ) {
-        if( idxNo < NIndexesBase )
-            return _indexes[idxNo];
+        if( idxNo < NIndexesBase ) {
+            IndexDetails& id = _indexes[idxNo];
+            return id;
+        }
         Extra *e = extra();
         if ( ! e ) {
             if ( missingExpected )

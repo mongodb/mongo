@@ -714,7 +714,7 @@ namespace mongo {
             indexDetails.info = newIndexSpecLoc;
             string newIndexNs = indexDetails.indexNamespace();
 
-            BtreeBucket::renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
+            renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
             deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
         }
     }
