@@ -480,7 +480,8 @@
     class ArtificialTree : public BtreeBucket {
     public:
         void push( const BSONObj &key, const DiskLoc &child ) {
-            pushBack( dummyDiskLoc(), KeyOwned(key), Ordering::make( BSON( "a" << 1 ) ), child );
+            KeyOwned k(key);
+            pushBack( dummyDiskLoc(), k, Ordering::make( BSON( "a" << 1 ) ), child );
         }
         void setNext( const DiskLoc &child ) {
             nextChild = child;
