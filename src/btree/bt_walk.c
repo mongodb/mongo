@@ -21,7 +21,6 @@
  *    + to walk the tree a few pages at a time, that is, periodically wake,
  *	visit some pages, then go back to sleep, which requires enough state
  *	to restart the traversal at any point,
- *    + to return the WT_REF structure (not the WT_PAGE structure),
  *    + to walk files not associated with the current SESSION's BTREE handle,
  *    + and finally, it doesn't require a hazard reference.
  *
@@ -50,8 +49,8 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	btree = session->btree;
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
-	if (page == NULL)
-		page = btree->root_page.page;
+	if (page == NULL && (page = btree->root_page.page) == NULL)
+		return (WT_ERROR);
 
 	/*
 	 * WT_TREE_WALK_DESCEND --
@@ -120,8 +119,12 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
  *	Start a tree walk.
  */
 int
-__wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
+__wt_walk_begin(SESSION *session, WT_PAGE *page, WT_WALK *walk)
 {
+	BTREE *btree;
+
+	btree = session->btree;
+
 	/*
 	 * The caller may be restarting a walk, so the structure may already
 	 * be allocated.  Check both reference and length, even though they
@@ -134,7 +137,10 @@ __wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk)
 	}
 	walk->tree_slot = 0;
 
-	walk->tree[0].ref = ref;
+	/* A NULL page starts at the top of the tree -- it's a convenience. */
+	if (page == NULL && (page = btree->root_page.page) == NULL)
+		return (WT_ERROR);
+	walk->tree[0].page = page;
 	walk->tree[0].indx = 0;
 	walk->tree[0].visited = 0;
 
@@ -154,10 +160,10 @@ __wt_walk_end(SESSION *session, WT_WALK *walk)
 
 /*
  * __wt_walk_next --
- *	Return the next WT_REF/WT_PAGE in the tree, in a non-recursive way.
+ *	Return the next WT_PAGE in the tree, in a non-recursive way.
  */
 int
-__wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
+__wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	WT_REF *ref;
@@ -176,20 +182,20 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, uint32_t flags, WT_REF **refp)
 	 * pop the stack and call ourselve recursively, unless the entire tree
 	 * has been traversed, in which case we return NULL.
 	 */
-	if (e->ref->state != WT_REF_MEM || e->visited) {
+	if (e->visited) {
 		if (walk->tree_slot == 0) {
-			*refp = NULL;
+			*pagep = NULL;
 			return (0);
 		}
 
 		--walk->tree_slot;
-		return (__wt_walk_next(session, walk, flags, refp));
+		return (__wt_walk_next(session, walk, flags, pagep));
 	}
 
-	page = e->ref->page;
+	page = e->page;
 	if (e->indx == page->entries) {
 eop:		e->visited = 1;
-		*refp = e->ref;
+		*pagep = e->page;
 		return (0);
 	}
 
@@ -261,10 +267,10 @@ eop:		e->visited = 1;
 		 * reasonably, we don't want to be pointing off into space.
 		 */
 		e = &walk->tree[++walk->tree_slot];
-		e->ref = ref;
+		e->page = ref->page;
 		e->indx = 0;
 		e->visited = 0;
-		return (__wt_walk_next(session, walk, flags, refp));
+		return (__wt_walk_next(session, walk, flags, pagep));
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
@@ -275,6 +281,6 @@ eop:		e->visited = 1;
 
 	/* Return the child page, it's not interesting for further traversal. */
 	++e->indx;
-	*refp = ref;
+	*pagep = ref->page;
 	return (0);
 }

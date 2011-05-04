@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 struct __wt_walk_entry {
-	WT_REF	*ref;		/* Page reference */
+	WT_PAGE	*page;		/* Page reference */
 	uint32_t indx;		/* Not-yet-visited slot on the page */
 	int	 visited;	/* If page itself been visited */
 };

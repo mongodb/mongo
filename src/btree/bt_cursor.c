@@ -15,13 +15,11 @@
 int
 __wt_btcur_first(CURSOR_BTREE *cbt)
 {
-	BTREE *btree;
 	SESSION *session;
 
-	btree = cbt->btree;
 	session = (SESSION *)cbt->iface.session;
 
-	WT_RET(__wt_walk_begin(session, &btree->root_page, &cbt->walk));
+	WT_RET(__wt_walk_begin(session, NULL, &cbt->walk));
 	F_SET(&cbt->iface, WT_CURSTD_POSITIONED);
 
 	return (__wt_btcur_next(cbt));
@@ -52,39 +50,39 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 
 	for (;;) {
 		while (cbt->nitems == 0) {
-			WT_RET(__wt_walk_next(session, &cbt->walk,
-			    0, &cbt->ref));
-			if (cbt->ref == NULL) {
+			WT_RET(__wt_walk_next(
+			    session, &cbt->walk, 0, &cbt->page));
+			if (cbt->page == NULL) {
 				F_CLR(cursor, WT_CURSTD_POSITIONED);
 				return (WT_NOTFOUND);
 			}
-			switch (cbt->ref->page->type) {
+			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
 			case WT_PAGE_COL_RLE:
 			case WT_PAGE_COL_VAR:
-				cbt->cip = cbt->ref->page->u.col_leaf.d;
-				cbt->recno = cbt->ref->page->u.col_leaf.recno;
+				cbt->cip = cbt->page->u.col_leaf.d;
+				cbt->recno = cbt->page->u.col_leaf.recno;
 				break;
 			case WT_PAGE_ROW_LEAF:
-				cbt->rip = cbt->ref->page->u.row_leaf.d;
+				cbt->rip = cbt->page->u.row_leaf.d;
 				break;
 			default:
 				continue;
 			}
 
-			cbt->nitems = cbt->ref->page->entries;
+			cbt->nitems = cbt->page->entries;
 		}
 
 		for (; cbt->nitems > 0;
 		    ++cbt->cip, ++cbt->rip, ++cbt->recno, cbt->nitems--) {
 			/* Check for deletion. */
-			switch (cbt->ref->page->type) {
+			switch (cbt->page->type) {
 			case WT_PAGE_COL_FIX:
 			case WT_PAGE_COL_VAR:
-				upd = WT_COL_UPDATE(cbt->ref->page, cbt->cip);
+				upd = WT_COL_UPDATE(cbt->page, cbt->cip);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				upd = WT_ROW_UPDATE(cbt->ref->page, cbt->rip);
+				upd = WT_ROW_UPDATE(cbt->page, cbt->rip);
 				break;
 			}
 
@@ -98,8 +96,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			if (!F_ISSET(btree, WT_COLUMN)) {
 				if (__wt_key_process(cbt->rip))
 					WT_RET(__wt_key_build(session,
-					    cbt->ref->page, cbt->rip,
-					    &cursor->key));
+					    cbt->page, cbt->rip, &cursor->key));
 
 				cursor->key.data = cbt->rip->key;
 				cursor->key.size = cbt->rip->size;
@@ -117,7 +114,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 
 			/* Check for empty data. */
 			if (F_ISSET(btree, WT_COLUMN)) {
-				cell = WT_COL_PTR(cbt->ref->page, cbt->cip);
+				cell = WT_COL_PTR(cbt->page, cbt->cip);
 				switch (WT_CELL_TYPE(cell)) {
 				case WT_CELL_DATA:
 					if (huffman == NULL) {
@@ -146,7 +143,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 			}
 
 			/* Set cell to reference the value we'll dump. */
-			cell = WT_ROW_PTR(cbt->ref->page, cbt->rip);
+			cell = WT_ROW_PTR(cbt->page, cbt->rip);
 			switch (WT_CELL_TYPE(cell)) {
 			case WT_CELL_DATA:
 				if (huffman == NULL) {

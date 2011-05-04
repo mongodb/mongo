@@ -196,12 +196,12 @@ int __wt_tree_walk(SESSION *session,
     WT_PAGE *,
     void *),
     void *arg);
-int __wt_walk_begin(SESSION *session, WT_REF *ref, WT_WALK *walk);
+int __wt_walk_begin(SESSION *session, WT_PAGE *page, WT_WALK *walk);
 void __wt_walk_end(SESSION *session, WT_WALK *walk);
 int __wt_walk_next(SESSION *session,
     WT_WALK *walk,
     uint32_t flags,
-    WT_REF **refp);
+    WT_PAGE **pagep);
 int __wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value);
 int __wt_btree_col_del(SESSION *session, uint64_t recno);
 int __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value);

@@ -10,7 +10,7 @@ typedef struct {
 
 	BTREE *btree;
 	WT_WALK walk;
-	WT_REF *ref;
+	WT_PAGE *page;
 	WT_COL *cip;
 	WT_ROW *rip;
 	wiredtiger_recno_t recno;

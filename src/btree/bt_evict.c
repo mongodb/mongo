@@ -57,7 +57,7 @@ static int  __evict_worker(SESSION *);
 static inline void
 __evict_clr(WT_EVICT_LIST *e)
 {
-	e->ref = NULL;
+	e->page = NULL;
 	e->btree = WT_DEBUG_POINT;
 }
 
@@ -374,7 +374,7 @@ static int
 __evict_file(SESSION *session, WT_EVICT_REQ *er)
 {
 	BTREE *btree;
-	WT_REF *ref;
+	WT_PAGE *page;
 	int caller, ret;
 
 	btree = session->btree;
@@ -385,12 +385,12 @@ __evict_file(SESSION *session, WT_EVICT_REQ *er)
 	 * Walk the tree.  It doesn't matter if we are already walking the tree,
 	 * __wt_walk_begin restarts the process.
 	 */
-	WT_RET(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
+	WT_RET(__wt_walk_begin(session, NULL, &btree->evict_walk));
 
 	for (;;) {
 		WT_ERR(__wt_walk_next(
-		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
-		if (ref == NULL)
+		    session, &btree->evict_walk, WT_WALK_CACHE, &page));
+		if (page == NULL)
 			break;
 
 		/*
@@ -398,9 +398,9 @@ __evict_file(SESSION *session, WT_EVICT_REQ *er)
 		 * Close: discarding all of the file's pages from the cache,
 		 * and reconciliation is how we do that.
 		 */
-		if (caller == WT_REC_SYNC && !WT_PAGE_IS_MODIFIED(ref->page))
+		if (caller == WT_REC_SYNC && !WT_PAGE_IS_MODIFIED(page))
 			continue;
-		if (__wt_page_reconcile(session, ref->page, 0, caller) == 0)
+		if (__wt_page_reconcile(session, page, 0, caller) == 0)
 			continue;
 
 		/*
@@ -420,7 +420,7 @@ __evict_file(SESSION *session, WT_EVICT_REQ *er)
 			    sizeof(*er->retry), &er->retry));
 			er->retry_entries += 100;
 		}
-		er->retry[er->retry_next++] = ref->page;
+		er->retry[er->retry_next++] = page;
 	}
 
 err:	/* End the walk cleanly. */
@@ -565,7 +565,6 @@ __evict_walk_file(SESSION *session, BTREE *btree, u_int slot)
 {
 	WT_CACHE *cache;
 	WT_PAGE *page;
-	WT_REF *ref;
 	int i, restarted_once;
 
 	cache = S2C(session)->cache;
@@ -578,25 +577,23 @@ __evict_walk_file(SESSION *session, BTREE *btree, u_int slot)
 
 	/* If we haven't yet started this walk, do so. */
 	if (btree->evict_walk.tree == NULL)
-restart:	WT_RET(__wt_walk_begin(session,
-		    &btree->root_page, &btree->evict_walk));
+walk:		WT_RET(__wt_walk_begin(session, NULL, &btree->evict_walk));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	while (i < WT_EVICT_WALK_PER_TABLE) {
 		WT_RET(__wt_walk_next(session,
-		    &btree->evict_walk, WT_WALK_CACHE, &ref));
+		    &btree->evict_walk, WT_WALK_CACHE, &page));
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
 		 * restart we've already visited all of the in-memory pages,
 		 * we could loop infinitely on a tree with too few pages).
 		 */
-		if (ref == NULL) {
+		if (page == NULL) {
 			if (restarted_once++)
 				break;
-			goto restart;
+			goto walk;
 		}
-		page = ref->page;
 
 		/*
 		 * Pinned pages can't be evicted, and it's not useful to try
@@ -610,7 +607,7 @@ restart:	WT_RET(__wt_walk_begin(session,
 		if (cache->only_evict_clean && WT_PAGE_IS_MODIFIED(page))
 			continue;
 
-		cache->evict[slot].ref = ref;
+		cache->evict[slot].page = page;
 		cache->evict[slot].btree = btree;
 		++slot;
 		++i;
@@ -656,11 +653,11 @@ __evict_dup_remove(SESSION *session)
 			 * If the leading pointer hits a NULL, we're done, the
 			 * NULLs all sorted to the top of the array.
 			 */
-			if (evict[j].ref == NULL)
+			if (evict[j].page == NULL)
 				return;
 
 			/* Delete the second and any subsequent duplicates. */
-			if (evict[i].ref == evict[j].ref)
+			if (evict[i].page == evict[j].page)
 				__evict_clr(&evict[j]);
 			else
 				break;
@@ -677,7 +674,6 @@ __evict_page(SESSION *session)
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
-	WT_REF *ref;
 	u_int i;
 
 	cache = S2C(session)->cache;
@@ -688,9 +684,8 @@ __evict_page(SESSION *session)
 
 	__wt_evict_dump(session);
 	WT_EVICT_FOREACH(cache, evict, i) {
-		if ((ref = evict->ref) == NULL)
+		if ((page = evict->page) == NULL)
 			continue;
-		page = ref->page;
 
 		/* Reference the correct BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, evict->btree);
@@ -719,23 +714,20 @@ __evict_page(SESSION *session)
 static int
 __evict_page_cmp(const void *a, const void *b)
 {
-	WT_REF *a_ref, *b_ref;
 	WT_PAGE *a_page, *b_page;
 
 	/*
 	 * There may be NULL references in the array; sort them as greater than
 	 * anything else so they migrate to the end of the array.
 	 */
-	a_ref = ((WT_EVICT_LIST *)a)->ref;
-	b_ref = ((WT_EVICT_LIST *)b)->ref;
-	if (a_ref == NULL)
-		return (b_ref == NULL ? 0 : 1);
-	if (b_ref == NULL)
+	a_page = ((WT_EVICT_LIST *)a)->page;
+	b_page = ((WT_EVICT_LIST *)b)->page;
+	if (a_page == NULL)
+		return (b_page == NULL ? 0 : 1);
+	if (b_page == NULL)
 		return (-1);
 
 	/* Sort the page address in ascending order. */
-	a_page = a_ref->page;
-	b_page = b_ref->page;
 	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
 }
 
@@ -747,23 +739,23 @@ __evict_page_cmp(const void *a, const void *b)
 static int
 __evict_lru_cmp(const void *a, const void *b)
 {
-	WT_REF *a_ref, *b_ref;
+	WT_PAGE *a_page, *b_page;
 	uint64_t a_lru, b_lru;
 
 	/*
 	 * There may be NULL references in the array; sort them as greater than
 	 * anything else so they migrate to the end of the array.
 	 */
-	a_ref = ((WT_EVICT_LIST *)a)->ref;
-	b_ref = ((WT_EVICT_LIST *)b)->ref;
-	if (a_ref == NULL)
-		return (b_ref == NULL ? 0 : 1);
-	if (b_ref == NULL)
+	a_page = ((WT_EVICT_LIST *)a)->page;
+	b_page = ((WT_EVICT_LIST *)b)->page;
+	if (a_page == NULL)
+		return (b_page == NULL ? 0 : 1);
+	if (b_page == NULL)
 		return (-1);
 
 	/* Sort the LRU in ascending order. */
-	a_lru = a_ref->page->read_gen;
-	b_lru = b_ref->page->read_gen;
+	a_lru = a_page->read_gen;
+	b_lru = b_page->read_gen;
 	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
 
@@ -787,10 +779,10 @@ __wt_evict_dump(SESSION *session)
 		return;
 	for (sep = "\tdump:", n = 0; n < cache->evict_entries; ++n) {
 		evict = &cache->evict[n];
-		if (evict->ref == NULL)
-			continue;
-		fprintf(fp, "%s %lu", sep, (u_long)evict->ref->page->addr);
-		sep = ",";
+		if (evict->page != NULL) {
+			fprintf(fp, "%s %lu", sep, (u_long)evict->page->addr);
+			sep = ",";
+		}
 	}
 	fprintf(fp, "\n");
 	(void)fclose(fp);

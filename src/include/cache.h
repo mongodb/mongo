@@ -18,7 +18,7 @@ extern "C" {
  *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_list {
-	WT_REF	*ref;				/* WT_REF structure */
+	WT_PAGE	*page;				/* Page */
 	BTREE	*btree;				/* Underlying file object */
 };
 
