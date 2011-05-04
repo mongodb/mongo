@@ -286,7 +286,11 @@ namespace mongo {
 
 
     ClientCursor::~ClientCursor() {
-        assert( _pos != -2 );
+        if( _pos == -2 ) {
+            // defensive: destructor called twice
+            wassert(false);
+            return;
+        }
 
         {
             recursive_scoped_lock lock(ccmutex);
