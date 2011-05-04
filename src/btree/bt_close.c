@@ -30,7 +30,7 @@ __wt_bt_close(SESSION *session)
 		goto done;
 
 	/* Ask the eviction thread to flush all pages. */
-	__wt_evict_file_serial(session, btree, 1, ret);
+	__wt_evict_file_serial(session, 1, ret);
 
 	/* Write out the free list. */
 	WT_TRET(__wt_block_write(session));

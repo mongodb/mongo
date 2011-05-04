@@ -23,7 +23,7 @@ __wt_bt_sync(SESSION *session)
 		return (0);
 
 	/* Ask the eviction thread to flush any dirty pages. */
-	__wt_evict_file_serial(session, btree, 0, ret);
+	__wt_evict_file_serial(session, 0, ret);
 
 	return (ret);
 }

@@ -24,22 +24,19 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	BTREE * btree;
 	int close_method;
 } __wt_evict_file_args;
 #define	__wt_evict_file_serial(\
-    session, _btree, _close_method, ret) do {\
+    session, _close_method, ret) do {\
 	__wt_evict_file_args _args;\
-	_args.btree = _btree;\
 	_args.close_method = _close_method;\
 	(ret) = __wt_session_serialize_func(session,\
 	    WT_WORKQ_EVICT, 0, __wt_evict_file_serial_func, &_args);\
 } while (0)
 #define	__wt_evict_file_unpack(\
-    session, _btree, _close_method) do {\
+    session, _close_method) do {\
 	__wt_evict_file_args *_args =\
 	    (__wt_evict_file_args *)(session)->wq_args;\
-	_btree = _args->btree;\
 	_close_method = _args->close_method;\
 } while (0)
 

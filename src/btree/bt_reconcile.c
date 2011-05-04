@@ -388,15 +388,9 @@ __wt_page_reconcile(
 	 * reconciliation.
 	 *
 	 * If the check fails (for example, we find an in-memory page and it's
-	 * an eviction attempt), we're done.  The only caller that cares if we
-	 * succeed or not is close, because close is trying to flush the entire
-	 * tree and expects that to succeed.  (Sync doesn't care if we succeed,
-	 * because sync's failure mode is when a thread of control is modifying
-	 * the tree at the same time sync is running -- there's nothing we can
-	 * do about that, sync isn't an atomic operation.)
+	 * an eviction attempt), we're done.
 	 */
-	if ((ret = __rec_subtree(session, page)) != 0)
-		return (caller == WT_REC_CLOSE ? ret : 0);
+	WT_RET(__rec_subtree(session, page));
 
 	/*
 	 * Clean pages are simple: update the page parent's state and discard
@@ -493,11 +487,11 @@ __rec_subtree(SESSION *session, WT_PAGE *page)
 	ret = 0;
 
 	/*
-	 * Wait for exclusive access to the page if our caller doesn't have the
+	 * Attempt exclusive access to the page if our caller doesn't have the
 	 * tree locked down.
 	 */
 	if (!r->single_use)
-		__wt_hazard_wait(session, page->parent_ref);
+		WT_RET(__wt_hazard_exclusive(session, page->parent_ref));
 
 	/*
 	 * Walk the page's subtree, and make sure we can reconcile this page.
@@ -537,11 +531,13 @@ __rec_subtree(SESSION *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		if ((ret = __rec_subtree_col(session, page)) != 0)
-			__rec_subtree_col_clear(session, page);
+			if (!r->single_use)
+				__rec_subtree_col_clear(session, page);
 		break;
 	case WT_PAGE_ROW_INT:
 		if ((ret = __rec_subtree_row(session, page)) != 0)
-			__rec_subtree_row_clear(session, page);
+			if (!r->single_use)
+				__rec_subtree_row_clear(session, page);
 		break;
 	default:
 		break;
@@ -579,6 +575,7 @@ __rec_subtree_col(SESSION *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
+			WT_ASSERT(session, 0);
 			return (1);
 		case WT_REF_MEM:			/* In-memory */
 			break;
@@ -598,9 +595,12 @@ __rec_subtree_col(SESSION *session, WT_PAGE *parent)
 			continue;
 		}
 
-		/* Wait for exclusive access to the page. */
+		/*
+		 * Attempt exclusive access to the page if our caller doesn't
+		 * have the tree locked down.
+		 */
 		if (!r->single_use)
-			__wt_hazard_wait(session, &cref->ref);
+			WT_RET(__wt_hazard_exclusive(session, &cref->ref));
 
 		/*
 		 * Split pages are always merged into the parent regardless of
@@ -671,8 +671,9 @@ __rec_subtree_col_clear(SESSION *session, WT_PAGE *parent)
 		if (WT_COL_REF_STATE(cref) == WT_REF_LOCKED) {
 			WT_COL_REF_STATE(cref) = WT_REF_MEM;
 
+			/* Recurse down the tree. */
 			page = WT_COL_REF_PAGE(cref);
-			if (F_ISSET(page, WT_PAGE_SPLIT))
+			if (page->type == WT_PAGE_COL_INT)
 				__rec_subtree_col_clear(session, page);
 		}
 }
@@ -698,7 +699,8 @@ __rec_subtree_row(SESSION *session, WT_PAGE *parent)
 		switch (WT_ROW_REF_STATE(rref)) {
 		case WT_REF_DISK:			/* On-disk */
 			continue;
-		case WT_REF_LOCKED:			/* Eviction candidate */
+	 	case WT_REF_LOCKED:			/* Eviction candidate */
+			WT_ASSERT(session, 0);
 			return (1);
 		case WT_REF_MEM:			/* In-memory */
 			break;
@@ -718,9 +720,12 @@ __rec_subtree_row(SESSION *session, WT_PAGE *parent)
 			continue;
 		}
 
-		/* Wait for exclusive access to the page. */
+		/*
+		 * Attempt exclusive access to the page if our caller doesn't
+		 * have the tree locked down.
+		 */
 		if (!r->single_use)
-			__wt_hazard_wait(session, &rref->ref);
+			WT_RET(__wt_hazard_exclusive(session, &rref->ref));
 
 		/*
 		 * Split pages are always merged into the parent regardless of
@@ -790,8 +795,9 @@ __rec_subtree_row_clear(SESSION *session, WT_PAGE *parent)
 		if (WT_ROW_REF_STATE(rref) == WT_REF_LOCKED) {
 			WT_ROW_REF_STATE(rref) = WT_REF_MEM;
 
+			/* Recurse down the tree. */
 			page = WT_ROW_REF_PAGE(rref);
-			if (F_ISSET(page, WT_PAGE_SPLIT))
+			if (page->type == WT_PAGE_ROW_INT)
 				__rec_subtree_row_clear(session, page);
 		}
 }
@@ -2177,12 +2183,28 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 		 */
 		WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
 
-		/* The parent is dirty, but otherwise there's no change. */
-		WT_PAGE_SET_MODIFIED(page->parent);
-
-		/* Release exclusive use of this page. */
-		if (!r->single_use)
+		/*
+		 * We're not going to reconcile this page after all -- release
+		 * our exclusive reference to it, as well as any pages in its
+		 * subtree that we locked down.
+		 */
+		if (!r->single_use) {
 			page->parent_ref->state = WT_REF_MEM;
+
+			switch (page->type) {
+			case WT_PAGE_COL_INT:
+				__rec_subtree_col_clear(session, page);
+				break;
+			case WT_PAGE_ROW_INT:
+				__rec_subtree_row_clear(session, page);
+				break;
+			default:
+				break;
+			}
+		}
+
+		/* The parent is dirty. */
+		WT_PAGE_SET_MODIFIED(page->parent);
 
 		return (0);
 	}

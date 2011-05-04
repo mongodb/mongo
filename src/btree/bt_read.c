@@ -8,7 +8,36 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int __wt_cache_read(SESSION *, WT_PAGE *, WT_REF *, int);
+static inline void
+    __cache_read_req_set(SESSION *, WT_READ_REQ *, WT_PAGE *, WT_REF *, int);
+static inline void __cache_read_req_clr(WT_READ_REQ *);
+
+static int __cache_read(SESSION *, WT_PAGE *, WT_REF *, int);
+
+#define	WT_READ_REQ_FOREACH(rr, rr_end, cache)				\
+	for ((rr) = (cache)->read_request,				\
+	    (rr_end) = (rr) + WT_ELEMENTS((cache)->read_request);	\
+	    (rr) < (rr_end); ++(rr))
+
+static inline void
+__cache_read_req_set(SESSION *session,
+    WT_READ_REQ *rr, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
+{
+	rr->parent = parent;
+	rr->ref = ref;
+	rr->dsk_verify = dsk_verify;
+	WT_MEMORY_FLUSH;		/* Flush before turning entry on */
+
+	rr->session = session;
+	WT_MEMORY_FLUSH;		/* Turn entry on */
+}
+
+static inline void
+__cache_read_req_clr(WT_READ_REQ *rr)
+{
+	rr->session = NULL;
+	WT_MEMORY_FLUSH;		/* Turn entry off */
+}
 
 /*
  * __wt_workq_read_server --
@@ -78,15 +107,14 @@ __wt_cache_read_serial_func(SESSION *session)
 	cache = S2C(session)->cache;
 
 	/* Find an empty slot and enter the read request. */
-	rr = cache->read_request;
-	rr_end = rr + WT_ELEMENTS(cache->read_request);
-	for (; rr < rr_end; ++rr)
-		if (WT_READ_REQ_ISEMPTY(rr)) {
-			WT_READ_REQ_SET(rr, session, parent, ref, dsk_verify);
+	WT_READ_REQ_FOREACH(rr, rr_end, cache)
+		if (rr->session == NULL) {
+			__cache_read_req_set
+			    (session, rr, parent, ref, dsk_verify);
 			return (0);
 		}
 	__wt_err(session, 0, "read server request table full");
-	return (WT_RESTART);
+	return (WT_ERROR);
 }
 
 /*
@@ -122,9 +150,6 @@ __wt_cache_read_server(void *arg)
 		return (NULL);
 	}
 
-	rr = cache->read_request;
-	rr_end = rr + WT_ELEMENTS(cache->read_request);
-
 	for (;;) {
 		WT_VERBOSE(conn,
 		    WT_VERB_READ, (session, "cache read server sleeping"));
@@ -143,7 +168,7 @@ __wt_cache_read_server(void *arg)
 		 */
 		do {
 			didwork = 0;
-			for (rr = cache->read_request; rr < rr_end; ++rr) {
+			WT_READ_REQ_FOREACH(rr, rr_end, cache) {
 				if ((request_session = rr->session) == NULL)
 					continue;
 				if (cache->read_lockout)
@@ -154,7 +179,7 @@ __wt_cache_read_server(void *arg)
 				WT_SET_BTREE_IN_SESSION(
 				    session, request_session->btree);
 
-				ret = __wt_cache_read(session,
+				ret = __cache_read(session,
 				    rr->parent, rr->ref, rr->dsk_verify);
 
 				/*
@@ -162,8 +187,7 @@ __wt_cache_read_server(void *arg)
 				 * flushed, but we have to flush the read
 				 * result, might as well include it.
 				 */
-				WT_READ_REQ_CLR(rr);
-
+				__cache_read_req_clr(rr);
 				__wt_session_serialize_wrapup(
 				    request_session, NULL, ret);
 			}
@@ -191,11 +215,11 @@ __wt_workq_read_server_exit(CONNECTION *conn)
 }
 
 /*
- * __wt_cache_read --
+ * __cache_read --
  *	Read a page from the file.
  */
 static int
-__wt_cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
+__cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	WT_CACHE *cache;
 	WT_PAGE *page;

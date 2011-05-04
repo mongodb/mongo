@@ -8,13 +8,17 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int  __evict(SESSION *);
+static inline void __evict_clr(WT_EVICT_LIST *);
+static inline void __evict_req_clr(SESSION *, WT_EVICT_REQ *);
+static inline void __evict_req_set(SESSION *, WT_EVICT_REQ *, int);
+
 static void __evict_dup_remove(SESSION *);
-static int  __evict_file_close(SESSION *);
-static int  __evict_file_sync(SESSION *);
+static int  __evict_file(SESSION *, WT_EVICT_REQ *);
+static int  __evict_lru(SESSION *);
 static int  __evict_lru_cmp(const void *, const void *);
-static int  __evict_page(SESSION *);
+static void __evict_page(SESSION *);
 static int  __evict_page_cmp(const void *, const void *);
+static int  __evict_request_retry(SESSION *);
 static int  __evict_request_walk(SESSION *);
 static int  __evict_walk(SESSION *);
 static int  __evict_walk_file(SESSION *, BTREE *, u_int);
@@ -38,13 +42,57 @@ static int  __evict_worker(SESSION *);
 	for ((i) = 0, (p) = (cache)->evict; (i) < WT_EVICT_GROUP; ++(i), ++(p))
 
 /*
- * WT_EVICT_REF_CLR --
- *	Clear an eviction list entry.
+ * WT_EVICT_REQ_FOREACH --
+ *	Walk a list of eviction requests.
  */
-#define	WT_EVICT_CLR(p) do {						\
-	(p)->ref = NULL;						\
-	(p)->btree = WT_DEBUG_POINT;					\
-} while (0)
+#define	WT_EVICT_REQ_FOREACH(er, er_end, cache)				\
+	for ((er) = (cache)->evict_request,				\
+	    (er_end) = (er) + WT_ELEMENTS((cache)->evict_request);	\
+	    (er) < (er_end); ++(er))
+
+/*
+ * __evict_clr --
+ *	Clear an entry in the eviction list.
+ */
+static inline void
+__evict_clr(WT_EVICT_LIST *e)
+{
+	e->ref = NULL;
+	e->btree = WT_DEBUG_POINT;
+}
+
+/*
+ * __evict_req_set --
+ *	Set an entry in the eviction request list.
+ */
+static inline void
+__evict_req_set(SESSION *session, WT_EVICT_REQ *r, int close_method)
+{
+	r->close_method = close_method;
+	WT_ASSERT(session, r->retry == NULL);
+	WT_ASSERT(session, r->retry_next == 0);
+	WT_ASSERT(session, r->retry_entries == 0);
+	WT_ASSERT(session, r->retry_allocated == 0);
+	WT_MEMORY_FLUSH;		/* Flush before turning entry on */
+
+	r->session = session;
+	WT_MEMORY_FLUSH;		/* Turn entry on */
+}
+
+/*
+ * __evict_req_clr --
+ *	Set an entry in the eviction request list.
+ */
+static inline void
+__evict_req_clr(SESSION *session, WT_EVICT_REQ *r)
+{
+	if (r->retry != NULL)
+		__wt_free(session, r->retry);
+	r->retry_next = r->retry_entries = r->retry_allocated = 0;
+
+	r->session = NULL;
+	WT_MEMORY_FLUSH;		/* Turn entry off */
+}
 
 /*
  * __wt_workq_evict_server --
@@ -94,25 +142,22 @@ __wt_workq_evict_server(CONNECTION *conn, int force)
 int
 __wt_evict_file_serial_func(SESSION *session)
 {
-	BTREE *btree;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
 	int close_method;
 
-	__wt_evict_file_unpack(session, btree, close_method);
+	__wt_evict_file_unpack(session, close_method);
 
 	cache = S2C(session)->cache;
 
 	/* Find an empty slot and enter the eviction request. */
-	er = cache->evict_request;
-	er_end = er + WT_ELEMENTS(cache->evict_request);
-	for (; er < er_end; ++er)
-		if (WT_EVICT_REQ_ISEMPTY(er)) {
-			WT_EVICT_REQ_SET(er, session, btree, close_method);
+	WT_EVICT_REQ_FOREACH(er, er_end, cache)
+		if (er->session == NULL) {
+			__evict_req_set(session, er, close_method);
 			return (0);
 		}
 	__wt_err(session, 0, "eviction server request table full");
-	return (WT_RESTART);
+	return (WT_ERROR);
 }
 
 /*
@@ -125,6 +170,7 @@ __wt_cache_evict_server(void *arg)
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CACHE *cache;
+	WT_EVICT_REQ *er, *er_end;
 	int ret;
 
 	conn = arg;
@@ -161,9 +207,6 @@ __wt_cache_evict_server(void *arg)
 		WT_VERBOSE(conn,
 		    WT_VERB_EVICT, (session, "eviction server waking"));
 
-		/* Walk the eviction-request queue. */
-		WT_ERR(__evict_request_walk(session));
-
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
 	}
@@ -188,6 +231,10 @@ err:		__wt_err(session, ret, "cache eviction server error");
 	if (cache->hazard != NULL)
 		__wt_free(session, cache->hazard);
 
+	WT_EVICT_REQ_FOREACH(er, er_end, cache)
+		if (er->retry != NULL)
+			__wt_free(session, er->retry);
+
 	if (session != &conn->default_session)
 		WT_TRET(__wt_session_close(session));
 
@@ -211,6 +258,75 @@ __wt_workq_evict_server_exit(CONNECTION *conn)
 }
 
 /*
+ * __evict_worker --
+ *	Evict pages from memory.
+ */
+static int
+__evict_worker(SESSION *session)
+{
+	WT_CACHE *cache;
+	uint64_t bytes_start, bytes_inuse, bytes_max;
+	int loop;
+
+	cache = S2C(session)->cache;
+
+	/* Evict pages from the cache. */
+	for (loop = 0;;) {
+		/* Walk the eviction-request queue. */
+		WT_RET(__evict_request_walk(session));
+
+		/*
+		 * Eviction requests can temporarily fail when a tree is active,
+		 * that is, we may not be able to immediately reconcile all of
+		 * the file's pages.  If the pending_retry value is non-zero, it
+		 * means there are pending requests we need to handle.
+		 *
+		 * Do general eviction even if we're just handling pending retry
+		 * requests.  The problematic case is when reads are locked out
+		 * because we're out of memory in the cache, a reading thread
+		 * is blocked, and that thread has a hazard reference blocking
+		 * us from reconciling a page that's part of a pending request.
+		 * Keep pushing out blocks from the general pool as well as the
+		 * pending requests until the system unjams.
+		 */
+		while (cache->pending_retry) {
+			WT_RET(__evict_request_retry(session));
+			if (cache->pending_retry)
+				WT_RET(__evict_lru(session));
+		}
+
+		/*
+		 * If we've locked out reads, keep evicting until we get to at
+		 * least 5% under the maximum cache.  Else, quit evicting as
+		 * soon as we get under the maximum cache.
+		 */
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		bytes_max = WT_STAT(cache->stats, cache_bytes_max);
+		if (cache->read_lockout) {
+			if (bytes_inuse <= bytes_max - (bytes_max / 20))
+				break;
+		} else if (bytes_inuse < bytes_max)
+			break;
+
+		WT_RET(__evict_lru(session));
+
+		/*
+		 * If we're making progress, keep going; if we're not making
+		 * any progress at all, go back to sleep, it's not something
+		 * we can fix.
+		 */
+		bytes_start = bytes_inuse;
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		if (bytes_start == bytes_inuse && ++loop == 10) {
+			__wt_errx(session,
+			    "eviction server: unable to evict cache pages");
+			break;
+		}
+	}
+	return (0);
+}
+
+/*
  * __evict_request_walk --
  *	Walk the eviction request queue.
  */
@@ -230,178 +346,181 @@ __evict_request_walk(SESSION *session)
 	 * it, flush the result and clear the request slot, then wake up the
 	 * requesting thread.
 	 */
-	er = cache->evict_request;
-	er_end = er + WT_ELEMENTS(cache->evict_request);
-	for (; er < er_end; ++er) {
+	WT_EVICT_REQ_FOREACH(er, er_end, cache) {
 		if ((request_session = er->session) == NULL)
 			continue;
 
 		/*
-		 * The eviction queue might reference pages we are about to
-		 * discard; clear it.
+		 * The eviction candidate list might reference pages we are
+		 * about to discard; clear it.
 		 */
-		memset(cache->evict, 0, cache->evict_len);
+		memset(cache->evict, 0, cache->evict_allocated);
 
 		/* Reference the correct BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
 
-		ret = er->close_method ?
-		    __evict_file_close(session) : __evict_file_sync(session);
-		WT_EVICT_REQ_CLR(er);
+		ret = __evict_file(session, er);
 
-		__wt_session_serialize_wrapup(request_session, NULL, ret);
+		/*
+		 * If we don't have any pages to retry, we're done, resolve the
+		 * request.  If we have pages to retry, we have to wait for the
+		 * main eviction loop to finish the work.
+		 */
+		if (er->retry == NULL) {
+			__wt_session_serialize_wrapup(
+			    request_session, NULL, ret);
+			__evict_req_clr(session, er);
+		} else
+			cache->pending_retry = 1;
 	}
 	return (0);
 }
 
 /*
- * __evict_worker --
- *	Evict pages from memory.
+ * __evict_file --
+ *	Flush pages for a specific file as part of a close/sync operation.
  */
 static int
-__evict_worker(SESSION *session)
+__evict_file(SESSION *session, WT_EVICT_REQ *er)
 {
+	BTREE *btree;
+	WT_REF *ref;
+	int caller, ret;
+
+	btree = session->btree;
+	ret = 0;
+	caller = er->close_method ? WT_REC_CLOSE : WT_REC_SYNC;
+
+	/*
+	 * Walk the tree.  It doesn't matter if we are already walking the tree,
+	 * __wt_walk_begin restarts the process.
+	 */
+	WT_RET(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
+
+	for (;;) {
+		WT_ERR(__wt_walk_next(
+		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
+		if (ref == NULL)
+			break;
+
+		/*
+		 * Sync: only dirty pages need be reconciled.
+		 * Close: discarding all of the file's pages from the cache,
+		 * and reconciliation is how we do that.
+		 */
+		if (caller == WT_REC_SYNC && !WT_PAGE_IS_MODIFIED(ref->page))
+			continue;
+		if (__wt_page_reconcile(session, ref->page, 0, caller) == 0)
+			continue;
+
+		/*
+		 * We weren't able to reconcile the page: possible in sync if
+		 * another thread of control holds a hazard reference on the
+		 * page we're reconciling (or a hazard reference on a deleted
+		 * or split page in that page's subtree), is trying to read
+		 * another page, and can't as the read subsystem is locked out
+		 * right now.  Possible in close or sync if the file system is
+		 * full.
+		 *
+		 * Add this page to the list of pages we'll have to retry.
+		 */
+		if (er->retry_next == er->retry_entries) {
+			WT_ERR(__wt_realloc(session, &er->retry_allocated,
+			    (er->retry_entries + 100) *
+			    sizeof(*er->retry), &er->retry));
+			er->retry_entries += 100;
+		}
+		er->retry[er->retry_next++] = ref->page;
+	}
+
+err:	/* End the walk cleanly. */
+	__wt_walk_end(session, &btree->evict_walk);
+
+	return (ret);
+}
+
+/*
+ * __evict_request_retry --
+ *	Retry an eviction request.
+ */
+static int
+__evict_request_retry(SESSION *session)
+{
+	SESSION *request_session;
 	WT_CACHE *cache;
-	uint64_t bytes_start, bytes_inuse, bytes_max;
-	int loop;
+	WT_EVICT_REQ *er, *er_end;
+	uint32_t i;
+	int caller, pending_retry;
 
 	cache = S2C(session)->cache;
 
-	/* Evict pages from the cache. */
-	for (loop = 0;;) {
-		/*
-		 * If we've locked out reads, keep evicting until we get to at
-		 * least 5% under the maximum cache.  Else, quit evicting as
-		 * soon as we get under the maximum cache.
-		 */
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		bytes_max = WT_STAT(cache->stats, cache_bytes_max);
-		if (cache->read_lockout) {
-			if (bytes_inuse <= bytes_max - (bytes_max / 20))
-				break;
-		} else if (bytes_inuse < bytes_max)
-			break;
+	/* Reset the flag for pending retry requests. */
+	cache->pending_retry = 0;
 
-		bytes_start = bytes_inuse;
-		WT_RET(__evict(session));
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
+	/*
+	 * Walk the eviction request queue, looking for sync or close requests
+	 * that need to be retried (defined by a non-NULL retry reference).
+	 */
+	WT_EVICT_REQ_FOREACH(er, er_end, cache) {
+		if (er->retry == NULL)
+			continue;
 
 		/*
-		 * If we're making progress, keep going; if we're not making
-		 * any progress at all, go back to sleep, it's not something
-		 * we can fix.
+		 * The eviction candidate list might reference pages we are
+		 * about to discard; clear it.
 		 */
-		if (bytes_start == bytes_inuse && ++loop == 10) {
-			__wt_errx(session,
-			    "cache server: unable to evict pages from the "
-			    "cache");
-			break;
+		memset(cache->evict, 0, cache->evict_allocated);
+
+		/* Reference the correct BTREE handle. */
+		request_session = er->session;
+		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
+
+		/*
+		 * Set the reconcile caller: should never be close, but we
+		 * can do the work even if it is.
+		 */
+		caller = er->close_method ? WT_REC_CLOSE : WT_REC_SYNC;
+
+		/* Walk the list of retry requests. */
+		for (pending_retry = 0, i = 0; i < er->retry_entries; ++i) {
+			if (er->retry[i] == NULL)
+				continue;
+			if (__wt_page_reconcile(
+			    session, er->retry[i], 0, caller) == 0)
+				er->retry[i] = NULL;
+			else
+				pending_retry = 1;
+		}
+
+		/*
+		 * If we finished, clean up and resolve the request, otherwise
+		 * there's still work to do.
+		 */
+		if (pending_retry)
+			cache->pending_retry = 1;
+		else {
+			__wt_session_serialize_wrapup(request_session, NULL, 0);
+			__evict_req_clr(session, er);
 		}
 	}
 	return (0);
 }
 
 /*
- * __evict_file_close --
- *	Flush pages for a specific file as part of a close operation.
+ * __evict_lru --
+ *	Evict pages from the cache based on their read generation.
  */
 static int
-__evict_file_close(SESSION *session)
+__evict_lru(SESSION *session)
 {
-	BTREE *btree;
-	WT_REF *ref;
-	int ret;
-
-	btree = session->btree;
-	ret = 0;
-
-	/*
-	 * Walk the tree.  It doesn't matter if we are already walking the tree,
-	 * __wt_walk_begin restarts the process.
-	 */
-	WT_RET(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
-
-	for (;;) {
-		WT_ERR(__wt_walk_next(
-		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
-		if (ref == NULL)
-			break;
-
-		/*
-		 * We're discarding all of the file's pages from the cache and
-		 * reconciliation is how we do that.
-		 */
-		WT_ERR(
-		    __wt_page_reconcile(session, ref->page, 0, WT_REC_CLOSE));
-	}
-
-err:	/* End the walk cleanly. */
-	__wt_walk_end(session, &btree->evict_walk);
-
-	return (ret);
-}
-
-/*
- * __evict_file_sync --
- *	Flush pages for a specific file as part of a sync operation.
- */
-static int
-__evict_file_sync(SESSION *session)
-{
-	BTREE *btree;
-	WT_REF *ref;
-	int ret;
-
-	btree = session->btree;
-	ret = 0;
-
-	/*
-	 * Walk the tree.  It doesn't matter if we are already walking the tree,
-	 * __wt_walk_begin restarts the process.
-	 */
-	WT_RET(__wt_walk_begin(session, &btree->root_page, &btree->evict_walk));
-
-	for (;;) {
-		WT_ERR(__wt_walk_next(
-		    session, &btree->evict_walk, WT_WALK_CACHE, &ref));
-		if (ref == NULL)
-			break;
-
-		/* Only dirty pages need be reconciled. */
-		if (WT_PAGE_IS_MODIFIED(ref->page))
-			WT_ERR(__wt_page_reconcile(
-			    session, ref->page, 0, WT_REC_SYNC));
-	}
-
-err:	/* End the walk cleanly. */
-	__wt_walk_end(session, &btree->evict_walk);
-
-	return (ret);
-}
-
-/*
- * __evict --
- *	Evict pages from the cache.
- */
-static int
-__evict(SESSION *session)
-{
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
 	/* Get some more pages to consider for eviction. */
 	WT_RET(__evict_walk(session));
 
 	/* Remove duplicates from the list. */
 	__evict_dup_remove(session);
 
-	/* Sort the array by LRU. */
-	qsort(cache->evict, (size_t)cache->evict_elem,
-	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
-
 	/* Reconcile and discard the pages. */
-	WT_RET(__evict_page(session));
+	__evict_page(session);
 
 	return (0);
 }
@@ -413,14 +532,14 @@ __evict(SESSION *session)
 static int
 __evict_walk(SESSION *session)
 {
-	BTREE *btree;
 	CONNECTION *conn;
+	BTREE *btree;
 	WT_CACHE *cache;
 	u_int elem, i;
 	int ret;
 
 	conn = S2C(session);
-	cache = conn->cache;
+	cache = S2C(session)->cache;
 
 	/*
 	 * Resize the array in which we're tracking pages, as necessary, then
@@ -432,10 +551,10 @@ __evict_walk(SESSION *session)
 	ret = 0;
 	__wt_lock(session, conn->mtx);
 	elem = WT_EVICT_WALK_BASE + (conn->dbqcnt * WT_EVICT_WALK_PER_TABLE);
-	if (elem <= cache->evict_elem || (ret = __wt_realloc(session,
-	    &cache->evict_len,
+	if (elem <= cache->evict_entries || (ret = __wt_realloc(session,
+	    &cache->evict_allocated,
 	    elem * sizeof(WT_EVICT_LIST), &cache->evict)) == 0) {
-		cache->evict_elem = elem;
+		cache->evict_entries = elem;
 
 		i = WT_EVICT_WALK_BASE;
 		TAILQ_FOREACH(btree, &conn->dbqh, q) {
@@ -489,8 +608,12 @@ restart:	WT_RET(__wt_walk_begin(session,
 		}
 		page = ref->page;
 
-		/* Pinned pages can't be evicted. */
-		if (F_ISSET(page, WT_PAGE_PINNED))
+		/*
+		 * Pinned pages can't be evicted, and it's not useful to try
+		 * and evict deleted or split pages.
+		 */
+		if (F_ISSET(page,
+		    WT_PAGE_PINNED | WT_PAGE_DELETED | WT_PAGE_SPLIT))
 			continue;
 
 		/* During verification, we can only evict clean pages. */
@@ -534,7 +657,7 @@ __evict_dup_remove(SESSION *session)
 	 * been free'd before a subsequent review of the eviction array.)
 	 */
 	evict = cache->evict;
-	elem = cache->evict_elem;
+	elem = cache->evict_entries;
 	qsort(evict,
 	    (size_t)elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
 	for (i = 0; i < elem; i = j)
@@ -548,7 +671,7 @@ __evict_dup_remove(SESSION *session)
 
 			/* Delete the second and any subsequent duplicates. */
 			if (evict[i].ref == evict[j].ref)
-				WT_EVICT_CLR(&evict[j]);
+				__evict_clr(&evict[j]);
 			else
 				break;
 		}
@@ -558,19 +681,22 @@ __evict_dup_remove(SESSION *session)
  * __evict_page --
  *	Reconcile and discard cache pages.
  */
-static int
+static void
 __evict_page(SESSION *session)
 {
-	CONNECTION *conn;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
 	WT_REF *ref;
 	u_int i;
 
-	conn = S2C(session);
-	cache = conn->cache;
+	cache = S2C(session)->cache;
 
+	/* Sort the array by LRU, then evict the most promising candidates. */
+	qsort(cache->evict, (size_t)cache->evict_entries,
+	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
+
+	__wt_evict_dump(session);
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((ref = evict->ref) == NULL)
 			continue;
@@ -583,11 +709,17 @@ __evict_page(SESSION *session)
 		 * Paranoia: remove the entry so we never try and reconcile
 		 * the same page on reconciliation error.
 		 */
-		WT_EVICT_CLR(evict);
+		__evict_clr(evict);
 
-		WT_RET(__wt_page_reconcile(session, page, 0, WT_REC_EVICT));
+		/*
+		 * For now, we don't care why reconciliation failed -- we expect
+		 * the reason is we were unable to get exclusive access for the
+		 * page, but it might be we're out of disk space.   Regardless,
+		 * try not to pick the same page every time.
+		 */
+		if (__wt_page_reconcile(session, page, 0, WT_REC_EVICT) != 0)
+			page->read_gen = cache->read_gen;
 	}
-	return (0);
 }
 
 /*
@@ -653,24 +785,24 @@ __evict_lru_cmp(const void *a, const void *b)
 void
 __wt_evict_dump(SESSION *session)
 {
+	FILE *fp;
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	WT_MBUF mb;
 	u_int n;
-	int sep;
+	const char *sep;
 
 	cache = S2C(session)->cache;
 
-	__wt_mb_init(session, &mb);
-	__wt_mb_add(&mb, "eviction list");
-
-	for (sep = ':', n = 0; n < cache->evict_elem; ++n) {
+	if ((fp = fopen("xx.log", "w")) == NULL)
+		return;
+	for (sep = "\tdump:", n = 0; n < cache->evict_entries; ++n) {
 		evict = &cache->evict[n];
 		if (evict->ref == NULL)
 			continue;
-		__wt_mb_add(&mb, "%c %lu", sep, (u_long)evict->ref->page->addr);
-		sep = ',';
+		fprintf(fp, "%s %lu", sep, (u_long)evict->ref->page->addr);
+		sep = ",";
 	}
-	__wt_mb_discard(&mb);
+	fprintf(fp, "\n");
+	(void)fclose(fp);
 }
 #endif

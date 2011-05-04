@@ -15,7 +15,7 @@ extern "C" {
 
 /*
  * WT_EVICT_LIST --
- *	Encapsulation of an eviction choice.
+ *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_list {
 	WT_REF	*ref;				/* WT_REF structure */
@@ -30,20 +30,12 @@ struct __wt_evict_req {
 	SESSION *session;			/* Requesting thread */
 	BTREE	*btree;				/* Btree */
 	int	 close_method;			/* Discard pages */
+
+	WT_PAGE **retry;			/* Pages to retry */
+	uint32_t  retry_next;			/* Next retry slot */
+	uint32_t  retry_entries;		/* Total retry slots */
+	uint32_t  retry_allocated;		/* Bytes allocated */
 };
-#define	WT_EVICT_REQ_ISEMPTY(r)						\
-	((r)->session == NULL)
-#define	WT_EVICT_REQ_SET(r, _session, _btree, _close_method) do {	\
-	(r)->btree = _btree;						\
-	(r)->close_method = _close_method;				\
-	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
-	(r)->session = _session;					\
-	WT_MEMORY_FLUSH;	/* Turn entry on */			\
-} while (0)
-#define	WT_EVICT_REQ_CLR(r) do {					\
-	(r)->session = NULL;						\
-	WT_MEMORY_FLUSH;	/* Turn entry off */			\
-} while (0)
 
 /*
  * WT_READ_REQ --
@@ -55,20 +47,6 @@ struct __wt_read_req {
 	WT_REF  *ref;				/* Reference/Address */
 	int	 dsk_verify;			/* Verify the disk image */
 };
-#define	WT_READ_REQ_ISEMPTY(r)						\
-	((r)->session == NULL)
-#define	WT_READ_REQ_SET(r, _session, _parent, _ref, _dsk_verify) do {	\
-	(r)->parent = _parent;						\
-	(r)->ref = _ref;						\
-	(r)->dsk_verify = _dsk_verify;					\
-	WT_MEMORY_FLUSH;	/* Flush before turning entry on */	\
-	(r)->session = _session;					\
-	WT_MEMORY_FLUSH;	/* Turn entry on */			\
-} while (0)
-#define	WT_READ_REQ_CLR(r) do {						\
-	(r)->session = NULL;						\
-	WT_MEMORY_FLUSH;	/* Turn entry off */			\
-} while (0)
 
 /*
  * WiredTiger cache structure.
@@ -108,6 +86,14 @@ struct __wt_cache {
 	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
 					   slot available if session is NULL */
 
+	/*
+	 * File sync can temporarily fail when a tree is active, that is, we may
+	 * not be able to immediately reconcile all of the file's pages.  If the
+	 * pending_retry value is non-zero, it means there are pending requests
+	 * we need to handle.
+	 */
+	int pending_retry;		/* Eviction request needs completion */
+
 	uint32_t   read_gen;		/* Page read generation (LRU) */
 
 	void	  *rec;			/* Page reconciliation structure */
@@ -125,8 +111,8 @@ struct __wt_cache {
 	uint64_t bytes_out;
 
 	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
-	uint32_t evict_elem;		/* Number of elements in the array */
-	uint32_t evict_len;		/* Bytes in the array */
+	uint32_t evict_entries;		/* Total evict slots */
+	uint32_t evict_allocated;	/* Bytes allocated */
 
 	WT_HAZARD *hazard;		/* Copy of the hazard references */
 	uint32_t   hazard_elem;		/* Number of entries in the list */

@@ -208,9 +208,12 @@ __wt_hazard_copy(SESSION *session)
 
 	/* Copy the list of hazard references, compacting it as we go. */
 	elem = conn->session_size * conn->hazard_size;
-	for (i = j = 0; j < elem; ++j)
-		if ((cache->hazard[i].page = conn->hazard[j].page) != NULL)
-			++i;
+	for (i = j = 0; j < elem; ++j) {
+		if (conn->hazard[j].page == NULL)
+			continue;
+		cache->hazard[i] = conn->hazard[j];
+		++i;
+	}
 	elem = i;
 
 	/* Sort the list by page address. */
@@ -221,40 +224,37 @@ __wt_hazard_copy(SESSION *session)
 }
 
 /*
- * __wt_hazard_wait --
- *	Wait for the hazard references on a page to clear.
+ * __wt_hazard_exclusive --
+ *	Request exclusive access to a page.
  */
-void
-__wt_hazard_wait(SESSION *session, WT_REF *ref)
+int
+__wt_hazard_exclusive(SESSION *session, WT_REF *ref)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
 	/*
+	 * Hazard references are acquired down the tree, which means we can't
+	 * deadlock.
+	 *
 	 * Request exclusive access to the page; no memory flush needed, the
 	 * state field is declared volatile.
 	 */
 	ref->state = WT_REF_LOCKED;
 
-	/*
-	 * Hazard references are acquired down the tree, which means we can't
-	 * deadlock -- wait until exclusive access is available..
-	 */
-	for (;;) {
-		/* Get a fresh copy of the hazard reference array. */
-		__wt_hazard_copy(session);
+	/* Get a fresh copy of the hazard reference array. */
+	__wt_hazard_copy(session);
 
-		/*
-		 * If we find a matching hazard reference, the page is still
-		 * in use.
-		 */
-		if (bsearch(ref->page, cache->hazard, cache->hazard_elem,
-		    sizeof(WT_HAZARD), __wt_hazard_bsearch_cmp) == NULL)
-			break;
+	/* If we find a matching hazard reference, the page is still in use. */
+	if (bsearch(ref->page, cache->hazard, cache->hazard_elem,
+	    sizeof(WT_HAZARD), __wt_hazard_bsearch_cmp) == NULL)
+		return (0);
 
-		__wt_yield();
-	}
+	/* Return the page to in-use. */
+	ref->state = WT_REF_MEM;
+
+	return (1);
 }
 
 #ifdef DIAGNOSTIC

@@ -20,8 +20,7 @@ serial['cache_read'] = Serial(
 serial['evict_file'] = Serial(
 	'evict_file',
 	'WT_WORKQ_EVICT', '0',
-	['BTREE */btree',
-	 'int/close_method'])
+	['int/close_method'])
 
 serial['insert'] = Serial(
 	'insert',
