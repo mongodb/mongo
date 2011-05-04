@@ -245,7 +245,7 @@ namespace mongo {
         template <class U> friend class BtreeBuilder;
         typedef typename Version::Key Key;
 
-        int getN() const { return n; }
+        int getN() const { return this->n; }
 
         /**
          * This is an in memory wrapper for a _KeyNode, and not itself part of btree
