@@ -59,6 +59,7 @@ namespace mongo {
 
     class GeoHash {
     public:
+
         GeoHash()
             : _hash(0),_bits(0) {
         }

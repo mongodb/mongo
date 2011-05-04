@@ -552,7 +552,7 @@ namespace mongo {
             for ( int i = 1; i <= size(); i++ ) {
                 Point p2 = _points[i % size()];
 
-                GEODEBUG( "Doing intersection check of " << fudgeBox << " with seg " << p1 << " to " << p2 );
+                GEODEBUG( "Doing intersection check of " << fudgeBox.toString() << " with seg " << p1.toString() << " to " << p2.toString() );
 
                 // We need to check whether or not this segment intersects our error box
                 if( fudge > 0 &&
@@ -1086,145 +1086,6 @@ namespace mongo {
         long long _found;
     };
 
-    class GeoHopper : public GeoAccumulator {
-    public:
-        typedef multiset<GeoPoint> Holder;
-
-        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN )
-            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
-        {}
-
-        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
-
-            // Always check approximate distance, since it lets us avoid doing
-            // checks of the rest of the object if it succeeds
-            // TODO:  Refactor so that we can check exact distance and within if we are going to
-            // anyway.
-            d = approxDistance( node );
-            assert( d >= 0 );
-
-            // Out of the error range, see how close we are to the furthest points
-            bool good = d <= _maxDistance + 2 * _distError /* In error range */
-            		     && ( _points.size() < _max /* need more points */
-            		       || d <= farthest() + 2 * _distError /* could be closer than previous points */ );
-
-            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
-                      << "\t" << GeoHash( node.key.firstElement() ) << "\t" << d
-                      << " ok: " << good << " farthest: " << farthest() );
-
-            return good;
-        }
-
-        double approxDistance( const GeoKeyNode& node ) {
-            return approxDistance( GeoHash( node.key._firstElement() ) );
-        }
-
-        double approxDistance( const GeoHash& h ) {
-
-            double approxDistance = -1;
-            switch (_type) {
-            case GEO_PLAIN:
-                approxDistance = _near.distance( Point( _g, h ) );
-                break;
-            case GEO_SPHERE:
-                approxDistance = spheredist_deg( _near, Point( _g, h ) );
-                break;
-            default: assert( false );
-            }
-
-            return approxDistance;
-        }
-
-        double exactDistances( const GeoKeyNode& node ) {
-
-            GEODEBUG( "Finding exact distance for " << node.key.toString() << " and " << node.recordLoc.obj().toString() );
-
-            // Find all the location objects from the keys
-            vector< BSONObj > locs;
-            _g->getKeys( node.recordLoc.obj(), locs );
-
-            double maxDistance = -1;
-
-            // Find the particular location we want
-            BSONObj loc;
-            GeoHash keyHash( node.key._firstElement(), _g->_bits );
-            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
-
-                loc = *i;
-
-                // Ignore all locations not hashed to the key's hash, since we may see
-                // those later
-                if( _g->_hash( loc ) != keyHash ) continue;
-
-                double exactDistance = -1;
-                bool exactWithin = false;
-
-                // Get the appropriate distance for the type
-                switch ( _type ) {
-                case GEO_PLAIN:
-                    exactDistance = _near.distance( Point( loc ) );
-                    exactWithin = _near.distanceWithin( Point( loc ), _maxDistance );
-                    break;
-                case GEO_SPHERE:
-                    exactDistance = spheredist_deg( _near, Point( loc ) );
-                    exactWithin = ( exactDistance <= _maxDistance );
-                    break;
-                default: assert( false );
-                }
-
-                assert( exactDistance >= 0 );
-                if( !exactWithin ) continue;
-
-                GEODEBUG( "Inserting exact point: " << GeoPoint( node , exactDistance, exactWithin ) );
-
-                // Add a point for this location
-                _points.insert( GeoPoint( node , exactDistance, exactWithin ) );
-
-                if( exactDistance > maxDistance ) maxDistance = exactDistance;
-            }
-
-            return maxDistance;
-
-        }
-
-        // Always in distance units, whether radians or normal
-        double farthest() const {
-            return _farthest;
-        }
-
-        bool inErrorBounds( double approxD ) const {
-            return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
-        }
-
-        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
-
-            GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
-
-            double maxDistance = exactDistances( node );
-            if( maxDistance >= 0 ){
-
-            	// Recalculate the current furthest point.
-            	int numToErase = _points.size() - _max;
-				while( numToErase-- > 0 ){
-					_points.erase( --_points.end() );
-				}
-
-				_farthest = boost::next( _points.end(), -1 )->_exactDistance;
-
-            }
-        }
-
-        unsigned _max;
-        Point _near;
-        Holder _points;
-        double _maxDistance;
-        GeoDistType _type;
-        double _distError;
-        double _farthest;
-
-    };
-
-
     struct BtreeLocation {
         int pos;
         bool found;
@@ -1305,198 +1166,6 @@ namespace mongo {
         }
     };
 
-    class GeoSearch {
-    public:
-        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN )
-            : _spec( g ) ,_startPt( startPt ), _start( g->hash( startPt._x, startPt._y ) ) ,
-              _numWanted( numWanted ) , _filter( filter ) , _maxDistance( maxDistance ) ,
-              _hopper( new GeoHopper( g , numWanted , _startPt , filter , maxDistance, type ) ), _type(type) {
-            assert( g->getDetails() );
-            _nscanned = 0;
-            _found = 0;
-
-            if (type == GEO_PLAIN) {
-                _scanDistance = _maxDistance + _spec->_error;
-            }
-            else if (type == GEO_SPHERE) {
-                if (_maxDistance == numeric_limits<double>::max()) {
-                    _scanDistance = _maxDistance;
-                }
-                else {
-                    //TODO: consider splitting into x and y scan distances
-                    _scanDistance = computeXScanDistance(_startPt._y, rad2deg( _maxDistance ) + _spec->_error );
-                }
-            }
-            else {
-                assert(0);
-            }
-        }
-
-        void exec() {
-            const IndexDetails& id = *_spec->getDetails();
-
-            const GeoBtreeBucket * head = id.head.BTREE();
-            assert( head );
-            /*
-             * Search algorithm
-             * 1) use geohash prefix to find X items
-             * 2) compute max distance from want to an item
-             * 3) find optimal set of boxes that complete circle
-             * 4) use regular btree cursors to scan those boxes
-             */
-
-            GeoHopper * hopper = _hopper.get();
-
-            _prefix = _start;
-
-            BtreeLocation min,max;
-            {
-                // TODO : Refactor this into the other, tested, geohash algorithm
-
-                // 1 regular geo hash algorithm
-                if ( ! BtreeLocation::initial( id , _spec , min , max , _start , _found , NULL ) )
-                    return;
-
-                while ( !_prefix.constrains() || // if next pass would cover universe, just keep going
-                        ( _hopper->found() < _numWanted && _spec->sizeEdge( _prefix ) <= _scanDistance)) {
-                    GEODEBUG( _prefix << "\t" << _found << "\t DESC" );
-                    while ( min.hasPrefix(_prefix) && min.checkCur(_found, hopper) && min.advance(-1, _found, NULL) )
-                        _nscanned++;
-                    GEODEBUG( _prefix << "\t" << _found << "\t ASC" );
-                    while ( max.hasPrefix(_prefix) && max.checkCur(_found, hopper) && max.advance(+1, _found, NULL) )
-                        _nscanned++;
-
-                    if ( ! _prefix.constrains() ) {
-                        GEODEBUG( "done search w/o part 2" )
-                        return;
-                    }
-
-                    _alreadyScanned = Box(_spec, _prefix);
-                    _prefix = _prefix.up();
-                }
-            }
-            GEODEBUG( "done part 1" );
-            {
-                // 2
-                double farthest = hopper->farthest();
-                GEODEBUGPRINT(hopper->farthest());
-                if (hopper->found() < _numWanted) {
-                    // Not enough found in Phase 1
-                    farthest = _scanDistance;
-                }
-                else if (_type == GEO_PLAIN) {
-                    farthest += _spec->_error;
-                }
-                else if (_type == GEO_SPHERE) {
-                    farthest = std::min( _scanDistance, computeXScanDistance(_startPt._y, rad2deg(farthest)) + 2 * _spec->_error );
-                }
-                assert( farthest >= 0 );
-                GEODEBUGPRINT(farthest);
-
-                Box want( _startPt._x - farthest , _startPt._y - farthest , farthest * 2 );
-                GEODEBUGPRINT(want.toString());
-
-                _prefix = _start;
-                while (_prefix.constrains() && _spec->sizeEdge( _prefix ) < farthest ) {
-                    _prefix = _prefix.up();
-                }
-
-                PREFIXDEBUG(_prefix, _spec);
-
-                if (_prefix.getBits() <= 1) {
-                    // TODO consider walking in $natural order
-
-                    while ( min.checkCur(_found, hopper) && min.advance(-1, _found, NULL) )
-                        _nscanned++;
-                    while ( max.checkCur(_found, hopper) && max.advance(+1, _found, NULL) )
-                        _nscanned++;
-
-                    GEODEBUG( "done search after scanning whole collection" )
-                    return;
-                }
-
-                if ( logLevel > 0 ) {
-                    log(1) << "want: " << want << " found:" << _found << " nscanned: " << _nscanned << " hash size:" << _spec->sizeEdge( _prefix )
-                           << " farthest: " << farthest << " using box: " << Box( _spec , _prefix ).toString() << endl;
-                }
-
-                for ( int x=-1; x<=1; x++ ) {
-                    for ( int y=-1; y<=1; y++ ) {
-                        GeoHash toscan = _prefix;
-                        toscan.move( x , y );
-
-                        // 3 & 4
-                        doBox( id , want , toscan );
-                    }
-                }
-            }
-            GEODEBUG( "done search" )
-
-        }
-
-        void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ) {
-            Box testBox( _spec , toscan );
-            if ( logLevel > 2 ) {
-                cout << "\t";
-                for ( int i=0; i<depth; i++ )
-                    cout << "\t";
-                cout << " doBox: " << testBox.toString() << "\t" << toscan.toString() << " scanned so far: " << _nscanned << endl;
-            }
-            else {
-                GEODEBUGPRINT(testBox.toString());
-            }
-
-            if ( _alreadyScanned.area() > 0 && _alreadyScanned.contains( testBox ) ) {
-                GEODEBUG( "skipping box : already scanned box " << _alreadyScanned.toString() );
-                return; // been here, done this
-            }
-
-            double intPer = testBox.intersects( want );
-
-            if ( intPer <= 0 ) {
-                GEODEBUG("skipping box: not in want");
-                return;
-            }
-
-            bool goDeeper = intPer < .5 && depth < 2;
-
-            long long myscanned = 0;
-
-            BtreeLocation loc;
-            loc.bucket = id.head.BTREE()->locate( id , id.head , toscan.wrap() , Ordering::make(_spec->_order) ,
-                                                  loc.pos , loc.found , minDiskLoc );
-            loc.checkCur( _found , _hopper.get() );
-            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) ) {
-                _nscanned++;
-                if ( ++myscanned > 100 && goDeeper ) {
-                    doBox( id , want , toscan + "00" , depth + 1);
-                    doBox( id , want , toscan + "01" , depth + 1);
-                    doBox( id , want , toscan + "10" , depth + 1);
-                    doBox( id , want , toscan + "11" , depth + 1);
-                    return;
-                }
-            }
-
-        }
-
-
-        const Geo2dType * _spec;
-
-        Point _startPt;
-        GeoHash _start;
-        GeoHash _prefix;
-        int _numWanted;
-        BSONObj _filter;
-        double _maxDistance;
-        double _scanDistance;
-        shared_ptr<GeoHopper> _hopper;
-
-        long long _nscanned;
-        int _found;
-        GeoDistType _type;
-
-        Box _alreadyScanned;
-    };
 
     class GeoCursorBase : public Cursor {
     public:
@@ -1533,56 +1202,6 @@ namespace mongo {
         const IndexDetails * _id;
     };
 
-    class GeoSearchCursor : public GeoCursorBase {
-    public:
-        GeoSearchCursor( shared_ptr<GeoSearch> s )
-            : GeoCursorBase( s->_spec ) ,
-              _s( s ) , _cur( s->_hopper->_points.begin() ) , _end( s->_hopper->_points.end() ), _nscanned() {
-            if ( _cur != _end ) {
-                ++_nscanned;
-            }
-        }
-
-        virtual ~GeoSearchCursor() {}
-
-        virtual bool ok() {
-            return _cur != _end;
-        }
-
-        virtual Record* _current() { assert(ok()); return _cur->_loc.rec(); }
-        virtual BSONObj current() { assert(ok()); return _cur->_o; }
-        virtual DiskLoc currLoc() { assert(ok()); return _cur->_loc; }
-        virtual bool advance() { _cur++; incNscanned(); return ok(); }
-        virtual BSONObj currKey() const { return _cur->_key; }
-
-        virtual string toString() {
-            return "GeoSearchCursor";
-        }
-
-
-        virtual BSONObj prettyStartKey() const {
-            return BSON( _s->_spec->_geo << _s->_prefix.toString() );
-        }
-        virtual BSONObj prettyEndKey() const {
-            GeoHash temp = _s->_prefix;
-            temp.move( 1 , 1 );
-            return BSON( _s->_spec->_geo << temp.toString() );
-        }
-
-        virtual long long nscanned() { return _nscanned; }
-
-        virtual CoveredIndexMatcher *matcher() const {
-            return _s->_hopper->_matcher.get();
-        }
-
-        shared_ptr<GeoSearch> _s;
-        GeoHopper::Holder::iterator _cur;
-        GeoHopper::Holder::iterator _end;
-
-        void incNscanned() { if ( ok() ) { ++_nscanned; } }
-        long long _nscanned;
-    };
-
     class GeoBrowse : public GeoCursorBase , public GeoAccumulator {
     public:
 
@@ -1598,13 +1217,13 @@ namespace mongo {
         } _state;
 
         GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj() )
-            : GeoCursorBase( g ) ,GeoAccumulator( g , filter ) ,
+            : GeoCursorBase( g ), GeoAccumulator( g , filter ) ,
               _type( type ) , _filter( filter ) , _firstCall(true), _nscanned(), _centerPrefix(0, 0, 0) {
 
             // Set up the initial expand state
             _state = START;
             _neighbor = -1;
-            _found = 0;
+            _foundInExp = 0;
 
         }
 
@@ -1671,18 +1290,25 @@ namespace mongo {
             return _state != DONE;
         }
 
+        virtual void resetSearch(){
+            _state = START;
+            _neighbor = -1;
+        }
+
         // Fills the stack, but only checks a maximum number of maxToCheck points at a time.
         // Further calls to this function will continue the expand/check neighbors algorithm.
-        virtual void fillStack( int maxToCheck ) {
+        virtual void fillStack( int maxToCheck, int maxToAdd = -1, bool onlyExpand = false ) {
 
 #ifdef GEODEBUGGING
 
             int s = _state;
-            log() << "Filling stack with maximum of " << maxToCheck << ", state : " << s << endl;
+            log() << "Filling stack with maximum of " << maxToCheck << ", state : " << (int) _state << endl;
 
 #endif
+            if( maxToAdd < 0 ) maxToAdd = maxToCheck;
+            int maxFound = _foundInExp + maxToCheck;
+            int maxAdded = _found + maxToAdd;
 
-            int maxFound = _found + maxToCheck;
             bool isNeighbor = _centerPrefix.constrains();
 
             // Starting a box expansion
@@ -1694,10 +1320,16 @@ namespace mongo {
 
                 GEODEBUG( "initializing btree" );
 
-                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , _prefix , _found , this ) )
+#ifdef GEODEBUGGING
+                log() << "Initializing from b-tree with hash of " << _prefix << " @ " << Box( _g, _prefix ) << endl;
+#endif
+
+                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , _prefix , _foundInExp , this ) )
                     _state = isNeighbor ? DONE_NEIGHBOR : DONE;
-                else
+                else {
                     _state = DOING_EXPAND;
+                    _lastPrefix.reset();
+                }
 
                 GEODEBUG( (_state == DONE_NEIGHBOR || _state == DONE ? "not initialized" : "initializedFig") );
 
@@ -1723,12 +1355,21 @@ namespace mongo {
                     GEODEBUG( "expanding box points... ");
 
                     // Find points inside this prefix
-                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) && _found < maxFound );
-                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) && _found < maxFound );
+                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _foundInExp , this ) && _foundInExp < maxFound && _found < maxAdded );
+                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _foundInExp , this ) && _foundInExp < maxFound && _found < maxAdded );
+
+#ifdef GEODEBUGGING
+
+                    log() << "finished expand, found : " << ( maxToCheck - ( maxFound - _foundInExp ) )
+                          << ( maxToAdd - ( maxAdded - _found ) ) << endl;
+
+#endif
 
                     GEODEBUG( "finished expand, found : " << ( maxToCheck - ( maxFound - _found ) ) );
+                    if( _foundInExp >= maxFound || _found >= maxAdded ) return;
 
-                    if( _found >= maxFound ) return;
+                    // We've searched this prefix fully, remember
+                    _lastPrefix = _prefix;
 
                     // If we've searched the entire space, we're finished.
                     if ( ! _prefix.constrains() ) {
@@ -1754,6 +1395,10 @@ namespace mongo {
 
                 }
             }
+
+
+            // If we doeighbors
+            if( onlyExpand ) return;
 
             // If we're done expanding the current box...
             if( _state == DONE_NEIGHBOR ) {
@@ -1802,13 +1447,15 @@ namespace mongo {
                         // Restart our search from a diff box.
                         _state = START;
 
-                        fillStack( maxFound - _found );
+                        assert( ! onlyExpand );
+
+                        fillStack( maxFound - _foundInExp, maxAdded - _found );
 
                         // When we return from the recursive fillStack call, we'll either have checked enough points or
                         // be entirely done.  Max recurse depth is 8.
 
                         // If we're maxed out on points, return
-                        if( _found >= maxFound ) {
+                        if( _foundInExp >= maxFound ) {
                             // Make sure we'll come back to add more points
                             assert( _state == DOING_EXPAND );
                             return;
@@ -1871,10 +1518,12 @@ namespace mongo {
         int _neighbor;
 
         // The points we've found so far
-        int _found;
+        // TODO:  Long long?
+        int _foundInExp;
 
         // The current hash prefix we're expanding and the center-box hash prefix
         GeoHash _prefix;
+        optional<GeoHash> _lastPrefix;
         GeoHash _centerPrefix;
         Box _centerBox;
 
@@ -1883,6 +1532,339 @@ namespace mongo {
         BtreeLocation _max;
 
     };
+
+
+    class GeoHopper : public GeoBrowse {
+    public:
+        typedef multiset<GeoPoint> Holder;
+
+        GeoHopper( const Geo2dType * g , unsigned max , const Point& n , const BSONObj& filter = BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN )
+            : GeoBrowse( g, "search", filter ), _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
+        {}
+
+        virtual bool checkDistance( const KeyNode& node, double& d ) {
+
+            // Always check approximate distance, since it lets us avoid doing
+            // checks of the rest of the object if it succeeds
+            // TODO:  Refactor so that we can check exact distance and within if we are going to
+            // anyway.
+            d = approxDistance( node );
+            assert( d >= 0 );
+
+            // Out of the error range, see how close we are to the furthest points
+            bool good = d <= _maxDistance + 2 * _distError /* In error range */
+                        && ( _points.size() < _max /* need more points */
+                          || d <= farthest() + 2 * _distError /* could be closer than previous points */ );
+
+            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
+                      << "\t" << GeoHash( node.key.firstElement() ) << "\t" << d
+                      << " ok: " << good << " farthest: " << farthest() );
+
+            return good;
+        }
+
+        double approxDistance( const KeyNode& node ) {
+            return approxDistance( GeoHash( node.key.firstElement() ) );
+        }
+
+        double approxDistance( const GeoHash& h ) {
+
+            double approxDistance = -1;
+            switch (_type) {
+            case GEO_PLAIN:
+                approxDistance = _near.distance( Point( _g, h ) );
+                break;
+            case GEO_SPHERE:
+                approxDistance = spheredist_deg( _near, Point( _g, h ) );
+                break;
+            default: assert( false );
+            }
+
+            return approxDistance;
+        }
+
+        double exactDistances( const KeyNode& node ) {
+
+            GEODEBUG( "Finding exact distance for " << node.key.toString() << " and " << node.recordLoc.obj().toString() );
+
+            // Find all the location objects from the keys
+            vector< BSONObj > locs;
+            _g->getKeys( node.recordLoc.obj(), locs );
+
+            double maxDistance = -1;
+
+            // Find the particular location we want
+            BSONObj loc;
+            GeoHash keyHash( node.key.firstElement(), _g->_bits );
+            for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
+
+                loc = *i;
+
+                // Ignore all locations not hashed to the key's hash, since we may see
+                // those later
+                if( _g->_hash( loc ) != keyHash ) continue;
+
+                double exactDistance = -1;
+                bool exactWithin = false;
+
+                // Get the appropriate distance for the type
+                switch ( _type ) {
+                case GEO_PLAIN:
+                    exactDistance = _near.distance( Point( loc ) );
+                    exactWithin = _near.distanceWithin( Point( loc ), _maxDistance );
+                    break;
+                case GEO_SPHERE:
+                    exactDistance = spheredist_deg( _near, Point( loc ) );
+                    exactWithin = ( exactDistance <= _maxDistance );
+                    break;
+                default: assert( false );
+                }
+
+                assert( exactDistance >= 0 );
+                if( !exactWithin ) continue;
+
+                GEODEBUG( "Inserting exact point: " << GeoPoint( node , exactDistance, exactWithin ).toString() );
+
+                // Add a point for this location
+                _points.insert( GeoPoint( node , exactDistance, exactWithin ) );
+
+                if( exactDistance > maxDistance ) maxDistance = exactDistance;
+            }
+
+            return maxDistance;
+
+        }
+
+        // Always in distance units, whether radians or normal
+        double farthest() const {
+            return _farthest;
+        }
+
+        bool inErrorBounds( double approxD ) const {
+            return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
+        }
+
+        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+
+            GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
+
+            double maxDistance = exactDistances( node );
+            if( maxDistance >= 0 ){
+
+               // Recalculate the current furthest point.
+               int numToErase = _points.size() - _max;
+               while( numToErase-- > 0 ){
+                   _points.erase( --_points.end() );
+               }
+
+               _farthest = boost::next( _points.end(), -1 )->_exactDistance;
+
+            }
+        }
+
+        unsigned _max;
+        Point _near;
+        Holder _points;
+        double _maxDistance;
+        GeoDistType _type;
+        double _distError;
+        double _farthest;
+
+    };
+
+
+
+    class GeoSearch : public GeoHopper {
+    public:
+        GeoSearch( const Geo2dType * g , const Point& startPt , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() , GeoDistType type=GEO_PLAIN )
+           : GeoHopper( g , numWanted , startPt , filter , maxDistance, type ),
+             _start( g->hash( startPt._x, startPt._y ) ),
+              _numWanted( numWanted ),
+              _type(type)
+        {
+
+           assert( g->getDetails() );
+            _nscanned = 0;
+            _found = 0;
+
+            if( _maxDistance < 0 ){
+               _scanDistance = numeric_limits<double>::max();
+            }
+            else if (type == GEO_PLAIN) {
+                _scanDistance = maxDistance + _spec->_error;
+            }
+            else if (type == GEO_SPHERE) {
+                // TODO: consider splitting into x and y scan distances
+                _scanDistance = computeXScanDistance( startPt._y, rad2deg( _maxDistance ) + _spec->_error );
+            }
+
+            assert( _scanDistance > 0 );
+
+        }
+
+        void exec() {
+
+            /*
+             * Search algorithm
+             * 1) use geohash prefix to find X items
+             * 2) compute max distance from want to an item
+             * 3) find optimal set of boxes that complete circle
+             * 4) use regular btree cursors to scan those boxes
+             */
+
+#ifdef GEODEBUGGING
+
+           log() << "start near search for points near " << _near << " (max dist " << _maxDistance << ")" << endl;
+
+#endif
+
+           // Part 1
+           {
+               do {
+                   fillStack( maxPointsHeuristic, _numWanted, true );
+               } while( _state != DONE && _state != DONE_NEIGHBOR &&
+                        found() < _numWanted &&
+                        (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
+
+               // If we couldn't scan or scanned everything, we're done
+               if( _state == DONE ) return;
+
+           }
+
+#ifdef GEODEBUGGING
+
+           log() << "part 1 of near search completed, found " << found() << " points (out of " << _foundInExp << " scanned)"
+                 << " in expanded region " << _prefix << " @ " << Box( _g, _prefix )
+                 << " with furthest distance " << farthest() << endl;
+
+#endif
+
+           // Part 2
+            {
+
+               // Find farthest distance for completion scan
+                double far = farthest();
+                if( found() < _numWanted ) {
+                    // Not enough found in Phase 1
+                    far = _scanDistance;
+                }
+                else if ( _type == GEO_PLAIN ) {
+                   // Enough found, but need to search neighbor boxes
+                    far += _spec->_error;
+                }
+                else if ( _type == GEO_SPHERE ) {
+                   // Enough found, but need to search neighbor boxes
+                    far = std::min( _scanDistance, computeXScanDistance( _near._y, rad2deg( far ) ) + 2 * _spec->_error );
+                }
+                assert( far >= 0 );
+                GEODEBUGPRINT( far );
+
+                // Find the box that includes all the points we need to return
+                _want = Box( _near._x - far , _near._y - far , far * 2 );
+                GEODEBUGPRINT( _want.toString() );
+
+                // Remember the far distance for further scans
+                _scanDistance = far;
+
+                // Reset the search, our distances have probably changed
+                if( _state == DONE_NEIGHBOR ){
+                   _state = DOING_EXPAND;
+                   _neighbor = -1;
+                }
+
+#ifdef GEODEBUGGING
+
+                log() << "resetting search with start at " << _start << " (edge length " << _g->sizeEdge( _start ) << ")" << endl;
+
+#endif
+
+                // Do regular search in the full region
+                do {
+                   fillStack( maxPointsHeuristic );
+                }
+                while( _state != DONE );
+
+            }
+
+            GEODEBUG( "done near search" )
+
+        }
+
+        virtual GeoHash expandStartHash(){
+           return _start;
+        }
+
+        // Whether the current box width is big enough for our search area
+        virtual bool fitsInBox( double width ){
+           return width >= _scanDistance;
+        }
+
+        // Whether the current box overlaps our search area
+        virtual bool intersectsBox( Box& cur ){
+           return _want.intersects( cur );
+        }
+
+        GeoHash _start;
+        int _numWanted;
+        double _scanDistance;
+
+        long long _nscanned;
+        int _found;
+        GeoDistType _type;
+
+        Box _want;
+    };
+
+    class GeoSearchCursor : public GeoCursorBase {
+    public:
+        GeoSearchCursor( shared_ptr<GeoSearch> s )
+            : GeoCursorBase( s->_spec ) ,
+              _s( s ) , _cur( s->_points.begin() ) , _end( s->_points.end() ), _nscanned() {
+            if ( _cur != _end ) {
+            +_nscanned;
+            }
+        }
+
+        virtual ~GeoSearchCursor() {}
+
+        virtual bool ok() {
+            return _cur != _end;
+        }
+
+        virtual Record* _current() { assert(ok()); return _cur->_loc.rec(); }
+        virtual BSONObj current() { assert(ok()); return _cur->_o; }
+        virtual DiskLoc currLoc() { assert(ok()); return _cur->_loc; }
+        virtual bool advance() { _cur++; incNscanned(); return ok(); }
+        virtual BSONObj currKey() const { return _cur->_key; }
+
+        virtual string toString() {
+            return "GeoSearchCursor";
+        }
+
+
+        virtual BSONObj prettyStartKey() const {
+            return BSON( _s->_g->_geo << _s->_prefix.toString() );
+        }
+        virtual BSONObj prettyEndKey() const {
+            GeoHash temp = _s->_prefix;
+            temp.move( 1 , 1 );
+            return BSON( _s->_g->_geo << temp.toString() );
+        }
+
+        virtual long long nscanned() { return _nscanned; }
+
+        virtual CoveredIndexMatcher *matcher() const {
+            return _s->_matcher.get();
+        }
+
+        shared_ptr<GeoSearch> _s;
+        GeoHopper::Holder::iterator _cur;
+        GeoHopper::Holder::iterator _end;
+
+        void incNscanned() { if ( ok() ) { ++_nscanned; } }
+        long long _nscanned;
+    };
+
 
     class GeoCircleBrowse : public GeoBrowse {
     public:
@@ -2381,7 +2363,7 @@ namespace mongo {
 
             BSONObjBuilder arr( result.subarrayStart( "results" ) );
             int x = 0;
-            for ( GeoHopper::Holder::iterator i=gs._hopper->_points.begin(); i!=gs._hopper->_points.end(); i++ ) {
+            for ( GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++ ) {
 
                 const GeoPoint& p = *i;
                 double dis = distanceMultiplier * p._exactDistance;
@@ -2397,10 +2379,10 @@ namespace mongo {
             BSONObjBuilder stats( result.subobjStart( "stats" ) );
             stats.append( "time" , cc().curop()->elapsedMillis() );
             stats.appendNumber( "btreelocs" , gs._nscanned );
-            stats.appendNumber( "nscanned" , gs._hopper->_lookedAt );
-            stats.appendNumber( "objectsLoaded" , gs._hopper->_objectsLoaded );
+            stats.appendNumber( "nscanned" , gs._lookedAt );
+            stats.appendNumber( "objectsLoaded" , gs._objectsLoaded );
             stats.append( "avgDistance" , totalDistance / x );
-            stats.append( "maxDistance" , gs._hopper->farthest() );
+            stats.append( "maxDistance" , gs.farthest() );
             stats.done();
 
             return true;
