@@ -78,12 +78,14 @@ namespace mongo {
             // after this it should be in ram, so 2nd should be fast
             {
                 shared_ptr<Cursor> c( BtreeCursor::make( d, idxNo, *id, min, max, false, 1 ) );
-                scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 while ( c->ok() ) {
                     num++;
                     c->advance();
-                    if ( ! cc->yieldSometimes() )
+                    if ( ! cc->yieldSometimes() ) {
+                        cc.release();
                         break;
+                    }
                 }
             }
 
@@ -177,7 +179,7 @@ namespace mongo {
 
             BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
-            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+            auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
             if ( ! cc->ok() ) {
                 // range is empty
                 return true;
@@ -218,8 +220,10 @@ namespace mongo {
                 }
                 cc->advance();
 
-                if ( ! cc->yieldSometimes() ) 
+                if ( ! cc->yieldSometimes() ) {
+                    cc.release();
                     break;
+                }
             }
 
             return true;
@@ -371,7 +375,7 @@ namespace mongo {
                 
                 BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
                 shared_ptr<Cursor> c( bc );
-                scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                 if ( ! cc->ok() ) {
                     errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                     return false;
@@ -421,7 +425,7 @@ namespace mongo {
                             
                             // don't use the btree cursor pointer to acces keys beyond this point but ok
                             // to use it for format the keys we've got already
-                            
+                            cc.release();
                             break;
                         }
                     }

@@ -430,9 +430,9 @@ namespace mongo {
                 return false;
             }
 
-            scoped_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
-                                         shared_ptr<Cursor>( BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
-                                         _ns ) );
+            auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
+                                                         shared_ptr<Cursor>( BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
+                                                         _ns ) );
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
@@ -464,6 +464,7 @@ namespace mongo {
                 // we can afford to yield here because any change to the base data that we might miss is already being
                 // queued and will be migrated in the 'transferMods' stage
                 if ( ! cc->yieldSometimes() ) {
+                    cc.release();
                     break;
                 }
 
