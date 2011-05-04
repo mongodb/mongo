@@ -190,13 +190,6 @@ __wt_cache_evict_server(void *arg)
 	session = &conn->default_session;
 	WT_ERR(conn->session(conn, 0, &session));
 
-	/*
-	 * Allocate memory for a copy of the hazard references -- it's a fixed
-	 * size so doesn't need run-time adjustments.
-	 */
-	WT_ERR(__wt_calloc_def(session,
-	    conn->session_size * conn->hazard_size, &cache->hazard));
-
 	for (;;) {
 		WT_VERBOSE(conn,
 		    WT_VERB_EVICT, (session, "eviction server sleeping"));
@@ -228,9 +221,6 @@ err:		__wt_err(session, ret, "cache eviction server error");
 
 	if (cache->evict != NULL)
 		__wt_free(session, cache->evict);
-	if (cache->hazard != NULL)
-		__wt_free(session, cache->hazard);
-
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->retry != NULL)
 			__wt_free(session, er->retry);

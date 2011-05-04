@@ -114,9 +114,6 @@ struct __wt_cache {
 	uint32_t evict_entries;		/* Total evict slots */
 	uint32_t evict_allocated;	/* Bytes allocated */
 
-	WT_HAZARD *hazard;		/* Copy of the hazard references */
-	uint32_t   hazard_elem;		/* Number of entries in the list */
-
 	WT_CACHE_STATS *stats;		/* Cache statistics */
 };
 #if defined(__cplusplus)

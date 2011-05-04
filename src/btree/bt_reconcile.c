@@ -166,6 +166,9 @@ typedef struct {
 	uint32_t split_allocated;	/* Bytes allocated */
 
 	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
+
+	WT_HAZARD *hazard;		/* Copy of the hazard references */
+	uint32_t   hazard_elem;		/* Number of entries in the list */
 } WT_RECONCILE;
 
 static uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
@@ -209,6 +212,11 @@ static int  __rec_subtree_row(SESSION *, WT_PAGE *);
 static void __rec_subtree_row_clear(SESSION *, WT_PAGE *);
 static int  __rec_wrapup(SESSION *, WT_PAGE *);
 
+static int  __hazard_bsearch_cmp(const void *, const void *);
+static void __hazard_copy(SESSION *);
+static int  __hazard_exclusive(SESSION *, WT_REF *);
+static int  __hazard_qsort_cmp(const void *, const void *);
+
 #define	__rec_discard_add_block(session, addr, size)			\
 	__rec_discard_add(session, NULL, addr, size)
 #define	__rec_discard_add_page(session, page)				\
@@ -224,12 +232,21 @@ static int  __rec_wrapup(SESSION *, WT_PAGE *);
 static int
 __rec_init(SESSION *session, int caller)
 {
+	CONNECTION *conn;
 	WT_RECONCILE *r;
 
 	/* Allocate a reconciliation structure if we don't already have one. */
 	if ((r = S2C(session)->cache->rec) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
 		S2C(session)->cache->rec = r;
+
+		/*
+		 * Allocate memory for a copy of the hazard references -- it's
+		 * a fixed size so doesn't need run-time adjustments.
+		 */
+		conn = S2C(session);
+		WT_RET(__wt_calloc_def(session,
+		    conn->session_size * conn->hazard_size, &r->hazard));
 	}
 
 	/* Set the eviction flag for close and evict callers. */
@@ -277,6 +294,8 @@ __wt_rec_destroy(SESSION *session)
 		__wt_free(session, r->bnd);
 	if (r->imref != NULL)
 		__wt_free(session, r->imref);
+	if (r->hazard != NULL)
+		__wt_free(session, r->hazard);
 
 	if (r->split != NULL) {
 		for (spl = r->split, i = 0; i < r->split_entries; ++spl, ++i) {
@@ -491,7 +510,7 @@ __rec_subtree(SESSION *session, WT_PAGE *page)
 	 * tree locked down.
 	 */
 	if (!r->single_use)
-		WT_RET(__wt_hazard_exclusive(session, page->parent_ref));
+		WT_RET(__hazard_exclusive(session, page->parent_ref));
 
 	/*
 	 * Walk the page's subtree, and make sure we can reconcile this page.
@@ -600,7 +619,7 @@ __rec_subtree_col(SESSION *session, WT_PAGE *parent)
 		 * have the tree locked down.
 		 */
 		if (!r->single_use)
-			WT_RET(__wt_hazard_exclusive(session, &cref->ref));
+			WT_RET(__hazard_exclusive(session, &cref->ref));
 
 		/*
 		 * Split pages are always merged into the parent regardless of
@@ -725,7 +744,7 @@ __rec_subtree_row(SESSION *session, WT_PAGE *parent)
 		 * have the tree locked down.
 		 */
 		if (!r->single_use)
-			WT_RET(__wt_hazard_exclusive(session, &rref->ref));
+			WT_RET(__hazard_exclusive(session, &rref->ref));
 
 		/*
 		 * Split pages are always merged into the parent regardless of
@@ -2748,4 +2767,97 @@ __rec_discard_evict(SESSION *session)
 		else
 			__wt_page_free(session, discard->page);
 	return (0);
+}
+
+/*
+ * __hazard_qsort_cmp --
+ *	Qsort function: sort hazard list based on the page's address.
+ */
+static int
+__hazard_qsort_cmp(const void *a, const void *b)
+{
+	WT_PAGE *a_page, *b_page;
+
+	a_page = ((WT_HAZARD *)a)->page;
+	b_page = ((WT_HAZARD *)b)->page;
+
+	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
+}
+
+/*
+ * __hazard_copy --
+ *	Copy the hazard array and prepare it for searching.
+ */
+static void
+__hazard_copy(SESSION *session)
+{
+	CONNECTION *conn;
+	WT_RECONCILE *r;
+	uint32_t elem, i, j;
+
+	conn = S2C(session);
+	r = S2C(session)->cache->rec;
+
+	/* Copy the list of hazard references, compacting it as we go. */
+	elem = conn->session_size * conn->hazard_size;
+	for (i = j = 0; j < elem; ++j) {
+		if (conn->hazard[j].page == NULL)
+			continue;
+		r->hazard[i] = conn->hazard[j];
+		++i;
+	}
+	elem = i;
+
+	/* Sort the list by page address. */
+	qsort(r->hazard, (size_t)elem, sizeof(WT_HAZARD), __hazard_qsort_cmp);
+
+	r->hazard_elem = elem;
+}
+
+/*
+ * __hazard_bsearch_cmp --
+ *	Bsearch function: search sorted hazard list.
+ */
+static int
+__hazard_bsearch_cmp(const void *search, const void *b)
+{
+	void *entry;
+
+	entry = ((WT_HAZARD *)b)->page;
+
+	return (search > entry ? 1 : ((search < entry) ? -1 : 0));
+}
+
+/*
+ * __hazard_exclusive --
+ *	Request exclusive access to a page.
+ */
+static int
+__hazard_exclusive(SESSION *session, WT_REF *ref)
+{
+	WT_RECONCILE *r;
+
+	r = S2C(session)->cache->rec;
+
+	/*
+	 * Hazard references are acquired down the tree, which means we can't
+	 * deadlock.
+	 *
+	 * Request exclusive access to the page; no memory flush needed, the
+	 * state field is declared volatile.
+	 */
+	ref->state = WT_REF_LOCKED;
+
+	/* Get a fresh copy of the hazard reference array. */
+	__hazard_copy(session);
+
+	/* If we find a matching hazard reference, the page is still in use. */
+	if (bsearch(ref->page, r->hazard, r->hazard_elem,
+	    sizeof(WT_HAZARD), __hazard_bsearch_cmp) == NULL)
+		return (0);
+
+	/* Return the page to in-use. */
+	ref->state = WT_REF_MEM;
+
+	return (1);
 }

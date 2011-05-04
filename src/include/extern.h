@@ -367,9 +367,6 @@ __wt_hazard_set(SESSION *session, WT_REF *ref
  );
 void __wt_hazard_clear(SESSION *session, WT_PAGE *page);
 void __wt_hazard_empty(SESSION *session, const char *name);
-int __wt_hazard_bsearch_cmp(const void *search, const void *b);
-void __wt_hazard_copy(SESSION *session);
-int __wt_hazard_exclusive(SESSION *session, WT_REF *ref);
 void __wt_hazard_validate(SESSION *session, WT_PAGE *page);
 int __wt_huffman_open(SESSION *session,
     uint8_t const *byte_frequency_array,
