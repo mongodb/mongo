@@ -992,7 +992,7 @@ namespace mongo {
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str(), query, sort);
-            scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
+            auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
 
             int n = 0;
             while ( cursor->ok() ) {
@@ -1018,17 +1018,19 @@ namespace mongo {
                 int len;
                 const char * data = obj["data"].binDataClean( len );
 
-                ClientCursor::YieldLock yield (cc);
+                ClientCursor::YieldLock yield (cc.get());
                 try {
                     md5_append( &st , (const md5_byte_t*)(data) , len );
                     n++;
                 }
                 catch (...) {
-                    yield.relock(); // needed before yield goes out of scope
+                    if ( ! yield.stillOk() ) // relocks
+                        cc.release();
                     throw;
                 }
 
                 if ( ! yield.stillOk() ) {
+                    cc.release();
                     uasserted(13281, "File deleted during filemd5 command");
                 }
             }

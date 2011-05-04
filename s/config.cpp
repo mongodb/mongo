@@ -391,6 +391,7 @@ namespace mongo {
     }
 
     void DBConfig::getAllShards(set<Shard>& shards) const {
+        scoped_lock lk( _lock );
         shards.insert(getPrimary());
         for (Collections::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it) {
             if (it->second.isSharded()) {

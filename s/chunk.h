@@ -351,9 +351,9 @@ namespace mongo {
 
         void ensureIndex_inlock();
 
-        string _ns;
-        ShardKeyPattern _key;
-        bool _unique;
+        const string _ns;
+        const ShardKeyPattern _key;
+        const bool _unique;
 
         ChunkMap _chunkMap;
         ChunkRangeManager _chunkRanges;
