@@ -344,7 +344,11 @@ namespace mongo {
     }
 
     const Member* ReplSetImpl::findById(unsigned id) const {
-        if( id == _self->id() ) return _self;
+        {
+            lock lk((RSBase*)this);
+            if( _self && id == _self->id() ) return _self;
+        }
+        
         for( Member *m = head(); m; m = m->next() )
             if( m->id() == id )
                 return m;
@@ -370,6 +374,8 @@ namespace mongo {
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
         vector<BSONObj> v;
 
+        lock lk((RSBase*)this);
+        
         // add self
         {
             BSONObjBuilder bb;

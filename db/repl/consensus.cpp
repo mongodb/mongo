@@ -78,8 +78,6 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            //task::lam f = boost::bind(&Consensus::electCmdReceived, &theReplSet->elect, cmdObj, &result);
-            //theReplSet->mgr->call(f);
             theReplSet->elect.electCmdReceived(cmdObj, &result);
             return true;
         }

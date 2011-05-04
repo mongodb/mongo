@@ -38,6 +38,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
+        lock lk(this);
+        
         static time_t lastLogged;
         _hbmsgTime = time(0);
 
@@ -159,6 +161,7 @@ namespace mongo {
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
+                lock lk(this);
                 m->_hbinfo = h;
                 return;
             }
@@ -195,6 +198,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
+        lock lk(this);
+        
         const StateBox::SP sp = box.get();
         bool isp = sp.state.primary();
         b.append("setName", name());
@@ -293,8 +298,6 @@ namespace mongo {
         changeState(MemberState::RS_STARTUP);
 
         _seeds = &replSetCmdline.seeds;
-        //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
-        //    addMemberIfMissing(*i);
 
         log(1) << "replSet beginning startup..." << rsLog;
 
@@ -317,7 +320,7 @@ namespace mongo {
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten() {
-        //assert( lastOpTimeWritten.isNull() );
+        lock l(this);
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
@@ -351,6 +354,7 @@ namespace mongo {
     extern BSONObj *getLastErrorDefault;
 
     void ReplSetImpl::setSelfTo(Member *m) {
+        // already locked in initFromConfig
         _self = m;
         if( m ) _buildIndexes = m->config().buildIndexes;
         else _buildIndexes = true;
@@ -610,8 +614,6 @@ namespace mongo {
     }
 
     void ReplSet::haveNewConfig(ReplSetConfig& newConfig, bool addComment) {
-        lock l(this); // convention is to lock replset before taking the db rwlock
-        writelock lk("");
         bo comment;
         if( addComment )
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );

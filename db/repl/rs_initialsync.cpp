@@ -92,13 +92,19 @@ namespace mongo {
             }
         }
 
-        if (!closest) {
-            _currentSyncTarget = NULL;
-            return NULL;
+        {
+            lock lk(this);        
+
+            if (!closest) {
+                _currentSyncTarget = NULL;
+                return NULL;
+            }
+            
+            _currentSyncTarget = closest;
         }
 
         sethbmsg( str::stream() << "syncing to: " << closest->fullName(), 0);
-        _currentSyncTarget = closest;
+
         return const_cast<Member*>(closest);
     }
 
@@ -184,8 +190,13 @@ namespace mongo {
             if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
-                lastOpTimeWritten = OpTime();
-                lastH = 0;
+
+                {
+                    lock lk(this);
+                    lastOpTimeWritten = OpTime();
+                    lastH = 0;
+                }
+                
                 log() << "replSet cleaning up [1]" << rsLog;
                 {
                     writelock lk("local.");
