@@ -9,24 +9,38 @@ function debug( x ) {
 }        
 
 /** Generate an object with a string field of specified length */
-function obj( size ) {
-    return {a:new Array( size + 1 ).toString()};;
+function obj( size, x ) {
+    return {X:x, a:new Array( size + 1 ).toString()};;
 }
 
 function withinOne( a, b ) {
     assert( Math.abs( a - b ) <= 1, "not within one: " + a + ", " + b )
 }
 
+var X = 0;
+
 /**
  * Insert enough documents of the given size spec that the collection will
  * contain only documents having this size spec.
  */
-function insertMany( size ) {
+function insertManyRollingOver( objsize ) {
     // Add some variability, as the precise number can trigger different cases.
-    n = 250 + Random.randInt( 10 );
+    X++;
+    n = 250 + Random.randInt(10);
+
+    assert(t.count() == 0 || t.findOne().X != X);
+
     for( i = 0; i < n; ++i ) {
-        t.save( obj( size ) );
+        t.save( obj( objsize, X ) );
         debug( t.count() );
+    }
+
+    if (t.findOne().X != X) {
+        printjson(t.findOne());
+        print("\n\nERROR didn't roll over in insertManyRollingOver " + objsize);
+        print("approx amountwritten: " + (objsize * n));
+        printjson(t.stats());
+        assert(false);
     }
 }
 
@@ -37,10 +51,10 @@ function insertMany( size ) {
 function insertAndTruncate( first ) {
     myInitialCount = t.count();
     // Insert enough documents to make the capped allocation loop over.
-    insertMany( 50 );
+    insertManyRollingOver( 150 );
     myFiftyCount = t.count();
     // Insert documents that are too big to fit in the smaller extents.
-    insertMany( 2000 );
+    insertManyRollingOver( 5000 );
     myTwokCount = t.count();
     if ( first ) {
         initialCount = myInitialCount;
@@ -69,18 +83,24 @@ function testTruncate() {
     insertAndTruncate( false );
 }
 
+var pass = 1;
+
+print("pass " + pass++);
 t.drop();
-db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000, 10000, 1000 ] } );
+db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000, 10000, 4000 ] } );
 testTruncate();
 
+print("pass " + pass++);
 t.drop();
-db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000, 1000, 1000 ] } );
+db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000, 1000, 4000 ] } );
 testTruncate();
 
+print("pass " + pass++);
 t.drop();
-db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000, 1000 ] } );
+db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000, 4000 ] } );
 testTruncate();
 
+print("pass " + pass++);
 t.drop();
 db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000 ] } );
 testTruncate();
