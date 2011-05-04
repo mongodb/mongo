@@ -43,7 +43,7 @@ namespace mongo {
             T *_next;
         public:
             Base() : _next(0){}
-            ~Base() { assert(false); } // we never want this to happen
+            ~Base() { wassert(false); } // we never want this to happen
             T* next() const { return _next; }
         };
 
