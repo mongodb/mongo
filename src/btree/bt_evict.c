@@ -21,7 +21,7 @@ static int  __evict_page_cmp(const void *, const void *);
 static int  __evict_request_retry(SESSION *);
 static int  __evict_request_walk(SESSION *);
 static int  __evict_walk(SESSION *);
-static int  __evict_walk_file(SESSION *, BTREE *, u_int);
+static int  __evict_walk_file(SESSION *, u_int);
 static int  __evict_worker(SESSION *);
 
 /*
@@ -548,7 +548,10 @@ __evict_walk(SESSION *session)
 
 		i = WT_EVICT_WALK_BASE;
 		TAILQ_FOREACH(btree, &conn->dbqh, q) {
-			WT_ERR(__evict_walk_file(session, btree, i));
+			/* Reference the correct BTREE handle. */
+			WT_SET_BTREE_IN_SESSION(session, btree);
+
+			WT_ERR(__evict_walk_file(session, i));
 			i += WT_EVICT_WALK_PER_TABLE;
 		}
 	}
@@ -561,12 +564,14 @@ err:	__wt_unlock(session, conn->mtx);
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__evict_walk_file(SESSION *session, BTREE *btree, u_int slot)
+__evict_walk_file(SESSION *session, u_int slot)
 {
+	BTREE *btree;
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	int i, restarted_once;
 
+	btree = session->btree;
 	cache = S2C(session)->cache;
 
 	/*
