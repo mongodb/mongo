@@ -1909,8 +1909,12 @@ namespace mongo {
 
         dbMutex.assertWriteLocked();
 
-        // WRITETODATAFILES etc. is in this lock only -- so we need it.
-        RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
+        // Not sure we need this here, so removed.  If we do, we need to move it down 
+        // within other calls both (1) as they could be called from elsewhere and 
+        // (2) to keep the lock order right - groupcommitmutex must be locked before 
+        // mmmutex (if both are locked).
+        //
+        //  RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
 
         getDur().syncDataAndTruncateJournal();
 
