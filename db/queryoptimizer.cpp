@@ -24,7 +24,6 @@
 #include "queryoptimizer.h"
 #include "cmdline.h"
 #include "clientcursor.h"
-#include <queue>
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -292,7 +291,7 @@ doneCheckOrder:
         _max( max.getOwned() ),
         _bestGuessOnly( bestGuessOnly ),
         _mayYield( mayYield ),
-        _yieldSometimesTracker( 256, 20 ) {
+	    _yieldSometimesTracker( 256, 20 ) {
         if ( hint && !hint->eoo() ) {
             _hint = hint->wrap();
         }
@@ -359,6 +358,7 @@ doneCheckOrder:
 
     void QueryPlanSet::init() {
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
+        _runner.reset();
         _plans.clear();
         _mayRecordPlan = true;
         _usingPrerecordedPlan = false;
@@ -519,15 +519,35 @@ doneCheckOrder:
     shared_ptr<QueryOp> QueryPlanSet::runOp( QueryOp &op ) {
         if ( _usingPrerecordedPlan ) {
             Runner r( *this, op );
-            shared_ptr<QueryOp> res = r.run();
-            // _plans.size() > 1 if addOtherPlans was called in Runner::run().
+            shared_ptr<QueryOp> res = r.runUntilFirstCompletes();
+            // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
             QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
         Runner r( *this, op );
-        return r.run();
+        return r.runUntilFirstCompletes();
+    }
+    
+    shared_ptr<QueryOp> QueryPlanSet::nextOp( QueryOp &originalOp ) {
+        if ( !_runner ) {
+            _runner.reset( new Runner( *this, originalOp ) );
+        	shared_ptr<QueryOp> op = _runner->init();
+            if ( op->complete() ) {
+             	return op;   
+            }
+        }
+     	shared_ptr<QueryOp> op = _runner->next();
+        if ( !op->error() ) {
+         	return op;   
+        }
+        if ( !_usingPrerecordedPlan || _bestGuessOnly || _plans.size() > 1 ) {
+            return op;
+        }
+        QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
+        init();
+        return nextOp( originalOp );
     }
 
     BSONObj QueryPlanSet::explain() const {
@@ -590,23 +610,13 @@ doneCheckOrder:
         }
     }
 
-    struct OpHolder {
-        OpHolder( const shared_ptr<QueryOp> &op ) : _op( op ), _offset() {}
-        shared_ptr<QueryOp> _op;
-        long long _offset;
-        bool operator<( const OpHolder &other ) const {
-            return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
-        }
-    };
-
-    shared_ptr<QueryOp> QueryPlanSet::Runner::run() {
+    shared_ptr<QueryOp> QueryPlanSet::Runner::init() {
         massert( 10369 ,  "no plans", _plans._plans.size() > 0 );
-
-        vector<shared_ptr<QueryOp> > ops;
+        
         if ( _plans._bestGuessOnly ) {
             shared_ptr<QueryOp> op( _op.createChild() );
             op->setQueryPlan( _plans.getBestGuess().get() );
-            ops.push_back( op );
+            _ops.push_back( op );
         }
         else {
             if ( _plans._plans.size() > 1 )
@@ -614,58 +624,76 @@ doneCheckOrder:
             for( PlanSet::iterator i = _plans._plans.begin(); i != _plans._plans.end(); ++i ) {
                 shared_ptr<QueryOp> op( _op.createChild() );
                 op->setQueryPlan( i->get() );
-                ops.push_back( op );
+                _ops.push_back( op );
             }
         }
-
-        for( vector<shared_ptr<QueryOp> >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+        
+        // Initialize ops.
+        for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
             initOp( **i );
             if ( (*i)->complete() )
                 return *i;
         }
-
-        std::priority_queue<OpHolder> queue;
-        for( vector<shared_ptr<QueryOp> >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+        
+        // Put runnable ops in the priority queue.
+        for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
             if ( !(*i)->error() ) {
-                queue.push( *i );
+                _queue.push( *i );
             }
         }
-
-        while( !queue.empty() ) {
-            mayYield( ops );
-            OpHolder holder = queue.top();
-            queue.pop();
-            QueryOp &op = *holder._op;
-            nextOp( op );
-            if ( op.complete() ) {
-                if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
-                    op.qp().registerSelf( op.nscanned() );
-                }
-                return holder._op;
+        
+        return *_ops.begin();
+    }
+    
+    shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
+        mayYield( _ops );
+        OpHolder holder = _queue.top();
+        _queue.pop();
+        QueryOp &op = *holder._op;
+        nextOp( op );
+        if ( op.complete() ) {
+            if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
+                op.qp().registerSelf( op.nscanned() );
             }
-            if ( op.error() ) {
-                continue;
+            return holder._op;
+        }
+        if ( op.error() ) {
+            return holder._op;
+        }
+        _queue.push( holder );
+        if ( !_plans._bestGuessOnly && _plans._usingPrerecordedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
+            holder._offset = -op.nscanned();
+            _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
+            PlanSet::iterator i = _plans._plans.begin();
+            ++i;
+            for( ; i != _plans._plans.end(); ++i ) {
+                shared_ptr<QueryOp> op( _op.createChild() );
+                op->setQueryPlan( i->get() );
+                _ops.push_back( op );
+                initOp( *op );
+                if ( op->complete() )
+                    return op;
+                _queue.push( op );
             }
-            queue.push( holder );
-            if ( !_plans._bestGuessOnly && _plans._usingPrerecordedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
-                holder._offset = -op.nscanned();
-                _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
-                PlanSet::iterator i = _plans._plans.begin();
-                ++i;
-                for( ; i != _plans._plans.end(); ++i ) {
-                    shared_ptr<QueryOp> op( _op.createChild() );
-                    op->setQueryPlan( i->get() );
-                    ops.push_back( op );
-                    initOp( *op );
-                    if ( op->complete() )
-                        return op;
-                    queue.push( op );
-                }
-                _plans._mayRecordPlan = true;
-                _plans._usingPrerecordedPlan = false;
+            _plans._mayRecordPlan = true;
+            _plans._usingPrerecordedPlan = false;
+        }
+        return holder._op;
+    }
+    
+    shared_ptr<QueryOp> QueryPlanSet::Runner::runUntilFirstCompletes() {
+        shared_ptr<QueryOp> potentialFinisher = init();
+        if ( potentialFinisher->complete() ) {
+         	return potentialFinisher;
+        }
+        
+        while( !_queue.empty() ) {
+            shared_ptr<QueryOp> potentialFinisher = next();
+            if ( potentialFinisher->complete() ) {
+                return potentialFinisher;
             }
         }
-        return ops[ 0 ];
+        return _ops[ 0 ];
     }
 
 #define GUARD_OP_EXCEPTION( op, expression ) \
@@ -769,7 +797,7 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::runOpOnce( QueryOp &op ) {
-        massert( 13271, "can't run more ops", mayRunMore() );
+        assertMayRunMore();
         if ( !_or ) {
             ++_i;
             return _currentQps->runOp( op );
@@ -795,6 +823,59 @@ doneCheckOrder:
             ret = runOpOnce( *ret );
         }
         return ret;
+    }
+    
+    shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause( QueryOp &prevOp ) {
+        shared_ptr<QueryOp> op = _currentQps->nextOp( prevOp );
+        if ( !op->complete() ) {
+            return op;   
+        }
+        if ( op->qp().willScanTable() ) {
+            _tableScanned = true;   
+        } else {
+            _org.popOrClause( op->qp().nsd(), op->qp().idxNo(), op->qp().indexed() ? op->qp().indexKey() : BSONObj() );         	   
+        }
+        return op;
+    }
+    
+    shared_ptr<QueryOp> MultiPlanScanner::nextOpBeginningClause( QueryOp &prevOp ) {
+        assertMayRunMore();
+        shared_ptr<QueryOp> op;
+        while( mayRunMore() ) {
+	        ++_i;
+    	    auto_ptr<FieldRangeSetPair> frsp( _org.topFrsp() );
+        	auto_ptr<FieldRangeSetPair> originalFrsp( _org.topFrspOriginal() );
+	        BSONElement hintElt = _hint.firstElement();
+    	    _currentQps.reset( new QueryPlanSet( _ns, frsp, originalFrsp, _query, BSONObj(), &hintElt, _honorRecordedPlan, BSONObj(), BSONObj(), _bestGuessOnly, _mayYield ) );
+            op = nextOpHandleEndOfClause( prevOp );
+            if ( !op->complete() ) {
+             	return op;
+            }
+        }
+        return op;
+    }
+
+    shared_ptr<QueryOp> MultiPlanScanner::nextOp( QueryOp &originalOp ) {
+        if ( !_or ) {
+            if ( _i == 0 ) {
+                assertMayRunMore();
+	         	++_i;
+            }            
+         	return _currentQps->nextOp( originalOp );   
+        }
+        if ( _i == 0 ) {
+         	return nextOpBeginningClause( originalOp );
+        }
+        shared_ptr<QueryOp> op = nextOpHandleEndOfClause( originalOp );
+        if ( !op->complete() ) {
+            return op;   
+        }
+        if ( !op->stopRequested() && mayRunMore() ) {
+            // Finished scanning the clause, but stop hasn't been requested.
+            // Start scanning the next clause.
+            return nextOpBeginningClause( *op );
+        }
+        return op;
     }
 
     bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {
