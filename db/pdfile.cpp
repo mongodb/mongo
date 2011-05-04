@@ -92,7 +92,7 @@ namespace mongo {
     }
 
     BackgroundOperation::~BackgroundOperation() {
-        assertInWriteLock();
+        wassert( dbMutex.isWriteLocked() );
         dbsInProg[_ns.db]--;
         nsInProg.erase(_ns.ns());
     }
