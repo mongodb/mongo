@@ -785,6 +785,9 @@
     <ClCompile Include="..\db\btreebuilder.cpp">
       <Filter>btree</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\queryoptimizercursor.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

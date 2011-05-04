@@ -40,6 +40,9 @@ namespace mongo {
 namespace QueryOptimizerTests {
 
     namespace QueryPlanTests {
+
+        using boost::shared_ptr;
+
         class Base {
         public:
             Base() : _ctx( ns() ) , indexNum_( 0 ) {
@@ -951,6 +954,8 @@ namespace QueryOptimizerTests {
     
     namespace QueryOptimizerCursorTests {
         
+        using boost::shared_ptr;
+
         class Base {
         public:
             Base() {

@@ -287,6 +287,7 @@
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
+    <ClCompile Include="..\db\queryoptimizercursor.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
