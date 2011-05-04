@@ -682,7 +682,6 @@ __evict_page(SESSION *session)
 	qsort(cache->evict, (size_t)cache->evict_entries,
 	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 
-	__wt_evict_dump(session);
 	WT_EVICT_FOREACH(cache, evict, i) {
 		if ((page = evict->page) == NULL)
 			continue;
