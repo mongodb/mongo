@@ -61,6 +61,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			base = indx + 1;
 			--limit;
 		}
+		WT_ASSERT(session, cref != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
@@ -124,6 +125,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
+	WT_ASSERT(session, cipdata != NULL);
 
 	/*
 	 * We have the right WT_COL slot: if it's a write, set up the return

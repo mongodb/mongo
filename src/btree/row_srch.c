@@ -78,6 +78,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 			base = indx + 1;
 			--limit;
 		}
+		WT_ASSERT(session, rref != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
@@ -146,6 +147,7 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		base = indx + 1;
 		--limit;
 	}
+	WT_ASSERT(session, rip != NULL);
 
 	/*
 	 * If we found a match in the page on-disk information, set the return
