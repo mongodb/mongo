@@ -594,7 +594,8 @@ __rec_subtree_col(SESSION *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
-			WT_ASSERT(session, 0);
+			WT_ASSERT(
+			    session, WT_COL_REF_STATE(cref) != WT_REF_LOCKED);
 			return (1);
 		case WT_REF_MEM:			/* In-memory */
 			break;
@@ -719,7 +720,8 @@ __rec_subtree_row(SESSION *session, WT_PAGE *parent)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
-			WT_ASSERT(session, 0);
+			WT_ASSERT(
+			    session, WT_ROW_REF_STATE(rref) != WT_REF_LOCKED);
 			return (1);
 		case WT_REF_MEM:			/* In-memory */
 			break;
