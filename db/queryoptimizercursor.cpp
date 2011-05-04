@@ -17,6 +17,7 @@
  */
 
 #include "queryoptimizer.h"
+#include "pdfile.h"
 
 namespace mongo {
     
