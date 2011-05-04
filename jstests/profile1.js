@@ -43,6 +43,30 @@ try {
     var auto_size = db.system.profile.storageSize();
     assert.gt(auto_size, capped_size, "K");
     
+
+    // 
+    db.setProfilingLevel(2);
+    before = db.system.profile.count();
+    db.eval( "sleep(50)" )
+    db.eval( "sleep(120)" )
+    after = db.system.profile.count()
+    assert.eq( before + 4 , after , "X1" )
+
+    db.setProfilingLevel(1,100);
+    before = db.system.profile.count();
+    db.eval( "sleep(50)" )
+    db.eval( "sleep(120)" )
+    after = db.system.profile.count()
+    assert.eq( before + 1 , after , "X2" )
+
+    db.setProfilingLevel(1,20);
+    before = db.system.profile.count();
+    db.eval( "sleep(50)" )
+    db.eval( "sleep(120)" )
+    after = db.system.profile.count()
+    assert.eq( before + 2 , after , "X2" )
+
+
 } finally {
     // disable profiling for subsequent tests
     assert.commandWorked( db.runCommand( {profile:0} ) );
