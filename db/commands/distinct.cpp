@@ -92,7 +92,7 @@ namespace mongo {
             assert( cursor );
             string cursorName = cursor->toString();
             
-            scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
+            auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
             while ( cursor->ok() ) {
                 nscanned++;
@@ -125,8 +125,10 @@ namespace mongo {
 
                 cursor->advance();
 
-                if (!cc->yieldSometimes())
+                if (!cc->yieldSometimes()) {
+                    cc.release();
                     break;
+                }
 
                 RARELY killCurrentOp.checkForInterrupt();
             }

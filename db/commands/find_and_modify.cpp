@@ -18,7 +18,6 @@
 #include "pch.h"
 #include "../commands.h"
 #include "../instance.h"
-#include "../queryoptimizer.h"
 #include "../clientcursor.h"
 
 namespace mongo {

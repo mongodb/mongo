@@ -913,7 +913,7 @@ namespace QueryOptimizerTests {
             dropNS( s );
         }
     protected:
-        static const char *ns() { return "unittests.BaseTests"; }
+        static const char *ns() { return "unittests.QueryOptimizerTests"; }
         static NamespaceDetails *nsd() { return nsdetails( ns() ); }
     private:
         dblock lk_;
@@ -948,50 +948,717 @@ namespace QueryOptimizerTests {
             ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
         }
     };
+    
+    namespace QueryOptimizerCursorTests {
+        
+        class Base {
+        public:
+            Base() {
+                _cli.dropCollection( ns() );
+            }
+        protected:
+            DBDirectClient _cli;
+            static const char *ns() { return "unittests.QueryOptimizerTests"; }
+            void setQueryOptimizerCursor( const BSONObj &query ) {
+             	_c = newQueryOptimizerCursor( ns(), query );
+                if ( ok() && !mayReturnCurrent() ) {
+                 	advance();
+                }
+            }
+            bool ok() const { return _c->ok(); }
+            /** Handles matching and deduping. */
+            bool advance() {
+             	while( _c->advance() && !mayReturnCurrent() );
+                return ok();
+            }
+            int itcount() {
+                int ret = 0;
+             	while( ok() ) {
+                    ++ret;
+                    advance();
+                }
+                return ret;
+            }
+            BSONObj current() const { return _c->current(); }
+            bool mayReturnCurrent() {
+             	return _c->matcher()->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() );
+            }
+        private:
+            shared_ptr<Cursor> _c;
+        };
+        
+        /** Basic test with two indexes and deduping requirement. */
+        class Basic : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+                _cli.insert( ns(), BSON( "_id" << 2 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                ASSERT( ok() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 2 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 2 << "a" << 1 ), current() );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }
+        };
+        
+        class NoMatch : public Base {
+        public:
+            void run() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+				setQueryOptimizerCursor( BSON( "_id" << GT << 5 << LT << 4 << "a" << GT << 0 ) );
+                ASSERT( !ok() );
+            }            
+        };
+        
+        /** Order of results indicates that interleaving is occurring. */
+        class Interleaved : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+                _cli.insert( ns(), BSON( "_id" << 3 << "a" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 2 << "a" << 2 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                ASSERT( ok() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 2 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 3 << "a" << 1 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 2 << "a" << 2 ), current() );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }
+        };
+        
+        /** Some values on each index do not match. */
+        class NotMatch : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 10 ) );
+                _cli.insert( ns(), BSON( "_id" << 10 << "a" << 0 ) );
+                _cli.insert( ns(), BSON( "_id" << 11 << "a" << 12 ) );
+                _cli.insert( ns(), BSON( "_id" << 12 << "a" << 11 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+				setQueryOptimizerCursor( BSON( "_id" << GT << 5 << "a" << GT << 5 ) );
+                ASSERT( ok() );
+                ASSERT_EQUALS( BSON( "_id" << 11 << "a" << 12 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 12 << "a" << 11 ), current() );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }            
+        };
+        
+        /** After the first 101 matches for a plan, we stop interleaving the plans. */
+        class StopInterleaving : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 101; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );   
+                }
+             	for( int i = 101; i < 200; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << (301-i) ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << -1 << "a" << GT << -1 ) );
+                for( int i = 0; i < 200; ++i ) {
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                    advance();
+                }
+                ASSERT( !advance() );
+                ASSERT( !ok() );                
+            }
+        };
+        
+        /** Test correct deduping with the takeover cursor. */
+        class TakeoverWithDup : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 101; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );   
+                }
+                _cli.insert( ns(), BSON( "_id" << 500 << "a" << BSON_ARRAY( 0 << 300 ) ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << -1 << "a" << GT << -1 ) );
+                ASSERT_EQUALS( 102, itcount() );
+            }
+        };
+        
+        /** Test usage of matcher with takeover cursor. */
+        class TakeoverWithNonMatches : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 101; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );   
+                }
+                _cli.insert( ns(), BSON( "_id" << 101 << "a" << 600 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << -1 << "a" << LT << 500 ) );
+                ASSERT_EQUALS( 101, itcount() );
+            }
+        };
+        
+        /** Check deduping of dups within just the takeover cursor. */
+        class TakeoverWithTakeoverDup : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 101; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i*2 << "a" << 0 ) );
+                 	_cli.insert( ns(), BSON( "_id" << i*2+1 << "a" << 1 ) );
+                }
+                _cli.insert( ns(), BSON( "_id" << 202 << "a" << BSON_ARRAY( 2 << 3 ) ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << -1 << "a" << GT << 0) );
+                ASSERT_EQUALS( 102, itcount() );
+            }
+        };
+        
+        /** Basic test with $or query. */
+        class BasicOr : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 0 ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 0 ) << BSON( "a" << 1 ) ) ) );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 0 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 ), current() );
+                ASSERT( !advance() );
+            }
+        };
+
+        /** $or first clause empty. */
+        class OrFirstClauseEmpty : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << -1 ) << BSON( "a" << 1 ) ) ) );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 ), current() );
+                ASSERT( !advance() );
+            }
+        };        
+
+        /** $or second clause empty. */
+        class OrSecondClauseEmpty : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+				setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 0 ) << BSON( "_id" << -1 ) << BSON( "a" << 1 ) ) ) );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 ), current() );
+                ASSERT( !advance() );
+            }
+        };
+        
+        /** $or multiple clauses empty empty. */
+        class OrMultipleClausesEmpty : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+				setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 2 ) << BSON( "_id" << 4 ) << BSON( "_id" << 0 ) << BSON( "_id" << -1 ) << BSON( "_id" << 6 ) << BSON( "a" << 1 ) << BSON( "_id" << 9 ) ) ) );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 ), current() );
+                ASSERT( advance() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 ), current() );
+                ASSERT( !advance() );
+            }
+        };
+        
+        /** Check that takeover occurs at proper match count with $or clauses */
+    	class TakeoverCountOr : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 60; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << 0 ) );   
+                }
+             	for( int i = 60; i < 120; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << 1 ) );
+                }
+             	for( int i = 120; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << (200-i) ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "a" << 0 ) << BSON( "a" << 1 ) << BSON( "_id" << GTE << 120 << "a" << GT << 1 ) ) ) );
+                for( int i = 0; i < 120; ++i ) {
+                 	ASSERT( ok() );
+                    advance();
+                }
+                // Expect to be scanning on _id index only.
+                for( int i = 120; i < 150; ++i ) {
+                 	ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                    advance();
+                }
+                ASSERT( !ok() );
+            }
+        };
+        
+        /** Takeover just at end of clause. */
+        class TakeoverEndOfOrClause : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 102; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i ) );   
+                }
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << LT << 101 ) << BSON( "_id" << 101 ) ) ) );
+                for( int i = 0; i < 102; ++i ) {
+                 	ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                    advance();
+                }
+                ASSERT( !ok() );
+            }
+        };
+
+        class TakeoverBeforeEndOfOrClause : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 101; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i ) );   
+                }
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << LT << 100 ) << BSON( "_id" << 100 ) ) ) );
+                for( int i = 0; i < 101; ++i ) {
+                 	ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                    advance();
+                }
+                ASSERT( !ok() );
+            }
+        };
+
+        class TakeoverAfterEndOfOrClause : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 103; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i ) );   
+                }
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << LT << 102 ) << BSON( "_id" << 102 ) ) ) );
+                for( int i = 0; i < 103; ++i ) {
+                 	ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                    advance();
+                }
+                ASSERT( !ok() );
+            }
+        };
+        
+        /** Test matching and deduping done manually by cursor client. */
+        class ManualMatchingDeduping : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 10 ) );
+                _cli.insert( ns(), BSON( "_id" << 10 << "a" << 0 ) ); 
+                _cli.insert( ns(), BSON( "_id" << 11 << "a" << 12 ) );
+                _cli.insert( ns(), BSON( "_id" << 12 << "a" << 11 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr< Cursor > c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 5 << "a" << GT << 5 ) );
+                ASSERT( c->ok() );
+
+                // _id 10 {_id:1}
+                ASSERT_EQUALS( 10, c->current().getIntField( "_id" ) );
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+
+                // _id 0 {a:1}
+                ASSERT_EQUALS( 0, c->current().getIntField( "_id" ) );
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+
+                // _id 0 {$natural:1}
+                ASSERT_EQUALS( 0, c->current().getIntField( "_id" ) );
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+                
+                // _id 11 {_id:1}
+                ASSERT_EQUALS( BSON( "_id" << 11 << "a" << 12 ), c->current() );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                ASSERT( c->advance() );
+                
+                // _id 12 {a:1}
+                ASSERT_EQUALS( BSON( "_id" << 12 << "a" << 11 ), c->current() );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                ASSERT( c->advance() );
+
+                // _id 10 {$natural:1}
+                ASSERT_EQUALS( 10, c->current().getIntField( "_id" ) );
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+                                
+                // _id 12 {_id:1}
+                ASSERT_EQUALS( BSON( "_id" << 12 << "a" << 11 ), c->current() );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->getsetdup( c->currLoc() ) );
+                ASSERT( c->advance() );
+                
+                // _id 11 {a:1}
+                ASSERT_EQUALS( BSON( "_id" << 11 << "a" << 12 ), c->current() );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->getsetdup( c->currLoc() ) );
+                ASSERT( c->advance() );
+
+                // _id 11 {$natural:1}
+                ASSERT_EQUALS( 11, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->getsetdup( c->currLoc() ) );
+
+                // {_id:1} scan is complete.
+                ASSERT( !c->advance() );
+                ASSERT( !c->ok() );       
+                
+                // Scan the results again - this time the winning plan has been
+                // recorded.
+                c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 5 << "a" << GT << 5 ) );
+                ASSERT( c->ok() );
+
+                // _id 10 {_id:1}
+                ASSERT_EQUALS( 10, c->current().getIntField( "_id" ) );
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+                
+                // _id 11 {_id:1}
+                ASSERT_EQUALS( BSON( "_id" << 11 << "a" << 12 ), c->current() );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                ASSERT( c->advance() );
+                
+                // _id 12 {_id:1}
+                ASSERT_EQUALS( BSON( "_id" << 12 << "a" << 11 ), c->current() );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                
+                // {_id:1} scan complete
+                ASSERT( !c->advance() );
+                ASSERT( !c->ok() );
+            }
+        };
+
+        /** Curr key must be correct for currLoc for correct matching. */
+        class ManualMatchingUsingCurrKey : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << "a" ) );
+                _cli.insert( ns(), BSON( "_id" << "b" ) );
+                _cli.insert( ns(), BSON( "_id" << "ba" ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr< Cursor > c = newQueryOptimizerCursor( ns(), fromjson( "{_id:/a/}" ) );
+                ASSERT( c->ok() );
+                // "a"
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                ASSERT( c->advance() );
+                ASSERT( c->ok() );
+                
+                // "b"
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+                ASSERT( c->ok() );
+                
+                // "ba"
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                ASSERT( !c->advance() );
+            }
+        };
+        
+        /** Test matching and deduping done manually by cursor client. */
+        class ManualMatchingDedupingTakeover : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 150; ++i ) {
+	                _cli.insert( ns(), BSON( "_id" << i << "a" << 0 ) );
+                }
+                _cli.insert( ns(), BSON( "_id" << 300 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr< Cursor > c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "_id" << LT << 300 ) << BSON( "a" << 1 ) ) ) );
+                for( int i = 0; i < 151; ++i ) {
+                    ASSERT( c->ok() );
+                    ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                    ASSERT( !c->getsetdup( c->currLoc() ) );
+                    c->advance();
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+        
+        /** Test single key matching bounds. */
+        class Singlekey : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "a" << "10" ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr< Cursor > c = newQueryOptimizerCursor( ns(), BSON( "a" << GT << 1 << LT << 5 ) );
+                // Two sided bounds work.
+                ASSERT( !c->ok() );
+            }
+        };
+
+        /** Test multi key matching bounds. */
+        class Multikey : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 10 ) ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "a" << GT << 5 << LT << 3 ) );
+                // Multi key bounds work.
+                ASSERT( ok() );
+            }
+        };
+        
+        /** Add other plans when the recorded one is doing more poorly than expected. */
+        class AddOtherPlans : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << 0 << "b" << 0 ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 << "b" << 0 ) );
+                for( int i = 100; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << 100 << "b" << i ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 0 << "b" << 0 ) );
+                
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 0 << "b" << 0 ), c->current() );
+                ASSERT( c->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 0 << "b" << 0 ), c->current() );
+                ASSERT( c->advance() );
+                // $natrual plan
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 0 << "b" << 0 ), c->current() );                
+                ASSERT( !c->advance() );
+                
+                c = newQueryOptimizerCursor( ns(), BSON( "a" << 100 << "b" << 149 ) );
+                // Try {a:1}, which was successful previously.
+                for( int i = 0; i < 10; ++i ) {
+                 	ASSERT( 149 != c->current().getIntField( "b" ) );
+                    ASSERT( c->advance() );
+                }
+                // Now try {b:1} plan.
+                ASSERT_EQUALS( 149, c->current().getIntField( "b" ) );
+                ASSERT( c->advance() );
+                // {b:1} plan finished.
+                ASSERT( !c->advance() );
+            }
+        };
+        
+        /** Check $or clause range elimination. */
+        class OrRangeElimination : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "_id" << GT << 0 ) << BSON( "_id" << 1 ) ) ) );
+                ASSERT( c->ok() );
+                ASSERT( !c->advance() );
+            }
+        };
+        
+        /** Check $or match deduping - in takeover cursor. */
+        class OrDedup : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "_id" << LT << 140 ) << BSON( "_id" << 145 ) << BSON( "a" << 145 ) ) ) );
+                
+                while( c->current().getIntField( "_id" ) < 140 ) {
+                 	ASSERT( c->advance() );
+                }
+                // Match from second $or clause.
+                ASSERT_EQUALS( 145, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->advance() );
+                // Match from third $or clause.
+                ASSERT_EQUALS( 145, c->current().getIntField( "_id" ) );
+                // $or deduping is handled by the matcher.
+                ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->advance() );
+            }
+        };
+        
+        /** Standard dups with a multikey cursor. */
+        class EarlyDups : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 0 << 1 << 200 ) ) );
+                for( int i = 2; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "a" << i ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "a" << GT << -1 ) );
+                ASSERT_EQUALS( 149, itcount() );
+            }
+        };
+        
+        /** Pop or clause in takeover cursor. */
+        class OrPopInTakeover : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i ) );   
+                }
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "_id" << LTE << 147 ) << BSON( "_id" << 148 ) << BSON( "_id" << 149 ) ) ) );
+                for( int i = 0; i < 150; ++i ) {
+                    ASSERT( c->ok() );
+                 	ASSERT_EQUALS( i, c->current().getIntField( "_id" ) );
+                    c->advance();
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+        
+        // TODO
+        // $or table scan abort case
+        // error cases causing ops to have error set
+        // originalOp updating
+        
+    } // namespace QueryOptimizerCursorTests
 
     class All : public Suite {
     public:
         All() : Suite( "queryoptimizer" ) {}
 
         void setupTests() {
-            add< QueryPlanTests::NoIndex >();
-            add< QueryPlanTests::SimpleOrder >();
-            add< QueryPlanTests::MoreIndexThanNeeded >();
-            add< QueryPlanTests::IndexSigns >();
-            add< QueryPlanTests::IndexReverse >();
-            add< QueryPlanTests::NoOrder >();
-            add< QueryPlanTests::EqualWithOrder >();
-            add< QueryPlanTests::Optimal >();
-            add< QueryPlanTests::MoreOptimal >();
-            add< QueryPlanTests::KeyMatch >();
-            add< QueryPlanTests::MoreKeyMatch >();
-            add< QueryPlanTests::ExactKeyQueryTypes >();
-            add< QueryPlanTests::Unhelpful >();
-            add< QueryPlanSetTests::NoIndexes >();
-            add< QueryPlanSetTests::Optimal >();
-            add< QueryPlanSetTests::NoOptimal >();
-            add< QueryPlanSetTests::NoSpec >();
-            add< QueryPlanSetTests::HintSpec >();
-            add< QueryPlanSetTests::HintName >();
-            add< QueryPlanSetTests::NaturalHint >();
-            add< QueryPlanSetTests::NaturalSort >();
-            add< QueryPlanSetTests::BadHint >();
-            add< QueryPlanSetTests::Count >();
-            add< QueryPlanSetTests::QueryMissingNs >();
-            add< QueryPlanSetTests::UnhelpfulIndex >();
-            add< QueryPlanSetTests::SingleException >();
-            add< QueryPlanSetTests::AllException >();
-            add< QueryPlanSetTests::SaveGoodIndex >();
-            add< QueryPlanSetTests::TryAllPlansOnErr >();
-            add< QueryPlanSetTests::FindOne >();
-            add< QueryPlanSetTests::Delete >();
-            add< QueryPlanSetTests::DeleteOneScan >();
-            add< QueryPlanSetTests::DeleteOneIndex >();
-            add< QueryPlanSetTests::TryOtherPlansBeforeFinish >();
-            add< QueryPlanSetTests::InQueryIntervals >();
-            add< QueryPlanSetTests::EqualityThenIn >();
-            add< QueryPlanSetTests::NotEqualityThenIn >();
-            add< BestGuess >();
+            add<QueryPlanTests::NoIndex>();
+            add<QueryPlanTests::SimpleOrder>();
+            add<QueryPlanTests::MoreIndexThanNeeded>();
+            add<QueryPlanTests::IndexSigns>();
+            add<QueryPlanTests::IndexReverse>();
+            add<QueryPlanTests::NoOrder>();
+            add<QueryPlanTests::EqualWithOrder>();
+            add<QueryPlanTests::Optimal>();
+            add<QueryPlanTests::MoreOptimal>();
+            add<QueryPlanTests::KeyMatch>();
+            add<QueryPlanTests::MoreKeyMatch>();
+            add<QueryPlanTests::ExactKeyQueryTypes>();
+            add<QueryPlanTests::Unhelpful>();
+            add<QueryPlanSetTests::NoIndexes>();
+            add<QueryPlanSetTests::Optimal>();
+            add<QueryPlanSetTests::NoOptimal>();
+            add<QueryPlanSetTests::NoSpec>();
+            add<QueryPlanSetTests::HintSpec>();
+            add<QueryPlanSetTests::HintName>();
+            add<QueryPlanSetTests::NaturalHint>();
+            add<QueryPlanSetTests::NaturalSort>();
+            add<QueryPlanSetTests::BadHint>();
+            add<QueryPlanSetTests::Count>();
+            add<QueryPlanSetTests::QueryMissingNs>();
+            add<QueryPlanSetTests::UnhelpfulIndex>();
+            add<QueryPlanSetTests::SingleException>();
+            add<QueryPlanSetTests::AllException>();
+            add<QueryPlanSetTests::SaveGoodIndex>();
+            add<QueryPlanSetTests::TryAllPlansOnErr>();
+            add<QueryPlanSetTests::FindOne>();
+            add<QueryPlanSetTests::Delete>();
+            add<QueryPlanSetTests::DeleteOneScan>();
+            add<QueryPlanSetTests::DeleteOneIndex>();
+            add<QueryPlanSetTests::TryOtherPlansBeforeFinish>();
+            add<QueryPlanSetTests::InQueryIntervals>();
+            add<QueryPlanSetTests::EqualityThenIn>();
+            add<QueryPlanSetTests::NotEqualityThenIn>();
+            add<BestGuess>();
+            add<QueryOptimizerCursorTests::Basic>();
+            add<QueryOptimizerCursorTests::NoMatch>();
+            add<QueryOptimizerCursorTests::Interleaved>();
+            add<QueryOptimizerCursorTests::NotMatch>();
+            add<QueryOptimizerCursorTests::StopInterleaving>();
+            add<QueryOptimizerCursorTests::TakeoverWithDup>();
+            add<QueryOptimizerCursorTests::TakeoverWithNonMatches>();
+            add<QueryOptimizerCursorTests::TakeoverWithTakeoverDup>();
+            add<QueryOptimizerCursorTests::BasicOr>();
+            add<QueryOptimizerCursorTests::OrFirstClauseEmpty>();
+            add<QueryOptimizerCursorTests::OrSecondClauseEmpty>();
+            add<QueryOptimizerCursorTests::OrMultipleClausesEmpty>();
+            add<QueryOptimizerCursorTests::TakeoverCountOr>();
+            add<QueryOptimizerCursorTests::TakeoverEndOfOrClause>();
+            add<QueryOptimizerCursorTests::TakeoverBeforeEndOfOrClause>();
+            add<QueryOptimizerCursorTests::TakeoverAfterEndOfOrClause>();
+            add<QueryOptimizerCursorTests::ManualMatchingDeduping>();
+            add<QueryOptimizerCursorTests::ManualMatchingUsingCurrKey>();
+            add<QueryOptimizerCursorTests::ManualMatchingDedupingTakeover>();
+            add<QueryOptimizerCursorTests::Singlekey>();
+            add<QueryOptimizerCursorTests::Multikey>();
+            add<QueryOptimizerCursorTests::AddOtherPlans>();
+            add<QueryOptimizerCursorTests::OrRangeElimination>();
+            add<QueryOptimizerCursorTests::OrDedup>();
+            add<QueryOptimizerCursorTests::EarlyDups>();
+            add<QueryOptimizerCursorTests::OrPopInTakeover>();
         }
     } myall;
 
