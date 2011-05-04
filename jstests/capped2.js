@@ -8,7 +8,7 @@ function debug( x ) {
 
 var val = new Array( 2000 );
 var c = "";
-for( i = 0; i < 2000; ++i, c += "---" ) {
+for( i = 0; i < 2000; ++i, c += "---" ) { // bigger and bigger objects through the array...
     val[ i ] = { a: c };
 }
 
