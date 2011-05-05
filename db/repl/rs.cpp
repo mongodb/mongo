@@ -93,9 +93,13 @@ namespace mongo {
 
     void ReplSetImpl::relinquish() {
         if( box.getState().primary() ) {
-            log() << "replSet relinquishing primary state" << rsLog;
-            changeState(MemberState::RS_SECONDARY);
-
+            {
+                writelock lk("admin."); // so we are synchronized with _logOp()
+            
+                log() << "replSet relinquishing primary state" << rsLog;
+                changeState(MemberState::RS_SECONDARY);
+            }
+            
             if( closeOnRelinquish ) {
                 /* close sockets that were talking to us so they don't blithly send many writes that will fail
                    with "not master" (of course client could check result code, but in case they are not)
