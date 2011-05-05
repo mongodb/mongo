@@ -191,7 +191,6 @@ int __wt_verify_dsk_chunk( SESSION *session,
     uint32_t size);
 int __wt_tree_walk(SESSION *session,
     WT_PAGE *page,
-    uint32_t flags,
     int (*work)(SESSION *,
     WT_PAGE *,
     void *),

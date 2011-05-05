@@ -35,16 +35,14 @@
  *	each page.
  */
 int
-__wt_tree_walk(SESSION *session, WT_PAGE *page,
-    uint32_t flags, int (*work)(SESSION *, WT_PAGE *, void *), void *arg)
+__wt_tree_walk(SESSION *session,
+    WT_PAGE *page, int (*work)(SESSION *, WT_PAGE *, void *), void *arg)
 {
 	BTREE *btree;
 	WT_COL_REF *cref;
 	WT_ROW_REF *rref;
 	uint32_t i;
-
-	 WT_CONN_FCHK(
-	     S2C(session), "__wt_tree_walk", flags, WT_APIMASK_BT_TREE_WALK);
+	int ret;
 
 	btree = session->btree;
 
@@ -57,36 +55,12 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	 *	The code to descend the tree is identical for both row- and
 	 * column-store pages, except for finding the WT_REF structure.
 	 */
-#define	WT_TREE_WALK_DESCEND(session, page, ref, flags, work, arg) do {	\
-	WT_PAGE *__ref_page;						\
-	int __tret;							\
-	/* ref references the subtree containing the child page. */	\
-	switch ((ref)->state) {						\
-	case WT_REF_DISK:						\
-	case WT_REF_LOCKED:						\
-		/* Optionally skip pages not in the cache. */		\
-		if (LF_ISSET(WT_WALK_CACHE))				\
-			continue;					\
-		break;							\
-	case WT_REF_MEM:						\
-		break;							\
-	}								\
-									\
-	/*								\
-	 * Tree-walk is called with work functions that reconcile pages	\
-	 * (specifically the sync code).  If sync splits a page, the	\
-	 * WT_REF page may change underfoot.  That's OK because sync is	\
-	 * single-threaded and has locked out the eviction thread, but	\
-	 * we can't re-use ref->page to clear the hazard reference, it	\
-	 * may have changed.  Save a copy of the page reference on which\
-	 * we acquired the hazard reference.				\
-	 */								\
+#define	WT_TREE_WALK_DESCEND(session, page, ref, work, arg) do {	\
 	WT_RET(__wt_page_in(session, page, ref, 0));			\
-	__ref_page = (ref)->page;					\
-	__tret = __wt_tree_walk(session, __ref_page, flags, work, arg);	\
-	__wt_hazard_clear(session, __ref_page);				\
-	if (__tret != 0)						\
-		return (__tret);					\
+	ret = __wt_tree_walk(session, (ref)->page, work, arg);	\
+	__wt_hazard_clear(session, (ref)->page);			\
+	if (ret != 0)							\
+		return (ret);						\
 } while (0)
 
 	/* Walk internal pages, descending through any off-page references. */
@@ -94,12 +68,12 @@ __wt_tree_walk(SESSION *session, WT_PAGE *page,
 	case WT_PAGE_COL_INT:
 		WT_COL_REF_FOREACH(page, cref, i)
 			WT_TREE_WALK_DESCEND(
-			    session, page, &cref->ref, flags, work, arg);
+			    session, page, &cref->ref, work, arg);
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ROW_REF_FOREACH(page, rref, i)
 			WT_TREE_WALK_DESCEND(
-			    session, page, &rref->ref, flags, work, arg);
+			    session, page, &rref->ref, work, arg);
 		break;
 	}
 

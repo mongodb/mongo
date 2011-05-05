@@ -53,7 +53,7 @@ __wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags)
 	 */
 	fprintf(stream, "VERSION=1\n");
 	fprintf(stream, "HEADER=END\n");
-	ret = __wt_tree_walk(session, NULL, 0, __wt_dump_page, &dstuff);
+	ret = __wt_tree_walk(session, NULL, __wt_dump_page, &dstuff);
 	fprintf(stream, "DATA=END\n");
 
 	/* Wrap up reporting. */

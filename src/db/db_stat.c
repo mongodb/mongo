@@ -35,7 +35,7 @@ __wt_btree_stat_print(SESSION *session, FILE *stream)
 	 * safe -- root pages are pinned into memory when a file is opened, and
 	 * never re-written until the file is closed.
 	 */
-	WT_RET(__wt_tree_walk(session, NULL, 0, __wt_page_stat, NULL));
+	WT_RET(__wt_tree_walk(session, NULL, __wt_page_stat, NULL));
 
 	fprintf(stream, "Btree file statistics: %s\n", btree->name);
 	__wt_stat_print_btree_file_stats(btree->fstats, stream);
