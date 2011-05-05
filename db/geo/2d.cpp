@@ -1772,28 +1772,28 @@ namespace mongo {
             {
 
                // Find farthest distance for completion scan
-                double far = farthest();
+                double farDist = farthest();
                 if( found() < _numWanted ) {
                     // Not enough found in Phase 1
-                    far = _scanDistance;
+                    farDist = _scanDistance;
                 }
                 else if ( _type == GEO_PLAIN ) {
                    // Enough found, but need to search neighbor boxes
-                    far += _spec->_error;
+                    farDist += _spec->_error;
                 }
                 else if ( _type == GEO_SPHERE ) {
                    // Enough found, but need to search neighbor boxes
-                    far = std::min( _scanDistance, computeXScanDistance( _near._y, rad2deg( far ) ) + 2 * _spec->_error );
+                    farDist = std::min( _scanDistance, computeXScanDistance( _near._y, rad2deg( farDist ) ) + 2 * _spec->_error );
                 }
-                assert( far >= 0 );
-                GEODEBUGPRINT( far );
+                assert( farDist >= 0 );
+                GEODEBUGPRINT( farDist );
 
                 // Find the box that includes all the points we need to return
-                _want = Box( _near._x - far , _near._y - far , far * 2 );
+                _want = Box( _near._x - farDist , _near._y - farDist , farDist * 2 );
                 GEODEBUGPRINT( _want.toString() );
 
                 // Remember the far distance for further scans
-                _scanDistance = far;
+                _scanDistance = farDist;
 
                 // Reset the search, our distances have probably changed
                 if( _state == DONE_NEIGHBOR ){
