@@ -959,7 +959,11 @@ namespace QueryOptimizerTests {
         class Base {
         public:
             Base() {
-                _cli.dropCollection( ns() );
+                dblock lk;
+                Client::Context ctx( ns() );
+                string err;
+                userCreateNS( ns(), BSONObj(), err, false );
+                dropNS( ns() );
             }
         protected:
             DBDirectClient _cli;
