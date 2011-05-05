@@ -199,6 +199,9 @@ namespace mongo {
         {
             scoped_lock lk( _mutex );
             for ( PoolMap::iterator i=_pools.begin(); i!=_pools.end(); ++i ) {
+                if ( i->second.numCreated() == 0 )
+                    continue;
+
                 string s = i->first;
                 BSONObjBuilder temp( bb.subobjStart( s ) );
                 temp.append( "available" , i->second.numAvailable() );

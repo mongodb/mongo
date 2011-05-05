@@ -71,7 +71,7 @@ namespace mongo {
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
     Member* ReplSetImpl::getMostElectable() {
-        scoped_lock lk(_elock);
+        lock lk(this);
         
         Member *max = 0;        
 
@@ -93,9 +93,13 @@ namespace mongo {
 
     void ReplSetImpl::relinquish() {
         if( box.getState().primary() ) {
-            log() << "replSet relinquishing primary state" << rsLog;
-            changeState(MemberState::RS_SECONDARY);
-
+            {
+                writelock lk("admin."); // so we are synchronized with _logOp()
+            
+                log() << "replSet relinquishing primary state" << rsLog;
+                changeState(MemberState::RS_SECONDARY);
+            }
+            
             if( closeOnRelinquish ) {
                 /* close sockets that were talking to us so they don't blithly send many writes that will fail
                    with "not master" (of course client could check result code, but in case they are not)
@@ -287,7 +291,6 @@ namespace mongo {
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
         _currentSyncTarget(0),
-        _elock("Election set lock"),
         _hbmsgTime(0),
         _self(0),
         mgr( new Manager(this) ) {

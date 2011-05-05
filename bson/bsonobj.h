@@ -28,6 +28,7 @@
 namespace mongo {
 
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
+    typedef multiset< BSONElement, BSONElementCmpWithoutField > BSONElementMSet;
 
     /**
        C++ representation of a "BSON" object -- that is, an extended JSON-style
@@ -167,6 +168,8 @@ namespace mongo {
          *  their contents.
          */
         void getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray = true ) const;
+        void getFieldsDotted(const StringData& name, BSONElementMSet &ret, bool expandLastArray = true ) const;
+
         /** Like getFieldDotted(), but returns first array encountered while traversing the
             dotted fields of name.  The name variable is updated to represent field
             names with respect to the returned element. */

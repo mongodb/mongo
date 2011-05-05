@@ -690,14 +690,16 @@ namespace mongo {
         return -1;
     }
 
-    void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray ) const {
-        BSONElement e = getField( name );
+    template <typename BSONElementColl>
+    void _getFieldsDotted( const BSONObj* obj, const StringData& name, BSONElementColl &ret, bool expandLastArray ) {
+        BSONElement e = obj->getField( name );
+
         if ( e.eoo() ) {
             const char *p = strchr(name.data(), '.');
             if ( p ) {
                 string left(name.data(), p-name.data());
                 const char* next = p+1;
-                BSONElement e = getField( left.c_str() );
+                BSONElement e = obj->getField( left.c_str() );
 
                 if (e.type() == Object) {
                     e.embeddedObject().getFieldsDotted(next, ret, expandLastArray );
@@ -737,6 +739,13 @@ namespace mongo {
                 ret.insert(e);
             }
         }
+    }
+
+    void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray ) const {
+        _getFieldsDotted( this, name, ret, expandLastArray );
+    }
+    void BSONObj::getFieldsDotted(const StringData& name, BSONElementMSet &ret, bool expandLastArray ) const {
+        _getFieldsDotted( this, name, ret, expandLastArray );
     }
 
     BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
