@@ -21,19 +21,13 @@
 
 namespace mongo {
 
-    // [ISKEY][HASMORE][x][y][canontype_4bits]
-
-    /* warning: don't do BinData here unless you are careful with Geo, as geo 
-                uses bindata.  you would want to perf test it on the change as 
-                the geo code doesn't use Key's but rather BSONObj's for its 
-                key manipulation.
-                */
-
+    // [ ][HASMORE][x][y][canontype_4bits]
     enum CanonicalsEtc { 
         cminkey=1,
         cnull=2,
         cdouble=4,
         cstring=6,
+        cbindata=7,
         coid=8,
         cfalse=10,
         ctrue=11,
@@ -45,8 +39,27 @@ namespace mongo {
         cX = 0x20,
         clong = cX | cdouble,
         cHASMORE = 0x40,
-        cNOTUSED = 0x80
+        cNOTUSED = 0x80 // but see IsBSON sentinel - this bit not usable without great care
     };
+
+    // bindata bson type
+    const unsigned BinDataLenMask = 0xf0;  // lengths are powers of 2 of this value
+    const unsigned BinDataTypeMask = 0x0f; // 0-7 as you would expect, 8-15 are 128+value.  see BinDataType.
+    const int BinDataLenMax = 32;
+    const int BinDataLengthToCode[] = { 
+        0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 
+        0x80, -1/*9*/, 0x90/*10*/, -1/*11*/, 0xa0/*12*/, -1/*13*/, 0xb0/*14*/, -1/*15*/,
+        0xc0/*16*/, -1, -1, -1, 0xd0/*20*/, -1, -1, -1, 
+        0xe0/*24*/, -1, -1, -1, -1, -1, -1, -1, 
+        0xf0/*32*/ 
+    };
+    const int BinDataCodeToLength[] = { 
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 32
+    };
+
+    int binDataCodeToLength(int codeByte) { 
+        return BinDataCodeToLength[codeByte >> 4];
+    }
 
     /** object cannot be represented in compact format.  so store in traditional bson format 
         with a leading sentinel byte IsBSON to indicate it's in that format.
@@ -90,6 +103,27 @@ namespace mongo {
                 b.appendUChar(coid|bits);
                 b.appendBuf(&e.__oid(), sizeof(OID));
                 break;
+            case BinData:
+                {
+                    int t = e.binDataType();
+                    // 0-7 and 0x80 to 0x87 are supported by Key
+                    if( (t & 0x78) == 0 && t != ByteArrayDeprecated ) {
+                        int len;
+                        const char * d = e.binData(len);
+                        int code = BinDataLengthToCode[len];
+                        if( code >= 0 ) {
+                            if( t >= 128 )
+                                t = (t-128) | 0x08;
+                            dassert( (code&t) == 0 );
+                            b.appendUChar( cbindata|bits );
+                            b.appendUChar( code | t );
+                            b.appendBuf(d, len);
+                            break;
+                        }
+                    }
+                    traditional(b, obj);
+                    return;
+                }
             case Date:
                 b.appendUChar(cdate|bits);
                 b.appendStruct(e.date());
@@ -179,6 +213,17 @@ namespace mongo {
                     b.appendOID("", (OID *) p);
                     p += sizeof(OID);
                     break;
+                case cbindata:
+                    {
+                        int len = binDataCodeToLength(*p);
+                        int subtype = (*p) & BinDataTypeMask;
+                        if( subtype & 0x8 ) { 
+                            subtype = (subtype & 0x7) | 0x80;
+                        }
+                        b.appendBinData("", len, (BinDataType) subtype, ++p);
+                        p += len;
+                        break;
+                    }
                 case cdate:
                     b.appendDate("", (Date_t&) *p);
                     p += 8;
@@ -244,6 +289,22 @@ namespace mongo {
                 if( res ) 
                     return res;
                 l += 12; r += 12;
+                break;
+            }
+        case cbindata:
+            {
+                int L = *l;
+                int R = *r;
+                int diff = L-R; // checks length and subtype simultaneously
+                if( diff )
+                    return diff;
+                // same length, same type
+                l++; r++;
+                int len = binDataCodeToLength(L);
+                int res = memcmp(l, r, len);
+                if( res ) 
+                    return res;
+                l += len; r += len;
                 break;
             }
         case cdate:
@@ -358,8 +419,13 @@ namespace mongo {
             unsigned type = *p & cCANONTYPEMASK;
             unsigned z = sizes[type];
             if( z == 0 ) {
-                assert( type == cstring );
-                z = ((unsigned) p[1]) + 2;
+                if( type == cstring ) { 
+                    z = ((unsigned) p[1]) + 2;
+                }
+                else {
+                    assert( type == cbindata );
+                    z = binDataCodeToLength(p[1]) + 2;
+                }
             }
             more = (*p & cHASMORE) != 0;
             p += z;
