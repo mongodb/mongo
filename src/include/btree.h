@@ -333,9 +333,6 @@ struct __wt_page {
 	WT_REF	*parent_ref;		/* Page's parent reference */
 
 	/*
-	 * We maintain 3 "generation" numbers for a page: the disk, read and
-	 * write generations.
-	 *
 	 * The read generation is incremented each time the page is searched,
 	 * and acts as an LRU value for each page in the tree; it is read by
 	 * the eviction server thread to select pages to be discarded from the
@@ -475,8 +472,8 @@ struct __wt_page {
 /*
  * WT_ROW --
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
- * this is created from on-page data when a page is read from the file.
- * It's sorted by key, fixed in size, and references data on the page.
+ * this is created from on-page data when a page is read from the file.  It's
+ * sorted by key, fixed in size, and references data on the page.
  */
 struct __wt_row {
 	/*
