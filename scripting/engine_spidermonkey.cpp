@@ -935,7 +935,7 @@ namespace mongo {
 
         BSONObj out;
         try {
-            out = func( a );
+            out = func( a, 0 );
         }
         catch ( std::exception& e ) {
             JS_ReportError( cx , e.what() );
@@ -1347,6 +1347,12 @@ namespace mongo {
             }
         }
 
+        void setFunction( const char *field , const char * code ) {
+            smlock;
+            jsval v = OBJECT_TO_JSVAL(JS_GetFunctionObject(_convertor->compileFunction(code)));
+            JS_SetProperty( _context , _global , field , &v );
+        }
+
         void rename( const char * from , const char * to ) {
             smlock;
             jsval v;
@@ -1517,7 +1523,7 @@ namespace mongo {
             return _error;
         }
 
-        void injectNative( const char *field, NativeFunction func ) {
+        void injectNative( const char *field, NativeFunction func, void* data ) {
             smlock;
             string name = field;
             _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );

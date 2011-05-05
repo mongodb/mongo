@@ -88,7 +88,7 @@ namespace mongo {
 
         class JSMapper : public Mapper {
         public:
-            JSMapper( const BSONElement & code ) : _func( "map" , code ) {}
+            JSMapper( const BSONElement & code ) : _func( "_map" , code ) {}
             virtual void map( const BSONObj& o );
             virtual void init( State * state );
 
@@ -99,8 +99,8 @@ namespace mongo {
 
         class JSReducer : public Reducer {
         public:
-            JSReducer( const BSONElement& code ) : _func( "reduce" , code ) {}
-            virtual void init( State * state ) { _func.init( state ); }
+            JSReducer( const BSONElement& code ) : _func( "_reduce" , code ) {}
+            virtual void init( State * state );
 
             virtual BSONObj reduce( const BSONList& tuples );
             virtual BSONObj finalReduce( const BSONList& tuples , Finalizer * finalizer );
@@ -115,12 +115,11 @@ namespace mongo {
             void _reduce( const BSONList& values , BSONObj& key , int& endSizeEstimate );
 
             JSFunction _func;
-
         };
 
         class JSFinalizer : public Finalizer  {
         public:
-            JSFinalizer( const BSONElement& code ) : _func( "finalize" , code ) {}
+            JSFinalizer( const BSONElement& code ) : _func( "_finalize" , code ) {}
             virtual BSONObj finalize( const BSONObj& o );
             virtual void init( State * state ) { _func.init( state ); }
         private:
@@ -153,6 +152,7 @@ namespace mongo {
 
             // options
             bool verbose;
+            bool jsMode;
 
             // query options
 
@@ -252,7 +252,7 @@ namespace mongo {
             /**
              * inserts with correct replication semantics
              */
-            void insert( const string& ns , BSONObj& o );
+            void insert( const string& ns , const BSONObj& o );
 
             // ------ simple accessors -----
 
@@ -265,13 +265,16 @@ namespace mongo {
 
             long long numEmits() const { return _numEmits; }
 
+            void switchMode(bool jsMode);
+
+            const Config& _config;
+
         protected:
 
             void _insertToInc( BSONObj& o );
             static void _add( InMemory* im , const BSONObj& a , long& size, long& dupCount );
 
             scoped_ptr<Scope> _scope;
-            const Config& _config;
             bool _onDisk; // if the end result of this map reduce is disk or not
 
             DBDirectClient _db;
@@ -281,9 +284,13 @@ namespace mongo {
             long _dupCount; // number of duplicate key entries
 
             long long _numEmits;
+
+            bool _jsMode;
+            ScriptingFunction _reduceAll;
+            ScriptingFunction _reduceAndFinalize;
         };
 
-        BSONObj fast_emit( const BSONObj& args );
+        BSONObj fast_emit( const BSONObj& args, void* data );
 
     } // end mr namespace
 }

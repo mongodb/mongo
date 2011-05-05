@@ -215,6 +215,7 @@ namespace mongo {
         V8STR_DBPTR = getV8Str( "__DBPointer" );
         V8STR_BINDATA = getV8Str( "__BinData" );
         V8STR_NATIVE_FUNC = getV8Str( "_native_function" );
+        V8STR_NATIVE_DATA = getV8Str( "_native_data" );
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
 
         injectV8Function("print", Print);
@@ -256,6 +257,7 @@ namespace mongo {
         HandleScope handle_scope;
         Local< External > f = External::Cast( *args.Callee()->Get( scope->V8STR_NATIVE_FUNC ) );
         NativeFunction function = (NativeFunction)(f->Value());
+        Local< External > data = External::Cast( *args.Callee()->Get( scope->V8STR_NATIVE_DATA ) );
         BSONObjBuilder b;
         for( int i = 0; i < args.Length(); ++i ) {
             stringstream ss;
@@ -265,7 +267,7 @@ namespace mongo {
         BSONObj nativeArgs = b.obj();
         BSONObj ret;
         try {
-            ret = function( nativeArgs );
+            ret = function( nativeArgs, data->Value() );
         }
         catch( const std::exception &e ) {
             return v8::ThrowException(v8::String::New(e.what()));
@@ -504,6 +506,11 @@ namespace mongo {
         return num;
     }
 
+    void V8Scope::setFunction( const char *field , const char * code ) {
+        V8_SIMPLE_HEADER
+        _global->Set( getV8Str( field ) , __createFunction(code) );
+    }
+
 //    void V8Scope::setThis( const BSONObj * obj ) {
 //        V8_SIMPLE_HEADER
 //        if ( ! obj ) {
@@ -643,15 +650,16 @@ namespace mongo {
         return true;
     }
 
-    void V8Scope::injectNative( const char *field, NativeFunction func ) {
-        injectNative(field, func, _global);
+    void V8Scope::injectNative( const char *field, NativeFunction func, void* data ) {
+        injectNative(field, func, _global, data);
     }
 
-    void V8Scope::injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj ) {
+    void V8Scope::injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj, void* data ) {
         V8_SIMPLE_HEADER
 
         Handle< FunctionTemplate > ft = createV8Function(nativeCallback);
         ft->Set( this->V8STR_NATIVE_FUNC, External::New( (void*)func ) );
+        ft->Set( this->V8STR_NATIVE_DATA, External::New( data ) );
         obj->Set( getV8Str( field ), ft->GetFunction() );
     }
 
@@ -1012,7 +1020,9 @@ namespace mongo {
             }
         }
 
-        o->SetInternalField(0, v8::External::New((new BSONObj( m.getOwned() ))));
+        BSONObj* own = new BSONObj(m.getOwned());
+//        BSONObj* own = new BSONObj(m);
+        o->SetInternalField(0, v8::External::New(own));
         // need to set all keys with dummy values, so that order of keys is correct during enumeration
         // otherwise v8 will list any newly set property in JS before the ones of underlying BSON obj.
         for (BSONObjIterator it(m); it.more();) {

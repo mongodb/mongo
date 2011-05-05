@@ -53,6 +53,9 @@ namespace mongo {
 
             _func = _scope->createFunction( _code.c_str() );
             uassert( 13598 , str::stream() << "couldn't compile code for: " << _type , _func );
+
+            // install in JS scope so that it can be called in JS mode
+            _scope->setFunction(_type.c_str(), _code.c_str());
         }
 
         void JSMapper::init( State * state ) {
@@ -87,6 +90,10 @@ namespace mongo {
             b.append( o.firstElement() );
             s->append( b , "value" , "return" );
             return b.obj();
+        }
+
+        void JSReducer::init( State * state ) {
+            _func.init( state );
         }
 
         /**
@@ -213,6 +220,7 @@ namespace mongo {
             ns = dbname + "." + cmdObj.firstElement().valuestr();
 
             verbose = cmdObj["verbose"].trueValue();
+            jsMode = cmdObj["jsMode"].trueValue();
 
             uassert( 13602 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
 
@@ -448,7 +456,7 @@ namespace mongo {
         /**
          * Insert doc in collection
          */
-        void State::insert( const string& ns , BSONObj& o ) {
+        void State::insert( const string& ns , const BSONObj& o ) {
             assert( _onDisk );
 
             writelock l( ns );
@@ -507,7 +515,19 @@ namespace mongo {
             if ( _config.finalizer )
                 _config.finalizer->init( this );
 
-            _scope->injectNative( "emit" , fast_emit );
+            // by default start in JS mode, will be faster for small jobs
+            _jsMode = _config.jsMode;
+            switchMode(_jsMode);
+
+            // global JS map/reduce hashmap
+            // we use a standard JS object which means keys are only simple types
+            // we could also add a real hashmap from a library, still we need to add object comparison methods
+            _scope->setObject("_mrMap", BSONObj(), false);
+
+            // js function to run reduce on all keys
+//            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
+            _reduceAll = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); _mrMap[key] = [ret];");
+            _reduceAndFinalize = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); if (typeof(_finalize) !== 'undefined') ret = _finalize(ret); _insertToTemp({_id: key, value: ret}) };");
 
             if ( _onDisk ) {
                 // clear temp collections
@@ -531,6 +551,17 @@ namespace mongo {
 
         }
 
+        void State::switchMode(bool jsMode) {
+            _jsMode = jsMode;
+            if (jsMode) {
+//                // emit function that stays in JS
+//                _scope->setFunction("emit", "function(key, value) { list = _mrMap[key]; if (!list) { list = []; _mrMap[key] = list; } list.push(value); }");
+            } else {
+                // emit now populates C++ map
+                _scope->injectNative( "emit" , fast_emit, this );
+            }
+        }
+
         /**
          * Applies last reduce and finalize on a list of tuples (key, val)
          * Inserts single result {_id: key, value: val} into temp collection
@@ -543,12 +574,29 @@ namespace mongo {
             insert( _config.tempLong , res );
         }
 
+        BSONObj _insertToTemp( const BSONObj& args, void* data ) {
+            State* state = (State*) data;
+            BSONObjIterator it(args);
+            state->insert(state->_config.tempLong, it.next().Obj());
+            return BSONObj();
+        }
+
         /**
          * Applies last reduce and finalize.
          * After calling this method, the temp collection will be completed.
          * If inline, the results will be in the in memory map
          */
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
+
+            if (_jsMode) {
+                if (_onDisk) {
+                    // apply the reduce within JS
+                    _scope->injectNative("_insertToTemp", _insertToTemp, this);
+                    _scope->invoke(_reduceAndFinalize, 0, 0, 0, true);
+                    return;
+                }
+            }
+
             if ( ! _onDisk ) {
                 // all data has already been reduced, just finalize
                 if ( _config.finalizer ) {
@@ -657,6 +705,11 @@ namespace mongo {
          */
         void State::reduceInMemory() {
 
+            if (_jsMode) {
+                // in js mode the reduce is applied when writing to collection
+                return;
+            }
+
             auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
             long dupCount = 0;
@@ -734,7 +787,7 @@ namespace mongo {
          * this method checks the size of in memory map and potentially flushes to disk
          */
         void State::checkSize() {
-            if ( _size < 1024 * 50 )
+            if (_jsMode || _size < 1024 * 50 )
                 return;
 
             // attempt to reduce in memory map, if we've seen duplicates
@@ -751,25 +804,26 @@ namespace mongo {
             log(1) << "  mr: dumping to db" << endl;
         }
 
-        boost::thread_specific_ptr<State*> _tl;
+//        boost::thread_specific_ptr<State*> _tl;
 
         /**
          * emit that will be called by js function
          */
-        BSONObj fast_emit( const BSONObj& args ) {
+        BSONObj fast_emit( const BSONObj& args, void* data ) {
             uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
             uassert( 13069 , "an emit can't be more than half max bson size" , args.objsize() < ( BSONObjMaxUserSize / 2 ) );
             
+            State* state = (State*) data;
             if ( args.firstElement().type() == Undefined ) {
                 BSONObjBuilder b( args.objsize() );
                 b.appendNull( "" );
                 BSONObjIterator i( args );
                 i.next();
                 b.append( i.next() );
-                (*_tl)->emit( b.obj() );
+                state->emit( b.obj() );
             }
             else {
-                (*_tl)->emit( args );
+                state->emit( args );
             }
             return BSONObj();
         }
@@ -828,7 +882,7 @@ namespace mongo {
                     {
                         State** s = new State*();
                         s[0] = &state;
-                        _tl.reset( s );
+//                        _tl.reset( s );
                     }
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
@@ -918,7 +972,7 @@ namespace mongo {
                     // final reduce
                     state.finalReduce( op , pm );
 
-                    _tl.reset();
+//                    _tl.reset();
                 }
                 catch ( ... ) {
                     log() << "mr failed, removing collection" << endl;

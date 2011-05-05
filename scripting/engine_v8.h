@@ -85,6 +85,7 @@ namespace mongo {
         virtual void setBoolean( const char *field , bool val );
         virtual void setElement( const char *field , const BSONElement& e );
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly);
+        virtual void setFunction( const char *field , const char * code );
 //        virtual void setThis( const BSONObj * obj );
 
         virtual void rename( const char * from , const char * to );
@@ -95,8 +96,8 @@ namespace mongo {
         virtual bool exec( const StringData& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError() { return _error; }
 
-        virtual void injectNative( const char *field, NativeFunction func );
-        void injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj );
+        virtual void injectNative( const char *field, NativeFunction func, void* data = 0 );
+        void injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj, void* data = 0 );
         void injectV8Function( const char *field, v8Function func );
         void injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj );
         void injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t );
@@ -126,6 +127,7 @@ namespace mongo {
         Persistent<v8::String> V8STR_LENGTH;
         Persistent<v8::String> V8STR_ISOBJECTID;
         Persistent<v8::String> V8STR_NATIVE_FUNC;
+        Persistent<v8::String> V8STR_NATIVE_DATA;
         Persistent<v8::String> V8STR_V8_FUNC;
         Persistent<v8::String> V8STR_RETURN;
         Persistent<v8::String> V8STR_ARGS;
