@@ -79,7 +79,8 @@ __wt_verify_dsk_page(
 
 	/* Ignore the checksum -- it verified when we first read the page. */
 
-	if (dsk->size != size) {
+	/* The in-memory and on-disk page sizes are currently the same. */
+	if (dsk->size != size || dsk->memsize != size) {
 		__wt_errx(session,
 		    "page at addr %lu has an incorrect size", (u_long)addr);
 		return (WT_ERROR);

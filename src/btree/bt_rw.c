@@ -72,7 +72,7 @@ __wt_disk_write(
 	 */
 	WT_LSN_INCR(btree->lsn);
 	dsk->lsn = btree->lsn;
-	dsk->size = size;
+	dsk->size = dsk->memsize = size;
 
 	dsk->checksum = 0;
 	dsk->checksum = __wt_cksum(dsk, size);

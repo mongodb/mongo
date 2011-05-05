@@ -147,27 +147,30 @@ struct __wt_page_disk {
 
 	/*
 	 * We don't need the page length for normal processing as the page's
-	 * parent knows how big it is.  However, we keep the page size in the
-	 * page header because it makes salvage easier, we know how long the
-	 * expected page is.
+	 * parent knows how big it is.  However, we write the page size in the
+	 * page header because it makes salvage easier.  (We know how long the
+	 * expected page is: the alternative would be to read increasingly
+	 * larger chunks from the file until we find one that checksums, and
+	 * that's going to be unpleasant in the face of WiredTiger's large page
+	 * sizes.)
 	 */
 	uint32_t size;			/* 20-23: size of page */
 
+	/*
+	 * If the page has been stream compressed, it has 2 sizes: the on-disk
+	 * compressed size, and the in-memory size.  Store the in-memory size
+	 * in the page header because otherwise we have no idea how big a chunk
+	 * of memory we need to expand the page.
+	 */
+	uint32_t memsize;		/* 24-27: in-memory page size */
+
 	union {
-		uint32_t entries;	/* 24-27: number of cells on page */
-		uint32_t datalen;	/* 24-27: overflow data length */
+		uint32_t entries;	/* 28-31: number of cells on page */
+		uint32_t datalen;	/* 28-31: overflow data length */
 	} u;
 
-	uint8_t type;			/* 28: page type */
-
-	/*
-	 * It would be possible to decrease the size of the page header by 3
-	 * bytes by only writing out the first 25 bytes of the structure to the
-	 * page, but I'm not bothering -- I don't think the space is worth it
-	 * and having a little bit of on-page data to play with in the future
-	 * can be a good thing.
-	 */
-	uint8_t unused[3];		/* 29-31: unused padding */
+	uint8_t type;			/* 32: page type */
+	uint8_t unused[3];		/* 33-35: unused padding */
 };
 /*
  * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
@@ -180,7 +183,7 @@ struct __wt_page_disk {
  * WT_PAGE_DISK_SIZE rather than sizeof to avoid writing 4 bytes of padding to
  * every page.
  */
-#define	WT_PAGE_DISK_SIZE		32
+#define	WT_PAGE_DISK_SIZE		36
 
 /*
  * WT_PAGE_DISK_BYTE --
