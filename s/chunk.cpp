@@ -176,7 +176,7 @@ namespace mongo {
         conn.done();
     }
 
-    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ) {
+    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ) const {
         vector<BSONObj> splitPoint;
 
         // if splitting is not obligatory we may return early if there are not enough data
@@ -235,7 +235,7 @@ namespace mongo {
         return multiSplit( splitPoint , res );
     }
 
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) {
+    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) const {
         const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -268,21 +268,9 @@ namespace mongo {
         }
 
         conn.done();
-        _manager->_reload();
-
-        // The previous multisplit logic adjusted the boundaries of 'this' chunk. Any call to 'this' object hereafter
-        // will see a different _max for the chunk.
-        // TODO Untie this dependency since, for metadata purposes, the reload() above already fixed boundaries
-        {
-            rwlock lk( _manager->_lock , true );
-
-            setMax(m[0].getOwned());
-            DEV assert( shared_from_this() );
-            _manager->_chunkMap[_max] = shared_from_this();
-        }
-
-        // return the second half, if a single split, or the first new chunk, if a multisplit.
-        return _manager->findChunk( m[0] );
+        
+        ChunkManagerPtr updated = grid.getDBConfig( getns() )->getChunkManager( getns() , true );
+        return updated->findChunk( m[0] );
     }
 
     bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ) {
@@ -390,7 +378,9 @@ namespace mongo {
         massert( 10412 ,
                  str::stream() << "moveAndCommit failed: " << res ,
                  toMove->moveAndCommit( newLocation , MaxChunkSize , res ) );
-
+        
+        // update our config
+        grid.getDBConfig( toMove->getns() )->getChunkManager( toMove->getns() , true );
         return true;
     }
 

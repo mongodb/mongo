@@ -110,7 +110,7 @@ namespace mongo {
          * @param res the object containing details about the split execution
          * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
          */
-        ChunkPtr singleSplit( bool force , BSONObj& res );
+        ChunkPtr singleSplit( bool force , BSONObj& res ) const;
 
         /**
          * Splits this chunk at the given key (or keys)
@@ -119,7 +119,7 @@ namespace mongo {
          * @param res the object containing details about the split execution
          * @return shared pointer to the first new Chunk or null pointer if failed
          */
-        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res );
+        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res ) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
