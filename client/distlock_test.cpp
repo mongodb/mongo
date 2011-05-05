@@ -235,16 +235,22 @@ namespace mongo {
 
                         log() << "**** Locked for thread " << threadId << " with ts " << lockObj["ts"] << endl;
 
-                        if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
-                            errors = true;
-                            log() << "**** !Could not re-enter lock already held" << endl;
-                            break;
-                        }
+                        // Legacy locks are not always guaranteed re-entry since they may not have a valid ping yet,
+                        // but don't use this feature anyway
+                        if( ! legacy ) {
 
-                        if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
-                            errors = true;
-                            log() << "**** !Invalid lock re-entry" << endl;
-                            break;
+                            if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
+                                errors = true;
+                                log() << "**** !Could not re-enter lock already held" << endl;
+                                break;
+                            }
+
+                            if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
+                                errors = true;
+                                log() << "**** !Invalid lock re-entry" << endl;
+                                break;
+                            }
+
                         }
 
                         count++;
