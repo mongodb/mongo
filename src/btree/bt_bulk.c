@@ -1027,16 +1027,14 @@ __wt_item_build_value(
 static int
 __wt_bulk_ovfl_copy(SESSION *session, WT_OVFL *from, WT_OVFL *to)
 {
-	BTREE *btree;
 	WT_BUF *tmp;
 	uint32_t size;
 	int ret;
 
-	btree = session->btree;
 	tmp = NULL;
 
 	/* Get a scratch buffer of the appropriate size. */
-	size = WT_ALIGN(WT_PAGE_DISK_SIZE + from->size, btree->allocsize);
+	size = WT_DISK_REQUIRED(session, from->size);
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/*
@@ -1068,18 +1066,16 @@ err:	__wt_scr_release(&tmp);
 static int
 __wt_bulk_ovfl_write(SESSION *session, WT_ITEM *item, WT_OVFL *to)
 {
-	BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	uint32_t size;
 	int ret;
 
-	btree = session->btree;
 	tmp = NULL;
 
 	/* Get a scratch buffer and make it look like our work page. */
-	size = WT_ALIGN(WT_PAGE_DISK_SIZE + item->size, btree->allocsize);
+	size = WT_DISK_REQUIRED(session, item->size);
 	WT_ERR(
 	    __wt_bulk_scratch_page(session, size, WT_PAGE_OVFL, &page, &tmp));
 
@@ -1090,7 +1086,7 @@ __wt_bulk_ovfl_write(SESSION *session, WT_ITEM *item, WT_OVFL *to)
 	/* Initialize the page header and copy the record into place. */
 	dsk = page->XXdsk;
 	dsk->u.datalen = item->size;
-	memcpy((uint8_t *)dsk + WT_PAGE_DISK_SIZE, item->data, item->size);
+	memcpy(WT_PAGE_DISK_BYTE(dsk), item->data, item->size);
 
 	ret = __wt_page_write(session, page);
 

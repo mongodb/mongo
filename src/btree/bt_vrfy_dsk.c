@@ -295,7 +295,7 @@ cell_len:			__wt_errx(session,
 		case WT_CELL_DATA_OVFL:
 			ovfl = WT_CELL_BYTE_OVFL(cell);
 			if (WT_ADDR_TO_OFF(btree, ovfl->addr) +
-			    (off_t)WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size) >
+			    (off_t)WT_DISK_REQUIRED(session, ovfl->size) >
 			    file_size)
 				goto eof;
 			break;
@@ -541,7 +541,7 @@ __wt_verify_dsk_chunk(
 	}
 
 	/* Any data after the data chunk should be nul bytes. */
-	p = (uint8_t *)dsk + (WT_PAGE_DISK_SIZE + dsk->u.datalen);
+	p = (uint8_t *)WT_PAGE_DISK_BYTE(dsk) + dsk->u.datalen;
 	len = size - (WT_PAGE_DISK_SIZE + dsk->u.datalen);
 	for (; len > 0; ++p, --len)
 		if (*p != '\0') {

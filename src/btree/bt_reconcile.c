@@ -223,7 +223,7 @@ static int  __hazard_qsort_cmp(const void *, const void *);
 	__rec_discard_add(session, page, 0, 0)
 #define	__rec_discard_add_ovfl(session, ovfl)				\
 	__rec_discard_add(session, NULL,				\
-	    (ovfl)->addr, WT_HDR_BYTES_TO_ALLOC((session)->btree, (ovfl)->size))
+	    (ovfl)->addr, WT_DISK_REQUIRED(session, (ovfl)->size))
 
 /*
  * __rec_init --

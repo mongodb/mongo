@@ -1662,11 +1662,8 @@ __slvg_ovfl_row_inmem_ref(WT_PAGE *page, uint32_t skip_start, WT_STUFF *ss)
 static void
 __slvg_trk_ovfl_ref(SESSION *session, WT_TRACK *trk, WT_STUFF *ss)
 {
-	BTREE *btree;
 	WT_TRACK **searchp;
 	uint32_t i;
-
-	btree = session->btree;
 
 	/*
 	 * Review the overflow pages referenced by the argument page: if we find
@@ -1690,7 +1687,7 @@ __slvg_trk_ovfl_ref(SESSION *session, WT_TRACK *trk, WT_STUFF *ss)
 		    bsearch(&trk->ovfl[i], ss->ovfl, ss->ovfl_next,
 		    sizeof(WT_TRACK *), __slvg_ovfl_compare);
 		if (searchp == NULL || (*searchp)->size !=
-		    WT_HDR_BYTES_TO_ALLOC(btree, trk->ovfl[i].size))
+		    WT_DISK_REQUIRED(session, trk->ovfl[i].size))
 			F_SET(trk, WT_TRACK_OVFL_MISSING);
 		else
 			F_SET(*searchp, WT_TRACK_OVFL_REFD);

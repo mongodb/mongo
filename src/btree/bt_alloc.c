@@ -249,9 +249,8 @@ __wt_block_read(SESSION *session)
 	    tmp->mem, btree->free_addr, btree->free_size));
 
 	/* Insert the free-list items into the linked list. */
-	for (p = (uint32_t *)((uint8_t *)tmp->mem + WT_PAGE_DISK_SIZE);
-	    *p != WT_ADDR_INVALID;
-	    p += 2)
+	for (p = (uint32_t *)WT_PAGE_DISK_BYTE(tmp->mem);
+	    *p != WT_ADDR_INVALID; p += 2)
 		WT_ERR(__wt_block_free(session, p[0], p[1]));
 
 err:	if (tmp != NULL)
@@ -293,8 +292,7 @@ __wt_block_write(SESSION *session)
 	 * second is for a list-terminating WT_ADDR_INVALID entry.
 	 */
 	total_entries = btree->freelist_entries + 2;
-	size = WT_ALIGN(WT_PAGE_DISK_SIZE +
-	     total_entries * 2 * sizeof(uint32_t), btree->allocsize);
+	size = WT_DISK_REQUIRED(session, total_entries * 2 * sizeof(uint32_t));
 
 	/* Allocate room at the end of the file. */
 	__wt_block_extend(session, &addr, size);

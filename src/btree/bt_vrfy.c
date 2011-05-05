@@ -505,18 +505,16 @@ static int
 __wt_verify_overflow(SESSION *session,
     WT_OVFL *ovfl, uint32_t entry_num, uint32_t page_ref_addr, WT_VSTUFF *vs)
 {
-	BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	WT_BUF *scratch;
 	uint32_t addr, size;
 	int ret;
 
-	btree = session->btree;
 	scratch = NULL;
 	ret = 0;
 
 	addr = ovfl->addr;
-	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
+	size = WT_DISK_REQUIRED(session, ovfl->size);
 
 	/* Allocate enough memory to hold the overflow pages. */
 	WT_RET(__wt_scr_alloc(session, size, &scratch));

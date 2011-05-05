@@ -52,14 +52,14 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	 *
 	 * Re-allocate memory as necessary to hold the overflow pages.
 	 */
-	size = WT_HDR_BYTES_TO_ALLOC(btree, ovfl->size);
+	size = WT_DISK_REQUIRED(session, ovfl->size);
 	WT_RET(__wt_buf_setsize(session, store, size));
 
 	/* Read the page. */
 	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, size));
 
 	/* Reference the start of the data. */
-	store->data = (uint8_t *)store->mem + WT_PAGE_DISK_SIZE;
+	store->data = WT_PAGE_DISK_BYTE(store->mem);
 	store->size = ovfl->size;
 
 	return (0);

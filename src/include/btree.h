@@ -53,11 +53,11 @@ extern "C" {
 	((uint32_t)((off) / (btree)->allocsize))
 
 /*
- * Return file allocation units needed for length (optionally including a page
- * header), rounded to an allocation unit.
+ * WT_DISK_REQUIRED--
+ *	Return bytes needed for data length, rounded to an allocation unit.
  */
-#define	WT_HDR_BYTES_TO_ALLOC(btree, size)				\
-	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (btree)->allocsize))
+#define	WT_DISK_REQUIRED(session, size)					\
+	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (session)->btree->allocsize))
 
 /*
  * The file needs a description, here's the structure.  At the moment, this
