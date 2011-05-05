@@ -195,6 +195,10 @@ __wt_cache_read_server(void *arg)
 	}
 
 	WT_VERBOSE(conn, WT_VERB_READ, (session, "cache read server exiting"));
+
+	if (session != &conn->default_session)
+		(void)__wt_session_close(session);
+
 	return (NULL);
 }
 

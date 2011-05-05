@@ -226,7 +226,7 @@ err:		__wt_err(session, ret, "cache eviction server error");
 			__wt_free(session, er->retry);
 
 	if (session != &conn->default_session)
-		WT_TRET(__wt_session_close(session));
+		(void)__wt_session_close(session);
 
 	return (NULL);
 }
