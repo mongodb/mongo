@@ -996,7 +996,7 @@ namespace mongo {
 
             int n = 0;
             while ( cursor->ok() ) {
-                if ( ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
+                if ( ! cursor->matcher().get()->matchesCurrent( cursor.get() ) ) {
                     log() << "**** NOT MATCHING ****" << endl;
                     PRINT(cursor->current());
                     cursor->advance();

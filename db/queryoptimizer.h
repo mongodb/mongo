@@ -167,7 +167,13 @@ namespace mongo {
             _error = true;
             _exception = e.getInfo();
         }
-        shared_ptr<CoveredIndexMatcher> matcher() const { return _matcher; }
+
+        shared_ptr<CoveredIndexMatcher> matcher( const shared_ptr<Cursor>& c ) const {
+           return matcher( c.get() );
+        }
+        shared_ptr<CoveredIndexMatcher> matcher( Cursor* c ) const {
+           return ( c && c->matcher().get() ) ? c->matcher() : _matcher;
+        }
         
     protected:
         /** Call if all results have been found. */
@@ -435,7 +441,8 @@ namespace mongo {
 
         virtual bool isMultiKey() const { return _mps->hasMultiKey(); }
 
-        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        virtual shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
+
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
         /** just for testing */

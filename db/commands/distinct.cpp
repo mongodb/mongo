@@ -98,7 +98,7 @@ namespace mongo {
                 nscanned++;
                 bool loadedObject = false;
 
-                if ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ) {
+                if ( ! cursor->matcher().get() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ) {
                     n++;
 
                     BSONElementSet temp;

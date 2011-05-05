@@ -253,7 +253,7 @@ namespace mongo {
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
 
         bool currentMatches() {
-            if ( ! _c->matcher() )
+            if ( ! _c->matcher().get() )
                 return true;
             return _c->matcher()->matchesCurrent( _c.get() );
         }

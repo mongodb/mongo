@@ -89,7 +89,7 @@ namespace mongo {
             shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
 
             while ( cursor->ok() ) {
-                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
+                if ( cursor->matcher().get() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
                     cursor->advance();
                     continue;
                 }
