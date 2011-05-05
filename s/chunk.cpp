@@ -349,7 +349,7 @@ namespace mongo {
 #endif
                   << endl;
 
-            moveIfShould( newShard );
+            moveIfShould( shared_from_this() , newShard );
 
             return true;
 
@@ -361,15 +361,14 @@ namespace mongo {
         }
     }
 
-    bool Chunk::moveIfShould( ChunkPtr newChunk ) {
+    bool Chunk::moveIfShould( ChunkPtr oldChunk , ChunkPtr newChunk ) {
         ChunkPtr toMove;
 
         if ( newChunk->countObjects(2) <= 1 ) {
             toMove = newChunk;
         }
-        else if ( this->countObjects(2) <= 1 ) {
-            DEV assert( shared_from_this() );
-            toMove = shared_from_this();
+        else if ( oldChunk->countObjects(2) <= 1 ) {
+            toMove = oldChunk;
         }
         else {
             // moving middle shards is handled by balancer
@@ -378,11 +377,11 @@ namespace mongo {
 
         assert( toMove );
 
-        Shard newLocation = Shard::pick( getShard() );
-        if ( getShard() == newLocation ) {
+        Shard newLocation = Shard::pick( toMove->getShard() );
+        if ( toMove->getShard() == newLocation ) {
             // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
-            log(1) << "recently split chunk: " << toString() << "already in the best shard" << endl;
-            return 0;
+            log(1) << "recently split chunk: " << toMove->toString() << "already in the best shard" << endl;
+            return false;
         }
 
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;

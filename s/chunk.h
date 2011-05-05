@@ -145,7 +145,7 @@ namespace mongo {
          *
          * @return whether or not a shard was moved
          */
-        bool moveIfShould( ChunkPtr newShard = ChunkPtr() );
+        static bool moveIfShould( ChunkPtr oldChunk , ChunkPtr newChunk );
 
         /**
          * Issues a migrate request for this chunk
