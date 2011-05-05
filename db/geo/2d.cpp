@@ -1368,7 +1368,7 @@ namespace mongo {
                     if( _foundInExp >= maxFound || _found >= maxAdded ) return;
 
                     // We've searched this prefix fully, remember
-                    _lastPrefix = _prefix;
+                    _lastPrefix.reset( new GeoHash( _prefix ));
 
                     // If we've searched the entire space, we're finished.
                     if ( ! _prefix.constrains() ) {
@@ -1550,7 +1550,7 @@ namespace mongo {
 
         // The current hash prefix we're expanding and the center-box hash prefix
         GeoHash _prefix;
-        optional<GeoHash> _lastPrefix;
+        shared_ptr<GeoHash> _lastPrefix;
         GeoHash _centerPrefix;
         list<string> _fringe;
         int recurseDepth;
