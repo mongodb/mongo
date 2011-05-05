@@ -71,7 +71,7 @@ namespace mongo {
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
     Member* ReplSetImpl::getMostElectable() {
-        scoped_lock lk(_elock);
+        lock lk(this);
         
         Member *max = 0;        
 
@@ -287,7 +287,6 @@ namespace mongo {
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
         _currentSyncTarget(0),
-        _elock("Election set lock"),
         _hbmsgTime(0),
         _self(0),
         mgr( new Manager(this) ) {

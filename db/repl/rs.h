@@ -133,7 +133,12 @@ namespace mongo {
         void multiCommand(BSONObj cmd, list<Target>& L);
     };
 
-    /** most operations on a ReplSet object should be done while locked. that logic implemented here. */
+    /**
+     * most operations on a ReplSet object should be done while locked. that
+     * logic implemented here.
+     *
+     * Order of locking: lock the replica set, then take a rwlock.
+     */
     class RSBase : boost::noncopyable {
     public:
         const unsigned magic;
@@ -294,7 +299,6 @@ namespace mongo {
 
         // set of electable members' _ids
         set<unsigned> _electableSet;
-        mutable mongo::mutex _elock; // protects _electableSet
     protected:
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
@@ -330,10 +334,10 @@ namespace mongo {
          * replSetStepDown requests to the primary to allow the higher-priority
          * node to take over.  
          */
-        void addToElectable(const unsigned m) { scoped_lock lk(_elock); _electableSet.insert(m); }
-        void rmFromElectable(const unsigned m) { scoped_lock lk(_elock); _electableSet.erase(m); }
-        bool iAmElectable() { lock l(this); scoped_lock lk(_elock); return _electableSet.find(_self->id()) != _electableSet.end(); }
-        bool isElectable(const unsigned id) { scoped_lock lk(_elock); return _electableSet.find(id) != _electableSet.end(); }
+        void addToElectable(const unsigned m) { lock lk(this); _electableSet.insert(m); }
+        void rmFromElectable(const unsigned m) { lock lk(this); _electableSet.erase(m); }
+        bool iAmElectable() { lock lk(this); return _electableSet.find(_self->id()) != _electableSet.end(); }
+        bool isElectable(const unsigned id) { lock lk(this); return _electableSet.find(id) != _electableSet.end(); }
         Member* getMostElectable();
     protected:
         /**
@@ -353,7 +357,7 @@ namespace mongo {
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { lock lk(this); return *_cfg; }
-        string name() const { return _name; } /* @return replica set's logical name */
+        string name() const { lock lk((RSBase*)this); return _name; } /* @return replica set's logical name */
         MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
