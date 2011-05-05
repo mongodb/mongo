@@ -177,7 +177,7 @@ namespace mongo {
         /** Finds the key objects and/or locations for a geo-indexed object */
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder* keys, vector< BSONObj >* locs ) const {
 
-            BSONElementSet bSet;
+            BSONElementMSet bSet;
 
             // Get all the nested location fields, but don't return individual elements from
             // the last array, if it exists.
@@ -186,7 +186,7 @@ namespace mongo {
             if( bSet.empty() )
                 return;
 
-            for( BSONElementSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI ) {
+            for( BSONElementMSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI ) {
 
                 BSONElement geo = *setI;
 
