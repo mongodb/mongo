@@ -249,7 +249,9 @@ namespace mongo {
     private:
         DocumentSourceCursor(boost::shared_ptr<Cursor> pTheCursor);
 
-        boost::shared_ptr<Cursor> pCursor;
+	void findNext();
+        shared_ptr<Cursor> pCursor;
+	shared_ptr<Document> pCurrent;
     };
 
 

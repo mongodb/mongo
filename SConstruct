@@ -367,7 +367,8 @@ serverOnlyFiles += [
     "db/commands/group.cpp",
     "db/commands/isself.cpp",
     "db/commands/mr.cpp",
-    "db/commands/pipeline_command.cpp" ]
+    "db/commands/pipeline_command.cpp",
+    "db/commands/document_source_cursor.cpp" ]
 
 # but the pipeline command works everywhere
 coreServerFiles += [ "db/commands/pipeline.cpp" ]
