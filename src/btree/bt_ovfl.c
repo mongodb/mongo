@@ -58,9 +58,8 @@ __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store)
 	/* Read the page. */
 	WT_RET(__wt_disk_read(session, store->mem, ovfl->addr, size));
 
-	/* Copy the actual data in the WT_ITEM down to the start of the data. */
-	(void)memmove(store->mem,
-	    (uint8_t *)store->mem + WT_PAGE_DISK_SIZE, ovfl->size);
+	/* Reference the start of the data. */
+	store->data = (uint8_t *)store->mem + WT_PAGE_DISK_SIZE;
 	store->size = ovfl->size;
 
 	return (0);

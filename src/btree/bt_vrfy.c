@@ -339,7 +339,6 @@ __wt_verify_row_int_key_order(
 {
 	BTREE *btree;
 	WT_BUF *scratch;
-	uint32_t size;
 	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
 	btree = session->btree;
@@ -373,12 +372,8 @@ __wt_verify_row_int_key_order(
 		/* Update the largest key we've seen to the key just checked. */
 		vs->max_addr = page->addr;
 
-		size = ((WT_ROW_REF *)rref)->size;
-		if (size > vs->max_key->mem_size)
-			WT_RET(__wt_buf_setsize(
-			    session, vs->max_key, (size_t)size));
-		memcpy(vs->max_key->mem, ((WT_ROW_REF *)rref)->key, size);
-		vs->max_key->size = size;
+		WT_RET(__wt_buf_set(session, vs->max_key,
+		    ((WT_ROW_REF *)rref)->key, ((WT_ROW_REF *)rref)->size));
 	}
 
 	if (rref == scratch)
@@ -397,7 +392,6 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	BTREE *btree;
 	WT_BUF *scratch;
-	uint32_t size;
 	int ret, (*func)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 	void *key;
 
@@ -455,12 +449,8 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	if (__wt_key_process(key))
 		return (__wt_key_build(session, page, key, vs->max_key));
 
-	size = ((WT_ROW *)key)->size;
-	if (size > vs->max_key->mem_size)
-		WT_RET(__wt_buf_setsize(session, vs->max_key, (size_t)size));
-	memcpy(vs->max_key->mem, ((WT_ROW *)key)->key, size);
-	vs->max_key->size = size;
-	return (0);
+	return (__wt_buf_set(
+	    session, vs->max_key, ((WT_ROW *)key)->key, ((WT_ROW *)key)->size));
 }
 
 /*

@@ -388,7 +388,14 @@ uint32_t __wt_nlpo2(uint32_t v);
 int __wt_ispo2(uint32_t v);
 uint32_t __wt_prime(uint32_t n);
 int __wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz);
-void __wt_buf_clear(WT_BUF *buf);
+int __wt_buf_set(SESSION *session,
+    WT_BUF *buf,
+    const void *data,
+    uint32_t size);
+void __wt_buf_steal( SESSION *session,
+    WT_BUF *buf,
+    const void *datap,
+    uint32_t *sizep);
 void __wt_buf_free(SESSION *session, WT_BUF *buf);
 int __wt_scr_alloc(SESSION *session, uint32_t size, WT_BUF **scratchp);
 void __wt_scr_release(WT_BUF **bufp);

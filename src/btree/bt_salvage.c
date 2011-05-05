@@ -1446,9 +1446,8 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 			if (deleted)
 				continue;
 		} else {
-			rref->key = trk->u.row.range_start.mem;
-			rref->size = trk->u.row.range_start.size;
-			__wt_buf_clear(&trk->u.row.range_start);
+			__wt_buf_steal(session,
+			    &trk->u.row.range_start, &rref->key, &rref->size);
 			if (ss->range_merge)
 				__slvg_trk_ovfl_ref(session, trk, ss);
 		}
@@ -1605,13 +1604,9 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 		rip = page->u.row_leaf.d + skip_start;
 		if (__wt_key_process(rip))
 			WT_ERR(__wt_cell_process(session, rip->key, key));
-		else {
-			WT_ERR(__wt_buf_setsize(session, key, rip->size));
-			memcpy(key->mem, rip->key, rip->size);
-		}
-		rref->key = key->mem;
-		rref->size = key->size;
-		__wt_buf_clear(key);
+		else
+			WT_ERR(__wt_buf_set(session, key, rip->key, rip->size));
+		__wt_buf_steal(session, key, &rref->key, &rref->size);
 	}
 
 	/* Discard the page and our hazard reference. */
@@ -1773,9 +1768,7 @@ __slvg_trk_compare(const void *a, const void *b)
 static int
 __slvg_key_copy(SESSION *session, WT_BUF *dst, WT_BUF *src)
 {
-	WT_RET(__wt_buf_setsize(session, dst, src->size));
-	memcpy(dst->mem, src->mem, src->size);
-	return (0);
+	return (__wt_buf_set(session, dst, src->data, src->size));
 }
 
 /*

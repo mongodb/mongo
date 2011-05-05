@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static void __wt_buf_clear(WT_BUF *);
+
 /*
  * __wt_buf_setsize --
  *	Ensure that a buffer is at least as big as required and configure it
@@ -28,10 +30,9 @@ __wt_buf_setsize(SESSION *session, WT_BUF *buf, size_t sz)
 
 /*
  * __wt_buf_clear --
- *	Clear a buffer (after stealing the pointer for another purpose).
- *	Note: don't clear the flags, the buffer remains marked in-use.
+ *	Clear a buffer.
  */
-void
+static void
 __wt_buf_clear(WT_BUF *buf)
 {
 	buf->data = NULL;
@@ -39,6 +40,66 @@ __wt_buf_clear(WT_BUF *buf)
 
 	buf->mem = NULL;
 	buf->mem_size = 0;
+
+	/* Note: don't clear the flags, the buffer remains marked in-use. */
+}
+
+/*
+ * __wt_buf_set --
+ *	Set the contents of the buffer.
+ */
+int
+__wt_buf_set(SESSION *session, WT_BUF *buf, const void *data, uint32_t size)
+{
+	/* Ensure the buffer is large enough. */
+	WT_RET(__wt_buf_setsize(session, buf, size));
+
+	memcpy(buf->mem, data, size);
+
+	/*
+	 * !!!
+	 * We don't have to set buf->data or buf->size, the __wt_buf_setsize()
+	 * function did that for us.
+	 */
+	return (0);
+}
+
+/*
+ * __wt_buf_steal --
+ *	Steal a buffer for another purpose.
+ */
+void
+__wt_buf_steal(
+    SESSION *session, WT_BUF *buf, const void *datap, uint32_t *sizep)
+{
+	/*
+	 * Sometimes we steal a buffer for a different purpose, for example,
+	 * we've read in an overflow item, and now it's going to become a key
+	 * on an in-memory page, eventually freed when the page is discarded.
+	 *
+	 * First, correct for the possibility the data field doesn't point to
+	 * the start of memory (if we only have a single memory reference, it
+	 * must point to the start of the memory chunk, otherwise freeing the
+	 * memory isn't going to work out).  This is possibly a common case:
+	 * it happens when we read in overflow items and we want to skip over
+	 * the page header, so buf->data references a location past buf->mem.
+	 */
+	if (buf->data != buf->mem) {
+		WT_ASSERT(session,
+		    buf->data > buf->mem &&
+		    (uint8_t *)buf->data <
+		    (uint8_t *)buf->mem + buf->mem_size &&
+		    (uint8_t *)buf->data + buf->size <=
+		    (uint8_t *)buf->mem + buf->mem_size);
+		memmove(buf->mem, buf->data, buf->size);
+	}
+
+	/* Second, give our caller the buffer's memory. */
+	*(void **)datap = buf->mem;
+	*sizep = buf->size;
+
+	/* Third, discard the buffer's memory. */
+	__wt_buf_clear(buf);
 }
 
 /*

@@ -15,12 +15,13 @@
 int
 __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 {
-	WT_BUF *tmp, __tmp;
+	WT_BUF scratch;
 	const WT_CELL *cell;
 	WT_ROW *rip;
+	uint32_t size;
 	int ret;
+	void *key;
 
-	WT_CLEAR(__tmp);
 	ret = 0;
 
 	/*
@@ -49,36 +50,32 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 * our caller, if that's what they wanted.
 	 */
 	if (__wt_ref_off_page(page, cell)) {
-		if (store != NULL) {
-			WT_RET(__wt_buf_setsize(session, store, rip->size));
-			memcpy(store->mem, rip->key, rip->size);
-		}
-		return (0);
+		if (store == NULL)
+			return (0);
+		return (__wt_buf_set(session, store, rip->key, rip->size));
 	}
 
 	/*
 	 * If our user passes us a temporary buffer for storage, don't install
 	 * the key in the in-memory page, our caller just needs a local copy.
 	 */
-	if (store == NULL) {
-		tmp = &__tmp;
-		WT_CLEAR(__tmp);
-	} else
-		tmp = store;
-
-	/* Instantiate the key. */
-	WT_RET(__wt_cell_process(session, cell, tmp));
-
-	/* Serialize the swap of the key into place. */
-	if (store == NULL)
-		__wt_key_build_serial(session, rip_arg, (WT_ITEM *)tmp, ret);
+	if (store != NULL)
+		return (__wt_cell_process(session, cell, store));
 
 	/*
-	 * Free any "permanent" memory we allocated the workQ didn't use for
-	 * the key.
+	 * Instantiate a copy of the key in a temporary buffer, then steal the
+	 * buffer.
 	 */
-	if (store == NULL && rip->key != tmp->mem)
-		__wt_buf_free(session, tmp);
+	WT_CLEAR(scratch);
+	WT_RET(__wt_cell_process(session, cell, &scratch));
+	__wt_buf_steal(session, &scratch, &key, &size);
+
+	/* Serialize the swap of the key into place. */
+	__wt_key_build_serial(session, rip_arg, key, size, ret);
+
+	/* Free allocated memory if the workQ didn't use it for the key. */
+	if (rip->key != key)
+		__wt_buf_free(session, key);
 
 	return (ret);
 }
@@ -90,10 +87,11 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 int
 __wt_key_build_serial_func(SESSION *session)
 {
-	WT_ITEM *item;
 	WT_ROW *rip;
+	uint32_t size;
+	void *key;
 
-	__wt_key_build_unpack(session, rip, item);
+	__wt_key_build_unpack(session, rip, key, size);
 
 	/*
 	 * We don't care about the page's write generation -- there's a simpler
@@ -111,9 +109,9 @@ __wt_key_build_serial_func(SESSION *session)
 		 * we'll resolve it all here), or see a non-zero size and valid
 		 * pointer pair.
 		 */
-		rip->key = item->data;
+		rip->key = key;
 		WT_MEMORY_FLUSH;
-		rip->size = item->size;
+		rip->size = size;
 	}
 
 	__wt_session_serialize_wrapup(session, NULL, 0);

@@ -69,9 +69,8 @@ __wt_return_data(SESSION *session, WT_ITEM *key, WT_ITEM *value, int key_return)
 			key->data = rip->key;
 			key->size = rip->size;
 		} else if (callback == NULL) {
-			WT_RET(__wt_buf_setsize(session,
-			    &cursor->key, rip->size));
-			memcpy(cursor->key.mem, rip->key, rip->size);
+			WT_RET(__wt_buf_set(session,
+			    &cursor->key, rip->key, rip->size));
 
 			*key = *(WT_ITEM *)&cursor->key;
 		} else {
@@ -148,11 +147,9 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 		 * return WT_ITEM (potentially done by __wt_cell_process), do
 		 * so now.
 		 */
-		if (value_ret != cursor->value.data) {
-			WT_RET(__wt_buf_setsize(session,
-			    &cursor->value, size_ret));
-			memcpy(cursor->value.mem, value_ret, size_ret);
-		}
+		if (value_ret != cursor->value.data)
+			WT_RET(__wt_buf_set(
+			    session, &cursor->value, value_ret, size_ret));
 
 		*value = *(WT_ITEM *)&cursor->value;
 	} else {

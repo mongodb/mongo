@@ -2415,8 +2415,9 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
 	WT_SPLIT *spl;
-	uint32_t i;
+	uint32_t i, size;
 	int ret;
+	void *key;
 
 	cache = S2C(session)->cache;
 	r = cache->rec;
@@ -2453,8 +2454,8 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 		 * memory allocations and the split buffers don't just keep
 		 * getting bigger.
 		 */
-		__wt_key_set(rref, spl->key.data, spl->key.size);
-		__wt_buf_clear(&spl->key);
+		__wt_buf_steal(session, &spl->key, &key, &size);
+		__wt_key_set(rref, key, size);
 		WT_ROW_REF_ADDR(rref) = spl->off.addr;
 		WT_ROW_REF_SIZE(rref) = spl->off.size;
 

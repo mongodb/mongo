@@ -439,10 +439,8 @@ offpage:	/*
 	 * copy a decoded version into the caller's WT_BUF.
 	 */
 	if (huffman == NULL) {
-		if (tmp != retbuf) {
-			WT_ERR(__wt_buf_setsize(session, retbuf, size));
-			memcpy(retbuf->mem, p, size);
-		}
+		if (tmp != retbuf)
+			WT_ERR(__wt_buf_set(session, retbuf, p, size));
 	} else
 		WT_ERR(__wt_huffman_decode(huffman, p, size, retbuf));
 

@@ -71,22 +71,25 @@ typedef struct {
 
 typedef struct {
 	void * key_arg;
-	WT_ITEM * item;
+	void * key;
+	uint32_t size;
 } __wt_key_build_args;
 #define	__wt_key_build_serial(\
-    session, _key_arg, _item, ret) do {\
+    session, _key_arg, _key, _size, ret) do {\
 	__wt_key_build_args _args;\
 	_args.key_arg = _key_arg;\
-	_args.item = _item;\
+	_args.key = _key;\
+	_args.size = _size;\
 	(ret) = __wt_session_serialize_func(session,\
 	    WT_WORKQ_FUNC, 1, __wt_key_build_serial_func, &_args);\
 } while (0)
 #define	__wt_key_build_unpack(\
-    session, _key_arg, _item) do {\
+    session, _key_arg, _key, _size) do {\
 	__wt_key_build_args *_args =\
 	    (__wt_key_build_args *)(session)->wq_args;\
 	_key_arg = _args->key_arg;\
-	_item = _args->item;\
+	_key = _args->key;\
+	_size = _args->size;\
 } while (0)
 
 typedef struct {
