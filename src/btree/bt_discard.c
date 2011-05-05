@@ -206,7 +206,12 @@ __wt_free_insert(
 	/*
 	 * For each non-NULL slot in the page's array of inserts, free the
 	 * linked list anchored in that slot.
+	 *
+	 * There is one additional slot in the insert array (the insert array
+	 * requires an extra slot to hold keys that sort before any key found
+	 * on the original page).
 	 */
+	++entries;
 	for (insp = insert_head; entries > 0; --entries, ++insp)
 		for (ins = *insp; ins != NULL; ins = next) {
 			__wt_free_update_list(session, ins->upd);
