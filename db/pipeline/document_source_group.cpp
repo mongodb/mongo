@@ -26,6 +26,8 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+    const char DocumentSourceGroup::groupName[] = "$group";
+
     string DocumentSourceGroup::idName("_id");
 
     DocumentSourceGroup::~DocumentSourceGroup() {

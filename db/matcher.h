@@ -122,12 +122,12 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details );
+            int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details ) const;
 
         int matchesNe(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            const ElementMatcher&bm, MatchDetails * details );
+            const ElementMatcher&bm, MatchDetails * details ) const;
 
     public:
         static int opDirection(int op) {
@@ -138,7 +138,7 @@ namespace mongo {
 
         ~Matcher();
 
-        bool matches(const BSONObj& j, MatchDetails * details = 0 );
+        bool matches(const BSONObj& j, MatchDetails * details = 0 ) const;
 
         // fast rough check to see if we must load the real doc - we also
         // compare field counts against covereed index matcher; for $or clauses
@@ -176,6 +176,8 @@ namespace mongo {
 //            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
         }
 
+	const BSONObj *getQuery() const { return &jsobj; };
+
     private:
         // Only specify constrainIndexKey if matches() will be called with
         // index keys having empty string field names.
@@ -191,7 +193,7 @@ namespace mongo {
         void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
         bool addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags );
 
-        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) const;
 
         bool parseOrNor( const BSONElement &e, bool subMatcher );
         void parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers );

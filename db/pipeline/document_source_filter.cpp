@@ -29,58 +29,6 @@ namespace mongo {
     DocumentSourceFilter::~DocumentSourceFilter() {
     }
 
-    void DocumentSourceFilter::findNext() {
-        /* only do this the first time */
-        if (unstarted) {
-            hasNext = !pSource->eof();
-            unstarted = false;
-        }
-
-        while(hasNext) {
-            boost::shared_ptr<Document> pDocument(pSource->getCurrent());
-            hasNext = pSource->advance();
-
-            boost::shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
-            bool pass = pValue->coerceToBool();
-            if (pass) {
-                pCurrent = pDocument;
-                return;
-            }
-        }
-
-        pCurrent.reset();
-    }
-
-    bool DocumentSourceFilter::eof() {
-        if (unstarted)
-            findNext();
-
-        return (pCurrent.get() == NULL);
-    }
-
-    bool DocumentSourceFilter::advance() {
-        if (unstarted)
-            findNext();
-
-        /*
-          This looks weird after the above, but is correct.  Note that calling
-          getCurrent() when first starting already yields the first document
-          in the collection.  Calling advance() without using getCurrent()
-          first will skip over the first item.
-         */
-        findNext();
-
-        return (pCurrent.get() != NULL);
-    }
-
-    boost::shared_ptr<Document> DocumentSourceFilter::getCurrent() {
-        if (unstarted)
-            findNext();
-
-        assert(pCurrent.get() != NULL); // CW TODO error
-        return pCurrent;
-    }
-
     bool DocumentSourceFilter::coalesce(
 	boost::shared_ptr<DocumentSource> pNextSource) {
 
@@ -110,8 +58,15 @@ namespace mongo {
 	pFilter->addToBsonObj(pBuilder, filterName, true);
     }
 
-    boost::shared_ptr<DocumentSourceFilter> DocumentSourceFilter::createFromBson(
-	BSONElement *pBsonElement) {
+    bool DocumentSourceFilter::accept(
+	const shared_ptr<Document> &pDocument) const {
+	shared_ptr<const Value> pValue(pFilter->evaluate(pDocument));
+	return pValue->coerceToBool();
+    }
+
+    shared_ptr<DocumentSource> DocumentSourceFilter::createFromBson(
+	BSONElement *pBsonElement,
+	const intrusive_ptr<ExpressionContext> &pCtx) {
         assert(pBsonElement->type() == Object);
         // CW TODO error: expression object must be an object
 
@@ -133,10 +88,8 @@ namespace mongo {
 
     DocumentSourceFilter::DocumentSourceFilter(
         boost::shared_ptr<Expression> pTheFilter):
-        pFilter(pTheFilter),
-        unstarted(true),
-        hasNext(false),
-        pCurrent() {
+	DocumentSourceFilterBase(),
+        pFilter(pTheFilter) {
     }
 
     void DocumentSourceFilter::toMatcherBson(BSONObjBuilder *pBuilder) const {

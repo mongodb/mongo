@@ -480,7 +480,7 @@ namespace mongo {
         }
     }
 
-    inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) {
+    inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) const {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
 
         if ( op == BSONObj::Equality ) {
@@ -536,7 +536,7 @@ namespace mongo {
         return (op & z);
     }
 
-    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) {
+    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) const {
         int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm , false , details );
         if ( bm.toMatch.type() != jstNULL )
             return ( ret <= 0 ) ? 1 : 0;
@@ -567,7 +567,7 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) {
+    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) const {
         DEBUGMATCHER( "\t matchesDotted : " << fieldName << " hasDetails: " << ( details ? "yes" : "no" ) );
         if ( compareOp == BSONObj::opALL ) {
 
@@ -785,14 +785,14 @@ namespace mongo {
 
     /* See if an object matches the query.
     */
-    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) {
+    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) const {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
         // check normal non-regex cases:
         for ( unsigned i = 0; i < basics.size(); i++ ) {
-            ElementMatcher& bm = basics[i];
-            BSONElement& m = bm.toMatch;
+            const ElementMatcher& bm = basics[i];
+            const BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm , false , details );
             if ( cmp == 0 && bm.compareOp == BSONObj::opEXISTS ) {
@@ -819,7 +819,7 @@ namespace mongo {
         }
 
         for ( int r = 0; r < nRegex; r++ ) {
-            RegexMatcher& rm = regexs[r];
+            const RegexMatcher& rm = regexs[r];
             BSONElementSet s;
             if ( !constrainIndexKey_.isEmpty() ) {
                 BSONElement e = jsobj.getFieldUsingIndexNames(rm.fieldName, constrainIndexKey_);

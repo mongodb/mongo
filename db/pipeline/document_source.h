@@ -28,6 +28,7 @@ namespace mongo {
     class Document;
     class Expression;
     class ExpressionContext;
+    class Matcher;
 
     class DocumentSource :
             boost::noncopyable {
@@ -152,7 +153,8 @@ namespace mongo {
 	  elements that appear after these documents must not be read until
 	  this source is exhausted.
 
-	  @param pCursor the cursor to use to fetch data
+	  @param pBsonElement the BSON array to treat as a document source
+	  @returns the newly created document source
 	*/
 	static boost::shared_ptr<DocumentSourceBsonArray> create(
 	    BSONElement *pBsonElement);
@@ -251,14 +253,61 @@ namespace mongo {
     };
 
 
-    class DocumentSourceFilter :
+    /*
+      This contains all the basic mechanics for filtering a stream of
+      Documents, except for the actual predicate evaluation itself.  This was
+      factored out so we could create DocumentSources that use both Matcher
+      style predicates as well as full Expressions.
+     */
+    class DocumentSourceFilterBase :
         public DocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceFilter();
+        virtual ~DocumentSourceFilterBase();
         virtual bool eof();
         virtual bool advance();
         virtual boost::shared_ptr<Document> getCurrent();
+
+	/*
+	  Create a BSONObj suitable for Matcher construction.
+
+	  This is used after filter analysis has moved as many filters to
+	  as early a point as possible in the document processing pipeline.
+	  See db/Matcher.h and the associated wiki documentation for the
+	  format.  This conversion is used to move back to the low-level
+	  find() Cursor mechanism.
+
+	  @params pBuilder the builder to write to
+	 */
+	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const = 0;
+
+    protected:
+        DocumentSourceFilterBase();
+
+	/*
+	  Test the given document against the predicate and report if it
+	  should be accepted or not.
+
+	  @param pDocument the document to test
+	  @returns true if the document matches the filter, false otherwise
+	 */
+	virtual bool accept(const shared_ptr<Document> &pDocument) const = 0;
+
+    private:
+
+        void findNext();
+
+        bool unstarted;
+        bool hasNext;
+        boost::shared_ptr<Document> pCurrent;
+    };
+
+
+    class DocumentSourceFilter :
+        public DocumentSourceFilterBase {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceFilter();
 	virtual bool coalesce(boost::shared_ptr<DocumentSource> pNextSource);
 	virtual void optimize();
 
@@ -268,8 +317,9 @@ namespace mongo {
           @param pBsonElement the raw BSON specification for the filter
           @returns the filter
 	 */
-	static boost::shared_ptr<DocumentSourceFilter> createFromBson(
-	    BSONElement *pBsonElement);
+	static boost::shared_ptr<DocumentSource> createFromBson(
+	    BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
 
         /*
           Create a filter.
@@ -299,17 +349,15 @@ namespace mongo {
 	// virtuals from DocumentSource
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
+	// virtuals from DocumentSourceFilterBase
+	virtual bool accept(const shared_ptr<Document> &pDocument) const;
+
     private:
         DocumentSourceFilter(boost::shared_ptr<Expression> pFilter);
 
         boost::shared_ptr<Expression> pFilter;
-
-        void findNext();
-
-        bool unstarted;
-        bool hasNext;
-        boost::shared_ptr<Document> pCurrent;
     };
+
 
     class DocumentSourceGroup :
         public DocumentSource {
@@ -381,6 +429,8 @@ namespace mongo {
 	*/
 	boost::shared_ptr<DocumentSource> createMerger();
 
+	static const char groupName[];
+
     protected:
 	// virtuals from DocumentSource
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
@@ -438,6 +488,82 @@ namespace mongo {
     };
 
 
+    class DocumentSourceMatch :
+        public DocumentSourceFilterBase {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceMatch();
+
+	/*
+	  Create a filter.
+
+          @param pBsonElement the raw BSON specification for the filter
+          @returns the filter
+	 */
+	static boost::shared_ptr<DocumentSource> createFromBson(
+	    BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+	/*
+	  Create a BSONObj suitable for Matcher construction.
+
+	  This is used after filter analysis has moved as many filters to
+	  as early a point as possible in the document processing pipeline.
+	  See db/Matcher.h and the associated wiki documentation for the
+	  format.  This conversion is used to move back to the low-level
+	  find() Cursor mechanism.
+
+	  @params pBuilder the builder to write to
+	 */
+	void toMatcherBson(BSONObjBuilder *pBuilder) const;
+
+	static const char matchName[];
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+	// virtuals from DocumentSourceFilterBase
+	virtual bool accept(const shared_ptr<Document> &pDocument) const;
+
+    private:
+        DocumentSourceMatch(const BSONObj &query);
+
+	Matcher matcher;
+    };
+
+
+    class DocumentSourceOut :
+        public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceOut();
+        virtual bool eof();
+        virtual bool advance();
+        virtual boost::shared_ptr<Document> getCurrent();
+
+	/*
+	  Create a document source for output and pass-through.
+
+	  This can be put anywhere in a pipeline and will store content as
+	  well as pass it on.
+
+	  @returns the newly created document source
+	*/
+	static boost::shared_ptr<DocumentSourceOut> createFromBson(
+	    BSONElement *pBsonElement);
+
+	static const char outName[];
+
+    protected:
+	// virtuals from DocumentSource
+	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+
+    private:
+        DocumentSourceOut(BSONElement *pBsonElement);
+    };
+
+    
     class DocumentSourceProject :
         public DocumentSource,
         public boost::enable_shared_from_this<DocumentSourceProject> {
@@ -484,7 +610,10 @@ namespace mongo {
 	  @returns the created projection
 	 */
         static boost::shared_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement);
+            BSONElement *pBsonElement,
+	    const intrusive_ptr<ExpressionContext> &pCtx);
+
+	static const char projectName[];
 
     protected:
 	// virtuals from DocumentSource

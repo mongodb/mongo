@@ -24,6 +24,8 @@
 
 namespace mongo {
 
+    const char DocumentSourceProject::projectName[] = "$project";
+
     DocumentSourceProject::~DocumentSourceProject() {
     }
 
@@ -174,7 +176,8 @@ namespace mongo {
     }
 
     boost::shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
-	BSONElement *pBsonElement) {
+	BSONElement *pBsonElement,
+	const intrusive_ptr<ExpressionContext> &pCtx) {
         /* validate */
         assert(pBsonElement->type() == Object); // CW TODO user error
 

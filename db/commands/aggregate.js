@@ -88,6 +88,12 @@ var f1 = db.runCommand(
     { $filter : { $eq:["$author", "dave"] } }
 ]});
 
+// try the same thing with matcher syntax
+var m1 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $match : { author : "dave" } }
+]});
+
 // combining filtering with a projection
 var f2 = db.runCommand(
 { aggregate : "article", pipeline : [
@@ -99,6 +105,19 @@ var f2 = db.runCommand(
 	comments : 1
     }},
     { $filter : { $eq:["$tag", "nasty"] } }
+]});
+
+// try it with match syntax
+var m2 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	title : 1,
+	author : 1,
+	pageViews : 1,
+	tag : { $unwind : "tags" },
+	comments : 1
+    }},
+    { $match : { tag : "nasty" } }
 ]});
 
 // group by tag

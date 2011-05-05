@@ -42,6 +42,39 @@ namespace mongo {
         pCtx(pTheCtx) {
     }
 
+
+
+    /* this structure is used to make a lookup table of operators */
+    struct StageDesc {
+	const char *pName;
+	shared_ptr<DocumentSource> (*pFactory)(
+	    BSONElement *, const intrusive_ptr<ExpressionContext> &);
+    };
+
+    /* this table must be in alphabetical order by name for bsearch() */
+    static const StageDesc stageDesc[] = {
+	{DocumentSourceFilter::filterName,
+	 DocumentSourceFilter::createFromBson},
+	{DocumentSourceGroup::groupName,
+	 DocumentSourceGroup::createFromBson},
+	{DocumentSourceMatch::matchName,
+	 DocumentSourceMatch::createFromBson},
+	{DocumentSourceProject::projectName,
+	 DocumentSourceProject::createFromBson},
+/* LATER
+	{DocumentSourceOut::outName,
+	 DocumentSourceOut::createFromBson},
+	{DocumentSourceSort::sortName,
+	 DocumentSourceSort::createFromBson},
+*/
+    };
+    static const size_t nStageDesc = sizeof(stageDesc) / sizeof(StageDesc);
+
+    static int stageDescCmp(const void *pL, const void *pR) {
+	return strcmp(((const StageDesc *)pL)->pName,
+		      ((const StageDesc *)pR)->pName);
+    }
+
     boost::shared_ptr<Pipeline> Pipeline::parseCommand(
 	string &errmsg, BSONObj &cmdObj,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
@@ -110,20 +143,14 @@ namespace mongo {
                 BSONElement bsonElement(bsonIterator.next());
                 const char *pFieldName = bsonElement.fieldName();
 
-                /* select the appropriate operation */
-                if (strcmp(pFieldName, "$project") == 0) {
-                    pSource =
-			DocumentSourceProject::createFromBson(&bsonElement);
-		}
-                else if (strcmp(pFieldName,
-				DocumentSourceFilter::filterName) == 0) {
-                    pSource = 
-			DocumentSourceFilter::createFromBson(&bsonElement);
-		}
-                else if (strcmp(pFieldName, "$group") == 0) {
-                    pSource = DocumentSourceGroup::createFromBson(
-			&bsonElement, pCtx);
-		}
+                /* select the appropriate operation and instantiate */
+		StageDesc key;
+		key.pName = pFieldName;
+		const StageDesc *pDesc = (const StageDesc *)
+		    bsearch(&key, stageDesc, nStageDesc, sizeof(StageDesc),
+			    stageDescCmp);
+		if (pDesc)
+		    pSource = (*pDesc->pFactory)(&bsonElement, pCtx);
                 else {
                     ostringstream sb;
                     sb <<
