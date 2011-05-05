@@ -245,6 +245,8 @@ namespace mongo {
         template <class U> friend class BtreeBuilder;
         typedef typename Version::Key Key;
 
+        int getN() const { return this->n; }
+
         /**
          * This is an in memory wrapper for a _KeyNode, and not itself part of btree
          * storage.  This object and its BSONObj 'key' will become invalid if the
@@ -942,13 +944,10 @@ namespace mongo {
             return kn;
         }
 
-//        const BSONObj currKey() const;
-        /*const KeyNode currKeyNode() const {
-            assert( !bucket.isNull() );
-            return bucket.btree()->keyNode(keyOfs);
-        }*/
+        /** returns BSONObj() if ofs is out of range */
+        virtual BSONObj keyAt(int ofs) const = 0;
 
-        virtual BSONObj currKey() const = 0; // { return currKeyNode().key.toBson(); }
+        virtual BSONObj currKey() const = 0;
         virtual BSONObj indexKeyPattern() { return indexDetails.keyPattern(); }
 
         virtual void aboutToDeleteBucket(const DiskLoc& b) {

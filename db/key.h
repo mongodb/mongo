@@ -1,4 +1,4 @@
-// @file key.h
+// @file key.h class(es) representing individual keys in a btree
 
 /**
 *    Copyright (C) 2011 10gen Inc.
@@ -92,10 +92,5 @@ namespace mongo {
         const char *_toFree;
         void traditional(BufBuilder& b, const BSONObj& obj); // store as traditional bson not as compact format
     };
-
-    //typedef KeyBson Key;
-    //typedef KeyBson KeyOwned;
-    //typedef KeyV1 Key;
-    //typedef KeyV1Owned KeyOwned;
 
 };

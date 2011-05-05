@@ -110,7 +110,7 @@ namespace mongo {
          * @param res the object containing details about the split execution
          * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
          */
-        ChunkPtr singleSplit( bool force , BSONObj& res );
+        ChunkPtr singleSplit( bool force , BSONObj& res ) const;
 
         /**
          * Splits this chunk at the given key (or keys)
@@ -119,7 +119,7 @@ namespace mongo {
          * @param res the object containing details about the split execution
          * @return shared pointer to the first new Chunk or null pointer if failed
          */
-        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res );
+        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res ) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -145,7 +145,7 @@ namespace mongo {
          *
          * @return whether or not a shard was moved
          */
-        bool moveIfShould( ChunkPtr newShard = ChunkPtr() );
+        static bool moveIfShould( ChunkPtr oldChunk , ChunkPtr newChunk );
 
         /**
          * Issues a migrate request for this chunk
@@ -308,7 +308,7 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
 
         void createFirstChunk( const Shard& shard );
-        ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
+        ChunkPtr findChunk( const BSONObj& obj );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
         const ShardKeyPattern& getShardKey() const {  return _key; }
@@ -345,15 +345,14 @@ namespace mongo {
         int getCurrentDesiredChunkSize() const;
 
     private:
-        void _reload();
         void _reload_inlock();
         void _load();
 
         void ensureIndex_inlock();
 
-        string _ns;
-        ShardKeyPattern _key;
-        bool _unique;
+        const string _ns;
+        const ShardKeyPattern _key;
+        const bool _unique;
 
         ChunkMap _chunkMap;
         ChunkRangeManager _chunkRanges;

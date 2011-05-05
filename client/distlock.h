@@ -90,16 +90,17 @@ namespace mongo {
          * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
          *
          * @param why human readable description of why the lock is being taken (used to log)
-         * @param other configdb's lock document that is currently holding the lock, if lock is taken
+         * @param whether this is a lock re-entry or a new lock
+         * @param other configdb's lock document that is currently holding the lock, if lock is taken, or our own lock
+         * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( string why , BSONObj * other = 0 );
+        bool lock_try( string why , bool reenter = false, BSONObj * other = 0 );
 
         /**
          * Releases a previously taken lock.
          */
-        void unlock();
-
+        void unlock( BSONObj* oldLockPtr = NULL );
 
         Date_t getRemoteTime();
 
@@ -147,7 +148,7 @@ namespace mongo {
         unsigned long long _lockPing;
 
         // Data from last check of process with ping time
-        boost::tuple<string, Date_t, Date_t> _lastPingCheck;
+        boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
 
         // Process id, in case we need to customize this
         string _processId;
@@ -168,6 +169,7 @@ namespace mongo {
     		// so we only unlock once.
     		((dist_lock_try&) that)._got = false;
     		((dist_lock_try&) that)._lock = NULL;
+    		((dist_lock_try&) that)._other = BSONObj();
     	}
 
     	// Needed so we can handle lock exceptions in context of lock try.
@@ -179,24 +181,39 @@ namespace mongo {
     	    _got = that._got;
     	    _other = that._other;
     	    _other.getOwned();
+    	    _why = that._why;
 
     	    // Make sure the lock ownership passes to this object,
     	    // so we only unlock once.
     	    ((dist_lock_try&) that)._got = false;
     	    ((dist_lock_try&) that)._lock = NULL;
+    	    ((dist_lock_try&) that)._other = BSONObj();
 
     	    return *this;
     	}
 
         dist_lock_try( DistributedLock * lock , string why )
-            : _lock(lock) {
-            _got = _lock->lock_try( why , &_other );
+            : _lock(lock), _why(why) {
+            _got = _lock->lock_try( why , false , &_other );
         }
 
         ~dist_lock_try() {
             if ( _got ) {
-                _lock->unlock();
+                assert( ! _other.isEmpty() );
+                _lock->unlock( &_other );
             }
+        }
+
+        bool reestablish(){
+            return retry();
+        }
+
+        bool retry() {
+            assert( _lock );
+            assert( _got );
+            assert( ! _other.isEmpty() );
+
+            return _got = _lock->lock_try( _why , true, &_other );
         }
 
         bool got() const { return _got; }
@@ -206,6 +223,7 @@ namespace mongo {
         DistributedLock * _lock;
         bool _got;
         BSONObj _other;
+        string _why;
     };
 
 }

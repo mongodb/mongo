@@ -23,6 +23,7 @@
 #include "queryutil.h"
 #include "matcher.h"
 #include "../util/message.h"
+#include <queue>
 
 namespace mongo {
 
@@ -232,6 +233,9 @@ namespace mongo {
             return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
         }
 
+        /** Initialize or iterate a runner generated from @param originalOp. */
+        shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
+        
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
         BSONObj explain() const;
         /** @return true iff a plan is selected based on previous success of this plan. */
@@ -254,9 +258,26 @@ namespace mongo {
         }
         void init();
         void addHint( IndexDetails &id );
-        struct Runner {
+        class Runner {
+        public:
             Runner( QueryPlanSet &plans, QueryOp &op );
-            shared_ptr<QueryOp> run();
+
+            /**
+             * Iterate interactively through candidate documents on all plans.
+             * QueryOp objects are returned at each interleaved step.
+             */
+            
+            /** @return a plan that has completed, otherwise an arbitrary plan. */
+            shared_ptr<QueryOp> init();
+            /**
+             * Move the Runner forward one iteration, and @return the plan for
+             * this iteration.
+             */
+            shared_ptr<QueryOp> next();
+
+            /** Run until first op completes. */
+            shared_ptr<QueryOp> runUntilFirstCompletes();
+             
             void mayYield( const vector<shared_ptr<QueryOp> > &ops );
             QueryOp &_op;
             QueryPlanSet &_plans;
@@ -264,6 +285,17 @@ namespace mongo {
             static void nextOp( QueryOp &op );
             static bool prepareToYield( QueryOp &op );
             static void recoverFromYield( QueryOp &op );
+        private:
+            vector<shared_ptr<QueryOp> > _ops;
+            struct OpHolder {
+                OpHolder( const shared_ptr<QueryOp> &op ) : _op( op ), _offset() {}
+                shared_ptr<QueryOp> _op;
+                long long _offset;
+                bool operator<( const OpHolder &other ) const {
+                    return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
+                }
+            };
+            priority_queue<OpHolder> _queue;
         };
 
         const char *_ns;
@@ -283,6 +315,7 @@ namespace mongo {
         bool _bestGuessOnly;
         bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
+        shared_ptr<Runner> _runner;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
@@ -320,6 +353,9 @@ namespace mongo {
             return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
         }
 
+        /** Initialize or iterate a runner generated from @param originalOp. */
+        shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
+        
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const { return _or ? ( !_tableScanned && !_org.orFinished() ) : _i == 0; }
         /** @return non-$or version of explain output. */
@@ -337,6 +373,11 @@ namespace mongo {
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
+        void assertMayRunMore() const {
+            massert( 13271, "can't run more ops", mayRunMore() );
+        }
+        shared_ptr<QueryOp> nextOpBeginningClause( QueryOp &prevOp );
+        shared_ptr<QueryOp> nextOpHandleEndOfClause( QueryOp &prevOp );
         bool uselessOr( const BSONElement &hint ) const;
         const char * _ns;
         bool _or;
@@ -433,6 +474,20 @@ namespace mongo {
      */
     shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
 
+    /**
+     * @return a cursor interface to the query optimizer.  The implementation may
+     * utilize a single query plan or interleave results from multiple query
+     * plans before settling on a single query plan.  Note that the schema of
+     * currKey() documents may change over the course of iteration.
+	 *
+     * This is a work in progress.  Partial list of features not yet implemented:
+     * - ordered/sorted document iteration
+     * - yielding
+     * - modification of scanned documents
+     * - handling of arbitrary asserts/error conditions
+     */
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query );
+    
     /**
      * Add-on functionality for queryutil classes requiring access to indexing
      * functionality not currently linked to mongos.

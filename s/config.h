@@ -182,7 +182,7 @@ namespace mongo {
 
         Collections _collections;
 
-        mongo::mutex _lock; // TODO: change to r/w lock ??
+        mutable mongo::mutex _lock; // TODO: change to r/w lock ??
     };
 
     class ConfigServer : public DBConfig {

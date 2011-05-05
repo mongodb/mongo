@@ -38,6 +38,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
+        lock lk(this);
+        
         static time_t lastLogged;
         _hbmsgTime = time(0);
 
@@ -69,7 +71,7 @@ namespace mongo {
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
     Member* ReplSetImpl::getMostElectable() {
-        scoped_lock lk(_elock);
+        lock lk(this);
         
         Member *max = 0;        
 
@@ -91,9 +93,13 @@ namespace mongo {
 
     void ReplSetImpl::relinquish() {
         if( box.getState().primary() ) {
-            log() << "replSet relinquishing primary state" << rsLog;
-            changeState(MemberState::RS_SECONDARY);
-
+            {
+                writelock lk("admin."); // so we are synchronized with _logOp()
+            
+                log() << "replSet relinquishing primary state" << rsLog;
+                changeState(MemberState::RS_SECONDARY);
+            }
+            
             if( closeOnRelinquish ) {
                 /* close sockets that were talking to us so they don't blithly send many writes that will fail
                    with "not master" (of course client could check result code, but in case they are not)
@@ -159,6 +165,7 @@ namespace mongo {
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
+                lock lk(this);
                 m->_hbinfo = h;
                 return;
             }
@@ -195,6 +202,8 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMaster(BSONObjBuilder& b) {
+        lock lk(this);
+        
         const StateBox::SP sp = box.get();
         bool isp = sp.state.primary();
         b.append("setName", name());
@@ -282,7 +291,6 @@ namespace mongo {
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
         _currentSyncTarget(0),
-        _elock("Election set lock"),
         _hbmsgTime(0),
         _self(0),
         mgr( new Manager(this) ) {
@@ -293,8 +301,6 @@ namespace mongo {
         changeState(MemberState::RS_STARTUP);
 
         _seeds = &replSetCmdline.seeds;
-        //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
-        //    addMemberIfMissing(*i);
 
         log(1) << "replSet beginning startup..." << rsLog;
 
@@ -317,7 +323,7 @@ namespace mongo {
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten() {
-        //assert( lastOpTimeWritten.isNull() );
+        lock l(this);
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
@@ -351,6 +357,7 @@ namespace mongo {
     extern BSONObj *getLastErrorDefault;
 
     void ReplSetImpl::setSelfTo(Member *m) {
+        // already locked in initFromConfig
         _self = m;
         if( m ) _buildIndexes = m->config().buildIndexes;
         else _buildIndexes = true;
@@ -610,8 +617,6 @@ namespace mongo {
     }
 
     void ReplSet::haveNewConfig(ReplSetConfig& newConfig, bool addComment) {
-        lock l(this); // convention is to lock replset before taking the db rwlock
-        writelock lk("");
         bo comment;
         if( addComment )
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );

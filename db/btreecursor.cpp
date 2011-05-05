@@ -49,6 +49,12 @@ namespace mongo {
             return currKeyNode().recordLoc;
         }
 
+        virtual BSONObj keyAt(int ofs) const { 
+            assert( !bucket.isNull() );
+            const BtreeBucket<V> *b = bucket.btree<V>();
+            return ofs >= b->getN() ? BSONObj() : b->keyNode(ofs).key.toBson();
+        }
+
         virtual BSONObj currKey() const { 
             assert( !bucket.isNull() );
             return bucket.btree<V>()->keyNode(keyOfs).key.toBson();
@@ -364,8 +370,6 @@ namespace mongo {
 
         _multikey = d->isMultikey(idxNo);
 
-        BSONObj _keyAtKeyOfs(keyAtKeyOfs);
-
         if ( keyOfs >= 0 ) {
             assert( !keyAtKeyOfs.isEmpty() );
 
@@ -373,20 +377,22 @@ namespace mongo {
             // which is possible as keys may have been deleted.
             int x = 0;
             while( 1 ) {
-                if( currKey().woEqual(keyAtKeyOfs) && currLoc() == locAtKeyOfs ) {
-
-                    if ( keyNode(keyOfs).isUsed() ) {
-                        /* we were deleted but still exist as an unused
-                        marker key. advance.
-                        */
-                        skipUnusedKeys( false );
+                //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
+                //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
+                if ( keyAt(keyOfs).woEqual(keyAtKeyOfs) ) {
+                    const _KeyNode& kn = keyNode(keyOfs);
+                    if( kn.recordLoc == locAtKeyOfs ) {
+                        if ( !kn.isUsed() ) {
+                            // we were deleted but still exist as an unused
+                            // marker key. advance.
+                            skipUnusedKeys( false );
+                        }
+                        return;
                     }
-                    return;
                 }
 
-                /* we check one key earlier too, in case a key was just deleted.  this is
-                   important so that multi updates are reasonably fast.
-                   */
+                // we check one key earlier too, in case a key was just deleted.  this is
+                // important so that multi updates are reasonably fast.
                 if( keyOfs == 0 || x++ )
                     break;
                 keyOfs--;
@@ -398,7 +404,7 @@ namespace mongo {
         */
 
         /* TODO: Switch to keep indexdetails and do idx.head! */
-        bucket = _locate(_keyAtKeyOfs, locAtKeyOfs);
+        bucket = _locate(keyAtKeyOfs, locAtKeyOfs);
         RARELY log() << "key seems to have moved in the index, refinding. " << bucket.toString() << endl;
         if ( ! bucket.isNull() )
             skipUnusedKeys( false );

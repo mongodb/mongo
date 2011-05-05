@@ -176,7 +176,7 @@ namespace mongo {
         conn.done();
     }
 
-    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ) {
+    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ) const {
         vector<BSONObj> splitPoint;
 
         // if splitting is not obligatory we may return early if there are not enough data
@@ -235,7 +235,7 @@ namespace mongo {
         return multiSplit( splitPoint , res );
     }
 
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) {
+    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) const {
         const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -262,27 +262,15 @@ namespace mongo {
 
             // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
             // but we issue here so that mongos may refresh wihtout needing to be written/read against
-            _manager->_reload();
+            grid.getDBConfig( getns() )->getChunkManager( getns() , true );
 
             return ChunkPtr();
         }
 
         conn.done();
-        _manager->_reload();
-
-        // The previous multisplit logic adjusted the boundaries of 'this' chunk. Any call to 'this' object hereafter
-        // will see a different _max for the chunk.
-        // TODO Untie this dependency since, for metadata purposes, the reload() above already fixed boundaries
-        {
-            rwlock lk( _manager->_lock , true );
-
-            setMax(m[0].getOwned());
-            DEV assert( shared_from_this() );
-            _manager->_chunkMap[_max] = shared_from_this();
-        }
-
-        // return the second half, if a single split, or the first new chunk, if a multisplit.
-        return _manager->findChunk( m[0] );
+        
+        ChunkManagerPtr updated = grid.getDBConfig( getns() )->getChunkManager( getns() , true );
+        return updated->findChunk( m[0] );
     }
 
     bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ) {
@@ -312,7 +300,7 @@ namespace mongo {
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
         // reload is excessive here as the failure could be simply because collection metadata is taken
-        _manager->_reload();
+        grid.getDBConfig( getns() )->getChunkManager( getns() , true );
 
         return worked;
     }
@@ -349,7 +337,7 @@ namespace mongo {
 #endif
                   << endl;
 
-            moveIfShould( newShard );
+            moveIfShould( shared_from_this() , newShard );
 
             return true;
 
@@ -361,15 +349,14 @@ namespace mongo {
         }
     }
 
-    bool Chunk::moveIfShould( ChunkPtr newChunk ) {
+    bool Chunk::moveIfShould( ChunkPtr oldChunk , ChunkPtr newChunk ) {
         ChunkPtr toMove;
 
         if ( newChunk->countObjects(2) <= 1 ) {
             toMove = newChunk;
         }
-        else if ( this->countObjects(2) <= 1 ) {
-            DEV assert( shared_from_this() );
-            toMove = shared_from_this();
+        else if ( oldChunk->countObjects(2) <= 1 ) {
+            toMove = oldChunk;
         }
         else {
             // moving middle shards is handled by balancer
@@ -378,11 +365,11 @@ namespace mongo {
 
         assert( toMove );
 
-        Shard newLocation = Shard::pick( getShard() );
-        if ( getShard() == newLocation ) {
+        Shard newLocation = Shard::pick( toMove->getShard() );
+        if ( toMove->getShard() == newLocation ) {
             // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
-            log(1) << "recently split chunk: " << toString() << "already in the best shard" << endl;
-            return 0;
+            log(1) << "recently split chunk: " << toMove->toString() << "already in the best shard" << endl;
+            return false;
         }
 
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;
@@ -391,7 +378,9 @@ namespace mongo {
         massert( 10412 ,
                  str::stream() << "moveAndCommit failed: " << res ,
                  toMove->moveAndCommit( newLocation , MaxChunkSize , res ) );
-
+        
+        // update our config
+        grid.getDBConfig( toMove->getns() )->getChunkManager( toMove->getns() , true );
         return true;
     }
 
@@ -528,11 +517,6 @@ namespace mongo {
         _chunkMap.clear();
         _chunkRanges.clear();
         _shards.clear();
-    }
-
-    void ChunkManager::_reload() {
-        rwlock lk( _lock , true );
-        _reload_inlock();
     }
 
     void ChunkManager::_reload_inlock() {
@@ -672,7 +656,7 @@ namespace mongo {
         log() << "successfully created first chunk for " << c->toString() << endl;
     }
 
-    ChunkPtr ChunkManager::findChunk( const BSONObj & obj , bool retry ) {
+    ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) {
         BSONObj key = _key.extractKey(obj);
 
         {
@@ -701,15 +685,7 @@ namespace mongo {
             }
         }
 
-        if ( retry ) {
-            stringstream ss;
-            ss << "couldn't find a chunk aftry retry which should be impossible extracted: " << key;
-            throw UserException( 8070 , ss.str() );
-        }
-
-        log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
-        _reload();
-        return findChunk( obj , true );
+        throw UserException( 8070 , str::stream() << "couldn't find a chunk which should be impossible: " << key );
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {

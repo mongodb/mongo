@@ -356,6 +356,7 @@ namespace mongo {
                         /* todo: too stale capability */
                     }
 
+                    lock lk(this);
                     if( !target->hbinfo().hbstate.readable() ) {
                         return;
                     }
@@ -387,9 +388,14 @@ namespace mongo {
                                     sleepsecs(6);
                                     if( time(0) >= waitUntil )
                                         break;
-                                    if( !target->hbinfo().hbstate.readable() ) {
-                                        break;
+
+                                    {
+                                        lock lk(this);
+                                        if( !target->hbinfo().hbstate.readable() ) {
+                                            break;
+                                        }
                                     }
+                                    
                                     if( myConfig().slaveDelay != sd ) // reconf
                                         break;
                                 }
@@ -420,8 +426,12 @@ namespace mongo {
                 // TODO : reuse our connection to the primary.
                 return;
             }
-            if( !target->hbinfo().hbstate.readable() ) {
-                return;
+            
+            {
+                lock lk(this);
+                if( !target->hbinfo().hbstate.readable() ) {
+                    return;
+                }
             }
             // looping back is ok because this is a tailable cursor
         }

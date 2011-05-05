@@ -38,7 +38,7 @@ namespace mongo {
        @param initial true when initiating
     */
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, bool initial) {
-        int failures = 0;
+        int failures = 0, majority = 0;
         int me = 0;
         stringstream selfs;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
@@ -50,8 +50,11 @@ namespace mongo {
                 if( !i->potentiallyHot() ) {
                     uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
                 }
+                majority += i->votes;
             }
         }
+        majority = (majority / 2) + 1;
+        
         uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
         if( me != 1 ) {
             stringstream ss;
@@ -106,21 +109,19 @@ namespace mongo {
                     }
 
                     bool allowFailure = false;
-                    failures++;
-                    if( res.isEmpty() && !initial && failures == 1 ) {
-                        /* for now we are only allowing 1 node to be down on a reconfig.  this can be made to be a minority
-                           trying to keep change small as release is near.
-                           */
+                    failures += i->votes;
+                    if( res.isEmpty() && !initial && failures >= majority ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
-                            // ok, so this was an existing member (wouldn't make sense to add to config a new member that is down)
                             assert( m->h().toString() == i->h.toString() );
-                            allowFailure = true;
                         }
+                        // it's okay if the down member isn't part of the config,
+                        // we might be adding a new member that isn't up yet
+                        allowFailure = true;
                     }
 
                     if( !allowFailure ) {
-                        string msg = string("need members up to initiate, not ok : ") + i->h.toString();
+                        string msg = string("need all members up to initiate, not ok : ") + i->h.toString();
                         if( !initial )
                             msg = string("need most members up to reconfigure, not ok : ") + i->h.toString();
                         uasserted(13144, msg);

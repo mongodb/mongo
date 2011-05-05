@@ -30,12 +30,15 @@
 
 namespace JsobjTests {
 
-    void keyTest(const BSONObj& o) {
+    void keyTest(const BSONObj& o, bool mustBeCompact = false) {
         static KeyV1Owned *kLast;
         static BSONObj last;
 
         KeyV1Owned *key = new KeyV1Owned(o);
         KeyV1Owned& k = *key;
+
+        ASSERT( !mustBeCompact || k.isCompactFormat() );
+
         BSONObj x = k.toBson();
         int res = o.woCompare(x, BSONObj(), /*considerfieldname*/false);
         if( res ) {
@@ -454,6 +457,52 @@ namespace JsobjTests {
                 keyTest( BSON("" << now << "" << 3 << "" << jstNULL << "" << true) );
                 keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
 
+                {
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 8, (BinDataType) 1, "aaaabbbb");
+                    b.appendBinData("e", 3, (BinDataType) 1, "aaa");
+                    b.appendBinData("b", 1, (BinDataType) 1, "x");
+                    BSONObj o = b.obj();
+                    keyTest( o, true );
+                }
+
+                {
+                    for( int i = 1; i <= 3; i++ ) {
+                        for( int j = 1; j <= 3; j++ ) {
+                            BSONObjBuilder b;
+                            b.appendBinData("f", i, (BinDataType) j, "abc");
+                            BSONObj o = b.obj();
+                            keyTest( o, j != ByteArrayDeprecated );
+                        }
+                    }
+                }
+
+                {
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 1, (BinDataType) 133, "a");
+                    BSONObj o = b.obj();
+                    keyTest( o, true );
+                }
+
+                {
+                    BSONObjBuilder b;
+                    b.append("AA", 3);
+                    b.appendBinData("f", 0, (BinDataType) 0, "");
+                    b.appendBinData("e", 3, (BinDataType) 7, "aaa");
+                    b.appendBinData("b", 1, (BinDataType) 128, "x");
+                    b.append("z", 3);
+                    b.appendBinData("bb", 0, (BinDataType) 129, "x");
+                    BSONObj o = b.obj();
+                    keyTest( o, true );
+                }
+
+                {
+                    // 9 is not supported in compact format. so test a non-compact case here.
+                    BSONObjBuilder b;
+                    b.appendBinData("f", 9, (BinDataType) 0, "aaaabbbbc");
+                    BSONObj o = b.obj();
+                    keyTest( o );
+                }
           }
         };
 

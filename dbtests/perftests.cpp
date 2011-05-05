@@ -286,14 +286,42 @@ namespace PerfTests {
         }
     };
 
+    // if a test is this fast, it was optimized out
+    class Dummy : public B {
+    public:
+        Dummy() { }
+        virtual int howLongMillis() { return 4000; } 
+        string name() { return "dummy"; }
+        void timed() {
+            dontOptimizeOutHopefully++;
+        }
+        unsigned long long expectation() { return 1000000; }
+        virtual bool showDurStats() { return false; }
+    };
+
     // test thread local speed
     class TLS : public B {
     public:
         TLS() { }
+        virtual int howLongMillis() { return 4000; } 
         string name() { return "thread-local-storage"; }
         void timed() {
             if( &cc() )
                 dontOptimizeOutHopefully++;
+        }
+        unsigned long long expectation() { return 1000000; }
+        virtual bool showDurStats() { return false; }
+    };
+
+    class Malloc : public B {
+    public:
+        Malloc() { }
+        virtual int howLongMillis() { return 4000; } 
+        string name() { return "malloc"; }
+        void timed() {
+            char *p = new char[128];
+            if( dontOptimizeOutHopefully++ > 0 )
+                delete p;
         }
         unsigned long long expectation() { return 1000000; }
         virtual bool showDurStats() { return false; }
@@ -522,10 +550,12 @@ namespace PerfTests {
             cout
                 << "stats test                              rps        time   "
                 << dur::stats.curr->_CSVHeader() << endl;
+            add< Dummy >();
+            add< TLS >();
+            add< Malloc >();
             add< BSONIter >();
             add< ChecksumTest >();
             add< TaskQueueTest >();
-            add< TLS >();
             add< InsertDup >();
             add< Insert1 >();
             add< InsertRandom >();

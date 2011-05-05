@@ -76,6 +76,7 @@ namespace mongo {
 
     // ns is either a full namespace or "dbname." when invalidating for a whole db
     void ClientCursor::invalidate(const char *ns) {
+        dbMutex.assertWriteLocked();
         int len = strlen(ns);
         const char* dot = strchr(ns, '.');
         assert( len > 0 && dot);
@@ -254,6 +255,9 @@ namespace mongo {
         _query(query),  _queryOptions(queryOptions),
         _idleAgeMillis(0), _pinValue(0),
         _doingDeletes(false), _yieldSometimesTracker(128,10) {
+
+        dbMutex.assertAtLeastReadLocked();
+
         assert( _db );
         assert( str::startsWith(_ns, _db->name) );
         if( queryOptions & QueryOption_NoCursorTimeout )
@@ -282,7 +286,11 @@ namespace mongo {
 
 
     ClientCursor::~ClientCursor() {
-        assert( _pos != -2 );
+        if( _pos == -2 ) {
+            // defensive: destructor called twice
+            wassert(false);
+            return;
+        }
 
         {
             recursive_scoped_lock lock(ccmutex);

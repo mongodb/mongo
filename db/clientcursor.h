@@ -396,3 +396,11 @@ namespace mongo {
     extern ClientCursorMonitor clientCursorMonitor;
 
 } // namespace mongo
+
+// ClientCursor should only be used with auto_ptr because it needs to be
+// release()ed after a yield if stillOk() returns false and these pointer types
+// do not support releasing. This will prevent them from being used accidentally
+namespace boost{
+    template<> struct scoped_ptr<mongo::ClientCursor> {};
+    template<> struct shared_ptr<mongo::ClientCursor> {};
+}

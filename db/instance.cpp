@@ -443,7 +443,6 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( 10054 ,  "not master", isMasterNs( ns ) );
         op.debug().str << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -469,6 +468,9 @@ namespace mongo {
 
         writelock lk;
 
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10054 ,  "not master", isMasterNs( ns ) );
+        
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
             return;
@@ -483,7 +485,6 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( 10056 ,  "not master", isMasterNs( ns ) );
         op.debug().str << ns << ' ';
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
@@ -497,6 +498,10 @@ namespace mongo {
         }
 
         writelock lk(ns);
+
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10056 ,  "not master", isMasterNs( ns ) );
+
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast & handlePossibleShardedMessage( m , 0 ) )
             return;
@@ -580,10 +585,12 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( 10058 ,  "not master", isMasterNs( ns ) );
         op.debug().str << ns;
 
         writelock lk(ns);
+
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10058 ,  "not master", isMasterNs( ns ) );        
 
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;

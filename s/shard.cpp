@@ -243,10 +243,7 @@ namespace mongo {
     void Shard::_rsInit() {
         if ( _cs.type() == ConnectionString::SET ) {
             string x = _cs.getSetName();
-            if ( x.size() == 0 ) {
-                warning() << "no set name for shard: " << _name << " " << _cs.toString() << endl;
-            }
-            assert( x.size() );
+            massert( 14807 , str::stream() << "no set name for shard: " << _name << " " << _cs.toString() , x.size() );
             _rs = ReplicaSetMonitor::get( x , _cs.getServers() );
         }
     }

@@ -70,7 +70,7 @@ namespace mongo {
 
         static void runThread() {
             while (keepGoing) {
-                if (current->lock_try("test")) {
+                if (current->lock_try( "test" )) {
                     count++;
                     int before = count;
                     sleepmillis(3);
@@ -227,12 +227,31 @@ namespace mongo {
             DistributedLock* myLock = lock.get();
 
             bool errors = false;
+            BSONObj lockObj;
             while (keepGoing) {
                 try {
 
-                    if (myLock->lock_try("Testing distributed lock with skew.")) {
+                    if (myLock->lock_try("Testing distributed lock with skew.", false, &lockObj )) {
 
-                        log() << "**** Locked for thread " << threadId << endl;
+                        log() << "**** Locked for thread " << threadId << " with ts " << lockObj["ts"] << endl;
+
+                        // Legacy locks are not always guaranteed re-entry since they may not have a valid ping yet,
+                        // but don't use this feature anyway
+                        if( ! legacy ) {
+
+                            if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
+                                errors = true;
+                                log() << "**** !Could not re-enter lock already held" << endl;
+                                break;
+                            }
+
+                            if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
+                                errors = true;
+                                log() << "**** !Invalid lock re-entry" << endl;
+                                break;
+                            }
+
+                        }
 
                         count++;
                         int before = count;
@@ -248,8 +267,8 @@ namespace mongo {
 
                         // Unlock only half the time...
                         if(hangThreads == 0 || threadId % hangThreads != 0) {
-                            log() << "**** Unlocking for thread " << threadId << endl;
-                            myLock->unlock();
+                            log() << "**** Unlocking for thread " << threadId << " with ts " << lockObj["ts"] << endl;
+                            myLock->unlock( &lockObj );
                         }
                         else {
                             log() << "**** Not unlocking for thread " << threadId << endl;

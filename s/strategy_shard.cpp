@@ -170,6 +170,7 @@ namespace mongo {
                         log( i < ( maxTries / 2 ) ) << "retrying insert because of StaleConfigException: " << e << " object: " << o << endl;
                         r.reset();
                         manager = r.getChunkManager();
+                        uassert(14804, "collection no longer sharded", manager);
                     }
                     sleepmillis( i * 200 );
                 }
@@ -271,6 +272,7 @@ namespace mongo {
                               << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                         r.reset( false );
                         manager = r.getChunkManager();
+                        uassert(14806, "collection no longer sharded", manager);
                     }
                 }
             }
@@ -308,6 +310,7 @@ namespace mongo {
                     r.reset( false );
                     shards.clear();
                     manager = r.getChunkManager();
+                    uassert(14805, "collection no longer sharded", manager);
                 }
             }
 
