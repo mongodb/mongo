@@ -178,6 +178,7 @@ namespace mongo {
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder* keys, vector< BSONObj >* locs ) const {
 
             BSONElementSet bSet;
+
             // Get all the nested location fields, but don't return individual elements from
             // the last array, if it exists.
             obj.getFieldsDotted(_geo.c_str(), bSet, false);
@@ -473,7 +474,7 @@ namespace mongo {
 
             Box intersection( boundMin , boundMax );
 
-            return intersection.area() / ( ( area() + other.area() ) / 2 );
+            return intersection.area() / area();
         }
 
         double area() const {
@@ -1202,6 +1203,9 @@ namespace mongo {
         const IndexDetails * _id;
     };
 
+    // TODO: Pull out the cursor bit from the browse, have GeoBrowse as field of cursor to clean up
+    // this hierarchy a bit.  Also probably useful to look at whether GeoAccumulator can be a member instead
+    // of a superclass.
     class GeoBrowse : public GeoCursorBase , public GeoAccumulator {
     public:
 
@@ -1290,11 +1294,6 @@ namespace mongo {
             return _state != DONE;
         }
 
-        virtual void resetSearch(){
-            _state = START;
-            _neighbor = -1;
-        }
-
         // Fills the stack, but only checks a maximum number of maxToCheck points at a time.
         // Further calls to this function will continue the expand/check neighbors algorithm.
         virtual void fillStack( int maxToCheck, int maxToAdd = -1, bool onlyExpand = false ) {
@@ -1344,8 +1343,7 @@ namespace mongo {
 
 #ifdef GEODEBUGGING
                     if( _prefix.constrains() ) {
-                        Box in( _g , GeoHash( _prefix ) );
-                        log() << "current expand box : " << in.toString() << endl;
+                        log() << "current expand box : " << Box( _g, _prefix ).toString() << endl;
                     }
                     else {
                         log() << "max expand box." << endl;
@@ -1360,8 +1358,9 @@ namespace mongo {
 
 #ifdef GEODEBUGGING
 
-                    log() << "finished expand, found : " << ( maxToCheck - ( maxFound - _foundInExp ) )
-                          << ( maxToAdd - ( maxAdded - _found ) ) << endl;
+                    log() << "finished expand, checked : " << ( maxToCheck - ( maxFound - _foundInExp ) )
+                          << " found : " << ( maxToAdd - ( maxAdded - _found ) )
+                          << " max : " << maxToCheck << " / " << maxToAdd << endl;
 
 #endif
 
@@ -1378,7 +1377,8 @@ namespace mongo {
                         return;
                     }
 
-                    if ( ! fitsInBox( _g->sizeEdge( _prefix ) ) ) {
+                    // If we won't fit in the box, and we're not doing a sub-scan, increase the size
+                    if ( ! fitsInBox( _g->sizeEdge( _prefix ) ) && _fringe.size() <= 1 ) {
 
                         // If we're still not expanded bigger than the box size, expand again
                         // TODO: Is there an advantage to scanning prior to expanding?
@@ -1389,8 +1389,12 @@ namespace mongo {
 
                     // We're done and our size is large enough
                     _state = DONE_NEIGHBOR;
-                    // Go to the next neighbor
-                    _neighbor++;
+
+                    // Go to the next sub-box, if applicable
+                    if( _fringe.size() > 0 ) _fringe.pop_back();
+                    // Go to the next neighbor if this was the last sub-search
+                    if( _fringe.size() == 0 ) _neighbor++;
+
                     break;
 
                 }
@@ -1407,6 +1411,9 @@ namespace mongo {
                 // Loop is useful for cases where we want to skip over boxes entirely,
                 // otherwise recursion increments the neighbors.
                 for ( ; _neighbor < 9; _neighbor++ ) {
+
+                    // If we have no fringe for the neighbor, make sure we have the default fringe
+                    if( _fringe.size() == 0 ) _fringe.push_back( "" );
 
                     if( ! isNeighbor ) {
                         _centerPrefix = _prefix;
@@ -1430,19 +1437,43 @@ namespace mongo {
                     // Make sure we've got a reasonable center
                     assert( _centerPrefix.constrains() );
 
-                    GeoHash newBox = _centerPrefix;
-                    newBox.move( i, j );
-                    _prefix = newBox;
+                    GeoHash _neighborPrefix = _centerPrefix;
+                    _neighborPrefix.move( i, j );
 
                     GEODEBUG( "moving to " << i << " , " << j );
                     PREFIXDEBUG( _centerPrefix, _g );
-                    PREFIXDEBUG( newBox , _g );
+                    PREFIXDEBUG( _neighborPrefix , _g );
+                    while( _fringe.size() > 0 ) {
 
-                    Box cur( _g , newBox );
-                    if ( intersectsBox( cur ) ) {
+                        _prefix = _neighborPrefix + _fringe.back();
+                        Box cur( _g , _prefix );
 
-                        // TODO: Consider exploiting recursion to do an expand search
-                        // from a smaller region
+                        PREFIXDEBUG( _prefix, _g );
+
+                        double intAmt = intersectsBox( cur );
+
+                        // No intersection
+                        if( intAmt <= 0 ) {
+                            GEODEBUG( "skipping box" << cur.toString() );
+                            _fringe.pop_back();
+                            continue;
+                        }
+                        // Large intersection, refine search
+                        else if( intAmt > 0.5 && _prefix.canRefine() && _fringe.back().size() < 4 /* two bits */ ) {
+
+                            GEODEBUG( "Adding to fringe: " << _fringe.back() << " curr prefix : " << _prefix << " bits : " << _prefix.getBits() );
+
+                            // log() << "Diving to level : " << ( _fringe.back().size() / 2 + 1 ) << endl;
+
+                            string lastSuffix = _fringe.back();
+                            _fringe.pop_back();
+                            _fringe.push_back( lastSuffix + "00" );
+                            _fringe.push_back( lastSuffix + "01" );
+                            _fringe.push_back( lastSuffix + "11" );
+                            _fringe.push_back( lastSuffix + "10" );
+
+                            continue;
+                        }
 
                         // Restart our search from a diff box.
                         _state = START;
@@ -1452,7 +1483,7 @@ namespace mongo {
                         fillStack( maxFound - _foundInExp, maxAdded - _found );
 
                         // When we return from the recursive fillStack call, we'll either have checked enough points or
-                        // be entirely done.  Max recurse depth is 8.
+                        // be entirely done.  Max recurse depth is < 8 * 16.
 
                         // If we're maxed out on points, return
                         if( _foundInExp >= maxFound ) {
@@ -1465,10 +1496,6 @@ namespace mongo {
                         assert( _state == DONE );
                         return;
 
-                    }
-                    else {
-                        GEODEBUG( "skipping box" );
-                        continue;
                     }
 
                 }
@@ -1485,8 +1512,8 @@ namespace mongo {
         // Whether the current box width is big enough for our search area
         virtual bool fitsInBox( double width ) = 0;
 
-        // Whether the current box overlaps our search area
-        virtual bool intersectsBox( Box& cur ) = 0;
+        // The amount the current box overlaps our search area
+        virtual double intersectsBox( Box& cur ) = 0;
 
         virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
 
@@ -1525,6 +1552,8 @@ namespace mongo {
         GeoHash _prefix;
         optional<GeoHash> _lastPrefix;
         GeoHash _centerPrefix;
+        list<string> _fringe;
+        int recurseDepth;
         Box _centerBox;
 
         // Start and end of our search range in the current box
@@ -1542,7 +1571,7 @@ namespace mongo {
             : GeoBrowse( g, "search", filter ), _max( max ) , _near( n ), _maxDistance( maxDistance ), _type( type ), _distError( type == GEO_PLAIN ? g->_error : g->_errorSphere ), _farthest(0)
         {}
 
-        virtual bool checkDistance( const KeyNode& node, double& d ) {
+        virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
 
             // Always check approximate distance, since it lets us avoid doing
             // checks of the rest of the object if it succeeds
@@ -1563,8 +1592,8 @@ namespace mongo {
             return good;
         }
 
-        double approxDistance( const KeyNode& node ) {
-            return approxDistance( GeoHash( node.key.firstElement() ) );
+        double approxDistance( const GeoKeyNode& node ) {
+            return approxDistance( GeoHash( node.key._firstElement() ) );
         }
 
         double approxDistance( const GeoHash& h ) {
@@ -1583,7 +1612,7 @@ namespace mongo {
             return approxDistance;
         }
 
-        double exactDistances( const KeyNode& node ) {
+        double exactDistances( const GeoKeyNode& node ) {
 
             GEODEBUG( "Finding exact distance for " << node.key.toString() << " and " << node.recordLoc.obj().toString() );
 
@@ -1595,7 +1624,7 @@ namespace mongo {
 
             // Find the particular location we want
             BSONObj loc;
-            GeoHash keyHash( node.key.firstElement(), _g->_bits );
+            GeoHash keyHash( node.key._firstElement(), _g->_bits );
             for( vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i ) {
 
                 loc = *i;
@@ -1644,7 +1673,7 @@ namespace mongo {
             return approxD >= _maxDistance - _distError && approxD <= _maxDistance + _distError;
         }
 
-        virtual void addSpecific( const KeyNode& node , double d, bool newDoc ) {
+        virtual void addSpecific( const GeoKeyNode& node , double d, bool newDoc ) {
 
             GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
 
@@ -1721,7 +1750,7 @@ namespace mongo {
            // Part 1
            {
                do {
-                   fillStack( maxPointsHeuristic, _numWanted, true );
+                   fillStack( maxPointsHeuristic, _numWanted - found() , true );
                } while( _state != DONE && _state != DONE_NEIGHBOR &&
                         found() < _numWanted &&
                         (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
@@ -1800,8 +1829,8 @@ namespace mongo {
         }
 
         // Whether the current box overlaps our search area
-        virtual bool intersectsBox( Box& cur ){
-           return _want.intersects( cur );
+        virtual double intersectsBox( Box& cur ){
+            return cur.intersects( _want );
         }
 
         GeoHash _start;
@@ -1821,7 +1850,7 @@ namespace mongo {
             : GeoCursorBase( s->_spec ) ,
               _s( s ) , _cur( s->_points.begin() ) , _end( s->_points.end() ), _nscanned() {
             if ( _cur != _end ) {
-            +_nscanned;
+            	++_nscanned;
             }
         }
 
@@ -1929,8 +1958,8 @@ namespace mongo {
             return width >= std::max(_xScanDistance, _yScanDistance);
         }
 
-        virtual bool intersectsBox( Box& cur ) {
-            return _bBox.intersects( cur );
+        virtual double intersectsBox( Box& cur ) {
+            return cur.intersects( _bBox );
         }
 
         virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
@@ -2055,8 +2084,8 @@ namespace mongo {
             return width >= _wantLen;
         }
 
-        virtual bool intersectsBox( Box& cur ) {
-            return _want.intersects( cur );
+        virtual double intersectsBox( Box& cur ) {
+            return cur.intersects( _want );
         }
 
         virtual bool checkDistance( const GeoKeyNode& node, double& d ) {
@@ -2137,8 +2166,8 @@ namespace mongo {
         }
 
         // Whether the current box overlaps our search area
-        virtual bool intersectsBox( Box& cur ) {
-            return _bounds.intersects( cur );
+        virtual double intersectsBox( Box& cur ) {
+            return cur.intersects( _bounds );
         }
 
         virtual bool checkDistance( const GeoKeyNode& node, double& d ) {

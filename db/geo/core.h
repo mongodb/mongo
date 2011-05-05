@@ -215,6 +215,10 @@ namespace mongo {
             return _bits > 0;
         }
 
+        bool canRefine() const {
+           return _bits < 32;
+        }
+
         void move( int x , int y ) {
             assert( _bits );
             _move( 0 , x );
@@ -292,6 +296,10 @@ namespace mongo {
             GeoHash n = *this;
             n+=s;
             return n;
+        }
+
+        GeoHash operator+( string s ) const {
+           return operator+( s.c_str() );
         }
 
         void _fix() {
