@@ -152,7 +152,13 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
  , const char *file, int line
 #endif
  );
-int __wt_page_inmem(SESSION *session, WT_PAGE *page);
+int __wt_page_inmem(SESSION *session,
+    WT_PAGE *parent,
+    WT_REF *parent_ref,
+    WT_PAGE_DISK *dsk,
+    uint32_t addr,
+    uint32_t size,
+    WT_PAGE **pagep);
 int __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf);
 void __wt_workq_read_server(CONNECTION *conn, int force);
 int __wt_cache_read_serial_func(SESSION *session);

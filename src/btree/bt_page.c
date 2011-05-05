@@ -77,40 +77,70 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(SESSION *session, WT_PAGE *page)
+__wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
+    WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size, WT_PAGE **pagep)
 {
-	WT_PAGE_DISK *dsk;
-
-	dsk = page->XXdsk;
+	WT_CACHE *cache;
+	WT_PAGE *page;
+	int ret;
 
 	WT_ASSERT(session, dsk->u.entries > 0);
-	WT_ASSERT(session, page->entries == 0);
+
+	cache = S2C(session)->cache;
+	*pagep = NULL;
+
+	/*
+	 * Allocate and initialize the WT_PAGE.
+	 * Set the LRU so the page is not immediately selected for eviction.
+	 */
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	page->addr = addr;
+	page->size = size;
+	page->type = dsk->type;
+	page->parent = parent;
+	page->parent_ref = parent_ref;
+	page->XXdsk = dsk;
+
+	page->read_gen = ++cache->read_gen;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_leaf.recno = dsk->recno;
-		return (__wt_page_inmem_col_fix(session, page));
+		WT_ERR(__wt_page_inmem_col_fix(session, page));
+		break;
 	case WT_PAGE_COL_INT:
 		page->u.col_int.recno = dsk->recno;
-
-		WT_RET(__wt_page_inmem_col_int(session, page));
+		WT_ERR(__wt_page_inmem_col_int(session, page));
 
 		/* Column-store internal pages do not require a disk image. */
 		__wt_free(session, page->XXdsk);
-		return (0);
+		break;
 	case WT_PAGE_COL_RLE:
 		page->u.col_leaf.recno = dsk->recno;
-		return (__wt_page_inmem_col_rle(session, page));
+		WT_ERR(__wt_page_inmem_col_rle(session, page));
+		break;
 	case WT_PAGE_COL_VAR:
 		page->u.col_leaf.recno = dsk->recno;
-		return (__wt_page_inmem_col_var(session, page));
+		WT_ERR(__wt_page_inmem_col_var(session, page));
+		break;
 	case WT_PAGE_ROW_INT:
-		return (__wt_page_inmem_row_int(session, page));
+		WT_ERR(__wt_page_inmem_row_int(session, page));
+		break;
 	case WT_PAGE_ROW_LEAF:
-		return (__wt_page_inmem_row_leaf(session, page));
+		WT_ERR(__wt_page_inmem_row_leaf(session, page));
+		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
-	/* NOTREACHED */
+
+	/* Add the page to our cache statistics. */
+	__wt_cache_page_in(session, page);
+
+	*pagep = page;
+	return (0);
+
+err:	if (page != NULL)
+		__wt_free(session, page);
+	return (ret);
 }
 
 /*

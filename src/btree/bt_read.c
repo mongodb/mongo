@@ -221,18 +221,13 @@ __wt_workq_read_server_exit(CONNECTION *conn)
 static int
 __cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
-	WT_CACHE *cache;
-	WT_PAGE *page;
 	WT_PAGE_DISK *dsk;
 	uint32_t addr, size;
 	int ret;
 
+	dsk = NULL;
 	addr = ref->addr;
 	size = ref->size;
-
-	cache = S2C(session)->cache;
-	page = NULL;
-	dsk = NULL;
 	ret = 0;
 
 	/* Review the possible page states. */
@@ -250,57 +245,28 @@ __cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 
 	/*
 	 * The page isn't in the cache, and since we're the only path for the
-	 * page to get into the cache, we don't have to worry further, and
-	 * we might as well get to it.
+	 * page to get into the cache, we don't have to worry further, and we
+	 * might as well get to it.
 	 *
 	 * Allocate memory for the in-memory page information and for the page
 	 * itself. They're two separate allocation calls so we (hopefully) get
 	 * better alignment from the underlying heap memory allocator.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
 	WT_ERR(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 
 	/* Read the page. */
 	WT_VERBOSE(S2C(session), WT_VERB_READ, (session,
 	    "cache read addr/size %lu/%lu", (u_long)addr, (u_long)size));
-
 	WT_ERR(__wt_disk_read(session, dsk, addr, size));
 
-	/* If the page needs to be verified, that's next. */
+	/* Verify the disk image on demand. */
 	if (dsk_verify)
 		WT_ERR(__wt_verify_dsk_page(session, dsk, addr, size));
 
-	/*
-	 * Fill in the WT_PAGE information;
-	 * reference the parent's WT_PAGE and WT_{COL,ROW}_REF structures;
-	 * reference the underlying disk page.
-	 * If this page is ever modified, we'll need to free its disk blocks.
-	 */
-	page->addr = addr;
-	page->size = size;
-	page->type = dsk->type;
-	page->parent = parent;
-	page->parent_ref = ref;
-	page->XXdsk = dsk;
+	/* Build the in-memory version of the page. */
+	WT_ERR(__wt_page_inmem(
+	    session, parent, ref, dsk, addr, size, &ref->page));
 
-	/*
-	 * Build the in-memory version of the page -- if this fails, do a real
-	 * discard of the page and its contents.
-	 */
-	if ((ret = __wt_page_inmem(session, page)) != 0) {
-		__wt_page_free(session, page);
-		return (ret);
-	}
-
-	/* Count this page in our cache statistics. */
-	__wt_cache_page_in(session, page);
-
-	/*
-	 * Set the LRU so the page is not immediately selected for eviction,
-	 * then go live.
-	 */
-	page->read_gen = ++cache->read_gen;
-	ref->page = page;
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;
 
@@ -308,7 +274,5 @@ __cache_read(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 
 err:	if (dsk != NULL)
 		__wt_free(session, dsk);
-	if (page != NULL)
-		__wt_free(session, page);
 	return (ret);
 }

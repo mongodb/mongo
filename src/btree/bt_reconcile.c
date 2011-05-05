@@ -1183,6 +1183,7 @@ __rec_split_write(SESSION *session, WT_BUF *buf, void *end)
 	int ret;
 
 	r = S2C(session)->cache->rec;
+	dsk = NULL;
 
 	/*
 	 * Set the disk block size and clear trailing bytes.
@@ -1230,26 +1231,17 @@ __rec_split_write(SESSION *session, WT_BUF *buf, void *end)
 
 	/*
 	 * If we're not evicting the page, we'll need a new in-memory version:
-	 * create the in-memory page and take any list of in-memory references.
+	 * create an in-memory page and take any list of in-memory references.
 	 */
-	/* Allocate memory for the in-memory page, and copy the disk image. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	if ((ret =
-	    __wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk)) != 0) {
-		__wt_free(session, page);
-		return (ret);
-	}
+	WT_RET(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 	memcpy(dsk, buf->mem, size);
-	page->addr = addr;
-	page->size = size;
-	page->type = dsk->type;
-	page->XXdsk = dsk;
-	if ((ret = __wt_page_inmem(session, page)) != 0) {
-		__wt_page_free(session, page);
+
+	if ((ret =__wt_page_inmem(
+	    session, NULL, NULL, dsk, addr, size, &page)) != 0) {
+		__wt_free(session, dsk);
 		return (ret);
 	}
 	spl->imp = page;
-
 	return (0);
 }
 
