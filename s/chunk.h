@@ -293,7 +293,7 @@ namespace mongo {
         int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj ) const;
 
-        void createFirstChunk( const Shard& shard );
+        void createFirstChunk( const Shard& shard ) const; // only call from DBConfig::shardCollection
         ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
@@ -334,8 +334,6 @@ namespace mongo {
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
 
         void _load();
-
-        void ensureIndex_inlock() const;
 
         const string _ns;
         const ShardKeyPattern _key;

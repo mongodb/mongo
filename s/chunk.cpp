@@ -582,10 +582,11 @@ namespace mongo {
         return _key.hasShardKey( obj );
     }
 
-    void ChunkManager::createFirstChunk( const Shard& shard ) {
+    void ChunkManager::createFirstChunk( const Shard& shard ) const {
+        // TODO distlock?
         assert( _chunkMap.size() == 0 );
 
-        ChunkPtr c( new Chunk(this, _key.globalMin(), _key.globalMax(), shard ) );
+        Chunk c (this, _key.globalMin(), _key.globalMax(), shard);
 
         // this is the first chunk; start the versioning from scratch
         ShardChunkVersion version;
@@ -593,14 +594,14 @@ namespace mongo {
 
         // build update for the chunk collection
         BSONObjBuilder chunkBuilder;
-        c->serialize( chunkBuilder , version );
+        c.serialize( chunkBuilder , version );
         BSONObj chunkCmd = chunkBuilder.obj();
 
         log() << "about to create first chunk for: " << _ns << endl;
 
         ScopedDbConnection conn( configServer.modelServer() );
         BSONObj res;
-        conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << c->genID() ), chunkCmd,  true, false );
+        conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << c.genID() ), chunkCmd,  true, false );
 
         string errmsg = conn->getLastError();
         if ( errmsg.size() ) {
@@ -612,21 +613,13 @@ namespace mongo {
 
         conn.done();
 
-        // every instance of ChunkManager has a unique sequence number; callers of ChunkManager may
-        // inquiry about whether there were changes in chunk configuration (see re/load() calls) since
-        // the last access to ChunkManager by checking the sequence number
-        _sequenceNumber = ++NextSequenceNumber;
-
-        _chunkMap[c->getMax()] = c;
-        _chunkRanges.reloadAll(_chunkMap);
-        _shards.insert(c->getShard());
-        c->setLastmod(version);
-
         // the ensure index will have the (desired) indirect effect of creating the collection on the
         // assigned shard, as it sets up the index over the sharding keys.
-        ensureIndex_inlock();
+        ScopedDbConnection shardConn( c.getShard().getConnString() );
+        shardConn->ensureIndex( getns() , getShardKey().key() , _unique , "" , false /* do not cache ensureIndex SERVER-1691 */ );
+        shardConn.done();
 
-        log() << "successfully created first chunk for " << c->toString() << endl;
+        log() << "successfully created first chunk for " << c.toString() << endl;
     }
 
     ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) const {
@@ -755,15 +748,6 @@ namespace mongo {
     void ChunkManager::getAllShards( set<Shard>& all ) const {
         rwlock lk( _lock , false );
         all.insert(_shards.begin(), _shards.end());
-    }
-
-    void ChunkManager::ensureIndex_inlock() const {
-        //TODO in parallel?
-        for ( set<Shard>::const_iterator i=_shards.begin(); i!=_shards.end(); ++i ) {
-            ScopedDbConnection conn( i->getConnString() );
-            conn->ensureIndex( getns() , getShardKey().key() , _unique , "" , false /* do not cache ensureIndex SERVER-1691 */ );
-            conn.done();
-        }
     }
 
     void ChunkManager::drop( ChunkManagerPtr me ) const {
