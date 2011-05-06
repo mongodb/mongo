@@ -1041,13 +1041,6 @@ namespace mongo {
 
     class ChunkObjUnitTest : public UnitTest {
     public:
-        void runShard() {
-            ChunkPtr c;
-            assert( ! c );
-            c.reset( new Chunk( 0 ) );
-            assert( c );
-        }
-
         void runShardChunkVersion() {
             vector<ShardChunkVersion> all;
             all.push_back( ShardChunkVersion(1,1) );
@@ -1064,7 +1057,6 @@ namespace mongo {
         }
 
         void run() {
-            runShard();
             runShardChunkVersion();
             log(1) << "shardObjTest passed" << endl;
         }
