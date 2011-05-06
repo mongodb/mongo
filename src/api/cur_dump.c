@@ -48,7 +48,6 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 
 	session = (SESSION *)cursor->session;
 
-#ifdef MICHAEL_PLEASE_FIX
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
 
@@ -56,7 +55,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 		WT_RET(__convert_to_dump(session, &cursor->key));
 		F_CLR(cursor, WT_CURSTD_KEY_RAW);
 	}
-#endif
+
 	va_start(ap, cursor);
 	key = va_arg(ap, WT_ITEM *);
 	key->data = cursor->key.data;
@@ -79,7 +78,6 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 
 	session = (SESSION *)cursor->session;
 
-#ifdef MICHAEL_PLEASE_FIX
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
 
@@ -87,7 +85,6 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		WT_RET(__convert_to_dump(session, &cursor->value));
 		F_SET(cursor, WT_CURSTD_VALUE_RAW);
 	}
-#endif
 	va_start(ap, cursor);
 	value = va_arg(ap, WT_ITEM *);
 	value->data = cursor->value.data;

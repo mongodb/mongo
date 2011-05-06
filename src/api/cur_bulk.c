@@ -14,9 +14,11 @@
 static int
 __curbulk_insert(WT_CURSOR *cursor)
 {
+	BTREE *btree;
 	CURSOR_BULK *cbulk;
 
 	cbulk = (CURSOR_BULK *)cursor;
+	btree = cbulk->cbt.btree;
 
 	/* TODO: check the state of the key/value pair. */
 #if 0

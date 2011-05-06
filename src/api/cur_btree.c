@@ -293,7 +293,7 @@ __wt_cursor_open(SESSION *session,
 	cursor->value_format = value_format;
 	__wt_cursor_init(cursor, config);
 
-	cbt->btree = btree;
+	cbt->btree = session->btree = btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((CURSOR_BULK *)cbt));
 	if (dump != 0)

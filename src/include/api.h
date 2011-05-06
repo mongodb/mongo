@@ -40,12 +40,33 @@ typedef struct {
 typedef struct {
 	CURSOR_BTREE cbt;
 
-	WT_BUF *tmp;
-	WT_PAGE *page;
-	WT_STACK stack;
-	uint64_t insert_cnt;
-	uint32_t space_avail;
-	uint8_t *first_free;
+	uint8_t	 page_type;			/* Page type */
+	uint64_t recno;				/* Total record number */
+	uint32_t ipp;				/* Items per page */
+
+	WT_BUF	 key;				/* Parent key buffer */
+
+	/*
+	 * K/V pairs for row-store leaf pages, and V objects for column-store
+	 * leaf pages, are stored in singly-linked lists (the lists are never
+	 * searched, only walked at reconciliation, so it's not so bad).
+	 */
+	WT_INSERT  *ins_base;			/* Base insert link */
+	WT_INSERT **insp;			/* Next insert link */
+	WT_UPDATE  *upd_base;			/* Base update link */
+	WT_UPDATE **updp;			/* Next update link */
+	uint32_t   ins_cnt;			/* Inserts on the list */
+
+	/*
+	 * Bulk load dynamically allocates an array of leaf-page references;
+	 * when the bulk load finishes, we build an internal page for those
+	 * references.
+	 */
+	WT_ROW_REF *rref;			/* List of row leaf pages */
+	WT_COL_REF *cref;			/* List of column leaf pages */
+	uint32_t ref_next;			/* Next leaf page slot */
+	uint32_t ref_entries;			/* Total leaf page slots */
+	uint32_t ref_allocated;			/* Bytes allocated */
 } CURSOR_BULK;
 
 typedef struct {

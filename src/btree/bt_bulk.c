@@ -402,45 +402,10 @@ err:	WT_TRET(__wt_bulk_stack_put(session, &stack));
 	return (ret);
 }
 
-/* Bulk load information. */
-typedef struct {
-	uint8_t	 page_type;			/* Page type */
-
-	uint64_t recno;				/* Total record number */
-
-	uint32_t ipp;				/* Items per page */
-
-	WT_BUF	 key;				/* Parent key buffer */
-
-	/*
-	 * K/V pairs for row-store leaf pages, and V objects for column-store
-	 * leaf pages, are stored in singly-linked lists (the lists are never
-	 * searched, only walked at reconciliation, so it's not so bad).
-	 */
-	WT_INSERT  *ins_base;			/* Base insert link */
-	WT_INSERT **insp;			/* Next insert link */
-	WT_UPDATE  *upd_base;			/* Base update link */
-	WT_UPDATE **updp;			/* Next update link */
-	uint32_t   ins_cnt;			/* Inserts on the list */
-
-	/*
-	 * Bulk load dynamically allocates an array of leaf-page references;
-	 * when the bulk load finishes, we build an internal page for those
-	 * references.
-	 */
-	WT_ROW_REF *rref;			/* List of row leaf pages */
-	WT_COL_REF *cref;			/* List of column leaf pages */
-	uint32_t ref_next;			/* Next leaf page slot */
-	uint32_t ref_entries;			/* Total leaf page slots */
-	uint32_t ref_allocated;			/* Bytes allocated */
-
-} WT_BSTUFF;
-WT_BSTUFF _blk, *blk;
-
-static int __wt_bulk_col(SESSION *, WT_CURSOR *);
-static int __wt_bulk_col_page(SESSION *);
-static int __wt_bulk_row(SESSION *session, WT_CURSOR *cursor);
-static int __wt_bulk_row_page(SESSION *);
+static int __wt_bulk_col(CURSOR_BULK *);
+static int __wt_bulk_col_page(CURSOR_BULK *);
+static int __wt_bulk_row(CURSOR_BULK *);
+static int __wt_bulk_row_page(CURSOR_BULK *);
 
 /*
  * __wt_bulk_init --
@@ -455,10 +420,6 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 
 	btree = cbulk->cbt.btree;
 	session = (SESSION *)cbulk->cbt.iface.session;
-	session->btree = btree;			/* XXX */
-
-	blk = &_blk;				/* XXX */
-	cbulk->insert_cnt = 0;			/* XXX */
 
 	/*
 	 * XXX
@@ -471,21 +432,21 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 
 	if (F_ISSET(btree, WT_COLUMN)) {
 		if (btree->fixed_len == 0)
-			blk->page_type = WT_PAGE_COL_VAR;
+			cbulk->page_type = WT_PAGE_COL_VAR;
 		else
 			if (F_ISSET(btree, WT_RLE))
-				blk->page_type = WT_PAGE_COL_RLE;
+				cbulk->page_type = WT_PAGE_COL_RLE;
 			else
-				blk->page_type = WT_PAGE_COL_FIX;
+				cbulk->page_type = WT_PAGE_COL_FIX;
 
-		blk->recno = 1;
-		blk->updp = &blk->upd_base;
+		cbulk->recno = 1;
+		cbulk->updp = &cbulk->upd_base;
 	} else {
-		blk->page_type = WT_PAGE_ROW_LEAF;
+		cbulk->page_type = WT_PAGE_ROW_LEAF;
 
-		blk->insp = &blk->ins_base;
+		cbulk->insp = &cbulk->ins_base;
 	}
-	blk->ipp = 50000;			/* XXX */
+	cbulk->ipp = 50000;			/* XXX */
 
 	return (0);
 }
@@ -506,8 +467,6 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
 	session->btree = cbulk->cbt.btree;	/* XXX */
 	btree = session->btree;
 
-	blk = &_blk;				/* XXX */
-
 	/*
 	 * The WiredTiger reconciliation code is where on-disk page formats are
 	 * defined -- the goal of bulk load is to build an in-memory page that
@@ -522,12 +481,12 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
 	 * bulk tracks where it ends up, and when bulk load completes, a single
 	 * internal page is created which is also passed to reconciliation.
 	 */
-	switch (blk->page_type) {
+	switch (cbulk->page_type) {
 	case WT_PAGE_COL_VAR:
-		WT_RET(__wt_bulk_col(session, cursor));
+		WT_RET(__wt_bulk_col(cbulk));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_bulk_row(session, cursor));
+		WT_RET(__wt_bulk_row(cbulk));
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
@@ -541,12 +500,15 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
  *	Column-store bulk load.
  */
 static int
-__wt_bulk_col(SESSION *session, WT_CURSOR *cursor)
+__wt_bulk_col(CURSOR_BULK *cbulk)
 {
+	SESSION *session;
+	WT_CURSOR *cursor;
 	WT_UPDATE *upd;
 	int ret;
 
-	blk = &_blk;				/* XXX */
+	cursor = &cbulk->cbt.iface;
+	session = (SESSION *)cbulk->cbt.iface.session;
 	upd = NULL;
 
 	/*
@@ -554,12 +516,12 @@ __wt_bulk_col(SESSION *session, WT_CURSOR *cursor)
 	 * update list.
 	 */
 	WT_RET(__wt_update_alloc(session, (WT_ITEM *)&cursor->value, &upd));
-	(*blk->updp) = upd;
-	blk->updp = &upd->next;
+	(*cbulk->updp) = upd;
+	cbulk->updp = &upd->next;
 
 	/* If the page is full, reconcile it and reset the insert list. */
-	if (++blk->ins_cnt == blk->ipp)
-		WT_ERR(__wt_bulk_col_page(session));
+	if (++cbulk->ins_cnt == cbulk->ipp)
+		WT_ERR(__wt_bulk_col_page(cbulk));
 
 	return (0);
 
@@ -573,16 +535,18 @@ err:	if (upd != NULL)
  *	Variable-length row-store bulk load.
  */
 static int
-__wt_bulk_row(SESSION *session, WT_CURSOR *cursor)
+__wt_bulk_row(CURSOR_BULK *cbulk)
 {
+	SESSION *session;
+	WT_CURSOR *cursor;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
 	int ret;
 
-	blk = &_blk;				/* XXX */
-
+	cursor = &cbulk->cbt.iface;
 	ins = NULL;
 	upd = NULL;
+	session = (SESSION *)cbulk->cbt.iface.session;
 
 	/*
 	 * Allocate a WT_INSERT/WT_UPDATE pair and append the K/V pair onto the
@@ -591,12 +555,12 @@ __wt_bulk_row(SESSION *session, WT_CURSOR *cursor)
 	WT_RET(__wt_row_insert_alloc(session, (WT_ITEM *)&cursor->key, &ins));
 	WT_ERR(
 	    __wt_update_alloc(session, (WT_ITEM *)&cursor->value, &ins->upd));
-	(*blk->insp) = ins;
-	blk->insp = &ins->next;
+	(*cbulk->insp) = ins;
+	cbulk->insp = &ins->next;
 
 	/* If the page is full, reconcile it and reset the insert list. */
-	if (++blk->ins_cnt == blk->ipp)
-		WT_ERR(__wt_bulk_row_page(session));
+	if (++cbulk->ins_cnt == cbulk->ipp)
+		WT_ERR(__wt_bulk_row_page(cbulk));
 
 	return (0);
 
@@ -621,16 +585,14 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	session = (SESSION *)cbulk->cbt.iface.session;
 	session->btree = cbulk->cbt.btree;		/* XXX */
 
-	blk = &_blk;					/* XXX */
-
 	/* If the page has entries, reconcile and discard it. */
-	if (blk->ins_cnt != 0)
-		switch (blk->page_type) {
+	if (cbulk->ins_cnt != 0)
+		switch (cbulk->page_type) {
 		case WT_PAGE_COL_VAR:
-			WT_RET(__wt_bulk_col_page(session));
+			WT_RET(__wt_bulk_col_page(cbulk));
 			break;
 		case WT_PAGE_ROW_LEAF:
-			WT_RET(__wt_bulk_row_page(session));
+			WT_RET(__wt_bulk_row_page(cbulk));
 			break;
 		}
 
@@ -645,16 +607,16 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	page->size = 0;
 	WT_PAGE_SET_MODIFIED(page);
 
-	switch (blk->page_type) {
+	switch (cbulk->page_type) {
 	case WT_PAGE_COL_VAR:
-		page->entries = blk->ref_next;
+		page->entries = cbulk->ref_next;
 		page->u.col_int.recno = 1;
-		page->u.col_int.t = blk->cref;
+		page->u.col_int.t = cbulk->cref;
 		page->type = WT_PAGE_COL_INT;
 		break;
 	case WT_PAGE_ROW_LEAF:
-		page->entries = blk->ref_next;
-		page->u.row_int.t = blk->rref;
+		page->entries = cbulk->ref_next;
+		page->u.row_int.t = cbulk->rref;
 		page->type = WT_PAGE_ROW_INT;
 		break;
 	WT_ILLEGAL_FORMAT(session);
@@ -677,27 +639,29 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
  *	Reconcile a set of row-store bulk-loaded items.
  */
 static int
-__wt_bulk_row_page(SESSION *session)
+__wt_bulk_row_page(CURSOR_BULK *cbulk)
 {
+	SESSION *session;
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
 
-	blk = &_blk;				/* XXX */
 	page = NULL;
+	session = (SESSION *)cbulk->cbt.iface.session;
 
 	/* Re-allocate the parent reference array as necessary. */
-	if (blk->ref_next == blk->ref_entries) {
-		WT_RET(__wt_realloc(session, &blk->ref_allocated,
-		    (blk->ref_entries + 1000) * sizeof(*blk->rref),
-		    &blk->rref));
-		blk->ref_entries += 1000;
+	if (cbulk->ref_next == cbulk->ref_entries) {
+		WT_RET(__wt_realloc(session, &cbulk->ref_allocated,
+		    (cbulk->ref_entries + 1000) * sizeof(*cbulk->rref),
+		    &cbulk->rref));
+		cbulk->ref_entries += 1000;
 	}
 
 	/* Take a copy of the first key for the parent. */
-	WT_RET(__wt_buf_set(session, &blk->key,
-	    WT_INSERT_KEY(blk->ins_base), WT_INSERT_KEY_SIZE(blk->ins_base)));
-	rref = &blk->rref[blk->ref_next];
-	__wt_buf_steal(session, &blk->key, &rref->key, &rref->size);
+	WT_RET(__wt_buf_set(session, &cbulk->key,
+	    WT_INSERT_KEY(cbulk->ins_base),
+	    WT_INSERT_KEY_SIZE(cbulk->ins_base)));
+	rref = &cbulk->rref[cbulk->ref_next];
+	__wt_buf_steal(session, &cbulk->key, &rref->key, &rref->size);
 
 	/*
 	 * Allocate a page.  Bulk load pages are skeleton pages: there's no
@@ -706,10 +670,10 @@ __wt_bulk_row_page(SESSION *session)
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->parent = NULL;
-	page->parent_ref = &blk->rref[blk->ref_next].ref;
+	page->parent_ref = &cbulk->rref[cbulk->ref_next].ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = 0;
-	page->u.bulk.ins = blk->ins_base;
+	page->u.bulk.ins = cbulk->ins_base;
 	page->XXdsk = NULL;
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
@@ -717,10 +681,10 @@ __wt_bulk_row_page(SESSION *session)
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
 
-	blk->insp = &blk->ins_base;	/* The page owns the insert list */
-	blk->ins_cnt = 0;
+	cbulk->insp = &cbulk->ins_base;	/* The page owns the insert list */
+	cbulk->ins_cnt = 0;
 
-	++blk->ref_next;		/* Move to the next parent slot */
+	++cbulk->ref_next;		/* Move to the next parent slot */
 
 	WT_RET(__wt_page_reconcile(session, page, 0, WT_REC_CLOSE));
 
@@ -732,22 +696,23 @@ __wt_bulk_row_page(SESSION *session)
  *	Reconcile a set of column-store bulk-loaded items.
  */
 static int
-__wt_bulk_col_page(SESSION *session)
+__wt_bulk_col_page(CURSOR_BULK *cbulk)
 {
+	SESSION *session;
 	WT_PAGE *page;
 
-	blk = &_blk;				/* XXX */
+	session = (SESSION *)cbulk->cbt.iface.session;
 
 	/* Re-allocate the parent reference array as necessary. */
-	if (blk->ref_next == blk->ref_entries) {
-		WT_RET(__wt_realloc(session, &blk->ref_allocated,
-		    (blk->ref_entries + 1000) * sizeof(*blk->cref),
-		    &blk->cref));
-		blk->ref_entries += 1000;
+	if (cbulk->ref_next == cbulk->ref_entries) {
+		WT_RET(__wt_realloc(session, &cbulk->ref_allocated,
+		    (cbulk->ref_entries + 1000) * sizeof(*cbulk->cref),
+		    &cbulk->cref));
+		cbulk->ref_entries += 1000;
 	}
 
 	/* Take a copy of the first key for the parent. */
-	blk->cref[blk->ref_next].recno = blk->recno;
+	cbulk->cref[cbulk->ref_next].recno = cbulk->recno;
 
 	/*
 	 * Allocate a page.  Bulk load pages are skeleton pages: there's no
@@ -756,23 +721,23 @@ __wt_bulk_col_page(SESSION *session)
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->parent = NULL;
-	page->parent_ref = &blk->cref[blk->ref_next].ref;
+	page->parent_ref = &cbulk->cref[cbulk->ref_next].ref;
 	page->read_gen = __wt_cache_read_gen(session);
-	page->u.bulk.recno = blk->recno;
-	page->u.bulk.upd = blk->upd_base;
+	page->u.bulk.recno = cbulk->recno;
+	page->u.bulk.upd = cbulk->upd_base;
 	page->XXdsk = NULL;
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
-	page->type = blk->page_type;
+	page->type = cbulk->page_type;
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
 
-	blk->updp = &blk->upd_base;	/* The page owns the update list */
-	blk->ins_cnt = 0;
+	cbulk->updp = &cbulk->upd_base;	/* The page owns the update list */
+	cbulk->ins_cnt = 0;
 
-	++blk->ref_next;		/* Move to the next parent slot */
+	++cbulk->ref_next;		/* Move to the next parent slot */
 
-	blk->recno += blk->ins_cnt;	/* Update the starting record number */
+	cbulk->recno += cbulk->ins_cnt;	/* Update the starting record number */
 
 	WT_RET(__wt_page_reconcile(session, page, 0, WT_REC_CLOSE));
 

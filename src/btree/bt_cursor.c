@@ -89,12 +89,18 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 				continue;
 
 			/*
-			 * Set the key for row stores.
+			 * The key and value variables reference the items we'll
+			 * print.  Set the key.
 			 */
-			if (!F_ISSET(btree, WT_COLUMN) &&
-			    __wt_key_process(cbt->rip))
-				WT_RET(__wt_key_build(session,
-				    cbt->page, cbt->rip, &cursor->key));
+			if (!F_ISSET(btree, WT_COLUMN)) {
+				if (__wt_key_process(cbt->rip))
+					WT_RET(__wt_key_build(session,
+					    cbt->page, cbt->rip, &cursor->key));
+				else {
+					cursor->key.data = cbt->rip->key;
+					cursor->key.size = cbt->rip->size;
+				}
+			}
 
 			/*
 			 * If the item was ever modified, dump the data from
