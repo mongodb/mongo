@@ -176,7 +176,7 @@ namespace mongo {
         conn.done();
     }
 
-    ChunkPtr Chunk::singleSplit( bool force , BSONObj& res ) const {
+    BSONObj Chunk::singleSplit( bool force , BSONObj& res ) const {
         vector<BSONObj> splitPoint;
 
         // if splitting is not obligatory we may return early if there are not enough data
@@ -191,7 +191,7 @@ namespace mongo {
                 // 1 split point means we have between half the chunk size to full chunk size
                 // so we shouldn't split
                 log(1) << "chunk not full enough to trigger auto-split" << endl;
-                return ChunkPtr();
+                return BSONObj();
             }
 
             splitPoint.push_back( candidates.front() );
@@ -229,13 +229,16 @@ namespace mongo {
         if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
             log() << "want to split chunk, but can't find split point chunk " << toString()
                   << " got: " << ( splitPoint.empty() ? "<empty>" : splitPoint.front().toString() ) << endl;
-            return ChunkPtr();
+            return BSONObj();
         }
-
-        return multiSplit( splitPoint , res );
+        
+        if (multiSplit( splitPoint , res ))
+            return splitPoint.front();
+        else
+            return BSONObj();
     }
 
-    ChunkPtr Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) const {
+    bool Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) const {
         const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -264,13 +267,15 @@ namespace mongo {
             // but we issue here so that mongos may refresh wihtout needing to be written/read against
             grid.getDBConfig( getns() )->getChunkManager( getns() , true );
 
-            return ChunkPtr();
+            return false;
         }
 
         conn.done();
         
-        ChunkManagerPtr updated = grid.getDBConfig( getns() )->getChunkManager( getns() , true );
-        return updated->findChunk( m[0] );
+        // force reload of config
+        grid.getDBConfig( getns() )->getChunkManager( getns() , true );
+
+        return true;
     }
 
     bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ) {
@@ -323,15 +328,15 @@ namespace mongo {
             _dataWritten = 0; // reset so we check often enough
 
             BSONObj res;
-            ChunkPtr newShard = singleSplit( false /* does not force a split if not enough data */ , res );
-            if ( newShard.get() == NULL ) {
+            BSONObj splitPoint = singleSplit( false /* does not force a split if not enough data */ , res );
+            if ( splitPoint.isEmpty() ) {
                 // singleSplit would have issued a message if we got here
                 _dataWritten = 0; // this means there wasn't enough data to split, so don't want to try again until considerable more data
                 return false;
             }
 
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
-                  << " on: " << newShard->getMax() << "(splitThreshold " << splitThreshold << ")"
+                  << " on: " << splitPoint << "(splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be usefule when debugging
 #endif
@@ -340,15 +345,15 @@ namespace mongo {
             BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
             if (!shouldMigrate.eoo()){
                 BSONObj range = shouldMigrate.embeddedObject();
+                BSONObj min = range["min"].embeddedObject();
+                BSONObj max = range["max"].embeddedObject();
+
                 Shard newLocation = Shard::pick( getShard() );
                 if ( getShard() == newLocation ) {
                     // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
                     log(1) << "recently split chunk: " << range << " already in the best shard: " << getShard() << endl;
                     return true; // we did split even if we didn't migrate
                 }
-
-                BSONObj min = range["min"].embeddedObject();
-                BSONObj max = range["max"].embeddedObject();
 
                 ChunkManagerPtr cm = grid.getDBConfig(getns())->getChunkManager(getns(), false/*reloaded by split*/);
                 ChunkPtr toMove = cm->findChunk(min);
@@ -845,8 +850,8 @@ namespace mongo {
 
         BSONObj res;
         ChunkPtr p;
-        p = soleChunk->multiSplit( splitPoints , res );
-        if ( p.get() == NULL ) {
+        bool worked = soleChunk->multiSplit( splitPoints , res );
+        if (!worked) {
             log( LL_WARNING ) << "could not split '" << getns() << "': " << res << endl;
             return;
         }

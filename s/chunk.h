@@ -108,18 +108,18 @@ namespace mongo {
          * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
          *              if set to false, will only split if the chunk has reached the currently desired maximum size
          * @param res the object containing details about the split execution
-         * @return if found a key, return a pointer to the first chunk, otherwise return a null pointer
+         * @return splitPoint if found a key and split successfully, else empty BSONObj
          */
-        ChunkPtr singleSplit( bool force , BSONObj& res ) const;
+        BSONObj singleSplit( bool force , BSONObj& res ) const;
 
         /**
          * Splits this chunk at the given key (or keys)
          *
          * @param splitPoints the vector of keys that should be used to divide this chunk
          * @param res the object containing details about the split execution
-         * @return shared pointer to the first new Chunk or null pointer if failed
+         * @return if the split was successful
          */
-        ChunkPtr multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res ) const;
+        bool multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res ) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
