@@ -49,17 +49,16 @@ namespace mongo {
     int Chunk::MaxObjectPerChunk = 250000;
     
 
-    Chunk::Chunk( const ChunkManager * manager ) : _manager(manager), _lastmod(0) {
-        _setDataWritten();
-    }
+    Chunk::Chunk(const ChunkManager * manager)
+        : _manager(manager), _lastmod(0), _dataWritten(mkDataWritten())
+    {}
 
     Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
-        : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0) {
-        _setDataWritten();
-    }
+        : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0), _dataWritten(mkDataWritten())
+    {}
 
-    void Chunk::_setDataWritten() {
-        _dataWritten = rand() % ( MaxChunkSize / 5 );
+    long Chunk::mkDataWritten() {
+        return rand() % ( MaxChunkSize / 5 );
     }
 
     string Chunk::getns() const {
