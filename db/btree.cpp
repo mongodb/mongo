@@ -290,7 +290,7 @@ namespace mongo {
     inline int BucketBasics<V>::_alloc(int bytes) {
         this->topSize += bytes;
         this->emptySize -= bytes;
-        dassert( this->emptySize >= 0 );
+        dassert( ((int)this->emptySize) >= 0 ); // this is unsigned in V1 so never fails
         int ofs = totalDataSize() - this->topSize;
         assert( ofs > 0 );
         return ofs;
