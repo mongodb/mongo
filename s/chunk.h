@@ -54,8 +54,8 @@ namespace mongo {
      */
     class Chunk : boost::noncopyable, public boost::enable_shared_from_this<Chunk>  {
     public:
-        Chunk( ChunkManager * info );
-        Chunk( ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
+        Chunk( const ChunkManager * info );
+        Chunk( const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
 
         //
         // serialization support
@@ -70,8 +70,6 @@ namespace mongo {
 
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
-        void setMin(const BSONObj& o) { _min = o; }
-        void setMax(const BSONObj& o) { _max = o; }
 
         // if min/max key is pos/neg infinity
         bool minIsInf() const;
@@ -86,7 +84,7 @@ namespace mongo {
         // chunk version support
         //
 
-        void appendShortVersion( const char * name , BSONObjBuilder& b );
+        void appendShortVersion( const char * name , BSONObjBuilder& b ) const;
 
         ShardChunkVersion getLastmod() const { return _lastmod; }
         void setLastmod( ShardChunkVersion v ) { _lastmod = v; }
@@ -100,7 +98,7 @@ namespace mongo {
          * then we check the real size, and if its too big, we split
          * @return if something was split
          */
-        bool splitIfShould( long dataWritten );
+        bool splitIfShould( long dataWritten ) const;
 
         /**
          * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this chunk.
@@ -148,7 +146,7 @@ namespace mongo {
          * @param res the object containing details about the migrate execution
          * @return true if move was successful
          */
-        bool moveAndCommit( const Shard& to , long long chunkSize , BSONObj& res );
+        bool moveAndCommit( const Shard& to , long long chunkSize , BSONObj& res ) const;
 
         /**
          * @return size of shard in bytes
@@ -182,7 +180,7 @@ namespace mongo {
     private:
         // main shard info
         
-        ChunkManager * _manager;
+        const ChunkManager * _manager;
 
         BSONObj _min;
         BSONObj _max;
@@ -191,7 +189,7 @@ namespace mongo {
 
         // transient stuff
 
-        long _dataWritten;
+        mutable long _dataWritten;
 
         // methods, etc..
 
@@ -293,20 +291,20 @@ namespace mongo {
         string getns() const { return _ns; }
 
         int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
-        bool hasShardKey( const BSONObj& obj );
+        bool hasShardKey( const BSONObj& obj ) const;
 
         void createFirstChunk( const Shard& shard );
-        ChunkPtr findChunk( const BSONObj& obj );
+        ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
         const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique() const { return _unique; }
 
-        void maybeChunkCollection();
+        void maybeChunkCollection() const;
 
-        void getShardsForQuery( set<Shard>& shards , const BSONObj& query );
-        void getAllShards( set<Shard>& all );
-        void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max); // [min, max)
+        void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
+        void getAllShards( set<Shard>& all ) const;
+        void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max) const; // [min, max)
 
         string toString() const;
 
@@ -318,7 +316,7 @@ namespace mongo {
          */
         unsigned long long getSequenceNumber() const { return _sequenceNumber; }
 
-        void getInfo( BSONObjBuilder& b ) {
+        void getInfo( BSONObjBuilder& b ) const {
             b.append( "key" , _key.key() );
             b.appendBool( "unique" , _unique );
         }
@@ -326,7 +324,7 @@ namespace mongo {
         /**
          * @param me - so i don't get deleted before i'm done
          */
-        void drop( ChunkManagerPtr me );
+        void drop( ChunkManagerPtr me ) const;
 
         void _printChunks() const;
 
@@ -337,7 +335,7 @@ namespace mongo {
 
         void _load();
 
-        void ensureIndex_inlock();
+        void ensureIndex_inlock() const;
 
         const string _ns;
         const ShardKeyPattern _key;
@@ -351,7 +349,7 @@ namespace mongo {
         unsigned long long _sequenceNumber;
 
         mutable RWLock _lock;
-        DistributedLock _nsLock;
+        mutable DistributedLock _nsLock;
 
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()

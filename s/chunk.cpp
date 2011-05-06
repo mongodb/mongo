@@ -49,11 +49,11 @@ namespace mongo {
     int Chunk::MaxObjectPerChunk = 250000;
     
 
-    Chunk::Chunk( ChunkManager * manager ) : _manager(manager), _lastmod(0) {
+    Chunk::Chunk( const ChunkManager * manager ) : _manager(manager), _lastmod(0) {
         _setDataWritten();
     }
 
-    Chunk::Chunk(ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
+    Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
         : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0) {
         _setDataWritten();
     }
@@ -278,7 +278,7 @@ namespace mongo {
         return true;
     }
 
-    bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ) {
+    bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, BSONObj& res ) const {
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
 
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
@@ -310,7 +310,7 @@ namespace mongo {
         return worked;
     }
 
-    bool Chunk::splitIfShould( long dataWritten ) {
+    bool Chunk::splitIfShould( long dataWritten ) const {
         LastError::Disabled d( lastError.get() );
 
         try {
@@ -401,7 +401,7 @@ namespace mongo {
         return (long)result["size"].number();
     }
 
-    void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ) {
+    void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ) const {
         BSONObjBuilder bb( b.subobjStart( name ) );
         bb.append( "min" , _min );
         bb.append( "max" , _max );
@@ -589,7 +589,7 @@ namespace mongo {
         }
     }
 
-    bool ChunkManager::hasShardKey( const BSONObj& obj ) {
+    bool ChunkManager::hasShardKey( const BSONObj& obj ) const {
         return _key.hasShardKey( obj );
     }
 
@@ -640,7 +640,7 @@ namespace mongo {
         log() << "successfully created first chunk for " << c->toString() << endl;
     }
 
-    ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) {
+    ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) const {
         BSONObj key = _key.extractKey(obj);
 
         {
@@ -649,7 +649,7 @@ namespace mongo {
             BSONObj foo;
             ChunkPtr c;
             {
-                ChunkMap::iterator it = _chunkMap.upper_bound(key);
+                ChunkMap::const_iterator it = _chunkMap.upper_bound(key);
                 if (it != _chunkMap.end()) {
                     foo = it->first;
                     c = it->second;
@@ -684,7 +684,7 @@ namespace mongo {
         return ChunkPtr();
     }
 
-    void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) {
+    void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
         rwlock lk( _lock , false );
 
         //TODO look into FieldRangeSetOr
@@ -747,7 +747,7 @@ namespace mongo {
         while (org.moreOrClauses());
     }
 
-    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max) {
+    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max) const {
         uassert(13405, "min must have shard key", hasShardKey(min));
         uassert(13406, "max must have shard key", hasShardKey(max));
 
@@ -763,12 +763,12 @@ namespace mongo {
         }
     }
 
-    void ChunkManager::getAllShards( set<Shard>& all ) {
+    void ChunkManager::getAllShards( set<Shard>& all ) const {
         rwlock lk( _lock , false );
         all.insert(_shards.begin(), _shards.end());
     }
 
-    void ChunkManager::ensureIndex_inlock() {
+    void ChunkManager::ensureIndex_inlock() const {
         //TODO in parallel?
         for ( set<Shard>::const_iterator i=_shards.begin(); i!=_shards.end(); ++i ) {
             ScopedDbConnection conn( i->getConnString() );
@@ -777,7 +777,7 @@ namespace mongo {
         }
     }
 
-    void ChunkManager::drop( ChunkManagerPtr me ) {
+    void ChunkManager::drop( ChunkManagerPtr me ) const {
         rwlock lk( _lock , true );
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
@@ -806,11 +806,6 @@ namespace mongo {
 
         log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;
 
-        // wipe my meta-data
-        _chunkMap.clear();
-        _chunkRanges.clear();
-        _shards.clear();
-
         // delete data from mongod
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
             ScopedDbConnection conn( *i );
@@ -838,7 +833,7 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
 
-    void ChunkManager::maybeChunkCollection() {
+    void ChunkManager::maybeChunkCollection() const {
         uassert( 13346 , "can't pre-split already splitted collection" , (_chunkMap.size() == 1) );
 
         ChunkPtr soleChunk = _chunkMap.begin()->second;
