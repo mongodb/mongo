@@ -104,6 +104,6 @@ int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dpV] [-f output-file] file\n", progname);
+	    "usage: %s [-dpV] [-f output-file] [-h home] file\n", progname);
 	return (EXIT_FAILURE);
 }
