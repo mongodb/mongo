@@ -52,7 +52,7 @@ namespace mongo {
        x is in a shard iff
        min <= x < max
      */
-    class Chunk : boost::noncopyable, public boost::enable_shared_from_this<Chunk>  {
+    class Chunk : boost::noncopyable {
     public:
         Chunk( const ChunkManager * info , BSONObj from);
         Chunk( const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
