@@ -36,6 +36,9 @@ namespace mongo {
         inline AtomicUInt operator--(); // --prefix
         inline AtomicUInt operator--(int); // postfix--
 
+        inline AtomicUInt operator+=(int i);
+        inline AtomicUInt operator-=(int i);
+
         inline void zero() { x = 0; } // TODO: this isn't thread safe
 
         volatile unsigned x;
@@ -55,6 +58,12 @@ namespace mongo {
     AtomicUInt AtomicUInt::operator--(int) {
         return InterlockedDecrement((volatile long*)&x)+1;
     }
+    AtomicUInt AtomicUInt::operator+=(int i) {
+        return InterlockedAdd((volatile long*)&x, (long)i);
+    }
+    AtomicUInt AtomicUInt::operator-=(int i) {
+        return InterlockedAdd((volatile long*)&x, (long)-i);
+    }
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
     // this is in GCC >= 4.1
     AtomicUInt AtomicUInt::operator++() {
@@ -68,6 +77,12 @@ namespace mongo {
     }
     AtomicUInt AtomicUInt::operator--(int) {
         return __sync_fetch_and_add(&x, -1);
+    }
+    AtomicUInt AtomicUInt::operator+=(int i) {
+        return __sync_add_and_fetch(&x, i);
+    }
+    AtomicUInt AtomicUInt::operator-=(int i) {
+        return __sync_add_and_fetch(&x, -i);
     }
 #elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
     // from boost 1.39 interprocess/detail/atomic.hpp
@@ -95,6 +110,12 @@ namespace mongo {
     }
     AtomicUInt AtomicUInt::operator--(int) {
         return atomic_int_helper(&x, -1);
+    }
+    AtomicUInt AtomicUInt::operator+=(int i) {
+        return atomic_int_helper(&x, i)+i;
+    }
+    AtomicUInt AtomicUInt::operator-=(int i) {
+        return atomic_int_helper(&x, -i)-i;
     }
 #else
 #  error "unsupported compiler or platform"
