@@ -288,7 +288,7 @@ namespace mongo {
 
         string getns() const { return _ns; }
 
-        int numChunks() const { rwlock lk( _lock , false ); return _chunkMap.size(); }
+        int numChunks() const { return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj ) const;
 
         void createFirstChunk( const Shard& shard ) const; // only call from DBConfig::shardCollection
@@ -345,7 +345,7 @@ namespace mongo {
 
         const set<Shard> _shards;
 
-        mutable RWLock _lock;
+        mutable mutex _mutex; // only used with _nsLock
         mutable DistributedLock _nsLock;
 
         const unsigned long long _sequenceNumber;

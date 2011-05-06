@@ -481,7 +481,7 @@ namespace mongo {
     AtomicUInt ChunkManager::NextSequenceNumber = 1;
 
     ChunkManager::ChunkManager( string ns , ShardKeyPattern pattern , bool unique ) :
-        _ns( ns ) , _key( pattern ) , _unique( unique ) , _chunkRanges(), _lock("rw:ChunkManager"),
+        _ns( ns ) , _key( pattern ) , _unique( unique ) , _chunkRanges(), _mutex("ChunkManager"),
         _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns ),
 
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
@@ -624,8 +624,6 @@ namespace mongo {
         BSONObj key = _key.extractKey(obj);
 
         {
-            rwlock lk( _lock , false );
-
             BSONObj foo;
             ChunkPtr c;
             {
@@ -653,8 +651,6 @@ namespace mongo {
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
-        rwlock lk( _lock , false );
-
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
             ChunkPtr c = i->second;
             if ( c->getShard() == shard )
@@ -665,8 +661,6 @@ namespace mongo {
     }
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
-        rwlock lk( _lock , false );
-
         //TODO look into FieldRangeSetOr
         OrRangeGenerator org(_ns.c_str(), query, false);
 
@@ -744,12 +738,11 @@ namespace mongo {
     }
 
     void ChunkManager::getAllShards( set<Shard>& all ) const {
-        rwlock lk( _lock , false );
         all.insert(_shards.begin(), _shards.end());
     }
 
     void ChunkManager::drop( ChunkManagerPtr me ) const {
-        rwlock lk( _lock , true );
+        scoped_lock lk( _mutex );
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
 
@@ -825,7 +818,6 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
-        rwlock lk( _lock , false );
         // TODO: cache or something?
 
         ShardChunkVersion max = 0;
@@ -842,8 +834,6 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersion() const {
-        rwlock lk( _lock , false );
-
         ShardChunkVersion max = 0;
 
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
@@ -856,8 +846,6 @@ namespace mongo {
     }
 
     string ChunkManager::toString() const {
-        rwlock lk( _lock , false );
-
         stringstream ss;
         ss << "ChunkManager: " << _ns << " key:" << _key.toString() << '\n';
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
