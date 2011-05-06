@@ -486,12 +486,13 @@ namespace mongo {
     {
         int tries = 3;
         while (tries--) {
-            _chunkMap.clear();
-            _chunkRanges.clear();
-            _shards.clear();
-            _load();
+            ChunkMap chunkMap;
+            set<Shard> shards;
+            _load(chunkMap, shards);
 
-            if (_isValid()) {
+            if (_isValid(chunkMap)) {
+                _chunkMap.swap(chunkMap);
+                _shards.swap(shards);
                 _chunkRanges.reloadAll(_chunkMap);
 
                 // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
@@ -523,7 +524,7 @@ namespace mongo {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
-    void ChunkManager::_load() {
+    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards) const {
         ScopedDbConnection conn( configServer.modelServer() );
 
         // TODO really need the sort?
@@ -538,25 +539,25 @@ namespace mongo {
 
             ChunkPtr c( new Chunk( this, d ) );
 
-            _chunkMap[c->getMax()] = c;
-            _shards.insert(c->getShard());
+            chunkMap[c->getMax()] = c;
+            shards.insert(c->getShard());
 
         }
         conn.done();
     }
 
-    bool ChunkManager::_isValid() const {
+    bool ChunkManager::_isValid(const ChunkMap& chunkMap) {
 #define ENSURE(x) do { if(!(x)) { log() << "ChunkManager::_isValid failed: " #x << endl; return false; } } while(0)
 
-        if (_chunkMap.empty())
+        if (chunkMap.empty())
             return true;
 
         // Check endpoints
-        ENSURE(allOfType(MinKey, _chunkMap.begin()->second->getMin()));
-        ENSURE(allOfType(MaxKey, prior(_chunkMap.end())->second->getMax()));
+        ENSURE(allOfType(MinKey, chunkMap.begin()->second->getMin()));
+        ENSURE(allOfType(MaxKey, prior(chunkMap.end())->second->getMax()));
 
         // Make sure there are no gaps or overlaps
-        for (ChunkMap::const_iterator it=boost::next(_chunkMap.begin()), end=_chunkMap.end(); it != end; ++it) {
+        for (ChunkMap::const_iterator it=boost::next(chunkMap.begin()), end=chunkMap.end(); it != end; ++it) {
             ChunkMap::const_iterator last = prior(it);
 
             if (!(it->second->getMin() == last->second->getMax())) {

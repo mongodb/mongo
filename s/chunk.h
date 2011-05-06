@@ -332,7 +332,9 @@ namespace mongo {
     private:
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
 
-        void _load();
+        // helpers for constructor
+        void _load(ChunkMap& chunks, set<Shard>& shards) const;
+        static bool _isValid(const ChunkMap& chunks);
 
         const string _ns;
         const ShardKeyPattern _key;
@@ -351,8 +353,6 @@ namespace mongo {
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;
-
-        bool _isValid() const;
     };
 
     // like BSONObjCmp. for use as an STL comparison functor
