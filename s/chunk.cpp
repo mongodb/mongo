@@ -668,7 +668,7 @@ namespace mongo {
                 PRINT(*c);
                 PRINT(key);
 
-                _reload_inlock();
+                reload();
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
             }
         }
