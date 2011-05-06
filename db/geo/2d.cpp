@@ -1599,12 +1599,14 @@ namespace mongo {
         double approxDistance( const GeoHash& h ) {
 
             double approxDistance = -1;
+            Point p( _g, h );
             switch (_type) {
             case GEO_PLAIN:
-                approxDistance = _near.distance( Point( _g, h ) );
+                approxDistance = _near.distance( p );
                 break;
             case GEO_SPHERE:
-                approxDistance = spheredist_deg( _near, Point( _g, h ) );
+                checkEarthBounds( p );
+                approxDistance = spheredist_deg( _near, p );
                 break;
             default: assert( false );
             }
@@ -1636,14 +1638,17 @@ namespace mongo {
                 double exactDistance = -1;
                 bool exactWithin = false;
 
+                Point p( loc );
+
                 // Get the appropriate distance for the type
                 switch ( _type ) {
                 case GEO_PLAIN:
-                    exactDistance = _near.distance( Point( loc ) );
-                    exactWithin = _near.distanceWithin( Point( loc ), _maxDistance );
+                    exactDistance = _near.distance( p );
+                    exactWithin = _near.distanceWithin( p, _maxDistance );
                     break;
                 case GEO_SPHERE:
-                    exactDistance = spheredist_deg( _near, Point( loc ) );
+                    checkEarthBounds( p );
+                    exactDistance = spheredist_deg( _near, p );
                     exactWithin = ( exactDistance <= _maxDistance );
                     break;
                 default: assert( false );
@@ -1723,6 +1728,7 @@ namespace mongo {
                 _scanDistance = maxDistance + _spec->_error;
             }
             else if (type == GEO_SPHERE) {
+                checkEarthBounds( startPt );
                 // TODO: consider splitting into x and y scan distances
                 _scanDistance = computeXScanDistance( startPt._y, rad2deg( _maxDistance ) + _spec->_error );
             }
@@ -1927,6 +1933,7 @@ namespace mongo {
                 // Same, but compute maxDistance using spherical transform
 
                 uassert(13461, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
+                checkEarthBounds( _startPt );
 
                 _type = GEO_SPHERE;
                 _yScanDistance = rad2deg( _maxDistance ) + _g->_error;
@@ -1973,10 +1980,13 @@ namespace mongo {
                 d = _g->distance( _start , h );
                 error = _g->_error;
                 break;
-            case GEO_SPHERE:
-                d = spheredist_deg( _startPt, Point( _g, h ) );
+            case GEO_SPHERE: {
+                Point p( _g, h );
+                checkEarthBounds( p );
+                d = spheredist_deg( _startPt, p );
                 error = _g->_errorSphere;
                 break;
+            }
             default: assert( false );
             }
 
@@ -1991,17 +2001,19 @@ namespace mongo {
 
                     GEODEBUG( "Inexact distance : " << d << " vs " << _maxDistance << " from " << ( *i ).toString() << " due to error " << error );
 
+                    Point p( *i );
                     // Exact distance checks.
                     switch (_type) {
                     case GEO_PLAIN: {
-                        if( _startPt.distanceWithin( Point( *i ), _maxDistance ) ) return true;
+                        if( _startPt.distanceWithin( p, _maxDistance ) ) return true;
                         break;
                     }
                     case GEO_SPHERE:
                         // Ignore all locations not hashed to the key's hash, since spherical calcs are
                         // more expensive.
                         if( _g->_hash( *i ) != h ) break;
-                        if( spheredist_deg( _startPt , Point( *i ) ) <= _maxDistance ) return true;
+                        checkEarthBounds( p );
+                        if( spheredist_deg( _startPt , p ) <= _maxDistance ) return true;
                         break;
                     default: assert( false );
                     }
@@ -2373,7 +2385,6 @@ namespace mongo {
             if ( cmdObj["spherical"].trueValue() )
                 type = GEO_SPHERE;
 
-            // We're returning exact distances, so don't evaluate lazily.
             GeoSearch gs( g , n , numWanted , filter , maxDistance , type );
 
             if ( cmdObj["start"].type() == String) {

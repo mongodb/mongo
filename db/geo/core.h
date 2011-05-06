@@ -454,6 +454,12 @@ namespace mongo {
     extern const double EARTH_RADIUS_KM;
     extern const double EARTH_RADIUS_MILES;
 
+    // Technically lat/long bounds, not really tied to earth radius.
+    inline void checkEarthBounds( Point p ) {
+        uassert( 14808, str::stream() << "point " << p.toString() << " must be in earth-like bounds of long : [-180, 180), lat : [-90, 90] ",
+                 p._x >= -180 && p._x < 180 && p._y >= -90 && p._y <= 90 );
+    }
+
     inline double deg2rad(double deg) { return deg * (M_PI/180); }
     inline double rad2deg(double rad) { return rad * (180/M_PI); }
 
