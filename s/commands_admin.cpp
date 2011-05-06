@@ -608,7 +608,7 @@ namespace mongo {
                     worked = chunk->multiSplit( splitPoints , res );
                 }
 
-                if ( worked ) {
+                if ( !worked ) {
                     errmsg = "split failed";
                     result.append( "cause" , res );
                     return false;
