@@ -288,7 +288,7 @@ namespace mongo {
      */
     template< class V >
     inline int BucketBasics<V>::_alloc(int bytes) {
-        dassert( this->emptySize > bytes );
+        assert( this->emptySize >= bytes );
         this->topSize += bytes;
         this->emptySize -= bytes;
         int ofs = totalDataSize() - this->topSize;
