@@ -264,8 +264,8 @@ namespace mongo {
             conn.done();
 
             // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
-            // but we issue here so that mongos may refresh wihtout needing to be written/read against
-            grid.getDBConfig( getns() )->getChunkManager( getns() , true );
+            // but we issue here so that mongos may refresh without needing to be written/read against
+            _manager->reload();
 
             return false;
         }
@@ -273,7 +273,7 @@ namespace mongo {
         conn.done();
         
         // force reload of config
-        grid.getDBConfig( getns() )->getChunkManager( getns() , true );
+        _manager->reload();
 
         return true;
     }
@@ -305,7 +305,7 @@ namespace mongo {
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
         // reload is excessive here as the failure could be simply because collection metadata is taken
-        grid.getDBConfig( getns() )->getChunkManager( getns() , true );
+        _manager->reload();
 
         return worked;
     }
@@ -355,7 +355,7 @@ namespace mongo {
                     return true; // we did split even if we didn't migrate
                 }
 
-                ChunkManagerPtr cm = grid.getDBConfig(getns())->getChunkManager(getns(), false/*reloaded by split*/);
+                ChunkManagerPtr cm = _manager->reload(false/*just reloaded in mulitsplit*/);
                 ChunkPtr toMove = cm->findChunk(min);
 
                 if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
@@ -371,7 +371,7 @@ namespace mongo {
                          toMove->moveAndCommit( newLocation , MaxChunkSize , res ) );
                 
                 // update our config
-                grid.getDBConfig( toMove->getns() )->getChunkManager( toMove->getns() , true );
+                _manager->reload();
             }
 
             return true;
@@ -501,6 +501,11 @@ namespace mongo {
         _chunkRanges.clear();
         _shards.clear();
     }
+
+    ChunkManagerPtr ChunkManager::reload(bool force) const {
+        return grid.getDBConfig(getns())->getChunkManager(getns(), force);
+    }
+
 
     void ChunkManager::_reload_inlock() {
         int tries = 3;
