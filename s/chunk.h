@@ -335,7 +335,6 @@ namespace mongo {
     private:
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
 
-        void _reload_inlock();
         void _load();
 
         void ensureIndex_inlock();

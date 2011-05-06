@@ -492,22 +492,8 @@ namespace mongo {
 
     ChunkManager::ChunkManager( string ns , ShardKeyPattern pattern , bool unique ) :
         _ns( ns ) , _key( pattern ) , _unique( unique ) , _lock("rw:ChunkManager"),
-        _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns ) {
-        _reload_inlock();  // will set _sequenceNumber
-    }
-
-    ChunkManager::~ChunkManager() {
-        _chunkMap.clear();
-        _chunkRanges.clear();
-        _shards.clear();
-    }
-
-    ChunkManagerPtr ChunkManager::reload(bool force) const {
-        return grid.getDBConfig(getns())->getChunkManager(getns(), force);
-    }
-
-
-    void ChunkManager::_reload_inlock() {
+        _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
+    {
         int tries = 3;
         while (tries--) {
             _chunkMap.clear();
@@ -533,8 +519,18 @@ namespace mongo {
             sleepmillis(10 * (3-tries));
         }
 
+        // this will abort construction so we should never have a reference to an invalid config
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
+    }
 
+    ChunkManager::~ChunkManager() {
+        _chunkMap.clear();
+        _chunkRanges.clear();
+        _shards.clear();
+    }
+
+    ChunkManagerPtr ChunkManager::reload(bool force) const {
+        return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
     void ChunkManager::_load() {
