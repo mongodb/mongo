@@ -1306,7 +1306,11 @@ namespace mongo {
 #endif
             if( maxToAdd < 0 ) maxToAdd = maxToCheck;
             int maxFound = _foundInExp + maxToCheck;
-            int maxAdded = _found + maxToAdd;
+            assert( maxToCheck > 0 );
+            assert( maxFound > 0 );
+            assert( _found <= 0x7fffffff ); // conversion to int
+            int maxAdded = static_cast<int>(_found) + maxToAdd;
+            assert( maxAdded >= 0 ); // overflow check
 
             bool isNeighbor = _centerPrefix.constrains();
 
@@ -1480,7 +1484,8 @@ namespace mongo {
 
                         assert( ! onlyExpand );
 
-                        fillStack( maxFound - _foundInExp, maxAdded - _found );
+                        assert( _found <= 0x7fffffff );
+                        fillStack( maxFound - _foundInExp, maxAdded - static_cast<int>(_found) );
 
                         // When we return from the recursive fillStack call, we'll either have checked enough points or
                         // be entirely done.  Max recurse depth is < 8 * 16.
@@ -1756,7 +1761,9 @@ namespace mongo {
            // Part 1
            {
                do {
-                   fillStack( maxPointsHeuristic, _numWanted - found() , true );
+                   long long f = found();
+                   assert( f <= 0x7fffffff );
+                   fillStack( maxPointsHeuristic, _numWanted - static_cast<int>(f) , true );
                } while( _state != DONE && _state != DONE_NEIGHBOR &&
                         found() < _numWanted &&
                         (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
