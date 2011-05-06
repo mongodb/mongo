@@ -481,8 +481,14 @@ namespace mongo {
     AtomicUInt ChunkManager::NextSequenceNumber = 1;
 
     ChunkManager::ChunkManager( string ns , ShardKeyPattern pattern , bool unique ) :
-        _ns( ns ) , _key( pattern ) , _unique( unique ) , _lock("rw:ChunkManager"),
-        _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns )
+        _ns( ns ) , _key( pattern ) , _unique( unique ) , _chunkRanges(), _lock("rw:ChunkManager"),
+        _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns ),
+
+        // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
+        // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
+        // the most up to date value.
+        _sequenceNumber(++NextSequenceNumber)
+
     {
         int tries = 3;
         while (tries--) {
@@ -491,15 +497,12 @@ namespace mongo {
             _load(chunkMap, shards);
 
             if (_isValid(chunkMap)) {
-                _chunkMap.swap(chunkMap);
-                _shards.swap(shards);
-                _chunkRanges.reloadAll(_chunkMap);
-
-                // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
-                // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
-                // the most up to date value.
-                _sequenceNumber = ++NextSequenceNumber;
-
+                // These variables are const for thread-safety. Since the
+                // constructor can only be called from one thread, we don't have
+                // to worry about that here.
+                const_cast<ChunkMap&>(_chunkMap).swap(chunkMap);
+                const_cast<set<Shard>&>(_shards).swap(shards);
+                const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
                 return;
             }
 
@@ -512,12 +515,6 @@ namespace mongo {
 
         // this will abort construction so we should never have a reference to an invalid config
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
-    }
-
-    ChunkManager::~ChunkManager() {
-        _chunkMap.clear();
-        _chunkRanges.clear();
-        _shards.clear();
     }
 
     ChunkManagerPtr ChunkManager::reload(bool force) const {

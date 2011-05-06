@@ -285,7 +285,6 @@ namespace mongo {
     public:
 
         ChunkManager( string ns , ShardKeyPattern pattern , bool unique );
-        virtual ~ChunkManager();
 
         string getns() const { return _ns; }
 
@@ -336,19 +335,20 @@ namespace mongo {
         void _load(ChunkMap& chunks, set<Shard>& shards) const;
         static bool _isValid(const ChunkMap& chunks);
 
+        // All members should be const for thread-safety
         const string _ns;
         const ShardKeyPattern _key;
         const bool _unique;
 
-        ChunkMap _chunkMap;
-        ChunkRangeManager _chunkRanges;
+        const ChunkMap _chunkMap;
+        const ChunkRangeManager _chunkRanges;
 
-        set<Shard> _shards;
-
-        unsigned long long _sequenceNumber;
+        const set<Shard> _shards;
 
         mutable RWLock _lock;
         mutable DistributedLock _nsLock;
+
+        const unsigned long long _sequenceNumber;
 
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
