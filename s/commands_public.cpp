@@ -1117,8 +1117,7 @@ namespace mongo {
 	    BSONObj shardedCommand(commandBuilder.done());
 
 	    BSONObjBuilder shardQueryBuilder;
-	        // CW TODO need to extract this from pShardPipeline!!
-	        // left empty like this, the predicate is "{}"
+	    pShardPipeline->getMatcherQuery(&shardQueryBuilder);
 	    BSONObj shardQuery(shardQueryBuilder.done());
 
 	    ChunkManagerPtr cm(conf->getChunkManager(fullns));

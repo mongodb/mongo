@@ -70,6 +70,27 @@ namespace mongo {
 	boost::shared_ptr<Pipeline> splitForSharded();
 
 	/*
+	  If there is a Matcher query at the beginning of the pipeline,
+	  get it, by adding its terms to the object under construction.  If
+	  not, this adds nothing to the object under construction.
+
+	  @param pQueryBuilder an initialized object builder
+	 */
+	void getMatcherQuery(BSONObjBuilder *pQueryBuilder) const;
+
+	/*
+	  If there is a matcher query at the beginning of the pipeline,
+	  remove it from the pipeline.
+
+	  This is used after we use the query optimizer to create a Cursor
+	  that already captures the Matcher query predicate, so we don't need
+	  to evaluate that predicate in the pipeline again.
+
+	  If there is no Matcher query, does nothing.
+	 */
+	void removeMatcherQuery();
+
+	/*
 	  Write the Pipeline as a BSONObj command.  This should be the
 	  inverse of parseCommand().
 

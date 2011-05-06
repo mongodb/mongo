@@ -18,12 +18,13 @@
 
 #include "db/commands/pipeline.h"
 #include "db/cursor.h"
+#include "db/pdfile.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
-#include "db/pdfile.h"
+#include "db/queryoptimizer.h"
 
 namespace mongo {
 
@@ -78,11 +79,20 @@ namespace mongo {
 	if (!pPipeline.get())
 	    return false;
 
-	/* now hook up the pipeline */
-        /* connect up a cursor to the specified collection */
+	/* get a query to use */
+	BSONObjBuilder queryBuilder;
+	pPipeline->getMatcherQuery(&queryBuilder);
+	BSONObj query(queryBuilder.done());
+
+	/* remove that query from the pipeline */
+	pPipeline->removeMatcherQuery();
+
+	/* create a cursor for that query */
 	string fullName(db + "." + pPipeline->getCollectionName());
-	boost::shared_ptr<Cursor> pCursor(
-            findTableScan(fullName.c_str(), BSONObj()));
+	shared_ptr<Cursor> pCursor(
+	    newQueryOptimizerCursor(fullName.c_str(), query));
+
+	/* wrap the cursor with a DocumentSource */
 	boost::shared_ptr<DocumentSource> pSource(
 	    DocumentSourceCursor::create(pCursor));
 

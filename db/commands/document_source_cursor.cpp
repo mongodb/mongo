@@ -53,8 +53,9 @@ namespace mongo {
 
     void DocumentSourceCursor::findNext() {
 	/* standard cursor usage pattern */
-	CoveredIndexMatcher *pCIM = pCursor->matcher();
 	while(pCursor->ok()) {
+	    CoveredIndexMatcher *pCIM = pCursor->matcher();
+	    assert(pCIM);
 	    if (!pCIM || pCIM->matchesCurrent(pCursor.get()) &&
 		!pCursor->getsetdup(pCursor->currLoc())) {
 

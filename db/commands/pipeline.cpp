@@ -164,6 +164,10 @@ namespace mongo {
 	    pSourceList->push_back(pSource);
         }
 
+	/* if there aren't any pipeline stages, there's nothing more to do */
+	if (!pSourceList->size())
+	    return pPipeline;
+
 	/*
 	  Move filters up where possible.
 
@@ -247,6 +251,22 @@ namespace mongo {
 	}
 
 	return pShardPipeline;
+    }
+
+    void Pipeline::getMatcherQuery(BSONObjBuilder *pQueryBuilder) const {
+	const shared_ptr<DocumentSource> &pFirst = sourceList.front();
+	shared_ptr<DocumentSourceMatch> pMatch(
+	    dynamic_pointer_cast<DocumentSourceMatch>(pFirst));
+	if (!pMatch.get())
+	    return;
+
+	pMatch->toMatcherBson(pQueryBuilder);
+    }
+
+    void Pipeline::removeMatcherQuery() {
+	const shared_ptr<DocumentSource> &pFirst = sourceList.front();
+	if (dynamic_cast<DocumentSourceMatch *>(pFirst.get()))
+	    sourceList.pop_front();
     }
 
     void Pipeline::toBson(BSONObjBuilder *pBuilder) const {
