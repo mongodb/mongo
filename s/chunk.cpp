@@ -337,7 +337,37 @@ namespace mongo {
 #endif
                   << endl;
 
-            moveIfShould( shared_from_this() , newShard );
+            BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
+            if (!shouldMigrate.eoo()){
+                BSONObj range = shouldMigrate.embeddedObject();
+                Shard newLocation = Shard::pick( getShard() );
+                if ( getShard() == newLocation ) {
+                    // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
+                    log(1) << "recently split chunk: " << range << " already in the best shard: " << getShard() << endl;
+                    return true; // we did split even if we didn't migrate
+                }
+
+                BSONObj min = range["min"].embeddedObject();
+                BSONObj max = range["max"].embeddedObject();
+
+                ChunkManagerPtr cm = grid.getDBConfig(getns())->getChunkManager(getns(), false/*reloaded by split*/);
+                ChunkPtr toMove = cm->findChunk(min);
+
+                if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
+                    log(1) << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
+                    return true;
+                }
+
+                log() << "moving chunk (auto): " << toMove << " to: " << newLocation.toString() << endl;
+
+                BSONObj res;
+                massert( 10412 ,
+                         str::stream() << "moveAndCommit failed: " << res ,
+                         toMove->moveAndCommit( newLocation , MaxChunkSize , res ) );
+                
+                // update our config
+                grid.getDBConfig( toMove->getns() )->getChunkManager( toMove->getns() , true );
+            }
 
             return true;
 
@@ -347,41 +377,6 @@ namespace mongo {
             warning() << "could have autosplit on collection: " << _manager->getns() << " but: " << e.what() << endl;
             return false;
         }
-    }
-
-    bool Chunk::moveIfShould( ChunkPtr oldChunk , ChunkPtr newChunk ) {
-        ChunkPtr toMove;
-
-        if ( newChunk->countObjects(2) <= 1 ) {
-            toMove = newChunk;
-        }
-        else if ( oldChunk->countObjects(2) <= 1 ) {
-            toMove = oldChunk;
-        }
-        else {
-            // moving middle shards is handled by balancer
-            return false;
-        }
-
-        assert( toMove );
-
-        Shard newLocation = Shard::pick( toMove->getShard() );
-        if ( toMove->getShard() == newLocation ) {
-            // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
-            log(1) << "recently split chunk: " << toMove->toString() << "already in the best shard" << endl;
-            return false;
-        }
-
-        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objects: " << toMove->countObjects() << endl;
-
-        BSONObj res;
-        massert( 10412 ,
-                 str::stream() << "moveAndCommit failed: " << res ,
-                 toMove->moveAndCommit( newLocation , MaxChunkSize , res ) );
-        
-        // update our config
-        grid.getDBConfig( toMove->getns() )->getChunkManager( toMove->getns() , true );
-        return true;
     }
 
     long Chunk::getPhysicalSize() const {
@@ -399,23 +394,6 @@ namespace mongo {
 
         conn.done();
         return (long)result["size"].number();
-    }
-
-    int Chunk::countObjects(int maxCount) const {
-        static const BSONObj fields = BSON("_id" << 1 );
-
-        ShardConnection conn( getShard() , _manager->getns() );
-
-        // not using regular count as this is more flexible and supports $min/$max
-        Query q = Query().minKey(_min).maxKey(_max);
-        int n;
-        {
-            auto_ptr<DBClientCursor> c = conn->query(_manager->getns(), q, maxCount, 0, &fields);
-            assert( c.get() );
-            n = c->itcount();
-        }
-        conn.done();
-        return n;
     }
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ) {

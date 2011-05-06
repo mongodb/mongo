@@ -802,6 +802,21 @@ namespace mongo {
                 }
             }
 
+            if (newChunks.size() == 2){
+                // If one of the chunks has only one object in it we should move it
+                static const BSONObj fields = BSON("_id" << 1 );
+                DBDirectClient conn;
+                for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
+                    ChunkInfo chunk = newChunks[i];
+                    Query q = Query().minKey(chunk.min).maxKey(chunk.max);
+                    scoped_ptr<DBClientCursor> c (conn.query(ns, q, /*limit*/-2, 0, &fields));
+                    if (c && c->itcount() == 1) {
+                        result.append("shouldMigrate", BSON("min" << chunk.min << "max" << chunk.max));
+                        break;
+                    }
+                }
+            }
+
             return true;
         }
     } cmdSplitChunk;

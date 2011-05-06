@@ -141,13 +141,6 @@ namespace mongo {
         //
 
         /**
-         * moves either this shard or newShard if it makes sense too
-         *
-         * @return whether or not a shard was moved
-         */
-        static bool moveIfShould( ChunkPtr oldChunk , ChunkPtr newChunk );
-
-        /**
          * Issues a migrate request for this chunk
          *
          * @param to shard to move this chunk to
@@ -162,11 +155,6 @@ namespace mongo {
          *  talks to mongod to do this
          */
         long getPhysicalSize() const;
-
-        //
-        // chunk size support
-
-        int countObjects(int maxcount=0) const;
 
         //
         // public constants
