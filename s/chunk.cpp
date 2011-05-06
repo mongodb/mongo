@@ -49,9 +49,27 @@ namespace mongo {
     int Chunk::MaxObjectPerChunk = 250000;
     
 
-    Chunk::Chunk(const ChunkManager * manager)
+    Chunk::Chunk(const ChunkManager * manager, BSONObj from)
         : _manager(manager), _lastmod(0), _dataWritten(mkDataWritten())
-    {}
+    {
+        string ns = from.getStringField( "ns" );
+        _shard.reset( from.getStringField( "shard" ) );
+
+        _lastmod = from["lastmod"];
+        assert( _lastmod > 0 );
+
+        _min = from.getObjectField( "min" ).getOwned();
+        _max = from.getObjectField( "max" ).getOwned();
+
+        uassert( 10170 ,  "Chunk needs a ns" , ! ns.empty() );
+        uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
+
+        uassert( 10171 ,  "Chunk needs a server" , _shard.ok() );
+
+        uassert( 10172 ,  "Chunk needs a min" , ! _min.isEmpty() );
+        uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
+    }
+
 
     Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
         : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0), _dataWritten(mkDataWritten())
@@ -448,25 +466,6 @@ namespace mongo {
         return buf.str();
     }
 
-    void Chunk::unserialize(const BSONObj& from) {
-        string ns = from.getStringField( "ns" );
-        _shard.reset( from.getStringField( "shard" ) );
-
-        _lastmod = from["lastmod"];
-        assert( _lastmod > 0 );
-
-        _min = from.getObjectField( "min" ).getOwned();
-        _max = from.getObjectField( "max" ).getOwned();
-
-        uassert( 10170 ,  "Chunk needs a ns" , ! ns.empty() );
-        uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
-
-        uassert( 10171 ,  "Chunk needs a server" , _shard.ok() );
-
-        uassert( 10172 ,  "Chunk needs a min" , ! _min.isEmpty() );
-        uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
-    }
-
     string Chunk::toString() const {
         stringstream ss;
         ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
@@ -537,8 +536,7 @@ namespace mongo {
                 continue;
             }
 
-            ChunkPtr c( new Chunk( this ) );
-            c->unserialize( d );
+            ChunkPtr c( new Chunk( this, d ) );
 
             _chunkMap[c->getMax()] = c;
             _shards.insert(c->getShard());

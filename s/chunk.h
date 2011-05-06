@@ -54,7 +54,7 @@ namespace mongo {
      */
     class Chunk : boost::noncopyable, public boost::enable_shared_from_this<Chunk>  {
     public:
-        Chunk( const ChunkManager * info );
+        Chunk( const ChunkManager * info , BSONObj from);
         Chunk( const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
 
         //
@@ -62,7 +62,6 @@ namespace mongo {
         //
 
         void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
-        void unserialize(const BSONObj& from);
 
         //
         // chunk boundary support
@@ -178,6 +177,7 @@ namespace mongo {
         
 
     private:
+
         // main shard info
         
         const ChunkManager * _manager;
