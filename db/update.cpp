@@ -985,8 +985,6 @@ namespace mongo {
             if( mss->canApplyInPlace() ) {
                 mss->applyModsInPlace(true);
                 DEBUGUPDATE( "\t\t\t updateById doing in place update" );
-                /*if ( profile )
-                    ss << " fastmod "; */
             }
             else {
                 BSONObj newObj = mss->createNewFromMods();
@@ -1034,7 +1032,9 @@ namespace mongo {
         int profile = client.database()->profile;
         StringBuilder& ss = debug.str;
 
-        if ( logLevel > 2 )
+                if ( profile && multi ) 
+
+        if ( logLevel > 2 && multi ) // todo https://jira.mongodb.org/browse/SERVER-3052
             ss << " update: " << updateobj.toString();
 
         /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
@@ -1131,7 +1131,7 @@ namespace mongo {
                 }
             }
 
-            if ( profile )
+            if ( profile  && !multi ) // todo https://jira.mongodb.org/browse/SERVER-3052
                 ss << " nscanned:" << nscanned;
 
             /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
@@ -1171,7 +1171,7 @@ namespace mongo {
                     mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                     DEBUGUPDATE( "\t\t\t doing in place update" );
-                    if ( profile )
+                    if ( profile && !multi ) // todo https://jira.mongodb.org/browse/SERVER-3052
                         ss << " fastmod ";
 
                     if ( modsIsIndexed ) {
@@ -1242,15 +1242,14 @@ namespace mongo {
             checkNoMods( updateobj );
             theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
             if ( logop ) {
-                DEV if( god ) log() << "REALLY??" << endl; // god doesn't get logged, this would be bad.
+                DEV wassert( !god ); // god doesn't get logged, this would be bad.
                 logOp("u", ns, updateobj, &pattern );
             }
             return UpdateResult( 1 , 0 , 1 );
-        }
+        } // end cursor loop
 
         if ( numModded )
             return UpdateResult( 1 , 1 , numModded );
-
 
         if ( profile )
             ss << " nscanned:" << nscanned;

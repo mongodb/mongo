@@ -32,11 +32,10 @@ namespace mongo {
     void profile( const Client& c , CurOp& currentOp, int millis) {
         assertInWriteLock();
         
-        string info = currentOp.debug().str.str();
-
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
+        const string info = currentOp.debug().str.str();
         b.append("info", info);
         b.append("millis", (double) millis);
         if ( currentOp.getNS() )
