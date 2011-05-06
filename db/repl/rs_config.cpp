@@ -158,9 +158,10 @@ namespace mongo {
         int me = 0;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = n.members.begin(); i != n.members.end(); i++ ) {
             const ReplSetConfig::MemberCfg& m = *i;
-            if ( isLocalHost && !m.h.isLocalHost() ) {
-                log() << "reconfig error: " << m.h.toString() << " cannot be used from localhost replset" << rsLog;
-                uasserted(13645, "hosts cannot change from localhost to hostname");
+            if ( (isLocalHost && !m.h.isLocalHost()) || (!isLocalHost && m.h.isLocalHost())) {
+                log() << "reconfig error, cannot switch between localhost and hostnames: "
+                      << m.h.toString() << rsLog;
+                uasserted(13645, "hosts cannot switch between localhost and hostname");
             }
             if( old.count(m.h) ) {
                 const ReplSetConfig::MemberCfg& oldCfg = *old[m.h];

@@ -33,13 +33,18 @@ var config = replTest.getReplSetConfig();
 
 config.members.pop();
 config.version = 2;
-try {
-  master.getDB("admin").runCommand({replSetReconfig:config});
-}
-catch(e) {
-  print(e);
-}
-reconnect(master);
+assert.soon(function() {
+        try {
+            master.getDB("admin").runCommand({replSetReconfig:config});
+        }
+        catch(e) {
+            print(e);
+        }
+
+        reconnect(master);
+        var c = master.getDB("local").system.replset.findOne();
+        return c.version == 2;
+    });
 
 
 print("Remove slave1");
