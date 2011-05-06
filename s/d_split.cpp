@@ -536,31 +536,31 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj keyPattern = cmdObj["keyPattern"].Obj();
+            const BSONObj keyPattern = cmdObj["keyPattern"].Obj();
             if ( keyPattern.isEmpty() ) {
                 errmsg = "need to specify the key pattern the collection is sharded over";
                 return false;
             }
 
-            BSONObj min = cmdObj["min"].Obj();
+            const BSONObj min = cmdObj["min"].Obj();
             if ( min.isEmpty() ) {
                 errmsg = "neet to specify the min key for the chunk";
                 return false;
             }
 
-            BSONObj max = cmdObj["max"].Obj();
+            const BSONObj max = cmdObj["max"].Obj();
             if ( max.isEmpty() ) {
                 errmsg = "neet to specify the max key for the chunk";
                 return false;
             }
 
-            string from = cmdObj["from"].str();
+            const string from = cmdObj["from"].str();
             if ( from.empty() ) {
                 errmsg = "need specify server to split chunk at";
                 return false;
             }
 
-            BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
+            const BSONObj splitKeysElem = cmdObj["splitKeys"].Obj();
             if ( splitKeysElem.isEmpty() ) {
                 errmsg = "need to provide the split points to chunk over";
                 return false;
@@ -571,7 +571,7 @@ namespace mongo {
                 splitKeys.push_back( it.next().Obj().getOwned() );
             }
 
-            BSONElement shardId = cmdObj["shardId"];
+            const BSONElement shardId = cmdObj["shardId"];
             if ( shardId.eoo() ) {
                 errmsg = "need to provide shardId";
                 return false;
