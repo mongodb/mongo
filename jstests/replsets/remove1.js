@@ -42,21 +42,38 @@ assert.soon(function() {
         }
 
         reconnect(master);
+        reconnect(replTest.nodes[2]);
         var c = master.getDB("local").system.replset.findOne();
         return c.version == 2;
+    });
+
+// make sure 2 is dead before continuing
+assert.soon(function() {
+        try {
+            replTest.nodes[2].getDB("foo").bar.findOne();
+        }
+        catch (e) {
+            return true;
+        }
+        return false;
     });
 
 
 print("Remove slave1");
 config.members.pop();
 config.version = 3;
-try {
-  master.getDB("admin").runCommand({replSetReconfig:config});
-}
-catch(e) {
-  print(e);
-}
-reconnect(master);
+assert.soon(function() {
+        try {
+            master.getDB("admin").runCommand({replSetReconfig:config});
+        }
+        catch(e) {
+            print(e);
+        }
+        
+        reconnect(master);
+        var c = master.getDB("local").system.replset.findOne();
+        return c.version == 3;
+    });
 
 print("clear slave ports");
 // these are already down, but this clears their ports from memory so that they
