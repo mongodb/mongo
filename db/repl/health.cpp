@@ -376,6 +376,9 @@ namespace mongo {
 
         lock lk((RSBase*)this);
         
+        const Member *_self = this->_self;
+        assert( _self );
+
         // add self
         {
             BSONObjBuilder bb;
