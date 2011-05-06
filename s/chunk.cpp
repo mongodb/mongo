@@ -455,16 +455,8 @@ namespace mongo {
         _lastmod = from["lastmod"];
         assert( _lastmod > 0 );
 
-        BSONElement e = from["minDotted"];
-
-        if (e.eoo()) {
-            _min = from.getObjectField( "min" ).getOwned();
-            _max = from.getObjectField( "max" ).getOwned();
-        }
-        else { // TODO delete this case after giving people a chance to migrate
-            _min = e.embeddedObject().getOwned();
-            _max = from.getObjectField( "maxDotted" ).getOwned();
-        }
+        _min = from.getObjectField( "min" ).getOwned();
+        _max = from.getObjectField( "max" ).getOwned();
 
         uassert( 10170 ,  "Chunk needs a ns" , ! ns.empty() );
         uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
