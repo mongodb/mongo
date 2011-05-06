@@ -126,22 +126,26 @@ namespace mongo {
     ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ) {
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
         uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
+
+        ChunkManagerPtr cm;
         
-        scoped_lock lk( _lock );
+        {
+            scoped_lock lk( _lock );
 
-        CollectionInfo& ci = _collections[ns];
-        uassert( 8043 , "collection already sharded" , ! ci.isSharded() );
+            CollectionInfo& ci = _collections[ns];
+            uassert( 8043 , "collection already sharded" , ! ci.isSharded() );
 
-        log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
+            log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
-        // From this point on, 'ns' is going to be treated as a sharded collection. We assume this is the first
-        // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
-        // chunks will be created as a by-product of splitting.
-        ci.shard( ns , fieldsAndOrder , unique );
-        ChunkManagerPtr cm = ci.getCM();
-        uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
-        cm->createFirstChunk( getPrimary() );
-        _save();
+            // From this point on, 'ns' is going to be treated as a sharded collection. We assume this is the first
+            // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
+            // chunks will be created as a by-product of splitting.
+            ci.shard( ns , fieldsAndOrder , unique );
+            cm = ci.getCM();
+            uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
+            cm->createFirstChunk( getPrimary() );
+            _save();
+        }
 
         try {
             cm->maybeChunkCollection();
@@ -151,7 +155,7 @@ namespace mongo {
             log() << "couldn't chunk recently created collection: " << ns << " " << e << endl;
         }
 
-        return cm;
+        return getChunkManager(ns); // may have reloaded since releasing _lock
     }
 
     bool DBConfig::removeSharding( const string& ns ) {
