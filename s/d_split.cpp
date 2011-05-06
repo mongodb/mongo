@@ -795,7 +795,7 @@ namespace mongo {
                 for ( int i=0; i < newChunksSize; i++ ) {
                     BSONObjBuilder chunkDetail;
                     chunkDetail.appendElements( beforeDetailObj );
-                    chunkDetail.append( "number", i );
+                    chunkDetail.append( "number", i+1 );
                     chunkDetail.append( "of" , newChunksSize );
                     newChunks[i].appendShortVersion( "chunk" , chunkDetail );
                     configServer.logChange( "multi-split" , ns , chunkDetail.obj() );
