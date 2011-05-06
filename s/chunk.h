@@ -261,7 +261,6 @@ namespace mongo {
         void clear() { _ranges.clear(); }
 
         void reloadAll(const ChunkMap& chunks);
-        void reloadRange(const ChunkMap& chunks, const BSONObj& min, const BSONObj& max);
 
         // Slow operation -- wrap with DEV
         void assertValid() const;

@@ -921,69 +921,6 @@ namespace mongo {
         }
     }
 
-    void ChunkRangeManager::reloadRange(const ChunkMap& chunks, const BSONObj& min, const BSONObj& max) {
-        if (_ranges.empty()) {
-            reloadAll(chunks);
-            return;
-        }
-
-        ChunkRangeMap::iterator low  = _ranges.upper_bound(min);
-        ChunkRangeMap::iterator high = _ranges.lower_bound(max);
-
-        assert(low != _ranges.end());
-        assert(high != _ranges.end());
-        assert(low->second);
-        assert(high->second);
-
-        ChunkMap::const_iterator begin = chunks.upper_bound(low->second->getMin());
-        ChunkMap::const_iterator end   = chunks.lower_bound(high->second->getMax());
-
-        assert(begin != chunks.end());
-        assert(end != chunks.end());
-
-        // C++ end iterators are one-past-last
-        ++high;
-        ++end;
-
-        // update ranges
-        _ranges.erase(low, high); // invalidates low
-        _insertRange(begin, end);
-
-        assert(!_ranges.empty());
-        DEV assertValid();
-
-        // merge low-end if possible
-        low = _ranges.upper_bound(min);
-        assert(low != _ranges.end());
-        if (low != _ranges.begin()) {
-            shared_ptr<ChunkRange> a = prior(low)->second;
-            shared_ptr<ChunkRange> b = low->second;
-            if (a->getShard() == b->getShard()) {
-                shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
-                _ranges.erase(prior(low));
-                _ranges.erase(low); // invalidates low
-                _ranges[cr->getMax()] = cr;
-            }
-        }
-
-        DEV assertValid();
-
-        // merge high-end if possible
-        high = _ranges.lower_bound(max);
-        if (high != prior(_ranges.end())) {
-            shared_ptr<ChunkRange> a = high->second;
-            shared_ptr<ChunkRange> b = boost::next(high)->second;
-            if (a->getShard() == b->getShard()) {
-                shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
-                _ranges.erase(boost::next(high));
-                _ranges.erase(high); //invalidates high
-                _ranges[cr->getMax()] = cr;
-            }
-        }
-
-        DEV assertValid();
-    }
-
     void ChunkRangeManager::reloadAll(const ChunkMap& chunks) {
         _ranges.clear();
         _insertRange(chunks.begin(), chunks.end());
