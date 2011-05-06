@@ -37,13 +37,13 @@ namespace mongo {
     class ChunkRangeMangager;
     class ChunkObjUnitTest;
 
-    typedef shared_ptr<Chunk> ChunkPtr;
+    typedef shared_ptr<const Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
     typedef map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
     typedef map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
 
-    typedef shared_ptr<ChunkManager> ChunkManagerPtr;
+    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
 
     /**
        config.chunks
