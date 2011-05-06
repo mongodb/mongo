@@ -201,7 +201,8 @@ wts_bulk_load(void)
                 if (++insert_count % 100 == 0)
                         track("bulk load", insert_count);
 	
-		cursor->set_key(cursor, key);
+		if (key != NULL)
+			cursor->set_key(cursor, key);
 		cursor->set_value(cursor, value);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr, "%s: cursor insert failed: %s\n",
@@ -229,7 +230,7 @@ wts_dump(void)
 	/* Dump the WiredTiger file. */
 	session = g.wts_session;
 	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
-	    "dump=print", &cursor)) != 0) {
+	    "dump,printable", &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -243,6 +244,8 @@ wts_dump(void)
 		return (1);
 	}
 
+        fprintf(fp, "VERSION=1\n");
+        fprintf(fp, "HEADER=END\n");
 	row_count = 0;
 	while ((ret = cursor->next(cursor)) == 0) {
 		if (++row_count % 100 == 0)
@@ -254,6 +257,7 @@ wts_dump(void)
 		fwrite(value.data, value.size, 1, fp);
 		fwrite("\n", 1, 1, fp);
 	}
+	fprintf(fp, "DATA=END\n");
 	(void)fclose(fp);
 	WT_TRET(cursor->close(cursor, NULL));
 
@@ -355,7 +359,7 @@ wts_stats(void)
 	}
 	
 	if ((ret = session->open_cursor(session, "stat:" WT_TABLENAME, NULL,
-	    "dump=print", &cursor)) != 0) {
+	    "printable", &cursor)) != 0) {
 		fprintf(stderr, "%s: stat cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);

@@ -349,9 +349,8 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
-#define	WT_DEBUG					0x00000004
-#define	WT_DUMP_PRINT					0x00000002
-#define	WT_DUMP_RAW					0x00000001
+#define	WT_DEBUG					0x00000002
+#define	WT_DUMP_PRINT					0x00000001
 #define	WT_HUFFMAN_KEY					0x00000004
 #define	WT_HUFFMAN_VALUE				0x00000002
 #define	WT_RDONLY					0x00000002
@@ -368,7 +367,7 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_WORKQ_RUN					0x00000001
 #define	WT_WRITE					0x00000001
 
-#define	WT_APIMASK_BT_DUMP				0x00000007
+#define	WT_APIMASK_BT_DUMP				0x00000003
 #define	WT_APIMASK_BT_OPEN				0x00000001
 #define	WT_APIMASK_BT_SEARCH_COL			0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001

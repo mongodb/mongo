@@ -200,23 +200,17 @@ __wt_curstat_open(SESSION *session,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	const char *key_format, *value_format;
-	int raw, ret;
-	uint32_t dump;
+	int dump, printable, raw, ret;
 	size_t csize;
 	API_CONF_INIT(session, open_cursor, config);
 
 	/* Skip "stat:". */
 	uri += 5;
 
-	dump = 0;
 	WT_ERR(__wt_config_gets(__cfg, "dump", &cval));
-	if ((cval.type == ITEM_STRING || cval.type == ITEM_ID) &&
-	    cval.len > 0) {
-		if (strncasecmp("printable", cval.str, cval.len) == 0)
-			dump = WT_DUMP_PRINT;
-		else if (strncasecmp("raw", cval.str, cval.len) == 0)
-			dump = WT_DUMP_RAW;
-	}
+	dump = (cval.val != 0);
+	WT_ERR(__wt_config_gets(__cfg, "printable", &cval));
+	printable = (cval.val != 0);
 	WT_ERR(__wt_config_gets(__cfg, "raw", &cval));
 	raw = (cval.val != 0);
 
@@ -230,7 +224,7 @@ __wt_curstat_open(SESSION *session,
 	__wt_cursor_init(cursor, config);
 
 	if (dump)
-		__wt_curdump_init(cursor, dump);
+		__wt_curdump_init(cursor, printable);
 	if (raw)
 		F_SET(cursor, WT_CURSTD_RAW);
 

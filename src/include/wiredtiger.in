@@ -459,12 +459,14 @@ struct wt_session {
 	 * @configstart{session.open_cursor, see dist/api_data.py}
 	 * @config{bulk, configure the cursor for bulk loads}
 	 * @config{dump, configure the cursor for dump format inputs and
-	 * outputs. One of \c false\, \c "printable" or \c "raw"}
+	 * outputs.}
 	 * @config{isolation, the isolation level for this cursor\, one of \c
 	 * "snapshot" or \c "read-committed" or \c "read-uncommitted". Ignored
 	 * for transactional cursors}
 	 * @config{overwrite, if an existing key is inserted\, overwrite the
 	 * existing value}
+	 * @config{printable, for dump cursors\, pass through printable bytes
+	 * unmodified.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u"}
 	 * @configend

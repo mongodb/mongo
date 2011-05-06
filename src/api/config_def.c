@@ -64,7 +64,8 @@ __wt_confdfl_session_log_printf =
 
 const char *
 __wt_confdfl_session_open_cursor =
-    "bulk=false,dump=false,isolation=read-committed,overwrite=false,raw=false";
+    "bulk=false,dump=false,isolation=read-committed,overwrite=false,"
+    "printable=false,raw=false";
 
 const char *
 __wt_confdfl_session_rename =

@@ -93,14 +93,15 @@ methods = {
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads'''),
 	Config('dump', 'false', r'''
-		configure the cursor for dump format inputs and outputs.
-		One of \c false, \c "printable" or \c "raw"'''),
+		configure the cursor for dump format inputs and outputs.'''),
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this cursor, one of \c "snapshot" or
 		\c "read-committed" or \c "read-uncommitted".
 		Ignored for transactional cursors'''),
 	Config('overwrite', 'false', r'''
 		if an existing key is inserted, overwrite the existing value'''),
+	Config('printable', 'false', r'''
+		for dump cursors, pass through printable bytes unmodified.'''),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if the
 		formats were \c "u"'''),
@@ -197,7 +198,7 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'bt_dump' : [ 'DEBUG', 'DUMP_PRINT', 'DUMP_RAW' ],
+	'bt_dump' : [ 'DEBUG', 'DUMP_PRINT' ],
 	'bt_open' : [ 'CREATE' ],
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],

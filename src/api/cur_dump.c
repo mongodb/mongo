@@ -154,13 +154,13 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
  *	initialize a dump cursor.
  */
 void
-__wt_curdump_init(WT_CURSOR *cursor, uint32_t flags)
+__wt_curdump_init(WT_CURSOR *cursor, int printable)
 {
 	cursor->get_key = __curdump_get_key;
 	cursor->get_value = __curdump_get_value;
 	cursor->set_key = __curdump_set_key;
 	cursor->set_value = __curdump_set_value;
 
-	if (LF_ISSET(WT_DUMP_PRINT))
+	if (printable)
 		F_SET(cursor, WT_CURSTD_PRINT);
 }

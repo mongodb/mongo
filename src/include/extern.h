@@ -65,7 +65,7 @@ int __wt_curconfig_open(SESSION *session,
     const char *uri,
     const char *config,
     WT_CURSOR **cursorp);
-void __wt_curdump_init(WT_CURSOR *cursor, uint32_t flags);
+void __wt_curdump_init(WT_CURSOR *cursor, int printable);
 int __wt_curstat_open(SESSION *session,
     const char *uri,
     const char *config,
