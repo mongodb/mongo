@@ -320,6 +320,7 @@ namespace mongo {
         _client = 0;
     }
 
+
     BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
@@ -518,4 +519,91 @@ namespace mongo {
 
         return writers + readers;
     }
+
+    void OpDebug::reset() {
+        extra.reset();
+
+        op = 0;
+        iscommand = false;
+        ns = "";
+        query = BSONObj();
+        updateobj = BSONObj();
+        
+        cursorid = 0;
+        ntoreturn = 0;
+        ntoskip = 0;
+        exhaust = false;
+
+        nscanned = 0;
+        idhack = false;
+        scanAndOrder = false;
+        moved = false;
+        fastmod = false;
+        fastmodinsert = false;
+        upsert = false;
+        keyUpdates = 0;
+        
+        exceptionInfo.reset();
+        
+        executionTime = 0;
+        nreturned = 0;
+        responseLength = 0;
+    }
+
+
+#define OPDEBUG_HELP(x) if( x ) s << " " #x ":" << (x)
+    string OpDebug::toString() const {
+        StringBuilder s( ns.size() + 64 );
+        if ( iscommand )
+            s << "command ";
+        else
+            s << opToString( op ) << ' ';
+        s << ns.toString();
+
+        if ( ! query.isEmpty() ) {
+            if ( iscommand )
+                s << " command: ";
+            else
+                s << " query: ";
+            s << query.toString();
+        }
+        
+        if ( ! updateobj.isEmpty() ) {
+            s << " update: ";
+            updateobj.toString( s , false , true );
+        }
+        
+        OPDEBUG_HELP( cursorid );
+        OPDEBUG_HELP( ntoreturn );
+        OPDEBUG_HELP( ntoskip );
+        OPDEBUG_HELP( exhaust );
+
+        OPDEBUG_HELP( nscanned );
+        OPDEBUG_HELP( idhack );
+        OPDEBUG_HELP( scanAndOrder );
+        OPDEBUG_HELP( moved );
+        OPDEBUG_HELP( fastmod );
+        OPDEBUG_HELP( fastmodinsert );
+        OPDEBUG_HELP( upsert );
+        OPDEBUG_HELP( keyUpdates );
+        
+        if ( extra.len() )
+            s << " " << extra.str();
+
+        if ( ! exceptionInfo.empty() ) {
+            s << " exception: " << exceptionInfo.msg;
+            if ( exceptionInfo.code )
+                s << " code:" << exceptionInfo.code;
+        }
+        
+        OPDEBUG_HELP( nreturned );
+        if ( responseLength )
+            s << " reslen:" << responseLength;
+        s << " " << executionTime << "ms";
+
+        return s.str();
+    }
+
+
+
 }

@@ -67,6 +67,9 @@ namespace mongo {
         bool operator==(const char *r) const { return strcmp(buf, r) == 0; }
         bool operator==(const Namespace& r) const { return strcmp(buf, r.buf) == 0; }
         int hash() const; // value returned is always > 0
+
+        size_t size() const { return strlen( buf ); }
+
         string toString() const { return (string) buf; }
         operator string() const { return (string) buf; }
 

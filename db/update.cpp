@@ -1030,10 +1030,8 @@ namespace mongo {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
-        StringBuilder& ss = debug.str;
-
-        if( logLevel > 2 )
-            ss << " update: " << updateobj.toString();
+        
+        debug.updateobj = updateobj;
 
         /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
         /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
@@ -1059,7 +1057,7 @@ namespace mongo {
         if( !upsert && !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
-                ss << " byid ";
+                debug.idhack = true;
                 return _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
             }
         }
@@ -1128,8 +1126,8 @@ namespace mongo {
                     }
                 }
 
-                if ( profile  && !multi ) // todo https://jira.mongodb.org/browse/SERVER-3052
-                    ss << " nscanned:" << nscanned;
+                if ( profile  && !multi ) 
+                    debug.nscanned = nscanned;
 
                 /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                     regular ones at the moment. */
@@ -1168,8 +1166,8 @@ namespace mongo {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );
-                        if ( profile && !multi ) // todo https://jira.mongodb.org/browse/SERVER-3052
-                            ss << " fastmod ";
+                        if ( profile && !multi ) 
+                            debug.fastmod = true;
 
                         if ( modsIsIndexed ) {
                             seenObjects.insert( loc );
@@ -1250,14 +1248,13 @@ namespace mongo {
             return UpdateResult( 1 , 1 , numModded );
 
         if ( profile )
-            ss << " nscanned:" << nscanned;
+            debug.nscanned = nscanned;
 
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
-                if ( profile )
-                    ss << " fastmodinsert ";
+                debug.fastmodinsert = true;
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )
                     logOp( "i", ns, newObj );
@@ -1266,8 +1263,7 @@ namespace mongo {
             }
             uassert( 10159 ,  "multi update only works with $ operators" , ! multi );
             checkNoMods( updateobj );
-            if ( profile )
-                ss << " upsert ";
+            debug.upsert = true;
             BSONObj no = updateobj;
             theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )

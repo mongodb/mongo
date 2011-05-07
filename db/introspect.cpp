@@ -35,7 +35,7 @@ namespace mongo {
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
-        const string info = currentOp.debug().str.str();
+        const string info = currentOp.debug().toString();
         b.append("info", info);
         b.append("millis", (double) millis);
         if ( currentOp.getNS() )

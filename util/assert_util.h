@@ -60,6 +60,8 @@ namespace mongo {
         void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
         string toString() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
         bool empty() const { return msg.empty(); }
+        
+        void reset(){ msg = ""; code=-1; }
 
         string msg;
         int code;

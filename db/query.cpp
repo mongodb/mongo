@@ -246,8 +246,8 @@ namespace mongo {
         }
         catch ( AssertionException& e ) {
             e.getInfo().append( anObjBuilder , "assertion" , "assertionCode" );
+            curop.debug().exceptionInfo = e.getInfo();
         }
-        curop.debug().str << " assertion ";
         anObjBuilder.append("errmsg", "db assertion failure");
         anObjBuilder.append("ok", 0.0);
         BSONObj x = anObjBuilder.done();
@@ -308,11 +308,8 @@ namespace mongo {
                 cc->updateSlaveLocation( curop );
 
             int queryOptions = cc->queryOptions();
-
-            if( pass == 0 ) {
-                StringBuilder& ss = curop.debug().str;
-                ss << " getMore: " << cc->query().toString() << " ";
-            }
+            
+            curop.debug().query = cc->query();
 
             start = cc->pos();
             Cursor *c = cc->c();
@@ -982,7 +979,6 @@ namespace mongo {
        @return points to ns if exhaust mode. 0=normal mode
     */
     const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
-        StringBuilder& ss = curop.debug().str;
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
         int ntoskip = q.ntoskip;
@@ -993,13 +989,8 @@ namespace mongo {
         if( logLevel >= 2 )
             log() << "query: " << ns << jsobj << endl;
 
-        ss << ns;
-        {
-            // only say ntoreturn if nonzero.
-            int n =  pq.getNumToReturn();
-            if( n )
-                ss << " ntoreturn:" << n;
-        }
+        curop.debug().ns = ns;
+        curop.debug().ntoreturn = pq.getNumToReturn();
         curop.setQuery(jsobj);
 
         if ( pq.couldBeCommand() ) {
@@ -1007,15 +998,16 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
             BSONObjBuilder cmdResBuf;
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                ss << " command: ";
-                jsobj.toString( ss );
+                curop.debug().iscommand = true;
+                curop.debug().query = jsobj;
                 curop.markCommand();
+
                 auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
                 qr->setResultFlagsToOk();
                 qr->len = bb.len();
-                ss << " reslen:" << bb.len();
+                curop.debug().responseLength = bb.len();
                 qr->setOperation(opReply);
                 qr->cursorId = 0;
                 qr->startingFrom = 0;
@@ -1100,8 +1092,8 @@ namespace mongo {
             if ( nsFound == false || indexFound == true ) {
                 BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
                 bb.skip(sizeof(QueryResult));
-
-                ss << " idhack ";
+                
+                curop.debug().idhack = true;
                 if ( found ) {
                     n = 1;
                     fillQueryResultFromObj( bb , pq.getFields() , resObject );
@@ -1111,7 +1103,8 @@ namespace mongo {
                 bb.decouple();
                 qr->setResultFlagsToOk();
                 qr->len = bb.len();
-                ss << " reslen:" << bb.len();
+                
+                curop.debug().responseLength = bb.len();
                 qr->setOperation(opReply);
                 qr->cursorId = 0;
                 qr->startingFrom = 0;
@@ -1148,8 +1141,8 @@ namespace mongo {
         }
         n = dqo.n();
         long long nscanned = dqo.totalNscanned();
-        if ( dqo.scanAndOrderRequired() )
-            ss << " scanAndOrder ";
+        curop.debug().scanAndOrder = dqo.scanAndOrderRequired();
+
         shared_ptr<Cursor> cursor = dqo.cursor();
         if( logLevel >= 5 )
             log() << "   used cursor: " << cursor.get() << endl;
@@ -1178,7 +1171,7 @@ namespace mongo {
                 DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
             if( queryOptions & QueryOption_Exhaust ) {
                 exhaust = ns;
-                ss << " exhaust ";
+                curop.debug().exhaust = true;
             }
             dqo.finishForOplogReplay(cc);
         }
@@ -1187,7 +1180,7 @@ namespace mongo {
         qr->cursorId = cursorid;
         qr->setResultFlagsToOk();
         // qr->len is updated automatically by appendData()
-        ss << " reslen:" << qr->len;
+        curop.debug().responseLength = qr->len;
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = n;
@@ -1195,14 +1188,10 @@ namespace mongo {
         int duration = curop.elapsedMillis();
         bool dbprofile = curop.shouldDBProfile( duration );
         if ( dbprofile || duration >= cmdLine.slowMS ) {
-            ss << " nscanned:" << nscanned << ' ';
-            if ( ntoskip )
-                ss << " ntoskip:" << ntoskip;
-            if ( dbprofile )
-                ss << " \nquery: ";
-            ss << jsobj.toString() << ' ';
+            curop.debug().nscanned = nscanned;
+            curop.debug().ntoskip = ntoskip;
         }
-        ss << " nreturned:" << n;
+        curop.debug().nreturned = n;
         return exhaust;
     }
 
