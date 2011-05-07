@@ -82,7 +82,7 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 		alloc_size = WT_SIZEOF32(SESSION_BUFFER) + align_size;
 		single_use = 1;
 	} else {
-		if (session->update_alloc_size < 8 * MEGABYTE)
+		if (session->update_alloc_size < 8 * WT_MEGABYTE)
 			session->update_alloc_size =
 			    __wt_nlpo2(session->update_alloc_size);
 		alloc_size = session->update_alloc_size;
