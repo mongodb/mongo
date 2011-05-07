@@ -1032,9 +1032,7 @@ namespace mongo {
         int profile = client.database()->profile;
         StringBuilder& ss = debug.str;
 
-                if ( profile && multi ) 
-
-        if ( logLevel > 2 && multi ) // todo https://jira.mongodb.org/browse/SERVER-3052
+        if( logLevel > 2 )
             ss << " update: " << updateobj.toString();
 
         /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
