@@ -352,7 +352,7 @@ namespace mongo {
     }
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
-    string ReplSetImpl::startupStatusMsg;
+    DiagStr ReplSetImpl::startupStatusMsg;
 
     extern BSONObj *getLastErrorDefault;
 
@@ -530,7 +530,7 @@ namespace mongo {
     void ReplSetImpl::loadConfig() {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
-            startupStatusMsg = "loading " + rsConfigNs + " config (LOADINGCONFIG)";
+            startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
             try {
                 vector<ReplSetConfig> configs;
                 try {
@@ -570,7 +570,7 @@ namespace mongo {
 
                     if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
-                        startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
+                        startupStatusMsg.set("can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)");
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         static unsigned once;
                         if( ++once == 1 )
@@ -580,7 +580,7 @@ namespace mongo {
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
-                        startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
+                        startupStatusMsg.set("can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)");
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (yet)" << rsLog;
                     }
 
@@ -596,7 +596,7 @@ namespace mongo {
             }
             catch(DBException& e) {
                 startupStatus = BADCONFIG;
-                startupStatusMsg = "replSet error loading set config (BADCONFIG)";
+                startupStatusMsg.set("replSet error loading set config (BADCONFIG)");
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
                 log() << "replSet error replication will not start" << rsLog;
                 sethbmsg("error loading set config");
@@ -605,7 +605,7 @@ namespace mongo {
             }
             break;
         }
-        startupStatusMsg = "? started";
+        startupStatusMsg.set("? started");
         startupStatus = STARTED;
     }
 

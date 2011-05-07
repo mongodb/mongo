@@ -60,6 +60,8 @@ namespace mongo {
             p = buf1;
         }
 
+        bool empty() const { return *p == 0; }
+
         const char * get() const { return p; }
 
         void set(const char *s) {
@@ -67,6 +69,7 @@ namespace mongo {
             strncpy(q, s, 255);
             p = q;
         }
+        void set(const string& s) { set(s.c_str()); }
     };
 
 }

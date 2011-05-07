@@ -149,7 +149,7 @@ namespace mongo {
             if( theReplSet == 0 ) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
-                result.append("info", ReplSet::startupStatusMsg);
+                result.append("info", ReplSet::startupStatusMsg.get());
                 result.append( "isreplicaset" , true );
                 return;
             }
