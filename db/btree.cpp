@@ -288,9 +288,9 @@ namespace mongo {
      */
     template< class V >
     inline int BucketBasics<V>::_alloc(int bytes) {
+        assert( this->emptySize >= bytes );
         this->topSize += bytes;
         this->emptySize -= bytes;
-        dassert( ((int)this->emptySize) >= 0 ); // this is unsigned in V1 so never fails
         int ofs = totalDataSize() - this->topSize;
         assert( ofs > 0 );
         return ofs;

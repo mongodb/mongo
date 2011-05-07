@@ -127,7 +127,6 @@ namespace mongo {
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
         uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
 
-        ChunkManagerPtr cm;
         
         {
             scoped_lock lk( _lock );
@@ -141,21 +140,21 @@ namespace mongo {
             // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
             // chunks will be created as a by-product of splitting.
             ci.shard( ns , fieldsAndOrder , unique );
-            cm = ci.getCM();
+            ChunkManagerPtr cm = ci.getCM();
             uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
             cm->createFirstChunk( getPrimary() );
             _save();
         }
 
         try {
-            cm->maybeChunkCollection();
+            getChunkManager(ns, true)->maybeChunkCollection();
         }
         catch ( UserException& e ) {
             // failure to chunk is not critical enough to abort the command (and undo the _save()'d configDB state)
             log() << "couldn't chunk recently created collection: " << ns << " " << e << endl;
         }
 
-        return getChunkManager(ns); // may have reloaded since releasing _lock
+        return getChunkManager(ns);
     }
 
     bool DBConfig::removeSharding( const string& ns ) {
