@@ -18,8 +18,9 @@ struct record_t {
 	size_t   value_memsize;
 };
 
-int	bulk_read(struct record_t *);
-int	usage(void);
+int bulk_read(struct record_t *, int *);
+int bulk_read_line(WT_ITEM *, size_t *, int, int *);
+int usage(void);
 
 struct {
 	int pagesize_set;
@@ -33,10 +34,10 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	struct record_t record;
+	uint64_t insert_count;
+	int ch, debug, eof, ret, text_input, tret, verbose;
 	const char *tablename, *table_config, *home;
 	char cursor_config[100], datasink[100];
-	unsigned long insert_count;
-	int ch, debug, ret, text_input, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
 
@@ -120,10 +121,10 @@ main(int argc, char *argv[])
 	record.key.data = record.value.data = NULL;
 	record.key_memsize = record.value_memsize = 0;
 
-	while ((ret = bulk_read(&record)) == 0) {
+	for (eof = 0; (ret = bulk_read(&record, &eof)) == 0 && !eof;) {
                 /* Report on progress every 100 inserts. */
-                if (++insert_count % 100 == 0 && verbose) {
-                        printf("\r\t%s: %lu\n", tablename, insert_count);
+                if (verbose && ++insert_count % 100 == 0) {
+                        printf("\r\t%s: %llu", tablename, insert_count);
 			fflush(stdout);
 		}
 	
@@ -137,7 +138,7 @@ main(int argc, char *argv[])
 	}
 
 	if (verbose)
-		printf("\n");
+		printf("\r\t%s: %llu\n", tablename, insert_count);
 
 	if (0) {
 err:		ret = 1;
@@ -156,22 +157,44 @@ err:		ret = 1;
 */
 
 /*
+ * bulk_read --
+ *	Read a key/value pair from stdin
+ */
+int
+bulk_read(struct record_t *r, int *eofp)
+{
+	int ret;
+
+	if ((ret = bulk_read_line(&r->key, &r->key_memsize, 1, eofp)) != 0)
+		return (ret);
+	if (*eofp)
+		return (0);
+	if ((ret = bulk_read_line(&r->value, &r->value_memsize, 0, eofp)) != 0)
+		return (ret);
+
+	return (0);
+}
+
+/*
  * bulk_read_line --
  *	Read a line from stdin into a WT_ITEM.
  */
-static int
-bulk_read_line(WT_ITEM *item, size_t *memsize, int iskey)
+int
+bulk_read_line(WT_ITEM *item, size_t *memsize, int iskey, int *eofp)
 {
 	static unsigned long long line = 0;
 	uint8_t *buf;
 	uint32_t len;
 	int ch;
 
+	*eofp = 0;
 	buf = (uint8_t *)item->data;
 	for (len = 0;; ++len) {
 		if ((ch = getchar()) == EOF) {
-			if (iskey && len == 0)
-				return (WT_NOTFOUND);
+			if (iskey && len == 0) {
+				*eofp = 1;
+				return (0);
+			}
 			fprintf(stderr, "%s: corrupted input at line %llu\n",
 			    progname, line + 1);
 			return (WT_ERROR);
@@ -189,23 +212,6 @@ bulk_read_line(WT_ITEM *item, size_t *memsize, int iskey)
 	}
 	item->data = buf;
 	item->size = len;
-	return (0);
-}
-
-/*
- * bulk_read --
- *	Read a key/value pair from stdin
- */
-int
-bulk_read(struct record_t *r)
-{
-	int ret;
-
-	if ((ret = bulk_read_line(&r->key, &r->key_memsize, 1)) != 0)
-		return (ret);
-	if ((ret = bulk_read_line(&r->value, &r->value_memsize, 0)) != 0)
-		return (ret);
-
 	return (0);
 }
 
