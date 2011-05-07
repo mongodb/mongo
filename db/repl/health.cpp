@@ -306,6 +306,8 @@ namespace mongo {
             myMinValid = "exception fetching minvalid";
         }
 
+        const Member *_self = this->_self;
+        assert(_self);
         {
             stringstream s;
             /* self row */
