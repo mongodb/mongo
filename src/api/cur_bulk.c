@@ -19,8 +19,25 @@ __curbulk_insert(WT_CURSOR *cursor)
 	cbulk = (CURSOR_BULK *)cursor;
 
 	/* TODO: check the state of the key/value pair. */
+#if 0
+	These are errors set in the original bulk-load code that need
+	to be reported somewhere.
 
-	WT_RET(__wt_bulk_var_insert(cbulk));
+	/* if key value specified to a column-store */
+	__wt_errx(session,
+	    "column-store keys are implied and should not be returned by "
+	    "the bulk load input routine"
+
+	/* if 0-length key to row-store */
+	__wt_errx(session, "zero-length keys are not supported");
+
+	/* the high-bit is set on fixed-length keys to signify deletion. */
+	__wt_errx(session,
+	    "the first bit may not be stored in fixed-length column-store "
+	    "file items");
+#endif
+
+	WT_RET(__wt_bulk_insert(cbulk));
 
 	return (0);
 }
