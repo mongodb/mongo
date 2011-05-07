@@ -1,5 +1,5 @@
 /* @file value.h
-   concurrency helpers Atomic<T> and DiagStr
+   concurrency helpers DiagStr, Guarded
 */
 
 /**
