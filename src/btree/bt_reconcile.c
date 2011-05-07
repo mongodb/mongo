@@ -173,11 +173,14 @@ typedef struct {
 
 static uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
 static int  __rec_col_fix(SESSION *, WT_PAGE *);
+static int  __rec_col_fix_bulk(SESSION *, WT_PAGE *);
 static int  __rec_col_int(SESSION *, WT_PAGE *);
 static int  __rec_col_merge(SESSION *, WT_PAGE *);
 static int  __rec_col_rle(SESSION *, WT_PAGE *);
+static int  __rec_col_rle_bulk(SESSION *, WT_PAGE *);
 static int  __rec_col_split(SESSION *, WT_PAGE **, WT_PAGE *);
 static int  __rec_col_var(SESSION *, WT_PAGE *);
+static int  __rec_col_var_bulk(SESSION *, WT_PAGE *);
 static int  __rec_col_var_del(SESSION *, WT_PAGE *);
 static int  __rec_discard_add(SESSION *, WT_PAGE *, uint32_t, uint32_t);
 static int  __rec_discard_evict(SESSION *);
@@ -439,13 +442,22 @@ __wt_page_reconcile(
 	/* Reconcile the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		WT_RET(__rec_col_fix(session, page));
+		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
+			WT_RET(__rec_col_fix_bulk(session, page));
+		else
+			WT_RET(__rec_col_fix(session, page));
 		break;
 	case WT_PAGE_COL_RLE:
-		WT_RET(__rec_col_rle(session, page));
+		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
+			WT_RET(__rec_col_rle_bulk(session, page));
+		else
+			WT_RET(__rec_col_rle(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__rec_col_var(session, page));
+		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
+			WT_RET(__rec_col_var_bulk(session, page));
+		else
+			WT_RET(__rec_col_var(session, page));
 		break;
 	case WT_PAGE_COL_INT:
 		WT_RET(__rec_col_int(session, page));
@@ -1337,7 +1349,7 @@ __rec_col_merge(SESSION *session, WT_PAGE *page)
 /*
  * __rec_col_fix --
  *	Reconcile a fixed-width, column-store leaf page (does not handle
- *	run-length encoding).
+ * run-length encoding).
  */
 static int
 __rec_col_fix(SESSION *session, WT_PAGE *page)
@@ -1377,8 +1389,6 @@ __rec_col_fix(SESSION *session, WT_PAGE *page)
 
 	/* For each entry in the in-memory page... */
 	WT_COL_FOREACH(page, cip, i) {
-		cipdata = WT_COL_PTR(page, cip);
-
 		/*
 		 * Get a reference to the data, on- or off- page, and see if
 		 * it's been deleted.
@@ -1388,10 +1398,13 @@ __rec_col_fix(SESSION *session, WT_PAGE *page)
 				data = tmp->mem;	/* Deleted */
 			else				/* Updated */
 				data = WT_UPDATE_DATA(upd);
-		} else if (WT_FIX_DELETE_ISSET(cipdata))
-			data = tmp->mem;		/* On-disk deleted */
-		else					/* On-disk data */
-			data = WT_COL_PTR(page, cip);
+		} else {
+			cipdata = WT_COL_PTR(page, cip);
+			if (WT_FIX_DELETE_ISSET(cipdata))
+				data = tmp->mem;	/* On-disk deleted */
+			else
+				data = cipdata;		/* On-disk data */
+		}
 
 		/*
 		 * When reconciling a fixed-width page that doesn't support
@@ -1408,6 +1421,44 @@ __rec_col_fix(SESSION *session, WT_PAGE *page)
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
 	return (ret);
+}
+
+/*
+ * __rec_col_fix_bulk --
+ *	Reconcile a bulk-loaded, fixed-width column-store leaf page (does not
+ * handle run-length encoding).
+ */
+static int
+__rec_col_fix_bulk(SESSION *session, WT_PAGE *page)
+{
+	BTREE *btree;
+	WT_RECONCILE *r;
+	WT_UPDATE *upd;
+	uint32_t len;
+
+	btree = session->btree;
+	r = S2C(session)->cache->rec;
+	len = btree->fixed_len;
+
+	WT_RET(__rec_split_init(session, page,
+	    page->u.bulk.recno,
+	    session->btree->leafmax, session->btree->leafmin));
+
+	/* For each entry in the update list... */
+	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
+		/* Boundary: allocate, split or write the page. */
+		while (len > r->space_avail)
+			WT_RET(__rec_split(session));
+
+		memcpy(r->first_free, WT_UPDATE_DATA(upd), len);
+		__rec_incr(session, r, len, 1);
+
+		/* Update the starting record number in case we split. */
+		++r->recno;
+	}
+
+	/* Write the remnant page. */
+	return (__rec_split_finish(session));
 }
 
 /*
@@ -1523,6 +1574,59 @@ err:	if (tmp != NULL)
 }
 
 /*
+ * __rec_col_rle_bulk --
+ *	Reconcile a bulk-loaded, fixed-width, run-length encoded, column-store
+ *	leaf page.
+ */
+static int
+__rec_col_rle_bulk(SESSION *session, WT_PAGE *page)
+{
+	BTREE *btree;
+	WT_UPDATE *upd;
+	WT_RECONCILE *r;
+	uint32_t len;
+	uint8_t *data, *last_data;
+
+	btree = session->btree;
+	r = S2C(session)->cache->rec;
+	len = btree->fixed_len;
+	last_data = NULL;
+
+	WT_RET(__rec_split_init(session, page,
+	    page->u.bulk.recno,
+	    session->btree->leafmax, session->btree->leafmin));
+
+	/* For each entry in the update list... */
+	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
+		data = WT_UPDATE_DATA(upd);
+
+		/*
+		 * In all cases, check the last entry written on the page to
+		 * see if it's identical, and increment its repeat count where
+		 * possible.
+		 */
+		if (last_data != NULL && memcmp(
+		    WT_RLE_REPEAT_DATA(last_data), data, len) == 0 &&
+		    WT_RLE_REPEAT_COUNT(last_data) < UINT16_MAX) {
+			++WT_RLE_REPEAT_COUNT(last_data);
+			continue;
+		}
+
+		/* Boundary: allocate, split or write the page. */
+		while (len > r->space_avail)
+			WT_RET(__rec_split(session));
+
+		last_data = r->first_free;
+		WT_RLE_REPEAT_COUNT(last_data) = 1;
+		memcpy(WT_RLE_REPEAT_DATA(last_data), data, len);
+		__rec_incr(session, r, len + WT_SIZEOF32(uint16_t), 1);
+	}
+
+	/* Write the remnant page. */
+	return (__rec_split_finish(session));
+}
+
+/*
  * __rec_col_var --
  *	Reconcile a variable-width column-store leaf page.
  */
@@ -1604,6 +1708,60 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 			    sizeof(value_cell), value->data, value->size);
 			break;
 		}
+		__rec_incr(session, r, len, 1);
+
+		/* Update the starting record number in case we split. */
+		++r->recno;
+	}
+
+	/* Free any allocated memory. */
+	if (value->mem != NULL)
+		__wt_buf_free(session, value);
+
+	/* Write the remnant page. */
+	return (__rec_split_finish(session));
+}
+
+/*
+ * __rec_col_var_bulk --
+ *	Reconcile a bulk-loaded, variable-width column-store leaf page.
+ */
+static int
+__rec_col_var_bulk(SESSION *session, WT_PAGE *page)
+{
+	WT_BUF *value, _value;
+	WT_CELL value_cell;
+	WT_OVFL value_ovfl;
+	WT_RECONCILE *r;
+	WT_UPDATE *upd;
+	uint32_t len;
+
+	r = S2C(session)->cache->rec;
+
+	WT_CLEAR(value_cell);
+	WT_CLEAR(_value);
+	value = &_value;
+
+	WT_RET(__rec_split_init(session, page,
+	    page->u.bulk.recno,
+	    session->btree->leafmax, session->btree->leafmin));
+
+	/* For each entry in the update list... */
+	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
+		value->data = WT_UPDATE_DATA(upd);
+		value->size = upd->size;
+		WT_RET(__wt_item_build_value(
+		    session, value, &value_cell, &value_ovfl));
+		len = WT_CELL_SPACE_REQ(value->size);
+
+		/* Boundary: allocate, split or write the page. */
+		while (len > r->space_avail)
+			WT_RET(__rec_split(session));
+
+		memcpy(r->first_free, &value_cell, sizeof(value_cell));
+		memcpy(r->first_free +
+		    sizeof(value_cell), value->data, value->size);
+
 		__rec_incr(session, r, len, 1);
 
 		/* Update the starting record number in case we split. */
@@ -1918,6 +2076,16 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 
 	WT_RET(__rec_split_init(session,
 	    page, 0ULL, session->btree->leafmax, session->btree->leafmin));
+
+	/*
+	 * Bulk-loaded pages are just an insert list and nothing more.  As
+	 * row-store leaf pages already have to deal with insert lists, it's
+	 * pretty easy to hack into that path.
+	 */
+	if (F_ISSET(page, WT_PAGE_BULK_LOAD)) {
+		WT_RET(__rec_row_leaf_insert(session, page->u.bulk.ins));
+		return (__rec_split_finish(session));
+	}
 
 	/*
 	 * Write any K/V pairs inserted into the page before the first from-disk
@@ -2402,7 +2570,6 @@ __rec_parent_update(SESSION *session, WT_PAGE *page,
 static int
 __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 {
-	WT_CACHE *cache;
 	WT_PAGE *imp, *page;
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
@@ -2411,8 +2578,7 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	int ret;
 	void *key;
 
-	cache = S2C(session)->cache;
-	r = cache->rec;
+	r = S2C(session)->cache->rec;
 	ret = 0;
 
 	/* Allocate a row-store internal page. */
@@ -2423,7 +2589,7 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->parent_ref = orig->parent_ref;
-	page->read_gen = ++cache->read_gen;
+	page->read_gen = __wt_cache_read_gen(session);
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;
 	page->entries = r->split_next;
@@ -2503,7 +2669,6 @@ err:	__wt_free(session, page);
 static int
 __rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 {
-	WT_CACHE *cache;
 	WT_COL_REF *cref;
 	WT_OFF_RECORD *off;
 	WT_PAGE *imp, *page;
@@ -2512,8 +2677,7 @@ __rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	uint32_t i;
 	int ret;
 
-	cache = S2C(session)->cache;
-	r = cache->rec;
+	r = S2C(session)->cache->rec;
 	ret = 0;
 
 	/* Allocate a column-store internal page. */
@@ -2524,7 +2688,7 @@ __rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->parent_ref = orig->parent_ref;
-	page->read_gen = ++cache->read_gen;
+	page->read_gen = __wt_cache_read_gen(session);
 	page->u.col_int.recno = WT_RECNO(&r->split->off);
 	page->addr = WT_ADDR_INVALID;
 	page->size = 0;

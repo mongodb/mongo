@@ -48,26 +48,31 @@ __wt_page_free(SESSION *session, WT_PAGE *page)
 	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
 		__wt_cache_page_out(session, page);
 
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		__wt_free_page_col_fix(session, page);
-		break;
-	case WT_PAGE_COL_INT:
-		__wt_free_page_col_int(session, page);
-		break;
-	case WT_PAGE_COL_RLE:
-		__wt_free_page_col_rle(session, page);
-		break;
-	case WT_PAGE_COL_VAR:
-		__wt_free_page_col_var(session, page);
-		break;
-	case WT_PAGE_ROW_INT:
-		__wt_free_page_row_int(session, page);
-		break;
-	case WT_PAGE_ROW_LEAF:
-		__wt_free_page_row_leaf(session, page);
-		break;
-	}
+	/*
+	 * Bulk-loaded pages are skeleton pages, we don't need to look at
+	 * the internals.
+	 */
+	if (!F_ISSET(page, WT_PAGE_BULK_LOAD))
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+			__wt_free_page_col_fix(session, page);
+			break;
+		case WT_PAGE_COL_INT:
+			__wt_free_page_col_int(session, page);
+			break;
+		case WT_PAGE_COL_RLE:
+			__wt_free_page_col_rle(session, page);
+			break;
+		case WT_PAGE_COL_VAR:
+			__wt_free_page_col_var(session, page);
+			break;
+		case WT_PAGE_ROW_INT:
+			__wt_free_page_row_int(session, page);
+			break;
+		case WT_PAGE_ROW_LEAF:
+			__wt_free_page_row_leaf(session, page);
+			break;
+		}
 
 	if (page->XXdsk != NULL)
 		__wt_free(session, page->XXdsk);

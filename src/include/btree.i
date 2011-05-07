@@ -42,6 +42,12 @@ __wt_cache_page_out(SESSION *session, WT_PAGE *page)
 	F_CLR(page, WT_PAGE_CACHE_COUNTED);
 }
 
+static inline uint64_t
+__wt_cache_read_gen(SESSION *session)
+{
+	return (++S2C(session)->cache->read_gen);
+}
+
 /*
  * __wt_cache_pages_inuse --
  *	Return the number of pages in use.

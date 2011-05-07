@@ -419,6 +419,15 @@ struct __wt_page {
 			WT_INSERT **ins;	/* Inserts */
 			WT_UPDATE **upd;	/* Updates */
 		} col_leaf;
+
+		/* Bulk-loaded linked list. */
+		struct {
+			uint64_t recno;		/* Starting recno */
+
+			WT_INSERT *ins;		/* Bulk-loaded K/V or V items */
+			WT_UPDATE *upd;		/* Bulk-loaded V items */
+		}
+		bulk;
 	} u;
 
 	/*
@@ -452,11 +461,12 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	8	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_CACHE_COUNTED	0x001	/* Page counted in cache stats */
-#define	WT_PAGE_DELETED		0x002	/* Page was empty at reconcilation */
-#define	WT_PAGE_MODIFIED	0x004	/* Page is modified */
-#define	WT_PAGE_PINNED		0x008	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x010	/* Internal page created in a split */
+#define	WT_PAGE_BULK_LOAD	0x001	/* Page bulk loaded */
+#define	WT_PAGE_CACHE_COUNTED	0x002	/* Page counted in cache stats */
+#define	WT_PAGE_DELETED		0x004	/* Page was empty at reconcilation */
+#define	WT_PAGE_MODIFIED	0x008	/* Page is modified */
+#define	WT_PAGE_PINNED		0x010	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x020	/* Internal page created in a split */
 	uint8_t flags;			/* Page flags */
 };
 /*

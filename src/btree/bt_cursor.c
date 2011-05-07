@@ -19,7 +19,7 @@ __wt_btcur_first(CURSOR_BTREE *cbt)
 
 	session = (SESSION *)cbt->iface.session;
 
-	WT_RET(__wt_walk_begin(session, NULL, &cbt->walk));
+	WT_RET(__wt_walk_begin(session, NULL, &cbt->walk, 0));
 	F_SET(&cbt->iface, WT_CURSTD_POSITIONED);
 
 	return (__wt_btcur_next(cbt));
@@ -50,8 +50,7 @@ __wt_btcur_next(CURSOR_BTREE *cbt)
 
 	for (;;) {
 		while (cbt->nitems == 0) {
-			WT_RET(__wt_walk_next(
-			    session, &cbt->walk, 0, &cbt->page));
+			WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
 			if (cbt->page == NULL) {
 				F_CLR(cursor, WT_CURSTD_POSITIONED);
 				return (WT_NOTFOUND);

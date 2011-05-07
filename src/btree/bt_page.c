@@ -27,10 +27,7 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 #endif
     )
 {
-	WT_CACHE *cache;
 	int ret;
-
-	cache = S2C(session)->cache;
 
 	for (;;)
 		switch (ref->state) {
@@ -60,7 +57,8 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
 			    , file, line
 #endif
 			    )) {
-				ref->page->read_gen = ++cache->read_gen;
+				ref->page->read_gen =
+				    __wt_cache_read_gen(session);
 				return (0);
 			}
 			__wt_yield();
@@ -80,13 +78,11 @@ int
 __wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
     WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size, WT_PAGE **pagep)
 {
-	WT_CACHE *cache;
 	WT_PAGE *page;
 	int ret;
 
 	WT_ASSERT(session, dsk->u.entries > 0);
 
-	cache = S2C(session)->cache;
 	*pagep = NULL;
 
 	/*
@@ -101,7 +97,7 @@ __wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
 	page->parent_ref = parent_ref;
 	page->XXdsk = dsk;
 
-	page->read_gen = ++cache->read_gen;
+	page->read_gen = __wt_cache_read_gen(session);
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:

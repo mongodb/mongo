@@ -34,6 +34,7 @@ __wt_cache_create(CONNECTION *conn)
 
 	WT_STAT_SET(
 	    cache->stats, cache_bytes_max, conn->cache_size * WT_MEGABYTE);
+	WT_STAT_SET(cache->stats, cache_bytes_max, 30 * WT_MEGABYTE);
 
 	return (0);
 

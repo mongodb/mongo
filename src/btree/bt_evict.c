@@ -385,11 +385,11 @@ __evict_file(SESSION *session, WT_EVICT_REQ *er)
 	 * Walk the tree.  It doesn't matter if we are already walking the tree,
 	 * __wt_walk_begin restarts the process.
 	 */
-	WT_RET(__wt_walk_begin(session, NULL, &btree->evict_walk));
+	WT_RET(
+	    __wt_walk_begin(session, NULL, &btree->evict_walk, WT_WALK_CACHE));
 
 	for (;;) {
-		WT_ERR(__wt_walk_next(
-		    session, &btree->evict_walk, WT_WALK_CACHE, &page));
+		WT_ERR(__wt_walk_next(session, &btree->evict_walk, &page));
 		if (page == NULL)
 			break;
 
@@ -582,12 +582,12 @@ __evict_walk_file(SESSION *session, u_int slot)
 
 	/* If we haven't yet started this walk, do so. */
 	if (btree->evict_walk.tree == NULL)
-walk:		WT_RET(__wt_walk_begin(session, NULL, &btree->evict_walk));
+walk:		WT_RET(__wt_walk_begin(
+		    session, NULL, &btree->evict_walk, WT_WALK_CACHE));
 
 	/* Get the next WT_EVICT_WALK_PER_TABLE entries. */
 	while (i < WT_EVICT_WALK_PER_TABLE) {
-		WT_RET(__wt_walk_next(session,
-		    &btree->evict_walk, WT_WALK_CACHE, &page));
+		WT_RET(__wt_walk_next(session, &btree->evict_walk, &page));
 
 		/*
 		 * Restart the walk as necessary,  but only once (after one
@@ -707,7 +707,7 @@ __evict_page(SESSION *session)
 		 * try not to pick the same page every time.
 		 */
 		if (__wt_page_reconcile(session, page, 0, WT_REC_EVICT) != 0)
-			page->read_gen = cache->read_gen;
+			page->read_gen = __wt_cache_read_gen(session);
 	}
 }
 

@@ -84,7 +84,7 @@ int __wt_btree_bulk_load(SESSION *session,
     WT_ITEM **,
     WT_ITEM **));
 int __wt_bulk_init(CURSOR_BULK *cbulk);
-int __wt_bulk_var_insert(CURSOR_BULK *cbulk);
+int __wt_bulk_insert(CURSOR_BULK *cbulk);
 int __wt_bulk_end(CURSOR_BULK *cbulk);
 int __wt_item_build_key( SESSION *session,
     WT_BUF *key,
@@ -201,12 +201,12 @@ int __wt_tree_walk(SESSION *session,
     WT_PAGE *,
     void *),
     void *arg);
-int __wt_walk_begin(SESSION *session, WT_PAGE *page, WT_WALK *walk);
-void __wt_walk_end(SESSION *session, WT_WALK *walk);
-int __wt_walk_next(SESSION *session,
+int __wt_walk_begin(SESSION *session,
+    WT_PAGE *page,
     WT_WALK *walk,
-    uint32_t flags,
-    WT_PAGE **pagep);
+    uint32_t flags);
+void __wt_walk_end(SESSION *session, WT_WALK *walk);
+int __wt_walk_next(SESSION *session, WT_WALK *walk, WT_PAGE **pagep);
 int __wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value);
 int __wt_btree_col_del(SESSION *session, uint64_t recno);
 int __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value);
@@ -219,6 +219,7 @@ int __wt_key_build(SESSION *session,
 int __wt_key_build_serial_func(SESSION *session);
 int __wt_btree_row_del(SESSION *session, WT_ITEM *key);
 int __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value);
+int __wt_row_insert_alloc(SESSION *session, WT_ITEM *key, WT_INSERT **insp);
 int __wt_insert_serial_func(SESSION *session);
 int __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
 int __wt_update_serial_func(SESSION *session);

@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 #include "btree.i"
 
-static int __wt_row_insert_alloc(SESSION *, WT_ITEM *, WT_INSERT **);
 static int __wt_row_update(SESSION *, WT_ITEM *, WT_ITEM *, int);
 
 /*
@@ -133,7 +132,7 @@ err:		if (ins != NULL)
  *	Row-store insert: allocate a WT_INSERT structure from the SESSION's
  *	buffer and fill it in.
  */
-static int
+int
 __wt_row_insert_alloc(SESSION *session, WT_ITEM *key, WT_INSERT **insp)
 {
 	SESSION_BUFFER *sb;
