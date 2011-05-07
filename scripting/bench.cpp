@@ -54,7 +54,7 @@ namespace mongo {
         string db;
 
         unsigned parallel;
-        int seconds;
+        double seconds;
 
         BSONObj ops;
 
@@ -78,12 +78,15 @@ namespace mongo {
                 if ( op == "findOne" ) {
                     conn->findOne( ns , e["query"].Obj() );
                 }
+                else if ( op == "update" ) {
+                    conn->update( ns , e["query"].Obj() , e["update"].Obj() );
+                }
                 else {
                     log() << "don't understand op: " << op << endl;
                     config->error = true;
                     return;
                 }
-
+                
             }
         }
 
@@ -109,7 +112,7 @@ namespace mongo {
         if ( args["parallel"].isNumber() )
             config.parallel = args["parallel"].numberInt();
         if ( args["seconds"].isNumber() )
-            config.seconds = args["seconds"].numberInt();
+            config.seconds = args["seconds"].number();
 
 
         config.ops = args["ops"].Obj();
@@ -130,7 +133,7 @@ namespace mongo {
         BSONObj before;
         conn->simpleCommand( "admin" , &before , "serverStatus" );
 
-        sleepsecs( config.seconds );
+        sleepmillis( (int)(1000.0 * config.seconds) );
 
         BSONObj after;
         conn->simpleCommand( "admin" , &after , "serverStatus" );
