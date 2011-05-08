@@ -70,6 +70,10 @@ namespace mongo {
             p = q;
         }
         void set(const string& s) { set(s.c_str()); }
+
+        operator string() const { return get(); }
+
+        void operator=(const string&s) { set(s.c_str()); }
     };
 
 }

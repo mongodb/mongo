@@ -74,7 +74,7 @@ namespace mongo {
         time_t upSince;
         long long downSince;
         time_t lastHeartbeat;
-        string lastHeartbeatMsg;
+        DiagStr lastHeartbeatMsg;
         OpTime opTime;
         int skew;
         unsigned int ping; // microseconds
