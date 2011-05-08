@@ -987,7 +987,7 @@ namespace mongo {
         const char *ns = q.ns;
 
         if( logLevel >= 2 )
-            log() << "query: " << ns << jsobj << endl;
+            log() << "runQuery called " << ns << " " << jsobj << endl;
 
         curop.debug().ns = ns;
         curop.debug().ntoreturn = pq.getNumToReturn();
