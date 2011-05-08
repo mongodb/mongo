@@ -1091,7 +1091,32 @@ shellHelper.show = function (what) {
         }
         else {
             print();
-            db.system.profile.find({ millis: { $gt: 0} }).sort({ $natural: -1 }).limit(5).forEach(function (x) { print("" + x.millis + "ms " + String(x.ts).substring(0, 24)); print(x.info); print("\n"); })
+            db.system.profile.find({ millis: { $gt: 0} }).sort({ $natural: -1 }).limit(5).forEach(
+                function (x) { 
+                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " + String(x.ts).substring(0, 24)); 
+                    var l = "";
+                    for ( var z in x ){
+                        if ( z == "op" || z == "ns" || z == "millis" || z == "ts" )
+                            continue;
+                        
+                        var val = x[z];
+                        var mytype = typeof(val);
+                        
+                        if ( mytype == "string" || 
+                             mytype == "number" )
+                            l += z + ":" + val + " ";
+                        else if ( mytype == "object" ) 
+                            l += z + ":" + tojson(val ) + " ";
+                        else if ( mytype == "boolean" )
+                            l += z + " ";
+                        else
+                            l += z + ":" + val + " ";
+
+                    }
+                    print( l );
+                    print("\n"); 
+                }
+            )
         }
         return "";
     }

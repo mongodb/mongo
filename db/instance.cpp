@@ -373,7 +373,7 @@ namespace mongo {
                 writelock lk;
                 if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS() );
-                    profile(c , currentOp, ms);
+                    profile(c , currentOp );
                 }
                 else {
                     mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;

@@ -35,8 +35,12 @@ namespace mongo {
         OpDebug() : ns(""){ reset(); }
 
         void reset();
+        
         string toString() const;
+        void append( BSONObjBuilder& b ) const;
 
+        // -------------------
+        
         StringBuilder extra; // weird things we need to fix later
         
         // basic options

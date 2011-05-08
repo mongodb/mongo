@@ -551,7 +551,7 @@ namespace mongo {
     }
 
 
-#define OPDEBUG_HELP(x) if( x ) s << " " #x ":" << (x)
+#define OPDEBUG_TOSTRING_HELP(x) if( x ) s << " " #x ":" << (x)
     string OpDebug::toString() const {
         StringBuilder s( ns.size() + 64 );
         if ( iscommand )
@@ -573,19 +573,19 @@ namespace mongo {
             updateobj.toString( s , false , true );
         }
         
-        OPDEBUG_HELP( cursorid );
-        OPDEBUG_HELP( ntoreturn );
-        OPDEBUG_HELP( ntoskip );
-        OPDEBUG_HELP( exhaust );
+        OPDEBUG_TOSTRING_HELP( cursorid );
+        OPDEBUG_TOSTRING_HELP( ntoreturn );
+        OPDEBUG_TOSTRING_HELP( ntoskip );
+        OPDEBUG_TOSTRING_HELP( exhaust );
 
-        OPDEBUG_HELP( nscanned );
-        OPDEBUG_HELP( idhack );
-        OPDEBUG_HELP( scanAndOrder );
-        OPDEBUG_HELP( moved );
-        OPDEBUG_HELP( fastmod );
-        OPDEBUG_HELP( fastmodinsert );
-        OPDEBUG_HELP( upsert );
-        OPDEBUG_HELP( keyUpdates );
+        OPDEBUG_TOSTRING_HELP( nscanned );
+        OPDEBUG_TOSTRING_HELP( idhack );
+        OPDEBUG_TOSTRING_HELP( scanAndOrder );
+        OPDEBUG_TOSTRING_HELP( moved );
+        OPDEBUG_TOSTRING_HELP( fastmod );
+        OPDEBUG_TOSTRING_HELP( fastmodinsert );
+        OPDEBUG_TOSTRING_HELP( upsert );
+        OPDEBUG_TOSTRING_HELP( keyUpdates );
         
         if ( extra.len() )
             s << " " << extra.str();
@@ -596,7 +596,7 @@ namespace mongo {
                 s << " code:" << exceptionInfo.code;
         }
         
-        OPDEBUG_HELP( nreturned );
+        OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength )
             s << " reslen:" << responseLength;
         s << " " << executionTime << "ms";
@@ -604,6 +604,37 @@ namespace mongo {
         return s.str();
     }
 
+#define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
+#define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
+    void OpDebug::append( BSONObjBuilder& b ) const {
+        b.append( "op" , iscommand ? "command" : opToString( op ) );
+        b.append( "ns" , ns.toString() );
+        if ( ! query.isEmpty() )
+            b.append( iscommand ? "command" : "query" , query );
+        if ( ! updateobj.isEmpty() )
+            b.append( "updateobj" , "updateobj" );
+        
+        OPDEBUG_APPEND_NUMBER( cursorid );
+        OPDEBUG_APPEND_NUMBER( ntoreturn );
+        OPDEBUG_APPEND_NUMBER( ntoskip );
+        OPDEBUG_APPEND_BOOL( exhaust );
 
+        OPDEBUG_APPEND_NUMBER( nscanned );
+        OPDEBUG_APPEND_BOOL( idhack );
+        OPDEBUG_APPEND_BOOL( scanAndOrder );
+        OPDEBUG_APPEND_BOOL( moved );
+        OPDEBUG_APPEND_BOOL( fastmod );
+        OPDEBUG_APPEND_BOOL( fastmodinsert );
+        OPDEBUG_APPEND_BOOL( upsert );
+        OPDEBUG_APPEND_NUMBER( keyUpdates );
+
+        if ( ! exceptionInfo.empty() ) 
+            exceptionInfo.append( b , "exception" , "exceptionCode" );
+        
+        OPDEBUG_APPEND_NUMBER( nreturned );
+        OPDEBUG_APPEND_NUMBER( responseLength );
+        b.append( "millis" , executionTime );
+        
+    }
 
 }

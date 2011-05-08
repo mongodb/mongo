@@ -29,17 +29,20 @@ namespace mongo {
 
     BufBuilder profileBufBuilder; // reused, instead of allocated every time - avoids a malloc/free cycle
 
-    void profile( const Client& c , CurOp& currentOp, int millis) {
+    void profile( const Client& c , CurOp& currentOp ) {
         assertInWriteLock();
         
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
+        currentOp.debug().append( b );
+        /*
         const string info = currentOp.debug().toString();
         b.append("info", info);
         b.append("millis", (double) millis);
         if ( currentOp.getNS() )
             b.append( "ns" , currentOp.getNS() );
+        */        
         b.append("client", c.clientAddress() );
 
         BSONObj p = b.done();
