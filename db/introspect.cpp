@@ -36,13 +36,7 @@ namespace mongo {
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
         currentOp.debug().append( b );
-        /*
-        const string info = currentOp.debug().toString();
-        b.append("info", info);
-        b.append("millis", (double) millis);
-        if ( currentOp.getNS() )
-            b.append( "ns" , currentOp.getNS() );
-        */        
+
         b.append("client", c.clientAddress() );
 
         BSONObj p = b.done();
