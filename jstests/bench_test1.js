@@ -12,5 +12,5 @@ ops = [
 
 seconds = .7
 
-res = benchRun( { ops : ops , parallel : 2 , seconds : seconds } )
+res = benchRun( { ops : ops , parallel : 2 , seconds : seconds , host : db.getMongo().host } )
 assert.lte( seconds * res.update , t.findOne( { _id : 1 } ).x , "A1" )
