@@ -570,7 +570,7 @@ namespace mongo {
         
         if ( ! updateobj.isEmpty() ) {
             s << " update: ";
-            updateobj.toString( s , false , true );
+            updateobj.toString( s );
         }
         
         OPDEBUG_TOSTRING_HELP( cursorid );
