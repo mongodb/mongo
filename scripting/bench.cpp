@@ -30,13 +30,6 @@
 namespace mongo {
 
 
-    /**
-     * benchQuery( "foo" , { _id : 1 } )
-     */
-    BSONObj benchQuery( const BSONObj& args ) {
-        return BSONObj();
-    }
-
     struct BenchRunConfig {
         BenchRunConfig() {
             host = "localhost";
