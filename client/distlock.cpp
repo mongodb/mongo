@@ -651,6 +651,9 @@ namespace mongo {
                                              << lockName << causedBy( e ), 13660);
                     }
 
+                    // Lock forced, reset our timer
+                    if(_lockTimeout > 0)
+                        _lastPingCheck = make_tuple(string(""), 0, 0, OID());
                 }
                 else {
 
@@ -688,15 +691,17 @@ namespace mongo {
                                              << lockName << causedBy( e ), 13660);
                     }
 
+                    // Lock re-entered, reset our timer
+                    // Not strictly necessary, but helpful for small timeouts where thread scheduling is significant.
+                    // This ensures that a force can only happen after one unsuccessful force or reacquire attempt.
+                    if(_lockTimeout > 0)
+                        _lastPingCheck = make_tuple(string(""), 0, 0, OID());
+
                     log( logLvl - 1 ) << "re-entered distributed lock '" << lockName << "'" << endl;
                     *other = o; other->getOwned(); conn.done();
                     return true;
 
                 }
-
-                // Lock forced, reset our timer
-                if(_lockTimeout > 0)
-                    _lastPingCheck = make_tuple(string(""), 0, 0, OID());
 
                 log( logLvl - 1 ) << "lock '" << lockName << "' successfully forced" << endl;
 
