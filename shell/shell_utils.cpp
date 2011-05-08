@@ -454,12 +454,16 @@ namespace mongo {
                 try {
                     // This assumes there aren't any 0's in the mongo program output.
                     // Hope that's ok.
-                    const unsigned bufSize = 64000;
+                    const unsigned bufSize = 128 * 1024;
                     char buf[ bufSize ];
                     char temp[ bufSize ];
                     char *start = buf;
                     while( 1 ) {
                         int lenToRead = ( bufSize - 1 ) - ( start - buf );
+                        if ( lenToRead <= 0 ) {
+                            cout << "error: lenToRead: " << lenToRead << endl;
+                            cout << "first 300: " << string(buf,0,300) << endl;
+                        }
                         assert( lenToRead > 0 );
                         int ret = read( pipe_, (void *)start, lenToRead );
                         if( mongo::dbexitCalled )
