@@ -380,7 +380,8 @@ namespace mongo {
                 }
             }
         }
-
+        
+        debug.reset();
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
