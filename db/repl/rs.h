@@ -389,7 +389,7 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { lock lk((RSBase*)this); assert( _self ); return _self->config(); }
+        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
     protected:
@@ -397,10 +397,11 @@ namespace mongo {
         bool _buildIndexes;       // = _self->config().buildIndexes
         void setSelfTo(Member *); // use this as it sets buildIndexes var
     private:
-        List1<Member> _members; /* all members of the set EXCEPT self. */
-
+        List1<Member> _members; // all members of the set EXCEPT _self.
+        ReplSetConfig::MemberCfg _config; // config of _self
+        unsigned _id; // _id of _self
     public:
-        unsigned selfId() const { lock lk((RSBase*)this); return _self->id(); }
+        unsigned selfId() const { return _id; }
         Manager *mgr;
 
     private:
