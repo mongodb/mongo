@@ -401,6 +401,6 @@ namespace mongo {
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
 namespace boost{
-    template<> struct scoped_ptr<mongo::ClientCursor> {};
-    template<> struct shared_ptr<mongo::ClientCursor> {};
+    template<> class scoped_ptr<mongo::ClientCursor> {};
+    template<> class shared_ptr<mongo::ClientCursor> {};
 }
