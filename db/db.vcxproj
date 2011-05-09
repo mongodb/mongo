@@ -634,6 +634,9 @@
     <ClInclude Include="..\bson\bson_db.h" />
     <ClInclude Include="..\bson\inline_decls.h" />
     <ClInclude Include="..\bson\stringdata.h" />
+    <ClInclude Include="..\bson\util\atomic_int.h" />
+    <ClInclude Include="..\bson\util\builder.h" />
+    <ClInclude Include="..\bson\util\misc.h" />
     <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\gridfs.h" />

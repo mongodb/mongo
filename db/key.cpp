@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "key.h"
+#include "../util/unittest.h"
 
 namespace mongo {
 
@@ -131,8 +132,8 @@ namespace mongo {
             case String:
                 {
                     b.appendUChar(cstring|bits);
-                    // should we do e.valuestrsize()-1?  last char currently will always be null.
-                    unsigned x = (unsigned) e.valuestrsize();
+                    // note we do not store the terminating null, to save space.
+                    unsigned x = (unsigned) e.valuestrsize() - 1;
                     if( x > 255 ) { 
                         traditional(b, obj);
                         return;
@@ -205,7 +206,13 @@ namespace mongo {
                 case cstring:
                     {
                         unsigned sz = *p++;
-                        b.append("", (const char *) p, sz);
+                        // we build the element ourself as we have to null terminate it
+                        BufBuilder &bb = b.bb();
+                        bb.appendNum((char) String);
+                        bb.appendUChar(0); // fieldname ""
+                        bb.appendNum(sz+1);
+                        bb.appendBuf(p, sz);
+                        bb.appendUChar(0); // null char at end of string
                         p += sz;
                         break;
                     }
@@ -274,13 +281,19 @@ namespace mongo {
             }
         case cstring:
             {
+                int lsz = *l;
+                int rsz = *r;
+                int common = min(lsz, rsz);
                 l++; r++; // skip the size byte
-                // todo: see https://jira.mongodb.org/browse/SERVER-1300
-                int res = strcmp((const char *) l, (const char *) r);
+                // use memcmp as we (will) allow zeros in UTF8 strings
+                int res = memcmp(l, r, common);
                 if( res ) 
                     return res;
-                unsigned sz = l[-1];
-                l += sz; r += sz;
+                // longer string is the greater one
+                int diff = lsz-rsz;
+                if( diff ) 
+                    return diff;
+                l += lsz; r += lsz;
                 break;
             }
         case coid:
@@ -432,5 +445,17 @@ namespace mongo {
         } while( more );
         return p - _keyData;
     }
+
+    struct CmpUnitTest : public UnitTest {
+        void run() {
+            char a[2];
+            char b[2];
+            a[0] = -3;
+            a[1] = 0;
+            b[0] = 3;
+            b[1] = 0;
+            assert( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
+        }
+    } cunittest;
 
 }

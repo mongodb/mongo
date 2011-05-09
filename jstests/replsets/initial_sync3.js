@@ -75,6 +75,18 @@ catch(e) {
     print("trying to reconfigure: "+e);
 }
 
+replTest.awaitReplication();
+
+// test partitioning
+master = rs2.bridge();
+rs2.partition(0, 2);
+
+for (i=0; i<100; i++) {
+    master.getDB("foo").bar.baz.insert({x:i});
+}
+
+replTest.awaitReplication();
+
 rs2.stopSet();
 
 print("initialSync3 success!");

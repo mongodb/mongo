@@ -55,6 +55,7 @@ namespace mongo {
     class Member : public List1<Member>::Base {
     private:
         ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
+        Member(const Member&); 
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
 
@@ -265,7 +266,7 @@ namespace mongo {
             EMPTYUNREACHABLE=4, STARTED=5, SOON=6
         };
         static StartupStatus startupStatus;
-        static string startupStatusMsg;
+        static DiagStr startupStatusMsg;
         static string stateAsHtml(MemberState state);
 
         /* todo thread */
@@ -502,7 +503,8 @@ namespace mongo {
             }
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
-                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg;
+                string s;
+                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg.get();
                 if( ReplSet::startupStatus == 3 )
                     result.append("info", "run rs.initiate(...) if not yet done for the set");
                 return false;

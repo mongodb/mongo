@@ -178,7 +178,7 @@ namespace mongo {
         }
         catch ( AssertionException& e ) {
             ok = false;
-            op.debug().str << " exception ";
+            op.debug().exceptionInfo = e.getInfo();
             LOGSOME {
                 log() << "assertion " << e.toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
@@ -210,9 +210,7 @@ namespace mongo {
             resp->setData( msgdata, true );
         }
 
-        if ( op.shouldDBProfile( 0 ) ) {
-            op.debug().str << " bytes:" << resp->header()->dataLen();
-        }
+        op.debug().responseLength = resp->header()->dataLen();
 
         dbresponse.response = resp.release();
         dbresponse.responseTo = responseTo;
@@ -280,8 +278,7 @@ namespace mongo {
         currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();
-        StringBuilder& ss = debug.str;
-        ss << opToString( op ) << " ";
+        debug.op = op;
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
@@ -333,7 +330,6 @@ namespace mongo {
                     else if ( op == dbKillCursors ) {
                         currentOp.ensureStarted();
                         logThreshold = 10;
-                        ss << "killcursors ";
                         receivedKillCursors(m);
                     }
                     else {
@@ -344,11 +340,11 @@ namespace mongo {
                 }
                 catch ( UserException& ue ) {
                     tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << ue.toString() << endl;
-                    ss << " exception " << ue.toString();
+                    debug.exceptionInfo = ue.getInfo();
                 }
                 catch ( AssertionException& e ) {
                     tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << e.toString() << endl;
-                    ss << " exception " << e.toString();
+                    debug.exceptionInfo = e.getInfo();
                     log = true;
                 }
             }
@@ -363,8 +359,8 @@ namespace mongo {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             }
             else {
-                ss << ' ' << ms << "ms";
-                mongo::tlog() << ss.str() << endl;
+                debug.executionTime = ms;
+                mongo::tlog() << debug << endl;
             }
         }
 
@@ -377,14 +373,15 @@ namespace mongo {
                 writelock lk;
                 if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS() );
-                    profile(c , currentOp, ms);
+                    profile(c , currentOp );
                 }
                 else {
                     mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
                 }
             }
         }
-
+        
+        debug.reset();
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
@@ -442,8 +439,7 @@ namespace mongo {
     void receivedUpdate(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-        op.debug().str << ns << ' ';
+        op.debug().ns = ns;
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -456,15 +452,9 @@ namespace mongo {
         bool upsert = flags & UpdateOption_Upsert;
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
-        {
-            string s = query.toString();
-            /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down.
-               instead, let's just story the query BSON in the debug object, and it can toString()
-               lazily
-            */
-            op.debug().str << " query: " << s;
-            op.setQuery(query);
-        }
+        
+        op.debug().query = query;
+        op.setQuery(query);
 
         writelock lk;
 
@@ -484,18 +474,15 @@ namespace mongo {
     void receivedDelete(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-        op.debug().str << ns << ' ';
+        op.debug().ns = ns;
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;
         assert( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        {
-            string s = pattern.toString();
-            op.debug().str << " query: " << s;
-            op.setQuery(pattern);
-        }
+        
+        op.debug().query = pattern;
+        op.setQuery(pattern);
 
         writelock lk(ns);
 
@@ -515,7 +502,6 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
-        StringBuilder& ss = curop.debug().str;
         bool ok = true;
 
         DbMessage d(m);
@@ -524,9 +510,9 @@ namespace mongo {
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
 
-        ss << ns << " cid:" << cursorid;
-        if( ntoreturn )
-            ss << " ntoreturn:" << ntoreturn;
+        curop.debug().ns = ns;
+        curop.debug().ntoreturn = ntoreturn;
+        curop.debug().cursorid = cursorid;
 
         time_t start = 0;
         int pass = 0;
@@ -561,7 +547,7 @@ namespace mongo {
             }
             catch ( AssertionException& e ) {
                 exhaust = false;
-                ss << " exception " << e.toString();
+                curop.debug().exceptionInfo = e.getInfo();
                 msgdata = emptyMoreResult(cursorid);
                 ok = false;
             }
@@ -570,22 +556,24 @@ namespace mongo {
 
         Message *resp = new Message();
         resp->setData(msgdata, true);
-        ss << " bytes:" << resp->header()->dataLen();
-        ss << " nreturned:" << msgdata->nReturned;
+        curop.debug().responseLength = resp->header()->dataLen();
+        curop.debug().nreturned = msgdata->nReturned;
+
         dbresponse.response = resp;
         dbresponse.responseTo = m.header()->id;
+        
         if( exhaust ) {
-            ss << " exhaust ";
+            curop.debug().exhaust = true;
             dbresponse.exhaust = ns;
         }
+
         return ok;
     }
 
     void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        assert(*ns);
-        op.debug().str << ns;
+        op.debug().ns = ns;
 
         writelock lk(ns);
 

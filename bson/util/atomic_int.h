@@ -36,15 +36,17 @@ namespace mongo {
         inline AtomicUInt operator--(); // --prefix
         inline AtomicUInt operator--(int); // postfix--
 
-        inline void zero() { x = 0; } // TODO: this isn't thread safe
+        inline void zero();
 
         volatile unsigned x;
     };
 
 #if defined(_WIN32)
+    void AtomicUInt::zero() { 
+        InterlockedExchange((volatile long*)&x, 0);
+    }
     AtomicUInt AtomicUInt::operator++() {
-        // InterlockedIncrement returns the new value
-        return InterlockedIncrement((volatile long*)&x); //long is 32bits in Win64
+        return InterlockedIncrement((volatile long*)&x);
     }
     AtomicUInt AtomicUInt::operator++(int) {
         return InterlockedIncrement((volatile long*)&x)-1;
@@ -57,6 +59,7 @@ namespace mongo {
     }
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
     // this is in GCC >= 4.1
+    inline void AtomicUInt::zero() { x = 0; } // TODO: this isn't thread safe - maybe
     AtomicUInt AtomicUInt::operator++() {
         return __sync_add_and_fetch(&x, 1);
     }
@@ -70,8 +73,8 @@ namespace mongo {
         return __sync_fetch_and_add(&x, -1);
     }
 #elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
+    inline void AtomicUInt::zero() { x = 0; } // TODO: this isn't thread safe
     // from boost 1.39 interprocess/detail/atomic.hpp
-
     inline unsigned atomic_int_helper(volatile unsigned *x, int val) {
         int r;
         asm volatile

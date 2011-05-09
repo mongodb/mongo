@@ -1048,17 +1048,22 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 
 
     if ( putBinaryFirst )
-        a.push( "mongod" )
+        a.push( "mongod" );
 
-    a.push( "--replSet" );
-
-    if( this.useSeedList ) {
-      a.push( this.getURL() );
+    if ( extra.noReplSet ) {
+        delete extra.noReplSet;
     }
     else {
-      a.push( this.name );
+        a.push( "--replSet" );
+        
+        if( this.useSeedList ) {
+            a.push( this.getURL() );
+        }
+        else {
+            a.push( this.name );
+        }
     }
-
+    
     a.push( "--noprealloc", "--smallfiles" );
 
     a.push( "--rest" );
@@ -1317,10 +1322,128 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
         this.stop( i, signal );
     }
     if ( ! forRestart && this._alldbpaths ){
+        print("deleting all dbpaths");
         for( i=0; i<this._alldbpaths.length; i++ ){
             resetDbpath( this._alldbpaths[i] );
         }
     }
 
     print('*** Shut down repl set - test worked ****' )
-}
+};
+
+/**
+ * Bridging allows you to test network partitioning.  For example, you can set
+ * up a replica set, run bridge(), then kill the connection between any two
+ * nodes x and y with partition(x, y).
+ *
+ * Once you have called bridging, you cannot reconfigure the replica set.
+ */
+ReplSetTest.prototype.bridge = function() {
+    if (this.bridges) {
+        print("bridges have already been created!");
+        return;
+    }
+    
+    var n = this.nodes.length;
+
+    // create bridges
+    this.bridges = [];
+    for (var i=0; i<n; i++) {
+        var nodeBridges = [];
+        for (var j=0; j<n; j++) {
+            if (i == j) {
+                continue;
+            }
+            nodeBridges[j] = new ReplSetBridge(this, i, j);
+        }
+        this.bridges.push(nodeBridges);
+    }
+    print("bridges: " + this.bridges);
+    
+    // restart everyone independently
+    this.stopSet(null, true);
+    for (var i=0; i<n; i++) {
+        this.restart(i, {noReplSet : true});
+    }
+    
+    // create new configs
+    for (var i=0; i<n; i++) {
+        config = this.nodes[i].getDB("local").system.replset.findOne();
+        
+        if (!config) {
+            print("couldn't find config for "+this.nodes[i]);
+            printjson(this.nodes[i].getDB("local").system.namespaces.find().toArray());
+            assert(false);
+        }
+        
+        for (var j = 0; j<config.members.length; j++) {
+            if (config.members[j].host == this.host+":"+this.ports[i]) {
+                continue;
+            }
+
+            config.members[j].host = this.bridges[i][j].host;
+        }
+        print("for node "+i+":");
+        printjson(config);
+        this.nodes[i].getDB("local").system.replset.update({},config);
+    }
+
+    this.stopSet(null, true);
+    
+    // start set
+    for (var i=0; i<n; i++) {
+        this.restart(i);
+    }
+
+    return this.getMaster();
+};
+
+/**
+ * This kills the bridge between two nodes.  As parameters, specify the from and
+ * to node numbers.
+ *
+ * For example, with a three-member replica set, we'd have nodes 0, 1, and 2,
+ * with the following bridges: 0->1, 0->2, 1->0, 1->2, 2->0, 2->1.  We can kill
+ * the connection between nodes 0 and 2 by calling replTest.partition(0,2) or
+ * replTest.partition(2,0) (either way is identical). Then the replica set would
+ * have the following bridges: 0->1, 1->0, 1->2, 2->1.
+ */
+ReplSetTest.prototype.partition = function(from, to) {
+    this.bridges[from][to].stop();
+    this.bridges[to][from].stop();
+};
+
+/**
+ * This reverses a partition created by partition() above.
+ */
+ReplSetTest.prototype.unPartition = function(from, to) {
+    this.bridges[from][to].start();
+    this.bridges[to][from].start();
+};
+
+ReplSetBridge = function(rst, from, to) {
+    var n = rst.nodes.length;
+
+    var startPort = rst.startPort+n;
+    this.port = (startPort+(from*n+to));
+    this.host = rst.host+":"+this.port;
+
+    this.dest = rst.host+":"+rst.ports[to];
+    this.start();
+};
+
+ReplSetBridge.prototype.start = function() {
+    var args = ["mongobridge", "--port", this.port, "--dest", this.dest];
+    print("starting: "+tojson(args));
+    this.bridge = startMongoProgram.apply( null , args );
+    print("started "+this.bridge);
+};
+
+ReplSetBridge.prototype.stop = function() {
+    print("stopping: "+this.port);
+    stopMongod(this.port);
+};
+
+ReplSetBridge.prototype.toString = function() {
+    return this.host+" -> "+this.dest;
+};

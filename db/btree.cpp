@@ -288,9 +288,9 @@ namespace mongo {
      */
     template< class V >
     inline int BucketBasics<V>::_alloc(int bytes) {
+        assert( this->emptySize >= bytes );
         this->topSize += bytes;
         this->emptySize -= bytes;
-        dassert( this->emptySize >= 0 );
         int ofs = totalDataSize() - this->topSize;
         assert( ofs > 0 );
         return ofs;
@@ -1291,7 +1291,7 @@ namespace mongo {
             out() << "   " << thisLoc.toString() << ".insertHere " << key.toString() << '/' << recordLoc.toString() << ' '
                   << lchild.toString() << ' ' << rchild.toString() << " keypos:" << keypos << endl;
 
-        if ( !basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
+        if ( !this->basicInsert(thisLoc, keypos, recordLoc, key, order) ) {
             // If basicInsert() fails, the bucket will be packed as required by split().
             thisLoc.btreemod<V>()->split(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
             return;

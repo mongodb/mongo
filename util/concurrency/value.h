@@ -1,5 +1,5 @@
 /* @file value.h
-   concurrency helpers Atomic<T> and DiagStr
+   concurrency helpers DiagStr, Guarded
 */
 
 /**
@@ -45,28 +45,31 @@ namespace mongo {
         }
     };
 
-    /** this string COULD be mangled but with the double buffering, assuming writes
-    are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of
-    diagnostic strings, where their content isn't critical.
-    */
     class DiagStr {
-        char buf1[256];
-        char buf2[256];
-        char *p;
+        string _s;
+        static mutex m;
     public:
-        DiagStr() {
-            memset(buf1, 0, 256);
-            memset(buf2, 0, 256);
-            p = buf1;
+        DiagStr(const DiagStr& r) : _s(r.get()) { }
+        DiagStr() { }
+        bool empty() const { 
+            mutex::scoped_lock lk(m);
+            return _s.empty();
         }
-
-        const char * get() const { return p; }
+        string get() const { 
+            mutex::scoped_lock lk(m);
+            return _s;
+        }
 
         void set(const char *s) {
-            char *q = (p==buf1) ? buf2 : buf1;
-            strncpy(q, s, 255);
-            p = q;
+            mutex::scoped_lock lk(m);
+            _s = s;
         }
+        void set(const string& s) { 
+            mutex::scoped_lock lk(m);
+            _s = 1;
+        }
+        operator string() const { return get(); }
+        void operator=(const string& s) { set(s); }
     };
 
 }

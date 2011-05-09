@@ -306,6 +306,8 @@ namespace mongo {
             myMinValid = "exception fetching minvalid";
         }
 
+        const Member *_self = this->_self;
+        assert(_self);
         {
             stringstream s;
             /* self row */
@@ -376,6 +378,9 @@ namespace mongo {
 
         lock lk((RSBase*)this);
         
+        const Member *_self = this->_self;
+        assert( _self );
+
         // add self
         {
             BSONObjBuilder bb;

@@ -1306,7 +1306,11 @@ namespace mongo {
 #endif
             if( maxToAdd < 0 ) maxToAdd = maxToCheck;
             int maxFound = _foundInExp + maxToCheck;
-            int maxAdded = _found + maxToAdd;
+            assert( maxToCheck > 0 );
+            assert( maxFound > 0 );
+            assert( _found <= 0x7fffffff ); // conversion to int
+            int maxAdded = static_cast<int>(_found) + maxToAdd;
+            assert( maxAdded >= 0 ); // overflow check
 
             bool isNeighbor = _centerPrefix.constrains();
 
@@ -1480,7 +1484,8 @@ namespace mongo {
 
                         assert( ! onlyExpand );
 
-                        fillStack( maxFound - _foundInExp, maxAdded - _found );
+                        assert( _found <= 0x7fffffff );
+                        fillStack( maxFound - _foundInExp, maxAdded - static_cast<int>(_found) );
 
                         // When we return from the recursive fillStack call, we'll either have checked enough points or
                         // be entirely done.  Max recurse depth is < 8 * 16.
@@ -1599,12 +1604,14 @@ namespace mongo {
         double approxDistance( const GeoHash& h ) {
 
             double approxDistance = -1;
+            Point p( _g, h );
             switch (_type) {
             case GEO_PLAIN:
-                approxDistance = _near.distance( Point( _g, h ) );
+                approxDistance = _near.distance( p );
                 break;
             case GEO_SPHERE:
-                approxDistance = spheredist_deg( _near, Point( _g, h ) );
+                checkEarthBounds( p );
+                approxDistance = spheredist_deg( _near, p );
                 break;
             default: assert( false );
             }
@@ -1636,14 +1643,17 @@ namespace mongo {
                 double exactDistance = -1;
                 bool exactWithin = false;
 
+                Point p( loc );
+
                 // Get the appropriate distance for the type
                 switch ( _type ) {
                 case GEO_PLAIN:
-                    exactDistance = _near.distance( Point( loc ) );
-                    exactWithin = _near.distanceWithin( Point( loc ), _maxDistance );
+                    exactDistance = _near.distance( p );
+                    exactWithin = _near.distanceWithin( p, _maxDistance );
                     break;
                 case GEO_SPHERE:
-                    exactDistance = spheredist_deg( _near, Point( loc ) );
+                    checkEarthBounds( p );
+                    exactDistance = spheredist_deg( _near, p );
                     exactWithin = ( exactDistance <= _maxDistance );
                     break;
                 default: assert( false );
@@ -1723,6 +1733,7 @@ namespace mongo {
                 _scanDistance = maxDistance + _spec->_error;
             }
             else if (type == GEO_SPHERE) {
+                checkEarthBounds( startPt );
                 // TODO: consider splitting into x and y scan distances
                 _scanDistance = computeXScanDistance( startPt._y, rad2deg( _maxDistance ) + _spec->_error );
             }
@@ -1750,7 +1761,9 @@ namespace mongo {
            // Part 1
            {
                do {
-                   fillStack( maxPointsHeuristic, _numWanted - found() , true );
+                   long long f = found();
+                   assert( f <= 0x7fffffff );
+                   fillStack( maxPointsHeuristic, _numWanted - static_cast<int>(f) , true );
                } while( _state != DONE && _state != DONE_NEIGHBOR &&
                         found() < _numWanted &&
                         (! _prefix.constrains() || _g->sizeEdge( _prefix ) <= _scanDistance ) );
@@ -1772,28 +1785,28 @@ namespace mongo {
             {
 
                // Find farthest distance for completion scan
-                double far = farthest();
+                double farDist = farthest();
                 if( found() < _numWanted ) {
                     // Not enough found in Phase 1
-                    far = _scanDistance;
+                    farDist = _scanDistance;
                 }
                 else if ( _type == GEO_PLAIN ) {
                    // Enough found, but need to search neighbor boxes
-                    far += _spec->_error;
+                    farDist += _spec->_error;
                 }
                 else if ( _type == GEO_SPHERE ) {
                    // Enough found, but need to search neighbor boxes
-                    far = std::min( _scanDistance, computeXScanDistance( _near._y, rad2deg( far ) ) + 2 * _spec->_error );
+                    farDist = std::min( _scanDistance, computeXScanDistance( _near._y, rad2deg( farDist ) ) + 2 * _spec->_error );
                 }
-                assert( far >= 0 );
-                GEODEBUGPRINT( far );
+                assert( farDist >= 0 );
+                GEODEBUGPRINT( farDist );
 
                 // Find the box that includes all the points we need to return
-                _want = Box( _near._x - far , _near._y - far , far * 2 );
+                _want = Box( _near._x - farDist , _near._y - farDist , farDist * 2 );
                 GEODEBUGPRINT( _want.toString() );
 
                 // Remember the far distance for further scans
-                _scanDistance = far;
+                _scanDistance = farDist;
 
                 // Reset the search, our distances have probably changed
                 if( _state == DONE_NEIGHBOR ){
@@ -1927,6 +1940,7 @@ namespace mongo {
                 // Same, but compute maxDistance using spherical transform
 
                 uassert(13461, "Spherical MaxDistance > PI. Are you sure you are using radians?", _maxDistance < M_PI);
+                checkEarthBounds( _startPt );
 
                 _type = GEO_SPHERE;
                 _yScanDistance = rad2deg( _maxDistance ) + _g->_error;
@@ -1973,10 +1987,13 @@ namespace mongo {
                 d = _g->distance( _start , h );
                 error = _g->_error;
                 break;
-            case GEO_SPHERE:
-                d = spheredist_deg( _startPt, Point( _g, h ) );
+            case GEO_SPHERE: {
+                Point p( _g, h );
+                checkEarthBounds( p );
+                d = spheredist_deg( _startPt, p );
                 error = _g->_errorSphere;
                 break;
+            }
             default: assert( false );
             }
 
@@ -1991,17 +2008,19 @@ namespace mongo {
 
                     GEODEBUG( "Inexact distance : " << d << " vs " << _maxDistance << " from " << ( *i ).toString() << " due to error " << error );
 
+                    Point p( *i );
                     // Exact distance checks.
                     switch (_type) {
                     case GEO_PLAIN: {
-                        if( _startPt.distanceWithin( Point( *i ), _maxDistance ) ) return true;
+                        if( _startPt.distanceWithin( p, _maxDistance ) ) return true;
                         break;
                     }
                     case GEO_SPHERE:
                         // Ignore all locations not hashed to the key's hash, since spherical calcs are
                         // more expensive.
                         if( _g->_hash( *i ) != h ) break;
-                        if( spheredist_deg( _startPt , Point( *i ) ) <= _maxDistance ) return true;
+                        checkEarthBounds( p );
+                        if( spheredist_deg( _startPt , p ) <= _maxDistance ) return true;
                         break;
                     default: assert( false );
                     }
@@ -2373,7 +2392,6 @@ namespace mongo {
             if ( cmdObj["spherical"].trueValue() )
                 type = GEO_SPHERE;
 
-            // We're returning exact distances, so don't evaluate lazily.
             GeoSearch gs( g , n , numWanted , filter , maxDistance , type );
 
             if ( cmdObj["start"].type() == String) {

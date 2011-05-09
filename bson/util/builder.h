@@ -142,8 +142,10 @@ namespace mongo {
             memcpy(grow(len), str.data(), len);
         }
 
+        /** @return length of current string */
         int len() const { return l; }
         void setlen( int newLen ) { l = newLen; }
+        /** @return size of the buffer */
         int getSize() const { return size; }
 
         /* returns the pre-grow write position */
@@ -242,6 +244,8 @@ namespace mongo {
         void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
 
         std::string str() const { return std::string(_buf.data, _buf.l); }
+        
+        int len() const { return _buf.l; }
 
     private:
         BufBuilder _buf;

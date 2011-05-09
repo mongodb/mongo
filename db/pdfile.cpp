@@ -1006,7 +1006,7 @@ namespace mongo {
         NamespaceDetailsTransient *nsdt,
         Record *toupdate, const DiskLoc& dl,
         const char *_buf, int _len, OpDebug& debug,  bool god) {
-        StringBuilder& ss = debug.str;
+
         dassert( toupdate == dl.rec() );
 
         BSONObj objOld(toupdate);
@@ -1040,8 +1040,7 @@ namespace mongo {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
-            if ( cc().database()->profile )
-                ss << " moved ";
+            debug.moved = true;
             deleteRecord(ns, toupdate, dl);
             return insert(ns, objNew.objdata(), objNew.objsize(), god);
         }
@@ -1065,7 +1064,7 @@ namespace mongo {
                         }
                     }
                     catch (AssertionException&) {
-                        ss << " exception update unindex ";
+                        debug.extra << " exception update unindex ";
                         problem() << " caught assertion update unindex " << idx.indexNamespace() << endl;
                     }
                 }
@@ -1081,13 +1080,13 @@ namespace mongo {
                             dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
                     }
                     catch (AssertionException& e) {
-                        ss << " exception update index ";
+                        debug.extra << " exception update index ";
                         problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << " " << objNew["_id"] << endl;
                     }
                 }
             }
-            if( keyUpdates && cc().database()->profile )
-                ss << '\n' << keyUpdates << " key updates ";
+            
+            debug.keyUpdates = keyUpdates;
         }
 
         //  update in place

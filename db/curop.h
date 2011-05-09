@@ -32,8 +32,47 @@ namespace mongo {
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
     public:
-        StringBuilder str;
-        void reset() { str.reset(); }
+        OpDebug() : ns(""){ reset(); }
+
+        void reset();
+        
+        string toString() const;
+        void append( BSONObjBuilder& b ) const;
+
+        // -------------------
+        
+        StringBuilder extra; // weird things we need to fix later
+        
+        // basic options
+        int op;
+        bool iscommand;
+        Namespace ns;
+        BSONObj query;
+        BSONObj updateobj;
+        
+        // detailed options
+        long long cursorid;
+        int ntoreturn;
+        int ntoskip;
+        bool exhaust;
+
+        // debugging/profile info
+        int nscanned;
+        bool idhack;
+        bool scanAndOrder;
+        bool moved;
+        bool fastmod;
+        bool fastmodinsert;
+        bool upsert;
+        unsigned keyUpdates;
+
+        // error handling
+        ExceptionInfo exceptionInfo;
+        
+        // response info
+        int executionTime;
+        int nreturned;
+        int responseLength;
     };
 
     /**

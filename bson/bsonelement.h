@@ -205,7 +205,9 @@ namespace mongo {
         }
 
         /** Size (length) of a string element.
-            You must assure of type String first.  */
+            You must assure of type String first.  
+            @return string size including terminating null
+        */
         int valuestrsize() const {
             return *reinterpret_cast< const int* >( value() );
         }

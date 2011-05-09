@@ -320,6 +320,7 @@ namespace mongo {
         _client = 0;
     }
 
+
     BSONObj CurOp::infoNoauth() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
@@ -518,4 +519,122 @@ namespace mongo {
 
         return writers + readers;
     }
+
+    void OpDebug::reset() {
+        extra.reset();
+
+        op = 0;
+        iscommand = false;
+        ns = "";
+        query = BSONObj();
+        updateobj = BSONObj();
+        
+        cursorid = 0;
+        ntoreturn = 0;
+        ntoskip = 0;
+        exhaust = false;
+
+        nscanned = 0;
+        idhack = false;
+        scanAndOrder = false;
+        moved = false;
+        fastmod = false;
+        fastmodinsert = false;
+        upsert = false;
+        keyUpdates = 0;
+        
+        exceptionInfo.reset();
+        
+        executionTime = 0;
+        nreturned = 0;
+        responseLength = 0;
+    }
+
+
+#define OPDEBUG_TOSTRING_HELP(x) if( x ) s << " " #x ":" << (x)
+    string OpDebug::toString() const {
+        StringBuilder s( ns.size() + 64 );
+        if ( iscommand )
+            s << "command ";
+        else
+            s << opToString( op ) << ' ';
+        s << ns.toString();
+
+        if ( ! query.isEmpty() ) {
+            if ( iscommand )
+                s << " command: ";
+            else
+                s << " query: ";
+            s << query.toString();
+        }
+        
+        if ( ! updateobj.isEmpty() ) {
+            s << " update: ";
+            updateobj.toString( s );
+        }
+        
+        OPDEBUG_TOSTRING_HELP( cursorid );
+        OPDEBUG_TOSTRING_HELP( ntoreturn );
+        OPDEBUG_TOSTRING_HELP( ntoskip );
+        OPDEBUG_TOSTRING_HELP( exhaust );
+
+        OPDEBUG_TOSTRING_HELP( nscanned );
+        OPDEBUG_TOSTRING_HELP( idhack );
+        OPDEBUG_TOSTRING_HELP( scanAndOrder );
+        OPDEBUG_TOSTRING_HELP( moved );
+        OPDEBUG_TOSTRING_HELP( fastmod );
+        OPDEBUG_TOSTRING_HELP( fastmodinsert );
+        OPDEBUG_TOSTRING_HELP( upsert );
+        OPDEBUG_TOSTRING_HELP( keyUpdates );
+        
+        if ( extra.len() )
+            s << " " << extra.str();
+
+        if ( ! exceptionInfo.empty() ) {
+            s << " exception: " << exceptionInfo.msg;
+            if ( exceptionInfo.code )
+                s << " code:" << exceptionInfo.code;
+        }
+        
+        OPDEBUG_TOSTRING_HELP( nreturned );
+        if ( responseLength )
+            s << " reslen:" << responseLength;
+        s << " " << executionTime << "ms";
+
+        return s.str();
+    }
+
+#define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
+#define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
+    void OpDebug::append( BSONObjBuilder& b ) const {
+        b.append( "op" , iscommand ? "command" : opToString( op ) );
+        b.append( "ns" , ns.toString() );
+        if ( ! query.isEmpty() )
+            b.append( iscommand ? "command" : "query" , query );
+        if ( ! updateobj.isEmpty() )
+            b.append( "updateobj" , "updateobj" );
+        
+        OPDEBUG_APPEND_NUMBER( cursorid );
+        OPDEBUG_APPEND_NUMBER( ntoreturn );
+        OPDEBUG_APPEND_NUMBER( ntoskip );
+        OPDEBUG_APPEND_BOOL( exhaust );
+
+        OPDEBUG_APPEND_NUMBER( nscanned );
+        OPDEBUG_APPEND_BOOL( idhack );
+        OPDEBUG_APPEND_BOOL( scanAndOrder );
+        OPDEBUG_APPEND_BOOL( moved );
+        OPDEBUG_APPEND_BOOL( fastmod );
+        OPDEBUG_APPEND_BOOL( fastmodinsert );
+        OPDEBUG_APPEND_BOOL( upsert );
+        OPDEBUG_APPEND_NUMBER( keyUpdates );
+
+        if ( ! exceptionInfo.empty() ) 
+            exceptionInfo.append( b , "exception" , "exceptionCode" );
+        
+        OPDEBUG_APPEND_NUMBER( nreturned );
+        OPDEBUG_APPEND_NUMBER( responseLength );
+        b.append( "millis" , executionTime );
+        
+    }
+
 }

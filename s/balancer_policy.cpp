@@ -51,6 +51,7 @@ namespace mongo {
             const bool draining = isDraining( shardLimits );
             const bool opsQueued = hasOpsQueued( shardLimits );
 
+            
             // Is this shard a better chunk receiver then the current one?
             // Shards that would be bad receiver candidates:
             // + maxed out shards
@@ -62,6 +63,13 @@ namespace mongo {
                     min = make_pair( shard , size );
                 }
             }
+            else if ( opsQueued ) {
+                LOG(1) << "won't send a chunk to: " << shard << " because it has ops queued" << endl;
+            }
+            else if ( maxedOut ) {
+                LOG(1) << "won't send a chunk to: " << shard << " because it is maxedOut" << endl;
+            }
+
 
             // Check whether this shard is a better chunk donor then the current one.
             // Draining shards take a lower priority than overloaded shards.

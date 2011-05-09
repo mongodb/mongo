@@ -382,7 +382,7 @@ namespace mongo {
 
         static CCById clientCursorsById;
         static long long numberTimedOut;
-        static boost::recursive_mutex ccmutex;   // must use this for all statics above!
+        static boost::recursive_mutex& ccmutex;   // must use this for all statics above!
         static CursorId allocCursorId_inlock();
 
     };

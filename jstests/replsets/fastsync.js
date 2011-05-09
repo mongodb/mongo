@@ -62,7 +62,16 @@ while (count < 10 && result.ok != 1) {
 }   
 
 assert(result.ok, tojson(result));
-assert.soon(function() { return admin.runCommand({isMaster:1}).ismaster; });
+assert.soon(function() { result = false;
+        try {
+            result = admin.runCommand({isMaster:1}).ismaster;
+        }
+        catch(e) {
+            print(e);
+            return false;
+        }
+        return result;
+    });
 
 print("1");
 for (var i=0; i<100000; i++) {
