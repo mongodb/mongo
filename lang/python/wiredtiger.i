@@ -130,7 +130,7 @@ SELFHELPER(struct wt_cursor)
             if self.is_column:
                 return self._get_recno()
             else:
-                return unpack(self.key_format, self._get_key(self))
+                return unpack(self.key_format, self._get_key())[0]
 
         def set_value(self, *args):
                 # Keep the Python string pinned
@@ -138,87 +138,26 @@ SELFHELPER(struct wt_cursor)
                 self._set_value(self.value)
 
         def get_value(self):
-                return unpack(self.value_format, self._get_value())
+                return unpack(self.value_format, self._get_value())[0]
+
+        # Implement the iterable contract for wt_cursor
+        def __iter__(self):
+                return self
+
+        def next(self):
+                try:
+                        self._next()
+                # TODO: catch wiredtiger exception when there is one?
+                except BaseException:
+                        raise StopIteration
+                return [self.get_key(), self.get_value()]
 %}
 };
 
 /*
- * Next, we want our own 'next' function for wt_cursor, so we can implement
- * iterable.  Since nobody but use will use the 'real' version, we'll remove it
- * to avoid confusion.
+ * We want our own 'next' function for wt_cursor to implement iterable.
  */
-%ignore next(WT_CURSOR *);
-
-/* We create an artificial return type for next, and use the typemap to
- * convert it to its final value (a python tuple).  That consolidates
- * the return code.
- * TODO: no need to do this anymore?
- */
-%{
-typedef struct IterNextValue {
-        PyObject *pyobj;
-        int ret;
-} IterNextValue;
-%}
-
-%typemap(out) IterNextValue {
-        if ($1.ret != 0) {
-                if ($1.ret == WT_NOTFOUND) {
-                        PyErr_SetString(PyExc_StopIteration, "No more data for cursor"); 
-                }
-                else {
-                        PyErr_SetString(PyExc_RuntimeError, wiredtiger_strerror($1.ret));
-                }
-                $1.pyobj = NULL;
-        }
-        $result = $1.pyobj;
-}
-
-%extend wt_cursor {
-        /* Implement the iterable contract for wt_cursor */
-        struct wt_cursor *__iter__() {
-                return $self;
-        }
-
-        IterNextValue next() {
-                // TODO: handle arbitrary types, not just strings!
-                char *keyptr = 0;
-                char *valptr = 0;
-                IterNextValue result;
-                int ret;
-
-                result.pyobj = NULL;
-                ret = self->next(self);
-#if 0
-                //TODO: for testing until real insertion works
-                {
-                        // fake some values to test the caller...
-                        static int count = 2;
-
-                        if (count-- > 0) {
-                                result.pyobj = Py_BuildValue("(ss)", "foo", "bar");
-                                result.ret = 0;
-                                return result;
-                        }
-                        else {
-                                ret = EIO; /* TODO!! */
-                        }
-                }
-#endif
-
-                if (ret == 0) {
-                        ret = self->get_key(self, &keyptr);
-                }
-                if (ret == 0) {
-                        ret = self->get_value(self, &valptr);
-                }
-                if (ret == 0) {
-                        result.pyobj = Py_BuildValue("(ss)", keyptr, valptr);
-                }
-                result.ret = ret;
-                return result;
-        }
-};
+%rename(_next) next(WT_CURSOR *);
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable wt_cursor::key_format;
