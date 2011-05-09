@@ -54,6 +54,12 @@ namespace mongo {
         char buf2[256];
         char *p;
     public:
+        DiagStr(const DiagStr& r) { 
+            memset(buf1, 0, 256);
+            memset(buf2, 0, 256);
+            strcpy(buf1, r.get());
+            p = buf1;
+        }
         DiagStr() {
             memset(buf1, 0, 256);
             memset(buf2, 0, 256);
