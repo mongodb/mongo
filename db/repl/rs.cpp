@@ -38,8 +38,6 @@ namespace mongo {
     }
 
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
-        lock lk(this);
-        
         static time_t lastLogged;
         _hbmsgTime = time(0);
 
