@@ -70,7 +70,7 @@ namespace mongo {
         */
         virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return false; }
 
-        /* Return true if slaves of a replication pair are allowed to execute the command
+        /* Return true if slaves are allowed to execute the command
            (the command directly from a client -- if fromRepl, always allowed).
         */
         virtual bool slaveOk() const = 0;

@@ -389,7 +389,7 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { lock lk((RSBase*)this); assert( _self ); return _self->config(); }
+        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const { return myConfig().potentiallyHot() && elect.steppedDown <= time(0); }
     protected:
@@ -397,10 +397,12 @@ namespace mongo {
         bool _buildIndexes;       // = _self->config().buildIndexes
         void setSelfTo(Member *); // use this as it sets buildIndexes var
     private:
-        List1<Member> _members; /* all members of the set EXCEPT self. */
-
+        List1<Member> _members; // all members of the set EXCEPT _self.
+        ReplSetConfig::MemberCfg _config; // config of _self
+        unsigned _id; // _id of _self
     public:
-        unsigned selfId() const { lock lk((RSBase*)this); return _self->id(); }
+        // this is called from within a writelock in logOpRS
+        unsigned selfId() const { return _id; }
         Manager *mgr;
 
     private:
@@ -467,12 +469,20 @@ namespace mongo {
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
 
-        /* we have a new config (reconfig) - apply it.
-           @param comment write a no-op comment to the oplog about it.  only makes sense if one is primary and initiating the reconf.
-        */
+        /**
+         * We have a new config (reconfig) - apply it.
+         * @param comment write a no-op comment to the oplog about it.  only
+         * makes sense if one is primary and initiating the reconf.
+         *
+         * The slaves are updated when they get a heartbeat indicating the new
+         * config.  The comment is a no-op.
+         */
         void haveNewConfig(ReplSetConfig& c, bool comment);
 
-        /* if we delete old configs, this needs to assure locking. currently we don't so it is ok. */
+        /**
+         * Pointer assignment isn't necessarily atomic, so this needs to assure
+         * locking, even though we don't delete old configs.
+         */
         const ReplSetConfig& getConfig() { return config(); }
 
         bool lockedByMe() { return RSBase::lockedByMe(); }
@@ -485,9 +495,10 @@ namespace mongo {
         }
     };
 
-    /** base class for repl set commands.  checks basic things such as in rs mode before the command
-        does its real work
-        */
+    /**
+     * Base class for repl set commands.  Checks basic things such if we're in
+     * rs mode before the command does its real work.
+     */
     class ReplSetCommand : public Command {
     protected:
         ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }

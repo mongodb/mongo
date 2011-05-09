@@ -359,6 +359,8 @@ namespace mongo {
     void ReplSetImpl::setSelfTo(Member *m) {
         // already locked in initFromConfig
         _self = m;
+        _id = m->id();
+        _config = m->config();
         if( m ) _buildIndexes = m->config().buildIndexes;
         else _buildIndexes = true;
     }
