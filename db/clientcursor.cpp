@@ -34,7 +34,7 @@
 namespace mongo {
 
     CCById ClientCursor::clientCursorsById;
-    boost::recursive_mutex ClientCursor::ccmutex;
+    boost::recursive_mutex& ClientCursor::ccmutex( *(new boost::recursive_mutex()) );
     long long ClientCursor::numberTimedOut = 0;
 
     void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl ); // from s/d_logic.h
