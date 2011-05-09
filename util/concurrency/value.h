@@ -66,7 +66,7 @@ namespace mongo {
         }
         void set(const string& s) { 
             mutex::scoped_lock lk(m);
-            _s = 1;
+            _s = s;
         }
         operator string() const { return get(); }
         void operator=(const string& s) { set(s); }
