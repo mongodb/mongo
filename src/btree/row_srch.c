@@ -39,9 +39,6 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	rip = NULL;
 	rref = NULL;
 
-	WT_DB_FCHK(btree,
-	    "__wt_row_search", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
-
 	/* Assume we don't match in case we're searching an empty tree. */
 	cmp = -1;
 

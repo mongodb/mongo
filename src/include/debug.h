@@ -9,8 +9,6 @@
 extern "C" {
 #endif
 
-/* Debug byte value */
-#define	WT_DEBUG_BYTE	0xab
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 
 #ifdef HAVE_DIAGNOSTIC

@@ -199,9 +199,8 @@ __wt_curstat_open(SESSION *session,
 	CURSOR_STAT *cst;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
-	const char *key_format, *value_format;
 	int dump, printable, raw, ret;
-	size_t csize;
+
 	API_CONF_INIT(session, open_cursor, config);
 
 	/* Skip "stat:". */
@@ -214,13 +213,13 @@ __wt_curstat_open(SESSION *session,
 	WT_ERR(__wt_config_gets(__cfg, "raw", &cval));
 	raw = (cval.val != 0);
 
-	WT_RET(__wt_calloc(session, 1, csize, &cst));
+	WT_RET(__wt_calloc_def(session, 1, &cst));
 
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->key_format = key_format;
-	cursor->value_format = value_format;
+	cursor->key_format = "S";
+	cursor->value_format = printable ? "S" : "q";
 	__wt_cursor_init(cursor, config);
 
 	if (dump)

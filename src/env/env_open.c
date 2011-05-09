@@ -66,8 +66,6 @@ __wt_connection_close(CONNECTION *conn)
 	WT_FH *fh;
 	int ret, secondary_err;
 
-	WT_CONN_FCHK_RET(conn, "Env.close", conn->flags, WT_APIMASK_CONN, ret);
-
 	session = &conn->default_session;
 	ret = secondary_err = 0;
 

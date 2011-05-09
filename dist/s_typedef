@@ -17,7 +17,8 @@ build() {
 	    `egrep -h '^struct[	 ]*__.*[	 ]*{$' $l |
 	    sed -e 's/struct[	 ]*__//' -e 's/[	 ]*{$//' | sort`; do
 		upper=`echo $i | tr a-z A-Z`
-		echo "struct __$i; typedef struct __$i $upper;"
+		echo "struct __$i;"
+		echo "    typedef struct __$i $upper;"
 	done
 
 	echo '/*'

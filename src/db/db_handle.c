@@ -87,9 +87,6 @@ __wt_btree_destroy(BTREE *btree)
 	if (btree == NULL)
 		return (0);
 
-	/* Diagnostic check: check flags against approved list. */
-	WT_CONN_FCHK_RET(conn, "Db.close", btree->flags, WT_APIMASK_BTREE, ret);
-
 	__wt_free(session, btree->name);
 
 	if (btree->huffman_key != NULL) {

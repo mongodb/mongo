@@ -34,7 +34,7 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	struct record_t record;
-	uint64_t insert_count;
+	unsigned long long insert_count;
 	int ch, debug, eof, ret, text_input, tret, verbose;
 	const char *tablename, *table_config, *home;
 	char cursor_config[100], datasink[100];

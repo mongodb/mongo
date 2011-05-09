@@ -50,9 +50,6 @@ __wt_connection_destroy(CONNECTION *conn)
 	if (conn == NULL)
 		return (0);
 
-	/* Diagnostic check: check flags against approved list. */
-	WT_CONN_FCHK_RET(conn, "Env.close", conn->flags, WT_APIMASK_CONN, ret);
-
 	if (conn->mtx != NULL)
 		(void)__wt_mtx_destroy(session, conn->mtx);
 

@@ -61,15 +61,6 @@ for f in sorted(flag_cnt.items()):
 	    "\t" * max(1, 6 - int((len('WT_') + len(f[0])) / 8)),\
 	    flag_bit[f[0]])
 
-# Print out the API masks in hex.
-#	Assumes tab stops set to 8 characters.
-flag_info += '\n'
-for f in sorted(name_mask.items()):
-	# Only write out masks for API/method functions.
-	flag_info += "#define\tWT_APIMASK_%s%s%#010x\n" %\
-	    (f[0].upper().replace('.', '_'),\
-	    "\t" * max(1, 6 - int((len('WT_APIMASK_') + len(f[0])) / 8)), f[1])
-
 # Update the wiredtiger.in file with the flags information.
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')

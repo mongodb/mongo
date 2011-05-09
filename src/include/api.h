@@ -387,18 +387,6 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
 #define	WT_WALK_CACHE					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 #define	WT_WRITE					0x00000001
-
-#define	WT_APIMASK_BT_DUMP				0x00000003
-#define	WT_APIMASK_BT_OPEN				0x00000001
-#define	WT_APIMASK_BT_SEARCH_COL			0x00000001
-#define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
-#define	WT_APIMASK_BT_TREE_WALK				0x00000001
-#define	WT_APIMASK_BTREE				0x00000007
-#define	WT_APIMASK_BUF					0x00000001
-#define	WT_APIMASK_CONN					0x00000003
-#define	WT_APIMASK_HUFFMAN_SET				0x0000000f
-#define	WT_APIMASK_SESSION				0x00000001
-#define	WT_APIMASK_VERBOSE				0x0000001f
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api_flags.py.

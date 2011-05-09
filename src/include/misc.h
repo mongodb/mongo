@@ -83,39 +83,10 @@ extern "C" {
 	__wt_page_in_func(a, b, c, d)
 #endif
 
-/*
- * Flag check for API functions.
- * Explicitly cast the hex bit mask to an unsigned value to avoid complaints
- * about implicit conversions of integers.  Using the largest unsigned type,
- * there's no defined bit mask type or maximum value.
- */
-#define	WT_CONN_FCHK_RET(conn, n, f, mask, ret) do {			\
-	if ((f) & ~((uintmax_t)(mask))) {				\
-		(conn)->default_session.name = (n);			\
-		ret = __wt_api_args(&(conn)->default_session);		\
-	}								\
-} while (0)
-#define	WT_CONN_FCHK(conn, n, f, mask)	do {				\
-	if ((f) & ~((uintmax_t)(mask))) {				\
-		(conn)->default_session.name = (n);			\
-		return (__wt_api_args(&(conn)->default_session));	\
-	}								\
-} while (0)
-#define	WT_DB_FCHK(btree, name, f, mask)				\
-	WT_CONN_FCHK((btree)->conn, (name), (f), (mask))
-
 /* Read-only file check. */
 #define	WT_DB_RDONLY(session, btree, name)				\
 	if (F_ISSET((btree), WT_RDONLY))				\
 		return (__wt_file_readonly((session), (name)));
-
-/* Column- and row-only file check. */
-#define	WT_DB_ROW_ONLY(session, btree, name)				\
-	if (F_ISSET((btree), WT_COLUMN))				\
-		return (__wt_file_method_type((session), (name), 1));
-#define	WT_DB_COL_ONLY(session, btree, name)				\
-	if (!F_ISSET((btree), WT_COLUMN))				\
-		return (__wt_file_method_type((session), (name), 0));
 
 /*
  * Flag set, clear and test.

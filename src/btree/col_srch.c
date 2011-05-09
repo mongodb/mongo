@@ -40,8 +40,6 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 
 	btree = session->btree;
 
-	WT_DB_FCHK(btree, "__wt_col_search", flags, WT_APIMASK_BT_SEARCH_COL);
-
 	/* Search the tree. */
 	for (page = btree->root_page.page; page->type == WT_PAGE_COL_INT;) {
 		/*
