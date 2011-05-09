@@ -478,8 +478,9 @@ namespace mongo {
      * @return a cursor interface to the query optimizer.  The implementation may
      * utilize a single query plan or interleave results from multiple query
      * plans before settling on a single query plan.  Note that the schema of
-     * currKey() documents may change over the course of iteration.
-	 *
+     * currKey() documents, the matcher(), and the isMultiKey() nature of the
+     * cursor may change over the course of iteration.
+     *
      * This is a work in progress.  Partial list of features not yet implemented:
      * - ordered/sorted document iteration
      * - yielding

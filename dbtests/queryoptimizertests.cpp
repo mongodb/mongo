@@ -996,6 +996,25 @@ namespace QueryOptimizerTests {
             shared_ptr<Cursor> _c;
         };
         
+        /** No results for empty collection. */
+        class Empty : public Base {
+        public:
+            void run() {
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSONObj() );
+                ASSERT( !c->ok() );
+                ASSERT_EXCEPTION( c->_current(), AssertionException );
+                ASSERT_EXCEPTION( c->current(), AssertionException );
+                ASSERT( c->currLoc().isNull() );
+                ASSERT( !c->advance() );
+                ASSERT_EXCEPTION( c->currKey(), AssertionException );
+                ASSERT_EXCEPTION( c->getsetdup( DiskLoc() ), AssertionException );
+                ASSERT_EXCEPTION( c->isMultiKey(), AssertionException );
+                ASSERT_EXCEPTION( c->matcher(), AssertionException );
+            }
+        };
+        
         /** Basic test with two indexes and deduping requirement. */
         class Basic : public Base {
         public:
@@ -1642,6 +1661,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::EqualityThenIn>();
             add<QueryPlanSetTests::NotEqualityThenIn>();
             add<BestGuess>();
+            add<QueryOptimizerCursorTests::Empty>();
             add<QueryOptimizerCursorTests::Basic>();
             add<QueryOptimizerCursorTests::NoMatch>();
             add<QueryOptimizerCursorTests::Interleaved>();

@@ -97,16 +97,17 @@ namespace mongo {
         }
         
         virtual bool ok() { return !currLoc().isNull(); }
-        virtual Record* _current() { return currLoc().rec(); }
-        virtual BSONObj current() { return currLoc().obj(); }
-        virtual DiskLoc currLoc() { 
+        virtual Record* _current() { assertOk(); return currLoc().rec(); }
+        virtual BSONObj current() { assertOk(); return currLoc().obj(); }
+        virtual DiskLoc currLoc() { return _currLoc(); }
+        DiskLoc _currLoc() const {
             if ( _takeover ) {
-            	return _takeover->currLoc();
+                return _takeover->currLoc();
             }
             if ( _currOp ) {
                 return _currOp->currLoc();
             }
-            return DiskLoc();
+            return DiskLoc();            
         }
         virtual bool advance() {
             if ( _takeover ) {
@@ -131,7 +132,10 @@ namespace mongo {
             
             return ok();
         }
-        virtual BSONObj currKey() const { return _takeover ? _takeover->currKey() : _currOp->currKey(); }
+        virtual BSONObj currKey() const {
+            assertOk();
+            return _takeover ? _takeover->currKey() : _currOp->currKey();
+        }
         
         virtual DiskLoc refLoc() { return DiskLoc(); }
         
@@ -141,6 +145,7 @@ namespace mongo {
         virtual string toString() { return "QueryOptimizerCursor"; }
         
         virtual bool getsetdup(DiskLoc loc) {
+            assertOk();
             if ( !_takeover ) {
                 return getsetdupInternal( loc );                
             }
@@ -150,18 +155,28 @@ namespace mongo {
             return _takeover->getsetdup( loc );
         }
         
-        virtual bool isMultiKey() const { return _takeover ? _takeover->isMultiKey() : _currOp->cursor()->isMultiKey(); }
+        virtual bool isMultiKey() const {
+            assertOk();
+            return _takeover ? _takeover->isMultiKey() : _currOp->cursor()->isMultiKey();
+        }
         
         virtual bool modifiedKeys() const { return true; }
         
         virtual long long nscanned() { return -1; }
 
-        virtual CoveredIndexMatcher *matcher() const { return _takeover ? _takeover->matcher() : _currOp->matcher().get(); }
+        virtual CoveredIndexMatcher *matcher() const {
+            assertOk();
+            return _takeover ? _takeover->matcher() : _currOp->matcher().get();
+        }
         
     private:
+        void assertOk() const {
+            massert( 14809, "Invalid access for cursor that is not ok()", !_currLoc().isNull() );
+        }
+        
         bool getsetdupInternal(const DiskLoc &loc) {
             pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
-			return !p.second;
+            return !p.second;
         }
 
         bool getdupInternal(const DiskLoc &loc) {
