@@ -9,6 +9,7 @@
 #include "btree.i"
 
 static void __wt_free_insert(SESSION *, WT_INSERT **, uint32_t);
+static void __wt_free_insert_list(SESSION *, WT_INSERT *);
 static void __wt_free_page_col_fix(SESSION *, WT_PAGE *);
 static void __wt_free_page_col_int(SESSION *, WT_PAGE *);
 static void __wt_free_page_col_rle(SESSION *, WT_PAGE *);
@@ -48,11 +49,19 @@ __wt_page_free(SESSION *session, WT_PAGE *page)
 	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
 		__wt_cache_page_out(session, page);
 
-	/*
-	 * Bulk-loaded pages are skeleton pages, we don't need to look at
-	 * the internals.
-	 */
-	if (!F_ISSET(page, WT_PAGE_BULK_LOAD))
+	/* Bulk-loaded pages are skeleton pages, we don't need to do much. */
+	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_RLE:
+		case WT_PAGE_COL_VAR:
+			__wt_free_update_list(session, page->u.bulk.upd);
+			break;
+		case WT_PAGE_ROW_LEAF:
+			__wt_free_insert_list(session, page->u.bulk.ins);
+			break;
+		}
+	else
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 			__wt_free_page_col_fix(session, page);
@@ -212,22 +221,36 @@ static void
 __wt_free_insert(
     SESSION *session, WT_INSERT **insert_head, uint32_t entries)
 {
-	WT_INSERT **insp, *ins, *next;
+	WT_INSERT **insp;
 
 	/*
 	 * For each non-NULL slot in the page's array of inserts, free the
 	 * linked list anchored in that slot.
 	 */
 	for (insp = insert_head; entries > 0; --entries, ++insp)
-		for (ins = *insp; ins != NULL; ins = next) {
-			__wt_free_update_list(session, ins->upd);
-
-			next = ins->next;
-			__wt_sb_free(session, ins->sb);
-		}
+		if (*insp != NULL)
+			__wt_free_insert_list(session, *insp);
 
 	/* Free the page's array of inserts. */
 	__wt_free(session, insert_head);
+}
+
+/*
+ * __wt_free_insert_list --
+ *	Walk a WT_INSERT forward-linked list and free the per-thread combination
+ * of a WT_INSERT structure and its associated chain of WT_UPDATE structures.
+ */
+static void
+__wt_free_insert_list(SESSION *session, WT_INSERT *ins)
+{
+	WT_INSERT *next;
+
+	do {
+		__wt_free_update_list(session, ins->upd);
+
+		next = ins->next;
+		__wt_sb_free(session, ins->sb);
+	} while ((ins = next) != NULL);
 }
 
 /*
