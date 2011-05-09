@@ -172,6 +172,9 @@ typedef struct {
 } WT_RECONCILE;
 
 static uint32_t __rec_allocation_size(SESSION *, WT_BUF *, uint8_t *);
+static int  __rec_cell_build_key(SESSION *, WT_BUF *, WT_CELL *, WT_OVFL *);
+static int  __rec_cell_build_ovfl(SESSION *, WT_BUF *, WT_OVFL *);
+static int  __rec_cell_build_value(SESSION *, WT_BUF *, WT_CELL *, WT_OVFL *);
 static int  __rec_col_fix(SESSION *, WT_PAGE *);
 static int  __rec_col_fix_bulk(SESSION *, WT_PAGE *);
 static int  __rec_col_int(SESSION *, WT_PAGE *);
@@ -1679,7 +1682,7 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 			} else {
 				value->data = WT_UPDATE_DATA(upd);
 				value->size = upd->size;
-				WT_RET(__wt_item_build_value(
+				WT_RET(__rec_cell_build_value(
 				    session, value, &value_cell, &value_ovfl));
 				len = WT_CELL_SPACE_REQ(value->size);
 				data_loc = DATA_OFF_PAGE;
@@ -1750,7 +1753,7 @@ __rec_col_var_bulk(SESSION *session, WT_PAGE *page)
 	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
 		value->data = WT_UPDATE_DATA(upd);
 		value->size = upd->size;
-		WT_RET(__wt_item_build_value(
+		WT_RET(__rec_cell_build_value(
 		    session, value, &value_cell, &value_ovfl));
 		len = WT_CELL_SPACE_REQ(value->size);
 
@@ -1995,7 +1998,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 			key.size = r->merge_ref->size;
 			r->merge_ref = NULL;
 		}
-		WT_RET(__wt_item_build_key(session, &key, &cell, &key_ovfl));
+		WT_RET(__rec_cell_build_key(session, &key, &cell, &key_ovfl));
 
 		/* Boundary: allocate, split or write the page. */
 		while (WT_CELL_SPACE_REQ(key.size) +
@@ -2154,7 +2157,7 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 			else {
 				value_buf.data = WT_UPDATE_DATA(upd);
 				value_buf.size = upd->size;
-				WT_RET(__wt_item_build_value(session,
+				WT_RET(__rec_cell_build_value(session,
 				    &value_buf, &value_cell, &value_ovfl));
 				value_len = WT_CELL_SPACE_REQ(value_buf.size);
 				data_loc = DATA_OFF_PAGE;
@@ -2283,7 +2286,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		else {
 			value_buf.data = WT_UPDATE_DATA(upd);
 			value_buf.size = upd->size;
-			WT_RET(__wt_item_build_value(
+			WT_RET(__rec_cell_build_value(
 			    session, &value_buf, &value_cell, &value_ovfl));
 			value_len = WT_CELL_SPACE_REQ(value_buf.size);
 		}
@@ -2291,7 +2294,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		/* Build a key to store on the page. */
 		key_buf.data = WT_INSERT_KEY(ins);
 		key_buf.size = WT_INSERT_KEY_SIZE(ins);
-		WT_RET(__wt_item_build_key(
+		WT_RET(__rec_cell_build_key(
 		    session, &key_buf, &key_cell, &key_ovfl));
 		key_len = WT_CELL_SPACE_REQ(key_buf.size);
 
@@ -2561,6 +2564,164 @@ __rec_parent_update(SESSION *session, WT_PAGE *page,
 	WT_PAGE_SET_MODIFIED(page->parent);
 
 	return (0);
+}
+
+/*
+ * __rec_cell_build_key --
+ *	Process an inserted key item and return an WT_CELL structure and byte
+ *	string to be stored on the page.
+ */
+static int
+__rec_cell_build_key(
+    SESSION *session, WT_BUF *key, WT_CELL *cell, WT_OVFL *ovfl)
+{
+	BTREE *btree;
+	uint32_t orig_size;
+
+	btree = session->btree;
+
+	WT_CELL_CLEAR(cell);
+
+	/*
+	 * We're called with a WT_BUF that references a data/size pair.  We can
+	 * re-point that WT_BUF's data and size fields to other memory, and if
+	 * we allocate memory in that WT_BUF, the caller must free it.
+	 *
+	 * Optionally compress the value using the Huffman engine.  For Huffman-
+	 * encoded key/data cells, we need additional memory; use the SESSION
+	 * key/value return memory: this routine is called during bulk insert
+	 * and reconciliation, we aren't returning key/data pairs.
+	 */
+	if (btree->huffman_key != NULL) {
+		orig_size = key->size;
+		WT_RET(__wt_huffman_encode(
+		    btree->huffman_key, key->data, orig_size, key));
+		if (key->size > orig_size)
+			WT_STAT_INCRV(btree->stats,
+			    huffman_key, key->size - orig_size);
+	}
+
+	/* Create an overflow object if the data won't fit. */
+	if (key->size > btree->leafitemsize) {
+		WT_RET(__rec_cell_build_ovfl(session, key, ovfl));
+
+		key->data = ovfl;
+		key->size = sizeof(*ovfl);
+		WT_CELL_SET(cell, WT_CELL_KEY_OVFL, key->size);
+		WT_STAT_INCR(btree->stats, overflow_key);
+	} else
+		WT_CELL_SET(cell, WT_CELL_KEY, key->size);
+	return (0);
+}
+
+/*
+ * __rec_cell_build_value --
+ *	Process an inserted data item and return an WT_CELL structure and byte
+ *	string to be stored on the page.
+ */
+static int
+__rec_cell_build_value(
+    SESSION *session, WT_BUF *value, WT_CELL *cell, WT_OVFL *ovfl)
+{
+	BTREE *btree;
+	uint32_t orig_size;
+
+	btree = session->btree;
+
+	WT_CELL_CLEAR(cell);
+
+	/*
+	 * We're called with a WT_BUF that references a data/size pair.  We can
+	 * re-point that WT_BUF's data and size fields to other memory, and if
+	 * we allocate memory in that WT_BUF, the caller must free it.
+	 *
+	 * Optionally compress the value using the Huffman engine.  For Huffman-
+	 * encoded key/data cells, we need additional memory; use the SESSION
+	 * key/value return memory: this routine is called during bulk insert
+	 * and reconciliation, we aren't returning key/data pairs.
+	 */
+	WT_CELL_SET_TYPE(cell, WT_CELL_DATA);
+
+	/*
+	 * Handle zero-length cells quickly -- this is a common value, it's
+	 * a deleted column-store variable length cell.
+	 */
+	if (value->size == 0) {
+		WT_CELL_SET_LEN(cell, 0);
+		return (0);
+	}
+
+	/* Optionally compress the data using the Huffman engine. */
+	if (btree->huffman_value != NULL) {
+		orig_size = value->size;
+		WT_RET(__wt_huffman_encode(btree->huffman_value,
+		    value->data, orig_size, value));
+		if (value->size > orig_size)
+			WT_STAT_INCRV(btree->stats,
+			    huffman_value, value->size - orig_size);
+	}
+
+	/* Create an overflow object if the data won't fit. */
+	if (value->size > btree->leafitemsize) {
+		WT_RET(__rec_cell_build_ovfl(session, value, ovfl));
+
+		value->data = ovfl;
+		value->size = sizeof(*ovfl);
+		WT_CELL_SET_TYPE(cell, WT_CELL_DATA_OVFL);
+		WT_STAT_INCR(btree->stats, overflow_data);
+	}
+
+	WT_CELL_SET_LEN(cell, value->size);
+	return (0);
+}
+
+/*
+ * __rec_cell_build_ovfl --
+ *	Store bulk-loaded overflow items in the file, returning the WT_OVFL.
+ */
+static int
+__rec_cell_build_ovfl(SESSION *session, WT_BUF *buf, WT_OVFL *to)
+{
+	WT_BUF *tmp;
+	WT_PAGE *page;
+	uint32_t page_size, size;
+	int ret;
+
+	tmp = NULL;
+	ret = 0;
+
+	/*
+	 * Allocate a scratch buffer and make sure it's big enough to hold a
+	 * WT_PAGE structure plus the page itself.  Clear the memory so it's
+	 * never random bytes.
+	 */
+	page_size = WT_DISK_REQUIRED(session, buf->size);
+	size = page_size + WT_SIZEOF32(WT_PAGE);
+	WT_ERR(__wt_scr_alloc(session, size, &tmp));
+	memset(tmp->mem, 0, size);
+
+	/*
+	 * Set up the page and allocate a file address.  We're the only user
+	 * of the file, which means we can grab file space whenever we want.
+	 */
+	page = tmp->mem;
+	page->XXdsk = (WT_PAGE_DISK *)((uint8_t *)tmp->mem + sizeof(WT_PAGE));
+	page->XXdsk->type = WT_PAGE_OVFL;
+	page->XXdsk->u.datalen = buf->size;
+	memcpy(WT_PAGE_DISK_BYTE(page->XXdsk), buf->data, buf->size);
+	page->size = page_size;
+	WT_ERR(__wt_block_alloc(session, &page->addr, page_size));
+
+	/* Fill in the return information. */
+	to->addr = page->addr;
+	to->size = buf->size;
+
+	ret = __wt_disk_write(session, page->XXdsk, page->addr, page->size);
+
+err:	if (tmp != NULL)
+		__wt_scr_release(&tmp);
+
+	return (ret);
 }
 
 /*

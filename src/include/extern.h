@@ -78,21 +78,9 @@ int __wt_block_read(SESSION *session);
 int __wt_block_write(SESSION *session);
 void __wt_block_discard(SESSION *session);
 void __wt_block_dump(SESSION *session);
-int __wt_btree_bulk_load(SESSION *session,
-    int (*cb)(BTREE *,
-    WT_ITEM **,
-    WT_ITEM **));
 int __wt_bulk_init(CURSOR_BULK *cbulk);
 int __wt_bulk_insert(CURSOR_BULK *cbulk);
 int __wt_bulk_end(CURSOR_BULK *cbulk);
-int __wt_item_build_key( SESSION *session,
-    WT_BUF *key,
-    WT_CELL *cell,
-    WT_OVFL *ovfl);
-int __wt_item_build_value( SESSION *session,
-    WT_BUF *value,
-    WT_CELL *cell,
-    WT_OVFL *ovfl);
 int __wt_cache_create(CONNECTION *conn);
 void __wt_cache_stats_update(CONNECTION *conn);
 void __wt_cache_destroy(CONNECTION *conn);
