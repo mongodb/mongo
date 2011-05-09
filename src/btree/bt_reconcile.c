@@ -1040,13 +1040,6 @@ __rec_split(SESSION *session)
 		 */
 		WT_RET(__rec_split_fixup(session));
 
-		/*
-		 * Set the starting record number for the next set of items.
-		 * The buffer information was set by the fixup function based
-		 * on any trailing remnant we didn't write.
-		 */
-		dsk->recno = r->recno;
-
 		/* We're done saving split chunks. */
 		r->state = SPLIT_TRACKING_OFF;
 		break;
@@ -1143,14 +1136,9 @@ __rec_split_fixup(SESSION *session)
 	dsk = tmp->mem;
 	dsk_start = WT_PAGE_DISK_BYTE(dsk);
 	for (i = 0, bnd = r->bnd; i < r->bnd_next; ++i, ++bnd) {
-		/* Copy out the starting record number. */
+		/* Set the starting record number and number of entries. */
 		dsk->recno = bnd->recno;
-
-		/*
-		 * Copy out the number of entries, and deduct that from the
-		 * main loop's count of entries.
-		 */
-		r->entries -= dsk->u.entries = bnd->entries;
+		dsk->u.entries = bnd->entries;
 
 		/* Copy out the page contents, and write it. */
 		len = WT_PTRDIFF32((bnd + 1)->start, bnd->start);
@@ -1160,23 +1148,24 @@ __rec_split_fixup(SESSION *session)
 
 	/*
 	 * There is probably a remnant in the working buffer that didn't get
-	 * written; copy it down to the beginning of the working buffer.
+	 * written; copy it down to the beginning of the working buffer, and
+	 * update the starting record number.
+	 *
 	 * Confirm the remnant is no larger than the available split buffer.
+	 *
+	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
 	WT_ASSERT(session, len < r->split_size - WT_PAGE_DISK_SIZE);
 
-	dsk_start = WT_PAGE_DISK_BYTE(r->dsk.mem);
+	dsk = r->dsk.mem;
+	dsk->recno = bnd->recno;
+	dsk_start = WT_PAGE_DISK_BYTE(dsk);
 	(void)memmove(dsk_start, bnd->start, len);
 
-	/*
-	 * Fix up our caller's information -- we corrected the entry count as
-	 * part of looping through the split page chunks.   Set the starting
-	 * record number, we have that saved.
-	 */
+	r->entries -= r->total_entries;
 	r->first_free = dsk_start + len;
 	r->space_avail = (r->split_size - WT_PAGE_DISK_SIZE) - len;
-	r->recno = bnd->recno;
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
