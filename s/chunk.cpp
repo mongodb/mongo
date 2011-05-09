@@ -360,7 +360,7 @@ namespace mongo {
                   << endl;
 
             BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
-            if (!shouldMigrate.eoo()){
+            if (!shouldMigrate.eoo() && grid.shouldBalance()){
                 BSONObj range = shouldMigrate.embeddedObject();
                 BSONObj min = range["min"].embeddedObject();
                 BSONObj max = range["max"].embeddedObject();
