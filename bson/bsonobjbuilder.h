@@ -149,7 +149,6 @@ namespace mongo {
             return *this;
         }
 
-
         /** add header for a new subobject and return bufbuilder for writing to
          *  the subobject's body
          *
@@ -636,6 +635,8 @@ namespace mongo {
         bool hasField( const StringData& name ) const ;
 
         int len() const { return _b.len(); }
+
+        BufBuilder& bb() { return _b; }
 
     private:
         char* _done() {
