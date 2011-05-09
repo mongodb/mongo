@@ -1,6 +1,8 @@
 
 // try reconfiguring with servers down
 
+load("jstests/replsets/rslib.js");
+
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 5 });
 var nodes = replTest.startSet();
 replTest.initiate();
@@ -38,6 +40,7 @@ replTest.stop(2);
 
 print("try to reconfigure with a 'majority' down");
 oldVersion = config.version++;
+reconnect(master);
 var result = master.getDB("admin").runCommand({replSetReconfig : config});
 assert.eq(13144, result.assertionCode);
 
