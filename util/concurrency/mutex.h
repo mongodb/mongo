@@ -242,7 +242,7 @@ namespace mongo {
         class scoped_lock : boost::noncopyable {
             mongo::mutex::scoped_lock _lk;
         public:
-            scoped_lock( SimpleMutex &m ) : _lk(m) { }
+            scoped_lock( SimpleMutex &m ) : _lk(m._m) { }
         };
     };
 #endif
