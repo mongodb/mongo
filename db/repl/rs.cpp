@@ -163,7 +163,6 @@ namespace mongo {
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
-                lock lk(this);
                 m->_hbinfo = h;
                 return;
             }
@@ -321,7 +320,6 @@ namespace mongo {
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten() {
-        lock l(this);
         readlock lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
