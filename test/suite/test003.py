@@ -26,13 +26,13 @@ class test003(wttest.WiredTigerTestCase):
     def create_table(self, tablename):
         extra_params = ',intl_node_min=512,intl_node_max=16384,leaf_node_min=131072,leaf_node_max=131072'
         self.pr('create_table')
-        self.session.create_table(tablename, 'key_format=S,value_format=S' + extra_params)
+        self.session.create(tablename, 'key_format=S,value_format=S' + extra_params)
 
     def test_table_ss(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
         """
-        self.session.create_table(self.table_name1, 'key_format=S,value_format=S')
+        self.session.create("table:" + self.table_name1, 'key_format=S,value_format=S')
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
@@ -53,7 +53,7 @@ class test003(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=string, value=int
         """
-        self.session.create_table(self.table_name2, 'key_format=S,value_format=i')
+        self.session.create("table:" + self.table_name2, 'key_format=S,value_format=i')
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
@@ -77,7 +77,7 @@ class test003(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=int, value=string
         """
-        self.session.create_table(self.table_name1, 'key_format=i,value_format=S')
+        self.session.create("table:" + self.table_name3, 'key_format=i,value_format=S')
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
@@ -99,7 +99,7 @@ class test003(wttest.WiredTigerTestCase):
         """
         Create entries, and read back in a cursor: key=int, value=int
         """
-        self.session.create_table(self.table_name1, 'key_format=i,value_format=i')
+        self.session.create("table:" + self.table_name4, 'key_format=i,value_format=i')
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
         self.pr('stepping')
