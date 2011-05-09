@@ -115,7 +115,12 @@ namespace mongo {
         // matcher() should be checked each time advance() is called.
         // Implementations which generate their own matcher should return this
         // to avoid a matcher being set manually.
+        // Note that the return values differ subtly here
+
+        // Used when we want fast matcher lookup
         virtual CoveredIndexMatcher *matcher() const { return 0; }
+        // Used when we need to share this matcher with someone else
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return shared_ptr< CoveredIndexMatcher >(); }
 
         // A convenience function for setting the value of matcher() manually
         // so it may accessed later.  Implementations which must generate
@@ -170,6 +175,7 @@ namespace mongo {
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return true; }
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher; }
         virtual long long nscanned() { return _nscanned; }
 

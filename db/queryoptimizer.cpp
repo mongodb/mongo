@@ -930,7 +930,7 @@ doneCheckOrder:
         if ( ! best->complete() )
             throw MsgAssertionException( best->exception() );
         _c = best->newCursor();
-        _matcher = best->matcher();
+        _matcher = best->matcher( _c );
         _op = best;
     }    
     

@@ -1080,7 +1080,7 @@ namespace mongo {
         const Geo2dType * _g;
         set< pair<const char*, DiskLoc> > _seen;
         map<DiskLoc, bool> _matched;
-        auto_ptr<CoveredIndexMatcher> _matcher;
+        shared_ptr<CoveredIndexMatcher> _matcher;
 
         long long _lookedAt;
         long long _objectsLoaded;
@@ -1170,6 +1170,9 @@ namespace mongo {
 
     class GeoCursorBase : public Cursor {
     public:
+
+        static const shared_ptr< CoveredIndexMatcher > emptyMatcher;
+
         GeoCursorBase( const Geo2dType * spec )
             : _spec( spec ), _id( _spec->getDetails() ) {
 
@@ -1202,6 +1205,9 @@ namespace mongo {
         const Geo2dType * _spec;
         const IndexDetails * _id;
     };
+
+    const shared_ptr< CoveredIndexMatcher > GeoCursorBase::emptyMatcher( new CoveredIndexMatcher( BSONObj(), BSONObj(), false ) );
+
 
     // TODO: Pull out the cursor bit from the browse, have GeoBrowse as field of cursor to clean up
     // this hierarchy a bit.  Also probably useful to look at whether GeoAccumulator can be a member instead
@@ -1285,8 +1291,14 @@ namespace mongo {
         virtual BSONObj currKey() const { return _cur._key; }
 
 
-        virtual CoveredIndexMatcher *matcher() const {
-            return _matcher.get();
+        virtual CoveredIndexMatcher* matcher() const {
+            if( _matcher.get() ) return _matcher.get();
+            else return GeoCursorBase::emptyMatcher.get();
+        }
+
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
+            if( _matcher.get() ) return _matcher;
+            else return GeoCursorBase::emptyMatcher;
         }
 
         // Are we finished getting points?
@@ -1859,6 +1871,7 @@ namespace mongo {
 
     class GeoSearchCursor : public GeoCursorBase {
     public:
+
         GeoSearchCursor( shared_ptr<GeoSearch> s )
             : GeoCursorBase( s->_spec ) ,
               _s( s ) , _cur( s->_points.begin() ) , _end( s->_points.end() ), _nscanned() {
@@ -1895,8 +1908,14 @@ namespace mongo {
 
         virtual long long nscanned() { return _nscanned; }
 
-        virtual CoveredIndexMatcher *matcher() const {
-            return _s->_matcher.get();
+        virtual CoveredIndexMatcher* matcher() const {
+            if( _s->_matcher.get() ) return _s->_matcher.get();
+            else return emptyMatcher.get();
+        }
+
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
+            if( _s->_matcher.get() ) return _s->_matcher;
+            else return emptyMatcher;
         }
 
         shared_ptr<GeoSearch> _s;
@@ -1906,7 +1925,6 @@ namespace mongo {
         void incNscanned() { if ( ok() ) { ++_nscanned; } }
         long long _nscanned;
     };
-
 
     class GeoCircleBrowse : public GeoBrowse {
     public:

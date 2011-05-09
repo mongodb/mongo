@@ -58,7 +58,7 @@ namespace mongo {
             }
             
             _nscanned = _c->nscanned();
-            if ( matcher()->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() ) ) {
+            if ( matcher( _c )->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() ) ) {
                 ++_matchCount;
             }
             _currLoc = _c->currLoc();
@@ -127,7 +127,7 @@ namespace mongo {
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
-                _takeover.reset( new MultiCursor( _mps, qocop->cursor(), op->matcher(), *op ) );
+                _takeover.reset( new MultiCursor( _mps, qocop->cursor(), op->matcher( qocop->cursor() ), *op ) );
             }
             
             return ok();
@@ -164,11 +164,16 @@ namespace mongo {
         
         virtual long long nscanned() { return -1; }
 
-        virtual CoveredIndexMatcher *matcher() const {
+        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
             assertOk();
-            return _takeover ? _takeover->matcher() : _currOp->matcher().get();
+            return _takeover ? _takeover->matcherPtr() : _currOp->matcher( _currOp->cursor() );
         }
-        
+
+        virtual CoveredIndexMatcher* matcher() const {
+            assertOk();
+            return _takeover ? _takeover->matcher() : _currOp->matcher( _currOp->cursor() ).get();
+        }
+
     private:
         void assertOk() const {
             massert( 14809, "Invalid access for cursor that is not ok()", !_currLoc().isNull() );
