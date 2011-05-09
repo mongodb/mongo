@@ -176,6 +176,28 @@ namespace mongo {
         class ValidateCmd : public AllShardsCollectionCommand {
         public:
             ValidateCmd() :  AllShardsCollectionCommand("validate") {}
+            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
+                for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it!=end; it++){
+                    const BSONObj& result = *it;
+                    const BSONElement valid = result["valid"];
+                    if (!valid.eoo()){
+                        if (!valid.trueValue()) {
+                            output.appendBool("valid", false);
+                            return;
+                        }
+                    }
+                    else {
+                        // Support pre-1.9.0 output with everything in a big string
+                        const char* s = result["result"].valuestrsafe();
+                        if (strstr(s, "exception") ||  strstr(s, "corrupt")){
+                            output.appendBool("valid", false);
+                            return;
+                        }
+                    }
+                }
+
+                output.appendBool("valid", true);
+            }
         } validateCmd;
 
         class RepairDatabaseCmd : public RunOnAllShardsCommand {
