@@ -294,18 +294,11 @@ namespace mongo {
     */
     void ReplSetImpl::startThreads() {
         task::fork(mgr);
-
-        /*Member* m = _members.head();
-        while( m ) {
-            ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
-            healthTasks.insert(task);
-            task::repeat(shared_ptr<task::Task>(task), 2000);
-            m = m->next();
-        }*/
-
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
         boost::thread t(startSyncThread);
+
+        // member heartbeats are started in ReplSetImpl::initFromConfig
     }
 
 }
