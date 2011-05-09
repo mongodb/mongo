@@ -7,12 +7,12 @@
 
 #include "wts.h"
 
-static int cb_bulk(WT_ITEM **, WT_ITEM **);
-static int wts_del_col(u_int64_t);
-static int wts_del_row(u_int64_t);
-static int wts_notfound_chk(const char *, int, int, u_int64_t);
-static int wts_put_col(u_int64_t);
-static int wts_put_row(u_int64_t, int);
+static int bulk(WT_ITEM **, WT_ITEM **);
+static int wts_del_col(uint64_t);
+static int wts_del_row(uint64_t);
+static int wts_notfound_chk(const char *, int, int, uint64_t);
+static int wts_put_col(uint64_t);
+static int wts_put_row(uint64_t, int);
 static int wts_read(uint64_t);
 static int wts_sync(void);
 
@@ -188,15 +188,15 @@ wts_bulk_load(void)
 
 	session = g.wts_session;
 
-	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
-	    "bulk", &cursor)) != 0) {
+	if ((ret = session->open_cursor(
+	    session, WT_TABLENAME, NULL, "bulk", &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
 
 	insert_count = 0;
-	while (cb_bulk(&key, &value) == 0) {
+	while (bulk(&key, &value) == 0) {
                 /* Report on progress every 100 inserts. */
                 if (++insert_count % 100 == 0)
                         track("bulk load", insert_count);
@@ -387,11 +387,11 @@ wts_stats(void)
 }
 
 /*
- * cb_bulk --
- *	WiredTiger bulk load callback routine. 
+ * bulk --
+ *	WiredTiger bulk load routine. 
  */
 static int
-cb_bulk(WT_ITEM **keyp, WT_ITEM **valuep)
+bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 {
 	static WT_ITEM key, value;
 	WT_SESSION *session;
@@ -415,14 +415,15 @@ cb_bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			session->log_printf(session, "%-10s{%.*s}",
-			    "bulk key", (int)key.size, (char *)key.data);
+			session->log_printf(session, "%-10s %llu {%.*s}",
+			    "bulk K",
+			    g.key_cnt, (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		session->log_printf(session, "%-10s{%.*s}",
-		    "bulk value", (int)value.size, (char *)value.data);
+		session->log_printf(session, "%-10s %llu {%.*s}",
+		    "bulk V", g.key_cnt, (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, value.data, value.size);

@@ -17,7 +17,7 @@ fname(const char *name)
 }
 
 void
-key_gen(void *keyp, uint32_t *sizep, u_int64_t keyno, int insert)
+key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
 {
 	int len;
 
@@ -137,7 +137,7 @@ value_gen(void *valuep, uint32_t *sizep, int grow_ok)
 }
 
 void
-track(const char *s, u_int64_t i)
+track(const char *s, uint64_t i)
 {
 	static int lastlen = 0;
 	int len, tlen;

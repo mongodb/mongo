@@ -47,8 +47,8 @@ bdb_teardown(void)
 
 void
 bdb_insert(
-    const void *key_data, u_int32_t key_size,
-    const void *value_data, u_int32_t value_size)
+    const void *key_data, uint32_t key_size,
+    const void *value_data, uint32_t value_size)
 {
 	static DBT key, value;
 	DB *db;
