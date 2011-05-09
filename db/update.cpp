@@ -926,7 +926,7 @@ namespace mongo {
                 return;
             }
             _nscanned = _c->nscanned();
-            if ( matcher( _c )->matchesCurrent(_c.get(), &_details ) ) {
+            if ( matcher()->matchesCurrent(_c.get(), &_details ) ) {
                 setComplete();
                 return;
             }

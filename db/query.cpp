@@ -86,7 +86,7 @@ namespace mongo {
 
             DiskLoc rloc = c_->currLoc();
 
-            if ( matcher( c_ )->matchesCurrent(c_.get()) ) {
+            if ( matcher()->matchesCurrent(c_.get()) ) {
                 if ( !c_->getsetdup(rloc) )
                     ++count_;
             }
@@ -344,7 +344,7 @@ namespace mongo {
                     break;
                 }
                 // in some cases (clone collection) there won't be a matcher
-                if ( c->matcher().get() && !c->matcher()->matchesCurrent( c ) ) {
+                if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
                 }
                 /*
                   TODO
@@ -420,7 +420,7 @@ namespace mongo {
         virtual void _init() {
             _c = qp().newCursor();
             _capped = _c->capped();
-            if ( qp().exactKeyMatch() && ! matcher( _c )->needRecord() ) {
+            if ( qp().exactKeyMatch() && ! matcher()->needRecord() ) {
                 _query = qp().simplifiedQuery( qp().indexKey() );
                 _bc = dynamic_cast< BtreeCursor* >( _c.get() );
                 _bc->forgetEndKey();
@@ -482,7 +482,7 @@ namespace mongo {
                 }
             }
             else {
-                if ( !matcher( _c )->matchesCurrent( _c.get() ) ) {
+                if ( !matcher()->matchesCurrent( _c.get() ) ) {
                 }
                 else if( !_c->getsetdup(_c->currLoc()) ) {
                     _gotOne();
@@ -772,7 +772,7 @@ namespace mongo {
             }
 
             _nscanned = _c->nscanned();
-            if ( !matcher( _c )->matchesCurrent(_c.get() , &_details ) ) {
+            if ( !matcher()->matchesCurrent(_c.get() , &_details ) ) {
                 // not a match, continue onward
                 if ( _details.loadedObject )
                     _nscannedObjects++;
@@ -1153,11 +1153,11 @@ namespace mongo {
             bool moreClauses = mps->mayRunMore();
             if ( moreClauses ) {
                 // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
-                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher( cursor ), dqo ) );
+                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher(), dqo ) );
                 cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
             }
             else {
-                if( ! cursor->matcher().get() ) cursor->setMatcher( dqo.matcher( cursor ) );
+                if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher() );
                 cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
             }
             cursorid = cc->cursorid();

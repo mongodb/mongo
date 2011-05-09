@@ -85,15 +85,9 @@ namespace mongo {
             
         _index = &d->idx(_idxNo);
 
-        // If the parsing or index indicates this is a special query, don't continue the processing
-        if ( _special.size() ||
-            ( _index->getSpec().getType() && _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
-
-            if( _special.size() ) _optimal = true;
-
+        if ( _special.size() ) {
+            _optimal = true;
             _type  = _index->getSpec().getType();
-            if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
-
             massert( 13040 , (string)"no type for special: " + _special , _type );
             // hopefully safe to use original query in these contexts - don't think we can mix special with $or clause separation yet
             _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , order );
@@ -936,7 +930,7 @@ doneCheckOrder:
         if ( ! best->complete() )
             throw MsgAssertionException( best->exception() );
         _c = best->newCursor();
-        _matcher = best->matcher( _c );
+        _matcher = best->matcher();
         _op = best;
     }    
     
@@ -1129,7 +1123,7 @@ doneCheckOrder:
             shared_ptr<Cursor> ret = qpp->newCursor();
 
             // If we don't already have a matcher, supply one.
-            if ( !query.isEmpty() && ! ret->matcher().get() ) {
+            if ( !query.isEmpty() && ! ret->matcher() ) {
                 shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
                 ret->setMatcher( matcher );
             }

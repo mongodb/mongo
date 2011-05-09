@@ -969,7 +969,7 @@ namespace mongo {
 
         void forgetEndKey() { endKey = BSONObj(); }
 
-        virtual shared_ptr< CoveredIndexMatcher > matcher() const { return _matcher; }
+        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
 
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher;  }
 

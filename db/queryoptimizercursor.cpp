@@ -58,7 +58,7 @@ namespace mongo {
             }
             
             _nscanned = _c->nscanned();
-            if ( matcher( _c )->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() ) ) {
+            if ( matcher()->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() ) ) {
                 ++_matchCount;
             }
             _currLoc = _c->currLoc();
@@ -126,7 +126,7 @@ namespace mongo {
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
-                _takeover.reset( new MultiCursor( _mps, qocop->cursor(), op->matcher( qocop->cursor() ), *op ) );
+                _takeover.reset( new MultiCursor( _mps, qocop->cursor(), op->matcher(), *op ) );
             }
             
             return ok();
@@ -156,7 +156,7 @@ namespace mongo {
         
         virtual long long nscanned() { return -1; }
 
-        virtual shared_ptr< CoveredIndexMatcher > matcher() const { return _takeover ? _takeover->matcher() : _currOp->matcher( _currOp->cursor() ); }
+        virtual CoveredIndexMatcher *matcher() const { return _takeover ? _takeover->matcher() : _currOp->matcher().get(); }
         
     private:
         bool getsetdupInternal(const DiskLoc &loc) {
