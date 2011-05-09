@@ -19,7 +19,6 @@
 
 #include <map>
 #include <set>
-
 #include "../heapcheck.h"
 
 namespace mongo {
@@ -50,7 +49,6 @@ namespace mongo {
         map< mid, set<mid> > followers;
         boost::mutex &x;
         unsigned magic;
-
         void aBreakPoint() { } // for debugging
     public:
         // set these to create an assert that
@@ -147,20 +145,16 @@ namespace mongo {
         ~StaticObserver() { _destroyingStatics = true; }
     };
 
-    /** On pthread systems, it is an error to destroy a mutex while held.  Static global
-     * mutexes may be held upon shutdown in our implementation, and this way we avoid
-     * destroying them.
-     * NOT recursive.
+    /** On pthread systems, it is an error to destroy a mutex while held (boost mutex 
+     *    may use pthread).  Static global mutexes may be held upon shutdown in our 
+     *    implementation, and this way we avoid destroying them.
+     *  NOT recursive.
      */
     class mutex : boost::noncopyable {
     public:
 #if defined(_DEBUG)
         const char * const _name;
-#endif
-
-#if defined(_DEBUG)
-        mutex(const char *name)
-            : _name(name)
+        mutex(const char *name) : _name(name)
 #else
         mutex(const char *)
 #endif
@@ -177,6 +171,7 @@ namespace mongo {
 
         class try_lock : boost::noncopyable {
         public:
+            const bool ok;
             try_lock( mongo::mutex &m , int millis = 0 )
                 : _l( m.boost() , incxtimemillis( millis ) ) ,
 #if BOOST_VERSION >= 103500
@@ -184,19 +179,10 @@ namespace mongo {
 #else
                   ok( _l.locked() )
 #endif
-            {
-            }
-
-            ~try_lock() {
-            }
-
+            { }
         private:
             boost::timed_mutex::scoped_timed_lock _l;
-
-        public:
-            const bool ok;
         };
-
 
         class scoped_lock : boost::noncopyable {
         public:
@@ -221,15 +207,43 @@ namespace mongo {
         private:
             boost::timed_mutex::scoped_lock _l;
         };
-
-
     private:
-
         boost::timed_mutex &boost() { return *_m; }
         boost::timed_mutex *_m;
     };
 
     typedef mutex::scoped_lock scoped_lock;
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
+
+    /** The concept with SimpleMutex is that it is a basic lock/unlock with no 
+          special functionality (such as try and try timeout).  Thus it can be 
+          implemented using OS-specific facilities in all environments (if desired).
+        On Windows, the implementation below is faster than boost mutex.
+    */
+#if defined(_WIN32)
+    class SimpleMutex : boost::noncopyable {
+        CRITICAL_SECTION _cs;
+    public:
+        SimpleMutex(const char *name) { InitializeCriticalSection(&_cs); }
+        ~SimpleMutex() { DeleteCriticalSection(&_cs); }
+        class scoped_lock : boost::noncopyable {
+            SimpleMutex& _m;
+        public:
+            scoped_lock( SimpleMutex &m ) : _m(m) { EnterCriticalSection(&_m._cs); }
+            ~scoped_lock() { LeaveCriticalSection(&_m._cs); }
+        };
+    };
+#else
+    class SimpleMutex : boost::noncopyable {
+        mongo::mutex _m;
+    public:
+        SimpleMutex(const char *name) : _m(name) { }
+        class scoped_lock : boost::noncopyable {
+            mongo::mutex::scoped_lock _lk;
+        public:
+            scoped_lock( SimpleMutex &m ) : _lk(m) { }
+        };
+    };
+#endif
 
 }
