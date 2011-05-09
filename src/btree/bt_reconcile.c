@@ -492,8 +492,7 @@ __wt_page_reconcile(
 	 * during a sync or close call, and the new root page is the one page
 	 * that won't be visited as part of that walk.
 	 */
-	if (btree->root_page.page != NULL &&
-	    btree->root_page.state == WT_REF_MEM &&
+	if (btree->root_page.state == WT_REF_MEM &&
 	    F_ISSET(btree->root_page.page, WT_PAGE_SPLIT)) {
 		F_CLR(btree->root_page.page, WT_PAGE_SPLIT);
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
@@ -2496,12 +2495,8 @@ __rec_parent_update_clean(SESSION *session, WT_PAGE *page)
 
 	parent_ref = page->parent_ref;
 
-	/*
-	 * If a page is on disk and non-empty, it must have a valid disk
-	 * address.
-	 */
-	WT_ASSERT(session, parent_ref->addr != WT_ADDR_INVALID ||
-	   page->size == 0);
+	/* If a page is on disk, it must have a valid disk address. */
+	WT_ASSERT(session, parent_ref->addr != WT_ADDR_INVALID);
 
 	/*
 	 * Update the relevant WT_REF structure; no memory flush is needed,

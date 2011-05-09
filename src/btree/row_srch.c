@@ -85,10 +85,8 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		 * index always sorts less than any application key).  The slot
 		 * for descent is the one before base.
 		 */
-		if (cmp != 0) {
-			WT_ASSERT(session, base != 0);
+		if (cmp != 0)
 			rref = page->u.row_int.t + (base - 1);
-		}
 
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
@@ -146,13 +144,13 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		base = indx + 1;
 		--limit;
 	}
+	WT_ASSERT(session, rip != NULL);
 
 	/*
 	 * If we found a match in the page on-disk information, set the return
 	 * information, we're done.
 	 */
 	if (cmp == 0) {
-		WT_ASSERT(session, rip != NULL);
 		session->srch_slot = slot = WT_ROW_SLOT(page, rip);
 		if (page->u.row_leaf.upd != NULL) {
 			session->srch_upd = &page->u.row_leaf.upd[slot];
