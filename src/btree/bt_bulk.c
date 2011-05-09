@@ -254,15 +254,16 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 	page = NULL;
 	session = (SESSION *)cbulk->cbt.iface.session;
 
-	/* Re-allocate the parent reference array as necessary. */
+	/*
+	 * Take a copy of the first key for the parent; re-allocate the parent
+	 * reference array as necessary.
+	 */
 	if (cbulk->ref_next == cbulk->ref_entries) {
 		WT_RET(__wt_realloc(session, &cbulk->ref_allocated,
 		    (cbulk->ref_entries + 1000) * sizeof(*cbulk->rref),
 		    &cbulk->rref));
 		cbulk->ref_entries += 1000;
 	}
-
-	/* Take a copy of the first key for the parent. */
 	WT_RET(__wt_buf_set(session, &cbulk->key,
 	    WT_INSERT_KEY(cbulk->ins_base),
 	    WT_INSERT_KEY_SIZE(cbulk->ins_base)));
@@ -309,15 +310,16 @@ __wt_bulk_col_page(CURSOR_BULK *cbulk)
 
 	session = (SESSION *)cbulk->cbt.iface.session;
 
-	/* Re-allocate the parent reference array as necessary. */
+	/*
+	 * Take a copy of the first key for the parent; re-allocate the parent
+	 * reference array as necessary.
+	 */
 	if (cbulk->ref_next == cbulk->ref_entries) {
 		WT_RET(__wt_realloc(session, &cbulk->ref_allocated,
 		    (cbulk->ref_entries + 1000) * sizeof(*cbulk->cref),
 		    &cbulk->cref));
 		cbulk->ref_entries += 1000;
 	}
-
-	/* Take a copy of the first key for the parent. */
 	cbulk->cref[cbulk->ref_next].recno = cbulk->recno;
 
 	/*
@@ -338,12 +340,12 @@ __wt_bulk_col_page(CURSOR_BULK *cbulk)
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
 
+	cbulk->recno += cbulk->ins_cnt;	/* Update the starting record number */
+
 	cbulk->updp = &cbulk->upd_base;	/* The page owns the update list */
 	cbulk->ins_cnt = 0;
 
 	++cbulk->ref_next;		/* Move to the next parent slot */
-
-	cbulk->recno += cbulk->ins_cnt;	/* Update the starting record number */
 
 	WT_RET(__wt_page_reconcile(session, page, 0, WT_REC_CLOSE));
 
