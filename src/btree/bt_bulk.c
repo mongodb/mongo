@@ -24,8 +24,8 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 	SESSION *session;
 	uint32_t addr;
 
-	btree = cbulk->cbt.btree;
 	session = (SESSION *)cbulk->cbt.iface.session;
+	btree = cbulk->cbt.btree;
 
 	/*
 	 * XXX
@@ -66,10 +66,8 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
 {
 	BTREE *btree;
 	SESSION *session;
-	WT_CURSOR *cursor;
 
-	cursor = &cbulk->cbt.iface;
-	session = (SESSION *)cursor->session;
+	session = (SESSION *)cbulk->cbt.iface.session;
 	session->btree = cbulk->cbt.btree;	/* XXX */
 	btree = session->btree;
 
@@ -113,8 +111,8 @@ __wt_bulk_col(CURSOR_BULK *cbulk)
 	WT_UPDATE *upd;
 	int ret;
 
-	cursor = &cbulk->cbt.iface;
 	session = (SESSION *)cbulk->cbt.iface.session;
+	cursor = &cbulk->cbt.iface;
 	upd = NULL;
 
 	/*
@@ -149,10 +147,10 @@ __wt_bulk_row(CURSOR_BULK *cbulk)
 	WT_UPDATE *upd;
 	int ret;
 
+	session = (SESSION *)cbulk->cbt.iface.session;
 	cursor = &cbulk->cbt.iface;
 	ins = NULL;
 	upd = NULL;
-	session = (SESSION *)cbulk->cbt.iface.session;
 
 	/*
 	 * Allocate a WT_INSERT/WT_UPDATE pair and append the K/V pair onto the
@@ -251,7 +249,6 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
 
-	page = NULL;
 	session = (SESSION *)cbulk->cbt.iface.session;
 
 	/*
