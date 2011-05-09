@@ -83,6 +83,35 @@ __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp)
 }
 
 /*
+ * __wt_debug_addr --
+ *	Read and dump a disk page in debugging mode.
+ */
+int
+__wt_debug_addr(
+    SESSION *session, uint32_t addr, uint32_t size, const char *ofile, FILE *fp)
+{
+	BTREE *btree;
+	int do_close, ret;
+	char *bp;
+
+	btree = session->btree;
+	ret = 0;
+
+	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
+
+	WT_RET(__wt_calloc_def(session, (size_t)size, &bp));
+	WT_ERR(__wt_disk_read(session, (WT_PAGE_DISK *)bp, addr, size));
+	ret = __wt_debug_disk(session, (WT_PAGE_DISK *)bp, NULL, fp);
+
+err:	__wt_free(session, bp);
+
+	if (do_close)
+		(void)fclose(fp);
+
+	return (ret);
+}
+
+/*
  * __wt_debug_disk --
  *	Dump a disk page in debugging mode.
  */
@@ -351,9 +380,8 @@ __wt_debug_page_col_int(
 
 	WT_COL_REF_FOREACH(page, cref, i) {
 		fprintf(fp,
-		    "recno %llu, ", (unsigned long long)cref->recno);
+		    "\trecno %llu, ", (unsigned long long)cref->recno);
 		__wt_debug_ref(&cref->ref, fp);
-		fprintf(fp, "\n");
 	}
 
 	if (!LF_ISSET(WT_DEBUG_TREE_WALK))
@@ -444,6 +472,7 @@ __wt_debug_page_row_int(
 			fprintf(fp, "\tK: {requires processing}\n");
 		else
 			__wt_debug_item("\tK", rref, fp);
+		fprintf(fp, "\t");
 		__wt_debug_ref(&rref->ref, fp);
 	}
 
@@ -814,9 +843,9 @@ __wt_debug_ref(WT_REF *ref, FILE *fp)
 	}
 
 	if (ref->addr == WT_ADDR_INVALID)
-		fprintf(fp, "\tnot-set");
+		fprintf(fp, "not-set");
 	else
-		fprintf(fp, "\t%lu", (u_long)ref->addr);
+		fprintf(fp, "%lu", (u_long)ref->addr);
 
 	fprintf(fp, "/%lu: %s", (u_long)ref->size, s);
 	if (ref->state == WT_REF_MEM)
