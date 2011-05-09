@@ -225,7 +225,7 @@ __session_drop(
 
 	session = (SESSION *)wt_session;
 
-	SESSION_API_CALL(session, create, config);
+	SESSION_API_CALL(session, drop, config);
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);

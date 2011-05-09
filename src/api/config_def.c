@@ -56,7 +56,7 @@ __wt_confdfl_session_create =
 
 const char *
 __wt_confdfl_session_drop =
-    "";
+    "force=false";
 
 const char *
 __wt_confdfl_session_log_printf =

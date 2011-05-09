@@ -46,16 +46,16 @@ methods = {
 	Config('columns', '', r'''
 		list of the column names.  Comma-separated list of the form
 		<code>(column[,...])</code>.  The number of entries must match the
-		total number of values in \c key_format and \c value_format.'''),
+		total number of values in \c key_format and \c value_format'''),
 	Config('colgroup.name', '', r'''
 		named group of columns to store together.  Comma-separated list of
 		the form <code>(column[,...])</code>.  Each column group is stored
 		separately, keyed by the primary key of the table.  Any column that
 		does not appear in a column group is stored in a default, unnamed,
-		column group for the table.'''),
+		column group for the table'''),
 	Config('exclusive', 'false', r'''
 		fail if the table exists (if "no", the default, verifies that the
-		table exists and has the specified schema.'''),
+		table exists and has the specified schema'''),
 	Config('huffman_key', '', r'''
 		use Huffman encoding for the key.  Permitted values are empty (off)
 		or \c "english"'''),
@@ -64,7 +64,7 @@ methods = {
 		or \c "english"'''),
 	Config('index.name', '', r'''
 		named index on a list of columns.  Comma-separated list of the form
-		<code>(column[,...])</code>.'''),
+		<code>(column[,...])</code>'''),
 	Config('intl_node_max', '2KB', r'''
 		maximum page size for internal nodes, in bytes'''),
 	Config('intl_node_min', '2KB', r'''
@@ -72,7 +72,7 @@ methods = {
 	Config('key_format', 'u', r'''
 		the format of the data packed into key items.  See @ref packing for
 		details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays.'''),
+		applications use the WT_ITEM struct to manipulate raw byte arrays'''),
 	Config('leaf_node_max', '1MB', r'''
 		maximum page size for leaf nodes, in bytes'''),
 	Config('leaf_node_min', '32KB', r'''
@@ -82,10 +82,13 @@ methods = {
 	Config('value_format', 'u', r'''
 		the format of the data packed into value items.  See @ref packing
 		for details.  If not set, a default value of \c "u" is assumed, and
-		applications use the WT_ITEM struct to manipulate raw byte arrays.'''),
+		applications use the WT_ITEM struct to manipulate raw byte arrays'''),
 ]),
 
-'session.drop' : Method([]),
+'session.drop' : Method([
+	Config('force', 'false', r'''
+		return success if the object does not exist'''),
+	]),
 
 'session.log_printf' : Method([]),
 
@@ -93,7 +96,7 @@ methods = {
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads'''),
 	Config('dump', 'false', r'''
-		configure the cursor for dump format inputs and outputs.'''),
+		configure the cursor for dump format inputs and outputs'''),
 	Config('isolation', 'read-committed', r'''
 		the isolation level for this cursor, one of \c "snapshot" or
 		\c "read-committed" or \c "read-uncommitted".
@@ -101,7 +104,7 @@ methods = {
 	Config('overwrite', 'false', r'''
 		if an existing key is inserted, overwrite the existing value'''),
 	Config('printable', 'false', r'''
-		for dump cursors, pass through printable bytes unmodified.'''),
+		for dump cursors, pass through printable bytes unmodified'''),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if the
 		formats were \c "u"'''),

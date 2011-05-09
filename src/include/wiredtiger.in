@@ -459,14 +459,14 @@ struct wt_session {
 	 * @configstart{session.open_cursor, see dist/api_data.py}
 	 * @config{bulk, configure the cursor for bulk loads}
 	 * @config{dump, configure the cursor for dump format inputs and
-	 * outputs.}
+	 * outputs}
 	 * @config{isolation, the isolation level for this cursor\, one of \c
 	 * "snapshot" or \c "read-committed" or \c "read-uncommitted". Ignored
 	 * for transactional cursors}
 	 * @config{overwrite, if an existing key is inserted\, overwrite the
 	 * existing value}
 	 * @config{printable, for dump cursors\, pass through printable bytes
-	 * unmodified.}
+	 * unmodified}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u"}
 	 * @configend
@@ -495,20 +495,20 @@ struct wt_session {
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  The number of entries must
 	 * match the total number of values in \c key_format and \c
-	 * value_format.}
+	 * value_format}
 	 * @config{colgroup.\<name\>, named group of columns to store together.
 	 * Comma-separated list of the form <code>(column[\,...])</code>.  Each
 	 * column group is stored separately\, keyed by the primary key of the
 	 * table.  Any column that does not appear in a column group is stored
-	 * in a default\, unnamed\, column group for the table.}
+	 * in a default\, unnamed\, column group for the table}
 	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
-	 * verifies that the table exists and has the specified schema.}
+	 * verifies that the table exists and has the specified schema}
 	 * @config{huffman_key, use Huffman encoding for the key.  Permitted
 	 * values are empty (off) or \c "english"}
 	 * @config{huffman_value, use Huffman encoding for the value.  Permitted
 	 * values are empty (off) or \c "english"}
 	 * @config{index.\<name\>, named index on a list of columns.  Comma-
-	 * separated list of the form <code>(column[\,...])</code>.}
+	 * separated list of the form <code>(column[\,...])</code>}
 	 * @config{intl_node_max, maximum page size for internal nodes\, in
 	 * bytes}
 	 * @config{intl_node_min, minimum page size for internal nodes\, in
@@ -516,14 +516,14 @@ struct wt_session {
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref packing for details.  If not set\, a default value of \c "u"
 	 * is assumed\, and applications use the WT_ITEM struct to manipulate
-	 * raw byte arrays.}
+	 * raw byte arrays}
 	 * @config{leaf_node_max, maximum page size for leaf nodes\, in bytes}
 	 * @config{leaf_node_min, minimum page size for leaf nodes\, in bytes}
 	 * @config{runlength_encoding, compress repeated adjacent values}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref packing for details.  If not set\, a default value of \c "u"
 	 * is assumed\, and applications use the WT_ITEM struct to manipulate
-	 * raw byte arrays.}
+	 * raw byte arrays}
 	 * @configend
 	 * @errors
 	 */
@@ -538,6 +538,7 @@ struct wt_session {
 	 * @param session the session handle
 	 * @param name the uri of the table to drop, such as \c "table:stock"
 	 * @configstart{session.drop, see dist/api_data.py}
+	 * @config{force, return success if the object does not exist}
 	 * @configend
 	 * @errors
 	 */
