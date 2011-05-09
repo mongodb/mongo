@@ -90,16 +90,15 @@ int
 __wt_debug_addr(
     SESSION *session, uint32_t addr, uint32_t size, const char *ofile, FILE *fp)
 {
-	BTREE *btree;
 	int do_close, ret;
 	char *bp;
 
-	btree = session->btree;
 	ret = 0;
 
 	WT_RET(__wt_debug_set_fp(ofile, &fp, &do_close));
 
 	WT_RET(__wt_calloc_def(session, (size_t)size, &bp));
+
 	WT_ERR(__wt_disk_read(session, (WT_PAGE_DISK *)bp, addr, size));
 	ret = __wt_debug_disk(session, (WT_PAGE_DISK *)bp, NULL, fp);
 

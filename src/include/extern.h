@@ -100,7 +100,7 @@ int __wt_btcur_update(CURSOR_BTREE *cbt);
 int __wt_btcur_remove(CURSOR_BTREE *cbt);
 int __wt_btcur_close(CURSOR_BTREE *cbt, const char *config);
 int __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp);
-int __wt_debug_disk_addr( SESSION *session,
+int __wt_debug_addr( SESSION *session,
     uint32_t addr,
     uint32_t size,
     const char *ofile,
