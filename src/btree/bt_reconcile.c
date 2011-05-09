@@ -2683,40 +2683,36 @@ static int
 __rec_cell_build_ovfl(SESSION *session, WT_BUF *buf, WT_OVFL *to)
 {
 	WT_BUF *tmp;
-	WT_PAGE *page;
-	uint32_t page_size, size;
+	WT_PAGE_DISK *dsk;
+	uint32_t addr, size;
 	int ret;
 
 	tmp = NULL;
 	ret = 0;
 
 	/*
-	 * Allocate a scratch buffer and make sure it's big enough to hold a
-	 * WT_PAGE structure plus the page itself.  Clear the memory so it's
-	 * never random bytes.
+	 * Allocate a scratch buffer and make sure it's big enough to hold the
+	 * overflow chunk.  Clear the memory so it's never random bytes.
 	 */
-	page_size = WT_DISK_REQUIRED(session, buf->size);
-	size = page_size + WT_SIZEOF32(WT_PAGE);
+	size = WT_DISK_REQUIRED(session, buf->size);
 	WT_ERR(__wt_scr_alloc(session, size, &tmp));
 	memset(tmp->mem, 0, size);
 
 	/*
-	 * Set up the page and allocate a file address.  We're the only user
+	 * Set up the chunk and allocate a file address.  We're the only user
 	 * of the file, which means we can grab file space whenever we want.
 	 */
-	page = tmp->mem;
-	page->XXdsk = (WT_PAGE_DISK *)((uint8_t *)tmp->mem + sizeof(WT_PAGE));
-	page->XXdsk->type = WT_PAGE_OVFL;
-	page->XXdsk->u.datalen = buf->size;
-	memcpy(WT_PAGE_DISK_BYTE(page->XXdsk), buf->data, buf->size);
-	page->size = page_size;
-	WT_ERR(__wt_block_alloc(session, &page->addr, page_size));
+	dsk = tmp->mem;
+	dsk->type = WT_PAGE_OVFL;
+	dsk->u.datalen = buf->size;
+	memcpy(WT_PAGE_DISK_BYTE(dsk), buf->data, buf->size);
+	WT_ERR(__wt_block_alloc(session, &addr, size));
 
 	/* Fill in the return information. */
-	to->addr = page->addr;
+	to->addr = addr;
 	to->size = buf->size;
 
-	ret = __wt_disk_write(session, page->XXdsk, page->addr, page->size);
+	ret = __wt_disk_write(session, dsk, addr, size);
 
 err:	if (tmp != NULL)
 		__wt_scr_release(&tmp);
