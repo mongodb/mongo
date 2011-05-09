@@ -83,9 +83,10 @@ main(int argc, char *argv[])
 	}
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &key);
-		fwrite(key.data, key.size, 1, stdout);
-		fwrite("\n", 1, 1, stdout);
+		if (cursor->get_key(cursor, &key) == 0 && key.data != NULL) {
+			fwrite(key.data, key.size, 1, stdout);
+			fwrite("\n", 1, 1, stdout);
+		}
 		cursor->get_value(cursor, &value);
 		fwrite(value.data, value.size, 1, stdout);
 		fwrite("\n", 1, 1, stdout);

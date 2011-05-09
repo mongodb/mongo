@@ -94,7 +94,8 @@ struct __wt_page_desc {
 	uint32_t free_addr;		/* 44-47: Free list page address */
 	uint32_t free_size;		/* 48-51: Free list page length */
 
-#define	WT_PAGE_DESC_RLE	0x01	/* Run-length encoding */
+#define	WT_PAGE_DESC_COLUMN	0x01	/* Column store */
+#define	WT_PAGE_DESC_RLE	0x02	/* Run-length encoding */
 	uint32_t flags;			/* 52-55: Flags */
 
 	uint8_t  fixed_len;		/* 56: Fixed length byte count */

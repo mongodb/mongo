@@ -250,9 +250,10 @@ wts_dump(void)
 	while ((ret = cursor->next(cursor)) == 0) {
 		if (++row_count % 100 == 0)
 			track("dump", row_count);
-		cursor->get_key(cursor, &key);
-		fwrite(key.data, key.size, 1, fp);
-		fwrite("\n", 1, 1, fp);
+		if (cursor->get_key(cursor, &key) == 0 && key.data != NULL) {
+			fwrite(key.data, key.size, 1, fp);
+			fwrite("\n", 1, 1, fp);
+		}
 		cursor->get_value(cursor, &value);
 		fwrite(value.data, value.size, 1, fp);
 		fwrite("\n", 1, 1, fp);
