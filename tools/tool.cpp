@@ -65,6 +65,7 @@ namespace mongo {
              "server - needs to lock the data directory, so cannot be "
              "used if a mongod is currently accessing the same path" )
             ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
+            ("journal", "enable journaling" )
             ;
 
         if ( access & SPECIFY_DBCOL )
@@ -208,6 +209,11 @@ namespace mongo {
                 directoryperdb = true;
             }
             assert( lastError.get( true ) );
+
+            if (_params.count("journal")){
+                cmdLine.dur = true;
+            }
+
             Client::initThread("tools");
             _conn = new DBDirectClient();
             _host = "DIRECT";
@@ -225,6 +231,8 @@ namespace mongo {
             }
 
             FileAllocator::get()->start();
+
+            dur::startup();
         }
 
         if ( _params.count( "db" ) )
