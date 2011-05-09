@@ -1015,6 +1015,20 @@ namespace QueryOptimizerTests {
             }
         };
         
+        /** Simple table scan. */
+        class Unindexed : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 2 ) );
+
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSONObj() );
+                ASSERT_EQUALS( 2, itcount() );
+            }
+        };
+        
         /** Basic test with two indexes and deduping requirement. */
         class Basic : public Base {
         public:
@@ -1611,6 +1625,49 @@ namespace QueryOptimizerTests {
             }
         };
         
+        /** Or clause iteration abandoned once full collection scan is performed. */
+        class OrCollectionScanAbort : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 << 3 << 4 << 5 ) << "b" << 4 ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << BSON_ARRAY( 6 << 7 << 8 << 9 << 10 ) << "b" << 4 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "a" << LT << 6 << "b" << 4 ) << BSON( "a" << GTE << 6 << "b" << 4 ) ) ) );
+                
+                ASSERT( c->ok() );
+                
+                // _id 0 on {a:1}
+                ASSERT_EQUALS( 0, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                c->advance();
+
+                // _id 0 on {$natural:1}
+                ASSERT_EQUALS( 0, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->getsetdup( c->currLoc() ) );
+                c->advance();
+
+                // _id 0 on {a:1}
+                ASSERT_EQUALS( 0, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->getsetdup( c->currLoc() ) );
+                c->advance();
+
+                // _id 1 on {$natural:1}
+                ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( !c->getsetdup( c->currLoc() ) );
+                c->advance();
+
+                // {$natural:1} finished
+                ASSERT( !c->ok() );
+            }
+        };
+        
         // TODO
         // $or table scan abort case
         // error cases causing ops to have error set
@@ -1662,6 +1719,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::NotEqualityThenIn>();
             add<BestGuess>();
             add<QueryOptimizerCursorTests::Empty>();
+            add<QueryOptimizerCursorTests::Unindexed>();
             add<QueryOptimizerCursorTests::Basic>();
             add<QueryOptimizerCursorTests::NoMatch>();
             add<QueryOptimizerCursorTests::Interleaved>();
@@ -1688,6 +1746,7 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::OrDedup>();
             add<QueryOptimizerCursorTests::EarlyDups>();
             add<QueryOptimizerCursorTests::OrPopInTakeover>();
+            add<QueryOptimizerCursorTests::OrCollectionScanAbort>();
         }
     } myall;
 
