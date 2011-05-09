@@ -1188,7 +1188,7 @@ namespace mongo {
         int duration = curop.elapsedMillis();
         bool dbprofile = curop.shouldDBProfile( duration );
         if ( dbprofile || duration >= cmdLine.slowMS ) {
-            curop.debug().nscanned = nscanned;
+            curop.debug().nscanned = (int) nscanned;
             curop.debug().ntoskip = ntoskip;
         }
         curop.debug().nreturned = n;

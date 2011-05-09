@@ -1127,7 +1127,7 @@ namespace mongo {
                 }
 
                 if ( profile  && !multi ) 
-                    debug.nscanned = nscanned;
+                    debug.nscanned = (int) nscanned;
 
                 /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                     regular ones at the moment. */
@@ -1248,7 +1248,7 @@ namespace mongo {
             return UpdateResult( 1 , 1 , numModded );
 
         if ( profile )
-            debug.nscanned = nscanned;
+            debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
