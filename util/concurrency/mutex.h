@@ -171,7 +171,6 @@ namespace mongo {
 
         class try_lock : boost::noncopyable {
         public:
-            const bool ok;
             try_lock( mongo::mutex &m , int millis = 0 )
                 : _l( m.boost() , incxtimemillis( millis ) ) ,
 #if BOOST_VERSION >= 103500
@@ -182,6 +181,8 @@ namespace mongo {
             { }
         private:
             boost::timed_mutex::scoped_timed_lock _l;
+        public:
+            const bool ok;
         };
 
         class scoped_lock : boost::noncopyable {
