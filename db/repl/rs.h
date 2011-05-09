@@ -55,7 +55,7 @@ namespace mongo {
     class Member : public List1<Member>::Base {
     private:
         ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
-        Member::Member(const Member&); 
+        Member(const Member&); 
     public:
         Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
 
