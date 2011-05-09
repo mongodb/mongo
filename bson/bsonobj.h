@@ -391,7 +391,7 @@ namespace mongo {
                 ...
             }
         */
-        BSONObjIterator begin();
+        BSONObjIterator begin() const;
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             assert( objsize() );

@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    inline BSONObjIterator BSONObj::begin() {
+    inline BSONObjIterator BSONObj::begin() const {
         return BSONObjIterator(*this);
     }
 
