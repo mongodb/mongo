@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "key.h"
+#include "../util/unittest.h"
 
 namespace mongo {
 
@@ -274,12 +275,12 @@ namespace mongo {
             }
         case cstring:
             {
+                unsigned sz = *l;
                 l++; r++; // skip the size byte
-                // todo: see https://jira.mongodb.org/browse/SERVER-1300
-                int res = strcmp((const char *) l, (const char *) r);
+                // use memcmp as we (will) allow zeros in UTF8 strings
+                int res = memcmp(l, r, sz);
                 if( res ) 
                     return res;
-                unsigned sz = l[-1];
                 l += sz; r += sz;
                 break;
             }
@@ -432,5 +433,17 @@ namespace mongo {
         } while( more );
         return p - _keyData;
     }
+
+    struct CmpUnitTest : public UnitTest {
+        void run() {
+            char a[2];
+            char b[2];
+            a[0] = -3;
+            a[1] = 0;
+            b[0] = 3;
+            b[1] = 0;
+            assert( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
+        }
+    } cunittest;
 
 }
