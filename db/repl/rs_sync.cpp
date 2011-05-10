@@ -472,7 +472,9 @@ namespace mongo {
                 _syncThread();
             }
             catch(DBException& e) {
-                sethbmsg("syncThread: " + e.toString() + ", last op: " + lastOpTimeWritten.toString());
+                sethbmsg(str::stream() << "syncThread: " << e.toString() <<
+                         ", try 'use local; db.oplog.rs.findOne({ts : {$gt : new Timestamp(" <<
+                         lastOpTimeWritten.getSecs() << "000," << lastOpTimeWritten.getInc() << ")});' on the primary");
                 sleepsecs(10);
             }
             catch(...) {
@@ -487,9 +489,7 @@ namespace mongo {
                member has done a stepDown() and needs to come back up.
                */
             OCCASIONALLY {
-            	log() << "replSet running manager" << rsLog;
             	mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
-            	log() << "replSet manager finished" << rsLog;
             }
         }
     }
