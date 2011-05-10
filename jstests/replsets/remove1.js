@@ -28,9 +28,10 @@ master.getDB("foo").bar.baz.insert({x:1});
 replTest.awaitReplication();
 
 
-print("Remove slave2");
+print("Remove slaves");
 var config = replTest.getReplSetConfig();
 
+config.members.pop();
 config.members.pop();
 config.version = 2;
 assert.soon(function() {
@@ -42,38 +43,34 @@ assert.soon(function() {
         }
 
         reconnect(master);
+        reconnect(replTest.nodes[1]);
         reconnect(replTest.nodes[2]);
         var c = master.getDB("local").system.replset.findOne();
         return c.version == 2;
     });
 
-// make sure 2 is dead before continuing
+print("make sure 1 & 2 are dead before continuing");
 assert.soon(function() {
+        var node1 = false;
+        var node2 = false;
         try {
-            replTest.nodes[2].getDB("foo").bar.findOne();
+            replTest.nodes[1].getDB("foo").stats();
         }
         catch (e) {
-            return true;
-        }
-        return false;
-    });
-
-
-print("Remove slave1");
-config.members.pop();
-config.version = 3;
-assert.soon(function() {
-        try {
-            master.getDB("admin").runCommand({replSetReconfig:config});
-        }
-        catch(e) {
             print(e);
+            node1 = true;
         }
-        
-        reconnect(master);
-        var c = master.getDB("local").system.replset.findOne();
-        return c.version == 3;
+        try {
+            replTest.nodes[2].getDB("foo").stats();
+        }
+        catch (e) {
+            print(e);
+            node2 = true;
+        }
+        print("node1: "+node1+" node2: "+node2);
+        return node1 && node2;
     });
+
 
 print("clear slave ports");
 // these are already down, but this clears their ports from memory so that they
@@ -90,7 +87,7 @@ replTest.restart(2, {"fastsync":null});
 print("Add them back as slaves");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
 config.members.push({_id:2, host : host+":"+replTest.getPort(2)});
-config.version = 4;
+config.version = 3;
 printjson(config);
 wait(function() {
     try {
@@ -105,7 +102,7 @@ wait(function() {
     master.setSlaveOk();
     var newConfig = master.getDB("local").system.replset.findOne();
     print( "newConfig: " + tojson(newConfig) );
-    return newConfig.version == 4;
+    return newConfig.version == 3;
 } , "wait1" );
 
 
