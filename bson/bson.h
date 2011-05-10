@@ -45,7 +45,6 @@
 #include <iostream>
 #include <sstream>
 #include <boost/utility.hpp>
-#include "util/builder.h"
 
 namespace bson {
 
@@ -56,7 +55,7 @@ namespace bson {
     public:
         assertion( unsigned u , const string& s )
             : id( u ) , msg( s ) {
-            mongo::StringBuilder ss;
+            stringstream ss;
             ss << "BsonAssertion id: " << u << " " << s;
             full = ss.str();
         }
@@ -101,14 +100,15 @@ namespace mongo {
 #endif
 }
 
-#include "../bson/bsontypes.h"
-#include "../bson/oid.h"
-#include "../bson/bsonelement.h"
-#include "../bson/bsonobj.h"
-#include "../bson/bsonmisc.h"
-#include "../bson/bsonobjbuilder.h"
-#include "../bson/bsonobjiterator.h"
-#include "../bson/bson-inl.h"
+#include "util/builder.h"
+#include "bsontypes.h"
+#include "oid.h"
+#include "bsonelement.h"
+#include "bsonobj.h"
+#include "bsonmisc.h"
+#include "bsonobjbuilder.h"
+#include "bsonobjiterator.h"
+#include "bson-inl.h"
 
 namespace mongo {
 

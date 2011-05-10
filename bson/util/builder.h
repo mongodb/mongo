@@ -20,7 +20,7 @@
 #include <string>
 #include <string.h>
 #include <stdio.h>
-#include <boost/shared_ptr.hpp>
+//#include <boost/shared_ptr.hpp>
 
 #include "../inline_decls.h"
 #include "../stringdata.h"
