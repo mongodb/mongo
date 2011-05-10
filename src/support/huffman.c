@@ -186,11 +186,11 @@ set_codes(WT_FREQTREE_NODE *node, WT_HUFFMAN_TABLE_ENTRY *entries, uint32_t code
 static void
 make_table(uint16_t *c2e, int max_depth, WT_HUFFMAN_TABLE_ENTRY *entries, int ncnt) {
 	/* here's the magic: flood all bit patterns for lower-order bits to point to same entry */
-	int i,j;
+	int c1, c2, i, j, shift;
 	for (i=0; i<ncnt; i++) {
 		int c = entries[i].code, len = entries[i].codeword_length;
 		if (len == 0) continue;
-		int shift = max_depth - len, c1 = c<<shift, c2 = (c+1)<<shift;
+		shift = max_depth - len, c1 = c<<shift, c2 = (c+1)<<shift;
 		for (j=c1; j<c2; j++) c2e[j] = i/*index which is also symbol*/;
 	}
 }
@@ -381,7 +381,7 @@ __wt_huffman_open(SESSION *session,
 
 	WT_ERR(__wt_calloc(session, 1 << huffman->max_depth, sizeof(uint16_t), &huffman->c2e));
 	make_table(huffman->c2e, huffman->max_depth, huffman->entries, nbytes);
-	printf("max depth = %d, memory use: entries %d*%ld + c2e %d*%ld\n", huffman->max_depth, nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY), (1<<huffman->max_depth), sizeof(uint16_t));
+	printf("max depth = %d, memory use: entries %d*%u + c2e %d*%u\n", huffman->max_depth, nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY), (1<<huffman->max_depth), sizeof(uint16_t));
 
 	*(void **)retp = huffman;
 
@@ -485,11 +485,10 @@ __wt_huffman_encode(void *huffman_arg,
 {
 	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
-	WT_STATIC_HUFFMAN_NODE *node;
-	uint32_t bitpos, i, n, j;
+	uint32_t bitpos, i, n;
 	uint16_t symbol;
-	uint8_t padding_info, *to;
-	int p;
+	uint8_t padding_info, *to, *out;
+	int bits, code, len, valid;
 
 	huffman = huffman_arg;
 	session = huffman->session;
@@ -520,8 +519,8 @@ __wt_huffman_encode(void *huffman_arg,
 	 * number of bits actually used in the last byte of the encoded value.
 	 */
 	bitpos = HEADER;
-	register int bits = 0, valid = bitpos;
-	uint8_t *out = to;
+	bits = 0, valid = bitpos;
+	out = to;
 	n = 1U << huffman->max_depth;
 	for (i = 0; i < from_len; i += huffman->numBytes) {
 		/* Getting the next symbol, either 1 or 2 bytes */
@@ -563,7 +562,7 @@ __wt_huffman_encode(void *huffman_arg,
 #endif
 
 		/* table-based */
-		int code = huffman->entries[symbol].code, len = huffman->entries[symbol].codeword_length;
+		code = huffman->entries[symbol].code, len = huffman->entries[symbol].codeword_length;
 		bits = (bits << len) | code; valid += len; bitpos += len;
 		while (valid >= 8) { *out++ = (bits>>(valid-8)); valid -= 8; }
 	}
@@ -597,9 +596,9 @@ __wt_huffman_decode(void *huffman_arg,
 {
 	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
-	WT_STATIC_HUFFMAN_NODE* node;
-	uint32_t bytes, i, from_len_bits, node_idx;
-	uint8_t bitpos, mask, bit, padding_info, *to;
+	uint32_t bytes, from_len_bits, node_idx;
+	uint8_t bitpos, padding_info, *to;
+	int bits, code, valid, from_bits, len, max, mmask, out_bits, symbol;
 
 	huffman = huffman_arg;
 	session = huffman->session;
@@ -682,16 +681,16 @@ __wt_huffman_decode(void *huffman_arg,
 #endif
 
 	/* table-based */
-	register int bits = *from++, valid = 8-HEADER;
-	int from_bits = from_len_bits - valid, out_bits = from_len_bits - HEADER;
-	int max = huffman->max_depth, mmask = (1<<max)-1;
+	bits = *from++, valid = 8-HEADER;
+	from_bits = from_len_bits - valid, out_bits = from_len_bits - HEADER;
+	max = huffman->max_depth, mmask = (1<<max)-1;
 	for ( ; out_bits > 0; bytes += huffman->numBytes) {
 		while (valid < max && from_bits > 0) { bits = (bits << 8) | *from++; valid += 8; from_bits -= 8; }
-		int code = valid >= max? (bits >> (valid-max)): (bits << (max-valid))/*short codes near end*/;
-		int symbol = huffman->c2e[code & mmask];
+		code = valid >= max? (bits >> (valid-max)): (bits << (max-valid))/*short codes near end*/;
+		symbol = huffman->c2e[code & mmask];
 		if (huffman->numBytes == 2) *to++ = (symbol>>8);
 		*to++ = symbol;
-		int len = huffman->entries[symbol].codeword_length;
+		len = huffman->entries[symbol].codeword_length;
 		valid -= len; out_bits -= len;
 	}
 
