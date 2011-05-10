@@ -24,8 +24,8 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 	SESSION *session;
 	uint32_t addr;
 
-	session = (SESSION *)cbulk->cbt.iface.session;
 	btree = cbulk->cbt.btree;
+	session = (SESSION *)cbulk->cbt.iface.session;
 
 	/*
 	 * XXX
@@ -67,9 +67,8 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
 	BTREE *btree;
 	SESSION *session;
 
+	btree = cbulk->cbt.btree;
 	session = (SESSION *)cbulk->cbt.iface.session;
-	session->btree = cbulk->cbt.btree;	/* XXX */
-	btree = session->btree;
 
 	/*
 	 * The WiredTiger reconciliation code is where on-disk page formats are
@@ -187,7 +186,6 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	WT_REF *root_page;
 
 	session = (SESSION *)cbulk->cbt.iface.session;
-	session->btree = cbulk->cbt.btree;		/* XXX */
 
 	/* If the page has entries, reconcile and discard it. */
 	if (cbulk->ins_cnt != 0)

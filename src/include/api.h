@@ -346,7 +346,7 @@ struct __connection {
 	    ((CURSOR_BTREE *)(cur))->btree);				\
 
 #define	CURSOR_API_CALL_CONF(cur, s, n, cfg)				\
-	(s) = (SESSION *)(c)->session;					\
+	(s) = (SESSION *)(cur)->session;				\
 	API_CALL(s, cursor, n, cur,					\
 	    ((CURSOR_BTREE *)cursor)->btree, cfg);			\
 

@@ -14,9 +14,12 @@
 static int
 __cursor_get_key(WT_CURSOR *cursor, ...)
 {
+	SESSION *session;
 	const char *fmt;
 	va_list ap;
 	int ret;
+
+	CURSOR_API_CALL(cursor, session, get_key);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -24,6 +27,7 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	    cursor->key.data, cursor->key.size, fmt, ap);
 	va_end(ap);
 
+	API_END();
 	return (ret);
 }
 
@@ -34,9 +38,12 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 static int
 __cursor_get_value(WT_CURSOR *cursor, ...)
 {
+	SESSION *session;
 	const char *fmt;
 	va_list ap;
 	int ret;
+
+	CURSOR_API_CALL(cursor, session, get_value);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
@@ -44,6 +51,7 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
 
+	API_END();
 	return (ret);
 }
 
@@ -62,7 +70,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL(cursor, session, set_key);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -93,6 +101,8 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
 	cursor->key.size = (uint32_t)sz;
 	va_end(ap);
+
+	API_END();
 }
 
 /*
@@ -110,7 +120,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL(cursor, session, set_value);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
@@ -138,6 +148,8 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	WT_ASSERT(NULL, sz <= UINT32_MAX);
 	cursor->value.size = (uint32_t)sz;
 	va_end(ap);
+
+	API_END();
 }
 
 /*
@@ -163,9 +175,7 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	SESSION *session;
 	int ret;
 
-	WT_UNUSED(config);
-
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL_CONF(cursor, session, close, config);
 	ret = 0;
 
 	__wt_buf_free(session, &cursor->key);
@@ -174,6 +184,7 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	TAILQ_REMOVE(&session->cursors, cursor, q);
 	__wt_free(session, cursor);
 
+	API_END();
 	return (ret);
 }
 

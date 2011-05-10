@@ -46,7 +46,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	WT_ITEM *key;
 	va_list ap;
 
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL(cursor, session, get_key);
 
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
@@ -62,6 +62,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	key->size = cursor->key.size;
 	va_end(ap);
 
+	API_END();
 	return (0);
 }
 
@@ -76,7 +77,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	WT_ITEM *value;
 	va_list ap;
 
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL(cursor, session, get_value);
 
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
@@ -91,6 +92,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	value->size = cursor->value.size;
 	va_end(ap);
 
+	API_END();
 	return (0);
 }
 
@@ -105,7 +107,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL(cursor, session, set_key);
 
 	va_start(ap, cursor);
 	*(WT_ITEM *)&cursor->key = *va_arg(ap, WT_ITEM *);
@@ -116,8 +118,9 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
 	}
-
 	va_end(ap);
+
+	API_END();
 }
 
 /*
@@ -131,7 +134,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	session = (SESSION *)cursor->session;
+	CURSOR_API_CALL(cursor, session, set_value);
 
 	va_start(ap, cursor);
 	*(WT_ITEM *)&cursor->value = *va_arg(ap, WT_ITEM *);
@@ -142,8 +145,9 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	}
-
 	va_end(ap);
+
+	API_END();
 }
 
 /*
