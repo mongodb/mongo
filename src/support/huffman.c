@@ -96,25 +96,6 @@ static void node_queue_dequeue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE **);
 static int  node_queue_enqueue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE *);
 static void recursive_free_node(SESSION *, WT_FREQTREE_NODE *);
 
-#if 0
-/*
- * The following macros are used by the encoder to write the buffer with bit
- * addressing.
- */
-#undef	SET_BIT
-#define	SET_BIT(ptr, pos)						\
-	*((ptr) + ((pos) / 8)) |= 1 << (7 - ((pos) % 8))
-#undef	CLEAR_BIT
-#define	CLEAR_BIT(ptr, pos)						\
-	*((ptr) + ((pos) / 8)) &= ~(uint8_t)(1 << (7 - ((pos) % 8)))
-#undef	MODIFY_BIT
-#define	MODIFY_BIT(ptr, pos, bit)					\
-	if (bit)							\
-		SET_BIT(ptr, pos);					\
-	else								\
-		CLEAR_BIT(ptr, pos);
-#endif
-
 /*
  * Internal data structure used to preserve the symbol when rearranging the
  * frequency array.
@@ -194,34 +175,6 @@ make_table(uint16_t *c2e, int max_depth, WT_HUFFMAN_TABLE_ENTRY *entries, int nc
 		for (j=c1; j<c2; j++) c2e[j] = i/*index which is also symbol*/;
 	}
 }
-
-
-#if 0
-/*
- * fill_static_representation --
- *	Recursive function that converts the huffman tree from its dynamic
- * representation to static tree representation, to a preallocated array.
- *
- * To know the required size of the array the traverse_tree function can be
- * used, determining the maximum depth N. Then the required array size is 2^N.
- */
-static void
-fill_static_representation(
-    WT_STATIC_HUFFMAN_NODE *target, WT_FREQTREE_NODE *node, int idx)
-{
-	WT_STATIC_HUFFMAN_NODE *current_target;
-
-	current_target = &target[idx];
-	current_target->symbol = node->symbol;
-	current_target->codeword_length = node->codeword_length;
-	current_target->valid = 1;
-
-	if (node->left != NULL)
-		fill_static_representation(target, node->left, idx * 2 + 1);
-	if (node->right != NULL)
-		fill_static_representation(target, node->right, idx * 2 + 2);
-}
-#endif
 
 /*
  * recursive_free_node --
@@ -364,16 +317,6 @@ __wt_huffman_open(SESSION *session,
 	 */
 	huffman->numSymbols = nbytes;
 	huffman->numBytes = nbytes > 256 ? 2 : 1;
-
-#if 0
-	/* Traverse the tree and set the code word length for each node. */
-	traverse_tree(node, 0, &huffman->max_depth);
-
-	/* Converting the tree to a static array representation. */
-	WT_ERR(__wt_calloc(session, 1U << huffman->max_depth,
-	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
-	fill_static_representation(huffman->nodes, node, 0);
-#endif
 
 	/* table-based */
 	WT_ERR(__wt_calloc(session, nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY), &huffman->entries));
@@ -531,36 +474,6 @@ __wt_huffman_encode(void *huffman_arg,
 			symbol |= *from++;
 		}
 
-#if 0
-		/* Getting the symbol's huffman code from the table */
-		node = NULL;
-		for (j = 0; j < n; ++j) {
-			node = &huffman->nodes[j];
-			if (node->valid &&
-			    node->symbol == symbol && node->codeword_length > 0)
-				break;
-		}
-
-		if (node != NULL) {
-			/*
-			 * We've got the leaf node, at index 'j'.  Now we fill
-			 * the output buffer in back order.
-			 */
-			for (p = node->codeword_length - 1; p >= 0; --p) {
-				MODIFY_BIT(to, bitpos + (u_int)p, (j % 2) ^ 1);
-				j = (j - 1) / 2;
-			}
-
-			bitpos += node->codeword_length;
-		} else {
-			__wt_errx(NULL,
-			    "Huffman compression: there was a symbol in the "
-			    "source originally declared with zero frequency; "
-			    "undefined source symbol: %lu", (u_long)symbol);
-			return (WT_ERROR);
-		}
-#endif
-
 		/* table-based */
 		code = huffman->entries[symbol].code, len = huffman->entries[symbol].codeword_length;
 		bits = (bits << len) | code; valid += len; bitpos += len;
@@ -635,50 +548,6 @@ __wt_huffman_decode(void *huffman_arg,
 	from_len_bits = from_len * 8;
 	if (padding_info != 0)
 		from_len_bits -= 8 - padding_info;
-
-#if 0
-	/*
-	 * The loop will go through each bit of the source stream, its length
-	 * is given in BITS!
-	 */
-	for (i = HEADER; i < from_len_bits; i++) {
-		/* Extracting the current bit */
-		mask = (uint8_t)(1U << bitpos);
-		bit = (*from & mask);
-
-		/*
-		 * As we go through the bits, we also make steps in the huffman
-		 * tree, originated from the root, toward the leaves.
-		 */
-		if (bit)
-			node_idx = (node_idx * 2) + 2;
-		else
-			node_idx = (node_idx * 2) + 1;
-
-		node = &huffman->nodes[node_idx];
-
-		/* If this is a leaf, we've found a complete symbol. */
-		if (node->valid && node->codeword_length > 0) {
-			if (huffman->numBytes == 1)
-				*to++ = (uint8_t)node->symbol;
-			else {
-				*to++ = (node->symbol & 0xFF00) >> 8;
-				*to++ = node->symbol & 0xFF;
-			}
-
-			bytes += huffman->numBytes;
-			node_idx = 0;
-		}
-
-		/* Moving forward one bit in the source stream. */
-		if (bitpos > 0)
-			bitpos--;
-		else {
-			bitpos = 7;
-			from++;
-		}
-	}
-#endif
 
 	/* table-based */
 	bits = *from++, valid = 8-HEADER;
