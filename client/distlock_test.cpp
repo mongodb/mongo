@@ -90,7 +90,7 @@ namespace mongo {
                  BSONObjBuilder& result, bool) {
             Timer t;
             DistributedLock lk(ConnectionString(cmdObj["host"].String(),
-                                                ConnectionString::SYNC), "testdistlockwithsync", 0, 0, true);
+                                                ConnectionString::SYNC), "testdistlockwithsync", 0, 0);
             current = &lk;
             count = 0;
             gotit = 0;
@@ -183,9 +183,6 @@ namespace mongo {
             int threadSleep = (int) number_field(cmdObj, "threadSleep", 30);
             if(threadSleep <= 0) threadSleep = 1;
 
-            // (Legacy) how long until the lock is forced in mins, measured locally
-            int takeoverMins = (int) number_field(cmdObj, "takeoverMins", 0);
-
             // How long until the lock is forced in ms, only compared locally
             unsigned long long takeoverMS = (unsigned long long) number_field(cmdObj, "takeoverMS", 0);
 
@@ -201,7 +198,6 @@ namespace mongo {
 
 
             int skew = 0;
-            bool legacy = (takeoverMins > 0);
             if (!lock.get()) {
 
                 // Pick a skew, but the first two threads skew the whole range
@@ -216,11 +212,11 @@ namespace mongo {
 
                 log() << "Initializing lock with skew of " << skew << " for thread " << threadId << endl;
 
-                lock.reset(new DistributedLock(hostConn, lockName, legacy ? (unsigned long long)takeoverMins : takeoverMS, true, legacy));
+                lock.reset(new DistributedLock(hostConn, lockName, takeoverMS, true ));
 
                 log() << "Skewed time " << jsTime() << "  for thread " << threadId << endl
                       << "  max wait (with lock: " << threadWait << ", after lock: " << threadSleep << ")" << endl
-                      << "  takeover in " << (legacy ? (unsigned long long)takeoverMins : takeoverMS) << (legacy ? " (mins local)" : "(ms remote)") << endl;
+                      << "  takeover in " << takeoverMS << "(ms remote)" << endl;
 
             }
 
@@ -235,22 +231,16 @@ namespace mongo {
 
                         log() << "**** Locked for thread " << threadId << " with ts " << lockObj["ts"] << endl;
 
-                        // Legacy locks are not always guaranteed re-entry since they may not have a valid ping yet,
-                        // but don't use this feature anyway
-                        if( ! legacy ) {
+                        if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
+                            errors = true;
+                            log() << "**** !Could not re-enter lock already held" << endl;
+                            break;
+                        }
 
-                            if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
-                                errors = true;
-                                log() << "**** !Could not re-enter lock already held" << endl;
-                                break;
-                            }
-
-                            if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
-                                errors = true;
-                                log() << "**** !Invalid lock re-entry" << endl;
-                                break;
-                            }
-
+                        if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
+                            errors = true;
+                            log() << "**** !Invalid lock re-entry" << endl;
+                            break;
                         }
 
                         count++;
@@ -289,7 +279,7 @@ namespace mongo {
 
             result << "errors" << errors
                    << "skew" << skew
-                   << "takeover" << (long long) (legacy ? takeoverMS : (unsigned long long)takeoverMins)
+                   << "takeover" << (long long) takeoverMS
                    << "localTimeout" << (takeoverMS > 0);
 
         }
