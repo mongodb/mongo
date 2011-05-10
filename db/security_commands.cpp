@@ -182,10 +182,10 @@ namespace mongo {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
 
             if ( userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean() ) {
-                ai->authorizeReadOnly( cc().database()->name.c_str() );
+                ai->authorizeReadOnly( cc().database()->name.c_str() , user );
             }
             else {
-                ai->authorize( cc().database()->name.c_str() );
+                ai->authorize( cc().database()->name.c_str() , user );
             }
             return true;
         }

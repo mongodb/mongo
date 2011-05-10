@@ -504,9 +504,7 @@ namespace mongo {
 
         Client::initThread("replica set sync");
         cc().iAmSyncThread();
-        if (!noauth) {
-            cc().getAuthenticationInfo()->authorize("local");
-        }
+        replLocalAuth();
         theReplSet->syncThread();
         cc().shutdown();
     }

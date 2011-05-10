@@ -37,23 +37,33 @@ namespace mongo {
     }
 
 
-
-    bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
+    string AuthenticationInfo::getUser( const string& dbname ) const {
         scoped_spinlock lk(_lock);
 
-        if ( _isAuthorizedSingle_inlock( dbname , level ) )
-            return true;
+        MA::const_iterator i = _dbs.find(dbname);
+        if ( i == _dbs.end() )
+            return "";
 
-        if ( noauth ) 
-            return true;
-        
-        if ( _isAuthorizedSingle_inlock( "admin" , level ) )
-            return true;
-        
-        if ( _isAuthorizedSingle_inlock( "local" , level ) )
-            return true;
-        
-        return _isAuthorizedSpecialChecks_inlock( dbname );
+        return i->second.user;
+    }
+
+    bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
+        {
+            scoped_spinlock lk(_lock);
+            
+            if ( _isAuthorizedSingle_inlock( dbname , level ) )
+                return true;
+            
+            if ( noauth ) 
+                return true;
+            
+            if ( _isAuthorizedSingle_inlock( "admin" , level ) )
+                return true;
+            
+            if ( _isAuthorizedSingle_inlock( "local" , level ) )
+                return true;
+        }
+        return _isAuthorizedSpecialChecks( dbname );
     }
 
     bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, int level) const {
@@ -61,10 +71,9 @@ namespace mongo {
         return i != _dbs.end() && i->second.level >= level;
     }
 
-    bool AuthenticationInfo::_isAuthorizedSpecialChecks_inlock( const string& dbname ) const {
-        if ( cc().isGod() ) {
+    bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
+        if ( cc().isGod() ) 
             return true;
-        }
 
         if ( isLocalHost ) {
             atleastreadlock l("");
@@ -80,6 +89,7 @@ namespace mongo {
                 return true;
             }
         }
+
         return false;
     }
 

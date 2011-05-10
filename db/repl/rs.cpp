@@ -662,9 +662,7 @@ namespace mongo {
                 assert(!replSet);
                 return;
             }
-            if( !noauth ) {
-                cc().getAuthenticationInfo()->authorize("local");
-            }
+            replLocalAuth();
             (theReplSet = new ReplSet(*replSetCmdline))->go();
         }
         catch(std::exception& e) {
@@ -674,6 +672,13 @@ namespace mongo {
         }
         cc().shutdown();
     }
+
+    void replLocalAuth() {
+        if ( noauth )
+            return;
+        cc().getAuthenticationInfo()->authorize("local","_repl");
+    }
+    
 
 }
 

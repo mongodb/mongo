@@ -35,6 +35,7 @@ namespace mongo {
     struct Auth {
         Auth() { level = 0; }
         int level;
+        string user;
     };
 
     class AuthenticationInfo : boost::noncopyable {
@@ -44,24 +45,38 @@ namespace mongo {
         AuthenticationInfo(){ isLocalHost = false; }
         ~AuthenticationInfo() {}
 
+        // -- modifiers ----
+        
         void logout(const string& dbname ) {
             scoped_spinlock lk(_lock);
             _dbs.erase(dbname);
         }
-        void authorize(const string& dbname ) {
+        void authorize(const string& dbname , const string& user ) {
             scoped_spinlock lk(_lock);
             _dbs[dbname].level = 2;
+            _dbs[dbname].user = user;
         }
-        void authorizeReadOnly(const string& dbname) {
+        void authorizeReadOnly(const string& dbname , const string& user ) {
             scoped_spinlock lk(_lock);
             _dbs[dbname].level = 1;
+            _dbs[dbname].user = user;
         }
+        
+        // -- accessors ---
 
-        bool isAuthorized(const string& dbname) const { return _isAuthorized( dbname, 2 ); }
-        bool isAuthorizedReads(const string& dbname) const { return _isAuthorized( dbname, 1 ); }
+        bool isAuthorized(const string& dbname) const { 
+            return _isAuthorized( dbname, 2 ); 
+        }
+        
+        bool isAuthorizedReads(const string& dbname) const { 
+            return _isAuthorized( dbname, 1 ); 
+        }
+        
         bool isAuthorizedForLock(const string& dbname, int lockType ) const { 
             return _isAuthorized( dbname , lockType > 0 ? 2 : 1 ); 
         }
+
+        string getUser( const string& dbname ) const;
 
         void print() const;
 
@@ -71,7 +86,8 @@ namespace mongo {
 
         bool _isAuthorizedSingle_inlock(const string& dbname, int level) const;
         
-        bool _isAuthorizedSpecialChecks_inlock( const string& dbname ) const ;
+        /** cannot call this locked */
+        bool _isAuthorizedSpecialChecks( const string& dbname ) const ;
 
     private:
         mutable SpinLock _lock;

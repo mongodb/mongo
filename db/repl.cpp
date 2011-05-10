@@ -1303,7 +1303,7 @@ namespace mongo {
                 if ( lk.got() ) {
                     toSleep = 10;
 
-                    cc().getAuthenticationInfo()->authorize("admin");
+                    replLocalAuth();
 
                     try {
                         logKeepalive();
@@ -1327,9 +1327,7 @@ namespace mongo {
 
         {
             dblock lk;
-            cc().getAuthenticationInfo()->authorize("admin");
-
-            BSONObj obj;
+            replLocalAuth();
         }
 
         while ( 1 ) {
@@ -1387,7 +1385,7 @@ namespace mongo {
 
         {
             dblock lk;
-            cc().getAuthenticationInfo()->authorize("admin");
+            replLocalAuth();
         }
 
         if ( replSettings.slave ) {

@@ -524,6 +524,12 @@ namespace mongo {
         }
     };
 
+    /**
+     * does local authentication
+     * directly authorizes against AuthenticationInfo
+     */
+    void replLocalAuth();
+
     /** inlines ----------------- */
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
