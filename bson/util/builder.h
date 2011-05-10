@@ -211,7 +211,6 @@ namespace mongo {
         friend class StringBuilder;
     };
 
-    template class _BufBuilder<TrivialAllocator>;
     typedef _BufBuilder<TrivialAllocator> BufBuilder;
 
     /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
