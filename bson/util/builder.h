@@ -79,7 +79,10 @@ namespace mongo {
     };
 
     template< class Allocator >
-    class _BufBuilder : boost::noncopyable {
+    class _BufBuilder {
+        // non-copyable, non-assignable
+        _BufBuilder( const _BufBuilder& );
+        _BufBuilder& operator=( const _BufBuilder& );
         Allocator al;
     public:
         _BufBuilder(int initsize = 512) : size(initsize) {
