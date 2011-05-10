@@ -18,7 +18,6 @@
 #pragma once
 
 #include "../pch.h"
-
 #include "jsobj.h"
 #include "../util/timer.h"
 
@@ -26,7 +25,6 @@ namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
-    class BufBuilder;
     class Client;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))

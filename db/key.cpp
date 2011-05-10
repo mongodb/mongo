@@ -68,18 +68,15 @@ namespace mongo {
         Given that the KeyV1Owned constructor already grabbed a bufbuilder, we reuse it here 
         so that we don't have to do an extra malloc.
     */
-    void KeyV1Owned::traditional(BufBuilder& b, const BSONObj& obj) { 
+    void KeyV1Owned::traditional(const BSONObj& obj) { 
         b.reset();
         b.appendUChar(IsBSON);
         b.appendBuf(obj.objdata(), obj.objsize());
-        _toFree = b.buf();
-        _keyData = (const unsigned char *) _toFree;
-        b.decouple();
+        _keyData = (const unsigned char *) b.buf();
     }
 
     // fromBSON to Key format
     KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
-        BufBuilder b(512);
         BSONObj::iterator i(obj);
         assert( i.more() );
         unsigned char bits = 0;
@@ -122,7 +119,7 @@ namespace mongo {
                             break;
                         }
                     }
-                    traditional(b, obj);
+                    traditional(obj);
                     return;
                 }
             case Date:
@@ -135,7 +132,7 @@ namespace mongo {
                     // note we do not store the terminating null, to save space.
                     unsigned x = (unsigned) e.valuestrsize() - 1;
                     if( x > 255 ) { 
-                        traditional(b, obj);
+                        traditional(obj);
                         return;
                     }
                     b.appendUChar(x);
@@ -151,7 +148,7 @@ namespace mongo {
                     long long n = e._numberLong();
                     double d = (double) n;
                     if( d != n ) { 
-                        traditional(b, obj);
+                        traditional(obj);
                         return;
                     }
                     b.appendUChar(clong|bits);
@@ -172,18 +169,16 @@ namespace mongo {
                 }
             default:
                 // if other types involved, store as traditional BSON
-                traditional(b, obj);
+                traditional(obj);
                 return;
             }
             if( !i.more() )
                 break;
             bits = 0;
         }
-        _toFree = b.buf();
-        _keyData = (const unsigned char *) _toFree;
+        _keyData = (const unsigned char *) b.buf();
         dassert( b.len() == dataSize() ); // check datasize method is correct
         dassert( (*_keyData & cNOTUSED) == 0 );
-        b.decouple();
     }
 
     BSONObj KeyV1::toBson() const { 

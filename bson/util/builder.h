@@ -20,8 +20,6 @@
 #include <string>
 #include <string.h>
 #include <stdio.h>
-//#include <boost/shared_ptr.hpp>
-
 #include "../inline_decls.h"
 #include "../stringdata.h"
 
@@ -49,11 +47,44 @@ namespace mongo {
 
     void msgasserted(int msgid, const char *msg);
 
-    class BufBuilder {
+    class TrivialAllocator { 
     public:
-        BufBuilder(int initsize = 512) : size(initsize) {
+        void* Malloc(size_t sz) { return malloc(sz); }
+        void* Realloc(void *p, size_t sz) { return realloc(p, sz); }
+        void Free(void *p) { free(p); }
+    };
+
+    class StackAllocator {
+    public:
+        enum { SZ = 512 };
+        void* Malloc(size_t sz) {
+            if( sz <= SZ ) return buf;
+            return malloc(sz); 
+        }
+        void* Realloc(void *p, size_t sz) { 
+            if( p == buf ) {
+                if( sz <= SZ ) return buf;
+                void *d = malloc(sz);
+                memcpy(d, p, SZ);
+                return d;
+            }
+            return realloc(p, sz); 
+        }
+        void Free(void *p) { 
+            if( p != buf )
+                free(p); 
+        }
+    private:
+        char buf[SZ];
+    };
+
+    template< class Allocator >
+    class _BufBuilder : boost::noncopyable {
+        Allocator al;
+    public:
+        _BufBuilder(int initsize = 512) : size(initsize) {
             if ( size > 0 ) {
-                data = (char *) malloc(size);
+                data = (char *) al.Malloc(size);
                 if( data == 0 )
                     msgasserted(10000, "out of memory BufBuilder");
             }
@@ -62,13 +93,11 @@ namespace mongo {
             }
             l = 0;
         }
-        ~BufBuilder() {
-            kill();
-        }
+        ~_BufBuilder() { kill(); }
 
         void kill() {
             if ( data ) {
-                free(data);
+                al.Free(data);
                 data = 0;
             }
         }
@@ -79,8 +108,8 @@ namespace mongo {
         void reset( int maxSize ) {
             l = 0;
             if ( maxSize && size > maxSize ) {
-                free(data);
-                data = (char*)malloc(maxSize);
+                al.Free(data);
+                data = (char*)al.Malloc(maxSize);
                 size = maxSize;
             }
         }
@@ -168,7 +197,7 @@ namespace mongo {
                 a = l + 16 * 1024;
             if ( a > BufferMaxSize )
                 msgasserted(13548, "BufBuilder grow() > 64MB");
-            data = (char *) realloc(data, a);
+            data = (char *) al.Realloc(data, a);
             size= a;
         }
 
@@ -177,6 +206,22 @@ namespace mongo {
         int size;
 
         friend class StringBuilder;
+    };
+
+    template class _BufBuilder<TrivialAllocator>;
+    typedef _BufBuilder<TrivialAllocator> BufBuilder;
+
+    /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
+          this can be significantly faster for small bufs.  However, you can not decouple() the 
+          buffer with StackBufBuilder.
+        While designed to be a variable on the stack, if you were to dynamically allocate one, 
+          nothing bad would happen.  In fact in some circumstances this might make sense, say, 
+          embedded in some other object.
+    */
+    class StackBufBuilder : public _BufBuilder<StackAllocator> { 
+    public:
+        StackBufBuilder() : _BufBuilder<StackAllocator>(StackAllocator::SZ) { }
+        void decouple(); // not allowed. not implemented.
     };
 
 #if defined(_WIN32)

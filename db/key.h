@@ -86,11 +86,10 @@ namespace mongo {
                  it will stay as bson herein.
         */
         KeyV1Owned(const BSONObj& obj);
-        ~KeyV1Owned() { free((void*) _toFree); }
     private:
         KeyV1Owned(const KeyV1Owned&); //not copyable
-        const char *_toFree;
-        void traditional(BufBuilder& b, const BSONObj& obj); // store as traditional bson not as compact format
+        StackBufBuilder b;
+        void traditional(const BSONObj& obj); // store as traditional bson not as compact format
     };
 
 };

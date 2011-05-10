@@ -24,7 +24,7 @@
 namespace mongo {
 
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
-    MongoMutex &dbMutex( *(new MongoMutex("rw:dbMutex")) );
+    MongoMutex &dbMutex( *(new MongoMutex("dbMutex")) );
 
     MongoMutex::MongoMutex(const char *name) : _m(name) {
         static int n = 0;

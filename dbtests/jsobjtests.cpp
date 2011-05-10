@@ -18,6 +18,7 @@
  */
 
 #include "pch.h"
+#include "../bson/util/builder.h"
 #include "../db/jsobj.h"
 #include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
@@ -75,10 +76,18 @@ namespace JsobjTests {
     class BufBuilderBasic {
     public:
         void run() {
-            BufBuilder b( 0 );
-            b.appendStr( "foo" );
-            ASSERT_EQUALS( 4, b.len() );
-            ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            {
+                BufBuilder b( 0 );
+                b.appendStr( "foo" );
+                ASSERT_EQUALS( 4, b.len() );
+                ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            }
+            {
+                mongo::StackBufBuilder b;
+                b.appendStr( "foo" );
+                ASSERT_EQUALS( 4, b.len() );
+                ASSERT( strcmp( "foo", b.buf() ) == 0 );
+            }
         }
     };
 

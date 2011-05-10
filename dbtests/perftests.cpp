@@ -286,6 +286,36 @@ namespace PerfTests {
         }
     };
 
+    class Bldr : public B { 
+    public:
+        int n;
+        string name() { return "BufBuilder"; }
+        Bldr() { 
+        }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            BufBuilder b;
+            b.appendNum(3);
+            b.appendUChar(' ');
+            b.appendStr("abcd");
+            n += b.len();
+        }
+    };
+
+    class StkBldr : public B { 
+    public:
+        int n;
+        string name() { return "StackBufBuilder"; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            StackBufBuilder b;
+            b.appendNum(3);
+            b.appendUChar(' ');
+            b.appendStr("abcd");
+            n += b.len();
+        }
+    };
+
     // if a test is this fast, it was optimized out
     class Dummy : public B {
     public:
@@ -553,6 +583,8 @@ namespace PerfTests {
             add< Dummy >();
             add< TLS >();
             add< Malloc >();
+            add< Bldr >();
+            add< StkBldr >();
             add< BSONIter >();
             add< ChecksumTest >();
             add< TaskQueueTest >();
