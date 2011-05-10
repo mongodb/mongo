@@ -10,14 +10,14 @@
  *	Read pages into the cache.
  */
 static inline void
-__wt_cache_page_in(SESSION *session, WT_PAGE *page)
+__wt_cache_page_in(SESSION *session, WT_PAGE *page, uint32_t size)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
 	++cache->pages_in;
-	cache->bytes_in += page->size;
+	cache->bytes_in += size;
 	F_SET(page, WT_PAGE_CACHE_COUNTED);
 }
 
@@ -26,14 +26,14 @@ __wt_cache_page_in(SESSION *session, WT_PAGE *page)
  *	Discard pages from the cache.
  */
 static inline void
-__wt_cache_page_out(SESSION *session, WT_PAGE *page)
+__wt_cache_page_out(SESSION *session, WT_PAGE *page, uint32_t size)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
 	++cache->pages_out;
-	cache->bytes_out += page->size;
+	cache->bytes_out += size;
 
 	WT_ASSERT(session, cache->pages_in >= cache->pages_out);
 	WT_ASSERT(session, cache->bytes_in >= cache->bytes_out);
@@ -167,15 +167,15 @@ __wt_key_cell_next(WT_CELL *key_cell)
  *	Return if a pointer references off-page data.
  */
 static inline int
-__wt_ref_off_page(WT_PAGE *page, const void *p)
+__wt_ref_off_page(WT_PAGE *page, const void *p, uint32_t size)
 {
 	/*
 	 * There may be no underlying page, in which case the reference is
 	 * off-page by definition.
 	 */
-	if (page->XXdsk == NULL)
+	if (page->dsk == NULL)
 		return (1);
 
-	return (p < (void *)page->XXdsk ||
-	    p >= (void *)((uint8_t *)page->XXdsk + page->size) ? 1 : 0);
+	return (p < (void *)page->dsk ||
+	    p >= (void *)((uint8_t *)page->dsk + size) ? 1 : 0);
 }

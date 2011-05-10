@@ -161,7 +161,7 @@ __wt_hazard_empty(SESSION *session, const char *name)
 		}
 }
 
-#ifdef DIAGNOSTIC
+#ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_hazard_validate --
  *	Confirm that a page isn't on the hazard list.
@@ -174,16 +174,10 @@ __wt_hazard_validate(SESSION *session, WT_PAGE *page)
 	SESSION **tp;
 
 	conn = S2C(session);
-	cache = conn->cache;
 
 	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
 		for (hp = session->hazard;
 		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
-			if (hp->page == page) {
-				__wt_err(session, 0,
-				    "eviction hazard check for page %lu failed",
-				    (u_long)page->addr);
-				WT_ASSERT(session, 0);
-			}
+			WT_ASSERT(session, hp->page != page);
 }
 #endif

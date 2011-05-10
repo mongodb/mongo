@@ -139,9 +139,9 @@ __wt_session_dump(SESSION *session)
 				continue;
 #ifdef HAVE_DIAGNOSTIC
 			__wt_mb_add(&mb, "\t\t%lu: %s, line %d\n",
-			    hp->page->addr, hp->file, hp->line);
+			    WT_PADDR(hp->page), hp->file, hp->line);
 #else
-			__wt_mb_add(&mb, "\t\t%lu\n", hp->page->addr);
+			__wt_mb_add(&mb, "\t\t%lu\n", WT_PADDR(hp->page));
 #endif
 		}
 

@@ -125,14 +125,16 @@ void __wt_debug_item(const char *tag, void *arg_item, FILE *fp);
 int __wt_desc_stat(SESSION *session);
 int __wt_desc_read(SESSION *session);
 int __wt_desc_write(SESSION *session);
-void __wt_page_free(SESSION *session, WT_PAGE *page);
+void __wt_page_free( SESSION *session,
+    WT_PAGE *page,
+    uint32_t addr,
+    uint32_t size);
 int __wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags);
 void __wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream);
 void __wt_workq_evict_server(CONNECTION *conn, int force);
 int __wt_evict_file_serial_func(SESSION *session);
 void *__wt_cache_evict_server(void *arg);
 void __wt_workq_evict_server_exit(CONNECTION *conn);
-void __wt_evict_dump(SESSION *session);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
 int __wt_bt_open(SESSION *session, int ok_create);
@@ -148,8 +150,6 @@ int __wt_page_inmem(SESSION *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,
     WT_PAGE_DISK *dsk,
-    uint32_t addr,
-    uint32_t size,
     WT_PAGE **pagep);
 int __wt_cell_process(SESSION *session, const WT_CELL *cell, WT_BUF *retbuf);
 void __wt_workq_read_server(CONNECTION *conn, int force);

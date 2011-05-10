@@ -49,7 +49,7 @@ __wt_key_build(SESSION *session, WT_PAGE *page, void *rip_arg, WT_BUF *store)
 	 * If it's on-page, we raced and we're done -- create the local copy for
 	 * our caller, if that's what they wanted.
 	 */
-	if (__wt_ref_off_page(page, cell)) {
+	if (__wt_ref_off_page(page, cell, WT_PSIZE(page))) {
 		if (store == NULL)
 			return (0);
 		return (__wt_buf_set(session, store, rip->key, rip->size));

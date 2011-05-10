@@ -75,8 +75,8 @@ __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
-    WT_PAGE_DISK *dsk, uint32_t addr, uint32_t size, WT_PAGE **pagep)
+__wt_page_inmem(SESSION *session,
+    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_DISK *dsk, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	int ret;
@@ -90,12 +90,10 @@ __wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
 	 * Set the LRU so the page is not immediately selected for eviction.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	page->addr = addr;
-	page->size = size;
 	page->type = dsk->type;
 	page->parent = parent;
 	page->parent_ref = parent_ref;
-	page->XXdsk = dsk;
+	page->dsk = dsk;
 
 	page->read_gen = __wt_cache_read_gen(session);
 
@@ -109,7 +107,7 @@ __wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
 		WT_ERR(__wt_page_inmem_col_int(session, page));
 
 		/* Column-store internal pages do not require a disk image. */
-		__wt_free(session, page->XXdsk);
+		__wt_free(session, page->dsk);
 		break;
 	case WT_PAGE_COL_RLE:
 		page->u.col_leaf.recno = dsk->recno;
@@ -127,9 +125,6 @@ __wt_page_inmem(SESSION *session, WT_PAGE *parent, WT_REF *parent_ref,
 		break;
 	WT_ILLEGAL_FORMAT(session);
 	}
-
-	/* Add the page to our cache statistics. */
-	__wt_cache_page_in(session, page);
 
 	*pagep = page;
 	return (0);
@@ -153,7 +148,7 @@ __wt_page_inmem_col_fix(SESSION *session, WT_PAGE *page)
 	uint8_t *p;
 
 	btree = session->btree;
-	dsk = page->XXdsk;
+	dsk = page->dsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -186,7 +181,7 @@ __wt_page_inmem_col_int(SESSION *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	dsk = page->XXdsk;
+	dsk = page->dsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -226,7 +221,7 @@ __wt_page_inmem_col_rle(SESSION *session, WT_PAGE *page)
 	uint8_t *p;
 
 	btree = session->btree;
-	dsk = page->XXdsk;
+	dsk = page->dsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -260,7 +255,7 @@ __wt_page_inmem_col_var(SESSION *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
-	dsk = page->XXdsk;
+	dsk = page->dsk;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -298,7 +293,7 @@ __wt_page_inmem_row_int(SESSION *session, WT_PAGE *page)
 	void *huffman;
 
 	btree = session->btree;
-	dsk = page->XXdsk;
+	dsk = page->dsk;
 	huffman = btree->huffman_key;
 
 	/*
@@ -354,7 +349,7 @@ __wt_page_inmem_row_leaf(SESSION *session, WT_PAGE *page)
 	uint32_t i, nindx;
 
 	btree = session->btree;
-	dsk = page->XXdsk;
+	dsk = page->dsk;
 
 	/*
 	 * Leaf row-store page entries map to a maximum of two-to-one to the

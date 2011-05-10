@@ -207,8 +207,6 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	page->parent = NULL;				/* Root page */
 	page->parent_ref = root_page;
 	page->read_gen = 0;
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
 	WT_PAGE_SET_MODIFIED(page);
 
 	switch (cbulk->page_type) {
@@ -278,9 +276,7 @@ __wt_bulk_row_page(CURSOR_BULK *cbulk)
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = 0;
 	page->u.bulk.ins = cbulk->ins_base;
-	page->XXdsk = NULL;
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
+	page->dsk = NULL;
 	page->type = WT_PAGE_ROW_LEAF;
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
@@ -330,9 +326,7 @@ __wt_bulk_col_page(CURSOR_BULK *cbulk)
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = cbulk->recno;
 	page->u.bulk.upd = cbulk->upd_base;
-	page->XXdsk = NULL;
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
+	page->dsk = NULL;
 	page->type = cbulk->page_type;
 	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);

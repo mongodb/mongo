@@ -431,19 +431,8 @@ struct __wt_page {
 		bulk;
 	} u;
 
-	/*
-	 * Page's on-disk representation: NULL for pages created in memory, and
-	 * most code should never look at this value.
-	 *
-	 * XXX
-	 * I don't think we actually need the addr field, it's only used as a
-	 * unique identifier for an in-memory page, that is, debugging.  It's
-	 * here because the bulk read code uses it, and we should try and get
-	 * rid of it when that code gets re-written.
-	 */
-	WT_PAGE_DISK *XXdsk;
-	uint32_t addr;				/* Original file address */
-	uint32_t size;				/* Original size */
+	/* Page's on-disk representation: NULL for pages created in memory. */
+	WT_PAGE_DISK *dsk;
 
 	/*
 	 * Every in-memory page references a number of entries, originally
@@ -481,7 +470,17 @@ struct __wt_page {
  */
 #define	WT_PAGE_SIZE							\
 	WT_ALIGN(6 * sizeof(void *) + 2 * sizeof(uint64_t) +		\
-	    4 * sizeof(uint32_t) + sizeof(uint8_t), sizeof(void *))
+	    2 * sizeof(uint32_t) + sizeof(uint8_t), sizeof(void *))
+
+/*
+ * WT_PADDR, WT_PSIZE --
+ *	A page's address and size.  We don't maintain the page's address/size in
+ * the page: a page's address/size is found in the page parent's WT_REF struct,
+ * and like a person with two watches can never be sure what time it is, having
+ * two places to find a piece of information leads to confusion.
+ */
+#define	WT_PADDR(p)	((p)->parent_ref->addr)
+#define	WT_PSIZE(p)	((p)->parent_ref->size)
 
 /*
  * WT_ROW --
@@ -530,7 +529,7 @@ struct __wt_row {
  *	Return a pointer corresponding to the data offset.
  */
 #define	WT_ROW_PTR(page, rip)						\
-	WT_PAGE_DISK_REF((page)->XXdsk, (rip)->value)
+	WT_PAGE_DISK_REF((page)->dsk, (rip)->value)
 
 /*
  * WT_ROW_FOREACH --
@@ -582,7 +581,7 @@ struct __wt_col {
  *	Return a pointer corresponding to the data offset.
  */
 #define	WT_COL_PTR(page, cip)						\
-	WT_PAGE_DISK_REF((page)->XXdsk, (cip)->value)
+	WT_PAGE_DISK_REF((page)->dsk, (cip)->value)
 
 /*
  * WT_COL_FOREACH --
@@ -734,14 +733,14 @@ struct __wt_insert {
  * find the original key WT_CELL.
  */
 #define	WT_ROW_REF_AND_KEY_FOREACH(page, rref, key_cell, i)		\
-	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->XXdsk),		\
+	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
 	    (rref) = (page)->u.row_int.t, (i) = (page)->entries;	\
 	    (i) > 0;							\
 	    ++(rref),							\
 	    key_cell = --(i) == 0 ?					\
 	    NULL : WT_CELL_NEXT(WT_CELL_NEXT(key_cell)))
 #define	WT_ROW_AND_KEY_FOREACH(page, rip, key_cell, i)			\
-	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->XXdsk),		\
+	for ((key_cell) = WT_PAGE_DISK_BYTE((page)->dsk),		\
 	    (rip) = (page)->u.row_leaf.d, (i) = (page)->entries;	\
 	    (i) > 0;							\
 	    ++(rip),							\

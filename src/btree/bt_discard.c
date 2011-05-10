@@ -14,8 +14,8 @@ static void __wt_free_page_col_fix(SESSION *, WT_PAGE *);
 static void __wt_free_page_col_int(SESSION *, WT_PAGE *);
 static void __wt_free_page_col_rle(SESSION *, WT_PAGE *);
 static void __wt_free_page_col_var(SESSION *, WT_PAGE *);
-static void __wt_free_page_row_int(SESSION *, WT_PAGE *);
-static void __wt_free_page_row_leaf(SESSION *, WT_PAGE *);
+static void __wt_free_page_row_int(SESSION *, WT_PAGE *, uint32_t);
+static void __wt_free_page_row_leaf(SESSION *, WT_PAGE *, uint32_t);
 static void __wt_free_update(SESSION *, WT_UPDATE **, uint32_t);
 static void __wt_free_update_list(SESSION *, WT_UPDATE *);
 
@@ -24,15 +24,32 @@ static void __wt_free_update_list(SESSION *, WT_UPDATE *);
  *	Free all memory associated with a page.
  */
 void
-__wt_page_free(SESSION *session, WT_PAGE *page)
+__wt_page_free(
+    SESSION *session, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
-	    (session, "discard addr %lu (type %s)",
-	    (u_long)page->addr, __wt_page_type_string(page->type)));
+	    (session, "discard addr %lu/%lu (type %s)",
+	    (u_long)addr/size, __wt_page_type_string(page->type)));
 
-#ifdef DIAGNOSTIC
+#ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);
 #endif
+
+	/*
+	 * When a page is discarded, it's been disconnected from its parent
+	 * (both page and WT_REF structure), and the parent's WT_REF structure
+	 * may now reference a different page.   Make sure we don't use any of
+	 * that information.
+	 */
+	page->parent = NULL;
+	page->parent_ref = NULL;
+
+	/*
+	 * The address/size may not be set, and that's OK, but it means there
+	 * better not be any disk image associated with this page.
+	 */
+	WT_ASSERT(session,
+		(addr != WT_ADDR_INVALID && size != 0) || page->dsk == NULL);
 
 	/*
 	 * The page must either be clean, or an internal split page, which
@@ -47,7 +64,7 @@ __wt_page_free(SESSION *session, WT_PAGE *page)
 	 * have more space.
 	 */
 	if (F_ISSET(page, WT_PAGE_CACHE_COUNTED))
-		__wt_cache_page_out(session, page);
+		__wt_cache_page_out(session, page, size);
 
 	/* Bulk-loaded pages are skeleton pages, we don't need to do much. */
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
@@ -76,15 +93,15 @@ __wt_page_free(SESSION *session, WT_PAGE *page)
 			__wt_free_page_col_var(session, page);
 			break;
 		case WT_PAGE_ROW_INT:
-			__wt_free_page_row_int(session, page);
+			__wt_free_page_row_int(session, page, size);
 			break;
 		case WT_PAGE_ROW_LEAF:
-			__wt_free_page_row_leaf(session, page);
+			__wt_free_page_row_leaf(session, page, size);
 			break;
 		}
 
-	if (page->XXdsk != NULL)
-		__wt_free(session, page->XXdsk);
+	if (page->dsk != NULL)
+		__wt_free(session, page->dsk);
 	__wt_free(session, page);
 }
 
@@ -156,7 +173,7 @@ __wt_free_page_col_var(SESSION *session, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_INT page.
  */
 static void
-__wt_free_page_row_int(SESSION *session, WT_PAGE *page)
+__wt_free_page_row_int(SESSION *session, WT_PAGE *page, uint32_t size)
 {
 	WT_ROW_REF *rref;
 	uint32_t i;
@@ -166,7 +183,7 @@ __wt_free_page_row_int(SESSION *session, WT_PAGE *page)
 	 * if it points somewhere other than the original page), and free it.
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
-		if (__wt_ref_off_page(page, rref->key))
+		if (__wt_ref_off_page(page, rref->key, size))
 			__wt_free(session, rref->key);
 
 	/* Free the subtree-reference array. */
@@ -179,7 +196,7 @@ __wt_free_page_row_int(SESSION *session, WT_PAGE *page)
  *	Discard a WT_PAGE_ROW_LEAF page.
  */
 static void
-__wt_free_page_row_leaf(SESSION *session, WT_PAGE *page)
+__wt_free_page_row_leaf(SESSION *session, WT_PAGE *page, uint32_t size)
 {
 	WT_ROW *rip;
 	uint32_t i;
@@ -192,7 +209,7 @@ __wt_free_page_row_leaf(SESSION *session, WT_PAGE *page)
 	 * the memory.
 	 */
 	WT_ROW_FOREACH(page, rip, i)
-		if (__wt_ref_off_page(page, rip->key))
+		if (__wt_ref_off_page(page, rip->key, size))
 			__wt_free(session, rip->key);
 	__wt_free(session, page->u.row_leaf.d);
 

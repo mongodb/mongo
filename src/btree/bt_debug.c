@@ -262,15 +262,15 @@ __wt_debug_page_work(SESSION *session, WT_PAGE *page, FILE *fp, uint32_t flags)
 	btree = session->btree;
 
 	fprintf(fp, "%p: ", page);
-	if (page->addr == WT_ADDR_INVALID)
+	if (WT_PADDR(page) == WT_ADDR_INVALID)
 		fprintf(fp, "[not set]");
 	else
 		fprintf(fp, "[%lu-%lu]",
-		    (u_long)page->addr,
-		    (u_long)page->addr +
-		    (WT_OFF_TO_ADDR(btree, page->size) - 1));
+		    (u_long)WT_PADDR(page),
+		    (u_long)WT_PADDR(page) +
+		    (WT_OFF_TO_ADDR(btree, WT_PSIZE(page)) - 1));
 	fprintf(fp, "/%lu %s",
-	    (u_long)page->size, __wt_page_type_string(page->type));
+	    (u_long)WT_PSIZE(page), __wt_page_type_string(page->type));
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:

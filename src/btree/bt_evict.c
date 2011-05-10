@@ -770,33 +770,3 @@ __evict_lru_cmp(const void *a, const void *b)
 	b_lru = b_page->read_gen;
 	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
-
-#ifdef HAVE_DIAGNOSTIC
-/*
- * __evict_dump --
- *	Display the eviction list.
- */
-void
-__wt_evict_dump(SESSION *session)
-{
-	FILE *fp;
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	u_int n;
-	const char *sep;
-
-	cache = S2C(session)->cache;
-
-	if ((fp = fopen("xx.log", "w")) == NULL)
-		return;
-	for (sep = "\tdump:", n = 0; n < cache->evict_entries; ++n) {
-		evict = &cache->evict[n];
-		if (evict->page != NULL) {
-			fprintf(fp, "%s %lu", sep, (u_long)evict->page->addr);
-			sep = ",";
-		}
-	}
-	fprintf(fp, "\n");
-	(void)fclose(fp);
-}
-#endif

@@ -40,8 +40,8 @@ typedef struct {
 	struct __rec_discard {
 		WT_PAGE *page;		/* Inactive page */
 
-		uint32_t addr;		/* Block pair to delete */
-		uint32_t size;
+		uint32_t addr;		/* Page's addr/size, */
+		uint32_t size;		/*    or block pair to delete */
 	} *discard;			/* List of discard objects */
 	uint32_t discard_next;		/* Next discard slot */
 	uint32_t discard_entries;	/* Total discard slots */
@@ -226,7 +226,7 @@ static int  __hazard_qsort_cmp(const void *, const void *);
 #define	__rec_discard_add_block(session, addr, size)			\
 	__rec_discard_add(session, NULL, addr, size)
 #define	__rec_discard_add_page(session, page)				\
-	__rec_discard_add(session, page, 0, 0)
+	__rec_discard_add(session, page, WT_PADDR(page), WT_PSIZE(page))
 #define	__rec_discard_add_ovfl(session, ovfl)				\
 	__rec_discard_add(session, NULL,				\
 	    (ovfl)->addr, WT_DISK_REQUIRED(session, (ovfl)->size))
@@ -307,7 +307,8 @@ __wt_rec_destroy(SESSION *session)
 		for (spl = r->split, i = 0; i < r->split_entries; ++spl, ++i) {
 			__wt_buf_free(session, &spl->key);
 			if (spl->imp != NULL)
-				__wt_page_free(session, spl->imp);
+				__wt_page_free(
+				    session, spl->imp, WT_ADDR_INVALID, 0);
 		}
 		__wt_free(session, r->split);
 	}
@@ -383,7 +384,7 @@ __wt_page_reconcile(
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile %s page addr %lu (type %s)",
 	    WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean",
-	    (u_long)page->addr, __wt_page_type_string(page->type)));
+	    (u_long)WT_PADDR(page), __wt_page_type_string(page->type)));
 
 	/*
 	 * Handle pages marked for deletion or split.
@@ -430,8 +431,9 @@ __wt_page_reconcile(
 
 		WT_STAT_INCR(cache->stats, cache_evict_unmodified);
 
+		WT_RET(__rec_discard_add_page(session, page));
 		__rec_parent_update_clean(session, page);
-		__wt_page_free(session, page);
+		WT_RET(__rec_discard_evict(session));
 		return (0);
 	}
 
@@ -1240,8 +1242,7 @@ __rec_split_write(SESSION *session, WT_BUF *buf, void *end)
 	WT_RET(__wt_calloc(session, (size_t)size, sizeof(uint8_t), &dsk));
 	memcpy(dsk, buf->mem, size);
 
-	if ((ret =__wt_page_inmem(
-	    session, NULL, NULL, dsk, addr, size, &page)) != 0) {
+	if ((ret = __wt_page_inmem(session, NULL, NULL, dsk, &page)) != 0) {
 		__wt_free(session, dsk);
 		return (ret);
 	}
@@ -1838,7 +1839,7 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 	 * here, with no disk image.  This code is here to handle that specific
 	 * case.
 	 */
-	if (page->XXdsk == NULL) {
+	if (page->dsk == NULL) {
 		WT_RET(__rec_row_merge(session, page));
 		return (__rec_split_finish(session));
 	}
@@ -2336,7 +2337,7 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	if (r->split_next == 0) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: delete page %lu (%luB)",
-		    (u_long)page->addr, (u_long)page->size));
+		    (u_long)WT_PADDR(page), (u_long)WT_PSIZE(page)));
 		WT_STAT_INCR(btree->stats, page_delete);
 
 		/*
@@ -2401,8 +2402,11 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	if (r->split_next == 1) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: move %lu to %lu, (%luB to %luB)",
-		    (u_long)page->addr, r->split[0].off.addr,
-		    (u_long)page->size, r->split[0].off.size));
+		    (u_long)WT_PADDR(page), r->split[0].off.addr,
+		    (u_long)WT_PSIZE(page), r->split[0].off.size));
+
+		/* Queue the original page to be discarded, we're done. */
+		WT_RET(__rec_discard_add_page(session, page));
 
 		/*
 		 * Update the page's parent reference -- when we created it,
@@ -2426,10 +2430,8 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 		    imp, r->split[0].off.addr, r->split[0].off.size,
 		    r->evict ? WT_REF_DISK : WT_REF_MEM));
 
-		/* Discard the page from the cache -- it has been replaced. */
-		__wt_page_free(session, page);
+		/* We're done, discard everything we've queued for discard. */
 		WT_RET(__rec_discard_evict(session));
-
 		return (0);
 	}
 
@@ -2439,7 +2441,7 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	 */
 	WT_VERBOSE(S2C(session), WT_VERB_EVICT,
 	    (session, "reconcile: %lu (%luB) splitting",
-	    (u_long)page->addr, (u_long)page->size));
+	    (u_long)WT_PADDR(page), (u_long)WT_PSIZE(page)));
 
 	switch (page->type) {
 	case WT_PAGE_ROW_INT:
@@ -2465,12 +2467,14 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT(session);
 	}
 
+	/* Queue the original page to be discarded, we're done. */
+	WT_RET(__rec_discard_add_page(session, page));
+
 	/* Update the parent to reference the newly created internal page. */
 	WT_RET(__rec_parent_update(
 	    session, page, imp, WT_ADDR_INVALID, 0, WT_REF_MEM));
 
-	/* Discard the page from the cache -- it has been replaced. */
-	__wt_page_free(session, page);
+	/* We're done, discard everything we've queued for discard. */
 	WT_RET(__rec_discard_evict(session));
 
 	return (0);
@@ -2736,8 +2740,6 @@ __rec_row_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->parent = orig->parent;
 	page->parent_ref = orig->parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
 	page->entries = r->split_next;
 	page->type = WT_PAGE_ROW_INT;
 	WT_PAGE_SET_MODIFIED(page);
@@ -2836,8 +2838,6 @@ __rec_col_split(SESSION *session, WT_PAGE **splitp, WT_PAGE *orig)
 	page->parent_ref = orig->parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.col_int.recno = WT_RECNO(&r->split->off);
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
 	page->entries = r->split_next;
 	page->type = WT_PAGE_COL_INT;
 	WT_PAGE_SET_MODIFIED(page);
@@ -3070,7 +3070,8 @@ __rec_discard_evict(SESSION *session)
 			WT_RET(__wt_block_free(
 			    session, discard->addr, discard->size));
 		else
-			__wt_page_free(session, discard->page);
+			__wt_page_free(session,
+			    discard->page, discard->addr, discard->size);
 	return (0);
 }
 

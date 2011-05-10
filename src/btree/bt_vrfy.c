@@ -35,7 +35,7 @@ static int __wt_verify_overflow_page(SESSION *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_row_int_key_order(
 		SESSION *, WT_PAGE *, void *, WT_VSTUFF *);
 static int __wt_verify_row_leaf_key_order(SESSION *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_verify_tree(SESSION *, WT_PAGE *, uint64_t, WT_VSTUFF *);
+static int __wt_verify_tree(SESSION *, WT_REF *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_btree_verify --
@@ -105,8 +105,8 @@ __wt_verify(SESSION *session, FILE *stream)
 	cache->only_evict_clean = 1;
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(__wt_verify_tree(
-	    session, btree->root_page.page, (uint64_t)1, &vstuff));
+	WT_ERR(
+	    __wt_verify_tree(session, &btree->root_page, (uint64_t)1, &vstuff));
 
 	WT_ERR(__wt_verify_freelist(session, &vstuff));
 
@@ -136,19 +136,20 @@ err:	/* Wrap up reporting. */
 static int
 __wt_verify_tree(
 	SESSION *session,		/* Thread of control */
-	WT_PAGE *page,			/* Page to verify */
+	WT_REF *ref,			/* Page to verify */
 	uint64_t parent_recno,		/* First record in this subtree */
 	WT_VSTUFF *vs)			/* The verify package */
 {
 	WT_COL *cip;
 	WT_COL_REF *cref;
-	WT_REF *ref;
+	WT_PAGE *page;
 	WT_ROW_REF *rref;
 	uint64_t recno;
 	uint32_t i;
 	int ret;
 
 	ret = 0;
+	page = ref->page;
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -189,8 +190,8 @@ __wt_verify_tree(
 	 * known to be clean, assuming the upper-level is doing the open for
 	 * us.)
 	 */
-	WT_ASSERT(session, page->addr != WT_ADDR_INVALID);
-	WT_RET(__wt_verify_addfrag(session, page->addr, page->size, vs));
+	WT_ASSERT(session, ref->addr != WT_ADDR_INVALID);
+	WT_RET(__wt_verify_addfrag(session, ref->addr, ref->size, vs));
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
@@ -214,7 +215,7 @@ recno_chk:	if (parent_recno != recno) {
 			__wt_errx(session,
 			    "page at addr %lu has a starting record of %llu "
 			    "where the expected starting record was %llu",
-			    (u_long)page->addr,
+			    (u_long)WT_PADDR(page),
 			    (unsigned long long)recno,
 			    (unsigned long long)parent_recno);
 			return (WT_ERROR);
@@ -283,7 +284,7 @@ recno_chk:	if (parent_recno != recno) {
 				    "page at addr %lu has a starting record of "
 				    "%llu where the expected starting record "
 				    "was %llu",
-				    (u_long)page->addr,
+				    (u_long)WT_PADDR(page),
 				    (unsigned long long)cref->recno,
 				    (unsigned long long)vs->record_total + 1);
 				return (WT_ERROR);
@@ -292,8 +293,7 @@ recno_chk:	if (parent_recno != recno) {
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
 			WT_RET(__wt_page_in(session, page, ref, 1));
-			ret = __wt_verify_tree(
-			    session, ref->page, cref->recno, vs);
+			ret = __wt_verify_tree(session, ref, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
 				return (ret);
@@ -317,8 +317,7 @@ recno_chk:	if (parent_recno != recno) {
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
 			WT_RET(__wt_page_in(session, page, ref, 1));
-			ret = __wt_verify_tree(
-			    session, ref->page, (uint64_t)0, vs);
+			ret = __wt_verify_tree(session, ref, (uint64_t)0, vs);
 			__wt_hazard_clear(session, ref->page);
 			if (ret != 0)
 				return (ret);
@@ -365,12 +364,12 @@ __wt_verify_row_int_key_order(
 		    "the internal key in entry %lu on the page at addr %lu "
 		    "sorts before a key appearing on page %lu",
 		    (u_long)WT_ROW_REF_SLOT(page, rref),
-		    (u_long)page->addr, (u_long)vs->max_addr);
+		    (u_long)WT_PADDR(page), (u_long)vs->max_addr);
 		ret = WT_ERROR;
 		WT_ASSERT(session, ret == 0);
 	} else {
 		/* Update the largest key we've seen to the key just checked. */
-		vs->max_addr = page->addr;
+		vs->max_addr = WT_PADDR(page);
 
 		WT_RET(__wt_buf_set(session, vs->max_key,
 		    ((WT_ROW_REF *)rref)->key, ((WT_ROW_REF *)rref)->size));
@@ -428,7 +427,7 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 			__wt_errx(session,
 			    "the first key on the page at addr %lu sorts "
 			    "equal or less than a key appearing on page %lu",
-			    (u_long)page->addr, (u_long)vs->max_addr);
+			    (u_long)WT_PADDR(page), (u_long)vs->max_addr);
 			ret = WT_ERROR;
 			WT_ASSERT(session, ret == 0);
 		}
@@ -443,7 +442,7 @@ __wt_verify_row_leaf_key_order(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 * Update the largest key we've seen to the last key on this page; the
 	 * key may require processing.
 	 */
-	vs->max_addr = page->addr;
+	vs->max_addr = WT_PADDR(page);
 
 	key = page->u.row_leaf.d + (page->entries - 1);
 	if (__wt_key_process(key))
@@ -464,8 +463,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_PAGE_DISK *dsk;
 	uint32_t entry_num, i;
 
-	dsk = page->XXdsk;
-
+	dsk = page->dsk;
 	if (dsk == NULL) {
 		/*
 		 * XXX
@@ -491,7 +489,7 @@ __wt_verify_overflow_page(SESSION *session, WT_PAGE *page, WT_VSTUFF *vs)
 		case WT_CELL_DATA_OVFL:
 			WT_RET(__wt_verify_overflow(session,
 			    WT_CELL_BYTE_OVFL(cell),
-			    entry_num, page->addr, vs));
+			    entry_num, WT_PADDR(page), vs));
 		}
 	}
 	return (0);

@@ -924,8 +924,6 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	page->parent_ref = root_page;
 	page->read_gen = 0;
 	page->u.col_int.recno = 1;
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
 	WT_PAGE_SET_MODIFIED(page);
@@ -1095,8 +1093,6 @@ __slvg_build_leaf_col(SESSION *session,
 	 * THIS IS WRONG -- THE PARENT ADDR IS WHAT WE USE TO FREE BLOCKS
 	 * IN RECONCILIATION.
 	 */
-
-	page->addr = WT_ADDR_INVALID;
 	WT_PAGE_SET_MODIFIED(page);
 	ret = __wt_page_reconcile(session, page, 0, WT_REC_SYNC);
 
@@ -1108,7 +1104,7 @@ __slvg_build_leaf_col(SESSION *session,
 	page->entries = save_entries;
 
 	/* Discard the page and our hazard reference. */
-	__wt_page_free(session, page);
+	__wt_page_free(session, page, WT_ADDR_INVALID, 0);
 	__wt_hazard_clear(session, page);
 
 	return (ret);
@@ -1404,8 +1400,6 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	page->parent = NULL;				/* Root page */
 	page->parent_ref = root_page;
 	page->read_gen = 0;
-	page->addr = WT_ADDR_INVALID;
-	page->size = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
 	WT_PAGE_SET_MODIFIED(page);
@@ -1594,7 +1588,6 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 			 * not free the underlying blocks, and set a flag so we
 			 * eventually free the blocks.
 			 */
-			page->addr = WT_ADDR_INVALID;
 			WT_PAGE_SET_MODIFIED(page);
 	/*
 	 * THIS IS WRONG -- THE PARENT ADDR IS WHAT WE USE TO FREE BLOCKS
@@ -1619,7 +1612,7 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	}
 
 	/* Discard the page and our hazard reference. */
-	__wt_page_free(session, page);
+	__wt_page_free(session, page, WT_ADDR_INVALID, 0);
 	__wt_hazard_clear(session, page);
 
 err:	__wt_scr_release(&key);
