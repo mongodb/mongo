@@ -85,6 +85,8 @@ __wt_bulk_insert(CURSOR_BULK *cbulk)
 	 * internal page is created which is also passed to reconciliation.
 	 */
 	switch (cbulk->page_type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		WT_RET(__wt_bulk_col(cbulk));
 		break;
@@ -190,6 +192,8 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	/* If the page has entries, reconcile and discard it. */
 	if (cbulk->ins_cnt != 0)
 		switch (cbulk->page_type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 			WT_RET(__wt_bulk_col_page(cbulk));
 			break;
@@ -208,6 +212,8 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	WT_PAGE_SET_MODIFIED(page);
 
 	switch (cbulk->page_type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		page->entries = cbulk->ref_next;
 		page->u.col_int.recno = 1;
