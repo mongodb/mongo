@@ -19,7 +19,7 @@ __cursor_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, get_key);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -43,7 +43,7 @@ __cursor_get_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, get_value);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
@@ -70,7 +70,7 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, set_key);
+	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
@@ -120,7 +120,7 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, set_value);
+	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
@@ -175,7 +175,7 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, config);
+	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config);
 	ret = 0;
 
 	__wt_buf_free(session, &cursor->key);

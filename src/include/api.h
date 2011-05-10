@@ -340,15 +340,13 @@ struct __connection {
 	s = &conn->default_session;					\
 	API_CALL(s, connection, n, NULL, NULL, cfg);			\
 
-#define	CURSOR_API_CALL(cur, s, n)					\
+#define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (SESSION *)(cur)->session;				\
-	API_CALL_NOCONF(s, cursor, n, (cur),				\
-	    ((CURSOR_BTREE *)(cur))->btree);				\
+	API_CALL_NOCONF(s, cursor, n, (cur), bt);			\
 
-#define	CURSOR_API_CALL_CONF(cur, s, n, cfg)				\
+#define	CURSOR_API_CALL_CONF(cur, s, n, bt, cfg)			\
 	(s) = (SESSION *)(cur)->session;				\
-	API_CALL(s, cursor, n, cur,					\
-	    ((CURSOR_BTREE *)cursor)->btree, cfg);			\
+	API_CALL(s, cursor, n, cur, bt, cfg);				\
 
 /*******************************************
  * Prototypes.

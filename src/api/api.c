@@ -71,7 +71,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 	if (strncmp(uri, "stat:", 5) == 0)
 		return (__wt_curstat_open(session, uri, config, cursorp));
 	if (strncmp(uri, "table:", 6) == 0)
-		return (__wt_cursor_open(session, uri, config, cursorp));
+		return (__wt_curbtree_open(session, uri, config, cursorp));
 
 	__wt_errx(session, "Unknown cursor type '%s'", uri);
 

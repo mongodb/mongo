@@ -56,7 +56,7 @@ int __wt_session_add_btree(SESSION *session,
     BTREE *btree,
     const char *key_format,
     const char *value_format);
-int __wt_cursor_open(SESSION *session,
+int __wt_curbtree_open(SESSION *session,
     const char *uri,
     const char *config,
     WT_CURSOR **cursorp);

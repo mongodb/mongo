@@ -17,7 +17,7 @@ __curstat_first(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, first);
+	CURSOR_API_CALL(cursor, session, first, NULL);
 	ret = WT_NOTFOUND;
 	API_END();
 
@@ -34,7 +34,7 @@ __curstat_last(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, last);
+	CURSOR_API_CALL(cursor, session, last, NULL);
 	ret = ENOTSUP;
 	API_END();
 
@@ -51,7 +51,7 @@ __curstat_next(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, next);
+	CURSOR_API_CALL(cursor, session, next, NULL);
 	ret = WT_NOTFOUND;
 	API_END();
 
@@ -68,7 +68,7 @@ __curstat_prev(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, prev);
+	CURSOR_API_CALL(cursor, session, prev, NULL);
 	ret = ENOTSUP;
 	API_END();
 
@@ -87,7 +87,7 @@ __curstat_search_near(WT_CURSOR *cursor, int *lastcmp)
 
 	WT_UNUSED(lastcmp);
 
-	CURSOR_API_CALL(cursor, session, search_near);
+	CURSOR_API_CALL(cursor, session, search_near, NULL);
 	ret = ENOTSUP;
 	API_END();
 
@@ -104,7 +104,7 @@ __curstat_insert(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, insert);
+	CURSOR_API_CALL(cursor, session, insert, NULL);
 	ret = ENOTSUP;
 	API_END();
 
@@ -121,7 +121,7 @@ __curstat_update(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, update);
+	CURSOR_API_CALL(cursor, session, update, NULL);
 	ret = ENOTSUP;
 	API_END();
 
@@ -138,7 +138,7 @@ __curstat_remove(WT_CURSOR *cursor)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, insert);
+	CURSOR_API_CALL(cursor, session, insert, NULL);
 	ret = ENOTSUP;
 	API_END();
 
@@ -155,7 +155,7 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, close);
+	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config);
 	ret = 0;
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END();

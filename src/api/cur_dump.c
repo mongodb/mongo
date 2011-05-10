@@ -46,7 +46,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	WT_ITEM *key;
 	va_list ap;
 
-	CURSOR_API_CALL(cursor, session, get_key);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
@@ -77,7 +77,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	WT_ITEM *value;
 	va_list ap;
 
-	CURSOR_API_CALL(cursor, session, get_value);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))
 		return ((cursor->saved_err != 0) ? cursor->saved_err : EINVAL);
@@ -107,7 +107,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, set_key);
+	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	va_start(ap, cursor);
 	*(WT_ITEM *)&cursor->key = *va_arg(ap, WT_ITEM *);
@@ -134,7 +134,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, set_value);
+	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	*(WT_ITEM *)&cursor->value = *va_arg(ap, WT_ITEM *);

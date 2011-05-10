@@ -18,9 +18,9 @@ __curbulk_insert(WT_CURSOR *cursor)
 	CURSOR_BULK *cbulk;
 	SESSION *session;
 
-	CURSOR_API_CALL(cursor, session, insert);
 	cbulk = (CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
+	CURSOR_API_CALL(cursor, session, insert, btree);
 
 	/* TODO: check the state of the key/value pair. */
 #if 0
@@ -54,12 +54,14 @@ __curbulk_insert(WT_CURSOR *cursor)
 static int
 __curbulk_close(WT_CURSOR *cursor, const char *config)
 {
+	BTREE *btree;
 	CURSOR_BULK *cbulk;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, config);
 	cbulk = (CURSOR_BULK *)cursor;
+	btree = cbulk->cbt.btree;
+	CURSOR_API_CALL_CONF(cursor, session, close, btree, config);
 	ret = 0;
 
 	WT_TRET(__wt_bulk_end(cbulk));

@@ -14,11 +14,13 @@
 static int
 __curbtree_first(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, first);
-	ret = __wt_btcur_first((CURSOR_BTREE *)cursor);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, first, cbt->btree);
+	ret = __wt_btcur_first(cbt);
 	API_END();
 
 	return (ret);
@@ -31,9 +33,11 @@ __curbtree_first(WT_CURSOR *cursor)
 static int
 __curbtree_last(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 
-	CURSOR_API_CALL(cursor, session, last);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, last, cbt->btree);
 	API_END();
 
 	return (ENOTSUP);
@@ -46,10 +50,12 @@ __curbtree_last(WT_CURSOR *cursor)
 static int
 __curbtree_next(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, next);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next((CURSOR_BTREE *)cursor);
 	API_END();
 
@@ -63,9 +69,11 @@ __curbtree_next(WT_CURSOR *cursor)
 static int
 __curbtree_prev(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 
-	CURSOR_API_CALL(cursor, session, prev);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 	API_END();
 
 	return (ENOTSUP);
@@ -78,10 +86,12 @@ __curbtree_prev(WT_CURSOR *cursor)
 static int
 __curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, search_near);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 	ret = __wt_btcur_search_near((CURSOR_BTREE *)cursor, lastcmp);
 	API_END();
 
@@ -95,10 +105,12 @@ __curbtree_search_near(WT_CURSOR *cursor, int *lastcmp)
 static int
 __curbtree_insert(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, insert);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, insert, cbt->btree);
 	ret = __wt_btcur_insert((CURSOR_BTREE *)cursor);
 	API_END();
 
@@ -112,10 +124,12 @@ __curbtree_insert(WT_CURSOR *cursor)
 static int
 __curbtree_update(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, update);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, update, cbt->btree);
 	ret = __wt_btcur_update((CURSOR_BTREE *)cursor);
 	API_END();
 
@@ -129,10 +143,12 @@ __curbtree_update(WT_CURSOR *cursor)
 static int
 __curbtree_remove(WT_CURSOR *cursor)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, insert);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, insert, cbt->btree);
 	ret = __wt_btcur_remove((CURSOR_BTREE *)cursor);
 	API_END();
 
@@ -146,10 +162,12 @@ __curbtree_remove(WT_CURSOR *cursor)
 static int
 __curbtree_close(WT_CURSOR *cursor, const char *config)
 {
+	CURSOR_BTREE *cbt;
 	SESSION *session;
 	int ret;
 
-	CURSOR_API_CALL(cursor, session, close);
+	cbt = (CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config);
 	ret = 0;
 	WT_TRET(__wt_btcur_close((CURSOR_BTREE *)cursor, config));
 	WT_TRET(__wt_cursor_close(cursor, config));
@@ -207,7 +225,7 @@ __get_btree(SESSION *session,
  *	WT_SESSION->open_cursor method for the btree cursor type.
  */
 int
-__wt_cursor_open(SESSION *session,
+__wt_curbtree_open(SESSION *session,
     const char *uri, const char *config, WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
