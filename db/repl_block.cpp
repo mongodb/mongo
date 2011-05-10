@@ -203,6 +203,12 @@ namespace mongo {
             return;
 
         slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
+        
+        if (theReplSet) {
+            // we don't know the slave's port, so we make the replica set keep
+            // a map of rids to slaves
+            theReplSet->percolate(rid, lastOp);
+        }
     }
 
     bool opReplicatedEnough( OpTime op , int w ) {
