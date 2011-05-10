@@ -526,7 +526,7 @@ namespace mongo {
 
             // js function to run reduce on all keys
 //            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
-            _reduceAll = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); _mrMap[key] = [ret];");
+//            _reduceAll = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); _mrMap[key] = [ret];");
             _reduceAndFinalize = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); if (typeof(_finalize) !== 'undefined') ret = _finalize(ret); _insertToTemp({_id: key, value: ret}) };");
 
             if ( _onDisk ) {
@@ -554,8 +554,8 @@ namespace mongo {
         void State::switchMode(bool jsMode) {
             _jsMode = jsMode;
             if (jsMode) {
-//                // emit function that stays in JS
-//                _scope->setFunction("emit", "function(key, value) { list = _mrMap[key]; if (!list) { list = []; _mrMap[key] = list; } list.push(value); }");
+                // emit function that stays in JS
+                _scope->setFunction("emit", "function(key, value) { list = _mrMap[key]; if (!list) { list = []; _mrMap[key] = list; } list.push(value); }");
             } else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );

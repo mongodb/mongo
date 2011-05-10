@@ -113,33 +113,35 @@ namespace mongo {
 
         void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
                                const string sname , v8::Handle<v8::Value> value , int depth = 0 );
-        v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f );
+        v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool readOnly = false );
         virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
         v8::Function * getNamedCons( const char * name );
         v8::Function * getObjectIdCons();
         Local< v8::Value > newId( const OID &id );
 
-        v8::Persistent<v8::String> getV8Str(string str);
+        v8::Handle<v8::String> getV8Str(string str);
+//        inline v8::Handle<v8::String> getV8Str(string str) { return v8::String::New(str.c_str()); }
+        inline v8::Handle<v8::String> getLocalV8Str(string str) { return v8::String::New(str.c_str()); }
 
-        Persistent<v8::String> V8STR_CONN;
-        Persistent<v8::String> V8STR_ID;
-        Persistent<v8::String> V8STR_LENGTH;
-        Persistent<v8::String> V8STR_ISOBJECTID;
-        Persistent<v8::String> V8STR_NATIVE_FUNC;
-        Persistent<v8::String> V8STR_NATIVE_DATA;
-        Persistent<v8::String> V8STR_V8_FUNC;
-        Persistent<v8::String> V8STR_RETURN;
-        Persistent<v8::String> V8STR_ARGS;
-        Persistent<v8::String> V8STR_T;
-        Persistent<v8::String> V8STR_I;
-        Persistent<v8::String> V8STR_EMPTY;
-        Persistent<v8::String> V8STR_MINKEY;
-        Persistent<v8::String> V8STR_MAXKEY;
-        Persistent<v8::String> V8STR_NUMBERLONG;
-        Persistent<v8::String> V8STR_DBPTR;
-        Persistent<v8::String> V8STR_BINDATA;
-        Persistent<v8::String> V8STR_WRAPPER;
+        Handle<v8::String> V8STR_CONN;
+        Handle<v8::String> V8STR_ID;
+        Handle<v8::String> V8STR_LENGTH;
+        Handle<v8::String> V8STR_ISOBJECTID;
+        Handle<v8::String> V8STR_NATIVE_FUNC;
+        Handle<v8::String> V8STR_NATIVE_DATA;
+        Handle<v8::String> V8STR_V8_FUNC;
+        Handle<v8::String> V8STR_RETURN;
+        Handle<v8::String> V8STR_ARGS;
+        Handle<v8::String> V8STR_T;
+        Handle<v8::String> V8STR_I;
+        Handle<v8::String> V8STR_EMPTY;
+        Handle<v8::String> V8STR_MINKEY;
+        Handle<v8::String> V8STR_MAXKEY;
+        Handle<v8::String> V8STR_NUMBERLONG;
+        Handle<v8::String> V8STR_DBPTR;
+        Handle<v8::String> V8STR_BINDATA;
+        Handle<v8::String> V8STR_WRAPPER;
 
     private:
         void _startCall();
@@ -169,7 +171,9 @@ namespace mongo {
         std::map <string, v8::Persistent <v8::String> > _strCache;
 
         Persistent<v8::ObjectTemplate> lzObjectTemplate;
+        Persistent<v8::ObjectTemplate> roObjectTemplate;
         Persistent<v8::ObjectTemplate> lzArrayTemplate;
+        Persistent<v8::ObjectTemplate> internalFieldObjects;
     };
 
     class V8ScriptEngine : public ScriptEngine {
@@ -194,6 +198,23 @@ namespace mongo {
 
     private:
         friend class V8Scope;
+    };
+
+    class ExternalString : public v8::String::ExternalAsciiStringResource {
+    public:
+        ExternalString(std::string str) : _data(str) {
+        }
+
+        ~ExternalString() {
+        }
+
+        const char* data () const { return _data.c_str(); }
+        size_t length () const { return _data.length(); }
+    private:
+//      string _str;
+//        const char* _data;
+        std::string _data;
+//        size_t _len;
     };
 
     extern ScriptEngine * globalScriptEngine;
