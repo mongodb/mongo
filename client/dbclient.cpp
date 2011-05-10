@@ -944,7 +944,7 @@ namespace mongo {
     }
 
     void DBClientConnection::killCursor( long long cursorId ) {
-        BufBuilder b;
+        StackBufBuilder b;
         b.appendNum( (int)0 ); // reserved
         b.appendNum( (int)1 ); // number
         b.appendNum( cursorId );
