@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    mutex DiagStr::m("diags");
+
     mongo::mutex _atomicMutex("_atomicMutex");
 
     // intentional leak. otherwise destructor orders can be problematic at termination.
