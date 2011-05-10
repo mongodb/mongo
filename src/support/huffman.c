@@ -344,7 +344,7 @@ __wt_huffman_open(SESSION *session,
 	WT_ERR(__wt_calloc(session,
 	    1U << huffman->max_depth, sizeof(uint16_t), &huffman->c2e));
 	make_table(huffman->c2e, huffman->max_depth, huffman->entries, nbytes);
-#if 1
+#if 0
 	printf("max depth = %d, memory use: entries %d * %u + c2e %d * %u\n",
 	    huffman->max_depth, nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY),
 	    (1U << huffman->max_depth), sizeof(uint16_t));
