@@ -321,7 +321,7 @@ namespace mongo {
     }
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
-    string ReplSetImpl::startupStatusMsg;
+    DiagStr ReplSetImpl::startupStatusMsg;
 
     extern BSONObj *getLastErrorDefault;
 
