@@ -301,7 +301,11 @@ void __wt_msgv(SESSION *session,
     const char *prefix2,
     const char *fmt,
     va_list ap);
-void __wt_msg(SESSION *session, const char *fmt, ...);
+void __wt_msg(SESSION *session,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    2,
+    3)));
 void __wt_assert( SESSION *session,
     const char *check,
     const char *file_name,
@@ -331,8 +335,17 @@ void __wt_errv(SESSION *session,
     const char *prefix2,
     const char *fmt,
     va_list ap);
-void __wt_err(SESSION *session, int error, const char *fmt, ...);
-void __wt_errx(SESSION *session, const char *fmt, ...);
+void __wt_err(SESSION *session,
+    int error,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    3,
+    4)));
+void __wt_errx(SESSION *session,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    2,
+    3)));
 int
 __wt_hazard_set(SESSION *session, WT_REF *ref
 #ifdef HAVE_DIAGNOSTIC

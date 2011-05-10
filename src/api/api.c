@@ -125,7 +125,7 @@ __session_create(WT_SESSION *wt_session,
 		key_format = "u";
 	else {
 		__wt_errx(session, "Unknown key_format '%.*s'",
-		    cval.len, cval.str);
+		    (int)cval.len, cval.str);
 		return (EINVAL);
 	}
 
@@ -139,7 +139,7 @@ __session_create(WT_SESSION *wt_session,
 		value_format = "u";
 	} else {
 		__wt_errx(session, "Unknown value_format '%.*s'",
-		    cval.len, cval.str);
+		    (int)cval.len, cval.str);
 		return (EINVAL);
 	}
 

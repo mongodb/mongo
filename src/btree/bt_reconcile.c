@@ -2402,8 +2402,8 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	if (r->split_next == 1) {
 		WT_VERBOSE(S2C(session), WT_VERB_EVICT, (session,
 		    "reconcile: move %lu to %lu, (%luB to %luB)",
-		    (u_long)WT_PADDR(page), r->split[0].off.addr,
-		    (u_long)WT_PSIZE(page), r->split[0].off.size));
+		    (u_long)WT_PADDR(page), (u_long)r->split[0].off.addr,
+		    (u_long)WT_PSIZE(page), (u_long)r->split[0].off.size));
 
 		/* Queue the original page to be discarded, we're done. */
 		WT_RET(__rec_discard_add_page(session, page));

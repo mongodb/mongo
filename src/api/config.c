@@ -597,7 +597,7 @@ __wt_config_checklist(SESSION *session,
 			if (ret == WT_NOTFOUND) {
 				__wt_errx(session,
 				    "Unknown configuration key found: '%.*s'\n",
-				    k.len, k.str);
+				    (int)k.len, k.str);
 				ret = EINVAL;
 			}
 			return (ret);

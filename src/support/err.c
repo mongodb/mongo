@@ -47,6 +47,7 @@ __wt_msgv(SESSION *session, const char *prefix1, const char *prefix2,
  */
 void
 __wt_msg(SESSION *session, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
 	va_list ap;
 
@@ -266,6 +267,7 @@ __wt_errv(SESSION *session, int error,
  */
 void
 __wt_err(SESSION *session, int error, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
 {
 	va_list ap;
 
@@ -283,6 +285,7 @@ __wt_err(SESSION *session, int error, const char *fmt, ...)
  */
 void
 __wt_errx(SESSION *session, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
 {
 	va_list ap;
 
