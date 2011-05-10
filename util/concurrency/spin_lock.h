@@ -49,6 +49,16 @@ namespace mongo {
         SpinLock(SpinLock&);
         SpinLock& operator=(SpinLock&);
     };
+    
+    struct scoped_spinlock {
+        scoped_spinlock( SpinLock& l ) : _l(l){
+            _l.lock();
+        }
+        ~scoped_spinlock() {
+            _l.unlock();
+        }
+        SpinLock& _l;
+    };
 
 }  // namespace mongo
 
