@@ -70,8 +70,6 @@ namespace {
     public:
         void run() {
 
-#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(_WIN32)
-
             SpinLock spin;
             int counter = 0;
 
@@ -92,14 +90,8 @@ namespace {
             }
 
             ASSERT_EQUALS( counter, threads*incs );
-#else
-            warning() << "spin lock slow on this platform" << endl;
-            
 #if defined(__linux__)
-            // we don't want to have linux binaries without a fast spinlock
-            //ASSERT( false ); TODO SERVER-3075
-#endif
-
+            ASSERT( SpinLock::isfast() );
 #endif
 
         }
