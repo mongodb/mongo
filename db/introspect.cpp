@@ -31,7 +31,12 @@ namespace mongo {
 
     void profile( const Client& c , CurOp& currentOp ) {
         assertInWriteLock();
+
+        Database *db = c.database();
+        DEV assert( db );
+        const char *ns = db->profileName.c_str();
         
+        // build object
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
@@ -39,13 +44,12 @@ namespace mongo {
 
         b.append("client", c.clientAddress() );
 
+        if ( c.getAuthenticationInfo() )
+            b.append( "user" , c.getAuthenticationInfo()->getUser( nsToDatabase( ns ) ) );
+
         BSONObj p = b.done();
 
         // write: not replicated
-        Database *db = c.database();
-        DEV assert( db );
-
-        const char *ns = db->profileName.c_str();
         NamespaceDetails *d = db->namespaceIndex.details(ns);
         if( d ) {
             int len = p.objsize();

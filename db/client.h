@@ -74,6 +74,7 @@ namespace mongo {
         }
         bool isSyncThread() const { return this == syncThread; } // true if this client is the replication secondary pull thread
         string clientAddress(bool includePort=false) const;
+        const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }
         AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
         CurOp* curop() const { return _curOp; }
