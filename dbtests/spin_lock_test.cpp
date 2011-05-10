@@ -97,7 +97,7 @@ namespace {
             
 #if defined(__linux__)
             // we don't want to have linux binaries without a fast spinlock
-            ASSERT( false );
+            //ASSERT( false ); TODO SERVER-3075
 #endif
 
 #endif
