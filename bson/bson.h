@@ -42,6 +42,7 @@
    */
 #endif
 
+#include <cstdlib>
 #include <memory>
 #include <iostream>
 #include <sstream>
