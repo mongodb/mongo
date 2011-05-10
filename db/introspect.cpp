@@ -43,6 +43,8 @@ namespace mongo {
 
         // write: not replicated
         Database *db = c.database();
+        DEV assert( db );
+
         const char *ns = db->profileName.c_str();
         NamespaceDetails *d = db->namespaceIndex.details(ns);
         if( d ) {
