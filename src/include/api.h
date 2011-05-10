@@ -13,6 +13,7 @@ typedef struct {
 	WT_PAGE *page;
 	WT_COL *cip;
 	WT_ROW *rip;
+	WT_INSERT *ins;                 /* For walking through RLE pages. */
 	wiredtiger_recno_t recno;
 	uint32_t nitems;
 	uint32_t nrepeats;

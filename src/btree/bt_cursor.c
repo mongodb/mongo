@@ -25,6 +25,239 @@ __wt_btcur_first(CURSOR_BTREE *cbt)
 	return (__wt_btcur_next(cbt));
 }
 
+static inline int
+__btcur_next_fix(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+{
+	WT_CELL *cell;
+	WT_UPDATE *upd;
+	int found;
+
+	/* New page? */
+	if (cbt->nitems == 0) {
+		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->recno = cbt->page->u.col_leaf.recno;
+	}
+
+	/*
+	 * This slightly odd-looking loop lets us have one place that does the
+	 * incrementing to move through a page.
+	 */
+	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
+		if (cbt->nitems == 0)
+			return (WT_NOTFOUND);
+
+		*recnop = cbt->recno;
+		cell = WT_COL_PTR(cbt->page, cbt->cip);
+		if ((upd = WT_COL_UPDATE(cbt->page, cbt->cip)) == NULL) {
+			if (!WT_FIX_DELETE_ISSET(cell)) {
+				value->data = cell;
+				value->size = cbt->btree->fixed_len;
+				found = 1;
+			}
+		} else if (!WT_UPDATE_DELETED_ISSET(upd)) {
+			value->data = WT_UPDATE_DATA(upd);
+			value->size = cbt->btree->fixed_len;
+			found = 1;
+		}
+	}
+
+	return (0);
+}
+
+static inline int
+__btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+{
+	WT_CELL *cell;
+	WT_UPDATE *upd;
+	int found;
+
+	/* New page? */
+	if (cbt->nitems == 0) {
+		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->recno = cbt->page->u.col_leaf.recno;
+
+		cell = WT_COL_PTR(cbt->page, cbt->cip);
+		cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
+		cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
+	}
+
+	for (;;) {
+		for (found = 0;
+		    !found && cbt->nrepeats > 0;
+		    ++cbt->recno, --cbt->nrepeats) {
+			*recnop = cbt->recno;
+			if (cbt->ins != NULL &&
+			    WT_INSERT_RECNO(cbt->ins) == *recnop) {
+				upd = cbt->ins->upd;
+				if (!WT_UPDATE_DELETED_ISSET(upd)) {
+					value->data = WT_UPDATE_DATA(upd);
+					value->size = upd->size;
+					found = 1;
+				}
+				cbt->ins = cbt->ins->next;
+			} else if (!WT_FIX_DELETE_ISSET(
+			    WT_RLE_REPEAT_DATA(cell))) {
+				value->data = WT_RLE_REPEAT_DATA(cell);
+				value->size = cbt->btree->fixed_len;
+				found = 1;
+			}
+		}
+
+		if (found)
+			return (0);
+		else if (--cbt->nitems == 0)
+			return (WT_NOTFOUND);
+
+		++cbt->cip;
+		cell = WT_COL_PTR(cbt->page, cbt->cip);
+		cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
+		cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
+	}
+
+	return (WT_NOTFOUND);
+}
+
+static inline int
+__btcur_next_var(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
+{
+	SESSION *session;
+	WT_CELL *cell;
+	WT_UPDATE *upd;
+	int found;
+
+	session = (SESSION *)cbt->iface.session;
+
+	/* New page? */
+	if (cbt->nitems == 0) {
+		cbt->cip = cbt->page->u.col_leaf.d;
+		cbt->nitems = cbt->page->entries;
+		cbt->recno = cbt->page->u.col_leaf.recno;
+	}
+
+	/*
+	 * This slightly odd-looking loop lets us have one place that does the
+	 * incrementing to move through a page.
+	 */
+	for (found = 0; !found; ++cbt->cip, ++cbt->recno, --cbt->nitems) {
+		if (cbt->nitems == 0)
+			return (WT_NOTFOUND);
+
+		/* Check for deletion. */
+		upd = WT_COL_UPDATE(cbt->page, cbt->cip);
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+			continue;
+
+		/* We've got a record. */
+		found = 1;
+		*recnop = cbt->recno;
+
+		/*
+		 * If the item was ever modified, use the data from the
+		 * WT_UPDATE entry. Then check for empty data.  Finally, use
+		 * the value from the disk image.
+		 */
+		if (upd != NULL) {
+			value->data = WT_UPDATE_DATA(upd);
+			value->size = upd->size;
+		} else {
+			cell = WT_COL_PTR(cbt->page, cbt->cip);
+			switch (WT_CELL_TYPE(cell)) {
+			case WT_CELL_DATA:
+				if (cbt->btree->huffman_value == NULL) {
+					value->data = WT_CELL_BYTE(cell);
+					value->size = WT_CELL_LEN(cell);
+					break;
+				}
+				/* FALLTHROUGH */
+			case WT_CELL_DATA_OVFL:
+				WT_RET(__wt_cell_process(session, cell, value));
+				break;
+			case WT_CELL_DEL:
+				found = 0;
+				break;
+			WT_ILLEGAL_FORMAT(session);
+			}
+		}
+	}
+
+	return (0);
+}
+
+static inline int
+__btcur_next_row(CURSOR_BTREE *cbt, WT_BUF *key, WT_BUF *value)
+{
+	SESSION *session;
+	WT_CELL *cell;
+	WT_UPDATE *upd;
+	int found;
+
+	session = (SESSION *)cbt->iface.session;
+
+	/* New page? */
+	if (cbt->nitems == 0) {
+		cbt->rip = cbt->page->u.row_leaf.d;
+		cbt->nitems = cbt->page->entries;
+	}
+
+	/*
+	 * This slightly odd-looking loop lets us have one place that does the
+	 * incrementing to move through a page.
+	 */
+	for (found = 0; !found; ++cbt->rip, --cbt->nitems) {
+		if (cbt->nitems == 0)
+			return (WT_NOTFOUND);
+
+		/* Check for deletion. */
+		upd = WT_ROW_UPDATE(cbt->page, cbt->rip);
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+			continue;
+
+		/* We've got a record. */
+		found = 1;
+
+		/* Set the key. */
+		if (__wt_key_process(cbt->rip))
+			WT_RET(__wt_key_build(session,
+			    cbt->page, cbt->rip, key));
+		else {
+			key->data = cbt->rip->key;
+			key->size = cbt->rip->size;
+		}
+
+		/*
+		 * If the item was ever modified, use the data from the
+		 * WT_UPDATE entry. Then check for empty data.  Finally, use
+		 * the value from the disk image.
+		 */
+		if (upd != NULL) {
+			value->data = WT_UPDATE_DATA(upd);
+			value->size = upd->size;
+		} else if (WT_ROW_EMPTY_ISSET(cbt->rip)) {
+			value->data = "";
+			value->size = 0;
+		} else {
+			cell = WT_ROW_PTR(cbt->page, cbt->rip);
+			switch (WT_CELL_TYPE(cell)) {
+			case WT_CELL_DATA:
+				if (cbt->btree->huffman_value == NULL) {
+					value->data = WT_CELL_BYTE(cell);
+					value->size = WT_CELL_LEN(cell);
+					break;
+				}
+				/* FALLTHROUGH */
+			case WT_CELL_DATA_OVFL:
+				WT_RET(__wt_cell_process(session, cell, value));
+				break;
+			WT_ILLEGAL_FORMAT(session);
+			}
+		}
+	}
+
+	return (0);
+}
+
 /*
  * __wt_btcur_next --
  *	Move to the next record in the tree.
@@ -32,149 +265,53 @@ __wt_btcur_first(CURSOR_BTREE *cbt)
 int
 __wt_btcur_next(CURSOR_BTREE *cbt)
 {
-	BTREE *btree;
 	SESSION *session;
-	WT_CELL *cell;
 	WT_CURSOR *cursor;
-	WT_UPDATE *upd;
-	void *huffman;
+	int ret;
 
-	btree = cbt->btree;
 	cursor = &cbt->iface;
-	huffman = btree->huffman_value;
 	session = (SESSION *)cbt->iface.session;
-	upd = NULL;
 
 	if (cbt->walk.tree == NULL)
 		return (__wt_btcur_first(cbt));
 
-	for (;;) {
-		while (cbt->nitems == 0) {
+	for (ret = WT_NOTFOUND; ret == WT_NOTFOUND;) {
+		if (cbt->nitems == 0) {
 			WT_RET(__wt_walk_next(session, &cbt->walk, &cbt->page));
 			if (cbt->page == NULL) {
-				F_CLR(cursor, WT_CURSTD_POSITIONED);
-				return (WT_NOTFOUND);
-			}
-			switch (cbt->page->type) {
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_RLE:
-			case WT_PAGE_COL_VAR:
-				cbt->cip = cbt->page->u.col_leaf.d;
-				cbt->recno = cbt->page->u.col_leaf.recno;
+				ret = WT_NOTFOUND;
 				break;
-			case WT_PAGE_ROW_LEAF:
-				cbt->rip = cbt->page->u.row_leaf.d;
-				break;
-			default:
-				continue;
 			}
-
-			cbt->nitems = cbt->page->entries;
 		}
 
-		for (; cbt->nitems > 0;
-		    ++cbt->cip, ++cbt->rip, ++cbt->recno, cbt->nitems--) {
-			/* Check for deletion. */
-			switch (cbt->page->type) {
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_VAR:
-				upd = WT_COL_UPDATE(cbt->page, cbt->cip);
-				break;
-			case WT_PAGE_ROW_LEAF:
-				upd = WT_ROW_UPDATE(cbt->page, cbt->rip);
-				break;
-			}
-
-			if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
-				continue;
-
-			/*
-			 * The key and value variables reference the items we'll
-			 * print.  Set the key.
-			 */
-			if (!F_ISSET(btree, WT_COLUMN)) {
-				if (__wt_key_process(cbt->rip))
-					WT_RET(__wt_key_build(session,
-					    cbt->page, cbt->rip, &cursor->key));
-				else {
-					cursor->key.data = cbt->rip->key;
-					cursor->key.size = cbt->rip->size;
-				}
-			}
-
-			/*
-			 * If the item was ever modified, dump the data from
-			 * the WT_UPDATE entry.
-			 */
-			if (upd != NULL) {
-				cursor->value.data = WT_UPDATE_DATA(upd);
-				cursor->value.size = upd->size;
-				break;
-			}
-
-			/* Check for empty data. */
-			if (F_ISSET(btree, WT_COLUMN)) {
-				cell = WT_COL_PTR(cbt->page, cbt->cip);
-				switch (WT_CELL_TYPE(cell)) {
-				case WT_CELL_DATA:
-					if (huffman == NULL) {
-						cursor->value.data =
-						    WT_CELL_BYTE(cell);
-						cursor->value.size =
-						    WT_CELL_LEN(cell);
-						break;
-					}
-					/* FALLTHROUGH */
-				case WT_CELL_DATA_OVFL:
-					WT_RET(__wt_cell_process(session,
-					    cell, &cursor->value));
-					break;
-				case WT_CELL_DEL:
-					continue;
-				WT_ILLEGAL_FORMAT(session);
-				}
-				break;
-			}
-
-			if (WT_ROW_EMPTY_ISSET(cbt->rip)) {
-				cursor->value.data = "";
-				cursor->value.size = 0;
-				break;
-			}
-
-			/* Set cell to reference the value we'll dump. */
-			cell = WT_ROW_PTR(cbt->page, cbt->rip);
-			switch (WT_CELL_TYPE(cell)) {
-			case WT_CELL_DATA:
-				if (huffman == NULL) {
-					cursor->value.data = WT_CELL_BYTE(cell);
-					cursor->value.size = WT_CELL_LEN(cell);
-					break;
-				}
-				/* FALLTHROUGH */
-			case WT_CELL_DATA_OVFL:
-				WT_RET(__wt_cell_process(session, cell,
-				    &cursor->value));
-				break;
-			}
+		switch (cbt->page->type) {
+		case WT_PAGE_COL_FIX:
+			ret = __btcur_next_fix(cbt,
+			   &cursor->recno, &cursor->value);
 			break;
-		}
-
-		if (cbt->nitems == 0)
+		case WT_PAGE_COL_RLE:
+			ret = __btcur_next_rle(cbt,
+			    &cursor->recno, &cursor->value);
+			break;
+		case WT_PAGE_COL_VAR:
+			ret = __btcur_next_var(cbt,
+			    &cursor->recno, &cursor->value);
+			break;
+		case WT_PAGE_ROW_LEAF:
+			ret = __btcur_next_row(cbt,
+			    &cursor->key, &cursor->value);
+			break;
+		default:
 			continue;
-
-		/* We have a key/value pair, return it and move on. */
-		if (cbt->nrepeats > 0)
-			cbt->nrepeats--;
-		else {
-			cbt->nitems--;
-			++cbt->rip;
-			++cbt->cip;
 		}
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-		return (0);
 	}
-	/* NOTREACHED */
+
+	if (ret == 0)
+		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	else
+		F_CLR(cursor, WT_CURSTD_POSITIONED |
+		    WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	return (ret);
 }
 
 /*
