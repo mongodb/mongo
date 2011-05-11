@@ -143,7 +143,9 @@ namespace mongo {
         _save();
 
         try {
-            cm->maybeChunkCollection();
+            if ( cm->maybeChunkCollection() ) {
+                _load();
+            }
         }
         catch ( UserException& e ) {
             // failure to chunk is not critical enough to abort the command (and undo the _save()'d configDB state)
