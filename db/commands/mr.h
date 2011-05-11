@@ -265,6 +265,7 @@ namespace mongo {
 
             long long numEmits() const { if (_jsMode) return _scope->getNumberLongLong("_emitCt"); return _numEmits; }
 
+            bool jsMode() {return _jsMode;}
             void switchMode(bool jsMode);
 
             const Config& _config;
