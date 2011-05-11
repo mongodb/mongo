@@ -199,7 +199,7 @@ namespace mongo {
             case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) == 0;
             case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) == 0;
             case AF_UNSPEC: return true; // assume all unspecified addresses are the same
-            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return false;
             }
         }
         bool operator!=(const SockAddr& r) const {
@@ -221,7 +221,7 @@ namespace mongo {
             case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) < 0;
             case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) < 0;
             case AF_UNSPEC: return false;
-            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+            default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return false;
             }
         }
 
