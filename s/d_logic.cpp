@@ -103,6 +103,7 @@ namespace mongo {
         b.append( "ns" , ns );
         b.append( "id" , writebackID );
         b.append( "connectionId" , cc().getConnectionId() );
+        b.append( "instanceIdent" , prettyHostName() );
         b.appendTimestamp( "version" , shardingState.getVersion( ns ) );
         b.appendTimestamp( "yourVersion" , ShardedConnectionInfo::get( true )->getVersion( ns ) );
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );

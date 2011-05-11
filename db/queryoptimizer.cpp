@@ -85,9 +85,15 @@ namespace mongo {
             
         _index = &d->idx(_idxNo);
 
-        if ( _special.size() ) {
-            _optimal = true;
+        // If the parsing or index indicates this is a special query, don't continue the processing
+        if ( _special.size() ||
+            ( _index->getSpec().getType() && _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
+
+            if( _special.size() ) _optimal = true;
+
             _type  = _index->getSpec().getType();
+            if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
+
             massert( 13040 , (string)"no type for special: " + _special , _type );
             // hopefully safe to use original query in these contexts - don't think we can mix special with $or clause separation yet
             _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , order );
@@ -930,7 +936,7 @@ doneCheckOrder:
         if ( ! best->complete() )
             throw MsgAssertionException( best->exception() );
         _c = best->newCursor();
-        _matcher = best->matcher();
+        _matcher = best->matcher( _c );
         _op = best;
     }    
     

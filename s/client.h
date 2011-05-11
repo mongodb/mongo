@@ -17,6 +17,7 @@
  */
 
 #include "../pch.h"
+#include "writeback_listener.h"
 
 namespace mongo {
 
@@ -85,8 +86,8 @@ namespace mongo {
     private:
 
         struct WBInfo {
-            WBInfo( ConnectionId c , OID o ) : connectionId( c ) , id( o ) {}
-            ConnectionId connectionId;
+            WBInfo( const WriteBackListener::ConnectionIdent& c , OID o ) : ident( c ) , id( o ) {}
+            WriteBackListener::ConnectionIdent ident;
             OID id;
         };
 
