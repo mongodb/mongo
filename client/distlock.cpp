@@ -446,7 +446,7 @@ namespace mongo {
     // If we are only trying to re-enter a currently held lock, reenter should be true.
     // Note:  reenter doesn't actually make this lock re-entrant in the normal sense, since it can still only
     // be unlocked once, instead it is used to verify that the lock is already held.
-    bool DistributedLock::lock_try( string why , bool reenter, BSONObj * other ) {
+    bool DistributedLock::lock_try( const string& why , bool reenter, BSONObj * other ) {
 
         // TODO:  Start pinging only when we actually get the lock?
         // If we don't have a thread pinger, make sure we shouldn't have one
