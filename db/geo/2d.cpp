@@ -386,13 +386,15 @@ namespace mongo {
                 case BSONObj::opNEAR:
                 case BSONObj::opWITHIN:
                     return OPTIMAL;
-                default:;
+                default:
+                    // We can try to match if there's no other indexing defined,
+                    // this is assumed a point
+                    return HELPFUL;
                 }
             }
             case Array:
-                // Non-geo index data is stored in a non-standard way, cannot use for exact lookups with
-                // additional criteria
-                if ( query.nFields() > 1 ) return USELESS;
+                // We can try to match if there's no other indexing defined,
+                // this is assumed a point
                 return HELPFUL;
             default:
                 return USELESS;
@@ -1946,7 +1948,7 @@ namespace mongo {
             _startPt = Point(center);
 
             _maxDistance = i.next().numberDouble();
-            uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
+            uassert( 13061 , "need a max distance >= 0 " , _maxDistance >= 0 );
 
             if (type == "$center") {
                 // Look in box with bounds of maxDistance in either direction
@@ -2278,71 +2280,81 @@ namespace mongo {
             if ( _geo != e.fieldName() )
                 continue;
 
-            if ( e.type() != Object )
-                continue;
-
-            switch ( e.embeddedObject().firstElement().getGtLtOp() ) {
-            case BSONObj::opNEAR: {
-                BSONObj n = e.embeddedObject();
-                e = n.firstElement();
-
-                const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
-                GeoDistType type;
-                if (suffix[0] == '\0') {
-                    type = GEO_PLAIN;
-                }
-                else if (strcmp(suffix, "Sphere") == 0) {
-                    type = GEO_SPHERE;
-                }
-                else {
-                    uassert(13464, string("invalid $near search type: ") + e.fieldName(), false);
-                    type = GEO_PLAIN; // prevents uninitialized warning
-                }
-
-                double maxDistance = numeric_limits<double>::max();
-                if ( e.isABSONObj() && e.embeddedObject().nFields() > 2 ) {
-                    BSONObjIterator i(e.embeddedObject());
-                    i.next();
-                    i.next();
-                    BSONElement e = i.next();
-                    if ( e.isNumber() )
-                        maxDistance = e.numberDouble();
-                }
-                {
-                    BSONElement e = n["$maxDistance"];
-                    if ( e.isNumber() )
-                        maxDistance = e.numberDouble();
-                }
-                shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type ) );
-                s->exec();
-                shared_ptr<Cursor> c;
-                c.reset( new GeoSearchCursor( s ) );
+            if ( e.type() == Array ) {
+                // If we get an array query, assume it is a location, and do a $within { $center : [[x, y], 0] } search
+                shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), false ) ) );
                 return c;
             }
-            case BSONObj::opWITHIN: {
-                e = e.embeddedObject().firstElement();
-                uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
-                e = e.embeddedObject().firstElement();
-                string type = e.fieldName();
-                if ( startsWith(type,  "$center") ) {
-                    uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
+            else if ( e.type() == Object ) {
+
+                // TODO:  Filter out _geo : { $special... } field so it doesn't get matched accidentally,
+                // if matcher changes
+
+                switch ( e.embeddedObject().firstElement().getGtLtOp() ) {
+                case BSONObj::opNEAR: {
+                    BSONObj n = e.embeddedObject();
+                    e = n.firstElement();
+
+                    const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
+                    GeoDistType type;
+                    if (suffix[0] == '\0') {
+                        type = GEO_PLAIN;
+                    }
+                    else if (strcmp(suffix, "Sphere") == 0) {
+                        type = GEO_SPHERE;
+                    }
+                    else {
+                        uassert(13464, string("invalid $near search type: ") + e.fieldName(), false);
+                        type = GEO_PLAIN; // prevents uninitialized warning
+                    }
+
+                    double maxDistance = numeric_limits<double>::max();
+                    if ( e.isABSONObj() && e.embeddedObject().nFields() > 2 ) {
+                        BSONObjIterator i(e.embeddedObject());
+                        i.next();
+                        i.next();
+                        BSONElement e = i.next();
+                        if ( e.isNumber() )
+                            maxDistance = e.numberDouble();
+                    }
+                    {
+                        BSONElement e = n["$maxDistance"];
+                        if ( e.isNumber() )
+                            maxDistance = e.numberDouble();
+                    }
+                    shared_ptr<GeoSearch> s( new GeoSearch( this , Point( e ) , numWanted , query , maxDistance, type ) );
+                    s->exec();
+                    shared_ptr<Cursor> c;
+                    c.reset( new GeoSearchCursor( s ) );
                     return c;
                 }
-                else if ( type == "$box" ) {
-                    uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                case BSONObj::opWITHIN: {
+                    e = e.embeddedObject().firstElement();
+                    uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
+                    e = e.embeddedObject().firstElement();
+                    string type = e.fieldName();
+                    if ( startsWith(type,  "$center") ) {
+                        uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
+                        shared_ptr<Cursor> c( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query , type) );
+                        return c;
+                    }
+                    else if ( type == "$box" ) {
+                        uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
+                        shared_ptr<Cursor> c( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                        return c;
+                    }
+                    else if ( startsWith( type, "$poly" ) ) {
+                        uassert( 14029 , "$polygon has to take an object or array" , e.isABSONObj() );
+                        shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                        return c;
+                    }
+                    throw UserException( 13058 , (string)"unknown $with type: " + type );
+                }
+                default:
+                    // Otherwise... assume the object defines a point, and we want to do a zero-radius $within $center
+                    shared_ptr<Cursor> c( new GeoCircleBrowse( this , BSON( "0" << e.embeddedObjectUserCheck() << "1" << 0 ), query.filterFieldsUndotted( BSON( _geo << "" ), false ) ) );
                     return c;
                 }
-                else if ( startsWith( type, "$poly" ) ) {
-                    uassert( 14029 , "$polygon has to take an object or array" , e.isABSONObj() );
-                    shared_ptr<Cursor> c( new GeoPolygonBrowse( this , e.embeddedObjectUserCheck() , query ) );
-                    return c;
-                }
-                throw UserException( 13058 , (string)"unknown $with type: " + type );
-            }
-            default:
-                break;
             }
         }
 
