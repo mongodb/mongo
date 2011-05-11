@@ -72,7 +72,7 @@ namespace mongo {
     }
 
     void SpinLock::unlock() {
-#if defined(WIN32)
+#if defined(_WIN32)
         LeaveCriticalSection(&_cs);
 #elif defined(__USE_XOPEN2K)
         pthread_spin_unlock(&_lock);

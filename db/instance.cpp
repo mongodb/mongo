@@ -71,7 +71,7 @@ namespace mongo {
     KillCurrentOp killCurrentOp;
 
     int lockFile = 0;
-#ifdef WIN32
+#ifdef _WIN32
     HANDLE lockFileHandle;
 #endif
 
@@ -782,7 +782,7 @@ namespace mongo {
             /* This ought to be an unlink(), but Eliot says the last
                time that was attempted, there was a race condition
                with acquirePathLock().  */
-#ifdef WIN32
+#ifdef _WIN32
             if( _chsize( lockFile , 0 ) )
                 log() << "couldn't remove fs lock " << getLastError() << endl;
             CloseHandle(lockFileHandle);
@@ -858,7 +858,7 @@ namespace mongo {
         ss << getpid() << endl;
         string s = ss.str();
         const char * data = s.c_str();
-#ifdef WIN32
+#ifdef _WIN32
         assert ( _write( fd, data, strlen( data ) ) );
 #else
         assert ( write( fd, data, strlen( data ) ) );
@@ -874,7 +874,7 @@ namespace mongo {
             oldFile = true;
         }
 
-#ifdef WIN32
+#ifdef _WIN32
         lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE,
             0 /* do not allow anyone else access */, NULL, 
             OPEN_ALWAYS /* success if fh can open */, 0, NULL );
@@ -945,7 +945,7 @@ namespace mongo {
 
             if (!errmsg.empty()) {
                 cout << errmsg << endl;
-#ifdef WIN32
+#ifdef _WIN32
                 CloseHandle( lockFileHandle );
 #else
                 close ( lockFile );
@@ -964,7 +964,7 @@ namespace mongo {
             uasserted(13597, "can't start without --journal enabled when journal/ files are present");
         }
 
-#ifdef WIN32
+#ifdef _WIN32
         uassert( 13625, "Unable to truncate lock file", _chsize(lockFile, 0) == 0);
         writePid( lockFile );
         _commit( lockFile );

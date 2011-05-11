@@ -31,13 +31,6 @@
 # define _CRT_SECURE_NO_WARNINGS
 #endif
 
-// [dm] i am not sure why we need this.
-#if defined(WIN32)
-# ifndef _WIN32
-# define _WIN32
-# endif
-#endif
-
 #if defined(_WIN32)
 // for rand_s() usage:
 # define _CRT_RAND_S

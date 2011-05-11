@@ -151,7 +151,7 @@ namespace mongo {
     };
 
     extern int lockFile;
-#ifdef WIN32
+#ifdef _WIN32
     extern HANDLE lockFileHandle;
 #endif
     void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
