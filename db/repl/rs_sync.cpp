@@ -509,4 +509,96 @@ namespace mongo {
         cc().shutdown();
     }
 
+    bool ReplSetImpl::_getSlave(const BSONObj& rid, GhostSlave& slave) {
+        slave = _ghostCache[rid];
+        if (slave.init) {
+            return true;
+        }
+
+        log(1) << "cache miss for " << rid << ", reloading slave info" << rsLog;
+        
+        for( Member *m = _members.head(); m; m=m->next() ) {
+            try {
+                ScopedConn conn(m->fullName());
+                BSONObj me = conn.findOne("local.me", BSONObj(), 0, 0);
+                if (me.isEmpty() || !me.hasField("_id")) {
+                    continue;
+                }
+                log(1) << "adding " << me << " -> " << m->fullName() << endl;
+                
+                GhostSlave& someSlave = _ghostCache[me];
+                if (!someSlave.init) {
+                    someSlave.init = true;
+                    someSlave.slave = m;
+                }
+            }
+            catch (DBException& e) {
+                log() << "error adding member " << m->fullName()
+                      << " to ghost list: " << e.what() << rsLog;
+            }
+        }
+            
+        // if rid doesn't refer to a member of the set, this still might not
+        // be inited
+        slave = _ghostCache[rid];
+        return slave.init;
+    }
+    
+    void ReplSetImpl::percolate(const BSONObj& rid, const OpTime& last) {
+        // do this before locking, in case we miss the cache        
+        GhostSlave s;
+        if (!_getSlave(rid, s)) {
+            log() << "replSet couldn't find a slave with id " << rid
+                  << ", not faux syncing" << rsLog;
+            return;
+        }
+        assert(s.slave);
+        
+        lock lk(this);
+        
+        const Member *target = _currentSyncTarget;
+        if (!target || box.getState().primary()) {
+            return;
+        }
+
+        try {
+            if (!s.reader.haveCursor()) {
+                if (!s.reader.connect(s.slave->fullName(), target->fullName())) {
+                    // error message logged in OplogReader::connect
+                    return;
+                }
+                s.reader.ghostQueryGTE(rsoplog, last);
+            }
+
+            log() << "last: " << s.last.toString() << " to " << last.toString() << rsLog;
+            
+            if (s.last > last) {
+                return;
+            }
+            
+            while (s.last <= last) {
+                if (!s.reader.more()) {
+                    // resets the cursor if it is dead
+                    s.reader.tailCheck();
+                    
+                    // if we don't have a cursor, we have to requery
+                    if( !s.reader.haveCursor() ) {
+                        s.reader.ghostQueryGTE(rsoplog, s.last);
+                        assert( s.reader.haveCursor() );
+                    }
+                    else {
+                        return;
+                    }
+                }
+            
+                BSONObj o = s.reader.nextSafe();
+                s.last = o["ts"]._opTime();
+            }
+        }
+        catch (DBException& e) {
+            // we'll be back
+            log() << "replSet ghost sync error: " << e.what() << " for "
+                  << s.slave->fullName() << rsLog;
+        }
+    }
 }

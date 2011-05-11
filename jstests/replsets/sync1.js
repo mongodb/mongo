@@ -21,9 +21,6 @@ doTest = function (signal) {
 
     var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
     var nodes = replTest.startSet({ oplogSize: "40" });
-
-    sleep(5000);
-
     print("\nsync1.js ********************************************************************** part 0");
     replTest.initiate();
 

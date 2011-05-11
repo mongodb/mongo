@@ -89,7 +89,7 @@ namespace mongo {
     /**
      * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
      */
-    BSONObj benchRun( const BSONObj& argsFake ) {
+    BSONObj benchRun( const BSONObj& argsFake, void* data ) {
         assert( argsFake.firstElement().isABSONObj() );
         BSONObj args = argsFake.firstElement().Obj();
 

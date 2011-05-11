@@ -66,6 +66,7 @@ rs2.initiate();
 master = rs2.getMaster();
 var config = master.getDB("local").system.replset.findOne();
 config.version++;
+config.members[0].priority = 2;
 config.members[0].initialSync = {state : 2};
 config.members[1].initialSync = {state : 1};
 try {
@@ -75,17 +76,19 @@ catch(e) {
     print("trying to reconfigure: "+e);
 }
 
-replTest.awaitReplication();
+rs2.awaitReplication();
 
 // test partitioning
 master = rs2.bridge();
 rs2.partition(0, 2);
 
-for (i=0; i<100; i++) {
-    master.getDB("foo").bar.baz.insert({x:i});
-}
+master.getDB("foo").bar.baz.insert({x:1});
+rs2.awaitReplication();
 
-replTest.awaitReplication();
+master.getDB("foo").bar.baz.insert({x:2});
+var x = master.getDB("foo").runCommand({getLastError : 1, w : 3, wtimeout : 5000});
+printjson(x);
+assert.eq(null, x.err);
 
 rs2.stopSet();
 

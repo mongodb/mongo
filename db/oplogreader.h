@@ -12,8 +12,8 @@ namespace mongo {
        still fairly awkward but a start.
     */
     class OplogReader {
-        auto_ptr<DBClientConnection> _conn;
-        auto_ptr<DBClientCursor> cursor;
+        shared_ptr<DBClientConnection> _conn;
+        shared_ptr<DBClientCursor> cursor;
     public:
 
         OplogReader() {
@@ -40,6 +40,9 @@ namespace mongo {
         /* ok to call if already connected */
         bool connect(string hostname);
 
+        bool connect(const string& from, const string& to);
+
+
         void tailCheck() {
             if( cursor.get() && cursor->isDead() ) {
                 log() << "repl: old cursor isDead, will initiate a new one" << endl;
@@ -62,22 +65,28 @@ namespace mongo {
             query(ns, q2.done());
         }
 
-        void tailingQuery(const char *ns, const BSONObj& query) {
+        void tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields=0) {
             assert( !haveCursor() );
             log(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
-            cursor = _conn->query( ns, query, 0, 0, 0,
+            cursor = _conn->query( ns, query, 0, 0, fields,
                                    QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay |
                                    /* TODO: slaveok maybe shouldn't use? */
                                    QueryOption_AwaitData
                                  );
         }
 
-        void tailingQueryGTE(const char *ns, OpTime t) {
+        void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0) {
             BSONObjBuilder q;
             q.appendDate("$gte", t.asDate());
             BSONObjBuilder query;
             query.append("ts", q.done());
-            tailingQuery(ns, query.done());
+            tailingQuery(ns, query.done(), fields);
+        }
+
+        /* Do a tailing query, but only send the ts field back. */
+        void ghostQueryGTE(const char *ns, OpTime t) {
+            const BSONObj fields = BSON("ts" << 1 << "_id" << 0);
+            return tailingQueryGTE(ns, t, &fields);
         }
 
         bool more() {
@@ -108,6 +117,10 @@ namespace mongo {
         void putBack(BSONObj op) {
             cursor->putBack(op);
         }
+
+    private:
+        bool commonConnect(const string& hostName);
+        bool passthroughHandshake(const string& f);
     };
 
 }

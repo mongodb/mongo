@@ -23,6 +23,7 @@
 #include "../../util/concurrency/msg.h"
 #include "../../util/hostandport.h"
 #include "../commands.h"
+#include "../oplogreader.h"
 #include "rs_exception.h"
 #include "rs_optime.h"
 #include "rs_member.h"
@@ -433,9 +434,37 @@ namespace mongo {
         void syncFixUp(HowToFixUp& h, OplogReader& r);
         bool _getOplogReader(OplogReader& r, string& hn);
         bool _isStale(OplogReader& r, const string& hn);
+
+        struct GhostSlave {
+        GhostSlave() : last(0), slave(0), init(false) {}
+            OplogReader reader;
+            OpTime last;
+            Member* slave;
+            bool init;
+        };
+        /**
+         * This is a cache of ghost slaves
+         */
+        map<BSONObj,GhostSlave> _ghostCache;
+        bool _getSlave(const BSONObj& rid, GhostSlave& slave);
     public:
         void syncThread();
         const OpTime lastOtherOpTime() const;
+        /**
+         * Replica sets can sync in a hierarchical fashion, which throws off w
+         * calculation on the master.  percolate() faux-syncs from an upstream
+         * node so that the primary will know what the slaves are up to.
+         *
+         * We can't just directly sync to the primary because it could be
+         * unreachable, e.g., S1--->S2--->S3--->P.  S2 should ghost sync from S3
+         * and S3 can ghost sync from the primary.
+         *
+         * Say we have an S1--->S2--->P situation and this node is S2.  rid
+         * would refer to S1.  S2 would create a ghost slave of S1 and connect
+         * it to P (_currentSyncTarget). Then it would use this connection to
+         * pretend to be S1, replicating off of P.
+         */
+        void percolate(const BSONObj& rid, const OpTime& last);
     };
 
     class ReplSet : public ReplSetImpl {
@@ -492,6 +521,9 @@ namespace mongo {
             lock lk((RSBase*)this);
             if( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
+        }
+        void percolate(const BSONObj& rid, const OpTime& last) {
+          ReplSetImpl::percolate(rid, last);
         }
     };
 

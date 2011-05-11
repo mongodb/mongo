@@ -1075,7 +1075,8 @@ doneCheckOrder:
         }
 
         if ( !id ) {
-            errmsg = (string)"no index found for specified keyPattern: " + keyPattern.toString();
+            errmsg = str::stream() << "no index found for specified keyPattern: " << keyPattern.toString() 
+                                   << " min: " << min << " max: " << max;
             return 0;
         }
 

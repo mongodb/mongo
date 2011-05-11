@@ -737,8 +737,8 @@ if nix:
         os.unlink('pch.h.gch') # gcc uses the file if it exists
 
 if usev8:
-    env.Append( CPPPATH=["../v8/include/"] )
-    env.Append( LIBPATH=["../v8/"] )
+    env.Prepend( CPPPATH=["../v8/include/"] )
+    env.Prepend( LIBPATH=["../v8/"] )
 
 
 if "uname" in dir(os):
