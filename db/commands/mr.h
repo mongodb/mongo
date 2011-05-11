@@ -288,6 +288,7 @@ namespace mongo {
             bool _jsMode;
             ScriptingFunction _reduceAll;
             ScriptingFunction _reduceAndFinalize;
+            ScriptingFunction _reduceAndFinalizeAndInsert;
         };
 
         BSONObj fast_emit( const BSONObj& args, void* data );

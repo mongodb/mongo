@@ -529,11 +529,12 @@ namespace mongo {
                 GhostSlave& someSlave = _ghostCache[me];
                 if (!someSlave.init) {
                     someSlave.init = true;
-                    someSlave.name = m->fullName();
-                }                
+                    someSlave.slave = m;
+                }
             }
-            catch (DBException&) {
-                log() << "error adding member " << m->fullName() << " to ghost list" << rsLog;
+            catch (DBException& e) {
+                log() << "error adding member " << m->fullName()
+                      << " to ghost list: " << e.what() << rsLog;
             }
         }
             
@@ -551,6 +552,7 @@ namespace mongo {
                   << ", not faux syncing" << rsLog;
             return;
         }
+        assert(s.slave);
         
         lock lk(this);
         
@@ -561,7 +563,7 @@ namespace mongo {
 
         try {
             if (!s.reader.haveCursor()) {
-                if (!s.reader.connect(s.name, target->fullName())) {
+                if (!s.reader.connect(s.slave->fullName(), target->fullName())) {
                     // error message logged in OplogReader::connect
                     return;
                 }
@@ -595,7 +597,8 @@ namespace mongo {
         }
         catch (DBException& e) {
             // we'll be back
-            log() << "replSet ghost sync error: " << e.what() << " for " << s.name << rsLog;
+            log() << "replSet ghost sync error: " << e.what() << " for "
+                  << s.slave->fullName() << rsLog;
         }
     }
 }
