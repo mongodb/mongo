@@ -157,27 +157,33 @@ SELFHELPER(struct wt_cursor)
         }
 
 %pythoncode %{
+        def get_key(self):
+            return self.get_keys()[0]
+
+        def get_keys(self):
+            if self.is_column:
+                return (self._get_recno(),)
+            else:
+                return unpack(self.key_format, self._get_key())
+
+        def get_value(self):
+                return self.get_values()[0]
+
+        def get_values(self):
+                return unpack(self.value_format, self._get_value())
+
         def set_key(self, *args):
             if self.is_column:
                 self._set_recno(args[0])
             else:
                 # Keep the Python string pinned
-                self.key = pack(self.key_format, *args)
-                self._set_key(self.key)
-
-        def get_key(self):
-            if self.is_column:
-                return self._get_recno()
-            else:
-                return unpack(self.key_format, self._get_key())[0]
+                self._key = pack(self.key_format, *args)
+                self._set_key(self._key)
 
         def set_value(self, *args):
                 # Keep the Python string pinned
-                self.value = pack(self.value_format, *args)
-                self._set_value(self.value)
-
-        def get_value(self):
-                return unpack(self.value_format, self._get_value())[0]
+                self._value = pack(self.value_format, *args)
+                self._set_value(self._value)
 
         # Implement the iterable contract for wt_cursor
         def __iter__(self):
@@ -186,10 +192,9 @@ SELFHELPER(struct wt_cursor)
         def next(self):
                 try:
                         self._next()
-                # TODO: catch wiredtiger exception when there is one?
-                except BaseException:
+                except WiredTigerError:
                         raise StopIteration
-                return [self.get_key(), self.get_value()]
+                return self.get_keys() + self.get_values()
 %}
 };
 
