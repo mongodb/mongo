@@ -532,7 +532,7 @@ namespace mongo {
                     someSlave.name = m->fullName();
                 }                
             }
-            catch (DBException&) {
+            catch (DBException& e) {
                 log() << "error adding member " << m->fullName() << " to ghost list" << rsLog;
             }
         }
