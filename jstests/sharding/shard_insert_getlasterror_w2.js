@@ -51,7 +51,7 @@ function go() {
     db.foo.insert({_id:'a', x:1});
     db.foo.insert({_id:'a', x:1});
     var x = db.getLastErrorObj(2, 30000)
-    assert.neq(x.err, null, tojson(x));
+    assert.neq(x.err, null, "C1 " + tojson(x));
 
     // Add more data
     for (var i = N; i < 2*N; i++) {
@@ -59,7 +59,7 @@ function go() {
         var x = db.getLastErrorObj(2, 30000)  // wait to be copied to at least one secondary
             if (i % 30 == 0) print(i)
         if (i % 100 == 0 || x.err != null) printjson(x);
-        assert.eq(x.err, null, tojson(x));
+        assert.eq(x.err, null, "C2 " + tojson(x));
     }
 
     // take down the slave and make sure it fails over
