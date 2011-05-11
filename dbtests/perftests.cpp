@@ -292,6 +292,7 @@ namespace PerfTests {
         string name() { return "BufBuilder"; }
         Bldr() { 
         }
+        virtual int howLongMillis() { return 3000; } 
         virtual bool showDurStats() { return false; }
         void timed() {
             BufBuilder b;
@@ -304,6 +305,7 @@ namespace PerfTests {
 
     class StkBldr : public B { 
     public:
+        virtual int howLongMillis() { return 3000; } 
         int n;
         string name() { return "StackBufBuilder"; }
         virtual bool showDurStats() { return false; }
