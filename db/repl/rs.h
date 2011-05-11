@@ -436,9 +436,10 @@ namespace mongo {
         bool _isStale(OplogReader& r, const string& hn);
 
         struct GhostSlave {
+        GhostSlave() : last(0), slave(0), init(false) {}
             OplogReader reader;
             OpTime last;
-            string name;
+            Member* slave;
             bool init;
         };
         /**
