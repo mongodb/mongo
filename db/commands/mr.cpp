@@ -362,6 +362,14 @@ namespace mongo {
             if ( _onDisk )
                 return;
 
+            if (_jsMode) {
+                ScriptingFunction getResult = _scope->createFunction("var map = _mrMap; var result = []; for (key in map) { result.push({_id: key, value: map[key]}) } return result;");
+                _scope->invoke(getResult, 0, 0, 0, false);
+                BSONObj obj = _scope->getObject("return");
+                final.append("results", BSONArray(obj));
+                return;
+            }
+
             uassert( 13604 , "too much data for in memory map/reduce" , _size < ( BSONObjMaxUserSize / 2 ) );
 
             BSONArrayBuilder b( (int)(_size * 1.2) ); // _size is data size, doesn't count overhead and keys
@@ -521,7 +529,8 @@ namespace mongo {
             _scope->setBoolean("_doFinal", _config.finalizer);
 
             // by default start in JS mode, will be faster for small jobs
-            _jsMode = _config.jsMode;
+//            _jsMode = _config.jsMode;
+            _jsMode = true;
             switchMode(_jsMode);
 
             // global JS map/reduce hashmap
