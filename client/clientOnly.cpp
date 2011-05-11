@@ -72,5 +72,9 @@ namespace mongo {
         return false;
     }
 
+    string prettyHostName() {
+        assert(0);
+        return "";
+    }
 
 }
