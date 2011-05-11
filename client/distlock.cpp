@@ -298,7 +298,7 @@ namespace mongo {
     DistributedLock::DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout, bool asProcess )
         : _conn(conn) , _name(name) , _id( BSON( "_id" << name ) ), _processId( asProcess ? getDistLockId() : getDistLockProcess() ),
           _lockTimeout( lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout ), _maxClockSkew( _lockTimeout / LOCK_SKEW_FACTOR ), _maxNetSkew( _maxClockSkew ), _lockPing( _maxClockSkew ),
-          _lastPingCheck( string(""), (mongo::Date_t) 0, (mongo::Date_t) 0, OID() )
+          _mutex( "DistributedLock" )
     {
         log( logLvl - 1 ) << "created new distributed lock for " << name << " on " << conn
                           << " ( lock timeout : " << _lockTimeout
@@ -450,8 +450,10 @@ namespace mongo {
 
         // TODO:  Start pinging only when we actually get the lock?
         // If we don't have a thread pinger, make sure we shouldn't have one
-        if( _threadId == "" )
+        if( _threadId == "" ){
+            scoped_lock lk( _mutex );
             _threadId = distLockPinger.got( *this, _lockPing );
+        }
 
         // This should always be true, if not, we are using the lock incorrectly.
         assert( _name != "" );
@@ -525,7 +527,8 @@ namespace mongo {
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
-                        _lastPingCheck = make_tuple(lastPing["_id"].String(), lastPing["ping"].Date(), remote, o["ts"].OID() );
+                        scoped_lock lk( _mutex );
+                        _lastPingCheck = boost::tuple<string, Date_t, Date_t, OID>( lastPing["_id"].String().c_str(), lastPing["ping"].Date(), remote, o["ts"].OID() );
                     }
                     else {
 

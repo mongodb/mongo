@@ -145,7 +145,12 @@ namespace mongo {
 
     private:
 
-        void resetLastPing(){ _lastPingCheck = make_tuple(string(""), 0, 0, OID()); }
+        void resetLastPing(){
+            scoped_lock lk( _mutex );
+            _lastPingCheck = boost::tuple<string, Date_t, Date_t, OID>();
+        }
+
+        mongo::mutex _mutex;
 
         // Data from last check of process with ping time
         boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
