@@ -91,7 +91,7 @@ namespace mongo {
         // real methods
 
         void goingAwaySoon();
-        BSONObj Quit(const BSONObj& args) {
+        BSONObj Quit(const BSONObj& args, void* data) {
             // If not arguments are given first element will be EOO, which
             // converts to the integer value 0.
             goingAwaySoon();
@@ -100,7 +100,7 @@ namespace mongo {
             return undefined_;
         }
 
-        BSONObj JSGetMemInfo( const BSONObj& args ) {
+        BSONObj JSGetMemInfo( const BSONObj& args, void* data ) {
             ProcessInfo pi;
             uassert( 10258 ,  "processinfo not supported" , pi.supported() );
 
@@ -117,7 +117,7 @@ namespace mongo {
 
 #ifndef MONGO_SAFE_SHELL
 
-        BSONObj listFiles(const BSONObj& _args) {
+        BSONObj listFiles(const BSONObj& _args, void* data) {
             static BSONObj cd = BSON( "0" << "." );
             BSONObj args = _args.isEmpty() ? cd : _args;
 
@@ -159,8 +159,8 @@ namespace mongo {
             return ret.obj();
         }
 
-        BSONObj ls(const BSONObj& args) {
-            BSONObj o = listFiles(args);
+        BSONObj ls(const BSONObj& args, void* data) {
+            BSONObj o = listFiles(args, data);
             if( !o.isEmpty() ) {
                 for( BSONObj::iterator i = o.firstElement().Obj().begin(); i.more(); ) {
                     BSONObj f = i.next().Obj();
@@ -173,7 +173,7 @@ namespace mongo {
             return BSONObj();
         }
 
-        BSONObj cd(const BSONObj& args) {
+        BSONObj cd(const BSONObj& args, void* data) {
 #if defined(_WIN32)
             std::wstring dir = toWideString( args.firstElement().String().c_str() );
             if( SetCurrentDirectory(dir.c_str()) )
@@ -188,12 +188,12 @@ namespace mongo {
             return BSON( "" << "change directory failed" );
         }
 
-        BSONObj pwd(const BSONObj&) {
+        BSONObj pwd(const BSONObj&, void* data) {
             boost::filesystem::path p = boost::filesystem::current_path();
             return BSON( "" << p.string() );
         }
 
-        BSONObj hostname(const BSONObj&) {
+        BSONObj hostname(const BSONObj&, void* data) {
             return BSON( "" << getHostName() );
         }
 
@@ -204,7 +204,7 @@ namespace mongo {
 
         const int CANT_OPEN_FILE = 13300;
 
-        BSONObj cat(const BSONObj& args) {
+        BSONObj cat(const BSONObj& args, void* data) {
             BSONElement e = oneArg(args);
             stringstream ss;
             ifstream f(e.valuestrsafe());
@@ -223,7 +223,7 @@ namespace mongo {
             return BSON( "" << ss.str() );
         }
 
-        BSONObj md5sumFile(const BSONObj& args) {
+        BSONObj md5sumFile(const BSONObj& args, void* data) {
             BSONElement e = oneArg(args);
             stringstream ss;
             FILE* f = fopen(e.valuestrsafe(), "rb");
@@ -244,12 +244,12 @@ namespace mongo {
             return BSON( "" << digestToString( d ) );
         }
 
-        BSONObj mkdir(const BSONObj& args) {
+        BSONObj mkdir(const BSONObj& args, void* data) {
             boost::filesystem::create_directories(args.firstElement().String());
             return BSON( "" << true );
         }
 
-        BSONObj removeFile(const BSONObj& args) {
+        BSONObj removeFile(const BSONObj& args, void* data) {
             BSONElement e = oneArg(args);
             bool found = false;
 
@@ -268,7 +268,7 @@ namespace mongo {
          * @param args - [ name, byte index ]
          * In this initial implementation, all bits in the specified byte are flipped.
          */
-        BSONObj fuzzFile(const BSONObj& args) {
+        BSONObj fuzzFile(const BSONObj& args, void* data) {
             uassert( 13619, "fuzzFile takes 2 arguments", args.nFields() == 2 );
             shared_ptr< File > f( new File() );
             f->open( args.getStringField( "0" ) );
@@ -310,7 +310,7 @@ namespace mongo {
         }
 
         // only returns last 100000 characters
-        BSONObj RawMongoProgramOutput( const BSONObj &args ) {
+        BSONObj RawMongoProgramOutput( const BSONObj &args, void* data ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             string out = mongoProgramOutput_.str();
             size_t len = out.length();
@@ -319,7 +319,7 @@ namespace mongo {
             return BSON( "" << out );
         }
 
-        BSONObj ClearRawMongoProgramOutput( const BSONObj &args ) {
+        BSONObj ClearRawMongoProgramOutput( const BSONObj &args, void* data ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             mongoProgramOutput_.str( "" );
             return undefined_;
@@ -616,14 +616,14 @@ namespace mongo {
 #endif
         }
 
-        BSONObj WaitProgram( const BSONObj& a ) {
+        BSONObj WaitProgram( const BSONObj& a, void* data ) {
             int pid = oneArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
             shells.erase( pid );
             return x;
         }
 
-        BSONObj WaitMongoProgramOnPort( const BSONObj &a ) {
+        BSONObj WaitMongoProgramOnPort( const BSONObj &a, void* data ) {
             int port = oneArg( a ).numberInt();
             uassert( 13621, "no known mongo program on port", dbs.count( port ) != 0 );
             log() << "waiting port: " << port << ", pid: " << dbs[ port ].first << endl;
@@ -634,7 +634,7 @@ namespace mongo {
             return BSON( "" << ret );
         }
 
-        BSONObj StartMongoProgram( const BSONObj &a ) {
+        BSONObj StartMongoProgram( const BSONObj &a, void* data ) {
             _nokillop = true;
             ProgramRunner r( a );
             r.start();
@@ -642,7 +642,7 @@ namespace mongo {
             return BSON( string( "" ) << int( r.pid() ) );
         }
 
-        BSONObj RunMongoProgram( const BSONObj &a ) {
+        BSONObj RunMongoProgram( const BSONObj &a, void* data ) {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
@@ -657,7 +657,7 @@ namespace mongo {
             return BSON( string( "" ) << exit_code );
         }
 
-        BSONObj RunProgram(const BSONObj &a) {
+        BSONObj RunProgram(const BSONObj &a, void* data) {
             ProgramRunner r( a, false );
             r.start();
             boost::thread t( r );
@@ -667,7 +667,7 @@ namespace mongo {
             return BSON( string( "" ) << exit_code );
         }
 
-        BSONObj ResetDbpath( const BSONObj &a ) {
+        BSONObj ResetDbpath( const BSONObj &a, void* data ) {
             assert( a.nFields() == 1 );
             string path = a.firstElement().valuestrsafe();
             assert( !path.empty() );
@@ -697,7 +697,7 @@ namespace mongo {
         }
 
         // NOTE target dbpath will be cleared first
-        BSONObj CopyDbpath( const BSONObj &a ) {
+        BSONObj CopyDbpath( const BSONObj &a, void* data ) {
             assert( a.nFields() == 2 );
             BSONObjIterator i( a );
             string from = i.next().str();
@@ -808,7 +808,7 @@ namespace mongo {
         }
 
         /** stopMongoProgram(port[, signal]) */
-        BSONObj StopMongoProgram( const BSONObj &a ) {
+        BSONObj StopMongoProgram( const BSONObj &a, void* data ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
             assert( a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
@@ -817,7 +817,7 @@ namespace mongo {
             return BSON( "" << code );
         }
 
-        BSONObj StopMongoProgramByPid( const BSONObj &a ) {
+        BSONObj StopMongoProgramByPid( const BSONObj &a, void* data ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
             assert( a.firstElement().isNumber() );
             int pid = int( a.firstElement().number() );
@@ -845,20 +845,20 @@ namespace mongo {
         MongoProgramScope::~MongoProgramScope() {
             DESTRUCTOR_GUARD(
                 KillMongoProgramInstances();
-                ClearRawMongoProgramOutput( BSONObj() );
+                ClearRawMongoProgramOutput( BSONObj(), 0 );
             )
         }
 
         unsigned _randomSeed;
 
-        BSONObj JSSrand( const BSONObj &a ) {
+        BSONObj JSSrand( const BSONObj &a, void* data ) {
             uassert( 12518, "srand requires a single numeric argument",
                      a.nFields() == 1 && a.firstElement().isNumber() );
             _randomSeed = (unsigned)a.firstElement().numberLong(); // grab least significant digits
             return undefined_;
         }
 
-        BSONObj JSRand( const BSONObj &a ) {
+        BSONObj JSRand( const BSONObj &a, void* data ) {
             uassert( 12519, "rand accepts no arguments", a.nFields() == 0 );
             unsigned r;
 #if !defined(_WIN32)
@@ -869,7 +869,7 @@ namespace mongo {
             return BSON( "" << double( r ) / ( double( RAND_MAX ) + 1 ) );
         }
 
-        BSONObj isWindows(const BSONObj& a) {
+        BSONObj isWindows(const BSONObj& a, void* data) {
             uassert( 13006, "isWindows accepts no arguments", a.nFields() == 0 );
 #ifdef _WIN32
             return BSON( "" << true );
@@ -878,7 +878,7 @@ namespace mongo {
 #endif
         }
 
-        BSONObj getHostName(const BSONObj& a) {
+        BSONObj getHostName(const BSONObj& a, void* data) {
             uassert( 13411, "getHostName accepts no arguments", a.nFields() == 0 );
             char buf[260]; // HOST_NAME_MAX is usually 255
             assert(gethostname(buf, 260) == 0);

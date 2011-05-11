@@ -514,6 +514,7 @@ namespace mongo {
             _config.reducer->init( this );
             if ( _config.finalizer )
                 _config.finalizer->init( this );
+            _scope->setBoolean("_doFinal", _config.finalizer);
 
             // by default start in JS mode, will be faster for small jobs
             _jsMode = _config.jsMode;
@@ -526,8 +527,9 @@ namespace mongo {
 
             // js function to run reduce on all keys
 //            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
-//            _reduceAll = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); _mrMap[key] = [ret];");
-            _reduceAndFinalize = _scope->createFunction("for (var key in _mrMap) {  list = _mrMap[key]; ret = _reduce(key, list); if (typeof(_finalize) !== 'undefined') ret = _finalize(ret); _insertToTemp({_id: key, value: ret}) };");
+            _reduceAll = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length != 1) { ret = _reduce(key, list); _mrMap[key] = [ret]; }");
+            _reduceAndFinalize = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } _mrMap[key] = ret; }");
+            _reduceAndFinalizeAndInsert = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } _insertToTemp({_id: key, value: ret}); }");
 
             if ( _onDisk ) {
                 // clear temp collections
@@ -589,9 +591,12 @@ namespace mongo {
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
 
             if (_jsMode) {
+                // apply the reduce within JS
                 if (_onDisk) {
-                    // apply the reduce within JS
                     _scope->injectNative("_insertToTemp", _insertToTemp, this);
+                    _scope->invoke(_reduceAndFinalizeAndInsert, 0, 0, 0, true);
+                    return;
+                } else {
                     _scope->invoke(_reduceAndFinalize, 0, 0, 0, true);
                     return;
                 }
