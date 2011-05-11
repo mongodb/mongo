@@ -533,9 +533,9 @@ namespace mongo {
 
             // js function to run reduce on all keys
 //            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
-            _reduceAll = _scope->createFunction("var map = _mrMap; for (var key in map) { list = map[key]; if (list.length != 1) { ret = _reduce(key, list); map[key] = [ret]; } }");
-            _reduceAndFinalize = _scope->createFunction("var map = _mrMap; for (var key in map) { list = map[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } map[key] = ret; }");
-            _reduceAndFinalizeAndInsert = _scope->createFunction("var map = _mrMap; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } delete map[key]; _insertToTemp({_id: key, value: ret}); }");
+            _reduceAll = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length != 1) { ret = _reduce(key, list); map[key] = [ret]; } }");
+            _reduceAndFinalize = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } map[key] = ret; }");
+            _reduceAndFinalizeAndInsert = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } delete map[key]; _insertToTemp({_id: key, value: ret}); }");
 
             if ( _onDisk ) {
                 // clear temp collections
@@ -563,7 +563,7 @@ namespace mongo {
             _jsMode = jsMode;
             if (jsMode) {
                 // emit function that stays in JS
-                _scope->setFunction("emit", "function(key, value) { ++_emitCt; var map = _mrMap; list = map[key]; if (!list) { list = []; map[key] = list; } list.push(value); }");
+                _scope->setFunction("emit", "function(key, value) { ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } list.push(value); }");
             } else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );
