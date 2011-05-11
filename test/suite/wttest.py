@@ -18,17 +18,23 @@ import subprocess
 class WiredTigerTestCase(unittest.TestCase):
     def setUp(self):
         self.prhead('started', True)
-        self.home = 'WT_TEST'
-        subprocess.call(["rm", "-rf", self.home])
-        subprocess.call(["mkdir", self.home])
+        self.testdir = 'WT_TEST'
+        self.origcwd = os.getcwd()
 
-        self.conn = wiredtiger.wiredtiger_open(self.home, None, 'create')
+        subprocess.call(["rm", "-rf", self.testdir])
+        if os.path.exists(self.testdir):
+            raise Exception(self.testdir + ": cannot remove directory");
+        subprocess.call(["mkdir", self.testdir])
+        os.chdir("WT_TEST")
+
+        self.conn = wiredtiger.wiredtiger_open(".", None, 'create')
         self.pr(`self.conn`)
         self.session = self.conn.open_session(None, None)
 
     def tearDown(self):
         self.pr('finishing')
         self.conn.close(None)
+        os.chdir(self.origcwd)
         self.prhead('TEST COMPLETED')
 
     def pr(self, s):
