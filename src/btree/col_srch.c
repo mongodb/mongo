@@ -42,10 +42,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 
 	/* Search the tree. */
 	for (page = btree->root_page.page; page->type == WT_PAGE_COL_INT;) {
-		/*
-		 * Binary search of internal pages, looking for the right
-		 * starting record.
-		 */
+		/* Binary search of internal pages. */
 		for (base = 0,
 		    limit = page->entries; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -75,7 +72,7 @@ __wt_col_search(SESSION *session, uint64_t recno, uint32_t flags)
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			cref = page->u.col_int.t + base - 1;
+			cref = page->u.col_int.t + (base - 1);
 		}
 
 		/* Swap the parent page for the child page. */
