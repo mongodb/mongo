@@ -523,7 +523,9 @@ namespace mongo {
             // global JS map/reduce hashmap
             // we use a standard JS object which means keys are only simple types
             // we could also add a real hashmap from a library, still we need to add object comparison methods
-            _scope->setObject("_mrMap", BSONObj(), false);
+//            _scope->setObject("_mrMap", BSONObj(), false);
+            ScriptingFunction init = _scope->createFunction("_emitCt = 0; _mrMap = {};");
+            _scope->invoke(init, 0, 0, 0, true);
 
             // js function to run reduce on all keys
 //            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
@@ -557,7 +559,7 @@ namespace mongo {
             _jsMode = jsMode;
             if (jsMode) {
                 // emit function that stays in JS
-                _scope->setFunction("emit", "function(key, value) { list = _mrMap[key]; if (!list) { list = []; _mrMap[key] = list; } list.push(value); }");
+                _scope->setFunction("emit", "function(key, value) { ++_emitCt; list = _mrMap[key]; if (!list) { list = []; _mrMap[key] = list; } list.push(value); }");
             } else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );

@@ -263,7 +263,7 @@ namespace mongo {
 
             const bool isOnDisk() { return _onDisk; }
 
-            long long numEmits() const { return _numEmits; }
+            long long numEmits() const { if (_jsMode) return _scope->getNumberLongLong("_emitCt"); return _numEmits; }
 
             void switchMode(bool jsMode);
 
