@@ -49,7 +49,7 @@ __wt_page_free(
 	 * better not be any disk image associated with this page.
 	 */
 	WT_ASSERT(session,
-		(addr != WT_ADDR_INVALID && size != 0) || page->dsk == NULL);
+	    (addr != WT_ADDR_INVALID && size != 0) || page->dsk == NULL);
 
 	/*
 	 * The page must either be clean, or an internal split page, which
