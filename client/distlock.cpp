@@ -489,12 +489,15 @@ namespace mongo {
 
                 bool canReenter = reenter && o["process"].String() == _processId && ! distLockPinger.willUnlockOID( o["ts"].OID() ) && o["state"].numberInt() == 2;
                 if( reenter && ! canReenter ) {
-                    log( logLvl ) << "not re-entering distributed lock " << lockName;
-                    if( o["process"].String() != _processId ) log( logLvl ) << ", different process " << _processId << endl;
-                    else if( o["state"].numberInt() == 2 ) log( logLvl ) << ", state not finalized" << endl;
-                    else log( logLvl ) << ", ts " << o["ts"].OID() << " scheduled for late unlock" << endl;
+                    log( logLvl - 1 ) << "not re-entering distributed lock " << lockName;
+                    if( o["process"].String() != _processId ) log( logLvl - 1 ) << ", different process " << _processId << endl;
+                    else if( o["state"].numberInt() == 2 ) log( logLvl - 1 ) << ", state not finalized" << endl;
+                    else log( logLvl - 1 ) << ", ts " << o["ts"].OID() << " scheduled for late unlock" << endl;
 
-                    *other = o; other->getOwned(); conn.done();
+                    // reset since we've been bounced by a previous lock not being where we thought it was,
+                    // and should go through full forcing process if required.
+                    // (in theory we should never see a ping here if used correctly)
+                    *other = o; other->getOwned(); conn.done(); resetLastPing();
                     return false;
                 }
 
@@ -540,6 +543,8 @@ namespace mongo {
 
                     // Remote server cannot be found / is not responsive
                     warning() << "Could not get remote time from " << _conn << causedBy( e );
+                    // If our config server is having issues, forget all the pings until we can see it again
+                    resetLastPing();
 
                 }
 
@@ -549,7 +554,7 @@ namespace mongo {
                     return false;
                 }
                 else if( elapsed > takeover && canReenter ) {
-                    log( logLvl ) << "not re-entering distributed lock " << lockName << "' because elapsed time " << elapsed << " > takeover time " << takeover << endl;
+                    log( logLvl - 1 ) << "not re-entering distributed lock " << lockName << "' because elapsed time " << elapsed << " > takeover time " << takeover << endl;
                     *other = o; other->getOwned(); conn.done();
                     return false;
                 }
@@ -559,6 +564,11 @@ namespace mongo {
                                   << "elapsed time " << elapsed << " > takeover time " << takeover << endl;
 
                 if( elapsed > takeover ) {
+
+                    // Lock may forced, reset our timer if succeeds or fails
+                    // Ensures that another timeout must happen if something borks up here, and resets our pristine
+                    // ping state if acquired.
+                    resetLastPing();
 
                     try {
 
@@ -596,12 +606,16 @@ namespace mongo {
                                              << lockName << causedBy( e ), 13660);
                     }
 
-                    // Lock forced, reset our timer
-                    _lastPingCheck = make_tuple(string(""), 0, 0, OID());
                 }
                 else {
 
                     assert( canReenter );
+
+                    // Lock may be re-entered, reset our timer if succeeds or fails
+                    // Not strictly necessary, but helpful for small timeouts where thread scheduling is significant.
+                    // This ensures that two attempts are still required for a force if not acquired, and resets our
+                    // state if we are acquired.
+                    resetLastPing();
 
                     // Test that the lock is held by trying to update the finalized state of the lock to the same state
                     // if it does not update or does not update on all servers, we can't re-enter.
@@ -635,11 +649,6 @@ namespace mongo {
                                              << lockName << causedBy( e ), 13660);
                     }
 
-                    // Lock re-entered, reset our timer
-                    // Not strictly necessary, but helpful for small timeouts where thread scheduling is significant.
-                    // This ensures that a force can only happen after one unsuccessful force or reacquire attempt.
-                    _lastPingCheck = make_tuple(string(""), 0, 0, OID());
-
                     log( logLvl - 1 ) << "re-entered distributed lock '" << lockName << "'" << endl;
                     *other = o; other->getOwned(); conn.done();
                     return true;
@@ -655,6 +664,10 @@ namespace mongo {
                 queryBuilder.append( o["ts"] );
             }
         }
+
+        // Always reset our ping if we're trying to get a lock, since getting a lock implies the lock state is open
+        // and no locks need to be forced.  If anything goes wrong, we don't want to remember an old lock.
+        resetLastPing();
 
         bool gotLock = false;
         BSONObj currLock;

@@ -144,6 +144,9 @@ namespace mongo {
         const unsigned long long _lockPing;
 
     private:
+
+        void resetLastPing(){ _lastPingCheck = make_tuple(string(""), 0, 0, OID()); }
+
         // Data from last check of process with ping time
         boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
         // May or may not exist, depending on startup
