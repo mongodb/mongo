@@ -70,8 +70,10 @@ namespace mongo {
             b.appendBool( "updatedExisting", updatedExisting == True );
         if ( upsertedId.isSet() )
             b.append( "upserted" , upsertedId );
-        if ( writebackId.isSet() )
+        if ( writebackId.isSet() ) {
             b.append( "writeback" , writebackId );
+            b.append( "instanceIdent" , prettyHostName() ); // this can be any unique string
+        }
         b.appendNumber( "n", nObjects );
 
         return ! msg.empty();
