@@ -86,6 +86,15 @@ __wt_desc_write(SESSION *session)
 	btree = session->btree;
 	ret = 0;
 
+	/*
+	 * XXX
+	 * Don't write the file's metadata unless we actually have a root page:
+	 * this catches an attempt to write empty files.  Once we know how the
+	 * file metadata will work, we can fix this.
+	 */
+	if (btree->root_page.addr == WT_ADDR_INVALID)
+		return (0);
+
 	WT_CLEAR(desc);
 	desc.magic = WT_BTREE_MAGIC;
 	desc.majorv = WT_BTREE_MAJOR_VERSION;

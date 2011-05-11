@@ -234,11 +234,8 @@ __wt_bulk_end(CURSOR_BULK *cbulk)
 	root_page->size = 0;
 	root_page->page = page;
 
-	WT_RET(__wt_page_reconcile(
+	return (__wt_page_reconcile(
 	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
-
-	/* Get a permanent root page reference. */
-	return (__wt_root_pin(session));
 }
 
 /*

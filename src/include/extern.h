@@ -138,7 +138,6 @@ void __wt_workq_evict_server_exit(CONNECTION *conn);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
 int __wt_bt_open(SESSION *session, int ok_create);
-int __wt_root_pin(SESSION *session);
 int __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store);
 int
 __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify

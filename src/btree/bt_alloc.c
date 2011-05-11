@@ -87,7 +87,13 @@ __wt_block_extend(SESSION *session, uint32_t *addrp, uint32_t size)
 	btree = session->btree;
 	fh = btree->fh;
 
-	/* Extend the file. */
+	/*
+	 * Extend the file.  We never allocate the first chunk of the file,
+	 * it's owned by the file's descriptor record.
+	 */
+	if (fh->file_size == 0)
+		fh->file_size = WT_BTREE_ALLOCATION_SIZE_MIN;
+
 	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
 
@@ -109,6 +115,8 @@ __wt_block_free(SESSION *session, uint32_t addr, uint32_t size)
 
 	WT_ASSERT(session, addr != WT_ADDR_INVALID);
 	WT_ASSERT(session, size % btree->allocsize == 0);
+
+	btree->freelist_dirty = 1;
 
 	WT_STAT_INCR(btree->stats, free);
 	++btree->freelist_entries;
@@ -275,6 +283,11 @@ __wt_block_write(SESSION *session)
 
 	btree = session->btree;
 	tmp = NULL;
+	ret = 0;
+
+	/* If the free-list hasn't changed, there's nothing to write. */
+	if (btree->freelist_dirty == 0)
+		return (0);
 
 	/* If there aren't any free-list entries, we're done. */
 	if (btree->freelist_entries == 0) {
@@ -327,7 +340,6 @@ __wt_block_write(SESSION *session)
 done:	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
-	WT_ERR(__wt_desc_write(session));
 
 	/* Discard the in-memory free-list. */
 	__wt_block_discard(session);

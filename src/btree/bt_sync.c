@@ -14,13 +14,7 @@
 int
 __wt_bt_sync(SESSION *session)
 {
-	BTREE *btree;
 	int ret;
-
-	btree = session->btree;
-
-	if (WT_UNOPENED_FILE(btree))
-		return (0);
 
 	/* Ask the eviction thread to flush any dirty pages. */
 	__wt_evict_file_serial(session, 0, ret);

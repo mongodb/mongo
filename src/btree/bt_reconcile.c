@@ -2487,8 +2487,13 @@ __rec_parent_update_clean(SESSION *session, WT_PAGE *page)
 
 	parent_ref = page->parent_ref;
 
-	/* If a page is on disk, it must have a valid disk address. */
-	WT_ASSERT(session, parent_ref->addr != WT_ADDR_INVALID);
+	/*
+	 * If a page is on disk, it must have a valid disk address -- with
+	 * one exception: if you create a root page and never use it, then
+	 * it won't have a disk address.
+	 */
+	WT_ASSERT(session,
+	    WT_PAGE_IS_ROOT(page) || parent_ref->addr != WT_ADDR_INVALID);
 
 	/*
 	 * Update the relevant WT_REF structure; no memory flush is needed,
@@ -2531,15 +2536,7 @@ __rec_parent_update(SESSION *session, WT_PAGE *page,
 	parent_ref->state = state;
 
 	/*
-	 * If we re-wrote the root page, update the descriptor record.  The
-	 * root page's parent WT_REF structure is in the BTREE structure, and
-	 * was just updated.
-	 */
-	if (WT_PAGE_IS_ROOT(page))
-		return (__wt_desc_write(session));
-
-	/*
-	 * In all other cases, mark the parent page dirty.
+	 * If it's not the root page, mark the parent page dirty.
 	 *
 	 * There's no chance we need to flush this write -- the eviction thread
 	 * is the only thread that eventually cares if the page is dirty or not,
@@ -2550,7 +2547,8 @@ __rec_parent_update(SESSION *session, WT_PAGE *page,
 	 * with us, the page will still be marked dirty and that's all we care
 	 * about.
 	 */
-	WT_PAGE_SET_MODIFIED(page->parent);
+	if (!WT_PAGE_IS_ROOT(page))
+		WT_PAGE_SET_MODIFIED(page->parent);
 
 	return (0);
 }

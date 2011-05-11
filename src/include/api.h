@@ -91,14 +91,7 @@ struct __btree {
 	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
-	/*
-	 * When a file is opened and/or created a hazard reference is taken on
-	 * its root page, and the root page brought into memory.  If no root
-	 * page has been acquired, there's usually not much work to do.
-	 */
-#define	WT_UNOPENED_FILE(btree)						\
-	((btree)->root_page.state == WT_REF_DISK)
-	WT_REF		root_page;	/* Root page reference */
+	WT_REF	root_page;		/* Root page reference */
 
 	uint32_t free_addr;		/* Free page */
 	uint32_t free_size;
@@ -106,6 +99,7 @@ struct __btree {
 	uint32_t freelist_entries;	/* Free list entry count */
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
+	int	 freelist_dirty;	/* Free-list modified */
 
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 

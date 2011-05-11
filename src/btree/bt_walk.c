@@ -187,7 +187,12 @@ __wt_walk_next(SESSION *session, WT_WALK *walk, WT_PAGE **pagep)
 		return (__wt_walk_next(session, walk, pagep));
 	}
 
-	if (e->indx == page->entries) {
+	/*
+	 * If we have a non-internal page at this point, we're walking a tree
+	 * with a single leaf page.  Sure, make it work.
+	 */
+	if (e->indx == page->entries ||
+	    (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_ROW_INT)) {
 eop:		e->visited = 1;
 		*pagep = e->page;
 		return (0);

@@ -18,32 +18,54 @@ int
 __wt_bt_open(SESSION *session, int ok_create)
 {
 	BTREE *btree;
+	WT_PAGE *page;
 
 	btree = session->btree;
 
 	/* Check page size configuration. */
 	WT_RET(__wt_open_verify(session, btree));
 
-	/* Open the fle. */
+	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session,
 	    btree->name, btree->mode, ok_create, &btree->fh));
 
 	/*
-	 * If the file size is 0, write a description page; if the file size
-	 * is non-zero, update the BTREE handle based on the on-disk
-	 * description page.  (If the file isn't empty, there must be a
-	 * description page.)
+	 * If the file size is 0 create an in-memory page, but leave it clean;
+	 * if it's never written, that's OK.
 	 */
-	if (btree->fh->file_size == 0)
-		WT_RET(__wt_desc_write(session));
-	else
-		WT_RET(__wt_desc_read(session));
+	if (btree->fh->file_size == 0) {
+		WT_RET(__wt_calloc_def(session, 1, &page));
+		if (F_ISSET(btree, WT_COLUMN)) {
+			if (btree->fixed_len == 0)
+				page->type = WT_PAGE_COL_VAR;
+			else
+				if (F_ISSET(btree, WT_RLE))
+					page->type = WT_PAGE_COL_RLE;
+				else
+					page->type = WT_PAGE_COL_FIX;
+			page->u.col_leaf.recno = 1;
+		} else
+			page->type = WT_PAGE_ROW_LEAF;
 
-	/* Pin the root, creating an empty root if necessary. */
-	WT_RET(__wt_root_pin(session));
+		btree->root_page.state = WT_REF_MEM;
+		btree->root_page.addr = WT_ADDR_INVALID;
+		btree->root_page.size = 0;
+		btree->root_page.page = page;
+		page->parent = NULL;
+		page->parent_ref = &btree->root_page;
+		return (0);
+	}
 
-	/* Read the free-list into memory. */
+	/*
+	 * If the file size isn't 0, read in the file's meta-data and compare
+	 * it with the application's, read in the free-list, then read in and
+	 * pin the root-page.
+	 */
+	WT_RET(__wt_desc_read(session));
 	WT_RET(__wt_block_read(session));
+	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
+	F_SET(btree->root_page.page, WT_PAGE_PINNED);
+	__wt_hazard_clear(session, btree->root_page.page);
 
 	return (0);
 }
@@ -242,37 +264,6 @@ __wt_open_verify_page_sizes(SESSION *session, BTREE *btree)
 		    "objects");
 		return (WT_ERROR);
 	}
-
-	return (0);
-}
-
-/*
- * __wt_root_pin --
- *	Read in the root page and pin it into memory.
- */
-int
-__wt_root_pin(SESSION *session)
-{
-	BTREE *btree;
-	WT_PAGE *page;
-
-	btree = session->btree;
-
-	if (btree->root_page.addr == 0 ||
-	    btree->root_page.addr == WT_ADDR_INVALID) {
-		WT_RET(__wt_calloc_def(session, 1, &page));
-		page->type = F_ISSET(btree, WT_COLUMN) ?
-		    WT_PAGE_COL_INT : WT_PAGE_ROW_INT;
-
-		btree->root_page.page = page;
-		btree->root_page.state = WT_REF_MEM;
-	}
-
-	/* Get the root page, which had better be there. */
-	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
-
-	F_SET(btree->root_page.page, WT_PAGE_PINNED);
-	__wt_hazard_clear(session, btree->root_page.page);
 
 	return (0);
 }

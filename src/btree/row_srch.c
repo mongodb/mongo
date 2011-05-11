@@ -37,15 +37,13 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 	btree = session->btree;
 	func = btree->btree_compare;
 	rip = NULL;
-	rref = NULL;
 
-	/* Assume we don't match in case we're searching an empty tree. */
-	cmp = -1;
+	cmp = -1;				/* Assume we don't match. */
 
 	/* Search the tree. */
 	for (page = btree->root_page.page; page->type == WT_PAGE_ROW_INT;) {
 		/* Binary search of internal pages. */
-		for (base = 0,
+		for (base = 0, rref = NULL,
 		    limit = page->entries; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rref = page->u.row_int.t + indx;
@@ -144,13 +142,13 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 		base = indx + 1;
 		--limit;
 	}
-	WT_ASSERT(session, rip != NULL);
 
 	/*
 	 * If we found a match in the page on-disk information, set the return
 	 * information, we're done.
 	 */
 	if (cmp == 0) {
+		WT_ASSERT(session, rip != NULL);
 		session->srch_slot = slot = WT_ROW_SLOT(page, rip);
 		if (page->u.row_leaf.upd != NULL) {
 			session->srch_upd = &page->u.row_leaf.upd[slot];
