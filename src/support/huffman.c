@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-#define	HEADER 3
-
 typedef struct __wt_freqtree_node {
 	/*
 	 * Data structure representing a node of the huffman tree. It holds a
@@ -21,26 +19,12 @@ typedef struct __wt_freqtree_node {
 	struct __wt_freqtree_node *right;	/* bit 1 */
 } WT_FREQTREE_NODE;
 
-typedef struct __wt_static_huffman_node {
-	/*
-	 * This data structure is used to represent the huffman tree in a static
-	 * array, after it has been created (using a dynamic tree representation
-	 * with WT_FREQTREE_NODE nodes).
-	 *
-	 * In the binary tree's array representation if a node's index is i,
-	 * then its left child node is 2i+1 and its right child node is 2i+2.
-	 */
-	uint8_t valid;
-	uint16_t symbol;
-	uint16_t codeword_length;
-} WT_STATIC_HUFFMAN_NODE;
-
 typedef struct __wt_huffman_table_entry {
-	uint16_t code;
+	uint16_t code;	/* length of field's type in bits >= max_code_length */
 
 	/*
 	 * Lengths usually range from 1-to-teens, 32 is big, 255 is pathological
-	 * worst case in which case you have other problems.
+	 * worst case, in which case you have other problems.
 	 */
 	uint8_t codeword_length;
 } WT_HUFFMAN_TABLE_ENTRY;
@@ -55,22 +39,13 @@ typedef struct __wt_huffman_obj {
 	uint32_t numSymbols;
 	uint8_t  numBytes;		/* 1 or 2 */
 					/* Tree in static array reprentation */
-	WT_STATIC_HUFFMAN_NODE *nodes;
-	uint16_t max_depth;
+	uint16_t max_depth, min_depth;
 
 	/*
 	 * Table-based Huffman:
-	 * data structures:
-	 *	symbols[0-to-(number of symbols - 1)]
- *
- * Tom: where is "symbols"?
- *
+	 * data structures (memory use):
+	 *	entries[0-to-(number of symbols - 1)]
 	 *	c2e[1 << max_depth] (code to entry in symbols)
-	 *
-	 * decoding use:
-	 *	c2e[code] = index of struct with symbol and length
-	 * encoding use:
-	 *	code = symbols[symbol].code
 	 *
 	 * c2e[Huffman code] = entry index.  Always 16-bit for simplicity,
 	 * if <=256 elements then waste 256 bytes, otherwise need them.
@@ -118,7 +93,7 @@ static void node_queue_dequeue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE **);
 static int  node_queue_enqueue(SESSION *, NODE_QUEUE *, WT_FREQTREE_NODE *);
 static void recursive_free_node(SESSION *, WT_FREQTREE_NODE *);
 static void set_codes(WT_FREQTREE_NODE *,
-	WT_HUFFMAN_TABLE_ENTRY *, uint32_t, uint16_t, uint16_t *);
+	WT_HUFFMAN_TABLE_ENTRY *, uint16_t, uint8_t, uint16_t *, uint16_t *);
 
 #define	node_queue_is_empty(queue)					\
 	(((queue) == NULL || (queue)->first == NULL) ? 1 : 0)
@@ -136,37 +111,38 @@ indexed_byte_comparator(const void *elem1, const void *elem2)
 
 /*
  * set_codes --
- *	Tom: Please fill this in.
+ *	Computes Huffman code for each symbol in tree, in standard way in the
+ * literature.
  */
 static void
 set_codes(WT_FREQTREE_NODE *node, WT_HUFFMAN_TABLE_ENTRY *entries,
-    uint32_t code, uint16_t len, uint16_t *max_depth)
+	uint16_t code, uint8_t len, uint16_t *max_depth, uint16_t *min_depth)
 {
 	WT_HUFFMAN_TABLE_ENTRY *entry;
 
 	if (node->left == NULL && node->right == NULL) {
 		entry = &entries[node->symbol];
-		/*
-		 * Tom:
-		 * Casts from 32-bits to 16-bits, and 16-bits to 8-bits?
-		 */
-		entry->code = (uint16_t)code;
+		entry->code = code;
 		entry->codeword_length = (uint8_t)len;
 		if (*max_depth < len)
 			*max_depth = len;
+		if (*min_depth > len)
+			*min_depth = len;
 	} else {
 		if (node->left != NULL)
-			set_codes(node->left,
-			    entries, (code << 1), len + 1, max_depth);
+			set_codes(node->left, entries,
+				(code << 1), len + 1, max_depth, min_depth);
 		if (node->right != NULL)
-			set_codes(node->right,
-			   entries, ((code << 1) | 1), len + 1, max_depth);
+			set_codes(node->right, entries,
+				(code << 1) | 1, len + 1, max_depth, min_depth);
 	}
 }
 
 /*
  * make_table --
- *	Tom: Please fill this in.
+ *	Computes Huffman table used for subsequent lookups in encoding and
+ * decoding.  With the table, encoding from a symbol to Huffman code and
+ * decoding from a code to a symbol are simple array lookups.
  */
 static void
 make_table(uint16_t *c2e,
@@ -183,8 +159,11 @@ make_table(uint16_t *c2e,
 			continue;
 
 		/*
-		 * Tom:
-		 * is making all of these uint16_t types safe?
+		 * The size of the array index should be enough to hold largest
+		 * index into symbol table.  Pre-existing symbols were packed
+		 * 0-255 or 0-0xffff, so 16 bits is enough.  Don't want to make
+		 * it larger than necessary, we allocate (2 ^ max-code-length)
+		 * of them.
 		 */
 		c = entries[i].code;
 		shift = max_depth - len;
@@ -229,7 +208,7 @@ __wt_huffman_open(SESSION *session,
 	NODE_QUEUE *combined_nodes, *leaves;
 	WT_FREQTREE_NODE *node, *node2, **refnode, *tempnode;
 	WT_HUFFMAN_OBJ *huffman;
-	uint32_t w1, w2;
+	uint32_t memuse, w1, w2;
 	uint16_t i;
 	int ret;
 
@@ -339,15 +318,47 @@ __wt_huffman_open(SESSION *session,
 
 	WT_ERR(__wt_calloc(session,
 	    nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY), &huffman->entries));
-	set_codes(node, huffman->entries, 0, 0, &huffman->max_depth);
+
+	/*
+	 * 1000, or ((1 << bits-in-codeword) - 1), but if >1000 you've got
+	 * other problems.
+	 */
+	huffman->min_depth = 1000;
+	set_codes(node,
+	    huffman->entries, 0, 0, &huffman->max_depth, &huffman->min_depth);
+
+	/*
+	 * It's potentially possible, but vanishingly unlikely, that a table
+	 * will be too large; before big memory allocation, see if would use
+	 * too much memory.
+	 */
+#define	WT_HUFFMAN_MAX_MEMORY	 (256 * 1024)
+	memuse = nbytes * sizeof(WT_HUFFMAN_TABLE_ENTRY) +
+	    (1U << huffman->max_depth) * sizeof(uint16_t);
+	if (memuse > WT_HUFFMAN_MAX_MEMORY) {
+		__wt_errx(session,
+		    "Huffman table would allocate too much memory, perhaps due "
+		    "to a very long code (maximum depth is %lu)",
+		    (u_long)huffman->max_depth);
+		goto err;
+	}
+#if 0
+	if (huffman->max_depth > sizeof(__wt_huffman_table_entry.code))
+		printf("ERROR: code word %d > field in "
+		    "WT_HUFFMAN_TABLE_ENTRY %d\n",
+		    huffman->max_depth,
+		    sizeof(__wt_huffman_table_entry.code));
+#endif
 
 	WT_ERR(__wt_calloc(session,
 	    1U << huffman->max_depth, sizeof(uint16_t), &huffman->c2e));
 	make_table(huffman->c2e, huffman->max_depth, huffman->entries, nbytes);
 #if 0
-	printf("max depth = %d, memory use: entries %d * %u + c2e %d * %u\n",
-	    huffman->max_depth, nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY),
-	    (1U << huffman->max_depth), sizeof(uint16_t));
+	printf("max depth = %d, min_depth = %d, "
+	    "memory use: entries %d * %u + c2e %d * %u\n",
+	    huffman->max_depth, huffman->min_depth, nbytes,
+	    sizeof(WT_HUFFMAN_TABLE_ENTRY), (1U << huffman->max_depth),
+	    sizeof(uint16_t));
 #endif
 
 	*(void **)retp = huffman;
@@ -364,11 +375,8 @@ err:	if (leaves != NULL)
 		recursive_free_node(session, node2);
 	if (tempnode != NULL)
 		__wt_free(session, tempnode);
-	if (ret != 0) {
-		if (huffman->nodes != NULL)
-			__wt_free(session, huffman->nodes);
+	if (ret != 0)
 		__wt_free(session, huffman);
-	}
 	return (ret);
 }
 
@@ -383,7 +391,6 @@ __wt_huffman_close(SESSION *session, void *huffman_arg)
 
 	huffman = huffman_arg;
 
-	__wt_free(session, huffman->nodes);
 	__wt_free(session, huffman->c2e);
 	__wt_free(session, huffman->entries);
 	__wt_free(session, huffman);
@@ -394,57 +401,46 @@ __wt_huffman_close(SESSION *session, void *huffman_arg)
  * __wt_print_huffman_code --
  *	Prints a symbol's huffman code. Can be used for debugging purposes.
  */
-int
-__wt_print_huffman_code(SESSION *session, void *huffman_arg, uint16_t symbol)
+void
+__wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
 {
 	WT_HUFFMAN_OBJ *huffman;
-	WT_STATIC_HUFFMAN_NODE *node;
-	u_int i, n;
-	int p;
-	char *buffer;
+	WT_HUFFMAN_TABLE_ENTRY *e;
 
 	huffman = huffman_arg;
 
-	/* Check if the symbol is in valid range */
-	if (symbol < huffman->numSymbols) {
-		WT_RET(__wt_calloc(session, huffman->max_depth, 1, &buffer));
-
-		node = NULL;
-		for (i = 0, n = 1U << huffman->max_depth; i < n; ++i) {
-			node = &huffman->nodes[i];
-			if (node->valid &&
-			    node->symbol == symbol && node->codeword_length > 0)
-				break;
-		}
-
-		if (node != NULL) {
-			/*
-			 * We've got the leaf node, at index 'i'.  Now we fill
-			 * the output buffer in back order.
-			 */
-			for (p = node->codeword_length - 1; p >= 0; --p) {
-				buffer[p] = (i % 2) == 1 ? '0' : '1';
-				i = (i - 1) / 2;
-			}
-
-			(void)printf("%s\n", buffer);
-		} else {
-			(void)printf(
-			    "Symbol is not in the huffman tree: %x\n", symbol);
-			return (WT_ERROR);
-		}
-
-		__wt_free(session, buffer);
-	} else
-		(void)printf("Symbol out of range: %lu >= %lu\n",
-		    (u_long)symbol, (u_long)huffman->numSymbols);
-	return (0);
+	if (symbol >= huffman->numSymbols) {
+		printf("symbol %d out of range\n", symbol);
+	} else {
+		e = &huffman->entries[symbol];
+		if (e->codeword_length == 0)
+			printf("symbol %d not defined -- 0 frequency\n",
+			    symbol);
+		else
+			/* should translate code to bindary */
+			printf("%d -> code %x, length %d\n",
+			    symbol, e->code, e->codeword_length);
+	}
 }
 #endif
 
 /*
  * __wt_huffman_encode --
  *	Take a byte string, encode it into the target.
+ *
+ * Translation from symbol to Huffman code is a simple array lookup.
+ *
+ * WT_HUFFMAN_OBJ contains an array called entries with a WT_HUFFMAN_TABLE_ENTRY
+ * per symbol.  Then, given a symbol:
+ *
+ *	code = entries[symbol].code;
+ *	length = entries[symbol].codeword_length;
+ *
+ * To encode a byte-string message, iterate over the input symbols.  For each
+ * symbol, look it up via table, shift bits onto a shift register (an int long
+ * enough to hold the longest code word + up to 7 bits remaining from the
+ * previous), then drain out full bytes.  Finally, at the end flush remaining
+ * bits and write header bits.
  */
 int
 __wt_huffman_encode(void *huffman_arg,
@@ -455,7 +451,17 @@ __wt_huffman_encode(void *huffman_arg,
 	uint32_t bitpos, bytes;
 	uint16_t symbol;
 	uint8_t len, padding_info, *to, *out;
-	int bits, code, valid;		/* Tom: "int" is correct? */
+	uint32_t code;
+
+	/*
+	 * Shift register to accumulate bits from input.  Should be >= length
+	 * of max_code_word + 7, but also efficient to shift bits and preferably
+	 * in a register.
+	 */
+	uint32_t bits;
+
+	/* Number of valid bits in shift register ('bits'). */
+	uint8_t valid;
 
 	huffman = huffman_arg;
 	session = huffman->session;
@@ -472,6 +478,14 @@ __wt_huffman_encode(void *huffman_arg,
 	/*
 	 * We need N+1 bytes to encode N bytes, re-allocate as necessary.
 	 *
+	 * XXX
+	 * THIS IS WRONG.  We if the input consists entirely of the least
+	 * frequent symbol (longest code word), we need:
+	 *
+	 *	max-code-length * symbols-in-input
+	 *
+	 * bits.
+	 *
 	 * If the initial target pointer, or the initial target buffer length,
 	 * aren't set, it's an allocation.   Clear the initial target pointer,
 	 * our caller may have only set the initial target buffer length, not
@@ -485,9 +499,10 @@ __wt_huffman_encode(void *huffman_arg,
 	 * Leave the first 3 bits of the encoded value empty, it holds the
 	 * number of bits actually used in the last byte of the encoded value.
 	 */
+#define	WT_HUFFMAN_HEADER 3
 	bits = 0;
-	bitpos = HEADER;
-	valid = HEADER;
+	bitpos = WT_HUFFMAN_HEADER;
+	valid = WT_HUFFMAN_HEADER;
 	out = to;
 	for (bytes = 0; bytes < from_len; bytes += huffman->numBytes) {
 		/* Getting the next symbol, either 1 or 2 bytes */
@@ -520,7 +535,7 @@ __wt_huffman_encode(void *huffman_arg,
 	 * used in the last byte, unless they're 0, in which case there are 8
 	 * bits used in the last byte.
 	 */
-	padding_info = (bitpos % 8) << (8 - HEADER);
+	padding_info = (bitpos % 8) << (8 - WT_HUFFMAN_HEADER);
 	*to |= padding_info;
 
 	to_buf->size = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
@@ -530,6 +545,32 @@ __wt_huffman_encode(void *huffman_arg,
 /*
  * __wt_huffman_decode --
  *	Take a byte string, decode it into the target.
+ *
+ * Translation from Huffman code to symbol is a simple array lookup.
+ *
+ * WT_HUFFMAN_OBJ contains an array called 'c2e' indexed by code word and whose
+ * value is the corresponding symbol.  From the symbol, index into the entries
+ * array to get the codeword length.
+ *
+ * When decoding a message, we don't know where the boundaries are between
+ * codewords.  The trick is that we collect enough bits for the longest code
+ * word, and construct the table such that for codes with fewer bits we flood
+ * the table with all of the bit patterns in the lower order bits.  This works
+ * because the Huffman code is a unique prefix, and by the flooding we are
+ * treating bits beyond the unique prefix as don't care bits.
+ *
+ * For example, we have table of length:
+ *	(2 ^ max-code-length (1 << max-code-length)
+ *
+ * For a code of length, max-code-length, the position c2e[code] = symbol.
+ * For a code word of (max-length - 1), we fill c2e[code << 1] = symbol, as
+ * well as c2e[(code << 1) | 1] = symbol.  And so on, so in general we will
+ * fill c2e[(code) << shift inclusive ... (code + 1) << shift exclusive].
+ *
+ * To decode a message, we read in enough bits from input to fill the shift
+ * register with at least max-code-length bits.  We look up in the table c2e.
+ * This gives the symbol.  We look up the symbol in 'entries' to get the
+ * codeword length, and subtract off these bits from the shift register.
  */
 int
 __wt_huffman_decode(void *huffman_arg,
@@ -538,7 +579,8 @@ __wt_huffman_decode(void *huffman_arg,
 	SESSION *session;
 	WT_HUFFMAN_OBJ *huffman;
 	uint32_t bits, bytes, code, from_bits, from_len_bits, len, max;
-	uint32_t mmask, out_bits, valid;
+	uint32_t mmask, out_bits;
+	uint8_t valid;
 	uint16_t symbol;
 	uint8_t padding_info, *to;
 
@@ -556,6 +598,14 @@ __wt_huffman_decode(void *huffman_arg,
 
 	/*
 	 * We need 2N+1 bytes to decode N bytes, re-allocate as necessary.
+	 *
+	 * XXX
+	 * THIS IS WRONG.  If the input consists entirely of the shortest code
+	 * word (more frequent symbol), we need a maximum of:
+	 *
+	 *	(bytes-per-symbol / min-code-length) * length-input
+	 *
+	 * bytes.
 	 *
 	 * If the initial target pointer, or the initial target buffer length,
 	 * aren't set, it's an allocation.   Clear the initial target pointer,
@@ -575,9 +625,9 @@ __wt_huffman_decode(void *huffman_arg,
 		from_len_bits -= 8 - padding_info;
 
 	bits = *from++;
-	valid = 8 - HEADER;
+	valid = 8 - WT_HUFFMAN_HEADER;
 	from_bits = from_len_bits - valid;
-	out_bits = from_len_bits - HEADER;
+	out_bits = from_len_bits - WT_HUFFMAN_HEADER;
 	max = huffman->max_depth;
 	mmask = (1 << max) - 1;
 	for (bytes = 0; out_bits > 0; bytes += huffman->numBytes) {
