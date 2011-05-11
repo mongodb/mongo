@@ -26,7 +26,7 @@ typedef struct {
 	WT_BUF dsk;			/* Temporary disk-image buffer */
 
 	int evict;			/* The page is being discarded */
-	int single_use;			/* The tree is locked down */
+	int locked;			/* The tree is locked down */
 
 	/*
 	 * As pages are reconciled, split pages are merged into their parent
@@ -194,7 +194,7 @@ static int  __rec_imref_fixup(SESSION *, WT_PAGE *);
 static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
 static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
-static int  __rec_init(SESSION *, int);
+static int  __rec_init(SESSION *, uint32_t);
 static int  __rec_parent_update(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
 static void __rec_parent_update_clean(SESSION *, WT_PAGE *);
@@ -236,7 +236,7 @@ static int  __hazard_qsort_cmp(const void *, const void *);
  *	Initialize the reconciliation structure.
  */
 static int
-__rec_init(SESSION *session, int caller)
+__rec_init(SESSION *session, uint32_t flags)
 {
 	CONNECTION *conn;
 	WT_RECONCILE *r;
@@ -255,11 +255,8 @@ __rec_init(SESSION *session, int caller)
 		    conn->session_size * conn->hazard_size, &r->hazard));
 	}
 
-	/* Set the eviction flag for close and evict callers. */
-	r->evict = caller == WT_REC_CLOSE || caller == WT_REC_EVICT ? 1 : 0;
-
-	/* Set the single-use flag for the close caller. */
-	r->single_use = caller == WT_REC_CLOSE ? 1 : 0;
+	r->evict = LF_ISSET(WT_REC_EVICT);
+	r->locked = LF_ISSET(WT_REC_LOCKED);
 
 	/*
 	 * During internal page reconcilition we track referenced objects that
@@ -371,7 +368,7 @@ __rec_allocation_size(SESSION *session, WT_BUF *buf, uint8_t *end)
  */
 int
 __wt_page_reconcile(
-    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, int caller)
+    SESSION *session, WT_PAGE *page, uint32_t slvg_skip, uint32_t flags)
 {
 	BTREE *btree;
 	WT_CACHE *cache;
@@ -405,7 +402,7 @@ __wt_page_reconcile(
 		return (0);
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_init(session, caller));
+	WT_RET(__rec_init(session, flags));
 
 	/*
 	 * Get exclusive access to the page and review the page's subtree: if
@@ -426,8 +423,7 @@ __wt_page_reconcile(
 	 * clean page if not to evict it.)
 	 */
 	if (!WT_PAGE_IS_MODIFIED(page)) {
-		WT_ASSERT(session,
-		    caller == WT_REC_CLOSE || caller == WT_REC_EVICT);
+		WT_ASSERT(session, LF_ISSET(WT_REC_EVICT));
 
 		WT_STAT_INCR(cache->stats, cache_evict_unmodified);
 
@@ -503,7 +499,7 @@ __wt_page_reconcile(
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		WT_PAGE_SET_MODIFIED(btree->root_page.page);
 		ret = __wt_page_reconcile(
-		    session, btree->root_page.page, 0, caller);
+		    session, btree->root_page.page, 0, flags);
 	}
 
 	return (ret);
@@ -526,7 +522,7 @@ __rec_subtree(SESSION *session, WT_PAGE *page)
 	 * Attempt exclusive access to the page if our caller doesn't have the
 	 * tree locked down.
 	 */
-	if (!r->single_use)
+	if (!r->locked)
 		WT_RET(__hazard_exclusive(session, page->parent_ref));
 
 	/*
@@ -567,12 +563,12 @@ __rec_subtree(SESSION *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		if ((ret = __rec_subtree_col(session, page)) != 0)
-			if (!r->single_use)
+			if (!r->locked)
 				__rec_subtree_col_clear(session, page);
 		break;
 	case WT_PAGE_ROW_INT:
 		if ((ret = __rec_subtree_row(session, page)) != 0)
-			if (!r->single_use)
+			if (!r->locked)
 				__rec_subtree_row_clear(session, page);
 		break;
 	default:
@@ -583,7 +579,7 @@ __rec_subtree(SESSION *session, WT_PAGE *page)
 	 * If we're not going to reconcile this page, release our exclusive
 	 * reference.
 	 */
-	if (ret != 0 && !r->single_use)
+	if (ret != 0 && !r->locked)
 		page->parent_ref->state = WT_REF_MEM;
 
 	return (ret);
@@ -636,7 +632,7 @@ __rec_subtree_col(SESSION *session, WT_PAGE *parent)
 		 * Attempt exclusive access to the page if our caller doesn't
 		 * have the tree locked down.
 		 */
-		if (!r->single_use)
+		if (!r->locked)
 			WT_RET(__hazard_exclusive(session, &cref->ref));
 
 		/*
@@ -762,7 +758,7 @@ __rec_subtree_row(SESSION *session, WT_PAGE *parent)
 		 * Attempt exclusive access to the page if our caller doesn't
 		 * have the tree locked down.
 		 */
-		if (!r->single_use)
+		if (!r->locked)
 			WT_RET(__hazard_exclusive(session, &rref->ref));
 
 		/*
@@ -2362,7 +2358,7 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 		 * our exclusive reference to it, as well as any pages in its
 		 * subtree that we locked down.
 		 */
-		if (!r->single_use) {
+		if (!r->locked) {
 			page->parent_ref->state = WT_REF_MEM;
 
 			switch (page->type) {

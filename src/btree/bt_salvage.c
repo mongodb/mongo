@@ -974,7 +974,8 @@ __slvg_build_internal_col(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	}
 
 	/* Write the internal page to disk. */
-	return (__wt_page_reconcile(session, page, 0, WT_REC_CLOSE));
+	return (__wt_page_reconcile(
+	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
 
 err:	if (page->u.col_int.t != NULL)
 		__wt_free(session, page->u.col_int.t);
@@ -1094,7 +1095,8 @@ __slvg_build_leaf_col(SESSION *session,
 	 * IN RECONCILIATION.
 	 */
 	WT_PAGE_SET_MODIFIED(page);
-	ret = __wt_page_reconcile(session, page, 0, WT_REC_SYNC);
+	ret =
+	    __wt_page_reconcile(session, page, 0, WT_REC_EVICT | WT_REC_LOCKED);
 
 	/*
 	 * Reset the page.  (Don't reset the record number or RLE counts -- it
@@ -1453,7 +1455,8 @@ __slvg_build_internal_row(SESSION *session, uint32_t leaf_cnt, WT_STUFF *ss)
 	}
 
 	/* Write the internal page to disk. */
-	return (__wt_page_reconcile(session, page, 0, WT_REC_CLOSE));
+	return (__wt_page_reconcile(
+	    session, page, 0, WT_REC_EVICT | WT_REC_LOCKED));
 
 err:	if (page->u.row_int.t != NULL)
 		__wt_free(session, page->u.row_int.t);
@@ -1593,8 +1596,8 @@ __slvg_build_leaf_row(SESSION *session, WT_TRACK *trk,
 	 * THIS IS WRONG -- THE PARENT ADDR IS WHAT WE USE TO FREE BLOCKS
 	 * IN RECONCILIATION.
 	 */
-			ret = __wt_page_reconcile(
-			    session, page, skip_start, WT_REC_SYNC);
+			ret = __wt_page_reconcile(session,
+			    page, skip_start, WT_REC_EVICT | WT_REC_LOCKED);
 			page->entries += skip_stop;
 		}
 

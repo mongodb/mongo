@@ -383,11 +383,12 @@ __evict_file(SESSION *session, WT_EVICT_REQ *er)
 {
 	BTREE *btree;
 	WT_PAGE *page;
-	int caller, ret;
+	uint32_t flags;
+	int ret;
 
 	btree = session->btree;
 	ret = 0;
-	caller = er->close_method ? WT_REC_CLOSE : WT_REC_SYNC;
+	flags = er->close_method ? WT_REC_EVICT | WT_REC_LOCKED : 0;
 
 	/*
 	 * Walk the tree.  It doesn't matter if we are already walking the tree,
@@ -406,9 +407,9 @@ __evict_file(SESSION *session, WT_EVICT_REQ *er)
 		 * Close: discarding all of the file's pages from the cache,
 		 * and reconciliation is how we do that.
 		 */
-		if (caller == WT_REC_SYNC && !WT_PAGE_IS_MODIFIED(page))
+		if (!er->close_method && !WT_PAGE_IS_MODIFIED(page))
 			continue;
-		if (__wt_page_reconcile(session, page, 0, caller) == 0)
+		if (__wt_page_reconcile(session, page, 0, flags) == 0)
 			continue;
 
 		/*
@@ -447,8 +448,8 @@ __evict_request_retry(SESSION *session)
 	SESSION *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
-	uint32_t i;
-	int caller, pending_retry;
+	uint32_t i, flags;
+	int pending_retry;
 
 	cache = S2C(session)->cache;
 
@@ -474,17 +475,17 @@ __evict_request_retry(SESSION *session)
 		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
 
 		/*
-		 * Set the reconcile caller: should never be close, but we
+		 * Set the reconcile flags: should never be close, but we
 		 * can do the work even if it is.
 		 */
-		caller = er->close_method ? WT_REC_CLOSE : WT_REC_SYNC;
+		flags = er->close_method ? WT_REC_EVICT | WT_REC_LOCKED : 0;
 
 		/* Walk the list of retry requests. */
 		for (pending_retry = 0, i = 0; i < er->retry_entries; ++i) {
 			if (er->retry[i] == NULL)
 				continue;
 			if (__wt_page_reconcile(
-			    session, er->retry[i], 0, caller) == 0)
+			    session, er->retry[i], 0, flags) == 0)
 				er->retry[i] = NULL;
 			else
 				pending_retry = 1;

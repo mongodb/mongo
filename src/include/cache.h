@@ -9,10 +9,6 @@
 extern "C" {
 #endif
 
-#define	WT_REC_CLOSE	1			/* Reconcile callers */
-#define	WT_REC_EVICT	2
-#define	WT_REC_SYNC	3
-
 /*
  * WT_EVICT_LIST --
  *	Encapsulation of an eviction candidate.

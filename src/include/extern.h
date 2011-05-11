@@ -160,7 +160,7 @@ void __wt_rec_destroy(SESSION *session);
 int __wt_page_reconcile( SESSION *session,
     WT_PAGE *page,
     uint32_t slvg_skip,
-    int caller);
+    uint32_t flags);
 int __wt_return_data(SESSION *session,
     WT_ITEM *key,
     WT_ITEM *value,
@@ -360,9 +360,7 @@ int __wt_huffman_open(SESSION *session,
     u_int nbytes,
     void *retp);
 void __wt_huffman_close(SESSION *session, void *huffman_arg);
-int __wt_print_huffman_code(SESSION *session,
-    void *huffman_arg,
-    uint16_t symbol);
+void __wt_print_huffman_code(void *huffman_arg, uint16_t symbol);
 int __wt_huffman_encode(void *huffman_arg,
     const uint8_t *from,
     uint32_t from_len,
