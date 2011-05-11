@@ -494,29 +494,45 @@ namespace mongo {
                 return false;
             }
 
-            readlock l( _ns );
-            Client::Context ctx( _ns );
+            ElapsedTracker tracker (128, 10); // same as ClientCursor::_yieldSometimesTracker
 
-            NamespaceDetails *d = nsdetails( _ns.c_str() );
-            assert( d );
+            int allocSize;
+            {
+                readlock l(_ns);
+                Client::Context ctx( _ns );
+                NamespaceDetails *d = nsdetails( _ns.c_str() );
+                assert( d );
+                allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
+            }
+            BSONArrayBuilder a (allocSize);
 
-            BSONArrayBuilder a( std::min( BSONObjMaxUserSize , (int)( ( 12 + d->averageObjectSize() )* _cloneLocs.size() ) ) );
+            bool keepGoing = true;
+            while (keepGoing && !_cloneLocs.empty()){
+                readlock l( _ns );
+                Client::Context ctx( _ns );
 
-            set<DiskLoc>::iterator i = _cloneLocs.begin();
-            for ( ; i!=_cloneLocs.end(); ++i ) {
-                DiskLoc dl = *i;
-                BSONObj o = dl.obj();
+                set<DiskLoc>::iterator i = _cloneLocs.begin();
+                for ( ; i!=_cloneLocs.end(); ++i ) {
+                    if (tracker.ping()) // should I yield?
+                        break;
 
-                // use the builder size instead of accumulating 'o's size so that we take into consideration
-                // the overhead of BSONArray indices
-                if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                    break;
+                    DiskLoc dl = *i;
+                    BSONObj o = dl.obj();
+
+                    // use the builder size instead of accumulating 'o's size so that we take into consideration
+                    // the overhead of BSONArray indices
+                    if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                        keepGoing = false; // break out of outer while loop
+                        break;
+                    }
+
+                    a.append( o );
                 }
-                a.append( o );
+
+                _cloneLocs.erase( _cloneLocs.begin() , i );
             }
 
             result.appendArray( "objects" , a.arr() );
-            _cloneLocs.erase( _cloneLocs.begin() , i );
             return true;
         }
 
