@@ -527,7 +527,7 @@ namespace mongo {
 
             // js function to run reduce on all keys
 //            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
-            _reduceAll = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length != 1) { ret = _reduce(key, list); _mrMap[key] = [ret]; }");
+            _reduceAll = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length != 1) { ret = _reduce(key, list); _mrMap[key] = [ret]; } }");
             _reduceAndFinalize = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } _mrMap[key] = ret; }");
             _reduceAndFinalizeAndInsert = _scope->createFunction("for (var key in _mrMap) { list = _mrMap[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } _insertToTemp({_id: key, value: ret}); }");
 

@@ -921,6 +921,7 @@ namespace mongo {
         Convertor c(cx);
 
         NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
+        void* data = (void*)((long long)c.getNumber( obj , "y" ) );
         assert( func );
 
         BSONObj a;
@@ -935,7 +936,7 @@ namespace mongo {
 
         BSONObj out;
         try {
-            out = func( a, 0 );
+            out = func( a, data );
         }
         catch ( std::exception& e ) {
             JS_ReportError( cx , e.what() );
@@ -1529,7 +1530,12 @@ namespace mongo {
             _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
 
             stringstream code;
-            code << field << "_" << " = { x : " << field << "_ }; ";
+            if (data) {
+                _convertor->setProperty( _global , (name + "_data_").c_str() , _convertor->toval( (double)(long long)data ) );
+                code << field << "_" << " = { x : " << field << "_ , y: " << field << "_data_ }; ";
+            } else {
+                code << field << "_" << " = { x : " << field << "_ }; ";
+            }
             code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
             exec( code.str() );
         }
