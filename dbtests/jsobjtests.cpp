@@ -95,6 +95,9 @@ namespace JsobjTests {
     public:
         void run() {
             ASSERT_EQUALS( 1, BSONElement().size() );
+
+            BSONObj x;
+            ASSERT_EQUALS( 1, x.firstElement().size() );
         }
     };
 

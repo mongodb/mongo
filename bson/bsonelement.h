@@ -372,24 +372,28 @@ namespace mongo {
 
         // @param maxLen don't scan more than maxLen bytes
         explicit BSONElement(const char *d, int maxLen) : data(d) {
-            fieldNameSize_ = -1;
-            if ( eoo() )
+            if ( eoo() ) {
+                totalSize = 1;
                 fieldNameSize_ = 0;
+            }
             else {
+                totalSize = -1;
+                fieldNameSize_ = -1;
                 if ( maxLen != -1 ) {
                     int size = (int) strnlen( fieldName(), maxLen - 1 );
                     massert( 10333 ,  "Invalid field name", size != -1 );
                     fieldNameSize_ = size + 1;
                 }
             }
-            totalSize = -1;
         }
 
         explicit BSONElement(const char *d) : data(d) {
             fieldNameSize_ = -1;
-            if ( eoo() )
-                fieldNameSize_ = 0;
             totalSize = -1;
+            if ( eoo() ) {
+                fieldNameSize_ = 0;
+                totalSize = 1;
+            }
         }
 
         string _asCode() const;

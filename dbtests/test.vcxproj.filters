@@ -53,6 +53,12 @@
     <Filter Include="dur">
       <UniqueIdentifier>{c296d097-0d46-46ee-9097-f2df659d9596}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\NewFilter1">
+      <UniqueIdentifier>{ff8969fe-1912-42d5-86c4-f7077a7e5a24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson">
+      <UniqueIdentifier>{e6652333-c77f-420c-af8e-72d55bc095fe}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -249,6 +255,45 @@
     </ClInclude>
     <ClInclude Include="..\util\checksum.h">
       <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_db.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bsonelement.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson-inl.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bsonmisc.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bsonobj.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bsonobjbuilder.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bsonobjiterator.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bsontypes.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\inline_decls.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\oid.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\ordering.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\stringdata.h">
+      <Filter>bson</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

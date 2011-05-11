@@ -196,6 +196,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp" />
+    <ClInclude Include="..\bson\bson-inl.h" />
+    <ClInclude Include="..\bson\bson.h" />
+    <ClInclude Include="..\bson\bsonelement.h" />
+    <ClInclude Include="..\bson\bsonmisc.h" />
+    <ClInclude Include="..\bson\bsonobj.h" />
+    <ClInclude Include="..\bson\bsonobjbuilder.h" />
+    <ClInclude Include="..\bson\bsonobjiterator.h" />
+    <ClInclude Include="..\bson\bsontypes.h" />
+    <ClInclude Include="..\bson\bson_db.h" />
+    <ClInclude Include="..\bson\inline_decls.h" />
+    <ClInclude Include="..\bson\oid.h" />
+    <ClInclude Include="..\bson\ordering.h" />
+    <ClInclude Include="..\bson\stringdata.h" />
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_journal.h" />
