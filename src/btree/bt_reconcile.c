@@ -1602,7 +1602,7 @@ __rec_col_rle_bulk(SESSION *session, WT_PAGE *page)
 		}
 
 		/* Boundary: allocate, split or write the page. */
-		while (len > r->space_avail)
+		while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		last_data = r->first_free;
