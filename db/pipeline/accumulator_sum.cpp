@@ -21,10 +21,10 @@
 
 namespace mongo {
 
-    boost::shared_ptr<const Value> AccumulatorSum::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> AccumulatorSum::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	boost::shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+	shared_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* upgrade to the widest type required to hold the result */
         BSONType rhsType = prhs->getType();
@@ -51,13 +51,13 @@ namespace mongo {
         return Value::getZero();
     }
 
-    boost::shared_ptr<Accumulator> AccumulatorSum::create(
+    shared_ptr<Accumulator> AccumulatorSum::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-	boost::shared_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
+	shared_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
         return pSummer;
     }
 
-    boost::shared_ptr<const Value> AccumulatorSum::getValue() const {
+    shared_ptr<const Value> AccumulatorSum::getValue() const {
         if (totalType == NumberInt)
             return Value::createInt((int)longTotal);
         if (totalType == NumberLong)

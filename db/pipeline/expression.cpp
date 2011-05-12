@@ -49,7 +49,7 @@ namespace mongo {
 
     const char Expression::unwindName[] = "$unwind";
 
-    boost::shared_ptr<Expression> Expression::parseObject(
+    shared_ptr<Expression> Expression::parseObject(
         BSONElement *pBsonElement, ObjectCtx *pCtx) {
         /*
           An object expression can take any of the following forms:
@@ -63,8 +63,8 @@ namespace mongo {
           code that parses the expression and returns an expression.
         */
 
-        boost::shared_ptr<Expression> pExpression; // the result
-        boost::shared_ptr<ExpressionObject> pExpressionObject; // alt result
+        shared_ptr<Expression> pExpression; // the result
+        shared_ptr<ExpressionObject> pExpressionObject; // alt result
         int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
         enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
 
@@ -123,28 +123,41 @@ namespace mongo {
                 string fieldName(pFieldName);
                 if (fieldType == Object) {
                     /* it's a nested document */
-                    boost::shared_ptr<Expression> pNested(
+                    shared_ptr<Expression> pNested(
                         parseObject(&fieldElement, &ObjectCtx(
                          (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0))));
                     pExpressionObject->addField(fieldName, pNested);
                 }
                 else if (fieldType == String) {
                     /* it's a renamed field */
-                    boost::shared_ptr<Expression> pPath(
+                    shared_ptr<Expression> pPath(
                         ExpressionFieldPath::create(fieldElement.String()));
                     pExpressionObject->addField(fieldName, pPath);
                 }
                 else if (fieldType == NumberDouble) {
                     /* it's an inclusion specification */
-                    int inclusion = (int)fieldElement.Double();
-                    assert(inclusion == 1);
-                    // CW TODO error: only positive inclusions allowed here
-
-                    boost::shared_ptr<Expression> pPath(
-                        ExpressionFieldPath::create(fieldName));
-                    pExpressionObject->addField(fieldName, pPath);
+                    double inclusion = fieldElement.Double();
+		    if (inclusion == 0)
+			pExpressionObject->excludeField(fieldName);
+		    else if (inclusion == 1) {
+			shared_ptr<Expression> pPath(
+			    ExpressionFieldPath::create(fieldName));
+			pExpressionObject->addField(fieldName, pPath);
+		    } else
+			assert(false);
+                    // CW TODO error: only 0 or 1 allowed here
                 }
-                else { /* nothing else is allowed */
+                else if (fieldType == Bool) {
+		    bool inclusion = fieldElement.Bool();
+		    if (!inclusion)
+			pExpressionObject->excludeField(fieldName);
+		    else {
+			shared_ptr<Expression> pPath(
+			    ExpressionFieldPath::create(fieldName));
+			pExpressionObject->addField(fieldName, pPath);
+		    }
+		}
+		else { /* nothing else is allowed */
                     assert(false); // CW TODO error
                 }
             }
@@ -156,7 +169,7 @@ namespace mongo {
 
     struct OpDesc {
         const char *pName;
-        boost::shared_ptr<ExpressionNary> (*pFactory)(void);
+        shared_ptr<ExpressionNary> (*pFactory)(void);
     };
 
     static int OpDescCmp(const void *pL, const void *pR) {
@@ -185,7 +198,7 @@ namespace mongo {
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
 
-    boost::shared_ptr<Expression> Expression::parseExpression(
+    shared_ptr<Expression> Expression::parseExpression(
         const char *pOpName, BSONElement *pBsonElement) {
         /* look for the specified operator */
         OpDesc key;
@@ -196,14 +209,14 @@ namespace mongo {
         assert(pOp); // CW TODO error: invalid operator
 
         /* make the expression node */
-        boost::shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
+        shared_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
 
         /* add the operands to the expression node */
         BSONType elementType = pBsonElement->type();
         if (elementType == Object) {
             /* the operator must be unary and accept an object argument */
             BSONObj objOperand(pBsonElement->Obj());
-            boost::shared_ptr<Expression> pOperand(
+            shared_ptr<Expression> pOperand(
                 Expression::parseObject(pBsonElement,
                             &ObjectCtx(ObjectCtx::DOCUMENT_OK)));
             pExpression->addOperand(pOperand);
@@ -214,13 +227,13 @@ namespace mongo {
             const size_t n = bsonArray.size();
             for(size_t i = 0; i < n; ++i) {
                 BSONElement *pBsonOperand = &bsonArray[i];
-                boost::shared_ptr<Expression> pOperand(
+                shared_ptr<Expression> pOperand(
 		    Expression::parseOperand(pBsonOperand));
                 pExpression->addOperand(pOperand);
             }
         }
         else { /* assume it's an atomic operand */
-            boost::shared_ptr<Expression> pOperand(
+            shared_ptr<Expression> pOperand(
 		Expression::parseOperand(pBsonElement));
             pExpression->addOperand(pOperand);
         }
@@ -228,7 +241,7 @@ namespace mongo {
         return pExpression;
     }
 
-    boost::shared_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
+    shared_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
         BSONType type = pBsonElement->type();
 
         switch(type) {
@@ -250,13 +263,13 @@ namespace mongo {
 
             /* if we got here, this is a field path expression */
 	    string fieldPath(value.substr(1));
-            boost::shared_ptr<Expression> pFieldExpr(
+            shared_ptr<Expression> pFieldExpr(
                 ExpressionFieldPath::create(fieldPath));
             return pFieldExpr;
         }
 
         case Object: {
-            boost::shared_ptr<Expression> pSubExpression(
+            shared_ptr<Expression> pSubExpression(
                 Expression::parseObject(pBsonElement,
                             &ObjectCtx(ObjectCtx::DOCUMENT_OK)));
             return pSubExpression;
@@ -264,7 +277,7 @@ namespace mongo {
 
         default:
 	ExpectConstant: {
-                boost::shared_ptr<Expression> pOperand(
+                shared_ptr<Expression> pOperand(
                     ExpressionConstant::createFromBsonElement(pBsonElement));
                 return pOperand;
             }
@@ -273,7 +286,7 @@ namespace mongo {
 
         /* NOTREACHED */
         assert(false);
-        return boost::shared_ptr<Expression>();
+        return shared_ptr<Expression>();
     }
 
     /* ------------------------- ExpressionAdd ----------------------------- */
@@ -281,8 +294,8 @@ namespace mongo {
     ExpressionAdd::~ExpressionAdd() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionAdd::create() {
-        boost::shared_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
+    shared_ptr<ExpressionNary> ExpressionAdd::create() {
+        shared_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
     }
 
@@ -290,8 +303,8 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    boost::shared_ptr<const Value> ExpressionAdd::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionAdd::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -304,7 +317,7 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            boost::shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
 
             totalType = Value::getWidestNumeric(totalType, pValue->getType());
             doubleTotal += pValue->coerceToDouble();
@@ -322,7 +335,7 @@ namespace mongo {
 	return "$add";
     }
 
-    boost::shared_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
+    shared_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
 	return ExpressionAdd::create;
     }
 
@@ -331,8 +344,8 @@ namespace mongo {
     ExpressionAnd::~ExpressionAnd() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionAnd::create() {
-        boost::shared_ptr<ExpressionNary> pExpression(new ExpressionAnd());
+    shared_ptr<ExpressionNary> ExpressionAnd::create() {
+        shared_ptr<ExpressionNary> pExpression(new ExpressionAnd());
         return pExpression;
     }
 
@@ -340,9 +353,9 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    boost::shared_ptr<Expression> ExpressionAnd::optimize() {
+    shared_ptr<Expression> ExpressionAnd::optimize() {
 	/* optimize the conjunction as much as possible */
-	boost::shared_ptr<Expression> pE(ExpressionNary::optimize());
+	shared_ptr<Expression> pE(ExpressionNary::optimize());
 
 	/* if the result isn't a conjunction, we can't do anything */
 	ExpressionAnd *pAnd = dynamic_cast<ExpressionAnd *>(pE.get());
@@ -355,7 +368,7 @@ namespace mongo {
 	  we can do.
 	*/
 	const size_t n = pAnd->vpOperand.size();
-	boost::shared_ptr<Expression> pLast(pAnd->vpOperand[n - 1]);
+	shared_ptr<Expression> pLast(pAnd->vpOperand[n - 1]);
 	const ExpressionConstant *pConst =
 	    dynamic_cast<ExpressionConstant *>(pLast.get());
 	if (!pConst)
@@ -365,9 +378,9 @@ namespace mongo {
 	  Evaluate and coerce the last argument to a boolean.  If it's false,
 	  then we can replace this entire expression.
 	 */
-	bool last = pLast->evaluate(boost::shared_ptr<Document>())->coerceToBool();
+	bool last = pLast->evaluate(shared_ptr<Document>())->coerceToBool();
 	if (!last) {
-	    boost::shared_ptr<ExpressionConstant> pFinal(
+	    shared_ptr<ExpressionConstant> pFinal(
 		ExpressionConstant::create(Value::getFalse()));
 	    return pFinal;
 	}
@@ -379,7 +392,7 @@ namespace mongo {
 	  the result will be a boolean.
 	 */
 	if (n == 2) {
-	    boost::shared_ptr<Expression> pFinal(
+	    shared_ptr<Expression> pFinal(
 		ExpressionCoerceToBool::create(pAnd->vpOperand[0]));
 	    return pFinal;
 	}
@@ -395,11 +408,11 @@ namespace mongo {
 	return pE;
     }
 
-    boost::shared_ptr<const Value> ExpressionAnd::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionAnd::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            boost::shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
             if (!pValue->coerceToBool())
                 return Value::getFalse();
         }
@@ -423,7 +436,7 @@ namespace mongo {
 	assert(false && "unimplemented");
     }
 
-    boost::shared_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
+    shared_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
 	return ExpressionAnd::create;
     }
 
@@ -432,20 +445,20 @@ namespace mongo {
     ExpressionCoerceToBool::~ExpressionCoerceToBool() {
     }
 
-    boost::shared_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
-	boost::shared_ptr<Expression> pExpression) {
-        boost::shared_ptr<ExpressionCoerceToBool> pNew(
+    shared_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
+	const shared_ptr<Expression> &pExpression) {
+        shared_ptr<ExpressionCoerceToBool> pNew(
 	    new ExpressionCoerceToBool(pExpression));
         return pNew;
     }
 
     ExpressionCoerceToBool::ExpressionCoerceToBool(
-	boost::shared_ptr<Expression> pTheExpression):
+	const shared_ptr<Expression> &pTheExpression):
         Expression(),
         pExpression(pTheExpression) {
     }
 
-    boost::shared_ptr<Expression> ExpressionCoerceToBool::optimize() {
+    shared_ptr<Expression> ExpressionCoerceToBool::optimize() {
 	/* optimize the operand */
 	pExpression = pExpression->optimize();
 
@@ -461,10 +474,10 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    boost::shared_ptr<const Value> ExpressionCoerceToBool::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionCoerceToBool::evaluate(
+        const shared_ptr<Document> &pDocument) const {
 
-	boost::shared_ptr<const Value> pResult(pExpression->evaluate(pDocument));
+	shared_ptr<const Value> pResult(pExpression->evaluate(pDocument));
         bool b = pResult->coerceToBool();
         if (b)
             return Value::getTrue();
@@ -486,44 +499,44 @@ namespace mongo {
     ExpressionCompare::~ExpressionCompare() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createEq() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createEq() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(EQ));
         return pExpression;
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createNe() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createNe() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(NE));
         return pExpression;
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createGt() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createGt() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(GT));
         return pExpression;
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createGte() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createGte() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(GTE));
         return pExpression;
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createLt() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createLt() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(LT));
         return pExpression;
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createLte() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createLte() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(LTE));
         return pExpression;
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionCompare::createCmp() {
-        boost::shared_ptr<ExpressionCompare> pExpression(
+    shared_ptr<ExpressionNary> ExpressionCompare::createCmp() {
+        shared_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(CMP));
         return pExpression;
     }
@@ -534,7 +547,7 @@ namespace mongo {
     }
 
     void ExpressionCompare::addOperand(
-	boost::shared_ptr<Expression> pExpression) {
+	const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
@@ -558,9 +571,9 @@ namespace mongo {
         /* CMP */ { false, false, false, Expression::CMP, "$cmp" },
     };
 
-    boost::shared_ptr<Expression> ExpressionCompare::optimize() {
+    shared_ptr<Expression> ExpressionCompare::optimize() {
 	/* first optimize the comparison operands */
-	boost::shared_ptr<Expression> pE(ExpressionNary::optimize());
+	shared_ptr<Expression> pE(ExpressionNary::optimize());
 
 	/*
 	  If the result of optimization is no longer a comparison, there's
@@ -584,11 +597,11 @@ namespace mongo {
 	  in any order.  If we need to reverse the sense of the comparison to
 	  put it into the required canonical form, do so.
 	 */
-	boost::shared_ptr<Expression> pLeft(pCmp->vpOperand[0]);
-	boost::shared_ptr<Expression> pRight(pCmp->vpOperand[1]);
-	boost::shared_ptr<ExpressionFieldPath> pFieldPath(
+	shared_ptr<Expression> pLeft(pCmp->vpOperand[0]);
+	shared_ptr<Expression> pRight(pCmp->vpOperand[1]);
+	shared_ptr<ExpressionFieldPath> pFieldPath(
 	    dynamic_pointer_cast<ExpressionFieldPath>(pLeft));
-	boost::shared_ptr<ExpressionConstant> pConstant;
+	shared_ptr<ExpressionConstant> pConstant;
 	if (pFieldPath.get()) {
 	    pConstant = dynamic_pointer_cast<ExpressionConstant>(pRight);
 	    if (!pConstant.get())
@@ -613,11 +626,11 @@ namespace mongo {
 	    pFieldPath, newOp, pConstant->getValue());
     }
 
-    boost::shared_ptr<const Value> ExpressionCompare::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionCompare::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        boost::shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        boost::shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
         BSONType leftType = pLeft->getType();
         BSONType rightType = pRight->getType();
@@ -690,9 +703,9 @@ namespace mongo {
     ExpressionConstant::~ExpressionConstant() {
     }
 
-    boost::shared_ptr<ExpressionConstant> ExpressionConstant::createFromBsonElement(
+    shared_ptr<ExpressionConstant> ExpressionConstant::createFromBsonElement(
         BSONElement *pBsonElement) {
-        boost::shared_ptr<ExpressionConstant> pEC(
+        shared_ptr<ExpressionConstant> pEC(
             new ExpressionConstant(pBsonElement));
         return pEC;
     }
@@ -701,24 +714,25 @@ namespace mongo {
         pValue(Value::createFromBsonElement(pBsonElement)) {
     }
 
-    boost::shared_ptr<ExpressionConstant> ExpressionConstant::create(
-        boost::shared_ptr<const Value> pValue) {
-        boost::shared_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
+    shared_ptr<ExpressionConstant> ExpressionConstant::create(
+        const shared_ptr<const Value> &pValue) {
+        shared_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
         return pEC;
     }
 
-    ExpressionConstant::ExpressionConstant(boost::shared_ptr<const Value> pTheValue):
+    ExpressionConstant::ExpressionConstant(
+	const shared_ptr<const Value> &pTheValue):
         pValue(pTheValue) {
     }
 
 
-    boost::shared_ptr<Expression> ExpressionConstant::optimize() {
+    shared_ptr<Expression> ExpressionConstant::optimize() {
 	/* nothing to do */
 	return shared_from_this();
     }
 
-    boost::shared_ptr<const Value> ExpressionConstant::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionConstant::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         return pValue;
     }
 
@@ -742,8 +756,8 @@ namespace mongo {
     ExpressionDivide::~ExpressionDivide() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionDivide::create() {
-        boost::shared_ptr<ExpressionDivide> pExpression(new ExpressionDivide());
+    shared_ptr<ExpressionNary> ExpressionDivide::create() {
+        shared_ptr<ExpressionDivide> pExpression(new ExpressionDivide());
         return pExpression;
     }
 
@@ -751,16 +765,17 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionDivide::addOperand(boost::shared_ptr<Expression> pExpression) {
+    void ExpressionDivide::addOperand(
+	const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
 
-    boost::shared_ptr<const Value> ExpressionDivide::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionDivide::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        boost::shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        boost::shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
         BSONType leftType = pLeft->getType();
         BSONType rightType = pRight->getType();
@@ -799,60 +814,236 @@ namespace mongo {
 
     /* ---------------------- ExpressionObject --------------------------- */
 
+    string ExpressionObject::idName("_id");
+
     ExpressionObject::~ExpressionObject() {
     }
 
-    boost::shared_ptr<ExpressionObject> ExpressionObject::create() {
-        boost::shared_ptr<ExpressionObject> pExpression(new ExpressionObject());
+    shared_ptr<ExpressionObject> ExpressionObject::create() {
+        shared_ptr<ExpressionObject> pExpression(new ExpressionObject());
         return pExpression;
     }
 
     ExpressionObject::ExpressionObject():
+	addId(true),
+	exclusions(),
         vFieldName(),
         vpExpression() {
     }
 
-    boost::shared_ptr<Expression> ExpressionObject::optimize() {
+    shared_ptr<Expression> ExpressionObject::optimize() {
 	const size_t n = vpExpression.size();
 	for(size_t i = 0; i < n; ++i) {
-	    boost::shared_ptr<Expression> pE(vpExpression[i]->optimize());
+	    shared_ptr<Expression> pE(vpExpression[i]->optimize());
 	    vpExpression[i] = pE;
 	}
 
 	return shared_from_this();
     }
 
-    boost::shared_ptr<const Value> ExpressionObject::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<Document> ExpressionObject::evaluateDocument(
+        const shared_ptr<Document> &pDocument) const {
+	/* try to figure out how big to make the result document */
+	size_t sizeHint = pDocument->getFieldCount();
+	size_t excludeCount = exclusions.size();
+	if (sizeHint > excludeCount)
+	    sizeHint -= excludeCount;
+	else
+	    sizeHint = 0;
+	sizeHint += vFieldName.size();
+
+	/* create the result */
+        shared_ptr<Document> pResult(Document::create(sizeHint));
+
+	/*
+	  If we're using exclusions, copy all the fields from the original
+	  that aren't excluded, unless it's just the _id.
+	*/
+	if (excludeCount) {
+	    set<string>::iterator end(exclusions.end());
+	    if ((excludeCount > 1) ||
+		(exclusions.find(idName) == end)) {
+		auto_ptr<FieldIterator> pIter(pDocument->createFieldIterator());
+		while(pIter->more()) {
+		    pair<string, shared_ptr<const Value> > field(pIter->next());
+	            set<string>::iterator si(exclusions.find(field.first));
+
+		    /* if it's not excluded, add it to the result */
+		    if (si == end)
+			pResult->addField(field.first, field.second);
+	        }
+	    }
+	}
+
+        /*
+	  If we're supposed to include the _id, and we haven't so far, do so.
+	  We do this here, because this is the case where there aren't any
+	  exclusions, so the _id appears first.  Of course, we can only do this
+	  if it came through from the underlying document.
+	 */
+        if (addId) {
+	    shared_ptr<const Value> pId(pDocument->getField(idName));
+	    if (pId.get())
+		pResult->addField(idName, pId);
+	}
+
+	/* add any remaining fields */
         const size_t n = vFieldName.size();
-        boost::shared_ptr<Document> pResult(Document::create(n));
         for(size_t i = 0; i < n; ++i) {
             pResult->addField(vFieldName[i],
                               vpExpression[i]->evaluate(pDocument));
         }
 
-        boost::shared_ptr<const Value> pValue(Value::createDocument(pResult));
-        return pValue;
+        return pResult;
     }
 
-    void ExpressionObject::addField(string fieldName,
-                                      boost::shared_ptr<Expression> pExpression) {
-        vFieldName.push_back(fieldName);
-        vpExpression.push_back(pExpression);
+    shared_ptr<const Value> ExpressionObject::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+	return Value::createDocument(evaluateDocument(pDocument));
+    }
+
+    void ExpressionObject::addField(const string &theFieldPath,
+				    const shared_ptr<Expression> &pExpression) {
+	/* parse the field path */
+	FieldPath fieldPath(theFieldPath);
+
+	/* add the expression at the end of the path */
+	addField(&fieldPath, 0, fieldPath.getPathLength(), pExpression);
+    }
+
+    ExpressionObject *ExpressionObject::addField(
+	const FieldPath *pPath, size_t pathi, size_t pathn,
+	const shared_ptr<Expression> &pExpression) {
+
+	/* get the current path field name */
+	string thisField(pPath->getFieldName(pathi));
+
+	/* find the field, if we already know about it */
+	const size_t n = vFieldName.size();
+	size_t i;
+	for(i = 0; i < n; ++i) {
+	    if (thisField.compare(vFieldName[i]) == 0)
+		break;
+	}
+
+	/* if this is the leaf-most object, stop and add the expression */
+	if (pathi == pPath->getPathLength() - 1) {
+	    assert(i == n); // CW TODO ERROR: already specified here */
+
+	    set<string>::iterator ex(exclusions.find(thisField));
+	    assert(ex == exclusions.end()); // CW TODO conflicting spec
+
+	    /*
+	      addField() is also used by excludeField() to insert the
+	      intermediate child objects, in which case no Expression is
+	      supplied.
+	     */
+	    if (pExpression.get()) {
+		/*
+		  If the _id has been explicitly added, we won't add it again
+		  ourselves; the user may have redefined it, or have put it
+		  in a particular position for some reason.
+		 */
+		if (thisField.compare(idName) == 0)
+		    addId = false;
+		else {
+		    vFieldName.push_back(thisField);
+		    vpExpression.push_back(pExpression);
+		}
+	    }
+
+	    return this;
+	}
+
+	/* find the right object, and continue */
+	ExpressionObject *pChild;
+	if (i < n) {
+	    /* the intermediate child already exists */
+	    pChild = dynamic_cast<ExpressionObject *>(vpExpression[i].get());
+	}
+	else {
+	    /*
+	      If we get here, the intervening child isn't already there,
+	      so create it.
+	    */
+	    shared_ptr<ExpressionObject> sharedChild(
+		ExpressionObject::create());
+	    vFieldName.push_back(thisField);
+	    vpExpression.push_back(sharedChild);
+	    pChild = sharedChild.get();
+	}
+
+	return pChild->addField(pPath, pathi + 1, pathn, pExpression);
+    }
+
+    void ExpressionObject::excludeField(const string &theFieldPath) {
+	/* parse the field path */
+	FieldPath fieldPath(theFieldPath);
+
+	/*
+	  Exclusion implies that all the intervening child objects will be
+	  included; if they weren't, we wouldn't need to exclude the item at
+	  the end of the path.
+	 */
+	const size_t pathLength = fieldPath.getPathLength();
+	ExpressionObject *pLeaf = addField(
+	    &fieldPath, 0, pathLength, shared_ptr<Expression>());
+
+	string fieldName(fieldPath.getFieldName(pathLength - 1));
+	if (fieldName.compare(idName) == 0)
+	    addId = false;
+	exclusions.insert(fieldName);
+    }
+
+    shared_ptr<Expression> ExpressionObject::getField(
+	const string &fieldName) const {
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i) {
+	    if (fieldName.compare(vFieldName[i]) == 0)
+		return vpExpression[i];
+	}
+
+	/* if we got here, we didn't find it */
+	return shared_ptr<Expression>();
     }
 
     void ExpressionObject::documentToBson(
-	BSONObjBuilder *pBuilder, bool fieldPrefix) const {
+	BSONObjBuilder *pBuilder, bool fieldPrefix,
+	const string &unwindField) const {
+
+	/* if there are any exclusions, write them out first */
+	if (exclusions.size()) {
+	    set<string>::iterator end(exclusions.end());
+	    for(set<string>::iterator end(exclusions.end()),
+		    iter(exclusions.begin()); iter != end; ++iter) {
+		pBuilder->append(*iter, false);
+	    }
+	}
+
+	/* then add any inclusions */
 	const size_t n = vFieldName.size();
-	for(size_t i = 0; i < n; ++i)
+	for(size_t i = 0; i < n; ++i) {
+	    if (unwindField.compare(vFieldName[i]) == 0) {
+		BSONObjBuilder unwind;
+		vpExpression[i]->addToBsonObj(
+		    &unwind, Expression::unwindName, false);
+		pBuilder->append(vFieldName[i], unwind.done());
+		continue;
+	    }
+
 	    vpExpression[i]->addToBsonObj(pBuilder, vFieldName[i], fieldPrefix);
+	}
+    }
+
+    void ExpressionObject::setAddId(bool b) {
+	addId = b;
     }
 
     void ExpressionObject::addToBsonObj(
 	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
 
 	BSONObjBuilder objBuilder;
-	documentToBson(&objBuilder, fieldPrefix);
+	documentToBson(&objBuilder, fieldPrefix, string());
 	pBuilder->append(fieldName, objBuilder.done());
     }
 
@@ -860,7 +1051,7 @@ namespace mongo {
 	BSONArrayBuilder *pBuilder, bool fieldPrefix) const {
 
 	BSONObjBuilder objBuilder;
-	documentToBson(&objBuilder, fieldPrefix);
+	documentToBson(&objBuilder, fieldPrefix, string());
 	pBuilder->append(objBuilder.done());
     }
 
@@ -869,52 +1060,30 @@ namespace mongo {
     ExpressionFieldPath::~ExpressionFieldPath() {
     }
 
-    boost::shared_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
-        string fieldPath) {
-        boost::shared_ptr<ExpressionFieldPath> pExpression(
+    shared_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
+        const string &fieldPath) {
+        shared_ptr<ExpressionFieldPath> pExpression(
             new ExpressionFieldPath(fieldPath));
         return pExpression;
     }
 
-    ExpressionFieldPath::ExpressionFieldPath(string fieldPath):
-        vField() {
-        /*
-          The field path could be using dot notation.
-          Break the field path up by peeling off successive pieces.
-        */
-        size_t startpos = 0;
-        while(true) {
-            /* find the next dot */
-            const size_t dotpos = fieldPath.find('.', startpos);
-
-            /* if there are no more dots, use the remainder of the string */
-            if (dotpos == fieldPath.npos) {
-                vField.push_back(fieldPath.substr(startpos, dotpos));
-                break;
-            }
-
-            /* use the string up to the dot */
-            const size_t length = dotpos - startpos;
-            assert(length); // CW TODO user error: no zero-length field names
-            vField.push_back(fieldPath.substr(startpos, length));
-
-            /* next time, search starting one spot after that */
-            startpos = dotpos + 1;
-        }
+    ExpressionFieldPath::ExpressionFieldPath(const string &theFieldPath):
+        fieldPath(theFieldPath) {
     }
 
-    boost::shared_ptr<Expression> ExpressionFieldPath::optimize() {
+    shared_ptr<Expression> ExpressionFieldPath::optimize() {
 	/* nothing can be done for these */
 	return shared_from_this();
     }
 
-    boost::shared_ptr<const Value> ExpressionFieldPath::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
-        boost::shared_ptr<const Value> pValue;
-        const size_t n = vField.size();
+    shared_ptr<const Value> ExpressionFieldPath::evaluate(
+        const shared_ptr<Document> &pDocument) const {
+        shared_ptr<const Value> pValue;
+	shared_ptr<Document> pLocal(pDocument);
+        const size_t n = fieldPath.getPathLength();
         size_t i = 0;
         while(true) {
-            pValue = pDocument->getValue(vField[i]);
+            pValue = pLocal->getValue(fieldPath.getFieldName(i));
 
             /* if the field doesn't exist, quit with a null value */
             if (!pValue.get())
@@ -934,31 +1103,16 @@ namespace mongo {
             if (type != Object)
                 assert(false); // CW TODO user error:  must be a document
 
-            /* extract from the next level down */
-            pDocument = pValue->getDocument();
+            /* Extract from the next level down */
+            pLocal = pValue->getDocument();
         }
 
         return pValue;
     }
 
-    string ExpressionFieldPath::getFieldPath(bool fieldPrefix) const {
-	stringstream ss;
-	if (fieldPrefix)
-	    //ss << "$document.";
-	    ss << "$";
-
-	ss << vField[0];
-
-	const size_t n = vField.size();
-	for(size_t i = 1; i < n; ++i)
-	    ss << "." << vField[i];
-
-	return ss.str();
-    }
-
     void ExpressionFieldPath::addToBsonObj(
 	BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const {
-	pBuilder->append(fieldName, getFieldPath(fieldPrefix));
+	pBuilder->append(fieldName, fieldPath.getPath(fieldPrefix));
     }
 
     void ExpressionFieldPath::addToBsonArray(
@@ -971,7 +1125,7 @@ namespace mongo {
     ExpressionFieldRange::~ExpressionFieldRange() {
     }
 
-    boost::shared_ptr<Expression> ExpressionFieldRange::optimize() {
+    shared_ptr<Expression> ExpressionFieldRange::optimize() {
 	/* if there is no range to match, this will never evaluate true */
 	if (!pRange.get())
 	    return ExpressionConstant::create(Value::getFalse());
@@ -992,14 +1146,14 @@ namespace mongo {
 	return shared_from_this();
     }
 
-    boost::shared_ptr<const Value> ExpressionFieldRange::evaluate(
-	boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionFieldRange::evaluate(
+	const shared_ptr<Document> &pDocument) const {
 	/* if there's no range, there can't be a match */
 	if (!pRange.get())
 	    return Value::getFalse();
 
 	/* get the value of the specified field */
-	boost::shared_ptr<const Value> pValue(pFieldPath->evaluate(pDocument));
+	shared_ptr<const Value> pValue(pFieldPath->evaluate(pDocument));
 
 	/* see if it fits within any of the ranges */
 	if (pRange->contains(pValue))
@@ -1114,23 +1268,23 @@ namespace mongo {
 	pBuilder->append(fieldPath, range.done());
     }
 
-    boost::shared_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
-	boost::shared_ptr<ExpressionFieldPath> pFieldPath, CmpOp cmpOp,
-	boost::shared_ptr<const Value> pValue) {
-	boost::shared_ptr<ExpressionFieldRange> pE(
+    shared_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
+	const shared_ptr<ExpressionFieldPath> &pFieldPath, CmpOp cmpOp,
+	const shared_ptr<const Value> &pValue) {
+	shared_ptr<ExpressionFieldRange> pE(
 	    new ExpressionFieldRange(pFieldPath, cmpOp, pValue));
 	return pE;
     }
 
     ExpressionFieldRange::ExpressionFieldRange(
-	boost::shared_ptr<ExpressionFieldPath> pTheFieldPath, CmpOp cmpOp,
-	boost::shared_ptr<const Value> pValue):
+	const shared_ptr<ExpressionFieldPath> &pTheFieldPath, CmpOp cmpOp,
+	const shared_ptr<const Value> &pValue):
         pFieldPath(pTheFieldPath),
 	pRange(new Range(cmpOp, pValue)) {
     }
 
     void ExpressionFieldRange::intersect(
-	CmpOp cmpOp, boost::shared_ptr<const Value> pValue) {
+	CmpOp cmpOp, const shared_ptr<const Value> &pValue) {
 
 	/* create the new range */
 	scoped_ptr<Range> pNew(new Range(cmpOp, pValue));
@@ -1145,7 +1299,7 @@ namespace mongo {
     }
 
     ExpressionFieldRange::Range::Range(
-	CmpOp cmpOp, boost::shared_ptr<const Value> pValue):
+	CmpOp cmpOp, const shared_ptr<const Value> &pValue):
 	bottomOpen(false),
 	topOpen(false),
 	pBottom(),
@@ -1188,8 +1342,8 @@ namespace mongo {
     }
 
     ExpressionFieldRange::Range::Range(
-	boost::shared_ptr<const Value> pTheBottom, bool theBottomOpen,
-	boost::shared_ptr<const Value> pTheTop, bool theTopOpen):
+	const shared_ptr<const Value> &pTheBottom, bool theBottomOpen,
+	const shared_ptr<const Value> &pTheTop, bool theTopOpen):
 	bottomOpen(theBottomOpen),
 	topOpen(theTopOpen),
 	pBottom(pTheBottom),
@@ -1204,7 +1358,7 @@ namespace mongo {
 	  Start by assuming the maximum is from pRange.  Then, if we have
 	  values of our own, see if they're greater.
 	*/
-	boost::shared_ptr<const Value> pMaxBottom(pRange->pBottom);
+	shared_ptr<const Value> pMaxBottom(pRange->pBottom);
 	bool maxBottomOpen = pRange->bottomOpen;
 	if (pBottom.get()) {
 	    if (!pRange->pBottom.get()) {
@@ -1228,7 +1382,7 @@ namespace mongo {
 	  Start by assuming the minimum is from pRange.  Then, if we have
 	  values of our own, see if they are less.
 	*/
-	boost::shared_ptr<const Value> pMinTop(pRange->pTop);
+	shared_ptr<const Value> pMinTop(pRange->pTop);
 	bool minTopOpen = pRange->topOpen;
 	if (pTop.get()) {
 	    if (!pRange->pTop.get()) {
@@ -1258,7 +1412,7 @@ namespace mongo {
     }
 
     bool ExpressionFieldRange::Range::contains(
-	boost::shared_ptr<const Value> pValue) const {
+	const shared_ptr<const Value> &pValue) const {
 	if (pBottom.get()) {
 	    const int cmp = Value::compare(pValue, pBottom);
 	    if (cmp < 0)
@@ -1283,8 +1437,8 @@ namespace mongo {
     ExpressionIfNull::~ExpressionIfNull() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionIfNull::create() {
-        boost::shared_ptr<ExpressionIfNull> pExpression(new ExpressionIfNull());
+    shared_ptr<ExpressionNary> ExpressionIfNull::create() {
+        shared_ptr<ExpressionIfNull> pExpression(new ExpressionIfNull());
         return pExpression;
     }
 
@@ -1292,20 +1446,21 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionIfNull::addOperand(boost::shared_ptr<Expression> pExpression) {
+    void ExpressionIfNull::addOperand(
+	const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 2); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
 
-    boost::shared_ptr<const Value> ExpressionIfNull::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionIfNull::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
-        boost::shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
 
         if (pLeft->getType() != jstNULL)
             return pLeft;
 
-        boost::shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
         return pRight;
     }
 
@@ -1319,11 +1474,11 @@ namespace mongo {
         vpOperand() {
     }
 
-    boost::shared_ptr<Expression> ExpressionNary::optimize() {
+    shared_ptr<Expression> ExpressionNary::optimize() {
 	size_t nConst = 0; // count of constant operands
 	const size_t n = vpOperand.size();
 	for(size_t i = 0; i < n; ++i) {
-	    boost::shared_ptr<Expression> pNew(vpOperand[i]->optimize());
+	    shared_ptr<Expression> pNew(vpOperand[i]->optimize());
 
 	    /* subsitute the optimized expression */
 	    vpOperand[i] = pNew;
@@ -1340,9 +1495,9 @@ namespace mongo {
 	  ExpressionConstant never refers to the argument Document.
 	*/
 	if (nConst == n) {
-	    boost::shared_ptr<const Value> pResult(
-		evaluate(boost::shared_ptr<Document>()));
-	    boost::shared_ptr<Expression> pReplacement(
+	    shared_ptr<const Value> pResult(
+		evaluate(shared_ptr<Document>()));
+	    shared_ptr<Expression> pReplacement(
 		ExpressionConstant::create(pResult));
 	    return pReplacement;
 	}
@@ -1354,7 +1509,7 @@ namespace mongo {
 	  we'll evaluate to collapse as many constants as we can down to
 	  a single one.
 	 */
-	boost::shared_ptr<ExpressionNary> (*const pFactory)() = getFactory();
+	shared_ptr<ExpressionNary> (*const pFactory)() = getFactory();
 	if (!pFactory)
 	    return shared_from_this();
 
@@ -1366,10 +1521,10 @@ namespace mongo {
 	  We then add this operand to the end of the non-constant expression,
 	  and return that.
 	 */
-	boost::shared_ptr<ExpressionNary> pNew((*pFactory)());
-	boost::shared_ptr<ExpressionNary> pConst((*pFactory)());
+	shared_ptr<ExpressionNary> pNew((*pFactory)());
+	shared_ptr<ExpressionNary> pConst((*pFactory)());
 	for(size_t i = 0; i < n; ++i) {
-	    boost::shared_ptr<Expression> pE(vpOperand[i]);
+	    shared_ptr<Expression> pE(vpOperand[i]);
 	    if (dynamic_cast<ExpressionConstant *>(pE.get()))
 		pConst->addOperand(pE);
 	    else {
@@ -1389,7 +1544,7 @@ namespace mongo {
 		if (!pNary)
 		    pNew->addOperand(pE);
 		else {
-		    boost::shared_ptr<ExpressionNary> (*const pChildFactory)() =
+		    shared_ptr<ExpressionNary> (*const pChildFactory)() =
 			pNary->getFactory();
 		    if (pChildFactory != pFactory)
 			pNew->addOperand(pE);
@@ -1397,7 +1552,7 @@ namespace mongo {
 			/* same factory, so flatten */
 			size_t nChild = pNary->vpOperand.size();
 			for(size_t iChild = 0; iChild < nChild; ++iChild) {
-			    boost::shared_ptr<Expression> pCE(
+			    shared_ptr<Expression> pCE(
 				pNary->vpOperand[iChild]);
 			    if (dynamic_cast<ExpressionConstant *>(pCE.get()))
 				pConst->addOperand(pCE);
@@ -1421,8 +1576,8 @@ namespace mongo {
 	      together before adding the result to the end of the expression
 	      operand vector.
 	    */
-	    boost::shared_ptr<const Value> pResult(
-		pConst->evaluate(boost::shared_ptr<Document>()));
+	    shared_ptr<const Value> pResult(
+		pConst->evaluate(shared_ptr<Document>()));
 	    pNew->addOperand(ExpressionConstant::create(pResult));
 	}
 
@@ -1430,11 +1585,11 @@ namespace mongo {
     }
 
     void ExpressionNary::addOperand(
-        boost::shared_ptr<Expression> pExpression) {
+        const shared_ptr<Expression> &pExpression) {
         vpOperand.push_back(pExpression);
     }
 
-    boost::shared_ptr<ExpressionNary> (*ExpressionNary::getFactory() const)() {
+    shared_ptr<ExpressionNary> (*ExpressionNary::getFactory() const)() {
 	return NULL;
     }
 
@@ -1474,8 +1629,8 @@ namespace mongo {
     ExpressionNot::~ExpressionNot() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionNot::create() {
-        boost::shared_ptr<ExpressionNot> pExpression(new ExpressionNot());
+    shared_ptr<ExpressionNary> ExpressionNot::create() {
+        shared_ptr<ExpressionNot> pExpression(new ExpressionNot());
         return pExpression;
     }
 
@@ -1483,15 +1638,15 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionNot::addOperand(boost::shared_ptr<Expression> pExpression) {
+    void ExpressionNot::addOperand(const shared_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO user error
         ExpressionNary::addOperand(pExpression);
     }
 
-    boost::shared_ptr<const Value> ExpressionNot::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionNot::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1); // CW TODO user error
-        boost::shared_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
+        shared_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
 
         bool b = pOp->coerceToBool();
         if (b)
@@ -1508,8 +1663,8 @@ namespace mongo {
     ExpressionOr::~ExpressionOr() {
     }
 
-    boost::shared_ptr<ExpressionNary> ExpressionOr::create() {
-        boost::shared_ptr<ExpressionNary> pExpression(new ExpressionOr());
+    shared_ptr<ExpressionNary> ExpressionOr::create() {
+        shared_ptr<ExpressionNary> pExpression(new ExpressionOr());
         return pExpression;
     }
 
@@ -1517,11 +1672,11 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    boost::shared_ptr<const Value> ExpressionOr::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> ExpressionOr::evaluate(
+        const shared_ptr<Document> &pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            boost::shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            shared_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
             if (pValue->coerceToBool())
                 return Value::getTrue();
         }
@@ -1538,13 +1693,13 @@ namespace mongo {
 	pBuilder->append("$or", opArray.done());
     }
 
-    boost::shared_ptr<ExpressionNary> (*ExpressionOr::getFactory() const)() {
+    shared_ptr<ExpressionNary> (*ExpressionOr::getFactory() const)() {
 	return ExpressionOr::create;
     }
 
-    boost::shared_ptr<Expression> ExpressionOr::optimize() {
+    shared_ptr<Expression> ExpressionOr::optimize() {
 	/* optimize the disjunction as much as possible */
-	boost::shared_ptr<Expression> pE(ExpressionNary::optimize());
+	shared_ptr<Expression> pE(ExpressionNary::optimize());
 
 	/* if the result isn't a conjunction, we can't do anything */
 	ExpressionOr *pOr = dynamic_cast<ExpressionOr *>(pE.get());
@@ -1557,7 +1712,7 @@ namespace mongo {
 	  we can do.
 	*/
 	const size_t n = pOr->vpOperand.size();
-	boost::shared_ptr<Expression> pLast(pOr->vpOperand[n - 1]);
+	shared_ptr<Expression> pLast(pOr->vpOperand[n - 1]);
 	const ExpressionConstant *pConst =
 	    dynamic_cast<ExpressionConstant *>(pLast.get());
 	if (!pConst)
@@ -1567,9 +1722,9 @@ namespace mongo {
 	  Evaluate and coerce the last argument to a boolean.  If it's true,
 	  then we can replace this entire expression.
 	 */
-	bool last = pLast->evaluate(boost::shared_ptr<Document>())->coerceToBool();
+	bool last = pLast->evaluate(shared_ptr<Document>())->coerceToBool();
 	if (last) {
-	    boost::shared_ptr<ExpressionConstant> pFinal(
+	    shared_ptr<ExpressionConstant> pFinal(
 		ExpressionConstant::create(Value::getTrue()));
 	    return pFinal;
 	}
@@ -1581,7 +1736,7 @@ namespace mongo {
 	  the result will be a boolean.
 	 */
 	if (n == 2) {
-	    boost::shared_ptr<Expression> pFinal(
+	    shared_ptr<Expression> pFinal(
 		ExpressionCoerceToBool::create(pOr->vpOperand[0]));
 	    return pFinal;
 	}

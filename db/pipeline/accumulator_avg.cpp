@@ -26,8 +26,8 @@ namespace mongo {
     const char AccumulatorAvg::subTotalName[] = "subTotal";
     const char AccumulatorAvg::countName[] = "count";
 
-    boost::shared_ptr<const Value> AccumulatorAvg::evaluate(
-        boost::shared_ptr<Document> pDocument) const {
+    shared_ptr<const Value> AccumulatorAvg::evaluate(
+        const shared_ptr<Document> &pDocument) const {
 	if (!pCtx->getInRouter()) {
 	    Super::evaluate(pDocument);
 	    ++count;
@@ -38,7 +38,7 @@ namespace mongo {
 	      both a subtotal and a count.  This is what getValue() produced
 	      below.
 	     */
-	    boost::shared_ptr<const Value> prhs(
+	    shared_ptr<const Value> prhs(
 		vpOperand[0]->evaluate(pDocument));
 	    assert(prhs->getType() == Object);
 	    shared_ptr<Document> pShardDoc(prhs->getDocument());
@@ -74,13 +74,13 @@ namespace mongo {
         return Value::getZero();
     }
 
-    boost::shared_ptr<Accumulator> AccumulatorAvg::create(
+    shared_ptr<Accumulator> AccumulatorAvg::create(
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-	boost::shared_ptr<AccumulatorAvg> pA(new AccumulatorAvg(pCtx));
+	shared_ptr<AccumulatorAvg> pA(new AccumulatorAvg(pCtx));
         return pA;
     }
 
-    boost::shared_ptr<const Value> AccumulatorAvg::getValue() const {
+    shared_ptr<const Value> AccumulatorAvg::getValue() const {
 	if (!pCtx->getInShard()) {
 	    double avg = 0;
 	    if (count) {

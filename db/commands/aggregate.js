@@ -150,6 +150,7 @@ var g2 = db.runCommand(
 	mostViewsByTag : { $max : "$pageViews" },
     }},
     { $project : {
+	_id: false,
 	tag : "_id.tag",
 	mostViewsByTag : 1,
 	docsByTag : 1,

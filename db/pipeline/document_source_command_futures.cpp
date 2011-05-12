@@ -41,13 +41,13 @@ namespace mongo {
 	return (pCurrent.get() != NULL);
     }
 
-    boost::shared_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
+    shared_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
 	assert(!eof());
 	return pCurrent;
     }
 
     void DocumentSourceCommandFutures::setSource(
-	boost::shared_ptr<DocumentSource> pSource) {
+	const shared_ptr<DocumentSource> &pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -68,10 +68,10 @@ namespace mongo {
         errmsg(theErrmsg) {
     }
 
-    boost::shared_ptr<DocumentSourceCommandFutures>
+    shared_ptr<DocumentSourceCommandFutures>
     DocumentSourceCommandFutures::create(
 	string &errmsg, FuturesList *pList) {
-	boost::shared_ptr<DocumentSourceCommandFutures> pSource(
+	shared_ptr<DocumentSourceCommandFutures> pSource(
 	    new DocumentSourceCommandFutures(errmsg, pList));
 	return pSource;
     }
@@ -86,7 +86,7 @@ namespace mongo {
 		}
 
 		/* grab the next command result */
-		boost::shared_ptr<Future::CommandResult> pResult(*iterator);
+		shared_ptr<Future::CommandResult> pResult(*iterator);
 		++iterator;
 
 		/* try to wait for it */

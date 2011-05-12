@@ -30,7 +30,7 @@ namespace mongo {
     }
 
     bool DocumentSourceFilter::coalesce(
-	boost::shared_ptr<DocumentSource> pNextSource) {
+	const shared_ptr<DocumentSource> &pNextSource) {
 
 	/* we only know how to coalesce other filters */
 	DocumentSourceFilter *pDocFilter =
@@ -42,7 +42,7 @@ namespace mongo {
 	  Two adjacent filters can be combined by creating a conjunction of
 	  their predicates.
 	 */
-	boost::shared_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
+	shared_ptr<ExpressionNary> pAnd(ExpressionAnd::create());
 	pAnd->addOperand(pFilter);
 	pAnd->addOperand(pDocFilter->pFilter);
 	pFilter = pAnd;
@@ -70,24 +70,24 @@ namespace mongo {
         assert(pBsonElement->type() == Object);
         // CW TODO error: expression object must be an object
 
-        boost::shared_ptr<Expression> pExpression(
+        shared_ptr<Expression> pExpression(
 	    Expression::parseObject(pBsonElement,
 				    &Expression::ObjectCtx(0)));
-        boost::shared_ptr<DocumentSourceFilter> pFilter(
+        shared_ptr<DocumentSourceFilter> pFilter(
             DocumentSourceFilter::create(pExpression));
 
         return pFilter;
     }
 
-    boost::shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
-        boost::shared_ptr<Expression> pFilter) {
-        boost::shared_ptr<DocumentSourceFilter> pSource(
+    shared_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
+        const shared_ptr<Expression> &pFilter) {
+        shared_ptr<DocumentSourceFilter> pSource(
             new DocumentSourceFilter(pFilter));
         return pSource;
     }
 
     DocumentSourceFilter::DocumentSourceFilter(
-        boost::shared_ptr<Expression> pTheFilter):
+        const shared_ptr<Expression> &pTheFilter):
 	DocumentSourceFilterBase(),
         pFilter(pTheFilter) {
     }

@@ -37,7 +37,7 @@ namespace mongo {
 
           @returns shared pointer to the newly created Document
         */
-        static boost::shared_ptr<Document> createFromBsonObj(BSONObj *pBsonObj);
+        static shared_ptr<Document> createFromBsonObj(BSONObj *pBsonObj);
 
         /*
           Create a new empty Document.
@@ -46,14 +46,14 @@ namespace mongo {
             known, this can be used to increase memory allocation efficiency
           @returns shared pointer to the newly created Document
         */
-        static boost::shared_ptr<Document> create(size_t sizeHint = 0);
+        static shared_ptr<Document> create(size_t sizeHint = 0);
 
         /*
           Clone a document.
 
           The new document shares all the fields' values with the original.
         */
-        boost::shared_ptr<Document> clone();
+        shared_ptr<Document> clone();
 
         /*
           Add this document to the BSONObj under construction with the
@@ -73,7 +73,7 @@ namespace mongo {
           @param fieldName the name of the field
           @return point to the requested field
         */
-        boost::shared_ptr<const Value> getValue(string fieldName);
+        shared_ptr<const Value> getValue(const string &fieldName);
 
         /*
           Add the given field to the Document.
@@ -84,17 +84,60 @@ namespace mongo {
           It is an error to add a field that has the same name as another
           field.
         */
-        void addField(string fieldName, boost::shared_ptr<const Value> pValue);
+        void addField(const string &fieldName,
+		      const shared_ptr<const Value> &pValue);
 
         /*
           Set the given field to be at the specified position in the
           Document.  This will replace any field that is currently in that
           position.  The index must be within the current range of field
           indices.
+
+	  @param index the field index in the list of fields
+	  @param fieldName the new field name
+	  @param pValue the new Value
         */
         void setField(size_t index,
-                      string fieldName, boost::shared_ptr<const Value> pValue);
+                      const string &fieldName,
+		      const shared_ptr<const Value> &pValue);
 
+	/*
+	  Convenience type for dealing with fields.
+	 */
+	typedef pair<string, shared_ptr<const Value> > FieldPair;
+
+	/*
+	  Get the indicated field.
+
+	  @param index the field index in the list of fields
+	  @returns the field name and value of the field
+	 */
+	FieldPair getField(size_t index) const;
+
+	/*
+	  Get the number of fields in the Document.
+
+	  @returns the number of fields in the Document
+	 */
+	size_t getFieldCount() const;
+
+	/*
+	  Get the index of the given field.
+
+	  @param fieldName the name of the field
+	  @returns the index of the field, or if it does not exist, the number
+	    of fields (getFieldCount())
+	*/
+	size_t getFieldIndex(const string &fieldName) const;
+
+	/*
+	  Get a field by name.
+
+	  @param fieldName the name of the field
+	  @returns the value of the field
+	*/
+	shared_ptr<const Value> getField(const string &fieldName) const;
+	
         /*
           Compare two documents.
 
@@ -103,8 +146,8 @@ namespace mongo {
           as strings are compared, but comparing one field at a time instead
           of one character at a time.
         */
-        static int compare(const boost::shared_ptr<Document> &rL,
-                           const boost::shared_ptr<Document> &rR);
+        static int compare(const shared_ptr<Document> &rL,
+                           const shared_ptr<Document> &rR);
 
     private:
         friend class FieldIterator;
@@ -114,7 +157,7 @@ namespace mongo {
 
         /* these two vectors parallel each other */
         vector<string> vFieldName;
-        vector<boost::shared_ptr<const Value> > vpValue;
+        vector<shared_ptr<const Value> > vpValue;
     };
 
 
@@ -133,7 +176,7 @@ namespace mongo {
 
           @return the next field's <name, Value>
         */
-        pair<string, boost::shared_ptr<const Value> > next();
+	Document::FieldPair next();
 
     private:
         friend class Document;
@@ -144,13 +187,28 @@ namespace mongo {
           @param pDocument points to the document whose fields are being
               iterated
         */
-        FieldIterator(boost::shared_ptr<Document> pDocument);
+        FieldIterator(const shared_ptr<Document> &pDocument);
 
         /*
           We'll hang on to the original document to ensure we keep the
           fieldPtr vector alive.
         */
-	boost::shared_ptr<Document> pDocument;
+	shared_ptr<Document> pDocument;
         size_t index; // current field in iteration
     };
+}
+
+
+/* ======================= INLINED IMPLEMENTATIONS ========================== */
+
+namespace mongo {
+
+    inline size_t Document::getFieldCount() const {
+	return vFieldName.size();
+    }
+
+    inline Document::FieldPair Document::getField(size_t index) const {
+	return FieldPair(vFieldName[index], vpValue[index]);
+    }
+
 }

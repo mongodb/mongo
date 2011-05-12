@@ -18,6 +18,9 @@
 
 #include "pch.h"
 
+#include "db/pipeline/field_path.h"
+
+
 namespace mongo {
     class BSONArrayBuilder;
     class BSONElement;
@@ -44,15 +47,15 @@ namespace mongo {
 
 	  @returns the optimized Expression
 	 */
-	virtual boost::shared_ptr<Expression> optimize() = 0;
+	virtual shared_ptr<Expression> optimize() = 0;
 
         /*
           Evaluate the Expression using the given document as input.
 
           @returns the computed value
         */
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const = 0;
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const = 0;
 
 	/*
 	  Add the Expression (and any descendant Expressions) into a BSON
@@ -143,7 +146,7 @@ namespace mongo {
 	  @param pCtx a MiniCtx representing the options above
 	  @returns the parsed Expression
 	 */
-        static boost::shared_ptr<Expression> parseObject(
+        static shared_ptr<Expression> parseObject(
             BSONElement *pBsonElement, ObjectCtx *pCtx);
 
 	static const char unwindName[];
@@ -156,7 +159,7 @@ namespace mongo {
 	  @param pBsonElement the BSONElement to parse
 	  @returns the parsed Expression
 	*/
-        static boost::shared_ptr<Expression> parseExpression(
+        static shared_ptr<Expression> parseExpression(
             const char *pOpName, BSONElement *pBsonElement);
 
 
@@ -166,7 +169,7 @@ namespace mongo {
 	  @param pBsonElement the expected operand's BSONElement
 	  @returns the parsed operand, as an Expression
 	 */
-        static boost::shared_ptr<Expression> parseOperand(
+        static shared_ptr<Expression> parseOperand(
 	    BSONElement *pBsonElement);
 
 	/*
@@ -195,7 +198,7 @@ namespace mongo {
         public boost::enable_shared_from_this<ExpressionNary> {
     public:
         // virtuals from Expression
-	virtual boost::shared_ptr<Expression> optimize();
+	virtual shared_ptr<Expression> optimize();
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
@@ -206,7 +209,7 @@ namespace mongo {
 
           @param pExpression the expression to add
         */
-        virtual void addOperand(boost::shared_ptr<Expression> pExpression);
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
 	/*
 	  Return a factory function that will make Expression nodes of
@@ -224,7 +227,7 @@ namespace mongo {
 
 	  @returns pointer to a factory function or NULL
 	 */
-	virtual boost::shared_ptr<ExpressionNary> (*getFactory() const)();
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
 	/*
 	  Get the name of the operator.
@@ -238,7 +241,7 @@ namespace mongo {
     protected:
         ExpressionNary();
 
-        vector<boost::shared_ptr<Expression> > vpOperand;
+        vector<shared_ptr<Expression> > vpOperand;
 
     private:
 	/*
@@ -264,19 +267,19 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionAdd();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 
 	// virtuals from ExpressionNary
-	virtual boost::shared_ptr<ExpressionNary> (*getFactory() const)();
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
         /*
           Create an expression that finds the sum of n operands.
 
           @returns addition expression
          */
-        static boost::shared_ptr<ExpressionNary> create();
+        static shared_ptr<ExpressionNary> create();
 
     private:
         ExpressionAdd();
@@ -288,14 +291,14 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionAnd();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
 	// virtuals from ExpressionNary
-	virtual boost::shared_ptr<ExpressionNary> (*getFactory() const)();
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -306,7 +309,7 @@ namespace mongo {
 
           @returns conjunction expression
          */
-        static boost::shared_ptr<ExpressionNary> create();
+        static shared_ptr<ExpressionNary> create();
 
     private:
         ExpressionAnd();
@@ -319,21 +322,21 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual ~ExpressionCoerceToBool();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
 	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
 
-        static boost::shared_ptr<ExpressionCoerceToBool> create(
-	    boost::shared_ptr<Expression> pExpression);
+        static shared_ptr<ExpressionCoerceToBool> create(
+	    const shared_ptr<Expression> &pExpression);
 
     private:
-        ExpressionCoerceToBool(boost::shared_ptr<Expression> pExpression);
+        ExpressionCoerceToBool(const shared_ptr<Expression> &pExpression);
 
-	boost::shared_ptr<Expression> pExpression;
+	shared_ptr<Expression> pExpression;
     };
 
 
@@ -342,11 +345,11 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual ~ExpressionCompare();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
-        virtual void addOperand(boost::shared_ptr<Expression> pExpression);
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
         /*
           Shorthands for creating various comparisons expressions.
@@ -356,13 +359,13 @@ namespace mongo {
           These create a particular comparision operand, without any
           operands.  Those must be added via ExpressionNary::addOperand().
         */
-        static boost::shared_ptr<ExpressionNary> createCmp();
-        static boost::shared_ptr<ExpressionNary> createEq();
-        static boost::shared_ptr<ExpressionNary> createNe();
-        static boost::shared_ptr<ExpressionNary> createGt();
-        static boost::shared_ptr<ExpressionNary> createGte();
-        static boost::shared_ptr<ExpressionNary> createLt();
-        static boost::shared_ptr<ExpressionNary> createLte();
+        static shared_ptr<ExpressionNary> createCmp();
+        static shared_ptr<ExpressionNary> createEq();
+        static shared_ptr<ExpressionNary> createNe();
+        static shared_ptr<ExpressionNary> createGt();
+        static shared_ptr<ExpressionNary> createGte();
+        static shared_ptr<ExpressionNary> createLt();
+        static shared_ptr<ExpressionNary> createLte();
 
     private:
 	friend class ExpressionFieldRange;
@@ -377,32 +380,32 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionConstant();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
 	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
 
-        static boost::shared_ptr<ExpressionConstant> createFromBsonElement(
+        static shared_ptr<ExpressionConstant> createFromBsonElement(
             BSONElement *pBsonElement);
-	static boost::shared_ptr<ExpressionConstant> create(
-	    boost::shared_ptr<const Value> pValue);
+	static shared_ptr<ExpressionConstant> create(
+	    const shared_ptr<const Value> &pValue);
 
 	/*
 	  Get the constant value represented by this Expression.
 
 	  @returns the value
 	 */
-	boost::shared_ptr<const Value> getValue() const;
+	shared_ptr<const Value> getValue() const;
 
     private:
         ExpressionConstant(BSONElement *pBsonElement);
-	ExpressionConstant(boost::shared_ptr<const Value> pValue);
+	ExpressionConstant(const shared_ptr<const Value> &pValue);
 
-        boost::shared_ptr<const Value> pValue;
+        shared_ptr<const Value> pValue;
     };
 
 
@@ -411,12 +414,12 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual ~ExpressionDivide();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
-        virtual void addOperand(boost::shared_ptr<Expression> pExpression);
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
-        static boost::shared_ptr<ExpressionNary> create();
+        static shared_ptr<ExpressionNary> create();
 
     private:
         ExpressionDivide();
@@ -429,9 +432,9 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionFieldPath();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
@@ -447,7 +450,8 @@ namespace mongo {
 	    indicator
 	  @returns the newly created field path expression
 	 */
-        static boost::shared_ptr<ExpressionFieldPath> create(string fieldPath);
+        static shared_ptr<ExpressionFieldPath> create(
+	    const string &fieldPath);
 
 	/*
 	  Return a string representation of the field path.
@@ -459,9 +463,9 @@ namespace mongo {
 	string getFieldPath(bool fieldPrefix) const;
 
     private:
-        ExpressionFieldPath(string fieldPath);
+        ExpressionFieldPath(const string &fieldPath);
 
-        vector<string> vField;
+	FieldPath fieldPath;
     };
 
 
@@ -471,9 +475,9 @@ namespace mongo {
     public:
 	// virtuals from expression
         virtual ~ExpressionFieldRange();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
@@ -500,9 +504,9 @@ namespace mongo {
 	  @param pValue the value to compare against
 	  @returns the newly created field range expression
 	 */
-	static boost::shared_ptr<ExpressionFieldRange> create(
-	    boost::shared_ptr<ExpressionFieldPath> pFieldPath,
-	    CmpOp cmpOp, boost::shared_ptr<const Value> pValue);
+	static shared_ptr<ExpressionFieldRange> create(
+	    const shared_ptr<ExpressionFieldPath> &pFieldPath,
+	    CmpOp cmpOp, const shared_ptr<const Value> &pValue);
 
 	/*
 	  Add an intersecting range.
@@ -517,30 +521,30 @@ namespace mongo {
 	  @param cmpOp the comparison operator
 	  @param pValue the value to compare against
 	 */
-	void intersect(CmpOp cmpOp, boost::shared_ptr<const Value> pValue);
+	void intersect(CmpOp cmpOp, const shared_ptr<const Value> &pValue);
 
     private:
-	ExpressionFieldRange(boost::shared_ptr<ExpressionFieldPath> pFieldPath,
+	ExpressionFieldRange(const shared_ptr<ExpressionFieldPath> &pFieldPath,
 			     CmpOp cmpOp,
-			     boost::shared_ptr<const Value> pValue);
+			     const shared_ptr<const Value> &pValue);
 
-	boost::shared_ptr<ExpressionFieldPath> pFieldPath;
+	shared_ptr<ExpressionFieldPath> pFieldPath;
 
 	class Range {
 	public:
-	    Range(CmpOp cmpOp, boost::shared_ptr<const Value> pValue);
+	    Range(CmpOp cmpOp, const shared_ptr<const Value> &pValue);
 	    Range(const Range &rRange);
 
 	    Range *intersect(const Range *pRange) const;
-	    bool contains(boost::shared_ptr<const Value> pValue) const;
+	    bool contains(const shared_ptr<const Value> &pValue) const;
 
-	    Range(boost::shared_ptr<const Value> pBottom, bool bottomOpen,
-		  boost::shared_ptr<const Value> pTop, bool topOpen);
+	    Range(const shared_ptr<const Value> &pBottom, bool bottomOpen,
+		  const shared_ptr<const Value> &pTop, bool topOpen);
 
 	    bool bottomOpen;
 	    bool topOpen;
-	    boost::shared_ptr<const Value> pBottom;
-	    boost::shared_ptr<const Value> pTop;
+	    shared_ptr<const Value> pBottom;
+	    shared_ptr<const Value> pTop;
 	};
 
 	scoped_ptr<Range> pRange;
@@ -563,12 +567,12 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual ~ExpressionIfNull();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
-        virtual void addOperand(boost::shared_ptr<Expression> pExpression);
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
-        static boost::shared_ptr<ExpressionNary> create();
+        static shared_ptr<ExpressionNary> create();
 
     private:
         ExpressionIfNull();
@@ -580,12 +584,12 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual ~ExpressionNot();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
-        virtual void addOperand(boost::shared_ptr<Expression> pExpression);
+        virtual void addOperand(const shared_ptr<Expression> &pExpression);
 
-        static boost::shared_ptr<ExpressionNary> create();
+        static shared_ptr<ExpressionNary> create();
 
     private:
         ExpressionNot();
@@ -598,39 +602,110 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionObject();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
 	    BSONArrayBuilder *pBuilder, bool fieldPrefix) const;
 
+	/*
+	  evaluate(), but return a Document instead of a Value-wrapped
+	  Document.
+
+	  @param pDocument the input Document
+	  @returns the result document
+	 */
+	shared_ptr<Document> evaluateDocument(
+	    const shared_ptr<Document> &pDocument) const;
+
         /*
           Create an empty expression.  Until fields are added, this
           will evaluate to an empty document (object).
          */
-        static boost::shared_ptr<ExpressionObject> create();
+        static shared_ptr<ExpressionObject> create();
 
         /*
           Add a field to the document expression.
 
-          @param fieldName the name the evaluated expression will have in the
+          @param fieldPath the path the evaluated expression will have in the
                  result Document
           @param pExpression the expression to evaluate obtain this field's
                  Value in the result Document
         */
-        void addField(string fieldName,
-		      boost::shared_ptr<Expression> pExpression);
+        void addField(const string &fieldPath,
+		      const shared_ptr<Expression> &pExpression);
+
+	/*
+	  Add a field to the set of those to be excluded.
+
+	  Note that excluding a nested field implies including everything on
+	  the path leading down to it.
+
+	  @param fieldName the name of the field to be excluded
+	 */
+	void excludeField(const string &fieldPath);
+
+	/*
+	  Return the expression for a field.
+
+	  @param fieldName the field name for the expression to return
+	  @returns the expression used to compute the field, if it is present,
+	    otherwise NULL.
+	*/
+	shared_ptr<Expression> getField(const string &fieldName) const;
+
+	/*
+	  Get a count of the added fields.
+
+	  @returns how many fields have been added
+	 */
+	size_t getFieldCount() const;
+
+	/*
+	  Get a count of the exclusions.
+
+	  @returns how many fields have been excluded.
+	*/
+	size_t getExclusionCount() const;
+
+	/*
+	  Specialized BSON conversion that allows for writing out an
+	  $unwind specification.  This creates a standalone object, which must
+	  be added to a containing object with a name
+
+	  @params pBuilder where to write the object to
+	  @params fieldPrefix whether or not fields require the field prefix
+	  @params unwindField which field to unwind, or empty
+	 */
+	void documentToBson(
+	    BSONObjBuilder *pBuilder, bool fieldPrefix,
+	    const string &unwindField) const;
+
+	/*
+	  Set whether or not to include _id by default.
+
+	  Does not affect explicit inclusions or exclusions of _id.
+
+	  @params addId whether or not to include _id
+	*/
+	void setAddId(bool addId);
 
     private:
         ExpressionObject();
 
-	void documentToBson(BSONObjBuilder *pBuilder, bool fieldPrefix) const;
+	ExpressionObject *addField(const FieldPath *pPath,
+				   size_t pathi, size_t pathn,
+				   const shared_ptr<Expression> &pExpression);
+
+	static string idName;
+	bool addId;
+	set<string> exclusions;
 
         /* these two vectors are maintained in parallel */
         vector<string> vFieldName;
-        vector<boost::shared_ptr<Expression> > vpExpression;
+        vector<shared_ptr<Expression> > vpExpression;
     };
 
 
@@ -639,14 +714,14 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionOr();
-	virtual boost::shared_ptr<Expression> optimize();
-        virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
+	virtual shared_ptr<Expression> optimize();
+        virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
 	virtual const char *getOpName() const;
 	virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
 	// virtuals from ExpressionNary
-	virtual boost::shared_ptr<ExpressionNary> (*getFactory() const)();
+	virtual shared_ptr<ExpressionNary> (*getFactory() const)();
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -657,7 +732,7 @@ namespace mongo {
 
           @returns conjunction expression
          */
-        static boost::shared_ptr<ExpressionNary> create();
+        static shared_ptr<ExpressionNary> create();
 
     private:
         ExpressionOr();
@@ -685,7 +760,20 @@ namespace mongo {
 	return 0;
     }
 
-    inline boost::shared_ptr<const Value> ExpressionConstant::getValue() const {
+    inline shared_ptr<const Value> ExpressionConstant::getValue() const {
 	return pValue;
     }
-};
+
+    inline string ExpressionFieldPath::getFieldPath(bool fieldPrefix) const {
+	return fieldPath.getPath(fieldPrefix);
+    }
+
+    inline size_t ExpressionObject::getFieldCount() const {
+	return vFieldName.size();
+    }
+
+    inline size_t ExpressionObject::getExclusionCount() const {
+	return exclusions.size();
+    }
+
+}

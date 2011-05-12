@@ -20,8 +20,8 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    boost::shared_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
-	boost::shared_ptr<Document> pDocument(new Document(pBsonObj));
+    shared_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
+	shared_ptr<Document> pDocument(new Document(pBsonObj));
         return pDocument;
     }
 
@@ -32,7 +32,7 @@ namespace mongo {
         while(bsonIterator.more()) {
             BSONElement bsonElement(bsonIterator.next());
             string fieldName(bsonElement.fieldName());
-	    boost::shared_ptr<const Value> pValue(
+	    shared_ptr<const Value> pValue(
                 Value::createFromBsonElement(&bsonElement));
 
             vFieldName.push_back(fieldName);
@@ -46,8 +46,8 @@ namespace mongo {
             vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);
     }
 
-    boost::shared_ptr<Document> Document::create(size_t sizeHint) {
-	boost::shared_ptr<Document> pDocument(new Document(sizeHint));
+    shared_ptr<Document> Document::create(size_t sizeHint) {
+	shared_ptr<Document> pDocument(new Document(sizeHint));
         return pDocument;
     }
 
@@ -60,9 +60,9 @@ namespace mongo {
         }
     }
 
-    boost::shared_ptr<Document> Document::clone() {
+    shared_ptr<Document> Document::clone() {
         const size_t n = vFieldName.size();
-	boost::shared_ptr<Document> pNew(Document::create(n));
+	shared_ptr<Document> pNew(Document::create(n));
         for(size_t i = 0; i < n; ++i)
             pNew->addField(vFieldName[i], vpValue[i]);
 
@@ -76,7 +76,7 @@ namespace mongo {
         return new FieldIterator(shared_from_this());
     }
 
-    boost::shared_ptr<const Value> Document::getValue(string fieldName) {
+    shared_ptr<const Value> Document::getValue(const string &fieldName) {
         /*
           For now, assume the number of fields is small enough that iteration
           is ok.  Later, if this gets large, we can create a map into the
@@ -93,24 +93,46 @@ namespace mongo {
                 return vpValue[i];
         }
 
-        return(boost::shared_ptr<const Value>());
+        return(shared_ptr<const Value>());
     }
 
-    void Document::addField(string fieldName,
-			    boost::shared_ptr<const Value> pValue) {
+    void Document::addField(const string &fieldName,
+			    const shared_ptr<const Value> &pValue) {
         vFieldName.push_back(fieldName);
         vpValue.push_back(pValue);
     }
 
     void Document::setField(size_t index,
-                            string fieldName,
-			    boost::shared_ptr<const Value> pValue) {
+                            const string &fieldName,
+			    const shared_ptr<const Value> &pValue) {
         vFieldName[index] = fieldName;
         vpValue[index] = pValue;
     }
 
-    int Document::compare(const boost::shared_ptr<Document> &rL,
-                          const boost::shared_ptr<Document> &rR) {
+    shared_ptr<const Value> Document::getField(const string &fieldName) const {
+	const size_t n = vFieldName.size();
+	for(size_t i = 0; i < n; ++i) {
+	    if (fieldName.compare(vFieldName[i]) == 0)
+		return vpValue[i];
+	}
+
+	/* if we got here, there's no such field */
+	return shared_ptr<const Value>();
+    }
+
+    size_t Document::getFieldIndex(const string &fieldName) const {
+	const size_t n = vFieldName.size();
+	size_t i = 0;
+	for(; i < n; ++i) {
+	    if (fieldName.compare(vFieldName[i]) == 0)
+		break;
+	}
+
+	return i;
+    }
+
+    int Document::compare(const shared_ptr<Document> &rL,
+                          const shared_ptr<Document> &rR) {
         const size_t lSize = rL->vFieldName.size();
         const size_t rSize = rR->vFieldName.size();
 
@@ -141,7 +163,7 @@ namespace mongo {
 
     /* ----------------------- FieldIterator ------------------------------- */
 
-    FieldIterator::FieldIterator(boost::shared_ptr<Document> pTheDocument):
+    FieldIterator::FieldIterator(const shared_ptr<Document> &pTheDocument):
         pDocument(pTheDocument),
         index(0) {
     }
@@ -150,9 +172,9 @@ namespace mongo {
         return (index < pDocument->vFieldName.size());
     }
 
-    pair<string, boost::shared_ptr<const Value> > FieldIterator::next() {
+    pair<string, shared_ptr<const Value> > FieldIterator::next() {
         assert(more());
-        pair<string, boost::shared_ptr<const Value> > result(
+        pair<string, shared_ptr<const Value> > result(
             pDocument->vFieldName[index], pDocument->vpValue[index]);
         ++index;
         return result;

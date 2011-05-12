@@ -43,7 +43,7 @@ namespace mongo {
         return (pCurrent.get() != NULL);
     }
 
-    boost::shared_ptr<Document> DocumentSourceCursor::getCurrent() {
+    shared_ptr<Document> DocumentSourceCursor::getCurrent() {
 	/* if we haven't gotten the first one yet, do so now */
 	if (!pCurrent.get())
 	    findNext();
@@ -74,7 +74,7 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::setSource(
-	boost::shared_ptr<DocumentSource> pSource) {
+	const shared_ptr<DocumentSource> &pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -85,14 +85,14 @@ namespace mongo {
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
-	boost::shared_ptr<Cursor> pTheCursor):
+	const shared_ptr<Cursor> &pTheCursor):
         pCursor(pTheCursor),
         pCurrent() {
     }
 
-    boost::shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-	boost::shared_ptr<Cursor> pCursor) {
-	boost::shared_ptr<DocumentSourceCursor> pSource(
+    shared_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
+	const shared_ptr<Cursor> &pCursor) {
+	shared_ptr<DocumentSourceCursor> pSource(
 	    new DocumentSourceCursor(pCursor));
 	    return pSource;
     }

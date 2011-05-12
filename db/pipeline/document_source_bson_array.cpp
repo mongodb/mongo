@@ -42,16 +42,16 @@ namespace mongo {
 	return true;
     }
 
-    boost::shared_ptr<Document> DocumentSourceBsonArray::getCurrent() {
+    shared_ptr<Document> DocumentSourceBsonArray::getCurrent() {
 	assert(haveCurrent);
         BSONObj documentObj(currentElement.Obj());
-        boost::shared_ptr<Document> pDocument(
+        shared_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
         return pDocument;
     }
 
     void DocumentSourceBsonArray::setSource(
-	boost::shared_ptr<DocumentSource> pSource) {
+	const shared_ptr<DocumentSource> &pSource) {
 	/* this doesn't take a source */
 	assert(false);
     }
@@ -67,11 +67,11 @@ namespace mongo {
 	}
     }
 
-    boost::shared_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
+    shared_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
 	BSONElement *pBsonElement) {
 
 	assert(pBsonElement->type() == Array);
-	boost::shared_ptr<DocumentSourceBsonArray> pSource(
+	shared_ptr<DocumentSourceBsonArray> pSource(
 	    new DocumentSourceBsonArray(pBsonElement));
 
 	return pSource;

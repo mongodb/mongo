@@ -28,7 +28,7 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-	virtual void addOperand(boost::shared_ptr<Expression> pExpression);
+	virtual void addOperand(const shared_ptr<Expression> &pExpression);
 	virtual void addToBsonObj(
 	    BSONObjBuilder *pBuilder, string fieldName, bool fieldPrefix) const;
 	virtual void addToBsonArray(
@@ -39,7 +39,7 @@ namespace mongo {
 
           @returns the accumulated value
          */
-        virtual boost::shared_ptr<const Value> getValue() const = 0;
+        virtual shared_ptr<const Value> getValue() const = 0;
 
     protected:
         Accumulator();
@@ -62,9 +62,9 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-	virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
-        virtual boost::shared_ptr<const Value> getValue() const;
+	virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
         /*
@@ -72,9 +72,9 @@ namespace mongo {
 
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> createMin(
+        static shared_ptr<Accumulator> createMin(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
-        static boost::shared_ptr<Accumulator> createMax(
+        static shared_ptr<Accumulator> createMax(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
@@ -82,7 +82,7 @@ namespace mongo {
 
         int sense; /* 1 for min, -1 for max; used to "scale" comparison */
 
-        mutable boost::shared_ptr<const Value> pValue; /* current min/max */
+        mutable shared_ptr<const Value> pValue; /* current min/max */
     };
 
 
@@ -90,9 +90,9 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-	virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
-        virtual boost::shared_ptr<const Value> getValue() const;
+	virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
         /*
@@ -101,13 +101,13 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> create(
+        static shared_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
 
-        mutable vector<boost::shared_ptr<const Value> > vpValue;
+        mutable vector<shared_ptr<const Value> > vpValue;
 	intrusive_ptr<ExpressionContext> pCtx;
     };
 
@@ -116,9 +116,9 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Accumulator
-	virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
-        virtual boost::shared_ptr<const Value> getValue() const;
+	virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
         /*
@@ -127,7 +127,7 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> create(
+        static shared_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     protected: /* reused by AccumulatorAvg */
@@ -144,9 +144,9 @@ namespace mongo {
         typedef AccumulatorSum Super;
     public:
         // virtuals from Accumulator
-	virtual boost::shared_ptr<const Value> evaluate(
-            boost::shared_ptr<Document> pDocument) const;
-        virtual boost::shared_ptr<const Value> getValue() const;
+	virtual shared_ptr<const Value> evaluate(
+            const shared_ptr<Document> &pDocument) const;
+        virtual shared_ptr<const Value> getValue() const;
 	virtual const char *getOpName() const;
 
         /*
@@ -155,7 +155,7 @@ namespace mongo {
 	  @param pCtx the expression context
           @returns the created accumulator
          */
-        static boost::shared_ptr<Accumulator> create(
+        static shared_ptr<Accumulator> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:

@@ -30,8 +30,8 @@ namespace mongo {
     }
 
     DocumentSourceProject::DocumentSourceProject():
-        vpExpression(),
-        unwindWhich(-1),
+	pEO(ExpressionObject::create()),
+	unwindName(),
         pNoUnwindDocument(),
         pUnwindArray(),
         pUnwind() {
@@ -62,33 +62,25 @@ namespace mongo {
         return pSource->advance();
     }
 
-    boost::shared_ptr<Document> DocumentSourceProject::getCurrent() {
+    shared_ptr<Document> DocumentSourceProject::getCurrent() {
         if (!pNoUnwindDocument.get()) {
-            boost::shared_ptr<Document> pInDocument(pSource->getCurrent());
+            shared_ptr<Document> pInDocument(pSource->getCurrent());
 
-            /*
-              Use the expressions to create a new Document out of the
-              source Document
-            */
-            const size_t n = vFieldName.size();
-            pNoUnwindDocument = Document::create(n);
-            for(size_t i = 0; i < n; ++i) {
-                string outName(vFieldName[i]);
-                boost::shared_ptr<Expression> pExpression(vpExpression[i]);
+	    /* use the ExpressionObject to create the base result */
+	    pNoUnwindDocument = pEO->evaluateDocument(pInDocument);
 
-                /* get the value for the field */
-                boost::shared_ptr<const Value> pOutValue(
-                    pExpression->evaluate(pInDocument));
-
-                /*
-                  If we're unwinding this field, and it's an array, then we're
-                  going to pick off elements one by one, and make fields of
-                  them below.
-                */
-                if (((int)i == unwindWhich) &&
-		    (pOutValue->getType() == Array)) {
-                    pUnwindArray = pOutValue;
-                    pUnwind = pUnwindArray->getArray();
+	    /*
+	      If we're unwinding this field, and it's an array, then we're
+	      going to pick off elements one by one, and make fields of
+	      them below.
+	    */
+	    if (unwindName.length() > 0) {
+		unwindWhich = pNoUnwindDocument->getFieldIndex(unwindName);
+		Document::FieldPair outPair(
+		    pNoUnwindDocument->getField(unwindWhich));
+		if (outPair.second->getType() == Array) {
+		    pUnwindArray = outPair.second;
+		    pUnwind = pUnwindArray->getArray();
 
                     /*
                       The $unwind of an empty array is a NULL value.  If we
@@ -100,14 +92,13 @@ namespace mongo {
                     else {
                         pUnwindArray.reset();
                         pUnwind.reset();
-                        pOutValue = Value::getNull();
+			pNoUnwindDocument->setField(
+			    unwindWhich, unwindName, Value::getNull());
                     }
-                }
+		}
+	    }
+	}
 
-                /* add the field to the document under construction */
-                pNoUnwindDocument->addField(outName, pOutValue);
-            }
-        }
 
         /*
           If we're unwinding a field, create an alternate document.  In the
@@ -116,11 +107,10 @@ namespace mongo {
          */
         if (pUnwindArray.get()) {
             /* clone the document with an array we're unwinding */
-            boost::shared_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
+            shared_ptr<Document> pUnwindDocument(pNoUnwindDocument->clone());
 
             /* substitute the named field into the prototype document */
-            pUnwindDocument->setField(
-                (size_t)unwindWhich, vFieldName[unwindWhich], pUnwindValue);
+            pUnwindDocument->setField(unwindWhich, unwindName, pUnwindValue);
 
             return pUnwindDocument;
         }
@@ -129,60 +119,55 @@ namespace mongo {
     }
 
     void DocumentSourceProject::optimize() {
-	const size_t n = vpExpression.size();
-	for(size_t i = 0; i < n; ++i)
-	    vpExpression[i] = vpExpression[i]->optimize();
+	shared_ptr<Expression> pE(pEO->optimize());
+	pEO = dynamic_pointer_cast<ExpressionObject>(pE);
     }
 
     void DocumentSourceProject::sourceToBson(BSONObjBuilder *pBuilder) const {
 	BSONObjBuilder insides;
-	
-	const size_t n = vFieldName.size();
-	for(size_t i = 0; i < n; ++i) {
-	    if (i == unwindWhich) {
-		BSONObjBuilder unwind;
-		vpExpression[i]->addToBsonObj(
-		    &unwind, Expression::unwindName, false);
-		insides.append(vFieldName[i], unwind.done());
-		continue;
-	    }
-
-	    vpExpression[i]->addToBsonObj(&insides, vFieldName[i], false);
-	}
-
+	pEO->documentToBson(&insides, false, unwindName);
 	pBuilder->append("$project", insides.done());
     }
 
-    boost::shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
-        boost::shared_ptr<DocumentSourceProject> pSource(
+    shared_ptr<DocumentSourceProject> DocumentSourceProject::create() {
+        shared_ptr<DocumentSourceProject> pSource(
             new DocumentSourceProject());
         return pSource;
     }
 
-    void DocumentSourceProject::addField(
-        string fieldName, boost::shared_ptr<Expression> pExpression,
+    void DocumentSourceProject::includeField(
+        const string &fieldName, const shared_ptr<Expression> &pExpression,
 	bool unwindArray) {
-        assert(fieldName.length()); // CW TODO must be a non-empty string
         assert(pExpression); // CW TODO must be a non-null expression
-        assert(!unwindArray || (unwindWhich < 0));
-                                             // CW TODO only one unwind allowed
 
         /* if we're unwinding, remember which field */
-        if (unwindArray)
-            unwindWhich = vFieldName.size();
+        if (unwindArray) {
+	    assert(!unwindName.length());
+	                           // CW TODO ERROR: only one unwind allowed
 
-        vFieldName.push_back(fieldName);
-        vpExpression.push_back(pExpression);
+	    FieldPath fp(fieldName);
+	    assert(fp.getPathLength() == 1);
+	                   // CW TODO ERROR: can only unwind a top-level field
+
+	    /* remember which field */
+	    unwindName = fieldName;
+	}
+
+	pEO->addField(fieldName, pExpression);
     }
 
-    boost::shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
+    void DocumentSourceProject::excludeField(const string &fieldName) {
+	pEO->excludeField(fieldName);
+    }
+
+    shared_ptr<DocumentSource> DocumentSourceProject::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         /* validate */
         assert(pBsonElement->type() == Object); // CW TODO user error
 
         /* chain the projection onto the original source */
-        boost::shared_ptr<DocumentSourceProject> pProject(
+        shared_ptr<DocumentSourceProject> pProject(
 	    DocumentSourceProject::create());
 
         /*
@@ -225,11 +210,11 @@ namespace mongo {
 
 AddField:
                 if (fieldInclusion == 0)
-                    assert(false); // CW TODO unimplemented
+		    pProject->excludeField(outFieldName);
                 else {
-                    boost::shared_ptr<Expression> pExpression(
+                    shared_ptr<Expression> pExpression(
                         ExpressionFieldPath::create(inFieldName));
-                    pProject->addField(outFieldName, pExpression, false);
+                    pProject->includeField(outFieldName, pExpression, false);
                 }
                 break;
 
@@ -247,7 +232,7 @@ AddField:
             case Object: {
                 bool hasUnwound = objectCtx.unwindUsed();
 
-                boost::shared_ptr<Expression> pDocument(
+                shared_ptr<Expression> pDocument(
                     Expression::parseObject(&outFieldElement, &objectCtx));
 
                 /*
@@ -256,7 +241,7 @@ AddField:
                   projection, and after parsing find that we have just gotten a
                   $unwind specification.
                  */
-                pProject->addField(
+                pProject->includeField(
                     outFieldName, pDocument,
                     !hasUnwound && objectCtx.unwindUsed());
                 break;
