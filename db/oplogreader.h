@@ -54,7 +54,7 @@ namespace mongo {
 
         void query(const char *ns, const BSONObj& query) {
             assert( !haveCursor() );
-            cursor = _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk);
+            cursor.reset( _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk).release() );
         }
 
         void queryGTE(const char *ns, OpTime t) {
