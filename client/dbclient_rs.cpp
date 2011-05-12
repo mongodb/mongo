@@ -74,7 +74,7 @@ namespace mongo {
 
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1) {
+        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1), _nextSlave(0) {
         
         uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
 
@@ -221,19 +221,19 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
-        int x = rand() % _nodes.size();
+
         {
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
-                int p = ( i + x ) % _nodes.size();
-                if ( p == _master )
+                _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
+                if ( _nextSlave == _master )
                     continue;
-                if ( _nodes[p].ok )
-                    return _nodes[p].addr;
+                if ( _nodes[ _nextSlave ].ok )
+                    return _nodes[ _nextSlave ].addr;
             }
         }
 
-        return _nodes[0].addr;
+        return _nodes[ 0 ].addr;
     }
 
     /**
@@ -537,8 +537,8 @@ namespace mongo {
                 try {
                     return checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                 }
             }
         }
@@ -555,8 +555,8 @@ namespace mongo {
                 try {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
-                catch ( DBException & ) {
-                    LOG(1) << "can't query replica set slave: " << _slaveHost << endl;
+                catch ( DBException &e ) {
+                	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                 }
             }
         }
@@ -591,8 +591,8 @@ namespace mongo {
                             *actualServer = s->getServerAddress();
                         return s->call( toSend , response , assertOk );
                     }
-                    catch ( DBException & ) {
-                        log(1) << "can't query replica set slave: " << _slaveHost << endl;
+                    catch ( DBException &e ) {
+                    	LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << e.what() << endl;
                         if ( actualServer )
                             *actualServer = "";
                     }

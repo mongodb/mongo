@@ -147,7 +147,7 @@ namespace mongo {
         vector<Node> _nodes;
 
         int _master; // which node is the current master.  -1 means no master is known
-
+        int _nextSlave; // which node is the current slave
 
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
