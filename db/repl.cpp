@@ -1116,7 +1116,11 @@ namespace mongo {
     }
 
     bool OplogReader::connect(const string& from, const string& to) {
+        if (conn() != 0) {
+            return true;
+        }
         if (commonConnect(to)) {
+            log() << "handshake between " << from << " and " << to << endl;
             return passthroughHandshake(from);
         }
         return false;
