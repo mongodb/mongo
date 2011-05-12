@@ -8,6 +8,80 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_errv --
+ * 	Report an error (va_list version).
+ */
+void
+__wt_errv(SESSION *session, int error,
+    const char *prefix1, const char *prefix2, const char *fmt, va_list ap)
+{
+	WT_EVENT_HANDLER *handler;
+	char *end, *p;
+
+	/*
+	 * !!!
+	 * SECURITY:
+	 * Buffer placed at the end of the stack in case snprintf overflows.
+	 */
+	char s[2048];
+
+	p = s;
+	end = s + sizeof(s);
+
+	if (prefix1 != NULL && prefix2 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p),
+		    "%s [%s]: ", prefix1, prefix2);
+	else if (prefix1 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
+	else if (prefix2 != NULL && p < end)
+		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
+	if (p < end)
+		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
+	if (error != 0 && p < end)
+		p += snprintf(p,
+		    (size_t)(end - p), ": %s", wiredtiger_strerror(error));
+
+	handler = session->event_handler;
+	handler->handle_error(handler, error, s);
+}
+
+/*
+ * __wt_err --
+ * 	Report an error.
+ */
+void
+__wt_err(SESSION *session, int error, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	__wt_errv(session, error,
+	    (session->btree != NULL) ? session->btree->name : NULL,
+	    session->name,
+	    fmt, ap);
+	va_end(ap);
+}
+
+/*
+ * __wt_errx --
+ * 	Report an error with no error code.
+ */
+void
+__wt_errx(SESSION *session, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	__wt_errv(session, 0,
+	    (session->btree != NULL) ? session->btree->name : NULL,
+	    session->name,
+	    fmt, ap);
+	va_end(ap);
+}
+
+/*
  * __wt_msg_call --
  *	Pass a message to a callback function.
  */
@@ -97,78 +171,4 @@ __wt_file_item_too_big(SESSION *session)
 {
 	__wt_errx(session, "the item is too large for the file to store");
 	return (WT_ERROR);
-}
-
-/*
- * __wt_errv --
- * 	Report an error (va_list version).
- */
-void
-__wt_errv(SESSION *session, int error,
-    const char *prefix1, const char *prefix2, const char *fmt, va_list ap)
-{
-	WT_EVENT_HANDLER *handler;
-	char *end, *p;
-
-	/*
-	 * !!!
-	 * SECURITY:
-	 * Buffer placed at the end of the stack in case snprintf overflows.
-	 */
-	char s[2048];
-
-	p = s;
-	end = s + sizeof(s);
-
-	if (prefix1 != NULL && prefix2 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p),
-		    "%s [%s]: ", prefix1, prefix2);
-	else if (prefix1 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
-	else if (prefix2 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
-	if (p < end)
-		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
-	if (error != 0 && p < end)
-		p += snprintf(p,
-		    (size_t)(end - p), ": %s", wiredtiger_strerror(error));
-
-	handler = session->event_handler;
-	handler->handle_error(handler, error, s);
-}
-
-/*
- * __wt_err --
- * 	Report an error.
- */
-void
-__wt_err(SESSION *session, int error, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 3, 4)))
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	__wt_errv(session, error,
-	    (session->btree != NULL) ? session->btree->name : NULL,
-	    session->name,
-	    fmt, ap);
-	va_end(ap);
-}
-
-/*
- * __wt_errx --
- * 	Report an error with no error code.
- */
-void
-__wt_errx(SESSION *session, const char *fmt, ...)
-    WT_GCC_ATTRIBUTE ((format (printf, 2, 3)))
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	__wt_errv(session, 0,
-	    (session->btree != NULL) ? session->btree->name : NULL,
-	    session->name,
-	    fmt, ap);
-	va_end(ap);
 }
