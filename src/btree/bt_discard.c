@@ -73,11 +73,11 @@ __wt_page_free(
 		case WT_PAGE_COL_RLE:
 		case WT_PAGE_COL_VAR:
 			__wt_free_update_list(session, page->u.bulk.upd);
-                        page->u.bulk.upd = NULL;
+			page->u.bulk.upd = NULL;
 			break;
 		case WT_PAGE_ROW_LEAF:
 			__wt_free_insert_list(session, page->u.bulk.ins);
-                        page->u.bulk.ins = NULL;
+			page->u.bulk.ins = NULL;
 			break;
 		}
 	else
