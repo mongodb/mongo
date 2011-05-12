@@ -302,7 +302,7 @@ namespace mongo {
     {
         log( logLvl - 1 ) << "created new distributed lock for " << name << " on " << conn
                           << " ( lock timeout : " << _lockTimeout
-                          << ", ping interval : " << _lockPing << ", process : " << asProcess << endl;
+                          << ", ping interval : " << _lockPing << ", process : " << asProcess << " )" << endl;
     }
 
     Date_t DistributedLock::getRemoteTime() {
