@@ -164,33 +164,12 @@ __wt_btree_huffman_set(BTREE *btree,
 
 	session = &btree->conn->default_session;
 
-	switch (LF_ISSET(WT_ASCII_ENGLISH | WT_TELEPHONE)) {
+	switch (LF_ISSET(WT_ASCII_ENGLISH)) {
 	case WT_ASCII_ENGLISH:
 		if (huffman_table != NULL)
 			goto err;
 		huffman_table = __wt_huffman_ascii_english;
 		huffman_table_size = sizeof(__wt_huffman_ascii_english);
-		break;
-	case WT_TELEPHONE:
-		if (huffman_table != NULL)
-			goto err;
-		memset(phone, 0, sizeof(phone));
-		phone['('] = 2;
-		phone[')'] = 2;
-		phone['+'] = 1;
-		phone['-'] = 3;
-		phone['0'] = 1;
-		phone['1'] = 1;
-		phone['2'] = 1;
-		phone['3'] = 1;
-		phone['4'] = 1;
-		phone['5'] = 1;
-		phone['6'] = 1;
-		phone['7'] = 1;
-		phone['8'] = 1;
-		phone['9'] = 1;
-		huffman_table = phone;
-		huffman_table_size = sizeof(phone);
 		break;
 	default:
 err:		return (__wt_api_args(session));

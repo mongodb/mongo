@@ -206,7 +206,7 @@ flags = {
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],
 	'bt_tree_walk' : [ 'WALK_CACHE' ],
-	'huffman_set' : [ 'ASCII_ENGLISH', 'HUFFMAN_KEY', 'HUFFMAN_VALUE', 'TELEPHONE' ],
+	'huffman_set' : [ 'ASCII_ENGLISH', 'HUFFMAN_KEY', 'HUFFMAN_VALUE' ],
 	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED' ],
 	'verbose' : [ 'VERB_EVICT', 'VERB_FILEOPS', 'VERB_HAZARD', 'VERB_MUTEX', 'VERB_READ' ],
 
