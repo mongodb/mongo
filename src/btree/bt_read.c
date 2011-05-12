@@ -113,7 +113,7 @@ __wt_cache_read_serial_func(SESSION *session)
 			    (session, rr, parent, ref, dsk_verify);
 			return (0);
 		}
-	__wt_err(session, 0, "read server request table full");
+	__wt_errx(session, "read server request table full");
 	return (WT_ERROR);
 }
 

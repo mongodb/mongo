@@ -156,7 +156,7 @@ __wt_evict_file_serial_func(SESSION *session)
 			__evict_req_set(session, er, close_method);
 			return (0);
 		}
-	__wt_err(session, 0, "eviction server request table full");
+	__wt_errx(session, "eviction server request table full");
 	return (WT_ERROR);
 }
 
