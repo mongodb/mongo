@@ -1586,7 +1586,7 @@ __rec_col_rle_bulk(SESSION *session, WT_PAGE *page)
 	    session->btree->leafmax, session->btree->leafmin));
 
 	/* For each entry in the update list... */
-	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
+	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next, ++r->recno) {
 		data = WT_UPDATE_DATA(upd);
 
 		/*
