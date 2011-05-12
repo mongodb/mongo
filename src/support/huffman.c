@@ -399,7 +399,7 @@ __wt_huffman_close(SESSION *session, void *huffman_arg)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_print_huffman_code --
- *	Prints a symbol's huffman code. Can be used for debugging purposes.
+ *	Print a symbol's Huffman code.
  */
 void
 __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
@@ -414,10 +414,10 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
 	} else {
 		e = &huffman->entries[symbol];
 		if (e->codeword_length == 0)
-			printf("symbol %d not defined -- 0 frequency\n",
-			    symbol);
+			printf(
+			    "symbol %d not defined -- 0 frequency\n", symbol);
 		else
-			/* should translate code to bindary */
+			/* Should translate code to binary. */
 			printf("%d -> code %x, length %d\n",
 			    symbol, e->code, e->codeword_length);
 	}
@@ -479,8 +479,8 @@ __wt_huffman_encode(void *huffman_arg,
 	 * We need N+1 bytes to encode N bytes, re-allocate as necessary.
 	 *
 	 * XXX
-	 * THIS IS WRONG.  We if the input consists entirely of the least
-	 * frequent symbol (longest code word), we need:
+	 * THIS IS WRONG.  If the input consists entirely of the least frequent
+	 * symbol (longest code word), we need:
 	 *
 	 *	max-code-length * symbols-in-input
 	 *
