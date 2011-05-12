@@ -2440,12 +2440,14 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 	    (u_long)WT_PADDR(page), (u_long)WT_PSIZE(page)));
 
 	switch (page->type) {
-	case WT_PAGE_ROW_INT:
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
 		WT_STAT_INCR(btree->stats, split_intl);
 		break;
-	case WT_PAGE_ROW_LEAF:
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
 		WT_STAT_INCR(btree->stats, split_leaf);
 		break;
 	WT_ILLEGAL_FORMAT(session);
@@ -2457,6 +2459,8 @@ __rec_wrapup(SESSION *session, WT_PAGE *page)
 		WT_RET(__rec_row_split(session, &imp, page));
 		break;
 	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_RLE:
 	case WT_PAGE_COL_VAR:
 		WT_RET(__rec_col_split(session, &imp, page));
 		break;
