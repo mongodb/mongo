@@ -1368,13 +1368,16 @@ __rec_col_fix(SESSION *session, WT_PAGE *page)
 	WT_FIX_DELETE_SET(tmp->mem);
 
 	/*
-	 * Fixed-size pages can't split, but we use the underlying helper
-	 * functions because they don't add much overhead, and it's better
-	 * if all the reconciliation functions look the same.
+	 * Fixed-size pages can't split; use the underlying helper functions
+	 * because they don't add much overhead, and it's better if all the
+	 * reconciliation functions look the same.
+	 *
+	 * Use the current page size as our min/max page size, we know exactly
+	 * how much space we need.
 	 */
 	WT_ERR(__rec_split_init(session, page,
 	    page->u.col_leaf.recno,
-	    session->btree->leafmax, session->btree->leafmin));
+	    page->parent_ref->size, page->parent_ref->size));
 
 	/* For each entry in the in-memory page... */
 	WT_COL_FOREACH(page, cip, i) {
