@@ -506,9 +506,11 @@ namespace mongo {
                 }
             }
 
-            // cleanup js objects
-            ScriptingFunction cleanup = _scope->createFunction("delete _emitCt; delete _keyCt; delete _mrMap;");
-            _scope->invoke(cleanup, 0, 0, 0, true);
+            if (_scope) {
+                // cleanup js objects
+                ScriptingFunction cleanup = _scope->createFunction("delete _emitCt; delete _keyCt; delete _mrMap;");
+                _scope->invoke(cleanup, 0, 0, 0, true);
+            }
         }
 
         /**
@@ -529,8 +531,8 @@ namespace mongo {
             _scope->setBoolean("_doFinal", _config.finalizer);
 
             // by default start in JS mode, will be faster for small jobs
-//            _jsMode = _config.jsMode;
-            _jsMode = true;
+            _jsMode = _config.jsMode;
+//            _jsMode = true;
             switchMode(_jsMode);
 
             // global JS map/reduce hashmap
@@ -881,7 +883,6 @@ namespace mongo {
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
                 State state( config );
-
                 if ( ! state.sourceExists() ) {
                     errmsg = "ns doesn't exist";
                     return false;
