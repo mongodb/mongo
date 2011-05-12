@@ -333,8 +333,8 @@ __wt_huffman_open(SESSION *session,
 	 * too much memory.
 	 */
 #define	WT_HUFFMAN_MAX_MEMORY	 (256 * 1024)
-	memuse = nbytes * sizeof(WT_HUFFMAN_TABLE_ENTRY) +
-	    (1U << huffman->max_depth) * sizeof(uint16_t);
+	memuse = nbytes * WT_SIZEOF32(WT_HUFFMAN_TABLE_ENTRY) +
+	    (1U << huffman->max_depth) * WT_SIZEOF32(uint16_t);
 	if (memuse > WT_HUFFMAN_MAX_MEMORY) {
 		__wt_errx(session,
 		    "Huffman table would allocate too much memory, perhaps due "
