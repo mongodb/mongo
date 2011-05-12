@@ -692,22 +692,13 @@ wts_del_row(uint64_t keyno)
 		return (1);
 
 	cursor->set_key(cursor, &key);
-	if ((ret = cursor->search(cursor)) == WT_NOTFOUND) {
-		NTF_CHK(wts_notfound_chk("wts_del_row", ret, notfound, keyno));
-		return (0);
-	}
-	if (ret != 0) {
-		fprintf(stderr, "%s: wts_del_row: find row %llu by key: %s\n",
-		    g.progname, (unsigned long long)keyno,
-		    wiredtiger_strerror(ret));
-		return (1);
-	}
-	if ((ret = cursor->remove(cursor)) != 0) {
+	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr, "%s: wts_del_row: remove %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
 	}
+	NTF_CHK(wts_notfound_chk("wts_del_row", ret, notfound, keyno));
 	return (0);
 }
 
@@ -734,9 +725,8 @@ wts_del_col(uint64_t keyno)
 		return (1);
 
 	cursor->set_key(cursor, keyno);
-	if (((ret = cursor->search(cursor)) != 0 ||
-	    (ret = cursor->remove(cursor)) != 0) && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_del_col: delete %llu by key: %s\n",
+	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
+		fprintf(stderr, "%s: wts_del_col: remove %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
