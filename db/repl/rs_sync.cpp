@@ -557,7 +557,11 @@ namespace mongo {
         lock lk(this);
         
         const Member *target = _currentSyncTarget;
-        if (!target || box.getState().primary()) {
+        if (!target || box.getState().primary()
+            // we are currently syncing from someone who's syncing from us
+            // the target might end up with a new Member, but s.slave never
+            // changes so we'll compare the names
+            || target == s.slave || target->fullName() == s.slave->fullName()) {
             return;
         }
 
