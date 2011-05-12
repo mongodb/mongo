@@ -214,7 +214,6 @@ flags = {
 # Structure flag declarations
 ###################################################
 	'conn' : [ 'SERVER_RUN', 'WORKQ_RUN' ],
-	'btree' : [ 'COLUMN', 'RDONLY', 'RLE' ],
 	'buf' : [ 'BUF_INUSE' ],
 	'session' : [ 'SESSION_INTERNAL' ],
 }

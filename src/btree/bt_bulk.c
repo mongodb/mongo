@@ -36,21 +36,26 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 	 */
 	WT_RET(__wt_block_alloc(session, &addr, 512));
 
-	if (F_ISSET(btree, WT_COLUMN)) {
-		if (btree->fixed_len == 0)
-			cbulk->page_type = WT_PAGE_COL_VAR;
-		else
-			if (F_ISSET(btree, WT_RLE))
-				cbulk->page_type = WT_PAGE_COL_RLE;
-			else
-				cbulk->page_type = WT_PAGE_COL_FIX;
-
+	switch (btree->type) {
+	case BTREE_COL_FIX:
 		cbulk->recno = 1;
 		cbulk->updp = &cbulk->upd_base;
-	} else {
-		cbulk->page_type = WT_PAGE_ROW_LEAF;
-
+		cbulk->page_type = WT_PAGE_COL_FIX;
+		break;
+	case BTREE_COL_RLE:
+		cbulk->recno = 1;
+		cbulk->updp = &cbulk->upd_base;
+		cbulk->page_type = WT_PAGE_COL_RLE;
+		break;
+	case BTREE_COL_VAR:
+		cbulk->recno = 1;
+		cbulk->updp = &cbulk->upd_base;
+		cbulk->page_type = WT_PAGE_COL_VAR;
+		break;
+	case BTREE_ROW:
 		cbulk->insp = &cbulk->ins_base;
+		cbulk->page_type = WT_PAGE_ROW_LEAF;
+		break;
 	}
 	cbulk->ipp = 50000;			/* XXX */
 

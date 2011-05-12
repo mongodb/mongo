@@ -29,9 +29,6 @@ __wt_btree_open(SESSION *session, const char *name, mode_t mode, uint32_t flags)
 	btree->file_id = ++conn->next_file_id;
 	__wt_unlock(session, conn->mtx);
 
-	if (LF_ISSET(WT_RDONLY))
-		F_SET(btree, WT_RDONLY);
-
 	/* Open the underlying Btree. */
 	WT_RET(__wt_bt_open(session, LF_ISSET(WT_CREATE) ? 1 : 0));
 

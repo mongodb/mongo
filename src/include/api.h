@@ -82,6 +82,14 @@ struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
 	uint32_t refcnt;		/* Sessions with this tree open. */
 
+	const char **__cfg;		/* Configuration. */
+
+	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
+		BTREE_COL_RLE=2,	/* Fixed-length, RLE column store */
+		BTREE_COL_VAR=3,	/* Variable-length column store */
+		BTREE_ROW=4		/* Row-store */
+	} type;				/* Type */
+
 	TAILQ_ENTRY(__btree) q;		/* Linked list of databases */
 
 	char	 *name;			/* File name */
@@ -110,10 +118,6 @@ struct __btree {
 	WT_BTREE_STATS *stats;		/* Btree handle statistics */
 	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
 
-	/*
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * BTREE getter/setter variables: BEGIN
-	 */
 	int btree_compare_int;
 
 	int (*btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *);
@@ -129,15 +133,9 @@ struct __btree {
 
 	uint32_t fixed_len;
 	const char *dictionary;
-	/*
-	 * BTREE getter/setter variables: END
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 */
 
 	const char *config;		/* Config settings. */
 	int config_dirty;		/* Config string modified. */
-
-	uint32_t flags;
 };
 
 struct __btree_session {
@@ -285,10 +283,6 @@ struct __connection {
 	WT_FH	  *log_fh;		/* Logging file handle */
 	const char *sep;		/* Display separator line */
 
-	/*
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * CONNECTION getter/setter variables: BEGIN
-	 */
 	uint64_t cache_size;
 
 	uint32_t data_update_max;
@@ -304,10 +298,6 @@ struct __connection {
 	uint32_t session_size;
 
 	uint32_t verbose;
-	/*
-	 * CONNECTION getter/setter variables: END
-	 * DO NOT EDIT: automatically built by dist/api.py.
-	 */
 
 	uint32_t flags;
 };
@@ -364,16 +354,13 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
  */
 #define	WT_ASCII_ENGLISH				0x00000004
 #define	WT_BUF_INUSE					0x00000001
-#define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUMP_PRINT					0x00000001
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_HUFFMAN_VALUE				0x00000001
-#define	WT_RDONLY					0x00000002
 #define	WT_REC_EVICT					0x00000002
 #define	WT_REC_LOCKED					0x00000001
-#define	WT_RLE						0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_SESSION_INTERNAL				0x00000001
 #define	WT_VERB_EVICT					0x00000010

@@ -57,17 +57,8 @@ __wt_desc_read(SESSION *session)
 	btree->root_page.size = desc.root_size;
 	btree->free_addr = desc.free_addr;
 	btree->free_size = desc.free_size;
+	btree->type = desc.type;
 	btree->fixed_len = desc.fixed_len;
-
-	/*
-	 * XXX
-	 * This is the wrong place to do this -- need to think about how
-	 * to update open/configuration information in a reasonable way.
-	 */
-	if (F_ISSET(&desc, WT_PAGE_DESC_COLUMN))
-		F_SET(btree, WT_COLUMN);
-	if (F_ISSET(&desc, WT_PAGE_DESC_RLE))
-		F_SET(btree, WT_RLE);
 
 	return (0);
 }
@@ -110,11 +101,7 @@ __wt_desc_write(SESSION *session)
 	desc.free_addr = btree->free_addr;
 	desc.free_size = btree->free_size;
 	desc.fixed_len = (uint8_t)btree->fixed_len;
-	desc.flags = 0;
-	if (F_ISSET(btree, WT_COLUMN))
-		F_SET(&desc, WT_PAGE_DESC_COLUMN);
-	if (F_ISSET(btree, WT_RLE))
-		F_SET(&desc, WT_PAGE_DESC_RLE);
+	desc.type = btree->type;
 
 	WT_RET(__wt_desc_io(session, &desc, 0));
 

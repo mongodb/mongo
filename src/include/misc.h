@@ -83,11 +83,6 @@ extern "C" {
 	__wt_page_in_func(a, b, c, d)
 #endif
 
-/* Read-only file check. */
-#define	WT_DB_RDONLY(session, btree, name)				\
-	if (F_ISSET((btree), WT_RDONLY))				\
-		return (__wt_file_readonly((session), (name)));
-
 /*
  * Flag set, clear and test.
  *

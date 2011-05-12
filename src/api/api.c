@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __wt_api_arg_min(SESSION *, const char *, uint64_t, uint64_t);
+
 /*
  * __session_close --
  *	WT_SESSION->close method.
@@ -84,15 +86,13 @@ __session_open_cursor(WT_SESSION *wt_session,
  *	WT_SESSION->create method.
  */
 static int
-__session_create(WT_SESSION *wt_session,
-    const char *name, const char *config)
+__session_create(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CONFIG_ITEM cval;
 	const char *key_format, *value_format;
-	uint32_t column_flags, fixed_len, huffman_flags;
 
 	session = (SESSION *)wt_session;
 	conn = (CONNECTION *)wt_session->connection;
@@ -114,8 +114,6 @@ __session_create(WT_SESSION *wt_session,
 	 * Also, avoiding copies / memory allocation at the moment by
 	 * pointing to constant strings for the few cases we handle.
 	 */
-	fixed_len = 0;
-
 	WT_RET(__wt_config_gets(__cfg, "key_format", &cval));
 	if (strncmp(cval.str, "r", cval.len) == 0)
 		key_format = "r";
@@ -134,62 +132,23 @@ __session_create(WT_SESSION *wt_session,
 		value_format = "S";
 	else if (strncmp(cval.str, "u", cval.len) == 0)
 		value_format = "u";
-	else if (cval.len > 1 && cval.str[cval.len - 1] == 'u') {
-		fixed_len = (uint32_t)strtol(cval.str, NULL, 10);
+	else if (cval.len > 1 && cval.str[cval.len - 1] == 'u')
 		value_format = "u";
-	} else {
+	else {
 		__wt_errx(session, "Unknown value_format '%.*s'",
 		    (int)cval.len, cval.str);
 		return (EINVAL);
 	}
 
-	column_flags = 0;
-	WT_RET(__wt_config_gets(__cfg, "runlength_encoding", &cval));
-	if (cval.val != 0)
-		column_flags |= WT_RLE;
-
-	huffman_flags = 0;
-	WT_RET(__wt_config_gets(__cfg, "huffman_key", &cval));
-	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
-		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_KEY;
-	WT_RET(__wt_config_gets(__cfg, "huffman_value", &cval));
-	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
-		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_VALUE;
-
 	/* Allocate a BTREE handle. */
 	WT_RET(__wt_connection_btree(conn, &btree));
-
-	WT_RET(__wt_config_gets(__cfg, "allocation_size", &cval));
-	btree->allocsize = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "intl_node_max", &cval));
-	btree->intlmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "intl_node_min", &cval));
-	btree->intlmin = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "leaf_node_max", &cval));
-	btree->leafmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "leaf_node_min", &cval));
-	btree->leafmin = (uint32_t)cval.val;
-
-	if (key_format[0] == 'r') {
-		/* Run-length encoding required fixed-length records. */
-		if (fixed_len == 0 && FLD_ISSET(column_flags, WT_RLE)) {
-			__wt_errx(session,
-			    "Run-length encoding is incompatible with "
-			    "variable length column-store records");
-			return (WT_ERROR);
-		}
-
-		btree->fixed_len = fixed_len;
-		F_SET(btree, WT_COLUMN | column_flags);
-	}
-	if (huffman_flags != 0)
-		WT_RET(__wt_btree_huffman_set(btree, NULL, 0, huffman_flags));
+	btree->__cfg = __cfg;				/* XXX */
 
 	session->btree = btree;
 	WT_RET(__wt_btree_open(session, name, 0666, WT_CREATE));
 
-	WT_RET(__wt_session_add_btree(session,
-	    btree, key_format, value_format));
+	WT_RET(__wt_session_add_btree(
+	    session, btree, key_format, value_format));
 
 	API_END();
 	return (0);
@@ -692,4 +651,21 @@ err:		if (opened)
 	}
 
 	return (ret);
+}
+
+/*
+ * __wt_api_arg_min --
+ *	Print a standard error message when an API function is passed a
+ *	too-small argument.
+ */
+static int
+__wt_api_arg_min(
+    SESSION *session, const char *arg_name, uint64_t v, uint64_t min)
+{
+	if (v >= min)
+		return (0);
+
+	__wt_errx(session, "%s argument %llu less than minimum value of %llu",
+	    arg_name, (unsigned long long)v, (unsigned long long)min);
+	return (WT_ERROR);
 }

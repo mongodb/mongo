@@ -29,15 +29,18 @@ extern "C" {
  * wasted space when storing overflow items), and when the allocation unit
  * grows, the maximum size of the file grows as well.
  *
- * The minimum btree leaf and internal page sizes are 512B, the maximum 256MB.
- * (The maximum of 256MB is enforced by the software, it could be set as high
+ * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
+ * (The maximum of 512MB is enforced by the software, it could be set as high
  * as 4GB.)
  *
  * Key and data item lengths are stored in 32-bit unsigned integers, meaning
- * the largest key or data item is 4GB.  Record numbers are stored in 64-bit
- * unsigned integers, meaning the largest record number is "huge".
+ * the largest key or data item is 4GB (minus a few bytes).  Record numbers
+ * are stored in 64-bit unsigned integers, meaning the largest record number
+ * is "really, really big".
  */
-#define	WT_BTREE_PAGE_SIZE_MAX		(256 * WT_MEGABYTE)
+#define	WT_BTREE_ALLOCATION_SIZE_MIN	(512)
+#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
+#define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
 #define	WT_ADDR_INVALID	UINT32_MAX	/* Invalid file address */
 
@@ -51,13 +54,6 @@ extern "C" {
 	((off_t)(addr) * (off_t)(btree)->allocsize)
 #define	WT_OFF_TO_ADDR(btree, off)					\
 	((uint32_t)((off) / (btree)->allocsize))
-
-/*
- * WT_DISK_REQUIRED--
- *	Return bytes needed for data length, rounded to an allocation unit.
- */
-#define	WT_DISK_REQUIRED(session, size)					\
-	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (session)->btree->allocsize))
 
 /*
  * The file needs a description, here's the structure.  At the moment, this
@@ -75,17 +71,11 @@ struct __wt_page_desc {
 	/* !!! 64-bit types must be on an 8-byte boundary to avoid padding. */
 	uint64_t recno_offset;		/* 08-15: Offset record number */
 
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
-#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 	uint32_t allocsize;		/* 16-19: Allocation size */
 
-#define	WT_BTREE_INTLMAX_DEFAULT	(2 * 1024)
-#define	WT_BTREE_INTLMIN_DEFAULT	(2 * 1024)
 	uint32_t intlmax;		/* 20-23: Maximum internal page size */
 	uint32_t intlmin;		/* 24-27: Minimum internal page size */
 
-#define	WT_BTREE_LEAFMAX_DEFAULT	WT_MEGABYTE
-#define	WT_BTREE_LEAFMIN_DEFAULT	(32 * 1024)
 	uint32_t leafmax;		/* 28-31: Maximum leaf page size */
 	uint32_t leafmin;		/* 32-35: Minimum leaf page size */
 
@@ -94,9 +84,7 @@ struct __wt_page_desc {
 	uint32_t free_addr;		/* 44-47: Free list page address */
 	uint32_t free_size;		/* 48-51: Free list page length */
 
-#define	WT_PAGE_DESC_COLUMN	0x01	/* Column store */
-#define	WT_PAGE_DESC_RLE	0x02	/* Run-length encoding */
-	uint32_t flags;			/* 52-55: Flags */
+	uint32_t type;			/* 52-55: Btree type */
 
 	uint8_t  fixed_len;		/* 56: Fixed length byte count */
 	uint8_t  unused1[3];		/* 57-59: Unused */
@@ -108,6 +96,13 @@ struct __wt_page_desc {
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_PAGE_DESC_SIZE		512
+
+/*
+ * WT_DISK_REQUIRED--
+ *	Return bytes needed for data length, rounded to an allocation unit.
+ */
+#define	WT_DISK_REQUIRED(session, size)					\
+	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (session)->btree->allocsize))
 
 /*
  * WT_PAGE_DISK --

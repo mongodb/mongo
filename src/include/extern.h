@@ -295,39 +295,6 @@ int __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg);
 void __wt_thread_join(pthread_t tid);
 void __wt_yield(void);
 uint32_t __wt_cksum(const void *chunk, size_t len);
-void __wt_msgv(SESSION *session,
-    const char *prefix1,
-    const char *prefix2,
-    const char *fmt,
-    va_list ap);
-void __wt_msg(SESSION *session,
-    const char *fmt,
-    ...) WT_GCC_ATTRIBUTE ((format (printf,
-    2,
-    3)));
-void __wt_assert( SESSION *session,
-    const char *check,
-    const char *file_name,
-    int line_number);
-int __wt_api_args(SESSION *session);
-int __wt_api_arg_min(SESSION *session,
-    const char *arg_name,
-    uint64_t v,
-    uint64_t min);
-int __wt_api_arg_max(SESSION *session,
-    const char *arg_name,
-    uint64_t v,
-    uint64_t max);
-int __wt_file_method_type(SESSION *session, int column_err);
-int __wt_file_wrong_fixed_size(SESSION *session,
-    uint32_t len,
-    uint32_t config_len);
-int __wt_file_readonly(SESSION *session);
-int __wt_file_format(SESSION *session);
-int __wt_file_item_too_big(SESSION *session);
-int __wt_session_lockout(SESSION *session);
-int __wt_btree_lockout(BTREE *btree);
-int __wt_connection_lockout(CONNECTION *conn);
 void __wt_errv(SESSION *session,
     int error,
     const char *prefix1,
@@ -345,6 +312,22 @@ void __wt_errx(SESSION *session,
     ...) WT_GCC_ATTRIBUTE ((format (printf,
     2,
     3)));
+void __wt_msgv(SESSION *session,
+    const char *prefix1,
+    const char *prefix2,
+    const char *fmt,
+    va_list ap);
+void __wt_msg(SESSION *session,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE ((format (printf,
+    2,
+    3)));
+void __wt_assert( SESSION *session,
+    const char *check,
+    const char *file_name,
+    int line_number);
+int __wt_file_format(SESSION *session);
+int __wt_file_item_too_big(SESSION *session);
 int
 __wt_hazard_set(SESSION *session, WT_REF *ref
 #ifdef HAVE_DIAGNOSTIC

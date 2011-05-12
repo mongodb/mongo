@@ -343,12 +343,19 @@ __wt_btcur_search_near(CURSOR_BTREE *cbt, int *exact)
 	session = (SESSION *)cursor->session;
 
 	*exact = 0;
-	if (F_ISSET(btree, WT_COLUMN))
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_RLE:
+	case BTREE_COL_VAR:
 		ret = __wt_btree_col_get(session,
 		    cursor->recno, (WT_ITEM *)&cursor->value);
-	else
+		break;
+	case BTREE_ROW:
 		ret = __wt_btree_row_get(session,
 		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value);
+		break;
+	WT_ILLEGAL_FORMAT(session);
+	}
 
 	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_VALUE_SET);
@@ -371,12 +378,17 @@ __wt_btcur_insert(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (SESSION *)cursor->session;
 
-	if (F_ISSET(btree, WT_COLUMN))
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_RLE:
+	case BTREE_COL_VAR:
 		return (__wt_btree_col_put(session,
 		    cursor->recno, (WT_ITEM *)&cursor->value));
-	else
+	case BTREE_ROW:
 		return (__wt_btree_row_put(session,
 		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+	WT_ILLEGAL_FORMAT(session);
+	}
 }
 
 /*
@@ -394,12 +406,17 @@ __wt_btcur_update(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (SESSION *)cursor->session;
 
-	if (F_ISSET(btree, WT_COLUMN))
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_RLE:
+	case BTREE_COL_VAR:
 		return (__wt_btree_col_put(session,
 		    cursor->recno, (WT_ITEM *)&cursor->value));
-	else
+	case BTREE_ROW:
 		return (__wt_btree_row_put(session,
 		    (WT_ITEM *)&cursor->key, (WT_ITEM *)&cursor->value));
+	WT_ILLEGAL_FORMAT(session);
+	}
 }
 
 /*
@@ -417,10 +434,15 @@ __wt_btcur_remove(CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (SESSION *)cursor->session;
 
-	if (F_ISSET(btree, WT_COLUMN))
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_RLE:
+	case BTREE_COL_VAR:
 		return (__wt_btree_col_del(session, cursor->recno));
-	else
+	case BTREE_ROW:
 		return (__wt_btree_row_del(session, (WT_ITEM *)&cursor->key));
+	WT_ILLEGAL_FORMAT(session);
+	}
 }
 
 /*

@@ -7,8 +7,9 @@
 
 #include "wt_internal.h"
 
-static int __wt_col_insert_alloc(SESSION *, uint64_t, WT_INSERT **);
-static int __wt_col_update(SESSION *, uint64_t, WT_ITEM *, int);
+static int __col_wrong_fixed_size(SESSION *, uint32_t, uint32_t);
+static int __col_insert_alloc(SESSION *, uint64_t, WT_INSERT **);
+static int __col_update(SESSION *, uint64_t, WT_ITEM *, int);
 
 /*
  * __wt_btree_col_del --
@@ -17,7 +18,7 @@ static int __wt_col_update(SESSION *, uint64_t, WT_ITEM *, int);
 int
 __wt_btree_col_del(SESSION *session, uint64_t recno)
 {
-	return (__wt_col_update(session, recno, NULL, 0));
+	return (__col_update(session, recno, NULL, 0));
 }
 
 /*
@@ -31,19 +32,19 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
 
 	btree = session->btree;
 
-	if (btree->fixed_len != 0 && value->size != btree->fixed_len)
-		WT_RET(__wt_file_wrong_fixed_size(
+	if (btree->type == BTREE_COL_FIX && value->size != btree->fixed_len)
+		WT_RET(__col_wrong_fixed_size(
 		    session, value->size, btree->fixed_len));
 
-	return (__wt_col_update(session, recno, value, 1));
+	return (__col_update(session, recno, value, 1));
 }
 
 /*
- * __wt_col_update --
+ * __col_update --
  *	Column-store delete and update.
  */
 static int
-__wt_col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
+__col_update(SESSION *session, uint64_t recno, WT_ITEM *value, int is_write)
 {
 	WT_PAGE *page;
 	WT_INSERT **new_ins, *ins;
@@ -119,7 +120,7 @@ simple_update:		WT_ERR(__wt_update_alloc(session, value, &upd));
 		}
 
 		/* Allocate a WT_INSERT/WT_UPDATE pair. */
-		WT_ERR(__wt_col_insert_alloc(session, recno, &ins));
+		WT_ERR(__col_insert_alloc(session, recno, &ins));
 		WT_ERR(__wt_update_alloc(session, value, &upd));
 		ins->upd = upd;
 
@@ -151,12 +152,12 @@ err:		if (ins != NULL)
 }
 
 /*
- * __wt_col_insert_alloc --
+ * __col_insert_alloc --
  *	Column-store insert: allocate a WT_INSERT structure from the SESSION's
  *	buffer and fill it in.
  */
 static int
-__wt_col_insert_alloc(SESSION *session, uint64_t recno, WT_INSERT **insp)
+__col_insert_alloc(SESSION *session, uint64_t recno, WT_INSERT **insp)
 {
 	SESSION_BUFFER *sb;
 	WT_INSERT *ins;
@@ -174,3 +175,19 @@ __wt_col_insert_alloc(SESSION *session, uint64_t recno, WT_INSERT **insp)
 	*insp = ins;
 	return (0);
 }
+
+/*
+ * __wt_file_wrong_fixed_size --
+ *	Print a standard error message on attempts to put the wrong size element
+ *	into a fixed-size file.
+ */
+static int
+__col_wrong_fixed_size(SESSION *session, uint32_t len, uint32_t config_len)
+{
+	__wt_errx(session,
+	    "%s: length of %lu does not match fixed-length file configuration "
+	    "of %lu",
+	    session->name, (u_long)len, (u_long)config_len);
+	return (WT_ERROR);
+}
+

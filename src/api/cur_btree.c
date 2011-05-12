@@ -281,7 +281,17 @@ __wt_curbtree_open(SESSION *session,
 		/*
 		 * !!! TODO read key / value formats from a table-of-tables.
 		 */
-		key_format = F_ISSET(btree, WT_COLUMN) ? "r" : "u";
+		switch (btree->type) {
+		case BTREE_COL_FIX:
+		case BTREE_COL_RLE:
+		case BTREE_COL_VAR:
+			key_format = "r";
+			break;
+		case BTREE_ROW:
+			key_format = "u";
+			break;
+		WT_ILLEGAL_FORMAT(session);
+		}
 		value_format = "u";
 		WT_RET(__wt_session_add_btree(session, btree,
 		    key_format, value_format));
