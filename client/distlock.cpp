@@ -892,6 +892,17 @@ namespace mongo {
                               BSON( "_id" << _id["_id"].String() << "ts" << oldLock["ts"].OID() ),
                               BSON( "$set" << BSON( "state" << 0 ) ) );
 
+                // Check that the lock was actually unlocked... if not, try again
+                BSONObj err = conn->getLastErrorDetailed();
+                string errMsg = DBClientWithCommands::getLastErrorString(err);
+
+                if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ){
+                    warning() << "distributed lock unlock update failed, retrying "
+                              << ( errMsg.empty() ? causedBy( "( update not registered )" ) : causedBy( errMsg ) ) << endl;
+                    conn.done();
+                    continue;
+                }
+
                 log( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked. " << endl;
                 conn.done();
                 return;
