@@ -87,7 +87,7 @@ def genErrorOutput():
         i = open( "docs/errors.md" , "r" )
         
         
-    out = open( "docs/errors.md" , 'w' )
+    out = open( "docs/errors.md" , 'wb' )
     out.write( "MongoDB Error Codes\n==========\n\n\n" )
 
     prev = ""
