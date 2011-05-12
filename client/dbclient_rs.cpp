@@ -292,6 +292,10 @@ namespace mongo {
             newConn->connect( h , temp );
             {
                 scoped_lock lk( _lock );
+                if ( _find( toCheck ) >= 0 ) {
+                    // we need this check inside the lock so there isn't thread contention on adding to vector
+                    continue;
+                }
                 _nodes.push_back( Node( h , newConn ) );
             }
             log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
