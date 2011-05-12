@@ -292,7 +292,7 @@ namespace mongo {
             newConn->connect( h , temp );
             {
                 scoped_lock lk( _lock );
-                if ( _find( toCheck ) >= 0 ) {
+                if ( _find_inlock( toCheck ) >= 0 ) {
                     // we need this check inside the lock so there isn't thread contention on adding to vector
                     continue;
                 }
@@ -397,11 +397,16 @@ namespace mongo {
 
     int ReplicaSetMonitor::_find( const string& server ) const {
         scoped_lock lk( _lock );
+        return _find_inlock( server );
+    }
+
+    int ReplicaSetMonitor::_find_inlock( const string& server ) const {
         for ( unsigned i=0; i<_nodes.size(); i++ )
             if ( _nodes[i].addr == server )
                 return i;
         return -1;
     }
+
 
     int ReplicaSetMonitor::_find( const HostAndPort& server ) const {
         scoped_lock lk( _lock );
