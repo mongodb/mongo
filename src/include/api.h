@@ -134,6 +134,9 @@ struct __btree {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
+	const char *config;		/* Config settings. */
+	int config_dirty;		/* Config string modified. */
+
 	uint32_t flags;
 };
 
