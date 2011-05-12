@@ -217,9 +217,8 @@ __wt_huffman_open(SESSION *session,
 	node = node2 = tempnode = NULL;
 	ret = 0;
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_HUFFMAN_OBJ), &huffman));
-	WT_ERR(__wt_calloc(
-	    session, (size_t)nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
+	WT_RET(__wt_calloc_def(session, 1, &huffman));
+	WT_ERR(__wt_calloc_def(session, (size_t)nbytes, &indexed_freqs));
 	huffman->session = session;
 
 	/*
@@ -235,8 +234,8 @@ __wt_huffman_open(SESSION *session,
 	    nbytes, sizeof(INDEXED_BYTE), indexed_byte_comparator);
 
 	/* We need two node queues to build the tree. */
-	WT_ERR(__wt_calloc(session, 1, sizeof(NODE_QUEUE), &leaves));
-	WT_ERR(__wt_calloc(session, 1, sizeof(NODE_QUEUE), &combined_nodes));
+	WT_ERR(__wt_calloc_def(session, 1, &leaves));
+	WT_ERR(__wt_calloc_def(session, 1, &combined_nodes));
 
 	/* Adding the leaves to the queue */
 	for (i = 0; i < nbytes; ++i) {
@@ -251,8 +250,7 @@ __wt_huffman_open(SESSION *session,
 		 * an optional feature.
 		 */
 		if (indexed_freqs[i].frequency > 0) {
-			WT_ERR(__wt_calloc(
-			    session, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
+			WT_ERR(__wt_calloc_def(session, 1, &tempnode));
 			tempnode->symbol = indexed_freqs[i].symbol;
 			tempnode->weight = indexed_freqs[i].frequency;
 			WT_ERR(node_queue_enqueue(session, leaves, tempnode));
@@ -291,8 +289,7 @@ __wt_huffman_open(SESSION *session,
 		 * In every second run, we have both node and node2 initialized.
 		 */
 		if (node != NULL && node2 != NULL) {
-			WT_ERR(__wt_calloc(
-			    session, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
+			WT_ERR(__wt_calloc_def(session, 1, &tempnode));
 
 			/* The new weight is the sum of the two weights. */
 			tempnode->weight = node->weight + node2->weight;
@@ -316,8 +313,7 @@ __wt_huffman_open(SESSION *session,
 	huffman->numSymbols = nbytes;
 	huffman->numBytes = nbytes > 256 ? 2 : 1;
 
-	WT_ERR(__wt_calloc(session,
-	    nbytes, sizeof(WT_HUFFMAN_TABLE_ENTRY), &huffman->entries));
+	WT_ERR(__wt_calloc_def(session, nbytes, &huffman->entries));
 
 	/*
 	 * 1000, or ((1 << bits-in-codeword) - 1), but if >1000 you've got
@@ -350,8 +346,8 @@ __wt_huffman_open(SESSION *session,
 		    sizeof(__wt_huffman_table_entry.code));
 #endif
 
-	WT_ERR(__wt_calloc(session,
-	    1U << huffman->max_depth, sizeof(uint16_t), &huffman->c2e));
+	WT_ERR(
+	    __wt_calloc_def(session, 1U << huffman->max_depth, &huffman->c2e));
 	make_table(huffman->c2e, huffman->max_depth, huffman->entries, nbytes);
 #if 0
 	printf("max depth = %d, min_depth = %d, "
