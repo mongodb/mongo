@@ -183,7 +183,7 @@ struct __wt_page_disk {
 
 /*
  * WT_PAGE_DISK_BYTE --
- * The first usable data byte on the page (past the header).
+ *	The first usable data byte on the page (past the header).
  */
 #define	WT_PAGE_DISK_BYTE(dsk)						\
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
