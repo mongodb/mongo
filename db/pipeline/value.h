@@ -154,6 +154,7 @@ namespace mongo {
         /*
           Get references to singleton instances of commonly used field values.
          */
+	static shared_ptr<const Value> getUndefined();
         static shared_ptr<const Value> getNull();
         static shared_ptr<const Value> getTrue();
         static shared_ptr<const Value> getFalse();
@@ -215,6 +216,8 @@ namespace mongo {
 
     private:
         Value(); // creates null value
+	Value(BSONType type); // creates an empty (unitialized value) of type
+	                                        // mostly useful for Undefined
         Value(BSONElement *pBsonElement);
 
         Value(bool boolValue);
@@ -254,6 +257,7 @@ namespace mongo {
 
         These are obtained via public static getters defined above.
         */
+	static const Value fieldUndefined;
         static const Value fieldNull;
         static const Value fieldTrue;
         static const Value fieldFalse;
@@ -296,6 +300,11 @@ namespace mongo {
 
     inline BSONType Value::getType() const {
         return type;
+    }
+
+    inline shared_ptr<const Value> Value::getUndefined() {
+	shared_ptr<const Value> pValue(&fieldUndefined, null_deleter());
+        return pValue;
     }
 
     inline shared_ptr<const Value> Value::getNull() {

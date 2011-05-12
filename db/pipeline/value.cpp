@@ -22,6 +22,7 @@
 #include "db/pipeline/document.h"
 
 namespace mongo {
+    const Value Value::fieldUndefined(Undefined);
     const Value Value::fieldNull;
     const Value Value::fieldTrue(true);
     const Value Value::fieldFalse(false);
@@ -39,6 +40,46 @@ namespace mongo {
         stringValue(),
         pDocumentValue(),
         vpValue() {
+    }
+
+    Value::Value(BSONType theType):
+        type(theType),
+        oidValue(),
+        dateValue(),
+        stringValue(),
+        pDocumentValue(),
+        vpValue() {
+	switch(type) {
+	case Undefined:
+	case jstNULL:
+	case Object: // empty
+	case Array: // empty
+	    break;
+
+	case NumberDouble:
+	    simple.doubleValue = 0;
+	    break;
+
+	case Bool:
+	    simple.boolValue = false;
+	    break;
+
+	case NumberInt:
+	    simple.intValue = 0;
+	    break;
+
+	case Timestamp:
+	    simple.timestampValue = 0;
+	    break;
+
+	case NumberLong:
+	    simple.longValue = 0;
+	    break;
+
+	default:
+	    // nothing else is allowed
+	    assert(false && type);
+	}
     }
 
     Value::Value(bool boolValue):
@@ -613,13 +654,13 @@ namespace mongo {
                 return 1;
             return 0;
 
+        case Undefined:
         case jstNULL:
-	    return 0; // treat two NULL values as equal
+	    return 0; // treat two Undefined or NULL values as equal
 
             /* these shouldn't happen in this context */
         case MinKey:
         case EOO:
-        case Undefined:
         case DBRef:
         case Code:
         case MaxKey:
@@ -657,6 +698,6 @@ namespace mongo {
         /* if we got here, rType must not be numeric */
         assert(false); // CW TODO rR is not numeric
         /* NOTREACHED */
-        return jstNULL;
+        return Undefined;
     }
 }

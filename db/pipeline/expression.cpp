@@ -890,8 +890,12 @@ namespace mongo {
 	/* add any remaining fields */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
-            pResult->addField(vFieldName[i],
-                              vpExpression[i]->evaluate(pDocument));
+	    shared_ptr<const Value> pValue(
+		vpExpression[i]->evaluate(pDocument));
+
+	    /* don't add the value if it is undefined */
+	    if (pValue->getType() != Undefined)
+		pResult->addField(vFieldName[i], pValue);
         }
 
         return pResult;
@@ -1085,9 +1089,9 @@ namespace mongo {
         while(true) {
             pValue = pLocal->getValue(fieldPath.getFieldName(i));
 
-            /* if the field doesn't exist, quit with a null value */
+            /* if the field doesn't exist, quit with an undefined value */
             if (!pValue.get())
-                return Value::getNull();
+                return Value::getUndefined();
 
             /* if we've hit the end of the path, stop */
             ++i;
@@ -1098,8 +1102,8 @@ namespace mongo {
               We're diving deeper.  If the value was null, return null.
             */
             BSONType type = pValue->getType();
-            if (type == jstNULL)
-                return Value::getNull();
+	    if ((type == Undefined) || (type == jstNULL))
+		return Value::getUndefined();
             if (type != Object)
                 assert(false); // CW TODO user error:  must be a document
 
@@ -1456,8 +1460,9 @@ namespace mongo {
         const shared_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 2); // CW TODO user error
         shared_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
+	BSONType leftType = pLeft->getType();
 
-        if (pLeft->getType() != jstNULL)
+        if ((leftType != Undefined) && (leftType != jstNULL))
             return pLeft;
 
         shared_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
