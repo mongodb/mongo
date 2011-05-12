@@ -19,13 +19,6 @@ __wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value)
 
 	btree = session->btree;
 
-	/* Search the column-store for the key. */
-	if (!F_ISSET(btree, WT_COLUMN)) {
-		__wt_errx(session,
-		    "row-store records cannot be retrieved by record number");
-		return (WT_ERROR);
-	}
-
 	WT_RET(__wt_col_search(session, recno, 0));
 	ret = __wt_return_data(session, NULL, value, 0);
 
