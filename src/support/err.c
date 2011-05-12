@@ -76,93 +76,6 @@ __wt_assert(
 #endif
 
 /*
- * __wt_api_args --
- *	Print a standard error message when an API function is passed illegal
- *	arguments.
- */
-int
-__wt_api_args(SESSION *session)
-{
-	__wt_errx(session, "illegal API arguments or flag values specified");
-	return (WT_ERROR);
-}
-
-/*
- * __wt_api_arg_min --
- *	Print a standard error message when an API function is passed a
- *	too-small argument.
- */
-int
-__wt_api_arg_min(SESSION *session, const char *arg_name,
-     uint64_t v, uint64_t min)
-{
-	if (v >= min)
-		return (0);
-
-	__wt_errx(session, "%s argument %llu less than minimum value of %llu",
-	    arg_name, (unsigned long long)v, (unsigned long long)min);
-	return (WT_ERROR);
-}
-
-/*
- * __wt_api_arg_max --
- *	Print a standard error message when an API function is passed a
- *	too-large argument.
- */
-int
-__wt_api_arg_max(SESSION *session, const char *arg_name,
-     uint64_t v, uint64_t max)
-{
-	if (v <= max)
-		return (0);
-
-	__wt_errx(session, "%s argument %llu larger than maximum value of %llu",
-	    arg_name, (unsigned long long)v, (unsigned long long)max);
-	return (WT_ERROR);
-}
-
-/*
- * __wt_file_method_type --
- *	Print a standard error message on attempts to call methods inappropriate
- *	for a file type.
- */
-int
-__wt_file_method_type(SESSION *session, int column_err)
-{
-	__wt_errx(session,
-	    "this method is not supported for a %s file",
-	    column_err ? "column-store" : "row-store");
-	return (WT_ERROR);
-}
-
-/*
- * __wt_file_wrong_fixed_size --
- *	Print a standard error message on attempts to put the wrong size element
- *	into a fixed-size file.
- */
-int
-__wt_file_wrong_fixed_size(SESSION *session, uint32_t len, uint32_t config_len)
-{
-	__wt_errx(session,
-	    "%s: length of %lu does not match fixed-length file configuration "
-	    "of %lu",
-	    session->name, (u_long)len, (u_long)config_len);
-	return (WT_ERROR);
-}
-
-/*
- * __wt_file_readonly --
- *	Print a standard error message on attempts to modify a read-only file.
- */
-int
-__wt_file_readonly(SESSION *session)
-{
-	__wt_errx(session,
-	    "the file was opened read-only and may not be modified");
-	return (WT_READONLY);
-}
-
-/*
  * __wt_file_format --
  *	Print a standard error message when a file format error is suddenly
  *	discovered.
@@ -184,43 +97,6 @@ __wt_file_item_too_big(SESSION *session)
 {
 	__wt_errx(session, "the item is too large for the file to store");
 	return (WT_ERROR);
-}
-
-/*
- * __wt_session_lockout --
- *	Standard SESSION handle lockout error message.
- */
-int
-__wt_session_lockout(SESSION *session)
-{
-	__wt_errx(session,
-	    "An unavailable handle method was called; the handle method is "
-	    "not available for some reason, for example, handle methods are "
-	    "restricted after an error, or configuration methods may be "
-	    "restricted after the file or environment have been opened, "
-	    "or operational methods may be restricted until the file or "
-	    "environment has been opened.");
-	return (WT_ERROR);
-}
-
-/*
- * __wt_btree_lockout --
- *	Standard BTREE handle lockout error message.
- */
-int
-__wt_btree_lockout(BTREE *btree)
-{
-	return (__wt_connection_lockout(btree->conn));
-}
-
-/*
- * __wt_connection_lockout --
- *	Standard CONNECTION handle lockout error message.
- */
-int
-__wt_connection_lockout(CONNECTION *conn)
-{
-	return (__wt_session_lockout(&conn->default_session));
 }
 
 /*
