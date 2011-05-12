@@ -175,11 +175,8 @@ namespace mongo {
 
     private:
         void validateNS(const char *ns, NamespaceDetails *d, const BSONObj& cmdObj, BSONObjBuilder& result) {
-            bool scanData = true;
-            if( !cmdObj["scandata"].trueValue() )
-                scanData = false;
-
-            bool full = cmdObj["full"].trueValue();
+            const bool full = cmdObj["full"].trueValue();
+            const bool scanData = full || cmdObj["scandata"].trueValue();
 
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false
