@@ -308,7 +308,7 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
 
         void createFirstChunk( const Shard& shard );
-        ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
+        ChunkPtr findChunk( const BSONObj& obj );
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
         const ShardKeyPattern& getShardKey() const {  return _key; }

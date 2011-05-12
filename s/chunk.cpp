@@ -272,7 +272,7 @@ namespace mongo {
 
             // reloading won't stricly solve all problems, e.g. the collection's metdata lock can be taken
             // but we issue here so that mongos may refresh wihtout needing to be written/read against
-            _manager->_reload();
+            grid.getDBConfig(_manager->getns())->getChunkManager(_manager->getns(), true);
 
             return false;
         }
@@ -314,7 +314,7 @@ namespace mongo {
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
         // reload is excessive here as the failure could be simply because collection metadata is taken
-        _manager->_reload();
+        grid.getDBConfig(_manager->getns())->getChunkManager(_manager->getns(), true);
 
         return worked;
     }
@@ -676,7 +676,7 @@ namespace mongo {
         log() << "successfully created first chunk for " << c->toString() << endl;
     }
 
-    ChunkPtr ChunkManager::findChunk( const BSONObj & obj , bool retry ) {
+    ChunkPtr ChunkManager::findChunk( const BSONObj & obj) {
         BSONObj key = _key.extractKey(obj);
 
         {
@@ -700,20 +700,13 @@ namespace mongo {
                 PRINT(*c);
                 PRINT(key);
 
-                _reload_inlock();
+                grid.getDBConfig(getns())->getChunkManager(getns(), true);
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
             }
         }
 
-        if ( retry ) {
-            stringstream ss;
-            ss << "couldn't find a chunk aftry retry which should be impossible extracted: " << key;
-            throw UserException( 8070 , ss.str() );
-        }
-
-        log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
-        _reload();
-        return findChunk( obj , true );
+        massert(8070, str::stream() << "couldn't find a chunk aftry retry which should be impossible extracted: " << key, false);
+        return ChunkPtr(); // unreachable
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
