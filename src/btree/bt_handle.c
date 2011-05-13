@@ -18,24 +18,96 @@ static int __btree_type(SESSION *);
  *	Create a Btree.
  */
 int
-__wt_btree_create(SESSION *session, const char *name)
+__wt_btree_create(SESSION *session, const char *name, const char *config)
+{
+	WT_FH *fh;
+	int ret;
+
+	/* Check to see if the file exists -- we don't want to overwrite it. */
+	if (__wt_exist(name)) {
+		__wt_errx(session,
+		    "the file %s already exists; to re-create it, remove it "
+		    "first, then create it",
+		    name);
+		return (WT_ERROR);
+	}
+
+	/* Open the underlying file handle. */
+	WT_RET(__wt_open(session, name, 0666, 1, &fh));
+
+	/* Write out the file's meta-data. */
+	ret = __wt_desc_write(session, config, fh);
+
+	/* Close the file handle. */
+	WT_TRET(__wt_close(session, fh));
+
+	return (ret);
+}
+
+/*
+ * __wt_btree_open --
+ *	Open a Btree.
+ */
+int
+__wt_btree_open(SESSION *session, const char *name)
 {
 	BTREE *btree;
-	CONNECTION *conn;
+	WT_PAGE *page;
 
 	btree = session->btree;
-	conn = btree->conn;
 
-	WT_STAT_INCR(conn->stats, file_open);
+	/* Initialize the BTREE structure. */
+	WT_RET(__btree_init(session, name));
 
 	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session, name, 0666, 1, &btree->fh));
 
-	/* Initialize the BTREE. */
-	WT_RET(__btree_init(session, name));
+	/*
+	 * Read in the file's metadata, configure the BTREE structure based on
+	 * the configuration string, read in the free-list.
+	 */
+	WT_RET(__wt_desc_read(session));
+	WT_RET(__btree_conf(session));
+	WT_RET(__wt_block_read(session));
 
-	/* Configure the BTREE. */
-	return (__btree_conf(session));
+	/*
+	 * If there's no root page, create an in-memory page but leave it clean;
+	 * if it's never written, that's OK.  If there is a root page, read it
+	 * in and pin it.
+	 */
+	if (btree->root_page.addr == WT_ADDR_INVALID) {
+		WT_RET(__wt_calloc_def(session, 1, &page));
+		switch (btree->type) {
+		case BTREE_COL_FIX:
+			page->u.col_leaf.recno = 1;
+			page->type = WT_PAGE_COL_FIX;
+			break;
+		case BTREE_COL_RLE:
+			page->u.col_leaf.recno = 1;
+			page->type = WT_PAGE_COL_RLE;
+			break;
+		case BTREE_COL_VAR:
+			page->u.col_leaf.recno = 1;
+			page->type = WT_PAGE_COL_VAR;
+			break;
+		case BTREE_ROW:
+			page->type = WT_PAGE_ROW_LEAF;
+			break;
+		}
+
+		btree->root_page.state = WT_REF_MEM;
+		btree->root_page.addr = WT_ADDR_INVALID;
+		btree->root_page.size = 0;
+		btree->root_page.page = page;
+		page->parent = NULL;
+		page->parent_ref = &btree->root_page;
+	} else  {
+		WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
+		F_SET(btree->root_page.page, WT_PAGE_PINNED);
+		__wt_hazard_clear(session, btree->root_page.page);
+	}
+
+	return (0);
 }
 
 /*
@@ -62,65 +134,6 @@ __btree_init(SESSION *session, const char *name)
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 	WT_RET(__wt_stat_alloc_btree_file_stats(session, &btree->fstats));
-
-	return (0);
-}
-
-/*
- * __wt_btree_open --
- *	Open a Btree.
- */
-int
-__wt_btree_open(SESSION *session)
-{
-	BTREE *btree;
-	WT_PAGE *page;
-
-	btree = session->btree;
-
-	/*
-	 * If the file size is 0 create an in-memory page, but leave it clean;
-	 * if it's never written, that's OK.
-	 */
-	if (btree->fh->file_size == 0) {
-		WT_RET(__wt_calloc_def(session, 1, &page));
-		switch (btree->type) {
-		case BTREE_COL_FIX:
-			page->u.col_leaf.recno = 1;
-			page->type = WT_PAGE_COL_FIX;
-			break;
-		case BTREE_COL_RLE:
-			page->u.col_leaf.recno = 1;
-			page->type = WT_PAGE_COL_RLE;
-			break;
-		case BTREE_COL_VAR:
-			page->u.col_leaf.recno = 1;
-			page->type = WT_PAGE_COL_VAR;
-			break;
-		case BTREE_ROW:
-			page->type = WT_PAGE_ROW_LEAF;
-			break;
-		}
-
-		btree->root_page.state = WT_REF_MEM;
-		btree->root_page.addr = WT_ADDR_INVALID;
-		btree->root_page.size = 0;
-		btree->root_page.page = page;
-		page->parent = NULL;
-		page->parent_ref = &btree->root_page;
-		return (0);
-	}
-
-	/*
-	 * If the file size isn't 0, read in the file's meta-data and compare
-	 * it with the application's, read in the free-list, then read in and
-	 * pin the root-page.
-	 */
-	WT_RET(__wt_desc_read(session));
-	WT_RET(__wt_block_read(session));
-	WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
-	F_SET(btree->root_page.page, WT_PAGE_PINNED);
-	__wt_hazard_clear(session, btree->root_page.page);
 
 	return (0);
 }
@@ -155,8 +168,8 @@ __wt_btree_close(SESSION *session)
 	/* Write out the free list. */
 	WT_TRET(__wt_block_write(session));
 
-	/* Write out the file's meta-data. */
-	WT_TRET(__wt_desc_write(session));
+	/* Write out the file's metadata. */
+	WT_TRET(__wt_desc_update(session));
 
 	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(session, btree->fh));
@@ -386,10 +399,9 @@ __btree_page_sizes(SESSION *session)
 
 	/*
 	 * Leaf pages are larger to amortize I/O across a large chunk of the
-	 * data space, but still minimize the chance of a broken write.  We
-	 * only require 20 key/data pairs fit onto a leaf page.  Again, if it's
-	 * a small page, push anything bigger than about 80 bytes off-page.
-	 * Here's the table:
+	 * data space.  We only require 20 key/data pairs fit onto a leaf page.
+	 * Again, if it's a small page, push anything bigger than about 80
+	 * bytes off-page.  Here's the table:
 	 *	Pagesize	Largest key or data item retained on-page:
 	 *	512B		 80 bytes
 	 *	 1K		 80 bytes
@@ -399,7 +411,7 @@ __btree_page_sizes(SESSION *session)
 	 *	16K		409 bytes
 	 * and so on, roughly doubling for each power-of-two.
 	 */
-	btree->leafitemsize = btree->leafmin <= 4096 ? 80 : btree->leafmin / 40;
+	btree->leafitemsize = btree->leafmin <= 4096 ? 80 : btree->leafmin / 20;
 
 	/*
 	 * We only have 3 bytes of length for on-page items, so the maximum
@@ -409,32 +421,6 @@ __btree_page_sizes(SESSION *session)
 		btree->intlitemsize = WT_CELL_MAX_LEN;
 	if (btree->leafitemsize > WT_CELL_MAX_LEN)
 		btree->leafitemsize = WT_CELL_MAX_LEN;
-
-	/*
-	 * A leaf page must hold at least 2 key/data pairs, otherwise the
-	 * whole btree thing breaks down because we can't split.  We have
-	 * to include WT_DESC_SIZE in leaf page calculations, it's not
-	 * strictly necessary in internal pages because page 0 is always
-	 * a leaf page.  The additional 10 bytes is for slop -- Berkeley DB
-	 * took roughly a decade to get the calculation correct, and that
-	 * way I can skip the suspense.
-	 */
-#define	WT_MINIMUM_DATA_SPACE(btree, s)					\
-	    (((s) - (WT_PAGE_DISK_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
-	if (btree->intlitemsize >
-	    WT_MINIMUM_DATA_SPACE(btree, btree->intlmin)) {
-		__wt_errx(session,
-		    "The internal page size is too small for its maximum item "
-		    "size");
-		return (WT_ERROR);
-	}
-	if (btree->leafitemsize >
-	    WT_MINIMUM_DATA_SPACE(btree, btree->leafmin)) {
-		__wt_errx(session,
-		    "The leaf page size is too small for its maximum item "
-		    "size");
-		return (WT_ERROR);
-	}
 
 	/*
 	 * A fixed-size column-store should be able to store at least 20

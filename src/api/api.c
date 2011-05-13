@@ -92,7 +92,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CONFIG_ITEM cval;
-	const char *key_format, *value_format;
+	const char *collapse, *key_format, *value_format;
 
 	session = (SESSION *)wt_session;
 	conn = (CONNECTION *)wt_session->connection;
@@ -104,8 +104,6 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		return (EINVAL);
 	}
 	name += 6;
-
-	/* XXX need check whether the table already exists. */
 
 	/*
 	 * Key / value formats.
@@ -140,13 +138,22 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		return (EINVAL);
 	}
 
+	/*
+	 * XXX
+	 * If the file doesn't exist, create it -- creation places a collapsed
+	 * copy of the configuration information into the file.
+	 */
+	if (!__wt_exist(name)) {
+		WT_RET(__wt_config_collapse(session, __cfg, &collapse));
+		WT_RET(__wt_btree_create(session, name, collapse));
+	}
+
 	/* Allocate a BTREE handle. */
 	WT_RET(__wt_connection_btree(conn, &btree));
-	WT_RET(__wt_config_collapse(session, __cfg, &btree->config));
-
 	session->btree = btree;
-	WT_RET(__wt_btree_create(session, name));
-	WT_RET(__wt_btree_open(session));
+
+	WT_STAT_INCR(conn->stats, file_open);
+	WT_RET(__wt_btree_open(session, name));
 	WT_RET(
 	    __wt_session_add_btree(session, btree, key_format, value_format));
 

@@ -124,9 +124,9 @@ int __wt_debug_page(SESSION *session,
     const char *ofile,
     FILE *fp);
 void __wt_debug_item(const char *tag, void *arg_item, FILE *fp);
-int __wt_desc_stat(SESSION *session);
 int __wt_desc_read(SESSION *session);
-int __wt_desc_write(SESSION *session);
+int __wt_desc_write(SESSION *session, const char *config, WT_FH *fh);
+int __wt_desc_update(SESSION *session);
 void __wt_page_free( SESSION *session,
     WT_PAGE *page,
     uint32_t addr,
@@ -137,8 +137,8 @@ void __wt_workq_evict_server(CONNECTION *conn, int force);
 int __wt_evict_file_serial_func(SESSION *session);
 void *__wt_cache_evict_server(void *arg);
 void __wt_workq_evict_server_exit(CONNECTION *conn);
-int __wt_btree_create(SESSION *session, const char *name);
-int __wt_btree_open(SESSION *session);
+int __wt_btree_create(SESSION *session, const char *name, const char *config);
+int __wt_btree_open(SESSION *session, const char *name);
 int __wt_btree_close(SESSION *session);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
@@ -260,6 +260,7 @@ int __wt_realloc(SESSION *session,
     void *retp);
 int __wt_strdup(SESSION *session, const char *str, void *retp);
 void __wt_free_int(SESSION *session, void *p_arg);
+int __wt_exist(const char *path);
 int __wt_filesize(SESSION *session, WT_FH *fh, off_t *sizep);
 int __wt_fsync(SESSION *session, WT_FH *fh);
 int __wt_ftruncate(SESSION *session, WT_FH *fh, off_t len);

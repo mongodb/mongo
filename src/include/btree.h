@@ -55,12 +55,8 @@ extern "C" {
 #define	WT_OFF_TO_ADDR(btree, off)					\
 	((uint32_t)((off) / (btree)->allocsize))
 
-/*
- * The file needs a description, here's the structure.  At the moment, this
- * structure is written into the first 512 bytes of the file, but that will
- * change in the future.
- */
-struct __wt_page_desc {
+/* The file's description, written into the first 512 bytes of the file. */
+struct __wt_btree_desc {
 #define	WT_BTREE_MAGIC		120897
 	uint32_t magic;			/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	0
@@ -68,34 +64,29 @@ struct __wt_page_desc {
 #define	WT_BTREE_MINOR_VERSION	1
 	uint16_t minorv;		/* 06-07: Minor version */
 
-	/* !!! 64-bit types must be on an 8-byte boundary to avoid padding. */
-	uint64_t recno_offset;		/* 08-15: Offset record number */
-
-	uint32_t allocsize;		/* 16-19: Allocation size */
-
-	uint32_t intlmax;		/* 20-23: Maximum internal page size */
-	uint32_t intlmin;		/* 24-27: Minimum internal page size */
-
-	uint32_t leafmax;		/* 28-31: Maximum leaf page size */
-	uint32_t leafmin;		/* 32-35: Minimum leaf page size */
-
+	/*
+	 * We store three page addr/size pairs: the root page for the tree, the
+	 * free-list and the configuration string.  The configuration string is
+	 * normally stored after this structure in the first sector of the file,
+	 * but if it's too large to fit, it gets its own chunk.
+	 *
+	 * XXX
+	 * Not currently implemented...
+	 */
 	uint32_t root_addr;		/* 36-39: Root page address */
 	uint32_t root_size;		/* 40-43: Root page length */
+
 	uint32_t free_addr;		/* 44-47: Free list page address */
 	uint32_t free_size;		/* 48-51: Free list page length */
 
-	uint32_t type;			/* 52-55: Btree type */
-
-	uint8_t  fixed_len;		/* 56: Fixed length byte count */
-	uint8_t  unused1[3];		/* 57-59: Unused */
-
-	uint32_t unused2[113];		/* Unused */
+	uint32_t config_addr;		/* 52-55: Free list page address */
+	uint32_t config_size;		/* 56-59: Free list page length */
 };
 /*
- * WT_PAGE_DESC_SIZE is the expected structure size -- we verify the build to
+ * WT_BTREE_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_PAGE_DESC_SIZE		512
+#define	WT_BTREE_DESC_SIZE		32
 
 /*
  * WT_DISK_REQUIRED--

@@ -7,119 +7,88 @@
 
 #include "wt_internal.h"
 
-static int __wt_desc_io(SESSION *, void *, int);
-
-/*
- * __wt_desc_stat --
- *	Fill in the statistics from the file's description.
- */
-int
-__wt_desc_stat(SESSION *session)
-{
-	WT_PAGE_DESC desc;
-
-	WT_RET(__wt_desc_io(session, &desc, 1));
-
-	WT_STAT_SET(session->btree->fstats, file_magic, desc.magic);
-	WT_STAT_SET(session->btree->fstats, file_major, desc.majorv);
-	WT_STAT_SET(session->btree->fstats, file_minor, desc.minorv);
-	WT_STAT_SET(session->btree->fstats, file_allocsize, desc.allocsize);
-	WT_STAT_SET(session->btree->fstats, file_intlmax, desc.intlmax);
-	WT_STAT_SET(session->btree->fstats, file_intlmin, desc.intlmin);
-	WT_STAT_SET(session->btree->fstats, file_leafmax, desc.leafmax);
-	WT_STAT_SET(session->btree->fstats, file_leafmin, desc.leafmin);
-	WT_STAT_SET(session->btree->fstats, file_base_recno, desc.recno_offset);
-	WT_STAT_SET(session->btree->fstats, file_fixed_len, desc.fixed_len);
-
-	return (0);
-}
-
 /*
  * __wt_desc_read --
- *	Read the descriptor structure from page 0.
+ *	Read the file's descriptor structure.
  */
 int
 __wt_desc_read(SESSION *session)
 {
 	BTREE *btree;
-	WT_PAGE_DESC desc;
+	WT_BTREE_DESC *desc;
+	uint8_t buf[512];
 
 	btree = session->btree;
 
-	WT_RET(__wt_desc_io(session, &desc, 1));
+	/* Read the first sector. */
+	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
 
-	btree->allocsize = desc.allocsize;		/* Update DB handle */
-	btree->intlmax = desc.intlmax;
-	btree->intlmin = desc.intlmin;
-	btree->leafmax = desc.leafmax;
-	btree->leafmin = desc.leafmin;
-	btree->root_page.addr = desc.root_addr;
-	btree->root_page.size = desc.root_size;
-	btree->free_addr = desc.free_addr;
-	btree->free_size = desc.free_size;
-	btree->type = desc.type;
-	btree->fixed_len = desc.fixed_len;
+	/* Copy the file's configuration string. */
+	WT_RET(__wt_strdup(
+	    session, (char *)(buf + sizeof(WT_BTREE_DESC)), &btree->config));
+
+	desc = (WT_BTREE_DESC *)buf;
+	btree->root_page.addr = desc->root_addr;
+	btree->root_page.size = desc->root_size;
+	btree->free_addr = desc->free_addr;
+	btree->free_size = desc->free_size;
 
 	return (0);
 }
 
 /*
  * __wt_desc_write --
- *	Update the description page.
+ *	Write the file's descriptor structure.
  */
 int
-__wt_desc_write(SESSION *session)
+__wt_desc_write(SESSION *session, const char *config, WT_FH *fh)
 {
-	BTREE *btree;
-	WT_PAGE_DESC desc;
-	int ret;
+	WT_BTREE_DESC *desc;
+	uint8_t buf[512];
 
-	btree = session->btree;
-	ret = 0;
+	memset(buf, 0, sizeof(buf));
+	desc = (WT_BTREE_DESC *)buf;
 
-	/*
-	 * XXX
-	 * Don't write the file's metadata unless we actually have a root page:
-	 * this catches an attempt to write empty files.  Once we know how the
-	 * file metadata will work, we can fix this.
-	 */
-	if (btree->root_page.addr == WT_ADDR_INVALID)
-		return (0);
+	desc->magic = WT_BTREE_MAGIC;
+	desc->majorv = WT_BTREE_MAJOR_VERSION;
+	desc->minorv = WT_BTREE_MINOR_VERSION;
 
-	WT_CLEAR(desc);
-	desc.magic = WT_BTREE_MAGIC;
-	desc.majorv = WT_BTREE_MAJOR_VERSION;
-	desc.minorv = WT_BTREE_MINOR_VERSION;
-	desc.allocsize = btree->allocsize;
-	desc.intlmax = btree->intlmax;
-	desc.intlmin = btree->intlmin;
-	desc.leafmax = btree->leafmax;
-	desc.leafmin = btree->leafmin;
-	desc.recno_offset = 0;
-	desc.root_addr = btree->root_page.addr;
-	desc.root_size = btree->root_page.size;
-	desc.free_addr = btree->free_addr;
-	desc.free_size = btree->free_size;
-	desc.fixed_len = (uint8_t)btree->fixed_len;
-	desc.type = btree->type;
+	desc->root_addr = WT_ADDR_INVALID;
+	desc->free_addr = WT_ADDR_INVALID;
+	desc->config_addr = WT_ADDR_INVALID;
 
-	WT_RET(__wt_desc_io(session, &desc, 0));
+	strcpy((char *)(buf + sizeof(WT_BTREE_DESC)), config);
 
-	return (ret);
+	return (__wt_write(session, fh, (off_t)0, 512, buf));
 }
 
 /*
- * __wt_desc_io --
- *	Read/write the WT_DESC sector.
+ * __wt_desc_update --
+ *	Update the file's descriptor structure.
  */
-static int
-__wt_desc_io(SESSION *session, void *p, int is_read)
+int
+__wt_desc_update(SESSION *session)
 {
-	WT_FH *fh;
+	BTREE *btree;
+	WT_BTREE_DESC *desc;
+	uint8_t buf[512];
 
-	fh = session->btree->fh;
+	btree = session->btree;
 
-	return (is_read ?
-	    __wt_read(session, fh, (off_t)0, 512, p) :
-	    __wt_write(session, fh, (off_t)0, 512, p));
+	/* Read the first sector. */
+	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
+	desc = (WT_BTREE_DESC *)buf;
+
+	/* Update the possibly changed fields. */
+	if (desc->root_addr == btree->root_page.addr &&
+	    desc->free_addr == btree->free_addr)
+		return (0);
+
+	desc->root_addr = btree->root_page.addr;
+	desc->root_size = btree->root_page.size;
+	desc->free_addr = btree->free_addr;
+	desc->free_size = btree->free_size;
+
+	/* Write the first sector. */
+	return (__wt_write(session, btree->fh, (off_t)0, 512, buf));
 }

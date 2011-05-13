@@ -47,13 +47,13 @@ __wt_verify_build(void)
 	 * The compiler had better not have padded our structures -- make sure
 	 * the page header structure is exactly what we expect.
 	 */
-	SIZE_CHECK(WT_COL, WT_COL_SIZE);
+	SIZE_CHECK(WT_BTREE_DESC, WT_BTREE_DESC_SIZE);
 	SIZE_CHECK(WT_CELL, WT_CELL_SIZE);
+	SIZE_CHECK(WT_COL, WT_COL_SIZE);
 	SIZE_CHECK(WT_OFF, WT_OFF_SIZE);
 	SIZE_CHECK(WT_OFF_RECORD, WT_OFF_RECORD_SIZE);
 	SIZE_CHECK(WT_OVFL, WT_OVFL_SIZE);
 	SIZE_CHECK(WT_PAGE, WT_PAGE_SIZE);
-	SIZE_CHECK(WT_PAGE_DESC, WT_PAGE_DESC_SIZE);
 	SIZE_CHECK(WT_ROW, WT_ROW_SIZE);
 
 	/*

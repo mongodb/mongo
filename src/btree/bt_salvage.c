@@ -143,7 +143,7 @@ __wt_btree_salvage(SESSION *session)
 		WT_ERR(__wt_ftruncate(session, btree->fh, len));
 
 	/* If the file doesn't have any pages, we're done. */
-	if (btree->fh->file_size <= WT_PAGE_DESC_SIZE) {
+	if (btree->fh->file_size <= allocsize) {
 		__wt_errx(session, "file is too small to salvage");
 		ret = WT_ERROR;
 		goto err;

@@ -74,7 +74,6 @@ __wt_stat_alloc_btree_file_stats(SESSION *session, WT_BTREE_FILE_STATS **statsp)
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
 	stats->file_allocsize.desc = "page size allocation unit";
-	stats->file_base_recno.desc = "base record number";
 	stats->file_col_fix.desc = "column-store fixed-size leaf pages";
 	stats->file_col_internal.desc = "column-store internal pages";
 	stats->file_col_rle.desc =
@@ -106,7 +105,6 @@ void
 __wt_stat_clear_btree_file_stats(WT_BTREE_FILE_STATS *stats)
 {
 	stats->file_allocsize.v = 0;
-	stats->file_base_recno.v = 0;
 	stats->file_col_fix.v = 0;
 	stats->file_col_internal.v = 0;
 	stats->file_col_rle.v = 0;
@@ -132,7 +130,6 @@ void
 __wt_stat_print_btree_file_stats(WT_BTREE_FILE_STATS *stats, FILE *stream)
 {
 	__wt_stat_print(&stats->file_allocsize, stream);
-	__wt_stat_print(&stats->file_base_recno, stream);
 	__wt_stat_print(&stats->file_col_fix, stream);
 	__wt_stat_print(&stats->file_col_internal, stream);
 	__wt_stat_print(&stats->file_col_rle, stream);

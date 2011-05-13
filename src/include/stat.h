@@ -62,7 +62,6 @@ struct __wt_btree_stats {
  */
 struct __wt_btree_file_stats {
 	struct __wt_stats file_allocsize;
-	struct __wt_stats file_base_recno;
 	struct __wt_stats file_col_fix;
 	struct __wt_stats file_col_internal;
 	struct __wt_stats file_col_rle;

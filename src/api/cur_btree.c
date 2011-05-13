@@ -276,8 +276,10 @@ __wt_curbtree_open(SESSION *session,
 		ret = 0;
 		WT_RET(__wt_connection_btree(conn, &btree));
 		session->btree = btree;
-		WT_RET(__wt_btree_create(session, tablename));
-		WT_RET(__wt_btree_open(session));
+
+		WT_STAT_INCR(conn->stats, file_open);
+		WT_RET(__wt_btree_create(session, tablename, "XXXX"));
+		WT_RET(__wt_btree_open(session, tablename));
 
 		/*
 		 * !!! TODO read key / value formats from a table-of-tables.

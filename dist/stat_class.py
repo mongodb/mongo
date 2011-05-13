@@ -64,7 +64,6 @@ btree_stats = {
 ##########################################
 btree_file_stats = {
 	'file_allocsize' : Stat('page size allocation unit'),
-	'file_base_recno' : Stat('base record number'),
 	'file_col_fix' : Stat('column-store fixed-size leaf pages'),
 	'file_col_internal' : Stat('column-store internal pages'),
 	'file_col_rle' : Stat('column-store repeat-count compressed fixed-size leaf pages'),
