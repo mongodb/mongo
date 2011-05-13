@@ -518,8 +518,8 @@ namespace mongo {
             return false;
 
         if( highest->version > myVersion && highest->version >= 0 ) {
+            lock lk(this);
             log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
-            writelock lk("admin.");
             highest->saveConfigLocally(BSONObj());
         }
         return true;
@@ -608,9 +608,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fatal() {
-        //lock l(this);
         box.set(MemberState::RS_FATAL, 0);
-        //sethbmsg("fatal error");
         log() << "replSet error fatal, stopping replication" << rsLog;
     }
 
@@ -618,7 +616,11 @@ namespace mongo {
         bo comment;
         if( addComment )
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
-        newConfig.saveConfigLocally(comment);
+        {
+            lock lk(this);
+            newConfig.saveConfigLocally(comment);
+        }
+        
         try {
             initFromConfig(newConfig, true);
             log() << "replSet replSetReconfig new config saved locally" << rsLog;
