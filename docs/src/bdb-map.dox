@@ -907,7 +907,7 @@ struct DB_SEQUENCE_STAT {
  *******************************************************/
 /*! Database types
  *
- * <b>Passed in \p config parameter to WT_SESSION::create_table</b>.
+ * <b>Passed in \p config parameter to WT_SESSION::create</b>.
  */
 typedef enum {
 	DB_BTREE=1,
@@ -1073,8 +1073,8 @@ struct DB {
 	int  open(DB *, DB_TXN *, const char *, const char *, DBTYPE, u_int32_t, int); /*!< <b>WT_SESSION::open_cursor</b>. */
 	int  pget(DB *, DB_TXN *, DBT *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::insert or WT_CURSOR::update</b>. */
 	int  put(DB *, DB_TXN *, DBT *, DBT *, u_int32_t); /*!< <b>WT_CURSOR::insert or WT_CURSOR::update</b>. */
-	int  remove(DB *, const char *, const char *, u_int32_t); /*!< <b>WT_SESSION::drop_table</b>. */
-	int  rename(DB *, const char *, const char *, const char *, u_int32_t); /*!< <b>WT_SESSION::rename_table</b>. */
+	int  remove(DB *, const char *, const char *, u_int32_t); /*!< <b>WT_SESSION::drop</b>. */
+	int  rename(DB *, const char *, const char *, const char *, u_int32_t); /*!< <b>WT_SESSION::rename</b>. */
 	int  set_alloc(DB *, void *(size_t, void *(void *, size_t), void (void *))); /*!< <b>Not implemented (OS layer)</b>. */
 	int  set_append_recno(DB *, int (DB *, DBT *, db_recno_t)); /*!< <b>Not implemented (record numbers)</b>. */
 	int  set_bt_compare(DB *, int (DB *, const DBT *, const DBT *)); /*!< <b>WT_COLLATOR</b>. */
@@ -1082,14 +1082,14 @@ struct DB {
 	int  set_bt_minkey(DB *, u_int32_t); /*!< <b>Not implemented?</b> */
 	int  set_bt_prefix(DB *, size_t (DB *, const DBT *, const DBT *)); /*!< <b>Not implemented?</b> */
 	int  set_cachesize(DB *, u_int32_t, u_int32_t, int); /*!< <b>\p config parameter to ::wiredtiger_open</b>. */
-	int  set_create_dir(DB *, const char *); /*!< <b>\p config parameter to WT_SESSION::create_table</b>. */
+	int  set_create_dir(DB *, const char *); /*!< <b>\p config parameter to WT_SESSION::create</b>. */
 	int  set_dup_compare(DB *, int (DB *, const DBT *, const DBT *)); /*!< <b>Not required: no duplicates</b>. */
 	int  set_encrypt(DB *, const char *, u_int32_t); /*!< <b>Not implemented</b>. */
 	void set_errcall(DB *, void (const DB_ENV *, const char *, const char *)); /*!< <b>set WT_SESSION::handle_error</b>. */
 	void set_errfile(DB *, FILE *); /*!< <b>Not implemented</b>. */
 	void set_errpfx(DB *, const char *); /*!< <b>Not implemented</b>. */
 	int  set_feedback(DB *, void (DB *, int, int)); /*!< <b>Not implemented</b>. */
-	int  set_flags(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create_table</b>. */
+	int  set_flags(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create</b>. */
 	int  set_h_compare(DB *, int (DB *, const DBT *, const DBT *)); /*!< <b>Not implemented (hash)</b>. */
 	int  set_h_ffactor(DB *, u_int32_t); /*!< <b>Not implemented (hash)</b>. */
 	int  set_h_hash(DB *, u_int32_t (DB *, const void *, u_int32_t)); /*!< <b>Not implemented (hash)</b>. */
@@ -1097,23 +1097,23 @@ struct DB {
 	int  set_lorder(DB *, int); /*!< <b>Not implemented (fixed byte order)</b>. */
 	void set_msgcall(DB *, void (const DB_ENV *, const char *)); /*!< <b>Not implemented</b>. */
 	void set_msgfile(DB *, FILE *); /*!< <b>Not implemented</b>. */
-	int  set_pagesize(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create_table</b>. */
+	int  set_pagesize(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create</b>. */
 	int  set_paniccall(DB *, void (DB_ENV *, int)); /*!< <b>Not implemented?</b> */
 	int  set_partition(DB *, u_int32_t, DBT *, u_int32_t (DB *, DBT *key)); /*!< <b>Special cursor type</b>. */
 	int  set_partition_dirs(DB *, const char **); /*!< <b>Special cursor type</b>. */
 	int  set_priority(DB *, DB_CACHE_PRIORITY); /*!< <b>\p config parameter to WT_SESSION::open_cursor</b>. */
 	int  set_q_extentsize(DB *, u_int32_t); /*!< <b>Not implemented (queue)</b>. */
 	int  set_re_delim(DB *, int); /*!< <b>Not implemented (recno)</b>. */
-	int  set_re_len(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create_table</b>. */
-	int  set_re_pad(DB *, int); /*!< <b>\p config parameter to WT_SESSION::create_table</b>. */
+	int  set_re_len(DB *, u_int32_t); /*!< <b>\p config parameter to WT_SESSION::create</b>. */
+	int  set_re_pad(DB *, int); /*!< <b>\p config parameter to WT_SESSION::create</b>. */
 	int  set_re_source(DB *, const char *); /*!< <b>Not implemented (recno)</b>. */
 	int  sort_multiple(DB *, DBT *, DBT *, u_int32_t); /*!< <b>Not implemented directly, could be via a bulk cursor</b>. */
 	int  stat(DB *, DB_TXN *, void *, u_int32_t); /*!< <b>Accessed via WT_SESSION::open_cursor with the URI \p "statistics:table:<tablename>"</b>. */
 	int  stat_print(DB *, u_int32_t); /*!< <b>Statistics cursor</b>. */
 	int  sync(DB *, u_int32_t); /*!< <b>WT_SESSION::checkpoint</b>. */
-	int  truncate(DB *, DB_TXN *, u_int32_t *, u_int32_t); /*!< <b>WT_SESSION::truncate_table</b>. */
-	int  upgrade(DB *, const char *, u_int32_t); /*!< <b>Not in version 1.0, could be WT_SESSION::upgrade_table, but better to build into ::wiredtiger_open</b>. */
-	int  verify(DB *, const char *, const char *, FILE *, u_int32_t); /*!< <b>WT_SESSION::verify_table</b>. */
+	int  truncate(DB *, DB_TXN *, u_int32_t *, u_int32_t); /*!< <b>WT_SESSION::truncate</b>. */
+	int  upgrade(DB *, const char *, u_int32_t); /*!< <b>Not in version 1.0, could be WT_SESSION::upgrade, but better to build into ::wiredtiger_open</b>. */
+	int  verify(DB *, const char *, const char *, FILE *, u_int32_t); /*!< <b>WT_SESSION::verify</b>. */
 	/* DB PUBLIC HANDLE LIST END */
 };
 
@@ -1632,8 +1632,8 @@ struct DB_ENV {
 	int  set_app_dispatch(DB_ENV *, int (DB_ENV *, DBT *, DB_LSN *, db_recops)); /*!< <b>Not implemented (application-level logging)</b> */
 	int  set_cache_max(DB_ENV *, u_int32_t, u_int32_t); /*!< <b>Not required</b>. */
 	int  set_cachesize(DB_ENV *, u_int32_t, u_int32_t, int); /*!< <b>\p config parameter to ::wiredtiger_open</b> */
-	int  set_create_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
-	int  set_data_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to WT_SESSION::create_table</b> */
+	int  set_create_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to WT_SESSION::create</b> */
+	int  set_data_dir(DB_ENV *, const char *); /*!< <b>\p config parameter to WT_SESSION::create</b> */
 	int  set_data_len(DB_ENV *, u_int32_t); /*!< <b>Not implemented</b>. */
 	int  set_encrypt(DB_ENV *, const char *, u_int32_t); /*!< <b>Not implemented (encryption)</b>. */
 	void set_errcall(DB_ENV *, void (const DB_ENV *, const char *, const char *)); /*!< <b>set WT_SESSION::handle_error</b> */
@@ -1908,7 +1908,7 @@ struct DB_LOG_VERIFY_CONFIG {
 #define	DB_YIELDCPU				0x00080000
 
 /* DO NOT EDIT: automatically built by dist/s_include. */
-int db_create(DB **, DB_ENV *, u_int32_t); /*!< <b>Indirectly, via WT_SESSION::create_table</b>. */
+int db_create(DB **, DB_ENV *, u_int32_t); /*!< <b>Indirectly, via WT_SESSION::create</b>. */
 char *db_strerror(int); /*!< <b>::wiredtiger_strerror</b>. */
 int db_env_set_func_close(int (int)); /*!< <b>Not implemented (OS interface)</b>. */
 int db_env_set_func_dirfree(void (char **, int)); /*!< <b>Not implemented (OS interface)</b>. */

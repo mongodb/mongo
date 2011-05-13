@@ -57,11 +57,13 @@ methods = {
 		fail if the table exists (if "no", the default, verifies that the
 		table exists and has the specified schema'''),
 	Config('huffman_key', '', r'''
-		use Huffman encoding for the key.  Permitted values are empty (off)
-		or \c "english"'''),
+		use Huffman encoding for the key.  Permitted values are empty (off),
+		\c "english" or \c "file:<filename>".  See @ref huffman for more
+		details.'''),
 	Config('huffman_value', '', r'''
-		use Huffman encoding for the value.  Permitted values are empty (off)
-		or \c "english"'''),
+		use Huffman encoding for the value.  Permitted values are empty (off),
+		\c "english" or \c "file:<filename>".  See @ref huffman for more
+		details.'''),
 	Config('index.name', '', r'''
 		named index on a list of columns.  Comma-separated list of the form
 		<code>(column[,...])</code>'''),

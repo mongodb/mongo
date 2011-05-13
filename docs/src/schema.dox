@@ -34,7 +34,7 @@ A column-oriented database stores all of the values of a column together, then t
 
 WiredTiger supports both storage formats, and can mix and match the storage of columns within a logical table.
 
-Applications describe the format of their data by supplying a schema to WT_SESSION::create_table.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
+Applications describe the format of their data by supplying a schema to WT_SESSION::create.  This specifies how the application's data can be split into fields and mapped onto rows and columns.
 
 @section schema_types Column types
 
@@ -79,7 +79,7 @@ The code below is taken from the complete example program @ex_ref{ex_call_center
 @skip home
 @until CALL
 
-@skip create_table
+@skip create
 @until conn->close
 
 @section schema_advanced Advanced Schemas

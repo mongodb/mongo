@@ -1,5 +1,7 @@
 /*! @page fileformats Table File Formats
 
+Keys in row stores and variable-length values can be compressed with Huffman encoding.  See @subpage huffman for more details.
+
 @todo rewrite this to describe the WiredTiger row- and column-store features in detail, including page sizing calculations for given key/value sizes
 
 There are a number of page formats used in WiredTiger, each with a unique page

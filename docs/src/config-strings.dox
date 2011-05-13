@@ -63,7 +63,7 @@ Open a connection to a database, creating it if it does not exist and set a cach
 
 Create a table that uses C language strings for keys and values:
 
-@skip create_table
+@skip create
 @until ;
 
 Assign a priority to a transaction and give it a name for debugging:

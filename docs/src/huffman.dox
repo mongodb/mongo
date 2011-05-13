@@ -1,0 +1,8 @@
+/*! @page huffman Huffman Encoding
+
+Keys in row stores and variable-length values can be compressed with Huffman encoding.  Specify \c "huffman_key=<language>" and/or \c "huffman_value=<language>" in the configuration passed to WT_SESSION::create.
+
+The \c language can be \c "english" for the builtin compression of English text.  Other languages can be specified by providing a file in the format specifed by @ref huffman_files.
+
+@section huffman_files Huffman File Format
+ */
