@@ -140,6 +140,8 @@ void __wt_workq_evict_server_exit(CONNECTION *conn);
 int __wt_btree_create(SESSION *session, const char *name, const char *config);
 int __wt_btree_open(SESSION *session, const char *name);
 int __wt_btree_close(SESSION *session);
+int __wt_btree_huffman_open(SESSION *session);
+void __wt_btree_huffman_close(SESSION *session);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
 int __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store);
@@ -220,10 +222,6 @@ int __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
 int __wt_update_serial_func(SESSION *session);
 int __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
 int __wt_connection_btree(CONNECTION *conn, BTREE **btreep);
-int __wt_btree_huffman_set(BTREE *btree,
-    uint8_t const *huffman_table,
-    u_int huffman_table_size,
-    uint32_t flags);
 int __wt_btree_stat_print(SESSION *session, FILE *stream);
 int __wt_btree_stat_clear(BTREE *btree);
 int __wt_library_init(void);

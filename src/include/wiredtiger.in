@@ -503,11 +503,11 @@ struct wt_session {
 	 * @config{exclusive, fail if the table exists (if "no"\, the default\,
 	 * verifies that the table exists and has the specified schema}
 	 * @config{huffman_key, use Huffman encoding for the key.  Permitted
-	 * values are empty (off)\, \c "english" or \c "file:<filename>".  See
-	 * @ref huffman for more details.}
+	 * values are empty (off)\, \c "english"\, \c "utf8:<filename>" or \c
+	 * "utf16:<filename>".  See @ref huffman for more details.}
 	 * @config{huffman_value, use Huffman encoding for the value.  Permitted
-	 * values are empty (off)\, \c "english" or \c "file:<filename>".  See
-	 * @ref huffman for more details.}
+	 * values are empty (off)\, \c "english"\, \c "utf8:<filename>" or \c
+	 * "utf16:<filename>".  See @ref huffman for more details.}
 	 * @config{index.\<name\>, named index on a list of columns.  Comma-
 	 * separated list of the form <code>(column[\,...])</code>}
 	 * @config{intl_node_max, maximum page size for internal nodes\, in

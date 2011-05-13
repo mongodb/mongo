@@ -25,6 +25,7 @@ src/btree/bt_discard.c
 src/btree/bt_dump.c
 src/btree/bt_evict.c
 src/btree/bt_handle.c
+src/btree/bt_huffman.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
@@ -46,7 +47,6 @@ src/btree/row_key.c
 src/btree/row_put.c
 src/btree/row_srch.c
 src/db/db_handle.c
-src/db/db_huffman.c
 src/db/db_stat.c
 src/env/env_global.c
 src/env/env_handle.c

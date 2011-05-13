@@ -58,11 +58,11 @@ methods = {
 		table exists and has the specified schema'''),
 	Config('huffman_key', '', r'''
 		use Huffman encoding for the key.  Permitted values are empty (off),
-		\c "english" or \c "file:<filename>".  See @ref huffman for more
+		\c "english", \c "utf8:<filename>" or \c "utf16:<filename>".  See @ref huffman for more
 		details.'''),
 	Config('huffman_value', '', r'''
 		use Huffman encoding for the value.  Permitted values are empty (off),
-		\c "english" or \c "file:<filename>".  See @ref huffman for more
+		\c "english", \c "utf8:<filename>" or \c "utf16:<filename>".  See @ref huffman for more
 		details.'''),
 	Config('index.name', '', r'''
 		named index on a list of columns.  Comma-separated list of the form
@@ -207,7 +207,6 @@ flags = {
 	'bt_search_col' : [ 'WRITE' ],
 	'bt_search_key_row' : [ 'WRITE' ],
 	'bt_tree_walk' : [ 'WALK_CACHE' ],
-	'huffman_set' : [ 'ASCII_ENGLISH', 'HUFFMAN_KEY', 'HUFFMAN_VALUE' ],
 	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED' ],
 	'verbose' : [ 'VERB_EVICT', 'VERB_FILEOPS', 'VERB_HAZARD', 'VERB_MUTEX', 'VERB_READ' ],
 

@@ -344,12 +344,9 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
-#define	WT_ASCII_ENGLISH				0x00000004
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUMP_PRINT					0x00000001
-#define	WT_HUFFMAN_KEY					0x00000002
-#define	WT_HUFFMAN_VALUE				0x00000001
 #define	WT_REC_EVICT					0x00000002
 #define	WT_REC_LOCKED					0x00000001
 #define	WT_SERVER_RUN					0x00000002

@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 
 static int __btree_conf(SESSION *);
-static int __btree_huffman(SESSION *);
 static int __btree_init(SESSION *, const char *);
 static int __btree_page_sizes(SESSION *);
 static int __btree_type(SESSION *);
@@ -177,17 +176,7 @@ __wt_btree_close(SESSION *session)
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->name);
 
-	if (btree->huffman_key != NULL) {
-		/* Key and data may use the same table, only close it once. */
-		if (btree->huffman_value == btree->huffman_key)
-			btree->huffman_value = NULL;
-		__wt_huffman_close(session, btree->huffman_key);
-		btree->huffman_key = NULL;
-	}
-	if (btree->huffman_value != NULL) {
-		__wt_huffman_close(session, btree->huffman_value);
-		btree->huffman_value = NULL;
-	}
+	__wt_btree_huffman_close(session);
 
 	__wt_walk_end(session, &btree->evict_walk);
 
@@ -213,7 +202,7 @@ __btree_conf(SESSION *session)
 	WT_RET(__btree_page_sizes(session));
 
 	/* Huffman encoding configuration. */
-	WT_RET(__btree_huffman(session));
+	WT_RET(__wt_btree_huffman_open(session));
 
 	return (0);
 }
@@ -258,44 +247,6 @@ __btree_type(SESSION *session)
 		btree->type = BTREE_COL_RLE;
 	}
 	return (0);
-}
-
-/*
- * __btree_huffman --
- *	Figure out Huffman encoding.
- */
-static int
-__btree_huffman(SESSION *session)
-{
-	const char *config;
-	BTREE *btree;
-	WT_CONFIG_ITEM cval;
-	uint32_t huffman_flags;
-
-	btree = session->btree;
-	config = btree->config;
-
-	huffman_flags = 0;
-	WT_RET(__wt_config_getones(config, "huffman_key", &cval));
-	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
-		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_KEY;
-	WT_RET(__wt_config_getones(config, "huffman_value", &cval));
-	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
-		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_VALUE;
-	if (huffman_flags == 0)
-		return (0);
-
-	switch (btree->type) {		/* Check file type compatibility. */
-	case BTREE_COL_FIX:
-	case BTREE_COL_RLE:
-		__wt_errx(session,
-		    "Fixed-size column-store files may not be Huffman encoded");
-		return (WT_ERROR);
-	case BTREE_COL_VAR:
-	case BTREE_ROW:
-		break;
-	}
-	return (__wt_btree_huffman_set(btree, NULL, 0, huffman_flags));
 }
 
 /*
