@@ -190,6 +190,7 @@ namespace mongo {
             Scope * s = _func.scope();
 
             s->invokeSafe( _func.func() , &args, 0 );
+            ++numReduces;
 
             if ( s->type( "return" ) == Array ) {
                 uasserted( 10075 , "reduce -> multiple not supported yet");
@@ -221,6 +222,10 @@ namespace mongo {
 
             verbose = cmdObj["verbose"].trueValue();
             jsMode = cmdObj["jsMode"].trueValue();
+
+            // js mode thresholds
+            jsMaxKeys = 500000;
+            jsReduceRatio = 3;
 
             uassert( 13602 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
 
@@ -539,14 +544,15 @@ namespace mongo {
             // we use a standard JS object which means keys are only simple types
             // we could also add a real hashmap from a library, still we need to add object comparison methods
 //            _scope->setObject("_mrMap", BSONObj(), false);
-            ScriptingFunction init = _scope->createFunction("_emitCt = 0; _keyCt = 0; if (typeof(_mrMap) === 'undefined') { _mrMap = {}; }");
+            ScriptingFunction init = _scope->createFunction("_emitCt = 0; _keyCt = 0; _dupCt = 0; _redCt = 0; if (typeof(_mrMap) === 'undefined') { _mrMap = {}; }");
             _scope->invoke(init, 0, 0, 0, true);
 
             // js function to run reduce on all keys
 //            redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
-            _reduceAll = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length != 1) { ret = _reduce(key, list); map[key] = [ret]; } }");
-            _reduceAndFinalize = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } map[key] = ret; }");
-            _reduceAndFinalizeAndInsert = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list) }; if (_doFinal){ ret = _finalize(ret); } delete map[key]; _insertToTemp({_id: key, value: ret}); }");
+            _reduceAll = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length != 1) { ret = _reduce(key, list); map[key] = [ret]; ++_redCt; } } _dupCt = 0;");
+            _reduceAndEmit = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; } emit(key, ret); }; delete _mrMap;");
+            _reduceAndFinalize = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { if (!_doFinal) {continue;} ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; }; if (_doFinal){ ret = _finalize(ret); } map[key] = ret; }");
+            _reduceAndFinalizeAndInsert = _scope->createFunction("var map = _mrMap; var list, ret; for (var key in map) { list = map[key]; if (list.length == 1) { ret = list[0]; } else { ret = _reduce(key, list); ++_redCt; }; if (_doFinal){ ret = _finalize(ret); } _nativeToTemp({_id: key, value: ret}); }");
 
             if ( _onDisk ) {
                 // clear temp collections
@@ -574,7 +580,7 @@ namespace mongo {
             _jsMode = jsMode;
             if (jsMode) {
                 // emit function that stays in JS
-                _scope->setFunction("emit", "function(key, value) { ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } list.push(value); }");
+                _scope->setFunction("emit", "function(key, value) { ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } else { ++_dupCt; } list.push(value); }");
             } else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );
@@ -593,12 +599,20 @@ namespace mongo {
             insert( _config.tempLong , res );
         }
 
-        BSONObj _insertToTemp( const BSONObj& args, void* data ) {
+        BSONObj _nativeToTemp( const BSONObj& args, void* data ) {
             State* state = (State*) data;
             BSONObjIterator it(args);
             state->insert(state->_config.tempLong, it.next().Obj());
             return BSONObj();
         }
+
+//        BSONObj _nativeToInc( const BSONObj& args, void* data ) {
+//            State* state = (State*) data;
+//            BSONObjIterator it(args);
+//            const BSONObj& obj = it.next().Obj();
+//            state->_insertToInc(const_cast<BSONObj&>(obj));
+//            return BSONObj();
+//        }
 
         /**
          * Applies last reduce and finalize.
@@ -610,7 +624,7 @@ namespace mongo {
             if (_jsMode) {
                 // apply the reduce within JS
                 if (_onDisk) {
-                    _scope->injectNative("_insertToTemp", _insertToTemp, this);
+                    _scope->injectNative("_nativeToTemp", _nativeToTemp, this);
                     _scope->invoke(_reduceAndFinalizeAndInsert, 0, 0, 0, true);
                     return;
                 } else {
@@ -809,6 +823,26 @@ namespace mongo {
          * this method checks the size of in memory map and potentially flushes to disk
          */
         void State::checkSize() {
+            if (_jsMode) {
+                // try to reduce if it is beneficial
+                int dupCt = _scope->getNumberInt("_dupCt");
+                int keyCt = _scope->getNumberInt("_keyCt");
+
+                if (keyCt > _config.jsMaxKeys) {
+                    // too many keys for JS, switch to mixed
+                    switchMode(false);
+                    _scope->invoke(_reduceAndEmit, 0, 0, 0, true);
+                    // need to get the real number emitted so far
+                    _numEmits = _scope->getNumberInt("_emitCt");
+                    _config.reducer->numReduces = _scope->getNumberInt("_redCt");
+                    // then fall through to check map size
+                } else if (dupCt > keyCt * _config.jsReduceRatio) {
+                    // reduce now to lower mem usage
+                    _scope->invoke(_reduceAll, 0, 0, 0, true);
+                    return;
+                }
+            }
+
             if (_jsMode || _size < 1024 * 50 )
                 return;
 
@@ -994,6 +1028,7 @@ namespace mongo {
                     // final reduce
                     state.finalReduce( op , pm );
                     inReduce += t.micros();
+                    countsBuilder.appendNumber( "reduce" , state.numReduces() );
                     timingBuilder.append( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
 
