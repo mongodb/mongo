@@ -118,30 +118,3 @@ __wt_btree_destroy(BTREE *btree)
 
 	return (ret);
 }
-
-/*
- * __wt_btree_lockout_err --
- *	Report an error for operations on an invalid btree handle.
- */
-int
-__wt_btree_lockout_err(BTREE *btree)
-{
-	__wt_errx(&btree->conn->default_session,
-	    "This btree handle has failed for some reason, and can no longer "
-	    "be used; the only method permitted on it is Db.close which "
-	    "discards the handle permanently");
-	return (WT_ERROR);
-}
-
-/*
- * __wt_btree_lockout_open --
- *	Report an error for operations on a not-yet-open btree handle.
- */
-int
-__wt_btree_lockout_open(BTREE *btree)
-{
-	__wt_errx(&btree->conn->default_session,
-	    "This method may not be called until after the Btree.open method "
-	    "has been called");
-	return (WT_ERROR);
-}
