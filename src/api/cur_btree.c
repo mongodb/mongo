@@ -185,7 +185,8 @@ __wt_session_add_btree(SESSION *session, BTREE *btree,
     const char *key_format, const char *value_format)
 {
 	BTREE_SESSION *btree_session;
-	WT_RET(__wt_calloc(session, 1, sizeof(BTREE_SESSION), &btree_session));
+
+	WT_RET(__wt_calloc_def(session, 1, &btree_session));
 
 	btree_session->btree = btree;
 	btree_session->key_format = key_format;

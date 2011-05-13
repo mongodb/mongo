@@ -160,7 +160,7 @@ __wt_curconfig_open(SESSION *session,
 	configitem = uri + 7;
 	ret = 0;
 
-	WT_RET(__wt_calloc(session, 1, sizeof(CURSOR_CONFIG), &cconfig));
+	WT_RET(__wt_calloc_def(session, 1, &cconfig));
 
 	cursor = &cconfig->iface;
 	*cursor = iface;

@@ -590,7 +590,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * We don't yet have a session handle to pass to the memory allocation
 	 * functions.
 	 */
-	WT_RET(__wt_calloc(NULL, 1, sizeof(CONNECTION), &conn));
+	WT_RET(__wt_calloc_def(NULL, 1, &conn));
 	conn->iface = stdc;
 	WT_ERR(__wt_strdup(NULL, home, &conn->home));
 	TAILQ_INIT(&conn->sessions_head);
