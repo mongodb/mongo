@@ -74,6 +74,7 @@ typedef uint64_t wiredtiger_recno_t;
 /*******************************************
  * Forward structure declarations
  *******************************************/
+struct wt_buf;		    typedef struct wt_buf WT_BUF;
 struct wt_collator;	    typedef struct wt_collator WT_COLLATOR;
 struct wt_connection;	    typedef struct wt_connection WT_CONNECTION;
 struct wt_cursor;	    typedef struct wt_cursor WT_CURSOR;
@@ -104,11 +105,12 @@ struct wt_item {
 	uint32_t size;
 };
 
+#ifndef DOXYGEN
 /*!
  * A data item with memory management.  Used internally to manage returned keys
  * and values in the WT_CURSOR implementation.
  */
-typedef struct {
+struct wt_buf {
 	/*
 	 * Note: the first two fields must match WT_ITEM, we cast between
 	 * those types.
@@ -125,7 +127,8 @@ typedef struct {
 
 #define	WT_BUF_INUSE					0x00000001
 	uint32_t flags;
-} WT_BUF;
+};
+#endif
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
@@ -351,7 +354,7 @@ struct wt_cursor {
 	 * Protected fields, only to be used by cursor implementations.
 	 */
 
-#ifndef SWIG
+#if !defined(SWIG) && !defined(DOXYGEN)
 	/*
 	 * !!!
 	 * Explicit representations of structures from queue.h.
