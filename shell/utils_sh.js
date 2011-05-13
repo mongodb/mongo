@@ -27,9 +27,11 @@ sh.help = function() {
     print( "\tsh.addShard( host )                       server:port OR setname/server:port" )
     print( "\tsh.enableSharding(dbname)                 enables sharding on the database dbname" )
     print( "\tsh.shardCollection(fullName,key,unique)   shards the collection" );
+
     print( "\tsh.splitFind(fullName,find)               splits the chunk that find is in at the median" );
     print( "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle" );
-
+    print( "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
+    
     print( "\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off" );
     print( "\tsh.getBalancerState()   return true if on, off if not" );
     
@@ -71,6 +73,11 @@ sh.splitFind = function( fullName , find ) {
 sh.splitAt = function( fullName , middle ) {
     sh._checkFullName( fullName )
     sh._adminCommand( { split : fullName , middle : middle } )
+}
+
+sh.moveChunk = function( fullName , find , to ) {
+    sh._checkFullName( fullName );
+    sh._adminCommand( { moveChunk : fullName , find : find , to : to } )
 }
 
 sh.setBalancerState = function( onOrNot ) { 
