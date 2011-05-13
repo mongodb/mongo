@@ -88,6 +88,7 @@ __wt_btree_destroy(BTREE *btree)
 		return (0);
 
 	__wt_free(session, btree->name);
+	__wt_free(session, btree->config);
 
 	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */

@@ -82,8 +82,6 @@ struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
 	uint32_t refcnt;		/* Sessions with this tree open. */
 
-	const char **__cfg;		/* Configuration. */
-
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_RLE=2,	/* Fixed-length, RLE column store */
 		BTREE_COL_VAR=3,	/* Variable-length column store */
@@ -92,7 +90,8 @@ struct __btree {
 
 	TAILQ_ENTRY(__btree) q;		/* Linked list of databases */
 
-	char	 *name;			/* File name */
+	const char *name;		/* File name */
+	const char *config;		/* Config settings. */
 	mode_t	  mode;			/* File create mode */
 
 	uint64_t  lsn;			/* LSN file/offset pair */
@@ -133,9 +132,6 @@ struct __btree {
 
 	uint32_t fixed_len;
 	const char *dictionary;
-
-	const char *config;		/* Config settings. */
-	int config_dirty;		/* Config string modified. */
 };
 
 struct __btree_session {

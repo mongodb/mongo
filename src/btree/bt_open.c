@@ -104,28 +104,28 @@ __wt_conf(SESSION *session)
 static int
 __wt_conf_type(SESSION *session)
 {
-	const char **__cfg;
+	const char *config;
 	BTREE *btree;
 	WT_CONFIG_ITEM cval;
 
 	btree = session->btree;
-	__cfg = btree->__cfg;
+	config = btree->config;
 
-	WT_RET(__wt_config_gets(__cfg, "key_format", &cval));
+	WT_RET(__wt_config_getones(config, "key_format", &cval));
 	if (cval.len > 0 && cval.str[0] == 'r')
 		btree->type = BTREE_COL_VAR;
 	else
 		btree->type = BTREE_ROW;;
 
 	/* Check for fixed-length data. */
-	WT_RET(__wt_config_gets(__cfg, "value_format", &cval));
+	WT_RET(__wt_config_getones(config, "value_format", &cval));
 	if (cval.len > 1 && cval.str[cval.len - 1] == 'u') {
 		btree->type = BTREE_COL_FIX;
 		btree->fixed_len = (uint32_t)strtol(cval.str, NULL, 10);
 	}
 
 	/* Check for run-length encoding */
-	WT_RET(__wt_config_gets(__cfg, "runlength_encoding", &cval));
+	WT_RET(__wt_config_getones(config, "runlength_encoding", &cval));
 	if (cval.val != 0) {
 		if (btree->type != BTREE_COL_FIX) {
 			__wt_errx(session,
@@ -146,19 +146,19 @@ __wt_conf_type(SESSION *session)
 static int
 __wt_conf_huffman(SESSION *session)
 {
-	const char **__cfg;
+	const char *config;
 	BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	uint32_t huffman_flags;
 
 	btree = session->btree;
-	__cfg = btree->__cfg;
+	config = btree->config;
 
 	huffman_flags = 0;
-	WT_RET(__wt_config_gets(__cfg, "huffman_key", &cval));
+	WT_RET(__wt_config_getones(config, "huffman_key", &cval));
 	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
 		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_KEY;
-	WT_RET(__wt_config_gets(__cfg, "huffman_value", &cval));
+	WT_RET(__wt_config_getones(config, "huffman_value", &cval));
 	if (cval.len > 0 && strncasecmp(cval.str, "english", cval.len) == 0)
 		huffman_flags |= WT_ASCII_ENGLISH | WT_HUFFMAN_VALUE;
 	if (huffman_flags == 0)
@@ -186,20 +186,20 @@ __wt_conf_page_sizes(SESSION *session)
 {
 	BTREE *btree;
 	WT_CONFIG_ITEM cval;
-	const char **__cfg;
+	const char *config;
 
 	btree = session->btree;
-	__cfg = btree->__cfg;
+	config = btree->config;
 
-	WT_RET(__wt_config_gets(__cfg, "allocation_size", &cval));
+	WT_RET(__wt_config_getones(config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "intl_node_max", &cval));
+	WT_RET(__wt_config_getones(config, "intl_node_max", &cval));
 	btree->intlmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "intl_node_min", &cval));
+	WT_RET(__wt_config_getones(config, "intl_node_min", &cval));
 	btree->intlmin = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "leaf_node_max", &cval));
+	WT_RET(__wt_config_getones(config, "leaf_node_max", &cval));
 	btree->leafmax = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(__cfg, "leaf_node_min", &cval));
+	WT_RET(__wt_config_getones(config, "leaf_node_min", &cval));
 	btree->leafmin = (uint32_t)cval.val;
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */

@@ -30,6 +30,9 @@ int __wt_config_checklist(SESSION *session,
 int __wt_config_check(SESSION *session,
     const char *defaults,
     const char *config);
+int __wt_config_collapse(SESSION *session,
+    const char **cfg,
+    const char **config_ret);
 const char *__wt_confdfl_connection_add_collator;
 const char *__wt_confdfl_connection_add_cursor_type;
 const char *__wt_confdfl_connection_add_extractor;

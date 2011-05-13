@@ -142,7 +142,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 
 	/* Allocate a BTREE handle. */
 	WT_RET(__wt_connection_btree(conn, &btree));
-	btree->__cfg = __cfg;				/* XXX */
+	WT_RET(__wt_config_collapse(session, __cfg, &btree->config));
 
 	session->btree = btree;
 	WT_RET(__wt_btree_open(session, name, 0666, WT_CREATE));
