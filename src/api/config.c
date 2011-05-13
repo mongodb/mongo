@@ -625,7 +625,6 @@ __wt_config_check(SESSION *session, const char *defaults, const char *config)
 	return (__wt_config_checklist(session, defs, config));
 }
 
-
 /*
  * __wt_config_collapse --
  *	Given a NULL-terminated list of configuration strings, where the first
@@ -649,7 +648,7 @@ __wt_config_collapse(SESSION *session,
 	 */
 	for (cp = cfg, len = 0; *cp != NULL; ++cp)
 		len += strlen(*cp);
-	
+
 	WT_RET(__wt_calloc_def(session, len, &config));
 	p = config;
 	end = config + len;
