@@ -414,7 +414,10 @@ namespace mongo {
         const BSONElement& chk(int t) const {
             if ( t != type() ) {
                 StringBuilder ss;
-                ss << "wrong type for BSONElement (" << fieldName() << ") " << type() << " != " << t;
+                if( eoo() )
+                    ss << "field not found, expected type " << t;
+                else
+                    ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
                 uasserted(13111, ss.str() );
             }
             return *this;
