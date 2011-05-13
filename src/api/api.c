@@ -243,9 +243,31 @@ __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 static int
 __session_sync(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(name);
-	WT_UNUSED(config);
+	WT_BTREE_SESSION *btree_session;
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, sync, config);
+	if (strncmp(name, "table:", 6) != 0) {
+		__wt_errx(session, "Unknown object type: %s", name);
+		return (EINVAL);
+	}
+	name += strlen("table:");
+
+	ret = __wt_session_get_btree(session,
+	    name, strlen(name), &btree_session);
+
+	/* If the tree isn't open, there's nothing to do. */
+	if (ret == WT_NOTFOUND)
+		return (0);
+	else if (ret != 0)
+		return (ret);
+
+	session->btree = btree_session->btree;
+	ret = __wt_bt_sync(session);
+	API_END();
 
 	return (0);
 }

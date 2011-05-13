@@ -112,9 +112,6 @@ extern int __wt_cell_copy(WT_SESSION_IMPL *session,
 extern int __wt_bt_lex_compare( WT_BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
-extern int __wt_bt_int_compare( WT_BTREE *btree,
-    const WT_ITEM *user_item,
-    const WT_ITEM *tree_item);
 extern int __wt_btcur_first(CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(CURSOR_BTREE *cbt);

@@ -71,12 +71,14 @@ __curbtree_prev(WT_CURSOR *cursor)
 {
 	CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
+	int ret;
 
 	cbt = (CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
+	ret = __wt_btcur_prev((CURSOR_BTREE *)cursor);
 	API_END();
 
-	return (ENOTSUP);
+	return (ret);
 }
 
 /*
@@ -222,7 +224,7 @@ __wt_curbtree_open(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 
 	/* TODO: handle projections. */
-	tablename = uri + 6;
+	tablename = uri + strlen("table:");
 
 	ret = __wt_session_get_btree(session,
 	    tablename, strlen(tablename), &btree_session);

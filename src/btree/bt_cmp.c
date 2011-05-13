@@ -44,31 +44,3 @@ __wt_bt_lex_compare(
 	return (user_item->size == tree_item->size ? 0 :
 	    (user_item->size < tree_item->size ? -1 : 1));
 }
-
-/*
- * __wt_bt_int_compare --
- *	Integer comparison routine.
- */
-int
-__wt_bt_int_compare(
-    WT_BTREE *btree, const WT_ITEM *user_item, const WT_ITEM *tree_item)
-{
-	uint64_t user_int, tree_int;
-
-	/*
-	 * The WT_ITEM must hold the low-order bits in machine integer order.
-	 *
-	 * Return:
-	 *	< 0 if user_item is < tree_item
-	 *	= 0 if user_item is = tree_item
-	 *	> 0 if user_item is > tree_item
-	 *
-	 * We use the names "user" and "tree" so it's clear which the
-	 * application is looking at when we call its comparison func.
-	 */
-	user_int = tree_int = 0;
-	memcpy(&user_int, user_item->data, (size_t)btree->btree_compare_int);
-	memcpy(&tree_int, tree_item->data, (size_t)btree->btree_compare_int);
-
-	return (user_int == tree_int ? 0 : (user_int < tree_int ? -1 : 1));
-}
