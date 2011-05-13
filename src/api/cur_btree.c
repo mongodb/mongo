@@ -177,7 +177,7 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 }
 
 /*
- * __add_btree --
+ * __wt_session_add_btree --
  *	Add a btree handle to the session's cache.
  */
 int
@@ -192,7 +192,6 @@ __wt_session_add_btree(SESSION *session, BTREE *btree,
 	btree_session->value_format = value_format;
 
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
-	++btree->refcnt;
 
 	return (0);
 }
@@ -276,7 +275,8 @@ __wt_curbtree_open(SESSION *session,
 		ret = 0;
 		WT_RET(__wt_connection_btree(conn, &btree));
 		session->btree = btree;
-		WT_RET(__wt_btree_open(session, tablename, 0666, 0));
+		WT_RET(__wt_btree_create(session, tablename));
+		WT_RET(__wt_btree_open(session));
 
 		/*
 		 * !!! TODO read key / value formats from a table-of-tables.
@@ -293,8 +293,8 @@ __wt_curbtree_open(SESSION *session,
 		WT_ILLEGAL_FORMAT(session);
 		}
 		value_format = "u";
-		WT_RET(__wt_session_add_btree(session, btree,
-		    key_format, value_format));
+		WT_RET(__wt_session_add_btree(
+		    session, btree, key_format, value_format));
 	} else {
 		WT_ERR(ret);
 		btree = btree_session->btree;

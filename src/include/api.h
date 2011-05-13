@@ -80,7 +80,11 @@ typedef struct {
 
 struct __btree {
 	CONNECTION *conn;		/* Enclosing connection */
-	uint32_t refcnt;		/* Sessions with this tree open. */
+	TAILQ_ENTRY(__btree) q;		/* Linked list of files */
+
+	const char *config;		/* Configuration string */
+
+	const char *name;		/* File name */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_RLE=2,	/* Fixed-length, RLE column store */
@@ -88,50 +92,42 @@ struct __btree {
 		BTREE_ROW=4		/* Row-store */
 	} type;				/* Type */
 
-	TAILQ_ENTRY(__btree) q;		/* Linked list of databases */
-
-	const char *name;		/* File name */
-	const char *config;		/* Config settings. */
-	mode_t	  mode;			/* File create mode */
-
 	uint64_t  lsn;			/* LSN file/offset pair */
 
-	uint32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
 	WT_REF	root_page;		/* Root page reference */
 
-	uint32_t free_addr;		/* Free page */
-	uint32_t free_size;
-
-	uint32_t freelist_entries;	/* Free list entry count */
+	uint32_t freelist_entries;	/* Free-list entry count */
+					/* Free-list queues */
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	int	 freelist_dirty;	/* Free-list modified */
+	int	 freelist_dirty;	/* Free-list has been modified */
+	uint32_t free_addr;		/* Free-list addr/size pair */
+	uint32_t free_size;
 
 	WT_WALK evict_walk;		/* Eviction thread's walk state */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
-	WT_BTREE_STATS *stats;		/* Btree handle statistics */
-	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
+	uint32_t fixed_len;		/* Fixed-length record size */
 
-	int btree_compare_int;
-
+	int btree_compare_int;		/* Integer keys */
+					/* Comparison function */
 	int (*btree_compare)(BTREE *, const WT_ITEM *, const WT_ITEM *);
 
-	uint32_t intlitemsize;
+	uint32_t intlitemsize;		/* Maximum item size for overflow */
 	uint32_t leafitemsize;
 
-	uint32_t allocsize;
-	uint32_t intlmin;
+	uint32_t allocsize;		/* Allocation size */
+	uint32_t intlmin;		/* Min/max internal page size */
 	uint32_t intlmax;
-	uint32_t leafmin;
+	uint32_t leafmin;		/* Min/max leaf page size */
 	uint32_t leafmax;
 
-	uint32_t fixed_len;
-	const char *dictionary;
+	WT_BTREE_STATS *stats;		/* Btree handle statistics */
+	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
 };
 
 struct __btree_session {
@@ -350,7 +346,6 @@ extern WT_EVENT_HANDLER *__wt_event_handler_verbose;
  */
 #define	WT_ASCII_ENGLISH				0x00000004
 #define	WT_BUF_INUSE					0x00000001
-#define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUMP_PRINT					0x00000001
 #define	WT_HUFFMAN_KEY					0x00000002

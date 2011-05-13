@@ -7,29 +7,76 @@
 
 #include "wt_internal.h"
 
-static int __wt_conf(SESSION *);
-static int __wt_conf_huffman(SESSION *);
-static int __wt_conf_type(SESSION *);
-static int __wt_conf_page_sizes(SESSION *);
+static int __btree_conf(SESSION *);
+static int __btree_huffman(SESSION *);
+static int __btree_init(SESSION *, const char *);
+static int __btree_page_sizes(SESSION *);
+static int __btree_type(SESSION *);
 
 /*
- * __wt_bt_open --
+ * __wt_btree_create --
+ *	Create a Btree.
+ */
+int
+__wt_btree_create(SESSION *session, const char *name)
+{
+	BTREE *btree;
+	CONNECTION *conn;
+
+	btree = session->btree;
+	conn = btree->conn;
+
+	WT_STAT_INCR(conn->stats, file_open);
+
+	/* Open the underlying file handle. */
+	WT_RET(__wt_open(session, name, 0666, 1, &btree->fh));
+
+	/* Initialize the BTREE. */
+	WT_RET(__btree_init(session, name));
+
+	/* Configure the BTREE. */
+	return (__btree_conf(session));
+}
+
+/*
+ * __btree_init --
+ *	Initialize the BTREE structure, after an zero-filled allocation.
+ */
+static int
+__btree_init(SESSION *session, const char *name)
+{
+	BTREE *btree;
+
+	btree = session->btree;
+
+	WT_RET(__wt_strdup(session, name, &btree->name));
+
+	btree->root_page.addr = WT_ADDR_INVALID;
+
+	TAILQ_INIT(&btree->freeqa);
+	TAILQ_INIT(&btree->freeqs);
+
+	btree->free_addr = WT_ADDR_INVALID;
+
+	btree->btree_compare = __wt_bt_lex_compare;
+
+	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
+	WT_RET(__wt_stat_alloc_btree_file_stats(session, &btree->fstats));
+
+	return (0);
+}
+
+/*
+ * __wt_btree_open --
  *	Open a Btree.
  */
 int
-__wt_bt_open(SESSION *session, int ok_create)
+__wt_btree_open(SESSION *session)
 {
 	BTREE *btree;
 	WT_PAGE *page;
 
 	btree = session->btree;
-
-	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session,
-	    btree->name, btree->mode, ok_create, &btree->fh));
-
-	/* Configure the btree. */
-	WT_RET(__wt_conf(session));
 
 	/*
 	 * If the file size is 0 create an in-memory page, but leave it clean;
@@ -79,30 +126,91 @@ __wt_bt_open(SESSION *session, int ok_create)
 }
 
 /*
- * __wt_conf --
+ * __wt_btree_close --
+ *	Close a Btree.
+ */
+int
+__wt_btree_close(SESSION *session)
+{
+	BTREE *btree;
+	CONNECTION *conn;
+	int ret;
+
+	btree = session->btree;
+	conn = btree->conn;
+
+	/*
+	 * Remove from the connection's list.
+	 * XXX
+	 * This code should go somewhere else.
+	 */
+	__wt_lock(session, conn->mtx);
+	TAILQ_REMOVE(&conn->dbqh, btree, q);
+	--conn->dbqcnt;
+	__wt_unlock(session, conn->mtx);
+
+	/* Ask the eviction thread to flush all pages. */
+	__wt_evict_file_serial(session, 1, ret);
+
+	/* Write out the free list. */
+	WT_TRET(__wt_block_write(session));
+
+	/* Write out the file's meta-data. */
+	WT_TRET(__wt_desc_write(session));
+
+	/* Close the underlying file handle. */
+	WT_TRET(__wt_close(session, btree->fh));
+
+	__wt_free(session, btree->config);
+	__wt_free(session, btree->name);
+
+	if (btree->huffman_key != NULL) {
+		/* Key and data may use the same table, only close it once. */
+		if (btree->huffman_value == btree->huffman_key)
+			btree->huffman_value = NULL;
+		__wt_huffman_close(session, btree->huffman_key);
+		btree->huffman_key = NULL;
+	}
+	if (btree->huffman_value != NULL) {
+		__wt_huffman_close(session, btree->huffman_value);
+		btree->huffman_value = NULL;
+	}
+
+	__wt_walk_end(session, &btree->evict_walk);
+
+	__wt_free(session, btree->stats);
+	__wt_free(session, btree->fstats);
+
+	__wt_free(session, session->btree);
+
+	return (ret);
+}
+
+/*
+ * __btree_conf --
  *	Configure the btree and verify the configuration relationships.
  */
 static int
-__wt_conf(SESSION *session)
+__btree_conf(SESSION *session)
 {
 	/* File type. */
-	WT_RET(__wt_conf_type(session));
+	WT_RET(__btree_type(session));
 
 	/* Page sizes. */
-	WT_RET(__wt_conf_page_sizes(session));
+	WT_RET(__btree_page_sizes(session));
 
 	/* Huffman encoding configuration. */
-	WT_RET(__wt_conf_huffman(session));
+	WT_RET(__btree_huffman(session));
 
 	return (0);
 }
 
 /*
- * __wt_conf_type --
+ * __btree_type --
  *	Figure out the database type.
  */
 static int
-__wt_conf_type(SESSION *session)
+__btree_type(SESSION *session)
 {
 	const char *config;
 	BTREE *btree;
@@ -140,11 +248,11 @@ __wt_conf_type(SESSION *session)
 }
 
 /*
- * __wt_conf_huffman --
+ * __btree_huffman --
  *	Figure out Huffman encoding.
  */
 static int
-__wt_conf_huffman(SESSION *session)
+__btree_huffman(SESSION *session)
 {
 	const char *config;
 	BTREE *btree;
@@ -178,11 +286,11 @@ __wt_conf_huffman(SESSION *session)
 }
 
 /*
- * __wt_conf_page_sizes --
+ * __btree_page_sizes --
  *	Verify the page sizes.
  */
 static int
-__wt_conf_page_sizes(SESSION *session)
+__btree_page_sizes(SESSION *session)
 {
 	BTREE *btree;
 	WT_CONFIG_ITEM cval;

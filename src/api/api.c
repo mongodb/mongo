@@ -145,10 +145,10 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	WT_RET(__wt_config_collapse(session, __cfg, &btree->config));
 
 	session->btree = btree;
-	WT_RET(__wt_btree_open(session, name, 0666, WT_CREATE));
-
-	WT_RET(__wt_session_add_btree(
-	    session, btree, key_format, value_format));
+	WT_RET(__wt_btree_create(session, name));
+	WT_RET(__wt_btree_open(session));
+	WT_RET(
+	    __wt_session_add_btree(session, btree, key_format, value_format));
 
 	API_END();
 	return (0);

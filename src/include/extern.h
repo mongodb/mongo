@@ -87,7 +87,6 @@ int __wt_bulk_end(CURSOR_BULK *cbulk);
 int __wt_cache_create(CONNECTION *conn);
 void __wt_cache_stats_update(CONNECTION *conn);
 void __wt_cache_destroy(CONNECTION *conn);
-int __wt_bt_close(SESSION *session);
 int __wt_bt_lex_compare( BTREE *btree,
     const WT_ITEM *user_item,
     const WT_ITEM *tree_item);
@@ -138,9 +137,11 @@ void __wt_workq_evict_server(CONNECTION *conn, int force);
 int __wt_evict_file_serial_func(SESSION *session);
 void *__wt_cache_evict_server(void *arg);
 void __wt_workq_evict_server_exit(CONNECTION *conn);
+int __wt_btree_create(SESSION *session, const char *name);
+int __wt_btree_open(SESSION *session);
+int __wt_btree_close(SESSION *session);
 const char *__wt_page_type_string(u_int type);
 const char *__wt_cell_type_string(WT_CELL *cell);
-int __wt_bt_open(SESSION *session, int ok_create);
 int __wt_ovfl_in(SESSION *session, WT_OVFL *ovfl, WT_BUF *store);
 int
 __wt_page_in_func(SESSION *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
@@ -219,16 +220,10 @@ int __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
 int __wt_update_serial_func(SESSION *session);
 int __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
 int __wt_connection_btree(CONNECTION *conn, BTREE **btreep);
-int __wt_btree_destroy(BTREE *btree);
 int __wt_btree_huffman_set(BTREE *btree,
     uint8_t const *huffman_table,
     u_int huffman_table_size,
     uint32_t flags);
-int __wt_btree_open(SESSION *session,
-    const char *name,
-    mode_t mode,
-    uint32_t flags);
-int __wt_btree_close(SESSION *session);
 int __wt_btree_stat_print(SESSION *session, FILE *stream);
 int __wt_btree_stat_clear(BTREE *btree);
 int __wt_library_init(void);
