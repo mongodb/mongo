@@ -580,11 +580,23 @@ namespace mongo {
             _jsMode = jsMode;
             if (jsMode) {
                 // emit function that stays in JS
-                _scope->setFunction("emit", "function(key, value) { ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } else { ++_dupCt; } list.push(value); }");
+                _scope->setFunction("emit", "function(key, value) { if (typeof(key) === 'object') { _bailFromJS(key, value); return; }; ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } else { ++_dupCt; } list.push(value); }");
+                _scope->injectNative("_bailFromJS", _bailFromJS, this);
             } else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );
             }
+        }
+
+        void State::bailFromJS() {
+            log(1) << "M/R: Switching from JS mode to mixed mode" << endl;
+
+            // reduce and reemit into c++
+            switchMode(false);
+            _scope->invoke(_reduceAndEmit, 0, 0, 0, true);
+            // need to get the real number emitted so far
+            _numEmits = _scope->getNumberInt("_emitCt");
+            _config.reducer->numReduces = _scope->getNumberInt("_redCt");
         }
 
         /**
@@ -829,12 +841,7 @@ namespace mongo {
 
                 if (keyCt > _config.jsMaxKeys) {
                     // too many keys for JS, switch to mixed
-                    log(1) << "M/R: Switching from JS mode to mixed mode, key count " << keyCt << endl;
-                    switchMode(false);
-                    _scope->invoke(_reduceAndEmit, 0, 0, 0, true);
-                    // need to get the real number emitted so far
-                    _numEmits = _scope->getNumberInt("_emitCt");
-                    _config.reducer->numReduces = _scope->getNumberInt("_redCt");
+                    _bailFromJS(BSONObj(), this);
                     // then fall through to check map size
                 } else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
                     // reduce now to lower mem usage
@@ -881,6 +888,20 @@ namespace mongo {
             }
             else {
                 state->emit( args );
+            }
+            return BSONObj();
+        }
+
+        /**
+         * function is called when we realize we cant use js mode for m/r on the 1st key
+         */
+        BSONObj _bailFromJS( const BSONObj& args, void* data ) {
+            State* state = (State*) data;
+            state->bailFromJS();
+
+            // emit this particular key if there is one
+            if (!args.isEmpty()) {
+                fast_emit(args, data);
             }
             return BSONObj();
         }

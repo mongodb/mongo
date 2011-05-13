@@ -279,6 +279,7 @@ namespace mongo {
 
             bool jsMode() {return _jsMode;}
             void switchMode(bool jsMode);
+            void bailFromJS();
 
             const Config& _config;
 
@@ -305,6 +306,7 @@ namespace mongo {
         };
 
         BSONObj fast_emit( const BSONObj& args, void* data );
+        BSONObj _bailFromJS( const BSONObj& args, void* data );
 
     } // end mr namespace
 }
