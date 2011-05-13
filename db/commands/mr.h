@@ -182,9 +182,11 @@ namespace mongo {
             string outDB;
 
             // max number of keys allowed in JS map before switching mode
-            int jsMaxKeys;
-            // ratio of js objects vs unique keys before reduce is triggered in js mode
-            int jsReduceRatio;
+            long jsMaxKeys;
+            // ratio of duplicates vs unique keys before reduce is triggered in js mode
+            float reduceTriggerRatio;
+            // maximum size of map before it gets dumped to disk
+            long maxInMemSize;
 
             enum { REPLACE , // atomically replace the collection
                    MERGE ,  // merge keys, override dups
@@ -282,7 +284,7 @@ namespace mongo {
 
         protected:
 
-            static void _add( InMemory* im , const BSONObj& a , long& size, long& dupCount );
+            void _add( InMemory* im , const BSONObj& a , long& size );
 
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not

@@ -223,9 +223,9 @@ namespace mongo {
             verbose = cmdObj["verbose"].trueValue();
             jsMode = cmdObj["jsMode"].trueValue();
 
-            // js mode thresholds
             jsMaxKeys = 500000;
-            jsReduceRatio = 3;
+            reduceTriggerRatio = 2.0;
+            maxInMemSize = 5 * 1024 * 1024;
 
             uassert( 13602 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
 
@@ -748,7 +748,7 @@ namespace mongo {
 
             auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
-            long dupCount = 0;
+            _dupCount = 0;
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ) {
                 BSONObj key = i->first;
@@ -764,20 +764,19 @@ namespace mongo {
                     }
                     else {
                         // add to new map
-                        _add( n.get() , all[0] , nSize, dupCount );
+                        _add( n.get() , all[0] , nSize );
                     }
                 }
                 else if ( all.size() > 1 ) {
                     // several values, reduce and add to map
                     BSONObj res = _config.reducer->reduce( all );
-                    _add( n.get() , res , nSize, dupCount );
+                    _add( n.get() , res , nSize );
                 }
             }
 
             // swap maps
             _temp.reset( n.release() );
             _size = nSize;
-            _dupCount = dupCount;
         }
 
         /**
@@ -808,15 +807,15 @@ namespace mongo {
          */
         void State::emit( const BSONObj& a ) {
             _numEmits++;
-            _add( _temp.get() , a , _size, _dupCount );
+            _add( _temp.get() , a , _size );
         }
 
-        void State::_add( InMemory* im, const BSONObj& a , long& size, long& dupCount ) {
+        void State::_add( InMemory* im, const BSONObj& a , long& size ) {
             BSONList& all = (*im)[a];
             all.push_back( a );
             size += a.objsize() + 16;
             if (all.size() > 1)
-            	++dupCount;
+            	++_dupCount;
         }
 
         /**
@@ -830,34 +829,36 @@ namespace mongo {
 
                 if (keyCt > _config.jsMaxKeys) {
                     // too many keys for JS, switch to mixed
+                    log(1) << "M/R: Switching from JS mode to mixed mode, key count " << keyCt << endl;
                     switchMode(false);
                     _scope->invoke(_reduceAndEmit, 0, 0, 0, true);
                     // need to get the real number emitted so far
                     _numEmits = _scope->getNumberInt("_emitCt");
                     _config.reducer->numReduces = _scope->getNumberInt("_redCt");
                     // then fall through to check map size
-                } else if (dupCt > keyCt * _config.jsReduceRatio) {
+                } else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
                     // reduce now to lower mem usage
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
                     return;
                 }
             }
 
-            if (_jsMode || _size < 1024 * 50 )
+            if (_jsMode)
                 return;
 
+            bool dump = _onDisk && _size > _config.maxInMemSize;
             // attempt to reduce in memory map, if we've seen duplicates
-            if ( _dupCount > 0) {
+            if ( dump || _dupCount > (_temp->size() * _config.reduceTriggerRatio)) {
 				long before = _size;
 				reduceInMemory();
 				log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
             }
 
-            if ( ! _onDisk || _size < 1024 * 100 )
-                return;
-
-            dumpToInc();
-            log(1) << "  mr: dumping to db" << endl;
+            // reevaluate size and potentially dump
+            if ( dump &&  _size > _config.maxInMemSize) {
+                dumpToInc();
+                log(1) << "  mr: dumping to db" << endl;
+            }
         }
 
 //        boost::thread_specific_ptr<State*> _tl;
@@ -984,7 +985,7 @@ namespace mongo {
                             if ( config.verbose ) mapTime += mt.micros();
 
                             num++;
-                            if ( num % 100 == 0 ) {
+                            if ( num % 1000 == 0 ) {
                                 // try to yield lock regularly
                                 ClientCursor::YieldLock yield (cursor.get());
                                 Timer t;
