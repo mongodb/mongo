@@ -61,6 +61,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::assumePrimary() {
+        log(2) << "assuming primary" << endl;
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
         changeState(MemberState::RS_PRIMARY);
@@ -90,6 +91,7 @@ namespace mongo {
     const bool closeOnRelinquish = true;
 
     void ReplSetImpl::relinquish() {
+        log(2) << "attempting to relinquish" << endl;
         if( box.getState().primary() ) {
             {
                 writelock lk("admin."); // so we are synchronized with _logOp()

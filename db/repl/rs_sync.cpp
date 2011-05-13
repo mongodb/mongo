@@ -553,9 +553,7 @@ namespace mongo {
             return;
         }
         assert(s.slave);
-        
-        lock lk(this);
-        
+
         const Member *target = _currentSyncTarget;
         if (!target || box.getState().primary()
             // we are currently syncing from someone who's syncing from us
