@@ -359,7 +359,6 @@ namespace mongo {
             multiCommand(electCmd, L);
 
             {
-                RSBase::lock lk(&rs);
                 for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
                     DEV log() << "replSet elect res: " << i->result.toString() << rsLog;
                     if( i->ok ) {

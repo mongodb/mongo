@@ -54,7 +54,7 @@ namespace mongo {
 
         void query(const char *ns, const BSONObj& query) {
             assert( !haveCursor() );
-            cursor = _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk);
+            cursor.reset( _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk).release() );
         }
 
         void queryGTE(const char *ns, OpTime t) {
@@ -68,11 +68,11 @@ namespace mongo {
         void tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields=0) {
             assert( !haveCursor() );
             log(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
-            cursor = _conn->query( ns, query, 0, 0, fields,
-                                   QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay |
-                                   /* TODO: slaveok maybe shouldn't use? */
-                                   QueryOption_AwaitData
-                                 );
+            cursor.reset( _conn->query( ns, query, 0, 0, fields,
+                                        QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay |
+                                        /* TODO: slaveok maybe shouldn't use? */
+                                        QueryOption_AwaitData
+                                        ).release() );
         }
 
         void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0) {

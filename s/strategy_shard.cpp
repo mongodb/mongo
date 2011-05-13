@@ -268,7 +268,7 @@ namespace mongo {
                         if ( left <= 0 )
                             throw e;
                         left--;
-                        log() << "update failed b/c of StaleConfigException, retrying "
+                        log() << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                         r.reset( false );
                         manager = r.getChunkManager();

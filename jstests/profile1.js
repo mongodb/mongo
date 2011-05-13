@@ -44,13 +44,14 @@ try {
     assert.gt(auto_size, capped_size, "K");
     
 
-    // 
+    db.eval("sleep(1)") // pre-load system.js
+
     db.setProfilingLevel(2);
     before = db.system.profile.count();
     db.eval( "sleep(50)" )
     db.eval( "sleep(120)" )
     after = db.system.profile.count()
-    assert.eq( before + 4 , after , "X1" )
+    assert.eq( before + 3 , after , "X1" )
 
     db.setProfilingLevel(1,100);
     before = db.system.profile.count();

@@ -142,7 +142,7 @@ namespace mongo {
      * includes fields from the query message, both possible query levels
      * parses everything up front
      */
-    class ParsedQuery {
+    class ParsedQuery : boost::noncopyable {
     public:
         ParsedQuery( QueryMessage& qm )
             : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
@@ -154,8 +154,6 @@ namespace mongo {
             init( query );
             initFields( fields );
         }
-
-        ~ParsedQuery() {}
 
         const char * ns() const { return _ns; }
         bool isLocalDB() const { return strncmp(_ns, "local.", 6) == 0; }
@@ -169,7 +167,6 @@ namespace mongo {
         bool wantMore() const { return _wantMore; }
         int getOptions() const { return _options; }
         bool hasOption( int x ) const { return x & _options; }
-
 
         bool isExplain() const { return _explain; }
         bool isSnapshot() const { return _snapshot; }
@@ -264,25 +261,28 @@ namespace mongo {
                     else {
                         uassert(13513, "sort must be an object or array", 0);
                     }
+                    continue;
                 }
-                else if ( strcmp( "$explain" , name ) == 0 )
-                    _explain = e.trueValue();
-                else if ( strcmp( "$snapshot" , name ) == 0 )
-                    _snapshot = e.trueValue();
-                else if ( strcmp( "$min" , name ) == 0 )
-                    _min = e.embeddedObject();
-                else if ( strcmp( "$max" , name ) == 0 )
-                    _max = e.embeddedObject();
-                else if ( strcmp( "$hint" , name ) == 0 )
-                    _hint = e;
-                else if ( strcmp( "$returnKey" , name ) == 0 )
-                    _returnKey = e.trueValue();
-                else if ( strcmp( "$maxScan" , name ) == 0 )
-                    _maxScan = e.numberInt();
-                else if ( strcmp( "$showDiskLoc" , name ) == 0 )
-                    _showDiskLoc = e.trueValue();
 
-
+                if( *name == '$' ) {
+                    name++;
+                    if ( strcmp( "explain" , name ) == 0 )
+                        _explain = e.trueValue();
+                    else if ( strcmp( "snapshot" , name ) == 0 )
+                        _snapshot = e.trueValue();
+                    else if ( strcmp( "min" , name ) == 0 )
+                        _min = e.embeddedObject();
+                    else if ( strcmp( "max" , name ) == 0 )
+                        _max = e.embeddedObject();
+                    else if ( strcmp( "hint" , name ) == 0 )
+                        _hint = e;
+                    else if ( strcmp( "returnKey" , name ) == 0 )
+                        _returnKey = e.trueValue();
+                    else if ( strcmp( "maxScan" , name ) == 0 )
+                        _maxScan = e.numberInt();
+                    else if ( strcmp( "showDiskLoc" , name ) == 0 )
+                        _showDiskLoc = e.trueValue();
+                }
             }
 
             if ( _snapshot ) {
@@ -299,20 +299,14 @@ namespace mongo {
             _fields->init( fields );
         }
 
-        ParsedQuery( const ParsedQuery& other ) {
-            assert(0);
-        }
-
-        const char* _ns;
-        int _ntoskip;
+        const char * const _ns;
+        const int _ntoskip;
         int _ntoreturn;
-        int _options;
-
         BSONObj _filter;
+        BSONObj _order;
+        const int _options;
         shared_ptr< Projection > _fields;
-
         bool _wantMore;
-
         bool _explain;
         bool _snapshot;
         bool _returnKey;
@@ -320,7 +314,6 @@ namespace mongo {
         BSONObj _min;
         BSONObj _max;
         BSONElement _hint;
-        BSONObj _order;
         int _maxScan;
     };
 

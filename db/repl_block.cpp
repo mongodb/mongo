@@ -207,6 +207,7 @@ namespace mongo {
         if (theReplSet) {
             // we don't know the slave's port, so we make the replica set keep
             // a map of rids to slaves
+            log(2) << "sending " << lastOp.toString() << " to " << rid << endl;
             theReplSet->percolate(rid, lastOp);
         }
     }

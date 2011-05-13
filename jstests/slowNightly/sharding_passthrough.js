@@ -67,7 +67,7 @@ files.forEach(
 	    return;
 	}
 	// These are bugs (some might be fixed now):
-	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4)\.js$/.test(x.name)) {
+	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4|profile1)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}

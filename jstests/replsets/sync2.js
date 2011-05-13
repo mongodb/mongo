@@ -3,8 +3,20 @@ var replTest = new ReplSetTest({ name: 'testSet', nodes: 5 });
 var nodes = replTest.startSet({ oplogSize: "2" });
 replTest.initiate();
 
+var master = replTest.getMaster();
+var config = master.getDB("local").system.replset.findOne();
+config.version++;
+config.members[0].priority = 2;
+
+try {
+    master.getDB("admin").runCommand({replSetReconfig : config});
+}
+catch(e) {
+    print(e);
+}
+
 // initial sync
-replTest.getMaster().getDB("foo").bar.insert({x:1});
+master.getDB("foo").bar.insert({x:1});
 replTest.awaitReplication();
 
 master = replTest.bridge();

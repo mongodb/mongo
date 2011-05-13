@@ -292,6 +292,10 @@ namespace mongo {
             newConn->connect( h , temp );
             {
                 scoped_lock lk( _lock );
+                if ( _find_inlock( toCheck ) >= 0 ) {
+                    // we need this check inside the lock so there isn't thread contention on adding to vector
+                    continue;
+                }
                 _nodes.push_back( Node( h , newConn ) );
             }
             log() << "updated set (" << _name << ") to: " << getServerAddress() << endl;
@@ -312,7 +316,6 @@ namespace mongo {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << c->toString() << ' ' << o << endl;
 
             // add other nodes
-            string maybePrimary;
             if ( o["hosts"].type() == Array ) {
                 if ( o["primary"].type() == String )
                     maybePrimary = o["primary"].String();
@@ -394,11 +397,16 @@ namespace mongo {
 
     int ReplicaSetMonitor::_find( const string& server ) const {
         scoped_lock lk( _lock );
+        return _find_inlock( server );
+    }
+
+    int ReplicaSetMonitor::_find_inlock( const string& server ) const {
         for ( unsigned i=0; i<_nodes.size(); i++ )
             if ( _nodes[i].addr == server )
                 return i;
         return -1;
     }
+
 
     int ReplicaSetMonitor::_find( const HostAndPort& server ) const {
         scoped_lock lk( _lock );

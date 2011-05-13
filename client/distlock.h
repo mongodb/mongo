@@ -86,7 +86,7 @@ namespace mongo {
         ~DistributedLock(){};
 
         /**
-         * Attempts to aquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
+         * Attempts to acquire 'this' lock, checking if it could or should be stolen from the previous holder. Please
          * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
          *
          * @param why human readable description of why the lock is being taken (used to log)
@@ -95,7 +95,7 @@ namespace mongo {
          * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( string why , bool reenter = false, BSONObj * other = 0 );
+        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0 );
 
         /**
          * Releases a previously taken lock.
@@ -144,6 +144,14 @@ namespace mongo {
         const unsigned long long _lockPing;
 
     private:
+
+        void resetLastPing(){
+            scoped_lock lk( _mutex );
+            _lastPingCheck = boost::tuple<string, Date_t, Date_t, OID>();
+        }
+
+        mongo::mutex _mutex;
+
         // Data from last check of process with ping time
         boost::tuple<string, Date_t, Date_t, OID> _lastPingCheck;
         // May or may not exist, depending on startup

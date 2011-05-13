@@ -6,34 +6,36 @@ doTest = function( signal ) {
 
     var N = 2000
 
-    // ~1KB string
+    print("~1KB string");
     var Text = ''
     for (var i = 0; i < 40; i++)
         Text += 'abcdefghijklmnopqrstuvwxyz'
 
-    // Create replica set
+    print("Create replica set");
     var repset = new ReplicaSet ('testSet', 3) .begin()
     var master = repset.getMaster()
     var db1 = master.getDB('test')
     
-    // Insert data
+    print("Insert data");
     for (var i = 0; i < N; i++) {
         db1['foo'].insert({x: i, text: Text})
         db1.getLastError(2)  // wait to be copied to at least one secondary
     }
     
-    // Create single server
+    print("Create single server");
     var solo = new Server ('singleTarget')
     var soloConn = solo.begin()
+    soloConn.getDB("admin").runCommand({setParameter:1,logLevel:5});
+    
     var db2 = soloConn.getDB('test')
     
-    // Clone db from replica set to single server
+    print("Clone db from replica set to single server");
     db2.cloneDatabase (repset.getURL())
     
-    // Confirm clone worked
+    print("Confirm clone worked");
     assert.eq (Text, db2['foo'] .findOne({x: N-1}) ['text'], 'cloneDatabase failed (test1)')
     
-    // Now test the reverse direction
+    print("Now test the reverse direction");
     db1 = master.getDB('test2')
     db2 = soloConn.getDB('test2')
     for (var i = 0; i < N; i++) {
@@ -43,7 +45,7 @@ doTest = function( signal ) {
     db1.cloneDatabase (solo.host())
     assert.eq (Text, db2['foo'] .findOne({x: N-1}) ['text'], 'cloneDatabase failed (test2)')
 
-    // Shut down replica set and single server
+    print("Shut down replica set and single server");
     solo.end()
     repset.stopSet( signal )
 }

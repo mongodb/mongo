@@ -124,6 +124,7 @@ namespace mongo {
         bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose );
 
         int _find( const string& server ) const ;
+        int _find_inlock( const string& server ) const ;
         int _find( const HostAndPort& server ) const ;
 
         mutable mongo::mutex _lock; // protects _nodes

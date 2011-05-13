@@ -553,11 +553,13 @@ namespace mongo {
             return;
         }
         assert(s.slave);
-        
-        lock lk(this);
-        
+
         const Member *target = _currentSyncTarget;
-        if (!target || box.getState().primary()) {
+        if (!target || box.getState().primary()
+            // we are currently syncing from someone who's syncing from us
+            // the target might end up with a new Member, but s.slave never
+            // changes so we'll compare the names
+            || target == s.slave || target->fullName() == s.slave->fullName()) {
             return;
         }
 
@@ -570,7 +572,7 @@ namespace mongo {
                 s.reader.ghostQueryGTE(rsoplog, last);
             }
 
-            log() << "last: " << s.last.toString() << " to " << last.toString() << rsLog;
+            log(1) << "last: " << s.last.toString() << " to " << last.toString() << rsLog;
             
             if (s.last > last) {
                 return;
@@ -594,6 +596,7 @@ namespace mongo {
                 BSONObj o = s.reader.nextSafe();
                 s.last = o["ts"]._opTime();
             }
+            log(2) << "now last is " << s.last.toString() << rsLog;
         }
         catch (DBException& e) {
             // we'll be back

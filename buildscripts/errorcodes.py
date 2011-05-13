@@ -81,13 +81,11 @@ def getBestMessage( err , start ):
     
 def genErrorOutput():
     
-    g = utils.getGitVersion()
-    
     if os.path.exists( "docs/errors.md" ):
         i = open( "docs/errors.md" , "r" )
         
         
-    out = open( "docs/errors.md" , 'w' )
+    out = open( "docs/errors.md" , 'wb' )
     out.write( "MongoDB Error Codes\n==========\n\n\n" )
 
     prev = ""
@@ -107,7 +105,7 @@ def genErrorOutput():
             out.write( f + "\n----\n" )
             prev = f
 
-        url = "http://github.com/mongodb/mongo/blob/" + g + "/" + f + "#L" + str(l)
+        url = "http://github.com/mongodb/mongo/blob/master/" + f + "#L" + str(l)
         
         out.write( "* " + str(num) + " [code](" + url + ") " + getBestMessage( line , str(num) ) + "\n" )
         
