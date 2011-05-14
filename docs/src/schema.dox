@@ -38,7 +38,7 @@ Applications describe the format of their data by supplying a schema to WT_SESSI
 
 @section schema_types Column types
 
-@todo decribe types
+@todo describe types
 
 See @ref packing for a complete list of types.
 

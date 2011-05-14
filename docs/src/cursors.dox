@@ -44,7 +44,11 @@ The following are builtin cursor types:
 
 @section cursor_projections Projections
 
-Cursors on tables, column groups and indices can return a subset of columns.  This is done by listing the column names in parantheses in the <code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields from the listed columns are returned by WT_CURSOR::get_key and WT_CURSOR::get_value.
+Cursors on tables, column groups and indices can return a subset of
+columns.  This is done by listing the column names in parenthesis in the
+<code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields
+from the listed columns are returned by WT_CURSOR::get_key and
+WT_CURSOR::get_value.
 
 This is particularly useful with index cursors, because if all columns in the projection are available in the index (including primary key columns, which are the values of the index), there is no need to access any column groups.
 

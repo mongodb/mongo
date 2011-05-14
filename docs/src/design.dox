@@ -285,8 +285,8 @@ secondary, we can avoid the second lookup.
 Compression
 </td><td>
 </td><td>
-WiredTiger will support static (probalby Huffman encoding) key/data
-item compression.  This worth doing because CPU is less-important than
+WiredTiger will support static (probably Huffman encoding) key/data item
+compression.  This worth doing because CPU is less-important than
 memory, and trading CPU to keep the cache hotter is the right choice to
 make.
 

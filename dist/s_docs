@@ -1,10 +1,31 @@
 #! /bin/sh
 
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
 # We require doxygen which may not be installed.
 type doxygen > /dev/null 2>&1 || {
 	echo 'doxygen not found, skipping document creation'
 	exit 1
 }
+
+spellchk()
+{
+	# If spell has been installed, run spell-check.
+	type spell > /dev/null 2>&1 || return
+
+	(cd ../docs/src &&
+	test -s spell.ok && cat spell.ok
+	spell *.dox) | tee /tmp/_f | sort | uniq -u > $t
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo 'Documentation spelling notes'
+		echo 'Update docs/src/spell.ok to remove warnings.'
+		sed -e 's/^/	/' < $t
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	}
+}
+
 
 filter=
 while :
@@ -17,5 +38,9 @@ while :
 	esac
 done
 
+# Spell check the documentation.
+spellchk
+
 # Run doxygen to generate HTML documentation.
 cd ../docs && (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen -
+
