@@ -244,13 +244,14 @@ __wt_huffman_read(
     SESSION *session, WT_CONFIG_ITEM *ip, uint8_t **tablep, u_int *entriesp)
 {
 	FILE *fp;
-	u_int entries, freq, lineno, max;
+	u_int byte, entries, freq, lineno, max;
 	uint16_t *p16;
 	uint8_t *p8;
 	int ret;
 	char *file;
 	void *table;
 
+	ret = 0;
 	table = NULL;
 
 	/*
@@ -271,13 +272,13 @@ __wt_huffman_read(
 		if (fp == NULL)
 			goto nofile;
 
-		for (p8 = table, lineno = 0;
-		    (ret = fscanf(fp, "%u\n", &freq)) != EOF;
-		    *p8++ = (uint8_t)freq) {
-			if (ret != 1 || freq > max)
+		for (p8 = table, lineno = 1;
+		    (ret = fscanf(fp, "%i %i\n", &byte, &freq)) != EOF;
+		    p8[byte] = (uint8_t)freq, ++lineno) {
+			if (ret != 2 || byte > max || freq > max)
 				goto corrupt;
-			if (++lineno > entries)
-				goto overflow;
+			if (p8[byte] != 0)
+				goto repeated;
 		}
 	} else if (strncasecmp(ip->str, "utf16", 5) == 0) {
 		max = 65535;
@@ -290,49 +291,50 @@ __wt_huffman_read(
 		memcpy(file, ip->str + 5, ip->len - 5);
 		fp = fopen(file, "r");
 		__wt_free(session, file);
-		if (fp == NULL)
-			goto nofile;
+		if (fp == NULL) {
+nofile:			ret = errno == 0 ? WT_ERROR : errno;
+			__wt_err(session, ret,
+			    "unable to read Huffman table file %.*s",
+			    (int)ip->len, ip->str);
+			goto err;
+		}
 
-		for (p16 = table, lineno = 0;
-		    (ret = fscanf(fp, "%u\n", &freq)) != EOF;
-		    *p16++ = (uint16_t)freq) {
-			if (ret != 1 || freq > max)
-				goto corrupt;
-			if (++lineno > entries)
-				goto overflow;
+		for (p16 = table, lineno = 1;
+		    (ret = fscanf(fp, "%i %i\n", &byte, &freq)) != EOF;
+		    p16[byte] = (uint16_t)freq, ++lineno) {
+			if (ret != 2 || byte > max || freq > max) {
+corrupt:			__wt_errx(session,
+				    "line %lu of Huffman table file %.*s is "
+				    "corrupted: expected an unsigned integer "
+				    "between 0 and %lu",
+				    (u_long)lineno,
+				    (int)ip->len, ip->str, (u_long)max);
+				goto err;
+			}
+			if (p16[byte] != 0) {
+repeated:			__wt_errx(session,
+				    "line %lu of Huffman table file %.*s has a "
+				    "repeated entry for byte value %#lx",
+				    (u_long)lineno,
+				    (int)ip->len, ip->str, (u_long)byte);
+				goto err;
+			}
 		}
 	} else {
 		__wt_errx(session,
 		    "unknown huffman configuration value %.*s",
 		    (int)ip->len, ip->str);
-		return (WT_ERROR);
+		goto err;
 	}
 
-	*entriesp = lineno;
+	*entriesp = entries;
 	*tablep = table;
 	return (0);
 
-nofile:	ret = errno == 0 ? WT_ERROR : errno;
-	__wt_err(session, ret,
-	    "unable to read Huffman table file %.*s", (int)ip->len, ip->str);
-
-	if (0) {
-overflow:	__wt_errx(session,
-		    "Huffman table file %.*s has more than %lu entries",
-		    (int)ip->len, ip->str, (u_long)entries);
-		ret = WT_ERROR;
-	}
-
-	if (0) {
-corrupt:	__wt_errx(session,
-		    "line %lu of Huffman table file %.*s is corrupted: "
-		    "expected an unsigned integer between 0 and %lu",
-		    (u_long)lineno, (int)ip->len, ip->str, (u_long)max);
-		ret = WT_ERROR;
-	}
-
 err:	if (table != NULL)
 		__wt_free(session, table);
+	if (ret == 0)
+		ret = WT_ERROR;
 	return (ret);
 }
 
