@@ -177,6 +177,26 @@ namespace mongo {
 //        return arr;
 //    }
 
+    Handle<Value> NamedReadOnlySet( Local<v8::String> property, Local<Value> value, const AccessorInfo& info ) {
+        cout << "cannot write to read-only object" << endl;
+        return value;
+    }
+
+    Handle<Boolean> NamedReadOnlyDelete( Local<v8::String> property, const AccessorInfo& info ) {
+        cout << "cannot delete from read-only object" << endl;
+        return Boolean::New( false );
+    }
+
+    Handle<Value> IndexedReadOnlySet( uint32_t index, Local<Value> value, const AccessorInfo& info ) {
+        cout << "cannot write to read-only array" << endl;
+        return value;
+    }
+
+    Handle<Boolean> IndexedReadOnlyDelete( uint32_t index, const AccessorInfo& info ) {
+        cout << "cannot delete from read-only array" << endl;
+        return Boolean::New( false );
+    }
+
     // --- engine ---
 
     V8ScriptEngine::V8ScriptEngine() {
@@ -230,8 +250,8 @@ namespace mongo {
         roObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
         roObjectTemplate->SetInternalFieldCount( 1 );
         roObjectTemplate->SetNamedPropertyHandler(0);
-        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, 0, 0, 0, 0, v8::External::New(this));
-        roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, 0, 0, 0, 0, v8::External::New(this));
+        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, 0, v8::External::New(this));
+        roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, IndexedReadOnlySet, 0, IndexedReadOnlyDelete, 0, v8::External::New(this));
 
         // initialize lazy array template
         // unfortunately it is not possible to create true v8 array from a template
@@ -790,26 +810,6 @@ namespace mongo {
 
     void V8Scope::_startCall() {
         _error = "";
-    }
-
-    Handle<Value> NamedReadOnlySet( Local<v8::String> property, Local<Value> value, const AccessorInfo& info ) {
-        cout << "cannot write to read-only object" << endl;
-        return value;
-    }
-
-    Handle<Boolean> NamedReadOnlyDelete( Local<v8::String> property, const AccessorInfo& info ) {
-        cout << "cannot delete from read-only object" << endl;
-        return Boolean::New( false );
-    }
-
-    Handle<Value> IndexedReadOnlySet( uint32_t index, Local<Value> value, const AccessorInfo& info ) {
-        cout << "cannot write to read-only array" << endl;
-        return value;
-    }
-
-    Handle<Boolean> IndexedReadOnlyDelete( uint32_t index, const AccessorInfo& info ) {
-        cout << "cannot delete from read-only array" << endl;
-        return Boolean::New( false );
     }
 
     Local< v8::Value > newFunction( const char *code ) {

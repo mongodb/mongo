@@ -50,12 +50,15 @@ namespace mongo {
 
         class Reducer : boost::noncopyable {
         public:
+            Reducer() : numReduces(0) {}
             virtual ~Reducer() {}
             virtual void init( State * state ) = 0;
 
             virtual BSONObj reduce( const BSONList& tuples ) = 0;
             /** this means its a final reduce, even if there is no finalizer */
             virtual BSONObj finalReduce( const BSONList& tuples , Finalizer * finalizer ) = 0;
+
+            long long numReduces;
         };
 
         // ------------  js function implementations -----------
@@ -178,6 +181,13 @@ namespace mongo {
 
             string outDB;
 
+            // max number of keys allowed in JS map before switching mode
+            long jsMaxKeys;
+            // ratio of duplicates vs unique keys before reduce is triggered in js mode
+            float reduceTriggerRatio;
+            // maximum size of map before it gets dumped to disk
+            long maxInMemSize;
+
             enum { REPLACE , // atomically replace the collection
                    MERGE ,  // merge keys, override dups
                    REDUCE , // merge keys, reduce dups
@@ -225,6 +235,7 @@ namespace mongo {
              * transfers in memory storage to temp collection
              */
             void dumpToInc();
+            void _insertToInc( BSONObj& o );
 
             // ------ reduce stage -----------
 
@@ -264,16 +275,17 @@ namespace mongo {
             const bool isOnDisk() { return _onDisk; }
 
             long long numEmits() const { if (_jsMode) return _scope->getNumberLongLong("_emitCt"); return _numEmits; }
+            long long numReduces() const { if (_jsMode) return _scope->getNumberLongLong("_redCt"); return _config.reducer->numReduces; }
 
             bool jsMode() {return _jsMode;}
             void switchMode(bool jsMode);
+            void bailFromJS();
 
             const Config& _config;
 
         protected:
 
-            void _insertToInc( BSONObj& o );
-            static void _add( InMemory* im , const BSONObj& a , long& size, long& dupCount );
+            void _add( InMemory* im , const BSONObj& a , long& size );
 
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
@@ -288,11 +300,13 @@ namespace mongo {
 
             bool _jsMode;
             ScriptingFunction _reduceAll;
+            ScriptingFunction _reduceAndEmit;
             ScriptingFunction _reduceAndFinalize;
             ScriptingFunction _reduceAndFinalizeAndInsert;
         };
 
         BSONObj fast_emit( const BSONObj& args, void* data );
+        BSONObj _bailFromJS( const BSONObj& args, void* data );
 
     } // end mr namespace
 }

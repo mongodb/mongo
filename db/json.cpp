@@ -315,6 +315,14 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
+    struct undefinedValue {
+        undefinedValue( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( const char *start, const char *end ) const {
+            b.back()->appendUndefined( b.fieldName() );
+        }
+        ObjectBuilder &b;
+    };
+    
     struct dbrefNS {
         dbrefNS( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
@@ -460,6 +468,7 @@ namespace mongo {
                     lexeme_d[ str_p( "true" ) ][ trueValue( self.b ) ] |
                     lexeme_d[ str_p( "false" ) ][ falseValue( self.b ) ] |
                     lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ] |
+                    lexeme_d[ str_p( "undefined" ) ][ undefinedValue( self.b ) ] |
                     singleQuoteStr[ stringEnd( self.b ) ] |
                     date[ dateEnd( self.b ) ] |
                     oid[ oidEnd( self.b ) ] |

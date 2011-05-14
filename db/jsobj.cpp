@@ -98,7 +98,7 @@ namespace mongo {
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         BSONType t = type();
         if ( t == Undefined )
-            return "";
+            return "undefined";
 
         stringstream s;
         if ( includeFieldNames )
@@ -142,19 +142,28 @@ namespace mongo {
             s << "[ ";
             BSONObjIterator i( embeddedObject() );
             BSONElement e = i.next();
-            if ( !e.eoo() )
+            if ( !e.eoo() ) {
+                int count = 0;
                 while ( 1 ) {
                     if( pretty ) {
                         s << '\n';
                         for( int x = 0; x < pretty; x++ )
                             s << "  ";
                     }
-                    s << e.jsonString( format, false, pretty?pretty+1:0 );
-                    e = i.next();
+
+                    if (strtol(e.fieldName(), 0, 10) > count) {
+                        s << "undefined";
+                    }
+                    else {
+                        s << e.jsonString( format, false, pretty?pretty+1:0 );
+                        e = i.next();
+                    }
+                    count++;
                     if ( e.eoo() )
                         break;
                     s << ", ";
                 }
+            }
             s << " ]";
             break;
         }

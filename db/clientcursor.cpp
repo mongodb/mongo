@@ -550,7 +550,7 @@ namespace mongo {
         static Mem mlast;
         try {
             ProcessInfo p;
-            if ( p.supported() ) {
+            if ( !cmdLine.quiet && p.supported() ) {
                 Mem m;
                 m.res = p.getResidentSize();
                 m.virt = p.getVirtualMemorySize();

@@ -41,10 +41,44 @@ namespace mongo {
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
+#if 0
+    struct StackChecker;
+    ThreadLocalValue<StackChecker *> checker;
+
+    struct StackChecker { 
+        enum { SZ = 256 * 1024 };
+        char buf[SZ];
+        StackChecker() { 
+            checker.set(this);
+        }
+        void init() { 
+            memset(buf, 42, sizeof(buf)); 
+        }
+        static void check(const char *tname) { 
+            StackChecker *sc = checker.get();
+            const char *p = sc->buf;
+            int i = 0;
+            for( ; i < SZ; i++ ) { 
+                if( p[i] != 42 )
+                    break;
+            }
+            cout << "\nthread " << tname << " stack usage was " << SZ-i << " bytes\n" << endl;
+        }
+    };
+#endif
+
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+#if 0
+        DEV { 
+            if( sizeof(void*) == 8 ) {
+                StackChecker sc;
+                sc.init();
+            }
+        }
+#endif
         assert( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
@@ -82,6 +116,13 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
+#if 0
+        DEV { 
+            if( sizeof(void*) == 8 ) {
+                StackChecker::check( desc() );
+            }
+        }
+#endif
         _shutdown = true;
         if ( inShutdown() )
             return false;
