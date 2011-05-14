@@ -520,7 +520,6 @@ namespace mongo {
             return false;
 
         if( highest->version > myVersion && highest->version >= 0 ) {
-            lock lk(this);
             log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
             highest->saveConfigLocally(BSONObj());
         }
@@ -618,10 +617,8 @@ namespace mongo {
         bo comment;
         if( addComment )
             comment = BSON( "msg" << "Reconfig set" << "version" << newConfig.version );
-        {
-            lock lk(this);
-            newConfig.saveConfigLocally(comment);
-        }
+
+        newConfig.saveConfigLocally(comment);
         
         try {
             initFromConfig(newConfig, true);

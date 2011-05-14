@@ -190,12 +190,9 @@ namespace mongo {
             if( ! initialSyncOplogApplication(source, /*applyGTE*/startingTS, /*minValid*/mvoptime) ) { // note we assume here that this call does not throw
                 log() << "replSet initial sync failed during applyoplog" << rsLog;
                 emptyOplog(); // otherwise we'll be up!
-
-                {
-                    lock lk(this);
-                    lastOpTimeWritten = OpTime();
-                    lastH = 0;
-                }
+                
+                lastOpTimeWritten = OpTime();
+                lastH = 0;
                 
                 log() << "replSet cleaning up [1]" << rsLog;
                 {

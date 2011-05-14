@@ -373,8 +373,6 @@ namespace mongo {
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
         vector<BSONObj> v;
 
-        lock lk((RSBase*)this);
-        
         const Member *_self = this->_self;
         assert( _self );
 

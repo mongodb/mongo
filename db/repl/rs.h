@@ -358,8 +358,8 @@ namespace mongo {
         bool initFromConfig(ReplSetConfig& c, bool reconf=false); 
         void _fillIsMaster(BSONObjBuilder&);
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
-        const ReplSetConfig& config() { lock lk(this); return *_cfg; }
-        string name() const { lock lk((RSBase*)this); return _name; } /* @return replica set's logical name */
+        const ReplSetConfig& config() { return *_cfg; }
+        string name() const { return _name; } /* @return replica set's logical name */
         MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
@@ -478,7 +478,6 @@ namespace mongo {
         bool freeze(int secs) { return _freeze(secs); }
 
         string selfFullName() {
-            lock lk(this);
             return _self->fullName();
         }
 
@@ -518,7 +517,6 @@ namespace mongo {
 
         // heartbeat msg to send to others; descriptive diagnostic info
         string hbmsg() const {
-            lock lk((RSBase*)this);
             if( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
         }

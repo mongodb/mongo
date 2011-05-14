@@ -356,7 +356,6 @@ namespace mongo {
                         /* todo: too stale capability */
                     }
 
-                    lock lk(this);
                     if( !target->hbinfo().hbstate.readable() ) {
                         return;
                     }
@@ -389,11 +388,8 @@ namespace mongo {
                                     if( time(0) >= waitUntil )
                                         break;
 
-                                    {
-                                        lock lk(this);
-                                        if( !target->hbinfo().hbstate.readable() ) {
-                                            break;
-                                        }
+                                    if( !target->hbinfo().hbstate.readable() ) {
+                                        break;
                                     }
                                     
                                     if( myConfig().slaveDelay != sd ) // reconf
@@ -427,11 +423,8 @@ namespace mongo {
                 return;
             }
             
-            {
-                lock lk(this);
-                if( !target->hbinfo().hbstate.readable() ) {
-                    return;
-                }
+            if( !target->hbinfo().hbstate.readable() ) {
+                return;
             }
             // looping back is ok because this is a tailable cursor
         }
@@ -510,14 +503,14 @@ namespace mongo {
     }
 
     bool ReplSetImpl::_getSlave(const BSONObj& rid, GhostSlave& slave) {
-        slave = _ghostCache[rid];
-        if (slave.init) {
-            return true;
-        }
-
         log(1) << "cache miss for " << rid << ", reloading slave info" << rsLog;
         
         for( Member *m = _members.head(); m; m=m->next() ) {
+            // no point in loading arbiters
+            if (!m->state().readable()) {
+                continue;
+            }
+            
             try {
                 ScopedConn conn(m->fullName());
                 BSONObj me = conn.findOne("local.me", BSONObj(), 0, 0);
@@ -531,6 +524,9 @@ namespace mongo {
                     someSlave.init = true;
                     someSlave.slave = m;
                 }
+                if (rid == me) {
+                    return true;
+                }
             }
             catch (DBException& e) {
                 log() << "error adding member " << m->fullName()
@@ -540,14 +536,12 @@ namespace mongo {
             
         // if rid doesn't refer to a member of the set, this still might not
         // be inited
-        slave = _ghostCache[rid];
         return slave.init;
     }
     
     void ReplSetImpl::percolate(const BSONObj& rid, const OpTime& last) {
-        // do this before locking, in case we miss the cache        
-        GhostSlave s;
-        if (!_getSlave(rid, s)) {
+        GhostSlave &s = _ghostCache[rid];
+        if (!s.init  && !_getSlave(rid, s)) {
             log() << "replSet couldn't find a slave with id " << rid
                   << ", not faux syncing" << rsLog;
             return;

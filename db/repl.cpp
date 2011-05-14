@@ -1138,9 +1138,7 @@ namespace mongo {
         cmd.appendAs( me["_id"] , "handshake" );
 
         BSONObj res;
-        bool ok = conn()->runCommand( "admin" , cmd.obj() , res );
-        log(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
-        return true;
+        return conn()->runCommand( "admin" , cmd.obj() , res );
     }
 
     /* note: not yet in mutex at this point.
