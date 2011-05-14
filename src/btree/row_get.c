@@ -19,8 +19,10 @@ __wt_btree_row_get(SESSION *session, WT_ITEM *key, WT_ITEM *value)
 
 	btree = session->btree;
 
-	/* Search the btree for the key. */
-	WT_RET(__wt_row_search(session, key, 0));
+	while ((ret = __wt_row_search(session, key, 0)) == WT_RESTART)
+		;
+	if (ret != 0)
+		return (ret);
 
 	ret = __wt_return_data(session, key, value, 0);
 

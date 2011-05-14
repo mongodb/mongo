@@ -17,7 +17,11 @@ static int __wt_row_update(SESSION *, WT_ITEM *, WT_ITEM *, int);
 int
 __wt_btree_row_del(SESSION *session, WT_ITEM *key)
 {
-	return (__wt_row_update(session, key, NULL, 0));
+	int ret;
+
+	while ((ret = __wt_row_update(session, key, NULL, 0)) == WT_RESTART)
+		;
+	return (ret);
 }
 
 /*
@@ -27,7 +31,11 @@ __wt_btree_row_del(SESSION *session, WT_ITEM *key)
 int
 __wt_btree_row_put(SESSION *session, WT_ITEM *key, WT_ITEM *value)
 {
-	return (__wt_row_update(session, key, value, 1));
+	int ret;
+
+	while ((ret = __wt_row_update(session, key, value, 1)) == WT_RESTART)
+		;
+	return (ret);
 }
 
 /*

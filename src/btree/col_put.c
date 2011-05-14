@@ -18,7 +18,11 @@ static int __col_update(SESSION *, uint64_t, WT_ITEM *, int);
 int
 __wt_btree_col_del(SESSION *session, uint64_t recno)
 {
-	return (__col_update(session, recno, NULL, 0));
+	int ret;
+
+	while ((ret = __col_update(session, recno, NULL, 0)) == WT_RESTART)
+		;
+	return (ret);
 }
 
 /*
@@ -29,6 +33,7 @@ int
 __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
 {
 	BTREE *btree;
+	int ret;
 
 	btree = session->btree;
 
@@ -36,7 +41,9 @@ __wt_btree_col_put(SESSION *session, uint64_t recno, WT_ITEM *value)
 		WT_RET(__col_wrong_fixed_size(
 		    session, value->size, btree->fixed_len));
 
-	return (__col_update(session, recno, value, 1));
+	while ((ret = __col_update(session, recno, value, 1)) == WT_RESTART)
+		;
+	return (ret);
 }
 
 /*

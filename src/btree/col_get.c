@@ -19,7 +19,11 @@ __wt_btree_col_get(SESSION *session, uint64_t recno, WT_ITEM *value)
 
 	btree = session->btree;
 
-	WT_RET(__wt_col_search(session, recno, 0));
+	while ((ret = __wt_col_search(session, recno, 0)) == WT_RESTART)
+		;
+	if (ret != 0)
+		return (ret);
+
 	ret = __wt_return_data(session, NULL, value, 0);
 
 	if (session->srch_page != btree->root_page.page)
