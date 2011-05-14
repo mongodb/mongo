@@ -1,11 +1,9 @@
-/* NOTE: Standalone bson header for when not using MongoDB.
-   See also: bsondemo.
-
-   MongoDB includes ../db/jsobj.h instead. This file, however, pulls in much less code / dependencies.
-*/
-
 /** @file bson.h
-    BSON classes
+
+    Main bson include file for mongodb c++ clients. MongoDB includes ../db/jsobj.h instead. 
+    This file, however, pulls in much less code / dependencies.
+
+    @see bsondemo
 */
 
 /*

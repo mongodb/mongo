@@ -1,4 +1,7 @@
-/** @file dbclient.h - connect to a Mongo database as a database, from C++ */
+/** @file dbclient.h
+
+    Core MongoDB C++ driver interfaces are defined here.
+*/
 
 /*    Copyright 2009 10gen Inc.
  *

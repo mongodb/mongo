@@ -1,4 +1,4 @@
-/** @file dbclient_rs.h - connect to a Replica Set, from C++ */
+/** @file dbclient_rs.h Connect to a Replica Set, from C++ */
 
 /*    Copyright 2009 10gen Inc.
  *

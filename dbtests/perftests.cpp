@@ -133,7 +133,8 @@ namespace PerfTests {
             cout << endl;
 
             /* if you want recording of the timings, place the password for the perf database 
-               in a "pstats.login" text file in the current directory for the test binary
+               in ./../settings.py:
+                 pstatspassword="<pwd>"
             */
             const char *fn = "../../settings.py";
             static bool ok = true;
