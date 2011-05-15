@@ -486,6 +486,13 @@ namespace JsobjTests {
                 keyTest( BSON("" << now << "" << 3 << "" << BSONObj() << "" << true) );
 
                 {
+                    // check signed dates with new key format
+                    KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
+                    KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
+                    ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
+                }
+
+                {
                     BSONObjBuilder b;
                     b.appendBinData("f", 8, (BinDataType) 1, "aaaabbbb");
                     b.appendBinData("e", 3, (BinDataType) 1, "aaa");
