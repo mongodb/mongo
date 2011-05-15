@@ -165,6 +165,7 @@ typedef struct {
 	uint32_t split_entries;		/* Total list slots */
 	uint32_t split_allocated;	/* Bytes allocated */
 
+	int	    cell_zero;		/* Row-store internal page 0th key */
 	WT_ROW_REF *merge_ref;		/* Row-store merge correction key */
 
 	WT_HAZARD *hazard;		/* Copy of the hazard references */
@@ -193,7 +194,7 @@ static int  __rec_imref_bsearch_cmp(const void *, const void *);
 static int  __rec_imref_fixup(SESSION *, WT_PAGE *);
 static void __rec_imref_init(WT_RECONCILE *);
 static int  __rec_imref_qsort_cmp(const void *, const void *);
-static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t, int);
+static inline void __rec_incr(SESSION *, WT_RECONCILE *, uint32_t);
 static int  __rec_init(SESSION *, uint32_t);
 static int  __rec_parent_update(
 		SESSION *, WT_PAGE *, WT_PAGE *, uint32_t, uint32_t, uint32_t);
@@ -318,7 +319,7 @@ __wt_rec_destroy(SESSION *session)
  *	Update the memory tracking structure for a new entry.
  */
 static inline void
-__rec_incr(SESSION *session, WT_RECONCILE *r, uint32_t size, int entries)
+__rec_incr(SESSION *session, WT_RECONCILE *r, uint32_t size)
 {
 	/*
 	 * The buffer code is fragile and prone to off-by-one errors --
@@ -328,9 +329,9 @@ __rec_incr(SESSION *session, WT_RECONCILE *r, uint32_t size, int entries)
 	WT_ASSERT(session, WT_PTRDIFF32(
 	    r->first_free + size, r->dsk.mem) <= r->page_size);
 
+	++r->entries;
 	r->space_avail -= size;
 	r->first_free += size;
-	r->entries += (uint32_t)entries;
 }
 
 /*
@@ -1320,7 +1321,7 @@ __rec_col_merge(SESSION *session, WT_PAGE *page)
 		/* Any off-page reference must be a valid disk address. */
 		WT_ASSERT(session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (sizeof(WT_OFF_RECORD) > r->space_avail)
 			WT_RET(__rec_split(session));
 
@@ -1329,7 +1330,7 @@ __rec_col_merge(SESSION *session, WT_PAGE *page)
 		off.size = WT_COL_REF_SIZE(cref);
 		WT_RECNO(&off) = cref->recno;
 		memcpy(r->first_free, &off, sizeof(WT_OFF_RECORD));
-		__rec_incr(session, r, WT_SIZEOF32(WT_OFF_RECORD), 1);
+		__rec_incr(session, r, WT_SIZEOF32(WT_OFF_RECORD));
 	}
 
 	return (0);
@@ -1404,7 +1405,7 @@ __rec_col_fix(SESSION *session, WT_PAGE *page)
 		 * size -- there's no reason to ever split such a page.
 		 */
 		memcpy(r->first_free, data, len);
-		__rec_incr(session, r, len, 1);
+		__rec_incr(session, r, len);
 	}
 
 	/* Write the remnant page. */
@@ -1438,12 +1439,12 @@ __rec_col_fix_bulk(SESSION *session, WT_PAGE *page)
 
 	/* For each entry in the update list... */
 	for (upd = page->u.bulk.upd; upd != NULL; upd = upd->next) {
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (len > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		memcpy(r->first_free, WT_UPDATE_DATA(upd), len);
-		__rec_incr(session, r, len, 1);
+		__rec_incr(session, r, len);
 
 		/* Update the starting record number in case we split. */
 		++r->recno;
@@ -1545,14 +1546,14 @@ __rec_col_rle(SESSION *session, WT_PAGE *page)
 				continue;
 			}
 
-			/* Boundary: allocate, split or write the page. */
+			/* Boundary: split or write the page. */
 			while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
 				WT_ERR(__rec_split(session));
 
 			last_data = r->first_free;
 			WT_RLE_REPEAT_COUNT(last_data) = repeat_count;
 			memcpy(WT_RLE_REPEAT_DATA(last_data), data, len);
-			__rec_incr(session, r, len + WT_SIZEOF32(uint16_t), 1);
+			__rec_incr(session, r, len + WT_SIZEOF32(uint16_t));
 		}
 	}
 
@@ -1604,14 +1605,14 @@ __rec_col_rle_bulk(SESSION *session, WT_PAGE *page)
 			continue;
 		}
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (len + WT_SIZEOF32(uint16_t) > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		last_data = r->first_free;
 		WT_RLE_REPEAT_COUNT(last_data) = 1;
 		memcpy(WT_RLE_REPEAT_DATA(last_data), data, len);
-		__rec_incr(session, r, len + WT_SIZEOF32(uint16_t), 1);
+		__rec_incr(session, r, len + WT_SIZEOF32(uint16_t));
 	}
 
 	/* Write the remnant page. */
@@ -1683,7 +1684,7 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 			data_loc = DATA_ON_PAGE;
 		}
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (len > r->space_avail)
 			WT_RET(__rec_split(session));
 
@@ -1700,7 +1701,7 @@ __rec_col_var(SESSION *session, WT_PAGE *page)
 			    sizeof(value_cell), value->data, value->size);
 			break;
 		}
-		__rec_incr(session, r, len, 1);
+		__rec_incr(session, r, len);
 
 		/* Update the starting record number in case we split. */
 		++r->recno;
@@ -1746,7 +1747,7 @@ __rec_col_var_bulk(SESSION *session, WT_PAGE *page)
 		    session, value, &value_cell, &value_ovfl));
 		len = WT_CELL_SPACE_REQ(value->size);
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (len > r->space_avail)
 			WT_RET(__rec_split(session));
 
@@ -1754,7 +1755,7 @@ __rec_col_var_bulk(SESSION *session, WT_PAGE *page)
 		memcpy(r->first_free +
 		    sizeof(value_cell), value->data, value->size);
 
-		__rec_incr(session, r, len, 1);
+		__rec_incr(session, r, len);
 
 		/* Update the starting record number in case we split. */
 		++r->recno;
@@ -1805,8 +1806,8 @@ __rec_col_var_del(SESSION *session, WT_PAGE *page)
 static int
 __rec_row_int(SESSION *session, WT_PAGE *page)
 {
-	WT_CELL *key_cell, *value_cell;
-	WT_OFF *from;
+	WT_CELL *cell, _cell, *key_cell;
+	WT_OFF off;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_ROW_REF *rref;
@@ -1842,6 +1843,21 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		WT_RET(__rec_row_merge(session, page));
 		return (__rec_split_finish(session));
 	}
+
+	/*
+	 * Ideally, we'd never store the 0th key on row-store internal pages
+	 * because it's never used during tree search and there's no reason
+	 * to waste the space.  The problem is how we do splits: when we split,
+	 * we've potentially picked out several "split points" in the buffer
+	 * which is overflowing the maximum page size, and when the overflow
+	 * happens, we go back and physically split the buffer, at those split
+	 * points, into new pages.  It would be both difficult and expensive
+	 * to re-process the 0th key at each split point to be an empty key,
+	 * so we don't do that.  However, we are reconciling an internal page
+	 * for whatever reason, and the 0th key is known to be useless.  Set
+	 * the 0th key to something small.
+	 */
+	r->cell_zero = 1;
 
 	/*
 	 * We have to walk both the WT_ROW structures and the original page --
@@ -1906,26 +1922,35 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		/* Any off-page reference must be a valid disk address. */
 		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
-		value_cell = WT_CELL_NEXT(key_cell);
-		len = WT_PTRDIFF32(WT_CELL_NEXT(value_cell), key_cell);
+		/*
+		 * Keys are immutable, so generally come from the original disk
+		 * page; however, discard any 0th key, we don't need it.
+		 */
+		if (r->cell_zero) {
+			cell = &_cell;
+			WT_CELL_SET(cell, WT_CELL_KEY, 0);
+			len = WT_CELL_SPACE_REQ(0);
+			r->cell_zero = 0;
+		} else {
+			cell = key_cell;
+			len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
+		}
 
-		/* Boundary: allocate, split or write the page. */
-		while (len > r->space_avail)
+		/* Boundary: split or write the page. */
+		while (len + WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > r->space_avail)
 			WT_RET(__rec_split(session));
 
-		/*
-		 * XXX
-		 * Overwrite the original on-page information with new page
-		 * locations and then copy the two WT_CELL's from the page;
-		 * that will eventually change.
-		 */
-		from = WT_CELL_BYTE_OFF(value_cell);
-		from->addr = WT_ROW_REF_ADDR(rref);
-		from->size = WT_ROW_REF_SIZE(rref);
+		/* Copy the key into place. */
+		memcpy(r->first_free, cell, len);
+		__rec_incr(session, r, len);
 
-		/* Copy the key and re-written WT_OFF structure into place. */
-		memcpy(r->first_free, key_cell, len);
-		__rec_incr(session, r, len, 2);
+		/* Copy the off-page reference into place. */
+		off.addr = WT_ROW_REF_ADDR(rref);
+		off.size = WT_ROW_REF_SIZE(rref);
+		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
+		memcpy(r->first_free, &cell, sizeof(WT_CELL));
+		memcpy(r->first_free + sizeof(WT_CELL), &off, sizeof(WT_OFF));
+		__rec_incr(session, r, WT_CELL_SPACE_REQ(sizeof(WT_OFF)));
 	}
 
 	/* Write the remnant page. */
@@ -1974,22 +1999,33 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
 		/*
-		 * Build a key to store on the page.  If this is the 0th key in
-		 * a "to be merged" subtree, use merge correction key that was
-		 * saved off before this function was called from the top-level
-		 * parent page.
+		 * Build a key to store on the page.
+		 *
+		 * If this is the 0th key on an internal page, we don't need it,
+		 * use a place-holder instead.  (This test preceeds the merge
+		 * test because we don't need any key in the 0th slot, merge or
+		 * not.)
+		 *
+		 * If this is the 0th key in a "to be merged" subtree, use the
+		 * merge correction key that was saved off before this function
+		 * was called from the top-level parent page.
 		 */
-		if (r->merge_ref == NULL) {
-			key.data = rref->key;
-			key.size = rref->size;
-		} else {
+		if (r->cell_zero) {
+			key.data = "";
+			key.size = 0;
+			r->cell_zero = 0;
+			r->merge_ref = NULL;
+		} else if (r->merge_ref != NULL) {
 			key.data = r->merge_ref->key;
 			key.size = r->merge_ref->size;
 			r->merge_ref = NULL;
+		} else {
+			key.data = rref->key;
+			key.size = rref->size;
 		}
 		WT_RET(__rec_cell_build_key(session, &key, &cell, &key_ovfl));
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (WT_CELL_SPACE_REQ(key.size) +
 		    WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > r->space_avail)
 			WT_RET(__rec_split(session));
@@ -1997,7 +2033,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		/* Copy the key into place. */
 		memcpy(r->first_free, &cell, sizeof(WT_CELL));
 		memcpy(r->first_free + sizeof(WT_CELL), key.data, key.size);
-		__rec_incr(session, r, WT_CELL_SPACE_REQ(key.size), 1);
+		__rec_incr(session, r, WT_CELL_SPACE_REQ(key.size));
 
 		/* Copy the off-page reference into place. */
 		off.addr = WT_ROW_REF_ADDR(rref);
@@ -2005,7 +2041,7 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		WT_CELL_SET(&cell, WT_CELL_OFF, sizeof(WT_OFF));
 		memcpy(r->first_free, &cell, sizeof(WT_CELL));
 		memcpy(r->first_free + sizeof(WT_CELL), &off, sizeof(WT_OFF));
-		__rec_incr(session, r, WT_CELL_SPACE_REQ(sizeof(WT_OFF)), 1);
+		__rec_incr(session, r, WT_CELL_SPACE_REQ(sizeof(WT_OFF)));
 	}
 
 	/* Free any allocated memory. */
@@ -2173,25 +2209,25 @@ __rec_row_leaf(SESSION *session, WT_PAGE *page, uint32_t slvg_skip)
 		/* Take the key's WT_CELL from the original page. */
 		key_len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (key_len + value_len > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		/* Copy the key onto the page. */
 		memcpy(r->first_free, key_cell, key_len);
-		__rec_incr(session, r, key_len, 1);
+		__rec_incr(session, r, key_len);
 
 		/* Copy the value onto the page. */
 		switch (data_loc) {
 		case DATA_ON_PAGE:
 			memcpy(r->first_free, value_buf.data, value_len);
-			__rec_incr(session, r, value_len, 1);
+			__rec_incr(session, r, value_len);
 			break;
 		case DATA_OFF_PAGE:
 			memcpy(r->first_free, &value_cell, sizeof(value_cell));
 			memcpy(r->first_free +
 			    sizeof(WT_CELL), value_buf.data, value_buf.size);
-			__rec_incr(session, r, value_len, 1);
+			__rec_incr(session, r, value_len);
 			break;
 		case EMPTY_DATA:
 			break;
@@ -2287,7 +2323,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		    session, &key_buf, &key_cell, &key_ovfl));
 		key_len = WT_CELL_SPACE_REQ(key_buf.size);
 
-		/* Boundary: allocate, split or write the page. */
+		/* Boundary: split or write the page. */
 		while (key_len + value_len > r->space_avail)
 			WT_RET(__rec_split(session));
 
@@ -2295,7 +2331,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		memcpy(r->first_free, &key_cell, sizeof(WT_CELL));
 		memcpy(r->first_free + sizeof(WT_CELL),
 		    key_buf.data, key_buf.size);
-		__rec_incr(session, r, key_len, 1);
+		__rec_incr(session, r, key_len);
 
 		/* Copy the value cell into place. */
 		if (value_len == 0)
@@ -2303,7 +2339,7 @@ __rec_row_leaf_insert(SESSION *session, WT_INSERT *ins)
 		memcpy(r->first_free, &value_cell, sizeof(WT_CELL));
 		memcpy(r->first_free + sizeof(WT_CELL),
 		    value_buf.data, value_buf.size);
-		__rec_incr(session, r, value_len, 1);
+		__rec_incr(session, r, value_len);
 	}
 
 	/* Free any allocated memory. */
