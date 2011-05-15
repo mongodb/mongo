@@ -55,7 +55,11 @@ extern "C" {
 #define	WT_OFF_TO_ADDR(btree, off)					\
 	((uint32_t)((off) / (btree)->allocsize))
 
-/* The file's description, written into the first 512 bytes of the file. */
+/*
+ * WT_BTREE_DESC --
+ *	The file's description is written into the first allocation-size bytes
+ * of the file.
+ */
 struct __wt_btree_desc {
 #define	WT_BTREE_MAGIC		120897
 	uint32_t magic;			/* 00-03: Magic number */
@@ -100,7 +104,7 @@ struct __wt_btree_desc {
 
 /*
  * WT_DISK_REQUIRED--
- *	Return bytes needed for data length, rounded to an allocation unit.
+ *	Return bytes needed for byte length, rounded to an allocation unit.
  */
 #define	WT_DISK_REQUIRED(session, size)					\
 	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (session)->btree->allocsize))
@@ -125,8 +129,8 @@ struct __wt_page_disk {
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
 	/*
-	 * The LSN is a 64-bit chunk to make comparisons easier, but it's really
-	 * 2 32-bit values: a file number and a file offset.
+	 * The LSN is a 64-bit chunk to make assignment and comparisons easier,
+	 * but it's 2 32-bit values underneath: a file number and a file offset.
 	 */
 #define	WT_LSN_FILE(lsn)						\
 	((uint32_t)(((lsn) & 0xffffffff00000000ULL) >> 32))
@@ -145,11 +149,10 @@ struct __wt_page_disk {
 	/*
 	 * We don't need the page length for normal processing as the page's
 	 * parent knows how big it is.  However, we write the page size in the
-	 * page header because it makes salvage easier.  (We know how long the
-	 * expected page is: the alternative would be to read increasingly
-	 * larger chunks from the file until we find one that checksums, and
-	 * that's going to be unpleasant in the face of WiredTiger's large page
-	 * sizes.)
+	 * page header because it makes salvage easier.  (If we don't know the
+	 * expected page length, we'd have to read increasingly larger chunks
+	 * from the file until we find one that checksums, and that's going to
+	 * be unpleasant given WiredTiger's large page sizes.)
 	 */
 	uint32_t size;			/* 20-23: size of page */
 
