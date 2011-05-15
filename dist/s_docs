@@ -26,7 +26,6 @@ spellchk()
 	}
 }
 
-
 filter=
 while :
 	do case "$1" in
