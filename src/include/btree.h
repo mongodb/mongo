@@ -81,12 +81,22 @@ struct __wt_btree_desc {
 
 	uint32_t config_addr;		/* 52-55: Free list page address */
 	uint32_t config_size;		/* 56-59: Free list page length */
+
+	/*
+	 * We maintain page LSN's for the file in the non-transactional case
+	 * (where, instead of a log reference, the LSN is simply a counter),
+	 * as that's how salvage can determine the most recent page between
+	 * pages overlapping the same key range.  This non-transactional LSN
+	 * has to be semi-permanent, which means we include it in the file's
+	 * metadata.
+	 */
+	uint64_t lsn;			/* 60-67: Non-transactional page LSN */
 };
 /*
  * WT_BTREE_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_BTREE_DESC_SIZE		32
+#define	WT_BTREE_DESC_SIZE		40
 
 /*
  * WT_DISK_REQUIRED--

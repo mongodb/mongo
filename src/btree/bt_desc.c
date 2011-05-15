@@ -32,6 +32,7 @@ __wt_desc_read(SESSION *session)
 	btree->root_page.size = desc->root_size;
 	btree->free_addr = desc->free_addr;
 	btree->free_size = desc->free_size;
+	btree->lsn = desc->lsn;
 
 	return (0);
 }
@@ -88,6 +89,7 @@ __wt_desc_update(SESSION *session)
 	desc->root_size = btree->root_page.size;
 	desc->free_addr = btree->free_addr;
 	desc->free_size = btree->free_size;
+	desc->lsn = btree->lsn;
 
 	/* Write the first sector. */
 	return (__wt_write(session, btree->fh, (off_t)0, 512, buf));
