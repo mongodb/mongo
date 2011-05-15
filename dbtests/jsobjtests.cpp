@@ -66,6 +66,15 @@ namespace JsobjTests {
                 cout << r3 << endl;
             }
             ASSERT(ok);
+            if( k.isCompactFormat() && kLast->isCompactFormat() ) { // only check if not bson as bson woEqual is broken! (or was may2011)
+                if( k.woEqual(*kLast) != (r2 == 0) ) { // check woEqual matches
+                    cout << r2 << endl;
+                    cout << k.toString() << endl;
+                    cout << kLast->toString() << endl;
+                    k.woEqual(*kLast);
+                    ASSERT(false);
+                }
+            }
         }
 
         delete kLast;

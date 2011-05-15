@@ -35,6 +35,7 @@
 #include "../db/dur_stats.h"
 #include "../util/checksum.h"
 #include "../util/version.h"
+#include "../db/key.h"
 
 using namespace bson;
 
@@ -284,6 +285,23 @@ namespace PerfTests {
             for( bo::iterator i = sub.begin(); i.more(); )
                 if( i.next().fieldName() )
                     n++;
+        }
+    };
+
+    class KeyTest : public B { 
+    public:
+        KeyV1Owned a,b,c;
+        string name() { return "Key-woequal"; }
+        virtual int howLongMillis() { return 3000; } 
+        KeyTest() : 
+          a(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqq")), 
+          b(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqq")), 
+          c(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqqb"))
+          {}
+        virtual bool showDurStats() { return false; }
+        void timed() { 
+            assert( a.woEqual(b) );
+            assert( !a.woEqual(c) );
         }
     };
 
@@ -586,6 +604,7 @@ namespace PerfTests {
             add< Dummy >();
             add< TLS >();
             add< Malloc >();
+            add< KeyTest >();
             add< Bldr >();
             add< StkBldr >();
             add< BSONIter >();

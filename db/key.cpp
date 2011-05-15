@@ -375,28 +375,6 @@ namespace mongo {
         return 0;
     }
 
-    bool KeyV1::woEqual(const KeyV1& right) const {
-        const unsigned char *l = _keyData;
-        const unsigned char *r = right._keyData;
-
-        if( (*l|*r) == IsBSON ) {
-            return toBson().woEqual(right.toBson());
-        }
-
-        while( 1 ) { 
-            char lval = *l; 
-            char rval = *r;
-            if( compare(l, r) ) // updates l and r pointers
-                return false;
-            if( (lval&cHASMORE)^(rval&cHASMORE) )
-                return false;
-            if( (lval&cHASMORE) == 0 )
-                break;
-        }
-
-        return true;
-    }
-
     static unsigned sizes[] = {
         0,
         1, //cminkey=1,
@@ -416,6 +394,21 @@ namespace mongo {
         0
     };
 
+    inline unsigned sizeOfElement(const unsigned char *p) { 
+        unsigned type = *p & cCANONTYPEMASK;
+        unsigned sz = sizes[type];
+        if( sz == 0 ) {
+            if( type == cstring ) { 
+                sz = ((unsigned) p[1]) + 2;
+            }
+            else {
+                assert( type == cbindata );
+                sz = binDataCodeToLength(p[1]) + 2;
+            }
+        }
+        return sz;
+    }
+
     int KeyV1::dataSize() const { 
         const unsigned char *p = _keyData;
         if( !isCompactFormat() ) {
@@ -424,21 +417,67 @@ namespace mongo {
 
         bool more;
         do { 
-            unsigned type = *p & cCANONTYPEMASK;
-            unsigned z = sizes[type];
-            if( z == 0 ) {
-                if( type == cstring ) { 
-                    z = ((unsigned) p[1]) + 2;
-                }
-                else {
-                    assert( type == cbindata );
-                    z = binDataCodeToLength(p[1]) + 2;
-                }
-            }
+            unsigned z = sizeOfElement(p);
             more = (*p & cHASMORE) != 0;
             p += z;
         } while( more );
         return p - _keyData;
+    }
+
+    bool KeyV1::woEqual(const KeyV1& right) const {
+        const unsigned char *l = _keyData;
+        const unsigned char *r = right._keyData;
+
+        if( (*l|*r) == IsBSON ) {
+            return toBson().woEqual(right.toBson());
+        }
+
+        while( 1 ) { 
+            char lval = *l; 
+            char rval = *r;
+            if( (lval&(cCANONTYPEMASK|cHASMORE)) != (rval&(cCANONTYPEMASK|cHASMORE)) )
+                return false;
+            l++; r++;
+            switch( lval&cCANONTYPEMASK ) { 
+            case coid:
+                if( *((unsigned*) l) != *((unsigned*) r) )
+                    return false;
+                l += 4; r += 4;
+            case cdate:
+            case cdouble:
+                if( *((unsigned long long *) l) != *((unsigned long long *) r) )
+                    return false;
+                l += 8; r += 8;
+                break;
+            case cstring:
+                {
+                    unsigned sz = ((unsigned) *l) + 1;
+                    if( memcmp(l, r, sz) ) // first byte checked is the length byte
+                        return false;
+                    l += sz; r += sz;
+                    break;
+                }
+            case cbindata:
+                {
+                    int len = binDataCodeToLength(*l) + 1;
+                    if( memcmp(l, r, len) ) 
+                        return false;
+                    l += len; r += len;
+                    break;
+                }
+            case cminkey:
+            case cnull:
+            case cfalse:
+            case ctrue:
+            case cmaxkey:
+                break;
+            default:
+                assert(false);
+            }
+            if( (lval&cHASMORE) == 0 )
+                break;
+        }
+        return true;
     }
 
     struct CmpUnitTest : public UnitTest {
