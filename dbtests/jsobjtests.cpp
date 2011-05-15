@@ -252,6 +252,13 @@ namespace JsobjTests {
         class TimestampTest : public Base {
         public:
             void run() {
+                Client *c = currentClient.get();
+                if( c == 0 ) {
+                    Client::initThread("pretouchN");
+                    c = &cc();
+                }
+                writelock lk(""); // for initTimestamp
+        
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );
                 BSONObj o = b.done();

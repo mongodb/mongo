@@ -24,6 +24,7 @@
 #include "repl/rs.h"
 #include "stats/counters.h"
 #include "../util/file.h"
+#include "../util/unittest.h"
 #include "queryoptimizer.h"
 
 namespace mongo {
@@ -506,11 +507,11 @@ namespace mongo {
     
     // -------------------------------------
 
-    struct TestOpTime {
-        TestOpTime() {
+    struct TestOpTime : public UnitTest {
+        void run() {
             OpTime t;
             for ( int i = 0; i < 10; i++ ) {
-                OpTime s = OpTime::now();
+                OpTime s = OpTime::now_inlock();
                 assert( s != t );
                 t = s;
             }

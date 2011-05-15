@@ -39,6 +39,7 @@ namespace mongo {
         unsigned i;
         unsigned secs;
         static OpTime last;
+        static OpTime skewed();
     public:
         static void setLast(const Date_t &date) {
             last = OpTime(date);
@@ -67,28 +68,22 @@ namespace mongo {
             secs = 0;
             i = 0;
         }
-        static OpTime now() {
+        // it isn't generally safe to not be locked for this. so use now(). some tests use this.
+        static OpTime now_inlock() {
             unsigned t = (unsigned) time(0);
-            if ( t < last.secs ) {
-                bool toLog = false;
-                ONCE toLog = true;
-                RARELY toLog = true;
-                if ( last.i & 0x80000000 )
-                    toLog = true;
-                if ( toLog )
-                    log() << "clock skew detected  prev: " << last.secs << " now: " << t << " trying to handle..." << endl;
-                if ( last.i & 0x80000000 ) {
-                    log() << "ERROR Large clock skew detected, shutting down" << endl;
-                    throw ClockSkewException();
-                }
-                t = last.secs;
-            }
             if ( last.secs == t ) {
                 last.i++;
                 return last;
             }
+            if ( t < last.secs ) {
+                return skewed(); // separate function to keep out of the hot code path
+            }
             last = OpTime(t, 1);
             return last;
+        }
+        static OpTime now() {
+            DEV dbMutex.assertWriteLocked();
+            return now_inlock();
         }
 
         /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of

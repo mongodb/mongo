@@ -75,7 +75,7 @@
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
-#include "../db/common.cpp"
+//#include "../db/common.cpp"
 #include "../db/nonce.cpp"
 #include "../db/commands.cpp"
 

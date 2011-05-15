@@ -1232,13 +1232,6 @@ namespace mongo {
     Labeler::Label NE( "$ne" );
     Labeler::Label SIZE( "$size" );
 
-    void BSONElementManipulator::initTimestamp() {
-        massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
-        unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
-        if ( timestamp == 0 )
-            timestamp = OpTime::now().asDate();
-    }
-
     void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
         switch ( t ) {
         case MinKey: appendMinKey( fieldName ); return;
