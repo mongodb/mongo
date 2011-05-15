@@ -4,8 +4,8 @@
 # data_min
 # delete_pct
 # file_type
-# huffman_data
 # huffman_key
+# huffman_value
 # insert_pct
 # intl_node_max
 # intl_node_min

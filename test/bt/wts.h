@@ -65,8 +65,8 @@ typedef struct {
 	uint32_t c_data_min;
 	uint32_t c_delete_pct;
 	uint32_t c_file_type;
-	uint32_t c_huffman_data;
 	uint32_t c_huffman_key;
+	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
 	uint32_t c_intl_node_max;
 	uint32_t c_intl_node_min;

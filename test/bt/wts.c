@@ -129,7 +129,7 @@ wts_startup(void)
 		if (g.c_huffman_key)
 			p += snprintf(
 			    p, (size_t)(end - p), ",huffman_key=english");
-		if (g.c_huffman_data)
+		if (g.c_huffman_value)
 			p += snprintf(
 			    p, (size_t)(end - p), ",huffman_value=english");
 		break;
