@@ -91,18 +91,18 @@ __wt_verify(SESSION *session, FILE *stream)
 	vstuff.max_addr = WT_ADDR_INVALID;
 
 	/*
-	 * The first sector of the file is the description record -- ignore
-	 * it for now.
-	 */
-	bit_nset(vstuff.fragbits, 0, 0);
-
-	/*
 	 * During verification, we can only evict clean pages (otherwise we can
 	 * race and verify pages not at all or more than once).  The variable
 	 * volatile, and the eviction code checks before each eviction, so no
 	 * further serialization is required.
 	 */
 	cache->only_evict_clean = 1;
+
+	/*
+	 * The first allocsize bytes of the file are the description record --
+	 * ignore it for now.
+	 */
+	WT_ERR(__wt_verify_addfrag(session, 0, btree->allocsize, &vstuff));
 
 	/* Verify the tree, starting at the root. */
 	WT_ERR(
