@@ -11,12 +11,12 @@ type doxygen > /dev/null 2>&1 || {
 
 spellchk()
 {
-	# If spell has been installed, run spell-check.
-	type spell > /dev/null 2>&1 || return
+	# If aspell has been installed, run a spell check.
+	type aspell > /dev/null 2>&1 || return
 
 	(cd ../docs/src &&
-	test -s spell.ok && cat spell.ok
-	spell *.dox) | tee /tmp/_f | sort | uniq -u > $t
+	cat *.dox | aspell --mode=ccpp --lang=en --personal=./spell.ok list) |
+	sort -u > $t
 	test -s $t && {
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		echo 'Documentation spelling notes'
