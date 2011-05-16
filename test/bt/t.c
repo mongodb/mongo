@@ -93,7 +93,7 @@ main(int argc, char *argv[])
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 
-		wts_teardown();		/* Close and  re-open */
+		wts_teardown();			/* Close and  re-open */
 		if (wts_startup())
 			goto err;
 
