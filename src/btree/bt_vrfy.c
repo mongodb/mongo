@@ -47,25 +47,41 @@ __wt_verify(
 {
 	BTREE *btree;
 	WT_CACHE *cache;
-	WT_VSTUFF vstuff;
+	WT_VSTUFF *vs, _vstuff;
 	int ret;
 
-	/* XXX should be used to open the file containing the tree. */
-	WT_UNUSED(filename);
-	WT_UNUSED(config);
+	WT_UNUSED(config);			/* XXX: unused for now */
 
-	btree = session->btree;
 	cache = S2C(session)->cache;
+	vs = NULL;
 	ret = 0;
 
-	WT_CLEAR(vstuff);
+	/* Get a Btree. */
+	WT_RET(__wt_connection_btree(S2C(session), &btree));
+	session->btree = btree;
+
+	/*
+	 * Open the file.  There's no special verification magic going on during
+	 * file open at the moment, the cost of verifying the file's metadata is
+	 * sufficiently cheap we always do it.  That may not always be the case,
+	 * which is one of the reasons we do our own open of the file instead of
+	 * having the schema layer do it for us.  In addition, we don't want to
+	 * use any existing in-memory information, we only want to deal with the
+	 * existing, on-disk information.
+	 */
+	WT_ERR(__wt_btree_open(session, filename));
+
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
-	 * size piece of the file.   This is how we track the parts of the file
-	 * we've verified.  Storing this on the heap seems reasonable: with a
-	 * minimum allocation size of 512B, we would allocate 4MB to verify a
-	 * 16GB file.  To verify larger files than we can handle this way, we'd
-	 * have to write parts of the bit array into a disk file.
+	 * size piece of the file (this is how we track the parts of the file
+	 * we've verified, and check for multiply referenced or unreferenced
+	 * blocks).  Storing this on the heap seems reasonable; verifying a 1TB
+	 * file with an allocation size of 512B would require a 256MB bit array:
+	 *
+	 *	(((1 * 2^40) / 512) / 8) / 2^20 = 256
+	 *
+	 * To verify larger files than we can handle in this way, we'd have to
+	 * write parts of the bit array into a disk file.
 	 *
 	 * !!!
 	 * There's one portability issue -- the bitstring package uses "ints",
@@ -74,16 +90,18 @@ __wt_verify(
 	 * don't overflow.   I don't ever expect to see this error message, but
 	 * better safe than sorry.
 	 */
-	vstuff.frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
-	if (vstuff.frags > INT_MAX) {
+	WT_CLEAR(_vstuff);
+	vs = &_vstuff;
+	vs->frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
+	if (vs->frags > INT_MAX) {
 		__wt_errx(session, "file is too large to verify");
 		ret = WT_ERROR;
 		goto err;
 	}
-	WT_ERR(bit_alloc(session, vstuff.frags, &vstuff.fragbits));
-	vstuff.stream = stream;
-	WT_ERR(__wt_scr_alloc(session, 0, &vstuff.max_key));
-	vstuff.max_addr = WT_ADDR_INVALID;
+	WT_ERR(bit_alloc(session, vs->frags, &vs->fragbits));
+	vs->stream = stream;
+	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
+	vs->max_addr = WT_ADDR_INVALID;
 
 	/*
 	 * During verification, we can only evict clean pages (otherwise we can
@@ -94,29 +112,35 @@ __wt_verify(
 	cache->only_evict_clean = 1;
 
 	/*
-	 * The first allocsize bytes of the file are the description record --
-	 * ignore it for now.
+	 * The first allocsize bytes of the file are the file's metadata and
+	 * configuration string, which we've already verified.
 	 */
-	WT_ERR(__wt_verify_addfrag(session, 0, btree->allocsize, &vstuff));
+	WT_RET(__wt_verify_addfrag(session, 0, btree->allocsize, vs));
 
 	/* Verify the tree, starting at the root. */
-	WT_ERR(
-	    __wt_verify_tree(session, &btree->root_page, (uint64_t)1, &vstuff));
+	WT_ERR(__wt_verify_tree(session, &btree->root_page, (uint64_t)1, vs));
 
-	WT_ERR(__wt_verify_freelist(session, &vstuff));
+	/* Verify the free-list. */
+	WT_ERR(__wt_verify_freelist(session, vs));
 
-	WT_ERR(__wt_verify_checkfrag(session, &vstuff));
+	/* Verify we read every file block. */
+	WT_ERR(__wt_verify_checkfrag(session, vs));
 
-	cache->only_evict_clean = 0;
+err:	cache->only_evict_clean = 0;
 
-err:	/* Wrap up reporting. */
-	__wt_progress(session, NULL, vstuff.fcnt);
+	if (vs != NULL) {
+		/* Wrap up reporting. */
+		__wt_progress(session, NULL, vs->fcnt);
 
-	/* Free allocated memory. */
-	if (vstuff.fragbits != NULL)
-		__wt_free(session, vstuff.fragbits);
-	if (vstuff.max_key != NULL)
-		__wt_scr_release(&vstuff.max_key);
+		/* Free allocated memory. */
+		if (vs->fragbits != NULL)
+			__wt_free(session, vs->fragbits);
+		if (vs->max_key != NULL)
+			__wt_scr_release(&vs->max_key);
+	}
+
+	/* Close the file and discard the BTREE structure. */
+	WT_TRET(__wt_btree_close(session));
 
 	return (ret);
 }
