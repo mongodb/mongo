@@ -70,21 +70,25 @@ __btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 {
 	WT_CELL *cell;
 	WT_UPDATE *upd;
-	int found;
+	int found, newcell;
+
+	newcell = 0;
 
 	/* New page? */
 	if (cbt->nitems == 0) {
 		cbt->cip = cbt->page->u.col_leaf.d;
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
-
-		cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
-		cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
+		newcell = 1;
 	}
 
-	cell = WT_COL_PTR(cbt->page, cbt->cip);
+	for (;; ++cbt->cip, newcell = 1) {
+		cell = WT_COL_PTR(cbt->page, cbt->cip);
+		if (newcell) {
+			cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
+			cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
+		}
 
-	for (;;) {
 		for (found = 0;
 		    !found && cbt->nrepeats > 0;
 		    ++cbt->recno, --cbt->nrepeats) {
@@ -110,11 +114,6 @@ __btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 			return (0);
 		else if (--cbt->nitems == 0)
 			return (WT_NOTFOUND);
-
-		++cbt->cip;
-		cell = WT_COL_PTR(cbt->page, cbt->cip);
-		cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
-		cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
 	}
 
 	/* NOTREACHED */
