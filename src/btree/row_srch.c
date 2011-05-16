@@ -49,21 +49,20 @@ __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags)
 			rref = page->u.row_int.t + indx;
 
 			/*
-			 * If the key is compressed or an overflow, it may not
-			 * have been instantiated yet.
-			 */
-			if (__wt_key_process(rref))
-				WT_ERR(
-				    __wt_key_build(session, page, rref, NULL));
-
-			/*
 			 * If we're about to compare an application key with the
 			 * 0th index on an internal page, pretend the 0th index
 			 * sorts less than any application key.  This test is so
 			 * we don't have to update internal pages if the
 			 * application stores a new, "smallest" key in the tree.
+			 *
+			 * If the key is compressed or an overflow, it may not
+			 * have been instantiated yet.
 			 */
 			if (indx != 0) {
+				if (__wt_key_process(rref))
+					WT_ERR(__wt_key_build(
+					    session, page, rref, NULL));
+
 				cmp = func(btree, key, (WT_ITEM *)rref);
 				if (cmp == 0)
 					break;
