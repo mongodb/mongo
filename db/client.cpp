@@ -41,7 +41,7 @@ namespace mongo {
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
-#if 0
+#if defined(_DEBUG)
     struct StackChecker;
     ThreadLocalValue<StackChecker *> checker;
 
@@ -62,7 +62,8 @@ namespace mongo {
                 if( p[i] != 42 )
                     break;
             }
-            cout << "\nthread " << tname << " stack usage was " << SZ-i << " bytes\n" << endl;
+            log() << "thread " << tname << " stack usage was " << SZ-i << " bytes" << endl;
+            wassert( i > 16000 );
         }
     };
 #endif
@@ -71,8 +72,8 @@ namespace mongo {
        call this when your thread starts.
     */
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-#if 0
-        DEV { 
+#if defined(_DEBUG)
+        { 
             if( sizeof(void*) == 8 ) {
                 StackChecker sc;
                 sc.init();
@@ -116,8 +117,8 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
-#if 0
-        DEV { 
+#if defined(_DEBUG)
+        { 
             if( sizeof(void*) == 8 ) {
                 StackChecker::check( desc() );
             }
