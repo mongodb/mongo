@@ -574,17 +574,8 @@ namespace mongo {
             
             while (s.last <= last) {
                 if (!s.reader.more()) {
-                    // resets the cursor if it is dead
-                    s.reader.tailCheck();
-                    
-                    // if we don't have a cursor, we have to requery
-                    if( !s.reader.haveCursor() ) {
-                        s.reader.ghostQueryGTE(rsoplog, s.last);
-                        assert( s.reader.haveCursor() );
-                    }
-                    else {
-                        return;
-                    }
+                    // we'll be back
+                    return;
                 }
             
                 BSONObj o = s.reader.nextSafe();
