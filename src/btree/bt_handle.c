@@ -215,6 +215,7 @@ static int
 __btree_type(SESSION *session)
 {
 	const char *config;
+	char *endp;
 	BTREE *btree;
 	WT_CONFIG_ITEM cval;
 
@@ -230,8 +231,9 @@ __btree_type(SESSION *session)
 	/* Check for fixed-length data. */
 	WT_RET(__wt_config_getones(config, "value_format", &cval));
 	if (cval.len > 1 && cval.str[cval.len - 1] == 'u') {
-		btree->type = BTREE_COL_FIX;
-		btree->fixed_len = (uint32_t)strtol(cval.str, NULL, 10);
+		btree->fixed_len = (uint32_t)strtol(cval.str, &endp, 10);
+		if (endp == cval.str + cval.len - 1 && btree->fixed_len != 0)
+			btree->type = BTREE_COL_FIX;
 	}
 
 	/* Check for run-length encoding */
