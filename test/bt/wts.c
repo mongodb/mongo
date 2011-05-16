@@ -8,12 +8,12 @@
 #include "wts.h"
 
 static int bulk(WT_ITEM **, WT_ITEM **);
-static int wts_del_col(uint64_t);
-static int wts_del_row(uint64_t);
+static int wts_col_del(uint64_t);
+static int wts_col_put(uint64_t);
 static int wts_notfound_chk(const char *, int, int, uint64_t);
-static int wts_put_col(uint64_t);
-static int wts_put_row(uint64_t, int);
 static int wts_read(uint64_t);
+static int wts_row_del(uint64_t);
+static int wts_row_put(uint64_t, int);
 static int wts_sync(void);
 
 static void
@@ -458,29 +458,29 @@ wts_ops(void)
 		if (op < g.c_delete_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (wts_del_row(keyno))
+				if (wts_row_del(keyno))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (wts_del_col(keyno))
+				if (wts_col_del(keyno))
 					return (1);
 				break;
 			}
 		} else if (g.c_file_type == ROW &&
 		    op < g.c_delete_pct + g.c_insert_pct) {
-			if (wts_put_row(keyno, 1))
+			if (wts_row_put(keyno, 1))
 				return (1);
 		} else if (
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (wts_put_row(keyno, 0))
+				if (wts_row_put(keyno, 0))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (wts_put_col(keyno))
+				if (wts_col_put(keyno))
 					return (1);
 				break;
 			}
@@ -593,11 +593,11 @@ wts_read(uint64_t keyno)
 }
 
 /*
- * wts_put_row --
+ * wts_row_put --
  *	Replace an element in a row-store file.
  */
 static int
-wts_put_row(uint64_t keyno, int insert)
+wts_row_put(uint64_t keyno, int insert)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -622,7 +622,7 @@ wts_put_row(uint64_t keyno, int insert)
 	cursor->set_key(cursor, &key);
 	cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_put_row: put row %llu by key: %s\n",
+		fprintf(stderr, "%s: wts_row_put: put row %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
@@ -631,11 +631,11 @@ wts_put_row(uint64_t keyno, int insert)
 }
 
 /*
- * wts_put_col --
+ * wts_col_put --
  *	Replace an element in a column-store file.
  */
 static int
-wts_put_col(uint64_t keyno)
+wts_col_put(uint64_t keyno)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -660,7 +660,7 @@ wts_put_col(uint64_t keyno)
 	cursor->set_key(cursor, (wiredtiger_recno_t)keyno);
 	cursor->set_value(cursor, &value);
 	if ((ret = cursor->update(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_put_col: put col %llu by key: %s\n",
+		fprintf(stderr, "%s: wts_col_put: put col %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
@@ -669,11 +669,11 @@ wts_put_col(uint64_t keyno)
 }
 
 /*
- * wts_del_row --
+ * wts_row_del --
  *	Delete an element from a row-store file.
  */
 static int
-wts_del_row(uint64_t keyno)
+wts_row_del(uint64_t keyno)
 {
 	static WT_ITEM key;
 	WT_CURSOR *cursor;
@@ -695,21 +695,21 @@ wts_del_row(uint64_t keyno)
 
 	cursor->set_key(cursor, &key);
 	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_del_row: remove %llu by key: %s\n",
+		fprintf(stderr, "%s: wts_row_del: remove %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
 	}
-	NTF_CHK(wts_notfound_chk("wts_del_row", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_row_del", ret, notfound, keyno));
 	return (0);
 }
 
 /*
- * wts_del_col --
+ * wts_col_del --
  *	Delete an element from a column-store file.
  */
 static int
-wts_del_col(uint64_t keyno)
+wts_col_del(uint64_t keyno)
 {
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
@@ -728,13 +728,13 @@ wts_del_col(uint64_t keyno)
 
 	cursor->set_key(cursor, keyno);
 	if ((ret = cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_del_col: remove %llu by key: %s\n",
+		fprintf(stderr, "%s: wts_col_del: remove %llu by key: %s\n",
 		    g.progname, (unsigned long long)keyno,
 		    wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	NTF_CHK(wts_notfound_chk("wts_del_col", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_col_del", ret, notfound, keyno));
 	return (0);
 }
 
