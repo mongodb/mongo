@@ -9,6 +9,9 @@ var config = r.getReplSetConfig();
 config.members[2].priority = 0;
 
 r.initiate(config);
+//Wait for replica set to be fully initialized - could take some time 
+//to pre-allocate files on slow systems
+r.awaitReplication();
 
 var master = r.getMaster();
 
@@ -29,6 +32,9 @@ config = r.getReplSetConfig();
 config.members[2].arbiterOnly = true;
 
 r.initiate(config);
+// Wait for replica set to be fully initialized - could take some time 
+// to pre-allocate files on slow systems
+r.awaitReplication();
 
 master = r.getMaster();
 
