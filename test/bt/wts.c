@@ -124,11 +124,12 @@ wts_startup(void)
 			p += snprintf(
 			    p, (size_t)(end - p), ",runlength_encoding");
 		break;
-	case VAR:
 	case ROW:
 		if (g.c_huffman_key)
 			p += snprintf(
 			    p, (size_t)(end - p), ",huffman_key=english");
+		/* FALLTHROUGH */
+	case VAR:
 		if (g.c_huffman_value)
 			p += snprintf(
 			    p, (size_t)(end - p), ",huffman_value=english");
