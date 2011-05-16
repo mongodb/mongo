@@ -22,19 +22,9 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 {
 	BTREE *btree;
 	SESSION *session;
-	uint32_t addr;
 
 	session = (SESSION *)cbulk->cbt.iface.session;
 	btree = session->btree;
-
-	/*
-	 * XXX
-	 * Write out the description record -- this goes away when we figure
-	 * out how the table schema is going to work, but for now, we use the
-	 * first sector, and this file extend makes sure we don't allocate it
-	 * as a table page.
-	 */
-	WT_RET(__wt_block_alloc(session, &addr, 512));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -64,7 +54,7 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 
 /*
  * __wt_bulk_insert --
- *	Db.bulk_load method.
+ *	Bulk insert.
  */
 int
 __wt_bulk_insert(CURSOR_BULK *cbulk)

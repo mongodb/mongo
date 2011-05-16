@@ -87,12 +87,8 @@ __wt_block_extend(SESSION *session, uint32_t *addrp, uint32_t size)
 	btree = session->btree;
 	fh = btree->fh;
 
-	/*
-	 * Extend the file.  We never allocate the first chunk of the file,
-	 * it's owned by the file's descriptor record.
-	 */
-	if (fh->file_size == 0)
-		fh->file_size = WT_BTREE_ALLOCATION_SIZE_MIN;
+	/* We should never be allocating from an empty file. */
+	WT_ASSERT(session, fh->file_size >= btree->allocsize);
 
 	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
