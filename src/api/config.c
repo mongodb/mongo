@@ -356,7 +356,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;
 	static WT_CONFIG_ITEM default_value = {
-		"1", 1, 1, ITEM_NUM
+		"", 0, 1, ITEM_NUM
 	};
 
 	key->len = 0;
