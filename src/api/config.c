@@ -316,7 +316,7 @@ __process_value(WT_CONFIG_ITEM *value)
 			value->type = ITEM_NUM;
 			value->val = 0;
 		}
-	} else if (value->type == ITEM_NUM) {
+	} else if (value->type == ITEM_NUM && value->len > 0) {
 		value->val = strtol(value->str, &endptr, 10);
 		if (endptr >= value->str + value->len)
 			return;

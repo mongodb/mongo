@@ -123,6 +123,8 @@ __wt_salvage(SESSION *session, const char *filename, const char *config)
 	WT_UNUSED(filename);
 	WT_UNUSED(config);
 
+	return (0);
+
 	btree = session->btree;
 	ret = 0;
 
