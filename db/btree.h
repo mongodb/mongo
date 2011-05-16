@@ -924,7 +924,7 @@ namespace mongo {
          * if a multikey index traversal:
          *   if loc has already been sent, returns true.
          *   otherwise, marks loc as sent.
-         * @return true if the loc has not been seen
+         * @return false if the loc has not been seen
          */
         virtual bool getsetdup(DiskLoc loc) {
             if( _multikey ) {
