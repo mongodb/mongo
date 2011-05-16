@@ -41,5 +41,10 @@ done
 spellchk
 
 # Run doxygen to generate HTML documentation.
-cd ../docs && (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen -
-
+cd ../docs &&
+    (eval cat Doxyfile $filter ; echo "QUIET=YES") | doxygen - > $t 2>&1
+test -s $t && {
+	cat $t
+	exit 1
+}
+exit 0
