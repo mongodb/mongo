@@ -1806,7 +1806,7 @@ __rec_col_var_del(SESSION *session, WT_PAGE *page)
 static int
 __rec_row_int(SESSION *session, WT_PAGE *page)
 {
-	WT_CELL *cell, _cell, *key_cell;
+	WT_CELL cell, *key_cell;
 	WT_OFF off;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
@@ -1855,7 +1855,9 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 	 * to re-process the 0th key at each split point to be an empty key,
 	 * so we don't do that.  However, we are reconciling an internal page
 	 * for whatever reason, and the 0th key is known to be useless.  Set
-	 * the 0th key to something small.
+	 * the 0th key to something small.  (We do NOT put a zero-length key
+	 * in the tree: zero-length keys are keys requiring further processing,
+	 * not keys we are going to ignore.)
 	 */
 	r->cell_zero = 1;
 
@@ -1902,7 +1904,7 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
 			rp = WT_ROW_REF_PAGE(rref);
 			if (F_ISSET(rp, WT_PAGE_DELETED | WT_PAGE_SPLIT)) {
-				/* Delete overflow keys for merged pages */
+				/* Delete overflow keys for merged pages. */
 				if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
 					WT_RET(__rec_discard_add_ovfl(session,
 					    WT_CELL_BYTE_OVFL(key_cell)));
@@ -1922,26 +1924,40 @@ __rec_row_int(SESSION *session, WT_PAGE *page)
 		/* Any off-page reference must be a valid disk address. */
 		WT_ASSERT(session, WT_ROW_REF_ADDR(rref) != WT_ADDR_INVALID);
 
-		/*
-		 * Keys are immutable, so generally come from the original disk
-		 * page; however, discard any 0th key, we don't need it.
-		 */
-		if (r->cell_zero) {
-			cell = &_cell;
-			WT_CELL_SET(cell, WT_CELL_KEY, 0);
-			len = WT_CELL_SPACE_REQ(0);
-			r->cell_zero = 0;
-		} else {
-			cell = key_cell;
-			len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
-		}
+		len = WT_CELL_SPACE_REQ(WT_CELL_LEN(key_cell));
 
 		/* Boundary: split or write the page. */
 		while (len + WT_CELL_SPACE_REQ(sizeof(WT_OFF)) > r->space_avail)
 			WT_RET(__rec_split(session));
 
-		/* Copy the key into place. */
-		memcpy(r->first_free, cell, len);
+		/*
+		 * Copy the key into place.
+		 *
+		 * Keys are immutable, so generally come from the original disk
+		 * page; however, discard any 0th key, we don't need it.
+		 */
+		if (r->cell_zero && WT_CELL_LEN(key_cell) > 1) {
+			WT_BUF key0;
+			WT_OVFL key_ovfl0;
+
+			WT_CLEAR(key0);
+
+			/* Delete overflow keys for discarded 0th keys. */
+			if (WT_CELL_TYPE(key_cell) == WT_CELL_KEY_OVFL)
+				WT_RET(__rec_discard_add_ovfl(session,
+				    WT_CELL_BYTE_OVFL(key_cell)));
+
+			key0.data = "*";
+			key0.size = 1;
+			WT_RET(__rec_cell_build_key(
+			    session, &key0, &cell, &key_ovfl0));
+			len = WT_CELL_SPACE_REQ(WT_CELL_LEN(&cell));
+			memcpy(r->first_free, &cell, sizeof(WT_CELL));
+			memcpy(r->first_free +
+			    sizeof(WT_CELL), key0.data, key0.size);
+		} else
+			memcpy(r->first_free, key_cell, len);
+		r->cell_zero = 0;
 		__rec_incr(session, r, len);
 
 		/* Copy the off-page reference into place. */
@@ -2011,8 +2027,8 @@ __rec_row_merge(SESSION *session, WT_PAGE *page)
 		 * was called from the top-level parent page.
 		 */
 		if (r->cell_zero) {
-			key.data = "";
-			key.size = 0;
+			key.data = "*";
+			key.size = 1;
 			r->cell_zero = 0;
 			r->merge_ref = NULL;
 		} else if (r->merge_ref != NULL) {
