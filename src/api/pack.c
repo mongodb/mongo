@@ -16,8 +16,11 @@ wiredtiger_struct_sizev(const char *fmt, va_list ap)
 {
 	size_t size;
 
-	size = 0;
+	/* XXX skip fixed sizes for now. */
+	while (isdigit(*fmt))
+		++fmt;
 
+	size = 0;
 	switch (fmt[0]) {
 	case 'S':
 		size += strlen(va_arg(ap, const char *)) + 1;
@@ -43,6 +46,10 @@ wiredtiger_struct_packv(void *buffer, size_t size, const char *fmt, va_list ap)
 	const void *src;
 	const char *str;
 	size_t sz;
+
+	/* XXX skip fixed sizes for now. */
+	while (isdigit(*fmt))
+		++fmt;
 
 	p = buffer;
 	switch (fmt[0]) {
@@ -85,6 +92,10 @@ wiredtiger_struct_unpackv(
 	WT_ITEM *item;
 	const uint8_t *p;
 	const char **strp;
+
+	/* XXX skip fixed sizes for now. */
+	while (isdigit(*fmt))
+		++fmt;
 
 	p = buffer;
 	switch (fmt[0]) {
