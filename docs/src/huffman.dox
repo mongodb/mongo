@@ -7,40 +7,40 @@ Huffman compression is maintained in memory as well as on disk, and can
 increase both the amount of usable data the cache can hold as well as
 decrease the size of the data on disk.
 
-To specify Huffman encoding for the key in a row-store, specify
-"huffman_key=english", "huffman_key=utf8:<file>" or
-"huffman_key=utf16:<file>" in the configuration passed to
+To specify Huffman encoding for the key in a row-store, specify \c
+"huffman_key=english", \c "huffman_key=utf8:<file>" or \c
+"huffman_key=utf16:<file>" in the configuration passed to \c
 WT_SESSION::create.
 
 To specify Huffman encoding for a variable-length value in either a
-row-store or a column-store, specify "huffman_value=english",
-"huffman_value=utf8:<file>" or "huffman_value=utf16:<file>" in the
-configuration passed to WT_SESSION::create.
+row-store or a column-store, specify "huffman_value=english", \c
+"huffman_value=utf8:<file>" or \c "huffman_value=utf16:<file>" in the
+configuration passed to \c WT_SESSION::create.
 
-Setting Huffman encoding to "english" configures WiredTiger to compress
-each byte individually and to use a built-in English language frequency
-table.
+Setting Huffman encoding to \c "english" configures WiredTiger to
+compress each byte individually and to use a built-in English language
+frequency table.
 
-Setting Huffman encoding to "utf8:<file>" configures WiredTiger to
+Setting Huffman encoding to \c "utf8:<file>" configures WiredTiger to
 encode each byte individually, and to read the specified file for the
 frequency table.  The format of the frequency table file is lines
 containing pairs of unsigned integers separated by whitespace.  The
 first integer is the byte value, the second integer is the frequency
 value.  Byte values and frequency values may be specified as hexadecimal
-numbers (with a leading "0x" prefix), or as integers.  Byte values must
-be unique and be in the range of 0 to 255.  Frequency values do not need
-to be unique, but must be in the range of 0 to 255, where the lower the
-frequency value, the less likely the byte value is to occur.   Any
+numbers (with a leading \c "0x" prefix), or as integers.  Byte values
+must be unique and be in the range of 0 to 255.  Frequency values do not
+need to be unique, but must be in the range of 0 to 255, where the lower
+the frequency value, the less likely the byte value is to occur.   Any
 unspecified byte values are assumed to have frequencies of 0.
 
-Setting Huffman encoding to "utf16:<file>" configures WiredTiger to
+Setting Huffman encoding to \c "utf16:<file>" configures WiredTiger to
 encode pairs of bytes, and to read the specified file for the frequency
 table.  The format of the frequency table file is lines containing pairs
 of unsigned integers separated by whitespace.  The first integer is the
 byte value, the second integer is the frequency value.  Byte values and
 frequency values may be specified as hexadecimal numbers (with a leading
-"0x" prefix), or as integers.  Byte values must be unique and be in the
-range of 0 to 65535.  Frequency values do not need to be unique, but
+\c "0x" prefix), or as integers.  Byte values must be unique and be in
+the range of 0 to 65535.  Frequency values do not need to be unique, but
 must be in the range of 0 to 65535, where the lower the frequency value,
 the less likely the byte value is to occur.   Any unspecified byte
 values are assumed to have frequencies of 0.
