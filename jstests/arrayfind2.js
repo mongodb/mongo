@@ -32,5 +32,5 @@ assert.eq( {"a.x":[[3,3]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } },
 
 t.ensureIndex( { "a.x":1,"a.y":-1 } );
 
-// TODO Index bounds below for elemMatch could be improved.
+// TODO Index bounds below for elemMatch could be improved. - SERVER-3104
 assert.eq( {"a.x":[[3,3]],"a.y":[[{$maxElement:1},{$minElement:1}]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3, y : { $gt: 4 } } } ] } } ).explain().indexBounds );
