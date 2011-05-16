@@ -128,6 +128,9 @@ struct __btree {
 
 	WT_BTREE_STATS *stats;		/* Btree handle statistics */
 	WT_BTREE_FILE_STATS *fstats;	/* Btree file statistics */
+
+#define	WT_BTREE_NO_EVICTION	0x01	/* Ignored by the eviction thread */
+	uint32_t flags;
 };
 
 struct __btree_session {

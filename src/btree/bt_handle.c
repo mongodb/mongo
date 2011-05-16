@@ -151,6 +151,7 @@ __wt_btree_close(SESSION *session)
 
 	btree = session->btree;
 	conn = btree->conn;
+	ret = 0;
 
 	/*
 	 * Remove from the connection's list.
@@ -162,8 +163,12 @@ __wt_btree_close(SESSION *session)
 	--conn->dbqcnt;
 	__wt_unlock(session, conn->mtx);
 
-	/* Ask the eviction thread to flush all pages. */
-	__wt_evict_file_serial(session, 1, ret);
+	/*
+	 * If it's a normal tree, ask the eviction thread to flush any pages
+	 * that remain in the cache.
+	 */
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		__wt_evict_file_serial(session, 1, ret);
 
 	/* Write out the free list. */
 	WT_TRET(__wt_block_write(session));

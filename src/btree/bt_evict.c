@@ -557,6 +557,10 @@ __evict_walk(SESSION *session)
 
 		i = WT_EVICT_WALK_BASE;
 		TAILQ_FOREACH(btree, &conn->dbqh, q) {
+			/* Skip trees we're not allowed to touch. */
+			if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+				continue;
+
 			/* Reference the correct BTREE handle. */
 			WT_SET_BTREE_IN_SESSION(session, btree);
 
@@ -615,10 +619,6 @@ walk:		WT_RET(__wt_walk_begin(
 		 */
 		if (F_ISSET(page,
 		    WT_PAGE_PINNED | WT_PAGE_DELETED | WT_PAGE_SPLIT))
-			continue;
-
-		/* During verification, we can only evict clean pages. */
-		if (cache->only_evict_clean && WT_PAGE_IS_MODIFIED(page))
 			continue;
 
 		cache->evict[slot].page = page;

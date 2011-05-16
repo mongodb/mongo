@@ -126,6 +126,9 @@ __wt_salvage(SESSION *session, const char *filename, const char *config)
 	btree = session->btree;
 	ret = 0;
 
+	/* Tell the eviction thread to ignore us, we'll handle our own pages. */
+	F_SET(btree, WT_BTREE_NO_EVICTION);
+
 	WT_CLEAR(stuff);
 	stuff.btree = btree;
 	stuff.page_type = WT_PAGE_INVALID;

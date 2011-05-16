@@ -46,19 +46,25 @@ __wt_verify(
     SESSION *session, const char *filename, FILE *stream, const char *config)
 {
 	BTREE *btree;
-	WT_CACHE *cache;
 	WT_VSTUFF *vs, _vstuff;
 	int ret;
 
 	WT_UNUSED(config);			/* XXX: unused for now */
 
-	cache = S2C(session)->cache;
 	vs = NULL;
 	ret = 0;
 
 	/* Get a Btree. */
 	WT_RET(__wt_connection_btree(S2C(session), &btree));
 	session->btree = btree;
+
+	/*
+	 * Tell the eviction thread to ignore us, we'll handle our own pages
+	 * (it would be possible for us to let the eviction thread handle us,
+	 * but there's no reason to do so, we can be more aggressive because
+	 * we know what pages are no longer needed, regardless of LRU).
+	 */
+	F_SET(btree, WT_BTREE_NO_EVICTION);
 
 	/*
 	 * Open the file.  There's no special verification magic going on during
@@ -104,14 +110,6 @@ __wt_verify(
 	vs->max_addr = WT_ADDR_INVALID;
 
 	/*
-	 * During verification, we can only evict clean pages (otherwise we can
-	 * race and verify pages not at all or more than once).  The variable
-	 * volatile, and the eviction code checks before each eviction, so no
-	 * further serialization is required.
-	 */
-	cache->only_evict_clean = 1;
-
-	/*
 	 * The first allocsize bytes of the file are the file's metadata and
 	 * configuration string, which we've already verified.
 	 */
@@ -126,9 +124,7 @@ __wt_verify(
 	/* Verify we read every file block. */
 	WT_ERR(__wt_verify_checkfrag(session, vs));
 
-err:	cache->only_evict_clean = 0;
-
-	if (vs != NULL) {
+err:	if (vs != NULL) {
 		/* Wrap up reporting. */
 		__wt_progress(session, NULL, vs->fcnt);
 
@@ -138,6 +134,11 @@ err:	cache->only_evict_clean = 0;
 		if (vs->max_key != NULL)
 			__wt_scr_release(&vs->max_key);
 	}
+
+	/* Discard the root page from the tree. */
+	if (btree->root_page.page != NULL)
+		WT_TRET(__wt_page_reconcile(session,
+		    btree->root_page.page, 0, WT_REC_EVICT | WT_REC_LOCKED));
 
 	/* Close the file and discard the BTREE structure. */
 	WT_TRET(__wt_btree_close(session));
@@ -314,6 +315,8 @@ recno_chk:	if (parent_recno != recno) {
 			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __wt_verify_tree(session, ref, cref->recno, vs);
 			__wt_hazard_clear(session, ref->page);
+			WT_TRET(__wt_page_reconcile(session,
+			    ref->page, 0, WT_REC_EVICT | WT_REC_LOCKED));
 			if (ret != 0)
 				return (ret);
 		}
@@ -338,6 +341,8 @@ recno_chk:	if (parent_recno != recno) {
 			WT_RET(__wt_page_in(session, page, ref, 1));
 			ret = __wt_verify_tree(session, ref, (uint64_t)0, vs);
 			__wt_hazard_clear(session, ref->page);
+			WT_TRET(__wt_page_reconcile(session,
+			    ref->page, 0, WT_REC_EVICT | WT_REC_LOCKED));
 			if (ret != 0)
 				return (ret);
 		}

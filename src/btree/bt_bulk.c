@@ -39,6 +39,9 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 		return (WT_ERROR);
 	}
 
+	/* Tell the eviction thread to ignore us, we'll handle our own pages. */
+	F_SET(btree, WT_BTREE_NO_EVICTION);
+
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		cbulk->recno = 1;
