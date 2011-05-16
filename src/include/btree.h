@@ -170,6 +170,12 @@ struct __wt_page_disk {
 	} u;
 
 	uint8_t type;			/* 32: page type */
+
+	/*
+	 * End the the WT_PAGE_DISK structure with 3 bytes of padding: it wastes
+	 * space, but it leaves the WT_PAGE_DISK structure aligned and having a
+	 * small amount of space to play with in the future can't hurt.
+	 */
 	uint8_t unused[3];		/* 33-35: unused padding */
 };
 /*
@@ -177,11 +183,6 @@ struct __wt_page_disk {
  * ensure the compiler hasn't inserted padding (which would break the world).
  * The header is followed by WT_CELL structures, which require 4-byte
  * alignment.
- *
- * 64-bit compilers will pad the end of this structure to a multiple of 8
- * bytes. We take that into account when checking the size, and always use
- * WT_PAGE_DISK_SIZE rather than sizeof to avoid writing 4 bytes of padding to
- * every page.
  */
 #define	WT_PAGE_DISK_SIZE		36
 
