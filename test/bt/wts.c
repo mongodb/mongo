@@ -416,15 +416,16 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			session->log_printf(session, "%-10s %llu {%.*s}",
+			session->log_printf(session, "%-10s %lu {%.*s}",
 			    "bulk K",
-			    g.key_cnt, (int)key.size, (char *)key.data);
+			    (u_long)g.key_cnt, (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		session->log_printf(session, "%-10s %llu {%.*s}",
-		    "bulk V", g.key_cnt, (int)value.size, (char *)value.data);
+		session->log_printf(session, "%-10s %lu {%.*s}",
+		    "bulk V",
+		    (u_long)g.key_cnt, (int)value.size, (char *)value.data);
 
 	/* Insert the item into BDB. */
 	bdb_insert(key.data, key.size, value.data, value.size);
@@ -531,7 +532,7 @@ wts_read_scan(void)
 } while (0)
 
 /*
- * wts_read_row --
+ * wts_read --
  *	Read and verify a single element in a row-store file.
  */
 static int
@@ -576,7 +577,7 @@ wts_read(uint64_t keyno)
 	}
 
 	/* Check for not-found status. */
-	NTF_CHK(wts_notfound_chk("wts_read_row", ret, notfound, keyno));
+	NTF_CHK(wts_notfound_chk("wts_read", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
