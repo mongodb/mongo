@@ -153,7 +153,9 @@ wts_startup(void)
 
 	if (g.logging) {
 		time(&now);
-		session->log_printf(session, "\nWT startup: %s", ctime(&now));
+		session->log_printf(session,
+		    "===============\nWT start: %s===============",
+		    ctime(&now));
 	}
 
 	g.wts_conn = conn;
@@ -174,7 +176,9 @@ wts_teardown(void)
 
 	if (g.logging) {
 		time(&now);
-		session->log_printf(session, "\nWT teardown: %s", ctime(&now));
+		session->log_printf(session,
+		    "===============\nWT stop: %s===============",
+		    ctime(&now));
 	}
 
 	assert(wts_sync() == 0);
