@@ -168,14 +168,6 @@ namespace mongo {
 
         bool sameCriteriaCount( const Matcher &other ) const;
         
-        bool singleSimpleCriterion() const {
-            return false; // TODO SERVER-958
-//            // TODO Really check, especially if all basics are ok.
-//            // $all, etc
-//            // _orConstraints?
-//            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
-        }
-
     private:
         // Only specify constrainIndexKey if matches() will be called with
         // index keys having empty string field names.
