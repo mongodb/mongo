@@ -74,6 +74,10 @@ __cursor_set_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->key_format;
+	/* XXX Ignore fixed lengths for now. */
+	while (isdigit(*fmt))
+		++fmt;
+	/* Fast path some common cases: single strings or byte arrays. */
 	if (fmt[0] == 'r' && fmt[1] == '\0') {
 		cursor->recno = va_arg(ap, wiredtiger_recno_t);
 		cursor->key.data = &cursor->recno;
@@ -124,6 +128,10 @@ __cursor_set_value(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSTD_RAW) ? "u" : cursor->value_format;
+	/* XXX Ignore fixed lengths for now. */
+	while (isdigit(*fmt))
+		++fmt;
+	/* Fast path some common cases: single strings or byte arrays. */
 	if (fmt[0] == 'S' && fmt[1] == '\0') {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;

@@ -170,6 +170,8 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
 	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config);
 	ret = 0;
 	WT_TRET(__wt_btcur_close((CURSOR_BTREE *)cursor, config));
+	__wt_free(session, cursor->key_format);
+	__wt_free(session, cursor->value_format);
 	WT_TRET(__wt_cursor_close(cursor, config));
 	API_END();
 
@@ -181,17 +183,12 @@ __curbtree_close(WT_CURSOR *cursor, const char *config)
  *	Add a btree handle to the session's cache.
  */
 int
-__wt_session_add_btree(SESSION *session, BTREE *btree,
-    const char *key_format, const char *value_format)
+__wt_session_add_btree(SESSION *session, BTREE *btree)
 {
 	BTREE_SESSION *btree_session;
 
 	WT_RET(__wt_calloc_def(session, 1, &btree_session));
-
 	btree_session->btree = btree;
-	btree_session->key_format = key_format;
-	btree_session->value_format = value_format;
-
 	TAILQ_INSERT_HEAD(&session->btrees, btree_session, q);
 
 	return (0);
@@ -254,13 +251,13 @@ __wt_curbtree_open(SESSION *session,
 		0			/* uint32_t flags */
 	};
 	const char *tablename;
+	char *format;
 	BTREE *btree;
 	BTREE_SESSION *btree_session;
 	CONNECTION *conn;
 	CURSOR_BTREE *cbt;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
-	const char *key_format, *value_format;
 	int bulk, dump, printable, raw, ret;
 	size_t csize;
 	API_CONF_INIT(session, open_cursor, config);
@@ -278,31 +275,12 @@ __wt_curbtree_open(SESSION *session,
 		session->btree = btree;
 
 		WT_STAT_INCR(conn->stats, file_open);
-		WT_RET(__wt_btree_create(session, tablename, "XXXX"));
 		WT_RET(__wt_btree_open(session, tablename));
 
-		/*
-		 * !!! TODO read key / value formats from a table-of-tables.
-		 */
-		switch (btree->type) {
-		case BTREE_COL_FIX:
-		case BTREE_COL_RLE:
-		case BTREE_COL_VAR:
-			key_format = "r";
-			break;
-		case BTREE_ROW:
-			key_format = "u";
-			break;
-		WT_ILLEGAL_FORMAT(session);
-		}
-		value_format = "u";
-		WT_RET(__wt_session_add_btree(
-		    session, btree, key_format, value_format));
+		WT_RET(__wt_session_add_btree(session, btree));
 	} else {
 		WT_ERR(ret);
 		btree = btree_session->btree;
-		key_format = btree_session->key_format;
-		value_format = btree_session->value_format;
 	}
 
 	WT_ERR(__wt_config_gets(__cfg, "bulk", &cval));
@@ -320,14 +298,23 @@ __wt_curbtree_open(SESSION *session,
 	cursor = &cbt->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->key_format = key_format;
-	cursor->value_format = value_format;
+
+	/* Get the key and value formats out of btree->config. */
+	WT_ERR(__wt_config_getones(btree->config, "key_format", &cval));
+	WT_ERR(__wt_calloc_def(session, cval.len + 1, &format));
+	memcpy(format, cval.str, cval.len);
+	cursor->key_format = format;
+	WT_ERR(__wt_config_getones(btree->config, "value_format", &cval));
+	WT_ERR(__wt_calloc_def(session, cval.len + 1, &format));
+	memcpy(format, cval.str, cval.len);
+	cursor->value_format = format;
+
 	__wt_cursor_init(cursor, config);
 
 	cbt->btree = session->btree = btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((CURSOR_BULK *)cbt));
-	if (dump != 0)
+	if (dump)
 		__wt_curdump_init(cursor, printable);
 	if (raw)
 		F_SET(cursor, WT_CURSTD_RAW);
