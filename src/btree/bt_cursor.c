@@ -78,10 +78,11 @@ __btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 		cbt->nitems = cbt->page->entries;
 		cbt->recno = cbt->page->u.col_leaf.recno;
 
-		cell = WT_COL_PTR(cbt->page, cbt->cip);
 		cbt->nrepeats = WT_RLE_REPEAT_COUNT(cell);
 		cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
 	}
+
+	cell = WT_COL_PTR(cbt->page, cbt->cip);
 
 	for (;;) {
 		for (found = 0;
@@ -116,7 +117,7 @@ __btcur_next_rle(CURSOR_BTREE *cbt, wiredtiger_recno_t *recnop, WT_BUF *value)
 		cbt->ins = WT_COL_INSERT(cbt->page, cbt->cip);
 	}
 
-	return (WT_NOTFOUND);
+	/* NOTREACHED */
 }
 
 static inline int
