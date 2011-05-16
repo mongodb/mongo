@@ -50,6 +50,17 @@ namespace mongo {
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
     BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
 
+    bool isValidNS( const StringData& ns ) {
+        // TODO: should check for invalid characters
+
+        const char * x = strchr( ns.data() , '.' );
+        if ( ! x )
+            return false;
+
+        x++;
+        return *x > 0;
+    }
+
     bool inDBRepair = false;
     struct doingRepair {
         doingRepair() {
@@ -1608,58 +1619,116 @@ namespace mongo {
         return loc;
     }
 
-    /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc
-             after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
+    bool NOINLINE_DECL insert_checkSys(const char *sys, const char *ns, bool& wouldAddIndex, const void *obuf, bool god) {
+        uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
+        if ( strstr(ns, ".system.") ) {
+            // later:check for dba-type permissions here if have that at some point separate
+            if ( strstr(ns, ".system.indexes" ) )
+                wouldAddIndex = true;
+            else if ( legalClientSystemNS( ns , true ) ) {
+                if ( obuf && strstr( ns , ".system.users" ) ) {
+                    BSONObj t( reinterpret_cast<const char *>( obuf ) );
+                    uassert( 14051 , "system.user entry needs 'user' field to be a string" , t["user"].type() == String );
+                    uassert( 14052 , "system.user entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
+                    uassert( 14053 , "system.user entry needs 'user' field to be non-empty" , t["user"].String().size() );
+                    uassert( 14054 , "system.user entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
+                }
+            }
+            else if ( !god ) {
+                // todo this should probably uasseert rather than doing this:
+                log() << "ERROR: attempt to insert in system namespace " << ns << endl;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    NOINLINE_DECL NamespaceDetails* insert_newNamespace(const char *ns, int len, bool god) { 
+        addNewNamespaceToCatalog(ns);
+        /* todo: shouldn't be in the namespace catalog until after the allocations here work.
+            also if this is an addIndex, those checks should happen before this!
+        */
+        // This may create first file in the database.
+        int ies = Extent::initialSize(len);
+        if( str::contains(ns, '$') && len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 && len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) { 
+            // probably an index.  so we pick a value here for the first extent instead of using initialExtentSize() which is more 
+            // for user collections.  TODO: we could look at the # of records in the parent collection to be smarter here.
+            ies = (32+4) * 1024;
+        }
+        cc().database()->allocExtent(ns, ies, false);
+        NamespaceDetails *d = nsdetails(ns);
+        if ( !god )
+            ensureIdIndexForNewNs(ns);
+        return d;
+    }
+
+    void NOINLINE_DECL insert_makeIndex(NamespaceDetails *tableToIndex, const string& tabletoidxns, const DiskLoc& loc) { 
+        uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
+
+        BSONObj info = loc.obj();
+        bool background = info["background"].trueValue();
+        if( background && cc().isSyncThread() ) {
+            /* don't do background indexing on slaves.  there are nuances.  this could be added later
+                but requires more code.
+                */
+            log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
+            background = false;
+        }
+
+        int idxNo = tableToIndex->nIndexes;
+        IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
+        getDur().writingDiskLoc(idx.info) = loc;
+        try {
+            buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
+        }
+        catch( DBException& e ) {
+            // save our error msg string as an exception or dropIndexes will overwrite our message
+            LastError *le = lastError.get();
+            int savecode = 0;
+            string saveerrmsg;
+            if ( le ) {
+                savecode = le->code;
+                saveerrmsg = le->msg;
+            }
+            else {
+                savecode = e.getCode();
+                saveerrmsg = e.what();
+            }
+
+            // roll back this index
+            string name = idx.indexName();
+            BSONObjBuilder b;
+            string errmsg;
+            bool ok = dropIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
+            if( !ok ) {
+                log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
+            }
+
+            assert( le && !saveerrmsg.empty() );
+            raiseError(savecode,saveerrmsg.c_str());
+            throw;
+        }
+    }
+
+    /* if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc
+         after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
+
+       @param mayAddIndex almost always true, except for invocation from rename namespace command.
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || isANormalNSName( ns ) );
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
-        const char *sys = strstr(ns, "system.");
-        if ( sys ) {
-            uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
-            if ( strstr(ns, ".system.") ) {
-                // later:check for dba-type permissions here if have that at some point separate
-                if ( strstr(ns, ".system.indexes" ) )
-                    wouldAddIndex = true;
-                else if ( legalClientSystemNS( ns , true ) ) {
-                    if ( obuf && strstr( ns , ".system.users" ) ) {
-                        BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                        uassert( 14051 , "system.user entry needs 'user' field to be a string" , t["user"].type() == String );
-                        uassert( 14052 , "system.user entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
-
-                        uassert( 14053 , "system.user entry needs 'user' field to be non-empty" , t["user"].String().size() );
-                        uassert( 14054 , "system.user entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
-                    }
-                }
-                else if ( !god ) {
-                    out() << "ERROR: attempt to insert in system namespace " << ns << endl;
-                    return DiskLoc();
-                }
-            }
-            else
-                sys = 0;
+        {
+            const char *sys = strstr(ns, "system.");
+            if ( sys && !insert_checkSys(sys, ns, wouldAddIndex, obuf, god) )
+                return DiskLoc();
         }
-
         bool addIndex = wouldAddIndex && mayAddIndex;
 
         NamespaceDetails *d = nsdetails(ns);
         if ( d == 0 ) {
-            addNewNamespaceToCatalog(ns);
-            /* todo: shouldn't be in the namespace catalog until after the allocations here work.
-               also if this is an addIndex, those checks should happen before this!
-            */
-            // This may create first file in the database.
-            int ies = Extent::initialSize(len);
-            if( str::contains(ns, '$') && len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 && len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) { 
-                // probably an index.  so we pick a value here for the first extent instead of using initialExtentSize() which is more 
-                // for user collections.  TODO: we could look at the # of records in the parent collection to be smarter here.
-                ies = (32+4) * 1024;
-            }
-            cc().database()->allocExtent(ns, ies, false);
-            d = nsdetails(ns);
-            if ( !god )
-                ensureIdIndexForNewNs(ns);
+            d = insert_newNamespace(ns, len, god);
         }
         d->paddingFits();
 
@@ -1675,12 +1744,10 @@ namespace mongo {
                 // as if index already exists)
                 return DiskLoc();
             }
-
             if ( ! fixedIndexObject.isEmpty() ) {
                 obuf = fixedIndexObject.objdata();
                 len = fixedIndexObject.objsize();
             }
-
         }
 
         const BSONElement *newId = &writeId;
@@ -1752,56 +1819,12 @@ namespace mongo {
             s->nrecords++;
         }
 
-        // we don't bother clearing those stats for the god tables - also god is true when adidng a btree bucket
+        // we don't bother resetting query optimizer stats for the god tables - also god is true when adidng a btree bucket
         if ( !god )
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
 
         if ( tableToIndex ) {
-            uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
-
-            BSONObj info = loc.obj();
-            bool background = info["background"].trueValue();
-            if( background && cc().isSyncThread() ) {
-                /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                   but requires more code.
-                   */
-                log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
-                background = false;
-            }
-
-            int idxNo = tableToIndex->nIndexes;
-            IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
-            getDur().writingDiskLoc(idx.info) = loc;
-            try {
-                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
-            }
-            catch( DBException& e ) {
-                // save our error msg string as an exception or dropIndexes will overwrite our message
-                LastError *le = lastError.get();
-                int savecode = 0;
-                string saveerrmsg;
-                if ( le ) {
-                    savecode = le->code;
-                    saveerrmsg = le->msg;
-                }
-                else {
-                    savecode = e.getCode();
-                    saveerrmsg = e.what();
-                }
-
-                // roll back this index
-                string name = idx.indexName();
-                BSONObjBuilder b;
-                string errmsg;
-                bool ok = dropIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
-                if( !ok ) {
-                    log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
-                }
-
-                assert( le && !saveerrmsg.empty() );
-                raiseError(savecode,saveerrmsg.c_str());
-                throw;
-            }
+            insert_makeIndex(tableToIndex, tabletoidxns, loc);
         }
 
         /* add this record to our indexes */
@@ -1827,7 +1850,6 @@ namespace mongo {
             }
         }
 
-        //  out() << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
         return loc;
     }
 
@@ -2180,17 +2202,5 @@ namespace mongo {
 
         return true;
     }
-
-    bool isValidNS( const StringData& ns ) {
-        // TODO: should check for invalid characters
-
-        const char * x = strchr( ns.data() , '.' );
-        if ( ! x )
-            return false;
-
-        x++;
-        return *x > 0;
-    }
-
 
 } // namespace mongo
