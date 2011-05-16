@@ -85,6 +85,10 @@ namespace mongo {
          */
         bool cleanupOldQueues();
         
+        /**
+         * starts background cleaner thread
+         */
+        void startCleaner();
     private:
         
         // '_writebackQueueLock' protects only the map itself, since each queue is syncrhonized.

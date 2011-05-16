@@ -44,6 +44,7 @@
 #include "dbwebserver.h"
 #include "dur.h"
 #include "concurrency.h"
+#include "../s/d_writeback.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -480,6 +481,7 @@ namespace mongo {
 
         snapshotThread.go();
         clientCursorMonitor.go();
+        writeBackManager.startCleaner();
 
         if( !cmdLine._replSet.empty() ) {
             replSet = true;

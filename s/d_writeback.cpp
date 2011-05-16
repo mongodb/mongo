@@ -34,7 +34,6 @@ namespace mongo {
     WriteBackManager writeBackManager;
 
     WriteBackManager::WriteBackManager() : _writebackQueueLock("sharding:writebackQueueLock") {
-        _cleaner.go();
     }
 
     WriteBackManager::~WriteBackManager() {
@@ -108,6 +107,10 @@ namespace mongo {
             return true;
         }
         return false;
+    }
+
+    void WriteBackManager::startCleaner() { 
+        _cleaner.go();
     }
 
     void WriteBackManager::Cleaner::run() { 
