@@ -30,9 +30,6 @@ files.forEach(
 	// dbcase: Database names are case-insensitive under ShardingTest?
 	//         SERVER-1443
 
-        // setParameter/syncdelay specifically does not work with sharding,
-        // at the moment (see dbcommands_generic.cpp).
-
 	// These are all SERVER-1444
 	// count5: limit() and maybe skip() may be unreliable
 	// geo3: limit() not working, I think
@@ -75,7 +72,7 @@ files.forEach(
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|compact.*|check_shard_index|mr_replaceIntoDB|dropdb_race)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|notablescan|compact.*|check_shard_index|mr_replaceIntoDB)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would fail under sharding " + x.name)	    
 	    return;
 	}
