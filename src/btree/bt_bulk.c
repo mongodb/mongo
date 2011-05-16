@@ -26,6 +26,19 @@ __wt_bulk_init(CURSOR_BULK *cbulk)
 	session = (SESSION *)cbulk->cbt.iface.session;
 	btree = session->btree;
 
+	/*
+	 * You can't bulk-load into existing trees; while checking, free the
+	 * empty page created when the btree was opened.
+	 */
+	if (F_ISSET(btree->root_page.page, WT_PAGE_INITIAL_EMPTY)) {
+		btree->root_page.state = WT_REF_DISK;
+		__wt_free(session, btree->root_page.page);
+	} else {
+		__wt_errx(
+		    session, "bulk-load is only possible for empty trees");
+		return (WT_ERROR);
+	}
+
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		cbulk->recno = 1;

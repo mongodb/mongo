@@ -93,13 +93,14 @@ __wt_btree_open(SESSION *session, const char *name)
 			page->type = WT_PAGE_ROW_LEAF;
 			break;
 		}
+		page->parent = NULL;
+		page->parent_ref = &btree->root_page;
+		F_SET(page, WT_PAGE_INITIAL_EMPTY);
 
 		btree->root_page.state = WT_REF_MEM;
 		btree->root_page.addr = WT_ADDR_INVALID;
 		btree->root_page.size = 0;
 		btree->root_page.page = page;
-		page->parent = NULL;
-		page->parent_ref = &btree->root_page;
 	} else  {
 		WT_RET(__wt_page_in(session, NULL, &btree->root_page, 0));
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);

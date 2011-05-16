@@ -454,9 +454,11 @@ struct __wt_page {
 #define	WT_PAGE_BULK_LOAD	0x001	/* Page bulk loaded */
 #define	WT_PAGE_CACHE_COUNTED	0x002	/* Page counted in cache stats */
 #define	WT_PAGE_DELETED		0x004	/* Page was empty at reconcilation */
-#define	WT_PAGE_MODIFIED	0x008	/* Page is modified */
-#define	WT_PAGE_PINNED		0x010	/* Page is pinned */
-#define	WT_PAGE_SPLIT		0x020	/* Internal page created in a split */
+#define	WT_PAGE_INITIAL_EMPTY	0x008	/* Empty page created during open */
+#define	WT_PAGE_MODIFIED	0x010	/* Page is modified */
+#define	WT_PAGE_PINNED		0x020	/* Page is pinned */
+#define	WT_PAGE_SPLIT		0x040	/* Internal page created in a split */
+
 	uint8_t flags;			/* Page flags */
 };
 /*
