@@ -107,17 +107,21 @@ static void __slvg_trk_dump_row(WT_TRACK *);
 #endif
 
 /*
- * __wt_btree_salvage --
+ * __wt_salvage --
  *	Salvage a Btree.
  */
 int
-__wt_btree_salvage(SESSION *session)
+__wt_salvage(SESSION *session, const char *filename, const char *config)
 {
 	BTREE *btree;
 	WT_STUFF *ss, stuff;
 	off_t len;
 	uint32_t allocsize, i, leaf_cnt;
 	int ret;
+
+	/* XXX should be used to open the file containing the tree. */
+	WT_UNUSED(filename);
+	WT_UNUSED(config);
 
 	btree = session->btree;
 	ret = 0;

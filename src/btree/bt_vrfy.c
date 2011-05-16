@@ -38,26 +38,21 @@ static int __wt_verify_row_leaf_key_order(SESSION *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_verify_tree(SESSION *, WT_REF *, uint64_t, WT_VSTUFF *);
 
 /*
- * __wt_btree_verify --
- *	Verify a Btree.
- */
-int
-__wt_btree_verify(SESSION *session)
-{
-	return (__wt_verify(session, NULL));
-}
-
-/*
  * __wt_verify --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_verify(SESSION *session, FILE *stream)
+__wt_verify(
+    SESSION *session, const char *filename, FILE *stream, const char *config)
 {
 	BTREE *btree;
 	WT_CACHE *cache;
 	WT_VSTUFF vstuff;
 	int ret;
+
+	/* XXX should be used to open the file containing the tree. */
+	WT_UNUSED(filename);
+	WT_UNUSED(config);
 
 	btree = session->btree;
 	cache = S2C(session)->cache;

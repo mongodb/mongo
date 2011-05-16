@@ -63,7 +63,8 @@ __wt_debug_set_fp(const char *ofile, FILE **fpp, int *close_varp)
  *	Dump a file in debugging mode.
  */
 int
-__wt_debug_dump(SESSION *session, const char *ofile, FILE *fp)
+__wt_debug_dump(
+    SESSION *session, const char *btfile, const char *ofile, FILE *fp)
 {
 	int do_close, ret;
 
@@ -74,7 +75,7 @@ __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_verify(session, fp);
+	ret = __wt_verify(session, btfile, fp, NULL);
 
 	if (do_close)
 		(void)fclose(fp);

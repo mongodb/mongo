@@ -216,11 +216,19 @@ __session_drop(
 static int
 __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(name);
-	WT_UNUSED(config);
+	SESSION *session;
 
-	return (0);
+	session = (SESSION *)wt_session;
+
+	SESSION_API_CALL(session, salvage, config);
+	if (strncmp(name, "table:", 6) != 0) {
+		__wt_errx(session, "Unknown object type: %s", name);
+		return (EINVAL);
+	}
+	name += 6;
+
+	return (__wt_salvage(session, name, config));
+	API_END();
 }
 
 /*
@@ -261,11 +269,19 @@ __session_truncate(WT_SESSION *wt_session,
 static int
 __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(name);
-	WT_UNUSED(config);
+	SESSION *session;
 
-	return (0);
+	session = (SESSION *)wt_session;
+
+	SESSION_API_CALL(session, verify, config);
+	if (strncmp(name, "table:", 6) != 0) {
+		__wt_errx(session, "Unknown object type: %s", name);
+		return (EINVAL);
+	}
+	name += 6;
+
+	return (__wt_verify(session, name, NULL, config));
+	API_END();
 }
 
 /*

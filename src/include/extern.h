@@ -98,7 +98,10 @@ int __wt_btcur_insert(CURSOR_BTREE *cbt);
 int __wt_btcur_update(CURSOR_BTREE *cbt);
 int __wt_btcur_remove(CURSOR_BTREE *cbt);
 int __wt_btcur_close(CURSOR_BTREE *cbt, const char *config);
-int __wt_debug_dump(SESSION *session, const char *ofile, FILE *fp);
+int __wt_debug_dump( SESSION *session,
+    const char *btfile,
+    const char *ofile,
+    FILE *fp);
 int __wt_debug_addr( SESSION *session,
     uint32_t addr,
     uint32_t size,
@@ -128,7 +131,10 @@ void __wt_page_free( SESSION *session,
     WT_PAGE *page,
     uint32_t addr,
     uint32_t size);
-int __wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags);
+int __wt_btree_dump( SESSION *session,
+    const char *btfile,
+    FILE *stream,
+    uint32_t flags);
 void __wt_print_byte_string(const uint8_t *data, uint32_t size, FILE *stream);
 void __wt_workq_evict_server(CONNECTION *conn, int force);
 int __wt_evict_file_serial_func(SESSION *session);
@@ -175,12 +181,14 @@ int __wt_disk_write( SESSION *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
     uint32_t size);
-int __wt_btree_salvage(SESSION *session);
+int __wt_salvage(SESSION *session, const char *filename, const char *config);
 void __wt_trk_dump(const char *l, void *ss_arg);
 int __wt_page_stat(SESSION *session, WT_PAGE *page, void *arg);
 int __wt_bt_sync(SESSION *session);
-int __wt_btree_verify(SESSION *session);
-int __wt_verify(SESSION *session, FILE *stream);
+int __wt_verify( SESSION *session,
+    const char *filename,
+    FILE *stream,
+    const char *config);
 int __wt_verify_dsk_page( SESSION *session,
     WT_PAGE_DISK *dsk,
     uint32_t addr,
