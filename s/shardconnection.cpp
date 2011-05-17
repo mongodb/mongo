@@ -43,7 +43,7 @@ namespace mongo {
 
     /**
      * holds all the actual db connections for a client to various servers
-     * 1 pre thread, so don't have to worry about thread safety
+     * 1 per thread, so doesn't have to be thread safe
      */
     class ClientConnections : boost::noncopyable {
     public:
