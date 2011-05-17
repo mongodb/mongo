@@ -120,6 +120,7 @@ cell_set:	switch (WT_CELL_TYPE(cell)) {
 			if (btree->huffman_value == NULL) {
 				value_ret = WT_CELL_BYTE(cell);
 				size_ret = WT_CELL_LEN(cell);
+				break;
 			}
 			/* FALLTHROUGH */
 		case WT_CELL_DATA_OVFL:
