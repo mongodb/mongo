@@ -21,6 +21,8 @@
 #include "dbclient.h"
 #include "redef_macros.h"
 
+#include "../util/background.h"
+
 namespace mongo {
 
     class Shard;
@@ -57,6 +59,8 @@ namespace mongo {
         void done( DBClientBase * c );
 
         void flush();
+        
+        void getStaleConnections( vector<DBClientBase*>& stale );
 
         static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
         static unsigned getMaxPerHost() { return _maxPerHost; }
@@ -100,7 +104,7 @@ namespace mongo {
            c.conn()...
         }
     */
-    class DBConnectionPool : boost::noncopyable {
+    class DBConnectionPool : public PeriodicTask {
         
     public:
 
@@ -134,8 +138,12 @@ namespace mongo {
             bool operator()( const string& a , const string& b ) const;
         };
 
-    private:
+        virtual string taskName() const { return "DBConnectionPool-cleaner"; }
+        virtual void taskDoWork();        
 
+    private:
+        DBConnectionPool( DBConnectionPool& p );
+        
         DBClientBase* _get( const string& ident );
 
         DBClientBase* _finishCreate( const string& ident , DBClientBase* conn );
@@ -150,6 +158,7 @@ namespace mongo {
         // pointers owned by me, right now they leak on shutdown
         // _hooks itself also leaks because it creates a shutdown race condition
         list<DBConnectionHook*> * _hooks; 
+
     };
 
     extern DBConnectionPool pool;

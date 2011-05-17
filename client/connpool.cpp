@@ -75,14 +75,34 @@ namespace mongo {
         }
     }
 
+    void PoolForHost::getStaleConnections( vector<DBClientBase*>& stale ) {
+        time_t now = time(0);
+
+        vector<StoredConnection> all;
+        while ( ! _pool.empty() ) {
+            StoredConnection c = _pool.top();
+            _pool.pop();
+            
+            if ( c.ok( now ) )
+                all.push_back( c );
+            else
+                stale.push_back( c.conn );
+        }
+
+        for ( size_t i=0; i<all.size(); i++ ) {
+            _pool.push( all[i] );
+        }
+    }
+
+
     PoolForHost::StoredConnection::StoredConnection( DBClientBase * c ) {
         conn = c;
         when = time(0);
     }
 
     bool PoolForHost::StoredConnection::ok( time_t now ) {
-        // if connection has been idle for an hour, kill it
-        return ( now - when ) < 3600;
+        // if connection has been idle for 30 minutes, kill it
+        return ( now - when ) < 1800;
     }
 
     void PoolForHost::createdOne( DBClientBase * base) {
@@ -234,6 +254,28 @@ namespace mongo {
         string bp = str::before( b , "/" );
         
         return ap < bp;
+    }
+
+    void DBConnectionPool::taskDoWork() { 
+        vector<DBClientBase*> toDelete;
+        
+        {
+            // we need to get the connections inside the lock
+            // but we can actually delete them outside
+            scoped_lock lk( _mutex );
+            for ( PoolMap::iterator i=_pools.begin(); i!=_pools.end(); ++i ) {
+                i->second.getStaleConnections( toDelete );
+            }
+        }
+
+        for ( size_t i=0; i<toDelete.size(); i++ ) {
+            try {
+                delete toDelete[i];
+            }
+            catch ( ... ) {
+                // we don't care if there was a socket error
+            }
+        }
     }
 
     // ------ ScopedDbConnection ------
