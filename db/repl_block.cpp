@@ -204,11 +204,11 @@ namespace mongo {
 
         slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
         
-        if (theReplSet) {
+        if (theReplSet && !theReplSet->isPrimary()) {
             // we don't know the slave's port, so we make the replica set keep
             // a map of rids to slaves
-            log(2) << "sending " << lastOp.toString() << " to " << rid << endl;
-            theReplSet->percolate(rid, lastOp);
+            log(2) << "percolating " << lastOp.toString() << " from " << rid << endl;
+            theReplSet->mgr->send( boost::bind(&ReplSet::percolate, theReplSet, rid, lastOp) );
         }
     }
 
