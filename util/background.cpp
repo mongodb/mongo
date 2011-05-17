@@ -18,6 +18,7 @@
 #include "pch.h"
 
 #include "concurrency/mutex.h"
+#include "concurrency/spin_lock.h"
 
 #include "background.h"
 #include "time_support.h"
@@ -125,38 +126,61 @@ namespace mongo {
     PeriodicTask::PeriodicTask() {
         if ( ! theRunner )
             theRunner = new Runner();
-        theRunner->_tasks.push_back( this );
+        theRunner->add( this );
     }
 
     PeriodicTask::~PeriodicTask() {
+        theRunner->remove( this );
+    }
+
+    void PeriodicTask::Runner::add( PeriodicTask* task ) {
+        scoped_spinlock lk( _lock );
+        _tasks.push_back( task );
+    }
+    
+    void PeriodicTask::Runner::remove( PeriodicTask* task ) {
+        scoped_spinlock lk( _lock );
+        for ( size_t i=0; i<_tasks.size(); i++ ) {
+            if ( _tasks[i] == task ) {
+                _tasks[i] = 0;
+                break;
+            }
+        }
     }
 
     void PeriodicTask::Runner::run() { 
+        int sleeptime = 60;
+        DEV sleeptime = 5; // to catch race conditions
+
         while ( ! inShutdown() ) {
 
-            sleepsecs( 60 );
+            sleepsecs( sleeptime );
+            
+            scoped_spinlock lk( _lock );
             
             size_t size = _tasks.size();
             
             for ( size_t i=0; i<size; i++ ) {
+                PeriodicTask * t = _tasks[i];
+                if ( ! t )
+                    continue;
+
                 if ( inShutdown() )
                     break;
-
-                PeriodicTask * t = _tasks[i];
-
+                
                 Timer timer;
                 try {
-                    t->doWork();
+                    t->taskDoWork();
                 }
                 catch ( std::exception& e ) {
-                    error() << "task: " << t->name() << " failed: " << e.what() << endl;
+                    error() << "task: " << t->taskName() << " failed: " << e.what() << endl;
                 }
                 catch ( ... ) {
-                    error() << "task: " << t->name() << " failed with unknown error" << endl;
+                    error() << "task: " << t->taskName() << " failed with unknown error" << endl;
                 }
                 
                 int ms = timer.millis();
-                LOG( ms <= 3 ) << "task: " << t->name() << " took: " << ms << "ms" << endl;
+                LOG( ms <= 3 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
             }
         }
     }

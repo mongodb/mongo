@@ -93,8 +93,8 @@ namespace mongo {
         
         class Cleaner : public PeriodicTask {
         public:
-            virtual string name() const { return "WriteBackManager::cleaner"; }
-            virtual void doWork();
+            virtual string taskName() const { return "WriteBackManager::cleaner"; }
+            virtual void taskDoWork();
         };
 
         Cleaner _cleaner;

@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "concurrency/spin_lock.h"
+
 namespace mongo {
 
     /**
@@ -117,8 +119,8 @@ namespace mongo {
         PeriodicTask();
         virtual ~PeriodicTask();
 
-        virtual void doWork() = 0;
-        virtual string name() const = 0;
+        virtual void taskDoWork() = 0;
+        virtual string taskName() const = 0;
 
         class Runner : public BackgroundJob {
         public:
@@ -127,13 +129,20 @@ namespace mongo {
             virtual string name() const { return "PeriodicTask::Runner"; }
             
             virtual void run();
+            
+            void add( PeriodicTask* task );
+            void remove( PeriodicTask* task );
 
         private:
+            
+            SpinLock _lock;
+            
             // these are NOT owned by Runner
             // Runner will not delete these
+            // this never gets smaller
+            // only fields replaced with nulls
             vector<PeriodicTask*> _tasks;
 
-            friend class PeriodicTask;
         };
 
         static Runner* theRunner;
