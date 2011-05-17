@@ -395,6 +395,10 @@ namespace mongo {
                 StringBuilder buf(128);
                 buf << _message.toString() << " " << _progressMeter.toString();
                 b.append( "msg" , buf.str() );
+                BSONObjBuilder sub( b.subobjStart( "progress" ) );
+                sub.appendNumber( "done" , (long long)_progressMeter.done() );
+                sub.appendNumber( "total" , (long long)_progressMeter.total() );
+                sub.done();
             }
             else {
                 b.append( "msg" , _message.toString() );
