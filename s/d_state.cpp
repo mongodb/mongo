@@ -542,7 +542,7 @@ namespace mongo {
             }
 
             if ( version < oldVersion ) {
-                errmsg = "you already have a newer version of collection '" + ns + "'";
+                errmsg = "this connection already had a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "newVersion" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
@@ -555,7 +555,7 @@ namespace mongo {
                     sleepmillis(2);
                     OCCASIONALLY log() << "waiting till out of critical section" << endl;
                 }
-                errmsg = "going to older version for global for collection '" + ns + "'";
+                errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
                 result.append( "ns" , ns );
                 result.appendTimestamp( "version" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
