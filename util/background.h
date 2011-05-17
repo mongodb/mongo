@@ -102,5 +102,45 @@ namespace mongo {
         void jobBody( boost::shared_ptr<JobStatus> status );
 
     };
+    
+    /**
+     * these run "roughly" every minute
+     * instantiate statically
+     * class MyTask : public PeriodicTask {
+     * public:
+     *   virtual string name() const { return "MyTask; " }
+     *   virtual void doWork() { log() << "hi" << endl; }
+     * } myTask;
+     */
+    class PeriodicTask {
+    public:
+        PeriodicTask();
+        virtual ~PeriodicTask();
+
+        virtual void doWork() = 0;
+        virtual string name() const = 0;
+
+        class Runner : public BackgroundJob {
+        public:
+            virtual ~Runner(){}
+
+            virtual string name() const { return "PeriodicTask::Runner"; }
+            
+            virtual void run();
+
+        private:
+            // these are NOT owned by Runner
+            // Runner will not delete these
+            vector<PeriodicTask*> _tasks;
+
+            friend class PeriodicTask;
+        };
+
+        static Runner* theRunner;
+
+    };
+
+
+
 
 } // namespace mongo

@@ -20,6 +20,8 @@
 #include "concurrency/mutex.h"
 
 #include "background.h"
+#include "time_support.h"
+#include "timer.h"
 
 #include "mongoutils/str.h"
 
@@ -117,5 +119,48 @@ namespace mongo {
         scoped_lock l( _status->m);
         return _status->state == Running;
     }
+
+    // -------------------------
+
+    PeriodicTask::PeriodicTask() {
+        if ( ! theRunner )
+            theRunner = new Runner();
+        theRunner->_tasks.push_back( this );
+    }
+
+    PeriodicTask::~PeriodicTask() {
+    }
+
+    void PeriodicTask::Runner::run() { 
+        while ( ! inShutdown() ) {
+
+            sleepsecs( 60 );
+            
+            size_t size = _tasks.size();
+            
+            for ( size_t i=0; i<size; i++ ) {
+                if ( inShutdown() )
+                    break;
+
+                PeriodicTask * t = _tasks[i];
+
+                Timer timer;
+                try {
+                    t->doWork();
+                }
+                catch ( std::exception& e ) {
+                    error() << "task: " << t->name() << " failed: " << e.what() << endl;
+                }
+                catch ( ... ) {
+                    error() << "task: " << t->name() << " failed with unknown error" << endl;
+                }
+                
+                int ms = timer.millis();
+                LOG( ms <= 3 ) << "task: " << t->name() << " took: " << ms << "ms" << endl;
+            }
+        }
+    }
+
+    PeriodicTask::Runner* PeriodicTask::theRunner = 0;
 
 } // namespace mongo
