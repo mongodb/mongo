@@ -243,6 +243,11 @@ namespace mongo {
         /** Initialize or iterate a runner generated from @param originalOp. */
         shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
         
+        /** Yield the runner member. */
+        
+        bool prepareToYield();
+        void recoverFromYield();
+        
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
         BSONObj explain() const;
         /** @return true iff a plan is selected based on previous success of this plan. */
@@ -281,17 +286,22 @@ namespace mongo {
              * this iteration.
              */
             shared_ptr<QueryOp> next();
+            /** @return next non error op if there is one, otherwise an error op. */
+            shared_ptr<QueryOp> nextNonError();
 
+            bool prepareToYield();
+            void recoverFromYield();
+            
             /** Run until first op completes. */
             shared_ptr<QueryOp> runUntilFirstCompletes();
              
-            void mayYield( const vector<shared_ptr<QueryOp> > &ops );
+            void mayYield();
             QueryOp &_op;
             QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
-            static bool prepareToYield( QueryOp &op );
-            static void recoverFromYield( QueryOp &op );
+            static bool prepareToYieldOp( QueryOp &op );
+            static void recoverFromYieldOp( QueryOp &op );
         private:
             vector<shared_ptr<QueryOp> > _ops;
             struct OpHolder {
@@ -361,7 +371,14 @@ namespace mongo {
         }
 
         /** Initialize or iterate a runner generated from @param originalOp. */
-        shared_ptr<QueryOp> nextOp( QueryOp &originalOp );
+        
+        void initialOp( const shared_ptr<QueryOp> &originalOp ) { _baseOp = originalOp; }
+        shared_ptr<QueryOp> nextOp();
+        
+        /** Yield the runner member. */
+        
+        bool prepareToYield();
+        void recoverFromYield();
         
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const { return _or ? ( !_tableScanned && !_org.orFinished() ) : _i == 0; }
@@ -383,8 +400,8 @@ namespace mongo {
         void assertMayRunMore() const {
             massert( 13271, "can't run more ops", mayRunMore() );
         }
-        shared_ptr<QueryOp> nextOpBeginningClause( QueryOp &prevOp );
-        shared_ptr<QueryOp> nextOpHandleEndOfClause( QueryOp &prevOp );
+        shared_ptr<QueryOp> nextOpBeginningClause();
+        shared_ptr<QueryOp> nextOpHandleEndOfClause();
         bool uselessOr( const BSONElement &hint ) const;
         const char * _ns;
         bool _or;
@@ -397,6 +414,7 @@ namespace mongo {
         BSONObj _hint;
         bool _mayYield;
         bool _tableScanned;
+        shared_ptr<QueryOp> _baseOp;
     };
 
     /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
@@ -490,13 +508,18 @@ namespace mongo {
      * currKey() documents, the matcher(), and the isMultiKey() nature of the
      * cursor may change over the course of iteration.
      *
+     * @param order - If no index exists that satisfies this sort order, an
+     * empty shared_ptr will be returned.
+     *
+     * The returned cursor may @throw inside of advance() or recoverFromYield() in
+     * certain error cases, for example if a capped overrun occurred during a yield.
+     * This indicates that the cursor was unable to perform a complete scan.
+     *
      * This is a work in progress.  Partial list of features not yet implemented:
-     * - ordered/sorted document iteration
-     * - yielding
      * - modification of scanned documents
-     * - handling of arbitrary asserts/error conditions
+     * - stats like nscanned
      */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query );
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
     
     /**
      * Add-on functionality for queryutil classes requiring access to indexing

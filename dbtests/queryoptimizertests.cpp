@@ -35,10 +35,17 @@ namespace mongo {
         Message response;
         runQuery( m, q, response );
     }
+    void __forceLinkGeoPlugin();
 } // namespace mongo
 
 namespace QueryOptimizerTests {
 
+    void dropCollection( const char *ns ) {
+     	string errmsg;
+        BSONObjBuilder result;
+        dropCollection( ns, errmsg, result );
+    }
+    
     namespace QueryPlanTests {
 
         using boost::shared_ptr;
@@ -52,8 +59,7 @@ namespace QueryOptimizerTests {
             ~Base() {
                 if ( !nsd() )
                     return;
-                string s( ns() );
-                dropNS( s );
+                dropCollection( ns() );
             }
         protected:
             static const char *ns() { return "unittests.QueryPlanTests"; }
@@ -333,8 +339,7 @@ namespace QueryOptimizerTests {
                 if ( !nsd() )
                     return;
                 NamespaceDetailsTransient::_get( ns() ).clearQueryCache();
-                string s( ns() );
-                dropNS( s );
+                dropCollection( ns() );
             }
             static void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
                 // see query.h for the protocol we are using here.
@@ -913,7 +918,7 @@ namespace QueryOptimizerTests {
             if ( !nsd() )
                 return;
             string s( ns() );
-            dropNS( s );
+            dropCollection( ns() );
         }
     protected:
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
@@ -963,13 +968,16 @@ namespace QueryOptimizerTests {
                 Client::Context ctx( ns() );
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
-                dropNS( ns() );
+                dropCollection( ns() );
+            }
+            ~Base() {
+             	cc().curop()->reset();
             }
         protected:
             DBDirectClient _cli;
             static const char *ns() { return "unittests.QueryOptimizerTests"; }
-            void setQueryOptimizerCursor( const BSONObj &query ) {
-             	_c = newQueryOptimizerCursor( ns(), query );
+            void setQueryOptimizerCursor( const BSONObj &query, const BSONObj &order = BSONObj() ) {
+             	_c = newQueryOptimizerCursor( ns(), query, order );
                 if ( ok() && !mayReturnCurrent() ) {
                  	advance();
                 }
@@ -992,6 +1000,14 @@ namespace QueryOptimizerTests {
             bool mayReturnCurrent() {
              	return _c->matcher()->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() );
             }
+            bool prepareToYield() const { return _c->prepareToYield(); }
+            void recoverFromYield() {
+                _c->recoverFromYield();
+                if ( ok() && !mayReturnCurrent() ) {
+                 	advance();   
+                }
+            }
+            shared_ptr<Cursor> c() { return _c; }
         private:
             shared_ptr<Cursor> _c;
         };
@@ -1534,7 +1550,7 @@ namespace QueryOptimizerTests {
                 
                 c = newQueryOptimizerCursor( ns(), BSON( "a" << 100 << "b" << 149 ) );
                 // Try {a:1}, which was successful previously.
-                for( int i = 0; i < 10; ++i ) {
+                for( int i = 0; i < 11; ++i ) {
                  	ASSERT( 149 != c->current().getIntField( "b" ) );
                     ASSERT( c->advance() );
                 }
@@ -1663,15 +1679,724 @@ namespace QueryOptimizerTests {
                 ASSERT( !c->getsetdup( c->currLoc() ) );
                 c->advance();
 
+                // _id 0 on {a:1}
+                ASSERT_EQUALS( 0, c->current().getIntField( "_id" ) );
+                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
+                ASSERT( c->getsetdup( c->currLoc() ) );
+                c->advance();
+                
                 // {$natural:1} finished
                 ASSERT( !c->ok() );
             }
         };
         
-        // TODO
-        // $or table scan abort case
-        // error cases causing ops to have error set
-        // originalOp updating
+        /** Simple geo query. */
+        class Geo : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "loc" << BSON( "lon" << 30 << "lat" << 30 ) ) );
+                _cli.insert( ns(), BSON( "_id" << 1 << "loc" << BSON( "lon" << 31 << "lat" << 31 ) ) );
+             	_cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "loc" << BSON( "$near" << BSON_ARRAY( 30 << 30 ) ) ) );
+                ASSERT( ok() );
+                ASSERT_EQUALS( 0, current().getIntField( "_id" ) );
+                ASSERT( advance() );
+                ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }
+        };
+        
+        /** Yield cursor and delete current entry, then continue iteration. */
+        class YieldNoOp : public Base {
+        public:
+            void run() {
+             	_cli.insert( ns(), BSON( "_id" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                    ASSERT( prepareToYield() );
+                    recoverFromYield();
+                }
+            }            
+        };
+        
+        /** Yield cursor and delete current entry. */
+        class YieldDelete : public Base {
+        public:
+            void run() {
+             	_cli.insert( ns(), BSON( "_id" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << 1 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.remove( ns(), BSON( "_id" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( !ok() );
+                    ASSERT( !advance() );
+                }
+            }
+        };
+        
+        /** Yield cursor and delete current entry, then continue iteration. */
+        class YieldDeleteContinue : public Base {
+        public:
+            void run() {
+             	_cli.insert( ns(), BSON( "_id" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.remove( ns(), BSON( "_id" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                }
+            }            
+        };
+
+        /** Yield cursor and delete current entry, then continue iteration. */
+        class YieldDeleteContinueFurther : public Base {
+        public:
+            void run() {
+             	_cli.insert( ns(), BSON( "_id" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 ) );
+             	_cli.insert( ns(), BSON( "_id" << 3 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.remove( ns(), BSON( "_id" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 3, current().getIntField( "_id" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                }
+            }            
+        };
+        
+        /** Yield and update current. */
+        class YieldUpdate : public Base {
+        public:
+            void run() {
+             	_cli.insert( ns(), BSON( "a" << 1 ) );
+             	_cli.insert( ns(), BSON( "a" << 2 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "a" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.update( ns(), BSON( "a" << 1 ), BSON( "$set" << BSON( "a" << 3 ) ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 2, current().getIntField( "a" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+        
+        /** Yield and drop collection. */
+        class YieldDrop : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.dropCollection( ns() );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+        
+        /** Yield and overwrite current in capped collection. */
+        class YieldCappedOverwrite : public Base {
+        public:
+            void run() {
+                _cli.createCollection( ns(), 1000, true );
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
+                 	_cli.insert( ns(), BSONObj() );   
+                }
+
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ASSERT_EXCEPTION( recoverFromYield(), MsgAssertionException );
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+        
+        /** Yield and drop unrelated index - see SERVER-2454. */
+        class YieldDropIndex : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << 1 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.dropIndex( ns(), BSON( "a" << 1 ) );
+
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+
+        /** Yielding with multiple plans active. */
+        class YieldMultiplePlansNoOp : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+
+        /** Yielding with advance and multiple plans active. */
+        class YieldMultiplePlansAdvanceNoOp : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 << "a" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 3 << "a" << 3 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    advance();
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 3, current().getIntField( "_id" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+
+        /** Yielding with delete and multiple plans active. */
+        class YieldMultiplePlansDelete : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+             	_cli.insert( ns(), BSON( "_id" << 2 << "a" << 1 ) );
+             	_cli.insert( ns(), BSON( "_id" << 3 << "a" << 4 ) );
+             	_cli.insert( ns(), BSON( "_id" << 4 << "a" << 3 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    advance();
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.remove( ns(), BSON( "_id" << 2 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    c()->recoverFromYield();
+                    ASSERT( ok() );
+                    // index {a:1} active during yield
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 3, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 4, current().getIntField( "_id" ) );
+                    ASSERT( !advance() );
+                    ASSERT( !ok() );
+                }                
+            }
+        };
+
+        /** Yielding with multiple plans and capped overwrite. */
+        class YieldMultiplePlansCappedOverwrite : public Base {
+        public:
+            void run() {
+                _cli.createCollection( ns(), 1000, true );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "_id" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                int i = 1;
+                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
+                    ++i;
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );
+                }
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    // {$natural:1} plan does not recover, {_id:1} plan does.
+                    ASSERT( 1 < current().getIntField( "_id" ) );
+                }                
+            }
+        };
+
+        /**
+         * Yielding with multiple plans and capped overwrite with unrecoverable cursor
+         * active at time of yield.
+         */
+        class YieldMultiplePlansCappedOverwriteManual : public Base {
+        public:
+            void run() {
+                _cli.createCollection( ns(), 1000, true );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "_id" << 1 ) );
+                
+                shared_ptr<Cursor> c;
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    ASSERT( !c->getsetdup( c->currLoc() ) );
+                    c->advance();
+                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    ASSERT( c->getsetdup( c->currLoc() ) );
+                    ASSERT( c->prepareToYield() );
+                }
+                
+                int i = 1;
+                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
+                    ++i;
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );
+                }
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    c->recoverFromYield();
+                    ASSERT( c->ok() );
+                    // {$natural:1} plan does not recover, {_id:1} plan does.
+                    ASSERT( 1 < c->current().getIntField( "_id" ) );
+                }                
+            }
+        };
+
+        /**
+         * Yielding with multiple plans and capped overwrite with unrecoverable cursor
+         * inctive at time of yield.
+         */
+        class YieldMultiplePlansCappedOverwriteManual2 : public Base {
+        public:
+            void run() {
+                _cli.createCollection( ns(), 1000, true );
+                _cli.insert( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "_id" << 1 ) );
+                
+                shared_ptr<Cursor> c;
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
+                    ASSERT( !c->getsetdup( c->currLoc() ) );
+                    ASSERT( c->prepareToYield() );
+                }
+                
+                int n = 1;
+                while( _cli.count( ns(), BSON( "_id" << 1 ) ) > 0 ) {
+                    ++n;
+                 	_cli.insert( ns(), BSON( "_id" << n << "a" << n ) );
+                }
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    c->recoverFromYield();
+                    ASSERT( c->ok() );
+                    // {$natural:1} plan does not recover, {_id:1} plan does.
+                    ASSERT( 1 < c->current().getIntField( "_id" ) );
+                    ASSERT( !c->getsetdup( c->currLoc() ) );
+                    int i = c->current().getIntField( "_id" );
+                    ASSERT( c->advance() );
+                    ASSERT( c->getsetdup( c->currLoc() ) );
+                    while( i < n ) {
+                        ASSERT( c->advance() );
+                        ++i;
+                        ASSERT_EQUALS( i, c->current().getIntField( "_id" ) );
+                    }
+                }                
+            }
+        };
+        
+        /** Try and fail to yield a geo query. */
+        class TryYieldGeo : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 0 << "loc" << BSON( "lon" << 30 << "lat" << 30 ) ) );
+             	_cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "loc" << BSON( "$near" << BSON_ARRAY( 50 << 50 ) ) ) );
+                ASSERT( ok() );
+                ASSERT_EQUALS( 0, current().getIntField( "_id" ) );
+                ASSERT( !prepareToYield() );
+                ASSERT( ok() );
+                ASSERT_EQUALS( 0, current().getIntField( "_id" ) );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }
+        };
+        
+        /** Yield with takeover cursor. */
+        class YieldTakeover : public Base {
+        public:
+            void run() {
+             	for( int i = 0; i < 150; ++i ) {
+                 	_cli.insert( ns(), BSON( "_id" << i << "a" << i ) );   
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GTE << 0 << "a" << GTE << 0 ) );
+                    for( int i = 0; i < 120; ++i ) {
+                     	ASSERT( advance() );
+                    }
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 120, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.remove( ns(), BSON( "_id" << 120 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 121, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 122, current().getIntField( "_id" ) );
+                }
+            }
+        };
+        
+        /** Yield with advance of inactive cursor. */
+        class YieldInactiveCursorAdvance : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 10; ++i ) {
+                    _cli.insert( ns(), BSON( "_id" << i << "a" << 10 - i ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 9, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                    ASSERT( prepareToYield() );
+                }
+                
+                _cli.remove( ns(), BSON( "_id" << 9 ) );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( 8, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 3, current().getIntField( "_id" ) );
+                    ASSERT( advance() );
+                    ASSERT_EQUALS( 7, current().getIntField( "_id" ) );
+                }                    
+            }
+        };
+        
+        class OrderId : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 10; ++i ) {
+                    _cli.insert( ns(), BSON( "_id" << i ) );
+                }
+
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSONObj(), BSON( "_id" << 1 ) );
+
+                for( int i = 0; i < 10; ++i, advance() ) {
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                }
+            }
+        };
+        
+        class OrderMultiIndex : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 10; ++i ) {
+                    _cli.insert( ns(), BSON( "_id" << i << "a" << 1 ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "_id" << 1 << "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GTE << 0 << "a" << GTE << 0 ), BSON( "_id" << 1 ) );
+                
+                for( int i = 0; i < 10; ++i, advance() ) {
+                    ASSERT( ok() );
+                    ASSERT_EQUALS( i, current().getIntField( "_id" ) );
+                }
+            }
+        };
+        
+        class OrderReject : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 10; ++i ) {
+                    _cli.insert( ns(), BSON( "_id" << i << "a" << i % 5 ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "a" << GTE << 3 ), BSON( "_id" << 1 ) );
+
+                ASSERT( ok() );
+                ASSERT_EQUALS( 3, current().getIntField( "_id" ) );
+                ASSERT( advance() );
+                ASSERT_EQUALS( 4, current().getIntField( "_id" ) );
+                ASSERT( advance() );
+                ASSERT_EQUALS( 8, current().getIntField( "_id" ) );
+                ASSERT( advance() );
+                ASSERT_EQUALS( 9, current().getIntField( "_id" ) );
+                ASSERT( !advance() );
+            }
+        };
+
+        class OrderNatural : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 5 ) );
+                _cli.insert( ns(), BSON( "_id" << 4 ) );
+                _cli.insert( ns(), BSON( "_id" << 6 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << 0 ), BSON( "$natural" << 1 ) );
+                
+                ASSERT( ok() );
+                ASSERT_EQUALS( 5, current().getIntField( "_id" ) );
+                ASSERT( advance() );
+                ASSERT_EQUALS( 4, current().getIntField( "_id" ) );
+                ASSERT( advance() );                
+                ASSERT_EQUALS( 6, current().getIntField( "_id" ) );
+                ASSERT( !advance() );                
+            }
+        };
+        
+        class OrderUnindexed : public Base {
+        public:
+            void run() {
+                dblock lk;
+                Client::Context ctx( ns() );
+             	ASSERT( !newQueryOptimizerCursor( ns(), BSONObj(), BSON( "a" << 1 ) ).get() );
+            }
+        };
+        
+        class RecordedOrderInvalid : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 2 ) );
+                _cli.insert( ns(), BSON( "a" << 3 << "b" << 3 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                ASSERT( _cli.query( ns(), QUERY( "a" << 2 ).sort( "b" ) )->more() );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 2 ), BSON( "b" << 1 ) );
+                // Check that we are scanning {b:1} not {a:1}.
+                for( int i = 0; i < 3; ++i ) {
+                 	ASSERT( c->ok() );
+                    c->advance();
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+        
+        class KillOp : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "b" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                
+                mongolock lk( false );
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+                ASSERT( ok() );
+                cc().curop()->kill();
+                // First advance() call throws, subsequent calls just fail.
+                ASSERT_EXCEPTION( advance(), MsgAssertionException );
+                ASSERT( !advance() );
+            }
+        };
+
+        class KillOpFirstClause : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "b" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                
+                mongolock lk( false );
+                Client::Context ctx( ns() );
+                shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "_id" << GT << 0 ) << BSON( "b" << GT << 0 ) ) ) );
+                ASSERT( c->ok() );
+                cc().curop()->kill();
+                // First advance() call throws, subsequent calls just fail.
+                ASSERT_EXCEPTION( c->advance(), MsgAssertionException );
+                ASSERT( !c->advance() );
+            }
+        };
         
     } // namespace QueryOptimizerCursorTests
 
@@ -1680,6 +2405,7 @@ namespace QueryOptimizerTests {
         All() : Suite( "queryoptimizer" ) {}
 
         void setupTests() {
+            __forceLinkGeoPlugin();
             add<QueryPlanTests::NoIndex>();
             add<QueryPlanTests::SimpleOrder>();
             add<QueryPlanTests::MoreIndexThanNeeded>();
@@ -1747,6 +2473,32 @@ namespace QueryOptimizerTests {
             add<QueryOptimizerCursorTests::EarlyDups>();
             add<QueryOptimizerCursorTests::OrPopInTakeover>();
             add<QueryOptimizerCursorTests::OrCollectionScanAbort>();
+            add<QueryOptimizerCursorTests::Geo>();
+            add<QueryOptimizerCursorTests::YieldNoOp>();
+            add<QueryOptimizerCursorTests::YieldDelete>();
+            add<QueryOptimizerCursorTests::YieldDeleteContinue>();
+            add<QueryOptimizerCursorTests::YieldDeleteContinueFurther>();
+            add<QueryOptimizerCursorTests::YieldUpdate>();
+            add<QueryOptimizerCursorTests::YieldDrop>();
+            add<QueryOptimizerCursorTests::YieldCappedOverwrite>();
+            add<QueryOptimizerCursorTests::YieldDropIndex>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansNoOp>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansAdvanceNoOp>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansDelete>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwrite>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
+            add<QueryOptimizerCursorTests::TryYieldGeo>();
+            add<QueryOptimizerCursorTests::YieldTakeover>();
+            add<QueryOptimizerCursorTests::YieldInactiveCursorAdvance>();
+            add<QueryOptimizerCursorTests::OrderId>();
+            add<QueryOptimizerCursorTests::OrderMultiIndex>();
+            add<QueryOptimizerCursorTests::OrderReject>();
+            add<QueryOptimizerCursorTests::OrderNatural>();
+            add<QueryOptimizerCursorTests::OrderUnindexed>();
+            add<QueryOptimizerCursorTests::RecordedOrderInvalid>();
+            add<QueryOptimizerCursorTests::KillOp>();
+            add<QueryOptimizerCursorTests::KillOpFirstClause>();
         }
     } myall;
 

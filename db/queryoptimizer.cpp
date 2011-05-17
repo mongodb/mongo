@@ -529,6 +529,7 @@ doneCheckOrder:
             // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
+            // Retry with all candidate plans.
             QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
@@ -539,23 +540,34 @@ doneCheckOrder:
     shared_ptr<QueryOp> QueryPlanSet::nextOp( QueryOp &originalOp ) {
         if ( !_runner ) {
             _runner.reset( new Runner( *this, originalOp ) );
-        	shared_ptr<QueryOp> op = _runner->init();
+            shared_ptr<QueryOp> op = _runner->init();
             if ( op->complete() ) {
-             	return op;   
+                return op;   
             }
         }
-     	shared_ptr<QueryOp> op = _runner->next();
+        shared_ptr<QueryOp> op = _runner->nextNonError();
         if ( !op->error() ) {
-         	return op;   
+            return op;   
         }
         if ( !_usingPrerecordedPlan || _bestGuessOnly || _plans.size() > 1 ) {
             return op;
         }
+        // Retry with all candidate plans.
         QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
         init();
         return nextOp( originalOp );
     }
 
+    bool QueryPlanSet::prepareToYield() {
+        return _runner ? _runner->prepareToYield() : true;   
+    }
+    
+    void QueryPlanSet::recoverFromYield() {
+        if ( _runner ) {
+            _runner->recoverFromYield();   
+        }
+    }
+    
     BSONObj QueryPlanSet::explain() const {
         vector<BSONObj> arr;
         for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
@@ -597,20 +609,31 @@ doneCheckOrder:
         _plans( plans ) {
     }
 
-    void QueryPlanSet::Runner::mayYield( const vector< shared_ptr< QueryOp > > &ops ) {
+    bool QueryPlanSet::Runner::prepareToYield() {
+        for( vector<shared_ptr<QueryOp> >::const_iterator i = _ops.begin(); i != _ops.end(); ++i ) {
+            if ( !prepareToYieldOp( **i ) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void QueryPlanSet::Runner::recoverFromYield() {
+        for( vector<shared_ptr<QueryOp> >::const_iterator i = _ops.begin(); i != _ops.end(); ++i ) {
+            recoverFromYieldOp( **i );
+        }        
+    }
+    
+    void QueryPlanSet::Runner::mayYield() {
         if ( _plans._mayYield ) {
             if ( _plans._yieldSometimesTracker.ping() ) {
                 int micros = ClientCursor::yieldSuggest();
                 if ( micros > 0 ) {
-                    for( vector<shared_ptr<QueryOp> >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
-                        if ( !prepareToYield( **i ) ) {
-                            return;
-                        }
+                    if ( !prepareToYield() ) {
+                        return;   
                     }
                     ClientCursor::staticYield( micros , _plans._ns );
-                    for( vector<shared_ptr<QueryOp> >::const_iterator i = ops.begin(); i != ops.end(); ++i ) {
-                        recoverFromYield( **i );
-                    }
+                    recoverFromYield();
                 }
             }
         }
@@ -651,8 +674,19 @@ doneCheckOrder:
         return *_ops.begin();
     }
     
+    shared_ptr<QueryOp> QueryPlanSet::Runner::nextNonError() {
+        if ( _queue.empty() ) {
+            return *_ops.begin();   
+        }
+        shared_ptr<QueryOp> ret;
+        do {
+            ret = next();
+        } while( ret->error() && !_queue.empty() );
+        return ret;
+    }
+    
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
-        mayYield( _ops );
+        mayYield();
         OpHolder holder = _queue.top();
         _queue.pop();
         QueryOp &op = *holder._op;
@@ -725,7 +759,7 @@ doneCheckOrder:
         GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.next(); } );
     }
 
-    bool QueryPlanSet::Runner::prepareToYield( QueryOp &op ) {
+    bool QueryPlanSet::Runner::prepareToYieldOp( QueryOp &op ) {
         GUARD_OP_EXCEPTION( op,
         if ( op.error() ) {
             return true;
@@ -736,7 +770,7 @@ doneCheckOrder:
         return true;
     }
 
-    void QueryPlanSet::Runner::recoverFromYield( QueryOp &op ) {
+    void QueryPlanSet::Runner::recoverFromYieldOp( QueryOp &op ) {
         GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.recoverFromYield(); } );
     }
 
@@ -831,8 +865,8 @@ doneCheckOrder:
         return ret;
     }
     
-    shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause( QueryOp &prevOp ) {
-        shared_ptr<QueryOp> op = _currentQps->nextOp( prevOp );
+    shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause() {
+        shared_ptr<QueryOp> op = _currentQps->nextOp( *_baseOp );
         if ( !op->complete() ) {
             return op;   
         }
@@ -844,7 +878,7 @@ doneCheckOrder:
         return op;
     }
     
-    shared_ptr<QueryOp> MultiPlanScanner::nextOpBeginningClause( QueryOp &prevOp ) {
+    shared_ptr<QueryOp> MultiPlanScanner::nextOpBeginningClause() {
         assertMayRunMore();
         shared_ptr<QueryOp> op;
         while( mayRunMore() ) {
@@ -853,35 +887,47 @@ doneCheckOrder:
         	auto_ptr<FieldRangeSetPair> originalFrsp( _org.topFrspOriginal() );
 	        BSONElement hintElt = _hint.firstElement();
     	    _currentQps.reset( new QueryPlanSet( _ns, frsp, originalFrsp, _query, BSONObj(), &hintElt, _honorRecordedPlan, BSONObj(), BSONObj(), _bestGuessOnly, _mayYield ) );
-            op = nextOpHandleEndOfClause( prevOp );
+            op = nextOpHandleEndOfClause();
             if ( !op->complete() ) {
              	return op;
             }
+            _baseOp = op;
         }
         return op;
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::nextOp( QueryOp &originalOp ) {
+    shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
         if ( !_or ) {
             if ( _i == 0 ) {
                 assertMayRunMore();
 	         	++_i;
             }            
-         	return _currentQps->nextOp( originalOp );   
+            return _currentQps->nextOp( *_baseOp );   
         }
         if ( _i == 0 ) {
-         	return nextOpBeginningClause( originalOp );
+            return nextOpBeginningClause();
         }
-        shared_ptr<QueryOp> op = nextOpHandleEndOfClause( originalOp );
+        shared_ptr<QueryOp> op = nextOpHandleEndOfClause();
         if ( !op->complete() ) {
             return op;   
         }
         if ( !op->stopRequested() && mayRunMore() ) {
             // Finished scanning the clause, but stop hasn't been requested.
             // Start scanning the next clause.
-            return nextOpBeginningClause( *op );
+            _baseOp = op;
+            return nextOpBeginningClause();
         }
         return op;
+    }
+    
+    bool MultiPlanScanner::prepareToYield() {
+        return _currentQps.get() ? _currentQps->prepareToYield() : true;
+    }
+    
+    void MultiPlanScanner::recoverFromYield() {
+        if ( _currentQps.get() ) {
+            _currentQps->recoverFromYield();   
+        }
     }
 
     bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {
@@ -1176,7 +1222,7 @@ doneCheckOrder:
             }
         }
         return make_pair( BSONObj(), 0 );
-    }    
+    }
     
     bool QueryUtilIndexed::uselessOr( const OrRangeGenerator &org, NamespaceDetails *d, int hintIdx ) {
         for( list<FieldRangeSetPair>::const_iterator i = org._originalOrSets.begin(); i != org._originalOrSets.end(); ++i ) {

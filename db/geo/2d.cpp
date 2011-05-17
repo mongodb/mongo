@@ -724,6 +724,10 @@ namespace mongo {
         }
     } geo2dplugin;
 
+    void __forceLinkGeoPlugin() {
+        geo2dplugin.getName();
+    }
+    
     struct GeoUnitTest : public UnitTest {
 
         int round( double d ) {
