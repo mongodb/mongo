@@ -1225,16 +1225,18 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
    this.getMaster();
    timeout = timeout || 30000;
 
-   assert.soon(function() {
-           try {
-               latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
-           }
-           catch(e) {
-               print(e);
-               return false;
-           }
-           return true;
-       });
+   this.attempt({context : this, desc : "awaiting oplog query"},
+                function() {
+                    try {
+                        latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+                    }
+                    catch(e) {
+                        print(e);
+                        return false;
+                    }
+                    return true;
+                });
+   
    print(latest);
 
    this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
