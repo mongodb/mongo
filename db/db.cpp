@@ -481,7 +481,7 @@ namespace mongo {
 
         snapshotThread.go();
         clientCursorMonitor.go();
-        writeBackManager.startCleaner();
+        PeriodicTask::theRunner->go();
 
         if( !cmdLine._replSet.empty() ) {
             replSet = true;

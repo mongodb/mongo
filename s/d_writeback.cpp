@@ -109,14 +109,10 @@ namespace mongo {
         return false;
     }
 
-    void WriteBackManager::startCleaner() { 
-        _cleaner.go();
-    }
-
-    void WriteBackManager::Cleaner::run() { 
-        while ( ! inShutdown() ) { 
-            sleepsecs( 60 );
-            while ( writeBackManager.cleanupOldQueues() );
+    void WriteBackManager::Cleaner::doWork() { 
+        for ( int i=0; i<1000; i++ ) {
+            if ( ! writeBackManager.cleanupOldQueues() )
+                break;
         }
     }
 

@@ -85,28 +85,16 @@ namespace mongo {
          */
         bool cleanupOldQueues();
         
-        /**
-         * starts background cleaner thread
-         */
-        void startCleaner();
     private:
         
         // '_writebackQueueLock' protects only the map itself, since each queue is syncrhonized.
         mutable mongo::mutex _writebackQueueLock;
         WriteBackQueuesMap _writebackQueues;
         
-        /**
-         * this background job cleans out writeback queues that have been dead 
-         * for a long time
-         */
-        class Cleaner : public BackgroundJob {
+        class Cleaner : public PeriodicTask {
         public:
-            Cleaner(){}
-            virtual ~Cleaner(){}
-
             virtual string name() const { return "WriteBackManager::cleaner"; }
-
-            virtual void run();
+            virtual void doWork();
         };
 
         Cleaner _cleaner;

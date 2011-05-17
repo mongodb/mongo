@@ -156,6 +156,7 @@ namespace mongo {
         installChunkShardVersioning();
         balancer.go();
         cursorCache.startTimeoutThread();
+        PeriodicTask::theRunner->go();
 
         log() << "waiting for connections on port " << cmdLine.port << endl;
         //DbGridListener l(port);
