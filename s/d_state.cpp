@@ -559,6 +559,7 @@ namespace mongo {
                 result.append( "ns" , ns );
                 result.appendTimestamp( "version" , version );
                 result.appendTimestamp( "globalVersion" , globalVersion );
+                result.appendBool( "reloadConfig" , true );
                 return false;
             }
 

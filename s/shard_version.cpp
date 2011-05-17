@@ -135,6 +135,11 @@ namespace mongo {
             checkShardVersion( conn , ns , 1 , tryNumber + 1 );
             return true;
         }
+        
+        if ( result["reloadConfig"].trueValue() ) {
+            // reload config
+            conf->getChunkManager( ns , true );
+        }
 
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
