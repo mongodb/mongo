@@ -226,7 +226,7 @@ int __wt_insert_serial_func(SESSION *session);
 int __wt_update_alloc(SESSION *session, WT_ITEM *value, WT_UPDATE **updp);
 int __wt_update_serial_func(SESSION *session);
 int __wt_row_search(SESSION *session, WT_ITEM *key, uint32_t flags);
-int __wt_connection_btree(CONNECTION *conn, BTREE **btreep);
+int __wt_session_btree(SESSION *session);
 int __wt_btree_stat_print(SESSION *session, FILE *stream);
 int __wt_btree_stat_clear(BTREE *btree);
 int __wt_library_init(void);

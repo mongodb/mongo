@@ -8,17 +8,16 @@
 #include "wt_internal.h"
 
 /*
- * __wt_connection_btree --
+ * __wt_session_btree --
  *	BTREE constructor.
  */
 int
-__wt_connection_btree(CONNECTION *conn, BTREE **btreep)
+__wt_session_btree(SESSION *session)
 {
 	BTREE *btree;
-	SESSION *session;
+	CONNECTION *conn;
 
-	*btreep = NULL;
-	session = &conn->default_session;
+	conn = S2C(session);
 
 	/* Create the BTREE structure. */
 	WT_RET(__wt_calloc_def(session, 1, &btree));
@@ -32,6 +31,6 @@ __wt_connection_btree(CONNECTION *conn, BTREE **btreep)
 	++conn->dbqcnt;
 	__wt_unlock(session, conn->mtx);
 
-	*btreep = btree;
+	session->btree = btree;
 	return (0);
 }

@@ -88,7 +88,6 @@ __session_open_cursor(WT_SESSION *wt_session,
 static int
 __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 {
-	BTREE *btree;
 	CONNECTION *conn;
 	SESSION *session;
 	WT_CONFIG_ITEM cval;
@@ -148,13 +147,11 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 		WT_RET(__wt_btree_create(session, name, collapse));
 	}
 
-	/* Allocate a BTREE handle. */
-	WT_RET(__wt_connection_btree(conn, &btree));
-	session->btree = btree;
-
+	/* Allocate a BTREE handle, and open the underlying file. */
+	WT_RET(__wt_session_btree(session));
 	WT_STAT_INCR(conn->stats, file_open);
 	WT_RET(__wt_btree_open(session, name));
-	WT_RET(__wt_session_add_btree(session, btree));
+	WT_RET(__wt_session_add_btree(session, session->btree));
 
 	API_END();
 	return (0);

@@ -55,8 +55,8 @@ __wt_verify(
 	ret = 0;
 
 	/* Get a Btree. */
-	WT_RET(__wt_connection_btree(S2C(session), &btree));
-	session->btree = btree;
+	WT_RET(__wt_session_btree(session));
+	btree = session->btree;
 
 	/*
 	 * Tell the eviction thread to ignore us, we'll handle our own pages
