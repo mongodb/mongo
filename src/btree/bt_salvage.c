@@ -111,7 +111,7 @@ static void __slvg_trk_dump_row(WT_TRACK *);
  *	Salvage a Btree.
  */
 int
-__wt_salvage(SESSION *session, const char *filename, const char *config)
+__wt_salvage(SESSION *session, const char *config)
 {
 	BTREE *btree;
 	WT_STUFF *ss, stuff;
@@ -119,17 +119,10 @@ __wt_salvage(SESSION *session, const char *filename, const char *config)
 	uint32_t allocsize, i, leaf_cnt;
 	int ret;
 
-	/* XXX should be used to open the file containing the tree. */
-	WT_UNUSED(filename);
 	WT_UNUSED(config);
-
-	return (0);
 
 	btree = session->btree;
 	ret = 0;
-
-	/* Tell the eviction thread to ignore us, we'll handle our own pages. */
-	F_SET(btree, WT_BTREE_NO_EVICTION);
 
 	WT_CLEAR(stuff);
 	stuff.btree = btree;

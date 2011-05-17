@@ -48,12 +48,20 @@ __wt_btree_create(SESSION *session, const char *name, const char *config)
  *	Open a Btree.
  */
 int
-__wt_btree_open(SESSION *session, const char *name)
+__wt_btree_open(SESSION *session, const char *name, uint32_t flags)
 {
+	CONNECTION *conn;
 	BTREE *btree;
 	WT_PAGE *page;
 
+	conn = S2C(session);
 	btree = session->btree;
+
+	/* Create the BTREE structure. */
+	WT_RET(__wt_calloc_def(session, 1, &btree));
+	btree->flags = flags;
+	btree->conn = conn;
+	session->btree = btree;
 
 	/* Initialize the BTREE structure. */
 	WT_RET(__btree_init(session, name));
@@ -64,6 +72,8 @@ __wt_btree_open(SESSION *session, const char *name)
 	/*
 	 * Read in the file's metadata, configure the BTREE structure based on
 	 * the configuration string, read in the free-list.
+	 *
+	 * XXX Take extra care with this if WT_BTREE_VERIFY is set?
 	 */
 	WT_RET(__wt_desc_read(session));
 	WT_RET(__btree_conf(session));
@@ -106,6 +116,14 @@ __wt_btree_open(SESSION *session, const char *name)
 		F_SET(btree->root_page.page, WT_PAGE_PINNED);
 		__wt_hazard_clear(session, btree->root_page.page);
 	}
+
+	/* Add to the connection's list. */
+	__wt_lock(session, conn->mtx);
+	TAILQ_INSERT_TAIL(&conn->dbqh, btree, q);
+	++conn->dbqcnt;
+	__wt_unlock(session, conn->mtx);
+
+	WT_STAT_INCR(conn->stats, file_open);
 
 	return (0);
 }
@@ -153,11 +171,7 @@ __wt_btree_close(SESSION *session)
 	conn = btree->conn;
 	ret = 0;
 
-	/*
-	 * Remove from the connection's list.
-	 * XXX
-	 * This code should go somewhere else.
-	 */
+	/* Remove from the connection's list. */
 	__wt_lock(session, conn->mtx);
 	TAILQ_REMOVE(&conn->dbqh, btree, q);
 	--conn->dbqcnt;

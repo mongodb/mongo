@@ -288,10 +288,8 @@ __wt_curbtree_open(SESSION *session,
 	    tablename, strlen(tablename), &btree_session);
 	if (ret == WT_NOTFOUND) {
 		ret = 0;
-		WT_RET(__wt_session_btree(session));
 
-		WT_STAT_INCR(conn->stats, file_open);
-		WT_RET(__wt_btree_open(session, tablename));
+		WT_RET(__wt_btree_open(session, tablename, 0));
 
 		WT_RET(__wt_session_add_btree(session));
 	} else {

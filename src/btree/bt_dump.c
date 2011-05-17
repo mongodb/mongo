@@ -27,8 +27,7 @@ static void __wt_print_byte_string_nl(const uint8_t *, uint32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_btree_dump(
-    SESSION *session, const char *btfile, FILE *stream, uint32_t flags)
+__wt_btree_dump(SESSION *session, FILE *stream, uint32_t flags)
 {
 	WT_DSTUFF dstuff;
 	int ret;
@@ -39,7 +38,7 @@ __wt_btree_dump(
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before blindly reading it.
 		 */
-		return (__wt_verify(session, btfile, stream, NULL));
+		return (__wt_verify(session, stream, NULL));
 	}
 
 	dstuff.p = flags == WT_DUMP_PRINT ?

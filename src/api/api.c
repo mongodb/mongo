@@ -150,9 +150,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	}
 
 	/* Allocate a BTREE handle, and open the underlying file. */
-	WT_RET(__wt_session_btree(session));
-	WT_STAT_INCR(conn->stats, file_open);
-	WT_RET(__wt_btree_open(session, name));
+	WT_RET(__wt_btree_open(session, name, 0));
 	WT_RET(__wt_session_add_btree(session));
 
 	API_END();
@@ -216,18 +214,37 @@ static int
 __session_salvage(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	SESSION *session;
+	int ret;
 
 	session = (SESSION *)wt_session;
+	ret = 0;
 
 	SESSION_API_CALL(session, salvage, config);
+
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
 	name += 6;
 
-	return (__wt_salvage(session, name, config));
+	/*
+	 * Open a btree handle.
+	 *
+	 * Tell the eviction thread to ignore this handle, we'll manage our own
+	 * pages.  Also tell open that we're going to salvage this handle, so
+	 * it skips loading metadata such as the free list, which could be
+	 * corrupted.
+	 */
+	WT_RET(__wt_btree_open(session, name,
+	    WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+
+	WT_TRET(__wt_salvage(session, config));
+
+	/* Close the file and discard the BTREE structure. */
+	WT_TRET(__wt_btree_close(session));
 	API_END();
+
+	return (ret);
 }
 
 /*
@@ -269,18 +286,40 @@ static int
 __session_verify(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	SESSION *session;
+	int ret;
 
 	session = (SESSION *)wt_session;
+	ret = 0;
 
 	SESSION_API_CALL(session, verify, config);
+
 	if (strncmp(name, "table:", 6) != 0) {
 		__wt_errx(session, "Unknown object type: %s", name);
 		return (EINVAL);
 	}
 	name += 6;
 
-	return (__wt_verify(session, name, NULL, config));
+	/*
+	 * Open a btree handle.
+	 *
+	 * Tell the eviction thread to ignore this handle, we'll manage our own
+	 * pages (it would be possible for us to let the eviction thread handle
+	 * us, but there's no reason to do so, we can be more aggressive
+	 * because we know what pages are no longer needed, regardless of LRU).
+	 *
+	 * Also tell open that we're going to verify this handle, so it skips
+	 * loading metadata such as the free list, which could be corrupted.
+	 */
+	WT_RET(__wt_btree_open(session, name,
+	    WT_BTREE_NO_EVICTION | WT_BTREE_VERIFY));
+
+	WT_TRET(__wt_verify(session, NULL, config));
+
+	/* Close the file and discard the BTREE structure. */
+	WT_TRET(__wt_btree_close(session));
 	API_END();
+
+	return (ret);
 }
 
 /*

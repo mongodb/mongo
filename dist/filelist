@@ -46,7 +46,6 @@ src/btree/row_get.c
 src/btree/row_key.c
 src/btree/row_put.c
 src/btree/row_srch.c
-src/db/db_handle.c
 src/db/db_stat.c
 src/env/env_global.c
 src/env/env_handle.c

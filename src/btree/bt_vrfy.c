@@ -42,8 +42,7 @@ static int __wt_verify_tree(SESSION *, WT_REF *, uint64_t, WT_VSTUFF *);
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_verify(
-    SESSION *session, const char *filename, FILE *stream, const char *config)
+__wt_verify(SESSION *session, FILE *stream, const char *config)
 {
 	BTREE *btree;
 	WT_VSTUFF *vs, _vstuff;
@@ -51,31 +50,9 @@ __wt_verify(
 
 	WT_UNUSED(config);			/* XXX: unused for now */
 
+	btree = session->btree;
 	vs = NULL;
 	ret = 0;
-
-	/* Get a Btree. */
-	WT_RET(__wt_session_btree(session));
-	btree = session->btree;
-
-	/*
-	 * Tell the eviction thread to ignore us, we'll handle our own pages
-	 * (it would be possible for us to let the eviction thread handle us,
-	 * but there's no reason to do so, we can be more aggressive because
-	 * we know what pages are no longer needed, regardless of LRU).
-	 */
-	F_SET(btree, WT_BTREE_NO_EVICTION);
-
-	/*
-	 * Open the file.  There's no special verification magic going on during
-	 * file open at the moment, the cost of verifying the file's metadata is
-	 * sufficiently cheap we always do it.  That may not always be the case,
-	 * which is one of the reasons we do our own open of the file instead of
-	 * having the schema layer do it for us.  In addition, we don't want to
-	 * use any existing in-memory information, we only want to deal with the
-	 * existing, on-disk information.
-	 */
-	WT_ERR(__wt_btree_open(session, filename));
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -139,9 +116,6 @@ err:	if (vs != NULL) {
 	if (btree->root_page.page != NULL)
 		WT_TRET(__wt_page_reconcile(session,
 		    btree->root_page.page, 0, WT_REC_EVICT | WT_REC_LOCKED));
-
-	/* Close the file and discard the BTREE structure. */
-	WT_TRET(__wt_btree_close(session));
 
 	return (ret);
 }
