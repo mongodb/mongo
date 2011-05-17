@@ -64,7 +64,10 @@ namespace mongo {
             }
 
             r.queryGTE( rsoplog, applyGTE );
-            assert( r.haveCursor() );
+            if ( !r.haveCursor() ) {
+                log() << "replSet initial sync oplog query error" << rsLog;
+                return false;
+            }
 
             {
                 if( !r.more() ) {
@@ -287,7 +290,11 @@ namespace mongo {
         }
         
         r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
-        assert( r.haveCursor() );
+        // if target cut connections between connecting and querying (for
+        // example, because it stepped down) we might not have a cursor
+        if ( !r.haveCursor() ) {
+            return;
+        }
 
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
