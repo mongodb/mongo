@@ -42,6 +42,15 @@ extern "C" {
 #define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
+/*
+ * Limit the maximum size of a single object to 4GB - 512B: in some places we
+ * allocate memory to store objects plus associated data structures, in other
+ * places we need out-of-band values in object sizes.   512B is far more space
+ * than we ever need, but I'm not eager to debug any off-by-ones, and storing
+ * a 4GB object in the file is flatly insane, anyway.
+ */
+#define	WT_BTREE_OBJECT_SIZE_MAX	(UINT32_MAX - 512)
+
 #define	WT_ADDR_INVALID	UINT32_MAX	/* Invalid file address */
 
 /*

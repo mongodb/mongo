@@ -15,10 +15,8 @@ int
 __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 {
 	SESSION_BUFFER *sb;
-	uint32_t align_size, alloc_size;
+	uint32_t alloc_size;
 	int single_use;
-
-	WT_ASSERT(session, size < UINT32_MAX);
 
 	/*
 	 * Allocate memory for an insert or change; there's a buffer in the
@@ -37,7 +35,6 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	 * (which we check is a multiple of 4B during initialization); then one
 	 * or more WT_UPDATE structure plus value chunk pairs.
 	 *
-	 * XXX
 	 * Figure out how much space we need: this code limits the maximum size
 	 * of a data item stored in the file.  In summary, for a big item we
 	 * have to store a SESSION_BUFFER structure, the WT_UPDATE structure and
@@ -45,22 +42,18 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	 * to our allocation routine, so we can't store an item bigger than the
 	 * maximum 32-bit value minus the sizes of those two structures, where
 	 * the WT_UPDATE structure and data item are aligned to a 32-bit
-	 * boundary.  We could fix this, but it's unclear it's worth the effort
-	 * -- document you can store a (4GB - 20B) item max, and you're done,
-	 * because it's insane to store a 4GB item in the file anyway.
-	 *
-	 * Check first we won't overflow when calculating an aligned size, then
-	 * check the total required space for this item.
+	 * boundary.  We could fix this, but it's unclear it's worth the effort:
+	 * document you can store a (4GB - 512B) item max, it's insane to store
+	 * 4GB items in the file anyway.
 	 */
-	if (size > UINT32_MAX - (sizeof(WT_UPDATE) + sizeof(uint32_t)))
-		return (__wt_file_item_too_big(session));
-	align_size = WT_ALIGN(size + sizeof(WT_UPDATE), sizeof(uint32_t));
-	if (align_size > UINT32_MAX - sizeof(SESSION_BUFFER))
+	if (size <= WT_BTREE_OBJECT_SIZE_MAX)
+		size = WT_ALIGN(size + sizeof(WT_UPDATE), sizeof(uint32_t));
+	if (size > WT_BTREE_OBJECT_SIZE_MAX)
 		return (__wt_file_item_too_big(session));
 
 	/* If we already have a buffer and the data fits, we're done. */
 	sb = session->sb;
-	if (sb != NULL && align_size <= sb->space_avail)
+	if (sb != NULL && size <= sb->space_avail)
 		goto no_allocation;
 
 	/*
@@ -78,8 +71,8 @@ __wt_sb_alloc(SESSION *session, size_t size, void *retp, SESSION_BUFFER **sbp)
 	 * it's a one-off.  Otherwise, allocate the next power-of-two larger
 	 * than 4 times the requested size and at least the default buffer size.
 	 */
-	if (align_size > session->update_alloc_size) {
-		alloc_size = WT_SIZEOF32(SESSION_BUFFER) + align_size;
+	if (size > session->update_alloc_size) {
+		alloc_size = WT_SIZEOF32(SESSION_BUFFER) + size;
 		single_use = 1;
 	} else {
 		if (session->update_alloc_size < 8 * WT_MEGABYTE)
@@ -117,8 +110,8 @@ no_allocation:
 	*(void **)retp = sb->first_free;
 	*sbp = sb;
 
-	sb->first_free += align_size;
-	sb->space_avail -= align_size;
+	sb->first_free += size;
+	sb->space_avail -= size;
 	++sb->in;
 
 	return (0);
