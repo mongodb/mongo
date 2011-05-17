@@ -975,23 +975,24 @@ namespace mongo {
                         }
 
                         // obtain cursor on data to apply mr to, sorted
-                        shared_ptr<Cursor> temp = bestGuessCursor( config.ns.c_str(), config.filter, config.sort );
+                        shared_ptr<Cursor> temp = newQueryOptimizerCursor( config.ns.c_str(), config.filter, config.sort );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
 
                         Timer mt;
                         // go through each doc
                         while ( cursor->ok() ) {
-                            // make sure we dont process duplicates in case data gets moved around during map
-                            if ( cursor->currentIsDup() ) {
-                                cursor->advance();
-                                continue;
-                            }
-
                             if ( ! cursor->currentMatches() ) {
                                 cursor->advance();
                                 continue;
                             }
 
+                            // make sure we dont process duplicates in case data gets moved around during map
+                            // TODO This won't actually help when data gets moved, it's to handle multikeys.
+                            if ( cursor->currentIsDup() ) {
+                                cursor->advance();
+                                continue;
+                            }
+                                                        
                             BSONObj o = cursor->current();
                             cursor->advance();
 
