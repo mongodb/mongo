@@ -84,7 +84,7 @@ namespace mongo {
         // If there is no candidate chunk receiver -- they may have all been maxed out,
         // draining, ... -- there's not much that the policy can do.
         if ( min.second == numeric_limits<unsigned>::max() ) {
-            log() << "no availalable shards to take chunks" << endl;
+            log() << "no available shards to take chunks" << endl;
             return NULL;
         }
 
