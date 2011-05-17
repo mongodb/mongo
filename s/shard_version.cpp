@@ -128,7 +128,7 @@ namespace mongo {
 
         LOG(1) << "       setShardVersion failed!\n" << result << endl;
 
-        if ( result.getBoolField( "need_authoritative" ) )
+        if ( result["need_authoritative"].trueValue() )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
 
         if ( ! authoritative ) {
