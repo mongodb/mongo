@@ -654,7 +654,7 @@ namespace mongo {
         if ( ! query.isEmpty() )
             b.append( iscommand ? "command" : "query" , query );
         if ( ! updateobj.isEmpty() )
-            b.append( "updateobj" , "updateobj" );
+            b.append( "updateobj" , updateobj );
         
         OPDEBUG_APPEND_NUMBER( cursorid );
         OPDEBUG_APPEND_NUMBER( ntoreturn );
