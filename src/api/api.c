@@ -35,6 +35,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL) {
 		TAILQ_REMOVE(&session->btrees, btree_session, q);
 		btree = btree_session->btree;
+		__wt_free(session, btree_session->key_format);
+		__wt_free(session, btree_session->value_format);
 		__wt_free(session, btree_session);
 		session->btree = btree;
 		WT_TRET(__wt_btree_close(session));
@@ -151,7 +153,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	WT_RET(__wt_session_btree(session));
 	WT_STAT_INCR(conn->stats, file_open);
 	WT_RET(__wt_btree_open(session, name));
-	WT_RET(__wt_session_add_btree(session, session->btree));
+	WT_RET(__wt_session_add_btree(session));
 
 	API_END();
 	return (0);
