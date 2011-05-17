@@ -147,6 +147,9 @@ main(int argc, char *argv[])
 	if (g.rand_log != NULL)
 		(void)fclose(g.rand_log);
 
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
+
 	return (EXIT_SUCCESS);
 
 err:	config_print(1);
@@ -160,7 +163,19 @@ err:	config_print(1);
 static void
 restart(void)
 {
-	system("rm -f __bdb* __wt*");
+	const char *p;
+
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
+
+	system("rm -f __bdb* __log __wt*");
+
+	p = "__log";
+	if (g.logging &&
+	    (g.logfp = fopen(p, "w")) == NULL) {
+		fprintf(stderr, "%s: %s\n", p, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 }
 
 /*

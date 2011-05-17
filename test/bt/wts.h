@@ -54,6 +54,7 @@ typedef struct {
 	uint32_t run_cnt;			/* Run counter */
 
 	int logging;				/* Are we logging everything? */
+	FILE *logfp;				/* Log file. */
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
 	int verbose;				/* Verbosity */

@@ -337,20 +337,22 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 }
 
 /*
- * __session_log_printf --
- *	WT_SESSION->log_printf method.
+ * __session_msg_printf --
+ *	WT_SESSION->msg_printf method.
  */
 static int
-__session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
+__session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
 {
+	SESSION *session;
 	va_list ap;
-	int ret;
+
+	session = (SESSION *)wt_session;
 
 	va_start(ap, fmt);
-	ret = __wt_log_vprintf((SESSION *)wt_session, fmt, ap);
+	__wt_msgv(session, session->name, NULL, fmt, ap);
 	va_end(ap);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -510,7 +512,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_log_printf,
+		__session_msg_printf,
 	};
 	CONNECTION *conn;
 	SESSION *session, *session_ret;

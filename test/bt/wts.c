@@ -33,10 +33,10 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
 	WT_UNUSED(handler);
 	session = g.wts_session;
 
-	if (g.logging && session != NULL)
-		return (session->log_printf(session, "%s", message));
+	if (g.logfp != NULL)
+		fprintf(g.logfp, "%s\n", message);
 	else
-		(void)printf("%s\n", message);
+		printf("%s\n", message);
 	return (0);
 }
 
@@ -73,9 +73,8 @@ wts_startup(void)
 	char config[200], *end, *p;
 
 	snprintf(config, sizeof(config),
-	    "error_prefix=\"%s\",cache_size=%luMB,%s,verbose=[%s]",
+	    "error_prefix=\"%s\",cache_size=%luMB,verbose=[%s]",
 	    g.progname, (u_long)g.c_cache,
-	    g.logging ? "logging" : "",
 	    ""
 	    // "evict,"
 	    // "fileops,"
@@ -153,7 +152,7 @@ wts_startup(void)
 
 	if (g.logging) {
 		time(&now);
-		session->log_printf(session,
+		session->msg_printf(session,
 		    "===============\nWT start: %s===============",
 		    ctime(&now));
 	}
@@ -176,7 +175,7 @@ wts_teardown(void)
 
 	if (g.logging) {
 		time(&now);
-		session->log_printf(session,
+		session->msg_printf(session,
 		    "===============\nWT stop: %s===============",
 		    ctime(&now));
 	}
@@ -424,14 +423,14 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case ROW:
 		*keyp = &key;
 		if (g.logging)
-			session->log_printf(session, "%-10s %lu {%.*s}",
+			session->msg_printf(session, "%-10s %lu {%.*s}",
 			    "bulk K",
 			    (u_long)g.key_cnt, (int)key.size, (char *)key.data);
 		break;
 	}
 	*valuep = &value;
 	if (g.logging)
-		session->log_printf(session, "%-10s %lu {%.*s}",
+		session->msg_printf(session, "%-10s %lu {%.*s}",
 		    "bulk V",
 		    (u_long)g.key_cnt, (int)value.size, (char *)value.data);
 
@@ -556,7 +555,7 @@ wts_read(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->log_printf(session, "%-10s%llu", "read",
+		session->msg_printf(session, "%-10s%llu", "read",
 		    (unsigned long long)keyno);
 
 	/* Retrieve the BDB value. */
@@ -620,7 +619,7 @@ wts_row_put(uint64_t keyno, int insert)
 
 	/* Log the operation */
 	if (g.logging)
-		session->log_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
+		session->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
 		    "put key", (int)key.size, (char *)key.data,
 		    "put data", (int)value.size, (char *)value.data);
 
@@ -657,7 +656,7 @@ wts_col_put(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->log_printf(session, "%-10s%llu {%.*s}",
+		session->msg_printf(session, "%-10s%llu {%.*s}",
 		    "put", (unsigned long long)keyno,
 		    (int)value.size, (char *)value.data);
 
@@ -695,7 +694,7 @@ wts_row_del(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->log_printf(session, "%-10s%llu",
+		session->msg_printf(session, "%-10s%llu",
 		    "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))
@@ -728,7 +727,7 @@ wts_col_del(uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging)
-		session->log_printf(session, "%-10s%llu",
+		session->msg_printf(session, "%-10s%llu",
 		    "delete", (unsigned long long)keyno);
 
 	if (bdb_del(keyno, &notfound))

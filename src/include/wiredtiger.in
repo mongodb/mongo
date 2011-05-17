@@ -721,16 +721,16 @@ struct wt_session {
 	 */
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
-	/*! Put a string into the log for debugging.
+	/*! Send a string to the message handler for debugging.
 	 *
 	 * @dontinclude ex_all.c
-	 * @skipline ->log_printf
+	 * @skipline ->msg_printf
 	 *
 	 * @param session the session handle
 	 * @param fmt a printf-like format specification
 	 * @errors
 	 */
-	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
+	int __F(msg_printf)(WT_SESSION *session, const char *fmt, ...);
 	/*! @} */
 };
 
